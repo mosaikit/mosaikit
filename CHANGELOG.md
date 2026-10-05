@@ -8,6 +8,11 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Tabs of the channels (MK-035): Posts, Files and the tabs that plugins contribute to the point
+  `channel.tab` of `app-teams`, added by the people of the channel; the sample To do offers one. The
+  shell no longer loads the frontends of plugins turned off for the organization, whose tabs show
+  as unavailable.
+
 - The app Chat, `app-chat` (MK-036): chats one to one and in groups, as groups of the kernel of
   kind `chat` seen only by their people; messages at once, with history, indicators of typing and
   reading, notifications, and cards of plugins whose actions run with the rights of who uses them.

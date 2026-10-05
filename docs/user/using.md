@@ -81,6 +81,10 @@ read the channel: they find it in **Activity**, and opening the notification ope
 Posts appear at once for whoever has the channel open. Who leaves a team, or a private channel, no
 longer reads its posts.
 
+Each channel has the tabs **Posts** and **Files**. Under **Add a tab**, choose an app that offers a
+tab, such as a list or a map, and every member of the channel sees it. When that app is turned off
+for the organization, its tab says it is unavailable, and the rest of the channel works on.
+
 ### The app Chat
 
 With the app **Chat** installed, start a chat with one or more colleagues of the organization:

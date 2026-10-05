@@ -47,7 +47,7 @@ HTTP Basic or bearer tokens.
 | `GET /api/v1/accounts/session` | anyone | the account of the session of the shell, or 204 without one |
 | `DELETE /api/v1/accounts/session` | anyone | end the session of the shell, and forget the browser if it was remembered |
 | `POST /api/v1/accounts/session/remembrance` | signed in, with a password | remember this browser: an HttpOnly cookie signs the person in again for `mosaikit.accounts.remember-for` |
-| `GET /api/v1/shell/plugins` | signed in | frontends of the active plugins, for the shell |
+| `GET /api/v1/shell/plugins` | signed in | frontends of the active plugins, for the shell; not those turned off for the organization of the request, nor what they contribute to other plugins (MK-030, MK-035) |
 | `WS /api/v1/live` (WebSocket) | signed in | the real-time channel (MK-031): `?organization=<slug>`; send `{"type": "subscribe", "topic": "…"}`, receive `subscribed`, `refused` or `{"type": "event", "topic", "data"}` |
 | `GET, POST /api/v1/teams` | signed in, with an organization | the teams the person sees (theirs and, unless a guest, the public ones), with their `role`; create one (`name`, `description`, `visibility` `public` or `private`), owned by the person (MK-032, audited); with `parent`, the groups of a team in which the person is, or a new group, always private, such as a private channel (MK-034); with `kind=chat`, the chats of the person with their people, newest first, or a new chat (`kind: chat`, `people`, optional `name`), the same one between two people (MK-036) |
 | `GET, PUT, DELETE /api/v1/teams/{id}` | signed in, with an organization | one team with its `members`; change or delete it: its owners and the administrators of the organization |

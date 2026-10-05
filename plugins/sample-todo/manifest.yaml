@@ -23,3 +23,8 @@ contributes:
       element: mk-sample-todo
       icon: web/icon.svg
       order: 10
+  # A tab of the channels of the app Teams (MK-035).
+  channel.tab:
+    - id: todo
+      title: To do
+      element: mk-sample-todo

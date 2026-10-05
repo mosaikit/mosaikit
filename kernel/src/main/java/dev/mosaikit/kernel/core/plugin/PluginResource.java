@@ -2,9 +2,12 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.core.plugin;
 
+import dev.mosaikit.kernel.core.apps.AppSettings;
 import dev.mosaikit.kernel.core.config.KernelConfig;
+import dev.mosaikit.kernel.core.identity.RequestOrganization;
 import dev.mosaikit.kernel.core.security.Roles;
 import io.quarkus.security.Authenticated;
+import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
@@ -13,6 +16,8 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
@@ -22,12 +27,16 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 @Tag(name = "Plugins")
 public class PluginResource {
 
+    private final AppSettings apps;
+    private final SecurityIdentity identity;
     private final PluginRegistry registry;
     private final boolean isolateUnverified;
     private final boolean watched;
 
-    public PluginResource(PluginRegistry registry, KernelConfig config) {
+    public PluginResource(PluginRegistry registry, KernelConfig config, AppSettings apps, SecurityIdentity identity) {
         this.registry = registry;
+        this.apps = apps;
+        this.identity = identity;
         this.watched = config.plugins().watch();
         this.isolateUnverified =
                 FrontendPluginView.isolatesUnverified(config.plugins().unverifiedFrontends());
@@ -44,9 +53,15 @@ public class PluginResource {
     @GET
     @Path("/shell/plugins")
     @Authenticated
-    @Operation(summary = "List the frontends the shell must load")
+    @Operation(
+            summary = "List the frontends the shell must load",
+            description = "Not those of the plugins turned off for the organization of the request (MK-030), so"
+                    + " that what they contribute to other plugins is missing too (MK-035).")
     public List<FrontendPluginView> shellPlugins() {
+        Optional<UUID> organization = RequestOrganization.of(identity);
         return registry.active().stream()
+                .filter(plugin ->
+                        organization.map(id -> !apps.isOff(id, plugin.key())).orElse(true))
                 .flatMap(plugin -> plugin.manifest().stream()
                         .flatMap(manifest -> manifest.frontend().stream()
                                 .map(frontend -> FrontendPluginView.of(

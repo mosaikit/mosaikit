@@ -2,10 +2,11 @@ id: MK-035
 title: Tabs of the channels added by plugins
 area: plugins
 priority: P1
-status: planned
+status: done
 description: >-
   Every channel of app-teams has the tabs Posts and Files and the tabs that other plugins add
-  through its extension point channel.tab, such as a map or a dashboard bound to the channel.
+  through its extension point channel.tab, such as a map or a dashboard bound to the channel. The
+  tab Files shows the files of the channel once the file service is there (MK-042).
 acceptance:
   - A member adds a tab of an installed plugin to a channel and every member sees it.
   - A tab of a plugin that is disabled for the organization is shown as unavailable instead of breaking the channel.
