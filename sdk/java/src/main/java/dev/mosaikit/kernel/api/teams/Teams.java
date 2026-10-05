@@ -18,8 +18,9 @@ public interface Teams {
      * @param visibility {@code public}, listed to every member of the organization, or {@code private}
      * @param role the role of the person of the request in the team, or {@code null} when not in it
      * @param parent the team of a group, such as a private channel, or {@code null} for a team
+     * @param kind {@code team}, or {@code chat} for a chat between some people (MK-036)
      */
-    record Team(UUID id, String name, String description, String visibility, String role, UUID parent) {}
+    record Team(UUID id, String name, String description, String visibility, String role, UUID parent, String kind) {}
 
     /**
      * A person of a team.

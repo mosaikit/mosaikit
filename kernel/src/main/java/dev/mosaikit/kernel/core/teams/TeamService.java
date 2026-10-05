@@ -51,6 +51,9 @@ public class TeamService implements Teams {
     static final int MAX_NAME = 100;
     static final int MAX_DESCRIPTION = 500;
 
+    /** Most people of a chat; a larger group is a team. */
+    static final int MAX_CHAT = 50;
+
     private final TeamRepository teams;
     private final OrganizationMembers organizationMembers;
     private final UserAccounts accounts;
@@ -117,7 +120,9 @@ public class TeamService implements Teams {
      *
      * @param role the role of the person of the request, or {@code null}
      * @param parent the team of a group, or {@code null} for a team of the organization
-     * @param members its people, when one team is asked for; {@code null} in lists
+     * @param kind {@code team}, or {@code chat} (MK-036)
+     * @param members its people, when one team is asked for, and in the lists of chats; {@code null}
+     *     in the lists of teams
      */
     public record TeamView(
             UUID id,
@@ -126,20 +131,34 @@ public class TeamService implements Teams {
             String visibility,
             String role,
             UUID parent,
+            String kind,
             List<Member> members) {}
 
     /**
      * What a team is made of, to create or change it.
      *
      * @param parent the team of a new group (MK-034), which is private; {@code null} for a team
+     * @param kind {@code chat} for a chat (MK-036), otherwise a team
+     * @param people the email addresses of the other people of a new chat
      */
-    public record TeamRequest(String name, String description, String visibility, UUID parent) {}
+    public record TeamRequest(
+            String name, String description, String visibility, UUID parent, String kind, List<String> people) {
+        public TeamRequest(String name, String description, String visibility, UUID parent) {
+            this(name, description, visibility, parent, null, null);
+        }
+    }
 
     @Override
     public List<Team> visible() {
         return list().stream()
                 .map(team -> new Team(
-                        team.id(), team.name(), team.description(), team.visibility(), team.role(), team.parent()))
+                        team.id(),
+                        team.name(),
+                        team.description(),
+                        team.visibility(),
+                        team.role(),
+                        team.parent(),
+                        team.kind()))
                 .toList();
     }
 
@@ -155,6 +174,69 @@ public class TeamService implements Teams {
                 .filter(team -> mine.containsKey(team.getId()) || (!guest && (team.isPublic() || admin)))
                 .map(team -> view(team, mine.get(team.getId()), null))
                 .toList();
+    }
+
+    /** The chats of the person of the request, newest first, with their people (MK-036). */
+    public List<TeamView> chats() {
+        UUID me = me();
+        return teams.chatsOf(me, organization.require()).stream()
+                .map(chat -> view(chat, roleOf(chat.getId(), me), members(chat)))
+                .toList();
+    }
+
+    /**
+     * Starts a chat with some people of the organization, all of whom manage it. A chat between two
+     * people without a name is theirs only: asked again, it is the same chat.
+     */
+    private TeamView createChat(UUID org, TeamRequest request) {
+        UUID me = me();
+        String name = request.name() == null ? "" : request.name().strip();
+        if (name.length() > MAX_NAME) {
+            throw new InvalidInputException(List.of("name must be at most " + MAX_NAME + " characters"));
+        }
+        List<UserAccount> others = new ArrayList<>();
+        for (String email : request.people() == null ? List.<String>of() : request.people()) {
+            UserAccount person = accounts.findByUsername(normalize(email))
+                    .filter(found -> isMemberOfOrganization(found.getId(), org))
+                    .orElseThrow(
+                            () -> new InvalidInputException(List.of(email + " is not a member of the organization")));
+            if (!person.getId().equals(me)
+                    && others.stream().noneMatch(o -> o.getId().equals(person.getId()))) {
+                others.add(person);
+            }
+        }
+        if (others.isEmpty() || others.size() > MAX_CHAT - 1) {
+            throw new InvalidInputException(
+                    List.of("a chat is between you and 1 to " + (MAX_CHAT - 1) + " other people"));
+        }
+        if (others.size() == 1 && name.isEmpty()) {
+            UUID other = others.getFirst().getId();
+            for (var chat : teams.chatsOf(me, org)) {
+                List<TeamMember> people = teams.members(chat.getId());
+                if (chat.getName().isEmpty()
+                        && people.size() == 2
+                        && people.stream()
+                                .anyMatch(person -> person.getAccountId().equals(other))) {
+                    return get(chat.getId());
+                }
+            }
+        }
+        var chat = dev.mosaikit.kernel.core.teams.Team.chat(org, name, actor(), clock.instant());
+        teams.insert(chat);
+        teams.insert(new TeamMember(chat.getId(), me, TeamMember.OWNER, clock.instant()));
+        for (UserAccount other : others) {
+            teams.insert(new TeamMember(chat.getId(), other.getId(), TeamMember.OWNER, clock.instant()));
+        }
+        audited("chat.created", chat, Map.of("people", others.size() + 1));
+        return get(chat.getId());
+    }
+
+    private boolean isMemberOfOrganization(UUID account, UUID org) {
+        return organizationMembers
+                .findByAccountIdAndOrganizationId(account, org)
+                .map(found -> found.getRoles().contains(Roles.ORGANIZATION_USER)
+                        || found.getRoles().contains(Roles.ORGANIZATION_ADMIN))
+                .orElse(false);
     }
 
     /** The groups of a team, such as its private channels, in which the person of the request is. */
@@ -177,6 +259,9 @@ public class TeamService implements Teams {
         UUID org = organization.require();
         if (organization.guest()) {
             throw new ForbiddenOperationException("A guest of the organization cannot create teams.");
+        }
+        if (request != null && dev.mosaikit.kernel.core.teams.Team.CHAT.equals(request.kind())) {
+            return createChat(org, request);
         }
         UUID parent = request == null ? null : request.parent();
         if (parent != null) {
@@ -242,6 +327,19 @@ public class TeamService implements Teams {
                         "No account for " + email + ": the person signs up on this installation first."));
         if (team.isGroup()) {
             return putGroupMember(team, person, role);
+        }
+        if (team.isChat()) {
+            if (!isMemberOfOrganization(person.getId(), team.getOrganizationId())) {
+                throw new InvalidInputException(List.of(email + " is not a member of the organization"));
+            }
+            if (teams.member(id, person.getId()).isEmpty()) {
+                if (teams.members(id).size() >= MAX_CHAT) {
+                    throw new ConflictException("A chat has at most " + MAX_CHAT + " people.");
+                }
+                teams.insert(new TeamMember(id, person.getId(), TeamMember.OWNER, clock.instant()));
+                audited("team.member.put", team, Map.of("email", person.getUsername(), "role", TeamMember.OWNER));
+            }
+            return get(id);
         }
         boolean joining = person.getId().equals(me())
                 && team.isPublic()
@@ -342,6 +440,15 @@ public class TeamService implements Teams {
         }
         TeamMember member = teams.member(id, person.getId())
                 .orElseThrow(() -> new ResourceNotFoundException("No " + email + " in the team."));
+        if (team.isChat()) {
+            // Whoever is in a chat can leave it; the last one leaves nothing behind.
+            teams.delete(member);
+            if (teams.members(id).isEmpty()) {
+                teams.delete(team);
+            }
+            audited("team.member.removed", team, Map.of("email", person.getUsername()));
+            return;
+        }
         if (TeamMember.OWNER.equals(member.getRole())) {
             requireAnotherOwner(id, person.getId());
         }
@@ -455,8 +562,8 @@ public class TeamService implements Teams {
         if (roleOf(team.getId(), me()) != null) {
             return true;
         }
-        // A group, such as a private channel, is seen by its people only.
-        return !team.isGroup() && !organization.guest() && (team.isPublic() || administers());
+        // A group, such as a private channel, and a chat are seen by their people only.
+        return !team.isGroup() && !team.isChat() && !organization.guest() && (team.isPublic() || administers());
     }
 
     private dev.mosaikit.kernel.core.teams.Team managed(UUID id) {
@@ -468,7 +575,8 @@ public class TeamService implements Teams {
     }
 
     private boolean manages(dev.mosaikit.kernel.core.teams.Team team) {
-        return (administers() && !team.isGroup()) || TeamMember.OWNER.equals(roleOf(team.getId(), me()));
+        return (administers() && !team.isGroup() && !team.isChat())
+                || TeamMember.OWNER.equals(roleOf(team.getId(), me()));
     }
 
     /** Whether the person administers the organization of the request. */
@@ -542,6 +650,7 @@ public class TeamService implements Teams {
                 team.getVisibility(),
                 role,
                 team.getParentId(),
+                team.getKind(),
                 members);
     }
 

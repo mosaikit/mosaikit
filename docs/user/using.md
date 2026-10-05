@@ -81,6 +81,15 @@ read the channel: they find it in **Activity**, and opening the notification ope
 Posts appear at once for whoever has the channel open. Who leaves a team, or a private channel, no
 longer reads its posts.
 
+### The app Chat
+
+With the app **Chat** installed, start a chat with one or more colleagues of the organization:
+write their addresses under **New chat**, and a name for a group if you like. The chat with one
+person is always the same one. Enter sends a message, Shift+Enter starts a new line. Below the
+messages you see who is typing and who has read your last message. Every message also reaches
+the others in **Activity**; turn the kind **message** off in your settings if you prefer. Apps can
+post cards in a chat, with buttons that act as you when you choose them.
+
 ## Activity
 
 **Activity**, at the top of the app bar, collects what the apps tell you: a mention, a task, a
