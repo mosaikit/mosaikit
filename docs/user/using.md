@@ -71,6 +71,16 @@ what the apps share with them. What an app shares with a team is read by its peo
 else, not even the administrators. Out of their last team, a guest is no longer in the
 organization.
 
+### The app Teams
+
+With the app **Teams** installed, every team has the channel **General** and the channels its
+people add: a standard channel is for the whole team, a **private** one for the people its creator
+adds, chosen among those of the team. Write a post in a channel, answer it with **Reply**, react
+with an emoji. Write `@name@example.org` to mention a colleague, or `@team` for everyone who can
+read the channel: they find it in **Activity**, and opening the notification opens the channel.
+Posts appear at once for whoever has the channel open. Who leaves a team, or a private channel, no
+longer reads its posts.
+
 ## Activity
 
 **Activity**, at the top of the app bar, collects what the apps tell you: a mention, a task, a

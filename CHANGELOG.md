@@ -8,6 +8,11 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The app Teams, `app-teams` (MK-034): channels General, standard and private for each team, posts
+  with threads, reactions, and mentions of people or of the team in the activity feed, all at once
+  for whoever has the channel open; a plugin without a backend. Teams have groups, private teams
+  inside a team (`parent`), for its private channels.
+
 - Teams (MK-032): groups of an organization with owners, members and guests of other organizations
   (`/api/v1/teams`, `Teams` of `kernel-api`, audited); documents of the data API shared with a team
   (`context.data(collection, { team })`), readable only by its people under row-level security;
@@ -103,6 +108,9 @@ project follows [Semantic Versioning](https://semver.org/).
   reaches Keycloak by another name than the browsers.
 
 ### Fixed
+
+- Installing a plugin without a backend no longer reports it active when the kernel could not load
+  it, and its package is unpacked on Windows even while an antivirus holds the new files.
 
 - When the apps cannot be loaded after signing in, the person enters and the workspace says that
   the apps could not be loaded, instead of a failed sign-in ("The request failed.").

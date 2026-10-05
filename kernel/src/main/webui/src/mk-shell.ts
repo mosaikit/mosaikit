@@ -777,7 +777,10 @@ export class MkShell extends LitElement {
     this.searchText = '';
     this.menuOpen = false;
     history.pushState(null, '', route);
-    this.path = route;
+    // A link can carry a query, such as /app/teams?channel=…, which the app reads itself.
+    this.path = new URL(route, location.origin).pathname;
+    // An app that stays open reads its new query, as after the back button.
+    window.dispatchEvent(new PopStateEvent('popstate'));
   }
 
   /**

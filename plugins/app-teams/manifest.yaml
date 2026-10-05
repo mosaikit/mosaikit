@@ -1,0 +1,22 @@
+# SPDX-FileCopyrightText: 2026 Massimo Antonini
+# SPDX-License-Identifier: MPL-2.0
+id: dev.mosaikit.app.teams
+version: 0.1.0
+name: Teams
+description: Teams with channels, posts, threads, mentions and reactions, kept in the kernel and shared with the people of each team (MK-034).
+kind: [app]
+platform: '>=0.1 <1'
+frontend:
+  entry: web/index.js
+data:
+  # Shared with a team: its channels, and the posts of its General and standard channels. The posts
+  # of a private channel are shared with the group of the channel (ADR-0033).
+  collections: [channels, posts]
+contributes:
+  rail.app:
+    - id: teams
+      title: Teams
+      route: /app/teams
+      element: mk-app-teams
+      icon: web/icon.svg
+      order: 5

@@ -116,18 +116,30 @@ public class TeamService implements Teams {
      * A team as the API returns it.
      *
      * @param role the role of the person of the request, or {@code null}
+     * @param parent the team of a group, or {@code null} for a team of the organization
      * @param members its people, when one team is asked for; {@code null} in lists
      */
     public record TeamView(
-            UUID id, String name, String description, String visibility, String role, List<Member> members) {}
+            UUID id,
+            String name,
+            String description,
+            String visibility,
+            String role,
+            UUID parent,
+            List<Member> members) {}
 
-    /** What a team is made of, to create or change it. */
-    public record TeamRequest(String name, String description, String visibility) {}
+    /**
+     * What a team is made of, to create or change it.
+     *
+     * @param parent the team of a new group (MK-034), which is private; {@code null} for a team
+     */
+    public record TeamRequest(String name, String description, String visibility, UUID parent) {}
 
     @Override
     public List<Team> visible() {
         return list().stream()
-                .map(team -> new Team(team.id(), team.name(), team.description(), team.visibility(), team.role()))
+                .map(team -> new Team(
+                        team.id(), team.name(), team.description(), team.visibility(), team.role(), team.parent()))
                 .toList();
     }
 
@@ -145,6 +157,16 @@ public class TeamService implements Teams {
                 .toList();
     }
 
+    /** The groups of a team, such as its private channels, in which the person of the request is. */
+    public List<TeamView> groups(UUID parent) {
+        seen(parent);
+        UUID me = me();
+        return teams.groupsOf(parent).stream()
+                .map(group -> view(group, roleOf(group.getId(), me), null))
+                .filter(group -> group.role() != null)
+                .toList();
+    }
+
     /** A team that the person of the request sees, with its people. */
     public TeamView get(UUID id) {
         var team = seen(id);
@@ -156,9 +178,17 @@ public class TeamService implements Teams {
         if (organization.guest()) {
             throw new ForbiddenOperationException("A guest of the organization cannot create teams.");
         }
+        UUID parent = request == null ? null : request.parent();
+        if (parent != null) {
+            var team = seen(parent);
+            String role = roleOf(team.getId(), me());
+            if (role == null || TeamMember.GUEST.equals(role)) {
+                throw new ForbiddenOperationException("Only the people of the team create its groups.");
+            }
+        }
         TeamRequest valid = checked(request, org, null);
         var team = new dev.mosaikit.kernel.core.teams.Team(
-                org, valid.name(), valid.description(), valid.visibility(), actor(), clock.instant());
+                org, parent, valid.name(), valid.description(), valid.visibility(), actor(), clock.instant());
         teams.insert(team);
         teams.insert(new TeamMember(team.getId(), me(), TeamMember.OWNER, clock.instant()));
         audited("team.created", team, Map.of("name", team.getName(), "visibility", team.getVisibility()));
@@ -176,6 +206,13 @@ public class TeamService implements Teams {
 
     public void delete(UUID id) {
         var team = managed(id);
+        // Its groups first, so that their guests are dismissed with those of the team.
+        for (var group : teams.groupsOf(id)) {
+            for (TeamMember member : teams.members(group.getId())) {
+                teams.delete(member);
+            }
+            teams.delete(group);
+        }
         List<TeamMember> people = teams.members(id);
         for (TeamMember member : people) {
             teams.delete(member);
@@ -203,6 +240,9 @@ public class TeamService implements Teams {
         UserAccount person = accounts.findByUsername(normalize(email))
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "No account for " + email + ": the person signs up on this installation first."));
+        if (team.isGroup()) {
+            return putGroupMember(team, person, role);
+        }
         boolean joining = person.getId().equals(me())
                 && team.isPublic()
                 && TeamMember.MEMBER.equals(role)
@@ -240,6 +280,58 @@ public class TeamService implements Teams {
         return get(id);
     }
 
+    /** Adds a person of the team to one of its groups, with the same kind of role as in the team. */
+    private TeamView putGroupMember(dev.mosaikit.kernel.core.teams.Team group, UserAccount person, String role) {
+        if (!manages(group)) {
+            throw new ForbiddenOperationException("Only the owners of the group manage its people.");
+        }
+        String inTeam = roleOf(group.getParentId(), person.getId());
+        if (inTeam == null) {
+            throw new InvalidInputException(
+                    List.of(person.getUsername() + " is not in the team: add them to the team first"));
+        }
+        if (TeamMember.GUEST.equals(inTeam) != TeamMember.GUEST.equals(role)) {
+            throw new InvalidInputException(List.of(
+                    TeamMember.GUEST.equals(inTeam)
+                            ? person.getUsername() + " is a guest of the team: add them as guest"
+                            : person.getUsername() + " is a member of the team: add them as member or owner"));
+        }
+        Optional<TeamMember> existing = teams.member(group.getId(), person.getId());
+        if (existing.isPresent()) {
+            if (TeamMember.OWNER.equals(existing.get().getRole()) && !TeamMember.OWNER.equals(role)) {
+                requireAnotherOwner(group.getId(), person.getId());
+            }
+            existing.get().changeRole(role);
+            teams.update(existing.get());
+        } else {
+            teams.insert(new TeamMember(group.getId(), person.getId(), role, clock.instant()));
+        }
+        audited("team.member.put", group, Map.of("email", person.getUsername(), "role", role));
+        return get(group.getId());
+    }
+
+    /**
+     * Takes a person out of the groups of a team they left: a group without people goes, and one
+     * without owners gets its longest member as owner.
+     */
+    private void leaveGroups(UUID team, UUID account) {
+        for (var group : teams.groupsOf(team)) {
+            Optional<TeamMember> member = teams.member(group.getId(), account);
+            if (member.isEmpty()) {
+                continue;
+            }
+            teams.delete(member.get());
+            List<TeamMember> rest = teams.members(group.getId());
+            if (rest.isEmpty()) {
+                teams.delete(group);
+            } else if (rest.stream().noneMatch(other -> TeamMember.OWNER.equals(other.getRole()))) {
+                TeamMember heir = rest.getFirst();
+                heir.changeRole(TeamMember.GUEST.equals(heir.getRole()) ? TeamMember.GUEST : TeamMember.OWNER);
+                teams.update(heir);
+            }
+        }
+    }
+
     /** Removes a person from a team: an owner removes anyone, a person leaves by themselves. */
     public void removeMember(UUID id, String email) {
         var team = seen(id);
@@ -254,6 +346,7 @@ public class TeamService implements Teams {
             requireAnotherOwner(id, person.getId());
         }
         teams.delete(member);
+        leaveGroups(id, person.getId());
         if (TeamMember.GUEST.equals(member.getRole())) {
             dismissGuest(person.getId(), team.getOrganizationId());
         }
@@ -362,7 +455,8 @@ public class TeamService implements Teams {
         if (roleOf(team.getId(), me()) != null) {
             return true;
         }
-        return !organization.guest() && (team.isPublic() || administers());
+        // A group, such as a private channel, is seen by its people only.
+        return !team.isGroup() && !organization.guest() && (team.isPublic() || administers());
     }
 
     private dev.mosaikit.kernel.core.teams.Team managed(UUID id) {
@@ -374,7 +468,7 @@ public class TeamService implements Teams {
     }
 
     private boolean manages(dev.mosaikit.kernel.core.teams.Team team) {
-        return administers() || TeamMember.OWNER.equals(roleOf(team.getId(), me()));
+        return (administers() && !team.isGroup()) || TeamMember.OWNER.equals(roleOf(team.getId(), me()));
     }
 
     /** Whether the person administers the organization of the request. */
@@ -393,7 +487,8 @@ public class TeamService implements Teams {
         String description = request == null || request.description() == null
                 ? ""
                 : request.description().strip();
-        String visibility = request == null || request.visibility() == null
+        UUID parent = current == null ? (request == null ? null : request.parent()) : current.getParentId();
+        String visibility = parent != null || request == null || request.visibility() == null
                 ? dev.mosaikit.kernel.core.teams.Team.PRIVATE
                 : request.visibility();
         if (name.isEmpty() || name.length() > MAX_NAME) {
@@ -410,10 +505,13 @@ public class TeamService implements Teams {
             throw new InvalidInputException(problems);
         }
         boolean renamed = current == null || !current.getName().equalsIgnoreCase(name);
-        if (renamed && teams.countNamed(org, name) > 0) {
+        if (renamed && parent == null && teams.countNamed(org, name) > 0) {
             throw new ConflictException("The organization has a team named " + name + " already.");
         }
-        return new TeamRequest(name, description, visibility);
+        if (renamed && parent != null && teams.countNamedIn(parent, name) > 0) {
+            throw new ConflictException("The team has a group named " + name + " already.");
+        }
+        return new TeamRequest(name, description, visibility, parent);
     }
 
     private UUID me() {
@@ -437,7 +535,14 @@ public class TeamService implements Teams {
     }
 
     private static TeamView view(dev.mosaikit.kernel.core.teams.Team team, String role, List<Member> members) {
-        return new TeamView(team.getId(), team.getName(), team.getDescription(), team.getVisibility(), role, members);
+        return new TeamView(
+                team.getId(),
+                team.getName(),
+                team.getDescription(),
+                team.getVisibility(),
+                role,
+                team.getParentId(),
+                members);
     }
 
     private static String normalize(String email) {

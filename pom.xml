@@ -60,6 +60,7 @@
         <module>plugins/sample-react</module>
         <module>plugins/sample-vue</module>
         <module>plugins/sample-todo</module>
+        <module>plugins/app-teams</module>
         <module>plugins/sample-theme</module>
         <module>kernel</module>
         <module>distributions</module>
