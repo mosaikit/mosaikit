@@ -37,6 +37,9 @@ public final class PluginPackages {
     static final long MAX_BYTES = 512L * 1024 * 1024;
     private static final String CHECKSUM_FILE = ".package.sha256";
 
+    /** Tries of the move of an unpacked package into place. */
+    private static final int MOVE_ATTEMPTS = 8;
+
     private PluginPackages() {}
 
     /** Whether the path is a plugin package. */
@@ -67,10 +70,33 @@ public final class PluginPackages {
             extract(zip, staging);
             Files.writeString(staging.resolve(CHECKSUM_FILE), checksum);
             deleteRecursively(target);
-            Files.move(staging, target, StandardCopyOption.ATOMIC_MOVE);
+            move(staging, target);
             return target;
         } finally {
             deleteRecursively(staging);
+        }
+    }
+
+    /**
+     * Moves the unpacked directory in place. On Windows a directory just written can stay locked
+     * for a moment, by an antivirus or the indexer: the move is tried again a few times.
+     */
+    private static void move(Path staging, Path target) throws IOException {
+        for (int attempt = 1; ; attempt++) {
+            try {
+                Files.move(staging, target, StandardCopyOption.ATOMIC_MOVE);
+                return;
+            } catch (java.nio.file.FileSystemException e) {
+                if (attempt == MOVE_ATTEMPTS) {
+                    throw e;
+                }
+                try {
+                    Thread.sleep(100L * attempt);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw e;
+                }
+            }
         }
     }
 

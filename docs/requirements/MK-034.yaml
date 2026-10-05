@@ -2,11 +2,12 @@ id: MK-034
 title: Channels with posts, threads, mentions and reactions (app-teams)
 area: plugins
 priority: P1
-status: planned
+status: done
 description: >-
   The plugin app-teams gives each team a General channel and other standard or private channels,
-  with posts, threads, mentions of people and teams, reactions and cards published by plugins. See
-  ADR-0027.
+  with posts, threads, mentions of people and teams, reactions and cards published by plugins. A
+  private channel is a group of the team in the kernel; the cards of plugins come with the chats
+  (MK-036). See ADR-0027 and ADR-0033.
 acceptance:
   - A post in a channel appears at once for the members who have the channel open, and a reply goes to its thread.
   - A mention notifies the person, or the members of the team, in the activity feed.

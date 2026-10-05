@@ -289,6 +289,53 @@ class TeamTest {
     }
 
     @Test
+    @Tag("MK-034")
+    void aGroupOfATeamIsSeenAndReadByItsPeopleOnly() {
+        String roads = createTeam("Roads", "public");
+        put(roads, member, "member", 200);
+        put(roads, guest, "guest", 200);
+
+        String group = in(owner)
+                .body(Map.of("name", "Budget", "parent", roads, "visibility", "public"))
+                .post("/api/v1/teams")
+                .then()
+                .statusCode(201)
+                .body("parent", equalTo(roads))
+                .body("visibility", equalTo("private"))
+                .extract()
+                .path("id");
+        // A group is not a team of the organization, and only its people see it.
+        in(owner).get("/api/v1/teams").then().body("name", not(hasItem("Budget")));
+        in(owner).queryParam("parent", roads).get("/api/v1/teams").then().body("name", contains("Budget"));
+        in(member).queryParam("parent", roads).get("/api/v1/teams").then().body("$", hasSize(0));
+        in(member).get("/api/v1/teams/" + group).then().statusCode(404);
+
+        // Its people come from the team, with the same kind of role.
+        put(group, outsider, "member", 400);
+        put(group, guest, "member", 400);
+        put(group, guest, "guest", 200);
+        in(owner)
+                .queryParam("team", group)
+                .body(Map.of("text", "Figures"))
+                .post(NOTES)
+                .then()
+                .statusCode(201);
+        as(guest, PASSWORD)
+                .header("X-Mosaikit-Organization", town)
+                .queryParam("team", group)
+                .get(NOTES)
+                .then()
+                .body("data.text", contains("Figures"));
+        in(member).queryParam("team", group).get(NOTES).then().statusCode(404);
+
+        // Out of the team, out of its groups.
+        in(owner).delete("/api/v1/teams/" + roads + "/members/" + guest).then().statusCode(204);
+        in(owner).get("/api/v1/teams/" + group).then().body("members.email", contains(owner));
+        in(owner).delete("/api/v1/teams/" + roads).then().statusCode(204);
+        in(owner).get("/api/v1/teams/" + group).then().statusCode(404);
+    }
+
+    @Test
     void refusesTeamsWithoutAName() {
         in(owner).body(Map.of("name", " ")).post("/api/v1/teams").then().statusCode(400);
         createTeam("Roads", "private");

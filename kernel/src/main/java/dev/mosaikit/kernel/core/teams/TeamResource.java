@@ -14,6 +14,7 @@ import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -41,9 +42,11 @@ public class TeamResource {
     }
 
     @GET
-    @Operation(summary = "List the teams that the signed-in person sees: theirs and the public ones")
-    public List<TeamView> list() {
-        return teams.list();
+    @Operation(
+            summary = "List the teams that the signed-in person sees: theirs and the public ones",
+            description = "With ?parent=<id>, the groups of that team in which the person is (MK-034).")
+    public List<TeamView> list(@QueryParam("parent") UUID parent) {
+        return parent == null ? teams.list() : teams.groups(parent);
     }
 
     @POST

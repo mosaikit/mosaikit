@@ -184,7 +184,19 @@ public class Marketplace {
             boolean restart = needsRestart(plugin);
             if (!restart) {
                 registry.reload();
-                LOG.infof("Plugin %s %s is active without a restart", plugin.key(), version);
+                if (registry.findActive(plugin.key()).isPresent()) {
+                    LOG.infof("Plugin %s %s is active without a restart", plugin.key(), version);
+                } else {
+                    // Say what the kernel found, rather than an activation that did not happen.
+                    problems = registry.all().stream()
+                            .filter(found -> found.key().equals(plugin.key()))
+                            .flatMap(found -> found.problems().stream())
+                            .toList();
+                    if (problems.isEmpty()) {
+                        problems = List.of("the kernel did not activate it: see the Plugins page");
+                    }
+                    LOG.warnf("Plugin %s %s is installed but not active: %s", plugin.key(), version, problems);
+                }
             }
             return new Installation(plugin.key(), version, file, replaced, keyId, problems, restart);
         } catch (IOException e) {

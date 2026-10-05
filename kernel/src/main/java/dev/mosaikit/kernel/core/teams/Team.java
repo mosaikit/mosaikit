@@ -9,7 +9,7 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
 
-/** A team of an organization (MK-032). */
+/** A team of an organization (MK-032), or a group of a team, such as a private channel (MK-034). */
 @Entity
 @Table(name = "team")
 public class Team {
@@ -22,6 +22,10 @@ public class Team {
 
     @Column(name = "organization_id", nullable = false, updatable = false)
     private UUID organizationId;
+
+    /** The team this group belongs to, or {@code null} for a team of the organization. */
+    @Column(name = "parent_id", updatable = false)
+    private UUID parentId;
 
     @Column(nullable = false)
     private String name;
@@ -41,9 +45,17 @@ public class Team {
     /** Required by JPA. */
     protected Team() {}
 
-    public Team(UUID organizationId, String name, String description, String visibility, String author, Instant now) {
+    public Team(
+            UUID organizationId,
+            UUID parentId,
+            String name,
+            String description,
+            String visibility,
+            String author,
+            Instant now) {
         this.id = UUID.randomUUID();
         this.organizationId = organizationId;
+        this.parentId = parentId;
         this.name = name;
         this.description = description;
         this.visibility = visibility;
@@ -63,6 +75,15 @@ public class Team {
 
     public UUID getOrganizationId() {
         return organizationId;
+    }
+
+    public UUID getParentId() {
+        return parentId;
+    }
+
+    /** Whether this is a group of a team rather than a team of the organization. */
+    public boolean isGroup() {
+        return parentId != null;
     }
 
     public String getName() {
