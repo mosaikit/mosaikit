@@ -8,6 +8,11 @@
  * the team, so that only its people read them. A private channel is a group of the team, and its
  * posts are shared with that group only. Posts of others appear at once through the real-time
  * channel (MK-031); mentions reach the activity feed (MK-038).
+ *
+ * Every channel has the tabs Posts and Files, and the tabs that its people add from what other
+ * plugins contribute to the point `channel.tab` (MK-035). The tabs of a channel are documents shared
+ * like its posts; a tab whose plugin is missing, or turned off for the organization, is shown as
+ * unavailable.
  */
 
 const GENERAL = 'general';
@@ -47,6 +52,11 @@ const STYLE = `
   .reactions button[aria-pressed='true'] { border-color: var(--mk-accent); background: var(--mk-accent-soft); }
   .muted { color: var(--mk-muted); }
   .people li { display: flex; justify-content: space-between; gap: 8px; padding: 4px 0; }
+  .tabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--mk-line); margin: 8px 0; }
+  .tabs [role=tab] { border: none; border-bottom: 3px solid transparent; border-radius: 0; background: transparent; }
+  .tabs [role=tab][aria-selected='true'] { border-bottom-color: var(--mk-accent); font-weight: 600; }
+  form.row { display: flex; gap: 6px; align-items: center; }
+  .unavailable { border: 1px dashed var(--mk-line); border-radius: var(--mk-radius); padding: 12px; }
   :focus-visible { outline: 2px solid var(--mk-focus); outline-offset: 2px; }
 `;
 
@@ -117,6 +127,9 @@ const plugin = {
       groups = [];
       channel = GENERAL;
       posts = [];
+      tabs = [];
+      tab = 'posts';
+      tabElements = new Map();
       replying = null;
       showPeople = false;
 
@@ -131,6 +144,7 @@ const plugin = {
         window.removeEventListener('popstate', this.onLocation);
         this.stopChannels?.();
         this.stopPosts?.();
+        this.stopTabs?.();
       }
 
       /** Opens the team and channel of the address, such as the link of a mention. */
@@ -180,10 +194,15 @@ const plugin = {
           channel === GENERAL ||
           this.channels.some((c) => c.id === channel) ||
           this.groups.some((g) => g.id === channel);
-        this.channel = known ? channel : GENERAL;
+        const next = known ? channel : GENERAL;
+        if (next !== this.channel || changed) {
+          this.tab = 'posts';
+          this.tabElements.clear();
+        }
+        this.channel = next;
         this.replying = null;
         this.follow();
-        await this.loadPosts();
+        await Promise.all([this.loadPosts(), this.loadTabs()]);
         this.render();
       }
 
@@ -212,6 +231,9 @@ const plugin = {
 
       follow() {
         this.stopPosts?.();
+        this.stopTabs?.();
+        this.tabData = context.data('tabs', { team: this.scope() });
+        this.stopTabs = this.tabData.onChange(() => void this.loadTabs().then(() => this.render()));
         this.postData = context.data('posts', { team: this.scope() });
         // Posts, replies and reactions of the others show at once (MK-031).
         this.stopPosts = this.postData.onChange(
@@ -227,6 +249,26 @@ const plugin = {
           this.posts = [];
           this.say(`The posts cannot be read: ${error.message}`);
         }
+      }
+
+      async loadTabs() {
+        try {
+          const all = await this.tabData.list({ limit: 200 });
+          this.tabs = all.filter((tab) => tab.data.channel === this.channel).reverse();
+        } catch {
+          this.tabs = [];
+        }
+      }
+
+      /** The tabs that other plugins offer, as the shell gives them: only active, not turned off. */
+      offered() {
+        return context
+          .contributionsTo('channel.tab')
+          .filter(
+            (contribution) =>
+              typeof contribution.attributes.element === 'string' &&
+              /^[a-z][a-z0-9]*-[a-z0-9-]*$/.test(contribution.attributes.element),
+          );
       }
 
       channelName() {
@@ -289,8 +331,7 @@ const plugin = {
               {},
               this.renderHeader(),
               this.showPeople ? this.renderPeople() : null,
-              this.renderComposer(),
-              h('div', { id: 'posts' }),
+              this.renderTabs(),
             )
           : h(
               'main',
@@ -304,7 +345,7 @@ const plugin = {
           h('div', { class: 'layout' }, nav, main),
           h('p', { class: 'muted', role: 'status', 'aria-live': 'polite' }, this.lastMessage ?? ''),
         );
-        if (this.team) {
+        if (this.team && this.tab === 'posts') {
           this.renderPosts();
         }
         this.restore(drafts);
@@ -342,6 +383,129 @@ const plugin = {
           `/app/teams?team=${encodeURIComponent(teamId)}&channel=${encodeURIComponent(channel)}`,
         );
         await this.open(teamId, channel);
+      }
+
+      /** The tabs of the channel and the panel of the open one. */
+      renderTabs() {
+        const tab = (id, title) =>
+          h(
+            'button',
+            {
+              type: 'button',
+              role: 'tab',
+              id: `tab-${id}`,
+              'aria-selected': String(this.tab === id),
+              'aria-controls': 'panel',
+              tabindex: this.tab === id ? '0' : '-1',
+              onclick: () => {
+                this.tab = id;
+                this.render();
+              },
+            },
+            title,
+          );
+        return [
+          h(
+            'div',
+            { role: 'tablist', 'aria-label': `Tabs of ${this.channelName()}`, class: 'tabs' },
+            tab('posts', 'Posts'),
+            tab('files', 'Files'),
+            this.tabs.map((saved) => tab(saved.id, String(saved.data.title ?? 'Tab'))),
+          ),
+          this.team.role === 'guest' ? null : this.renderAddTab(),
+          h(
+            'div',
+            { role: 'tabpanel', id: 'panel', 'aria-labelledby': `tab-${this.tab}` },
+            this.renderPanel(),
+          ),
+        ];
+      }
+
+      renderPanel() {
+        if (this.tab === 'posts') {
+          return [this.renderComposer(), h('div', { id: 'posts' })];
+        }
+        if (this.tab === 'files') {
+          return h('p', { class: 'muted' }, 'The files of the channel come with the file service.');
+        }
+        const saved = this.tabs.find((candidate) => candidate.id === this.tab);
+        if (!saved) {
+          this.tab = 'posts';
+          return this.renderPanel();
+        }
+        const contribution = this.offered().find(
+          (offer) => offer.pluginId === saved.data.plugin && offer.id === saved.data.tab,
+        );
+        if (!contribution) {
+          // Its plugin is not installed, or is turned off for the organization: the channel works on.
+          return h(
+            'section',
+            { class: 'unavailable', 'aria-label': `${saved.data.title} is unavailable` },
+            h(
+              'p',
+              {},
+              `${saved.data.title} is unavailable: its app is not installed or is turned off for your organization.`,
+            ),
+            h(
+              'button',
+              {
+                type: 'button',
+                onclick: () => void this.run(() => this.tabData.remove(saved.id), 'Tab removed.'),
+              },
+              'Remove the tab',
+            ),
+          );
+        }
+        let element = this.tabElements.get(saved.id);
+        if (!element) {
+          element = document.createElement(contribution.attributes.element);
+          element.team = this.team.id;
+          element.channel = this.channel;
+          element.setAttribute('team', this.team.id);
+          element.setAttribute('channel', this.channel);
+          this.tabElements.set(saved.id, element);
+        }
+        return element;
+      }
+
+      renderAddTab() {
+        const offers = this.offered();
+        if (offers.length === 0) {
+          return null;
+        }
+        return h(
+          'form',
+          {
+            'aria-label': 'Add a tab',
+            class: 'row',
+            onsubmit: (event) => {
+              event.preventDefault();
+              const chosen = offers[Number(event.target.elements.namedItem('offer').value)];
+              if (chosen) {
+                const title = String(chosen.attributes.title ?? chosen.id);
+                void this.run(async () => {
+                  const created = await this.tabData.create({
+                    channel: this.channel,
+                    plugin: chosen.pluginId,
+                    tab: chosen.id,
+                    title,
+                  });
+                  await this.loadTabs();
+                  this.tab = created.id;
+                  this.render();
+                }, `Tab ${title} added.`);
+              }
+            },
+          },
+          h(
+            'select',
+            { name: 'offer', 'aria-label': 'App of the tab' },
+            offers.map((offer, index) =>
+              h('option', { value: String(index) }, String(offer.attributes.title ?? offer.id)),
+            ),
+          ),
+          h('button', { type: 'submit' }, 'Add tab'),
+        );
       }
 
       renderChannels() {

@@ -404,7 +404,20 @@ as [`sample-estimates`](../../plugins/sample-estimates) extends
    ```
 
    The owner of a point reads the contributions with `context.contributionsTo('activities.detail')`
-   and creates the elements.
+   and creates the elements. The contributions of a plugin turned off for the organization are
+   missing, so the owner shows them as unavailable instead of breaking.
+
+   The app Teams declares `channel.tab`, the tabs of its channels (MK-035): contribute
+   `{ id, title, element }`, and the element gets the properties `team` and `channel`, the
+   identifiers of the team and of the channel, to read and write the documents of that team:
+
+   ```yaml
+   contributes:
+     channel.tab:
+       - id: todo
+         title: To do
+         element: mk-sample-todo
+   ```
 4. **Behaviour**: publish and subscribe to events on the bus (`estimates.changed`,
    `activities.completed`).
 

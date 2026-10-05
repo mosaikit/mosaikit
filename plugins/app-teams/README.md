@@ -17,5 +17,10 @@ with threads, mentions and reactions. A plugin without a backend
 - `@name@example.org` and `@team` notify the people who can read the channel in their activity
   feed, with a link that opens the channel.
 
+Every channel has the tabs **Posts** and **Files**, and the tabs its people add from what other
+plugins contribute to the point `channel.tab` (MK-035), such as the sample To do. A tab whose
+plugin is not installed or is turned off for the organization is shown as unavailable, and can be
+removed.
+
 Nothing to build: installed from the Plugins page, it is active at once. Its end-to-end tests are
 `e2e/tests/21-channels.e2e.ts`.

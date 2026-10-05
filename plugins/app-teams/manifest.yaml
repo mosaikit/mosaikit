@@ -8,10 +8,13 @@ kind: [app]
 platform: '>=0.1 <1'
 frontend:
   entry: web/index.js
+  # Other plugins add tabs to the channels (MK-035): `{ id, title, element }`; the element gets the
+  # properties `team` and `channel`, the identifiers of the team and of the channel.
+  points: [channel.tab]
 data:
   # Shared with a team: its channels, and the posts of its General and standard channels. The posts
   # of a private channel are shared with the group of the channel (ADR-0033).
-  collections: [channels, posts]
+  collections: [channels, posts, tabs]
 contributes:
   rail.app:
     - id: teams
