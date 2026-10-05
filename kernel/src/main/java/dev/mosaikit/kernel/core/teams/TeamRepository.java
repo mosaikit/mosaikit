@@ -19,15 +19,25 @@ public interface TeamRepository {
     @Find
     Optional<Team> findById(UUID id);
 
-    @Query("from Team t where t.organizationId = :organizationId and t.parentId is null order by lower(t.name)")
+    @Query("""
+            from Team t where t.organizationId = :organizationId and t.parentId is null and t.kind = 'team'
+            order by lower(t.name)""")
     List<Team> ofOrganization(UUID organizationId);
+
+    @Query("""
+            select t from Team t, TeamMember m
+            where m.teamId = t.id and m.accountId = :accountId and t.organizationId = :organizationId
+              and t.kind = 'chat'
+            order by t.createdAt desc""")
+    List<Team> chatsOf(UUID accountId, UUID organizationId);
 
     @Query("from Team t where t.parentId = :parentId order by lower(t.name)")
     List<Team> groupsOf(UUID parentId);
 
     @Query("""
             select count(t) from Team t
-            where t.organizationId = :organizationId and t.parentId is null and lower(t.name) = lower(:name)""")
+            where t.organizationId = :organizationId and t.parentId is null and t.kind = 'team'
+              and lower(t.name) = lower(:name)""")
     long countNamed(UUID organizationId, String name);
 
     @Query("select count(t) from Team t where t.parentId = :parentId and lower(t.name) = lower(:name)")

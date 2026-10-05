@@ -24,6 +24,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.sql.DriverManager;
 import java.sql.SQLException;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.eclipse.microprofile.config.Config;
@@ -333,6 +334,58 @@ class TeamTest {
         in(owner).get("/api/v1/teams/" + group).then().body("members.email", contains(owner));
         in(owner).delete("/api/v1/teams/" + roads).then().statusCode(204);
         in(owner).get("/api/v1/teams/" + group).then().statusCode(404);
+    }
+
+    @Test
+    @Tag("MK-036")
+    void aChatIsBetweenItsPeopleOnlyAndOneToOneIsAlwaysTheSame() {
+        String chat = in(owner)
+                .body(Map.of("kind", "chat", "people", List.of(member)))
+                .post("/api/v1/teams")
+                .then()
+                .statusCode(201)
+                .body("kind", equalTo("chat"))
+                .body("visibility", equalTo("private"))
+                .body("members.email", containsInAnyOrder(owner, member))
+                .extract()
+                .path("id");
+        // Asked again, by either of them, the chat between two people is the same.
+        in(member)
+                .body(Map.of("kind", "chat", "people", List.of(owner)))
+                .post("/api/v1/teams")
+                .then()
+                .body("id", equalTo(chat));
+        in(member).queryParam("kind", "chat").get("/api/v1/teams").then().body("id", contains(chat));
+        // Not a team, and nobody else sees it nor its messages.
+        in(owner).get("/api/v1/teams").then().body("id", not(hasItem(chat)));
+        in(member)
+                .queryParam("team", chat)
+                .body(Map.of("text", "Ciao"))
+                .post(NOTES)
+                .then()
+                .statusCode(201);
+        in(outsider).get("/api/v1/teams/" + chat).then().statusCode(404);
+        in(outsider).queryParam("team", chat).get(NOTES).then().statusCode(404);
+        // Only people of the organization, not its guests.
+        in(owner)
+                .body(Map.of("kind", "chat", "people", List.of(guest)))
+                .post("/api/v1/teams")
+                .then()
+                .statusCode(400);
+
+        // A group chat takes more people; whoever leaves no longer reads it.
+        String group = in(owner)
+                .body(Map.of("kind", "chat", "name", "Ufficio", "people", List.of(member, outsider)))
+                .post("/api/v1/teams")
+                .then()
+                .statusCode(201)
+                .extract()
+                .path("id");
+        in(outsider)
+                .delete("/api/v1/teams/" + group + "/members/" + outsider)
+                .then()
+                .statusCode(204);
+        in(outsider).queryParam("kind", "chat").get("/api/v1/teams").then().body("$", hasSize(0));
     }
 
     @Test

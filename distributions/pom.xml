@@ -160,6 +160,19 @@
             </exclusions>
         </dependency>
         <dependency>
+            <groupId>io.github.mosaikit.apps</groupId>
+            <artifactId>mosaikit-app-chat</artifactId>
+            <version>${project.version}</version>
+            <type>pom</type>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
             <groupId>io.github.mosaikit.samples</groupId>
             <artifactId>mosaikit-sample-theme</artifactId>
             <version>${project.version}</version>

@@ -16,6 +16,8 @@ public class Team {
 
     public static final String PUBLIC = "public";
     public static final String PRIVATE = "private";
+    public static final String TEAM = "team";
+    public static final String CHAT = "chat";
 
     @Id
     private UUID id;
@@ -26,6 +28,10 @@ public class Team {
     /** The team this group belongs to, or {@code null} for a team of the organization. */
     @Column(name = "parent_id", updatable = false)
     private UUID parentId;
+
+    /** {@value #TEAM}, or {@value #CHAT} for a chat between some people (MK-036). */
+    @Column(nullable = false, updatable = false)
+    private String kind = TEAM;
 
     @Column(nullable = false)
     private String name;
@@ -79,6 +85,21 @@ public class Team {
 
     public UUID getParentId() {
         return parentId;
+    }
+
+    /** A chat between some people of the organization (MK-036): private, without a parent. */
+    public static Team chat(UUID organizationId, String name, String author, Instant now) {
+        Team chat = new Team(organizationId, null, name, "", PRIVATE, author, now);
+        chat.kind = CHAT;
+        return chat;
+    }
+
+    public String getKind() {
+        return kind;
+    }
+
+    public boolean isChat() {
+        return CHAT.equals(kind);
     }
 
     /** Whether this is a group of a team rather than a team of the organization. */

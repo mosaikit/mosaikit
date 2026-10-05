@@ -2,10 +2,12 @@ id: MK-036
 title: Chats one to one and in groups (app-chat)
 area: plugins
 priority: P1
-status: planned
+status: done
 description: >-
   The plugin app-chat offers chats between two people and in small groups, with history, cards and
-  indicators of typing and reading; attachments come with the files (MK-042). See ADR-0027.
+  indicators of typing and reading; attachments come with the files (MK-042). A chat is a group
+  of the kernel of kind chat; the history is kept until the retention of organizations (MK-044)
+  says otherwise. See ADR-0027 and ADR-0033.
 acceptance:
   - Two people exchange messages that appear within one second, with the history kept for the retention of the organization.
   - A card published by a plugin in a chat shows its fields and its actions, and an action runs with the rights of the person who uses it.

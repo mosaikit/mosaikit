@@ -8,6 +8,10 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The app Chat, `app-chat` (MK-036): chats one to one and in groups, as groups of the kernel of
+  kind `chat` seen only by their people; messages at once, with history, indicators of typing and
+  reading, notifications, and cards of plugins whose actions run with the rights of who uses them.
+
 - The app Teams, `app-teams` (MK-034): channels General, standard and private for each team, posts
   with threads, reactions, and mentions of people or of the team in the activity feed, all at once
   for whoever has the channel open; a plugin without a backend. Teams have groups, private teams

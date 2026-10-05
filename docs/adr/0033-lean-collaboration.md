@@ -30,7 +30,8 @@ Mosaikit, and the way of working is lean (ADR-0031).
   with the role `organization-guest` only, kept by the kernel to the teams where they were added.
   A private channel is a group of the team, a private team inside it whose people are people of
   the team (MK-034): the same sharing and policy apply, and leaving the team leaves its groups.
-  Sharing with some people comes with the chats (MK-036).
+  A chat is a group of kind `chat`, private and without a team, of the people who talk in it
+  (MK-036): the same sharing and policy apply, so no sharing with a list of people is needed.
 - **In this repository for now.** `app-chat` and `app-teams` live in `plugins/` until their API is
   stable, so that their end-to-end tests run with the changes of the kernel they need; they move to
   repositories of their own (ADR-0024) afterwards.

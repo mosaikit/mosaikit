@@ -1,0 +1,9 @@
+<!-- SPDX-FileCopyrightText: 2026 Massimo Antonini -->
+<!-- SPDX-License-Identifier: MPL-2.0 -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <rect width="24" height="24" rx="6" fill="#0f7b6c"/>
+  <g fill="none" stroke="#ffffff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M6 7.5h12a1 1 0 0 1 1 1V15a1 1 0 0 1-1 1h-6.5L8 18.5V16H6a1 1 0 0 1-1-1V8.5a1 1 0 0 1 1-1z"/>
+    <path d="M8.5 11h7M8.5 13.5h4.5"/>
+  </g>
+</svg>

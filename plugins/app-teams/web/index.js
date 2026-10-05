@@ -90,7 +90,9 @@ const plugin = {
           element.setAttribute(name, value === true ? '' : String(value));
         }
       }
-      element.append(...children.flat().filter((child) => child !== null && child !== undefined));
+      element.append(
+        ...children.flat(Infinity).filter((child) => child !== null && child !== undefined),
+      );
       return element;
     }
 

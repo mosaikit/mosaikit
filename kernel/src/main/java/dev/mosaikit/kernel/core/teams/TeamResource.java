@@ -44,8 +44,12 @@ public class TeamResource {
     @GET
     @Operation(
             summary = "List the teams that the signed-in person sees: theirs and the public ones",
-            description = "With ?parent=<id>, the groups of that team in which the person is (MK-034).")
-    public List<TeamView> list(@QueryParam("parent") UUID parent) {
+            description = "With ?parent=<id>, the groups of that team in which the person is (MK-034); with"
+                    + " ?kind=chat, the chats of the person, newest first (MK-036).")
+    public List<TeamView> list(@QueryParam("parent") UUID parent, @QueryParam("kind") String kind) {
+        if ("chat".equals(kind)) {
+            return teams.chats();
+        }
         return parent == null ? teams.list() : teams.groups(parent);
     }
 

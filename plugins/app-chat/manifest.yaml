@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2026 Massimo Antonini
+# SPDX-License-Identifier: MPL-2.0
+id: dev.mosaikit.app.chat
+version: 0.1.0
+name: Chat
+description: Chats one to one and in groups, with history, cards of plugins and indicators of typing and reading (MK-036).
+kind: [app]
+platform: '>=0.1 <1'
+frontend:
+  entry: web/index.js
+data:
+  # Shared with each chat, a group of the kernel: its messages, and where each person is (read, typing).
+  collections: [messages, reads]
+contributes:
+  rail.app:
+    - id: chat
+      title: Chat
+      route: /app/chat
+      element: mk-app-chat
+      icon: web/icon.svg
+      order: 4

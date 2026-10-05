@@ -8,6 +8,7 @@ to `target/dist/plugins`. In development mode the kernel loads every plugin in t
 
 | Plugin | Purpose |
 |---|---|
+| `app-chat` | Chats one to one and in groups, with history, typing and reading, and cards of plugins (MK-036). |
 | `app-teams` | Teams with channels, posts, threads, mentions and reactions, without a backend (MK-034). |
 | `sample-hello` | Minimal frontend-only app without any framework. Shows the plugin context and the event bus. |
 | `sample-notes` | Java plugin with an entity, a migration, a REST API, an app and actions for assistants (MK-011, MK-015). |
