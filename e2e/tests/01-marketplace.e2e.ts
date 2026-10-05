@@ -16,7 +16,8 @@ test.describe('MK-022 Minimal marketplace with signed catalogs', () => {
     await openApp(page, 'Plugins');
     await expect(page.getByText(/verified, key/)).toBeVisible();
     const rows = page.locator('tbody tr');
-    await expect(rows).toHaveCount(8);
+    // The packages of plugins/: the samples, the theme and the app Teams.
+    await expect(rows).toHaveCount(9);
 
     for (const name of SAMPLES) {
       const id = `dev.mosaikit.sample.${name}`;
