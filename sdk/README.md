@@ -9,7 +9,7 @@ Everything a third party needs to write a Mosaikit plugin, and nothing of the ke
 | `js/` | `@mosaikit/sdk` (npm) | the frontend of a plugin: the context the shell passes to `activate(context)`, the event bus, the types of contributions |
 
 Both are published with each release: the Maven artifact to Maven Central (`io.github.mosaikit`),
-the npm package to npmjs.org ([docs/developer/release.md](../docs/developer/release.md)).
+the npm package to npmjs.org ([docs/development/release.md](../docs/development/release.md)).
 
 ## A plugin in short
 
@@ -24,8 +24,8 @@ my-plugin/
 
 The build produces `target/my-plugin-<version>.zip` with `manifest.yaml`, `lib/`, `db/` and
 `web/`; it is installed by copying it into `plugins/` of an installation, as it is. The samples in
-[`plugins/`](../plugins) are complete examples, and
-[docs/developer/plugin-development.md](../docs/developer/plugin-development.md) is the full guide.
+[`plugins/`](../src/plugins) are complete examples, and
+[docs/development/plugin-development.md](../docs/development/plugin-development.md) is the full guide.
 
 ## Rules
 

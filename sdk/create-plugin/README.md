@@ -16,4 +16,4 @@ npx @mosaikit/create-plugin dev.acme.traffic --name "Traffic" --backend
 | `--author` | for the licence headers |
 | `--mosaikit` | version of `io.github.mosaikit:mosaikit-kernel-api` to compile against |
 
-See the [plugin development guide](../../docs/developer/plugin-development.md).
+See the [plugin development guide](../../docs/development/plugin-development.md).

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SPDX-FileCopyrightText: 2026 Massimo Antonini
+  SPDX-License-Identifier: MPL-2.0
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.github.mosaikit</groupId>
+        <artifactId>mosaikit-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+        <relativePath>../../../pom.xml</relativePath>
+    </parent>
+
+    <groupId>io.github.mosaikit.samples</groupId>
+    <artifactId>mosaikit-sample-react</artifactId>
+    <packaging>pom</packaging>
+    <name>Mosaikit :: Samples :: React</name>
+    <description>Sample frontend plugin written with React, bundled with Vite (MK-021).</description>
+
+    <properties>
+        <plugin.package.name>sample-react</plugin.package.name>
+        <!-- SonarQube: what this module contributes to the analysis (the root pom.xml sets the default). -->
+        <sonar.sources>pom.xml,manifest.yaml,src</sonar.sources>
+        <sonar.tests></sonar.tests>
+        <!-- An example for plugin authors: it runs in a separate kernel in JavaPluginInstallationIT,
+             whose coverage is not collected, so it is left out of the coverage. -->
+        <sonar.coverage.exclusions>**/*</sonar.coverage.exclusions>
+    </properties>
+
+    <build>
+        <plugins>
+            <plugin>
+                <!-- target/sample-hello-<version>.zip, the plugin to install. -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-assembly-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+</project>

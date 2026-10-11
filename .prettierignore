@@ -6,10 +6,10 @@ package-lock.json
 docs/adr/
 docs/*.md
 *.md
-kernel/src/test/resources/
-distributions/k8s/
+src/server/src/test/resources/
+distribution/k8s/
 LICENSES/
 LICENSE
-e2e/.work/
-e2e/report/
+tests/e2e/.work/
+tests/e2e/report/
 .dev/

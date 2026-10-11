@@ -1,0 +1,41 @@
+# SPDX-FileCopyrightText: 2026 Massimo Antonini
+# SPDX-License-Identifier: MPL-2.0
+#
+# Image of Mosaikit: the installation (target/dist/mosaikit) in /opt/mosaikit, run as a non-root
+# user. Build it from the root of the project:
+#
+#   docker build -f distribution/docker/Containerfile -t mosaikit:dev .
+#
+# Plugins with Java code are added by building a derived image, so that the kernel is rebuilt at
+# image build time and the container can run with a read-only root filesystem:
+#
+#   FROM ghcr.io/mosaikit/mosaikit:<version>
+#   COPY --chown=185 my-plugin-1.0.0.zip /opt/mosaikit/plugins/
+#   RUN /opt/mosaikit/mosaikit build
+
+FROM node:24 AS node
+
+FROM maven:3.9-eclipse-temurin-25 AS build
+# The Maven build also builds the frontend with npm.
+COPY --from=node /usr/local/bin/node /usr/local/bin/node
+COPY --from=node /usr/local/lib/node_modules /usr/local/lib/node_modules
+RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
+    && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
+WORKDIR /workspace
+COPY . .
+RUN mvn --batch-mode --no-transfer-progress -DskipTests -Dspotless.apply.skip=true \
+        -pl distributions -am install
+
+# Ubuntu 24.04 LTS JRE image of Eclipse Temurin (no UBI 9 variant is published for Java 25).
+FROM eclipse-temurin:25-jre-noble
+LABEL org.opencontainers.image.title="Mosaikit" \
+      org.opencontainers.image.licenses="MPL-2.0" \
+      org.opencontainers.image.authors="Massimo Antonini"
+ENV LANG=C.UTF-8 \
+    JAVA_OPTS="-XX:MaxRAMPercentage=75 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
+WORKDIR /opt/mosaikit
+COPY --from=build --chown=185 /workspace/target/dist/mosaikit/ ./
+RUN chmod 755 mosaikit
+USER 185
+EXPOSE 8080
+ENTRYPOINT ["/opt/mosaikit/mosaikit", "start"]

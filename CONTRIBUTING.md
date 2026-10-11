@@ -30,7 +30,7 @@ Thank you for considering a contribution. This document describes how the projec
 6. Open a pull request with auto-merge (`gh pr merge --auto --rebase`): GitHub merges it with
    rebase once the required checks pass. Changes to `kernel-api`
    (including the manifest schema) or `sdk/` require a review.
-7. A feature is done when its end-to-end tests pass in `e2e/`, not only its unit tests.
+7. A feature is done when its end-to-end tests pass in `tests/e2e/`, not only its unit tests.
 
 ## Quality gate
 

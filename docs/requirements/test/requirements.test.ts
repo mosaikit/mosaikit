@@ -33,14 +33,15 @@ function filesUnder(path: string, suffix: string): string[] {
 function referencedIds(): Map<string, string[]> {
   const references = new Map<string, string[]>();
   const sources = [
-    ...filesUnder(join(root, 'kernel'), 'Test.java'),
-    ...filesUnder(join(root, 'kernel'), 'IT.java'),
-    ...filesUnder(join(root, 'kernel'), '.test.ts'),
+    // src/: the server, the web shell and the sample plugins.
+    ...filesUnder(join(root, 'src'), 'Test.java'),
+    ...filesUnder(join(root, 'src'), 'IT.java'),
+    ...filesUnder(join(root, 'src'), '.test.ts'),
     ...filesUnder(join(root, 'sdk'), 'Test.java'),
     ...filesUnder(join(root, 'sdk'), '.test.ts'),
-    ...filesUnder(join(root, 'plugins'), '.test.ts'),
+    ...filesUnder(join(root, 'build'), '.test.ts'),
     // A requirement is done when its end-to-end tests pass, so they count too.
-    ...filesUnder(join(root, 'e2e', 'tests'), '.e2e.ts'),
+    ...filesUnder(join(root, 'tests', 'e2e', 'tests'), '.e2e.ts'),
   ];
   for (const file of sources) {
     for (const match of readFileSync(file, 'utf8').matchAll(/MK-\d{3}/g)) {

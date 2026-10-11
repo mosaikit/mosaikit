@@ -1,0 +1,464 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SPDX-FileCopyrightText: 2026 Massimo Antonini
+  SPDX-License-Identifier: MPL-2.0
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.github.mosaikit</groupId>
+        <artifactId>mosaikit-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mosaikit-distributions</artifactId>
+    <packaging>pom</packaging>
+    <name>Mosaikit :: Distributions</name>
+    <description>
+        Everything that can be delivered, in target/dist of the project: the installation, the
+        Docker Compose and Kubernetes deployments, the plugin packages and, with -Pportable, the
+        portable archives.
+    </description>
+
+    <properties>
+        <!-- SonarQube: what this module contributes to the analysis (the root pom.xml sets the default). -->
+        <sonar.sources>pom.xml</sonar.sources>
+        <sonar.tests></sonar.tests>
+        <dist.directory>${maven.multiModuleProjectDirectory}/target/dist</dist.directory>
+        <kernel.directory>${maven.multiModuleProjectDirectory}/src/server/target/kernel</kernel.directory>
+        <!-- Bash for -Pportable; on Windows Git Bash (see the windows profile), override with -Dportable.bash. -->
+        <portable.bash>bash</portable.bash>
+        <!-- Key that signs the plugin packages (MK-013), as <directory>/<name> of <name>.key.pem and
+             <name>.pub.pem: -Dmosaikit.signing.key for releases, otherwise a key of this build. -->
+        <signing.key>${project.build.directory}/signing/mosaikit-build</signing.key>
+        <java.executable>${java.home}/bin/java</java.executable>
+    </properties>
+
+    <dependencies>
+        <!-- The signing tool of the plugin packages. -->
+        <dependency>
+            <groupId>io.github.mosaikit</groupId>
+            <artifactId>mosaikit-kernel-api</artifactId>
+            <version>${project.version}</version>
+        </dependency>
+        <!-- Only to build the kernel and the plugins before this module. -->
+        <dependency>
+            <groupId>io.github.mosaikit</groupId>
+            <artifactId>mosaikit-kernel</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>io.github.mosaikit.samples</groupId>
+            <artifactId>mosaikit-sample-notes</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>io.github.mosaikit.samples</groupId>
+            <artifactId>mosaikit-sample-activities</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>io.github.mosaikit.samples</groupId>
+            <artifactId>mosaikit-sample-estimates</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>io.github.mosaikit.samples</groupId>
+            <artifactId>mosaikit-sample-hello</artifactId>
+            <version>${project.version}</version>
+            <type>pom</type>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>io.github.mosaikit.samples</groupId>
+            <artifactId>mosaikit-sample-react</artifactId>
+            <version>${project.version}</version>
+            <type>pom</type>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>io.github.mosaikit.samples</groupId>
+            <artifactId>mosaikit-sample-vue</artifactId>
+            <version>${project.version}</version>
+            <type>pom</type>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>io.github.mosaikit.samples</groupId>
+            <artifactId>mosaikit-sample-todo</artifactId>
+            <version>${project.version}</version>
+            <type>pom</type>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>io.github.mosaikit.apps</groupId>
+            <artifactId>mosaikit-app-teams</artifactId>
+            <version>${project.version}</version>
+            <type>pom</type>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>io.github.mosaikit.apps</groupId>
+            <artifactId>mosaikit-app-chat</artifactId>
+            <version>${project.version}</version>
+            <type>pom</type>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>io.github.mosaikit.samples</groupId>
+            <artifactId>mosaikit-sample-theme</artifactId>
+            <version>${project.version}</version>
+            <type>pom</type>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>dist</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <!-- target/dist/mosaikit: the installation (Java 25 and PostgreSQL 18 needed). -->
+                                <delete dir="${dist.directory}/mosaikit"/>
+                                <copy todir="${dist.directory}/mosaikit">
+                                    <fileset dir="${project.basedir}/install">
+                                        <include name="mosaikit"/>
+                                        <include name="mosaikit.cmd"/>
+                                        <include name="README.md"/>
+                                        <include name="bin/**"/>
+                                    </fileset>
+                                </copy>
+                                <copy file="${project.basedir}/install/application.properties"
+                                      todir="${dist.directory}/mosaikit/config"/>
+                                <copy file="${project.basedir}/install/trusted-keys.md"
+                                      tofile="${dist.directory}/mosaikit/config/trusted-keys/README.md"/>
+                                <copy todir="${dist.directory}/mosaikit/bin/kernel">
+                                    <fileset dir="${kernel.directory}"/>
+                                </copy>
+                                <mkdir dir="${dist.directory}/mosaikit/plugins"/>
+                                <chmod file="${dist.directory}/mosaikit/mosaikit" perm="755"/>
+
+                                <!-- target/dist/plugins: the plugin packages, to copy into plugins/. -->
+                                <delete dir="${dist.directory}/plugins"/>
+                                <copy todir="${dist.directory}/plugins" flatten="true">
+                                    <fileset dir="${maven.multiModuleProjectDirectory}/plugins">
+                                        <include name="*/target/*.zip"/>
+                                    </fileset>
+                                </copy>
+                                <!-- mosaikit/catalog: the same packages as the catalog of the installation, the
+                                     default marketplace source (MK-022), signed and indexed below. -->
+                                <copy todir="${dist.directory}/mosaikit/catalog">
+                                    <fileset dir="${dist.directory}/plugins"/>
+                                </copy>
+
+                                <!-- target/dist/mosaikit-docker: Docker Compose with PostgreSQL and Keycloak.
+                                     Not deleted first: a running compose keeps it open, and the user's .env and
+                                     plugins/ must survive a rebuild. -->
+                                <copy todir="${dist.directory}/mosaikit-docker" overwrite="true">
+                                    <fileset dir="${project.basedir}/docker">
+                                        <exclude name="Containerfile"/>
+                                        <exclude name="env.example"/>
+                                    </fileset>
+                                </copy>
+                                <!-- Docker Compose reads .env; the repository keeps it as env.example. Created only once. -->
+                                <copy todir="${dist.directory}/mosaikit-docker">
+                                    <fileset dir="${project.basedir}/docker" includes="env.example">
+                                        <present present="srconly" targetdir="${dist.directory}/mosaikit-docker">
+                                            <globmapper from="env.example" to=".env"/>
+                                        </present>
+                                    </fileset>
+                                    <globmapper from="env.example" to=".env"/>
+                                </copy>
+                                <chmod file="${dist.directory}/mosaikit-docker/postgres/init-keycloak.sh" perm="755"/>
+
+                                <!-- target/dist/mosaikit-k8s: the Helm chart. -->
+                                <delete dir="${dist.directory}/mosaikit-k8s"/>
+                                <copy todir="${dist.directory}/mosaikit-k8s">
+                                    <fileset dir="${project.basedir}/k8s"/>
+                                </copy>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <!-- After the copy above: signs the plugin packages of target/dist/plugins and makes the
+                     installation trust the key (MK-013). -->
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>sign-plugins</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>${java.executable}</executable>
+                            <arguments>
+                                <argument>-classpath</argument>
+                                <classpath/>
+                                <argument>dev.mosaikit.kernel.api.signature.PackageSigningTool</argument>
+                                <argument>sign</argument>
+                                <argument>${signing.key}</argument>
+                                <argument>${dist.directory}/plugins</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <!-- target/dist/plugins/index.json(.sig): the signed catalog of the packages, which
+                             an installation can use as a marketplace source (MK-022). -->
+                        <id>index-plugins</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>${java.executable}</executable>
+                            <arguments>
+                                <argument>-classpath</argument>
+                                <classpath/>
+                                <argument>dev.mosaikit.kernel.api.signature.PackageSigningTool</argument>
+                                <argument>index</argument>
+                                <argument>${signing.key}</argument>
+                                <argument>${dist.directory}/plugins</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>sign-installation-catalog</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>${java.executable}</executable>
+                            <arguments>
+                                <argument>-classpath</argument>
+                                <classpath/>
+                                <argument>dev.mosaikit.kernel.api.signature.PackageSigningTool</argument>
+                                <argument>sign</argument>
+                                <argument>${signing.key}</argument>
+                                <argument>${dist.directory}/mosaikit/catalog</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>index-installation-catalog</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>${java.executable}</executable>
+                            <arguments>
+                                <argument>-classpath</argument>
+                                <classpath/>
+                                <argument>dev.mosaikit.kernel.api.signature.PackageSigningTool</argument>
+                                <argument>index</argument>
+                                <argument>${signing.key}</argument>
+                                <argument>${dist.directory}/mosaikit/catalog</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>trust-signing-key</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>exec</goal>
+                        </goals>
+                        <configuration>
+                            <executable>${java.executable}</executable>
+                            <arguments>
+                                <argument>-classpath</argument>
+                                <classpath/>
+                                <argument>dev.mosaikit.kernel.api.signature.PackageSigningTool</argument>
+                                <argument>trust</argument>
+                                <argument>${signing.key}</argument>
+                                <argument>${dist.directory}/mosaikit/config/trusted-keys</argument>
+                            </arguments>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <profile>
+            <!-- Without -Dmosaikit.signing.key: a key generated for this build signs the packages. -->
+            <id>build-signing-key</id>
+            <activation>
+                <property>
+                    <name>!mosaikit.signing.key</name>
+                </property>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>build-signing-key</id>
+                                <phase>prepare-package</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>${java.executable}</executable>
+                                    <arguments>
+                                        <argument>-classpath</argument>
+                                        <classpath/>
+                                        <argument>dev.mosaikit.kernel.api.signature.PackageSigningTool</argument>
+                                        <argument>keygen</argument>
+                                        <argument>${project.build.directory}/signing</argument>
+                                        <argument>mosaikit-build</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+        <profile>
+            <!-- With -Dmosaikit.signing.key=<directory>/<name>: the key of the publisher signs the packages. -->
+            <id>publisher-signing-key</id>
+            <activation>
+                <property>
+                    <name>mosaikit.signing.key</name>
+                </property>
+            </activation>
+            <properties>
+                <signing.key>${mosaikit.signing.key}</signing.key>
+            </properties>
+        </profile>
+        <profile>
+            <!-- On Windows "bash" is usually the WSL launcher of System32: use the Bash of Git for Windows. -->
+            <id>windows-bash</id>
+            <activation>
+                <os>
+                    <family>windows</family>
+                </os>
+            </activation>
+            <properties>
+                <!-- Maven reads the environment of Windows with upper-case names. -->
+                <portable.bash>${env.PROGRAMFILES}\Git\bin\bash.exe</portable.bash>
+            </properties>
+        </profile>
+        <profile>
+            <!-- mvnw install -Pportable: also the portable archives for Windows, Linux and macOS
+                 (target/dist/mosaikit-portable/mosaikit-portable-<version>-<platform>.zip|tar.gz). Needs Bash (Git Bash on Windows). -->
+            <id>portable</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>portable</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>${portable.bash}</executable>
+                                    <workingDirectory>${maven.multiModuleProjectDirectory}</workingDirectory>
+                                    <arguments>
+                                        <argument>distribution/portable/build.sh</argument>
+                                        <argument>${portable.platforms}</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>

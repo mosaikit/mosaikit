@@ -26,12 +26,13 @@ can in turn be extended by other plugins.
 
 | Path | Content |
 |---|---|
-| `kernel/` | The kernel: one Quarkus application with the services, the launcher that loads Java plugins, and the web UI in `src/main/webui` (Lit + Vite). |
+| `src/server/` | The kernel: one Quarkus application with the services and the launcher that loads Java plugins. |
+| `src/web/` | The web shell (Lit + Vite), built by npm and packaged in the kernel. |
 | `sdk/` | What third parties need to write plugins: `sdk/java` (the Java plugin API and the manifest schema), `sdk/js` (`@mosaikit/sdk` for plugin frontends) and `sdk/create-plugin` (a generator of new plugins). See [sdk/README.md](sdk/README.md). |
-| `plugins/` | Sample plugins, which follow the same rules as third-party plugins: frontend only (`sample-hello`, `sample-todo`), written with a framework (`sample-react`, `sample-vue`), with Java code (`sample-notes`, `sample-activities`, `sample-estimates`). |
-| `distributions/` | How Mosaikit is delivered: installation, portable archives, Docker, Kubernetes, Keycloak realm, release scripts. |
-| `e2e/` | End-to-end tests with Playwright on a real installation. See [e2e/README.md](e2e/README.md). |
-| `tools/` | Scripts for development: `npm run dev` and the embedded PostgreSQL it starts. |
+| `src/plugins/` | Sample plugins, which follow the same rules as third-party plugins: frontend only (`sample-hello`, `sample-todo`), written with a framework (`sample-react`, `sample-vue`), with Java code (`sample-notes`, `sample-activities`, `sample-estimates`). |
+| `distribution/` | How Mosaikit is delivered: installation, portable archives, Docker, Kubernetes, Keycloak realm, release scripts. |
+| `tests/e2e/` | End-to-end tests with Playwright on a real installation. See [tests/e2e/README.md](tests/e2e/README.md). |
+| `build/` | Scripts for development: `npm run dev` and the embedded PostgreSQL it starts. |
 | `docs/` | Guides for users and developers, compliance (AgID, ACN, GDPR), decisions (ADR) and the requirements (`docs/requirements`, `MK-xxx`). See [docs/README.md](docs/README.md). |
 
 ## Requirements
@@ -70,7 +71,7 @@ Open <http://localhost:8080> and sign in:
 `.dev/postgres`, kept between runs; `npm run dev -- --reset` starts again from an empty database)
 and a fake language model for the assistant, then runs the kernel with `quarkus:dev`:
 
-- Java code and the UI reload live (Quinoa runs Vite on `kernel/src/main/webui`).
+- Java code and the UI reload live (Quinoa runs Vite on `src/web`).
 - Plugins are read from `plugins/`, which is watched: save a file of a frontend, or add a plugin
   without Java code, and the open pages reload by themselves. Plugins with Java code are loaded
   only by the launcher of an installation (see [Try the distributions](#try-the-distributions)).
@@ -86,7 +87,7 @@ node sdk/create-plugin/dist/bin.js dev.example.roads --name Roads --backend --di
 
 The first one has no Java code: created in `plugins/`, it appears in the shell of `npm run dev`
 at once. The second one, with Java code, is built with Maven and installed in a distribution. See
-the [plugin development guide](docs/developer/plugin-development.md).
+the [plugin development guide](docs/development/plugin-development.md).
 
 ## Test
 
@@ -99,9 +100,9 @@ npm run e2e                              # end-to-end tests, after ./mvnw instal
 ```
 
 No Docker is needed: every test starts its own PostgreSQL. `npm run e2e` builds a test
-installation in `e2e/.work` from `target/dist`, starts it with its launcher and drives the shell
+installation in `tests/e2e/.work` from `target/dist`, starts it with its launcher and drives the shell
 with Playwright. Pull requests run the same checks in CI; see
-[docs/developer/development.md](docs/developer/development.md).
+[docs/development/development.md](docs/development/development.md).
 
 ## Build the distributions
 
@@ -168,9 +169,9 @@ In every distribution plugins are installed in two ways:
 
 ## Documentation
 
-- [User and administrator guide](docs/user/README.md): installation, administration, plugins,
+- [User and administrator guide](docs/guide/README.md): installation, administration, plugins,
   configuration, operations.
-- [Developer guide](docs/developer/README.md): architecture, building, plugin development, API.
+- [Developer guide](docs/development/README.md): architecture, building, plugin development, API.
 - [Compliance](docs/compliance/README.md): AgID and ACN QC2 matrix, evidence, open
   non-conformities.
 

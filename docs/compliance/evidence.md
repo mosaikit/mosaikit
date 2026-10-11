@@ -9,7 +9,7 @@ artefacts of the pipeline of the release tag.
 | Evidence | Job | Where |
 |---|---|---|
 | Unit and integration tests, per requirement (`@Tag("MK-…")`) | `backend`, `frontend` | job artefacts: JUnit reports (`**/target/surefire-reports`, `**/target/failsafe-reports`); the *Tests* tab of the pipeline |
-| Test coverage of Java and TypeScript | `backend`, `frontend`, `sonarqube` | `kernel/target/jacoco-report/`, `coverage/lcov.info`; SonarQube Cloud, project `mosaikit_mosaikit` |
+| Test coverage of Java and TypeScript | `backend`, `frontend`, `sonarqube` | `src/server/target/jacoco-report/`, `coverage/lcov.info`; SonarQube Cloud, project `mosaikit_mosaikit` |
 | Static analysis and quality gate | `sonarqube`, `sast` | SonarQube Cloud (A ratings, quality gate); Semgrep log of `sast` |
 | Secret scanning of the whole history | `secrets` | log of `secrets`; accepted findings in `.gitleaksignore` with their reason |
 | Software bill of materials | `sbom` | artefact `target/sbom.json` (CycloneDX) |
@@ -32,7 +32,7 @@ tag should be kept (*Keep* on the job page) or its artefacts attached to the rel
 | Catalogue metadata | `publiccode.yml` |
 | Vulnerability disclosure | `SECURITY.md` |
 | Secure development process | [secure-development.md](secure-development.md) |
-| Operating documentation | [docs/user/](../user/README.md) |
+| Operating documentation | [docs/guide/](../guide/README.md) |
 
 ## Checklist for a tender
 

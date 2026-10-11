@@ -12,21 +12,21 @@
     "sdk/js",
     "sdk/ui",
     "sdk/create-plugin",
-    "kernel/src/main/webui",
-    "plugins/sample-react",
-    "plugins/sample-vue"
+    "src/web",
+    "src/plugins/sample-react",
+    "src/plugins/sample-vue"
   ],
   "scripts": {
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
-    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p docs/requirements && tsc -p docs/test && tsc -p sdk/java && tsc -p e2e && tsc -p tools",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p docs/requirements && tsc -p docs/test && tsc -p sdk/java && tsc -p tests/e2e && tsc -p build",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "build": "npm run build --workspaces --if-present",
     "check": "npm run lint && npm run typecheck && npm run test:coverage",
     "verify": "npm run check && npm run build",
-    "e2e": "playwright test -c e2e",
-    "dev": "node tools/dev.ts",
+    "e2e": "playwright test -c tests/e2e",
+    "dev": "node build/dev.ts",
     "check:fast": "npm run lint && npm run typecheck && vitest run"
   },
   "devDependencies": {

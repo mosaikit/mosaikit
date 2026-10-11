@@ -1,0 +1,93 @@
+# Plugins
+
+Every feature of Mosaikit beyond organizations and accounts comes from a plugin. A plugin is one
+zip file (`<name>-<version>.zip`) that can hold a web frontend, Java code, database migrations and
+translations.
+
+## Installing, updating and removing
+
+| To | Do |
+|---|---|
+| install | copy the zip into `plugins/` as it is, and restart Mosaikit |
+| update | replace the zip with the new version, and restart |
+| remove | delete the zip, and restart; its database schema is kept |
+
+Plugins with Java code are built into the kernel by the launcher at the next start, which takes a
+few seconds. If the kernel cannot be rebuilt or does not start with a new plugin, the launcher
+restores the previous build, starts again, and the plugin stays disabled ("Rolled back") until a
+different version is installed.
+
+In Docker Compose, copy the zip into `mosaikit-docker/plugins/` and run
+`docker compose restart mosaikit`. In Kubernetes, build a derived image with the plugins (see the
+[Kubernetes guide](../../distribution/k8s/README.md)); frontend-only plugins can also be put on
+the plugins volume.
+
+## Marketplace
+
+Platform administrators find **Plugins** in the menu (MK-022,
+[ADR-0021](../adr/0021-minimal-marketplace.md)). The page lists the catalogs of the installation
+and what they offer next to what is installed, with **Install** and **Update** buttons, and accepts
+a package file for installations without network. Every package must be signed by a trusted
+publisher and, from a catalog, match its signed index. The package goes into `plugins/` (the one it
+replaces into `plugins/.previous/`) and takes effect at the next restart.
+
+Catalogs are directories with a signed `index.json`, listed in `mosaikit.marketplace.sources`. A
+path without scheme is a directory of the installation:
+
+```properties
+# the catalog of the installation, the one of the project, and a USB stick for an offline transfer
+mosaikit.marketplace.sources=catalog/,https://mosaikit.github.io/catalog/,file:/media/usb/mosaikit-plugins/
+```
+
+Each installation brings the sample plugins as a catalog in `catalog/`, its default source, signed
+with a key it already trusts; the build also leaves the packages in `target/dist/plugins`. Remove
+`catalog/` from the sources, or the directory, to offer none of them.
+
+To publish your own catalog, sign its index with your key:
+
+```bash
+java -cp bin/kernel/lib/main/io.github.mosaikit.mosaikit-kernel-api-*.jar \
+  dev.mosaikit.kernel.api.signature.PackageSigningTool index ~/keys/acme /srv/plugins/stable
+```
+
+## Status
+
+`GET /api/v1/plugins` (platform administrators) lists every plugin found:
+
+| Status | Meaning | What to do |
+|---|---|---|
+| `ACTIVE` | in use | |
+| `INCOMPATIBLE` | needs another kernel version, or a plugin that is missing or disabled | install the right versions |
+| `RESTART_REQUIRED` | its Java code is not in the running kernel | start Mosaikit with its launcher (`mosaikit`, `mosaikit.cmd`) |
+| `INVALID` | unreadable, broken manifest, refused signature, or rolled back | read `problems`, fix or replace the package |
+
+## Signed packages and trusted publishers
+
+A package can be signed by its publisher (see
+[ADR-0014](../adr/0014-signed-plugin-packages.md)). The installation trusts the public keys in
+`config/trusted-keys/` (`<name>.pub.pem`); the packages shipped with a distribution are signed with
+a key that is already there.
+
+- A signed package whose content was changed is **always refused**.
+- A package signed with a trusted key shows its publisher key (`publisherKey`).
+- Unsigned packages and packages of unknown publishers are accepted, as long as
+  `mosaikit.plugins.signatures` is `optional` (the default).
+- With `mosaikit.plugins.signatures=required` only packages signed with a trusted key are
+  accepted; plugin directories and unsigned packages are refused. Use it in production.
+
+The frontends of plugins whose publisher is not verified run isolated in a sandboxed iframe
+(`mosaikit.plugins.unverified-frontends=iframe`, the default): they cannot reach the rest of the
+page nor the credentials of the person, and exchange with the shell only the events and calls
+declared in their manifest. If such an app misses events or cannot load its data, its manifest
+does not declare them; trust its publisher, or ask for a manifest with a complete `bridge`.
+
+To trust a publisher, copy its `.pub.pem` file into `config/trusted-keys/` and restart. To check
+a package before installing it:
+
+```bash
+java -cp bin/kernel/lib/main/io.github.mosaikit.mosaikit-kernel-api-*.jar \
+  dev.mosaikit.kernel.api.signature.PackageSigningTool verify config/trusted-keys my-plugin-1.0.0.zip
+```
+
+To stop trusting a publisher (for example after a leaked key), delete its file and restart:
+its packages are refused at once when signatures are required.

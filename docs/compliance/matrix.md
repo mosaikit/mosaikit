@@ -32,7 +32,7 @@ Linee guida AgID per lo sviluppo del software sicuro, and OWASP ASVS 5.0 level 2
 | C-12 | Threat model of kernel and plugin model | Non-compliant | | NC-04 |
 | C-13 | Verification against ASVS 5.0 level 2 | Non-compliant | | NC-05 |
 | C-14 | Dynamic testing and penetration test | Non-compliant | | NC-06 |
-| C-15 | Secure HTTP headers (CSP, HSTS, nosniff, frame options, referrer) | Compliant | `kernel/src/main/resources/application.properties`, `SystemResourceTest` (MK-001) | |
+| C-15 | Secure HTTP headers (CSP, HSTS, nosniff, frame options, referrer) | Compliant | `src/server/src/main/resources/application.properties`, `SystemResourceTest` (MK-001) | |
 | C-16 | Errors without internal details (RFC 9457) | Compliant | MK-010, `dev.mosaikit.kernel.core.error` | |
 | C-17 | Passwords stored with a slow hash | Compliant | `PasswordHasher` (PBKDF2-HMAC-SHA256, 600 000 iterations), `PasswordHasherTest` | |
 

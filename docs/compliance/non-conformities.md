@@ -47,7 +47,7 @@ must provide a capability that the provider operates.
 - **Measure:** C-02. **Severity:** Low. **Owner:** Software.
 - **Gap:** the file is written by hand and never checked; `releaseDate` and `softwareVersion` can
   drift from the release.
-- **Action:** run `publiccode-parser` in the `verify` stage; let `distributions/release/prepare.sh`
+- **Action:** run `publiccode-parser` in the `verify` stage; let `distribution/release/prepare.sh`
   update version and date.
 
 ### NC-02 Repository not public, not in the Developers Italia catalogue
@@ -96,7 +96,7 @@ must provide a capability that the provider operates.
   no automated check.
 - **Action:** axe-core checks of the shell pages in the frontend tests (Playwright) and in CI;
   manual evaluation with a screen reader and keyboard only; plugin guidelines on accessible
-  custom elements in `docs/developer/plugin-development.md`; alternative texts for maps and
+  custom elements in `docs/development/plugin-development.md`; alternative texts for maps and
   dashboards in the plugins that draw them.
 
 ### NC-08 No accessibility evaluation report

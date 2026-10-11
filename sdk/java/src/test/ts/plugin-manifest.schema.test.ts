@@ -21,7 +21,7 @@ function manifestsIn(directory: string): string[] {
 }
 
 describe('plugin manifest schema', () => {
-  it.each([...manifestsIn('plugins'), ...manifestsIn('kernel/src/test/resources/plugins')])(
+  it.each([...manifestsIn('src/plugins'), ...manifestsIn('src/server/src/test/resources/plugins')])(
     'accepts %s',
     (file) => {
       const valid = validate(parse(readFileSync(file, 'utf8')));

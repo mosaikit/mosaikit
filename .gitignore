@@ -4,6 +4,8 @@ dist/
 build/
 # ...except the sources of the release documents.
 !docs/build/
+# ...and the development scripts at the root (MK-049).
+!/build/
 .quinoa/
 *.log
 
@@ -11,8 +13,8 @@ build/
 .dev/
 
 # End-to-end tests: the test installation, results and report
-e2e/.work/
-e2e/report/
+tests/e2e/.work/
+tests/e2e/report/
 
 # Node
 node_modules/
@@ -44,5 +46,5 @@ Thumbs.db
 # Local runtime data
 .mosaikit/
 
-# Plugin JARs built from sources (plugins/*/backend)
-plugins/*/lib/
+# Plugin JARs built from sources (src/plugins/*/backend)
+src/plugins/*/lib/

@@ -5,7 +5,7 @@
 # SonarQube, security scans and packaging. Images and actions are pinned by tag; Renovate proposes
 # updates.
 #
-# A tag vX.Y.Z (see docs/developer/release.md) also runs the release: version check, container image
+# A tag vX.Y.Z (see docs/development/release.md) also runs the release: version check, container image
 # in GHCR, kernel-api and its parent POM in Maven Central, @mosaikit/sdk and @mosaikit/create-plugin
 # in npmjs.org, the Helm
 # chart in GHCR as an OCI artifact, and a GitHub release with the CHANGELOG section,
@@ -62,8 +62,8 @@ jobs:
       - name: Check the version and extract the release notes
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          bash distributions/release/check-version.sh "$VERSION"
-          bash distributions/release/release-notes.sh "$VERSION" > release-notes.md
+          bash distribution/release/check-version.sh "$VERSION"
+          bash distribution/release/release-notes.sh "$VERSION" > release-notes.md
           test -s release-notes.md
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -113,8 +113,8 @@ jobs:
           name: frontend
           path: |
             coverage/
-            kernel/src/main/webui/dist/
-            plugins/*/dist/
+            src/web/dist/
+            src/plugins/*/dist/
           retention-days: 7
 
   # The documents of every commit (ADR-0023): Word and PDF guides, the compliance workbook, the
@@ -158,7 +158,7 @@ jobs:
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
-        run: bash distributions/release/check-changelog.sh "$BASE_SHA"
+        run: bash distribution/release/check-changelog.sh "$BASE_SHA"
 
   backend:
     needs: changes
@@ -190,7 +190,7 @@ jobs:
           CODE: ${{ needs.changes.outputs.code }}
         run: |
           if [[ "$CODE" != true ]]; then
-            ./mvnw $MAVEN_CLI_OPTS -pl kernel -am test -Dskip.npm -Dtest=DocumentationTest -Dsurefire.failIfNoSpecifiedTests=false
+            ./mvnw $MAVEN_CLI_OPTS -pl src/server -am test -Dskip.npm -Dtest=DocumentationTest -Dsurefire.failIfNoSpecifiedTests=false
           elif [[ "$SLOW" == true ]]; then
             ./mvnw $MAVEN_CLI_OPTS verify -Dskip.npm -Dtest.groups.excluded=
           else
@@ -206,12 +206,12 @@ jobs:
           name: backend
           path: |
             sdk/java/target/site/jacoco/
-            kernel/target/site/jacoco/
-            kernel/target/jacoco-report/
+            src/server/target/site/jacoco/
+            src/server/target/jacoco-report/
             target/dist/
           retention-days: 7
 
-  # End-to-end tests (e2e/): an installation built here, at the same time as the backend job runs
+  # End-to-end tests (tests/e2e/): an installation built here, at the same time as the backend job runs
   # the unit tests, started by its launcher on a PostgreSQL 18 of its own, driven in Chromium by
   # Playwright. Only the language model is a fake. A requirement is done when its e2e cases pass
   # here, not only its unit tests.
@@ -248,10 +248,10 @@ jobs:
         with:
           name: e2e
           path: |
-            e2e/report/
-            e2e/.work/results/
-            e2e/.work/installation.log
-            e2e/.work/mail/
+            tests/e2e/report/
+            tests/e2e/.work/results/
+            tests/e2e/.work/installation.log
+            tests/e2e/.work/mail/
           retention-days: 7
 
   # ---------------------------------------------------------------------------------------------
@@ -432,7 +432,7 @@ jobs:
           SOURCE_DATE_EPOCH: ${{ steps.image.outputs.epoch }}
         with:
           context: .
-          file: distributions/docker/Containerfile
+          file: distribution/docker/Containerfile
           tags: ${{ steps.image.outputs.name }}:${{ github.ref_name }}
           labels: org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
           outputs: type=registry,rewrite-timestamp=true
@@ -466,7 +466,7 @@ jobs:
         env:
           PLATFORM: ${{ matrix.platform }}
         run: |
-          distributions/portable/build.sh "$PLATFORM" target/portable
+          distribution/portable/build.sh "$PLATFORM" target/portable
           if [[ "$GITHUB_REF" == refs/tags/v* ]]; then
             # The archives take the name of the tag before the checksums are computed, so that the
             # names in SHA256SUMS match the files attached to the release:
@@ -509,7 +509,7 @@ jobs:
       - name: MK-016 acceptance test on the Linux archive, as a user would run it
         run: |
           ARCHIVE="$(ls target/portable/mosaikit-portable-*-linux-x64.tar.gz)"
-          ./mvnw $MAVEN_CLI_OPTS -pl kernel -am verify -Dskip.npm \
+          ./mvnw $MAVEN_CLI_OPTS -pl src/server -am verify -Dskip.npm \
             -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false \
             -Dit.test=PortableDistributionIT -Dfailsafe.failIfNoSpecifiedTests=false \
             -Dmosaikit.it.portable="$GITHUB_WORKSPACE/$ARCHIVE"
@@ -605,8 +605,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          linux-amd64/helm lint distributions/k8s/mosaikit
-          linux-amd64/helm package distributions/k8s/mosaikit
+          linux-amd64/helm lint distribution/k8s/mosaikit
+          linux-amd64/helm package distribution/k8s/mosaikit
           echo "$GITHUB_TOKEN" | linux-amd64/helm registry login ghcr.io \
             --username "$GITHUB_ACTOR" --password-stdin
           linux-amd64/helm push "mosaikit-${GITHUB_REF_NAME#v}.tgz" \

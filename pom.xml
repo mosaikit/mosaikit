@@ -53,18 +53,18 @@
         <!-- Order of the build: the plugin API, the sample plugins, the kernel, the distributions.
              The frontend (npm workspaces) is built and tested by this POM before them. -->
         <module>sdk/java</module>
-        <module>plugins/sample-hello</module>
-        <module>plugins/sample-notes</module>
-        <module>plugins/sample-activities</module>
-        <module>plugins/sample-estimates</module>
-        <module>plugins/sample-react</module>
-        <module>plugins/sample-vue</module>
-        <module>plugins/sample-todo</module>
-        <module>plugins/app-teams</module>
-        <module>plugins/app-chat</module>
-        <module>plugins/sample-theme</module>
-        <module>kernel</module>
-        <module>distributions</module>
+        <module>src/plugins/sample-hello</module>
+        <module>src/plugins/sample-notes</module>
+        <module>src/plugins/sample-activities</module>
+        <module>src/plugins/sample-estimates</module>
+        <module>src/plugins/sample-react</module>
+        <module>src/plugins/sample-vue</module>
+        <module>src/plugins/sample-todo</module>
+        <module>src/plugins/app-teams</module>
+        <module>src/plugins/app-chat</module>
+        <module>src/plugins/sample-theme</module>
+        <module>src/server</module>
+        <module>distribution</module>
     </modules>
 
     <properties>
@@ -73,7 +73,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <project.build.outputTimestamp>2026-09-29T00:00:00Z</project.build.outputTimestamp>
 
-        <!-- Platform versions (see docs/adr/0003 and docs/developer/versions.md) -->
+        <!-- Platform versions (see docs/adr/0003 and docs/development/versions.md) -->
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
         <quarkus.platform.version>3.39.5</quarkus.platform.version>
@@ -118,7 +118,7 @@
         <!-- SonarQube Cloud: keys shown in the project information page; override with -D if they differ. -->
         <sonar.organization>mosaikit</sonar.organization>
         <sonar.projectKey>mosaikit_mosaikit</sonar.projectKey>
-        <sonar.coverage.jacoco.xmlReportPaths>${maven.multiModuleProjectDirectory}/kernel/target/jacoco-report/jacoco.xml,${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+        <sonar.coverage.jacoco.xmlReportPaths>${maven.multiModuleProjectDirectory}/src/server/target/jacoco-report/jacoco.xml,${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
         <!-- The TypeScript SDK sits outside the Maven modules, so the root project analyses it; every
              module sets its own sonar.sources and sonar.tests, since these properties are inherited. -->
         <sonar.sources>pom.xml,package.json,sdk/js/src,sdk/js/package.json,sdk/create-plugin/src,sdk/create-plugin/package.json</sonar.sources>
@@ -137,7 +137,7 @@
         <sonar.issue.ignore.multicriteria.e1.resourceKey>**/application-dev.properties</sonar.issue.ignore.multicriteria.e1.resourceKey>
         <sonar.issue.ignore.multicriteria.e2.ruleKey>java:S2077</sonar.issue.ignore.multicriteria.e2.ruleKey>
         <sonar.issue.ignore.multicriteria.e2.resourceKey>**/kernel/core/data/RowSecurity.java</sonar.issue.ignore.multicriteria.e2.resourceKey>
-        <sonar.coverage.exclusions>**/webui/src/main.ts,**/webui/src/mk-shell.ts,**/webui/src/mk-plugin-frame.ts,**/webui/src/mk-admin-plugins.ts,**/webui/src/mk-assistant.ts</sonar.coverage.exclusions>
+        <sonar.coverage.exclusions>**/web/src/main.ts,**/web/src/mk-shell.ts,**/web/src/mk-plugin-frame.ts,**/web/src/mk-admin-plugins.ts,**/web/src/mk-assistant.ts</sonar.coverage.exclusions>
     </properties>
 
     <dependencyManagement>
@@ -253,7 +253,7 @@
                     <version>${jandex-plugin.version}</version>
                 </plugin>
                 <plugin>
-                    <!-- Packages a plugin as one zip (plugins/plugin-package.xml): see plugins/README.md. -->
+                    <!-- Packages a plugin as one zip (src/plugins/plugin-package.xml): see src/plugins/README.md. -->
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-assembly-plugin</artifactId>
                     <version>${assembly-plugin.version}</version>
@@ -266,7 +266,7 @@
                             </goals>
                             <configuration>
                                 <descriptors>
-                                    <descriptor>${maven.multiModuleProjectDirectory}/plugins/plugin-package.xml</descriptor>
+                                    <descriptor>${maven.multiModuleProjectDirectory}/src/plugins/plugin-package.xml</descriptor>
                                 </descriptors>
                                 <finalName>${plugin.package.name}-${project.version}</finalName>
                                 <appendAssemblyId>false</appendAssemblyId>
@@ -291,7 +291,7 @@
                     <version>${jacoco-plugin.version}</version>
                 </plugin>
                 <plugin>
-                    <!-- Used by distributions/release/prepare.sh -->
+                    <!-- Used by distribution/release/prepare.sh -->
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>versions-maven-plugin</artifactId>
                     <version>${versions-plugin.version}</version>

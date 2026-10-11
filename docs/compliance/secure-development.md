@@ -48,7 +48,7 @@ Dynamic testing and penetration tests are to be added (NC-06).
 
 ## Release and maintenance
 
-- Releases come from signed tags (`docs/developer/release.md`); the pipeline of the tag builds,
+- Releases come from signed tags (`docs/development/release.md`); the pipeline of the tag builds,
   tests and publishes everything; the SBOM goes with the release.
 - Dependencies are updated by Renovate, which waits seven days after a release before proposing
   it, to avoid compromised versions.

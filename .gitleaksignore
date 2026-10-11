@@ -2,4 +2,4 @@
 # Development-only password of the dev-mode administrator, in a docs example (since removed).
 071e81bd3addbf4a72dda6c39b7c278c8213c7ae:docs/development.md:curl-auth-user:88
 # Not a secret: the characters of generated passwords, under a name that the rule matched (since renamed).
-794405e16e70f468ca95576467177ea123402e81:kernel/src/main/java/dev/mosaikit/launcher/PortableDatabase.java:generic-api-key:49
+794405e16e70f468ca95576467177ea123402e81:src/server/src/main/java/dev/mosaikit/launcher/PortableDatabase.java:generic-api-key:49

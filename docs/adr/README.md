@@ -38,3 +38,4 @@ by a new record that supersedes the old one, never by editing it.
 | [0031](0031-frontend-plugins-on-the-data-api.md) | Frontend plugins on a data API of the kernel, active without a restart | Accepted |
 | [0032](0032-fluent-ui-and-themes.md) | Fluent UI web components behind `@mosaikit/ui`, with selectable themes | Accepted |
 | [0033](0033-lean-collaboration.md) | Collaboration on the real-time channel and the data API, without brokers or backends | Accepted |
+| [0034](0034-repository-layout-by-role.md) | Repository laid out by role, with the sources under src/ | Accepted |
