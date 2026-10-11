@@ -838,7 +838,7 @@ export class MkShell extends LitElement {
     for (const muted of this.preferences?.mutedNotifications ?? []) {
       kinds.add(muted);
     }
-    return [...kinds].sort();
+    return [...kinds].sort((a, b) => a.localeCompare(b));
   }
 
   /** Reads the activity feed again: at sign-in and when the kernel pushes a notification. */

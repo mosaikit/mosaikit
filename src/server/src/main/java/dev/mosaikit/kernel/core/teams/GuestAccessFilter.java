@@ -5,7 +5,6 @@ package dev.mosaikit.kernel.core.teams;
 import dev.mosaikit.kernel.core.identity.RequestOrganization;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.annotation.Priority;
-import jakarta.inject.Inject;
 import jakarta.ws.rs.Priorities;
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ContainerRequestFilter;
@@ -35,8 +34,11 @@ public class GuestAccessFilter implements ContainerRequestFilter {
             "/api/v1/system/",
             "/api/v1/teams");
 
-    @Inject
-    SecurityIdentity identity;
+    private final SecurityIdentity identity;
+
+    public GuestAccessFilter(SecurityIdentity identity) {
+        this.identity = identity;
+    }
 
     @Override
     public void filter(ContainerRequestContext request) {

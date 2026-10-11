@@ -6,7 +6,6 @@ import dev.mosaikit.kernel.core.identity.RequestOrganization;
 import dev.mosaikit.kernel.core.plugin.PluginRegistry;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.annotation.Priority;
-import jakarta.inject.Inject;
 import jakarta.ws.rs.Priorities;
 import jakarta.ws.rs.container.ContainerRequestContext;
 import jakarta.ws.rs.container.ContainerRequestFilter;
@@ -24,14 +23,15 @@ import java.util.UUID;
 @Priority(Priorities.AUTHORIZATION + 10)
 public class AppAccessFilter implements ContainerRequestFilter {
 
-    @Inject
-    SecurityIdentity identity;
+    private final SecurityIdentity identity;
+    private final AppSettings settings;
+    private final PluginRegistry registry;
 
-    @Inject
-    AppSettings settings;
-
-    @Inject
-    PluginRegistry registry;
+    public AppAccessFilter(SecurityIdentity identity, AppSettings settings, PluginRegistry registry) {
+        this.identity = identity;
+        this.settings = settings;
+        this.registry = registry;
+    }
 
     @Override
     public void filter(ContainerRequestContext request) {
