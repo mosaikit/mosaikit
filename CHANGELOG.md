@@ -90,6 +90,10 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The repository is laid out by role (MK-049, ADR-0034): the sources under `src/` (`src/server`,
+  `src/web`, `src/plugins`), beside `sdk/`, `distribution/`, `tests/e2e`, `build/`, `docs/guide`
+  and `docs/development`. The layout of an installation does not change.
+
 - The Maven coordinates are `io.github.mosaikit` (`io.github.mosaikit:mosaikit-kernel-api`) and
   `io.github.mosaikit.samples`, the namespace that Maven Central verifies with the GitHub
   organization (ADR-0025); the Java packages and the plugin identifiers do not change.

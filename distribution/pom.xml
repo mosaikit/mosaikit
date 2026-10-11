@@ -224,7 +224,7 @@
                                 <!-- target/dist/plugins: the plugin packages, to copy into plugins/. -->
                                 <delete dir="${dist.directory}/plugins"/>
                                 <copy todir="${dist.directory}/plugins" flatten="true">
-                                    <fileset dir="${maven.multiModuleProjectDirectory}/plugins">
+                                    <fileset dir="${maven.multiModuleProjectDirectory}/src/plugins">
                                         <include name="*/target/*.zip"/>
                                     </fileset>
                                 </copy>
