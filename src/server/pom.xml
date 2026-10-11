@@ -154,10 +154,10 @@
             <artifactId>testcontainers</artifactId>
             <scope>test</scope>
         </dependency>
-        <!-- Only to build the sample Java plugin before the installation tests. -->
+        <!-- Only to build the fixture Java plugins before the installation tests. -->
         <dependency>
-            <groupId>io.github.mosaikit.samples</groupId>
-            <artifactId>mosaikit-sample-notes</artifactId>
+            <groupId>io.github.mosaikit.fixtures</groupId>
+            <artifactId>mosaikit-fixture-notes</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
             <exclusions>
@@ -168,8 +168,8 @@
             </exclusions>
         </dependency>
         <dependency>
-            <groupId>io.github.mosaikit.samples</groupId>
-            <artifactId>mosaikit-sample-activities</artifactId>
+            <groupId>io.github.mosaikit.fixtures</groupId>
+            <artifactId>mosaikit-fixture-activities</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
             <exclusions>
@@ -180,8 +180,8 @@
             </exclusions>
         </dependency>
         <dependency>
-            <groupId>io.github.mosaikit.samples</groupId>
-            <artifactId>mosaikit-sample-estimates</artifactId>
+            <groupId>io.github.mosaikit.fixtures</groupId>
+            <artifactId>mosaikit-fixture-estimates</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
             <exclusions>
@@ -276,9 +276,9 @@
                 <configuration>
                     <systemPropertyVariables>
                         <mosaikit.it.kernel>${project.build.directory}/kernel</mosaikit.it.kernel>
-                        <mosaikit.it.plugin>${maven.multiModuleProjectDirectory}/src/plugins/sample-notes/target/sample-notes-${project.version}.zip</mosaikit.it.plugin>
-                        <mosaikit.it.activities>${maven.multiModuleProjectDirectory}/src/plugins/sample-activities/target/sample-activities-${project.version}.zip</mosaikit.it.activities>
-                        <mosaikit.it.estimates>${maven.multiModuleProjectDirectory}/src/plugins/sample-estimates/target/sample-estimates-${project.version}.zip</mosaikit.it.estimates>
+                        <mosaikit.it.plugin>${maven.multiModuleProjectDirectory}/tests/fixtures/plugins/notes/target/fixture-notes-${project.version}.zip</mosaikit.it.plugin>
+                        <mosaikit.it.activities>${maven.multiModuleProjectDirectory}/tests/fixtures/plugins/activities/target/fixture-activities-${project.version}.zip</mosaikit.it.activities>
+                        <mosaikit.it.estimates>${maven.multiModuleProjectDirectory}/tests/fixtures/plugins/estimates/target/fixture-estimates-${project.version}.zip</mosaikit.it.estimates>
                         <mosaikit.it.work>${project.build.directory}/it</mosaikit.it.work>
                         <test.root>${maven.multiModuleProjectDirectory}</test.root>
                     </systemPropertyVariables>

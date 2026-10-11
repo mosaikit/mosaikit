@@ -95,7 +95,7 @@ class PortableDistributionIT {
         stop();
         installSampleNotes(home);
         start(home);
-        assertThat(post(MEMBER, "/api/v1/p/sample-notes/notes", MEMBER_PASSWORD, "{\"text\":\"Kept in data/\"}"))
+        assertThat(post(MEMBER, "/api/v1/p/fixture-notes/notes", MEMBER_PASSWORD, "{\"text\":\"Kept in data/\"}"))
                 .isEqualTo(201);
 
         // 2. Data survive a restart and a backup of data/ restores them on another copy.
@@ -106,7 +106,7 @@ class PortableDistributionIT {
         start(restored);
         assertThat(get("/api/v1/organizations", password).findValuesAsText("slug"))
                 .contains("demo");
-        assertThat(get(MEMBER, "/api/v1/p/sample-notes/notes", MEMBER_PASSWORD).findValuesAsText("text"))
+        assertThat(get(MEMBER, "/api/v1/p/fixture-notes/notes", MEMBER_PASSWORD).findValuesAsText("text"))
                 .contains("Kept in data/");
     }
 

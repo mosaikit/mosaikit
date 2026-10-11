@@ -64,7 +64,7 @@ test.describe('MK-024 Assistant on the tools of the plugins', () => {
     // A draft for an activity that does not exist: the plugin answers 404 at the confirmation.
     const drafted = await api(
       MARIO,
-      '/api/v1/ai/tools/sample-activities__complete-activity/invocations',
+      '/api/v1/ai/tools/fixture-activities__complete-activity/invocations',
       {
         method: 'POST',
         body: JSON.stringify({ id: '00000000-0000-4000-8000-000000000000' }),
@@ -81,7 +81,7 @@ test.describe('MK-024 Assistant on the tools of the plugins', () => {
     const activity = await createActivity(MARIO, unique('Controllare i lampioni'));
     const drafted = await api(
       MARIO,
-      '/api/v1/ai/tools/sample-activities__complete-activity/invocations',
+      '/api/v1/ai/tools/fixture-activities__complete-activity/invocations',
       {
         method: 'POST',
         body: JSON.stringify({ id: activity.id }),

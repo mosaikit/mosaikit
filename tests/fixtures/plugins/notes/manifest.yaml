@@ -1,0 +1,52 @@
+id: dev.mosaikit.fixture.notes
+version: 0.1.0
+name: Notes (fixture)
+description: Sample Java plugin with a REST endpoint, an entity, a database migration and an app.
+kind: [app, service]
+platform: '>=0.1 <1'
+backend:
+  jar: lib/fixture-notes.jar
+  api: fixture-notes
+# Typed actions for assistants and MCP clients (MK-015). A write action runs only after the
+# person confirms the draft.
+actions:
+  - name: list-notes
+    title: List notes
+    description: Lists the notes of the organization, oldest first.
+    risk: read
+    call:
+      method: GET
+      path: notes
+  - name: create-note
+    title: Create a note
+    description: Adds a note to the organization.
+    risk: write
+    input:
+      type: object
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 500
+      required: [text]
+      additionalProperties: false
+    call:
+      method: POST
+      path: notes
+database:
+  schema: p_fixture_notes
+frontend:
+  entry: web/index.js
+  isolation: module
+  # Used when the shell isolates the frontend in an iframe (MK-014).
+  bridge:
+    services: [api]
+contributes:
+  # The app bar of the shell (MK-025).
+  rail.app:
+    - id: notes
+      title: Notes
+      route: /app/notes
+      element: mk-fixture-notes
+      icon: web/icon.svg
+      order: 30

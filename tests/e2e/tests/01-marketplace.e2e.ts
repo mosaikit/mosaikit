@@ -4,9 +4,9 @@ import { expect, test } from '@playwright/test';
 import { MARIO } from '../support/env.js';
 import { apps, openApp, plugins, restart, signIn } from '../support/shell.js';
 
-const SAMPLES = ['activities', 'estimates', 'notes', 'react', 'vue'];
+const FIXTURES = ['activities', 'estimates', 'notes', 'hello'];
 /** Frontends without a backend or a schema: active as soon as they are installed (ADR-0031). */
-const FRONTEND_ONLY = new Set(['react', 'vue']);
+const FRONTEND_ONLY = new Set(['hello']);
 
 test.describe('MK-022 Minimal marketplace with signed catalogs', () => {
   test('22.1–22.2 an administrator installs plugins from a signed catalog without touching files', async ({
@@ -16,11 +16,11 @@ test.describe('MK-022 Minimal marketplace with signed catalogs', () => {
     await openApp(page, 'Plugins');
     await expect(page.getByText(/verified, key/)).toBeVisible();
     const rows = page.locator('tbody tr');
-    // The packages of plugins/: the samples, the theme and the apps Teams and Chat.
-    await expect(rows).toHaveCount(10);
+    // The packages of the fixture plugins (tests/fixtures/plugins).
+    await expect(rows).toHaveCount(6);
 
-    for (const name of SAMPLES) {
-      const id = `dev.mosaikit.sample.${name}`;
+    for (const name of FIXTURES) {
+      const id = `dev.mosaikit.fixture.${name}`;
       const row = rows.filter({ hasText: id });
       await row.getByRole('button', { name: 'Install' }).click();
       const status = page.locator('mk-admin-plugins').getByRole('status');
@@ -37,8 +37,8 @@ test.describe('MK-022 Minimal marketplace with signed catalogs', () => {
     const log = await restart();
     expect(log).toMatch(/kernel rebuilt in [\d.]+ s/);
     const statuses = await plugins();
-    for (const name of SAMPLES) {
-      expect(statuses.find((p) => p.id === `dev.mosaikit.sample.${name}`)?.status).toBe('ACTIVE');
+    for (const name of FIXTURES) {
+      expect(statuses.find((p) => p.id === `dev.mosaikit.fixture.${name}`)?.status).toBe('ACTIVE');
     }
   });
 
@@ -46,7 +46,7 @@ test.describe('MK-022 Minimal marketplace with signed catalogs', () => {
     page,
   }) => {
     await signIn(page, MARIO);
-    for (const app of ['Activities', 'Notes', 'Palette']) {
+    for (const app of ['Activities', 'Notes', 'Hello']) {
       await expect(apps(page).getByRole('link', { name: app, exact: true })).toBeVisible();
     }
   });

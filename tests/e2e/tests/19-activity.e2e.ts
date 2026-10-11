@@ -11,7 +11,7 @@ async function annaNotifiesMario(kind: string, title: string): Promise<number> {
   const response = await api(ANNA, '/api/v1/notifications', {
     method: 'POST',
     body: JSON.stringify({
-      plugin: 'dev.mosaikit.sample.todo',
+      plugin: 'dev.mosaikit.fixture.todo',
       to: [MARIO.user],
       kind,
       title,

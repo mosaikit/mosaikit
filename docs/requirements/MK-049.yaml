@@ -5,8 +5,8 @@ priority: P1
 status: done
 description: >-
   The repository says at first sight where each thing is. The code that runs is under src/: the
-  server (src/server, the Quarkus kernel and the launcher), the web shell (src/web) and the sample
-  plugins (src/plugins). Beside it stand what third parties use (sdk/), how Mosaikit is delivered
+  server (src/server, the Quarkus kernel and the launcher), and the web shell (src/web);
+  the plugins that its tests install are fixtures under tests/fixtures/plugins. Beside it stand what third parties use (sdk/), how Mosaikit is delivered
   (distribution/), the tests that need a whole installation (tests/e2e), the scripts of development
   (build/) and the documentation (docs/, with docs/guide for who runs Mosaikit and
   docs/development for who changes it). The folders of an installation (plugins/, bin/kernel/)

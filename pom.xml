@@ -53,16 +53,12 @@
         <!-- Order of the build: the plugin API, the sample plugins, the kernel, the distributions.
              The frontend (npm workspaces) is built and tested by this POM before them. -->
         <module>sdk/java</module>
-        <module>src/plugins/sample-hello</module>
-        <module>src/plugins/sample-notes</module>
-        <module>src/plugins/sample-activities</module>
-        <module>src/plugins/sample-estimates</module>
-        <module>src/plugins/sample-react</module>
-        <module>src/plugins/sample-vue</module>
-        <module>src/plugins/sample-todo</module>
-        <module>src/plugins/app-teams</module>
-        <module>src/plugins/app-chat</module>
-        <module>src/plugins/sample-theme</module>
+        <module>tests/fixtures/plugins/hello</module>
+        <module>tests/fixtures/plugins/notes</module>
+        <module>tests/fixtures/plugins/activities</module>
+        <module>tests/fixtures/plugins/estimates</module>
+        <module>tests/fixtures/plugins/todo</module>
+        <module>tests/fixtures/plugins/theme</module>
         <module>src/server</module>
         <module>distribution</module>
     </modules>
@@ -253,7 +249,7 @@
                     <version>${jandex-plugin.version}</version>
                 </plugin>
                 <plugin>
-                    <!-- Packages a plugin as one zip (src/plugins/plugin-package.xml): see src/plugins/README.md. -->
+                    <!-- Packages a plugin as one zip (tests/fixtures/plugins/plugin-package.xml). -->
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-assembly-plugin</artifactId>
                     <version>${assembly-plugin.version}</version>
@@ -266,7 +262,7 @@
                             </goals>
                             <configuration>
                                 <descriptors>
-                                    <descriptor>${maven.multiModuleProjectDirectory}/src/plugins/plugin-package.xml</descriptor>
+                                    <descriptor>${maven.multiModuleProjectDirectory}/tests/fixtures/plugins/plugin-package.xml</descriptor>
                                 </descriptors>
                                 <finalName>${plugin.package.name}-${project.version}</finalName>
                                 <appendAssemblyId>false</appendAssemblyId>

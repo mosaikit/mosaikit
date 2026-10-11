@@ -12,8 +12,8 @@ class PluginApiGuardTest {
 
     @Test
     void findsTheApiNameOfAPluginPath() {
-        assertThat(PluginApiGuard.apiName("/api/v1/p/sample-notes/notes")).contains("sample-notes");
-        assertThat(PluginApiGuard.apiName("/api/v1/p/sample-notes")).contains("sample-notes");
+        assertThat(PluginApiGuard.apiName("/api/v1/p/fixture-notes/notes")).contains("fixture-notes");
+        assertThat(PluginApiGuard.apiName("/api/v1/p/fixture-notes")).contains("fixture-notes");
     }
 
     @Test

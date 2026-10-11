@@ -1,130 +1,65 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
-import { rmSync } from 'node:fs';
-import { createServer, type Server } from 'node:http';
 import { join } from 'node:path';
-import { startPostgres } from '../../build/postgres.ts';
-import { startFakeSmtp } from '../../build/smtp.ts';
+import { Bench } from '../../sdk/testing/src/bench.js';
+import { packagesIn } from '../../sdk/testing/src/packages.js';
+import { readdirSync } from 'node:fs';
 import {
   ADMIN,
   ANNA,
-  BASE_URL,
   CONTROL_PORT,
-  MAIL,
+  DIST,
+  FIXTURES,
+  KERNEL_PORT,
   MARIO,
   MODEL_PORT,
+  MODEL_URL,
   ORGANIZATION,
-  SMTP_PORT,
   WORK,
 } from './support/env.js';
 import { startFakeModel } from './support/fake-model.js';
-import { confirmationLink } from './support/mail.js';
-import {
-  configure,
-  defaultSettings,
-  logLength,
-  logSince,
-  prepare,
-  start,
-  stop,
-  type Settings,
-} from './support/installation.js';
 
 /**
- * Prepares and starts a test installation from target/dist, a fake language model, and a control
- * endpoint with which the tests restart the installation (after installing plugins, or with other
- * settings): POST /restart {"settings": {...}} answers with the log of the restart.
+ * Starts the bench of @mosaikit/testing (ADR-0035) on the installation that `./mvnw install`
+ * writes to target/dist, with a catalog of the fixture plugins, a fake language model, and a
+ * control endpoint with which the tests restart the installation.
  */
 export default async function globalSetup(): Promise<() => Promise<void>> {
-  prepare();
-  // Without E2E_DB_URL, a PostgreSQL of its own, deleted at the end (nothing to start by hand).
-  const database = process.env.E2E_DB_URL
-    ? undefined
-    : await startPostgres({ directory: join(WORK, 'postgres'), persistent: false });
-  if (database) {
-    process.env.E2E_DB_URL = database.url;
-    process.env.E2E_DB_USERNAME = database.user;
-    process.env.E2E_DB_PASSWORD = database.password;
+  const fixtures = readdirSync(FIXTURES, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => join(FIXTURES, entry.name, 'target'));
+  const catalog = packagesIn(...fixtures);
+  if (catalog.length === 0) {
+    throw new Error('Build first: ./mvnw install -DskipTests (no packages of the fixture plugins)');
   }
-  configure(defaultSettings());
   const model = await startFakeModel(MODEL_PORT);
-  rmSync(MAIL, { recursive: true, force: true });
-  const smtp = await startFakeSmtp(SMTP_PORT, MAIL);
-  await start();
-  await seed();
-
-  let restarting = Promise.resolve('');
-  const control: Server = createServer((request, response) => {
-    let body = '';
-    request.on('data', (chunk: Buffer) => (body += chunk.toString()));
-    request.on('end', () => {
-      if (request.method !== 'POST' || request.url !== '/restart') {
-        response.writeHead(404).end();
-        return;
-      }
-      const { settings } = (body ? JSON.parse(body) : {}) as { settings?: Settings };
-      restarting = restarting.then(async () => {
-        const mark = logLength();
-        await stop();
-        configure(settings ?? defaultSettings());
-        await start();
-        return logSince(mark);
-      });
-      restarting.then(
-        (log) => response.writeHead(200, { 'Content-Type': 'text/plain' }).end(log),
-        (error: unknown) => response.writeHead(500).end(String(error)),
-      );
-    });
+  const database = process.env.E2E_DB_URL;
+  const bench = await Bench.start({
+    work: WORK,
+    installation: join(DIST, 'mosaikit'),
+    catalog,
+    port: KERNEL_PORT,
+    controlPort: CONTROL_PORT,
+    admin: ADMIN,
+    organization: ORGANIZATION,
+    people: [MARIO, ANNA],
+    settings: {
+      'mosaikit.assistant.url': MODEL_URL,
+      'mosaikit.assistant.model': 'e2e-fake-model',
+    },
+    ...(database
+      ? {
+          database: {
+            url: database,
+            username: process.env.E2E_DB_USERNAME ?? 'mosaikit',
+            password: process.env.E2E_DB_PASSWORD ?? 'mosaikit',
+          },
+        }
+      : {}),
   });
-  await new Promise<void>((resolve) => control.listen(CONTROL_PORT, resolve));
-
+  bench.publish();
   return async () => {
-    await stop();
-    control.close();
+    await bench.stop();
     model.close();
-    await smtp.close();
-    await database?.stop();
   };
-}
-
-/** The organization of the tests and two of its people; existing ones are kept. */
-async function seed(): Promise<void> {
-  const admin = `Basic ${Buffer.from(`${ADMIN.user}:${ADMIN.password}`).toString('base64')}`;
-  const created = await fetch(`${BASE_URL}/api/v1/organizations`, {
-    method: 'POST',
-    headers: { authorization: admin, 'content-type': 'application/json' },
-    body: JSON.stringify({ ...ORGANIZATION, selfRegistration: true }),
-  });
-  if (!created.ok && created.status !== 409) {
-    throw new Error(
-      `Cannot create the organization: ${String(created.status)} ${await created.text()}`,
-    );
-  }
-  for (const person of [MARIO, ANNA]) {
-    const registered = await fetch(`${BASE_URL}/api/v1/accounts/registrations`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        organization: ORGANIZATION.slug,
-        email: person.user,
-        displayName: person.name,
-        password: person.password,
-      }),
-    });
-    if (!registered.ok && registered.status !== 409) {
-      throw new Error(`Cannot register ${person.user}: ${String(registered.status)}`);
-    }
-    // They confirm their address with the link of the mail, as people do (MK-048).
-    if (registered.status === 202) {
-      const token = new URL(await confirmationLink(person.user)).searchParams.get('confirm');
-      const confirmed = await fetch(`${BASE_URL}/api/v1/accounts/confirmations`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ token }),
-      });
-      if (!confirmed.ok) {
-        throw new Error(`Cannot confirm ${person.user}: ${String(confirmed.status)}`);
-      }
-    }
-  }
 }

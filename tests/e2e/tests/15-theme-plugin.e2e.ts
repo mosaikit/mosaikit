@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test';
 import { MARIO } from '../support/env.js';
 import { api, openApp, signIn } from '../support/shell.js';
 
-const ID = 'dev.mosaikit.sample.theme';
+const ID = 'dev.mosaikit.fixture.theme';
 
 test.describe('MK-028 Themes as theme plugins', () => {
   test.afterEach(async () => {

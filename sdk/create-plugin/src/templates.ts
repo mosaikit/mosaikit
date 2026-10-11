@@ -27,8 +27,15 @@ export function pluginFiles(options: PluginOptions): PluginFiles {
   files.set('web/index.js', frontend(options));
   files.set('web/icon.svg', icon(options));
   files.set('README.md', readme(options));
-  files.set('.gitignore', 'target/\nlib/\ndist/\n');
+  files.set(
+    '.gitignore',
+    'target/\nlib/\ndist/\nnode_modules/\n.mosaikit-bench/\ntest-results/\nplaywright-report/\n',
+  );
   files.set('.github/workflows/ci.yml', workflow(options));
+  files.set('package.json', packageJson(options));
+  files.set('playwright.config.ts', playwrightConfig(options));
+  files.set('tests/global-setup.ts', globalSetup(options));
+  files.set(`tests/${options.names.slug}.spec.ts`, spec(options));
   if (options.backend) {
     const path = `src/main/java/${options.names.javaPackage.replaceAll('.', '/')}`;
     files.set('pom.xml', pom(options));
@@ -282,6 +289,102 @@ jobs:
 `;
 }
 
+/** Where the snapshots of Mosaikit are published (ADR-0035). */
+const SNAPSHOTS = 'https://github.com/mosaikit/mosaikit/releases/download/snapshot';
+
+/**
+ * The dependency on @mosaikit/testing of a Mosaikit version: a snapshot of main comes from the
+ * pre-release "snapshot", a release from npm.
+ */
+export function testingDependency(version: string): string {
+  return version.includes('-dev.') ? `${SNAPSHOTS}/mosaikit-testing-${version}.tgz` : version;
+}
+
+/** The scripts of the plugin: the bench of @mosaikit/testing to try it and to test it. */
+function packageJson(options: PluginOptions): string {
+  const manifest = {
+    name: options.names.slug,
+    version: '0.1.0',
+    private: true,
+    type: 'module',
+    scripts: {
+      dev: options.backend ? 'mvn package && mosaikit-bench' : 'mosaikit-bench',
+      test: 'playwright test',
+    },
+    devDependencies: {
+      '@mosaikit/testing': testingDependency(options.mosaikitVersion),
+      '@playwright/test': '^1.63.0',
+    },
+    // The PostgreSQL of the bench links its binaries when it is installed.
+    allowScripts: Object.fromEntries(
+      ['windows-x64', 'linux-x64', 'linux-arm64', 'darwin-x64', 'darwin-arm64'].map((platform) => [
+        `@embedded-postgres/${platform}`,
+        true,
+      ]),
+    ),
+  };
+  return `${JSON.stringify(manifest, null, 2)}\n`;
+}
+
+function playwrightConfig(options: PluginOptions): string {
+  return `${header(options, '//')}import { defineConfig, devices } from '@playwright/test';
+
+/** Tests of the plugin on a Mosaikit installation started by the bench (tests/global-setup.ts). */
+export default defineConfig({
+  testDir: './tests',
+  globalSetup: './tests/global-setup.ts',
+  workers: 1,
+  timeout: 60_000,
+  use: { trace: 'retain-on-failure', ...devices['Desktop Chrome'] },
+});
+`;
+}
+
+function globalSetup(options: PluginOptions): string {
+  const plugins = options.backend
+    ? `const plugins = packagesIn('target');
+  if (plugins.length === 0) {
+    throw new Error('Build the plugin first: mvn package');
+  }`
+    : 'const plugins = [process.cwd()];';
+  return `${header(options, '//')}import { Bench, packagesIn } from '@mosaikit/testing';
+
+/**
+ * Starts Mosaikit with this plugin on an embedded PostgreSQL, with an organization and two people,
+ * and stops it after the tests. The installation is downloaded once (MOSAIKIT_INSTALLATION
+ * chooses another one).
+ */
+export default async function globalSetup(): Promise<() => Promise<void>> {
+  ${plugins}
+  const bench = await Bench.start({
+    work: '.mosaikit-bench/test',
+    plugins,
+    // The plugin is not signed in the tests: its frontend runs like a verified one.
+    settings: { 'mosaikit.plugins.unverified-frontends': 'module' },
+  });
+  bench.publish();
+  return () => bench.stop();
+}
+`;
+}
+
+function spec(options: PluginOptions): string {
+  const { names } = options;
+  return `${header(options, '//')}import { expect, test } from '@playwright/test';
+import { member, openApp, signIn, unique } from '@mosaikit/testing/playwright';
+
+test('a person of the organization adds an item to ${names.name}', async ({ page }) => {
+  await signIn(page, member());
+  await openApp(page, '${names.name}');
+  await expect(page.getByRole('heading', { name: '${names.name}' })).toBeVisible();
+  const title = unique('Check the lights');
+  await page.getByLabel('New item').fill(title);
+  await page.getByRole('button', { name: 'Add' }).click();
+  await expect(page.getByRole('listitem').filter({ hasText: title })).toBeVisible();
+});
+`;
+}
+
 function readme(options: PluginOptions): string {
   const { names, backend } = options;
   const build = backend
@@ -316,10 +419,24 @@ ${backend ? `| \`src/\` | Entity, repository and REST resource under \`/api/v1/p
 ${build}
 ## Try it
 
-1. Copy the plugin directory (or the zip) into \`plugins/\` of a Mosaikit installation, or of the
-   Mosaikit repository to use it in development mode.
-2. Start Mosaikit${backend ? ' with its launcher, which builds your Java code into the kernel' : ''}.
-3. Sign in: **${names.name}** is in the app bar, with the icon of \`web/icon.svg\`.
+\`\`\`bash
+npm install
+npm run dev        # Mosaikit with this plugin; Ctrl+C stops it
+\`\`\`
+
+The bench of \`@mosaikit/testing\` downloads the installation once, starts it on an embedded
+PostgreSQL with an organization and two people, and prints the address and how to sign in. A
+changed frontend shows at once in the open page${backend ? '; Java code and migrations need a new `npm run dev`' : ''}.
+**${names.name}** is in the app bar, with the icon of \`web/icon.svg\`.
+
+## Test
+
+\`\`\`bash
+npx playwright install chromium   # once
+npm test
+\`\`\`
+
+\`tests/\` holds Playwright tests that run on the bench: only this plugin, on a real installation.
 
 ## Release
 

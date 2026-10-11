@@ -1,7 +1,7 @@
 **/node_modules
 **/target
 **/dist
-src/plugins/*/lib
+tests/fixtures/plugins/*/lib
 .quinoa
 **/.m2
 **/coverage

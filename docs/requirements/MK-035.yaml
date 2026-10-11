@@ -3,6 +3,7 @@ title: Tabs of the channels added by plugins
 area: plugins
 priority: P1
 status: done
+verified-in: mosaikit/app-teams
 description: >-
   Every channel of app-teams has the tabs Posts and Files and the tabs that other plugins add
   through its extension point channel.tab, such as a map or a dashboard bound to the channel. The

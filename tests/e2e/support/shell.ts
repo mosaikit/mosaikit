@@ -80,11 +80,11 @@ export interface Activity {
 }
 
 export async function activities(person: Person): Promise<Activity[]> {
-  return (await api(person, '/api/v1/p/sample-activities/activities')).body as Activity[];
+  return (await api(person, '/api/v1/p/fixture-activities/activities')).body as Activity[];
 }
 
 export async function createActivity(person: Person, title: string): Promise<Activity> {
-  const { status, body } = await api(person, '/api/v1/p/sample-activities/activities', {
+  const { status, body } = await api(person, '/api/v1/p/fixture-activities/activities', {
     method: 'POST',
     body: JSON.stringify({ title }),
   });

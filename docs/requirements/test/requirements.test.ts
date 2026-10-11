@@ -9,6 +9,7 @@ import { parse } from 'yaml';
 interface Requirement {
   readonly id: string;
   readonly status: 'planned' | 'in-progress' | 'done';
+  readonly 'verified-in'?: string;
   readonly depends?: readonly string[];
 }
 
@@ -75,6 +76,8 @@ describe('requirements', () => {
     const references = referencedIds();
     const untested = requirements
       .filter((requirement) => requirement.status === 'done')
+      // Verified by the tests of the repository of a plugin (ADR-0035).
+      .filter((requirement) => requirement['verified-in'] === undefined)
       .filter((requirement) => !references.has(requirement.id))
       .map((requirement) => requirement.id);
     expect(untested).toEqual([]);

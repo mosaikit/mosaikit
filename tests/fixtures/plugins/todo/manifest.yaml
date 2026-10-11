@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 Massimo Antonini
+# SPDX-License-Identifier: MPL-2.0
+id: dev.mosaikit.fixture.todo
+version: 0.1.0
+name: To do (fixture)
+description: App without a backend that keeps its items in the kernel (ADR-0031), active as soon as it is installed.
+kind: [app]
+platform: '>=0.1 <1'
+frontend:
+  entry: web/index.js
+  isolation: module
+  # Used when the shell isolates the frontend in an iframe (MK-014): only its own collections.
+  bridge:
+    services: [data]
+data:
+  collections: [items]
+contributes:
+  # The app bar of the shell (MK-025).
+  rail.app:
+    - id: todo
+      title: To do
+      route: /app/todo
+      element: mk-fixture-todo
+      icon: web/icon.svg
+      order: 10
+  # A tab of the channels of the app Teams (MK-035).
+  channel.tab:
+    - id: todo
+      title: To do
+      element: mk-fixture-todo

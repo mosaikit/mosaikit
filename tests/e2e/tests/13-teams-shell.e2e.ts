@@ -31,7 +31,7 @@ test.describe('MK-025 Shell with app bar, top bar and work area', () => {
       bar.getByRole('link', { name: 'To do', exact: true }).locator('img'),
     ).toHaveAttribute(
       'src',
-      /\/api\/v1\/plugin-assets\/dev\.mosaikit\.sample\.todo\/web\/icon\.svg$/,
+      /\/api\/v1\/plugin-assets\/dev\.mosaikit\.fixture.todo\/web\/icon\.svg$/,
     );
 
     await bar.getByRole('link', { name: 'Activities', exact: true }).click();

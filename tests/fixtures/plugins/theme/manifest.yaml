@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: 2026 Massimo Antonini
+# SPDX-License-Identifier: MPL-2.0
+id: dev.mosaikit.fixture.theme
+version: 0.1.0
+name: Green theme (fixture)
+description: A theme plugin (MK-028) with the colors of a brand; what it leaves out comes from the default theme.
+kind: [theme]
+platform: '>=0.1 <1'
+theme:
+  title: Green
+  radius: 8
+  # Only some colors: the others, such as the background, come from the default theme.
+  light:
+    brand: '#1b6e3c'
+    focus: '#0d3d20'
+  dark:
+    brand: '#58c487'

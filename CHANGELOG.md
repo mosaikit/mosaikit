@@ -8,6 +8,12 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The test bench of plugins, `@mosaikit/testing` (MK-050): a real installation with the plugin on
+  an embedded PostgreSQL, with an organization and two people, for `npm run dev` (`mosaikit-bench`)
+  and for Playwright tests; `create-mosaikit-plugin` writes both, and the end-to-end tests of the
+  kernel run on it. Every push to `main` publishes the installation, the plugin API and the npm
+  packages of the SDK in the pre-release `snapshot`.
+
 - Tabs of the channels (MK-035): Posts, Files and the tabs that plugins contribute to the point
   `channel.tab` of `app-teams`, added by the people of the channel; the sample To do offers one. The
   shell no longer loads the frontends of plugins turned off for the organization, whose tabs show
@@ -90,6 +96,11 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The plugins are no longer part of the kernel repository (ADR-0035): the tests of the kernel
+  install fixtures of their own (`tests/fixtures/plugins`, `dev.mosaikit.fixture.*`); the sample
+  plugins move to `mosaikit/samples`, the apps Teams and Chat to `mosaikit/app-teams` and
+  `mosaikit/app-chat`. The installation no longer comes with a catalog of samples, and
+  `mosaikit.marketplace.sources` has no default.
 - The repository is laid out by role (MK-049, ADR-0034): the sources under `src/` (`src/server`,
   `src/web`, `src/plugins`), beside `sdk/`, `distribution/`, `tests/e2e`, `build/`, `docs/guide`
   and `docs/development`. The layout of an installation does not change.

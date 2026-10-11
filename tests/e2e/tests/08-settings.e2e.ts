@@ -63,6 +63,6 @@ test.describe('MK-024 Assistant on the tools of the plugins', () => {
     await expect(page.locator('mk-assistant')).toHaveCount(0);
     const tools = await api(MARIO, '/api/v1/ai/tools');
     expect(tools.status).toBe(200);
-    expect(JSON.stringify(tools.body)).toContain('sample-activities__list-activities');
+    expect(JSON.stringify(tools.body)).toContain('fixture-activities__list-activities');
   });
 });

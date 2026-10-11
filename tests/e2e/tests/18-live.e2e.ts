@@ -41,7 +41,7 @@ test.describe('MK-031 Real-time channel from the kernel to the browser', () => {
         received.push(JSON.parse(event.data) as { type: string; topic: string });
       });
       for (const topic of [
-        'documents.dev.mosaikit.sample.todo.items',
+        'documents.dev.mosaikit.fixture.todo.items',
         'documents.dev.none.items',
       ]) {
         socket.send(JSON.stringify({ type: 'subscribe', topic }));
@@ -52,7 +52,7 @@ test.describe('MK-031 Real-time channel from the kernel to the browser', () => {
     }, ORGANIZATION.slug);
 
     expect(answers).toEqual([
-      { type: 'subscribed', topic: 'documents.dev.mosaikit.sample.todo.items' },
+      { type: 'subscribed', topic: 'documents.dev.mosaikit.fixture.todo.items' },
       expect.objectContaining({ type: 'refused', topic: 'documents.dev.none.items' }),
     ]);
   });

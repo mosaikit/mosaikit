@@ -15,7 +15,7 @@ import { existsSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { startFakeModel } from '../tests/e2e/support/fake-model.ts';
-import { startFakeSmtp } from './smtp.ts';
+import { startFakeSmtp } from '../sdk/testing/src/smtp.ts';
 
 const ROOT = fileURLToPath(new URL('../', import.meta.url));
 const WINDOWS = process.platform === 'win32';
@@ -147,7 +147,7 @@ function checkPackages(): void {
 async function main(): Promise<void> {
   checkPackages();
   // Imported only now: it needs the package embedded-postgres.
-  const { startPostgres } = await import('./postgres.ts');
+  const { startPostgres } = await import('../sdk/testing/src/postgres.ts');
   const directory = join(ROOT, '.dev', 'postgres');
   if (process.argv.includes('--reset')) {
     rmSync(directory, { recursive: true, force: true });

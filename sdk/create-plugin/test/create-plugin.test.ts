@@ -67,6 +67,11 @@ describe('create-mosaikit-plugin (MK-023)', () => {
     });
     expect(files.get('web/icon.svg')).toContain('<svg');
     expect(files.has('pom.xml')).toBe(backend);
+    // The bench of @mosaikit/testing to try the plugin and to test it (MK-050).
+    const scripts = (JSON.parse(files.get('package.json') ?? '{}') as { scripts: object }).scripts;
+    expect(scripts).toMatchObject({ test: 'playwright test' });
+    expect(files.get('tests/global-setup.ts')).toContain('Bench.start(');
+    expect(files.get('tests/traffic-lights.spec.ts')).toContain("openApp(page, 'Traffic lights')");
     if (backend) {
       expect(manifest).toMatchObject({
         backend: { jar: 'lib/traffic-lights.jar', api: 'traffic-lights' },

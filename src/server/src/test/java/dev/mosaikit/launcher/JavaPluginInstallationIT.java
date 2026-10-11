@@ -52,7 +52,7 @@ import org.junit.jupiter.api.TestInfo;
 class JavaPluginInstallationIT {
 
     private static final String ADMIN_PASSWORD = "it-admin-password";
-    private static final String NOTES = "dev.mosaikit.sample.notes";
+    private static final String NOTES = "dev.mosaikit.fixture.notes";
     private static final Duration ACCEPTANCE = Duration.ofSeconds(60);
 
     private static EmbeddedPostgres postgres;
@@ -126,7 +126,7 @@ class JavaPluginInstallationIT {
         String ada = member("acme");
         String bea = member("globex");
         HttpResponse<String> created = send(
-                HttpRequest.newBuilder(uri("/api/v1/p/sample-notes/notes"))
+                HttpRequest.newBuilder(uri("/api/v1/p/fixture-notes/notes"))
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString("{\"text\":\"Written by the plugin\"}")),
                 ada,
@@ -135,7 +135,7 @@ class JavaPluginInstallationIT {
         assertThat(notes(ada)).containsExactly("Written by the plugin");
         // Each organization sees only its own data, and a plugin API always acts on one (MK-017).
         assertThat(notes(bea)).isEmpty();
-        assertThat(send(HttpRequest.newBuilder(uri("/api/v1/p/sample-notes/notes"))
+        assertThat(send(HttpRequest.newBuilder(uri("/api/v1/p/fixture-notes/notes"))
                                 .GET())
                         .statusCode())
                 .as("the platform administrator has no organization")
@@ -160,9 +160,9 @@ class JavaPluginInstallationIT {
         }
         assertThat(prepare()).as("prepare with the app and its extension").isZero();
         assertThat(startKernel()).as("the kernel starts").isTrue();
-        assertThat(plugin("dev.mosaikit.sample.activities").path("status").asText())
+        assertThat(plugin("dev.mosaikit.fixture.activities").path("status").asText())
                 .isEqualTo("ACTIVE");
-        assertThat(plugin("dev.mosaikit.sample.estimates").path("status").asText())
+        assertThat(plugin("dev.mosaikit.fixture.estimates").path("status").asText())
                 .isEqualTo("ACTIVE");
         String ada = member("acme");
         String bea = member("globex");
@@ -174,14 +174,14 @@ class JavaPluginInstallationIT {
         assertThat(shell.toString()).contains("mk-activity-estimate");
 
         HttpResponse<String> created = send(
-                HttpRequest.newBuilder(uri("/api/v1/p/sample-activities/activities"))
+                HttpRequest.newBuilder(uri("/api/v1/p/fixture-activities/activities"))
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString("{\"title\":\"Paint the fence\"}")),
                 ada,
                 MEMBER_PASSWORD);
         assertThat(created.statusCode()).as(created.body()).isEqualTo(201);
         String activity = json.readTree(created.body()).path("id").asText();
-        String estimate = "/api/v1/p/sample-estimates/estimates/" + activity;
+        String estimate = "/api/v1/p/fixture-estimates/estimates/" + activity;
         HttpResponse<String> estimated = send(
                 HttpRequest.newBuilder(uri(estimate))
                         .header("Content-Type", "application/json")
@@ -192,7 +192,7 @@ class JavaPluginInstallationIT {
 
         // The extension reads the activities through the data contract of the app, per organization.
         JsonNode adaEstimates = json.readTree(send(
-                        HttpRequest.newBuilder(uri("/api/v1/p/sample-estimates/estimates"))
+                        HttpRequest.newBuilder(uri("/api/v1/p/fixture-estimates/estimates"))
                                 .GET(),
                         ada,
                         MEMBER_PASSWORD)
@@ -200,7 +200,7 @@ class JavaPluginInstallationIT {
         assertThat(adaEstimates.findValuesAsText("title")).containsExactly("Paint the fence");
         assertThat(adaEstimates.get(0).path("hours").decimalValue()).isEqualByComparingTo("3.5");
         assertThat(send(
-                                HttpRequest.newBuilder(uri("/api/v1/p/sample-estimates/estimates"))
+                                HttpRequest.newBuilder(uri("/api/v1/p/fixture-estimates/estimates"))
                                         .GET(),
                                 bea,
                                 MEMBER_PASSWORD)
@@ -236,7 +236,7 @@ class JavaPluginInstallationIT {
                 .isTrue();
         assertThat(plugin(NOTES).path("status").asText()).isEqualTo("INVALID");
         assertThat(plugin(NOTES).path("problems").get(0).asText()).startsWith("Rolled back");
-        assertThat(send(HttpRequest.newBuilder(uri("/api/v1/p/sample-notes/notes"))
+        assertThat(send(HttpRequest.newBuilder(uri("/api/v1/p/fixture-notes/notes"))
                                 .GET())
                         .statusCode())
                 .isEqualTo(404);
@@ -458,7 +458,7 @@ class JavaPluginInstallationIT {
     /** The actions of the plugin are tools for assistants, run with the credentials of the person (MK-015). */
     private void runsTheActionsOfThePluginAsTools(String ada, String bea) throws IOException, InterruptedException {
         HttpResponse<String> listed = send(
-                HttpRequest.newBuilder(uri("/api/v1/ai/tools/sample-notes__list-notes/invocations"))
+                HttpRequest.newBuilder(uri("/api/v1/ai/tools/fixture-notes__list-notes/invocations"))
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString("{}")),
                 ada,
@@ -467,7 +467,7 @@ class JavaPluginInstallationIT {
         assertThat(json.readTree(listed.body()).path("result").path("body").findValuesAsText("text"))
                 .containsExactly("Written by the plugin");
         HttpResponse<String> drafted = send(
-                HttpRequest.newBuilder(uri("/api/v1/ai/tools/sample-notes__create-note/invocations"))
+                HttpRequest.newBuilder(uri("/api/v1/ai/tools/fixture-notes__create-note/invocations"))
                         .header("Content-Type", "application/json")
                         .POST(HttpRequest.BodyPublishers.ofString("{\"text\":\"Proposed by an assistant\"}")),
                 ada,
@@ -488,8 +488,8 @@ class JavaPluginInstallationIT {
     }
 
     private List<String> notes(String username) throws IOException, InterruptedException {
-        HttpResponse<String> response =
-                send(HttpRequest.newBuilder(uri("/api/v1/p/sample-notes/notes")).GET(), username, MEMBER_PASSWORD);
+        HttpResponse<String> response = send(
+                HttpRequest.newBuilder(uri("/api/v1/p/fixture-notes/notes")).GET(), username, MEMBER_PASSWORD);
         assertThat(response.statusCode()).as(response.body()).isEqualTo(200);
         return json.readTree(response.body()).findValuesAsText("text");
     }

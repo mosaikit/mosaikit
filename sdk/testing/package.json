@@ -1,0 +1,44 @@
+{
+  "name": "@mosaikit/testing",
+  "version": "0.1.0-SNAPSHOT",
+  "description": "Test bench for Mosaikit plugins: a real installation with the plugin, on an embedded PostgreSQL, for Playwright.",
+  "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mosaikit/mosaikit.git",
+    "directory": "sdk/testing"
+  },
+  "author": "Massimo Antonini",
+  "type": "module",
+  "bin": {
+    "mosaikit-bench": "./dist/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./playwright": {
+      "types": "./dist/playwright.d.ts",
+      "import": "./dist/playwright.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "embedded-postgres": "18.4.0-beta.17"
+  },
+  "peerDependencies": {
+    "@playwright/test": "^1.63.0"
+  },
+  "peerDependenciesMeta": {
+    "@playwright/test": {
+      "optional": true
+    }
+  }
+}

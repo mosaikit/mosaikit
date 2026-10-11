@@ -6,6 +6,7 @@ import { join } from 'node:path';
 /** Where things are, and the settings of the test installation; each can be changed by env. */
 export const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 export const DIST = join(ROOT, 'target', 'dist');
+export const FIXTURES = join(ROOT, 'tests', 'fixtures', 'plugins');
 export const WORK = join(ROOT, 'tests', 'e2e', '.work');
 export const INSTALLATION = join(WORK, 'mosaikit');
 /** The catalog that comes with the installation, its default marketplace source. */
@@ -20,28 +21,31 @@ export const CONTROL_PORT = Number(env('E2E_CONTROL_PORT', '18090'));
 export const BASE_URL = `http://localhost:${String(KERNEL_PORT)}`;
 export const CONTROL_URL = `http://localhost:${String(CONTROL_PORT)}`;
 export const MODEL_URL = `http://localhost:${String(MODEL_PORT)}/v1`;
-/** The fake mail server (build/smtp.ts), which writes the mails of the kernel to MAIL. */
-export const SMTP_PORT = Number(env('E2E_SMTP_PORT', '18093'));
+/** The mails of the kernel, written by the fake mail server of the bench. */
 export const MAIL = join(WORK, 'mail');
 
-/**
- * The database of the test installation: E2E_DB_URL when set, otherwise the PostgreSQL that the
- * global setup starts and names in the same variables (read when used, after the setup).
- */
+const benchSetting = (name: string, fallback: string): string => {
+  const bench = process.env.MOSAIKIT_BENCH;
+  return bench
+    ? ((JSON.parse(bench) as { settings: Record<string, string> }).settings[name] ?? fallback)
+    : fallback;
+};
+
+/** The database of the test installation, as the bench configured it. */
 export const DATABASE = {
   get url(): string {
-    return env('E2E_DB_URL', '');
+    return benchSetting('quarkus.datasource.jdbc.url', '');
   },
   get username(): string {
-    return env('E2E_DB_USERNAME', 'mosaikit');
+    return benchSetting('quarkus.datasource.username', 'mosaikit');
   },
   get password(): string {
-    return env('E2E_DB_PASSWORD', 'mosaikit');
+    return benchSetting('quarkus.datasource.password', 'mosaikit');
   },
 };
 
 /** Signs the packages and the index that the tests add; trusted by the test installation. */
-export const KEY_NAME = 'e2e';
+export const KEY_NAME = 'bench';
 
 export const ORGANIZATION = { slug: 'comune-prova', name: 'Comune di Prova' };
 

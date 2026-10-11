@@ -12,9 +12,8 @@
     "sdk/js",
     "sdk/ui",
     "sdk/create-plugin",
-    "src/web",
-    "src/plugins/sample-react",
-    "src/plugins/sample-vue"
+    "sdk/testing",
+    "src/web"
   ],
   "scripts": {
     "lint": "eslint . && prettier --check .",
@@ -36,7 +35,6 @@
     "@types/node": "^24.19.0",
     "@vitest/coverage-v8": "^5.0.2",
     "ajv": "^8.20.0",
-    "embedded-postgres": "18.4.0-beta.17",
     "eslint": "^10.11.0",
     "globals": "^17.12.0",
     "prettier": "^3.9.9",

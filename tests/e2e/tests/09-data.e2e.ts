@@ -5,7 +5,7 @@ import { ANNA, MARIO } from '../support/env.js';
 import { OTHER, otherOrganizationPerson } from '../support/people.js';
 import { api, apps, openApp, plugins, signIn, unique } from '../support/shell.js';
 
-const ID = 'dev.mosaikit.sample.todo';
+const ID = 'dev.mosaikit.fixture.todo';
 const ITEMS = `/api/v1/data/${ID}/items`;
 
 test.describe('MK-046 Data of plugins without a backend', () => {

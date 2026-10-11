@@ -20,11 +20,11 @@ export default defineConfig({
       'sdk/ui/test/**/*.test.ts',
       'build/test/**/*.test.ts',
       'sdk/create-plugin/test/**/*.test.ts',
+      'sdk/testing/test/**/*.test.ts',
       'sdk/java/src/test/ts/**/*.test.ts',
       'src/web/test/**/*.test.ts',
       'docs/requirements/test/**/*.test.ts',
       'docs/test/**/*.test.ts',
-      'src/plugins/*/test/**/*.test.ts',
     ],
     environment: 'node',
     coverage: {

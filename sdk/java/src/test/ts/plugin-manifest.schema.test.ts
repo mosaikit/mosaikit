@@ -21,14 +21,14 @@ function manifestsIn(directory: string): string[] {
 }
 
 describe('plugin manifest schema', () => {
-  it.each([...manifestsIn('src/plugins'), ...manifestsIn('src/server/src/test/resources/plugins')])(
-    'accepts %s',
-    (file) => {
-      const valid = validate(parse(readFileSync(file, 'utf8')));
-      expect(validate.errors ?? []).toEqual([]);
-      expect(valid).toBe(true);
-    },
-  );
+  it.each([
+    ...manifestsIn('tests/fixtures/plugins'),
+    ...manifestsIn('src/server/src/test/resources/plugins'),
+  ])('accepts %s', (file) => {
+    const valid = validate(parse(readFileSync(file, 'utf8')));
+    expect(validate.errors ?? []).toEqual([]);
+    expect(valid).toBe(true);
+  });
 
   it.each([
     ['an id that is not reverse-DNS', { id: 'Traffic' }],

@@ -7,7 +7,7 @@ import { api } from '../support/shell.js';
 
 const TEAMS = '/api/v1/teams';
 // The collection of the sample To do, which 09-data installs.
-const ITEMS = '/api/v1/data/dev.mosaikit.sample.todo/items';
+const ITEMS = '/api/v1/data/dev.mosaikit.fixture.todo/items';
 
 interface Team {
   readonly id: string;

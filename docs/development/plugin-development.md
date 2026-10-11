@@ -14,8 +14,34 @@ cd traffic && mvn package                                                 # targ
 From this repository, `node sdk/create-plugin/dist/bin.js` does the same after `npm run build`.
 The generated plugin has an app at `/app/traffic`; with `--backend`, a table under row-level
 security, a REST API under `/api/v1/p/traffic`, and two actions for assistants. Copy the zip (or
-the directory) into `plugins/` of an installation and start it with the launcher. The rest of this
-guide explains what each part does.
+the directory) into `plugins/` of an installation and start it with the launcher, or try it on the
+bench (below). The rest of this guide explains what each part does.
+
+## Try and test a plugin
+
+`@mosaikit/testing` ([ADR-0035](../adr/0035-plugins-outside-the-kernel-repository.md), MK-050) is
+a test bench: a real installation with your plugin, on an embedded PostgreSQL, with an
+organization and two people who confirmed their address. Nothing to install but Java 25 and
+Node.js 24; the installation is downloaded once into `~/.cache/mosaikit`. The generated plugin
+uses it already:
+
+```bash
+npm install
+npm run dev     # Mosaikit with the plugin, until Ctrl+C; prints the address and the people
+npm test        # the Playwright tests of tests/, on a bench started for them
+```
+
+With `npm run dev` the plugin directory is linked into the installation and watched: a changed
+frontend shows at once in the open page; Java code and migrations are read at the next start.
+`npm test` starts a bench in `tests/global-setup.ts` (`Bench.start`) and the tests use the helpers
+of `@mosaikit/testing/playwright`: `signIn`, `openApp`, `api`, `member`, `restart`. A run with one
+test takes about 20 seconds for a frontend-only plugin and 35 seconds with Java code, which the
+launcher builds into the kernel at the first start.
+
+Until the first release the bench tests on the snapshot of `main`, published at every push in the
+pre-release [`snapshot`](https://github.com/mosaikit/mosaikit/releases/tag/snapshot): the version
+of `@mosaikit/testing` chooses the installation. `MOSAIKIT_INSTALLATION` chooses another one, such
+as `target/dist/mosaikit` of a build of the kernel.
 
 ## Anatomy
 
@@ -186,7 +212,7 @@ theme:
 
 Every color, font or radius it leaves out comes from the default theme. Choose colors with enough
 contrast (WCAG 2.1 AA: 4.5:1 for text): the high contrast appearance stays available to everyone.
-[`sample-theme`](../../src/plugins/sample-theme) is a complete example.
+[`sample-theme`](https://github.com/mosaikit/samples/tree/main/theme) is a complete example.
 
 ### Components and themes
 
@@ -212,8 +238,8 @@ Bootstrap Italia) and with the light or dark preference of the system; never har
 
 A frontend may use React, Vue or any framework ([ADR-0020](../adr/0020-frontends-in-any-framework.md)):
 bundle it with the framework into one ES module (Vite library mode, `formats: ['es']`) and declare
-that module as `frontend.entry`, as [`sample-react`](../../src/plugins/sample-react) and
-[`sample-vue`](../../src/plugins/sample-vue) do. Render inside the shadow root of your custom element,
+that module as `frontend.entry`, as [`sample-react`](https://github.com/mosaikit/samples/tree/main/react) and
+[`sample-vue`](https://github.com/mosaikit/samples/tree/main/vue) do. Render inside the shadow root of your custom element,
 unmount in `disconnectedCallback`, style with the `--mk-*` tokens and talk to other plugins only
 through `context.events` and extension points.
 
@@ -240,7 +266,7 @@ even if you plan to run as a module: installations that isolate unverified plugi
 
 ## Java code
 
-[`src/plugins/sample-notes`](../../src/plugins/sample-notes) is a complete example: an entity, a Jakarta
+[`samples/notes`](https://github.com/mosaikit/samples/tree/main/notes) is a complete example: an entity, a Jakarta
 Data repository and a REST resource, with the migration of its schema.
 
 - Build the plugin as a Maven module whose dependencies all have scope `provided`: `mosaikit-kernel-api` (sdk/java),
@@ -254,8 +280,8 @@ Data repository and a REST resource, with the migration of its schema.
   serves it only while the plugin is active.
 - Map entities to the plugin schema: `@Table(name = "note", schema = "p_sample_notes")`.
 
-Package it as one zip with only what the kernel needs, as the samples do with the shared
-descriptor `src/plugins/plugin-package.xml`: `manifest.yaml`, `lib/`, `db/`, `web/`, no sources. To
+Package it as one zip with only what the kernel needs, with the descriptor `package.xml` that
+`@mosaikit/create-plugin` writes: `manifest.yaml`, `lib/`, `db/`, `web/`, no sources. To
 install it, copy the zip into `plugins/` of an installation as it is and restart it with the
 `mosaikit` launcher. The launcher sees the new JAR, rebuilds the
 kernel in a few seconds and starts it; the kernel then migrates the plugin schema. Updating or
@@ -319,7 +345,7 @@ await items.remove(created.id);
 A document is a JSON object of at most 256 KiB, and a collection holds at most 10,000 of them.
 Errors are `DataError`s with the HTTP status and the detail of the kernel. Such a plugin is active
 as soon as it is installed: the marketplace answers `restartRequired: false` and the shell shows
-the app without a reload. [`sample-todo`](../../src/plugins/sample-todo) is a complete example, and
+the app without a reload. [`sample-todo`](https://github.com/mosaikit/samples/tree/main/todo) is a complete example, and
 `create-mosaikit-plugin` without `--backend` writes one. When an app needs queries beyond listing
 and paging, give it a backend and a schema.
 
@@ -385,8 +411,8 @@ plugin publishes as its data contract.
 ## Extending another plugin
 
 A plugin extends another one on three levels ([ADR-0019](../adr/0019-plugins-extending-plugins.md)),
-as [`sample-estimates`](../../src/plugins/sample-estimates) extends
-[`sample-activities`](../../src/plugins/sample-activities):
+as [`sample-estimates`](https://github.com/mosaikit/samples/tree/main/estimates) extends
+[`sample-activities`](https://github.com/mosaikit/samples/tree/main/activities):
 
 1. **Require it**, so that the kernel migrates it first and refuses yours without it:
    `requires: { dev.mosaikit.sample.activities: '^0.1' }`.
