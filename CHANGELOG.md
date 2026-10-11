@@ -122,6 +122,10 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The nightly checks of `main` pass again: constructor injection in the live socket and in the
+  access filters of apps and guests, no final method in an entity, a stable sort of the kinds of
+  notifications, and `source-map-js` 1.2.2 (CVE-2026-93749).
+
 - Installing a plugin without a backend no longer reports it active when the kernel could not load
   it, and its package is unpacked on Windows even while an antivirus holds the new files.
 
