@@ -31,6 +31,29 @@ npm run format                          # format frontend sources
 The Maven build runs npm itself: `npm ci`, then `npm run build` (SDK and UI, before the kernel,
 which packages the UI), then `npm run check` in the test phase.
 
+## Test what you changed
+
+A whole build with every test takes 15 to 20 minutes on a laptop; nobody needs it to change one
+thing. Run the tests of what you changed, and leave the rest to the CI, which runs everything on
+every pull request.
+
+| You changed | Run | Takes |
+|---|---|---|
+| a plugin | `npm test` in the repository of the plugin, on the bench of `@mosaikit/testing` (ADR-0035) | 20–40 s |
+| the shell (`src/web`) or the SDK (`sdk/js`, `sdk/ui`) | `npm run check:fast` | under a minute |
+| the same, as people see it | `./mvnw install -DskipTests` once, then `npx playwright test -c tests/e2e <file>` | about 35 s for a file |
+| a class of the kernel | `./mvnw -pl src/server test -Dskip.npm -Dtest=<TestClass>` | 1–2 min |
+| the launcher or the installation of Java plugins | `./mvnw -pl src/server verify -Dskip.npm -Dit.test=JavaPluginInstallationIT -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false` | about 3 min |
+| documentation only | `npx vitest run docs` | seconds |
+
+Before a pull request that touches more than one of these, `npm run check:fast` and
+`./mvnw verify -Dskip.npm -DskipITs` cover the frontend and the backend; `npm run e2e` runs the
+whole end-to-end suite (about 6 minutes).
+
+On Windows an antivirus scans each new file when a program first opens it, and a build writes
+thousands: a [Dev Drive](https://learn.microsoft.com/windows/dev-drive/) for the sources, the
+Maven repository and the npm cache makes builds and tests much faster.
+
 ## Development mode
 
 ```bash
@@ -110,14 +133,14 @@ curl -u admin -X PUT localhost:8080/api/v1/organizations/<slug>/identity \
 
 ## Tests and traceability
 
-- Java unit tests live next to the code (`sdk/java`, `kernel`); the integration tests with
+- Java unit tests live next to the code (`sdk/java`, `src/server`); the integration tests with
   `@QuarkusTest` and REST Assured are in `src/server/src/test/java/dev/mosaikit/kernel/app`.
 - The tests need no Docker: `EmbeddedPostgres` (`src/server/src/test/java/dev/mosaikit/testing`)
   starts PostgreSQL 18 from `node_modules` for every `@QuarkusTest`, in a temporary directory on a
   free port. The tests with Keycloak are tagged `keycloak` and run only with
   `-Dtest.groups.excluded=` (they start Keycloak in Docker).
-- `JavaPluginInstallationIT` (`kernel`, run by Failsafe in `verify`, skipped with `-DskipITs`)
-  installs the package of the sample Java plugin in a real installation and checks MK-011 end to
+- `JavaPluginInstallationIT` (`src/server`, run by Failsafe in `verify`, skipped with `-DskipITs`)
+  installs the package of the fixture Java plugin in a real installation and checks MK-011 end to
   end. It starts PostgreSQL the same way, or uses a server given with `-Dmosaikit.it.jdbc-url=…` (plus `-username`,
   `-password`) on which it creates and drops its own database.
 - Frontend tests use Vitest; the JSON Schema of the manifest is tested against every manifest
@@ -128,7 +151,9 @@ curl -u admin -X PUT localhost:8080/api/v1/organizations/<slug>/identity \
 ## End-to-end tests
 
 [`tests/e2e/`](../../tests/e2e/README.md) runs Playwright on a real installation built by `./mvnw install`:
-launcher, kernel, shell and plugins, in Chromium, with a fake language model only. Every
+launcher, kernel, shell and the fixture plugins of `tests/fixtures/plugins`, in Chromium, with a
+fake language model only. The installation runs on the bench of `@mosaikit/testing` (`sdk/testing`),
+the same that the repositories of plugins use. Every
 requirement has its e2e cases there, one per acceptance criterion; a requirement is done when they
 pass in CI (job `e2e`), not only its unit tests.
 

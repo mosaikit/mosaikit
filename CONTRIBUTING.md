@@ -21,16 +21,15 @@ Thank you for considering a contribution. This document describes how the projec
    `feat(kernel): add organization registry`.
 4. Sign off every commit (`git commit -s`) to certify the
    [Developer Certificate of Origin](https://developercertificate.org/).
-5. Run the fast checks locally before pushing; the CI runs the rest:
-   ```bash
-   npm run check:fast
-   ./mvnw verify -Dskip.npm -DskipITs
-   npm run e2e        # when the change touches what people see or do
-   ```
+5. Test what you changed before pushing, and let the CI run the rest: the table "Test what you
+   changed" of [docs/development/development.md](docs/development/development.md) says what to run
+   for each kind of change, in seconds rather than in the 15 minutes of a whole build. A change to a
+   plugin belongs to the repository of the plugin (ADR-0035), not to this one.
 6. Open a pull request with auto-merge (`gh pr merge --auto --rebase`): GitHub merges it with
    rebase once the required checks pass. Changes to `kernel-api`
    (including the manifest schema) or `sdk/` require a review.
-7. A feature is done when its end-to-end tests pass in `tests/e2e/`, not only its unit tests.
+7. A feature is done when its end-to-end tests pass in `tests/e2e/` (in the repository of the
+   plugin for a plugin), not only its unit tests.
 
 ## Quality gate
 
