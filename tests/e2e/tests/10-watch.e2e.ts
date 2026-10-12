@@ -57,14 +57,17 @@ test.describe('Development mode: changed plugins show at once', () => {
     });
     await signIn(page, MARIO);
 
+    // The watcher and the live channel of the shell, with other installations running beside this
+    // one (tests/e2e/run.ts), may take longer than the default 15 s.
+    const watched = { timeout: 30_000 };
     write('Benvenuti');
-    await expect(apps(page).getByRole('link', { name: 'Kiosk', exact: true })).toBeVisible();
+    await expect(apps(page).getByRole('link', { name: 'Kiosk', exact: true })).toBeVisible(watched);
     await openApp(page, 'Kiosk');
     await expect(page.getByRole('heading', { name: 'Benvenuti' })).toBeVisible();
 
     // The page reloads by itself and keeps the session.
     write('Welcome');
-    await expect(page.getByRole('heading', { name: 'Welcome' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Welcome' })).toBeVisible(watched);
     await expect(page).toHaveURL(/\/app\/kiosk$/);
   });
 });

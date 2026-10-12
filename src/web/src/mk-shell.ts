@@ -1393,6 +1393,8 @@ export class MkShell extends LitElement {
    * enters, and the workspace says so: it is not a failed sign-in.
    */
   private async enter(account: Account): Promise<void> {
+    // Read before the plugins: a plugin that changes while they load is seen at the first check.
+    const revision = await this.client.pluginRevision().catch(() => undefined);
     let plugins: FrontendPlugin[] = [];
     this.appsError = undefined;
     try {
@@ -1429,17 +1431,18 @@ export class MkShell extends LitElement {
     await this.loadAssistant();
     clearInterval(this.draftTimer);
     this.draftTimer = setInterval(() => void this.loadDrafts(), DRAFT_REFRESH_MS);
-    await this.watchPlugins();
+    this.watchPlugins(revision);
   }
 
   /**
    * When the kernel watches the plugins directory, follows its revision: a changed module cannot
    * replace the custom elements it defined, so the shell reloads the page, which keeps the session
    * of a local account. With the tokens of a realm, held in memory only, it loads the new plugins.
+   * The revision is the one read before the plugins were loaded.
    */
-  private async watchPlugins(): Promise<void> {
+  private watchPlugins(loaded: number | undefined): void {
     clearInterval(this.watchTimer);
-    let revision = await this.client.pluginRevision().catch(() => undefined);
+    let revision = loaded;
     if (revision === undefined) {
       return;
     }

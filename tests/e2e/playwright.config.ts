@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
 import { defineConfig, devices } from '@playwright/test';
-import { BASE_URL } from './support/env.js';
+import { join } from 'node:path';
+import { BASE_URL, WORK } from './support/env.js';
 
 /**
  * End-to-end tests on a real installation built by `./mvnw install` (target/dist): launcher,
@@ -19,9 +20,9 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   forbidOnly: !!process.env.CI,
   reporter: process.env.CI
-    ? [['list'], ['html', { open: 'never', outputFolder: 'report' }], ['github']]
-    : [['list'], ['html', { open: 'never', outputFolder: 'report' }]],
-  outputDir: './.work/results',
+    ? [['list'], ['html', { open: 'never', outputFolder: join(WORK, 'report') }], ['github']]
+    : [['list'], ['html', { open: 'never', outputFolder: join(WORK, 'report') }]],
+  outputDir: join(WORK, 'results'),
   use: {
     baseURL: BASE_URL,
     trace: 'retain-on-failure',

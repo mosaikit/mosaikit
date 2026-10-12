@@ -8,60 +8,18 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
 
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.Map;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /** The themes of theme plugins, for the shell (MK-028). */
 @QuarkusTest
-@TestProfile(ThemePluginTest.ThemePlugin.class)
+@TestProfile(TestPlugins.class)
 @Tag("MK-028")
 class ThemePluginTest {
 
-    static final Path PLUGINS = Path.of("target", "theme-test", "plugins").toAbsolutePath();
-
-    /** A theme plugin and a broken one, as directories. */
-    public static class ThemePlugin implements QuarkusTestProfile {
-        @Override
-        public Map<String, String> getConfigOverrides() {
-            try {
-                Path green = Files.createDirectories(PLUGINS.resolve("green"));
-                Files.writeString(green.resolve("manifest.yaml"), """
-                        id: dev.mosaikit.test.green
-                        version: 1.0.0
-                        name: Green (test)
-                        kind: [theme]
-                        platform: '>=0.1 <1'
-                        theme:
-                          title: Green
-                          light:
-                            brand: '#1b6e3c'
-                        """);
-                Path broken = Files.createDirectories(PLUGINS.resolve("broken"));
-                Files.writeString(broken.resolve("manifest.yaml"), """
-                        id: dev.mosaikit.test.broken-theme
-                        version: 1.0.0
-                        name: Broken (test)
-                        kind: [theme]
-                        platform: '>=0.1 <1'
-                        theme:
-                          title: Broken
-                          light:
-                            brand: red
-                        """);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-            return Map.of(
-                    "mosaikit.plugins.directory", PLUGINS.toString(), "mosaikit.ui.theme", "dev.mosaikit.test.green");
-        }
-    }
+    static final Path PLUGINS = TestPlugins.PLUGINS;
 
     @Test
     void offersTheThemesOfActiveThemePluginsBeforeSignIn() {

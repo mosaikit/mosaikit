@@ -108,6 +108,9 @@
         <skip.npm>false</skip.npm>
         <skipTests>false</skipTests>
         <npm.check.skip>${skipTests}</npm.check.skip>
+        <!-- The installation tests (failsafe, minutes) run in CI on main and every night; locally
+             only with -DskipITs=false, or when the launcher changed. -->
+        <skipITs>true</skipITs>
         <!-- Platforms of mvnw install -Pportable, separated by commas. -->
         <portable.platforms>linux-x64,windows-x64,macos-arm64,macos-x64</portable.platforms>
 

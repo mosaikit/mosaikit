@@ -134,7 +134,9 @@ export class Bench {
     let database = options.database;
     if (!database) {
       const embedded: Database = await startPostgres({
-        directory: join(work, 'postgres'),
+        // A directory of its own at each start: on Windows a worker of the cluster of a previous
+        // run can outlive it and keep its shared memory, which a cluster in the same place refuses.
+        directory: join(work, `postgres-${String(process.pid)}-${String(Date.now())}`),
         persistent: false,
       });
       closers.push(() => embedded.stop());

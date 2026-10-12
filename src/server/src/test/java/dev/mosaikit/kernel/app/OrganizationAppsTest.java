@@ -11,12 +11,8 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
 
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import io.restassured.specification.RequestSpecification;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -26,47 +22,15 @@ import org.junit.jupiter.api.Test;
 
 /** The apps of the app bar of an organization, set by its administrators (MK-030). */
 @QuarkusTest
-@TestProfile(OrganizationAppsTest.TwoApps.class)
+@TestProfile(TestPlugins.class)
 @Tag("MK-030")
 class OrganizationAppsTest {
 
-    static final Path PLUGINS = Path.of("target", "apps-test", "plugins").toAbsolutePath();
+    static final Path PLUGINS = TestPlugins.PLUGINS;
     static final String TODO = "dev.mosaikit.test.todo";
     static final String BOARD = "dev.mosaikit.test.board";
     static final String SLUG = "apps-town";
     static final String PASSWORD = "a long enough password";
-
-    /** Two frontend-only plugins with an app each; the first keeps documents. */
-    public static class TwoApps implements QuarkusTestProfile {
-        @Override
-        public Map<String, String> getConfigOverrides() {
-            try {
-                plugin("todo", TODO, "To do", 10, "data:\n  collections: [items]\n");
-                plugin("board", BOARD, "Board", 20, "");
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-            return Map.of("mosaikit.plugins.directory", PLUGINS.toString());
-        }
-
-        private static void plugin(String name, String id, String title, int order, String extra) throws IOException {
-            Path directory = Files.createDirectories(PLUGINS.resolve(name).resolve("web"));
-            Files.writeString(directory.resolve("index.js"), "export default { activate() {} };\n");
-            Files.writeString(directory.getParent().resolve("manifest.yaml"), """
-                    id: %s
-                    version: 1.0.0
-                    name: %s (test)
-                    kind: [app]
-                    platform: '>=0.1 <1'
-                    frontend:
-                      entry: web/index.js
-                    %scontributes:
-                      rail.app:
-                        - { id: %s, title: %s, route: /app/%s, element: test-%s-app, order: %d }
-                    """.formatted(
-                            id, title, extra, name, title, name, name, order));
-        }
-    }
 
     private String manager;
     private String member;

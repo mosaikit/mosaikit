@@ -24,7 +24,7 @@
     "build": "npm run build --workspaces --if-present",
     "check": "npm run lint && npm run typecheck && npm run test:coverage",
     "verify": "npm run check && npm run build",
-    "e2e": "playwright test -c tests/e2e",
+    "e2e": "node tests/e2e/run.ts",
     "dev": "node build/dev.ts",
     "check:fast": "npm run lint && npm run typecheck && vitest run"
   },

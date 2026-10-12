@@ -102,6 +102,11 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- A whole build with every test is faster: the Quarkus tests that need plugins share one kernel
+  (5 profiles instead of 10), the end-to-end tests run in three groups at the same time, each on a
+  bench of its own (`node tests/e2e/run.ts`, also one group or one file), and the installation
+  tests run only with `-DskipITs=false`, as the CI does on `main` and every night.
+
 - The plugins are no longer part of the kernel repository (ADR-0035): the tests of the kernel
   install fixtures of their own (`tests/fixtures/plugins`, `dev.mosaikit.fixture.*`); the sample
   plugins and the apps Teams and Chat move to `mosaikit/mosaikit-samples`, a project each. The
@@ -138,6 +143,9 @@ project follows [Semantic Versioning](https://semver.org/).
   reaches Keycloak by another name than the browsers.
 
 ### Fixed
+
+- The shell no longer misses a plugin that changes in a watched directory while it loads its
+  plugins: it reads the revision of the plugins before loading them.
 
 - A release publishes everything that plugins use: the parent of plugins on Maven Central, also
   `@mosaikit/ui` and `@mosaikit/testing` on npm, and the installation archive

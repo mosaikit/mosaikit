@@ -191,7 +191,7 @@ jobs:
           if [[ "$CODE" != true ]]; then
             ./mvnw $MAVEN_CLI_OPTS -pl src/server -am test -Dskip.npm -Dtest=DocumentationTest -Dsurefire.failIfNoSpecifiedTests=false
           elif [[ "$SLOW" == true ]]; then
-            ./mvnw $MAVEN_CLI_OPTS verify -Dskip.npm -Dtest.groups.excluded=
+            ./mvnw $MAVEN_CLI_OPTS verify -Dskip.npm -DskipITs=false -Dtest.groups.excluded=
           else
             ./mvnw $MAVEN_CLI_OPTS verify -Dskip.npm -DskipITs
           fi
@@ -247,10 +247,10 @@ jobs:
         with:
           name: e2e
           path: |
-            tests/e2e/report/
-            tests/e2e/.work/results/
-            tests/e2e/.work/installation.log
-            tests/e2e/.work/mail/
+            tests/e2e/.work/*/report/
+            tests/e2e/.work/*/results/
+            tests/e2e/.work/*/installation.log
+            tests/e2e/.work/*/mail/
           retention-days: 7
 
   # Snapshot of main (ADR-0035): what the repositories of plugins build and test against until the

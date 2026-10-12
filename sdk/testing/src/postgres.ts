@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 import EmbeddedPostgres from 'embedded-postgres';
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
@@ -108,7 +108,21 @@ export async function startPostgres(options: {
           stdio: 'ignore',
         });
       }
-      await server.stop();
+      try {
+        await server.stop();
+      } catch (error) {
+        // On Windows the files of a server that just stopped can stay locked for a moment, and
+        // the package fails to delete the cluster (EBUSY): retry for a few seconds.
+        if (options.persistent) {
+          throw error;
+        }
+        rmSync(options.directory, {
+          recursive: true,
+          force: true,
+          maxRetries: 20,
+          retryDelay: 250,
+        });
+      }
     },
   };
 }

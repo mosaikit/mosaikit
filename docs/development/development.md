@@ -16,7 +16,7 @@
 npm ci                                  # once: also brings PostgreSQL 18 (@embedded-postgres)
 npm run dev                             # kernel and shell in development mode, with database and sample data
 npm run check:fast                      # frontend: lint, type check, unit tests
-./mvnw verify -Dskip.npm -DskipITs      # backend: unit and Quarkus tests, without the slow ones
+./mvnw verify -Dskip.npm                # backend: unit and Quarkus tests (the installation tests need -DskipITs=false)
 npm run e2e                             # end-to-end tests on a real installation (after ./mvnw install)
 ./mvnw install                          # everything: frontend and backend checks, tests, target/dist
 ./mvnw install -DskipTests              # without tests (and without the frontend checks)
@@ -41,14 +41,15 @@ every pull request.
 |---|---|---|
 | a plugin | `npm test` in the repository of the plugin, on the bench of `@mosaikit/testing` (ADR-0035) | 20–40 s |
 | the shell (`src/web`) or the SDK (`sdk/js`, `sdk/ui`) | `npm run check:fast` | under a minute |
-| the same, as people see it | `./mvnw install -DskipTests` once, then `npx playwright test -c tests/e2e <file>` | about 35 s for a file |
+| the same, as people see it | `./mvnw install -DskipTests` once, then `node tests/e2e/run.ts <file>` (such as `13-teams-shell`) | about 35 s for a file |
 | a class of the kernel | `./mvnw -pl src/server test -Dskip.npm -Dtest=<TestClass>` | 1–2 min |
-| the launcher or the installation of Java plugins | `./mvnw -pl src/server verify -Dskip.npm -Dit.test=JavaPluginInstallationIT -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false` | about 3 min |
+| the launcher or the installation of Java plugins | `./mvnw -pl src/server verify -Dskip.npm -DskipITs=false -Dit.test=JavaPluginInstallationIT -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false` | about 3 min |
 | documentation only | `npx vitest run docs` | seconds |
 
 Before a pull request that touches more than one of these, `npm run check:fast` and
-`./mvnw verify -Dskip.npm -DskipITs` cover the frontend and the backend; `npm run e2e` runs the
-whole end-to-end suite (about 6 minutes).
+`./mvnw verify -Dskip.npm` cover the frontend and the backend; `npm run e2e` runs the
+whole end-to-end suite in three groups at the same time, each on a bench of its own (about 3–4
+minutes; `node tests/e2e/run.ts B` runs one group).
 
 On Windows an antivirus scans each new file when a program first opens it, and a build writes
 thousands: a [Dev Drive](https://learn.microsoft.com/windows/dev-drive/) for the sources, the
@@ -139,7 +140,7 @@ curl -u admin -X PUT localhost:8080/api/v1/organizations/<slug>/identity \
   starts PostgreSQL 18 from `node_modules` for every `@QuarkusTest`, in a temporary directory on a
   free port. The tests with Keycloak are tagged `keycloak` and run only with
   `-Dtest.groups.excluded=` (they start Keycloak in Docker).
-- `JavaPluginInstallationIT` (`src/server`, run by Failsafe in `verify`, skipped with `-DskipITs`)
+- `JavaPluginInstallationIT` (`src/server`, run by Failsafe in `verify` only with `-DskipITs=false`, as the CI does on `main` and every night)
   installs the package of the fixture Java plugin in a real installation and checks MK-011 end to
   end. It starts PostgreSQL the same way, or uses a server given with `-Dmosaikit.it.jdbc-url=…` (plus `-username`,
   `-password`) on which it creates and drops its own database.
@@ -169,7 +170,7 @@ running one.
 
 | Lane | When | What |
 |---|---|---|
-| Fast | pull requests, about 4 minutes | frontend checks, unit and Quarkus tests (`-DskipITs`, without Keycloak) and end-to-end tests at the same time, secrets, SAST; a pull request of documentation only (`docs/`, Markdown files at the root) runs the frontend checks and `DocumentationTest`, in about a minute |
+| Fast | pull requests, about 4 minutes | frontend checks, unit and Quarkus tests (without the installation tests and Keycloak) and end-to-end tests at the same time, secrets, SAST; a pull request of documentation only (`docs/`, Markdown files at the root) runs the frontend checks and `DocumentationTest`, in about a minute |
 | Full | `main`, every night at 02:17 UTC, tags, by hand | everything above, plus the installation tests, the tests with Keycloak, SonarQube, SBOM, dependency scan and the release documents; the portable archives on tags or by hand |
 
 `frontend`, `backend` and `e2e` are required checks of `main`, and pull requests are opened with

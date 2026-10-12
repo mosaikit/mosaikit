@@ -10,12 +10,8 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import io.restassured.specification.RequestSpecification;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -25,37 +21,14 @@ import org.junit.jupiter.api.Test;
 
 /** The activity feed and the notifications of plugins (MK-038). */
 @QuarkusTest
-@TestProfile(ActivityTest.NotesPlugin.class)
+@TestProfile(TestPlugins.class)
 @Tag("MK-038")
 class ActivityTest {
 
-    static final Path PLUGINS = Path.of("target", "activity-test", "plugins").toAbsolutePath();
+    static final Path PLUGINS = TestPlugins.PLUGINS;
     static final String PLUGIN = "dev.mosaikit.test.notify";
     static final String SLUG = "activity-town";
     static final String PASSWORD = "a long enough password";
-
-    /** A plugin that sends notifications. */
-    public static class NotesPlugin implements QuarkusTestProfile {
-        @Override
-        public Map<String, String> getConfigOverrides() {
-            try {
-                Path plugin = Files.createDirectories(PLUGINS.resolve("notify").resolve("web"));
-                Files.writeString(plugin.resolve("index.js"), "export default { activate() {} };\n");
-                Files.writeString(plugin.getParent().resolve("manifest.yaml"), """
-                        id: dev.mosaikit.test.notify
-                        version: 1.0.0
-                        name: Notify (test)
-                        kind: [app]
-                        platform: '>=0.1 <1'
-                        frontend:
-                          entry: web/index.js
-                        """);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-            return Map.of("mosaikit.plugins.directory", PLUGINS.toString());
-        }
-    }
 
     private String ada;
     private String bea;

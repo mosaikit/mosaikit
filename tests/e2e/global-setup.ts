@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { Bench } from '../../sdk/testing/src/bench.js';
 import { packagesIn } from '../../sdk/testing/src/packages.js';
 import { readdirSync } from 'node:fs';
@@ -32,12 +32,18 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
   if (catalog.length === 0) {
     throw new Error('Build first: ./mvnw install -DskipTests (no packages of the fixture plugins)');
   }
+  // A group of tests/e2e/run.ts may start with fixtures installed, as the files before it left them.
+  const preinstalled = (process.env.E2E_PREINSTALL ?? '').split(',').filter((name) => name !== '');
+  const plugins = catalog.filter((file) =>
+    preinstalled.some((name) => basename(file).startsWith(`fixture-${name}-`)),
+  );
   const model = await startFakeModel(MODEL_PORT);
   const database = process.env.E2E_DB_URL;
   const bench = await Bench.start({
     work: WORK,
     installation: join(DIST, 'mosaikit'),
     catalog,
+    plugins,
     port: KERNEL_PORT,
     controlPort: CONTROL_PORT,
     admin: ADMIN,
