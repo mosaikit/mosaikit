@@ -1,10 +1,10 @@
 id: MK-015
-title: AI tool registry for plugin actions
+title: AI tool registry for extension actions
 area: ai
 priority: P2
 status: done
 description: >-
-  Plugins declare typed actions that an assistant and an MCP server can use with the permissions
+  Extensions declare typed actions that an assistant and an MCP server can use with the permissions
   of the signed-in person, producing drafts that the person confirms. See ADR-0017.
 acceptance:
   - Actions are declared in the manifest with a JSON Schema and a risk level.

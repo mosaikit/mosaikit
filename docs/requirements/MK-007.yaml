@@ -1,12 +1,12 @@
 id: MK-007
-title: Serve plugin web assets safely
+title: Serve extension web assets safely
 area: security
 priority: P1
 status: done
 description: >-
-  The browser loads plugin modules from the kernel. Serving files must not expose anything else.
+  The browser loads extension modules from the kernel. Serving files must not expose anything else.
 acceptance:
-  - Only active plugins serve assets.
-  - Paths that leave the plugin directory, the manifest and non-web file types are refused.
+  - Only active extensions serve assets.
+  - Paths that leave the extension directory, the manifest and non-web file types are refused.
   - Assets are served with their media type and X-Content-Type-Options nosniff.
 depends: [MK-006]

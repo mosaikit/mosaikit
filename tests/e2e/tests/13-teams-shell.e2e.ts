@@ -6,7 +6,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { ADMIN, INSTALLATION, MARIO } from '../support/env.js';
 import { defaultSettings } from '../support/installation.js';
-import { apps, plugins, restart, signIn, signOut } from '../support/shell.js';
+import { apps, extensions, restart, signIn, signOut } from '../support/shell.js';
 
 async function expectAccessible(page: Page): Promise<void> {
   const results = await new AxeBuilder({ page })
@@ -23,7 +23,7 @@ test.describe('MK-025 Shell with app bar, top bar and work area', () => {
   test('25.1 the app bar opens each app in the work area with its own route', async ({ page }) => {
     await signIn(page, MARIO);
     const bar = apps(page);
-    // The sample plugins contribute to rail.app with an order: To do (10) before Activities (20).
+    // The sample extensions contribute to rail.app with an order: To do (10) before Activities (20).
     const titles = await bar.getByRole('link').allInnerTexts();
     expect(titles.slice(0, 2)).toEqual(['Activity', 'Home']);
     expect(titles.indexOf('To do')).toBeLessThan(titles.indexOf('Activities'));
@@ -31,7 +31,7 @@ test.describe('MK-025 Shell with app bar, top bar and work area', () => {
       bar.getByRole('link', { name: 'To do', exact: true }).locator('img'),
     ).toHaveAttribute(
       'src',
-      /\/api\/v1\/plugin-assets\/dev\.mosaikit\.fixture.todo\/web\/icon\.svg$/,
+      /\/api\/v1\/extension-assets\/dev\.mosaikit\.fixture.todo\/web\/icon\.svg$/,
     );
 
     await bar.getByRole('link', { name: 'Activities', exact: true }).click();
@@ -61,8 +61,8 @@ test.describe('MK-025 Shell with app bar, top bar and work area', () => {
   test('25.2 an app contributed with launcher.app is shown, with a deprecation warning', async ({
     page,
   }) => {
-    // A plugin written before rail.app, as a directory of the installation.
-    const legacy = join(INSTALLATION, 'plugins', 'legacy');
+    // An extension written before rail.app, as a directory of the installation.
+    const legacy = join(INSTALLATION, 'extensions', 'legacy');
     mkdirSync(join(legacy, 'web'), { recursive: true });
     writeFileSync(join(legacy, 'web', 'index.js'), 'export default { activate() {} };\n');
     writeFileSync(
@@ -83,9 +83,11 @@ test.describe('MK-025 Shell with app bar, top bar and work area', () => {
     );
     try {
       await restart(defaultSettings());
-      const legacyPlugin = (await plugins()).find((plugin) => plugin.id === 'dev.acme.legacy');
-      expect(legacyPlugin?.status).toBe('ACTIVE');
-      expect(legacyPlugin?.warnings.join(' ')).toContain('launcher.app is deprecated');
+      const legacyExtension = (await extensions()).find(
+        (extension) => extension.id === 'dev.acme.legacy',
+      );
+      expect(legacyExtension?.status).toBe('ACTIVE');
+      expect(legacyExtension?.warnings.join(' ')).toContain('launcher.app is deprecated');
       await signIn(page, MARIO);
       await expect(apps(page).getByRole('link', { name: 'Legacy', exact: true })).toBeVisible();
     } finally {
@@ -113,7 +115,7 @@ test.describe('MK-025 Shell with app bar, top bar and work area', () => {
     const bar = apps(page);
     const box = await bar.boundingBox();
     expect(box?.y ?? 0).toBeGreaterThan(600);
-    for (const name of ['Home', 'Plugins', 'Platform']) {
+    for (const name of ['Home', 'Extensions', 'Platform']) {
       await bar.getByRole('link', { name, exact: true }).click();
       const width = await page.evaluate(() => document.documentElement.scrollWidth);
       expect(width).toBeLessThanOrEqual(360);
@@ -123,7 +125,7 @@ test.describe('MK-025 Shell with app bar, top bar and work area', () => {
   test('25.6 when the apps cannot be loaded the person still enters, and is told why', async ({
     page,
   }) => {
-    await page.route('**/api/v1/shell/plugins', (route) =>
+    await page.route('**/api/v1/shell/extensions', (route) =>
       route.fulfill({
         status: 500,
         contentType: 'application/problem+json',

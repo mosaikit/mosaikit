@@ -9,10 +9,10 @@ import dev.mosaikit.kernel.core.apps.AppSettings;
 import dev.mosaikit.kernel.core.error.ForbiddenOperationException;
 import dev.mosaikit.kernel.core.error.InvalidInputException;
 import dev.mosaikit.kernel.core.error.ResourceNotFoundException;
+import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
 import dev.mosaikit.kernel.core.live.LiveBus;
 import dev.mosaikit.kernel.core.live.LiveEvent;
 import dev.mosaikit.kernel.core.live.LiveTopics;
-import dev.mosaikit.kernel.core.plugin.PluginRegistry;
 import jakarta.data.Limit;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -27,7 +27,7 @@ import java.util.UUID;
 import java.util.regex.Pattern;
 
 /**
- * The activity feed of people (MK-038): notifications that plugins send to people of their
+ * The activity feed of people (MK-038): notifications that extensions send to people of their
  * organization, kept in the feed, pushed on the real-time channel and left out for the people who
  * turned their kind off.
  */
@@ -42,7 +42,7 @@ public class ActivityService implements Notifications {
     private final NotificationRepository notifications;
     private final CurrentOrganization organization;
     private final AccountService accounts;
-    private final PluginRegistry registry;
+    private final ExtensionRegistry registry;
     private final LiveBus live;
     private final AppSettings apps;
     private final Clock clock;
@@ -52,7 +52,7 @@ public class ActivityService implements Notifications {
             NotificationRepository notifications,
             CurrentOrganization organization,
             AccountService accounts,
-            PluginRegistry registry,
+            ExtensionRegistry registry,
             LiveBus live,
             AppSettings apps) {
         this(notifications, organization, accounts, registry, live, apps, Clock.systemUTC());
@@ -62,7 +62,7 @@ public class ActivityService implements Notifications {
             NotificationRepository notifications,
             CurrentOrganization organization,
             AccountService accounts,
-            PluginRegistry registry,
+            ExtensionRegistry registry,
             LiveBus live,
             AppSettings apps,
             Clock clock) {
@@ -76,13 +76,13 @@ public class ActivityService implements Notifications {
     }
 
     @Override
-    public void send(String pluginId, Collection<UUID> addressees, Notification notification) {
+    public void send(String extensionId, Collection<UUID> addressees, Notification notification) {
         UUID org = organization.require();
         List<String> problems = new ArrayList<>();
-        if (registry.findActive(pluginId).isEmpty()) {
-            problems.add("plugin " + pluginId + " is not an active plugin");
-        } else if (apps.isOff(org, pluginId)) {
-            throw new ForbiddenOperationException("The plugin is turned off for your organization.");
+        if (registry.findActive(extensionId).isEmpty()) {
+            problems.add("extension " + extensionId + " is not an active extension");
+        } else if (apps.isOff(org, extensionId)) {
+            throw new ForbiddenOperationException("The extension is turned off for your organization.");
         }
         if (notification.kind() == null || !KIND.matcher(notification.kind()).matches()) {
             problems.add("kind must be lowercase letters, digits and '-', such as mention");
@@ -102,7 +102,7 @@ public class ActivityService implements Notifications {
         if (!problems.isEmpty()) {
             throw new InvalidInputException(problems);
         }
-        String muted = pluginId + "/" + notification.kind();
+        String muted = extensionId + "/" + notification.kind();
         Instant now = Instant.now(clock);
         for (UUID account : addressees) {
             if (!accounts.isMemberOf(account, org) || accounts.mutes(account, muted)) {
@@ -111,7 +111,7 @@ public class ActivityService implements Notifications {
             var stored = new dev.mosaikit.kernel.core.activity.Notification(
                     org,
                     account,
-                    pluginId,
+                    extensionId,
                     notification.kind(),
                     notification.title().strip(),
                     body,
@@ -126,14 +126,14 @@ public class ActivityService implements Notifications {
         }
     }
 
-    /** Notifies people by email address: for frontend plugins, which do not know account identifiers. */
-    public void sendToAddresses(String pluginId, Collection<String> emails, Notification notification) {
+    /** Notifies people by email address: for frontend extensions, which do not know account identifiers. */
+    public void sendToAddresses(String extensionId, Collection<String> emails, Notification notification) {
         UUID org = organization.require();
         List<UUID> addressees = new ArrayList<>();
         for (String email : emails) {
             accounts.idIn(email, org).ifPresent(addressees::add);
         }
-        send(pluginId, addressees, notification);
+        send(extensionId, addressees, notification);
     }
 
     /** The latest notifications of a person in the organization of the request, newest first. */

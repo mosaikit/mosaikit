@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
-import { definePlugin, type PluginContext } from '@mosaikit/sdk';
+import { defineExtension, type ExtensionContext } from '@mosaikit/sdk';
 import { describe, expect, it, vi } from 'vitest';
 import {
   isFrameMessage,
@@ -13,8 +13,8 @@ import { FrameEventBus, PendingCalls, connect, start, type FrameDocument } from 
 const init: InitMessage = {
   mk: 1,
   type: 'init',
-  plugin: { id: 'dev.example.boxed', version: '1.0.0' },
-  entry: '/api/v1/plugin-assets/dev.example.boxed/web/index.js',
+  extension: { id: 'dev.example.boxed', version: '1.0.0' },
+  entry: '/api/v1/extension-assets/dev.example.boxed/web/index.js',
   element: 'mk-boxed',
   contributions: [],
   user: { username: 'ada', displayName: 'Ada', roles: [] },
@@ -72,7 +72,7 @@ describe('frame runtime (MK-014)', () => {
       headers: { 'Content-Type': 'application/json' },
       body: '{"text":"hi"}',
     });
-    const listed = calls.fetch('/api/v1/p/boxed/notes');
+    const listed = calls.fetch('/api/v1/ext/boxed/notes');
     const empty = calls.fetch('notes/1', { method: 'DELETE' });
     const failed = calls.fetch('other');
     calls.settle({
@@ -96,7 +96,7 @@ describe('frame runtime (MK-014)', () => {
       headers: { 'content-type': 'application/json' },
       body: '{"text":"hi"}',
     });
-    expect(sent[1]).toMatchObject({ method: 'GET', path: '/api/v1/p/boxed/notes', headers: {} });
+    expect(sent[1]).toMatchObject({ method: 'GET', path: '/api/v1/ext/boxed/notes', headers: {} });
     expect(await (await created).json()).toEqual({ id: 1 });
     expect(await (await listed).text()).toBe('[]');
     expect((await empty).status).toBe(204);
@@ -104,12 +104,12 @@ describe('frame runtime (MK-014)', () => {
     await expect(calls.fetch('x', { body: new Blob(['x']) })).rejects.toThrow('text bodies');
   });
 
-  it('activates the plugin and renders its app with the tokens of the shell', async () => {
+  it('activates the extension and renders its app with the tokens of the shell', async () => {
     const { doc, properties, rendered } = fakeDocument();
-    let context: PluginContext | undefined;
+    let context: ExtensionContext | undefined;
     const importModule = vi.fn(() =>
       Promise.resolve({
-        default: definePlugin({
+        default: defineExtension({
           activate: (received) => {
             context = received;
           },
@@ -122,21 +122,21 @@ describe('frame runtime (MK-014)', () => {
     await start(init, events, fetch, importModule, doc);
 
     expect(importModule).toHaveBeenCalledWith(
-      'https://mosaikit.example.org/api/v1/plugin-assets/dev.example.boxed/web/index.js',
+      'https://mosaikit.example.org/api/v1/extension-assets/dev.example.boxed/web/index.js',
     );
     expect(properties).toEqual({ '--mk-accent': '#0b5' });
     expect(rendered).toEqual(['mk-boxed']);
-    expect(context).toMatchObject({ plugin: init.plugin, locale: 'it-IT', user: init.user });
+    expect(context).toMatchObject({ extension: init.extension, locale: 'it-IT', user: init.user });
     expect(context?.events).toBe(events);
     expect(context?.fetch).toBe(fetch);
   });
 
-  it('refuses a module that is not a plugin', async () => {
+  it('refuses a module that is not an extension', async () => {
     const { doc } = fakeDocument();
 
     await expect(
       start(init, new FrameEventBus(() => undefined), fetch, () => Promise.resolve({}), doc),
-    ).rejects.toThrow('no default plugin export');
+    ).rejects.toThrow('no default extension export');
   });
 
   it('talks with the shell through the channel it sends to the shell origin', async () => {
@@ -149,7 +149,7 @@ describe('frame runtime (MK-014)', () => {
     const received: unknown[] = [];
     const importModule = () =>
       Promise.resolve({
-        default: definePlugin({
+        default: defineExtension({
           activate: (context) => {
             context.events.on('maps.moved', (payload) => received.push(payload));
           },

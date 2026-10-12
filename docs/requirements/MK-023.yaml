@@ -1,15 +1,15 @@
 id: MK-023
-title: Devkit for third-party plugin developers
+title: Devkit for third-party extension developers
 area: sdk
 priority: P1
 status: done
 description: >-
-  A developer outside the team creates a working plugin without reading the kernel code: the
-  create-mosaikit-plugin generator writes the manifest, the frontend and, optionally, the Java
-  backend with its schema under row-level security and actions for assistants, and the plugin
+  A developer outside the team creates a working extension without reading the kernel code: the
+  create-mosaikit-extension generator writes the manifest, the frontend and, optionally, the Java
+  backend with its schema under row-level security and actions for assistants, and the extension
   development guide explains the rest. Prototype spike S8.
 acceptance:
-  - The generator creates a frontend-only plugin and a plugin with a Java backend, whose manifests the kernel accepts.
-  - The generated Java plugin builds with Maven against the published plugin API and is accepted by the kernel.
-  - The guide covers creating, building, trying, signing and publishing a plugin.
+  - The generator creates a frontend-only extension and an extension with a Java backend, whose manifests the kernel accepts.
+  - The generated Java extension builds with Maven against the published extension API and is accepted by the kernel.
+  - The guide covers creating, building, trying, signing and publishing an extension.
 depends: [MK-005, MK-011, MK-019]

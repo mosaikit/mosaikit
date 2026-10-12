@@ -3,7 +3,7 @@
 import type { Contribution, CurrentUser } from '@mosaikit/sdk';
 
 /**
- * Messages between the shell and a plugin frontend isolated in a sandboxed iframe (MK-014). They
+ * Messages between the shell and an extension frontend isolated in a sandboxed iframe (MK-014). They
  * travel with `postMessage`; every message carries `mk: 1`, and each side checks the window that
  * sent it, since the frame has an opaque origin.
  */
@@ -29,7 +29,7 @@ export interface SubscriptionMessage {
   readonly pattern: string;
 }
 
-/** A request to a service of the shell: `api`, the backend API of the plugin. */
+/** A request to a service of the shell: `api`, the backend API of the extension. */
 export interface CallMessage {
   readonly mk: 1;
   readonly type: 'call';
@@ -43,11 +43,11 @@ export interface CallMessage {
 
 export type FrameMessage = ReadyMessage | PublishMessage | SubscriptionMessage | CallMessage;
 
-/** What the frame needs to activate the plugin and render one of its apps. */
+/** What the frame needs to activate the extension and render one of its apps. */
 export interface InitMessage {
   readonly mk: 1;
   readonly type: 'init';
-  readonly plugin: { readonly id: string; readonly version: string };
+  readonly extension: { readonly id: string; readonly version: string };
   readonly entry: string;
   readonly element: string;
   readonly contributions: readonly Contribution[];

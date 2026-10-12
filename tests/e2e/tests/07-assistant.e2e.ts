@@ -17,7 +17,7 @@ async function ask(page: Page, question: string): Promise<string> {
 
 const pending = (page: Page) => page.getByRole('region', { name: 'Pending actions' });
 
-test.describe('MK-024 Assistant on the tools of the plugins', () => {
+test.describe('MK-024 Assistant on the tools of the extensions', () => {
   test('24.1 a request in Italian is answered at once with a read tool', async ({ page }) => {
     const open = await createActivity(MARIO, unique('Potare gli alberi del parco'));
     await signIn(page, MARIO);
@@ -58,10 +58,10 @@ test.describe('MK-024 Assistant on the tools of the plugins', () => {
     await expect(pending(page)).toHaveCount(0);
   });
 
-  test('a confirmed action that the plugin refuses is reported, and nothing changes', async ({
+  test('a confirmed action that the extension refuses is reported, and nothing changes', async ({
     page,
   }) => {
-    // A draft for an activity that does not exist: the plugin answers 404 at the confirmation.
+    // A draft for an activity that does not exist: the extension answers 404 at the confirmation.
     const drafted = await api(
       MARIO,
       '/api/v1/ai/tools/fixture-activities__complete-activity/invocations',

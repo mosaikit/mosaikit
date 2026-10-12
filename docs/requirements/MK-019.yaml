@@ -4,11 +4,11 @@ area: security
 priority: P1
 status: done
 description: >-
-  The database keeps the data of each organization apart, also for queries of plugins that do not
-  filter: plugin tables declare PostgreSQL row-level security policies on the organization of the
+  The database keeps the data of each organization apart, also for queries of extensions that do not
+  filter: extension tables declare PostgreSQL row-level security policies on the organization of the
   request, which the kernel sets on every connection. Prototype spike S3. See ADR-0018.
 acceptance:
-  - A plugin that reads its table without any filter sees only the rows of the organization of the request.
+  - An extension that reads its table without any filter sees only the rows of the organization of the request.
   - A request cannot write a row of another organization.
-  - A request without organization sees no row of a plugin table; migrations and the kernel at start see every row.
+  - A request without organization sees no row of an extension table; migrations and the kernel at start see every row.
 depends: [MK-011, MK-017]

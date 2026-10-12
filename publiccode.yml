@@ -23,18 +23,18 @@ softwareType: 'standalone/web'
 description:
   en:
     shortDescription: >-
-      Domain-agnostic plugin platform for multi-organization web applications.
+      Domain-agnostic extension platform for multi-organization web applications.
     longDescription: >-
       Mosaikit provides a small kernel with identity, organizations, users, localization,
-      theming and plugin management. Every product feature is a plugin that can extend the
+      theming and extension management. Every product feature is an extension that can extend the
       user interface, the backend API and the database schema, and can itself be extended by
-      other plugins. It ships as a portable application, a container image and a Helm chart
+      other extensions. It ships as a portable application, a container image and a Helm chart
       for SaaS and on-premises deployments. This description is a placeholder and will be
       extended before the first release, as required by the publiccode.yml specification.
     features:
-      - Plugin system with frontend, backend and database extensions
+      - Extension system with frontend, backend and database extensions
       - Multi-organization identity with local accounts and federation
-      - Plugin marketplace with signed packages
+      - Extension marketplace with signed packages
 
 legal:
   license: MPL-2.0

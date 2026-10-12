@@ -1,11 +1,11 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
-import type { FrontendPlugin } from '@mosaikit/sdk';
+import type { FrontendExtension } from '@mosaikit/sdk';
 import { describe, expect, it } from 'vitest';
 import { entryForPath, initials, launcherEntries, matching } from '../src/navigation.js';
 
-const plugin = (attributes: Record<string, unknown>, id = 'app'): FrontendPlugin => ({
-  id: 'dev.example.plugin',
+const extension = (attributes: Record<string, unknown>, id = 'app'): FrontendExtension => ({
+  id: 'dev.example.extension',
   version: '1.0.0',
   entry: '/index.js',
   isolation: 'module',
@@ -15,12 +15,12 @@ const plugin = (attributes: Record<string, unknown>, id = 'app'): FrontendPlugin
 describe('launcherEntries (MK-008)', () => {
   it('builds entries from launcher contributions', () => {
     const entries = launcherEntries([
-      plugin({ route: '/app/hello', element: 'mk-hello-app', title: 'Hello' }),
+      extension({ route: '/app/hello', element: 'mk-hello-app', title: 'Hello' }),
     ]);
 
     expect(entries).toEqual([
       {
-        pluginId: 'dev.example.plugin',
+        extensionId: 'dev.example.extension',
         id: 'app',
         title: 'Hello',
         route: '/app/hello',
@@ -30,7 +30,7 @@ describe('launcherEntries (MK-008)', () => {
   });
 
   it('uses the contribution id when the title is missing', () => {
-    const [entry] = launcherEntries([plugin({ route: '/app/x', element: 'x-app' }, 'fallback')]);
+    const [entry] = launcherEntries([extension({ route: '/app/x', element: 'x-app' }, 'fallback')]);
 
     expect(entry?.title).toBe('fallback');
   });
@@ -42,12 +42,12 @@ describe('launcherEntries (MK-008)', () => {
     { element: 'mk-hello-app' },
     { route: 42, element: 'mk-hello-app' },
   ])('ignores invalid contributions %j', (attributes) => {
-    expect(launcherEntries([plugin(attributes)])).toEqual([]);
+    expect(launcherEntries([extension(attributes)])).toEqual([]);
   });
 });
 
 describe('entryForPath', () => {
-  const entries = launcherEntries([plugin({ route: '/app/hello', element: 'mk-hello-app' })]);
+  const entries = launcherEntries([extension({ route: '/app/hello', element: 'mk-hello-app' })]);
 
   it('matches the route, ignoring a trailing slash', () => {
     expect(entryForPath(entries, '/app/hello/')?.element).toBe('mk-hello-app');
@@ -65,9 +65,9 @@ describe('the app bar (MK-025)', () => {
     point: string,
     id: string,
     attributes: Record<string, unknown>,
-    pluginId = 'dev.example.plugin',
-  ): FrontendPlugin => ({
-    id: pluginId,
+    extensionId = 'dev.example.extension',
+  ): FrontendExtension => ({
+    id: extensionId,
     version: '1.0.0',
     entry: '/index.js',
     isolation: 'module',
@@ -88,7 +88,7 @@ describe('the app bar (MK-025)', () => {
     ]);
 
     expect(entries.map((entry) => entry.title)).toEqual(['New', 'Old']);
-    expect(entries[0]?.icon).toBe('/api/v1/plugin-assets/dev.example.plugin/web/icon.svg');
+    expect(entries[0]?.icon).toBe('/api/v1/extension-assets/dev.example.extension/web/icon.svg');
   });
 
   it.each(['../secret.svg', '/etc/icon.svg', 'web/icon.js', 'https://elsewhere.example/i.svg'])(
@@ -104,10 +104,10 @@ describe('the app bar (MK-025)', () => {
   );
 
   it('finds apps by a part of their title, and makes initials', () => {
-    const items = [{ title: 'To do' }, { title: 'Notes' }, { title: 'Plugins' }];
+    const items = [{ title: 'To do' }, { title: 'Notes' }, { title: 'Extensions' }];
 
     expect(matching(items, ' no')).toEqual([{ title: 'Notes' }]);
-    expect(matching(items, 'O')).toHaveLength(2);
+    expect(matching(items, 'O')).toHaveLength(3);
     expect(matching(items, '   ')).toEqual([]);
     expect(initials('Mario Rossi')).toBe('MR');
     expect(initials('anna maria bianchi')).toBe('AB');

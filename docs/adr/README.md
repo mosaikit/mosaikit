@@ -40,3 +40,4 @@ by a new record that supersedes the old one, never by editing it.
 | [0033](0033-lean-collaboration.md) | Collaboration on the real-time channel and the data API, without brokers or backends | Accepted |
 | [0034](0034-repository-layout-by-role.md) | Repository laid out by role, with the sources under src/ | Accepted |
 | [0035](0035-plugins-outside-the-kernel-repository.md) | Plugins outside the kernel repository, tested on a published snapshot | Accepted |
+| [0036](0036-extensions-not-plugins.md) | Extensions, not plugins | Accepted |

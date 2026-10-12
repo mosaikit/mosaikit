@@ -5,12 +5,12 @@ import { existsSync, mkdirSync, statSync, symlinkSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { Bench } from './bench.js';
 
-const USAGE = `Usage: mosaikit-bench [--port <port>] [--work <directory>] [<plugin directory or package> ...]
+const USAGE = `Usage: mosaikit-bench [--port <port>] [--work <directory>] [<extension directory or package> ...]
 
-Starts a Mosaikit installation with the given plugins, on an embedded PostgreSQL, and keeps it
-running until Ctrl+C. Without arguments, the plugin of the current directory (its manifest.yaml).
+Starts a Mosaikit installation with the given extensions, on an embedded PostgreSQL, and keeps it
+running until Ctrl+C. Without arguments, the extension of the current directory (its manifest.yaml).
 
-A plugin directory is linked into the installation and watched: a changed frontend shows at once in
+An extension directory is linked into the installation and watched: a changed frontend shows at once in
 the open page; Java code and schemas are read again at the next start. A package (.zip) is signed
 with the key of the bench and installed.
 
@@ -36,7 +36,7 @@ async function main(argv: string[]): Promise<void> {
   }
   if (sources.length === 0) {
     if (!existsSync('manifest.yaml')) {
-      throw new Error('No plugin here (no manifest.yaml): name the plugins to start with');
+      throw new Error('No extension here (no manifest.yaml): name the extensions to start with');
     }
     sources.push(resolve('.'));
   }
@@ -45,17 +45,17 @@ async function main(argv: string[]): Promise<void> {
 
   const bench = await Bench.start({
     work,
-    plugins: packages,
+    extensions: packages,
     ...(port === undefined ? {} : { port }),
     settings: {
-      'mosaikit.plugins.watch': 'true',
-      // Plugins in development are not signed: their frontends run like verified ones.
-      'mosaikit.plugins.unverified-frontends': 'module',
+      'mosaikit.extensions.watch': 'true',
+      // Extensions in development are not signed: their frontends run like verified ones.
+      'mosaikit.extensions.unverified-frontends': 'module',
     },
     beforeStart: (installation) => {
       for (const directory of directories) {
-        const link = join(installation, 'plugins', basename(directory));
-        mkdirSync(join(installation, 'plugins'), { recursive: true });
+        const link = join(installation, 'extensions', basename(directory));
+        mkdirSync(join(installation, 'extensions'), { recursive: true });
         symlinkSync(directory, link, process.platform === 'win32' ? 'junction' : 'dir');
       }
     },

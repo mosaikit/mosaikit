@@ -11,8 +11,8 @@ import java.util.UUID;
  * selector of the shell or by the realm the person signed in with, and only if the person is a
  * member and the organization accepts the way the person signed in.
  *
- * <p>The kernel provides this bean to plugins; the requests that reach a plugin API always have an
- * organization. A plugin reads and writes only the data of {@link #require()}, so that data of
+ * <p>The kernel provides this bean to extensions; the requests that reach an extension API always have an
+ * organization. An extension reads and writes only the data of {@link #require()}, so that data of
  * other organizations are never visible.
  */
 public interface CurrentOrganization {

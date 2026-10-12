@@ -5,7 +5,7 @@ priority: P2
 status: planned
 description: >-
   The kernel keeps the presence of each person (available, busy, away, offline) from the open pages
-  and from the choice of the person, and offers it to the plugins. See ADR-0028.
+  and from the choice of the person, and offers it to the extensions. See ADR-0028.
 acceptance:
   - The presence of a person changes for the others within a few seconds when they open or close their last page or choose another status.
   - People of other organizations see the presence only of the guests of their shared teams.

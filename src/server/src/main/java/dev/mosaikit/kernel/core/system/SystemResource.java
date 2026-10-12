@@ -3,7 +3,7 @@
 package dev.mosaikit.kernel.core.system;
 
 import dev.mosaikit.kernel.core.config.KernelConfig;
-import dev.mosaikit.kernel.core.plugin.PluginRegistry;
+import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
 import jakarta.annotation.security.PermitAll;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
@@ -22,13 +22,13 @@ public class SystemResource {
     private static final String PRODUCT_NAME = "Mosaikit";
 
     private final KernelVersion kernelVersion;
-    private final PluginRegistry plugins;
+    private final ExtensionRegistry extensions;
     private final String theme;
     private final long rememberDays;
 
-    public SystemResource(KernelVersion kernelVersion, PluginRegistry plugins, KernelConfig config) {
+    public SystemResource(KernelVersion kernelVersion, ExtensionRegistry extensions, KernelConfig config) {
         this.kernelVersion = kernelVersion;
-        this.plugins = plugins;
+        this.extensions = extensions;
         this.theme = config.ui().theme();
         this.rememberDays = config.accounts().rememberFor().toDays();
     }
@@ -36,19 +36,23 @@ public class SystemResource {
     @GET
     @Path("/info")
     @PermitAll
-    @Operation(summary = "Get product name, kernel version, number of active plugins and theme")
+    @Operation(summary = "Get product name, kernel version, number of active extensions and theme")
     public SystemInfo info() {
         return new SystemInfo(
-                PRODUCT_NAME, kernelVersion.get().toString(), plugins.active().size(), theme, rememberDays);
+                PRODUCT_NAME,
+                kernelVersion.get().toString(),
+                extensions.active().size(),
+                theme,
+                rememberDays);
     }
 
     @GET
     @Path("/themes")
     @PermitAll
-    @Operation(summary = "List the themes of the active theme plugins (MK-028)")
+    @Operation(summary = "List the themes of the active theme extensions (MK-028)")
     public List<ThemeView> themes() {
-        return plugins.active().stream()
-                .flatMap(plugin -> plugin.manifest().stream())
+        return extensions.active().stream()
+                .flatMap(extension -> extension.manifest().stream())
                 .flatMap(manifest -> manifest.theme().stream()
                         .map(theme -> new ThemeView(
                                 manifest.id(),

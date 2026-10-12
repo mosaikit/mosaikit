@@ -68,10 +68,10 @@ must provide a capability that the provider operates.
 ### NC-04 No threat model
 
 - **Measure:** C-12. **Severity:** High. **Owner:** Software.
-- **Gap:** the risks of the kernel, of the plugin model (code of third parties in the kernel and
+- **Gap:** the risks of the kernel, of the extension model (code of third parties in the kernel and
   in the browser) and of the identity flows are not analysed in writing.
 - **Action:** `docs/compliance/threat-model.md` with STRIDE per component (kernel API, shell,
-  plugin frontends, plugin backends, launcher, Keycloak, database), the trust boundaries and the
+  extension frontends, extension backends, launcher, Keycloak, database), the trust boundaries and the
   mitigations, linked to requirements and tests. Review it at every new extension point.
 
 ### NC-05 No ASVS 5.0 L2 verification
@@ -92,12 +92,12 @@ must provide a capability that the provider operates.
 ### NC-07 Accessibility not evaluated nor checked in CI
 
 - **Measure:** C-18, C-19. **Severity:** High. **Owner:** Software.
-- **Gap:** the shell and the sample plugins were never evaluated against WCAG 2.1 AA / EN 301 549;
+- **Gap:** the shell and the sample extensions were never evaluated against WCAG 2.1 AA / EN 301 549;
   no automated check.
 - **Action:** axe-core checks of the shell pages in the frontend tests (Playwright) and in CI;
-  manual evaluation with a screen reader and keyboard only; plugin guidelines on accessible
-  custom elements in `docs/development/plugin-development.md`; alternative texts for maps and
-  dashboards in the plugins that draw them.
+  manual evaluation with a screen reader and keyboard only; extension guidelines on accessible
+  custom elements in `docs/development/extension-development.md`; alternative texts for maps and
+  dashboards in the extensions that draw them.
 
 ### NC-08 No accessibility evaluation report
 
@@ -111,7 +111,7 @@ must provide a capability that the provider operates.
 - **Measure:** C-21. **Severity:** Medium. **Owner:** Software.
 - **Gap:** public instances should follow the Designers Italia models; the shell has its own
   tokens only.
-- **Action:** a theme plugin that maps the design tokens of the shell (`--mk-*`) to Bootstrap
+- **Action:** a theme extension that maps the design tokens of the shell (`--mk-*`) to Bootstrap
   Italia, and the header and footer models of Designers Italia.
 
 ### NC-10 No SPID and CIE sign-in
@@ -128,7 +128,7 @@ must provide a capability that the provider operates.
 - **Gap:** the APIs follow OpenAPI and RFC 9457 but not the security profiles of the
   interoperability guidelines, and cannot be published on the PDND.
 - **Action:** ModI profiles (ID_AUTH_CHANNEL_02, INTEGRITY_REST_01) on the public APIs of the
-  kernel and of plugins, through the API gateway of the kernel; a guide to publish them as
+  kernel and of extensions, through the API gateway of the kernel; a guide to publish them as
   e-services.
 
 ### NC-12 MFA not required nor available for local accounts
@@ -167,10 +167,10 @@ must provide a capability that the provider operates.
   `audit_event` table, the `AuditLog` service, the `mosaikit.audit` log category and the read API
   `GET /api/v1/audit-events`; actions of assistants, creation and identity settings of
   organizations and changes of members are recorded.
-- **Gap:** sign-ins and failed attempts, changes of plugins and events of plugins are not recorded;
+- **Gap:** sign-ins and failed attempts, changes of extensions and events of extensions are not recorded;
   events have no request identifier.
 - **Action:** record authentication successes and failures (identity augmentor and failure
-  handler), plugin installation outcomes at start, an `AuditLog` API in the SDK for plugins, and a
+  handler), extension installation outcomes at start, an `AuditLog` API in the SDK for extensions, and a
   request identifier.
 
 ### NC-17 No log integrity, retention nor SIEM export
@@ -201,7 +201,7 @@ must provide a capability that the provider operates.
 
 - **Measure:** C-34. **Severity:** High. **Owner:** Both.
 - **Gap:** only the portable distribution has a proven backup (a copy of `data/`).
-- **Action:** a documented backup of PostgreSQL (logical and point in time) and of the plugins
+- **Action:** a documented backup of PostgreSQL (logical and point in time) and of the extensions
   directory; a scheduled restore test in staging with a report; RPO and RTO declared by the
   provider.
 
@@ -210,7 +210,7 @@ must provide a capability that the provider operates.
 - **Measure:** C-35. **Severity:** High. **Owner:** Software.
 - **Gap:** an administration cannot take its data to another provider.
 - **Action:** an export of an organization (kernel data plus an `export()` contract that each
-  plugin implements) in an open format, and the matching import.
+  extension implements) in an open format, and the matching import.
 
 ### NC-22 Container image and archives not signed
 
@@ -229,7 +229,7 @@ must provide a capability that the provider operates.
 - **Gap:** the controller cannot fill the records of processing without a list of the personal
   data that the kernel keeps, where and for how long.
 - **Action:** `docs/compliance/personal-data.md` for the kernel (accounts: email, display name,
-  password hash, roles, organization) and a section of the same kind in each plugin; retention
+  password hash, roles, organization) and a section of the same kind in each extension; retention
   settings.
 
 ### NC-24 No access, rectification and erasure of an account
@@ -238,7 +238,7 @@ must provide a capability that the provider operates.
 - **Gap:** a person cannot see, correct or delete the data of their account, and an administrator
   cannot do it for them.
 - **Action:** API and UI for the account (show, change display name and email, delete) and for the
-  administrator, with the deletion propagated to plugins through an event.
+  administrator, with the deletion propagated to extensions through an event.
 
 ### NC-25 No oversight of AI actions
 

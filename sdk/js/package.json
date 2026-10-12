@@ -1,7 +1,7 @@
 {
   "name": "@mosaikit/sdk",
   "version": "0.1.0-SNAPSHOT",
-  "description": "Mosaikit SDK for plugin frontends: the contract between the shell and a plugin.",
+  "description": "Mosaikit SDK for extension frontends: the contract between the shell and an extension.",
   "license": "MPL-2.0",
   "repository": {
     "type": "git",

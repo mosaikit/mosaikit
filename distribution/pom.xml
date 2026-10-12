@@ -21,7 +21,7 @@
     <description>
         Everything that can be delivered, in target/dist of the project: the installation, the
         Docker Compose and Kubernetes deployments and, with -Pportable, the portable archives. No
-        plugin is bundled: products choose theirs (ADR-0035).
+        extension is bundled: products choose theirs (ADR-0035).
     </description>
 
     <properties>
@@ -81,11 +81,11 @@
                                 <copy todir="${dist.directory}/mosaikit/bin/kernel">
                                     <fileset dir="${kernel.directory}"/>
                                 </copy>
-                                <mkdir dir="${dist.directory}/mosaikit/plugins"/>
+                                <mkdir dir="${dist.directory}/mosaikit/extensions"/>
                                 <chmod file="${dist.directory}/mosaikit/mosaikit" perm="755"/>
                                 <!-- target/dist/mosaikit-docker: Docker Compose with PostgreSQL and Keycloak.
                                      Not deleted first: a running compose keeps it open, and the user's .env and
-                                     plugins/ must survive a rebuild. -->
+                                     extensions/ must survive a rebuild. -->
                                 <copy todir="${dist.directory}/mosaikit-docker" overwrite="true">
                                     <fileset dir="${project.basedir}/docker">
                                         <exclude name="Containerfile"/>

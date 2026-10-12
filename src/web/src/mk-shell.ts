@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
 import { applyTheme, isThemeName, registerTheme, themes as uiThemes } from '@mosaikit/ui';
-import { contributionsTo, stringAttribute, type FrontendPlugin } from '@mosaikit/sdk';
+import { contributionsTo, stringAttribute, type FrontendExtension } from '@mosaikit/sdk';
 import { LitElement, css, html, nothing, svg, type PropertyValues } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import {
@@ -25,10 +25,10 @@ import {
   type LauncherEntry,
 } from './navigation.js';
 import { MkAdminApps } from './mk-admin-apps.js';
-import './mk-admin-plugins.js';
+import './mk-admin-extensions.js';
 import './mk-admin-settings.js';
 import './mk-assistant.js';
-import './mk-plugin-frame.js';
+import './mk-extension-frame.js';
 import './mk-activity.js';
 import './mk-settings.js';
 import type { SettingsSection } from './mk-settings.js';
@@ -36,16 +36,16 @@ import './mk-sign-in.js';
 import { browserLanguage, isLanguage, language, setLanguage, t } from './i18n.js';
 import type { PasswordSignIn } from './mk-sign-in.js';
 import { LiveClient } from './live.js';
-import { PluginLoader, type LoadResult } from './plugin-loader.js';
+import { ExtensionLoader, type LoadResult } from './extension-loader.js';
 
 /** How often the shell looks for actions proposed by assistants. */
 const DRAFT_REFRESH_MS = 20_000;
-/** How often the shell asks whether the watched plugins changed (development mode). */
-const PLUGIN_WATCH_MS = 1_000;
+/** How often the shell asks whether the watched extensions changed (development mode). */
+const EXTENSION_WATCH_MS = 1_000;
 
 /**
  * The pages of administrators: the apps of the organization for its administrators (MK-030), the
- * plugins (MK-022) and the platform (MK-048) for platform administrators.
+ * extensions (MK-022) and the platform (MK-048) for platform administrators.
  */
 const ADMIN_PAGES = [
   {
@@ -54,7 +54,12 @@ const ADMIN_PAGES = [
     element: 'mk-admin-apps',
     role: 'organization-admin',
   },
-  { path: '/admin/plugins', title: 'Plugins', element: 'mk-admin-plugins', role: 'platform-admin' },
+  {
+    path: '/admin/extensions',
+    title: 'Extensions',
+    element: 'mk-admin-extensions',
+    role: 'platform-admin',
+  },
   {
     path: '/admin/settings',
     title: 'Platform',
@@ -64,7 +69,7 @@ const ADMIN_PAGES = [
 ] as const;
 
 /**
- * Root element of the shell: sign-in, launcher navigation and the area where plugin apps render.
+ * Root element of the shell: sign-in, launcher navigation and the area where extension apps render.
  */
 @customElement('mk-shell')
 export class MkShell extends LitElement {
@@ -482,8 +487,8 @@ export class MkShell extends LitElement {
   private readonly client = new KernelClient();
   private readonly federated = new FederatedSignIn();
   private session: { federation: Federation; tokens: Tokens } | undefined;
-  private plugins: FrontendPlugin[] = [];
-  private loader: PluginLoader | undefined;
+  private extensions: FrontendExtension[] = [];
+  private loader: ExtensionLoader | undefined;
   private refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
   @state() private info: SystemInfo | undefined;
@@ -536,9 +541,9 @@ export class MkShell extends LitElement {
   override connectedCallback(): void {
     super.connectedCallback();
     setLanguage(this.shellLanguage);
-    // A theme plugin installed from the Plugins page is active at once (MK-028).
-    this.addEventListener('mk-plugins-changed', () => {
-      void this.reloadPlugins()
+    // A theme extension installed from the Extensions page is active at once (MK-028).
+    this.addEventListener('mk-extensions-changed', () => {
+      void this.reloadExtensions()
         .then(() => this.loadBarApps())
         .then(() => this.loadThemes());
     });
@@ -784,7 +789,7 @@ export class MkShell extends LitElement {
   }
 
   /**
-   * Registers the themes of the active theme plugins, so that people can choose them and the
+   * Registers the themes of the active theme extensions, so that people can choose them and the
    * installation can name one as its theme; a missing value comes from the default theme.
    */
   private async loadThemes(): Promise<void> {
@@ -813,7 +818,7 @@ export class MkShell extends LitElement {
     }
     return bar.flatMap((app) => {
       const entry = all.find(
-        (candidate) => candidate.pluginId === app.pluginId && candidate.id === app.appId,
+        (candidate) => candidate.extensionId === app.extensionId && candidate.id === app.appId,
       );
       return entry ? [{ entry, pinned: app.pinned }] : [];
     });
@@ -833,7 +838,7 @@ export class MkShell extends LitElement {
   /** The kinds of notifications the person received or turned off, for the settings. */
   private notificationKinds(): string[] {
     const kinds = new Set(
-      this.activity.map((notification) => `${notification.pluginId}/${notification.kind}`),
+      this.activity.map((notification) => `${notification.extensionId}/${notification.kind}`),
     );
     for (const muted of this.preferences?.mutedNotifications ?? []) {
       kinds.add(muted);
@@ -877,7 +882,7 @@ export class MkShell extends LitElement {
 
   /** The personal settings page (MK-027). */
   private renderSettings(): unknown {
-    const all = launcherEntries(this.plugins);
+    const all = launcherEntries(this.extensions);
     return html`<mk-settings
       .preferences=${this.preferences}
       .themes=${uiThemes()}
@@ -892,12 +897,12 @@ export class MkShell extends LitElement {
   }
 
   /**
-   * The sections that plugins add to the settings (settings.section), for the people the plugin
+   * The sections that extensions add to the settings (settings.section), for the people the extension
    * allows: a section with `roles` shows only to people with one of them.
    */
   private settingsSections(): SettingsSection[] {
     const roles = new Set(this.account?.roles ?? []);
-    return contributionsTo(this.plugins, 'settings.section').flatMap((contribution) => {
+    return contributionsTo(this.extensions, 'settings.section').flatMap((contribution) => {
       const element = stringAttribute(contribution, 'element');
       const allowed = contribution.attributes.roles;
       if (!element || !/^[a-z][a-z0-9]*(-[a-z0-9]+)+$/.test(element)) {
@@ -912,7 +917,7 @@ export class MkShell extends LitElement {
       }
       return [
         {
-          pluginId: contribution.pluginId,
+          extensionId: contribution.extensionId,
           id: contribution.id,
           title: stringAttribute(contribution, 'title') ?? contribution.id,
           element,
@@ -927,18 +932,18 @@ export class MkShell extends LitElement {
    */
   private visibleEntries(entries: LauncherEntry[]): LauncherEntry[] {
     const hidden = new Set(this.preferences?.hiddenApps ?? []);
-    const key = (entry: LauncherEntry): string => `${entry.pluginId}/${entry.id}`;
+    const key = (entry: LauncherEntry): string => `${entry.extensionId}/${entry.id}`;
     const bar = this.barApps;
     const ordered = bar
       ? bar.flatMap((app) => {
           const entry = entries.find(
-            (candidate) => key(candidate) === `${app.pluginId}/${app.appId}`,
+            (candidate) => key(candidate) === `${app.extensionId}/${app.appId}`,
           );
           return entry ? [entry] : [];
         })
       : entries;
     const pinned = new Set(
-      (bar ?? []).filter((app) => app.pinned).map((app) => `${app.pluginId}/${app.appId}`),
+      (bar ?? []).filter((app) => app.pinned).map((app) => `${app.extensionId}/${app.appId}`),
     );
     return ordered.filter((entry) => pinned.has(key(entry)) || !hidden.has(key(entry)));
   }
@@ -950,12 +955,12 @@ export class MkShell extends LitElement {
     } catch {
       this.barApps = undefined;
     }
-    this.entries = this.visibleEntries(launcherEntries(this.plugins));
+    this.entries = this.visibleEntries(launcherEntries(this.extensions));
   }
 
   /**
    * Applies the theme, the appearance and the language: those of the person once signed in, those
-   * of the installation and of the browser otherwise. Plugins hear it on the event bus.
+   * of the installation and of the browser otherwise. Extensions hear it on the event bus.
    */
   private applyAppearance(): void {
     const preferences = this.preferences;
@@ -993,7 +998,7 @@ export class MkShell extends LitElement {
     const wanted = event.detail;
     const save = ++this.saves;
     this.preferences = wanted;
-    this.entries = this.visibleEntries(launcherEntries(this.plugins));
+    this.entries = this.visibleEntries(launcherEntries(this.extensions));
     this.applyAppearance();
     this.saving = this.saving.then(async () => {
       try {
@@ -1166,7 +1171,7 @@ export class MkShell extends LitElement {
             href=${page.path}
             aria-current=${this.path === page.path ? 'page' : 'false'}
             @click=${this.navigate}
-            >${page.path === '/admin/settings' ? settingsIcon : pluginsIcon}<span
+            >${page.path === '/admin/settings' ? settingsIcon : extensionsIcon}<span
               >${t(page.title)}</span
             ></a
           >`,
@@ -1177,7 +1182,7 @@ export class MkShell extends LitElement {
     const failed = this.loadResults.filter((result) => !result.loaded);
     const failures =
       failed.length > 0
-        ? t('{count} plugins could not be loaded.', { count: failed.length })
+        ? t('{count} extensions could not be loaded.', { count: failed.length })
         : nothing;
     return html`
       <nav class="rail" aria-label=${t('Apps')}>
@@ -1393,19 +1398,19 @@ export class MkShell extends LitElement {
    * enters, and the workspace says so: it is not a failed sign-in.
    */
   private async enter(account: Account): Promise<void> {
-    // Read before the plugins: a plugin that changes while they load is seen at the first check.
-    const revision = await this.client.pluginRevision().catch(() => undefined);
-    let plugins: FrontendPlugin[] = [];
+    // Read before the extensions: an extension that changes while they load is seen at the first check.
+    const revision = await this.client.extensionRevision().catch(() => undefined);
+    let extensions: FrontendExtension[] = [];
     this.appsError = undefined;
     try {
-      plugins = await this.client.shellPlugins();
+      extensions = await this.client.shellExtensions();
     } catch (error) {
       this.appsError = t(
         'You are signed in, but the apps could not be loaded: {reason} Reload the page; if it happens again, tell your administrator.',
         { reason: error instanceof Error ? error.message : String(error) },
       );
     }
-    const loader = new PluginLoader(
+    const loader = new ExtensionLoader(
       (path, init) => this.client.request(path, init),
       undefined,
       undefined,
@@ -1415,14 +1420,14 @@ export class MkShell extends LitElement {
     this.live.connect(account.organization ?? undefined);
     this.stopActivity?.();
     this.stopActivity = this.live.subscribe('notifications', () => void this.loadActivity());
-    this.loadResults = await loader.loadAll(plugins, account);
-    this.plugins = plugins;
+    this.loadResults = await loader.loadAll(extensions, account);
+    this.extensions = extensions;
     this.loader = loader;
-    this.entries = this.visibleEntries(launcherEntries(plugins));
+    this.entries = this.visibleEntries(launcherEntries(extensions));
     this.account = account;
     this.preferences = account.preferences ?? NO_PREFERENCES;
     void this.loadActivity();
-    this.plugins = plugins;
+    this.extensions = extensions;
     await this.loadBarApps();
     this.applyAppearance();
     this.email = undefined;
@@ -1431,54 +1436,54 @@ export class MkShell extends LitElement {
     await this.loadAssistant();
     clearInterval(this.draftTimer);
     this.draftTimer = setInterval(() => void this.loadDrafts(), DRAFT_REFRESH_MS);
-    this.watchPlugins(revision);
+    this.watchExtensions(revision);
   }
 
   /**
-   * When the kernel watches the plugins directory, follows its revision: a changed module cannot
+   * When the kernel watches the extensions directory, follows its revision: a changed module cannot
    * replace the custom elements it defined, so the shell reloads the page, which keeps the session
-   * of a local account. With the tokens of a realm, held in memory only, it loads the new plugins.
-   * The revision is the one read before the plugins were loaded.
+   * of a local account. With the tokens of a realm, held in memory only, it loads the new extensions.
+   * The revision is the one read before the extensions were loaded.
    */
-  private watchPlugins(loaded: number | undefined): void {
+  private watchExtensions(loaded: number | undefined): void {
     clearInterval(this.watchTimer);
     let revision = loaded;
     if (revision === undefined) {
       return;
     }
     this.watchTimer = setInterval(() => {
-      void this.client.pluginRevision().then(
+      void this.client.extensionRevision().then(
         (current) => {
           if (current === undefined || current === revision) {
             return;
           }
           revision = current;
           if (this.session) {
-            void this.reloadPlugins();
+            void this.reloadExtensions();
           } else {
             location.reload();
           }
         },
         () => undefined,
       );
-    }, PLUGIN_WATCH_MS);
+    }, EXTENSION_WATCH_MS);
   }
 
   /**
-   * Loads the plugins that became active without a restart (ADR-0031), such as one just installed
-   * from the Plugins page; those already loaded stay as they are.
+   * Loads the extensions that became active without a restart (ADR-0031), such as one just installed
+   * from the Extensions page; those already loaded stay as they are.
    */
-  private async reloadPlugins(): Promise<void> {
+  private async reloadExtensions(): Promise<void> {
     if (!this.account || !this.loader) {
       return;
     }
-    const plugins = await this.client.shellPlugins();
-    const known = new Set(this.plugins.map((plugin) => plugin.id));
-    const added = plugins.filter((plugin) => !known.has(plugin.id));
-    const results = await this.loader.loadAll(added, this.account, plugins);
+    const extensions = await this.client.shellExtensions();
+    const known = new Set(this.extensions.map((extension) => extension.id));
+    const added = extensions.filter((extension) => !known.has(extension.id));
+    const results = await this.loader.loadAll(added, this.account, extensions);
     this.loadResults = [...this.loadResults, ...results];
-    this.plugins = plugins;
-    this.entries = this.visibleEntries(launcherEntries(plugins));
+    this.extensions = extensions;
+    this.entries = this.visibleEntries(launcherEntries(extensions));
   }
 
   private readonly signOut = async (): Promise<void> => {
@@ -1509,7 +1514,7 @@ export class MkShell extends LitElement {
     this.applyAppearance();
     this.entries = [];
     this.loadResults = [];
-    this.plugins = [];
+    this.extensions = [];
     this.loader = undefined;
   }
 
@@ -1528,7 +1533,7 @@ export class MkShell extends LitElement {
    */
   private renderOrganizationNotice(): unknown {
     const error = this.error ? html`<p class="error" role="alert">${this.error}</p>` : nothing;
-    // The Plugins page does not act on an organization.
+    // The Extensions page does not act on an organization.
     if (!this.account || this.account.organizationId || this.showsAdmin()) {
       return error;
     }
@@ -1568,7 +1573,7 @@ export class MkShell extends LitElement {
   }
 
   /**
-   * Mounts the current app, or the Plugins page, in an element of its own: Lit renders the rest of
+   * Mounts the current app, or the Extensions page, in an element of its own: Lit renders the rest of
    * the work area, and replacing children that Lit placed breaks its next render (back to Home).
    */
   private renderApp(): void {
@@ -1593,15 +1598,15 @@ export class MkShell extends LitElement {
     if (!area || !entry) {
       return;
     }
-    const plugin = this.plugins.find((candidate) => candidate.id === entry.pluginId);
-    if (plugin?.isolation === 'iframe') {
+    const extension = this.extensions.find((candidate) => candidate.id === entry.extensionId);
+    if (extension?.isolation === 'iframe') {
       const current = area.firstElementChild;
-      if (current instanceof HTMLElement && current.dataset.app === `${plugin.id}/${entry.id}`) {
+      if (current instanceof HTMLElement && current.dataset.app === `${extension.id}/${entry.id}`) {
         return;
       }
-      const frame = document.createElement('mk-plugin-frame');
-      frame.dataset.app = `${plugin.id}/${entry.id}`;
-      frame.plugin = plugin;
+      const frame = document.createElement('mk-extension-frame');
+      frame.dataset.app = `${extension.id}/${entry.id}`;
+      frame.extension = extension;
       frame.element = entry.element;
       frame.user = this.account;
       frame.events = this.loader?.events;
@@ -1616,7 +1621,7 @@ export class MkShell extends LitElement {
 }
 
 /**
- * The message for a confirmed action that the plugin refused, with the detail of its problem
+ * The message for a confirmed action that the extension refused, with the detail of its problem
  * (RFC 9457) when there is one, or `undefined` when it succeeded.
  */
 export function failureOf(
@@ -1664,7 +1669,7 @@ const icon = (paths: unknown): unknown =>
 const homeIcon = icon(
   svg`<path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z" />`,
 );
-const pluginsIcon = icon(
+const extensionsIcon = icon(
   svg`<rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><path d="M16.5 13v7M13 16.5h7" />`,
 );
 const bellIcon = icon(

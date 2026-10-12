@@ -12,7 +12,7 @@
     "realm": [
       {
         "name": "organization-admin",
-        "description": "Manager of the organization in Mosaikit: members, enabled plugins, data rules."
+        "description": "Manager of the organization in Mosaikit: members, enabled extensions, data rules."
       }
     ]
   },

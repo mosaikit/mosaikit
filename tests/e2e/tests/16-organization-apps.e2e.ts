@@ -49,7 +49,7 @@ test.describe('MK-030 Apps of the app bar per organization and role', () => {
     const titles = await bar.getByRole('link').allInnerTexts();
     expect(titles.slice(0, 3)).toEqual(['Activity', 'Home', 'Activities']);
     // The API of the app that is off refuses the people of the organization.
-    const notes = await api(MARIO, '/api/v1/p/fixture-notes/notes');
+    const notes = await api(MARIO, '/api/v1/ext/fixture-notes/notes');
     expect(notes.status).toBe(403);
 
     // A pinned app cannot be hidden in the personal settings.
@@ -70,7 +70,7 @@ test.describe('MK-030 Apps of the app bar per organization and role', () => {
       method: 'PUT',
       body: JSON.stringify([
         {
-          pluginId: 'dev.mosaikit.fixture.todo',
+          extensionId: 'dev.mosaikit.fixture.todo',
           appId: 'todo',
           enabled: true,
           pinned: false,

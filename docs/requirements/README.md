@@ -11,7 +11,7 @@ which also verifies traceability:
 |---|---|
 | `id` | `MK-` followed by three digits, never reused |
 | `title` | What the platform does, in one line |
-| `area` | kernel, plugins, shell, sdk, security, distribution, marketplace, ai |
+| `area` | kernel, extensions, shell, sdk, security, distribution, marketplace, ai |
 | `priority` | P1 (needed for the prototype), P2, P3 |
 | `status` | planned, in-progress, done |
 | `description` | Why it is needed and what it covers |

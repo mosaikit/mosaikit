@@ -8,6 +8,6 @@ description: >-
   channel of app-teams, with the rights of the person who asks; its changes stay drafts until
   confirmed. See ADR-0022 and ADR-0027.
 acceptance:
-  - A person asks the assistant in a chat and gets an answer from the tools of the active plugins.
+  - A person asks the assistant in a chat and gets an answer from the tools of the active extensions.
   - When mentioned in a channel the assistant answers in the thread, and a change it proposes waits for the confirmation of the person who asked.
 depends: [MK-024, MK-034, MK-036]

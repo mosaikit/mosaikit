@@ -9,7 +9,7 @@ import java.util.UUID;
 /**
  * An event of the real-time channel (MK-031).
  *
- * @param topic what it is about, such as {@code documents.<plugin>.<collection>}
+ * @param topic what it is about, such as {@code documents.<extension>.<collection>}
  * @param organization the organization whose pages may receive it
  * @param audience the accounts that receive it, or {@code null} for every member of the organization,
  *     but not its guests (MK-032)

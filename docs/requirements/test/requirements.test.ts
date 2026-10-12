@@ -34,7 +34,7 @@ function filesUnder(path: string, suffix: string): string[] {
 function referencedIds(): Map<string, string[]> {
   const references = new Map<string, string[]>();
   const sources = [
-    // src/: the server, the web shell and the sample plugins.
+    // src/: the server, the web shell and the sample extensions.
     ...filesUnder(join(root, 'src'), 'Test.java'),
     ...filesUnder(join(root, 'src'), 'IT.java'),
     ...filesUnder(join(root, 'src'), '.test.ts'),
@@ -76,7 +76,7 @@ describe('requirements', () => {
     const references = referencedIds();
     const untested = requirements
       .filter((requirement) => requirement.status === 'done')
-      // Verified by the tests of the repository of a plugin (ADR-0035).
+      // Verified by the tests of the repository of an extension (ADR-0035).
       .filter((requirement) => requirement['verified-in'] === undefined)
       .filter((requirement) => !references.has(requirement.id))
       .map((requirement) => requirement.id);

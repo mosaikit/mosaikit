@@ -4,7 +4,7 @@ area: kernel
 priority: P1
 status: done
 description: >-
-  The organization is the unit of isolation for people, data and enabled plugins. The platform
+  The organization is the unit of isolation for people, data and enabled extensions. The platform
   administrator creates and lists organizations.
 acceptance:
   - Only a platform administrator can list, read and create organizations.

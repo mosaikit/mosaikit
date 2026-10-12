@@ -6,7 +6,7 @@ import { join } from 'node:path';
 /** Where things are, and the settings of the test installation; each can be changed by env. */
 export const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 export const DIST = join(ROOT, 'target', 'dist');
-export const FIXTURES = join(ROOT, 'tests', 'fixtures', 'plugins');
+export const FIXTURES = join(ROOT, 'tests', 'fixtures', 'extensions');
 /** The working directory of this run: one for each group of tests/e2e/run.ts. */
 export const WORK = process.env.E2E_WORK ?? join(ROOT, 'tests', 'e2e', '.work');
 export const INSTALLATION = join(WORK, 'mosaikit');

@@ -6,11 +6,11 @@ status: done
 description: >-
   The shell has the structure of the web version of Teams: an app bar on the left, a top bar with
   the search and the menu of the person, and the work area, where each app shows its own list pane
-  and content (the channels and tabs of F2 add theirs); at phone width a bottom navigation. Plugins add apps to the bar with the point rail.app, which replaces launcher.app. See
+  and content (the channels and tabs of F2 add theirs); at phone width a bottom navigation. Extensions add apps to the bar with the point rail.app, which replaces launcher.app. See
   ADR-0026.
 acceptance:
-  - The app bar shows the apps of the kernel and of the active plugins in the order of their contributions (MK-030 lets organizations change it), and opens each one in the work area with its own route.
-  - An app contributed with launcher.app is still shown, with a deprecation warning in the plugin status.
+  - The app bar shows the apps of the kernel and of the active extensions in the order of their contributions (MK-030 lets organizations change it), and opens each one in the work area with its own route.
+  - An app contributed with launcher.app is still shown, with a deprecation warning in the extension status.
   - At 360 px of width the app bar becomes a bottom navigation and every screen stays usable with touch.
   - No name, logo or icon of Microsoft appears in the shell.
 depends: [MK-008]

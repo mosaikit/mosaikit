@@ -4,18 +4,18 @@ import { expect, test } from '@playwright/test';
 import { MARIO } from '../support/env.js';
 import { openApp, signIn, signOut } from '../support/shell.js';
 
-test.describe('MK-008 Shell with sign-in, launcher and plugin apps', () => {
-  test('the way back to Home works from an app and from the Plugins page', async ({ page }) => {
+test.describe('MK-008 Shell with sign-in, launcher and extension apps', () => {
+  test('the way back to Home works from an app and from the Extensions page', async ({ page }) => {
     const errors: string[] = [];
     page.on('pageerror', (error) => errors.push(error.message));
     await signIn(page);
-    await openApp(page, 'Plugins');
-    await expect(page.getByRole('heading', { name: 'Plugins', level: 1 })).toBeVisible();
+    await openApp(page, 'Extensions');
+    await expect(page.getByRole('heading', { name: 'Extensions', level: 1 })).toBeVisible();
     await openApp(page, 'Home');
     await expect(page.getByRole('heading', { name: /Welcome/ })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Plugins', level: 1 })).toHaveCount(0);
+    await expect(page.getByRole('heading', { name: 'Extensions', level: 1 })).toHaveCount(0);
 
-    await openApp(page, 'Plugins');
+    await openApp(page, 'Extensions');
     await openApp(page, 'Activities');
     await expect(page.getByRole('heading', { name: 'Activities' })).toBeVisible();
     await openApp(page, 'Home');

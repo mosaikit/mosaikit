@@ -1,11 +1,11 @@
 id: MK-014
-title: Isolated iframe mode for untrusted plugin frontends
+title: Isolated iframe mode for untrusted extension frontends
 area: shell
 priority: P2
 status: done
 description: >-
-  Plugins from unverified publishers run in a sandboxed iframe that talks to the shell through
+  Extensions from unverified publishers run in a sandboxed iframe that talks to the shell through
   a declared message bridge.
 acceptance:
-  - An iframe plugin can publish and receive declared events and call declared services only.
+  - An iframe extension can publish and receive declared events and call declared services only.
 depends: [MK-008]

@@ -16,7 +16,16 @@
       "maxLength": 120
     },
     "area": {
-      "enum": ["kernel", "plugins", "shell", "sdk", "security", "distribution", "marketplace", "ai"]
+      "enum": [
+        "kernel",
+        "extensions",
+        "shell",
+        "sdk",
+        "security",
+        "distribution",
+        "marketplace",
+        "ai"
+      ]
     },
     "priority": {
       "enum": ["P1", "P2", "P3"]

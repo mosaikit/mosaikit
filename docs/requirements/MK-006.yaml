@@ -1,13 +1,13 @@
 id: MK-006
-title: Plugin registry with requirement resolution
-area: plugins
+title: Extension registry with requirement resolution
+area: extensions
 priority: P1
 status: done
 description: >-
-  At start the kernel reads the installed plugins and decides which ones can be used.
+  At start the kernel reads the installed extensions and decides which ones can be used.
 acceptance:
-  - Each plugin is ACTIVE, INCOMPATIBLE or INVALID, with human readable reasons.
-  - A plugin whose requirement is missing, inactive or in a wrong version is INCOMPATIBLE, transitively.
-  - A second plugin with an id already installed is INVALID.
-  - The platform administrator lists plugins; signed-in people get the frontends of active plugins.
+  - Each extension is ACTIVE, INCOMPATIBLE or INVALID, with human readable reasons.
+  - An extension whose requirement is missing, inactive or in a wrong version is INCOMPATIBLE, transitively.
+  - A second extension with an id already installed is INVALID.
+  - The platform administrator lists extensions; signed-in people get the frontends of active extensions.
 depends: [MK-005]

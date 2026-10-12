@@ -16,7 +16,7 @@ import java.util.Map;
 /**
  * Keeps the guests of an organization (MK-032) to what concerns them: their account, their teams,
  * the documents shared with their teams, their activity and what the shell needs. The APIs of the
- * plugin backends, the assistant and the administration are refused, since they would show the
+ * extension backends, the assistant and the administration are refused, since they would show the
  * data of the organization.
  */
 @Provider
@@ -29,7 +29,7 @@ public class GuestAccessFilter implements ContainerRequestFilter {
             "/api/v1/data/",
             "/api/v1/identity",
             "/api/v1/notifications",
-            "/api/v1/plugin-assets/",
+            "/api/v1/extension-assets/",
             "/api/v1/shell/",
             "/api/v1/system/",
             "/api/v1/teams");

@@ -1,14 +1,14 @@
 id: MK-005
-title: Validate plugin manifests
-area: plugins
+title: Validate extension manifests
+area: extensions
 priority: P1
 status: done
 description: >-
-  The manifest is the contract of a plugin. The kernel, the command line and the marketplace
+  The manifest is the contract of an extension. The kernel, the command line and the marketplace
   must apply the same rules and report every problem at once.
 acceptance:
   - Required fields are id, version, name, kind and platform.
-  - Frontend and migration paths cannot leave the plugin directory.
+  - Frontend and migration paths cannot leave the extension directory.
   - Database schemas start with p_.
   - The JSON Schema shipped with kernel-api accepts every manifest of the repository and refuses the same mistakes as the kernel.
 depends: [MK-004]

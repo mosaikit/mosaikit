@@ -5,7 +5,7 @@ import {
   topicMatches,
   type EventBus,
   type FrontendBridge,
-  type FrontendPlugin,
+  type FrontendExtension,
 } from '@mosaikit/sdk';
 import { isFrameMessage, type CallMessage, type ShellMessage } from './bridge-protocol.js';
 
@@ -14,7 +14,7 @@ const HEADERS = new Set(['accept', 'content-type', 'if-match']);
 
 /**
  * The side of the shell of the bridge with one isolated frontend (MK-014): it lets through only
- * the events and services the plugin declared, and calls the backend API of the plugin with the
+ * the events and services the extension declared, and calls the backend API of the extension with the
  * credentials of the signed-in person, which the frame never sees.
  */
 export class ShellBridge {
@@ -22,7 +22,7 @@ export class ShellBridge {
   private readonly bridge: FrontendBridge;
 
   constructor(
-    private readonly plugin: FrontendPlugin,
+    private readonly extension: FrontendExtension,
     private readonly events: EventBus,
     private readonly request: (path: string, init?: RequestInit) => Promise<Response>,
     private readonly post: (message: ShellMessage) => void,
@@ -30,7 +30,7 @@ export class ShellBridge {
       console.warn(message);
     },
   ) {
-    this.bridge = plugin.bridge ?? { publishes: [], subscribes: [], services: [] };
+    this.bridge = extension.bridge ?? { publishes: [], subscribes: [], services: [] };
   }
 
   /** Handles a message from the frame; returns `true` for the `ready` message. */
@@ -68,14 +68,14 @@ export class ShellBridge {
   private publish(topic: string, payload: unknown): void {
     if (!this.bridge.publishes.some((pattern) => topicMatches(pattern, topic))) {
       this.report(
-        `Plugin ${this.plugin.id} may not publish '${topic}': it is not in bridge.publishes`,
+        `Extension ${this.extension.id} may not publish '${topic}': it is not in bridge.publishes`,
       );
       return;
     }
     try {
       this.events.publish(topic, payload);
     } catch (error) {
-      this.report(`Plugin ${this.plugin.id} published an invalid event: ${String(error)}`);
+      this.report(`Extension ${this.extension.id} published an invalid event: ${String(error)}`);
     }
   }
 
@@ -85,7 +85,7 @@ export class ShellBridge {
     }
     if (!this.bridge.subscribes.some((declared) => patternCovers(declared, pattern))) {
       this.report(
-        `Plugin ${this.plugin.id} may not receive '${pattern}': it is not in bridge.subscribes`,
+        `Extension ${this.extension.id} may not receive '${pattern}': it is not in bridge.subscribes`,
       );
       return;
     }
@@ -94,12 +94,16 @@ export class ShellBridge {
         try {
           this.post({ mk: 1, type: 'event', topic, payload });
         } catch (error) {
-          this.report(`An event for plugin ${this.plugin.id} could not be sent: ${String(error)}`);
+          this.report(
+            `An event for extension ${this.extension.id} could not be sent: ${String(error)}`,
+          );
         }
       });
       this.subscriptions.set(pattern, unsubscribe);
     } catch (error) {
-      this.report(`Plugin ${this.plugin.id} asked for an invalid subscription: ${String(error)}`);
+      this.report(
+        `Extension ${this.extension.id} asked for an invalid subscription: ${String(error)}`,
+      );
     }
   }
 
@@ -135,13 +139,13 @@ export class ShellBridge {
     }
   }
 
-  /** A relative path is relative to the backend API of the plugin. */
+  /** A relative path is relative to the backend API of the extension. */
   private resolve(path: string): string {
     return path.startsWith('/') ? path : (this.bridge.api ?? '') + path;
   }
 
   /**
-   * Where the frame may call: the backend API of the plugin (service `api`) and its collections of
+   * Where the frame may call: the backend API of the extension (service `api`) and its collections of
    * documents (service `data`, ADR-0031), when it has them.
    */
   private bases(): string[] {
@@ -163,7 +167,7 @@ export class ShellBridge {
     }
     const bases = this.bases();
     if (bases.length === 0) {
-      return 'the plugin has no backend API';
+      return 'the extension has no backend API';
     }
     if (!METHODS.has(message.method.toUpperCase())) {
       return `method ${message.method} is not allowed`;
@@ -176,7 +180,7 @@ export class ShellBridge {
       path.includes('..') ||
       path.includes('\\')
     ) {
-      return `only the API of the plugin, under ${bases.join(' or ')}, can be called`;
+      return `only the API of the extension, under ${bases.join(' or ')}, can be called`;
     }
     return undefined;
   }

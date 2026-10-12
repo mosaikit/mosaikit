@@ -46,5 +46,5 @@ Thumbs.db
 # Local runtime data
 .mosaikit/
 
-# Plugin JARs built from sources (tests/fixtures/plugins/*/src)
-tests/fixtures/plugins/*/lib/
+# Extension JARs built from sources (tests/fixtures/extensions/*/src)
+tests/fixtures/extensions/*/lib/

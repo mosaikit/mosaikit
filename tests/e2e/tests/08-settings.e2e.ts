@@ -17,7 +17,7 @@ function files(directory: string): string[] {
 
 test.describe('MK-011 Settings of the installation and rebuilds of the kernel', () => {
   test('the rebuilt kernel holds none of the settings of the installation', () => {
-    // The previous files installed Java plugins, so the kernel was rebuilt with these settings.
+    // The previous files installed Java extensions, so the kernel was rebuilt with these settings.
     const kernel = join(INSTALLATION, 'bin', 'kernel');
     // Only values that cannot appear by chance: the test database may use the password "mosaikit".
     const secrets = [DATABASE.password, ADMIN.password].filter(
@@ -25,7 +25,7 @@ test.describe('MK-011 Settings of the installation and rebuilds of the kernel', 
     );
     expect(secrets).toContain(ADMIN.password);
     const leaks = files(kernel)
-      .filter((file) => !file.includes(join('kernel', 'plugin-packages')))
+      .filter((file) => !file.includes(join('kernel', 'extension-packages')))
       .filter((file) => {
         const content = readFileSync(file).toString('latin1');
         return secrets.some((secret) => content.includes(secret));
@@ -34,7 +34,7 @@ test.describe('MK-011 Settings of the installation and rebuilds of the kernel', 
   });
 });
 
-test.describe('MK-024 Assistant on the tools of the plugins', () => {
+test.describe('MK-024 Assistant on the tools of the extensions', () => {
   test('24.6 a model that cannot be reached gives a readable error, and the shell works', async ({
     page,
   }) => {

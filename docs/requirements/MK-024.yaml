@@ -1,11 +1,11 @@
 id: MK-024
-title: Assistant on the tools of the plugins
+title: Assistant on the tools of the extensions
 area: ai
 priority: P2
 status: done
 description: >-
   The kernel offers an assistant that answers requests in natural language with the tools of the
-  active plugins (MK-015), through a language model behind an OpenAI-compatible API, local such as
+  active extensions (MK-015), through a language model behind an OpenAI-compatible API, local such as
   Ollama or hosted. It acts with the permissions of the person in the organization of the request;
   changes become drafts that the person confirms. The shell has an assistant panel. Prototype spike
   S10. See ADR-0022.

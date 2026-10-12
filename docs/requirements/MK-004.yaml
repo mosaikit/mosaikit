@@ -1,10 +1,10 @@
 id: MK-004
 title: Semantic versions and version ranges
-area: plugins
+area: extensions
 priority: P1
 status: done
 description: >-
-  Plugins declare the kernel versions they run on and the versions of the plugins they need.
+  Extensions declare the kernel versions they run on and the versions of the extensions they need.
 acceptance:
   - Versions follow Semantic Versioning 2.0.0, including pre-release precedence.
   - Ranges support comparators, caret, tilde, partial versions, wildcards, intersection and union.

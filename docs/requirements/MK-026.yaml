@@ -5,10 +5,10 @@ priority: P1
 status: done
 description: >-
   @mosaikit/ui wraps Fluent UI Web Components and maps the theme tokens --mk-* on the Fluent design
-  tokens, so that the shell and the plugins that use it look the same. Plugins keep their framework.
+  tokens, so that the shell and the extensions that use it look the same. Extensions keep their framework.
   See ADR-0026 and ADR-0032.
 acceptance:
   - The shell is built only with components of @mosaikit/ui.
-  - A plugin in React and one in Vue use components of the kit and follow a change of theme without reloading.
+  - An extension in React and one in Vue use components of the kit and follow a change of theme without reloading.
   - The components of the kit pass the accessibility checks (axe) of the shell.
 depends: [MK-021]

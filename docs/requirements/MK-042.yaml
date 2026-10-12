@@ -1,10 +1,10 @@
 id: MK-042
 title: Files of people, teams, channels and chats (app-files)
-area: plugins
+area: extensions
 priority: P1
 status: planned
 description: >-
-  The plugin app-files shows the files of the person, of the teams and channels and of the chats,
+  The extension app-files shows the files of the person, of the teams and channels and of the chats,
   with folders, versions, previews and sharing, on the file service of the kernel. See ADR-0029.
 acceptance:
   - A file uploaded to a channel appears in its Files tab and in app-files for every member.

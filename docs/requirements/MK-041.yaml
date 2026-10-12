@@ -1,13 +1,13 @@
 id: MK-041
-title: S3-compatible file storage and file service for plugins
+title: S3-compatible file storage and file service for extensions
 area: kernel
 priority: P1
 status: planned
 description: >-
   The kernel keeps files in an S3-compatible object store, one prefix per organization, and offers
-  plugins a file service that applies the rights of the person and records the audit. The portable
+  extensions a file service that applies the rights of the person and records the audit. The portable
   distribution brings MinIO or uses a directory. See ADR-0029.
 acceptance:
-  - A plugin stores and reads a file through the service without knowing the credentials of the store.
+  - An extension stores and reads a file through the service without knowing the credentials of the store.
   - A person cannot read a file of another organization, or of a team they do not belong to, even with its identifier.
 depends: [MK-019, MK-032]

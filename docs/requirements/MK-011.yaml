@@ -1,12 +1,12 @@
 id: MK-011
-title: Install Java plugins with a restart
-area: plugins
+title: Install Java extensions with a restart
+area: extensions
 priority: P1
 status: done
 description: >-
-  Spike S1 of the prototype. A plugin that brings Java code and migrations is installed by
+  Spike S1 of the prototype. An extension that brings Java code and migrations is installed by
   adding it and re-running the Quarkus build step at the next start, as Keycloak does.
 acceptance:
-  - A plugin with a REST endpoint, an entity and a Flyway migration is active after one restart, in less than 60 seconds.
-  - A plugin with which the kernel cannot be rebuilt or started is rolled back automatically, and the kernel starts again with the previous plugins.
+  - An extension with a REST endpoint, an entity and a Flyway migration is active after one restart, in less than 60 seconds.
+  - An extension with which the kernel cannot be rebuilt or started is rolled back automatically, and the kernel starts again with the previous extensions.
 depends: [MK-006]

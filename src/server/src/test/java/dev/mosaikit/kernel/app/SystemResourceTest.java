@@ -22,7 +22,7 @@ class SystemResourceTest {
                 .statusCode(200)
                 .body("name", equalTo("Mosaikit"))
                 .body("version", startsWith("0.1.0"))
-                .body("activePlugins", equalTo(2))
+                .body("activeExtensions", equalTo(2))
                 .body("theme", equalTo("mosaikit"))
                 .body("rememberDays", equalTo(30));
     }

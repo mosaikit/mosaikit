@@ -61,11 +61,11 @@ test.describe('MK-027 Personal settings: theme, language and active organization
     await expect(apps(page).getByRole('link', { name: 'To do', exact: true })).toHaveCount(0);
   });
 
-  test('27.3 a section of a plugin shows only to the people the plugin allows, in their language', async ({
+  test('27.3 a section of an extension shows only to the people the extension allows, in their language', async ({
     page,
   }) => {
-    // A plugin that adds a section for platform administrators; it shows the language it reads.
-    const directory = join(INSTALLATION, 'plugins', 'audit-prefs');
+    // An extension that adds a section for platform administrators; it shows the language it reads.
+    const directory = join(INSTALLATION, 'extensions', 'audit-prefs');
     mkdirSync(join(directory, 'web'), { recursive: true });
     writeFileSync(
       join(directory, 'web', 'index.js'),
@@ -95,7 +95,7 @@ test.describe('MK-027 Personal settings: theme, language and active organization
       ].join('\n'),
     );
     try {
-      await restart({ ...defaultSettings(), 'mosaikit.plugins.unverified-frontends': 'module' });
+      await restart({ ...defaultSettings(), 'mosaikit.extensions.unverified-frontends': 'module' });
       await signIn(page, MARIO);
       await openSettings(page);
       await expect(page.getByText('Audit export')).toHaveCount(0);

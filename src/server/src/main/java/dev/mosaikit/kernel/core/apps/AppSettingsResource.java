@@ -73,7 +73,7 @@ public class AppSettingsResource {
                         "off",
                         apps.stream()
                                 .filter(app -> !app.enabled())
-                                .map(app -> app.pluginId() + "/" + app.appId())
+                                .map(app -> app.extensionId() + "/" + app.appId())
                                 .toList()));
         return result;
     }

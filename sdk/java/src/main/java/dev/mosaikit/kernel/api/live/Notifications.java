@@ -6,7 +6,7 @@ import java.util.Collection;
 import java.util.UUID;
 
 /**
- * The activity feed of people (MK-038): a plugin notifies people of the organization of the request
+ * The activity feed of people (MK-038): an extension notifies people of the organization of the request
  * about something that concerns them, such as a mention or an assignment. The kernel keeps the
  * notification in their feed, pushes it to their open pages and leaves out the people who turned
  * that kind off.
@@ -24,6 +24,6 @@ public interface Notifications {
      */
     record Notification(String kind, String title, String body, String link) {}
 
-    /** Notifies people of the organization of the request, by account identifier, as the given plugin. */
-    void send(String pluginId, Collection<UUID> accounts, Notification notification);
+    /** Notifies people of the organization of the request, by account identifier, as the given extension. */
+    void send(String extensionId, Collection<UUID> accounts, Notification notification);
 }

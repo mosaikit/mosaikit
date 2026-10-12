@@ -1,17 +1,17 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
 /**
- * Runtime of a plugin frontend isolated in a sandboxed iframe (MK-014). The shell creates the
- * frame with this script only; the runtime asks for the plugin, imports its module, activates it
+ * Runtime of an extension frontend isolated in a sandboxed iframe (MK-014). The shell creates the
+ * frame with this script only; the runtime asks for the extension, imports its module, activates it
  * with a context that goes through the bridge, and renders the requested app.
  */
 import {
   dataCollections,
   NO_LIVE,
   EventBus,
-  isMosaikitPlugin,
+  isMosaikitExtension,
   type EventHandler,
-  type PluginContext,
+  type ExtensionContext,
 } from '@mosaikit/sdk';
 import { isShellMessage, type FrameMessage, type InitMessage } from './bridge-protocol.js';
 
@@ -66,10 +66,10 @@ export class PendingCalls {
 
   constructor(private readonly send: (message: FrameMessage) => void) {}
 
-  /** `fetch` of the plugin context: only the backend API of the plugin, through the shell. */
+  /** `fetch` of the extension context: only the backend API of the extension, through the shell. */
   readonly fetch = (path: string, init: RequestInit = {}): Promise<Response> => {
     if (init.body !== undefined && init.body !== null && typeof init.body !== 'string') {
-      return Promise.reject(new TypeError('An isolated plugin can only send text bodies'));
+      return Promise.reject(new TypeError('An isolated extension can only send text bodies'));
     }
     const body = typeof init.body === 'string' ? init.body : undefined;
     const id = this.next++;
@@ -133,11 +133,11 @@ export interface FrameDocument {
   createElement(name: string): HTMLElement;
 }
 
-/** Imports the plugin, activates it and renders the app of the init message. */
+/** Imports the extension, activates it and renders the app of the init message. */
 export async function start(
   init: InitMessage,
   events: EventBus,
-  fetch: PluginContext['fetch'],
+  fetch: ExtensionContext['fetch'],
   importModule: (url: string) => Promise<unknown> = (url) => import(/* @vite-ignore */ url),
   doc: FrameDocument = document,
 ): Promise<void> {
@@ -147,21 +147,21 @@ export async function start(
     }
   }
   const module = await importModule(new URL(init.entry, doc.baseURI).href);
-  const plugin = (module as { default?: unknown }).default;
-  if (!isMosaikitPlugin(plugin)) {
-    throw new Error('the module has no default plugin export');
+  const extension = (module as { default?: unknown }).default;
+  if (!isMosaikitExtension(extension)) {
+    throw new Error('the module has no default extension export');
   }
-  await plugin.activate({
-    plugin: init.plugin,
+  await extension.activate({
+    extension: init.extension,
     contributions: init.contributions,
-    // The elements of other plugins are not loaded in the frame (MK-020).
+    // The elements of other extensions are not loaded in the frame (MK-020).
     contributionsTo: () => [],
     events,
     locale: init.locale,
     user: init.user,
     fetch,
     // Through the data service of the bridge, which the shell checks (ADR-0031).
-    data: dataCollections(fetch, init.plugin.id),
+    data: dataCollections(fetch, init.extension.id),
     // An isolated frame has no real-time channel of its own (MK-031).
     live: NO_LIVE,
     notify: () => Promise.reject(new Error('Notifications are not sent from an isolated frame')),

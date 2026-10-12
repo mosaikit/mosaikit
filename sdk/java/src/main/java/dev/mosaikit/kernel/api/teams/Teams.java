@@ -7,7 +7,7 @@ import java.util.UUID;
 
 /**
  * The teams of the organization of the request (MK-032): groups with owners, members and guests,
- * which the plugins read to share their data with a group. A guest is a person of another
+ * which the extensions read to share their data with a group. A guest is a person of another
  * organization who sees only the teams where they were added.
  */
 public interface Teams {

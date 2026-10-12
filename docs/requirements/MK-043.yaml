@@ -1,6 +1,6 @@
 id: MK-043
 title: Connectors to external file services (ext-files-*)
-area: plugins
+area: extensions
 priority: P2
 status: planned
 description: >-

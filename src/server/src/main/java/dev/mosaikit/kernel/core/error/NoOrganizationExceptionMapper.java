@@ -8,7 +8,7 @@ import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
 import java.util.List;
 
-/** A request that needs an organization and has none, also from the code of a plugin (MK-017). */
+/** A request that needs an organization and has none, also from the code of an extension (MK-017). */
 @Provider
 public class NoOrganizationExceptionMapper implements ExceptionMapper<NoOrganizationException> {
 
