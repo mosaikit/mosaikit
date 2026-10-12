@@ -108,7 +108,36 @@
                                 <copy todir="${dist.directory}/mosaikit-k8s">
                                     <fileset dir="${project.basedir}/k8s"/>
                                 </copy>
+
+                                <!-- The installation as a Maven artifact (classifier installation), on which
+                                     products build their distributions: io.github.mosaikit:
+                                     mosaikit-distributions:<version>:zip:installation. -->
+                                <zip destfile="${project.build.directory}/mosaikit-installation-${project.version}.zip"
+                                     basedir="${dist.directory}" includes="mosaikit/**"/>
                             </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.6.1</version>
+                <executions>
+                    <execution>
+                        <id>attach-installation</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>attach-artifact</goal>
+                        </goals>
+                        <configuration>
+                            <artifacts>
+                                <artifact>
+                                    <file>${project.build.directory}/mosaikit-installation-${project.version}.zip</file>
+                                    <type>zip</type>
+                                    <classifier>installation</classifier>
+                                </artifact>
+                            </artifacts>
                         </configuration>
                     </execution>
                 </executions>

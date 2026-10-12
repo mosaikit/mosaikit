@@ -8,6 +8,9 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The installation is also a Maven artifact, `io.github.mosaikit:mosaikit-distributions:zip:installation`,
+  on which products build their own distributions; the snapshot of `main` publishes it too.
+
 - The parent POM of extensions, `io.github.mosaikit:mosaikit-extension-parent` (MK-051): an extension POM
   names it, its coordinates and, with Java code, the APIs it compiles against; `mvn package` writes
   the JAR in `lib/` and the package, `mvn verify` also runs the tests of the extension on the bench.

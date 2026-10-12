@@ -299,6 +299,8 @@ jobs:
           cp sdk/java/pom.xml "snapshot/mosaikit-kernel-api-$maven.pom"
           cp pom.xml "snapshot/mosaikit-parent-$maven.pom"
           cp sdk/extension-parent/pom.xml "snapshot/mosaikit-extension-parent-$maven.pom"
+          cp "distribution/target/mosaikit-installation-$maven.zip" snapshot/
+          cp distribution/pom.xml "snapshot/mosaikit-distributions-$maven.pom"
           # The latest snapshot under a name that does not change, for the extensions that follow main.
           for package in sdk testing ui create-extension; do
             cp "snapshot/mosaikit-$package-$VERSION.tgz" "snapshot/mosaikit-$package-latest.tgz"
