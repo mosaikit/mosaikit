@@ -119,6 +119,14 @@
                                 <zip destfile="${project.build.directory}/mosaikit-portable-tools-${project.version}.zip">
                                     <zipfileset dir="${project.basedir}/portable" prefix="portable"/>
                                 </zip>
+                                <!-- Docker Compose and the Helm chart, which products extend with their own
+                                     services (classifiers docker and helm). -->
+                                <zip destfile="${project.build.directory}/mosaikit-docker-${project.version}.zip">
+                                    <zipfileset dir="${project.basedir}/docker" prefix="mosaikit-docker" excludes="extensions/*.zip"/>
+                                </zip>
+                                <zip destfile="${project.build.directory}/mosaikit-helm-${project.version}.zip">
+                                    <zipfileset dir="${project.basedir}/k8s/mosaikit" prefix="mosaikit"/>
+                                </zip>
                             </target>
                         </configuration>
                     </execution>
@@ -146,6 +154,16 @@
                                     <file>${project.build.directory}/mosaikit-portable-tools-${project.version}.zip</file>
                                     <type>zip</type>
                                     <classifier>portable-tools</classifier>
+                                </artifact>
+                                <artifact>
+                                    <file>${project.build.directory}/mosaikit-docker-${project.version}.zip</file>
+                                    <type>zip</type>
+                                    <classifier>docker</classifier>
+                                </artifact>
+                                <artifact>
+                                    <file>${project.build.directory}/mosaikit-helm-${project.version}.zip</file>
+                                    <type>zip</type>
+                                    <classifier>helm</classifier>
                                 </artifact>
                             </artifacts>
                         </configuration>
