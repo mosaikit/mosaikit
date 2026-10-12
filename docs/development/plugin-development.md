@@ -2,20 +2,29 @@
 
 ## Quick start
 
-`create-mosaikit-plugin` (MK-023, in `sdk/create-plugin`) writes a working plugin, so that you
-start from code that the kernel accepts:
+Java 25, Maven and Node.js 24; nothing else to install. `create-mosaikit-plugin` (MK-023) writes
+a working plugin, already wired to the parent POM of plugins and to the test bench:
 
 ```bash
 npx @mosaikit/create-plugin dev.acme.traffic --name "Traffic"            # frontend only
 npx @mosaikit/create-plugin dev.acme.traffic --name "Traffic" --backend  # with Java, schema and actions
-cd traffic && mvn package                                                 # target/traffic-0.1.0.zip
+cd traffic
+npm install
+npm run dev      # Mosaikit with the plugin, until Ctrl+C: open the address it prints and sign in
+mvn verify       # the package target/traffic-0.1.0.zip, and the tests of tests/ on the bench
 ```
 
-From this repository, `node sdk/create-plugin/dist/bin.js` does the same after `npm run build`.
+`npm run dev` starts a real Mosaikit with the plugin, an organization and two people on your
+machine, downloading the installation once; a changed frontend shows at once in the open page.
 The generated plugin has an app at `/app/traffic`; with `--backend`, a table under row-level
-security, a REST API under `/api/v1/p/traffic`, and two actions for assistants. Copy the zip (or
-the directory) into `plugins/` of an installation and start it with the launcher, or try it on the
-bench (below). The rest of this guide explains what each part does.
+security, a REST API under `/api/v1/p/traffic`, and two actions for assistants. From this
+repository, `node sdk/create-plugin/dist/bin.js` does the same after `npm run build`.
+
+To install the plugin elsewhere, copy `target/traffic-0.1.0.zip` into `plugins/` of an
+installation, or upload it from the Plugins page; sign it first for an installation that accepts
+only trusted publishers ([Signing a package](#signing-a-package)). The samples in
+[mosaikit/samples](https://github.com/mosaikit/samples) are complete plugins built the same way.
+The rest of this guide explains what each part does.
 
 ## Build a plugin
 
