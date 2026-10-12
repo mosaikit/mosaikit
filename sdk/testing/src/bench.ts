@@ -1,10 +1,12 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
+import { execFileSync } from 'node:child_process';
 import {
   copyFileSync,
   cpSync,
   linkSync,
   mkdirSync,
+  readFileSync,
   readdirSync,
   rmSync,
   statSync,
@@ -14,7 +16,7 @@ import { createServer, type Server } from 'node:http';
 import { basename, join, resolve } from 'node:path';
 import { Launcher, locateInstallation, writeSettings, type Settings } from './installation.js';
 import { freePort, startPostgres, type Database } from './postgres.js';
-import { Signing } from './signing.js';
+import { Signing, jdkTool } from './signing.js';
 import { mails, startFakeSmtp, type FakeSmtp } from './smtp.js';
 
 export interface Person {
@@ -38,7 +40,10 @@ export interface BenchOptions {
    * or plugin directories, copied unsigned.
    */
   readonly plugins?: readonly string[];
-  /** Packages offered by a signed catalog of the installation (catalog/), not installed. */
+  /**
+   * Plugins offered by a signed catalog of the installation (catalog/), not installed: packages,
+   * or plugin directories, which the bench packs.
+   */
   readonly catalog?: readonly string[];
   /** The port of the kernel; a free one by default. */
   readonly port?: number;
@@ -113,8 +118,15 @@ export class Bench {
     signing.setUp();
     place(signing, options.plugins ?? [], join(installation, 'plugins'));
     if (options.catalog) {
-      place(signing, options.catalog, join(installation, 'catalog'));
-      signing.index(join(installation, 'catalog'));
+      const catalog = join(installation, 'catalog');
+      place(
+        signing,
+        options.catalog.map((plugin) =>
+          statSync(plugin).isDirectory() ? pack(plugin, join(work, 'packages')) : plugin,
+        ),
+        catalog,
+      );
+      signing.index(catalog);
     }
     phase('installation and signed plugins');
 
@@ -146,6 +158,9 @@ export class Bench {
       'quarkus.mailer.host': 'localhost',
       'quarkus.mailer.port': String(smtpPort),
       'quarkus.mailer.start-tls': 'DISABLED',
+      // One connection for each mail: a pooled connection to the fake mail server once hung the
+      // client, and a registration waited 22 s for its mail.
+      'quarkus.mailer.keep-alive': 'false',
       ...(options.catalog ? { 'mosaikit.marketplace.sources': 'catalog/' } : {}),
       ...options.settings,
     };
@@ -317,6 +332,27 @@ function place(signing: Signing, plugins: readonly string[], directory: string):
     }
   }
   signing.sign(...packages);
+}
+
+/**
+ * Packs a plugin directory into `<directory name>-<version>.zip`, with only what the kernel reads,
+ * as a published package is; the catalog of a marketplace offers packages, not directories.
+ */
+export function pack(plugin: string, target: string): string {
+  const version = /^version:\s*(\S+)/m.exec(
+    readFileSync(join(plugin, 'manifest.yaml'), 'utf8'),
+  )?.[1];
+  if (!version) {
+    throw new Error(`No version in ${join(plugin, 'manifest.yaml')}`);
+  }
+  mkdirSync(target, { recursive: true });
+  const file = join(target, `${basename(plugin)}-${version}.zip`);
+  rmSync(file, { force: true });
+  const parts = readdirSync(plugin)
+    .filter((name) => PLUGIN_FILES.has(name))
+    .flatMap((name) => ['-C', plugin, name]);
+  execFileSync(jdkTool('jar'), ['--create', '--no-manifest', '--file', file, ...parts]);
+  return file;
 }
 
 export const basic = (person: Person): string =>

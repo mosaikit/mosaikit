@@ -10,6 +10,7 @@ export {
   confirmationLink,
   copyInstallation,
   fromEnvironment,
+  pack,
   register,
   type BenchInfo,
   type BenchOptions,
