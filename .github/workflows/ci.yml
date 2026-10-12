@@ -298,6 +298,11 @@ jobs:
           cp "sdk/java/target/mosaikit-kernel-api-$maven.jar" snapshot/
           cp sdk/java/pom.xml "snapshot/mosaikit-kernel-api-$maven.pom"
           cp pom.xml "snapshot/mosaikit-parent-$maven.pom"
+          cp sdk/plugin-parent/pom.xml "snapshot/mosaikit-plugin-parent-$maven.pom"
+          # The latest snapshot under a name that does not change, for the plugins that follow main.
+          for package in sdk testing ui create-plugin; do
+            cp "snapshot/mosaikit-$package-$VERSION.tgz" "snapshot/mosaikit-$package-latest.tgz"
+          done
           printf '{"version":"%s","maven":"%s","commit":"%s"}\n' "$VERSION" "$maven" "$GITHUB_SHA" \
             > snapshot/snapshot.json
           ls -l snapshot

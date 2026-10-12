@@ -8,6 +8,12 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The parent POM of plugins, `io.github.mosaikit:mosaikit-plugin-parent` (MK-051): a plugin POM
+  names it, its coordinates and, with Java code, the APIs it compiles against; `mvn package` writes
+  the JAR in `lib/` and the package, `mvn verify` also runs the tests of the plugin on the bench.
+  `create-mosaikit-plugin` writes POMs on it, for plugins with and without Java code, and the
+  fixtures of the kernel are built on it.
+
 - The test bench of plugins, `@mosaikit/testing` (MK-050): a real installation with the plugin on
   an embedded PostgreSQL, with an organization and two people, for `npm run dev` (`mosaikit-bench`)
   and for Playwright tests; `create-mosaikit-plugin` writes both, and the end-to-end tests of the
@@ -98,8 +104,8 @@ project follows [Semantic Versioning](https://semver.org/).
 
 - The plugins are no longer part of the kernel repository (ADR-0035): the tests of the kernel
   install fixtures of their own (`tests/fixtures/plugins`, `dev.mosaikit.fixture.*`); the sample
-  plugins move to `mosaikit/samples`, the apps Teams and Chat to `mosaikit/app-teams` and
-  `mosaikit/app-chat`. The installation no longer comes with a catalog of samples, and
+  plugins and the apps Teams and Chat move to `mosaikit/samples`, a project each. The
+  installation no longer comes with a catalog of samples, and
   `mosaikit.marketplace.sources` has no default.
 - The repository is laid out by role (MK-049, ADR-0034): the sources under `src/` (`src/server`,
   `src/web`, `src/plugins`), beside `sdk/`, `distribution/`, `tests/e2e`, `build/`, `docs/guide`
@@ -170,6 +176,12 @@ project follows [Semantic Versioning](https://semver.org/).
   message, instead of messages posted to the wildcard origin (SonarCloud S2819).
 
 ### Added
+
+- The parent POM of plugins, `io.github.mosaikit:mosaikit-plugin-parent` (MK-051): a plugin POM
+  names it, its coordinates and, with Java code, the APIs it compiles against; `mvn package` writes
+  the JAR in `lib/` and the package, `mvn verify` also runs the tests of the plugin on the bench.
+  `create-mosaikit-plugin` writes POMs on it, for plugins with and without Java code, and the
+  fixtures of the kernel are built on it.
 
 - Each installation brings the sample plugins as a signed catalog in `catalog/`, the default
   source of the marketplace, so the Plugins page offers them at once; a catalog can be a path

@@ -17,6 +17,30 @@ security, a REST API under `/api/v1/p/traffic`, and two actions for assistants. 
 the directory) into `plugins/` of an installation and start it with the launcher, or try it on the
 bench (below). The rest of this guide explains what each part does.
 
+## Build a plugin
+
+The POM of a plugin names the parent of plugins, `io.github.mosaikit:mosaikit-plugin-parent`
+(MK-051), which holds the build: versions of Quarkus and of the plugin API, compilation, the Jandex
+index, the JAR in `lib/` and the package.
+
+```xml
+<parent>
+    <groupId>io.github.mosaikit</groupId>
+    <artifactId>mosaikit-plugin-parent</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath/>
+</parent>
+<groupId>dev.acme</groupId>
+<artifactId>traffic</artifactId>
+<version>0.1.0</version>
+<!-- <packaging>pom</packaging> for a plugin without Java code -->
+```
+
+`mvn package` writes `target/<artifactId>-<version>.zip`; the property `plugin.package.name`
+changes its name, which is also the name of the JAR (`backend.jar` in the manifest). With a
+`package.json`, `mvn package` also runs `npm install` and `npm run build`, and `mvn verify` the
+tests of the plugin (`npm test`); `-Dskip.npm` and `-DskipTests` skip them.
+
 ## Try and test a plugin
 
 `@mosaikit/testing` ([ADR-0035](../adr/0035-plugins-outside-the-kernel-repository.md), MK-050) is

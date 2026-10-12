@@ -1,0 +1,17 @@
+id: MK-051
+title: A parent POM that builds, packages and tests a plugin
+area: sdk
+priority: P1
+status: done
+description: >-
+  io.github.mosaikit:mosaikit-plugin-parent holds the build of a plugin, so that the POM of a plugin
+  names only the parent, its coordinates and the APIs its Java code compiles against. mvn package
+  writes the JAR in lib/ with its Jandex index and target/<name>-<version>.zip with only what the
+  kernel reads; with a package.json, the frontend is built before the package and mvn verify runs
+  the tests of the plugin on the bench of @mosaikit/testing (MK-050). The version of the plugin API
+  follows the version of the parent. It is published with the plugin API.
+acceptance:
+  - A plugin with Java code and one without it build their package with mvn package on the parent.
+  - mvn verify runs the tests of a plugin with a package.json; -Dskip.npm and -DskipTests skip them.
+  - The fixtures of the kernel and the plugins written by create-mosaikit-plugin are built on it.
+depends: [MK-023, MK-050]

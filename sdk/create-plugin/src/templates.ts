@@ -9,8 +9,6 @@ export interface PluginOptions {
   readonly backend: boolean;
   /** Version of the Mosaikit plugin API (`io.github.mosaikit:mosaikit-kernel-api`). */
   readonly mosaikitVersion: string;
-  /** Version of Quarkus of that Mosaikit version. */
-  readonly quarkusVersion: string;
   /** Author, for the licence headers. */
   readonly author: string;
 }
@@ -36,10 +34,9 @@ export function pluginFiles(options: PluginOptions): PluginFiles {
   files.set('playwright.config.ts', playwrightConfig(options));
   files.set('tests/global-setup.ts', globalSetup(options));
   files.set(`tests/${options.names.slug}.spec.ts`, spec(options));
+  files.set('pom.xml', pom(options));
   if (options.backend) {
     const path = `src/main/java/${options.names.javaPackage.replaceAll('.', '/')}`;
-    files.set('pom.xml', pom(options));
-    files.set('package.xml', assembly(options));
     files.set('db/V1__create_item.sql', migration(options));
     files.set(`${path}/Item.java`, entity(options));
     files.set(`${path}/Items.java`, repository(options));
@@ -294,9 +291,13 @@ const SNAPSHOTS = 'https://github.com/mosaikit/mosaikit/releases/download/snapsh
 
 /**
  * The dependency on @mosaikit/testing of a Mosaikit version: a snapshot of main comes from the
- * pre-release "snapshot", a release from npm.
+ * pre-release "snapshot" (the latest one for a build of the repository), a release from npm.
  */
 export function testingDependency(version: string): string {
+  if (version.endsWith('-SNAPSHOT')) {
+    // A build of the repository: the latest snapshot of main.
+    return `${SNAPSHOTS}/mosaikit-testing-latest.tgz`;
+  }
   return version.includes('-dev.') ? `${SNAPSHOTS}/mosaikit-testing-${version}.tgz` : version;
 }
 
@@ -401,10 +402,10 @@ the kernel, with scope \`provided\`: the package contains only your classes. Eve
     : `## Build
 
 Nothing to build: the plugin is a manifest and an ES module, and its items are documents that the
-kernel keeps for each organization (\`context.data('items')\`). Zip it:
+kernel keeps for each organization (\`context.data('items')\`). Package it:
 
 \`\`\`bash
-zip -r ${names.slug}-0.1.0.zip manifest.yaml web README.md
+mvn package        # needs JDK 25 and Maven; writes target/${names.slug}-0.1.0.zip
 \`\`\`
 `;
   return `# ${names.name}
@@ -450,10 +451,13 @@ of Mosaikit.
 `;
 }
 
+/**
+ * The POM of the plugin, on io.github.mosaikit:mosaikit-plugin-parent (MK-051), which builds the
+ * JAR in lib/ and the package, and runs the tests of the plugin in mvn verify.
+ */
 function pom(options: PluginOptions): string {
-  const { names } = options;
+  const { names, backend } = options;
   const provided = [
-    ['io.github.mosaikit', 'mosaikit-kernel-api', '${mosaikit.version}'],
     ['io.quarkus', 'quarkus-rest-jackson'],
     ['io.quarkus', 'quarkus-hibernate-orm'],
     ['io.quarkus', 'quarkus-hibernate-validator'],
@@ -461,13 +465,25 @@ function pom(options: PluginOptions): string {
     ['jakarta.data', 'jakarta.data-api'],
   ]
     .map(
-      ([group, artifact, version]) => `        <dependency>
+      ([group, artifact]) => `        <dependency>
             <groupId>${String(group)}</groupId>
-            <artifactId>${String(artifact)}</artifactId>${version ? `\n            <version>${version}</version>` : ''}
+            <artifactId>${String(artifact)}</artifactId>
             <scope>provided</scope>
         </dependency>`,
     )
     .join('\n');
+  const dependencies = backend
+    ? `
+    <!-- Everything is provided by the kernel at runtime: the JAR in lib/ holds only these classes. -->
+    <dependencies>
+        <dependency>
+            <groupId>io.github.mosaikit</groupId>
+            <artifactId>mosaikit-kernel-api</artifactId>
+        </dependency>
+${provided}
+    </dependencies>
+`
+    : '';
   return `<?xml version="1.0" encoding="UTF-8"?>
 <!--
 ${header(options, ' ').trimEnd()}
@@ -476,142 +492,18 @@ ${header(options, ' ').trimEnd()}
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
+    <!-- mvn package: target/${names.slug}-0.1.0.zip; mvn verify: also the tests of tests/ on the bench. -->
+    <parent>
+        <groupId>io.github.mosaikit</groupId>
+        <artifactId>mosaikit-plugin-parent</artifactId>
+        <version>${options.mosaikitVersion}</version>
+        <relativePath/>
+    </parent>
     <groupId>${names.id.slice(0, names.id.lastIndexOf('.'))}</groupId>
     <artifactId>${names.slug}</artifactId>
-    <version>0.1.0</version>
+    <version>0.1.0</version>${backend ? '' : '\n    <packaging>pom</packaging>'}
     <name>${names.name}</name>
-
-    <properties>
-        <maven.compiler.release>25</maven.compiler.release>
-        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <mosaikit.version>${options.mosaikitVersion}</mosaikit.version>
-        <quarkus.version>${options.quarkusVersion}</quarkus.version>
-    </properties>
-
-    <dependencyManagement>
-        <dependencies>
-            <dependency>
-                <groupId>io.quarkus.platform</groupId>
-                <artifactId>quarkus-bom</artifactId>
-                <version>\${quarkus.version}</version>
-                <type>pom</type>
-                <scope>import</scope>
-            </dependency>
-        </dependencies>
-    </dependencyManagement>
-
-    <!-- Everything is provided by the kernel at runtime: the package holds only these classes. -->
-    <dependencies>
-${provided}
-    </dependencies>
-
-    <build>
-        <finalName>${names.slug}</finalName>
-        <plugins>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-resources-plugin</artifactId>
-                <version>3.3.1</version>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-surefire-plugin</artifactId>
-                <version>3.5.4</version>
-            </plugin>
-            <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.15.0</version>
-                <configuration>
-                    <!-- The Jakarta Data repositories are generated at build, with the versions of Quarkus. -->
-                    <annotationProcessorPathsUseDepMgmt>true</annotationProcessorPathsUseDepMgmt>
-                    <annotationProcessorPaths>
-                        <path>
-                            <groupId>io.quarkus</groupId>
-                            <artifactId>quarkus-data-processor</artifactId>
-                        </path>
-                    </annotationProcessorPaths>
-                </configuration>
-            </plugin>
-            <plugin>
-                <!-- The kernel discovers entities, beans and resources from this index. -->
-                <groupId>io.smallrye</groupId>
-                <artifactId>jandex-maven-plugin</artifactId>
-                <version>3.3.1</version>
-                <executions>
-                    <execution>
-                        <id>make-index</id>
-                        <goals>
-                            <goal>jandex</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-            <plugin>
-                <!-- The JAR goes where the manifest declares it. -->
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-jar-plugin</artifactId>
-                <version>3.4.2</version>
-                <configuration>
-                    <outputDirectory>\${project.basedir}/lib</outputDirectory>
-                </configuration>
-            </plugin>
-            <plugin>
-                <!-- target/${names.slug}-0.1.0.zip: the package to install. -->
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-assembly-plugin</artifactId>
-                <version>3.7.1</version>
-                <configuration>
-                    <descriptors>
-                        <descriptor>package.xml</descriptor>
-                    </descriptors>
-                    <finalName>${names.slug}-\${project.version}</finalName>
-                    <appendAssemblyId>false</appendAssemblyId>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>plugin-package</id>
-                        <phase>package</phase>
-                        <goals>
-                            <goal>single</goal>
-                        </goals>
-                    </execution>
-                </executions>
-            </plugin>
-        </plugins>
-    </build>
-</project>
-`;
-}
-
-function assembly(options: PluginOptions): string {
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<!--
-${header(options, ' ').trimEnd()}
-  The package of the plugin: only what the kernel needs.
--->
-<assembly xmlns="http://maven.apache.org/ASSEMBLY/2.2.0"
-          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-          xsi:schemaLocation="http://maven.apache.org/ASSEMBLY/2.2.0 https://maven.apache.org/xsd/assembly-2.2.0.xsd">
-    <id>plugin</id>
-    <formats>
-        <format>zip</format>
-    </formats>
-    <includeBaseDirectory>false</includeBaseDirectory>
-    <fileSets>
-        <fileSet>
-            <directory>\${project.basedir}</directory>
-            <outputDirectory>/</outputDirectory>
-            <includes>
-                <include>manifest.yaml</include>
-                <include>README.md</include>
-                <include>db/**</include>
-                <include>web/**</include>
-                <include>lib/**</include>
-            </includes>
-        </fileSet>
-    </fileSets>
-</assembly>
+${dependencies}</project>
 `;
 }
 

@@ -6,9 +6,8 @@ import { parseArgs } from 'node:util';
 import { namesOf } from './names.js';
 import { pluginFiles, type PluginFiles } from './templates.js';
 
-/** Version of Mosaikit that this generator belongs to, and the Quarkus version of that kernel. */
+/** Version of Mosaikit that this generator belongs to. */
 export const MOSAIKIT_VERSION = '0.1.0-SNAPSHOT';
-export const QUARKUS_VERSION = '3.39.5';
 
 const USAGE = `Usage: create-mosaikit-plugin <id> [options]
 
@@ -66,7 +65,6 @@ export function main(args: readonly string[], out: (line: string) => void = cons
       names,
       backend: parsed.values.backend,
       mosaikitVersion: parsed.values.mosaikit,
-      quarkusVersion: QUARKUS_VERSION,
       author: parsed.values.author ?? id.split('.').slice(0, -1).join('.'),
     });
     writePlugin(directory, files);

@@ -17,7 +17,8 @@ test.describe('MK-023 Devkit for third-party plugin developers', () => {
     createPlugin('dev.acme.traffic', '--name', 'Traffic', '--backend', '--directory', TRAFFIC);
     createPlugin('dev.acme.signage', '--name', 'Signage', '--directory', SIGNAGE);
     // The Java plugin builds with Maven against the plugin API of this repository.
-    maven(join(TRAFFIC, 'pom.xml'), 'package', '-DskipTests');
+    // Only the Java build: the npm part of the parent needs the published test bench.
+    maven(join(TRAFFIC, 'pom.xml'), 'package', '-DskipTests', '-Dskip.npm');
     const built = readdirSync(join(TRAFFIC, 'target')).find((f) => f.endsWith('.zip'));
     expect(built).toBe('traffic-0.1.0.zip');
     const traffic = join(TRAFFIC, 'target', built ?? '');

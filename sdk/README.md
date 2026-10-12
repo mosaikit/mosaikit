@@ -7,6 +7,7 @@ Everything a third party needs to write a Mosaikit plugin, and nothing of the ke
 | `java/` | `io.github.mosaikit:mosaikit-kernel-api` (Maven) | the Java code of a plugin: manifest model, versions, service interfaces. It depends on the JDK only |
 | `java/src/main/resources/.../plugin-manifest.schema.json` | in the same JAR | the JSON Schema of `manifest.yaml`, for editors and CI |
 | `js/` | `@mosaikit/sdk` (npm) | the frontend of a plugin: the context the shell passes to `activate(context)`, the event bus, the types of contributions |
+| `plugin-parent/` | `io.github.mosaikit:mosaikit-plugin-parent` (Maven) | the parent POM of a plugin: build, package and, with `mvn verify`, tests on the bench (MK-051) |
 | `testing/` | `@mosaikit/testing` (npm) | the test bench of a plugin: a real installation with the plugin on an embedded PostgreSQL, for `npm run dev` (`mosaikit-bench`) and for Playwright tests (ADR-0035) |
 
 Both are published with each release: the Maven artifact to Maven Central (`io.github.mosaikit`),
@@ -16,7 +17,7 @@ the npm package to npmjs.org ([docs/development/release.md](../docs/development/
 
 ```
 my-plugin/
-├── pom.xml          # only for Java code: dependencies with scope provided, and the package
+├── pom.xml          # on mosaikit-plugin-parent: the package, and for Java code its dependencies
 ├── manifest.yaml    # id, version, what the plugin needs and contributes
 ├── src/main/java/   # Java code (optional), compiled into lib/my-plugin.jar
 ├── db/              # Flyway migrations of the plugin schema (optional)

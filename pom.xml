@@ -53,6 +53,7 @@
         <!-- Order of the build: the plugin API, the sample plugins, the kernel, the distributions.
              The frontend (npm workspaces) is built and tested by this POM before them. -->
         <module>sdk/java</module>
+        <module>sdk/plugin-parent</module>
         <module>tests/fixtures/plugins/hello</module>
         <module>tests/fixtures/plugins/notes</module>
         <module>tests/fixtures/plugins/activities</module>
@@ -102,7 +103,6 @@
         <cyclonedx-plugin.version>2.9.1</cyclonedx-plugin.version>
         <exec-plugin.version>3.5.1</exec-plugin.version>
         <antrun-plugin.version>3.1.0</antrun-plugin.version>
-        <assembly-plugin.version>3.7.1</assembly-plugin.version>
 
         <!-- Frontend in the Maven build: -Dskip.npm skips it; its checks follow -DskipTests. -->
         <skip.npm>false</skip.npm>
@@ -247,29 +247,6 @@
                     <groupId>io.smallrye</groupId>
                     <artifactId>jandex-maven-plugin</artifactId>
                     <version>${jandex-plugin.version}</version>
-                </plugin>
-                <plugin>
-                    <!-- Packages a plugin as one zip (tests/fixtures/plugins/plugin-package.xml). -->
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-assembly-plugin</artifactId>
-                    <version>${assembly-plugin.version}</version>
-                    <executions>
-                        <execution>
-                            <id>plugin-package</id>
-                            <phase>package</phase>
-                            <goals>
-                                <goal>single</goal>
-                            </goals>
-                            <configuration>
-                                <descriptors>
-                                    <descriptor>${maven.multiModuleProjectDirectory}/tests/fixtures/plugins/plugin-package.xml</descriptor>
-                                </descriptors>
-                                <finalName>${plugin.package.name}-${project.version}</finalName>
-                                <appendAssemblyId>false</appendAssemblyId>
-                                <attach>false</attach>
-                            </configuration>
-                        </execution>
-                    </executions>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
