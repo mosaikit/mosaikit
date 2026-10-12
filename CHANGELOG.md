@@ -9,7 +9,9 @@ project follows [Semantic Versioning](https://semver.org/).
 ### Added
 
 - The installation is also a Maven artifact, `io.github.mosaikit:mosaikit-distributions:zip:installation`,
-  on which products build their own distributions; the snapshot of `main` publishes it too.
+  on which products build their own distributions, with the builder of the portable archives
+  (`zip:portable-tools`, `portable/build.sh` with `PORTABLE_*` variables); the snapshot of `main`
+  publishes both. `mosaikit-bench --set <key>=<value>` starts the bench with a setting.
 
 - The parent POM of extensions, `io.github.mosaikit:mosaikit-extension-parent` (MK-051): an extension POM
   names it, its coordinates and, with Java code, the APIs it compiles against; `mvn package` writes

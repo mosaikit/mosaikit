@@ -20,18 +20,27 @@ platforms="${1:?usage: $0 <platform>[,<platform>...] [output directory]}"
 JDK_VERSION="25.0.4.1+1"
 POSTGRES_PACKAGE_VERSION="18.4.0-beta.17" # PostgreSQL 18.4
 
-cd "$(dirname "$0")/../.."
+# The files of the portable archive sit next to this script, which products run too, on their own
+# installation (the artifact io.github.mosaikit:mosaikit-distributions:zip:portable-tools):
+#   PORTABLE_INSTALLATION  the installation to package     PORTABLE_NAME     the name of the archives
+#   PORTABLE_SETTINGS      config/application.properties   PORTABLE_README   README.md of the archive
+#   PORTABLE_VERSION       the version in the names        PORTABLE_CACHE    where downloads are kept
+here="$(cd "$(dirname "$0")" && pwd)"
+cd "$here/../.."
 root="$PWD"
-installation="$root/target/dist/mosaikit"
-cache="$root/target/portable-cache"
-output="${2:-$root/target/dist/mosaikit-portable}"
+installation="${PORTABLE_INSTALLATION:-$root/target/dist/mosaikit}"
+cache="${PORTABLE_CACHE:-$root/target/portable-cache}"
+prefix="${PORTABLE_NAME:-mosaikit-portable}"
+settings="${PORTABLE_SETTINGS:-$here/application.properties}"
+readme="${PORTABLE_README:-$here/README.md}"
+output="${2:-$root/target/dist/$prefix}"
 mkdir -p "$cache" "$output"
 output="$(cd "$output" && pwd)"
 
 kernel_jar="$(find "$installation/bin/kernel/app" -maxdepth 1 -name 'mosaikit-kernel-*.jar' 2>/dev/null | head -1)"
 [[ -n "$kernel_jar" ]] || { echo "Build the installation first: ./mvnw install" >&2; exit 1; }
 version="$(basename "$kernel_jar" .jar)"
-version="${version#mosaikit-kernel-}"
+version="${PORTABLE_VERSION:-${version#mosaikit-kernel-}}"
 
 jdk_tag="jdk-${JDK_VERSION/+/%2B}"
 jdk_file_version="${JDK_VERSION/+/_}"
@@ -117,13 +126,13 @@ build() {
   fi
 
   # 4. The installation, with bin/java, bin/pgsql and the portable settings.
-  local name="mosaikit-portable-$version" staging
+  local name="$prefix-$version" staging
   staging="$cache/staging-$platform/$name"
   rm -rf "$cache/staging-$platform"
   mkdir -p "$staging"
   cp -R "$installation/." "$staging/"
-  cp distribution/portable/application.properties "$staging/config/application.properties"
-  cp distribution/portable/README.md "$staging/README.md"
+  cp "$settings" "$staging/config/application.properties"
+  cp "$readme" "$staging/README.md"
 
   # --strip-debug also strips native symbols with the objcopy of the host, which reads only Linux
   # binaries: for other targets only the Java debug attributes are stripped.
@@ -150,7 +159,7 @@ build() {
   rm -f "$staging/bin/pgsql/pg-symlinks.json"
   mkdir -p "$staging/bin/licenses"
   cp "$pg_cache/package/LICENSE.md" "$staging/bin/licenses/embedded-postgres-LICENSE.md"
-  cp distribution/portable/licenses/* "$staging/bin/licenses/"
+  cp "$here"/licenses/* "$staging/bin/licenses/"
   cp LICENSE "$staging/bin/licenses/Mosaikit-MPL-2.0.txt"
 
   # 5. The archive.

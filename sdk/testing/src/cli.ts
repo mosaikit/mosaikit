@@ -5,14 +5,15 @@ import { existsSync, mkdirSync, statSync, symlinkSync } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 import { Bench } from './bench.js';
 
-const USAGE = `Usage: mosaikit-bench [--port <port>] [--work <directory>] [<extension directory or package> ...]
+const USAGE = `Usage: mosaikit-bench [--port <port>] [--work <directory>] [--set <key>=<value> ...] [<extension directory or package> ...]
 
 Starts a Mosaikit installation with the given extensions, on an embedded PostgreSQL, and keeps it
 running until Ctrl+C. Without arguments, the extension of the current directory (its manifest.yaml).
 
 An extension directory is linked into the installation and watched: a changed frontend shows at once in
 the open page; Java code and schemas are read again at the next start. A package (.zip) is signed
-with the key of the bench and installed.
+with the key of the bench and installed. --set adds a setting of the installation, such as
+mosaikit.ui.theme=<theme extension>, which a product starts with.
 
 The installation is MOSAIKIT_INSTALLATION when set, otherwise the one of the version of this
 package, downloaded once.`;
@@ -21,6 +22,7 @@ async function main(argv: string[]): Promise<void> {
   let port: number | undefined;
   let work = resolve('.mosaikit-bench');
   const sources: string[] = [];
+  const settings: Record<string, string> = {};
   for (let i = 0; i < argv.length; i++) {
     const argument = argv[i] ?? '';
     if (argument === '--help' || argument === '-h') {
@@ -30,6 +32,13 @@ async function main(argv: string[]): Promise<void> {
       port = Number(argv[++i]);
     } else if (argument === '--work') {
       work = resolve(argv[++i] ?? work);
+    } else if (argument === '--set') {
+      const setting = argv[++i] ?? '';
+      const equals = setting.indexOf('=');
+      if (equals <= 0) {
+        throw new Error(`--set needs <key>=<value>, not ${setting}`);
+      }
+      settings[setting.slice(0, equals)] = setting.slice(equals + 1);
     } else {
       sources.push(resolve(argument));
     }
@@ -51,6 +60,7 @@ async function main(argv: string[]): Promise<void> {
       'mosaikit.extensions.watch': 'true',
       // Extensions in development are not signed: their frontends run like verified ones.
       'mosaikit.extensions.unverified-frontends': 'module',
+      ...settings,
     },
     beforeStart: (installation) => {
       for (const directory of directories) {

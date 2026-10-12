@@ -114,6 +114,11 @@
                                      mosaikit-distributions:<version>:zip:installation. -->
                                 <zip destfile="${project.build.directory}/mosaikit-installation-${project.version}.zip"
                                      basedir="${dist.directory}" includes="mosaikit/**"/>
+                                <!-- The builder of the portable archives, which products run on their own
+                                     installation (classifier portable-tools, see portable/build.sh). -->
+                                <zip destfile="${project.build.directory}/mosaikit-portable-tools-${project.version}.zip">
+                                    <zipfileset dir="${project.basedir}/portable" prefix="portable"/>
+                                </zip>
                             </target>
                         </configuration>
                     </execution>
@@ -136,6 +141,11 @@
                                     <file>${project.build.directory}/mosaikit-installation-${project.version}.zip</file>
                                     <type>zip</type>
                                     <classifier>installation</classifier>
+                                </artifact>
+                                <artifact>
+                                    <file>${project.build.directory}/mosaikit-portable-tools-${project.version}.zip</file>
+                                    <type>zip</type>
+                                    <classifier>portable-tools</classifier>
                                 </artifact>
                             </artifacts>
                         </configuration>

@@ -11,6 +11,7 @@ address. Nothing to install but Java 25 and Node.js 24. The extensions written b
 npx mosaikit-bench                      # the extension of the current directory (its manifest.yaml)
 npx mosaikit-bench . ../todo            # more extensions: directories or packages (.zip)
 npx mosaikit-bench --port 8080 --work .mosaikit-bench
+npx mosaikit-bench --set mosaikit.ui.theme=dev.acme.theme . ../theme   # with a setting of the installation
 ```
 
 It prints the address, the administrator and the people, and runs until Ctrl+C. An extension
