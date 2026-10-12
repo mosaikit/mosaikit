@@ -3,7 +3,7 @@
   SPDX-FileCopyrightText: 2026 Massimo Antonini
   SPDX-License-Identifier: MPL-2.0
 -->
-<project xmlns="http://maven.apache.org/POM/4.0.0"
+<project child.project.url.inherit.append.path="false" xmlns="http://maven.apache.org/POM/4.0.0"
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
@@ -24,13 +24,28 @@
     <packaging>pom</packaging>
     <name>Mosaikit :: SDK :: Plugin parent</name>
     <description>Parent POM of Mosaikit plugins: build, package and test of a plugin.</description>
+    <!-- Maven Central needs these; a plugin replaces them with its own. -->
     <url>https://github.com/mosaikit/mosaikit</url>
     <licenses>
         <license>
             <name>MPL-2.0</name>
             <url>https://mozilla.org/MPL/2.0/</url>
+            <distribution>repo</distribution>
         </license>
     </licenses>
+    <developers>
+        <developer>
+            <id>antus</id>
+            <name>Massimo Antonini</name>
+        </developer>
+    </developers>
+    <scm child.scm.connection.inherit.append.path="false"
+         child.scm.developerConnection.inherit.append.path="false"
+         child.scm.url.inherit.append.path="false">
+        <url>https://github.com/mosaikit/mosaikit</url>
+        <connection>scm:git:https://github.com/mosaikit/mosaikit.git</connection>
+        <developerConnection>scm:git:git@github.com:mosaikit/mosaikit.git</developerConnection>
+    </scm>
 
     <properties>
         <maven.compiler.release>25</maven.compiler.release>
@@ -181,6 +196,48 @@
     </build>
 
     <profiles>
+        <profile>
+            <!-- The release of Mosaikit publishes this POM to Maven Central with the plugin API
+                 (-Prelease,mosaikit-release in the CI): signed, in the same deployment. Only for
+                 Mosaikit itself: the plugins that inherit it never activate it. -->
+            <id>mosaikit-release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-gpg-plugin</artifactId>
+                        <version>3.2.8</version>
+                        <configuration>
+                            <gpgArguments>
+                                <arg>--pinentry-mode</arg>
+                                <arg>loopback</arg>
+                            </gpgArguments>
+                        </configuration>
+                        <executions>
+                            <execution>
+                                <id>sign-artifacts</id>
+                                <phase>verify</phase>
+                                <goals>
+                                    <goal>sign</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <groupId>org.sonatype.central</groupId>
+                        <artifactId>central-publishing-maven-plugin</artifactId>
+                        <version>0.9.0</version>
+                        <extensions>true</extensions>
+                        <configuration>
+                            <publishingServerId>central</publishingServerId>
+                            <deploymentName>Mosaikit ${project.version}</deploymentName>
+                            <autoPublish>true</autoPublish>
+                            <waitUntil>published</waitUntil>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
         <profile>
             <!-- A plugin with a package.json: its frontend is built before the package, and its tests
                  run on the bench of @mosaikit/testing after it. -->

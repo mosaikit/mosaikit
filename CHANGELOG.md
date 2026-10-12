@@ -139,6 +139,11 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A release publishes everything that plugins use: the parent of plugins on Maven Central, also
+  `@mosaikit/ui` and `@mosaikit/testing` on npm, and the installation archive
+  `mosaikit-X.Y.Z.tar.gz`, signed in `SHA256SUMS`, which the test bench downloads. npm no longer
+  drops the commands `create-mosaikit-plugin` and `mosaikit-bench` from the packages.
+
 - The nightly checks of `main` pass again: constructor injection in the live socket and in the
   access filters of apps and guests, no final method in an entity, a stable sort of the kinds of
   notifications, and `source-map-js` 1.2.2 (CVE-2026-93749).

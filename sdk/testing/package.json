@@ -11,7 +11,7 @@
   "author": "Massimo Antonini",
   "type": "module",
   "bin": {
-    "mosaikit-bench": "./dist/cli.js"
+    "mosaikit-bench": "dist/cli.js"
   },
   "exports": {
     ".": {

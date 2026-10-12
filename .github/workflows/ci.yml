@@ -547,12 +547,20 @@ jobs:
               [ "$base" = "$name" ] || mv "$file" "target/portable/$name"
             done
           fi
-          (cd target/portable && sha256sum mosaikit-portable-* > "SHA256SUMS-$PLATFORM")
+          files=(mosaikit-portable-*)
+          if [[ "$GITHUB_REF" == refs/tags/v* && "$PLATFORM" == linux-x64 ]]; then
+            # The installation, which the test bench of plugins (@mosaikit/testing) downloads for
+            # this version: releases/download/vX.Y.Z/mosaikit-X.Y.Z.tar.gz (ADR-0035).
+            tar -czf "target/portable/mosaikit-${GITHUB_REF_NAME#v}.tar.gz" -C target/dist mosaikit
+            files+=("mosaikit-${GITHUB_REF_NAME#v}.tar.gz")
+          fi
+          (cd target/portable && sha256sum "${files[@]}" > "SHA256SUMS-$PLATFORM")
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: portable-${{ matrix.platform }}
           path: |
             target/portable/mosaikit-portable-*
+            target/portable/mosaikit-[0-9]*.tar.gz
             target/portable/SHA256SUMS-*
           retention-days: 7
 
@@ -612,7 +620,7 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: backend
-      - name: Deploy kernel-api and the parent POM to Maven Central
+      - name: Deploy kernel-api, the parent POM and the parent of plugins to Maven Central
         env:
           CENTRAL_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
           CENTRAL_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
@@ -620,7 +628,7 @@ jobs:
         run: |
           # The parent POM is published with kernel-api because plugin builds need it to resolve the
           # API.
-          ./mvnw $MAVEN_CLI_OPTS -Prelease -DskipTests -Dskip.npm -pl .,sdk/java deploy
+          ./mvnw $MAVEN_CLI_OPTS -Prelease,mosaikit-release -DskipTests -Dskip.npm -pl .,sdk/java,sdk/plugin-parent deploy
 
   # npmjs.org with trusted publishing (OIDC): no token to keep, and npm attaches the provenance
   # attestation by itself. On npmjs.com the package declares this repository, the workflow ci.yml
@@ -646,12 +654,12 @@ jobs:
         with:
           name: frontend
       - run: npm ci --prefer-offline
-      - run: npm run build -w sdk/js -w sdk/create-plugin
-      - name: Publish @mosaikit/sdk and @mosaikit/create-plugin
+      - run: npm run build -w sdk/js -w sdk/ui -w sdk/create-plugin -w sdk/testing
+      - name: Publish @mosaikit/sdk, @mosaikit/ui, @mosaikit/create-plugin and @mosaikit/testing
         run: |
           # Pre-releases (v1.2.0-rc.1) are published under the "next" dist-tag, not "latest".
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then TAG=next; else TAG=latest; fi
-          npm publish -w sdk/js -w sdk/create-plugin --tag "$TAG" --access public
+          npm publish -w sdk/js -w sdk/ui -w sdk/create-plugin -w sdk/testing --tag "$TAG" --access public
 
   publish-helm:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -794,6 +802,7 @@ jobs:
           gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --verify-tag \
             --title "Mosaikit $TAG" --notes-file release-notes.md "${PRERELEASE[@]}" \
             target/portable/mosaikit-portable-* \
+            target/portable/mosaikit-[0-9]*.tar.gz \
             target/docs/mosaikit-docs-*.zip \
             target/signatures/SHA256SUMS \
             target/signatures/SHA256SUMS.sigstore.json \

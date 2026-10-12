@@ -11,7 +11,7 @@
   "author": "Massimo Antonini",
   "type": "module",
   "bin": {
-    "create-mosaikit-plugin": "./dist/bin.js"
+    "create-mosaikit-plugin": "dist/bin.js"
   },
   "files": [
     "dist"
