@@ -95,50 +95,50 @@ my-extension/
 ## Manifest
 
 ```yaml
-id: dev.example.hello # reverse-DNS, stable forever
-version: 1.0.0 # semantic version
+id: dev.example.hello          # reverse-DNS, stable forever
+version: 1.0.0                 # semantic version
 name: Hello
-kind: [app] # app, extension, service, theme, locale, auth
-platform: '>=0.1 <1' # kernel versions the extension runs on
-requires: # other extensions, with accepted versions
-  dev.example.base: '^2'
+kind: [app]                    # app, extension, service, theme, locale, auth
+platform: ">=0.1 <1"           # kernel versions the extension runs on
+requires:                      # other extensions, with accepted versions
+  dev.example.base: "^2"
 frontend:
   entry: web/index.js
-  isolation: module # module, or iframe to always run isolated (MK-014)
-  points: [hello.panel] # extension points that other extensions contribute to (MK-020)
-  bridge: # what the frontend may do when it runs isolated
+  isolation: module            # module, or iframe to always run isolated (MK-014)
+  points: [hello.panel]        # extension points that other extensions contribute to (MK-020)
+  bridge:                      # what the frontend may do when it runs isolated
     publishes: [hello.greeted]
     subscribes: [maps.*]
-    services: [api] # api: its own backend API; data: its collections
-data: # JSON documents kept by the kernel, without a backend (MK-046)
-  collections: [greetings] # [a-z][a-z0-9-]*, unique in the extension
+    services: [api]            # api: its own backend API; data: its collections
+data:                          # JSON documents kept by the kernel, without a backend (MK-046)
+  collections: [greetings]     # [a-z][a-z0-9-]*, unique in the extension
 backend:
-  jar: lib/hello.jar # Java code, loaded by the launcher at the next start
-  api: hello # REST resources under /api/v1/ext/hello/
-actions: # tools for assistants and MCP clients (MK-015)
-  - name: greet # [a-z][a-z0-9-]*, unique in the extension
+  jar: lib/hello.jar           # Java code, loaded by the launcher at the next start
+  api: hello                   # REST resources under /api/v1/ext/hello/
+actions:                       # tools for assistants and MCP clients (MK-015)
+  - name: greet                # [a-z][a-z0-9-]*, unique in the extension
     title: Greet someone
     description: Says hello to a person by name.
-    risk: write # read runs at once; write and execute need a confirmation
-    input: # JSON Schema subset: type, properties, required,
-      type: object # additionalProperties, items, enum, lengths, bounds
+    risk: write                # read runs at once; write and execute need a confirmation
+    input:                     # JSON Schema subset: type, properties, required,
+      type: object             # additionalProperties, items, enum, lengths, bounds
       properties:
-        name: { type: string, maxLength: 80 }
+        name: {type: string, maxLength: 80}
       required: [name]
     call:
-      method: POST # read actions must use GET
-      path: greetings/{name} # relative to /api/v1/ext/hello/; {name} comes from the input
+      method: POST             # read actions must use GET
+      path: greetings/{name}   # relative to /api/v1/ext/hello/; {name} comes from the input
 database:
-  schema: ext_hello # owned by the extension; migrations in db/ (default)
+  schema: ext_hello              # owned by the extension; migrations in db/ (default)
 contributes:
-  rail.app: # the app bar of the shell (MK-025)
+  rail.app:                    # the app bar of the shell (MK-025)
     - id: hello
       title: Hello
-      route: /app/hello # /app/<name>
-      element: example-hello # custom element rendered for the route
-      icon: web/icon.svg # 24 × 24 SVG or PNG of the extension; a tile with the initials otherwise
-      order: 50 # position in the app bar, smaller first; 100 by default
-      i18n: # the texts in other languages (MK-053); title is the default
+      route: /app/hello        # /app/<name>
+      element: example-hello   # custom element rendered for the route
+      icon: web/icon.svg       # 24 × 24 SVG or PNG of the extension; a tile with the initials otherwise
+      order: 50                # position in the app bar, smaller first; 100 by default
+      i18n:                    # the texts in other languages (MK-053); title is the default
         it: { title: Ciao }
 ```
 
@@ -166,15 +166,8 @@ import { defineExtension } from '@mosaikit/sdk';
 
 export default defineExtension({
   activate(context) {
-    customElements.define(
-      'example-hello',
-      class extends HTMLElement {
-        /* ... */
-      },
-    );
-    context.events.on('maps.selection.changed', (payload) => {
-      /* ... */
-    });
+    customElements.define('example-hello', class extends HTMLElement { /* ... */ });
+    context.events.on('maps.selection.changed', (payload) => { /* ... */ });
   },
 });
 ```
@@ -214,10 +207,10 @@ identifier.
 ```js
 await context.notify({
   to: ['anna.bianchi@example.org'],
-  kind: 'mention', // people can turn each kind off
+  kind: 'mention',            // people can turn each kind off
   title: 'Mario mentioned you',
   body: 'In the notes of the meeting',
-  link: '/app/notes', // a path of the shell
+  link: '/app/notes',         // a path of the shell
 });
 ```
 
@@ -234,8 +227,8 @@ contributes:
   settings.section:
     - id: export
       title: Export
-      element: example-export-settings # custom element rendered in the section
-      roles: [organization-admin] # optional
+      element: example-export-settings   # custom element rendered in the section
+      roles: [organization-admin]        # optional
 ```
 
 `context.locale` is the language the person chose (`en`, `it`); read it when rendering. The shell
@@ -256,16 +249,16 @@ kind: [theme]
 platform: '>=0.1 <1'
 theme:
   title: Our brand
-  font: "'Inter', system-ui, sans-serif" # optional
-  radius: 8 # optional, 0 to 24 pixels
-  light: # any of: brand, background, surface, foreground,
-    brand: '#8a1538' # muted, line, danger, success, warning, focus
+  font: "'Inter', system-ui, sans-serif"   # optional
+  radius: 8                                # optional, 0 to 24 pixels
+  light:                                   # any of: brand, background, surface, foreground,
+    brand: '#8a1538'                       # muted, line, danger, success, warning, focus
   dark:
     brand: '#e2738f'
-  product: Our product # optional, up to 60 characters
-  logo: # optional, SVG or PNG files of the extension
-    light: web/logo.svg # for light backgrounds
-    dark: web/logo-dark.svg # optional, for dark backgrounds
+  product: Our product                     # optional, up to 60 characters
+  logo:                                    # optional, SVG or PNG files of the extension
+    light: web/logo.svg                    # for light backgrounds
+    dark: web/logo-dark.svg                # optional, for dark backgrounds
 ```
 
 Every color, font or radius it leaves out comes from the default theme. The product name and the
@@ -284,15 +277,15 @@ The shell defines the Fluent UI web components for the page
 `<fluent-button>`, `<fluent-dialog>`, `<fluent-tablist>` and the others without bundling them, and
 they follow the theme of the installation. Style everything else with the tokens:
 
-| Token                                               | Use                                         |
-| --------------------------------------------------- | ------------------------------------------- |
-| `--mk-bg`, `--mk-surface`                           | background of the page, of cards and panels |
-| `--mk-fg`, `--mk-muted`                             | text, secondary text                        |
-| `--mk-line`                                         | borders                                     |
-| `--mk-accent`, `--mk-accent-fg`, `--mk-accent-soft` | primary actions, text on them, selection    |
-| `--mk-danger`, `--mk-success`, `--mk-warning`       | states                                      |
-| `--mk-focus`                                        | the ring of the keyboard focus              |
-| `--mk-radius`, `--mk-font`, `--mk-font-mono`        | shapes and fonts                            |
+| Token | Use |
+|---|---|
+| `--mk-bg`, `--mk-surface` | background of the page, of cards and panels |
+| `--mk-fg`, `--mk-muted` | text, secondary text |
+| `--mk-line` | borders |
+| `--mk-accent`, `--mk-accent-fg`, `--mk-accent-soft` | primary actions, text on them, selection |
+| `--mk-danger`, `--mk-success`, `--mk-warning` | states |
+| `--mk-focus` | the ring of the keyboard focus |
+| `--mk-radius`, `--mk-font`, `--mk-font-mono` | shapes and fonts |
 
 The tokens change with the theme (`mosaikit.ui.theme`: `mosaikit`, or `pa` in the style of
 Bootstrap Italia) and with the light or dark preference of the system; never hard-code colors.
@@ -315,13 +308,13 @@ installation does not trust, an extension directory) and the installation isolat
 (`mosaikit.extensions.unverified-frontends=iframe`, the default). The same module works in both
 modes, as long as it uses only its `context`:
 
-| In the context                                 | Isolated                                                                                                                            |
-| ---------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| `events.publish(topic)`                        | only topics of `bridge.publishes` reach the shell                                                                                   |
-| `events.on(pattern)`                           | only patterns covered by `bridge.subscribes` receive events                                                                         |
-| `fetch(path, init)`                            | only the backend API of the extension (`/api/v1/ext/<api>/…`, or a path relative to it), text bodies, with `bridge.services: [api]` |
-| `data(collection)`                             | only the collections of the extension, with `bridge.services: [data]`                                                               |
-| `user`, `extension`, `contributions`, `locale` | as usual                                                                                                                            |
+| In the context | Isolated |
+|---|---|
+| `events.publish(topic)` | only topics of `bridge.publishes` reach the shell |
+| `events.on(pattern)` | only patterns covered by `bridge.subscribes` receive events |
+| `fetch(path, init)` | only the backend API of the extension (`/api/v1/ext/<api>/…`, or a path relative to it), text bodies, with `bridge.services: [api]` |
+| `data(collection)` | only the collections of the extension, with `bridge.services: [data]` |
+| `user`, `extension`, `contributions`, `locale` | as usual |
 
 In the iframe the extension has no access to the page of the shell, to its storage or to the
 credentials of the person, and it can load code and data only from the kernel. Declare the bridge
@@ -401,7 +394,7 @@ context:
 const items = context.data('items');
 const created = await items.create({ title: 'Paint the fence', done: false });
 await items.update(created.id, { ...created.data, done: true }, created.version); // 409 if changed since
-const all = await items.list({ limit: 50 }); // newest first
+const all = await items.list({ limit: 50 });                                     // newest first
 await items.remove(created.id);
 ```
 
@@ -489,7 +482,7 @@ as [`sample-estimates`](https://github.com/mosaikit/mosaikit-samples/tree/main/e
    contributes:
      activities.detail:
        - id: estimate
-         element: mk-activity-estimate # receives the activity in its activity-id attribute
+         element: mk-activity-estimate   # receives the activity in its activity-id attribute
    ```
 
    The owner of a point reads the contributions with `context.contributionsTo('activities.detail')`
@@ -507,7 +500,6 @@ as [`sample-estimates`](https://github.com/mosaikit/mosaikit-samples/tree/main/e
          title: To do
          element: mk-sample-todo
    ```
-
 4. **Behaviour**: publish and subscribe to events on the bus (`estimates.changed`,
    `activities.completed`).
 
