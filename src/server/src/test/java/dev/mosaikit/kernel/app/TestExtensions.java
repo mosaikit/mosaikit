@@ -47,9 +47,16 @@ public class TestExtensions implements QuarkusTestProfile {
                     data:
                       collections: [notes]
                     """);
-            // ThemeExtensionTest: a theme, and one with a value that is not a color.
-            theme("green", "dev.mosaikit.test.green", "Green", "'#1b6e3c'");
-            theme("broken", "dev.mosaikit.test.broken-theme", "Broken", "red");
+            // ThemeExtensionTest: a theme that names the product and brings its logo (MK-052), and one
+            // with a value that is not a color.
+            theme("green", "dev.mosaikit.test.green", "Green", "'#1b6e3c'", """
+                      product: Green Works
+                      logo:
+                        light: web/logo.svg
+                    """);
+            Path logo = Files.createDirectories(EXTENSIONS.resolve("green").resolve("web"));
+            Files.writeString(logo.resolve("logo.svg"), "<svg xmlns=\"http://www.w3.org/2000/svg\"/>\n");
+            theme("broken", "dev.mosaikit.test.broken-theme", "Broken", "red", "");
         } catch (IOException e) {
             throw new UncheckedIOException(e);
         }
@@ -71,7 +78,8 @@ public class TestExtensions implements QuarkusTestProfile {
                 %s""".formatted(id, name, extra));
     }
 
-    private static void theme(String directory, String id, String title, String brand) throws IOException {
+    private static void theme(String directory, String id, String title, String brand, String extra)
+            throws IOException {
         Path extension = Files.createDirectories(EXTENSIONS.resolve(directory));
         Files.writeString(extension.resolve("manifest.yaml"), """
                 id: %s
@@ -83,6 +91,6 @@ public class TestExtensions implements QuarkusTestProfile {
                   title: %s
                   light:
                     brand: %s
-                """.formatted(id, title, title, brand));
+                %s""".formatted(id, title, title, brand, extra));
     }
 }

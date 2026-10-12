@@ -9,6 +9,12 @@ platform: '>=0.1 <1'
 theme:
   title: Green
   radius: 8
+  # As the theme of the installation, it also names the product and brings its logo (MK-052): one
+  # for light backgrounds, one for dark ones (the dark scheme and the bar of the shell).
+  product: Green Works
+  logo:
+    light: web/logo.svg
+    dark: web/logo-dark.svg
   # Only some colors: the others, such as the background, come from the default theme.
   light:
     brand: '#1b6e3c'

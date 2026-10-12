@@ -8,6 +8,11 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- A theme extension can name the product and bring its logo (MK-052, `theme.product` and
+  `theme.logo` with `light` and `dark`): as the theme of the installation, the shell shows them in
+  its bar and on the sign-in page, and uses them as the title and the icon of the page.
+  `/api/v1/system/info` gives them as `name`, `logo` and `logoDark`.
+
 - The installation is also a Maven artifact, `io.github.mosaikit:mosaikit-distributions:zip:installation`,
   on which products build their own distributions, with the builder of the portable archives
   (`zip:portable-tools`, `portable/build.sh` with `PORTABLE_*` variables), Docker Compose

@@ -213,6 +213,64 @@ class ExtensionManifestsTest {
     }
 
     @Test
+    @Tag("MK-052")
+    void readsTheProductAndTheLogoOfATheme() {
+        Map<String, Object> tree = validTree();
+        tree.put("kind", List.of("theme"));
+        tree.put(
+                "theme",
+                Map.of(
+                        "title",
+                        "Acme",
+                        "product",
+                        "Acme Maps",
+                        "logo",
+                        Map.of("light", "web/logo.svg", "dark", "web/logo-dark.png")));
+
+        assertThat(parseValid(tree).theme()).hasValueSatisfying(theme -> {
+            assertThat(theme.product()).isEqualTo("Acme Maps");
+            assertThat(theme.logo()).isEqualTo("web/logo.svg");
+            assertThat(theme.logoDark()).isEqualTo("web/logo-dark.png");
+        });
+
+        Map<String, Object> plain = validTree();
+        plain.put("theme", Map.of("title", "Plain"));
+        assertThat(parseValid(plain).theme()).hasValueSatisfying(theme -> {
+            assertThat(theme.product()).isNull();
+            assertThat(theme.logo()).isNull();
+            assertThat(theme.logoDark()).isNull();
+        });
+    }
+
+    @Test
+    @Tag("MK-052")
+    void rejectsProductNamesAndLogosThatTheShellCannotShow() {
+        Map<String, Object> tree = validTree();
+        tree.put(
+                "theme",
+                Map.of(
+                        "title",
+                        "Broken",
+                        "product",
+                        "<script>",
+                        "logo",
+                        Map.of("light", "../outside.svg", "dark", "web/logo.gif")));
+        assertThat(parseInvalid(tree))
+                .extracting(ManifestViolation::field)
+                .containsExactlyInAnyOrder("theme.product", "theme.logo.light", "theme.logo.dark");
+
+        Map<String, Object> withoutLight = validTree();
+        withoutLight.put("theme", Map.of("title", "Dark only", "logo", Map.of("dark", "web/logo.svg")));
+        assertThat(parseInvalid(withoutLight))
+                .extracting(ManifestViolation::field)
+                .containsExactly("theme.logo.light");
+
+        Map<String, Object> notAMap = validTree();
+        notAMap.put("theme", Map.of("title", "Flat", "logo", "web/logo.svg"));
+        assertThat(parseInvalid(notAMap)).extracting(ManifestViolation::field).containsExactly("theme.logo");
+    }
+
+    @Test
     @Tag("MK-028")
     void rejectsThemesThatTheShellCannotUse() {
         Map<String, Object> tree = validTree();

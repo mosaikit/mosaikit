@@ -229,9 +229,9 @@ on the event bus, and mounts the current app again when the language changes.
 
 ### Theme extensions
 
-An extension of kind `theme` brings the colors of a brand, and nothing else; it is active as soon as it
-is installed, people choose it in their settings, and an installation can make it its default
-(`mosaikit.ui.theme=<extension id>`):
+An extension of kind `theme` brings the colors of a brand and, for a product built on Mosaikit, the
+name and logo of the product. It is active as soon as it is installed, people choose it in their
+settings, and an installation can make it its default (`mosaikit.ui.theme=<extension id>`):
 
 ```yaml
 id: dev.example.brand
@@ -247,9 +247,18 @@ theme:
     brand: '#8a1538'                       # muted, line, danger, success, warning, focus
   dark:
     brand: '#e2738f'
+  product: Our product                     # optional, up to 60 characters
+  logo:                                    # optional, SVG or PNG files of the extension
+    light: web/logo.svg                    # for light backgrounds
+    dark: web/logo-dark.svg                # optional, for dark backgrounds
 ```
 
-Every color, font or radius it leaves out comes from the default theme. Choose colors with enough
+Every color, font or radius it leaves out comes from the default theme. The product name and the
+logo (MK-052) apply only when the theme is the one of the installation: the shell then shows them
+in its bar and on the sign-in page, and uses them as the title and the icon of the page, also for
+people who choose another theme in their settings. The bar of the shell has the brand color, so it
+shows the logo for dark backgrounds; without one, the logo for light backgrounds. Draw the logo
+square: it is shown at 22 to 28 pixels. Choose colors with enough
 contrast (WCAG 2.1 AA: 4.5:1 for text): the high contrast appearance stays available to everyone.
 [`sample-theme`](https://github.com/mosaikit/mosaikit-samples/tree/main/theme) is a complete example.
 

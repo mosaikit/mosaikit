@@ -248,6 +248,28 @@
           "minimum": 0,
           "maximum": 24
         },
+        "product": {
+          "description": "The name of the product, shown in place of Mosaikit when this is the theme of the installation (MK-052).",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "logo": {
+          "description": "The logo of the product, SVG or PNG files of the extension, shown in place of the one of Mosaikit when this is the theme of the installation (MK-052).",
+          "type": "object",
+          "required": ["light"],
+          "additionalProperties": false,
+          "properties": {
+            "light": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_][A-Za-z0-9_./-]*\\.(svg|png)$"
+            },
+            "dark": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_][A-Za-z0-9_./-]*\\.(svg|png)$"
+            }
+          }
+        },
         "light": {
           "type": "object",
           "additionalProperties": false,

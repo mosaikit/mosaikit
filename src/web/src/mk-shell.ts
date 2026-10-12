@@ -120,6 +120,11 @@ export class MkShell extends LitElement {
       font-weight: 400;
       font-size: 12px;
     }
+    .brand .logo {
+      width: 22px;
+      height: 22px;
+      flex: none;
+    }
     .rail .badge {
       position: absolute;
       top: 4px;
@@ -538,6 +543,12 @@ export class MkShell extends LitElement {
     this.path = location.pathname;
   };
 
+  /** The light or dark scheme the theme applied, for the logo of the sign-in page (MK-052). */
+  @state() private scheme = document.documentElement.dataset.mkScheme;
+  private readonly schemeObserver = new MutationObserver(() => {
+    this.scheme = document.documentElement.dataset.mkScheme;
+  });
+
   override connectedCallback(): void {
     super.connectedCallback();
     setLanguage(this.shellLanguage);
@@ -552,9 +563,11 @@ export class MkShell extends LitElement {
     window.addEventListener('popstate', this.onPopState);
     window.addEventListener('online', this.onNetwork);
     window.addEventListener('offline', this.onNetwork);
+    this.schemeObserver.observe(document.documentElement, { attributeFilter: ['data-mk-scheme'] });
     this.client.systemInfo().then(
       (info) => {
         this.info = info;
+        showProduct(info);
         this.applyAppearance();
         void this.loadThemes();
       },
@@ -613,6 +626,7 @@ export class MkShell extends LitElement {
     window.removeEventListener('popstate', this.onPopState);
     window.removeEventListener('online', this.onNetwork);
     window.removeEventListener('offline', this.onNetwork);
+    this.schemeObserver.disconnect();
     super.disconnectedCallback();
   }
 
@@ -636,7 +650,8 @@ export class MkShell extends LitElement {
       <div class="frame" @keydown=${this.keyFrame}>
         <header class="top">
           <span class="brand"
-            >${mark}<span class="name">${this.info?.name ?? 'Mosaikit'}</span
+            >${productMark(this.info?.logoDark ?? this.info?.logo)}<span class="name"
+              >${this.info?.name ?? 'Mosaikit'}</span
             ><span class="version">${this.info ? `v${this.info.version}` : nothing}</span></span
           >
           ${this.renderSearch()} ${this.renderAccount()}
@@ -1020,6 +1035,7 @@ export class MkShell extends LitElement {
   private renderSignIn(): unknown {
     return html`<mk-sign-in
       .product=${this.info?.name ?? 'Mosaikit'}
+      .logo=${(this.scheme === 'dark' ? this.info?.logoDark : undefined) ?? this.info?.logo ?? undefined}
       .version=${this.info?.version}
       .email=${this.email}
       .busy=${this.busy}
@@ -1697,6 +1713,24 @@ const mark = html`<svg width="22" height="22" viewBox="0 0 28 28" aria-hidden="t
   <rect x="1" y="15" width="12" height="12" rx="3" fill="#ffffff" opacity="0.4" />
   <rect x="15" y="15" width="12" height="12" rx="3" fill="#ffffff" opacity="0.8" />
 </svg>`;
+
+/** The logo of the product in the bar of the shell: the one of the theme, or the mark of Mosaikit. */
+function productMark(logo: string | null | undefined): unknown {
+  return logo ? html`<img class="logo" src=${logo} alt="" />` : mark;
+}
+
+/**
+ * Names the page and its icon after the product, when the theme of the installation brings them
+ * (MK-052); index.html carries those of Mosaikit until the kernel answers.
+ */
+function showProduct(info: SystemInfo): void {
+  document.title = info.name;
+  const icon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+  if (info.logo && icon) {
+    icon.href = info.logo;
+    icon.type = info.logo.endsWith('.png') ? 'image/png' : 'image/svg+xml';
+  }
+}
 
 /** The icon of an app: its own file, or a tile with its initials. */
 function appIcon(entry: LauncherEntry): unknown {

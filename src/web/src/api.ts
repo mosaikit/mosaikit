@@ -12,6 +12,10 @@ export interface SystemInfo {
   readonly theme: string;
   /** How many days "remember me" keeps a person signed in. */
   readonly rememberDays: number;
+  /** The logo of the product for light backgrounds, when the theme of the installation brings one (MK-052). */
+  readonly logo?: string | null;
+  /** The logo for dark backgrounds: the dark scheme and the bar of the shell. */
+  readonly logoDark?: string | null;
 }
 
 /** Whether the sign-in page offers to create an account (MK-048). */
