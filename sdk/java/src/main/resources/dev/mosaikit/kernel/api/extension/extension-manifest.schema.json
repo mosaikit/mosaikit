@@ -176,6 +176,19 @@
             "id": {
               "type": "string",
               "minLength": 1
+            },
+            "i18n": {
+              "description": "The text attributes in other languages, by language tag (MK-053), such as { \"it\": { \"title\": \"Catalogo\" } }.",
+              "type": "object",
+              "propertyNames": {
+                "pattern": "^[a-z]{2,3}(-[A-Z][A-Za-z0-9]{1,7})?$"
+              },
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
             }
           }
         }
@@ -247,6 +260,28 @@
           "type": "integer",
           "minimum": 0,
           "maximum": 24
+        },
+        "product": {
+          "description": "The name of the product, shown in place of Mosaikit when this is the theme of the installation (MK-052).",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "logo": {
+          "description": "The logo of the product, SVG or PNG files of the extension, shown in place of the one of Mosaikit when this is the theme of the installation (MK-052).",
+          "type": "object",
+          "required": ["light"],
+          "additionalProperties": false,
+          "properties": {
+            "light": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_][A-Za-z0-9_./-]*\\.(svg|png)$"
+            },
+            "dark": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_][A-Za-z0-9_./-]*\\.(svg|png)$"
+            }
+          }
         },
         "light": {
           "type": "object",

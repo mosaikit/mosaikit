@@ -213,6 +213,64 @@ class ExtensionManifestsTest {
     }
 
     @Test
+    @Tag("MK-052")
+    void readsTheProductAndTheLogoOfATheme() {
+        Map<String, Object> tree = validTree();
+        tree.put("kind", List.of("theme"));
+        tree.put(
+                "theme",
+                Map.of(
+                        "title",
+                        "Acme",
+                        "product",
+                        "Acme Maps",
+                        "logo",
+                        Map.of("light", "web/logo.svg", "dark", "web/logo-dark.png")));
+
+        assertThat(parseValid(tree).theme()).hasValueSatisfying(theme -> {
+            assertThat(theme.product()).isEqualTo("Acme Maps");
+            assertThat(theme.logo()).isEqualTo("web/logo.svg");
+            assertThat(theme.logoDark()).isEqualTo("web/logo-dark.png");
+        });
+
+        Map<String, Object> plain = validTree();
+        plain.put("theme", Map.of("title", "Plain"));
+        assertThat(parseValid(plain).theme()).hasValueSatisfying(theme -> {
+            assertThat(theme.product()).isNull();
+            assertThat(theme.logo()).isNull();
+            assertThat(theme.logoDark()).isNull();
+        });
+    }
+
+    @Test
+    @Tag("MK-052")
+    void rejectsProductNamesAndLogosThatTheShellCannotShow() {
+        Map<String, Object> tree = validTree();
+        tree.put(
+                "theme",
+                Map.of(
+                        "title",
+                        "Broken",
+                        "product",
+                        "<script>",
+                        "logo",
+                        Map.of("light", "../outside.svg", "dark", "web/logo.gif")));
+        assertThat(parseInvalid(tree))
+                .extracting(ManifestViolation::field)
+                .containsExactlyInAnyOrder("theme.product", "theme.logo.light", "theme.logo.dark");
+
+        Map<String, Object> withoutLight = validTree();
+        withoutLight.put("theme", Map.of("title", "Dark only", "logo", Map.of("dark", "web/logo.svg")));
+        assertThat(parseInvalid(withoutLight))
+                .extracting(ManifestViolation::field)
+                .containsExactly("theme.logo.light");
+
+        Map<String, Object> notAMap = validTree();
+        notAMap.put("theme", Map.of("title", "Flat", "logo", "web/logo.svg"));
+        assertThat(parseInvalid(notAMap)).extracting(ManifestViolation::field).containsExactly("theme.logo");
+    }
+
+    @Test
     @Tag("MK-028")
     void rejectsThemesThatTheShellCannotUse() {
         Map<String, Object> tree = validTree();
@@ -261,6 +319,50 @@ class ExtensionManifestsTest {
                 .extracting(ManifestViolation::field)
                 .containsExactlyInAnyOrder(
                         "contributes.launcher.app[0].id", "contributes.launcher.app[1]", "contributes.shell.command");
+    }
+
+    @Test
+    @Tag("MK-053")
+    void readsTheTextsOfAContributionByLanguage() {
+        Map<String, Object> tree = validTree();
+        tree.put(
+                "contributes",
+                Map.of(
+                        "rail.app",
+                        List.of(Map.of(
+                                "id",
+                                "catalog",
+                                "title",
+                                "Catalog",
+                                "i18n",
+                                Map.of("it", Map.of("title", "Catalogo"), "pt-BR", Map.of("title", "Catálogo"))))));
+
+        assertThat(parseValid(tree).contributions())
+                .singleElement()
+                .satisfies(contribution -> assertThat(contribution.attributes())
+                        .containsEntry("title", "Catalog")
+                        .containsKey("i18n"));
+    }
+
+    @Test
+    @Tag("MK-053")
+    void rejectsTextsByLanguageThatTheShellCannotRead() {
+        Map<String, Object> tree = validTree();
+        tree.put(
+                "contributes",
+                Map.of(
+                        "rail.app",
+                        List.of(
+                                Map.of("id", "a", "i18n", "Catalogo"),
+                                Map.of("id", "b", "i18n", Map.of("Italian", Map.of("title", "Catalogo"))),
+                                Map.of("id", "c", "i18n", Map.of("it", Map.of("title", 42))))));
+
+        assertThat(parseInvalid(tree))
+                .extracting(ManifestViolation::field)
+                .containsExactlyInAnyOrder(
+                        "contributes.rail.app[0].i18n",
+                        "contributes.rail.app[1].i18n.Italian",
+                        "contributes.rail.app[2].i18n.it");
     }
 
     @Test

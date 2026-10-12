@@ -1,13 +1,19 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
 import { applyTheme, isThemeName, registerTheme, themes as uiThemes } from '@mosaikit/ui';
-import { contributionsTo, stringAttribute, type FrontendExtension } from '@mosaikit/sdk';
+import {
+  contributionsTo,
+  stringAttribute,
+  textAttribute,
+  type FrontendExtension,
+} from '@mosaikit/sdk';
 import { LitElement, css, html, nothing, svg, type PropertyValues } from 'lit';
 import { customElement, state } from 'lit/decorators.js';
 import {
   KernelClient,
   KernelError,
   type Account,
+  type ExtensionTheme,
   type ActionDraft,
   type ActivityNotification,
   type Preferences,
@@ -119,6 +125,11 @@ export class MkShell extends LitElement {
     .brand .version {
       font-weight: 400;
       font-size: 12px;
+    }
+    .brand .logo {
+      width: 22px;
+      height: 22px;
+      flex: none;
     }
     .rail .badge {
       position: absolute;
@@ -538,6 +549,12 @@ export class MkShell extends LitElement {
     this.path = location.pathname;
   };
 
+  /** The light or dark scheme the theme applied, for the logo of the sign-in page (MK-052). */
+  @state() private scheme = document.documentElement.dataset.mkScheme;
+  private readonly schemeObserver = new MutationObserver(() => {
+    this.scheme = document.documentElement.dataset.mkScheme;
+  });
+
   override connectedCallback(): void {
     super.connectedCallback();
     setLanguage(this.shellLanguage);
@@ -552,11 +569,15 @@ export class MkShell extends LitElement {
     window.addEventListener('popstate', this.onPopState);
     window.addEventListener('online', this.onNetwork);
     window.addEventListener('offline', this.onNetwork);
-    this.client.systemInfo().then(
-      (info) => {
+    this.schemeObserver.observe(document.documentElement, { attributeFilter: ['data-mk-scheme'] });
+    // The installation and its themes together: the sign-in page shows with the name, the logo and
+    // the colors of the theme of the installation, not with those of Mosaikit first (MK-052).
+    Promise.all([this.client.systemInfo(), this.client.themes().catch(() => [])]).then(
+      ([info, themes]) => {
+        registerThemes(themes);
         this.info = info;
+        showProduct(info);
         this.applyAppearance();
-        void this.loadThemes();
       },
       () => {
         this.error = 'The kernel is not reachable.';
@@ -613,6 +634,7 @@ export class MkShell extends LitElement {
     window.removeEventListener('popstate', this.onPopState);
     window.removeEventListener('online', this.onNetwork);
     window.removeEventListener('offline', this.onNetwork);
+    this.schemeObserver.disconnect();
     super.disconnectedCallback();
   }
 
@@ -630,13 +652,16 @@ export class MkShell extends LitElement {
           ${t('You are offline: what you see may not be up to date, and changes wait for the network.')}
         </p>`;
     if (!this.account) {
-      return html`${offline}${this.renderSignIn()}`;
+      // Until the kernel answers, nothing: the page would show the name and the colors of Mosaikit
+      // and then change to those of the installation.
+      return this.info || this.error ? html`${offline}${this.renderSignIn()}` : offline;
     }
     return html`${offline}
       <div class="frame" @keydown=${this.keyFrame}>
         <header class="top">
           <span class="brand"
-            >${mark}<span class="name">${this.info?.name ?? 'Mosaikit'}</span
+            >${productMark(this.info?.logoDark ?? this.info?.logo)}<span class="name"
+              >${this.info?.name ?? 'Mosaikit'}</span
             ><span class="version">${this.info ? `v${this.info.version}` : nothing}</span></span
           >
           ${this.renderSearch()} ${this.renderAccount()}
@@ -794,15 +819,7 @@ export class MkShell extends LitElement {
    */
   private async loadThemes(): Promise<void> {
     try {
-      for (const theme of await this.client.themes()) {
-        registerTheme(theme.id, {
-          title: theme.title,
-          ...(theme.font ? { font: theme.font } : {}),
-          ...(theme.radius === null ? {} : { radius: theme.radius }),
-          light: theme.light,
-          dark: theme.dark,
-        });
-      }
+      registerThemes(await this.client.themes());
       this.applyAppearance();
       this.requestUpdate();
     } catch {
@@ -919,7 +936,7 @@ export class MkShell extends LitElement {
         {
           extensionId: contribution.extensionId,
           id: contribution.id,
-          title: stringAttribute(contribution, 'title') ?? contribution.id,
+          title: textAttribute(contribution, 'title', this.shellLanguage) ?? contribution.id,
           element,
         },
       ];
@@ -983,6 +1000,8 @@ export class MkShell extends LitElement {
     this.loader?.events.publish('shell.theme.changed', { theme, appearance });
     if (languageChanged) {
       this.loader?.events.publish('shell.locale.changed', { locale: lang });
+      // The names of the apps in the new language (MK-053).
+      this.entries = this.visibleEntries(launcherEntries(this.extensions, lang));
       // The app reads context.locale when it renders: mount it again in the new language.
       this.renderRoot.querySelector('#app-host')?.replaceChildren();
       this.renderApp();
@@ -1020,6 +1039,7 @@ export class MkShell extends LitElement {
   private renderSignIn(): unknown {
     return html`<mk-sign-in
       .product=${this.info?.name ?? 'Mosaikit'}
+      .logo=${(this.scheme === 'dark' ? this.info?.logoDark : undefined) ?? this.info?.logo ?? undefined}
       .version=${this.info?.version}
       .email=${this.email}
       .busy=${this.busy}
@@ -1697,6 +1717,37 @@ const mark = html`<svg width="22" height="22" viewBox="0 0 28 28" aria-hidden="t
   <rect x="1" y="15" width="12" height="12" rx="3" fill="#ffffff" opacity="0.4" />
   <rect x="15" y="15" width="12" height="12" rx="3" fill="#ffffff" opacity="0.8" />
 </svg>`;
+
+/** Makes the themes of the active theme extensions available to the shell (MK-028). */
+function registerThemes(themes: readonly ExtensionTheme[]): void {
+  for (const theme of themes) {
+    registerTheme(theme.id, {
+      title: theme.title,
+      ...(theme.font ? { font: theme.font } : {}),
+      ...(theme.radius === null ? {} : { radius: theme.radius }),
+      light: theme.light,
+      dark: theme.dark,
+    });
+  }
+}
+
+/** The logo of the product in the bar of the shell: the one of the theme, or the mark of Mosaikit. */
+function productMark(logo: string | null | undefined): unknown {
+  return logo ? html`<img class="logo" src=${logo} alt="" />` : mark;
+}
+
+/**
+ * Names the page and its icon after the product, when the theme of the installation brings them
+ * (MK-052); index.html carries those of Mosaikit until the kernel answers.
+ */
+function showProduct(info: SystemInfo): void {
+  document.title = info.name;
+  const icon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+  if (info.logo && icon) {
+    icon.href = info.logo;
+    icon.type = info.logo.endsWith('.png') ? 'image/png' : 'image/svg+xml';
+  }
+}
 
 /** The icon of an app: its own file, or a tile with its initials. */
 function appIcon(entry: LauncherEntry): unknown {

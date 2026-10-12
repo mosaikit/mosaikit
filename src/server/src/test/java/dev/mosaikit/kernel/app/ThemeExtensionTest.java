@@ -6,6 +6,7 @@ import static dev.mosaikit.kernel.app.Credentials.anonymous;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.nullValue;
+import static org.hamcrest.Matchers.startsWith;
 
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
@@ -36,5 +37,21 @@ class ThemeExtensionTest {
                 .body("[0].radius", nullValue());
         // The installation names it as its theme.
         anonymous().get("/api/v1/system/info").then().body("theme", equalTo("dev.mosaikit.test.green"));
+    }
+
+    @Test
+    @Tag("MK-052")
+    void theThemeOfTheInstallationNamesTheProductAndBringsItsLogo() {
+        String logo = "/api/v1/extension-assets/dev.mosaikit.test.green/web/logo.svg";
+        anonymous()
+                .get("/api/v1/system/info")
+                .then()
+                .statusCode(200)
+                .body("name", equalTo("Green Works"))
+                .body("logo", equalTo(logo))
+                // Without a logo for dark backgrounds, the one for light backgrounds.
+                .body("logoDark", equalTo(logo));
+        // The logo is there before sign-in, for the sign-in page.
+        anonymous().get(logo).then().statusCode(200).contentType(startsWith("image/svg+xml"));
     }
 }

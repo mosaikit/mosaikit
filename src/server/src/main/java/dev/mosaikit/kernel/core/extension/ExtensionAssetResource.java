@@ -32,7 +32,7 @@ public class ExtensionAssetResource {
     }
 
     /** URL of an asset of an extension. */
-    static String assetUrl(String extensionId, String relativePath) {
+    public static String assetUrl(String extensionId, String relativePath) {
         return "/api/v1/extension-assets/" + extensionId + "/" + relativePath;
     }
 

@@ -35,6 +35,20 @@ describe('launcherEntries (MK-008)', () => {
     expect(entry?.title).toBe('fallback');
   });
 
+  it('names the apps in the language of the person (MK-053)', () => {
+    const apps = [
+      extension({
+        route: '/app/catalog',
+        element: 'gp-catalog',
+        title: 'Catalog',
+        i18n: { it: { title: 'Catalogo' } },
+      }),
+    ];
+
+    expect(launcherEntries(apps, 'it')[0]?.title).toBe('Catalogo');
+    expect(launcherEntries(apps, 'en')[0]?.title).toBe('Catalog');
+  });
+
   it.each([
     { route: '/elsewhere', element: 'mk-hello-app' },
     { route: '/app/hello', element: 'noHyphen' },

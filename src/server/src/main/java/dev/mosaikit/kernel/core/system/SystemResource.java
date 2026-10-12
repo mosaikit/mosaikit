@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.core.system;
 
+import dev.mosaikit.kernel.api.extension.ThemeEntry;
 import dev.mosaikit.kernel.core.config.KernelConfig;
+import dev.mosaikit.kernel.core.extension.ExtensionAssetResource;
 import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
 import jakarta.annotation.security.PermitAll;
 import jakarta.ws.rs.GET;
@@ -36,14 +38,30 @@ public class SystemResource {
     @GET
     @Path("/info")
     @PermitAll
-    @Operation(summary = "Get product name, kernel version, number of active extensions and theme")
+    @Operation(summary = "Get product name and logo, kernel version, number of active extensions and theme")
     public SystemInfo info() {
+        // The theme of the installation names the product and brings its logo (MK-052); a person who
+        // chooses another theme keeps them, since they are the installation's, not a look.
+        var branding = extensions
+                .findActive(theme)
+                .flatMap(extension -> extension.manifest())
+                .flatMap(manifest -> manifest.theme());
+        String product = branding.map(ThemeEntry::product).orElse(PRODUCT_NAME);
+        String logo = branding.map(ThemeEntry::logo).map(this::themeAsset).orElse(null);
+        String logoDark =
+                branding.map(ThemeEntry::logoDark).map(this::themeAsset).orElse(logo);
         return new SystemInfo(
-                PRODUCT_NAME,
+                product,
                 kernelVersion.get().toString(),
                 extensions.active().size(),
                 theme,
-                rememberDays);
+                rememberDays,
+                logo,
+                logoDark);
+    }
+
+    private String themeAsset(String path) {
+        return ExtensionAssetResource.assetUrl(theme, path);
     }
 
     @GET

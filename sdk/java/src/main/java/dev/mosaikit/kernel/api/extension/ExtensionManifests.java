@@ -46,16 +46,26 @@ public final class ExtensionManifests {
 
     public static final List<String> ACTION_METHODS = List.of("GET", "POST", "PUT", "PATCH", "DELETE");
 
-    /** Name of the API of an extension: one path segment under {@code /api/v1/ext/}. */
     /** A color of a theme (MK-028). */
     public static final Pattern COLOR_PATTERN = Pattern.compile("^#[0-9a-fA-F]{6}$");
 
     /** A font stack of a theme: names, quotes, commas and spaces only. */
     public static final Pattern FONT_PATTERN = Pattern.compile("^[\\w\\s'\",.-]{1,200}$");
 
+    /** The name of the product a theme brings (MK-052): letters, digits, spaces and . &amp; ' -. */
+    public static final Pattern PRODUCT_PATTERN =
+            Pattern.compile("^(?=.*\\S)[\\p{L}\\p{N} .&'-]{1,60}$", Pattern.UNICODE_CHARACTER_CLASS);
+
+    /** A logo of a theme (MK-052): an SVG or PNG file. */
+    public static final Pattern LOGO_PATTERN = Pattern.compile("^[A-Za-z0-9_][A-Za-z0-9_./-]*\\.(svg|png)$");
+
+    /** A language of the texts of a contribution (MK-053), such as {@code it} or {@code pt-BR}. */
+    public static final Pattern LANGUAGE_PATTERN = Pattern.compile("^[a-z]{2,3}(-[A-Z][A-Za-z0-9]{1,7})?$");
+
     /** Name of a collection of documents of an extension (ADR-0031). */
     public static final Pattern COLLECTION_PATTERN = Pattern.compile("^[a-z][a-z0-9-]{0,63}$");
 
+    /** Name of the API of an extension: one path segment under {@code /api/v1/ext/}. */
     public static final Pattern API_PATTERN = Pattern.compile("^[a-z][a-z0-9-]{1,39}$");
 
     /** Extension point or requirement name, for example {@code launcher.app}. */
@@ -384,9 +394,36 @@ public final class ExtensionManifests {
                     violation("theme.radius", "must be a whole number of pixels from 0 to 24");
                 }
             }
+            String product = optionalText(theme, "product");
+            if (product != null && !PRODUCT_PATTERN.matcher(product).matches()) {
+                violation("theme.product", "must be a name of 1 to 60 letters, digits, spaces and . & ' -");
+            }
+            Map<String, ?> logo = optionalMap(theme, "logo", "theme.logo");
+            String logoLight = logoFile(logo, "light", !logo.isEmpty());
+            String logoDark = logoFile(logo, "dark", false);
             return title == null
                     ? null
-                    : new ThemeEntry(title, font, radius, colors(theme, "light"), colors(theme, "dark"));
+                    : new ThemeEntry(
+                            title,
+                            font,
+                            radius,
+                            colors(theme, "light"),
+                            colors(theme, "dark"),
+                            product,
+                            logoLight,
+                            logoDark);
+        }
+
+        /** A logo of a theme (MK-052): an SVG or PNG file inside the extension. */
+        private String logoFile(Map<String, ?> logo, String scheme, boolean required) {
+            String field = "theme.logo." + scheme;
+            String path = required ? requiredText(logo, scheme, field) : optionalText(logo, scheme);
+            if (path != null
+                    && (!isSafeRelativePath(path) || !LOGO_PATTERN.matcher(path).matches())) {
+                violation(field, "must be an SVG or PNG file inside the extension, such as web/logo.svg");
+                return null;
+            }
+            return path;
         }
 
         private Map<String, String> colors(Map<String, ?> theme, String scheme) {
@@ -439,7 +476,28 @@ public final class ExtensionManifests {
                 return Optional.empty();
             }
             attributes.values().removeIf(Objects::isNull);
+            checkTranslations(field + ".i18n", attributes.get("i18n"));
             return Optional.of(new Contribution(point, text, attributes));
+        }
+
+        /** The texts of a contribution by language (MK-053): {@code i18n: { it: { title: Catalogo } }}. */
+        private void checkTranslations(String field, Object i18n) {
+            if (i18n == null) {
+                return;
+            }
+            if (!(i18n instanceof Map<?, ?> languages)) {
+                violation(field, MUST_BE_OBJECT);
+                return;
+            }
+            languages.forEach((language, texts) -> {
+                String languageField = field + "." + language;
+                if (!LANGUAGE_PATTERN.matcher(String.valueOf(language)).matches()) {
+                    violation(languageField, "must be a language tag, such as it or pt-BR");
+                } else if (!(texts instanceof Map<?, ?> values)
+                        || values.values().stream().anyMatch(value -> !(value instanceof String))) {
+                    violation(languageField, "must map attributes to their text, such as { title: Catalogo }");
+                }
+            });
         }
 
         private String requiredText(Map<String, ?> map, String key) {
