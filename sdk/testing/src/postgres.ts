@@ -27,6 +27,27 @@ function pgCtl(): string | undefined {
 }
 
 /**
+ * On Windows an I/O worker of PostgreSQL 18 can outlive its server, and keeps the files of
+ * node_modules locked so that the next npm ci fails: ends the processes of these binaries whose
+ * server is gone. The servers still running, such as those of other benches, are left alone.
+ */
+function endOrphans(ctl: string): void {
+  if (process.platform !== 'win32') {
+    return;
+  }
+  const binaries = dirname(ctl).replaceAll('\\', '/');
+  const script = [
+    'Get-CimInstance Win32_Process -Filter "Name=\'postgres.exe\'"',
+    `| Where-Object { $_.CommandLine -and $_.CommandLine.Replace('\\', '/') -like '*${binaries}/*'`,
+    '-and -not (Get-Process -Id $_.ParentProcessId -ErrorAction SilentlyContinue) }',
+    '| ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }',
+  ].join(' ');
+  spawnSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', script], {
+    stdio: 'ignore',
+  });
+}
+
+/**
  * PostgreSQL 18 for development and the end-to-end tests, from the binaries that npm installs
  * (@embedded-postgres, the same as the portable distribution and the Java tests): no Docker, no
  * server to install.
@@ -108,13 +129,20 @@ export async function startPostgres(options: {
           stdio: 'ignore',
         });
       }
+      let failure: Error | undefined;
       try {
         await server.stop();
       } catch (error) {
+        failure = error instanceof Error ? error : new Error('PostgreSQL did not stop');
+      }
+      if (ctl) {
+        endOrphans(ctl);
+      }
+      if (failure !== undefined) {
         // On Windows the files of a server that just stopped can stay locked for a moment, and
         // the package fails to delete the cluster (EBUSY): retry for a few seconds.
         if (options.persistent) {
-          throw error;
+          throw failure;
         }
         rmSync(options.directory, {
           recursive: true,
