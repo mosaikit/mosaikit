@@ -151,7 +151,17 @@ export class Launcher {
     } catch {
       // already gone
     }
-    await Promise.race([exited, new Promise((resolve) => setTimeout(resolve, 30_000))]);
+    // The timer is cleared at once: a pending one kept Node alive for 30 s after every bench.
+    let timer: NodeJS.Timeout | undefined;
+    await Promise.race([
+      exited,
+      new Promise((resolve) => {
+        timer = setTimeout(resolve, 30_000);
+      }),
+    ]);
+    clearTimeout(timer);
+    launcher.stdout?.destroy();
+    launcher.stderr?.destroy();
     for (let i = 0; i < 30; i++) {
       try {
         await fetch(`${this.baseUrl}/q/health/ready`);
