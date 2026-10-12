@@ -3,6 +3,7 @@
 import {
   copyFileSync,
   cpSync,
+  linkSync,
   mkdirSync,
   readdirSync,
   rmSync,
@@ -97,12 +98,13 @@ export class Bench {
   ) {}
 
   static async start(options: BenchOptions): Promise<Bench> {
+    const phase = phases();
     const source = await locateInstallation(options.installation);
     const work = resolve(options.work);
     rmSync(work, { recursive: true, force: true });
     mkdirSync(work, { recursive: true });
     const installation = join(work, 'mosaikit');
-    cpSync(source, installation, { recursive: true });
+    copyInstallation(source, installation);
     for (const directory of ['plugins', 'catalog', join('config', 'trusted-keys')]) {
       mkdirSync(join(installation, directory), { recursive: true });
     }
@@ -114,6 +116,7 @@ export class Bench {
       place(signing, options.catalog, join(installation, 'catalog'));
       signing.index(join(installation, 'catalog'));
     }
+    phase('installation and signed plugins');
 
     const closers: (() => Promise<void>)[] = [];
     let database = options.database;
@@ -129,6 +132,7 @@ export class Bench {
     const smtpPort = await freePort();
     const smtp: FakeSmtp = await startFakeSmtp(smtpPort, mail);
     closers.push(() => smtp.close());
+    phase('database and mail server');
 
     const port = options.port ?? (await freePort());
     const baseUrl = `http://localhost:${String(port)}`;
@@ -150,6 +154,7 @@ export class Bench {
     const launcher = new Launcher(installation, baseUrl, join(work, 'installation.log'));
     await launcher.start();
     closers.unshift(() => launcher.stop());
+    phase('kernel ready');
 
     const info: BenchInfo = {
       baseUrl,
@@ -163,6 +168,7 @@ export class Bench {
     };
     const bench = new Bench(info, signing, launcher, settings, closers);
     await bench.seed();
+    phase('organization and people');
     if (options.controlPort !== undefined) {
       bench.info = { ...info, controlUrl: await bench.listen(options.controlPort) };
     }
@@ -243,6 +249,50 @@ export class Bench {
       await register(baseUrl, mail, organization.slug, person);
     }
   }
+}
+
+/**
+ * Copies an installation, with hard links for the libraries of the kernel (bin/kernel/lib), which
+ * no start changes: a new file would be scanned again by an antivirus when the kernel opens it,
+ * which took 40 seconds on Windows, and the copy costs 95 MB. Copied when a link is not possible,
+ * on another volume.
+ */
+export function copyInstallation(source: string, target: string): void {
+  const libraries = join(source, 'bin', 'kernel', 'lib');
+  cpSync(source, target, {
+    recursive: true,
+    filter: (path) => resolve(path) !== resolve(libraries),
+  });
+  linkTree(libraries, join(target, 'bin', 'kernel', 'lib'));
+}
+
+function linkTree(source: string, target: string): void {
+  mkdirSync(target, { recursive: true });
+  for (const entry of readdirSync(source, { withFileTypes: true })) {
+    const from = join(source, entry.name);
+    const to = join(target, entry.name);
+    if (entry.isDirectory()) {
+      linkTree(from, to);
+    } else {
+      try {
+        linkSync(from, to);
+      } catch {
+        copyFileSync(from, to);
+      }
+    }
+  }
+}
+
+/** With MOSAIKIT_BENCH_DEBUG set, prints how long each phase of the start took. */
+function phases(): (name: string) => void {
+  let last = Date.now();
+  return (name) => {
+    if (process.env.MOSAIKIT_BENCH_DEBUG) {
+      const now = Date.now();
+      process.stderr.write(`[bench] ${name}: ${((now - last) / 1000).toFixed(1)} s\n`);
+      last = now;
+    }
+  };
 }
 
 /** What a plugin directory holds for the kernel; sources and build files stay out. */

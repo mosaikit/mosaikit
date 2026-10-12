@@ -8,6 +8,7 @@ export {
   ENVIRONMENT,
   basic,
   confirmationLink,
+  copyInstallation,
   fromEnvironment,
   register,
   type BenchInfo,

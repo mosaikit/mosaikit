@@ -536,16 +536,32 @@ class JavaPluginInstallationIT {
         }
     }
 
+    /**
+     * Copies the kernel, with hard links for its libraries ({@code lib/}), which no rebuild changes:
+     * a new file is scanned again by an antivirus when the kernel opens it, which made each rebuild
+     * 40 seconds longer on Windows. Copied when a link is not possible.
+     */
     private static void copyRecursively(Path source, Path target) throws IOException {
+        Path libraries = source.resolve("lib");
         try (Stream<Path> paths = Files.walk(source)) {
             for (Path path : paths.toList()) {
                 Path destination = target.resolve(source.relativize(path).toString());
                 if (Files.isDirectory(path)) {
                     Files.createDirectories(destination);
-                } else {
+                } else if (!path.startsWith(libraries) || !link(path, destination)) {
                     Files.copy(path, destination, StandardCopyOption.REPLACE_EXISTING);
                 }
             }
+        }
+    }
+
+    private static boolean link(Path existing, Path link) {
+        try {
+            Files.deleteIfExists(link);
+            Files.createLink(link, existing);
+            return true;
+        } catch (IOException | UnsupportedOperationException e) {
+            return false;
         }
     }
 

@@ -76,7 +76,8 @@ export async function startPostgres(options: {
     user: USER,
     password: PASSWORD,
     persistent: options.persistent,
-    initdbFlags: ['--locale=C', '--encoding=UTF8'],
+    // A disposable cluster needs no sync to disk while it is created.
+    initdbFlags: ['--locale=C', '--encoding=UTF8', ...(options.persistent ? [] : ['--no-sync'])],
     postgresFlags: ['-c', 'listen_addresses=127.0.0.1', '-c', 'unix_socket_directories=', ...quick],
     onLog: () => undefined,
     onError: (message: unknown) => {
