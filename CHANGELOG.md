@@ -104,7 +104,7 @@ project follows [Semantic Versioning](https://semver.org/).
 
 - The plugins are no longer part of the kernel repository (ADR-0035): the tests of the kernel
   install fixtures of their own (`tests/fixtures/plugins`, `dev.mosaikit.fixture.*`); the sample
-  plugins and the apps Teams and Chat move to `mosaikit/samples`, a project each. The
+  plugins and the apps Teams and Chat move to `mosaikit/mosaikit-samples`, a project each. The
   installation no longer comes with a catalog of samples, and
   `mosaikit.marketplace.sources` has no default.
 - The repository is laid out by role (MK-049, ADR-0034): the sources under `src/` (`src/server`,

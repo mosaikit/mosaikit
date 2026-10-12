@@ -23,7 +23,7 @@ repository, `node sdk/create-plugin/dist/bin.js` does the same after `npm run bu
 To install the plugin elsewhere, copy `target/traffic-0.1.0.zip` into `plugins/` of an
 installation, or upload it from the Plugins page; sign it first for an installation that accepts
 only trusted publishers ([Signing a package](#signing-a-package)). The samples in
-[mosaikit/samples](https://github.com/mosaikit/samples) are complete plugins built the same way.
+[mosaikit/mosaikit-samples](https://github.com/mosaikit/mosaikit-samples) are complete plugins built the same way.
 The rest of this guide explains what each part does.
 
 ## Build a plugin
@@ -251,7 +251,7 @@ theme:
 
 Every color, font or radius it leaves out comes from the default theme. Choose colors with enough
 contrast (WCAG 2.1 AA: 4.5:1 for text): the high contrast appearance stays available to everyone.
-[`sample-theme`](https://github.com/mosaikit/samples/tree/main/theme) is a complete example.
+[`sample-theme`](https://github.com/mosaikit/mosaikit-samples/tree/main/theme) is a complete example.
 
 ### Components and themes
 
@@ -277,8 +277,8 @@ Bootstrap Italia) and with the light or dark preference of the system; never har
 
 A frontend may use React, Vue or any framework ([ADR-0020](../adr/0020-frontends-in-any-framework.md)):
 bundle it with the framework into one ES module (Vite library mode, `formats: ['es']`) and declare
-that module as `frontend.entry`, as [`sample-react`](https://github.com/mosaikit/samples/tree/main/react) and
-[`sample-vue`](https://github.com/mosaikit/samples/tree/main/vue) do. Render inside the shadow root of your custom element,
+that module as `frontend.entry`, as [`sample-react`](https://github.com/mosaikit/mosaikit-samples/tree/main/react) and
+[`sample-vue`](https://github.com/mosaikit/mosaikit-samples/tree/main/vue) do. Render inside the shadow root of your custom element,
 unmount in `disconnectedCallback`, style with the `--mk-*` tokens and talk to other plugins only
 through `context.events` and extension points.
 
@@ -305,7 +305,7 @@ even if you plan to run as a module: installations that isolate unverified plugi
 
 ## Java code
 
-[`samples/notes`](https://github.com/mosaikit/samples/tree/main/notes) is a complete example: an entity, a Jakarta
+[`samples/notes`](https://github.com/mosaikit/mosaikit-samples/tree/main/notes) is a complete example: an entity, a Jakarta
 Data repository and a REST resource, with the migration of its schema.
 
 - Build the plugin as a Maven module whose dependencies all have scope `provided`: `mosaikit-kernel-api` (sdk/java),
@@ -384,7 +384,7 @@ await items.remove(created.id);
 A document is a JSON object of at most 256 KiB, and a collection holds at most 10,000 of them.
 Errors are `DataError`s with the HTTP status and the detail of the kernel. Such a plugin is active
 as soon as it is installed: the marketplace answers `restartRequired: false` and the shell shows
-the app without a reload. [`sample-todo`](https://github.com/mosaikit/samples/tree/main/todo) is a complete example, and
+the app without a reload. [`sample-todo`](https://github.com/mosaikit/mosaikit-samples/tree/main/todo) is a complete example, and
 `create-mosaikit-plugin` without `--backend` writes one. When an app needs queries beyond listing
 and paging, give it a backend and a schema.
 
@@ -450,8 +450,8 @@ plugin publishes as its data contract.
 ## Extending another plugin
 
 A plugin extends another one on three levels ([ADR-0019](../adr/0019-plugins-extending-plugins.md)),
-as [`sample-estimates`](https://github.com/mosaikit/samples/tree/main/estimates) extends
-[`sample-activities`](https://github.com/mosaikit/samples/tree/main/activities):
+as [`sample-estimates`](https://github.com/mosaikit/mosaikit-samples/tree/main/estimates) extends
+[`sample-activities`](https://github.com/mosaikit/mosaikit-samples/tree/main/activities):
 
 1. **Require it**, so that the kernel migrates it first and refuses yours without it:
    `requires: { dev.mosaikit.sample.activities: '^0.1' }`.

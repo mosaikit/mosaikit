@@ -3,7 +3,7 @@ title: Plugin frontends written with any framework
 area: shell
 priority: P1
 status: done
-verified-in: mosaikit/samples
+verified-in: mosaikit/mosaikit-samples
 description: >-
   A plugin frontend may be written with a framework such as React or Vue, bundled with it into one
   ES module, and shares the page, the theme, the language and the event bus with the others. The

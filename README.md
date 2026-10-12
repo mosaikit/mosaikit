@@ -29,7 +29,7 @@ can in turn be extended by other plugins.
 | `src/server/` | The kernel: one Quarkus application with the services and the launcher that loads Java plugins. |
 | `src/web/` | The web shell (Lit + Vite), built by npm and packaged in the kernel. |
 | `sdk/` | What third parties need to write plugins: `sdk/java` (the Java plugin API and the manifest schema), `sdk/js` (`@mosaikit/sdk` for plugin frontends) and `sdk/create-plugin` (a generator of new plugins). See [sdk/README.md](sdk/README.md). |
-| `tests/fixtures/plugins/` | The plugins that the tests of the kernel install: small, owned by the tests. The sample plugins are in [mosaikit/samples](https://github.com/mosaikit/samples), the apps Teams and Chat in repositories of their own (ADR-0035). |
+| `tests/fixtures/plugins/` | The plugins that the tests of the kernel install: small, owned by the tests. The sample plugins are in [mosaikit/mosaikit-samples](https://github.com/mosaikit/mosaikit-samples), the apps Teams and Chat in repositories of their own (ADR-0035). |
 | `distribution/` | How Mosaikit is delivered: installation, portable archives, Docker, Kubernetes, Keycloak realm, release scripts. |
 | `tests/e2e/` | End-to-end tests with Playwright on a real installation. See [tests/e2e/README.md](tests/e2e/README.md). |
 | `build/` | Scripts for development: `npm run dev`, which starts the kernel with an embedded PostgreSQL and a fake mail server from `sdk/testing`. |

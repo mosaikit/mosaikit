@@ -21,7 +21,7 @@ third-party plugin is.
 - **The kernel repository has no plugins.** What the kernel tests need are fixtures, under
   `tests/fixtures/plugins/`, with identifiers of their own (`dev.mosaikit.fixture.*`): small,
   owned by the tests, not documentation.
-- **Plugins live outside, built only against what is published**: `mosaikit/samples` holds the
+- **Plugins live outside, built only against what is published**: `mosaikit/mosaikit-samples` holds the
   sample plugins and the collaboration apps Teams and Chat, one directory each, and each directory
   is a project of its own that builds and tests alone (`mvn verify`, `npm test`) on the parent POM
   of plugins, `io.github.mosaikit:mosaikit-plugin-parent` (MK-051).

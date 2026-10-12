@@ -26,7 +26,7 @@ my-plugin/
 
 The build produces `target/my-plugin-<version>.zip` with `manifest.yaml`, `lib/`, `db/` and
 `web/`; it is installed by copying it into `plugins/` of an installation, as it is. The samples in
-[`mosaikit/samples`](https://github.com/mosaikit/samples) are complete examples, and
+[`mosaikit/mosaikit-samples`](https://github.com/mosaikit/mosaikit-samples) are complete examples, and
 [docs/development/plugin-development.md](../docs/development/plugin-development.md) is the full guide.
 
 ## Rules
