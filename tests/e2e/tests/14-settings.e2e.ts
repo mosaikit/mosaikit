@@ -90,7 +90,11 @@ test.describe('MK-027 Personal settings: theme, language and active organization
         '  entry: web/index.js',
         'contributes:',
         '  settings.section:',
-        '    - { id: export, title: Audit export, element: acme-audit-section, roles: [platform-admin] }',
+        '    - id: export',
+        '      title: Audit export',
+        '      element: acme-audit-section',
+        '      roles: [platform-admin]',
+        '      i18n: { it: { title: Esportazione audit } }',
         '',
       ].join('\n'),
     );
@@ -106,6 +110,8 @@ test.describe('MK-027 Personal settings: theme, language and active organization
       await expect(page.getByText('Audit export, language en')).toBeVisible();
       await page.getByLabel('Language').selectOption('it');
       await expect(page.getByText('Audit export, language it')).toBeVisible();
+      // MK-053: the title of the section in the language of the person.
+      await expect(page.getByText('Esportazione audit', { exact: true })).toBeVisible();
       await page.getByLabel('Lingua').selectOption('en');
       await expect(page.getByText('Audit export, language en')).toBeVisible();
     } finally {

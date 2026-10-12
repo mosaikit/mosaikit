@@ -11,7 +11,12 @@ project follows [Semantic Versioning](https://semver.org/).
 - A theme extension can name the product and bring its logo (MK-052, `theme.product` and
   `theme.logo` with `light` and `dark`): as the theme of the installation, the shell shows them in
   its bar and on the sign-in page, and uses them as the title and the icon of the page.
-  `/api/v1/system/info` gives them as `name`, `logo` and `logoDark`.
+  `/api/v1/system/info` gives them as `name`, `logo` and `logoDark`. The sign-in page waits for the
+  installation and its themes, so it no longer shows the name and colors of Mosaikit first.
+
+- The texts of a contribution in other languages (MK-053): an `i18n` block by language tag, such as
+  `i18n: { it: { title: Catalogo } }`, which the shell uses for the names of the apps and of the
+  sections of the settings in the language of the person; `textAttribute` in `@mosaikit/sdk`.
 
 - The installation is also a Maven artifact, `io.github.mosaikit:mosaikit-distributions:zip:installation`,
   on which products build their own distributions, with the builder of the portable archives

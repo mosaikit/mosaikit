@@ -176,6 +176,19 @@
             "id": {
               "type": "string",
               "minLength": 1
+            },
+            "i18n": {
+              "description": "The text attributes in other languages, by language tag (MK-053), such as { \"it\": { \"title\": \"Catalogo\" } }.",
+              "type": "object",
+              "propertyNames": {
+                "pattern": "^[a-z]{2,3}(-[A-Z][A-Za-z0-9]{1,7})?$"
+              },
+              "additionalProperties": {
+                "type": "object",
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
             }
           }
         }

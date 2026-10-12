@@ -59,6 +59,9 @@ public final class ExtensionManifests {
     /** A logo of a theme (MK-052): an SVG or PNG file. */
     public static final Pattern LOGO_PATTERN = Pattern.compile("^[A-Za-z0-9_][A-Za-z0-9_./-]*\\.(svg|png)$");
 
+    /** A language of the texts of a contribution (MK-053), such as {@code it} or {@code pt-BR}. */
+    public static final Pattern LANGUAGE_PATTERN = Pattern.compile("^[a-z]{2,3}(-[A-Z][A-Za-z0-9]{1,7})?$");
+
     /** Name of a collection of documents of an extension (ADR-0031). */
     public static final Pattern COLLECTION_PATTERN = Pattern.compile("^[a-z][a-z0-9-]{0,63}$");
 
@@ -473,7 +476,28 @@ public final class ExtensionManifests {
                 return Optional.empty();
             }
             attributes.values().removeIf(Objects::isNull);
+            checkTranslations(field + ".i18n", attributes.get("i18n"));
             return Optional.of(new Contribution(point, text, attributes));
+        }
+
+        /** The texts of a contribution by language (MK-053): {@code i18n: { it: { title: Catalogo } }}. */
+        private void checkTranslations(String field, Object i18n) {
+            if (i18n == null) {
+                return;
+            }
+            if (!(i18n instanceof Map<?, ?> languages)) {
+                violation(field, MUST_BE_OBJECT);
+                return;
+            }
+            languages.forEach((language, texts) -> {
+                String languageField = field + "." + language;
+                if (!LANGUAGE_PATTERN.matcher(String.valueOf(language)).matches()) {
+                    violation(languageField, "must be a language tag, such as it or pt-BR");
+                } else if (!(texts instanceof Map<?, ?> values)
+                        || values.values().stream().anyMatch(value -> !(value instanceof String))) {
+                    violation(languageField, "must map attributes to their text, such as { title: Catalogo }");
+                }
+            });
         }
 
         private String requiredText(Map<String, ?> map, String key) {

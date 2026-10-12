@@ -1,0 +1,15 @@
+id: MK-053
+title: The texts of contributions in the language of the person
+area: extensions
+priority: P1
+status: done
+description: >-
+  The names that extensions give to their apps and to their sections of the settings show in the
+  language of the person, not only in the one of the manifest. A contribution gives its text
+  attributes in other languages in an i18n block by language tag; the shell uses the language of the
+  person, then its main language, then the attribute itself, and follows a change of language at once.
+acceptance:
+  - A contribution declares i18n with texts by language tag; a block that is not texts by language makes the manifest invalid.
+  - The app bar, the home page and the settings show the names of apps and sections in the language of the person, and change with it.
+  - Without a text for the language, the attribute itself is shown.
+depends: [MK-027, MK-052]

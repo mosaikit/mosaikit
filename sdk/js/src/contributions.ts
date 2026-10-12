@@ -67,3 +67,29 @@ export function stringAttribute(contribution: Contribution, name: string): strin
   const value = contribution.attributes[name];
   return typeof value === 'string' ? value : undefined;
 }
+
+/**
+ * Reads a text attribute of a contribution in a language (MK-053): the text of the `i18n` block of the
+ * contribution for that language (`i18n: { it: { title: Catalogo } }`), or for its main language
+ * (`it` for `it-CH`), otherwise the attribute itself.
+ */
+export function textAttribute(
+  contribution: Contribution,
+  name: string,
+  language: string,
+): string | undefined {
+  const i18n = contribution.attributes.i18n;
+  if (i18n && typeof i18n === 'object') {
+    const texts = i18n as Readonly<Record<string, unknown>>;
+    for (const tag of [language, language.split('-')[0] ?? language]) {
+      const forLanguage = texts[tag];
+      if (forLanguage && typeof forLanguage === 'object') {
+        const text = (forLanguage as Readonly<Record<string, unknown>>)[name];
+        if (typeof text === 'string' && text.trim() !== '') {
+          return text;
+        }
+      }
+    }
+  }
+  return stringAttribute(contribution, name);
+}

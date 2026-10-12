@@ -1,7 +1,12 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
 import { describe, expect, it } from 'vitest';
-import { contributionsTo, stringAttribute, type FrontendExtension } from '../src/contributions.js';
+import {
+  contributionsTo,
+  stringAttribute,
+  textAttribute,
+  type FrontendExtension,
+} from '../src/contributions.js';
 import { defineExtension, isMosaikitExtension } from '../src/extension.js';
 
 const extensions: FrontendExtension[] = [
@@ -56,5 +61,30 @@ describe('extension modules', () => {
     expect(isMosaikitExtension({ activate: 'no' })).toBe(false);
     expect(isMosaikitExtension(null)).toBe(false);
     expect(isMosaikitExtension('module')).toBe(false);
+  });
+});
+
+describe('textAttribute (MK-053)', () => {
+  const catalog = {
+    point: 'rail.app',
+    id: 'catalog',
+    attributes: {
+      title: 'Catalog',
+      i18n: { it: { title: 'Catalogo' }, 'pt-BR': { title: 'Catálogo' }, de: { title: 7 } },
+    },
+  };
+
+  it('reads the text in the language, or in its main language', () => {
+    expect(textAttribute(catalog, 'title', 'it')).toBe('Catalogo');
+    expect(textAttribute(catalog, 'title', 'it-CH')).toBe('Catalogo');
+    expect(textAttribute(catalog, 'title', 'pt-BR')).toBe('Catálogo');
+  });
+
+  it('falls back to the attribute itself', () => {
+    expect(textAttribute(catalog, 'title', 'zh')).toBe('Catalog');
+    expect(textAttribute(catalog, 'title', 'de')).toBe('Catalog');
+    expect(
+      textAttribute({ point: 'rail.app', id: 'x', attributes: {} }, 'title', 'it'),
+    ).toBeUndefined();
   });
 });

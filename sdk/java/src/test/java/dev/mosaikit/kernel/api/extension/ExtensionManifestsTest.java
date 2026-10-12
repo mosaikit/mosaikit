@@ -322,6 +322,50 @@ class ExtensionManifestsTest {
     }
 
     @Test
+    @Tag("MK-053")
+    void readsTheTextsOfAContributionByLanguage() {
+        Map<String, Object> tree = validTree();
+        tree.put(
+                "contributes",
+                Map.of(
+                        "rail.app",
+                        List.of(Map.of(
+                                "id",
+                                "catalog",
+                                "title",
+                                "Catalog",
+                                "i18n",
+                                Map.of("it", Map.of("title", "Catalogo"), "pt-BR", Map.of("title", "Catálogo"))))));
+
+        assertThat(parseValid(tree).contributions())
+                .singleElement()
+                .satisfies(contribution -> assertThat(contribution.attributes())
+                        .containsEntry("title", "Catalog")
+                        .containsKey("i18n"));
+    }
+
+    @Test
+    @Tag("MK-053")
+    void rejectsTextsByLanguageThatTheShellCannotRead() {
+        Map<String, Object> tree = validTree();
+        tree.put(
+                "contributes",
+                Map.of(
+                        "rail.app",
+                        List.of(
+                                Map.of("id", "a", "i18n", "Catalogo"),
+                                Map.of("id", "b", "i18n", Map.of("Italian", Map.of("title", "Catalogo"))),
+                                Map.of("id", "c", "i18n", Map.of("it", Map.of("title", 42))))));
+
+        assertThat(parseInvalid(tree))
+                .extracting(ManifestViolation::field)
+                .containsExactlyInAnyOrder(
+                        "contributes.rail.app[0].i18n",
+                        "contributes.rail.app[1].i18n.Italian",
+                        "contributes.rail.app[2].i18n.it");
+    }
+
+    @Test
     void reportsUnknownKindsAndIsolation() {
         Map<String, Object> tree = validTree();
         tree.put("kind", List.of("app", "widget"));

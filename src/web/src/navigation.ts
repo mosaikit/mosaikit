@@ -1,6 +1,12 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
-import { contributionsTo, stringAttribute, type FrontendExtension } from '@mosaikit/sdk';
+import {
+  contributionsTo,
+  stringAttribute,
+  textAttribute,
+  type FrontendExtension,
+} from '@mosaikit/sdk';
+import { language as shellLanguage } from './i18n.js';
 
 /** Extension point through which an extension adds an app to the app bar (MK-025, ADR-0026). */
 export const RAIL_POINT = 'rail.app';
@@ -31,7 +37,10 @@ const DEFAULT_ORDER = 100;
  * the extensions come. Contributions without a valid route or custom element name are ignored, so that
  * a broken extension cannot break the shell.
  */
-export function launcherEntries(extensions: readonly FrontendExtension[]): LauncherEntry[] {
+export function launcherEntries(
+  extensions: readonly FrontendExtension[],
+  language: string = shellLanguage(),
+): LauncherEntry[] {
   const seen = new Set<string>();
   const entries: { entry: LauncherEntry; order: number }[] = [];
   for (const point of [RAIL_POINT, LAUNCHER_POINT]) {
@@ -51,7 +60,7 @@ export function launcherEntries(extensions: readonly FrontendExtension[]): Launc
         entry: {
           extensionId: contribution.extensionId,
           id: contribution.id,
-          title: stringAttribute(contribution, 'title') ?? contribution.id,
+          title: textAttribute(contribution, 'title', language) ?? contribution.id,
           route,
           element,
           ...(icon && ICON.test(icon)
