@@ -16,8 +16,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Gives each connection taken from the pool the organization of the current request, the person
- * and whether they are a guest (MK-032), and the member role that makes the row-level security
+ * Gives each connection taken from the pool the organization of the current request, the person,
+ * whether they are a guest (MK-032) or an administrator of the organization (MK-055), and the member
+ * role that makes the row-level security
  * policies apply (MK-019); takes them away when the connection goes back to the pool.
  */
 @ApplicationScoped
@@ -25,7 +26,8 @@ public class OrganizationConnections implements AgroalPoolInterceptor {
 
     private static final String SET =
             "select set_config('role', ?, false), set_config('mosaikit.organization', ?, false),"
-                    + " set_config('mosaikit.account', ?, false), set_config('mosaikit.guest', ?, false)";
+                    + " set_config('mosaikit.account', ?, false), set_config('mosaikit.guest', ?, false),"
+                    + " set_config('mosaikit.administrator', ?, false)";
     private static final String NONE = "none";
 
     private final RowSecurity rowSecurity;
@@ -63,15 +65,19 @@ public class OrganizationConnections implements AgroalPoolInterceptor {
             statement.setString(2, request.organization().map(UUID::toString).orElse(""));
             statement.setString(3, request.account().map(UUID::toString).orElse(""));
             statement.setString(4, String.valueOf(request.guest()));
+            statement.setString(5, String.valueOf(request.administrator()));
             statement.execute();
         } catch (SQLException e) {
             throw new IllegalStateException("Cannot set the organization of the connection", e);
         }
     }
 
-    /** What the policies know of a request: its organization, its person, and if a guest. */
-    record Request(Optional<UUID> organization, Optional<UUID> account, boolean guest) {
-        static final Request NONE = new Request(Optional.empty(), Optional.empty(), false);
+    /**
+     * What the policies know of a request: its organization, its person, if a guest, and if an
+     * administrator of the organization, who holds every level on its resources (MK-055).
+     */
+    record Request(Optional<UUID> organization, Optional<UUID> account, boolean guest, boolean administrator) {
+        static final Request NONE = new Request(Optional.empty(), Optional.empty(), false, false);
     }
 
     /** The request on this thread, if there is one. */
@@ -86,6 +92,7 @@ public class OrganizationConnections implements AgroalPoolInterceptor {
         return Optional.of(new Request(
                 RequestOrganization.of(identity),
                 RequestOrganization.account(identity),
-                RequestOrganization.guest(identity)));
+                RequestOrganization.guest(identity),
+                RequestOrganization.administrator(identity)));
     }
 }

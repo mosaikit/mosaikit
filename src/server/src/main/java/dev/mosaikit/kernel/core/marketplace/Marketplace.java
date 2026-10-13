@@ -21,6 +21,7 @@ import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
 import dev.mosaikit.kernel.core.extension.ExtensionStatus;
 import dev.mosaikit.kernel.core.extension.InstalledExtension;
 import dev.mosaikit.kernel.core.extension.PackageTrust;
+import dev.mosaikit.kernel.core.sharing.SharingLevels;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -69,9 +70,16 @@ public class Marketplace {
     private final ObjectMapper json;
     private final List<URI> catalogs;
     private final long maxBytes;
+    private final SharingLevels sharing;
 
-    public Marketplace(ExtensionRegistry registry, CatalogSources sources, ObjectMapper json, KernelConfig config) {
+    public Marketplace(
+            ExtensionRegistry registry,
+            CatalogSources sources,
+            ObjectMapper json,
+            KernelConfig config,
+            SharingLevels sharing) {
         this.registry = registry;
+        this.sharing = sharing;
         this.sources = sources;
         this.json = json;
         this.catalogs = config.marketplace().sources().orElse(List.of()).stream()
@@ -175,6 +183,14 @@ public class Marketplace {
                             + entry.id() + " " + entry.version() + " as the index says.");
                 }
             });
+            // An update that removes a resource type or a level on which grants exist is refused,
+            // naming them (MK-055, ADR-0037).
+            registry.all().stream()
+                    .filter(installed -> installed.key().equals(extension.key()))
+                    .flatMap(installed -> installed.manifest().stream())
+                    .findFirst()
+                    .ifPresent(current ->
+                            sharing.refuseRemovals(current, extension.manifest().orElseThrow()));
             String replaced = setAside(extension.key());
             String file = packageFile(extension.key(), version);
             Files.copy(candidate, registry.directory().resolve(file), StandardCopyOption.REPLACE_EXISTING);
@@ -184,6 +200,7 @@ public class Marketplace {
             boolean restart = needsRestart(extension);
             if (!restart) {
                 registry.reload();
+                sharing.refresh(registry.active());
                 if (registry.findActive(extension.key()).isPresent()) {
                     LOG.infof("Extension %s %s is active without a restart", extension.key(), version);
                 } else {

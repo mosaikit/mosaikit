@@ -18,6 +18,22 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The kernel implements sharing (MK-055, ADR-0037): the `Sharing` bean of `kernel-api` shares a
+  registered resource with a person, a team, the organization, a link or the public at the levels
+  that the manifest declares, ordered as listed; deny by default, every level to the owner and to
+  the administrators of the organization, none to platform administrators for being platform
+  administrators, grants only add, granting again replaces the level (also lowering it), the public
+  gets the lowest level and links at most the `linkLevel` of the type. Links keep only the SHA-256
+  of their secret, expire within `mosaikit.sharing.link-max-validity` (default `30d`), may have a
+  password, are revoked, and answer 404 afterwards; every grant, revocation and use of a link is
+  audited. The SQL function `mk_kernel.allows(extension, type, id, level)` lets extensions filter
+  large lists in the database with the same answers. REST API under `/api/v1/sharing` for the
+  sharing dialog, and `POST /api/v1/sharing/links/open` for people without an account. An
+  extension update that removes a resource type or a level with grants is refused with their list.
+  Grants are kept in `mk_kernel.resource_grant` (migration V18) under row-level security. The
+  sharing dialog, the `@mosaikit/sdk` counterpart and the move of the team sharing of documents
+  (MK-032) onto this model come next.
+
 - The kernel implements permissions (MK-056, ADR-0038): the `Permissions` bean of `kernel-api`
   answers for the person and the organization of the request, deny by default, with profiles
   (one per member, the assigned one or the default profile of members), teams and personal

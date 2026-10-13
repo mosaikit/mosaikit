@@ -66,6 +66,12 @@ HTTP Basic or bearer tokens.
 | `GET /api/v1/organizations/{slug}/permissions/teams/{id}` | the administrators of the organization, signed in to it | the permissions granted to a team |
 | `PUT, DELETE /api/v1/organizations/{slug}/permissions/teams/{id}/{permission}` | the administrators of the organization, signed in to it | grant or revoke a permission to a team, for its members and guests (audited) |
 | `POST /api/v1/organizations/{slug}/permissions/preview` | the administrators of the organization, signed in to it | what a proposed member would hold (`role`, `profile`, `teams`), with the sources, without changing anything: for invitations |
+| `GET /api/v1/sharing/resources/{extension}/{type}/{id}` | signed in, or a link (`X-Mosaikit-Link`) | a registered resource with the level of the request on it and whether the person may share it (MK-055) |
+| `GET /api/v1/sharing/resources/{extension}/{type}/{id}/grants` | who may share the resource | its grants, links included, with the names of their subjects |
+| `PUT /api/v1/sharing/resources/{extension}/{type}/{id}/grants` | who may share the resource | grants a level to a person, a team, the organization or the public; granting again replaces the level |
+| `POST /api/v1/sharing/resources/{extension}/{type}/{id}/links` | who may share the resource | creates a link with a level, an expiry within `mosaikit.sharing.link-max-validity` and an optional password; the token is returned once |
+| `DELETE /api/v1/sharing/grants/{grant}` | who may share the resource | revokes a grant or a link |
+| `POST /api/v1/sharing/links/open` | anyone | opens a link with its token and password: the resource and the level, `404` when unknown, expired or revoked, `403` when the password is wrong; every use is audited |
 | `GET /api/v1/shell/extensions/revision` | signed in | changes when the watched extensions directory changes (`mosaikit.extensions.watch`); 404 when it is not watched |
 | `GET /api/v1/extension-assets/{id}/{path}` | anyone | web files of active extensions |
 | `GET /api/v1/extensions` | `platform-admin` | every extension found, with status, problems and publisher |
