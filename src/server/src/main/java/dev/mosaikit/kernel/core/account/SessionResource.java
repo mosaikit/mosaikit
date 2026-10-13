@@ -3,12 +3,17 @@
 package dev.mosaikit.kernel.core.account;
 
 import dev.mosaikit.kernel.core.error.ForbiddenOperationException;
+import dev.mosaikit.kernel.core.identity.OrganizationAccess;
 import dev.mosaikit.kernel.core.identity.RequestOrganization;
 import io.quarkus.security.Authenticated;
+import io.quarkus.security.AuthenticationFailedException;
 import io.quarkus.security.identity.SecurityIdentity;
+import io.vertx.core.http.HttpServerRequest;
 import jakarta.annotation.security.PermitAll;
+import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.CookieParam;
 import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.FormParam;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
@@ -18,39 +23,90 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.NewCookie;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
+import java.util.UUID;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 /**
  * The session of the shell for local accounts. {@code POST /api/v1/accounts/session} with the form
- * fields {@code username} and {@code password} is answered by the form authentication of Quarkus,
- * with the same {@link LocalIdentityProvider} as HTTP Basic: it sets an encrypted, HttpOnly cookie,
- * so that a reload of the page keeps the session and no script of the page, extensions included, ever
- * holds the password. API and MCP clients keep using HTTP Basic or bearer tokens.
+ * fields {@code username} and {@code password} verifies them with the same {@link
+ * LocalIdentityProvider} as HTTP Basic and opens a session that the kernel keeps (MK-125): the
+ * HttpOnly cookie holds only a random value, so that a reload of the page keeps the session, no script
+ * of the page, extensions included, ever holds the password, and signing out ends the session on the
+ * server, whoever kept a copy of the cookie. API and MCP clients keep using HTTP Basic or bearer
+ * tokens.
  */
 @Path("/api/v1/accounts/session")
 @Produces(MediaType.APPLICATION_JSON)
 @Tag(name = "Accounts")
 public class SessionResource {
 
-    /** The session cookie; {@code quarkus.http.auth.form.cookie-name} must have this value. */
+    /** The session cookie. */
     public static final String COOKIE = "mosaikit-session";
+
+    /** Longest password verified: longer ones are refused without hashing them. */
+    private static final int MAX_PASSWORD = 1024;
 
     private final AccountService service;
     private final SecurityIdentity identity;
     private final RememberMe rememberMe;
-    private final String cookie;
+    private final LocalIdentityProvider local;
+    private final SessionRegistry sessions;
 
     public SessionResource(
             AccountService service,
             SecurityIdentity identity,
             RememberMe rememberMe,
-            @ConfigProperty(name = "quarkus.http.auth.form.cookie-name") String cookie) {
+            LocalIdentityProvider local,
+            SessionRegistry sessions) {
         this.service = service;
         this.identity = identity;
         this.rememberMe = rememberMe;
-        this.cookie = cookie;
+        this.local = local;
+        this.sessions = sessions;
+    }
+
+    @POST
+    @PermitAll
+    @Consumes(MediaType.APPLICATION_FORM_URLENCODED)
+    @Operation(
+            summary = "Sign a local account in and open a session of the shell",
+            description = "200 with the account and an HttpOnly session cookie, or 401. A session cookie"
+                    + " sent along ends its session first.")
+    public Response open(
+            @FormParam("username") String username,
+            @FormParam("password") String password,
+            @CookieParam(COOKIE) String previous,
+            @Context HttpServerRequest request,
+            @Context UriInfo uri) {
+        if (username == null || username.isBlank() || password == null || password.length() > MAX_PASSWORD) {
+            return Response.status(Response.Status.UNAUTHORIZED).build();
+        }
+        SecurityIdentity signedIn;
+        try {
+            signedIn = local.verify(
+                    username,
+                    password.toCharArray(),
+                    request.getHeader(OrganizationAccess.HEADER),
+                    request.authority() == null ? null : request.authority().host());
+        } catch (AuthenticationFailedException e) {
+            return Response.status(Response.Status.UNAUTHORIZED).build();
+        }
+        sessions.byCookie(previous).ifPresent(session -> sessions.end(session.id()));
+        UUID account = UUID.fromString(signedIn.getAttribute(OrganizationAccess.ACCOUNT_ATTRIBUTE));
+        UUID organization = LocalIdentityProvider.organizationOf(signedIn);
+        SessionRegistry.Opened opened = sessions.open(account, organization, SessionClient.of(request));
+        NewCookie cookie = new NewCookie.Builder(COOKIE)
+                .value(opened.token())
+                .path("/")
+                .httpOnly(true)
+                .secure("https".equals(uri.getBaseUri().getScheme()))
+                .sameSite(NewCookie.SameSite.STRICT)
+                .build();
+        return Response.ok(service.get(
+                        signedIn.getPrincipal().getName(), signedIn.getRoles(), RequestOrganization.of(signedIn)))
+                .cookie(cookie)
+                .build();
     }
 
     @GET
@@ -71,10 +127,12 @@ public class SessionResource {
     @Operation(
             summary = "Remember the signed-in person on this browser",
             description = "Sets an HttpOnly cookie that signs the person in again when the session ends,"
-                    + " for mosaikit.accounts.remember-for, until they sign out.")
+                    + " for mosaikit.accounts.remember-for, until they sign out or the session is ended.")
     public Response remember(@Context UriInfo uri) {
         String token = rememberMe
-                .issue(identity.getPrincipal().getName())
+                .issue(
+                        identity.getPrincipal().getName(),
+                        SessionRegistry.of(identity).orElse(null))
                 .orElseThrow(
                         () -> new ForbiddenOperationException(
                                 "Only accounts with a password are remembered; accounts of a realm are remembered by the realm."));
@@ -91,15 +149,18 @@ public class SessionResource {
 
     @DELETE
     @PermitAll
-    @Operation(summary = "End the session of the shell, and forget the browser if it was remembered")
+    @Operation(
+            summary = "End the session of the request, and forget the browser if it was remembered",
+            description = "The cookie, or the tokens of the realm session, open nothing any more.")
     public Response end(@CookieParam(RememberMe.COOKIE) String remembered) {
+        SessionRegistry.of(identity).ifPresent(sessions::end);
         rememberMe.revoke(remembered);
         return Response.noContent()
-                .cookie(expired(cookie), expired(RememberMe.COOKIE))
+                .cookie(expired(COOKIE), expired(RememberMe.COOKIE))
                 .build();
     }
 
-    private static NewCookie expired(String name) {
+    static NewCookie expired(String name) {
         return new NewCookie.Builder(name)
                 .value("")
                 .path("/")

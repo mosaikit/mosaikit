@@ -15,6 +15,7 @@ import io.quarkus.vertx.http.runtime.security.HttpSecurityUtils;
 import io.smallrye.mutiny.Uni;
 import io.vertx.ext.web.RoutingContext;
 import jakarta.enterprise.context.ApplicationScoped;
+import java.util.UUID;
 
 /**
  * Authenticates local accounts with username and password. It works without any external
@@ -50,7 +51,12 @@ public class LocalIdentityProvider implements IdentityProvider<UsernamePasswordA
                 () -> verify(request.getUsername(), request.getPassword().getPassword(), requested, host));
     }
 
-    private SecurityIdentity verify(String username, char[] password, String requested, String host) {
+    /**
+     * Verifies a username and a password, for HTTP Basic and for the sign-in of the shell.
+     *
+     * @throws AuthenticationFailedException when they do not sign anybody in
+     */
+    SecurityIdentity verify(String username, char[] password, String requested, String host) {
         var account = accounts.findForAuthentication(username);
         if (account.isEmpty()) {
             passwordHasher.simulateVerification(password);
@@ -70,19 +76,34 @@ public class LocalIdentityProvider implements IdentityProvider<UsernamePasswordA
             // Registered, but the link sent to the address was not opened yet.
             throw new AuthenticationFailedException();
         }
-        return identityOf(found, requested, host);
+        if (found.isSuspended()) {
+            // Suspended by an administrator (MK-125).
+            throw new AuthenticationFailedException();
+        }
+        return identityOf(found, requested, host, null);
+    }
+
+    /** The organization of an identity built here, or {@code null}. */
+    static UUID organizationOf(SecurityIdentity identity) {
+        Object organization = identity.getAttribute(OrganizationAccess.ORGANIZATION_ATTRIBUTE);
+        return organization == null ? null : UUID.fromString(organization.toString());
     }
 
     /**
      * The identity of a local account, with its roles in the organization the request acts on;
      * shared with {@link SessionIdentityProvider}, so that a session has the same rights as Basic.
+     *
+     * @param session the session of the request (MK-125), or {@code null} for HTTP Basic
      */
-    SecurityIdentity identityOf(UserAccount found, String requested, String host) {
+    SecurityIdentity identityOf(UserAccount found, String requested, String host, UUID session) {
         var builder = QuarkusSecurityIdentity.builder()
                 .setPrincipal(new QuarkusPrincipal(found.getUsername()))
                 .addRoles(found.getRoles())
                 .addAttribute(
                         OrganizationAccess.ACCOUNT_ATTRIBUTE, found.getId().toString());
+        if (session != null) {
+            builder.addAttribute(SessionRegistry.ATTRIBUTE, session.toString());
+        }
         // The roles in an organization count only for the organization the request acts on (MK-017).
         access.forPassword(found.getId(), requested, host)
                 .ifPresent(organization -> builder.addRoles(organization.roles())
