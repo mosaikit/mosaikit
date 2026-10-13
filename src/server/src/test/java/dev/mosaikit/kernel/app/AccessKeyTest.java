@@ -250,7 +250,8 @@ class AccessKeyTest {
         asAdmin()
                 .get("/api/v1/audit-events?limit=50")
                 .then()
-                .body("find { it.action == 'account.access-key.refused' }.detail", containsString("read-only"));
+                .body("find { it.action == 'account.access-key.refused' }.detail", containsString("read-only"))
+                .body("find { it.action == 'account.access-key.refused' }.channel", equalTo("API_KEY"));
     }
 
     @Test

@@ -102,11 +102,12 @@ open sessions or manage keys.
   installation within `mosaikit.accounts.session-cache` (5 seconds by default).
 - Suspending a person revokes all their keys; removing them from an organization revokes their keys
   for it. Reactivated or added again, the person creates new keys.
-- Every request made with a key is in the audit log: `account.access-key.used` with the key, the
-  method and the path, or `account.access-key.refused` with the reason (`revoked`, `expired`,
-  `suspended`, `not-a-member`, `read-only`, `not-with-a-key`); `account.access-key.created` and
-  `account.access-key.revoked` record the actions of the person. The subject of the events is the
-  prefix of the key that people see in their list.
+- Every request made with a key is in the audit log, through the channel `API_KEY`:
+  `account.access-key.used` with the key, the method and the path, or `account.access-key.refused`
+  with the reason (`revoked`, `expired`, `suspended`, `not-a-member`, `read-only`,
+  `not-with-a-key`); `account.access-key.created` and `account.access-key.revoked` record the
+  actions of the person. The subject of the events is the prefix of the key that people see in
+  their list.
 - A service that receives keys from its callers, such as a gateway, checks one with `GET
   /api/v1/access-keys/current`, called with that key (see the [API](../development/api.md)).
 

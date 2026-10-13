@@ -14,7 +14,7 @@ import java.util.UUID;
 /**
  * The audit of personal access keys (MK-060): every request made with a key, accepted or refused,
  * is recorded with the key, the method and the path, also during authentication, outside of any
- * request. The secret never is.
+ * request, through the channel {@link AuditEvent.Channel#API_KEY} (MK-059). The secret never is.
  */
 @ApplicationScoped
 @ActivateRequestContext
@@ -81,6 +81,13 @@ public class AccessKeyAudit {
         if (reason != null) {
             detail.put("reason", reason);
         }
-        audit.append(actor, Optional.ofNullable(key.organizationId()), action, key.prefix(), outcome, detail);
+        audit.append(
+                AuditEvent.Channel.API_KEY,
+                actor,
+                Optional.ofNullable(key.organizationId()),
+                action,
+                key.prefix(),
+                outcome,
+                detail);
     }
 }
