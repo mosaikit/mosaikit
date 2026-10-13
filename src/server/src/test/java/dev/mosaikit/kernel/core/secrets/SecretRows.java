@@ -51,6 +51,22 @@ public final class SecretRows {
                 StandardCharsets.UTF_8);
     }
 
+    /** Seals a value of a credential of the installation (MK-127) under the former key. */
+    public static Row sealFormerOfInstallation(String name, String value) {
+        MasterKey former = KEYS.find(formerId()).orElseThrow();
+        SecretCipher.Sealed sealed = SecretCipher.seal(
+                former, SecretCipher.installationBinding(name), value.getBytes(StandardCharsets.UTF_8));
+        return new Row(sealed.keyId(), sealed.wrappedKey(), sealed.ciphertext());
+    }
+
+    /** The value of a row of the installation (MK-127), decrypted with the key it names. */
+    public static String openOfInstallation(String name, Row row) {
+        MasterKey key = KEYS.find(row.keyId()).orElseThrow();
+        return new String(
+                SecretCipher.open(key, SecretCipher.installationBinding(name), row.wrappedKey(), row.ciphertext()),
+                StandardCharsets.UTF_8);
+    }
+
     private static byte[] filled(int value) {
         byte[] bytes = new byte[SecretKeys.KEY_BYTES];
         Arrays.fill(bytes, (byte) value);

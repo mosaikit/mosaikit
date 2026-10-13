@@ -1164,6 +1164,25 @@ String summarize(String text) {
 - Tell the administrators in the documentation of the extension which names it reads, and of which
   kind.
 
+### Credentials of the installation
+
+Some credentials belong to no organization: the account of a server shared by the whole
+installation, a mail relay, a licence key. Platform administrators keep them in **Installation
+credentials** (MK-127). `resolve` reads the most specific credential with a name: the one of the
+organization of the request when the extension may read it, otherwise the one of the installation;
+outside any organization, such as in a scheduled job or a request without one, the one of the
+installation only. `find` and `require` keep to the organization, as before.
+
+```java
+Optional<SecretValue> relay = secrets.resolve("org.example.reports", "mail-relay");
+```
+
+The same rules apply: a credential of the installation meant for one extension is read by that
+extension only, values stay on the server, and every read is audited, a credential of the
+installation in the audit log of the platform (`secrets.read`, with `scope` `installation` and the
+organization of the request, if any). An organization that stores a credential with the same name
+replaces the one of the installation for itself: document which names may be set at either level.
+
 ## Rules
 
 - Import only `kernel-api`, the Jakarta APIs and the extensions provided by the kernel (Java) and

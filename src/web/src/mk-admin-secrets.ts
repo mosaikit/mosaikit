@@ -7,11 +7,13 @@ import { t } from './i18n.js';
 import {
   SECRET_KINDS,
   SecretList,
+  type SecretStore,
   audience,
   describeChange,
   emptyForm,
   formFor,
   kindLabel,
+  organizationSecrets,
   type SecretForm,
 } from './secrets.js';
 
@@ -117,7 +119,7 @@ export class MkAdminSecrets extends LitElement {
 
   override connectedCallback(): void {
     super.connectedCallback();
-    this.list = new SecretList(this.client, this.organization, {
+    this.list = new SecretList(this.secretStore(), {
       changed: () => {
         this.requestUpdate();
       },
@@ -129,15 +131,28 @@ export class MkAdminSecrets extends LitElement {
     void this.list.load();
   }
 
+  /** Where the credentials of this page are kept: the organization. */
+  protected secretStore(): SecretStore | undefined {
+    return organizationSecrets(this.client, this.organization);
+  }
+
+  /** The title of the page. */
+  protected heading(): string {
+    return t('Credentials');
+  }
+
+  /** What the page is for. */
+  protected introduction(): string {
+    return t(
+      'Keys and passwords with which the extensions of your organization call other services. They are encrypted, only the servers of the extensions read them, and nobody sees a value again after saving it.',
+    );
+  }
+
   override render(): unknown {
     const secrets = this.list?.secrets;
     return html`
-      <h1>${t('Credentials')}</h1>
-      <p>
-        ${t(
-          'Keys and passwords with which the extensions of your organization call other services. They are encrypted, only the servers of the extensions read them, and nobody sees a value again after saving it.',
-        )}
-      </p>
+      <h1>${this.heading()}</h1>
+      <p>${this.introduction()}</p>
       ${
         secrets === undefined
           ? nothing

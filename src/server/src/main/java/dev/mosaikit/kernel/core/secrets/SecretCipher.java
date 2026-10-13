@@ -58,6 +58,15 @@ final class SecretCipher {
         return ("mosaikit.secret.v1\u0000" + organization + "\u0000" + name).getBytes(StandardCharsets.UTF_8);
     }
 
+    /**
+     * The associated data that binds a ciphertext of the installation (MK-127) to its name, in a
+     * scope that no organization has: a row moved between the installation and an organization does
+     * not decrypt.
+     */
+    static byte[] installationBinding(String name) {
+        return ("mosaikit.installation-secret.v1\u0000" + name).getBytes(StandardCharsets.UTF_8);
+    }
+
     /** Encrypts a value under a new data key, and the data key under the master key. */
     static Sealed seal(MasterKey master, byte[] binding, byte[] value) {
         byte[] dataKey = new byte[DATA_KEY_BYTES];

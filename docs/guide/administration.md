@@ -406,6 +406,23 @@ replacement and deletion, and every read by an extension (`secrets.read`, channe
 the audit log under `secrets.`, without the value; values never appear in logs nor in error
 messages.
 
+### Credentials of the installation
+
+Some credentials belong to no organization: the account of a server shared by every organization, a
+mail relay, a licence key. Platform administrators keep them in **Installation credentials**, in the
+administration menu, or with `/api/v1/platform/credentials` (MK-127): the same fields, the same
+encryption and the same hints as the credentials of an organization. Extensions that read a
+credential by name with `resolve` get the one of the organization of the request when there is one
+they may read, otherwise the one of the installation, also where there is no organization, such as
+in a scheduled job. So an organization can use an account of its own instead of the shared one by
+storing a credential with the same name.
+
+Every change is in the audit log of the platform under `secrets.`, with `scope` `installation`, and
+every read by an extension too (`secrets.read`, with the organization of the request), without the
+value. The values are bound to the installation when encrypted, so a row moved between the
+installation and an organization does not decrypt. The table belongs to no organization: requests,
+and the SQL of extensions, have no right on it; only the kernel reads it.
+
 ### The master key
 
 Each value is encrypted with AES-256-GCM under a data key of its own, and the data key under the
@@ -434,8 +451,8 @@ kernels of an installation need the same keys.
    `mosaikit.secrets.previous-keys`; restart the kernels. New and replaced credentials use the new
    key; the others still decrypt with the old one.
 3. As a platform administrator, call `POST /api/v1/platform/secrets/re-encryption`: it encrypts the
-   data key of every credential, in every organization, under the new key, without decrypting the
-   values, and answers how many moved (`reEncrypted`) and how many it could not read (`unreadable`,
+   data key of every credential, in every organization and of the installation, under the new key,
+   without decrypting the values, and answers how many moved (`reEncrypted`) and how many it could not read (`unreadable`,
    when their key is missing from `previous-keys` or a row was altered). It is audited as
    `secrets.re-encrypted`.
 4. `GET /api/v1/platform/secrets/keys` lists how many credentials each key still holds, by an
