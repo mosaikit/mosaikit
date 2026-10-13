@@ -686,6 +686,80 @@ class PermissionsTest {
     }
 
     @Test
+    void anInvitationGivesTheProfileAndTheTeamsThatItsPreviewShowed() {
+        String builders = profile("Builders", null, CREATE);
+        String roads = team("Roads", ada);
+        in(boss, acme)
+                .put(admin(acme) + "/teams/{id}/{permission}", roads, ADD_ITEM)
+                .then()
+                .statusCode(200);
+        String newcomer = unique("invited") + "@example.org";
+        Map<String, Object> invitation = Map.of(
+                "roles",
+                List.of("organization-user"),
+                "displayName",
+                "New Comer",
+                "profile",
+                builders,
+                "teams",
+                List.of(roads));
+
+        in(boss, acme)
+                .body(Map.of("role", "organization-user", "profile", builders, "teams", List.of(roads)))
+                .post(admin(acme) + "/preview")
+                .then()
+                .body("permissions.id", contains(CREATE, ADD_ITEM));
+        // The administrators of the organization invite, signed in to it.
+        in(boss, acme)
+                .body(invitation)
+                .put("/api/v1/organizations/{slug}/members/{email}", acme, newcomer)
+                .then()
+                .statusCode(200)
+                .body("displayName", equalTo("New Comer"))
+                .body("roles", contains("organization-user"));
+        in(boss, acme)
+                .get(admin(acme) + "/members/{email}", newcomer)
+                .then()
+                .statusCode(200)
+                .body("profile.name", equalTo("Builders"))
+                .body("profileAssigned", equalTo(true))
+                .body("permissions.id", contains(CREATE, ADD_ITEM))
+                .body("permissions.find { it.id == '" + ADD_ITEM + "' }.sources[0].name", equalTo("Roads"));
+        in(boss, acme).get("/api/v1/organizations/{slug}/members", acme).then().body("username", hasItem(newcomer));
+
+        // Nothing is kept of an invitation that fails.
+        String other = unique("invited") + "@example.org";
+        in(boss, acme)
+                .body(Map.of("teams", List.of("00000000-0000-0000-0000-000000000001")))
+                .put("/api/v1/organizations/{slug}/members/{email}", acme, other)
+                .then()
+                .statusCode(404);
+        in(boss, acme).get("/api/v1/organizations/{slug}/members", acme).then().body("username", not(hasItem(other)));
+
+        // Only the administrators of the organization, signed in to it, and the platform administrators.
+        in(ada, acme).get("/api/v1/organizations/{slug}/members", acme).then().statusCode(403);
+        in(ada, acme)
+                .body(Map.of("roles", List.of("organization-admin")))
+                .put("/api/v1/organizations/{slug}/members/{email}", acme, ada)
+                .then()
+                .statusCode(403);
+        in(globexBoss, globex)
+                .get("/api/v1/organizations/{slug}/members", acme)
+                .then()
+                .statusCode(403);
+        in(boss, acme)
+                .delete("/api/v1/organizations/{slug}/members/{email}", acme, newcomer)
+                .then()
+                .statusCode(403);
+        // A platform administrator outside the organization gives roles, not profiles and teams.
+        asAdmin()
+                .body(Map.of("profile", builders))
+                .put("/api/v1/organizations/{slug}/members/{email}", acme, newcomer)
+                .then()
+                .statusCode(400);
+    }
+
+    @Test
     void everyChangeIsInTheAuditLog() {
         String builders = profile("Builders", null, CREATE);
         in(boss, acme)
