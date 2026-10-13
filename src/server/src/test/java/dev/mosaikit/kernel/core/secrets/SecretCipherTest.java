@@ -107,8 +107,9 @@ class SecretCipherTest {
                 .hasMessageContaining("mosaikit.secrets.master-key");
         assertThat(none.disabled().status()).isEqualTo(503);
 
-        SecretAdministration administration = new SecretAdministration(null, none, null, null, null);
+        SecretAdministration administration = new SecretAdministration(null, null, none, null, null, null);
         assertThatThrownBy(() -> administration.list(ACME)).isInstanceOf(ServiceUnavailableException.class);
+        assertThatThrownBy(administration::listInstallation).isInstanceOf(ServiceUnavailableException.class);
         assertThatThrownBy(() -> administration.store(ACME, new SecretRequest("a", "token", VALUE, null, null), "boss"))
                 .isInstanceOf(ServiceUnavailableException.class)
                 .hasMessageNotContaining(VALUE);
@@ -192,5 +193,31 @@ class SecretCipherTest {
                 return Optional.of(previous);
             }
         };
+    }
+
+    @Test
+    @Tag("MK-127")
+    void aValueOfTheInstallationIsBoundToTheScopeOfTheInstallation() {
+        SecretKeys keys = SecretKeys.of(SecretRows.CURRENT);
+        SecretCipher.Sealed sealed = SecretCipher.seal(
+                keys.current(), SecretCipher.installationBinding("shared"), VALUE.getBytes(StandardCharsets.UTF_8));
+        assertThat(new String(
+                        SecretCipher.open(
+                                keys.current(),
+                                SecretCipher.installationBinding("shared"),
+                                sealed.wrappedKey(),
+                                sealed.ciphertext()),
+                        StandardCharsets.UTF_8))
+                .isEqualTo(VALUE);
+        // Not under another name, nor as a credential of any organization.
+        assertThatThrownBy(() -> SecretCipher.open(
+                        keys.current(),
+                        SecretCipher.installationBinding("other"),
+                        sealed.wrappedKey(),
+                        sealed.ciphertext()))
+                .isInstanceOf(SecretCipher.UnreadableException.class);
+        assertThatThrownBy(() -> SecretCipher.open(
+                        keys.current(), SecretCipher.binding(ACME, "shared"), sealed.wrappedKey(), sealed.ciphertext()))
+                .isInstanceOf(SecretCipher.UnreadableException.class);
     }
 }

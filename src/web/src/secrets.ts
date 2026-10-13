@@ -114,27 +114,73 @@ function reason(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** Where credentials are kept: an organization (MK-062) or the installation (MK-127). */
+export interface SecretStore {
+  list(): Promise<Secret[]>;
+  store(draft: SecretDraft): Promise<Secret>;
+  replace(name: string, draft: SecretDraft): Promise<Secret>;
+  remove(name: string): Promise<void>;
+}
+
+/** The credentials of an organization, for its administrators; none without a client or organization. */
+export function organizationSecrets(
+  client:
+    Pick<KernelClient, 'secrets' | 'storeSecret' | 'replaceSecret' | 'deleteSecret'> | undefined,
+  organization: string | undefined,
+): SecretStore | undefined {
+  if (!client || !organization) {
+    return undefined;
+  }
+  return {
+    list: () => client.secrets(organization),
+    store: (draft) => client.storeSecret(organization, draft),
+    replace: (name, draft) => client.replaceSecret(organization, name, draft),
+    remove: (name) => client.deleteSecret(organization, name),
+  };
+}
+
+/** The credentials of the installation, for platform administrators (MK-127). */
+export function installationSecrets(
+  client:
+    | Pick<
+        KernelClient,
+        | 'installationSecrets'
+        | 'storeInstallationSecret'
+        | 'replaceInstallationSecret'
+        | 'deleteInstallationSecret'
+      >
+    | undefined,
+): SecretStore | undefined {
+  if (!client) {
+    return undefined;
+  }
+  return {
+    list: () => client.installationSecrets(),
+    store: (draft) => client.storeInstallationSecret(draft),
+    replace: (name, draft) => client.replaceInstallationSecret(name, draft),
+    remove: (name) => client.deleteInstallationSecret(name),
+  };
+}
+
 /**
- * The credentials of an organization for its administrators (MK-062), without the view: reads them,
- * stores, replaces and deletes one, and says what happened. Values only go to the kernel; nothing
- * here keeps one after it is sent.
+ * The credentials of an organization for its administrators (MK-062), or of the installation for
+ * platform administrators (MK-127), without the view: reads them, stores, replaces and deletes one,
+ * and says what happened. Values only go to the kernel; nothing here keeps one after it is sent.
  */
 export class SecretList {
   secrets: readonly Secret[] | undefined;
 
   constructor(
-    private readonly client:
-      Pick<KernelClient, 'secrets' | 'storeSecret' | 'replaceSecret' | 'deleteSecret'> | undefined,
-    private readonly organization: string | undefined,
+    private readonly store: SecretStore | undefined,
     private readonly events: SecretListEvents,
   ) {}
 
   async load(): Promise<void> {
-    if (!this.client || !this.organization) {
+    if (!this.store) {
       return;
     }
     try {
-      this.secrets = await this.client.secrets(this.organization);
+      this.secrets = await this.store.list();
     } catch (error) {
       this.events.announce(
         t('The credentials cannot be read: {reason}', { reason: reason(error) }),
@@ -149,7 +195,7 @@ export class SecretList {
    * whatever happens. Answers whether it was saved.
    */
   async save(form: SecretForm, replacing: boolean): Promise<boolean> {
-    if (!this.client || !this.organization) {
+    if (!this.store) {
       return false;
     }
     const problems = checkForm(form, replacing);
@@ -161,8 +207,8 @@ export class SecretList {
     form.value = '';
     try {
       const saved = replacing
-        ? await this.client.replaceSecret(this.organization, form.name, draft)
-        : await this.client.storeSecret(this.organization, draft);
+        ? await this.store.replace(form.name, draft)
+        : await this.store.store(draft);
       const others = (this.secrets ?? []).filter((secret) => secret.name !== saved.name);
       this.secrets = [...others, saved].sort((a, b) => a.name.localeCompare(b.name));
       this.events.announce(
@@ -180,11 +226,11 @@ export class SecretList {
   }
 
   async remove(secret: Secret): Promise<void> {
-    if (!this.client || !this.organization) {
+    if (!this.store) {
       return;
     }
     try {
-      await this.client.deleteSecret(this.organization, secret.name);
+      await this.store.remove(secret.name);
     } catch (error) {
       this.events.announce(
         t('The credential was not deleted: {reason}', { reason: reason(error) }),

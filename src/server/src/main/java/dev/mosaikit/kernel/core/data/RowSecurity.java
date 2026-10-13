@@ -75,6 +75,7 @@ public class RowSecurity {
             }
             appendOnly(statement, name);
             readOnly(statement, name);
+            ownerOnly(statement, name);
             role = name;
             LOG.infof("Row-level security on: requests of organizations run as role %s", name);
         } catch (SQLException e) {
@@ -154,6 +155,19 @@ public class RowSecurity {
             // nosemgrep: java.lang.security.audit.formatted-sql-string.formatted-sql-string
             statement.execute("revoke insert, update, delete, truncate on " + s + "." + quote(table) + " from " + r);
         }
+    }
+
+    /*
+     * The credentials of the installation (MK-127) belong to no organization: the member role, and so
+     * every request and the SQL of every extension, has no right on them; only the kernel reads them,
+     * as the owner. The table has row-level security without a policy too, so a grant added by mistake
+     * still shows no row.
+     */
+    private void ownerOnly(Statement statement, String role) throws SQLException {
+        String r = quote(role);
+        String s = quote(kernelSchema);
+        // nosemgrep: java.lang.security.audit.formatted-sql-string.formatted-sql-string
+        statement.execute("revoke all on " + s + ".installation_secret from " + r);
     }
 
     private static String database(Connection connection) throws SQLException {

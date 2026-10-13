@@ -502,6 +502,7 @@ function tabStorage(): KeyValueStore | undefined {
 
 /** The service identities of the installation (MK-124). */
 const SERVICE_IDENTITIES = '/api/v1/platform/service-identities';
+const INSTALLATION_SECRETS = '/api/v1/platform/credentials';
 
 /**
  * Minimal client of the kernel API. A local account signs in once: the kernel keeps the session
@@ -694,6 +695,27 @@ export class KernelClient {
 
   async deleteSecret(slug: string, name: string): Promise<void> {
     await this.sendJson<undefined>(`${secretsPath(slug)}/${encodeURIComponent(name)}`, 'DELETE');
+  }
+
+  /** The credentials of the installation, without their values, for platform administrators (MK-127). */
+  installationSecrets(): Promise<Secret[]> {
+    return this.getJson<Secret[]>(INSTALLATION_SECRETS);
+  }
+
+  storeInstallationSecret(draft: SecretDraft): Promise<Secret> {
+    return this.sendJson<Secret>(INSTALLATION_SECRETS, 'POST', draft);
+  }
+
+  replaceInstallationSecret(name: string, draft: SecretDraft): Promise<Secret> {
+    return this.sendJson<Secret>(
+      `${INSTALLATION_SECRETS}/${encodeURIComponent(name)}`,
+      'PUT',
+      draft,
+    );
+  }
+
+  async deleteInstallationSecret(name: string): Promise<void> {
+    await this.sendJson<undefined>(`${INSTALLATION_SECRETS}/${encodeURIComponent(name)}`, 'DELETE');
   }
 
   /** The permissions of the signed-in person in the organization, `<extension>:<permission>` (MK-056). */

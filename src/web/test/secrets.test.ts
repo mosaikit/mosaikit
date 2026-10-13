@@ -12,7 +12,9 @@ import {
   draftOf,
   emptyForm,
   formFor,
+  installationSecrets,
   kindLabel,
+  organizationSecrets,
 } from '../src/secrets.js';
 
 const VALUE = 'sk-acme-0123456789-abcdefghij';
@@ -119,7 +121,7 @@ describe('the credentials of the organization (MK-062)', () => {
   it('reads, stores, replaces and deletes credentials, forgetting the value', async () => {
     const kernel = client();
     const told = events();
-    const list = new SecretList(kernel, 'acme', told);
+    const list = new SecretList(organizationSecrets(kernel, 'acme'), told);
 
     await list.load();
     expect(kernel.secrets).toHaveBeenCalledWith('acme');
@@ -171,7 +173,7 @@ describe('the credentials of the organization (MK-062)', () => {
       deleteSecret: vi.fn(() => Promise.reject(new Error('No credential named model-provider'))),
     });
     const told = events();
-    const list = new SecretList(kernel, 'acme', told);
+    const list = new SecretList(organizationSecrets(kernel, 'acme'), told);
 
     await list.load();
     expect(told.announce).toHaveBeenLastCalledWith(
@@ -203,7 +205,7 @@ describe('the credentials of the organization (MK-062)', () => {
 
   it('does nothing without a client or an organization', async () => {
     const told = events();
-    const list = new SecretList(undefined, undefined, told);
+    const list = new SecretList(organizationSecrets(undefined, undefined), told);
     await list.load();
     expect(await list.save({ ...emptyForm(), name: 'a', value: VALUE }, false)).toBe(false);
     await list.remove(PROVIDER);
@@ -240,5 +242,83 @@ describe('the credentials of the organization (MK-062)', () => {
       kind: 'password',
       value: VALUE,
     });
+  });
+});
+
+describe('the credentials of the installation (MK-127)', () => {
+  function platform() {
+    return {
+      installationSecrets: vi.fn(() => Promise.resolve([PROVIDER])),
+      storeInstallationSecret: vi.fn((draft: SecretDraft) =>
+        Promise.resolve({ ...DATABASE, name: draft.name ?? '', kind: draft.kind }),
+      ),
+      replaceInstallationSecret: vi.fn((name: string, draft: SecretDraft) =>
+        Promise.resolve({ ...PROVIDER, name, kind: draft.kind }),
+      ),
+      deleteInstallationSecret: vi.fn(() => Promise.resolve()),
+    };
+  }
+
+  it('reads, stores, replaces and deletes them through the store of the installation', async () => {
+    const kernel = platform();
+    const told = events();
+    const list = new SecretList(installationSecrets(kernel), told);
+
+    await list.load();
+    expect(kernel.installationSecrets).toHaveBeenCalledWith();
+    expect(list.secrets).toEqual([PROVIDER]);
+
+    const form = { ...emptyForm(), name: 'mail-relay', kind: 'password' as const, value: VALUE };
+    expect(await list.save(form, false)).toBe(true);
+    expect(form.value).toBe('');
+    expect(kernel.storeInstallationSecret).toHaveBeenCalledWith({
+      name: 'mail-relay',
+      kind: 'password',
+      value: VALUE,
+      description: '',
+      extension: null,
+    });
+
+    expect(await list.save({ ...formFor(PROVIDER), kind: 'key' }, true)).toBe(true);
+    expect(kernel.replaceInstallationSecret).toHaveBeenCalledWith('model-provider', {
+      kind: 'key',
+      description: 'The model provider',
+      extension: 'org.example.reports',
+    });
+
+    await list.remove(PROVIDER);
+    expect(kernel.deleteInstallationSecret).toHaveBeenCalledWith('model-provider');
+    expect(list.secrets?.map((secret) => secret.name)).toEqual(['mail-relay']);
+    expect(told.announce.mock.calls.flat().join(' ')).not.toContain(VALUE);
+  });
+
+  it('has no store without a client', () => {
+    expect(installationSecrets(undefined)).toBeUndefined();
+  });
+
+  it('calls the endpoints of the platform', async () => {
+    const fetchMock = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>(() =>
+      Promise.resolve(
+        new Response(JSON.stringify(PROVIDER), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    );
+    const kernel = new KernelClient(fetchMock, undefined);
+
+    await kernel.installationSecrets();
+    await kernel.storeInstallationSecret({ name: 'mail-relay', kind: 'password', value: VALUE });
+    await kernel.replaceInstallationSecret('mail relay', { kind: 'token' });
+    fetchMock.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    await kernel.deleteInstallationSecret('mail-relay');
+
+    const calls = fetchMock.mock.calls.map(([path, init]) => `${init?.method ?? ''} ${path}`);
+    expect(calls).toEqual([
+      'GET /api/v1/platform/credentials',
+      'POST /api/v1/platform/credentials',
+      'PUT /api/v1/platform/credentials/mail%20relay',
+      'DELETE /api/v1/platform/credentials/mail-relay',
+    ]);
   });
 });

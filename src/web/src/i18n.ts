@@ -279,6 +279,10 @@ const ITALIAN: Record<string, string> = {
   'Credential {name} stored.': 'Credenziale {name} salvata.',
   'The credential was not deleted: {reason}': 'La credenziale non è stata eliminata: {reason}',
   'Credential {name} deleted.': 'Credenziale {name} eliminata.',
+  // Credentials of the installation (MK-127)
+  'Installation credentials': "Credenziali dell'installazione",
+  'Keys and passwords of services shared by every organization, such as a mail relay or the account of a shared server. The extensions of every organization read them on their servers, unless the organization keeps a credential with the same name. They are encrypted, and nobody sees a value again after saving it.':
+    "Chiavi e password di servizi condivisi da tutte le organizzazioni, come un relay di posta o l'account di un server condiviso. Le leggono sui loro server le estensioni di ogni organizzazione, a meno che l'organizzazione non abbia una credenziale con lo stesso nome. Sono cifrate, e nessuno rivede un valore dopo averlo salvato.",
   // Quotas of the organization (MK-076)
   Quotas: 'Quote',
   'What your organization keeps and uses of each measure, against its limit. The figures are current: they change with every action.':

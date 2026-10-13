@@ -36,6 +36,7 @@ import { MkAdminPermissions } from './mk-admin-permissions.js';
 import { MkAdminQuotas } from './mk-admin-quotas.js';
 import { MkAdminSecrets } from './mk-admin-secrets.js';
 import './mk-admin-services.js';
+import './mk-admin-installation-secrets.js';
 import './mk-admin-settings.js';
 import './mk-assistant.js';
 import './mk-extension-frame.js';
@@ -62,7 +63,8 @@ const EXTENSION_WATCH_MS = 1_000;
 /**
  * The pages of administrators: the apps, the permissions, the credentials and the quotas of the
  * organization for its administrators (MK-030, MK-056, MK-062, MK-076), the extensions (MK-022),
- * the platform (MK-048) and the service identities (MK-124) for platform administrators.
+ * the platform (MK-048), the service identities (MK-124) and the credentials of the installation
+ * (MK-127) for platform administrators.
  */
 const ADMIN_PAGES = [
   {
@@ -105,6 +107,12 @@ const ADMIN_PAGES = [
     path: '/admin/services',
     title: 'Service identities',
     element: 'mk-admin-services',
+    role: 'platform-admin',
+  },
+  {
+    path: '/admin/installation-credentials',
+    title: 'Installation credentials',
+    element: 'mk-admin-installation-secrets',
     role: 'platform-admin',
   },
 ] as const;

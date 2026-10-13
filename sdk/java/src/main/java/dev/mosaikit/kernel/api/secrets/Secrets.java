@@ -12,10 +12,18 @@ import java.util.Optional;
  * name, on the server, at the moment of the call, and never sends it to the browser nor writes it
  * into a document, a log or an error message.
  *
- * <p>The kernel provides this bean to extensions. Every method acts on the organization of the
- * request ({@link dev.mosaikit.kernel.api.context.CurrentOrganization}): an extension reads the
- * credentials of that organization only, whoever the person of the request is, and the
- * administrators of the organization decide what is there.
+ * <p>The kernel provides this bean to extensions. {@link #find} and {@link #require} act on the
+ * organization of the request ({@link dev.mosaikit.kernel.api.context.CurrentOrganization}): an
+ * extension reads the credentials of that organization only, whoever the person of the request is,
+ * and the administrators of the organization decide what is there.
+ *
+ * <p><strong>Credentials of the installation</strong> (MK-127). Some credentials belong to no
+ * organization: the account of a service shared by the whole installation, a mail relay, a licence
+ * key. The platform administrators keep them, encrypted the same way. {@link #resolve} reads the most
+ * specific credential with a name: the one of the organization of the request when the extension may
+ * read it, otherwise the one of the installation; outside any organization, such as in a scheduled
+ * job, the one of the installation. The same rules apply: a credential meant for one extension is read
+ * by that extension only, and every read is audited.
  *
  * <p><strong>The caller names its extension.</strong> All Java extensions run in the same process, so
  * the calling extension names itself in every call, as {@code Notifications.send} does. The kernel
@@ -66,5 +74,25 @@ public interface Secrets {
         return find(extension, name)
                 .orElseThrow(() -> new NoSuchElementException(
                         "No credential named " + name + " for " + extension + " in the organization."));
+    }
+
+    /**
+     * The value of the most specific credential with this name that the extension may read (MK-127):
+     * the one of the organization of the request, otherwise the one of the installation. Outside any
+     * organization (a request without one, a scheduled job) it reads the credential of the
+     * installation only.
+     *
+     * <p>A kernel without credentials of the installation answers as {@link #find}.
+     *
+     * @param extension identifier of the calling extension
+     * @param name the name the administrators gave the credential
+     * @return empty when neither the organization nor the installation has a credential with this name
+     *     that the extension may read
+     * @throws IllegalArgumentException when {@code extension} is not an active extension
+     * @throws SecretsUnavailableException when the installation has no master key, or the
+     *     credential cannot be decrypted with its keys
+     */
+    default Optional<SecretValue> resolve(String extension, String name) {
+        return find(extension, name);
     }
 }
