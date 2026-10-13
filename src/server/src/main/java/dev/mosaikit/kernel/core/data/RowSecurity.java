@@ -122,6 +122,10 @@ public class RowSecurity {
         statement.execute("revoke update, delete, truncate on " + s + ".audit_event from " + r);
         // nosemgrep: java.lang.security.audit.formatted-sql-string.formatted-sql-string
         statement.execute("revoke all on " + s + ".audit_chain from " + r);
+        // The external origins of the content security policy (MK-128) are of the installation: no
+        // request, and no SQL of an extension, may read or widen them; only the kernel, as the owner.
+        // nosemgrep: java.lang.security.audit.formatted-sql-string.formatted-sql-string
+        statement.execute("revoke all on " + s + ".csp_origin from " + r);
     }
 
     /**

@@ -25,6 +25,9 @@ public interface KernelConfig {
     /** Federated sign-in through Keycloak (MK-012). */
     Identity identity();
 
+    /** The content security policy of the shell (MK-128). */
+    ContentSecurityPolicy contentSecurityPolicy();
+
     /** Catalogs of extensions to install from (MK-022). */
     Marketplace marketplace();
 
@@ -497,5 +500,20 @@ public interface KernelConfig {
          * is created and a warning is logged.
          */
         Optional<String> adminPassword();
+    }
+
+    /** The content security policy of the shell and of the other answers of the kernel (MK-128). */
+    interface ContentSecurityPolicy {
+
+        /** Whether the kernel sends the policy; on in production, off in development and tests. */
+        @WithDefault("false")
+        boolean enabled();
+
+        /**
+         * External origins that the browser may contact for images, data and tiles, as {@code
+         * scheme://host[:port]}, in addition to those that platform administrators list; added to {@code
+         * connect-src} and {@code img-src}. The kernel does not start with one it does not accept.
+         */
+        Optional<List<String>> allowedOrigins();
     }
 }

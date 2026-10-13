@@ -37,6 +37,22 @@ export interface PlatformSettings {
   readonly registration: boolean;
 }
 
+/** An external origin of the content security policy (MK-128), and where it comes from. */
+export interface AllowedOrigin {
+  readonly origin: string;
+  readonly source: 'CONFIGURATION' | 'ADMINISTRATION';
+  readonly addedAt: string | null;
+  readonly addedBy: string | null;
+}
+
+/** The content security policy of the shell, for platform administrators (MK-128). */
+export interface ContentSecurityPolicy {
+  /** Whether the kernel sends the policy (in production). */
+  readonly enabled: boolean;
+  readonly policy: string;
+  readonly origins: AllowedOrigin[];
+}
+
 /** A live session of the signed-in person, kept by the kernel (MK-125). */
 export interface AccountSession {
   readonly id: string;
@@ -503,6 +519,7 @@ function tabStorage(): KeyValueStore | undefined {
 /** The service identities of the installation (MK-124). */
 const SERVICE_IDENTITIES = '/api/v1/platform/service-identities';
 const INSTALLATION_SECRETS = '/api/v1/platform/credentials';
+const CONTENT_SECURITY_POLICY = '/api/v1/platform/content-security-policy';
 
 /**
  * Minimal client of the kernel API. A local account signs in once: the kernel keeps the session
@@ -911,6 +928,22 @@ export class KernelClient {
 
   changePlatformSettings(settings: PlatformSettings): Promise<PlatformSettings> {
     return this.sendJson<PlatformSettings>('/api/v1/platform/settings', 'PUT', settings);
+  }
+
+  /** The external origins of the content security policy (MK-128). */
+  contentSecurityPolicy(): Promise<ContentSecurityPolicy> {
+    return this.getJson<ContentSecurityPolicy>(CONTENT_SECURITY_POLICY);
+  }
+
+  allowOrigin(origin: string): Promise<AllowedOrigin> {
+    return this.sendJson<AllowedOrigin>(`${CONTENT_SECURITY_POLICY}/origins`, 'POST', { origin });
+  }
+
+  async disallowOrigin(origin: string): Promise<void> {
+    await this.sendJson<undefined>(
+      `${CONTENT_SECURITY_POLICY}/origins?origin=${encodeURIComponent(origin)}`,
+      'DELETE',
+    );
   }
 
   private async send(path: string, body: unknown): Promise<void> {

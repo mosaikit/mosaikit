@@ -50,6 +50,23 @@ sessions are removed every 15 minutes.
 Terminate TLS at a reverse proxy or an ingress; in production the kernel sends
 `Strict-Transport-Security` and a `Content-Security-Policy`.
 
+## Content security policy
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `mosaikit.content-security-policy.enabled` | `true` in production, `false` in development and tests | whether the kernel sends its `Content-Security-Policy` with every answer |
+| `mosaikit.content-security-policy.allowed-origins` | | comma-separated external origins that the browser may contact for images, data and tiles (MK-128), as `scheme://host[:port]`, in addition to those that platform administrators list in **External origins**; the kernel does not start with one it does not accept |
+
+The policy lets the browser load and contact the installation only, and Keycloak for sign-in. An
+allowed origin is added to `connect-src` (what scripts read with `fetch`, XHR and WebSocket, such as
+data and vector tiles, also from workers) and `img-src` (images, such as raster tiles), never to the
+directives of scripts, styles, frames or workers: an external service gives data to read, never code
+to run. An origin is a scheme (`https`, `wss`, `http` or `ws`), a host, a DNS name or an IPv4 address,
+and an optional port; one leading `*.` stands for the sub-domains of a name of two labels or more
+(`https://*.tiles.example.org`). Paths, other wildcards, schemes alone such as `https:`, `data:`,
+`blob:` and keywords are refused. The browser still applies its own rules: the service must allow
+cross-origin reads (CORS) for data, and an `http` origin is blocked from a shell served with `https`.
+
 ## Identity
 
 | Setting | Default | Meaning |
