@@ -291,7 +291,7 @@ public class FileLinks {
                     AuditEvent.Outcome.SUCCEEDED,
                     detail);
         }
-        return files.new Content(found.file(), found.key());
+        return files.signed(found.file(), found.key());
     }
 
     private void created(Made made, Map<String, String> what) {

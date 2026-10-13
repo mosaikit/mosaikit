@@ -281,6 +281,14 @@ public class FileService {
     }
 
     /**
+     * The content of a file found without the person of the request, through a signed link that the
+     * caller verified (MK-093). Through this bean, so that the content reads its own store.
+     */
+    Content signed(FileView file, String key) {
+        return new Content(file, key);
+    }
+
+    /**
      * Checks that the person may make a link to every file of an extension under a prefix (MK-093):
      * those of one of their teams, or, unless a guest, those of the organization.
      *

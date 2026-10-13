@@ -23,6 +23,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import javax.crypto.Mac;
@@ -187,6 +188,18 @@ class SignedFileLinksTest {
 
         // The same file stays unreachable without a link.
         given().get(FILES + "/" + id + "/content").then().statusCode(401);
+
+        // Making the link is audited; its use once in the hour, not at every download.
+        List<Map<String, Object>> events = asAdmin()
+                .get("/api/v1/audit-events?limit=500")
+                .then()
+                .extract()
+                .path("findAll { it.subject == '" + id + "' }");
+        assertThat(events)
+                .extracting(event -> event.get("action"))
+                .containsExactlyInAnyOrder("file.stored", "file.link.created", "file.link.used");
+        String signature = url.substring(url.indexOf("signature=") + "signature=".length());
+        assertThat(events.toString()).doesNotContain(signature);
     }
 
     @Test
@@ -262,7 +275,9 @@ class SignedFileLinksTest {
                 .then()
                 .statusCode(404);
         nobody().get(path).then().statusCode(404);
-        nobody().get(path + "?expires=" + expires + "&signature=%%%").then().statusCode(404);
+        nobody().get(path + "?expires=" + expires + "&signature=not.base64!")
+                .then()
+                .statusCode(404);
 
         // Well signed but expired.
         long past = Instant.now().minusSeconds(60).getEpochSecond();

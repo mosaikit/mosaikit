@@ -18,6 +18,14 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Signed, expiring links to the files of extensions (MK-093): `POST /api/v1/files/{extension}/links`
+  makes a link to a file the person reads, or to every file under a prefix of names of the
+  organization or of one of their teams, valid at most `mosaikit.files.link-max-validity` (7 days);
+  `/api/v1/files/signed/...` serves its files without a session, with ranges and cache validators,
+  and answers 404 alike for an expired or altered link. Links are stateless, signed with
+  HMAC-SHA256 by `mosaikit.files.link-key` or a key derived from the master key of the store of
+  credentials, with former keys accepted during a rotation (migration V26). Making a link is
+  audited, and its use once an hour.
 - Files of extensions (MK-041): the kernel keeps them in a directory of the server (the default,
   `files/` of the installation, `data/files/` of the portable, a volume in compose and Helm) or in a
   bucket of an S3-compatible object store such as Amazon S3, MinIO, Ceph or Garage
