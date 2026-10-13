@@ -27,16 +27,17 @@ Estimates are in weeks of 30 hours.
 |---|---|---|---|---|---|
 | F0 Lean development | | Development without manual infrastructure, fast and full CI lanes, data API for frontend-only extensions, changed extensions shown at once in development | MK-046 | 1 | done |
 | F1 Shell | 0.2 | UI kit on Fluent UI with the theme for public administrations; sign-in page with "remember me"; local registration confirmed by mail, which administrators turn off; shell like Teams (app bar, top bar, menu of the person); settings; apps per organization; progressive web app | MK-026, MK-047, MK-048, MK-025, MK-027, MK-030; MK-028, MK-029 | 4–5 | done |
-| F2 Collaboration | 0.3 | Real-time channel, teams as groups with guests, presence, activity feed, `app-teams` (channels, posts, threads, mentions, reactions, tabs), `app-chat`, the assistant as a bot | MK-031, MK-032, MK-034, MK-035, MK-036, MK-038; MK-033, MK-037 | 7–9 | in progress: MK-031, MK-032, MK-034, MK-035, MK-036, MK-038 done |
-| F3 Search and push | 0.4 | Global search with pills and providers of the extensions; push notifications of the browser | MK-040; MK-039 | 3–4 | |
-| F4 Files | 0.5 | S3-compatible storage and file service, `app-files` with files of teams, channels and chats, connectors `ext-files-*` (WebDAV and Nextcloud first, then GeoNode, CKAN, S3), retention with audit | MK-041, MK-042, MK-044; MK-043 | 4–5 | |
-| F5 Apps of Geoportal and verticals | 0.6 | `app-data`, `app-maps`, `app-dashboards`, `app-processes` ported from Geoportal, as apps of the app bar and tabs of the channels; mockups of the verticals Citizy (smart city: the management of a city) and Searen (identification and collection of oil spills at sea) built on them | in the repositories of the apps | 8–12 | |
-| Later | | Calendar, eDiscovery, online editing of documents, meetings, OpenSearch | MK-045 | | |
+| F2 Collaboration | 0.3 | Real-time channel, teams as groups with guests, activity feed, `app-teams` (channels, posts, threads, mentions, reactions, tabs), `app-chat` | MK-031, MK-032, MK-034, MK-035, MK-036, MK-038 | 7–9 | done |
+| F3 Search | 0.4 | Global search with pills and providers of the extensions | MK-040 | 2–3 | |
+| F4 Resources, sharing and permissions | 0.5 | Registry of the resources of extensions; permissions declared by manifests and granted through profiles, groups and people; one sharing model (person, group, organization, link, public); audit log; personal access keys; secrets store; quotas; S3-compatible storage and file service | MK-054, MK-056, MK-055, MK-059, MK-060, MK-062, MK-076, MK-041 | | |
+| F5 Console | 0.6 | Administration of platform and organizations on one model, home of widgets, list and empty-state patterns, branding per organization, deep links, tags, embedding, favorites, trash, versions, access requests, transfer of resources | MK-072, MK-101, MK-105, MK-074, MK-099, MK-097, MK-100, MK-094, MK-095, MK-096, MK-058, MK-071 | | |
+| F6 Events, mail, files and collaboration | 0.7 | Platform events for extension backends, outgoing mail, notifications by mail; `app-files` with files of teams, channels and chats, connectors `ext-files-*`, retention with audit; presence; the assistant as a bot | MK-085, MK-087, MK-088, MK-042, MK-043, MK-044, MK-033, MK-037 | | |
+| F7 Distributions | 0.8 | Companion services started by the portable launcher, single-organization mode | MK-121, MK-073 | | |
+| Later | | Push notifications, calendar, and the other proposed requirements | MK-039, MK-045, and the `proposed` ones in `docs/requirements` | | |
 
-In each row the requirements before the semicolon are needed for the release; the others (P2) can
-move to the next release without blocking it. At 30 hours a week F1 to F5 take about 26 to 35
-weeks: with F1 started in October 2026, the release 0.6 with the apps of Geoportal and the mockups
-of the verticals falls between April and June 2027.
+The phases are kept in step with the products built on Mosaikit, which need F4 and F5 first; a
+requirement is `planned` when it is in a phase, and `proposed` while it waits. Estimates of the new
+phases come when they start.
 
 ## In every phase
 
@@ -54,10 +55,11 @@ of the verticals falls between April and June 2027.
 - **F2.** Real-time channel (MK-031) and groups (MK-032) first: everything else needs them. Then
   the activity feed (MK-038), `app-chat` (MK-036), which is smaller and proves the real-time path,
   then `app-teams` (MK-034, MK-035), presence and the bot.
-- **F4.** Storage and file service (MK-041) before `app-files`; the connector to WebDAV first,
-  because Nextcloud and many document services speak it.
-- **F5.** The apps of Geoportal one at a time, `app-data` first; the verticals Citizy and Searen
-  as mockups made of those apps and of frontend-only extensions.
+- **F4.** The registry of resources (MK-054) first: sharing, favorites, trash, versions, tags and
+  search of resources all build on it. Then permissions (MK-056) and sharing (MK-055), then the
+  rest.
+- **F6.** Storage and file service (MK-041, in F4) before `app-files`; the connector to WebDAV
+  first, because Nextcloud and many document services speak it.
 
 ## Repositories
 
