@@ -30,13 +30,23 @@ describe('extension manifest schema', () => {
     expect(valid).toBe(true);
   });
 
-  it('MK-055 MK-056: accepts permissions and resource types with their sharing levels', () => {
+  it('MK-055 MK-056 MK-076: accepts permissions, measures and resource types with their sharing levels', () => {
     const manifest = {
       id: 'dev.example.dashboards',
       version: '1.0.0',
       name: 'Dashboards',
       kind: 'app',
       platform: '>=0.1',
+      measures: [
+        {
+          id: 'renders',
+          label: 'Renders',
+          unit: 'renders',
+          kind: 'counter',
+          i18n: { it: { label: 'Rendering' } },
+        },
+        { id: 'tiles', label: 'Tiles', unit: 'bytes', kind: 'gauge' },
+      ],
       permissions: [
         {
           name: 'create-dashboard',
@@ -87,6 +97,18 @@ describe('extension manifest schema', () => {
     [
       'MK-056: a translation of a permission attribute that is not a text',
       { permissions: [{ name: 'export', title: 'x', i18n: { it: { icon: 'x' } } }] },
+    ],
+    [
+      'MK-076: a measure without kind',
+      { measures: [{ id: 'renders', label: 'Renders', unit: 'renders' }] },
+    ],
+    [
+      'MK-076: a measure that is neither a counter nor a gauge',
+      { measures: [{ id: 'renders', label: 'Renders', unit: 'renders', kind: 'rate' }] },
+    ],
+    [
+      'MK-076: a unit with spaces',
+      { measures: [{ id: 'credits', label: 'Credits', unit: 'AI credits', kind: 'counter' }] },
     ],
     ['MK-055: a resource type without levels', { resources: [{ type: 'dashboard', title: 'x' }] }],
     [
