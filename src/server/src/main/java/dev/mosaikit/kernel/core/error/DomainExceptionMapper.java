@@ -13,12 +13,15 @@ public class DomainExceptionMapper implements ExceptionMapper<DomainException> {
 
     @Override
     public Response toResponse(DomainException exception) {
+        QuotaExceededException.Quota quota =
+                exception instanceof QuotaExceededException exceeded ? exceeded.quota() : null;
         var problem = new ProblemDetail(
                 "about:blank",
                 exception.title(),
                 exception.status(),
                 exception.getMessage(),
-                exception instanceof InvalidInputException invalid ? invalid.fieldErrors() : List.of());
+                exception instanceof InvalidInputException invalid ? invalid.fieldErrors() : List.of(),
+                quota);
         return Response.status(exception.status())
                 .type(ProblemDetail.MEDIA_TYPE)
                 .entity(problem)

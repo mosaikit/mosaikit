@@ -499,6 +499,40 @@ the former keys, stops every link it signed: the way to revoke all links after a
 from the master key rotates with it: the former master keys in `mosaikit.secrets.previous-keys` keep
 their links working.
 
+## Quotas of organizations
+
+The kernel measures what each organization consumes and refuses what would pass its limits
+(MK-076). A measure is either a **gauge**, what the organization keeps now, or a **counter**, what
+it uses in a calendar month (UTC), from zero at the start of each month. The kernel has one measure
+of its own, **storage**, a gauge in bytes: the files of the organization and the space that its
+extensions report for their resources. Extensions may declare their own measures, such as calls to
+a service or the credits of a model.
+
+A limit comes from one of two places:
+
+- the **default of the installation**, the same for every organization, in the settings:
+  `mosaikit.quotas.storage=10G`, and `mosaikit.quotas.limits."<extension>/<measure>"=1000` for a
+  measure of an extension (see [configuration](configuration.md#quotas));
+- a **limit of the organization**, which a platform administrator sets over the default, on the
+  **Quotas** page of the organization or with
+  `PUT /api/v1/organizations/{slug}/quotas/{measure}` (`{"limit": n}`, or `{"limit": null}` for no
+  limit whatever the default); removing it brings the default back.
+
+Without either, the measure has no limit. A limit is never applied to what is already kept: an
+organization above its storage limit keeps its files, deletes some to make room, and may not add
+more until then. An action that does not fit is refused with `403 Quota exceeded`, whose message
+names the measure, the limit, what is used and what the action needed; two uploads at the same time
+cannot both pass a limit that only one of them fits. Every change of a limit is in the audit log, as
+`quota.limit.set` and `quota.limit.removed`.
+
+The administrators of the organization see, under **Administration > Quotas**, each measure with
+its limit, where the limit comes from and the share used, and the consumption of a month by person;
+platform administrators see and change the limits there. The same figures are at
+`GET /api/v1/organizations/{slug}/quotas` and `GET /api/v1/organizations/{slug}/quotas/usage`. They
+are current: every action updates them, there is nothing to wait for. A file counts to the person
+who stored it, the space of a resource to its owner; what was used without a person, or by people
+who left, counts to nobody in particular.
+
 ## Assistants and MCP clients
 
 Extensions may declare actions that assistants use as tools (see

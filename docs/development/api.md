@@ -143,6 +143,9 @@ answer 401, as when the person sends them to the kernel.
 | `POST /api/v1/organizations/{slug}/permissions/preview` | the administrators of the organization, signed in to it | what a proposed member would hold (`role`, `profile`, `teams`), with the sources, without changing anything: for invitations |
 | `GET, POST /api/v1/organizations/{slug}/secrets` | the administrators of the organization, signed in to it | the credentials that its extensions use (MK-062), without their values: `name`, `kind`, `description`, `extension`, `hint` (`••••`, or the last four characters of a long token or key), `createdAt`, `updatedAt`, `updatedBy`; store one (`name`, `kind` `password`, `token`, `key` or `other`, `value`, `description`, and `extension` when only that extension may read it), encrypted at once (audited); 503 when the installation has no master key |
 | `GET, PUT, DELETE /api/v1/organizations/{slug}/secrets/{name}` | the administrators of the organization, signed in to it | one credential, without its value; replace it (`kind`, `description`, `extension`, and `value`, kept when absent; the name does not change); delete it (audited) |
+| `GET /api/v1/organizations/{slug}/quotas` | the administrators of the organization, signed in to it; `platform-admin` | its measures (MK-076): `storage`, then those of the active extensions, each with `measure`, `label`, `unit`, `kind` (`counter` per month or `gauge`), `extension`, `limit` (`null` for none), `source` (`organization`, `installation` or `none`), `installationLimit`, `period` (this month for a counter, `null` for a gauge) and `used`, current at every call |
+| `GET /api/v1/organizations/{slug}/quotas/usage?period=` | the administrators of the organization, signed in to it; `platform-admin` | its consumption by measure and person: the counters of a month (`period`, such as `2026-10`, this month by default) and the gauges now, as `rows` of `measure`, `period`, `person` (`id`, `name`, `email`, or `null` for none or a person who left), `amount`, `updatedAt`; `periods` lists the months with consumption |
+| `GET, PUT, DELETE /api/v1/organizations/{slug}/quotas/{measure}` | reading: as above; changing: `platform-admin` | one measure; set its limit for the organization (`{"limit": n}` in its unit, bytes for `storage`, per month for a counter; `{"limit": null}` for none), over the default of the installation (`mosaikit.quotas.*`); remove it, back to the default (audited) |
 | `GET /api/v1/sharing/resources/{extension}/{type}/{id}` | signed in, or a link (`X-Mosaikit-Link`) | a registered resource with the level of the request on it and whether the person may share it (MK-055) |
 | `GET /api/v1/sharing/resources/{extension}/{type}/{id}/grants` | who may share the resource | its grants, links included, with the names of their subjects |
 | `PUT /api/v1/sharing/resources/{extension}/{type}/{id}/grants` | who may share the resource | grants a level to a person, a team, the organization or the public; granting again replaces the level |
@@ -233,7 +236,7 @@ internal messages:
 | Status | When |
 |---|---|
 | `400` | validation failed; `errors` lists the fields |
-| `401`, `403` | not signed in, or not allowed |
+| `401`, `403` | not signed in, or not allowed; `403` with the title `Quota exceeded` when the action passes a limit of the organization (MK-076), named in `detail` and in the member `quota`: `measure`, `unit`, `period`, `limit`, `used`, `requested` |
 | `404` | not found, or an API of an extension that is not active |
 | `409` | conflict, for example a slug, an email domain or a realm already in use |
 | `413` | the content is too large, such as a file over `mosaikit.files.max-size` |

@@ -9,6 +9,7 @@ import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /** Configuration of the kernel, under the {@code mosaikit} prefix. */
@@ -198,6 +199,28 @@ public interface KernelConfig {
             /** The secret of the access key, from a secret: the kernel never logs it. */
             Optional<String> secretAccessKey();
         }
+    }
+
+    /** The quotas of organizations (MK-076). */
+    Quotas quotas();
+
+    /**
+     * The limits that every organization has unless a platform administrator sets others for it
+     * (MK-076). Without a limit, a measure has none.
+     */
+    interface Quotas {
+
+        /**
+         * The space each organization keeps, such as {@code 10G}: its files and the space that
+         * extensions report for their resources.
+         */
+        Optional<MemorySize> storage();
+
+        /**
+         * The limit of each measure of extensions, by its identifier {@code <extension>/<measure>}:
+         * per month for a counter, at any time for a gauge.
+         */
+        Map<String, Long> limits();
     }
 
     /** Settings of the audit log. */

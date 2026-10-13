@@ -14,6 +14,8 @@ import dev.mosaikit.kernel.core.error.ResourceNotFoundException;
 import dev.mosaikit.kernel.core.error.ServiceUnavailableException;
 import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
 import dev.mosaikit.kernel.core.identity.RequestOrganization;
+import dev.mosaikit.kernel.core.quotas.Measure;
+import dev.mosaikit.kernel.core.quotas.QuotaService;
 import dev.mosaikit.kernel.core.resources.RegisteredResource;
 import dev.mosaikit.kernel.core.resources.RegisteredResources;
 import dev.mosaikit.kernel.core.teams.TeamMember;
@@ -62,6 +64,9 @@ import org.jboss.logging.Logger;
  * <p>An upload is first written to a temporary file of the server, which gives its size and its
  * checksum without holding it in memory and refuses it beyond {@code mosaikit.files.max-size}; only
  * then is it put in the store, and recorded. Reads are streamed from the store, by range.
+ *
+ * <p>Files count to the storage quota of the organization (MK-076): an upload that does not fit is
+ * refused before it reaches the store, and checked again, under a lock, when it is recorded.
  */
 @ApplicationScoped
 public class FileService {
@@ -132,6 +137,7 @@ public class FileService {
     private final SecurityIdentity identity;
     private final AuditLog audit;
     private final TransactionSynchronizationRegistry transactions;
+    private final QuotaService quotas;
     private final long maxSize;
     private final Clock clock = Clock.systemUTC();
 
@@ -146,6 +152,7 @@ public class FileService {
             SecurityIdentity identity,
             AuditLog audit,
             TransactionSynchronizationRegistry transactions,
+            QuotaService quotas,
             KernelConfig config) {
         this.files = files;
         this.store = store;
@@ -156,6 +163,7 @@ public class FileService {
         this.identity = identity;
         this.audit = audit;
         this.transactions = transactions;
+        this.quotas = quotas;
         this.maxSize = config.files().maxSize().asLongValue();
     }
 
@@ -179,8 +187,17 @@ public class FileService {
             throw tooLarge();
         }
         UUID resource = transaction(() -> permitted(extension, upload));
-        Spooled spooled = spool(content);
         UUID org = organization.require();
+        if (declaredSize.isPresent()) {
+            fits(org, declaredSize.getAsLong());
+        }
+        Spooled spooled = spool(content);
+        try {
+            fits(org, spooled.size());
+        } catch (RuntimeException e) {
+            spooled.discard();
+            throw e;
+        }
         UUID id = UUID.randomUUID();
         String key = FileStore.key(org, extension, id);
         try {
@@ -195,6 +212,7 @@ public class FileService {
             return transaction(() -> {
                 deleteUnlessCommitted(key);
                 permitted(extension, upload);
+                quotas.reserveStorage(org, spooled.size());
                 StoredFile file = new StoredFile(
                         id,
                         org,
@@ -495,6 +513,14 @@ public class FileService {
             throw new InvalidInputException(List.of("the content could not be read to its end"));
         }
         return new Spooled(path, size, HexFormat.of().formatHex(digest.digest()));
+    }
+
+    /** Refuses a file that the storage quota of the organization has no room for (MK-076). */
+    private void fits(UUID org, long size) {
+        var check = quotas.check(org, Measure.STORAGE, size);
+        if (!check.fits()) {
+            throw check.refusal();
+        }
     }
 
     private ContentTooLargeException tooLarge() {

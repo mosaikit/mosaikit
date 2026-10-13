@@ -121,6 +121,17 @@ S3-compatible object store; the database keeps only what the kernel knows of eac
 | `mosaikit.files.s3.access-key-id` | | the access key; empty to use the credentials of the environment of the kernel (`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, a profile, the role of the machine or of the pod) |
 | `mosaikit.files.s3.secret-access-key` | | its secret, from a secret (`MOSAIKIT_FILES_S3_SECRET_ACCESS_KEY`); the kernel never logs it |
 
+## Quotas
+
+The limits that every organization has, unless a platform administrator sets others for it
+([quotas of organizations](administration.md#quotas-of-organizations)). Without a limit, a measure
+has none.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `mosaikit.quotas.storage` | | the space each organization keeps, such as `10G` or `500M`: its files and the space its extensions report for their resources. New data beyond it are refused with 403 |
+| `mosaikit.quotas.limits.*` | | the limit of a measure of an extension, by its identifier `<extension>/<measure>` in quotes, per month for a counter: `mosaikit.quotas.limits."org.example.maps/renders"=1000` |
+
 ## Assistant
 
 | Setting | Default | Meaning |
