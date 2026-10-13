@@ -516,15 +516,16 @@ who has to confirm it, not for the assistant only.
 
 ## Resources, sharing and permissions
 
-> **Registry implemented, sharing and permissions in preview.** The kernel provides the
-> `Resources` bean (MK-054): Java extensions register, update, remove and list their resources
-> today. Sharing (MK-055) and permissions (MK-056) are still an **API preview**: their manifest
-> entries are validated and their Java types are in `kernel-api`, but the beans `Sharing` and
-> `Permissions` are not provided yet: write against the contract, do not ship on it. See
+> **Registry and permissions implemented, sharing in preview.** The kernel provides the
+> `Resources` bean (MK-054) and the `Permissions` bean (MK-056): Java extensions register their
+> resources and check permissions today. Sharing (MK-055) is still an **API preview**: its manifest
+> entries are validated and its Java types are in `kernel-api`, but the bean `Sharing` is not
+> provided yet: write against the contract, do not ship on it. See
 > [ADR-0037](../adr/0037-resources-and-one-sharing-model.md) and
 > [ADR-0038](../adr/0038-permissions-from-manifests-and-profiles.md). The counterpart in
-> `@mosaikit/sdk` (permissions to hide what is not available, the sharing dialog) and the REST API
-> for extensions without a backend come **with the implementation**, not as a second preview.
+> `@mosaikit/sdk` (permissions to hide what is not available, the sharing dialog) comes with the
+> next versions; the shell can already read the permissions of the person from
+> `GET /api/v1/shell/permissions`.
 
 Permissions say **what** a person may do in an extension; sharing says **on which resources**. The
 extension declares both in its manifest, and the kernel keeps who has what:
@@ -657,6 +658,28 @@ above their own level. Remove the entry with `resources.remove(ref)` when the re
 its grants go with it. The registration joins the transaction of the request, so a rollback undoes
 both.
 
+What the permissions do today (MK-056):
+
+- `has`, `granted` and `require` act on the person and the organization of the request. They
+  refuse, with `IllegalArgumentException`, an `extension` that is not active; a permission that its
+  manifest does not declare is never granted, not even to an administrator.
+- A member holds the permissions of their profile (the one assigned to them, or the default profile
+  of members), of their teams and of their personal exceptions; the administrators of the
+  organization hold every declared permission; guests only those of their teams and exceptions; a
+  request without an organization or without a person holds none.
+- When all the apps of the extension are off for the organization (MK-030), nobody holds its
+  permissions.
+- `AccessDeniedException` from `require` reaches the kernel, which answers 403 with a problem
+  detail: let it propagate from the resource method.
+- A permission that an update adds is in no profile. When an update removes a permission, its
+  grants are removed at the next start, so that bringing it back later arrives switched off too.
+- Profiles and grants live in the kernel tables `mk_kernel.permission_profile`,
+  `mk_kernel.member_profile` and `mk_kernel.permission_grant`, under row-level security; the
+  administrators of the organization manage them through
+  `/api/v1/organizations/{slug}/permissions` (see the [administration guide](../guide/administration.md)).
+- Guests are refused the backends of extensions (`/api/v1/ext/…`) as before (MK-032): a permission
+  granted to a guest matters for the frontend and for the documents of the extension.
+
 What the registry does today (MK-054):
 
 - `register` refuses, with `IllegalArgumentException`, a reference whose extension is not active or
@@ -673,8 +696,8 @@ What the registry does today (MK-054):
 - When an extension is no longer in the installation, the kernel removes its entries, in every
   organization, at the next start.
 
-Two mechanisms of today **move onto this model** when it is implemented: the apps per role of an
-organization (MK-030) become permissions in profiles, and the sharing of the rows of a data
+Two mechanisms of today **move onto this model** next: the apps per role of an organization
+(MK-030) become permissions in profiles, and the sharing of the rows of a data
 collection with a team (MK-032) becomes a grant to a group.
 
 ## Rules

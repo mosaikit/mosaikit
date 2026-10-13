@@ -8,6 +8,22 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The kernel implements permissions (MK-056, ADR-0038): the `Permissions` bean of `kernel-api`
+  answers for the person and the organization of the request, deny by default, with profiles
+  (one per member, the assigned one or the default profile of members), teams and personal
+  exceptions that only add; administrators of the organization hold every declared permission,
+  guests only what their teams and exceptions grant, platform administrators none for being so; a
+  permission the manifest does not declare is never granted, and none of an extension whose apps
+  are all off. `AccessDeniedException` is answered with 403 (404 when concealed). New tables
+  `permission_profile`, `member_profile` and `permission_grant` (migration V17) under row-level
+  security; grants of permissions that the extensions no longer declare are removed at start, so
+  that a permission added again arrives switched off. REST API for the administrators of an
+  organization under `/api/v1/organizations/{slug}/permissions` (declared permissions, profiles,
+  profile of a member, grants to teams, exceptions, effective permissions with their sources, and a
+  preview for invitations without side effects), every change in the audit log, and
+  `GET /api/v1/shell/permissions` for the shell. The console and the move of the apps per role onto
+  permissions follow.
+
 - The kernel implements the registry of resources (MK-054): the `Resources` bean of `kernel-api`
   lets Java extensions register, update, remove, find and list their resources (type, identifier,
   title, owner, link, parent) in the organization of the request, within the transaction of the
