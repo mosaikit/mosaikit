@@ -384,7 +384,7 @@ export async function register(
     }),
   });
   if (!registered.ok && registered.status !== 409) {
-    throw new Error(`Cannot register ${person.user}: ${String(registered.status)}`);
+    throw new Error(`Cannot register ${person.user}: ${String(registered.status)} ${await registered.text()}`);
   }
   if (registered.status === 202) {
     const link = await confirmationLink(mail, person.user);
