@@ -99,6 +99,16 @@ answer 401, as when the person sends them to the kernel.
 
 ## Endpoints of the kernel
 
+<!-- Generated: the rows are sorted by path and rewritten from the OpenAPI document of the kernel.
+     After adding, changing or removing an endpoint run
+       ./mvnw -pl sdk/java,src/server test -Dskip.npm -Dtest=DocumentationTest -Dsurefire.failIfNoSpecifiedTests=false -Ddocs.write=true
+     which adds a row for each new endpoint (who may call it, from its security annotations or its
+     OpenAPI extension x-mosaikit-access, and its @Operation summary) and removes the gone ones; the
+     text of a row may then be completed by hand. DocumentationTest fails when the table is not up
+     to date. -->
+
+The rows are sorted by path, one row for a path and the methods that share a description.
+
 | Method and path | Who | Purpose |
 |---|---|---|
 | `GET /api/v1/system/info` | anyone | product, version, active extensions, theme |
@@ -132,7 +142,8 @@ answer 401, as when the person sends them to the kernel.
 | `GET, PUT, DELETE /api/v1/teams/{id}` | signed in, with an organization | one team with its `members`; change or delete it: its owners and the administrators of the organization |
 | `PUT, DELETE /api/v1/teams/{id}/members/{email}` | signed in, with an organization | add a person with a `role` (`owner`, `member`, or `guest` for a person of another organization) or change it: the owners; join a public team as `member`, or leave a team: the person (audited) |
 | `GET, POST /api/v1/notifications` | signed in, with an organization | the activity feed of the person (`unread`, `notifications`, newest first); notify people of the organization as an extension (`extension`, `to` email addresses, `kind`, `title`, `body`, `link`): 202 (MK-038) |
-| `POST /api/v1/notifications/{id}/read`, `POST /api/v1/notifications/read` | signed in, with an organization | mark one, or every, notification of the person as read |
+| `POST /api/v1/notifications/{id}/read` | signed in, with an organization | mark a notification of the person as read |
+| `POST /api/v1/notifications/read` | signed in, with an organization | mark every notification of the person as read |
 | `GET /api/v1/shell/apps` | signed in | the apps the person sees in the app bar, in order, with the pinned ones (MK-030); a restricted app, and any app for a guest, only when the person holds its permission (MK-056) |
 | `GET, PUT /api/v1/organizations/{slug}/apps` | the administrators of the organization, `platform-admin` | the apps of its app bar: `enabled`, `pinned`, `restricted` (only who holds the `permission` of the app, `<extension>:use-<app>`, sees it; MK-056), in order; `roles` is deprecated (`[organization-admin]` is `restricted`); `PUT []` goes back to the defaults (audited) |
 | `GET /api/v1/shell/permissions` | signed in | the permissions of the person in the organization of the request, as `<extension>:<permission>` (MK-056); empty without an organization; a hint for the interface, the backends check |
@@ -149,7 +160,7 @@ answer 401, as when the person sends them to the kernel.
 | `GET, PUT, DELETE /api/v1/organizations/{slug}/secrets/{name}` | the administrators of the organization, signed in to it | one credential, without its value; replace it (`kind`, `description`, `extension`, and `value`, kept when absent; the name does not change); delete it (audited) |
 | `GET /api/v1/organizations/{slug}/quotas` | the administrators of the organization, signed in to it; `platform-admin` | its measures (MK-076): `storage`, then those of the active extensions, each with `measure`, `label`, `unit`, `kind` (`counter` per month or `gauge`), `extension`, `limit` (`null` for none), `source` (`organization`, `installation` or `none`), `installationLimit`, `period` (this month for a counter, `null` for a gauge) and `used`, current at every call |
 | `GET /api/v1/organizations/{slug}/quotas/usage?period=` | the administrators of the organization, signed in to it; `platform-admin` | its consumption by measure and person: the counters of a month (`period`, such as `2026-10`, this month by default) and the gauges now, as `rows` of `measure`, `period`, `person` (`id`, `name`, `email`, or `null` for none or a person who left), `amount`, `updatedAt`; `periods` lists the months with consumption |
-| `GET, PUT, DELETE /api/v1/organizations/{slug}/quotas/{measure}` | reading: as above; changing: `platform-admin` | one measure; set its limit for the organization (`{"limit": n}` in its unit, bytes for `storage`, per month for a counter; `{"limit": null}` for none), over the default of the installation (`mosaikit.quotas.*`); remove it, back to the default (audited) |
+| `GET, PUT, DELETE /api/v1/organizations/{slug}/quotas/{measure}` | reading: the administrators of the organization, signed in to it, and `platform-admin`; changing: `platform-admin` | one measure; set its limit for the organization (`{"limit": n}` in its unit, bytes for `storage`, per month for a counter; `{"limit": null}` for none), over the default of the installation (`mosaikit.quotas.*`); remove it, back to the default (audited) |
 | `GET /api/v1/sharing/resources/{extension}/{type}/{id}` | signed in | a registered resource with its owner (`ownerName`), the level of the request on it (the one `Sharing.level` gives the extension) and whether the person may share it (MK-055); 404 without a level |
 | `GET /api/v1/sharing/resources/{extension}/{type}/{id}/grants` | who may share the resource | its grants, links included, with the names of their subjects |
 | `PUT /api/v1/sharing/resources/{extension}/{type}/{id}/grants` | who may share the resource | grants a level to a person (`subject.id`, or `subject.email` of a person of the organization), a team, the organization or the public; granting again replaces the level |
@@ -177,7 +188,7 @@ answer 401, as when the person sends them to the kernel.
 | `DELETE /api/v1/files/{extension}/{id}` | its owner, an owner of its team, the administrators of the organization; for a file attached to a resource, its owner and the people with a level that edits the resource (its owner and administrators included, MK-055) | delete a file (audited) |
 | `POST /api/v1/files/{extension}/links` | signed in, with an organization: for a file, the people who read it; for a prefix, the people of the team, or of the organization without `team` (not its guests) | make a signed, expiring link (MK-093): `{"file": <id>}`, or `{"prefix": "tiles/", "team"?: <id>}` for every file whose name starts with the prefix (empty for every file); `expires` at most `mosaikit.files.link-max-validity` from now, the longest when absent. 201 with `url`, `base`, `query` and `expires`: a file under a prefix is at `base + name + "?" + query`; a link made by a person carries their account (`creator`) and serves only what they still read: a file attached to a resource while they hold a level on it (MK-055), nothing once they left the organization; 503 when the installation has no key for links (audited) |
 | `GET /api/v1/files/signed/{organization}/{extension}/{id}?expires=&creator=&signature=` | anyone with the link | the content of the file of a signed link, as `GET /api/v1/files/{extension}/{id}/content` serves it (ranges, cache validators); 404, the same for every refusal, when the link expired or was altered, the file is no longer there, or the person who made the link (`creator`, absent for a link made without a person) no longer reads it: out of the organization, or without a level on the resource of the file (MK-055). Its first use in each hour is audited |
-| `GET /api/v1/files/signed/{organization}/{extension}/named/{name}?prefix=&team=&expires=&creator=&signature=` | anyone with the link | the newest file of that name under a signed link to a prefix; 404 as above, and when the name does not start with the prefix or the file is of another scope than the link; a file attached to a resource only while the person who made the link holds a level on it, files without a resource as the scope of the link |
+| `GET /api/v1/files/signed/{organization}/{extension}/named/{name}?prefix=&team=&expires=&creator=&signature=` | anyone with the link | the newest file of that name under a signed link to a prefix; 404 as for a link to one file, and when the name does not start with the prefix or the file is of another scope than the link; a file attached to a resource only while the person who made the link holds a level on it, files without a resource as the scope of the link |
 | `GET, PUT /api/v1/platform/settings` | `platform-admin` | the settings of the platform: `{"registration": true}` turns self-registration on or off (audited) |
 | `GET /api/v1/platform/secrets/keys` | `platform-admin` | the master keys of the store of credentials: `enabled`, `problem` when disabled, `currentKey` and `previousKeys` (identifiers, never keys), and `credentials`, how many each key holds in every organization (MK-062) |
 | `POST /api/v1/platform/secrets/re-encryption` | `platform-admin` | after a rotation, encrypt the data key of every credential under the current master key, without decrypting the values: `{"reEncrypted", "unreadable", "currentKey"}` (audited) |
@@ -189,7 +200,8 @@ answer 401, as when the person sends them to the kernel.
 | `GET, PUT /api/v1/organizations/{slug}/audit-events/retention` | the administrators of the organization, signed in to it, `platform-admin` | the retention of the entries of the organization, as for the platform (audited) |
 | `GET /api/v1/ai/tools` | signed in, with an organization | the tools of the active extensions (MK-015) |
 | `POST /api/v1/ai/tools/{tool}/invocations` | signed in, with an organization | invoke a tool: 200 with the result, or 202 with a draft |
-| `GET /api/v1/ai/drafts`, `GET /api/v1/ai/drafts/{id}` | the person who proposed them | open drafts, one draft |
+| `GET /api/v1/ai/drafts` | signed in | the open drafts that the person proposed |
+| `GET /api/v1/ai/drafts/{id}` | the person who proposed it | one draft |
 | `POST /api/v1/ai/drafts/{id}/confirmation` | the person who proposed it | run a draft |
 | `DELETE /api/v1/ai/drafts/{id}` | the person who proposed it | reject a draft |
 | `GET /api/v1/ai/assistant` | signed in | whether an assistant is configured, and its model (MK-024) |

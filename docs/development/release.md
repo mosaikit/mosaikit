@@ -79,7 +79,7 @@ The pipeline fails when it no longer matches the code:
 
 | Check | Job | Fails when |
 |---|---|---|
-| `DocumentationTest` | `backend` | an endpoint is missing from `api.md`, or documented but gone; a setting is missing from `configuration.md` |
+| `DocumentationTest` | `backend` | the table of endpoints of `api.md` is not the one generated from the OpenAPI document of the kernel (the failure names the command that rewrites it), or the text names an endpoint that is gone; a setting is missing from `configuration.md` |
 | `docs/test` | `frontend` | a relative link is broken; an ADR is not in the index; the compliance documents name a test, requirement or non-conformity that does not exist |
 | `docs/requirements/test` | `frontend` | a requirement breaks the schema, or is done without a test |
 | `changelog` | merge requests | the product changes without a fragment in `changelog.d/` or an edit of `CHANGELOG.md` (label `no-changelog` to skip) |

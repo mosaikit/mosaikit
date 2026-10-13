@@ -43,6 +43,7 @@ every pull request.
 | the shell (`src/web`) or the SDK (`sdk/js`, `sdk/ui`) | `npm run check:fast` | under a minute |
 | the same, as people see it | `./mvnw install -DskipTests` once, then `node tests/e2e/run.ts <file>` (such as `13-teams-shell`) | about 35 s for a file |
 | a class of the kernel | `./mvnw -pl src/server test -Dskip.npm -Dtest=<TestClass>` | 1–2 min |
+| an endpoint of the kernel (added, changed, removed) | `./mvnw -pl sdk/java,src/server test -Dskip.npm -Dtest=DocumentationTest -Dsurefire.failIfNoSpecifiedTests=false -Ddocs.write=true`: rewrites the table of [api.md](api.md) from the OpenAPI document, with a row for each new endpoint to complete | 1–2 min |
 | the launcher or the installation of Java extensions | `./mvnw -pl src/server verify -Dskip.npm -DskipITs=false -Dit.test=JavaExtensionInstallationIT -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false` | about 3 min |
 | documentation only | `npx vitest run docs` | seconds |
 
