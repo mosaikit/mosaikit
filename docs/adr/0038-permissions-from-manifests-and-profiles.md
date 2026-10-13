@@ -32,6 +32,16 @@ Answers of the maintainer to the review of the extension API (pull request #42),
   granted explicitly, through a group or a personal exception.
 - The apps per role (MK-030) move onto permissions in the implementation.
 
+### Apps on permissions (2026-10-13)
+
+Every app of an extension has a permission, `<extension>:use-<app>`, that the kernel declares for
+it. The organization keeps switching each app on or off and chooses whether its members and
+administrators see it or only the people who hold its permission; the second replaces "for the
+administrators only", which keeps its effect because administrators hold every permission. No
+extension has to change, and members and administrators see the same apps as before. Guests hold no
+permission unless granted explicitly, so they see an app only when a team of theirs or a personal
+exception grants its permission.
+
 ## Consequences
 
 - The apps per organization and role (MK-030) become a special case of permissions.

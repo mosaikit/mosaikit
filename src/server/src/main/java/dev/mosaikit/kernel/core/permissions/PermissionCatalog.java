@@ -5,6 +5,7 @@ package dev.mosaikit.kernel.core.permissions;
 import dev.mosaikit.kernel.api.extension.ExtensionManifest;
 import dev.mosaikit.kernel.api.extension.PermissionEntry;
 import dev.mosaikit.kernel.api.permission.PermissionId;
+import dev.mosaikit.kernel.core.apps.AppPermissions;
 import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
 import dev.mosaikit.kernel.core.extension.InstalledExtension;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -19,8 +20,8 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 /**
- * The permissions that the active extensions declare in their manifests (MK-056): the only ones the
- * kernel ever grants. A permission that an extension no longer declares, or of an extension that is
+ * The permissions that the active extensions declare in their manifests (MK-056), and the permission
+ * of each of their apps ({@link AppPermissions}, MK-030): the only ones the kernel ever grants. A permission that an extension no longer declares, or of an extension that is
  * not active, is never granted, whatever the profiles, teams and exceptions say.
  */
 @ApplicationScoped
@@ -36,6 +37,8 @@ public class PermissionCatalog {
      * @param title short name shown to administrators
      * @param description what the permission allows, possibly empty
      * @param i18n {@code title} and {@code description} in other languages
+     * @param app the app that the permission opens, for the permission of an app ({@link
+     *     AppPermissions}); {@code null} for a permission of the manifest
      */
     public record Declared(
             String id,
@@ -44,7 +47,8 @@ public class PermissionCatalog {
             String name,
             String title,
             String description,
-            Map<String, Map<String, String>> i18n) {
+            Map<String, Map<String, String>> i18n,
+            String app) {
 
         static Declared of(ExtensionManifest manifest, PermissionEntry entry) {
             return new Declared(
@@ -54,7 +58,8 @@ public class PermissionCatalog {
                     entry.name(),
                     entry.title(),
                     entry.description(),
-                    entry.i18n());
+                    entry.i18n(),
+                    AppPermissions.appOf(manifest, entry.name()).orElse(null));
         }
 
         /** The qualified identifier. */
@@ -105,15 +110,16 @@ public class PermissionCatalog {
     public Optional<Declared> find(PermissionId permission) {
         return manifests
                 .apply(permission.extension())
-                .flatMap(manifest -> manifest.permissions().stream()
+                .flatMap(manifest -> AppPermissions.withApps(manifest).stream()
                         .filter(entry -> entry.name().equals(permission.name()))
                         .findFirst()
                         .map(entry -> Declared.of(manifest, entry)));
     }
 
-    /** Whether a manifest declares a permission by that name. */
+    /** Whether a manifest declares a permission by that name, or has an app whose permission it is. */
     public static boolean declares(ExtensionManifest manifest, String permission) {
-        return manifest.permissions().stream().anyMatch(entry -> entry.name().equals(permission));
+        return manifest.permissions().stream().anyMatch(entry -> entry.name().equals(permission))
+                || AppPermissions.appOf(manifest, permission).isPresent();
     }
 
     /** Every permission of the active extensions, by extension and then in the order of the manifest. */
@@ -121,14 +127,16 @@ public class PermissionCatalog {
         List<Declared> found = new ArrayList<>();
         active.get().stream()
                 .sorted(Comparator.comparing(ExtensionManifest::id))
-                .forEach(manifest -> manifest.permissions().forEach(entry -> found.add(Declared.of(manifest, entry))));
+                .forEach(manifest ->
+                        AppPermissions.withApps(manifest).forEach(entry -> found.add(Declared.of(manifest, entry))));
         return found;
     }
 
     /** Every permission of one active extension, in the order of its manifest. */
     public List<Declared> of(String extension) {
         return manifests.apply(extension).stream()
-                .flatMap(manifest -> manifest.permissions().stream().map(entry -> Declared.of(manifest, entry)))
+                .flatMap(manifest ->
+                        AppPermissions.withApps(manifest).stream().map(entry -> Declared.of(manifest, entry)))
                 .toList();
     }
 }

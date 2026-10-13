@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.core.permissions;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import dev.mosaikit.kernel.api.extension.PermissionEntry;
 import dev.mosaikit.kernel.api.permission.PermissionId;
 import dev.mosaikit.kernel.core.account.UserAccount;
 import dev.mosaikit.kernel.core.account.UserAccounts;
+import dev.mosaikit.kernel.core.apps.AppPermissions;
 import dev.mosaikit.kernel.core.apps.AppSettings;
 import dev.mosaikit.kernel.core.audit.AuditEvent;
 import dev.mosaikit.kernel.core.audit.AuditLog;
@@ -69,7 +71,13 @@ public class PermissionAdministration {
     static final Set<String> PREVIEW_ROLES =
             Set.of(Roles.ORGANIZATION_ADMIN, Roles.ORGANIZATION_USER, Roles.ORGANIZATION_GUEST);
 
-    /** A permission of an active extension, and whether its apps are off for the organization. */
+    /**
+     * A permission of an active extension, and whether its apps are off for the organization.
+     *
+     * @param app the app that the permission opens, for the permission of an app (MK-030); {@code
+     *     null} for a permission of the manifest
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public record DeclaredView(
             String id,
             String extension,
@@ -78,7 +86,8 @@ public class PermissionAdministration {
             String title,
             String description,
             Map<String, Map<String, String>> i18n,
-            boolean off) {}
+            boolean off,
+            String app) {}
 
     /** A profile with its permissions, by qualified identifier. */
     public record ProfileView(
@@ -187,7 +196,8 @@ public class PermissionAdministration {
                         declared.title(),
                         declared.description(),
                         declared.i18n(),
-                        off.computeIfAbsent(declared.extension(), extension -> apps.isOff(organization, extension))))
+                        off.computeIfAbsent(declared.extension(), extension -> apps.isOff(organization, extension)),
+                        declared.app()))
                 .toList();
     }
 
@@ -490,14 +500,15 @@ public class PermissionAdministration {
 
     /**
      * {@link #forgetUndeclared(Map)} for the extensions found in the installation, active or not; an
-     * extension whose manifest cannot be read keeps its grants.
+     * extension whose manifest cannot be read keeps its grants. The permissions of the apps of an
+     * extension (MK-030) count as declared.
      */
     public int forgetUndeclared(List<InstalledExtension> found) {
         Map<String, Optional<Set<String>>> installed = new HashMap<>();
         for (InstalledExtension extension : found) {
             Optional<Set<String>> declared = extension
                     .manifest()
-                    .map(manifest -> manifest.permissions().stream()
+                    .map(manifest -> AppPermissions.withApps(manifest).stream()
                             .map(PermissionEntry::name)
                             .collect(Collectors.toSet()));
             installed.merge(

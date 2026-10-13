@@ -59,7 +59,8 @@ public class AppSettingsResource {
     @PUT
     @Operation(
             summary = "Set the apps of the app bar of an organization",
-            description = "The order of the list is the order of the app bar; an empty list goes back to the defaults.")
+            description = "The order of the list is the order of the app bar; an empty list goes back to the defaults."
+                    + " restricted: only the people who hold the permission of the app see it (MK-056).")
     public List<AppView> change(@PathParam("slug") String slug, @Valid @NotNull List<AppView> apps) {
         Organization organization = managed(slug);
         List<AppView> result = settings.change(organization.getId(), apps);
@@ -73,6 +74,11 @@ public class AppSettingsResource {
                         "off",
                         apps.stream()
                                 .filter(app -> !app.enabled())
+                                .map(app -> app.extensionId() + "/" + app.appId())
+                                .toList(),
+                        "restricted",
+                        apps.stream()
+                                .filter(AppView::isRestricted)
                                 .map(app -> app.extensionId() + "/" + app.appId())
                                 .toList()));
         return result;

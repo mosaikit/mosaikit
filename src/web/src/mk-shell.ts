@@ -32,6 +32,7 @@ import {
 } from './navigation.js';
 import { MkAdminApps } from './mk-admin-apps.js';
 import './mk-admin-extensions.js';
+import { MkAdminPermissions } from './mk-admin-permissions.js';
 import './mk-admin-settings.js';
 import './mk-assistant.js';
 import './mk-extension-frame.js';
@@ -43,6 +44,7 @@ import { browserLanguage, isLanguage, language, setLanguage, t } from './i18n.js
 import type { PasswordSignIn } from './mk-sign-in.js';
 import { LiveClient } from './live.js';
 import { ExtensionLoader, type LoadResult } from './extension-loader.js';
+import { allows, requiredPermission } from './permissions.js';
 
 /** How often the shell looks for actions proposed by assistants. */
 const DRAFT_REFRESH_MS = 20_000;
@@ -50,14 +52,21 @@ const DRAFT_REFRESH_MS = 20_000;
 const EXTENSION_WATCH_MS = 1_000;
 
 /**
- * The pages of administrators: the apps of the organization for its administrators (MK-030), the
- * extensions (MK-022) and the platform (MK-048) for platform administrators.
+ * The pages of administrators: the apps and the permissions of the organization for its
+ * administrators (MK-030, MK-056), the extensions (MK-022) and the platform (MK-048) for platform
+ * administrators.
  */
 const ADMIN_PAGES = [
   {
     path: '/admin/apps',
     title: 'Organization apps',
     element: 'mk-admin-apps',
+    role: 'organization-admin',
+  },
+  {
+    path: '/admin/permissions',
+    title: 'Permissions',
+    element: 'mk-admin-permissions',
     role: 'organization-admin',
   },
   {
@@ -536,6 +545,11 @@ export class MkShell extends LitElement {
   @state() private settingsStatus = '';
   /** The apps that the organization shows to the person, in order (MK-030). */
   @state() private barApps: ShellApp[] | undefined;
+  /**
+   * The permissions of the person in the organization (MK-056), to hide what needs one they lack;
+   * `undefined` while unknown, when nothing is hidden: the backends check anyway.
+   */
+  @state() private held: ReadonlySet<string> | undefined;
   private saves = 0;
   private saving: Promise<void> = Promise.resolve();
   @state() private shellLanguage = browserLanguage();
@@ -564,8 +578,9 @@ export class MkShell extends LitElement {
         .then(() => this.loadBarApps())
         .then(() => this.loadThemes());
     });
-    // The administrators of the organization changed its apps (MK-030).
+    // The administrators of the organization changed its apps (MK-030) or its permissions (MK-056).
     this.addEventListener('mk-apps-changed', () => void this.loadBarApps());
+    this.addEventListener('mk-permissions-changed', () => void this.loadBarApps());
     window.addEventListener('popstate', this.onPopState);
     window.addEventListener('online', this.onNetwork);
     window.addEventListener('offline', this.onNetwork);
@@ -925,6 +940,10 @@ export class MkShell extends LitElement {
       if (!element || !/^[a-z][a-z0-9]*(-[a-z0-9]+)+$/.test(element)) {
         return [];
       }
+      // A section that needs a permission the person lacks (MK-056).
+      if (!allows(this.held, requiredPermission(contribution))) {
+        return [];
+      }
       if (
         Array.isArray(allowed) &&
         allowed.length > 0 &&
@@ -945,7 +964,8 @@ export class MkShell extends LitElement {
 
   /**
    * The apps of the app bar: those that the organization shows to the person, in its order (MK-030),
-   * without those the person hid, unless the organization pinned them.
+   * without those the person hid, unless the organization pinned them, and without those that need a
+   * permission the person lacks (MK-056).
    */
   private visibleEntries(entries: LauncherEntry[]): LauncherEntry[] {
     const hidden = new Set(this.preferences?.hiddenApps ?? []);
@@ -962,16 +982,25 @@ export class MkShell extends LitElement {
     const pinned = new Set(
       (bar ?? []).filter((app) => app.pinned).map((app) => `${app.extensionId}/${app.appId}`),
     );
-    return ordered.filter((entry) => pinned.has(key(entry)) || !hidden.has(key(entry)));
+    return ordered
+      .filter((entry) => allows(this.held, entry.permission))
+      .filter((entry) => pinned.has(key(entry)) || !hidden.has(key(entry)));
   }
 
-  /** Reads which apps the organization shows to the person, then lays out the app bar again. */
+  /**
+   * Reads which apps the organization shows to the person and the permissions of the person, then
+   * lays out the app bar again.
+   */
   private async loadBarApps(): Promise<void> {
-    try {
-      this.barApps = await this.client.shellApps();
-    } catch {
-      this.barApps = undefined;
-    }
+    const [apps, held] = await Promise.all([
+      this.client.shellApps().catch(() => undefined),
+      this.client.shellPermissions().then(
+        (permissions) => new Set(permissions),
+        () => undefined,
+      ),
+    ]);
+    this.barApps = apps;
+    this.held = held;
     this.entries = this.visibleEntries(launcherEntries(this.extensions));
   }
 
@@ -1531,6 +1560,7 @@ export class MkShell extends LitElement {
     this.account = undefined;
     this.preferences = undefined;
     this.barApps = undefined;
+    this.held = undefined;
     this.applyAppearance();
     this.entries = [];
     this.loadResults = [];
@@ -1607,8 +1637,11 @@ export class MkShell extends LitElement {
       if (area.firstElementChild?.localName !== page.element) {
         const admin = document.createElement(page.element);
         admin.client = this.client;
-        if (admin instanceof MkAdminApps) {
+        if (admin instanceof MkAdminApps || admin instanceof MkAdminPermissions) {
           admin.organization = this.account?.organization ?? undefined;
+        }
+        if (admin instanceof MkAdminPermissions) {
+          admin.platformAdmin = this.isPlatformAdmin();
         }
         area.replaceChildren(admin);
       }

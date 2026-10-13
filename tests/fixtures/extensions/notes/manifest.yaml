@@ -33,6 +33,12 @@ actions:
     call:
       method: POST
       path: notes
+# Permissions that the administrators of an organization grant through profiles, teams and
+# personal exceptions (MK-056): off until granted.
+permissions:
+  - name: export-notes
+    title: Export notes
+    description: Download every note of the organization at once.
 database:
   schema: ext_fixture_notes
 frontend:

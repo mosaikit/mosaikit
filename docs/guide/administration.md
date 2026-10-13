@@ -67,7 +67,9 @@ An email domain belongs to one organization only. Changes of identity settings t
 A person has one account, identified by the email address, and can belong to several
 organizations, with roles in each (MK-017). People who register or sign in through the realm of an
 organization become members of it by themselves; to add a person to another organization, or to
-change their roles:
+change their roles (platform administrators; the administrators of the organization, signed in to
+it, list the members and give profile and teams to those who already are: see
+[Permissions](#permissions-of-an-organization)):
 
 ```bash
 curl -u admin https://mosaikit.example.org/api/v1/organizations/globex/members          # list
@@ -124,7 +126,12 @@ the bottom of the app bar, and for each app of the active extensions choose:
 - **Shown**: an app that is off leaves the app bar of the organization; when all the apps of a
   extension are off, its API and its documents answer 403 to the people of the organization;
 - **Pinned**: people cannot hide it in their settings;
-- **For**: everyone, or the administrators only;
+- **For**: **members and administrators**, or **who holds its permission**: the administrators of
+  the organization, and the people to whom **Permissions** grants the permission of the app ("Use
+  <app>") through a profile, a team or a personal exception (MK-056). An app that was for the
+  administrators only before is now for who holds its permission, which nobody else holds until it
+  is granted. Guests see an app only when a team of theirs or a personal exception grants its
+  permission;
 - the **order** of the app bar, with the arrows.
 
 **Save** applies the settings to everyone in the organization at their next page, and records the
@@ -148,12 +155,37 @@ administrators. A permission that an update of an extension adds is in no profil
 the apps of an extension are off its permissions are held by nobody. Every change is in the audit
 log.
 
-The console for profiles comes with a later version; until then the administrators of the
-organization use the API under `/api/v1/organizations/{slug}/permissions`, signed in to that
-organization: the declared permissions, `profiles`, `members/{email}` (what a member holds and
-where each permission comes from, `profile`, `exceptions/{permission}`), `teams/{id}/{permission}`
-and `preview` (what a proposed member with a role, a profile and teams would hold, without changing
-anything). Permissions are named `<extension>:<permission>`.
+The administrators of the organization open **Permissions** at the bottom of the app bar, next to
+**Organization apps**. It has three tabs:
+
+- **Profiles**: the profiles of the organization; **New profile**, a name, a description, and the
+  permissions grouped by extension, each with what it allows. Permissions are off until checked,
+  and a permission that an update of an extension brings shows unchecked. **Default profile of
+  members** makes it the profile of every member without one of their own (one profile at a time).
+  **Delete** gives its members back the default profile. The permission of each app ("Use <app>",
+  marked *App*) is here too: see **For** in the apps of an organization.
+- **People**: choose a person to see their role, to assign a profile (or the default one), to grant
+  or revoke **personal exceptions**, and **What they can do**: each permission with where it comes
+  from (profile, team, personal exception, administrator of the organization). Administrators hold
+  everything; guests have no profile.
+- **Teams**: choose a team and check the permissions it grants to its members and guests.
+
+Changes apply at once and are recorded in the audit log.
+
+**Invite a person** (in **People**) asks for the email address, a name for a person without an
+account, the role (member or administrator), the profile and the teams, and shows **What they will
+be able to do**, with the source of each permission, before anything is sent. For a person who is
+already a member, **Apply** gives them that profile and those teams (their role stays). A person
+who is not a member yet is added by a platform administrator, whose **Invite** adds them with role,
+profile and teams; the administrators of the organization see the preview only, until invitations
+by link, accepted by the person, come with MK-068.
+
+The same through the API, signed in to the organization: `/api/v1/organizations/{slug}/permissions`
+(the declared permissions, `profiles`, `members/{email}`, its `profile` and
+`exceptions/{permission}`, `teams/{id}/{permission}`, and `preview` of a proposed member), and
+`PUT /api/v1/organizations/{slug}/members/{email}` with `profile` and `teams` (and `roles`, for
+platform administrators).
+Permissions are named `<extension>:<permission>`.
 
 ## Audit log
 

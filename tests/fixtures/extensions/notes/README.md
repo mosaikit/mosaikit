@@ -4,8 +4,8 @@ Shows what an extension with Java code looks like (MK-011):
 
 | Path | Content |
 |---|---|
-| `manifest.yaml` | Declares the JAR (`backend.jar`) and the database schema `ext_fixture_notes` |
-| `pom.xml`, `src/` | The Java code: entity, Jakarta Data repository, REST resource under `/api/v1/ext/fixture-notes` |
+| `manifest.yaml` | Declares the JAR (`backend.jar`), the database schema `ext_fixture_notes` and the permission `export-notes` (MK-056) |
+| `pom.xml`, `src/` | The Java code: entity, Jakarta Data repository, REST resource under `/api/v1/ext/fixture-notes`, whose `notes/export` needs the permission `export-notes` |
 | `web/` | The Notes app: a Web Component that calls the extension API with `context.fetch` |
 | `db/` | Flyway migrations of the extension schema, run by the kernel at start |
 | `lib/fixture-notes.jar` | Built by `./mvnw package`; not versioned |

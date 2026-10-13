@@ -2,13 +2,13 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.core.apps;
 
+import dev.mosaikit.kernel.core.security.Roles;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.util.Arrays;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -38,7 +38,11 @@ public class OrganizationApp {
     @Column(nullable = false)
     private boolean pinned;
 
-    /** Comma-separated roles that see the app; empty for everyone. */
+    /**
+     * Comma-separated roles that saw the app before MK-056; now {@code organization-admin} when the
+     * app is restricted to the people who hold its permission, and empty when everyone sees it. Rows
+     * written before keep their meaning: the administrators hold every permission.
+     */
     @Column(nullable = false)
     private String roles;
 
@@ -52,7 +56,7 @@ public class OrganizationApp {
             boolean enabled,
             int position,
             boolean pinned,
-            Set<String> roles) {
+            boolean restricted) {
         this.id = UUID.randomUUID();
         this.organizationId = organizationId;
         this.extensionId = extensionId;
@@ -60,7 +64,7 @@ public class OrganizationApp {
         this.enabled = enabled;
         this.position = position;
         this.pinned = pinned;
-        this.roles = String.join(",", new TreeSet<>(roles));
+        this.roles = restricted ? Roles.ORGANIZATION_ADMIN : "";
     }
 
     public String getExtensionId() {
@@ -83,7 +87,13 @@ public class OrganizationApp {
         return pinned;
     }
 
-    public Set<String> getRoles() {
-        return roles.isBlank() ? Set.of() : Arrays.stream(roles.split(",")).collect(Collectors.toUnmodifiableSet());
+    /**
+     * Whether only the people who hold the permission of the app see it: the app was for the
+     * administrators only, as rows written before MK-056 say with their roles.
+     */
+    public boolean isRestricted() {
+        Set<String> found =
+                roles.isBlank() ? Set.of() : Arrays.stream(roles.split(",")).collect(Collectors.toUnmodifiableSet());
+        return found.contains(Roles.ORGANIZATION_ADMIN) && !found.contains(Roles.ORGANIZATION_USER);
     }
 }

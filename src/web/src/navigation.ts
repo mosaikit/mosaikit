@@ -7,6 +7,7 @@ import {
   type FrontendExtension,
 } from '@mosaikit/sdk';
 import { language as shellLanguage } from './i18n.js';
+import { requiredPermission } from './permissions.js';
 
 /** Extension point through which an extension adds an app to the app bar (MK-025, ADR-0026). */
 export const RAIL_POINT = 'rail.app';
@@ -24,6 +25,8 @@ export interface LauncherEntry {
   readonly element: string;
   /** Address of the icon of the app, an SVG or PNG file of the extension; a tile with its initials otherwise. */
   readonly icon?: string;
+  /** The permission the app needs, `<extension>:<permission>`, from its `permission` attribute (MK-056). */
+  readonly permission?: string;
 }
 
 const CUSTOM_ELEMENT = /^[a-z][a-z0-9]*(-[a-z0-9]+)+$/;
@@ -55,6 +58,7 @@ export function launcherEntries(
       }
       seen.add(route);
       const icon = stringAttribute(contribution, 'icon');
+      const permission = requiredPermission(contribution);
       const order = contribution.attributes.order;
       entries.push({
         entry: {
@@ -66,6 +70,7 @@ export function launcherEntries(
           ...(icon && ICON.test(icon)
             ? { icon: `/api/v1/extension-assets/${contribution.extensionId}/${icon}` }
             : {}),
+          ...(permission ? { permission } : {}),
         },
         order: typeof order === 'number' && Number.isFinite(order) ? order : DEFAULT_ORDER,
       });
