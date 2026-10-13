@@ -366,6 +366,66 @@ const ITALIAN: Record<string, string> = {
   'Saved: {name}': 'Salvato: {name}',
   'New key for {name}. Copy it now, put it in the service, then revoke the old key.':
     'Nuova chiave per {name}. Copiala ora, mettila nel servizio, poi revoca la vecchia chiave.',
+  // Sharing (MK-055)
+  'A person': 'Una persona',
+  'Everyone in {name}': 'Tutti in {name}',
+  'the organization': "l'organizzazione",
+  'Everyone, also without an account': 'Chiunque, anche senza un account',
+  'Link with a password, until {date}': 'Link con password, fino al {date}',
+  'Link, until {date}': 'Link, fino al {date}',
+  '{owner}, who owns it, the people with the level {level} and the administrators of the organization can share it.':
+    "Possono condividerla {owner}, che ne è proprietario, le persone con il livello {level} e gli amministratori dell'organizzazione.",
+  'The people with the level {level} and the administrators of the organization can share it.':
+    "Possono condividerla le persone con il livello {level} e gli amministratori dell'organizzazione.",
+  'You have no access to this resource.': 'Non hai accesso a questa risorsa.',
+  'The sharing cannot be read: {reason}': 'La condivisione non si può leggere: {reason}',
+  'Shared with {subject}.': 'Condiviso con {subject}.',
+  'Not shared: {reason}': 'Non condiviso: {reason}',
+  'Choose a day from tomorrow on.': 'Scegli un giorno da domani in poi.',
+  'Link made. Copy it now: it is shown only once.':
+    'Link creato. Copialo ora: si vede una volta sola.',
+  'The link was not made: {reason}': 'Il link non è stato creato: {reason}',
+  'Access removed: {subject}.': 'Accesso tolto: {subject}.',
+  'The access was not removed: {reason}': "L'accesso non è stato tolto: {reason}",
+  'Share {title}': 'Condividi {title}',
+  Share: 'Condividi',
+  'Your level: {level}': 'Il tuo livello: {level}',
+  Close: 'Chiudi',
+  'Who has access': 'Chi ha accesso',
+  'Only who owns it and the administrators.': 'Solo chi ne è proprietario e gli amministratori.',
+  'Level of {subject}': 'Livello di {subject}',
+  'Remove access of {subject}': "Togli l'accesso a {subject}",
+  Remove: 'Togli',
+  'A team': 'Un team',
+  'Everyone in the organization': "Tutti nell'organizzazione",
+  'Share with': 'Condividi con',
+  Who: 'Chi',
+  Level: 'Livello',
+  Link: 'Link',
+  'Anyone with the link opens it, also without an account, until it expires or is removed.':
+    'Chiunque abbia il link lo apre, anche senza account, finché non scade o viene tolto.',
+  'Link level': 'Livello del link',
+  'Expires on': 'Scade il',
+  'Password (optional)': 'Password (facoltativa)',
+  'Create link': 'Crea link',
+  'Address of the link': 'Indirizzo del link',
+  'Shown only now: copy it and give it to the people you choose.':
+    'Si vede solo ora: copialo e dallo alle persone che scegli.',
+  Copied: 'Copiato',
+  'Copy the address': "Copia l'indirizzo",
+  'Select the address and copy it.': "Seleziona l'indirizzo e copialo.",
+  'Opening the link…': 'Apertura del link…',
+  'Link not found': 'Link non trovato',
+  'This link does not exist: it may have expired or been removed. Ask who gave it to you for a new one.':
+    'Questo link non esiste: può essere scaduto o essere stato tolto. Chiedine uno nuovo a chi te lo ha dato.',
+  'The link cannot be opened: {reason}': 'Il link non si può aprire: {reason}',
+  'This link asks for a password': 'Questo link chiede una password',
+  'The password is not correct.': 'La password non è corretta.',
+  'Password of the link': 'Password del link',
+  Open: 'Apri',
+  'Shared with you through a link, until {date}.': 'Condiviso con te con un link, fino al {date}.',
+  'Its app cannot show it here. Sign in to open it.':
+    'La sua app non lo può mostrare qui. Accedi per aprirlo.',
 };
 
 const TRANSLATIONS: Record<Language, Record<string, string>> = { en: {}, it: ITALIAN };
