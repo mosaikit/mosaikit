@@ -155,6 +155,29 @@ where each permission comes from, `profile`, `exceptions/{permission}`), `teams/
 and `preview` (what a proposed member with a role, a profile and teams would hold, without changing
 anything). Permissions are named `<extension>:<permission>`.
 
+## Sharing of resources
+
+Extensions that register their resources (MK-054) let people share them, one by one, with a
+person, a team, the whole organization, anyone with a link or the public, at the levels the
+extension declares, such as view, use, edit and manage (MK-055). The administrators of an
+organization hold every level on every resource of their organization and may share any of them;
+platform administrators hold none for being platform administrators. A guest gets what is shared
+with them or with their teams, never what is shared with the organization.
+
+A link carries a level (never one that edits), an expiry and an optional password, and can be
+revoked; after its expiry or revocation it answers "not found". No link lasts longer than
+`mosaikit.sharing.link-max-validity` (30 days unless the installation sets otherwise; see
+[configuration](configuration.md)). The kernel keeps only a hash of the secret of a link, so its
+address is shown once, when it is made.
+
+Every grant, change of level, revocation and use of a link is in the audit log, as
+`sharing.granted`, `sharing.revoked`, `sharing.link.created`, `sharing.link.revoked` and
+`sharing.link.used` (also when refused). The REST API is under `/api/v1/sharing` (see the OpenAPI
+document of the installation); the sharing dialog of the shell comes next.
+
+An update of an extension that removes a resource type, or a level of one, on which grants exist
+is refused, with the list of those grants: revoke them first.
+
 ## Audit log
 
 The kernel records who proposed, confirmed, rejected or ran an action of an assistant, and who

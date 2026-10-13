@@ -516,11 +516,11 @@ who has to confirm it, not for the assistant only.
 
 ## Resources, sharing and permissions
 
-> **Registry and permissions implemented, sharing in preview.** The kernel provides the
-> `Resources` bean (MK-054) and the `Permissions` bean (MK-056): Java extensions register their
-> resources and check permissions today. Sharing (MK-055) is still an **API preview**: its manifest
-> entries are validated and its Java types are in `kernel-api`, but the bean `Sharing` is not
-> provided yet: write against the contract, do not ship on it. See
+> **Registry, permissions and sharing implemented.** The kernel provides the `Resources` bean
+> (MK-054), the `Permissions` bean (MK-056) and the `Sharing` bean (MK-055): Java extensions
+> register their resources, check permissions and share resources today, and the REST API of the
+> sharing dialog is under `/api/v1/sharing`; the dialog itself and its `@mosaikit/sdk` counterpart
+> come next. See
 > [ADR-0037](../adr/0037-resources-and-one-sharing-model.md) and
 > [ADR-0038](../adr/0038-permissions-from-manifests-and-profiles.md). The counterpart in
 > `@mosaikit/sdk` (permissions to hide what is not available, the sharing dialog) comes with the
@@ -645,10 +645,24 @@ public class DashboardResource {
 ```
 
 `sharing.visible` returns a set of identifiers, which suits collections of hundreds of resources.
-For larger ones the implementation adds a SQL function of the kernel, such as
-`mk_kernel.allows(type, id, level)`, next to `mk_kernel.current_organization()`: call it in the
-query of the list page, so that the database filters and pages the rows and the identifiers never
-travel.
+For larger ones call the SQL function of the kernel in the query of the list page, so that the
+database filters and pages the rows and the identifiers never travel:
+
+```sql
+-- mk_kernel.allows(extension text, type text, id text, level text) returns boolean
+select d.* from ext_dashboards.dashboard d
+where mk_kernel.allows('dev.example.dashboards', 'dashboard', d.id::text, 'view')
+order by d.title
+limit 50 offset 0;
+```
+
+It answers for the request, as `sharing.allows(ref, level)` does: `true` when the resource is
+registered in the organization of the request and the person is its owner, an administrator of the
+organization, or reached by a grant at that level or above (to them, to a team of theirs, to the
+organization unless they are a guest, or to the public, which counts as the lowest level). An
+undeclared level, a type of no active extension or a resource that is not registered give `false`.
+Links are not considered: a request opened with a link has no organization, and the Java API answers
+for it.
 
 `require` throws `AccessDeniedException` (`dev.mosaikit.kernel.api.permission`), which the kernel
 answers with 403, or with 404 when the person may not see the resource at all, so that its existence
@@ -679,6 +693,31 @@ What the permissions do today (MK-056):
   `/api/v1/organizations/{slug}/permissions` (see the [administration guide](../guide/administration.md)).
 - Guests are refused the backends of extensions (`/api/v1/ext/…`) as before (MK-032): a permission
   granted to a guest matters for the frontend and for the documents of the extension.
+
+What sharing does today (MK-055):
+
+- Levels are ordered as the manifest lists them; `grant`, `createLink` and `allows` refuse, with
+  `IllegalArgumentException`, a level the type does not declare, a kind of subject the type does not
+  accept (`subjects`), a level above what the kind may get (the lowest for the public, `linkLevel`
+  for links), a person or a team of another organization, and a link without an expiry or expiring
+  after the longest validity of the installation (`mosaikit.sharing.link-max-validity`, 30 days by
+  default). A resource that is not registered in the organization throws `NoSuchElementException`.
+- The people who share are the owner, the administrators of the organization and the people who
+  hold the highest level through a grant to them, a team of theirs or the organization; a level
+  given by a link or the public never lets anyone share. The others get `AccessDeniedException`.
+- Granting again to the same subject replaces its level, also lowering it; `revoke` of a grant that
+  is gone does nothing. The grants of a resource go with it, with the person or the team they name.
+- `createLink` returns the address `/shared/<secret>`; the kernel keeps only the SHA-256 of the
+  secret, so the address is given once. A link is opened without an account with
+  `POST /api/v1/sharing/links/open` (`{ "token", "password" }`), which answers the resource, its
+  link and the level, 404 once the link expired or was revoked, and 403 when its password is
+  missing or wrong. A request that carries the secret in the header `X-Mosaikit-Link` (and the
+  password in `X-Mosaikit-Link-Password`) gets the level of the link from `level`, `allows`,
+  `require` and `visible`. Every use of a link, refused or not, is in the audit log
+  (`sharing.link.used`). The APIs of extension backends (`/api/v1/ext/*`) still require an account:
+  serving a resource to a link without an account comes with the sharing dialog.
+- Grants live in the kernel table `mk_kernel.resource_grant`, under row-level security: another
+  organization never sees them.
 
 What the registry does today (MK-054):
 
