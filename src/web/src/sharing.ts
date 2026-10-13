@@ -3,6 +3,7 @@
 import {
   EventBus,
   NO_LIVE,
+  SHARE_TOPIC,
   dataCollections,
   isMosaikitExtension,
   type ExtensionContext,
@@ -16,7 +17,7 @@ import { language, t } from './i18n.js';
  */
 
 /** The topic on which a frontend asks the shell to open the sharing dialog for one of its resources. */
-export const SHARE_TOPIC = 'shell.share';
+export { SHARE_TOPIC };
 
 /** The path of the shell that opens a link, followed by its secret. */
 export const SHARED_PATH = '/shared/';

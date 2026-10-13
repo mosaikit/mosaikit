@@ -41,6 +41,8 @@ project follows [Semantic Versioning](https://semver.org/).
   /api/v1/sharing/resources/.../grants` takes a person by `email`, the resource of the dialog names
   its owner (`ownerName`), and opening a link names the element that shows it (`view`). The notes
   fixture shares memos this way (MK-054).
+- `@mosaikit/sdk`: `openSharing` opens the sharing dialog of the shell for a resource of the
+  extension, and `sharingLevel` reads the level of the person on it, as the dialog shows it (MK-055).
 
 - Signed, expiring links to the files of extensions (MK-093): `POST /api/v1/files/{extension}/links`
   makes a link to a file the person reads, or to every file under a prefix of names of the
