@@ -54,7 +54,10 @@ class S3FileStoreTest {
     @BeforeAll
     @SuppressWarnings("resource")
     static void start() {
-        minio = new GenericContainer<>(System.getProperty("it.minio.image", "cgr.dev/chainguard/minio:latest"))
+        minio = new GenericContainer<>(
+                        System.getProperty(
+                                "it.minio.image",
+                                "cgr.dev/chainguard/minio@sha256:dc455cdd4db6e390b1b26514f15ff37681a777bf8dab41aac445a0259f751e56"))
                 .withCommand("server", "/tmp/data")
                 .withEnv("MINIO_ROOT_USER", USER)
                 .withEnv("MINIO_ROOT_PASSWORD", SECRET)
