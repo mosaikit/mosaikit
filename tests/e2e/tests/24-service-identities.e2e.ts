@@ -33,7 +33,7 @@ test.describe('MK-124 Service identities for internal callers of the APIs of ext
     await expect(page.getByRole('heading', { name: 'Service identities', level: 1 })).toBeVisible();
 
     const form = page.getByRole('form', { name: 'New service identity' });
-    await form.getByLabel('Name').fill('e2e-gateway');
+    await form.getByLabel('Name', { exact: true }).fill('e2e-gateway');
     await form.getByLabel('Description').fill('In front of the map server');
     await form.getByLabel('APIs of extensions').fill('fixture-notes');
     await form.getByLabel('Check the access keys of people').check();
