@@ -171,7 +171,8 @@ running one.
 
 | Lane | When | What |
 |---|---|---|
-| Fast | pull requests, about 4 minutes | frontend checks, unit and Quarkus tests (without the installation tests and Keycloak) and end-to-end tests at the same time, secrets, SAST; a pull request of documentation only (`docs/`, Markdown files at the root) runs the frontend checks and `DocumentationTest`, in about a minute |
+| Fast | pull requests, about 4 minutes | frontend checks, unit and Quarkus tests (without the installation tests and Keycloak) and end-to-end tests at the same time, secrets, SAST; a pull request of documentation only (`docs/`, `changelog.d/`, Markdown files at the root) runs the frontend checks and `DocumentationTest`, in about a minute |
+| Merge queue | each pull request in the merge queue of `main` (`merge_group`), on the commit that merges it with `main` and the pull requests ahead of it | the fast lane, always whole (no documentation-only shortcut), plus the release documents; not `changelog`, which passed on the pull request |
 | Full | `main`, every night at 02:17 UTC, tags, by hand | everything above, plus the installation tests, the tests with Keycloak, SonarQube, SBOM, dependency scan and the release documents; the portable archives on tags or by hand |
 
 The tests of the backend run in two jobs at the same time, `backend shard 1/2` and
@@ -181,9 +182,12 @@ keep the test classes of one shard, the slow ones as listed in
 every class runs in exactly one shard. A class that takes more than a few seconds is worth a line
 there. The job `backend` passes when both shards pass.
 
-`frontend`, `backend` and `e2e` are required checks of `main`, and pull requests are opened with
-auto-merge (`gh pr merge --auto --rebase`): GitHub merges them when the checks pass, so nobody
-waits for the CI.
+`frontend`, `backend`, `e2e`, `docs`, `changelog`, `secrets` and `sast` are the required checks of
+`main` (a job skipped by its condition, such as `docs` on a pull request, counts as passed), and pull
+requests are opened with auto-merge (`gh pr merge --auto --rebase`): GitHub merges them when the
+checks pass, so nobody waits for the CI. With the merge queue of `main` turned on, auto-merge puts
+a pull request in the queue instead, and the workflow runs again on what `main` will be after it;
+pull requests that each passed alone, but not together, no longer break `main`.
 
 The code is analysed on SonarQube Cloud (organization `mosaikit`, project `mosaikit_mosaikit`):
 the `sonarqube` job runs when the repository secret `SONAR_TOKEN` is defined, with Automatic Analysis

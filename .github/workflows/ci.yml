@@ -18,6 +18,9 @@ name: CI
 
 on:
   pull_request:
+  # The merge queue of main: the checks of a pull request run again on the commit that merges it
+  # with main and the pull requests ahead of it in the queue, before it is merged.
+  merge_group:
   push:
     branches: [main]
     tags:
@@ -70,9 +73,10 @@ jobs:
           name: release-notes
           path: release-notes.md
 
-  # Whether a pull request changes more than the documentation: one that changes only docs/ and the
-  # Markdown files at the root skips the build of the kernel and the end-to-end tests (a skipped
-  # job counts as passed for the required checks). Pushes and the nightly lane always run them.
+  # Whether a pull request changes more than the documentation: one that changes only docs/, the
+  # changelog fragments and the Markdown files at the root skips the build of the kernel and the
+  # end-to-end tests (a skipped job counts as passed for the required checks). Pushes, the nightly
+  # lane and the merge queue (merge_group, which has no diff of a pull request) always run them.
   changes:
     runs-on: ubuntu-latest
     outputs:
@@ -89,7 +93,7 @@ jobs:
           code=true
           if [[ "$EVENT" == pull_request ]]; then
             changed="$(git diff --name-only "$BASE_SHA"...HEAD)"
-            if ! grep -qvE '^(docs/|[^/]+\.md$|LICENSE$)' <<<"$changed"; then
+            if ! grep -qvE '^(docs/|changelog\.d/|[^/]+\.md$|LICENSE$)' <<<"$changed"; then
               code=false
             fi
           fi
@@ -121,7 +125,7 @@ jobs:
   # follows the code run in the frontend (docs/test) and backend (DocumentationTest) jobs.
   # On a tag the release job attaches the bundle.
   docs:
-    # Nightly lane: not on pull requests.
+    # Nightly lane and merge queue (under a minute): not on pull requests.
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     container: pandoc/extra:3.7
@@ -144,8 +148,9 @@ jobs:
           path: target/docs/
           retention-days: 7
 
-  # A pull request that changes the product also updates CHANGELOG.md (label no-changelog to skip;
-  # after adding the label, re-run the job).
+  # A pull request that changes the product adds a changelog fragment, changelog.d/<id>.md, or edits
+  # CHANGELOG.md (label no-changelog to skip; after adding the label, re-run the job). Skipped in the
+  # merge queue, where it already passed on the pull request.
   changelog:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
@@ -193,11 +198,12 @@ jobs:
       # The UI that the kernel packages (the frontend job checks it at the same time).
       - run: npm run build
       # Pull requests run the fast lane: the installation tests (MK-011, minutes each) and the tests
-      # with Keycloak (in Docker) run on main, every night and on tags. A pull request of
+      # with Keycloak (in Docker) run on main, every night and on tags; the merge queue runs the fast
+      # lane too, as main runs the full one right after the merge. A pull request of
       # documentation only runs the test that the documentation follows the code, in shard 1.
       - name: Tests
         env:
-          SLOW: ${{ github.event_name != 'pull_request' }}
+          SLOW: ${{ github.event_name != 'pull_request' && github.event_name != 'merge_group' }}
           CODE: ${{ needs.changes.outputs.code }}
           SHARD: ${{ matrix.shard }}/2
         run: |
@@ -384,8 +390,9 @@ jobs:
   # pom.xml. Pull requests from forks get no secrets, so the analysis is skipped there.
   sonarqube:
     needs: [backend, frontend]
-    # Nightly lane: not on pull requests (the analysis of main keeps the quality gate).
-    if: github.event_name != 'pull_request'
+    # Nightly lane: not on pull requests nor in the merge queue (the analysis of main keeps the
+    # quality gate).
+    if: github.event_name != 'pull_request' && github.event_name != 'merge_group'
     runs-on: ubuntu-latest
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -488,8 +495,9 @@ jobs:
   # ---------------------------------------------------------------------------------------------
 
   sbom:
-    # Nightly lane: not on pull requests.
-    if: github.event_name != 'pull_request'
+    # Nightly lane: not on pull requests nor in the merge queue, as before the queue (with sbom, the
+    # dependency scan runs on every push to main and every night).
+    if: github.event_name != 'pull_request' && github.event_name != 'merge_group'
     needs: backend
     runs-on: ubuntu-latest
     steps:
