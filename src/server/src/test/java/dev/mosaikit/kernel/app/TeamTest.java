@@ -285,7 +285,50 @@ class TeamTest {
         in(outsider).get(NOTES + "/" + id).then().statusCode(200);
     }
 
+    @Test
+    @Tag("MK-055")
+    void anAdministratorOutsideTheTeamGetsNoLevelOnItsDocuments() throws SQLException {
+        String administrator = register(town);
+        asAdmin()
+                .body(Map.of("roles", List.of("organization-admin", "organization-user")))
+                .put("/api/v1/organizations/{slug}/members/{email}", town, administrator)
+                .then()
+                .statusCode(200);
+        String roads = createTeam("Roads", "private");
+        put(roads, member, "member", 200);
+        String id = in(member)
+                .queryParam("team", roads)
+                .body(Map.of("text", "Salaries"))
+                .post(NOTES)
+                .then()
+                .statusCode(201)
+                .extract()
+                .path("id");
+
+        // As MK-032 decided: the documents of a team are for its members, not for the administrators
+        // of the organization by being administrators (ADR-0037, refined); Java and SQL agree.
+        in(administrator).get(NOTES + "/" + id).then().statusCode(404);
+        in(administrator)
+                .get("/api/v1/sharing/resources/dev.mosaikit.test.notes/data-document/" + id)
+                .then()
+                .statusCode(404);
+        in(administrator).body(Map.of("text", "x")).put(NOTES + "/" + id).then().statusCode(404);
+        in(administrator).delete(NOTES + "/" + id).then().statusCode(404);
+        assertThat(visibleRows(id, administrator, false, true)).isZero();
+        assertThat(visibleRows(id, member, false, false)).isEqualTo(1);
+
+        // An administrator who is in the team reads it as a member.
+        put(roads, administrator, "member", 200);
+        in(administrator).get(NOTES + "/" + id).then().statusCode(200);
+        assertThat(visibleRows(id, administrator, false, true)).isEqualTo(1);
+    }
+
     private int visibleRows(String document, String person, boolean asGuest) throws SQLException {
+        return visibleRows(document, person, asGuest, false);
+    }
+
+    private int visibleRows(String document, String person, boolean asGuest, boolean administrator)
+            throws SQLException {
         Config config = ConfigProvider.getConfig();
         String organization = asAdmin().get("/api/v1/organizations/" + town).path("id");
         String account = as(person, PASSWORD).get("/api/v1/accounts/me").path("id");
@@ -299,11 +342,12 @@ class TeamTest {
             String member = roles.getString(1);
             try (var set = connection.prepareStatement("select set_config('role', ?, false),"
                     + " set_config('mosaikit.organization', ?, false), set_config('mosaikit.account', ?, false),"
-                    + " set_config('mosaikit.guest', ?, false)")) {
+                    + " set_config('mosaikit.guest', ?, false), set_config('mosaikit.administrator', ?, false)")) {
                 set.setString(1, member);
                 set.setString(2, organization);
                 set.setString(3, account);
                 set.setString(4, String.valueOf(asGuest));
+                set.setString(5, String.valueOf(administrator));
                 set.execute();
             }
             try (var count =

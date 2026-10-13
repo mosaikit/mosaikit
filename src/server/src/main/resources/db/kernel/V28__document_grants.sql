@@ -7,6 +7,13 @@
 -- highest of the type: what the members of the team could do before. The kernel writes the levels of
 -- 'data-document' in sharing_level at start, for every extension with collections, as it does for the
 -- types that manifests declare. Documents of the whole organization do not change.
+--
+-- A document of a team stays for the members of the team only, as MK-032 decided: the administrators
+-- of the organization, who hold every level on the resources of their organization (ADR-0037), do
+-- not hold it on 'data-document', a type of the kernel private to its subjects. sharing_level says it
+-- per type, and allows() reads it.
+
+alter table sharing_level add column administrators boolean not null default true;
 
 insert into resource (id, organization_id, extension_id, type, ref_id, owner_id, title, link, parent_id,
                       created_at, updated_at)
@@ -33,7 +40,7 @@ on conflict do nothing;
 
 -- A document of the organization is for its members, not its guests, as before; a document of a team
 -- is for those to whom mk_kernel.allows() gives a level on it: the members of the team through its
--- grant, and the administrators of the organization, who hold every level on its resources (ADR-0037).
+-- grant, and the people it was then shared with; not the administrators by being administrators.
 -- Reading needs 'view', writing 'edit'.
 drop policy extension_document_access on extension_document;
 create policy extension_document_access on extension_document
@@ -47,3 +54,39 @@ create policy extension_document_access on extension_document
             when team_id is null then not current_guest()
             else allows(extension_id, 'data-document', id::text, 'edit')
         end);
+
+-- As in V18, but the administrators of the organization hold every level only on the types where
+-- sharing_level says so.
+create or replace function allows(p_extension text, p_type text, p_ref_id text, p_level text)
+    returns boolean
+    language sql stable
+    set search_path = mk_kernel, pg_temp
+    as $$
+    select exists (
+        select 1
+        from resource r
+        join sharing_level needed
+          on needed.extension_id = r.extension_id and needed.type = r.type and needed.level = p_level
+        where r.organization_id = current_organization()
+          and r.extension_id = p_extension and r.type = p_type and r.ref_id = p_ref_id
+          and (
+            (current_account() is not null and r.owner_id = current_account())
+            or (current_administrator() and needed.administrators)
+            or exists (
+                select 1
+                from resource_grant g
+                join sharing_level given
+                  on given.extension_id = r.extension_id and given.type = r.type and given.level = g.level
+                where g.resource_id = r.id
+                  and case when g.subject_kind = 'public' then 0 else given.rank end >= needed.rank
+                  and (
+                    g.subject_kind = 'public'
+                    or (g.subject_kind = 'organization' and current_account() is not null and not current_guest())
+                    or (g.subject_kind = 'person' and g.account_id = current_account())
+                    or (g.subject_kind = 'group' and exists (
+                            select 1 from team_member m
+                            where m.team_id = g.team_id and m.account_id = current_account()))
+                  )
+            )
+          )
+    ) $$;

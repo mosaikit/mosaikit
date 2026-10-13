@@ -12,8 +12,10 @@ project follows [Semantic Versioning](https://semver.org/).
   (MK-055, ADR-0037): each is a resource of type `data-document` of its extension, owned by the
   organization, and its team holds the level `edit` (migration V28 moves the existing ones). The
   row-level security reads them through `mk_kernel.allows()`: the members of the team read and change
-  them as before, the sharing dialog can give access to other people and teams, and the
-  administrators of the organization now read them too, as every resource of their organization.
+  them as before, and the sharing dialog can give access to other people and teams. As MK-032
+  decided, the administrators of the organization do not read them for being administrators:
+  `data-document` is a type of the kernel private to its subjects, where the implicit level of
+  administrators does not apply (`sharing_level.administrators`, read by `mk_kernel.allows()`).
 - The APIs of extensions (`/api/v1/ext/*`) answer a request without an account that carries a link
   that works and opens a resource of that same extension (policy `person-or-link`): it acts on the
   organization of the resource only once `Sharing` answered for that resource, so routes that do not

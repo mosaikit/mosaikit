@@ -43,6 +43,17 @@ public final class ResourceTypes {
 
     private ResourceTypes() {}
 
+    /**
+     * Whether the administrators of the organization hold every level on the resources of a type
+     * (ADR-0037), as on every type that an extension declares; not on the kernel's types that are
+     * private to their subjects, such as {@value #DOCUMENT}: a document shared with a team is read by
+     * the members of the team only, as MK-032 decided, administrators included only when they are
+     * members. The owner and the explicit grants still apply. Extension types cannot opt out yet.
+     */
+    public static boolean administratorsHoldEveryLevel(ResourceTypeEntry type) {
+        return !DOCUMENT_TYPE.equals(type);
+    }
+
     /** A type of the extension: the type of its documents, or one its manifest declares. */
     public static Optional<ResourceTypeEntry> of(ExtensionManifest manifest, String type) {
         if (DOCUMENT.equals(type) && manifest.data().isPresent()) {

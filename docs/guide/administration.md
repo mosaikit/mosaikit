@@ -317,8 +317,9 @@ organization turns the apps of an extension off, its links open nothing.
 
 The documents that apps without a backend share with a team (MK-032) are resources of this model
 too: the team holds the level Edit on each of them, and the dialog can give access to other people
-or teams, or take it away from the team. The administrators of the organization read and change
-them, as every resource of their organization. The documents shared with teams before this version
+or teams, or take it away from the team. As before, the administrators of the organization do not
+read them for being administrators: only the members of the team and whoever a document is shared
+with do (an exception to the rule above). The documents shared with teams before this version
 were moved onto the model when the kernel was updated (migration `V28`).
 
 An update of an extension that removes a resource type, or a level of one, on which grants exist

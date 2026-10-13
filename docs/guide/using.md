@@ -68,9 +68,9 @@ a team owns it, and adds or removes people; a **public** team is listed to every
 organization, who can join it, a **private** one only to its people. An owner can also add a
 **guest**: a person of another organization with an account on this installation. A guest signs in
 with their password, chooses the organization, and sees only the teams where they were added and
-what the apps share with them. What an app shares with a team is read by its people and by the
-administrators of the organization, and by whoever it is then shared with (see "Sharing"). Out of
-their last team, a guest is no longer in the organization.
+what the apps share with them. What an app shares with a team is read by its people and by no one
+else, not even the administrators. Out of their last team, a guest is no longer in the
+organization.
 
 ### The app Teams
 

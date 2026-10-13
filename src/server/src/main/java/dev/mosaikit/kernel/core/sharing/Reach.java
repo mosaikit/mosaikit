@@ -41,7 +41,8 @@ final class Reach {
 
     /**
      * The highest level of the viewer on a resource: every level for its owner and for the
-     * administrators of its organization, otherwise the highest that a live grant reaching them gives,
+     * administrators of its organization (unless the type is private to its subjects,
+     * {@link ResourceTypes#administratorsHoldEveryLevel}), otherwise the highest that a live grant reaching them gives,
      * capped at what its kind of subject may be given; empty when none reaches them.
      *
      * @param owner the owner of the resource, {@code null} when the organization owns it
@@ -53,7 +54,8 @@ final class Reach {
         if (viewer.account() != null && viewer.account().equals(owner)) {
             return Optional.of(top);
         }
-        if (viewer.administrator()) {
+        // Not for a type private to its subjects, such as the documents of a team (MK-032).
+        if (viewer.administrator() && ResourceTypes.administratorsHoldEveryLevel(type)) {
             return Optional.of(top);
         }
         int best = -1;

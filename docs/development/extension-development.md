@@ -438,9 +438,11 @@ extension, owned by the organization, with the title of its `title`, `name` or `
 gives the team the level `edit` (the type has `view` and `edit`, and is shared with people, teams
 and the organization, never with links or the public). The sharing dialog opens it like any other
 resource (`context.events.publish('shell.share', { extension, type: 'data-document', id })`), to give
-other people or teams access, for reading only or for changing it, or to take the team away. As for
-every resource, the administrators of the organization read and change it. The name `data-document`
-belongs to the kernel in an extension with collections.
+other people or teams access, for reading only or for changing it, or to take the team away. Unlike
+the types of extensions, `data-document` is **private to its subjects**: the administrators of the
+organization hold no level on it for being administrators, so a document of a team is read only by
+the members of the team and by whoever it is shared with, as MK-032 decided. The name
+`data-document` belongs to the kernel in an extension with collections.
 
 A Java backend reads the teams of the person and their people through `Teams` of `kernel-api`
 (`dev.mosaikit.kernel.api.teams`). Guests of an organization cannot call the APIs of backends.
@@ -600,7 +602,9 @@ The rules the kernel applies:
   group of theirs, to the organization, to a link they opened or to the public.
 - **Administrators of the organization hold everything in it**: every permission of every
   extension, implicitly, and every level on every resource of the organization, so they read and
-  edit everything. **Platform administrators hold none** in an organization for being platform
+  edit everything. The only exception are types of the kernel private to their subjects, such as
+  the documents of a team (`data-document`); the types of extensions cannot opt out yet (a later
+  change of `kernel-api` may let them). **Platform administrators hold none** in an organization for being platform
   administrators. **Guests hold no permission** unless a group of theirs or a personal exception
   grants it explicitly.
 - **Grants only add.** Profiles, groups and exceptions add permissions, grants add levels; nothing

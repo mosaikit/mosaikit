@@ -226,8 +226,8 @@ public class DocumentService {
     /**
      * Whether the person reads a document, as the row-level security decides too: one of the whole
      * organization unless a guest, one shared with a team at the level {@value ResourceTypes#VIEW}
-     * of the sharing model (MK-032, MK-055): its members, through the grant to the team, and the
-     * administrators of the organization.
+     * of the sharing model (MK-032, MK-055): its members, through the grant to the team, and whoever
+     * it was shared with; not the administrators of the organization for being administrators.
      */
     private boolean readable(ExtensionDocument document) {
         if (document.getTeamId() == null) {
