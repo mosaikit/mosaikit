@@ -85,11 +85,14 @@ services:
       # Signed extension packages (MK-013): "required" accepts only packages signed with a key of
       # /opt/mosaikit/config/trusted-keys, which includes the key that signed ../extensions.
       MOSAIKIT_EXTENSIONS_SIGNATURES: ${MOSAIKIT_EXTENSIONS_SIGNATURES:-optional}
+      # Files of extensions (MK-041): in the mosaikit-files volume. For an S3-compatible store set
+      # MOSAIKIT_FILES_STORE=s3 and the MOSAIKIT_FILES_S3_* variables (see README.md).
     ports:
       - '8080:8080'
     volumes:
       # Copy extension packages (*.zip) here and run: docker compose restart mosaikit
       - ./extensions:/opt/mosaikit/extensions
+      - mosaikit-files:/opt/mosaikit/files
     depends_on:
       postgres:
         condition: service_healthy
@@ -99,3 +102,4 @@ services:
 
 volumes:
   postgres-data:
+  mosaikit-files:

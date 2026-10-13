@@ -79,6 +79,8 @@
              when the Quarkus BOM brings 2.22.3 or later. -->
         <jackson-bom.version>2.22.3</jackson-bom.version>
         <archunit.version>1.5.0</archunit.version>
+        <!-- The S3 client of the file store (MK-041), not managed by the Quarkus BOM. -->
+        <awssdk.version>2.55.15</awssdk.version>
         <!-- Test libraries not managed by the Quarkus BOM -->
         <assertj.version>3.27.7</assertj.version>
 
@@ -160,6 +162,13 @@
                 <groupId>io.github.mosaikit</groupId>
                 <artifactId>mosaikit-kernel-api</artifactId>
                 <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>software.amazon.awssdk</groupId>
+                <artifactId>bom</artifactId>
+                <version>${awssdk.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
             </dependency>
             <dependency>
                 <groupId>io.quarkiverse.quinoa</groupId>

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.core.config;
 
+import io.quarkus.runtime.configuration.MemorySize;
 import io.smallrye.config.ConfigMapping;
 import io.smallrye.config.WithDefault;
 import java.net.URI;
@@ -105,6 +106,78 @@ public interface KernelConfig {
 
     /** The audit log (MK-059). */
     Audit audit();
+
+    /** The files of extensions (MK-041). */
+    Files files();
+
+    /** Where and how the kernel keeps the files of extensions (MK-041, ADR-0029). */
+    interface Files {
+
+        /**
+         * The store of the files: {@code filesystem}, a directory of the server, or {@code s3}, a
+         * bucket of an S3-compatible object store.
+         */
+        @WithDefault("filesystem")
+        Store store();
+
+        /**
+         * The directory of the {@code filesystem} store, relative to the working directory of the
+         * kernel when not absolute.
+         */
+        @WithDefault("files")
+        Path directory();
+
+        /**
+         * The largest file, such as {@code 512M} or {@code 2G}. An upload through the REST API is also
+         * bound by {@code quarkus.http.limits.max-body-size} (10M by default), which an installation
+         * raises with it.
+         */
+        @WithDefault("10M")
+        MemorySize maxSize();
+
+        /** The {@code s3} store. */
+        S3 s3();
+
+        /** The stores of files. */
+        enum Store {
+            FILESYSTEM,
+            S3
+        }
+
+        /** Settings of an S3-compatible object store. */
+        interface S3 {
+
+            /**
+             * The URL of the store, such as {@code https://s3.example.org} for a store on premises;
+             * absent for Amazon S3, whose URL follows from the region.
+             */
+            Optional<URI> endpoint();
+
+            /** The region of the bucket; any value for a store that has no regions. */
+            @WithDefault("us-east-1")
+            String region();
+
+            /** The bucket of the files, which must exist. */
+            Optional<String> bucket();
+
+            /**
+             * Whether the bucket goes in the path of the URL ({@code https://s3.example.org/bucket})
+             * rather than in its host name, as most stores on premises need.
+             */
+            @WithDefault("false")
+            boolean pathStyle();
+
+            /**
+             * The access key; absent to use the credentials of the environment of the kernel (the
+             * variables {@code AWS_ACCESS_KEY_ID} and {@code AWS_SECRET_ACCESS_KEY}, a profile, the
+             * role of the machine).
+             */
+            Optional<String> accessKeyId();
+
+            /** The secret of the access key, from a secret: the kernel never logs it. */
+            Optional<String> secretAccessKey();
+        }
+    }
 
     /** Settings of the audit log. */
     interface Audit {

@@ -30,7 +30,7 @@ in `extensions/`, so the folder can stay in use (even with the stack running) ac
 | install an extension | copy its package (`<name>.zip`, for example from `../extensions`) into `extensions/`, then `docker compose restart mosaikit` |
 | stop | `docker compose down` (the data stay in the `mosaikit_postgres-data` volume) |
 | delete everything, data included | `docker compose down -v` |
-| back up the data | `docker compose exec postgres pg_dumpall -U mosaikit > backup.sql` |
+| back up the data | `docker compose exec postgres pg_dumpall -U mosaikit > backup.sql`, and the files of extensions in the `mosaikit_mosaikit-files` volume |
 
 ## Organizations that sign in with Keycloak
 
@@ -47,6 +47,23 @@ The answer contains `initialAdministrator` with a temporary password, shown only
 open <http://localhost:8080>, enter `ada@acme.test`: Mosaikit sends you to the realm `acme`,
 where you set a new password. The identity providers of the organization (Microsoft Entra ID,
 Google, SAML, LDAP) are connected to its realm in the Keycloak console.
+
+## Files on an S3-compatible store
+
+The files of extensions are kept in the `mosaikit-files` volume. To keep them in a bucket of an
+S3-compatible store instead (MinIO, Ceph, Garage, Amazon S3), create the bucket and add to the
+`environment` of `mosaikit`:
+
+```yaml
+      MOSAIKIT_FILES_STORE: s3
+      MOSAIKIT_FILES_S3_ENDPOINT: https://s3.example.org
+      MOSAIKIT_FILES_S3_BUCKET: mosaikit-files
+      MOSAIKIT_FILES_S3_PATH_STYLE: 'true'
+      MOSAIKIT_FILES_S3_ACCESS_KEY_ID: mosaikit
+      MOSAIKIT_FILES_S3_SECRET_ACCESS_KEY: ${FILES_S3_SECRET:?set it in .env}
+```
+
+See the administration guide for the choice of the store.
 
 ## Production
 

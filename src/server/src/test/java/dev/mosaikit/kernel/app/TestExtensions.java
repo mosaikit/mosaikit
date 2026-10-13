@@ -66,6 +66,13 @@ public class TestExtensions implements QuarkusTestProfile {
                         title: Note
                         levels: [{ name: view, title: View }]
                     """);
+            // FileStorageTest: an extension that stores files, some attached to its albums (MK-041).
+            extension("files", FileStorageTest.EXTENSION, "Files", """
+                    resources:
+                      - type: album
+                        title: Album
+                        levels: [{ name: view, title: View }]
+                    """);
             // PermissionsTest: an extension that declares permissions (MK-056); the test changes
             // its manifest as an update would.
             extension("permissions", PermissionsTest.EXTENSION, "Permissions", PermissionsTest.PERMISSIONS);
@@ -86,7 +93,13 @@ public class TestExtensions implements QuarkusTestProfile {
             throw new UncheckedIOException(e);
         }
         return Map.of(
-                "mosaikit.extensions.directory", EXTENSIONS.toString(), "mosaikit.ui.theme", "dev.mosaikit.test.green");
+                "mosaikit.extensions.directory",
+                EXTENSIONS.toString(),
+                "mosaikit.ui.theme",
+                "dev.mosaikit.test.green",
+                // FileStorageTest: a limit that a test reaches quickly.
+                "mosaikit.files.max-size",
+                "1M");
     }
 
     static void extension(String directory, String id, String name, String extra) throws IOException {

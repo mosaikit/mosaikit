@@ -100,6 +100,24 @@ disabled: the kernel starts, logs why, and the endpoints of credentials answer 5
 | `mosaikit.extensions.providers-directory` | | set by the launcher: where the JARs of Java extensions are |
 | `mosaikit.extensions.packages-directory` | `extensions/.packages` | set by the launcher: where packages are unpacked |
 
+## Files
+
+The files of extensions (MK-041) are kept in a directory of the server or in a bucket of an
+S3-compatible object store; the database keeps only what the kernel knows of each file. See
+[choosing the store of files](administration.md#files-of-extensions).
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `mosaikit.files.store` | `filesystem` | `filesystem`, a directory of the server, or `s3`, a bucket of an S3-compatible object store (Amazon S3, MinIO, Ceph, Garage) |
+| `mosaikit.files.directory` | `files` | the directory of the `filesystem` store, relative to the working directory of the kernel when not absolute (the installation directory) |
+| `mosaikit.files.max-size` | `10M` | the largest file, such as `512M` or `2G`; an upload through the REST API is also bound by `quarkus.http.limits.max-body-size` (`10M`), which an installation raises with it. Larger files are refused with 413 |
+| `mosaikit.files.s3.endpoint` | | the URL of the store, such as `https://s3.example.org`; empty for Amazon S3, whose URL follows from the region |
+| `mosaikit.files.s3.region` | `us-east-1` | the region of the bucket; any value for a store without regions |
+| `mosaikit.files.s3.bucket` | | the bucket of the files, created beforehand; required with `s3` |
+| `mosaikit.files.s3.path-style` | `false` | `true` puts the bucket in the path of the URL rather than in its host name, as MinIO and most stores on premises need |
+| `mosaikit.files.s3.access-key-id` | | the access key; empty to use the credentials of the environment of the kernel (`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`, a profile, the role of the machine or of the pod) |
+| `mosaikit.files.s3.secret-access-key` | | its secret, from a secret (`MOSAIKIT_FILES_S3_SECRET_ACCESS_KEY`); the kernel never logs it |
+
 ## Assistant
 
 | Setting | Default | Meaning |

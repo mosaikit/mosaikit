@@ -26,14 +26,36 @@
         <!-- SonarQube: what this module contributes to the analysis (the root pom.xml sets the default). -->
         <sonar.sources>pom.xml,src/main/java,src/main/resources,../web/src,../web/index.html</sonar.sources>
         <sonar.tests>src/test/java,../web/test</sonar.tests>
-        <!-- Tests that need Keycloak (Docker): run with -Dtest.groups.excluded= (the nightly CI). -->
-        <test.groups.excluded>keycloak</test.groups.excluded>
+        <!-- Tests that need Keycloak or another container (Docker): run with -Dtest.groups.excluded=
+             (the nightly CI). -->
+        <test.groups.excluded>keycloak,docker</test.groups.excluded>
     </properties>
 
     <dependencies>
         <dependency>
             <groupId>io.github.mosaikit</groupId>
             <artifactId>mosaikit-kernel-api</artifactId>
+        </dependency>
+
+        <!-- Files on an S3-compatible object store (MK-041, ADR-0029): the S3 client of the AWS SDK
+             with the HTTP client of the JDK, without the Apache and Netty clients. -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <exclusions>
+                <exclusion>
+                    <groupId>software.amazon.awssdk</groupId>
+                    <artifactId>apache-client</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>software.amazon.awssdk</groupId>
+                    <artifactId>netty-nio-client</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>url-connection-client</artifactId>
         </dependency>
 
         <!-- HTTP: REST API, user interface routes, validation, OpenAPI, health -->

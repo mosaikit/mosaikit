@@ -75,6 +75,39 @@ spec:
             - name: MOSAIKIT_EXTENSIONS_TRUSTED_KEYS_DIRECTORY
               value: /etc/mosaikit/trusted-keys
             {{- end }}
+            - name: MOSAIKIT_FILES_STORE
+              value: {{ .Values.files.store | quote }}
+            - name: MOSAIKIT_FILES_MAX_SIZE
+              value: {{ .Values.files.maxSize | quote }}
+            - name: QUARKUS_HTTP_LIMITS_MAX_BODY_SIZE
+              value: {{ .Values.files.maxSize | quote }}
+            {{- if eq .Values.files.store "filesystem" }}
+            - name: MOSAIKIT_FILES_DIRECTORY
+              value: /var/lib/mosaikit/files
+            {{- else }}
+            {{- with .Values.files.s3.endpoint }}
+            - name: MOSAIKIT_FILES_S3_ENDPOINT
+              value: {{ . | quote }}
+            {{- end }}
+            - name: MOSAIKIT_FILES_S3_REGION
+              value: {{ .Values.files.s3.region | quote }}
+            - name: MOSAIKIT_FILES_S3_BUCKET
+              value: {{ required "files.s3.bucket is required with files.store=s3" .Values.files.s3.bucket | quote }}
+            - name: MOSAIKIT_FILES_S3_PATH_STYLE
+              value: {{ .Values.files.s3.pathStyle | quote }}
+            {{- with .Values.files.s3.existingSecret }}
+            - name: MOSAIKIT_FILES_S3_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: access-key-id
+            - name: MOSAIKIT_FILES_S3_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: secret-access-key
+            {{- end }}
+            {{- end }}
           readinessProbe:
             httpGet:
               path: /q/health/ready
@@ -95,6 +128,10 @@ spec:
               mountPath: /etc/mosaikit/trusted-keys
               readOnly: true
             {{- end }}
+            {{- if eq .Values.files.store "filesystem" }}
+            - name: files
+              mountPath: /var/lib/mosaikit/files
+            {{- end }}
             - name: tmp
               mountPath: /tmp
       volumes:
@@ -107,6 +144,11 @@ spec:
         - name: trusted-keys
           configMap:
             name: {{ . }}
+        {{- end }}
+        {{- if eq .Values.files.store "filesystem" }}
+        - name: files
+          persistentVolumeClaim:
+            claimName: {{ include "mosaikit.fullname" . }}-files
         {{- end }}
         - name: tmp
           emptyDir: {}

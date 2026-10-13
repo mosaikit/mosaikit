@@ -15,7 +15,7 @@ import java.util.Map;
 
 /**
  * Keeps the guests of an organization (MK-032) to what concerns them: their account, their teams,
- * the documents shared with their teams, the resources shared with them (MK-055), their activity
+ * the documents and files shared with their teams (MK-041), the resources shared with them (MK-055), their activity
  * and what the shell needs. The APIs of the
  * extension backends, the assistant and the administration are refused, since they would show the
  * data of the organization.
@@ -24,13 +24,14 @@ import java.util.Map;
 @Priority(Priorities.AUTHORIZATION + 5)
 public class GuestAccessFilter implements ContainerRequestFilter {
 
-    /** The paths open to guests; the row-level security limits the documents to their teams. */
+    /** The paths open to guests; the row-level security limits the documents and files to their teams. */
     static final List<String> OPEN = List.of(
             "/api/v1/accounts/",
             "/api/v1/data/",
             "/api/v1/identity",
             "/api/v1/notifications",
             "/api/v1/extension-assets/",
+            "/api/v1/files/",
             "/api/v1/sharing/",
             "/api/v1/shell/",
             "/api/v1/system/",

@@ -11,7 +11,8 @@ public abstract sealed class DomainException extends RuntimeException
                 ConflictException,
                 ForbiddenOperationException,
                 ServiceUnavailableException,
-                InvalidInputException {
+                InvalidInputException,
+                ContentTooLargeException {
 
     private static final long serialVersionUID = 1L;
 

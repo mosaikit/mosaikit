@@ -11,7 +11,8 @@ ENV LANG=C.UTF-8 \
     JAVA_OPTS="-XX:MaxRAMPercentage=75 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
 WORKDIR /opt/mosaikit
 COPY --chown=185 mosaikit/ ./
-RUN chmod 755 mosaikit
+# files/: the files of extensions (MK-041), a volume in compose.yaml, owned by the kernel.
+RUN chmod 755 mosaikit && mkdir -p files && chown 185 files
 USER 185
 EXPOSE 8080
 ENTRYPOINT ["/opt/mosaikit/mosaikit", "start"]
