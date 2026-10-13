@@ -85,11 +85,12 @@ class ResourceOwnerTest {
     }
 
     @Test
-    void anInstallationWithoutExtensionsKeepsNoEntry() {
+    void anInstallationWhereNoExtensionIsFoundKeepsItsEntries() {
         registry.register(NOTE, Resources.Details.of("Garden", "/app/notes/n1"));
 
-        assertThat(registry.forgetUninstalled(List.of())).isEqualTo(1);
-        assertThat(entries.rows).isEmpty();
+        // A missing or misconfigured extensions directory must not wipe the registry.
+        assertThat(registry.forgetUninstalled(List.of())).isZero();
+        assertThat(entries.rows).hasSize(1);
     }
 
     private static ExtensionManifest manifest() {
@@ -185,13 +186,6 @@ class ResourceOwnerTest {
             int before = rows.size();
             rows.removeIf(row -> !installed.contains(row.getExtensionId()));
             return before - rows.size();
-        }
-
-        @Override
-        public int deleteAll() {
-            int before = rows.size();
-            rows.clear();
-            return before;
         }
     }
 }

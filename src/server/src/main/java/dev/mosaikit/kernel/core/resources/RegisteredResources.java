@@ -57,8 +57,4 @@ public interface RegisteredResources {
     /** Removes the entries of every organization whose extension is not among those given. */
     @Query("delete from RegisteredResource r where r.extensionId not in :installed")
     int deleteAllExcept(List<String> installed);
-
-    /** Removes the entries of every organization. */
-    @Query("delete from RegisteredResource r")
-    int deleteAll();
 }

@@ -161,12 +161,18 @@ public class ResourceRegistry implements Resources {
      * security does not hide the entries of other organizations.
      *
      * @param installedExtensions the identifiers of every extension found in the installation, active
-     *     or not: an extension that is only incompatible keeps its entries
+     *     or not: an extension that is only incompatible keeps its entries. When none is found
+     *     nothing is removed: an extensions directory that is missing or misconfigured must not wipe
+     *     the registry and every grant built on it.
      * @return how many entries were removed
      */
     public int forgetUninstalled(Collection<String> installedExtensions) {
         List<String> keep = List.copyOf(new HashSet<>(installedExtensions));
-        int removed = keep.isEmpty() ? entries.deleteAll() : entries.deleteAllExcept(keep);
+        if (keep.isEmpty()) {
+            LOG.warn("No extension found in the installation: the registered resources are kept");
+            return 0;
+        }
+        int removed = entries.deleteAllExcept(keep);
         if (removed > 0) {
             LOG.infof("Removed %d registered resources of extensions that are no longer installed", removed);
         }
