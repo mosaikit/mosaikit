@@ -8,9 +8,12 @@ export function mailsTo(address: string): ReturnType<typeof mails> {
   return mails(MAIL).filter((mail) => mail.to.includes(address));
 }
 
-/** The latest confirmation link sent to an address, waiting for it to arrive. */
+/**
+ * The latest confirmation link sent to an address, waiting for it to arrive: up to 30 s, as the
+ * first mail of a cold installation on a busy CI runner can take that long.
+ */
 export async function confirmationLink(address: string, after = 0): Promise<string> {
-  for (let attempt = 0; attempt < 100; attempt++) {
+  for (let attempt = 0; attempt < 300; attempt++) {
     const received = mailsTo(address);
     const latest = received.length > after ? received.at(-1) : undefined;
     const link = latest ? /https?:\/\/\S+\?confirm=[\w-]+/.exec(latest.raw)?.[0] : undefined;
