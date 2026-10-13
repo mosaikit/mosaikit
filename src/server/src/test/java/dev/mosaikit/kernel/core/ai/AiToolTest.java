@@ -5,9 +5,9 @@ package dev.mosaikit.kernel.core.ai;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import dev.mosaikit.kernel.api.plugin.ActionEntry;
-import dev.mosaikit.kernel.api.plugin.ActionRisk;
-import dev.mosaikit.kernel.api.plugin.InputSchema;
+import dev.mosaikit.kernel.api.extension.ActionEntry;
+import dev.mosaikit.kernel.api.extension.ActionRisk;
+import dev.mosaikit.kernel.api.extension.InputSchema;
 import dev.mosaikit.kernel.core.error.InvalidInputException;
 import java.net.URI;
 import java.util.LinkedHashMap;
@@ -38,15 +38,15 @@ class AiToolTest {
     @Test
     void putsArgumentsInThePathTheQueryOrTheBody() {
         AiTool get = tool("GET", "things/{id}/parts");
-        PluginCall read = get.call(arguments("id", "a b/c", "tag", List.of("x", "y"), "limit", 5, "none", null));
+        ExtensionCall read = get.call(arguments("id", "a b/c", "tag", List.of("x", "y"), "limit", 5, "none", null));
 
         assertThat(get.name()).isEqualTo("things__do-it");
         assertThat(get.needsConfirmation()).isTrue();
-        assertThat(read.target()).isEqualTo("/api/v1/p/things/things/a%20b%2Fc/parts?tag=x&tag=y&limit=5");
+        assertThat(read.target()).isEqualTo("/api/v1/ext/things/things/a%20b%2Fc/parts?tag=x&tag=y&limit=5");
         assertThat(read.body()).isNull();
 
-        PluginCall write = tool("PUT", "things/{id}").call(arguments("id", 7, "name", "seven"));
-        assertThat(write.target()).isEqualTo("/api/v1/p/things/things/7");
+        ExtensionCall write = tool("PUT", "things/{id}").call(arguments("id", 7, "name", "seven"));
+        assertThat(write.target()).isEqualTo("/api/v1/ext/things/things/7");
         assertThat(write.body()).isEqualTo(Map.of("name", "seven"));
     }
 

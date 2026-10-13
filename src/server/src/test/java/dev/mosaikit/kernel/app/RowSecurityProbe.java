@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Stands for the Java code of a third-party plugin that forgets to filter by organization
+ * Stands for the Java code of a third-party extension that forgets to filter by organization
  * (MK-019): it reads and writes its table with plain SQL.
  */
 @Path("/api/v1/test/scoped-notes")
@@ -37,7 +37,7 @@ public class RowSecurityProbe {
         List<String> texts = new ArrayList<>();
         try (var connection = dataSource.getConnection();
                 var statement = connection.createStatement();
-                var result = statement.executeQuery("select text from p_test_schema.scoped_note order by id")) {
+                var result = statement.executeQuery("select text from ext_test_schema.scoped_note order by id")) {
             while (result.next()) {
                 texts.add(result.getString(1));
             }
@@ -50,7 +50,7 @@ public class RowSecurityProbe {
     public Response add(String text) throws SQLException {
         try (var connection = dataSource.getConnection();
                 var statement =
-                        connection.prepareStatement("insert into p_test_schema.scoped_note (text) values (?)")) {
+                        connection.prepareStatement("insert into ext_test_schema.scoped_note (text) values (?)")) {
             statement.setString(1, text);
             statement.executeUpdate();
         }
@@ -63,7 +63,7 @@ public class RowSecurityProbe {
     public Response addTo(@PathParam("organization") UUID organization, String text) {
         try (var connection = dataSource.getConnection();
                 var statement = connection.prepareStatement(
-                        "insert into p_test_schema.scoped_note (organization_id, text) values (?, ?)")) {
+                        "insert into ext_test_schema.scoped_note (organization_id, text) values (?, ?)")) {
             statement.setObject(1, organization);
             statement.setString(2, text);
             statement.executeUpdate();

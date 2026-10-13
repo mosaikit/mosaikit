@@ -23,7 +23,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-/** The call of a tool to the backend of a plugin, against a small HTTP server. */
+/** The call of a tool to the backend of an extension, against a small HTTP server. */
 @Tag("MK-015")
 class HttpActionInvokerTest {
 
@@ -40,10 +40,11 @@ class HttpActionInvokerTest {
     void startServer() throws IOException {
         server = HttpServer.create(new InetSocketAddress(InetAddress.getLoopbackAddress(), 0), 0);
         server.createContext(
-                "/api/v1/p/notes/json", exchange -> answer(exchange, 201, "application/json", "{\"id\":7}"));
-        server.createContext("/api/v1/p/notes/text", exchange -> answer(exchange, 200, "text/plain", "plain"));
-        server.createContext("/api/v1/p/notes/broken", exchange -> answer(exchange, 500, "application/json", "{oops"));
-        server.createContext("/api/v1/p/notes/empty", exchange -> answer(exchange, 204, "application/json", ""));
+                "/api/v1/ext/notes/json", exchange -> answer(exchange, 201, "application/json", "{\"id\":7}"));
+        server.createContext("/api/v1/ext/notes/text", exchange -> answer(exchange, 200, "text/plain", "plain"));
+        server.createContext(
+                "/api/v1/ext/notes/broken", exchange -> answer(exchange, 500, "application/json", "{oops"));
+        server.createContext("/api/v1/ext/notes/empty", exchange -> answer(exchange, 204, "application/json", ""));
         server.start();
         invoker = new HttpActionInvoker(
                 new ObjectMapper(),
@@ -74,21 +75,21 @@ class HttpActionInvokerTest {
 
     @Test
     void sendsTheCallWithTheCredentialsAndTheOrganizationOfThePerson() {
-        PluginResponse response =
-                invoker.invoke(new PluginCall("POST", "/api/v1/p/notes/json", List.of(), Map.of("text", "hi")), ADA);
+        ExtensionResponse response = invoker.invoke(
+                new ExtensionCall("POST", "/api/v1/ext/notes/json", List.of(), Map.of("text", "hi")), ADA);
 
-        assertThat(response).isEqualTo(new PluginResponse(201, Map.of("id", 7)));
+        assertThat(response).isEqualTo(new ExtensionResponse(201, Map.of("id", 7)));
         assertThat(response.succeeded()).isTrue();
         assertThat(received)
                 .singleElement()
-                .isEqualTo(new Received("POST", "/api/v1/p/notes/json", "Basic YWRh", "acme", "{\"text\":\"hi\"}"));
+                .isEqualTo(new Received("POST", "/api/v1/ext/notes/json", "Basic YWRh", "acme", "{\"text\":\"hi\"}"));
     }
 
     @Test
     void sendsTheSessionOfTheShellWhenTheRequestHadNoAuthorization() {
         Caller shell = new Caller("ada@example.org", UUID.randomUUID(), "acme", null, "s3ss10n");
 
-        invoker.invoke(new PluginCall("POST", "/api/v1/p/notes/json", List.of(), Map.of("text", "hi")), shell);
+        invoker.invoke(new ExtensionCall("POST", "/api/v1/ext/notes/json", List.of(), Map.of("text", "hi")), shell);
 
         assertThat(received).singleElement().extracting(Received::authorization).isNull();
         assertThat(cookies).containsExactly("mosaikit-session=s3ss10n");
@@ -99,30 +100,33 @@ class HttpActionInvokerTest {
         Caller anonymous = new Caller("bea", UUID.randomUUID(), "globex", null);
 
         assertThat(invoker.invoke(
-                        new PluginCall("GET", "/api/v1/p/notes/text", List.of(Map.entry("q", "a b")), null), anonymous))
-                .isEqualTo(new PluginResponse(200, "plain"));
-        assertThat(invoker.invoke(new PluginCall("DELETE", "/api/v1/p/notes/empty", List.of(), null), anonymous))
-                .isEqualTo(new PluginResponse(204, null));
-        PluginResponse broken = invoker.invoke(new PluginCall("GET", "/api/v1/p/notes/broken", List.of(), null), ADA);
-        assertThat(broken).isEqualTo(new PluginResponse(500, "{oops"));
+                        new ExtensionCall("GET", "/api/v1/ext/notes/text", List.of(Map.entry("q", "a b")), null),
+                        anonymous))
+                .isEqualTo(new ExtensionResponse(200, "plain"));
+        assertThat(invoker.invoke(new ExtensionCall("DELETE", "/api/v1/ext/notes/empty", List.of(), null), anonymous))
+                .isEqualTo(new ExtensionResponse(204, null));
+        ExtensionResponse broken =
+                invoker.invoke(new ExtensionCall("GET", "/api/v1/ext/notes/broken", List.of(), null), ADA);
+        assertThat(broken).isEqualTo(new ExtensionResponse(500, "{oops"));
         assertThat(broken.succeeded()).isFalse();
-        assertThat(received.getFirst().target()).isEqualTo("/api/v1/p/notes/text?q=a%20b");
+        assertThat(received.getFirst().target()).isEqualTo("/api/v1/ext/notes/text?q=a%20b");
         assertThat(received.getFirst().authorization()).isNull();
     }
 
     @Test
-    void reportsAPluginThatCannotBeReached() {
+    void reportsAExtensionThatCannotBeReached() {
         server.stop(0);
-        PluginCall call = new PluginCall("GET", "/api/v1/p/notes/json", List.of(), null);
+        ExtensionCall call = new ExtensionCall("GET", "/api/v1/ext/notes/json", List.of(), null);
 
         assertThatThrownBy(() -> invoker.invoke(call, ADA))
                 .isInstanceOf(UncheckedIOException.class)
-                .hasMessageContaining("/api/v1/p/notes/json");
+                .hasMessageContaining("/api/v1/ext/notes/json");
     }
 
     @Test
     void refusesArgumentsThatAreNotJson() {
-        PluginCall call = new PluginCall("POST", "/api/v1/p/notes/json", List.of(), Map.of("self", new Object()));
+        ExtensionCall call =
+                new ExtensionCall("POST", "/api/v1/ext/notes/json", List.of(), Map.of("self", new Object()));
 
         assertThatThrownBy(() -> invoker.invoke(call, ADA)).isInstanceOf(IllegalArgumentException.class);
     }

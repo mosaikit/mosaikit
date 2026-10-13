@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * An MCP server (Streamable HTTP transport, JSON responses) with the tools of the active plugins
+ * An MCP server (Streamable HTTP transport, JSON responses) with the tools of the active extensions
  * (MK-015). MCP clients authenticate like any API client and act on the organization of the
  * request; the tools that change data return a draft that the person confirms in Mosaikit.
  */
@@ -50,7 +50,7 @@ public class McpResource {
     static final int NO_ORGANIZATION = -32001;
 
     private static final String INSTRUCTIONS = """
-            Tools of the Mosaikit plugins, acting on one organization with the permissions of the \
+            Tools of the Mosaikit extensions, acting on one organization with the permissions of the \
             signed-in person. Tools that change data do not run at once: they return a draft that \
             the person confirms or rejects in Mosaikit, under Pending actions.""";
 
@@ -212,7 +212,7 @@ public class McpResource {
                     + ". Nothing has changed yet.";
             return toolResult(Map.of("draft", draft), text, false);
         }
-        PluginResponse response = invocation.result();
+        ExtensionResponse response = invocation.result();
         Map<String, Object> structured = new LinkedHashMap<>();
         structured.put("status", response.status());
         structured.put("body", response.body());

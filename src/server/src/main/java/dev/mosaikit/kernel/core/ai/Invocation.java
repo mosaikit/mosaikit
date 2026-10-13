@@ -8,18 +8,18 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 /**
  * The outcome of invoking a tool or confirming a draft.
  *
- * @param outcome {@code executed} when the plugin was called, {@code drafted} when the person must
+ * @param outcome {@code executed} when the extension was called, {@code drafted} when the person must
  *     confirm first
- * @param result what the plugin answered, when it was called
+ * @param result what the extension answered, when it was called
  * @param draft the draft, when there is one
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
-public record Invocation(String outcome, PluginResponse result, DraftView draft) {
+public record Invocation(String outcome, ExtensionResponse result, DraftView draft) {
 
     public static final String EXECUTED = "executed";
     public static final String DRAFTED = "drafted";
 
-    static Invocation executed(PluginResponse result, DraftView draft) {
+    static Invocation executed(ExtensionResponse result, DraftView draft) {
         return new Invocation(EXECUTED, result, draft);
     }
 

@@ -7,14 +7,15 @@ import java.util.Set;
 /**
  * An app of the app bar of an organization, as its administrators see and set it (MK-030).
  *
- * @param pluginId the plugin that contributes the app
- * @param appId the identifier of the app in its plugin
+ * @param extensionId the extension that contributes the app
+ * @param appId the identifier of the app in its extension
  * @param title the title of the app, read-only
- * @param enabled whether the app appears; a plugin with all its apps off refuses its API too
+ * @param enabled whether the app appears; an extension with all its apps off refuses its API too
  * @param pinned whether people cannot hide it from their app bar
  * @param roles the roles of the organization that see it; empty for everyone
  */
-public record AppView(String pluginId, String appId, String title, boolean enabled, boolean pinned, Set<String> roles) {
+public record AppView(
+        String extensionId, String appId, String title, boolean enabled, boolean pinned, Set<String> roles) {
 
     public AppView {
         roles = roles == null ? Set.of() : Set.copyOf(roles);

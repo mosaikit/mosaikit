@@ -12,7 +12,7 @@ function jdkTool(name: string): string {
   return home ? join(home, 'bin', exe) : exe;
 }
 
-/** The JAR of the plugin API in the test installation, which holds PackageSigningTool. */
+/** The JAR of the extension API in the test installation, which holds PackageSigningTool. */
 export function kernelApiJar(): string {
   const lib = join(INSTALLATION, 'bin', 'kernel', 'lib', 'main');
   const jar = readdirSync(lib).find((name) => /mosaikit-kernel-api-.*\.jar$/.test(name));
@@ -41,7 +41,7 @@ export function index(directory: string): void {
   signingTool('index', join(KEYS, KEY_NAME), directory);
 }
 
-/** Zips the content of a directory, without a manifest, as plugin packages are. */
+/** Zips the content of a directory, without a manifest, as extension packages are. */
 export function zip(directory: string, target: string): void {
   rmSync(target, { force: true });
   execFileSync(jdkTool('jar'), [
@@ -85,9 +85,9 @@ export function maven(pom: string, ...goals: string[]): string {
   });
 }
 
-/** Runs the plugin generator of the repository. */
-export function createPlugin(...args: string[]): string {
-  return execFileSync('node', [join(ROOT, 'sdk', 'create-plugin', 'dist', 'bin.js'), ...args], {
+/** Runs the extension generator of the repository. */
+export function createExtension(...args: string[]): string {
+  return execFileSync('node', [join(ROOT, 'sdk', 'create-extension', 'dist', 'bin.js'), ...args], {
     encoding: 'utf8',
   });
 }

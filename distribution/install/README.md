@@ -20,12 +20,12 @@ installing anything use the portable archive.
 
 Stop with Ctrl+C. The launcher uses the Java of `JAVA_HOME`, or `java` on the path.
 
-## Plugins
+## Extensions
 
-Copy the plugin package (`<name>.zip`) into `plugins/` as it is and start Mosaikit again. Plugins
+Copy the extension package (`<name>.zip`) into `extensions/` as it is and start Mosaikit again. Extensions
 with Java code are loaded by rebuilding the kernel at the next start, which takes a few seconds; if
-the kernel cannot start with a new plugin, the plugin is rolled back and Mosaikit starts with the
-previous plugins.
+the kernel cannot start with a new extension, the extension is rolled back and Mosaikit starts with the
+previous extensions.
 
 ## Contents
 
@@ -33,6 +33,6 @@ previous plugins.
 |---|---|
 | `mosaikit`, `mosaikit.cmd` | the launcher |
 | `config/` | settings; every setting can also be an environment variable (`QUARKUS_*`, `MOSAIKIT_*`) |
-| `plugins/` | installed plugins |
-| `catalog/` | signed catalog of the sample plugins, offered on the Plugins page (`mosaikit.marketplace.sources`) |
+| `extensions/` | installed extensions |
+| `catalog/` | signed catalog of the sample extensions, offered on the Extensions page (`mosaikit.marketplace.sources`) |
 | `bin/kernel/` | the kernel, with the web interface |

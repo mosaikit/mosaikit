@@ -11,9 +11,9 @@ import java.util.UUID;
  *
  * @param id identifier to confirm or reject it with
  * @param tool name of the tool
- * @param title title of the tool, or its name when no active plugin offers it any more
+ * @param title title of the tool, or its name when no active extension offers it any more
  * @param description what the tool does
- * @param risk {@code write} or {@code execute}; absent when no active plugin offers the tool
+ * @param risk {@code write} or {@code execute}; absent when no active extension offers the tool
  * @param input the arguments
  * @param status {@code pending}, {@code executed}, {@code failed}, {@code rejected} or {@code
  *     expired}

@@ -24,7 +24,7 @@ import java.util.UUID;
 import java.util.function.Supplier;
 
 /**
- * Runs the tools of plugins on behalf of a person (MK-015). A tool that reads runs at once; a tool
+ * Runs the tools of extensions on behalf of a person (MK-015). A tool that reads runs at once; a tool
  * that writes or executes becomes a draft, which runs only when the same person confirms it within
  * {@link #DRAFT_LIFETIME}. Every run, proposal and decision goes to the audit log.
  */
@@ -34,7 +34,7 @@ public class AiActions {
     /** How long a person has to confirm a draft. */
     public static final Duration DRAFT_LIFETIME = Duration.ofMinutes(15);
 
-    /** Longest answer of a plugin kept with a draft. */
+    /** Longest answer of an extension kept with a draft. */
     static final int MAX_RESULT = 65_536;
 
     private static final String DRAFT = "draft";
@@ -66,7 +66,7 @@ public class AiActions {
         this.clock = clock;
     }
 
-    /** The tools of the active plugins. */
+    /** The tools of the active extensions. */
     public List<AiTool> tools() {
         return catalog.tools();
     }
@@ -74,13 +74,13 @@ public class AiActions {
     /**
      * Invokes a tool: runs it if it only reads, otherwise keeps it as a draft for the person.
      *
-     * @throws ResourceNotFoundException when no active plugin offers the tool
+     * @throws ResourceNotFoundException when no active extension offers the tool
      * @throws dev.mosaikit.kernel.core.error.InvalidInputException when the arguments do not match
      *     the input schema of the tool
      */
     public Invocation invoke(String name, Object input, Caller caller) {
         AiTool tool = catalog.find(name)
-                .orElseThrow(() -> new ResourceNotFoundException("No active plugin offers the tool " + name + "."));
+                .orElseThrow(() -> new ResourceNotFoundException("No active extension offers the tool " + name + "."));
         Map<String, Object> arguments = tool.arguments(input);
         tool.call(arguments);
         if (!tool.needsConfirmation()) {
@@ -133,7 +133,7 @@ public class AiActions {
         ActionDraft draft = decide(id, caller, now, ActionDraft::confirm);
         Optional<AiTool> tool = catalog.find(draft.getTool());
         if (tool.isEmpty()) {
-            complete(draft, false, null, "No active plugin offers the tool any more.");
+            complete(draft, false, null, "No active extension offers the tool any more.");
             audit.append(
                     caller.username(),
                     Optional.of(caller.organizationId()),
@@ -141,10 +141,10 @@ public class AiActions {
                     draft.getTool(),
                     AuditEvent.Outcome.FAILED,
                     Map.of(DRAFT, id, "error", "tool not offered"));
-            throw new ConflictException("No active plugin offers the tool " + draft.getTool() + " any more.");
+            throw new ConflictException("No active extension offers the tool " + draft.getTool() + " any more.");
         }
         Map<String, Object> arguments = tool.get().arguments(read(draft.getInput()));
-        PluginResponse response;
+        ExtensionResponse response;
         try {
             response = run(tool.get(), arguments, caller, CONFIRMED, Map.of(DRAFT, id));
         } catch (ServiceUnavailableException e) {
@@ -211,11 +211,11 @@ public class AiActions {
         });
     }
 
-    private PluginResponse run(
+    private ExtensionResponse run(
             AiTool tool, Map<String, Object> arguments, Caller caller, String action, Map<String, ?> extra) {
         Map<String, Object> detail = new LinkedHashMap<>(extra);
         detail.put("input", arguments);
-        PluginResponse response;
+        ExtensionResponse response;
         try {
             response = invoker.invoke(tool.call(arguments), caller);
         } catch (RuntimeException e) {
@@ -227,7 +227,8 @@ public class AiActions {
                     tool.name(),
                     AuditEvent.Outcome.FAILED,
                     detail);
-            throw new ServiceUnavailableException("The plugin " + tool.plugin() + " did not answer; try again later.");
+            throw new ServiceUnavailableException(
+                    "The extension " + tool.extension() + " did not answer; try again later.");
         }
         detail.put("status", response.status());
         audit.append(

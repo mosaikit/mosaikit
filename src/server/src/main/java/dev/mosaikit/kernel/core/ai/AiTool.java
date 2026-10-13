@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.core.ai;
 
-import dev.mosaikit.kernel.api.plugin.ActionEntry;
+import dev.mosaikit.kernel.api.extension.ActionEntry;
 import dev.mosaikit.kernel.core.error.InvalidInputException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -13,16 +13,16 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * An action of an active plugin, as a tool for assistants and MCP clients (MK-015).
+ * An action of an active extension, as a tool for assistants and MCP clients (MK-015).
  *
  * @param name {@code <api>__<action>}, unique in the installation
- * @param plugin identifier of the plugin
- * @param api name of the backend API of the plugin
+ * @param extension identifier of the extension
+ * @param api name of the backend API of the extension
  * @param action the action as declared in the manifest
  */
-public record AiTool(String name, String plugin, String api, ActionEntry action) {
+public record AiTool(String name, String extension, String api, ActionEntry action) {
 
-    /** Separates the API of the plugin from the name of the action in the name of a tool. */
+    /** Separates the API of the extension from the name of the action in the name of a tool. */
     public static final String SEPARATOR = "__";
 
     private static final Pattern PLACEHOLDER = Pattern.compile("\\{([A-Za-z][A-Za-z0-9_-]*)}");
@@ -30,13 +30,13 @@ public record AiTool(String name, String plugin, String api, ActionEntry action)
 
     public AiTool {
         Objects.requireNonNull(name, "name");
-        Objects.requireNonNull(plugin, "plugin");
+        Objects.requireNonNull(extension, "extension");
         Objects.requireNonNull(api, "api");
         Objects.requireNonNull(action, "action");
     }
 
-    static AiTool of(String plugin, String api, ActionEntry action) {
-        return new AiTool(api + SEPARATOR + action.name(), plugin, api, action);
+    static AiTool of(String extension, String api, ActionEntry action) {
+        return new AiTool(api + SEPARATOR + action.name(), extension, api, action);
     }
 
     /** Whether the person must confirm a draft before the action runs. */
@@ -57,12 +57,12 @@ public record AiTool(String name, String plugin, String api, ActionEntry action)
     }
 
     /**
-     * The call to the plugin for valid arguments: the arguments named in the path go into it; the
+     * The call to the extension for valid arguments: the arguments named in the path go into it; the
      * others go into the query for {@code GET} and {@code DELETE}, into the JSON body otherwise.
      */
-    public PluginCall call(Map<String, Object> arguments) {
+    public ExtensionCall call(Map<String, Object> arguments) {
         Map<String, Object> rest = new LinkedHashMap<>(arguments);
-        StringBuilder path = new StringBuilder("/api/v1/p/").append(api).append('/');
+        StringBuilder path = new StringBuilder("/api/v1/ext/").append(api).append('/');
         Matcher placeholder = PLACEHOLDER.matcher(action.path());
         int last = 0;
         while (placeholder.find()) {
@@ -72,12 +72,12 @@ public record AiTool(String name, String plugin, String api, ActionEntry action)
             if (!isScalar(value)) {
                 throw new InvalidInputException(List.of("input." + argument + " is required, as a string or number"));
             }
-            path.append(PluginCall.encode(String.valueOf(value)));
+            path.append(ExtensionCall.encode(String.valueOf(value)));
             last = placeholder.end();
         }
         path.append(action.path().substring(last));
         if (!WITHOUT_BODY.contains(action.method())) {
-            return new PluginCall(action.method(), path.toString(), List.of(), rest);
+            return new ExtensionCall(action.method(), path.toString(), List.of(), rest);
         }
         List<Map.Entry<String, String>> query = new ArrayList<>();
         rest.forEach((key, value) -> {
@@ -87,7 +87,7 @@ public record AiTool(String name, String plugin, String api, ActionEntry action)
                 query.add(parameter(key, value));
             }
         });
-        return new PluginCall(action.method(), path.toString(), query, null);
+        return new ExtensionCall(action.method(), path.toString(), query, null);
     }
 
     private static Map.Entry<String, String> parameter(String key, Object value) {

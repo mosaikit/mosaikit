@@ -6,7 +6,7 @@
 # updates.
 #
 # A tag vX.Y.Z (see docs/development/release.md) also runs the release: version check, container image
-# in GHCR, kernel-api and its parent POM in Maven Central, @mosaikit/sdk and @mosaikit/create-plugin
+# in GHCR, kernel-api and its parent POM in Maven Central, @mosaikit/sdk and @mosaikit/create-extension
 # in npmjs.org, the Helm
 # chart in GHCR as an OCI artifact, and a GitHub release with the CHANGELOG section,
 # the portable archives, the documents, the SBOM and the signed checksums attached.
@@ -191,7 +191,7 @@ jobs:
           if [[ "$CODE" != true ]]; then
             ./mvnw $MAVEN_CLI_OPTS -pl src/server -am test -Dskip.npm -Dtest=DocumentationTest -Dsurefire.failIfNoSpecifiedTests=false
           elif [[ "$SLOW" == true ]]; then
-            ./mvnw $MAVEN_CLI_OPTS verify -Dskip.npm -Dtest.groups.excluded=
+            ./mvnw $MAVEN_CLI_OPTS verify -Dskip.npm -DskipITs=false -Dtest.groups.excluded=
           else
             ./mvnw $MAVEN_CLI_OPTS verify -Dskip.npm -DskipITs
           fi
@@ -230,9 +230,9 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
       - run: npm ci --prefer-offline
-      # The UI, the SDK and the generator of plugins (for the tests of the devkit, MK-023).
+      # The UI, the SDK and the generator of extensions (for the tests of the devkit, MK-023).
       - run: npm run build
-      # The installation and the catalog in target/dist, and the plugin API in the local repository.
+      # The installation and the catalog in target/dist, and the extension API in the local repository.
       - run: ./mvnw $MAVEN_CLI_OPTS -T 1C install -DskipTests -Dskip.npm
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
@@ -247,16 +247,16 @@ jobs:
         with:
           name: e2e
           path: |
-            tests/e2e/report/
-            tests/e2e/.work/results/
-            tests/e2e/.work/installation.log
-            tests/e2e/.work/mail/
+            tests/e2e/.work/*/report/
+            tests/e2e/.work/*/results/
+            tests/e2e/.work/*/installation.log
+            tests/e2e/.work/*/mail/
           retention-days: 7
 
-  # Snapshot of main (ADR-0035): what the repositories of plugins build and test against until the
+  # Snapshot of main (ADR-0035): what the repositories of extensions build and test against until the
   # first release, in the pre-release "snapshot", readable without a token. Each push adds a version
   # <next>-dev.<date>.<run> of the installation and of the npm packages of the SDK (the last 20 are
-  # kept); the plugin API keeps the Maven version of the build (-SNAPSHOT) and is replaced.
+  # kept); the extension API keeps the Maven version of the build (-SNAPSHOT) and is replaced.
   snapshot:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [frontend, backend, e2e]
@@ -284,7 +284,7 @@ jobs:
       - name: Version the npm packages
         env:
           VERSION: ${{ steps.version.outputs.version }}
-        run: npm version "$VERSION" --no-git-tag-version -w sdk/js -w sdk/ui -w sdk/create-plugin -w sdk/testing
+        run: npm version "$VERSION" --no-git-tag-version -w sdk/js -w sdk/ui -w sdk/create-extension -w sdk/testing
       - run: npm run build
       - run: ./mvnw $MAVEN_CLI_OPTS -T 1C install -DskipTests -Dskip.npm
       - name: Assets
@@ -293,14 +293,18 @@ jobs:
         run: |
           mkdir -p snapshot
           tar -czf "snapshot/mosaikit-$VERSION.tar.gz" -C target/dist mosaikit
-          (cd snapshot && npm pack ../sdk/js ../sdk/ui ../sdk/create-plugin ../sdk/testing)
+          (cd snapshot && npm pack ../sdk/js ../sdk/ui ../sdk/create-extension ../sdk/testing)
           maven="$(./mvnw -q help:evaluate -Dexpression=project.version -DforceStdout)"
           cp "sdk/java/target/mosaikit-kernel-api-$maven.jar" snapshot/
           cp sdk/java/pom.xml "snapshot/mosaikit-kernel-api-$maven.pom"
           cp pom.xml "snapshot/mosaikit-parent-$maven.pom"
-          cp sdk/plugin-parent/pom.xml "snapshot/mosaikit-plugin-parent-$maven.pom"
-          # The latest snapshot under a name that does not change, for the plugins that follow main.
-          for package in sdk testing ui create-plugin; do
+          cp sdk/extension-parent/pom.xml "snapshot/mosaikit-extension-parent-$maven.pom"
+          cp "distribution/target/mosaikit-installation-$maven.zip" snapshot/
+          cp "distribution/target/mosaikit-portable-tools-$maven.zip" snapshot/
+          cp "distribution/target/mosaikit-docker-$maven.zip" "distribution/target/mosaikit-helm-$maven.zip" snapshot/
+          cp distribution/pom.xml "snapshot/mosaikit-distributions-$maven.pom"
+          # The latest snapshot under a name that does not change, for the extensions that follow main.
+          for package in sdk testing ui create-extension; do
             cp "snapshot/mosaikit-$package-$VERSION.tgz" "snapshot/mosaikit-$package-latest.tgz"
           done
           printf '{"version":"%s","maven":"%s","commit":"%s"}\n' "$VERSION" "$maven" "$GITHUB_SHA" \
@@ -315,7 +319,7 @@ jobs:
               --notes "Built from every push to main (ADR-0035): not a release. snapshot.json names the latest version."
           fi
           gh release upload snapshot snapshot/* --clobber
-          # The last 20 versions stay, for the plugins that pinned one.
+          # The last 20 versions stay, for the extensions that pinned one.
           gh release view snapshot --json assets -q '.assets[].name' \
             | grep -oE '[0-9]+\.[0-9]+\.[0-9]+-dev\.[0-9]+\.[0-9]+' | sort -u -t. -k5,5n | head -n -20 \
             | while read -r old; do
@@ -465,7 +469,7 @@ jobs:
           # npm dependencies (package-lock.json), secrets and licenses of the sources.
           trivy fs --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed \
             --scanners vuln,secret,license --skip-files '**/pom.xml' --skip-dirs .trivy .
-          # Java dependencies of the kernel and the plugins.
+          # Java dependencies of the kernel and the extensions.
           trivy sbom --exit-code 1 --severity HIGH,CRITICAL --ignore-unfixed target/sbom.json
 
   container-image:
@@ -549,7 +553,7 @@ jobs:
           fi
           files=(mosaikit-portable-*)
           if [[ "$GITHUB_REF" == refs/tags/v* && "$PLATFORM" == linux-x64 ]]; then
-            # The installation, which the test bench of plugins (@mosaikit/testing) downloads for
+            # The installation, which the test bench of extensions (@mosaikit/testing) downloads for
             # this version: releases/download/vX.Y.Z/mosaikit-X.Y.Z.tar.gz (ADR-0035).
             tar -czf "target/portable/mosaikit-${GITHUB_REF_NAME#v}.tar.gz" -C target/dist mosaikit
             files+=("mosaikit-${GITHUB_REF_NAME#v}.tar.gz")
@@ -620,15 +624,15 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         with:
           name: backend
-      - name: Deploy kernel-api, the parent POM and the parent of plugins to Maven Central
+      - name: Deploy kernel-api, the parent POM and the parent of extensions to Maven Central
         env:
           CENTRAL_USERNAME: ${{ secrets.CENTRAL_TOKEN_USERNAME }}
           CENTRAL_PASSWORD: ${{ secrets.CENTRAL_TOKEN_PASSWORD }}
           MAVEN_GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
         run: |
-          # The parent POM is published with kernel-api because plugin builds need it to resolve the
+          # The parent POM is published with kernel-api because extension builds need it to resolve the
           # API.
-          ./mvnw $MAVEN_CLI_OPTS -Prelease,mosaikit-release -DskipTests -Dskip.npm -pl .,sdk/java,sdk/plugin-parent deploy
+          ./mvnw $MAVEN_CLI_OPTS -Prelease,mosaikit-release -DskipTests -Dskip.npm -pl .,sdk/java,sdk/extension-parent deploy
 
   # npmjs.org with trusted publishing (OIDC): no token to keep, and npm attaches the provenance
   # attestation by itself. On npmjs.com the package declares this repository, the workflow ci.yml
@@ -654,12 +658,12 @@ jobs:
         with:
           name: frontend
       - run: npm ci --prefer-offline
-      - run: npm run build -w sdk/js -w sdk/ui -w sdk/create-plugin -w sdk/testing
-      - name: Publish @mosaikit/sdk, @mosaikit/ui, @mosaikit/create-plugin and @mosaikit/testing
+      - run: npm run build -w sdk/js -w sdk/ui -w sdk/create-extension -w sdk/testing
+      - name: Publish @mosaikit/sdk, @mosaikit/ui, @mosaikit/create-extension and @mosaikit/testing
         run: |
           # Pre-releases (v1.2.0-rc.1) are published under the "next" dist-tag, not "latest".
           if [[ "$GITHUB_REF_NAME" == *-* ]]; then TAG=next; else TAG=latest; fi
-          npm publish -w sdk/js -w sdk/ui -w sdk/create-plugin -w sdk/testing --tag "$TAG" --access public
+          npm publish -w sdk/js -w sdk/ui -w sdk/create-extension -w sdk/testing --tag "$TAG" --access public
 
   publish-helm:
     if: startsWith(github.ref, 'refs/tags/v')
@@ -785,7 +789,7 @@ jobs:
             echo "- Helm chart: \`oci://ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/charts/mosaikit\`, version ${TAG#v}"
             echo "- kernel-api and its parent POM: Maven Central, version ${TAG#v}"
             echo "- @mosaikit/sdk: https://www.npmjs.com/package/@mosaikit/sdk/v/${TAG#v}"
-            echo "- @mosaikit/create-plugin: \`npx @mosaikit/create-plugin@${TAG#v}\`"
+            echo "- @mosaikit/create-extension: \`npx @mosaikit/create-extension@${TAG#v}\`"
             echo
             echo "The checksums of the archives and documents are signed with Sigstore. Verify them with:"
             echo

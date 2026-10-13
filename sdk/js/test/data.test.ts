@@ -15,7 +15,7 @@ function answering(status: number, body?: unknown) {
 }
 
 describe('dataCollections (ADR-0031)', () => {
-  it('calls the collection of the plugin', async () => {
+  it('calls the collection of the extension', async () => {
     const fetch = answering(200, []);
     const items = dataCollections(fetch, 'dev.example.todo')('items');
 

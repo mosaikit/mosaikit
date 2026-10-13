@@ -1,7 +1,7 @@
 # Using Mosaikit
 
-Mosaikit is a web application made of *apps* provided by plugins. What you see depends on the
-organization you belong to and on the plugins your administrator installed.
+Mosaikit is a web application made of *apps* provided by extensions. What you see depends on the
+organization you belong to and on the extensions your administrator installed.
 
 ## Signing in
 
@@ -33,7 +33,7 @@ provider instead.
 The screen has three parts, as in the collaboration suites people already know:
 
 - the **app bar** on the left, with **Home**, one icon per app you can use and, for platform
-  administrators, **Plugins** and **Settings** at the bottom; on a phone it is at the bottom of the
+  administrators, **Extensions** and **Settings** at the bottom; on a phone it is at the bottom of the
   screen;
 - the **top bar**, with the search of apps and pages (type a part of the name, then Enter) and the
   menu of your avatar;
@@ -43,8 +43,8 @@ The screen has three parts, as in the collaboration suites people already know:
 Home greets you and lists your apps. Apps can talk to each other: an action in one app can update
 another one.
 
-If an app cannot be loaded, the home page says how many plugins failed; tell your administrator,
-who sees the reason in the plugin list.
+If an app cannot be loaded, the home page says how many extensions failed; tell your administrator,
+who sees the reason in the extension list.
 
 ## Mosaikit as an app
 

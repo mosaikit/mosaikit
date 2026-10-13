@@ -7,7 +7,7 @@ import java.util.UUID;
 
 /**
  * Events that reach the pages of people in real time (MK-031, ADR-0028), over the WebSocket of the
- * shell. A plugin publishes under its own topics, {@code plugin.<plugin id>.<name>}, for the
+ * shell. An extension publishes under its own topics, {@code extension.<extension id>.<name>}, for the
  * organization of the request; the event leaves when the transaction of the request commits, and
  * reaches the pages that subscribed to the topic. Send small events, such as the identifier of what
  * changed, and let the pages read the rest through the API: it keeps the rights of each person.

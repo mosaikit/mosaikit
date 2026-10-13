@@ -14,8 +14,8 @@ import java.util.Optional;
 @ConfigMapping(prefix = "mosaikit")
 public interface KernelConfig {
 
-    /** Plugin installation. */
-    Plugins plugins();
+    /** Extension installation. */
+    Extensions extensions();
 
     /** First start of an empty installation. */
     Bootstrap bootstrap();
@@ -23,10 +23,10 @@ public interface KernelConfig {
     /** Federated sign-in through Keycloak (MK-012). */
     Identity identity();
 
-    /** Catalogs of plugins to install from (MK-022). */
+    /** Catalogs of extensions to install from (MK-022). */
     Marketplace marketplace();
 
-    /** The assistant that uses the tools of the plugins (MK-024). */
+    /** The assistant that uses the tools of the extensions (MK-024). */
     Assistant assistant();
 
     /** The look of the user interface. */
@@ -65,7 +65,7 @@ public interface KernelConfig {
 
         /**
          * The theme of the shell: {@code mosaikit}, {@code pa} for public administrations in the style
-         * of Bootstrap Italia (AgID design guidelines), or the identifier of an active theme plugin
+         * of Bootstrap Italia (AgID design guidelines), or the identifier of an active theme extension
          * (MK-028); the shell uses {@code mosaikit} when the theme is not available.
          */
         @WithDefault("mosaikit")
@@ -98,12 +98,12 @@ public interface KernelConfig {
         Duration timeout();
     }
 
-    /** Catalogs of plugins: directories with a signed {@code index.json}, local or over HTTPS. */
+    /** Catalogs of extensions: directories with a signed {@code index.json}, local or over HTTPS. */
     interface Marketplace {
 
         /**
-         * Directories of catalogs, such as {@code https://plugins.example.org/stable/}, {@code
-         * file:/media/usb/mosaikit-plugins/} for an offline transfer, or {@code catalog/}, a directory
+         * Directories of catalogs, such as {@code https://extensions.example.org/stable/}, {@code
+         * file:/media/usb/mosaikit-extensions/} for an offline transfer, or {@code catalog/}, a directory
          * of the installation.
          */
         Optional<List<URI>> sources();
@@ -164,28 +164,28 @@ public interface KernelConfig {
         Duration cacheTtl();
     }
 
-    /** Plugin installation settings. */
-    interface Plugins {
+    /** Extension installation settings. */
+    interface Extensions {
 
-        /** Directory that holds one sub-directory per installed plugin. */
-        @WithDefault("plugins")
+        /** Directory that holds one sub-directory per installed extension. */
+        @WithDefault("extensions")
         Path directory();
 
         /**
          * The providers directory of the kernel, set by the launcher (the {@code mosaikit} launcher) that
-         * loads the Java code of plugins. When absent, plugins that bring Java code are not
+         * loads the Java code of extensions. When absent, extensions that bring Java code are not
          * activated.
          */
         Optional<Path> providersDirectory();
 
         /**
-         * Where plugin packages ({@code *.zip}) are unpacked. Set by the launcher to a directory
-         * of the kernel; when absent, {@code .packages} in the plugins directory.
+         * Where extension packages ({@code *.zip}) are unpacked. Set by the launcher to a directory
+         * of the kernel; when absent, {@code .packages} in the extensions directory.
          */
         Optional<Path> packagesDirectory();
 
         /**
-         * Directory of the public keys of trusted plugin publishers ({@code *.pub.pem}, MK-013).
+         * Directory of the public keys of trusted extension publishers ({@code *.pub.pem}, MK-013).
          * The launcher reads the same directory, relative to the installation.
          */
         @WithDefault("config/trusted-keys")
@@ -193,14 +193,14 @@ public interface KernelConfig {
 
         /**
          * {@code optional}: signed packages are checked and refused when they were changed, and
-         * unsigned plugins are accepted. {@code required}: only packages signed with a trusted
+         * unsigned extensions are accepted. {@code required}: only packages signed with a trusted
          * key are accepted.
          */
         @WithDefault("optional")
         String signatures();
 
         /**
-         * How the shell runs the frontends of plugins whose publisher is not verified (MK-014):
+         * How the shell runs the frontends of extensions whose publisher is not verified (MK-014):
          * {@code iframe} isolates them in a sandboxed iframe that reaches the shell only through
          * the bridge declared in their manifest; {@code module} loads them like verified ones.
          * Frontends that declare {@code isolation: iframe} always run in an iframe.
@@ -209,7 +209,7 @@ public interface KernelConfig {
         String unverifiedFrontends();
 
         /**
-         * Watches the plugins directory and reads it again when a file changes, and lets the shell
+         * Watches the extensions directory and reads it again when a file changes, and lets the shell
          * reload its page then: changed frontends show at once. Java code and schemas still wait
          * for the next start. On in development mode.
          */

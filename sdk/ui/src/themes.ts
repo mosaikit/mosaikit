@@ -4,11 +4,11 @@ import { createDarkTheme, createLightTheme, type BrandVariants } from '@fluentui
 
 /**
  * The themes of the shell. Each one gives the tokens of Fluent UI and the `--mk-*` tokens that
- * plugins read, for a light and a dark color scheme; the high contrast scheme is the same for all.
- * The kernel has two themes; theme plugins add others (MK-028).
+ * extensions read, for a light and a dark color scheme; the high contrast scheme is the same for all.
+ * The kernel has two themes; theme extensions add others (MK-028).
  */
 export const THEMES = ['mosaikit', 'pa'] as const;
-/** The identifier of a theme: a built-in one, or the identifier of a theme plugin. */
+/** The identifier of a theme: a built-in one, or the identifier of a theme extension. */
 export type ThemeName = string;
 export type ColorScheme = 'light' | 'dark' | 'contrast';
 
@@ -132,7 +132,7 @@ const CONTRAST: Palette = {
   focus: '#00ffff',
 };
 
-/** What a theme plugin brings (MK-028): only some values; the others come from the default theme. */
+/** What a theme extension brings (MK-028): only some values; the others come from the default theme. */
 export interface ThemeInput {
   readonly title: string;
   readonly font?: string;
@@ -145,7 +145,7 @@ export interface ThemeInput {
 const COLOR = /^#[0-9a-f]{6}$/i;
 const FONT = /^[\w\s'",.-]{1,200}$/;
 
-/** The colors of a scheme of a theme plugin that are valid, so that a broken value cannot break the shell. */
+/** The colors of a scheme of a theme extension that are valid, so that a broken value cannot break the shell. */
 function validColors(palette: Partial<Palette> | undefined): Partial<Palette> {
   return Object.fromEntries(
     Object.entries(palette ?? {}).filter(
@@ -155,7 +155,7 @@ function validColors(palette: Partial<Palette> | undefined): Partial<Palette> {
 }
 
 /**
- * Adds a theme, such as one of a theme plugin; every value it misses, or that is not valid, comes
+ * Adds a theme, such as one of a theme extension; every value it misses, or that is not valid, comes
  * from the default theme.
  */
 export function registerTheme(id: ThemeName, input: ThemeInput): void {
@@ -219,7 +219,7 @@ export function brandVariants(brand: string): BrandVariants {
 export interface ThemeTokens {
   /** Tokens of Fluent UI, without the leading `--`. */
   readonly fluent: Record<string, string | number>;
-  /** The `--mk-*` tokens of the shell and the plugins, with the leading `--`. */
+  /** The `--mk-*` tokens of the shell and the extensions, with the leading `--`. */
   readonly mosaikit: Record<string, string>;
 }
 

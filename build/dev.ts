@@ -39,12 +39,12 @@ const log = (message: string): void => {
 };
 
 /**
- * Builds the plugin API (`sdk/java`) at every start. The dev mode of the kernel takes its classes
+ * Builds the extension API (`sdk/java`) at every start. The dev mode of the kernel takes its classes
  * from `sdk/java/target/classes` of this checkout, which a `git pull` leaves stale: a kernel with
  * new code would then run on the old API (NoSuchMethodError). It takes a few seconds.
  */
-function buildPluginApi(): void {
-  log('building the plugin API…');
+function buildExtensionApi(): void {
+  log('building the extension API…');
   const built = spawnSync(
     mvnw,
     [
@@ -65,7 +65,7 @@ function buildPluginApi(): void {
     },
   );
   if (built.status !== 0) {
-    throw new Error('The build of the plugin API failed');
+    throw new Error('The build of the extension API failed');
   }
 }
 
@@ -153,7 +153,7 @@ async function main(): Promise<void> {
     rmSync(directory, { recursive: true, force: true });
     log('database reset');
   }
-  buildPluginApi();
+  buildExtensionApi();
   const database = await startPostgres({ directory, persistent: true, port: DB_PORT });
   log(`PostgreSQL on 127.0.0.1:${String(database.port)} (.dev/postgres)`);
   const model = await startFakeModel(MODEL_PORT);

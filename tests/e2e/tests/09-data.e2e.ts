@@ -3,23 +3,23 @@
 import { expect, test } from '@playwright/test';
 import { ANNA, MARIO } from '../support/env.js';
 import { OTHER, otherOrganizationPerson } from '../support/people.js';
-import { api, apps, openApp, plugins, signIn, unique } from '../support/shell.js';
+import { api, apps, openApp, extensions, signIn, unique } from '../support/shell.js';
 
 const ID = 'dev.mosaikit.fixture.todo';
 const ITEMS = `/api/v1/data/${ID}/items`;
 
-test.describe('MK-046 Data of plugins without a backend', () => {
-  test('46.1 a frontend-only plugin is active as soon as it is installed', async ({ page }) => {
+test.describe('MK-046 Data of extensions without a backend', () => {
+  test('46.1 a frontend-only extension is active as soon as it is installed', async ({ page }) => {
     await signIn(page);
-    await openApp(page, 'Plugins');
+    await openApp(page, 'Extensions');
     const row = page.locator('tbody tr').filter({ hasText: ID });
     await row.getByRole('button', { name: 'Install' }).click();
-    await expect(page.locator('mk-admin-plugins').getByRole('status')).toContainText(
+    await expect(page.locator('mk-admin-extensions').getByRole('status')).toContainText(
       `${ID} 0.1.0 is installed and active`,
     );
     // No restart, no reload of the page: the shell loads the new app at once.
     await expect(apps(page).getByRole('link', { name: 'To do', exact: true })).toBeVisible();
-    expect((await plugins()).find((plugin) => plugin.id === ID)?.status).toBe('ACTIVE');
+    expect((await extensions()).find((extension) => extension.id === ID)?.status).toBe('ACTIVE');
   });
 
   test('46.2 the items are kept for the organization and nobody else', async ({ page }) => {

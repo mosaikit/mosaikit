@@ -6,7 +6,7 @@ import type { ChatMessage, KernelClient } from './api.js';
 
 /**
  * The assistant panel of the home page (MK-024): the person writes, the assistant answers with the
- * tools of the plugins. Changes come back as drafts, which the shell lists under Pending actions;
+ * tools of the extensions. Changes come back as drafts, which the shell lists under Pending actions;
  * the panel fires `mk-drafts-changed` when there are new ones.
  */
 @customElement('mk-assistant')

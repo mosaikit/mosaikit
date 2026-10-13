@@ -13,7 +13,7 @@ replaced by `_`: `mosaikit.identity.keycloak-url` is `MOSAIKIT_IDENTITY_KEYCLOAK
 | `quarkus.datasource.password` | | database password |
 
 The portable distribution sets them itself (in `config/database.properties`, written at each
-start). The kernel keeps its tables in the `mk_kernel` schema and each plugin in its own schema.
+start). The kernel keeps its tables in the `mk_kernel` schema and each extension in its own schema.
 
 ## First administrator
 
@@ -50,26 +50,26 @@ Terminate TLS at a reverse proxy or an ingress; in production the kernel sends
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `mosaikit.database.row-security` | `true` | requests run as the member role of the installation, so that the row-level security policies of plugins apply (MK-019); the database user needs `CREATEROLE` once |
+| `mosaikit.database.row-security` | `true` | requests run as the member role of the installation, so that the row-level security policies of extensions apply (MK-019); the database user needs `CREATEROLE` once |
 
-## Plugins
+## Extensions
 
 | Setting | Default | Meaning |
 |---|---|---|
-| `mosaikit.plugins.directory` | `plugins` | directory of the installed plugins |
-| `mosaikit.plugins.trusted-keys-directory` | `config/trusted-keys` | public keys of trusted publishers |
-| `mosaikit.plugins.signatures` | `optional` | `required`: only packages signed with a trusted key are accepted |
-| `mosaikit.plugins.unverified-frontends` | `iframe` | `iframe` runs the frontends of unverified publishers in a sandboxed iframe; `module` loads them like the others |
-| `mosaikit.plugins.watch` | `false` (`true` in development mode) | read the plugins directory again when a file changes; the shell then reloads its page, so changed frontends show at once |
-| `mosaikit.ui.theme` | `mosaikit` | the theme of the interface: `mosaikit`, `pa` for public administrations in the style of Bootstrap Italia, or the identifier of an active theme plugin, such as `dev.mosaikit.sample.theme` |
+| `mosaikit.extensions.directory` | `extensions` | directory of the installed extensions |
+| `mosaikit.extensions.trusted-keys-directory` | `config/trusted-keys` | public keys of trusted publishers |
+| `mosaikit.extensions.signatures` | `optional` | `required`: only packages signed with a trusted key are accepted |
+| `mosaikit.extensions.unverified-frontends` | `iframe` | `iframe` runs the frontends of unverified publishers in a sandboxed iframe; `module` loads them like the others |
+| `mosaikit.extensions.watch` | `false` (`true` in development mode) | read the extensions directory again when a file changes; the shell then reloads its page, so changed frontends show at once |
+| `mosaikit.ui.theme` | `mosaikit` | the theme of the interface: `mosaikit`, `pa` for public administrations in the style of Bootstrap Italia, or the identifier of an active theme extension, such as `dev.mosaikit.sample.theme` |
 | `mosaikit.accounts.remember-for` | `30d` | how long "Remember me" keeps a person signed in on a browser, unless they sign out |
 | `mosaikit.accounts.confirm-email` | `true` | self-registered people confirm their address with a link sent by mail before signing in |
 | `mosaikit.accounts.confirmation-valid-for` | `24h` | how long the link that confirms an address works |
 | `mosaikit.public-url` | | the address of the installation as people reach it, such as `https://mosaikit.example.org`, for the links in mails; without it, the address of the request |
 | `quarkus.mailer.host`, `port`, `username`, `password`, `tls`, `start-tls` | `localhost`, `25` | the mail server that sends the confirmation links |
 | `quarkus.mailer.from` | `Mosaikit <no-reply@localhost>` | the sender of the mails |
-| `mosaikit.plugins.providers-directory` | | set by the launcher: where the JARs of Java plugins are |
-| `mosaikit.plugins.packages-directory` | `plugins/.packages` | set by the launcher: where packages are unpacked |
+| `mosaikit.extensions.providers-directory` | | set by the launcher: where the JARs of Java extensions are |
+| `mosaikit.extensions.packages-directory` | `extensions/.packages` | set by the launcher: where packages are unpacked |
 
 ## Assistant
 

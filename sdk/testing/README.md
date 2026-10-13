@@ -1,24 +1,25 @@
 # @mosaikit/testing
 
-The test bench of Mosaikit plugins (MK-050, ADR-0035): a real Mosaikit installation with your
-plugin, on an embedded PostgreSQL, with an organization and two people who confirmed their
-address. Nothing to install but Java 25 and Node.js 24. The plugins written by
-`create-mosaikit-plugin` use it already.
+The test bench of Mosaikit extensions (MK-050, ADR-0035): a real Mosaikit installation with your
+extension, on an embedded PostgreSQL, with an organization and two people who confirmed their
+address. Nothing to install but Java 25 and Node.js 24. The extensions written by
+`create-mosaikit-extension` use it already.
 
-## Try a plugin: `mosaikit-bench`
+## Try an extension: `mosaikit-bench`
 
 ```bash
-npx mosaikit-bench                      # the plugin of the current directory (its manifest.yaml)
-npx mosaikit-bench . ../todo            # more plugins: directories or packages (.zip)
+npx mosaikit-bench                      # the extension of the current directory (its manifest.yaml)
+npx mosaikit-bench . ../todo            # more extensions: directories or packages (.zip)
 npx mosaikit-bench --port 8080 --work .mosaikit-bench
+npx mosaikit-bench --set mosaikit.ui.theme=dev.acme.theme . ../theme   # with a setting of the installation
 ```
 
-It prints the address, the administrator and the people, and runs until Ctrl+C. A plugin
+It prints the address, the administrator and the people, and runs until Ctrl+C. An extension
 directory is linked into the installation and watched: a changed frontend shows at once in the open
 page; Java code (`lib/`) and migrations are read at the next start. A package is signed with the
 key of the bench and installed.
 
-## Test a plugin with Playwright
+## Test an extension with Playwright
 
 `tests/global-setup.ts` starts the bench before the tests and stops it after them:
 
@@ -28,8 +29,8 @@ import { Bench, packagesIn } from '@mosaikit/testing';
 export default async function globalSetup(): Promise<() => Promise<void>> {
   const bench = await Bench.start({
     work: '.mosaikit-bench',
-    plugins: packagesIn('target'), // what mvn package built; a directory works too
-    settings: { 'mosaikit.plugins.unverified-frontends': 'module' },
+    extensions: packagesIn('target'), // what mvn package built; a directory works too
+    settings: { 'mosaikit.extensions.unverified-frontends': 'module' },
   });
   bench.publish(); // the tests read the bench from the environment
   return () => bench.stop();
@@ -46,7 +47,7 @@ test('a person of the organization opens the app', async ({ page }) => {
   await signIn(page, member());
   await openApp(page, 'Traffic');
   await expect(page.getByRole('heading', { name: 'Traffic' })).toBeVisible();
-  expect((await api(member(1), '/api/v1/p/traffic/items')).status).toBe(200);
+  expect((await api(member(1), '/api/v1/ext/traffic/items')).status).toBe(200);
 });
 ```
 
@@ -65,8 +66,8 @@ test('a person of the organization opens the app', async ({ page }) => {
 | Option | Default | Meaning |
 |---|---|---|
 | `work` | (required) | where the bench keeps the installation, the database, the mails and the log |
-| `plugins` | none | installed before the first start: packages (signed by the bench) or plugin directories |
-| `catalog` | none | offered by a signed catalog of the installation, to install from the Plugins page |
+| `extensions` | none | installed before the first start: packages (signed by the bench) or extension directories |
+| `catalog` | none | offered by a signed catalog of the installation, to install from the Extensions page |
 | `installation` | see below | the installation to copy |
 | `port` | a free port | the port of the kernel |
 | `admin`, `organization`, `people` | `admin`, `example`, two people | who the bench creates; people register and confirm their address by mail |
@@ -84,8 +85,8 @@ its key), and `info`. Mails go to a fake mail server, readable with `mails(direc
 The installation of the version of this package, downloaded once into `~/.cache/mosaikit`
 (`MOSAIKIT_CACHE` changes it): for a snapshot of `main` from the pre-release `snapshot` of
 mosaikit/mosaikit, for a release from its GitHub release. `MOSAIKIT_INSTALLATION` chooses another
-one, such as `target/dist/mosaikit` of a build of Mosaikit, to test a plugin against a change of
+one, such as `target/dist/mosaikit` of a build of Mosaikit, to test an extension against a change of
 the kernel. `MOSAIKIT_BENCH_DEBUG=1` prints how long each phase of a start takes.
 
-A start takes about 15 seconds, and about 25 when a plugin brings Java code, which the launcher
+A start takes about 15 seconds, and about 25 when an extension brings Java code, which the launcher
 builds into the kernel at the first start.

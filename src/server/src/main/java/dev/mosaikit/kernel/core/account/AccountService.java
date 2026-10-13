@@ -38,7 +38,7 @@ import java.util.stream.Collectors;
 @Transactional
 public class AccountService {
 
-    /** An app of the app bar in the personal settings: {@code <plugin id>/<app id>}. */
+    /** An app of the app bar in the personal settings: {@code <extension id>/<app id>}. */
     private static final java.util.regex.Pattern HIDDEN_APP =
             java.util.regex.Pattern.compile("^[a-z0-9][a-z0-9.-]{0,99}/[a-z0-9][a-z0-9-]{0,63}$");
 
@@ -286,7 +286,7 @@ public class AccountService {
                 .filter(account -> isMemberOf(account, organization));
     }
 
-    /** Whether an account turned off a kind of notifications, as {@code <plugin id>/<kind>} (MK-038). */
+    /** Whether an account turned off a kind of notifications, as {@code <extension id>/<kind>} (MK-038). */
     public boolean mutes(UUID account, String kind) {
         return accounts.findById(account)
                 .map(this::readPreferences)
@@ -310,7 +310,7 @@ public class AccountService {
                 .toList();
         if (!wrong.isEmpty()) {
             throw new InvalidInputException(
-                    List.of("hiddenApps must hold <plugin id>/<app id>, not " + String.join(", ", wrong)));
+                    List.of("hiddenApps must hold <extension id>/<app id>, not " + String.join(", ", wrong)));
         }
         try {
             account.setPreferences(json.writeValueAsString(preferences));

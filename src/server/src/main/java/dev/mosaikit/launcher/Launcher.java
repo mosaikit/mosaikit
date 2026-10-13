@@ -3,11 +3,11 @@
 package dev.mosaikit.launcher;
 
 import dev.mosaikit.kernel.api.version.Version;
-import dev.mosaikit.kernel.core.plugin.BackendCheck;
-import dev.mosaikit.kernel.core.plugin.InstalledPlugin;
-import dev.mosaikit.kernel.core.plugin.PackageTrust;
-import dev.mosaikit.kernel.core.plugin.PluginCatalog;
-import dev.mosaikit.kernel.core.plugin.ProviderState;
+import dev.mosaikit.kernel.core.extension.BackendCheck;
+import dev.mosaikit.kernel.core.extension.ExtensionCatalog;
+import dev.mosaikit.kernel.core.extension.InstalledExtension;
+import dev.mosaikit.kernel.core.extension.PackageTrust;
+import dev.mosaikit.kernel.core.extension.ProviderState;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.PrintStream;
@@ -25,8 +25,8 @@ import java.util.stream.Collectors;
  * Prepares an installation before the kernel starts.
  *
  * <ul>
- *   <li>{@code prepare <home>} before a start: reads the plugins with the same catalog as the
- *       kernel, copies the JARs of the Java plugins that can run into the providers directory and
+ *   <li>{@code prepare <home>} before a start: reads the extensions with the same catalog as the
+ *       kernel, copies the JARs of the Java extensions that can run into the providers directory and
  *       rebuilds the kernel (Quarkus re-augmentation) only when that set changed. The new JARs
  *       stay pending until the kernel has started with them.
  *   <li>{@code build <home>} while building a container image: the same, without the pending
@@ -34,7 +34,7 @@ import java.util.stream.Collectors;
  *       the previous one.
  * </ul>
  *
- * <p>A plugin that breaks the kernel is rolled back automatically: if the rebuild fails, the
+ * <p>An extension that breaks the kernel is rolled back automatically: if the rebuild fails, the
  * previous build is restored at once; if the kernel does not start with the new JARs, the next
  * {@code prepare} restores it. Rolled back JARs are rejected until a different version is
  * installed. The scripts in {@code bin/} run the launcher, then the kernel, and retry once after
@@ -141,19 +141,21 @@ public final class Launcher {
             rollBack(snapshot, providers, rejected, "the kernel did not start with " + describe(pending));
         }
 
-        List<InstalledPlugin> plugins = new PluginCatalog(kernelVersion, BackendCheck.available(rejected), trust)
-                .scan(installation.plugins(), installation.packages());
+        List<InstalledExtension> extensions = new ExtensionCatalog(
+                        kernelVersion, BackendCheck.available(rejected), trust)
+                .scan(installation.extensions(), installation.packages());
         ProviderSync sync = new ProviderSync(providers);
-        ProviderSync.Plan plan = sync.plan(plugins);
+        ProviderSync.Plan plan = sync.plan(extensions);
         if (plan.upToDate()) {
             out.printf(
-                    "Mosaikit: %d Java plugin(s), kernel up to date.%n",
+                    "Mosaikit: %d Java extension(s), kernel up to date.%n",
                     plan.sources().size());
             return 0;
         }
 
         out.printf(
-                "Mosaikit: Java plugins changed (%s), rebuilding the kernel...%n", String.join(", ", plan.changes()));
+                "Mosaikit: Java extensions changed (%s), rebuilding the kernel...%n",
+                String.join(", ", plan.changes()));
         long start = System.nanoTime();
         snapshot.save();
         sync.apply(plan);
@@ -191,13 +193,13 @@ public final class Launcher {
         ProviderState.clear(providers, ProviderState.PENDING_FILE);
         rejected.write(providers, ProviderState.REJECTED_FILE);
         out.printf(
-                "Mosaikit: %s. Rolled back to the previous plugins; the plugin(s) stay disabled until a"
+                "Mosaikit: %s. Rolled back to the previous extensions; the extension(s) stay disabled until a"
                         + " different version is installed.%n",
                 reason);
     }
 
     private static String describe(ProviderState state) {
-        return state.entries().stream().map(ProviderState.Entry::pluginId).collect(Collectors.joining(", "));
+        return state.entries().stream().map(ProviderState.Entry::extensionId).collect(Collectors.joining(", "));
     }
 
     /** Runs the Quarkus re-augmentation of the mutable JAR, which exits once the kernel is rebuilt. */
@@ -239,8 +241,8 @@ public final class Launcher {
 
     /**
      * The trust of the installation, read like the kernel reads it: {@code
-     * mosaikit.plugins.signatures} and {@code mosaikit.plugins.trusted-keys-directory} from the
-     * environment ({@code MOSAIKIT_PLUGINS_SIGNATURES}, {@code MOSAIKIT_PLUGINS_TRUSTED_KEYS_DIRECTORY})
+     * mosaikit.extensions.signatures} and {@code mosaikit.extensions.trusted-keys-directory} from the
+     * environment ({@code MOSAIKIT_EXTENSIONS_SIGNATURES}, {@code MOSAIKIT_EXTENSIONS_TRUSTED_KEYS_DIRECTORY})
      * or from {@code config/application.properties}, relative to the installation.
      */
     static PackageTrust trust(Installation installation, UnaryOperator<String> environment) {
@@ -253,9 +255,9 @@ public final class Launcher {
                 throw new UncheckedIOException("Cannot read " + file, e);
             }
         }
-        String signatures = setting(environment, properties, "mosaikit.plugins.signatures", "optional");
+        String signatures = setting(environment, properties, "mosaikit.extensions.signatures", "optional");
         String directory =
-                setting(environment, properties, "mosaikit.plugins.trusted-keys-directory", "config/trusted-keys");
+                setting(environment, properties, "mosaikit.extensions.trusted-keys-directory", "config/trusted-keys");
         return PackageTrust.read(installation.home().resolve(directory), signatures);
     }
 
