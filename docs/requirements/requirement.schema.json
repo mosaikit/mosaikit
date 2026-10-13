@@ -4,7 +4,7 @@
   "title": "Requirement",
   "description": "The front matter of a requirement: one Markdown file per requirement, named after its id, with this YAML front matter and the description in the body. The same format serves Mosaikit and the products built on it; each repository says its prefix and its areas in requirements.json.",
   "type": "object",
-  "required": ["id", "title", "area", "priority", "status", "acceptance"],
+  "required": ["id", "title", "area", "priority", "status"],
   "additionalProperties": false,
   "properties": {
     "id": {
@@ -83,7 +83,7 @@
       "pattern": "^[a-z0-9-]+/[a-z0-9.-]+$"
     },
     "acceptance": {
-      "description": "Verifiable criteria: the requirement is done when tests show each of them.",
+      "description": "Verifiable criteria: the requirement is done when tests show each of them. Required unless the requirement is dropped or moved.",
       "type": "array",
       "items": {
         "type": "string",
@@ -92,10 +92,30 @@
       "minItems": 1
     }
   },
-  "if": {
-    "properties": { "status": { "const": "moved" } }
-  },
-  "then": {
-    "required": ["moved-to"]
-  }
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "moved"
+          }
+        }
+      },
+      "then": {
+        "required": ["moved-to"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": ["proposed", "planned", "in-progress", "done"]
+          }
+        }
+      },
+      "then": {
+        "required": ["acceptance"]
+      }
+    }
+  ]
 }

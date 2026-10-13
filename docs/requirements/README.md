@@ -45,7 +45,7 @@ file, and the traceability:
 | `estimate` | days of work, `[least, most]` |
 | `legacy` | its identifier in a tracker it comes from |
 | `verified-in` | the repository whose tests verify it, when not this one |
-| `acceptance` | verifiable criteria: done when tests show each of them |
+| `acceptance` | verifiable criteria: done when tests show each of them; not needed when dropped or moved |
 
 The body says why the requirement exists and what it covers; longer analysis, open questions and a
 dated history go under their own headings (`## Analysis`, `## History`).
