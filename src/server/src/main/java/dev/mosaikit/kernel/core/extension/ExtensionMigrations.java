@@ -4,6 +4,7 @@ package dev.mosaikit.kernel.core.extension;
 
 import dev.mosaikit.kernel.api.extension.DatabaseEntry;
 import dev.mosaikit.kernel.api.extension.ExtensionManifest;
+import dev.mosaikit.kernel.core.data.PublishedViews;
 import dev.mosaikit.kernel.core.data.RowSecurity;
 import io.agroal.api.AgroalDataSource;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -36,10 +37,12 @@ public class ExtensionMigrations {
 
     private final AgroalDataSource dataSource;
     private final RowSecurity rowSecurity;
+    private final PublishedViews publishedViews;
 
-    public ExtensionMigrations(AgroalDataSource dataSource, RowSecurity rowSecurity) {
+    public ExtensionMigrations(AgroalDataSource dataSource, RowSecurity rowSecurity, PublishedViews publishedViews) {
         this.dataSource = dataSource;
         this.rowSecurity = rowSecurity;
+        this.publishedViews = publishedViews;
     }
 
     void onExtensionsLoaded(@Observes ExtensionsLoaded event) {
@@ -50,6 +53,9 @@ public class ExtensionMigrations {
                 schemas.add(database.schema());
             });
         }
+        // The reader role of the views for external services (MK-123), before row-level security:
+        // once it is on, the connections of the start run as the member role, which creates no role.
+        publishedViews.prepare();
         // After the migrations, which run as the owner and see every row (MK-019).
         rowSecurity.prepare(schemas);
     }

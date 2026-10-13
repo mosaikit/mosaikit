@@ -310,6 +310,34 @@ connects to `https://<host>/mcp` with the credentials of a person and the header
 `X-Mosaikit-Organization: <slug>`; it has exactly the rights of that person in that organization,
 and changes wait for the confirmation of the person.
 
+## Published views for external services
+
+Services that read who belongs to which organization and team from the database, such as a map
+server with a JDBC role service, read the [published views](../development/published-views.md) of
+schema `mk_published`: accounts, organizations, memberships, teams and their members, never
+passwords or secrets. Their names and columns are a contract that changes only with a breaking
+change of the platform.
+
+At each start the installation creates the role `mk_<database>_reader` (for the database `mosaikit`,
+`mk_mosaikit_reader`), which reads those views and nothing else of the database. A database
+administrator gives it to a login of the service:
+
+```sql
+create role map_server login password 'a long random secret';
+grant mk_mosaikit_reader to map_server;
+```
+
+Or the kernel creates the login at start, from `mosaikit.database.published-views.login` and
+`mosaikit.database.published-views.password` (see [configuration](configuration.md)).
+Both ways need a database user with `CREATEROLE`, as row-level security does; without it the kernel
+starts with a warning and the role is created by hand as above, followed by
+`grant usage on schema mk_published to mk_mosaikit_reader` and
+`grant select on all tables in schema mk_published to mk_mosaikit_reader`.
+
+The views run with the rights of the kernel: row-level security never hides rows from them, and a
+change made in the console or through the API is read at once. The login cannot read the tables of
+the kernel or of extensions, call their functions, or write the views.
+
 ## Extensions
 
 See [extensions](extensions.md). `GET /api/v1/extensions` lists every extension found, with its status, its

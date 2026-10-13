@@ -18,6 +18,16 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Read-only views of people, organizations, memberships and teams for external services (MK-123),
+  such as a map server that reads the roles of people from the database: `account`,
+  `organization`, `membership`, `team` and `team_member` in the new schema `mk_published`
+  (migration V21). The installation creates the role `mk_<database>_reader`, which reads them and
+  nothing else; an administrator grants it to a login, or the kernel creates one from
+  `mosaikit.database.published-views.login` and `.password`. Their names and columns are a
+  contract: a change is announced here as a breaking change of the platform
+  ([published views](docs/development/published-views.md)). The setting
+  `mosaikit.database.row-security` can now also be set in a configuration file.
+
 - The kernel keeps the sessions of people on the server (MK-125). Signing in with a password opens
   a session recorded in the new table `account_session` (migration V19) and the `mosaikit-session`
   cookie holds only a random value, kept as its digest: after signing out, a copy of the cookie is

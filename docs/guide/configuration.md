@@ -56,6 +56,8 @@ Terminate TLS at a reverse proxy or an ingress; in production the kernel sends
 | Setting | Default | Meaning |
 |---|---|---|
 | `mosaikit.database.row-security` | `true` | requests run as the member role of the installation, so that the row-level security policies of extensions apply (MK-019); the database user needs `CREATEROLE` once |
+| `mosaikit.database.published-views.login` | | a login the kernel creates at start for external services, which reads the [published views](../development/published-views.md) and nothing else (MK-123); an existing role is used only when the kernel created it |
+| `mosaikit.database.published-views.password` | | its password, required with the login; set it from a secret (`MOSAIKIT_DATABASE_PUBLISHED_VIEWS_PASSWORD`). The kernel sends it to PostgreSQL already hashed (SCRAM-SHA-256) and never logs it; changing it changes the password of the login at the next start |
 
 ## Audit log
 

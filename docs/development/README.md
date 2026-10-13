@@ -6,6 +6,7 @@
 | [Development guide](development.md) | Contributors: build, run, test, quality gate, CI |
 | [Extension development](extension-development.md) | Extension authors: manifest, frontend contract, Java code, packaging, signing |
 | [REST API](api.md) | Clients and extension authors: conventions, authentication, errors |
+| [Published views](published-views.md) | Services outside the kernel: the read-only views of people, organizations and teams, and their stability |
 | [Release process](release.md) | Maintainers: versioning, tags, what a release publishes |
 | [Versions](versions.md) | Reference versions of the stack and update policy |
 | [Roadmap](roadmap.md) | Everyone: the phases from the prototype to the first version, with their requirements |
