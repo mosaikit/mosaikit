@@ -26,7 +26,8 @@
     "verify": "npm run check && npm run build",
     "e2e": "node tests/e2e/run.ts",
     "dev": "node build/dev.ts",
-    "check:fast": "npm run lint && npm run typecheck && vitest run"
+    "check:fast": "npm run lint && npm run typecheck && vitest run",
+    "check:pr": "node build/check-pr.ts"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

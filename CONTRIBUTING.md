@@ -27,7 +27,8 @@ Thank you for considering a contribution. This document describes how the projec
    extension belongs to the repository of the extension (ADR-0035), not to this one.
 6. Describe a change that users see in a changelog fragment, `changelog.d/<requirement or
    slug>.md` ([changelog.d/README.md](changelog.d/README.md)), not in `CHANGELOG.md`: the release
-   assembles the fragments, and pull requests no longer conflict on the changelog.
+   assembles the fragments, and pull requests no longer conflict on the changelog. Run
+   `npm run check:pr` before pushing: it runs the checks on which the CI fails most often.
 7. Open a pull request with auto-merge (`gh pr merge --auto --rebase`): GitHub merges it with
    rebase once the required checks pass. Changes to `kernel-api`
    (including the manifest schema) or `sdk/` require a review.

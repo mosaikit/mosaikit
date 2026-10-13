@@ -39,12 +39,17 @@ of change; a whole build with every test takes about 11 minutes and is rarely ne
 | a kernel class | `./mvnw -pl src/server test -Dskip.npm -Dtest=<TestClass>` |
 | the extension API | `./mvnw -pl sdk/java install` (then the kernel compiles against it) |
 | documentation | `npx vitest run docs` |
-| before a pull request | `npm run check:fast`, `./mvnw verify -Dskip.npm`, `npm run e2e` |
+| an endpoint of the kernel | `-Dtest=DocumentationTest -Ddocs.write=true` rewrites the table of `docs/development/api.md` |
+| before pushing a pull request | `npm run check:pr` (about a minute on a built kernel: what the CI fails on most) |
+| everything, rarely | `npm run check:fast`, `./mvnw verify -Dskip.npm`, `npm run e2e` |
 
 - Run **one** end-to-end suite or bench at a time on a machine: several embedded PostgreSQL and
   JVMs together stall the suites, and the failure looks like a bug of the change.
 - `npx playwright install chromium` after an update of Playwright, or every browser test fails
   with "Executable doesn't exist".
+- The changelog entry goes in a fragment, `changelog.d/<MK-xxx or slug>.md` (`### Added` and a list
+  item), never in `CHANGELOG.md`; a new end-to-end file names its group in its header,
+  `// e2e-group: C`, not in `tests/e2e/run.ts`.
 - Run Prettier only on the files you changed: `docs/` and Markdown are formatted by hand, and a run
   on a folder realigns the comments of every example in it.
 
@@ -55,7 +60,8 @@ of change; a whole build with every test takes about 11 minutes and is rarely ne
   `describe`). Big decisions get an ADR in `docs/adr/`.
 - Documented in the same pull request: the guide for extension developers
   (`docs/development/extension-development.md`) when the contract of extensions changes, the user
-  and administrator guide (`docs/guide/`) when behaviour changes, and `CHANGELOG.md` (Unreleased).
+  and administrator guide (`docs/guide/`) when behaviour changes, and a changelog fragment in
+  `changelog.d/` ([changelog.d/README.md](changelog.d/README.md)).
 - English everywhere; the shell's texts go through `t()` with their translations.
 - Conventional Commits, signed off (`git commit -s`, DCO), SPDX headers on every source file.
 - Changes to `sdk/` (public API, manifest schema) or `.github/` (CI) are reviewed by a maintainer.

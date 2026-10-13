@@ -46,6 +46,14 @@ every pull request.
 | an endpoint of the kernel (added, changed, removed) | `./mvnw -pl sdk/java,src/server test -Dskip.npm -Dtest=DocumentationTest -Dsurefire.failIfNoSpecifiedTests=false -Ddocs.write=true`: rewrites the table of [api.md](api.md) from the OpenAPI document, with a row for each new endpoint to complete | 1–2 min |
 | the launcher or the installation of Java extensions | `./mvnw -pl src/server verify -Dskip.npm -DskipITs=false -Dit.test=JavaExtensionInstallationIT -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false` | about 3 min |
 | documentation only | `npx vitest run docs` | seconds |
+| anything, before pushing a pull request | `npm run check:pr` (`-- --no-java` without a JDK, `-- --base <ref>` against another branch than `origin/main`) | about a minute once the kernel is built |
+
+`npm run check:pr` runs the checks on which the CI of a pull request fails most often: lint, type
+check and the unit tests with the coverage thresholds (`docs/` and the requirements included);
+`DocumentationTest`, the architecture tests and the other fast tests of the kernel, at the same
+time; the groups of the end-to-end tests; a changelog fragment against `origin/main` (committed
+changes only, as in the CI); semgrep on the changed files when it is installed, with the
+configuration of the job `sast`. It prints what passed, failed or was skipped, and why.
 
 Before a pull request that touches more than one of these, `npm run check:fast` and
 `./mvnw verify -Dskip.npm` cover the frontend and the backend; `npm run e2e` runs the
