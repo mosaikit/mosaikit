@@ -2,8 +2,10 @@
 # SPDX-FileCopyrightText: 2026 Massimo Antonini
 # SPDX-License-Identifier: MPL-2.0
 #
-# Fails a merge request that changes the product but neither CHANGELOG.md nor the documentation
-# (ADR-0023). The label "no-changelog" skips it, for changes that users do not see.
+# Fails a merge request that changes the product without an entry for the changelog (ADR-0023): a
+# fragment added in changelog.d/ (see changelog.d/README.md), or, for now, an edit of CHANGELOG.md.
+# The label "no-changelog" skips it, for changes that users do not see. `npm run check:pr` runs it
+# against origin/main.
 #
 #   check-changelog.sh <base commit>
 set -euo pipefail
@@ -20,13 +22,21 @@ if [[ -z "$product" ]]; then
   echo "No change to the product."
   exit 0
 fi
-if ! grep -qx 'CHANGELOG.md' <<<"$changed"; then
-  echo "The merge request changes the product but not CHANGELOG.md:" >&2
+# A fragment that the merge request adds or changes (README.md describes the directory).
+fragments="$(git diff --name-only --diff-filter=AM "$base"...HEAD -- 'changelog.d/*.md' \
+  | grep -vx 'changelog.d/README.md' || true)"
+if [[ -z "$fragments" ]] && ! grep -qx 'CHANGELOG.md' <<<"$changed"; then
+  echo "The merge request changes the product but adds no changelog fragment:" >&2
   sed 's/^/  /' <<<"$product" >&2
-  echo "Add an entry under ## [Unreleased], or the label no-changelog if users do not see the change." >&2
+  echo "Add changelog.d/<requirement or slug>.md (see changelog.d/README.md), or the label" >&2
+  echo "no-changelog if users do not see the change." >&2
   exit 1
 fi
 if ! grep -q '^docs/' <<<"$changed"; then
   echo "Warning: no file of docs/ changes; check that the guides still describe the product."
 fi
-echo "CHANGELOG.md is updated."
+if [[ -n "$fragments" ]]; then
+  echo "Changelog fragment(s): $(paste -sd ' ' <<<"$fragments")"
+else
+  echo "CHANGELOG.md is updated."
+fi

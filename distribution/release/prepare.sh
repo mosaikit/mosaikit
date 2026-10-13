@@ -4,7 +4,8 @@
 #
 # Sets the version of every artifact of the repository.
 #
-#   prepare.sh 0.2.0             release: also turns "## [Unreleased]" into "## [0.2.0] - <today>"
+#   prepare.sh 0.2.0             release: also moves the fragments of changelog.d/ into CHANGELOG.md
+#                                and turns "## [Unreleased]" into "## [0.2.0] - <today>"
 #   prepare.sh 0.3.0-SNAPSHOT    next development version: versions only
 #
 # Review the diff, commit, then tag the release with `git tag -s v0.2.0` (see docs/development/release.md).
@@ -40,8 +41,10 @@ chart=distribution/k8s/mosaikit/Chart.yaml
 sed -i.bak -E "s/^version: .*/version: $version/; s/^appVersion: .*/appVersion: \"$version\"/" "$chart"
 rm -f "$chart.bak"
 
-# Changelog, only for releases
+# Changelog, only for releases: the fragments of changelog.d/ go into Unreleased first, then
+# Unreleased becomes the section of the version.
 if [[ "$version" != *-SNAPSHOT ]]; then
+  node build/changelog.ts assemble
   if grep -q "^## \[$version\]" CHANGELOG.md; then
     echo "CHANGELOG.md already has a section for $version" >&2
   else
