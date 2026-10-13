@@ -9,6 +9,7 @@ import dev.mosaikit.kernel.core.error.ConflictException;
 import dev.mosaikit.kernel.core.error.ForbiddenOperationException;
 import dev.mosaikit.kernel.core.error.InvalidInputException;
 import dev.mosaikit.kernel.core.error.ResourceNotFoundException;
+import dev.mosaikit.kernel.core.error.ServiceUnavailableException;
 import dev.mosaikit.kernel.core.organization.Organization;
 import dev.mosaikit.kernel.core.organization.OrganizationMember;
 import dev.mosaikit.kernel.core.organization.OrganizationMembers;
@@ -16,9 +17,12 @@ import dev.mosaikit.kernel.core.organization.OrganizationService;
 import dev.mosaikit.kernel.core.security.PasswordHasher;
 import dev.mosaikit.kernel.core.security.Roles;
 import dev.mosaikit.kernel.core.settings.PlatformSettingsService;
+import io.quarkus.mailer.Mail;
+import io.quarkus.narayana.jta.QuarkusTransaction;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.context.control.ActivateRequestContext;
 import jakarta.transaction.Transactional;
+import jakarta.transaction.Transactional.TxType;
 import java.net.URI;
 import java.time.Clock;
 import java.time.Instant;
@@ -103,12 +107,18 @@ public class AccountService {
         return new RegistrationOptions(!open.isEmpty(), open);
     }
 
-    /** Sends a new confirmation link to a registered address that is not confirmed yet. */
+    /**
+     * Sends a new confirmation link to a registered address that is not confirmed yet. The link is
+     * written in a transaction of its own, and the mail goes out after it has committed.
+     */
+    @Transactional(TxType.NOT_SUPPORTED)
     public void resendConfirmation(String email, URI base) {
-        accounts.findByUsername(normalize(email))
-                .filter(account -> !account.isEmailConfirmed())
-                .filter(account -> account.getPasswordHash().isPresent())
-                .ifPresent(account -> confirmationMail.send(account, base));
+        QuarkusTransaction.requiringNew()
+                .call(() -> accounts.findByUsername(normalize(email))
+                        .filter(account -> !account.isEmailConfirmed())
+                        .filter(account -> account.getPasswordHash().isPresent())
+                        .map(account -> confirmationMail.prepare(account, base)))
+                .ifPresent(confirmationMail::deliver);
     }
 
     /** Confirms the address of the link; false when the link is unknown, used or expired. */
@@ -121,9 +131,36 @@ public class AccountService {
      * mosaikit.accounts.confirm-email} the account signs in only after the link sent to the address
      * is opened.
      *
+     * <p>The account and its link are committed before the mail goes out, so that a slow or stuck
+     * mail server never holds the transaction. When the mail cannot be sent, the account stays and
+     * the answer is 503: the person asks for the link again.
+     *
      * @param base the address of the installation, for the link
      */
+    @Transactional(TxType.NOT_SUPPORTED)
     public Registration register(RegistrationRequest request, URI base) {
+        record Created(Registration registration, Optional<Mail> mail) {}
+        Created created = QuarkusTransaction.requiringNew().call(() -> {
+            Registration registration = createAccount(request);
+            Optional<Mail> mail = Optional.empty();
+            if (confirmEmail) {
+                UserAccount account =
+                        accounts.findById(registration.account().id()).orElseThrow();
+                mail = Optional.of(confirmationMail.prepare(account, base));
+            }
+            return new Created(registration, mail);
+        });
+        try {
+            created.mail().ifPresent(confirmationMail::deliver);
+        } catch (ServiceUnavailableException e) {
+            throw new ServiceUnavailableException("The account was created, but the mail with the link that"
+                    + " confirms the address could not be sent. Ask for the link again in a few minutes, or ask"
+                    + " the administrator.");
+        }
+        return created.registration();
+    }
+
+    private Registration createAccount(RegistrationRequest request) {
         if (!settings.registrationEnabled()) {
             throw new ForbiddenOperationException(
                     "Self-registration is turned off on this installation. Ask the administrator for an account.");
@@ -153,9 +190,6 @@ public class AccountService {
         accounts.insert(account);
         members.insert(new OrganizationMember(
                 account.getId(), organization.getId(), Set.of(Roles.ORGANIZATION_USER), Instant.now(clock)));
-        if (confirmEmail) {
-            confirmationMail.send(account, base);
-        }
         return new Registration(
                 view(account, Set.of(Roles.ORGANIZATION_USER), Optional.of(organization.getId())), confirmEmail);
     }

@@ -89,6 +89,16 @@ public interface KernelConfig {
          */
         @WithDefault("5s")
         Duration sessionCache();
+
+        /**
+         * How long the kernel waits for the mail server to take a mail, such as the confirmation
+         * link, in all. The time is split in two attempts: when the first one times out, the mail is
+         * sent once more on another connection. The mail is sent outside of any database
+         * transaction; when the server does not take it in time, the person gets an answer that the
+         * mail could not be sent, and can ask for it again.
+         */
+        @WithDefault("15s")
+        Duration mailTimeout();
     }
 
     /**

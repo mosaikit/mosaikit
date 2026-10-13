@@ -255,6 +255,13 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A slow or stuck mail server no longer makes a registration fail with 500 after 60 s (MK-048):
+  the confirmation mail goes out after the account and its link are committed, outside of any
+  database transaction, and the kernel waits for the mail server at most
+  `mosaikit.accounts.mail-timeout` (15 s), in two attempts of half each: when the first times out,
+  the mail is sent once more on another connection. When the mail is not sent the answer is 503, the
+  account stays, and the sign-in page offers to send the link again. The same holds when the link
+  is asked for again.
 - The test bench and `npm run dev` send mail to `127.0.0.1`, where their mail server listens: on
   Linux `localhost` resolved to `::1` too, and every other mail failed the registration that sent it.
 - The shell no longer misses an extension that changes in a watched directory while it loads its

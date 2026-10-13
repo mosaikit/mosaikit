@@ -70,6 +70,7 @@ Terminate TLS at a reverse proxy or an ingress; in production the kernel sends
 | `mosaikit.accounts.remember-for` | `30d` | how long "Remember me" keeps a person signed in on a browser, unless they sign out |
 | `mosaikit.accounts.confirm-email` | `true` | self-registered people confirm their address with a link sent by mail before signing in |
 | `mosaikit.accounts.confirmation-valid-for` | `24h` | how long the link that confirms an address works |
+| `mosaikit.accounts.mail-timeout` | `15s` | how long the kernel waits for the mail server to take a mail, in all: two attempts of half each, the second on another connection when the first times out; after it the person can ask for the link again |
 | `mosaikit.sharing.link-max-validity` | `30d` | the longest validity of a link to a resource of an extension (MK-055): every link expires, at the latest this long after it is made |
 | `mosaikit.public-url` | | the address of the installation as people reach it, such as `https://mosaikit.example.org`, for the links in mails; without it, the address of the request |
 | `quarkus.mailer.host`, `port`, `username`, `password`, `tls`, `start-tls` | `localhost`, `25` | the mail server that sends the confirmation links |
