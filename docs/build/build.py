@@ -36,9 +36,9 @@ PDF_HEADER = Path(__file__).with_name("pdf-header.tex")
 SKIPPED = {"node_modules", "target", "dist", "coverage"}
 
 GUIDES = {
-    "User-Guide": ("User and administrator guide", "user",
+    "User-Guide": ("User and administrator guide", "guide",
                    ["README", "installation", "using", "administration", "extensions", "configuration", "operations"]),
-    "Developer-Guide": ("Developer guide", "developer",
+    "Developer-Guide": ("Developer guide", "development",
                         ["README", "architecture", "development", "extension-development", "api", "versions", "release", "roadmap"]),
     "Compliance": ("Compliance: AgID, ACN QC2 and GDPR", "compliance",
                    ["README", "matrix", "non-conformities", "evidence", "secure-development"]),
