@@ -10,6 +10,7 @@ Checked on 29 September 2026. Renovate proposes updates; changing a major versio
 | Hibernate ORM / Jakarta Data | 7.4 / 1.0 (from the Quarkus BOM) |
 | Jackson | 2.22.3, over the 2.22.2 of the Quarkus BOM for CVE-2026-91776 and CVE-2026-91777 |
 | PostgreSQL | 18 |
+| AWS SDK for Java (S3 client of the store of files) | 2.55, with the HTTP client of the JDK (`url-connection-client`) |
 | Keycloak | 26.7 (federation, next iteration) |
 | Node.js | 24 LTS, 26 LTS from 28 October 2026 |
 | TypeScript | 6.0 (TypeScript 7 as soon as typescript-eslint supports it; see ADR-0007) |
