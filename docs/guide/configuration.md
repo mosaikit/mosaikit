@@ -111,6 +111,9 @@ S3-compatible object store; the database keeps only what the kernel knows of eac
 | `mosaikit.files.store` | `filesystem` | `filesystem`, a directory of the server, or `s3`, a bucket of an S3-compatible object store (Amazon S3, MinIO, Ceph, Garage) |
 | `mosaikit.files.directory` | `files` | the directory of the `filesystem` store, relative to the working directory of the kernel when not absolute (the installation directory) |
 | `mosaikit.files.max-size` | `10M` | the largest file, such as `512M` or `2G`; an upload through the REST API is also bound by `quarkus.http.limits.max-body-size` (`10M`), which an installation raises with it. Larger files are refused with 413 |
+| `mosaikit.files.link-max-validity` | `7d` | the longest validity of a signed link to files (MK-093): every link expires, at the latest this long after it is made |
+| `mosaikit.files.link-key` | | the key that signs links to files: at least 32 random bytes in base64 (`openssl rand -base64 32`), from a secret (`MOSAIKIT_FILES_LINK_KEY`). Empty, the key is derived from `mosaikit.secrets.master-key`; without either, links to files are disabled. See [signed links to files](administration.md#signed-links-to-files) |
+| `mosaikit.files.link-previous-keys` | | the former link keys of a rotation, comma-separated: the links they signed keep working until they expire |
 | `mosaikit.files.s3.endpoint` | | the URL of the store, such as `https://s3.example.org`; empty for Amazon S3, whose URL follows from the region |
 | `mosaikit.files.s3.region` | `us-east-1` | the region of the bucket; any value for a store without regions |
 | `mosaikit.files.s3.bucket` | | the bucket of the files, created beforehand; required with `s3` |
