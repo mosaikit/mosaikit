@@ -37,7 +37,10 @@ export const GROUPS: readonly Group[] = [
     ],
     installs: { '01-marketplace': ['activities', 'estimates', 'notes', 'hello'] },
   },
-  { name: 'B', files: ['06-devkit', '10-watch', '11-sign-in', '12-registration', '17-pwa'] },
+  {
+    name: 'B',
+    files: ['06-devkit', '10-watch', '11-sign-in', '12-registration', '17-pwa', '21-sessions'],
+  },
   {
     name: 'C',
     files: [

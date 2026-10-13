@@ -931,6 +931,9 @@ export class MkShell extends LitElement {
         slot="sessions"
         .client=${this.client}
         @mk-signed-out=${() => void this.signOut()}
+        @mk-settings-status=${(event: CustomEvent<string>) => {
+          this.settingsStatus = event.detail;
+        }}
       ></mk-sessions>
     </mk-settings>`;
   }
