@@ -52,9 +52,11 @@ describe('extension manifest schema', () => {
           i18n: { it: { title: 'Cruscotto' } },
           levels: [
             { name: 'view', title: 'View', i18n: { it: { title: 'Vedere' } } },
-            { name: 'edit', title: 'Edit' },
+            { name: 'use', title: 'Use' },
+            { name: 'edit', title: 'Edit', edits: true },
           ],
           subjects: ['person', 'group', 'organization', 'link'],
+          linkLevel: 'use',
         },
       ],
     };
@@ -100,6 +102,31 @@ describe('extension manifest schema', () => {
             title: 'x',
             levels: [{ name: 'view', title: 'View' }],
             subjects: ['everyone'],
+          },
+        ],
+      },
+    ],
+    [
+      'MK-055: a link level for a type that accepts no links',
+      {
+        resources: [
+          {
+            type: 'dashboard',
+            title: 'x',
+            levels: [{ name: 'view', title: 'View' }],
+            linkLevel: 'view',
+          },
+        ],
+      },
+    ],
+    [
+      'MK-055: a level that edits written as text',
+      {
+        resources: [
+          {
+            type: 'dashboard',
+            title: 'x',
+            levels: [{ name: 'edit', title: 'Edit', edits: 'yes' }],
           },
         ],
       },

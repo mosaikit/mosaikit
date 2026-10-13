@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.api.extension;
 
-import dev.mosaikit.kernel.api.sharing.SubjectKind;
 import dev.mosaikit.kernel.api.version.InvalidVersionException;
 import dev.mosaikit.kernel.api.version.Version;
 import dev.mosaikit.kernel.api.version.VersionRange;
@@ -222,11 +221,42 @@ public final class ExtensionManifests {
             String title = requiredText(type, TITLE, field + "." + TITLE);
             List<SharingLevelEntry> levels = readLevels(field + ".levels", type.get("levels"));
             Set<SubjectKind> subjects = readSubjects(field + ".subjects", type.get("subjects"));
+            String linkLevel = readLinkLevel(field + ".linkLevel", type.get("linkLevel"), levels, subjects);
             Map<String, Map<String, String>> i18n = readTranslations(field + "." + I18N, type.get(I18N), Set.of(TITLE));
             if (violations.size() > before) {
                 return Optional.empty();
             }
-            return Optional.of(new ResourceTypeEntry(name, title, levels, subjects, i18n));
+            return Optional.of(new ResourceTypeEntry(name, title, levels, subjects, linkLevel, i18n));
+        }
+
+        /**
+         * The highest level a link may give (MK-055): a declared level that does not edit, for a type
+         * that accepts links; the lowest level when left out.
+         */
+        private String readLinkLevel(
+                String field, Object raw, List<SharingLevelEntry> levels, Set<SubjectKind> subjects) {
+            if (raw == null) {
+                return null;
+            }
+            if (!(raw instanceof String name)) {
+                violation(field, "must be the name of a level");
+                return null;
+            }
+            if (!subjects.contains(SubjectKind.LINK)) {
+                violation(field, "is only for a type whose subjects include link");
+                return null;
+            }
+            Optional<SharingLevelEntry> level =
+                    levels.stream().filter(entry -> entry.name().equals(name)).findFirst();
+            if (level.isEmpty()) {
+                violation(field, "'" + name + "' is not a level of the type");
+                return null;
+            }
+            if (level.get().edits()) {
+                violation(field, "'" + name + "' edits: a link never gives a level that edits");
+                return null;
+            }
+            return name;
         }
 
         private List<SharingLevelEntry> readLevels(String field, Object raw) {
@@ -250,11 +280,20 @@ public final class ExtensionManifests {
                     violation(levelField + ".name", "the level '" + name + "' is declared twice");
                 }
                 String title = requiredText(level, TITLE, levelField + "." + TITLE);
+                Object edits = level.get("edits");
+                if (edits != null && !(edits instanceof Boolean)) {
+                    violation(levelField + ".edits", "must be true or false");
+                }
                 Map<String, Map<String, String>> i18n =
                         readTranslations(levelField + "." + I18N, level.get(I18N), Set.of(TITLE));
                 if (violations.size() == before) {
-                    levels.add(new SharingLevelEntry(name, title, i18n));
+                    levels.add(new SharingLevelEntry(name, title, Boolean.TRUE.equals(edits), i18n));
                 }
+            }
+            if (!ResourceTypeEntry.editingLevelsLast(levels)) {
+                violation(
+                        field,
+                        "the levels that edit come after those that do not, as each level includes the previous");
             }
             return levels;
         }

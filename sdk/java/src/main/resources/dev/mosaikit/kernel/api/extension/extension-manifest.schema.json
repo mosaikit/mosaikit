@@ -277,6 +277,16 @@
       "items": {
         "type": "object",
         "required": ["type", "title", "levels"],
+        "dependentSchemas": {
+          "linkLevel": {
+            "required": ["subjects"],
+            "properties": {
+              "subjects": {
+                "contains": { "const": "link" }
+              }
+            }
+          }
+        },
         "properties": {
           "type": {
             "type": "string",
@@ -302,6 +312,10 @@
                   "type": "string",
                   "minLength": 1
                 },
+                "edits": {
+                  "description": "Whether the level lets people change the resource; never given to a link or to the public, and every level after it edits too.",
+                  "type": "boolean"
+                },
                 "i18n": {
                   "$ref": "#/$defs/i18n",
                   "additionalProperties": {
@@ -322,6 +336,11 @@
             "items": {
               "enum": ["person", "group", "organization", "link", "public"]
             }
+          },
+          "linkLevel": {
+            "description": "The highest level a link may give, a level that does not edit; the lowest level when left out. The public always gets the lowest level.",
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
           },
           "i18n": {
             "$ref": "#/$defs/i18n",

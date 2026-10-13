@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
-package dev.mosaikit.kernel.api.sharing;
+package dev.mosaikit.kernel.api.extension;
 
 import java.util.Arrays;
 import java.util.Locale;
@@ -8,8 +8,10 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * The kinds of {@link Subject} a resource can be shared with (MK-055). A resource type lists in its
- * manifest the kinds it accepts, in {@code subjects}; without it, {@link #DEFAULT}.
+ * The kinds of subjects a resource can be shared with (MK-055), as a resource type lists them in
+ * {@code subjects} of its manifest; without it, {@link #DEFAULT}. The subjects themselves are
+ * {@link dev.mosaikit.kernel.api.sharing.Subject}; the kinds live here, with the manifest, so that
+ * the manifest model depends on no other package of the API.
  */
 public enum SubjectKind {
     /** One person of the organization. */

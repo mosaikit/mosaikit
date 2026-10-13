@@ -5,7 +5,6 @@ package dev.mosaikit.kernel.api.extension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import dev.mosaikit.kernel.api.sharing.SubjectKind;
 import dev.mosaikit.kernel.api.version.Version;
 import java.util.HashMap;
 import java.util.List;
@@ -759,7 +758,149 @@ class ExtensionManifestsTest {
         List<SharingLevelEntry> none = List.of();
         Set<SubjectKind> subjects = SubjectKind.DEFAULT;
 
-        assertThatThrownBy(() -> new ResourceTypeEntry("dashboard", "Dashboard", none, subjects, null))
+        assertThatThrownBy(() -> new ResourceTypeEntry("dashboard", "Dashboard", none, subjects, null, null))
                 .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @Tag("MK-055")
+    void linksAndThePublicGetAtMostALevelThatDoesNotEdit() {
+        Map<String, Object> tree = validTree();
+        tree.put(
+                "resources",
+                List.of(
+                        Map.of(
+                                "type",
+                                "dashboard",
+                                "title",
+                                "Dashboard",
+                                "levels",
+                                List.of(
+                                        Map.of("name", "view", "title", "View"),
+                                        Map.of("name", "use", "title", "Use"),
+                                        Map.of("name", "edit", "title", "Edit", "edits", true),
+                                        Map.of("name", "manage", "title", "Manage", "edits", true)),
+                                "subjects",
+                                List.of("person", "link", "public"),
+                                "linkLevel",
+                                "use"),
+                        Map.of(
+                                "type",
+                                "report",
+                                "title",
+                                "Report",
+                                "levels",
+                                List.of(
+                                        Map.of("name", "view", "title", "View"),
+                                        Map.of("name", "edit", "title", "Edit", "edits", true)),
+                                "subjects",
+                                List.of("link"))));
+
+        ExtensionManifest manifest = parseValid(tree);
+
+        ResourceTypeEntry dashboard = manifest.resourceType("dashboard").orElseThrow();
+        assertThat(dashboard.levels()).extracting(SharingLevelEntry::edits).containsExactly(false, false, true, true);
+        assertThat(dashboard.linkLevel()).isEqualTo("use");
+        assertThat(dashboard.highestLevelFor(SubjectKind.LINK)).isEqualTo("use");
+        assertThat(dashboard.highestLevelFor(SubjectKind.PUBLIC)).isEqualTo("view");
+        assertThat(dashboard.highestLevelFor(SubjectKind.PERSON)).isEqualTo("manage");
+        assertThat(dashboard.grantable(SubjectKind.LINK, "use")).isTrue();
+        assertThat(dashboard.grantable(SubjectKind.LINK, "edit")).isFalse();
+        assertThat(dashboard.grantable(SubjectKind.PUBLIC, "view")).isTrue();
+        assertThat(dashboard.grantable(SubjectKind.PUBLIC, "use")).isFalse();
+        assertThat(dashboard.grantable(SubjectKind.PERSON, "manage")).isTrue();
+        assertThat(dashboard.grantable(SubjectKind.GROUP, "view")).isFalse();
+        assertThat(dashboard.grantable(SubjectKind.PERSON, "own")).isFalse();
+        assertThat(manifest.resourceType("report").orElseThrow().linkLevel()).isEqualTo("view");
+    }
+
+    @Test
+    @Tag("MK-055")
+    void rejectsLinkLevelsThatEditOrThatNoLinkUses() {
+        Map<String, Object> view = Map.of("name", "view", "title", "View");
+        Map<String, Object> edit = Map.of("name", "edit", "title", "Edit", "edits", true);
+        Map<String, Object> tree = validTree();
+        tree.put(
+                "resources",
+                List.of(
+                        Map.of(
+                                "type",
+                                "edits",
+                                "title",
+                                "x",
+                                "levels",
+                                List.of(view, edit),
+                                "subjects",
+                                List.of("link"),
+                                "linkLevel",
+                                "edit"),
+                        Map.of(
+                                "type",
+                                "unknown",
+                                "title",
+                                "x",
+                                "levels",
+                                List.of(view),
+                                "subjects",
+                                List.of("link"),
+                                "linkLevel",
+                                "use"),
+                        Map.of("type", "no-links", "title", "x", "levels", List.of(view), "linkLevel", "view"),
+                        Map.of("type", "editing-first", "title", "x", "levels", List.of(edit, view)),
+                        Map.of(
+                                "type",
+                                "bad-edits",
+                                "title",
+                                "x",
+                                "levels",
+                                List.of(Map.of("name", "view", "title", "View", "edits", "no")))));
+
+        assertThat(parseInvalid(tree))
+                .extracting(ManifestViolation::field)
+                .containsExactlyInAnyOrder(
+                        "resources[0].linkLevel",
+                        "resources[1].linkLevel",
+                        "resources[2].linkLevel",
+                        "resources[3].levels",
+                        "resources[4].levels[0].edits");
+
+        List<SharingLevelEntry> editingFirst = List.of(
+                new SharingLevelEntry("edit", "Edit", true, null), new SharingLevelEntry("view", "View", false, null));
+        List<SharingLevelEntry> levels = List.of(
+                new SharingLevelEntry("view", "View", false, null), new SharingLevelEntry("edit", "Edit", true, null));
+        Set<SubjectKind> links = Set.of(SubjectKind.LINK);
+        assertThatThrownBy(() -> new ResourceTypeEntry("x", "X", editingFirst, links, null, null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ResourceTypeEntry("x", "X", levels, links, "edit", null))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new ResourceTypeEntry("x", "X", levels, links, "own", null))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @Tag("MK-055")
+    void tellsWhichTypesAndLevelsAnUpdateRemoves() {
+        Map<String, Object> view = Map.of("name", "view", "title", "View");
+        Map<String, Object> edit = Map.of("name", "edit", "title", "Edit", "edits", true);
+        Map<String, Object> before = validTree();
+        before.put(
+                "resources",
+                List.of(
+                        Map.of("type", "dashboard", "title", "x", "levels", List.of(view, edit)),
+                        Map.of("type", "folder", "title", "x", "levels", List.of(view)),
+                        Map.of("type", "chart", "title", "x", "levels", List.of(view, edit))));
+        Map<String, Object> after = validTree();
+        after.put(
+                "resources",
+                List.of(
+                        Map.of("type", "dashboard", "title", "x", "levels", List.of(view)),
+                        Map.of("type", "chart", "title", "x", "levels", List.of(view, edit)),
+                        Map.of("type", "report", "title", "x", "levels", List.of(view))));
+
+        assertThat(parseValid(before).sharingRemovedBy(parseValid(after)))
+                .containsExactly(
+                        new SharingRemoval("dashboard", false, List.of("edit")),
+                        new SharingRemoval("folder", true, List.of("view")));
+        assertThat(parseValid(after).sharingRemovedBy(parseValid(after))).isEmpty();
     }
 }

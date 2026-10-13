@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.api.sharing;
 
+import dev.mosaikit.kernel.api.extension.SubjectKind;
 import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
@@ -56,7 +57,8 @@ public sealed interface Subject {
     /**
      * Anyone who opens a link made by the kernel with {@link Sharing#createLink}, also without an
      * account, until the link expires or its grant is revoked; after that the link answers not
-     * found. Every use of a link is in the audit log. A link is never passed to {@link Sharing#grant}.
+     * found. A link gives at most the link level of the type, never a level that edits, and every use
+     * of a link is in the audit log. A link is never passed to {@link Sharing#grant}.
      *
      * @param link the identifier of the link; not the secret of its address
      * @param expires when the link stops working
@@ -73,7 +75,10 @@ public sealed interface Subject {
         }
     }
 
-    /** Anyone, also people without an account and people of other organizations. */
+    /**
+     * Anyone, also people without an account and people of other organizations, only at the lowest
+     * level of the type and only for a type whose manifest accepts the public.
+     */
     record Public() implements Subject {
         @Override
         public SubjectKind kind() {

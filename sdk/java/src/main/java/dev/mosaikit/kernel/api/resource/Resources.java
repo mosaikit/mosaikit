@@ -15,10 +15,23 @@ import java.util.UUID;
  *
  * <p>The kernel provides this bean to extensions. Every method acts on the organization of the
  * request ({@link dev.mosaikit.kernel.api.context.CurrentOrganization}) and joins the transaction of
- * the caller, so that a resource and its entry are written or rolled back together. An extension
- * registers only its own resources, of the types it declares in {@code resources} of its manifest;
- * any other reference is refused with {@link IllegalArgumentException}. Uninstalling an extension
- * removes its entries and everything built on them.
+ * the caller, so that a resource and its entry are written or rolled back together.
+ *
+ * <p><strong>The caller names its extension.</strong> All Java extensions run in the same process, so
+ * the calling extension names itself in every call, in {@link ResourceRef#extension()} or as the
+ * {@code extension} argument, as {@code Notifications.send} does. The kernel checks that it is an
+ * installed extension and that its manifest declares the type in {@code resources}; any other
+ * reference is refused with {@link IllegalArgumentException}. An extension registers only its own
+ * resources. Uninstalling an extension removes its entries and everything built on them.
+ *
+ * <p><strong>Owner.</strong> A resource registered in a request with a signed-in person is owned by
+ * that person. One registered without a person, by a job, an import or a migration of existing data,
+ * is owned by the organization: {@link Resource#owner()} is absent and the administrators of the
+ * organization manage it.
+ *
+ * <p><strong>Parent.</strong> A resource may name the resource that contains it, such as a folder.
+ * For now grants do not pass from a parent to its children: each resource is shared on its own. This
+ * is a decision to revisit when the kernel has folders.
  *
  * <p>{@link #find} and {@link #list} do not check sharing: they serve the extension's own
  * bookkeeping. What a person may see and do is answered by {@link dev.mosaikit.kernel.api.sharing.Sharing}.
@@ -34,7 +47,7 @@ public interface Resources {
      *     {@value Resource#MAX_TITLE} characters
      * @param link where the resource opens, a path of the shell such as {@code /app/dashboards/42}
      * @param parent the resource that contains this one, or {@code null}; grants on the parent do not
-     *     extend to it
+     *     pass to it
      */
     record Details(String title, String link, ResourceRef parent) {
 
@@ -55,7 +68,8 @@ public interface Resources {
     }
 
     /**
-     * Registers a resource of the organization of the request, owned by the person of the request.
+     * Registers a resource of the organization of the request, owned by the person of the request,
+     * or by the organization when the request has no person (a job, an import, a migration).
      * Registering a resource that is already registered changes its details and keeps its owner, so
      * that an extension can register again the resources it kept before it used the registry.
      *
@@ -83,7 +97,10 @@ public interface Resources {
     /**
      * The registered resources of one type of an extension in the organization of the request.
      *
-     * @param owner the account of the owner, or {@code null} for every owner
+     * @param extension identifier of the calling extension
+     * @param type a resource type the extension declares
+     * @param owner the account of the owner, or {@code null} for every owner, the organization
+     *     included
      */
     List<Resource> list(String extension, String type, UUID owner);
 }

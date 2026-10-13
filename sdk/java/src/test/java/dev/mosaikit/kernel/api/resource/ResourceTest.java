@@ -75,6 +75,17 @@ class ResourceTest {
     }
 
     @Test
+    void aResourceWithoutAPersonAsOwnerIsOwnedByTheOrganization() {
+        Resource imported = new Resource(DASHBOARD, ORGANIZATION, null, "Traffic", "/app/x", null);
+
+        assertThat(imported.ownedByOrganization()).isTrue();
+        assertThat(new Resource(DASHBOARD, ORGANIZATION, OWNER, "Traffic", "/app/x", null).ownedByOrganization())
+                .isFalse();
+        assertThatThrownBy(() -> new Resource(DASHBOARD, null, OWNER, "Traffic", "/app/x", null))
+                .isInstanceOf(NullPointerException.class);
+    }
+
+    @Test
     void aResourceIsNotItsOwnParent() {
         assertThatThrownBy(() -> new Resource(DASHBOARD, ORGANIZATION, OWNER, "Traffic", "/app/x", DASHBOARD))
                 .isInstanceOf(IllegalArgumentException.class);

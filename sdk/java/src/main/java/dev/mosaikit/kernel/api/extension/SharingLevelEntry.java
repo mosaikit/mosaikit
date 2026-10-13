@@ -10,9 +10,11 @@ import java.util.Objects;
  *
  * @param name identifier within the type, such as {@code edit}
  * @param title short human readable name, shown in the sharing dialog
+ * @param edits whether the level lets people change the resource, as {@code edit} and {@code manage}
+ *     do; such a level is never given to a link or to the public, and every level after it edits too
  * @param i18n {@code title} in other languages, by language tag (MK-053)
  */
-public record SharingLevelEntry(String name, String title, Map<String, Map<String, String>> i18n) {
+public record SharingLevelEntry(String name, String title, boolean edits, Map<String, Map<String, String>> i18n) {
 
     public SharingLevelEntry {
         Objects.requireNonNull(name, "name");

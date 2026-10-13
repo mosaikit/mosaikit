@@ -1,6 +1,6 @@
 # 0040. Accounts in Keycloak, and one emergency administrator account
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-13
 - Deciders: Massimo Antonini
 

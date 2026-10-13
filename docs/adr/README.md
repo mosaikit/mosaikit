@@ -41,7 +41,7 @@ by a new record that supersedes the old one, never by editing it.
 | [0034](0034-repository-layout-by-role.md) | Repository laid out by role, with the sources under src/ | Accepted |
 | [0035](0035-plugins-outside-the-kernel-repository.md) | Plugins outside the kernel repository, tested on a published snapshot | Accepted |
 | [0036](0036-extensions-not-plugins.md) | Extensions, not plugins | Accepted |
-| [0037](0037-resources-and-one-sharing-model.md) | A registry of resources and one sharing model | Proposed |
-| [0038](0038-permissions-from-manifests-and-profiles.md) | Permissions declared by extensions, granted through profiles | Proposed |
-| [0039](0039-console-layout.md) | A console with a sidebar for work, organization and platform | Proposed |
-| [0040](0040-accounts-in-keycloak-and-emergency-access.md) | Accounts in Keycloak, and one emergency administrator account | Proposed |
+| [0037](0037-resources-and-one-sharing-model.md) | A registry of resources and one sharing model | Accepted |
+| [0038](0038-permissions-from-manifests-and-profiles.md) | Permissions declared by extensions, granted through profiles | Accepted |
+| [0039](0039-console-layout.md) | A console with a sidebar for work, organization and platform | Accepted |
+| [0040](0040-accounts-in-keycloak-and-emergency-access.md) | Accounts in Keycloak, and one emergency administrator account | Accepted |

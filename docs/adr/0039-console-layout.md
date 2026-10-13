@@ -1,6 +1,6 @@
 # 0039. A console with a sidebar for work, organization and platform
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-13
 - Deciders: Massimo Antonini
 

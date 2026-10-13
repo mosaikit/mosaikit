@@ -1,6 +1,6 @@
 # 0038. Permissions declared by extensions, granted through profiles
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-13
 - Deciders: Massimo Antonini
 
@@ -19,6 +19,18 @@ extension would multiply roles.
   personal exceptions **add** permissions, never remove them (MK-056).
 - Permissions say what a person may do; sharing (ADR-0037) says on which resources. The backend checks
   both at every request; the interface uses them only to hide what is not available.
+
+### Refined on 2026-10-13
+
+Answers of the maintainer to the review of the extension API (pull request #42), before acceptance:
+
+- The calling extension passes its identifier in every call; the kernel checks it against an
+  installed extension and its manifest.
+- Wherever a permission is named outside its extension (profiles, answers of the API) it has one
+  qualified identifier, `<extension>:<permission>`.
+- The administrators of the organization hold every permission implicitly; guests hold none unless
+  granted explicitly, through a group or a personal exception.
+- The apps per role (MK-030) move onto permissions in the implementation.
 
 ## Consequences
 

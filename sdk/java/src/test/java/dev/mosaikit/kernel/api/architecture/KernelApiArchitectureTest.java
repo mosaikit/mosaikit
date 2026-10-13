@@ -3,6 +3,7 @@
 package dev.mosaikit.kernel.api.architecture;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
+import static com.tngtech.archunit.library.dependencies.SlicesRuleDefinition.slices;
 
 import com.tngtech.archunit.core.importer.ImportOption;
 import com.tngtech.archunit.junit.AnalyzeClasses;
@@ -22,4 +23,11 @@ class KernelApiArchitectureTest {
             .onlyDependOnClassesThat()
             .resideInAnyPackage("dev.mosaikit.kernel.api..", "java..")
             .because("the extension contract must not expose framework types such as Jackson, Vert.x or Hibernate");
+
+    @ArchTest
+    static final ArchRule packagesHaveNoCycles = slices().matching("dev.mosaikit.kernel.api.(*)..")
+            .should()
+            .beFreeOfCycles()
+            .because("each package of the contract can be read and changed on its own; the manifest model"
+                    + " (extension) is at the bottom and the services build on it");
 }

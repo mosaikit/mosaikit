@@ -5,6 +5,7 @@ package dev.mosaikit.kernel.api.sharing;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import dev.mosaikit.kernel.api.extension.SubjectKind;
 import dev.mosaikit.kernel.api.permission.AccessDeniedException;
 import dev.mosaikit.kernel.api.resource.ResourceRef;
 import java.time.Instant;

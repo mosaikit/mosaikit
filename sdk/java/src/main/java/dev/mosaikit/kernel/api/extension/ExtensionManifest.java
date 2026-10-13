@@ -4,6 +4,7 @@ package dev.mosaikit.kernel.api.extension;
 
 import dev.mosaikit.kernel.api.version.Version;
 import dev.mosaikit.kernel.api.version.VersionRange;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -84,6 +85,30 @@ public final class ExtensionManifest {
     /** The resource type declared with this name, if any. */
     public Optional<ResourceTypeEntry> resourceType(String type) {
         return resourceTypes.stream().filter(entry -> entry.type().equals(type)).findFirst();
+    }
+
+    /**
+     * The resource types and sharing levels of this manifest that an update of the extension removes
+     * (MK-055). The kernel refuses the update when grants exist on any of them, and lists those grants.
+     *
+     * @param update the manifest of the new version of the extension
+     */
+    public List<SharingRemoval> sharingRemovedBy(ExtensionManifest update) {
+        List<SharingRemoval> removed = new ArrayList<>();
+        for (ResourceTypeEntry type : resourceTypes) {
+            Optional<ResourceTypeEntry> kept = update.resourceType(type.type());
+            if (kept.isEmpty()) {
+                removed.add(new SharingRemoval(type.type(), true, type.levelNames()));
+                continue;
+            }
+            List<String> levels = type.levelNames().stream()
+                    .filter(level -> !kept.get().declares(level))
+                    .toList();
+            if (!levels.isEmpty()) {
+                removed.add(new SharingRemoval(type.type(), false, levels));
+            }
+        }
+        return removed;
     }
 
     /** Typed actions that an assistant can use (MK-015). */

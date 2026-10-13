@@ -34,10 +34,26 @@ class PermissionsTest {
         assertThatThrownBy(() -> CREATOR.require(DASHBOARDS, "delete-dashboard"))
                 .isInstanceOfSatisfying(AccessDeniedException.class, denied -> {
                     assertThat(denied.concealed()).isFalse();
-                    assertThat(denied).hasMessageContaining("delete-dashboard");
+                    assertThat(denied).hasMessageContaining("dev.example.dashboards:delete-dashboard");
                 });
         assertThatThrownBy(() -> CREATOR.require("dev.example.other", "create-dashboard"))
                 .isInstanceOf(AccessDeniedException.class);
+    }
+
+    @Test
+    void outsideItsExtensionAPermissionIsNamedByItsQualifiedIdentifier() {
+        PermissionId id = new PermissionId(DASHBOARDS, "create-dashboard");
+
+        assertThat(id).hasToString("dev.example.dashboards:create-dashboard");
+        assertThat(PermissionId.parse("dev.example.dashboards:create-dashboard"))
+                .isEqualTo(id);
+        assertThatThrownBy(() -> PermissionId.parse("create-dashboard")).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> PermissionId.parse("dev.example.dashboards:a:b"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> PermissionId.parse("Dashboards:create-dashboard"))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new PermissionId(DASHBOARDS, "Create Dashboard"))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

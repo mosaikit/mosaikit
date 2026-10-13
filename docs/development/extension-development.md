@@ -521,7 +521,9 @@ who has to confirm it, not for the assistant only.
 > and MK-056 (permissions). Until then the beans `Resources`, `Sharing` and `Permissions` are not
 > provided: write against the contract, do not ship on it. See
 > [ADR-0037](../adr/0037-resources-and-one-sharing-model.md) and
-> [ADR-0038](../adr/0038-permissions-from-manifests-and-profiles.md).
+> [ADR-0038](../adr/0038-permissions-from-manifests-and-profiles.md). The counterpart in
+> `@mosaikit/sdk` (permissions to hide what is not available, the sharing dialog) and the REST API
+> for extensions without a backend come **with the implementation**, not as a second preview.
 
 Permissions say **what** a person may do in an extension; sharing says **on which resources**. The
 extension declares both in its manifest, and the kernel keeps who has what:
@@ -538,24 +540,58 @@ resources:                     # types of the resources the extension registers 
     i18n: { it: { title: Cruscotto } }
     levels:                    # from the lowest to the highest; each includes those before it
       - { name: view, title: View, i18n: { it: { title: Vedere } } }
-      - { name: edit, title: Edit }
-      - { name: manage, title: Manage }
+      - { name: use, title: Use }
+      - { name: edit, title: Edit, edits: true }       # levels that edit come last
+      - { name: manage, title: Manage, edits: true }
     subjects: [person, group, organization, link]   # person, group, organization when left out
+    linkLevel: use             # the most a link gives (lowest when left out), never one that edits
 ```
 
 The rules the kernel applies:
 
-- **Deny by default.** A person has a permission only through their profile, a group of theirs or a
+- **Deny by default.** A member has a permission only through their profile, a group of theirs or a
   personal exception, and a level on a resource only as its owner or through a grant to them, to a
   group of theirs, to the organization, to a link they opened or to the public.
+- **Administrators of the organization hold everything in it**: every permission of every
+  extension, implicitly, and every level on every resource of the organization, so they read and
+  edit everything. **Platform administrators hold none** in an organization for being platform
+  administrators. **Guests hold no permission** unless a group of theirs or a personal exception
+  grants it explicitly.
 - **Grants only add.** Profiles, groups and exceptions add permissions, grants add levels; nothing
-  takes away what another grants. A grant on a parent resource does not extend to its children.
+  takes away what another grants. Granting again to the same subject **replaces** its level, also
+  lowering it, and the change is audited.
+- **No inheritance from the parent, for now.** A grant on a parent resource (a folder, a project)
+  does not pass to its children; this is a decision to revisit when the kernel has folders.
+- **Owner.** A resource registered in a request with a signed-in person is owned by that person; one
+  registered without a person (a job, an import, a migration of existing data) is owned by the
+  **organization**, has no owner in `Resource`, and its administrators manage it.
+- **Who shares**: the owner, the people with the highest level of the type and the administrators of
+  the organization, never above their own level.
+- **Links and the public get little.** They are opt-in in `subjects`. The public always gets the
+  lowest level of the type; a link gets at most `linkLevel`, which a type may raise to its "use"
+  level but never to a level with `edits: true`. A link always has an expiry, within a longest
+  validity set by the installation.
 - **New permissions arrive switched off.** A permission that an update of the extension adds is in
   no profile until an administrator puts it there.
+- **Removing what has grants is refused.** An update of the extension that removes a resource type,
+  or a level of one, on which grants exist is refused, with the list of those grants: revoke them
+  first (a migration declared by the extension may come later). `ExtensionManifest.sharingRemovedBy`
+  tells what an update removes.
 - **The kernel is the authority**: it keeps profiles and grants, offers the same sharing dialog for
-  every type, and writes every grant, revocation and use of a link in the audit log (MK-059).
+  every type, and writes every grant, change of level, revocation and use of a link in the audit log
+  (MK-059).
 - **The extension enforces the answers in its backend**, at every request: the interface only hides
   what is not available.
+
+Outside its extension a permission is named by its qualified identifier `<extension>:<permission>`,
+such as `dev.example.dashboards:create-dashboard` (`PermissionId`): in the profiles of the
+organization, in the answers of the API of the kernel and in the audit log. Inside the extension, in
+the manifest and in the calls of `Permissions`, the name alone is used.
+
+All Java extensions run in the same process, so the kernel cannot tell which one calls: **every call
+names the calling extension**, in `ResourceRef` or as the `extension` argument, as
+`Notifications.send` does. The kernel checks that it is an installed extension and that its manifest
+declares the type or the permission, and refuses anything else.
 
 In the Java backend, register each resource when it is created, and check both the permission and
 the level before acting:
@@ -606,6 +642,12 @@ public class DashboardResource {
 }
 ```
 
+`sharing.visible` returns a set of identifiers, which suits collections of hundreds of resources.
+For larger ones the implementation adds a SQL function of the kernel, such as
+`mk_kernel.allows(type, id, level)`, next to `mk_kernel.current_organization()`: call it in the
+query of the list page, so that the database filters and pages the rows and the identifiers never
+travel.
+
 `require` throws `AccessDeniedException` (`dev.mosaikit.kernel.api.permission`), which the kernel
 answers with 403, or with 404 when the person may not see the resource at all, so that its existence
 is not revealed. `grant`, `createLink` and `revoke` act as the person of the request: the owner, the
@@ -613,6 +655,10 @@ administrators of the organization and the people with the highest level of the 
 above their own level. Remove the entry with `resources.remove(ref)` when the resource is deleted:
 its grants go with it. The registration joins the transaction of the request, so a rollback undoes
 both.
+
+Two mechanisms of today **move onto this model** when it is implemented: the apps per role of an
+organization (MK-030) become permissions in profiles, and the sharing of the rows of a data
+collection with a team (MK-032) becomes a grant to a group.
 
 ## Rules
 
