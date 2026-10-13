@@ -45,6 +45,15 @@ public class RequestOrganization implements CurrentOrganization {
                 && !identity.hasRole(Roles.ORGANIZATION_ADMIN);
     }
 
+    /**
+     * Whether a security identity administers the organization of the request (MK-055): it holds
+     * every level on the resources of that organization. Being a platform administrator does not
+     * count.
+     */
+    public static boolean administrator(SecurityIdentity identity) {
+        return identity != null && of(identity).isPresent() && identity.hasRole(Roles.ORGANIZATION_ADMIN);
+    }
+
     /** Whether the person of the request is only a guest of its organization. */
     public boolean guest() {
         return guest(identity);

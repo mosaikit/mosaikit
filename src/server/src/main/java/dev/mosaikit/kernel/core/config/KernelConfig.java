@@ -35,6 +35,20 @@ public interface KernelConfig {
     /** Local accounts. */
     Accounts accounts();
 
+    /** Sharing of the resources of extensions (MK-055). */
+    Sharing sharing();
+
+    /** Settings of sharing. */
+    interface Sharing {
+
+        /**
+         * The longest validity of a link to a resource: every link expires, at the latest this long
+         * after it is made ({@code mosaikit.sharing.link-max-validity}).
+         */
+        @WithDefault("30d")
+        Duration linkMaxValidity();
+    }
+
     /** Settings of local accounts. */
     interface Accounts {
 
