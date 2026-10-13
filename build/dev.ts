@@ -182,7 +182,8 @@ async function main(): Promise<void> {
       `-Dquarkus.datasource.password=${database.password}`,
       `-Dmosaikit.assistant.url=http://localhost:${String(MODEL_PORT)}/v1`,
       '-Dmosaikit.assistant.model=dev-fake-model',
-      '-Dquarkus.mailer.host=localhost',
+      // 127.0.0.1, where the fake mail server listens: on Linux localhost is also ::1 (see bench.ts).
+      '-Dquarkus.mailer.host=127.0.0.1',
       `-Dquarkus.mailer.port=${String(SMTP_PORT)}`,
       '-Dquarkus.mailer.start-tls=DISABLED',
     ],

@@ -157,7 +157,10 @@ export class Bench {
       'quarkus.datasource.password': database.password,
       'mosaikit.bootstrap.admin-password': admin.password,
       'quarkus.http.port': String(port),
-      'quarkus.mailer.host': 'localhost',
+      // The address the fake mail server listens on: on Linux "localhost" resolves to ::1 too, and
+      // the mail client of Vert.x rotates over the addresses, so every other mail went to ::1, where
+      // nobody listens, and failed the registration that sent it.
+      'quarkus.mailer.host': '127.0.0.1',
       'quarkus.mailer.port': String(smtpPort),
       'quarkus.mailer.start-tls': 'DISABLED',
       // One connection for each mail: a pooled connection to the fake mail server once hung the
