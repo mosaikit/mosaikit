@@ -516,10 +516,11 @@ who has to confirm it, not for the assistant only.
 
 ## Resources, sharing and permissions
 
-> **API preview.** The manifest entries below are already validated, and the Java types are in
-> `kernel-api`, but the kernel implements them with MK-054 (registry of resources), MK-055 (sharing)
-> and MK-056 (permissions). Until then the beans `Resources`, `Sharing` and `Permissions` are not
-> provided: write against the contract, do not ship on it. See
+> **Registry implemented, sharing and permissions in preview.** The kernel provides the
+> `Resources` bean (MK-054): Java extensions register, update, remove and list their resources
+> today. Sharing (MK-055) and permissions (MK-056) are still an **API preview**: their manifest
+> entries are validated and their Java types are in `kernel-api`, but the beans `Sharing` and
+> `Permissions` are not provided yet: write against the contract, do not ship on it. See
 > [ADR-0037](../adr/0037-resources-and-one-sharing-model.md) and
 > [ADR-0038](../adr/0038-permissions-from-manifests-and-profiles.md). The counterpart in
 > `@mosaikit/sdk` (permissions to hide what is not available, the sharing dialog) and the REST API
@@ -655,6 +656,22 @@ administrators of the organization and the people with the highest level of the 
 above their own level. Remove the entry with `resources.remove(ref)` when the resource is deleted:
 its grants go with it. The registration joins the transaction of the request, so a rollback undoes
 both.
+
+What the registry does today (MK-054):
+
+- `register` refuses, with `IllegalArgumentException`, a reference whose extension is not active or
+  does not declare the type in `resources`, a title or a link that is not valid, and a parent that is
+  not a registered resource of the organization or that is contained in the resource itself.
+  Registering again changes title, link and parent and keeps the owner, so existing resources can
+  be registered by a migration of the extension, owned by the organization.
+- `update` throws `NoSuchElementException` for a resource that is not registered in the
+  organization; `remove` of a resource that is not registered does nothing. Removing a parent leaves
+  its children without a parent.
+- Entries live in the kernel table `mk_kernel.resource`, under row-level security like the tables of
+  extensions: a request sees and writes only the entries of its organization, and another
+  organization never sees them, not even by reference.
+- When an extension is no longer in the installation, the kernel removes its entries, in every
+  organization, at the next start.
 
 Two mechanisms of today **move onto this model** when it is implemented: the apps per role of an
 organization (MK-030) become permissions in profiles, and the sharing of the rows of a data

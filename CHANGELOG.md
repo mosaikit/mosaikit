@@ -8,6 +8,14 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The kernel implements the registry of resources (MK-054): the `Resources` bean of `kernel-api`
+  lets Java extensions register, update, remove, find and list their resources (type, identifier,
+  title, owner, link, parent) in the organization of the request, within the transaction of the
+  caller. The entries are kept in the new table `mk_kernel.resource` (migration V16) under
+  row-level security; a resource registered without a person is owned by the organization; the
+  entries of an extension that is no longer installed are removed at the next start. Sharing and
+  permissions (MK-055, MK-056) are still a preview.
+
 - Preview of the extension API for resources, sharing and permissions (MK-054, MK-055, MK-056;
   ADR-0037 and ADR-0038, now accepted), before the kernel implements it: `permissions` and
   `resources` in the manifest (resource types with their sharing levels, the levels that edit, the
