@@ -48,6 +48,7 @@ public class MyAccessKeysResource {
     private final OrganizationAccess access;
     private final SecurityIdentity identity;
     private final AuditLog audit;
+    private final AccessKeyAudit keyAudit;
     private final Clock clock;
 
     public MyAccessKeysResource(
@@ -56,12 +57,14 @@ public class MyAccessKeysResource {
             OrganizationAccess access,
             SecurityIdentity identity,
             AuditLog audit,
+            AccessKeyAudit keyAudit,
             Clock clock) {
         this.keys = keys;
         this.directory = directory;
         this.access = access;
         this.identity = identity;
         this.audit = audit;
+        this.keyAudit = keyAudit;
         this.clock = clock;
     }
 
@@ -120,13 +123,7 @@ public class MyAccessKeysResource {
     public Response revoke(@PathParam("id") UUID id) {
         AccessKey key = keys.revokeOwn(account(), id)
                 .orElseThrow(() -> new ResourceNotFoundException("You have no access key with this identifier."));
-        audit.append(
-                identity.getPrincipal().getName(),
-                Optional.of(key.getOrganizationId()),
-                "account.access-key.revoked",
-                key.getPrefix(),
-                AuditEvent.Outcome.SUCCEEDED,
-                Map.of("key", key.getId().toString(), "name", key.getName()));
+        keyAudit.revoked(identity.getPrincipal().getName(), key, "person");
         return Response.noContent().build();
     }
 

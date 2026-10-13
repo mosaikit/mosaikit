@@ -15,7 +15,7 @@ import java.util.UUID;
  * @param prefix the first characters of the key, to tell it apart
  * @param organization the slug of the organization the key acts on
  * @param write whether the key may change anything, or only read
- * @param lastUsedAt when it was last used, to the minute, or {@code null}
+ * @param lastUsedAt when it was last used, to the hour, or {@code null}
  * @param expired whether it is past its expiry
  * @param secret the whole key, only in the answer to its creation
  */

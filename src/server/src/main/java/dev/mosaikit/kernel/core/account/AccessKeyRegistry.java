@@ -27,7 +27,8 @@ import java.util.function.Predicate;
  * <p>As for sessions (MK-125), what was read about a key is kept in memory for {@code
  * mosaikit.accounts.session-cache} (5 seconds by default) and dropped at once when this kernel revokes
  * it: a revoked key is refused at once on this kernel, and on the other kernels of an installation
- * within that time. The time a key was last used is written at most once a minute.
+ * within that time. The time a key was last used is written, and its use audited, at most once an
+ * hour: a script that polls must not fill the audit log nor queue on the lock of its chain (MK-059).
  *
  * <p>The mechanism is not tied to people: service identities (MK-124) can reuse the format, the
  * digest, the memory and the revocation with a holder of their own.
@@ -49,8 +50,8 @@ public class AccessKeyRegistry {
     /** Attribute of the security identity: {@code true} when the key of the request may write. */
     public static final String WRITE_ATTRIBUTE = "mosaikit.access-key.write";
 
-    /** How often the time a key was last used is written, at most. */
-    static final Duration TOUCH_EVERY = Duration.ofMinutes(1);
+    /** How often the time a key was last used is written, and its use audited, at most. */
+    static final Duration TOUCH_EVERY = Duration.ofHours(1);
 
     /** Most keys kept in memory; beyond, the memory is emptied and filled again. */
     static final int CACHE_LIMIT = 10_000;
@@ -216,15 +217,20 @@ public class AccessKeyRegistry {
         return loaded;
     }
 
-    /** Records that a key was used: written when a minute passed since the last time. */
-    public void used(Active active) {
+    /**
+     * Records that a key was used: written when an hour passed since the last time.
+     *
+     * @return whether the use was written, and is to be audited
+     */
+    public boolean used(Active active) {
         Instant now = Instant.now(clock);
         if (active.lastUsed() != null
                 && Duration.between(active.lastUsed(), now).compareTo(TOUCH_EVERY) < 0) {
-            return;
+            return false;
         }
         store.touch(active.id(), now);
         cache.computeIfPresent(active.digest(), (digest, cached) -> new Cached(active.usedAt(now), cached.readAt()));
+        return true;
     }
 
     /** A key, live or not. */
@@ -249,17 +255,26 @@ public class AccessKeyRegistry {
         return own;
     }
 
-    /** Revokes every key of an account, for a suspension. */
-    public void revokeAllOf(UUID accountId) {
+    /** Revokes every key of an account, for a suspension; returns the keys it revoked. */
+    public List<AccessKey> revokeAllOf(UUID accountId) {
+        List<AccessKey> revoked = store.notRevoked(accountId);
         store.revokeAllOf(accountId, Instant.now(clock));
         forget(active -> active.accountId().equals(accountId));
+        return revoked;
     }
 
-    /** Revokes the keys of an account in an organization, when the account leaves it. */
-    public void revokeIn(UUID accountId, UUID organizationId) {
+    /**
+     * Revokes the keys of an account in an organization, when the account leaves it; returns the keys
+     * it revoked.
+     */
+    public List<AccessKey> revokeIn(UUID accountId, UUID organizationId) {
+        List<AccessKey> revoked = store.notRevoked(accountId).stream()
+                .filter(key -> key.getOrganizationId().equals(organizationId))
+                .toList();
         store.revokeIn(accountId, organizationId, Instant.now(clock));
         forget(active ->
                 active.accountId().equals(accountId) && active.organizationId().equals(organizationId));
+        return revoked;
     }
 
     private void forget(Predicate<Active> which) {

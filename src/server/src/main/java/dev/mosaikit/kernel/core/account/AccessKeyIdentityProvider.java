@@ -22,7 +22,8 @@ import java.util.Optional;
  * on the organization of the key with the roles they have there now, read again for every request as
  * for sessions. The roles of the platform are left out: they need a password (MK-017), and a key acts
  * in one organization only. A key that was revoked or expired, of a suspended person or of a person
- * no longer in its organization opens nothing. Every request is audited.
+ * no longer in its organization opens nothing. Every refusal is audited, and the use of a key at
+ * most once an hour.
  */
 @ApplicationScoped
 public class AccessKeyIdentityProvider implements IdentityProvider<AccessKeyAuthenticationRequest> {
@@ -73,8 +74,10 @@ public class AccessKeyIdentityProvider implements IdentityProvider<AccessKeyAuth
         }
         OrganizationAccess.Access organization = access.forKey(key.accountId(), key.organizationId())
                 .orElseThrow(() -> refused(actor, key, method, path, "not-a-member"));
-        keys.used(key);
-        audit.used(actor, AccessKeyAudit.Key.of(key), method, path);
+        if (keys.used(key)) {
+            // The first use of each hour, not every request (MK-059: each entry locks its chain).
+            audit.used(actor, AccessKeyAudit.Key.of(key), method, path);
+        }
         return QuarkusSecurityIdentity.builder()
                 .setPrincipal(new QuarkusPrincipal(account.get().getUsername()))
                 .addRoles(organization.roles())

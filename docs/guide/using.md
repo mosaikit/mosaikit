@@ -147,7 +147,9 @@ A key acts as you, in its organization, with the rights you have there at the ti
 never more. It cannot sign in to the shell, nor create other keys. The list shows each key with its
 first characters, when it was created and last used, and when it expires; **Revoke** stops it at
 once, while your sessions go on. If you are suspended or leave the organization of a key, the key
-stops working and stays revoked. Every call made with a key is recorded in the audit log.
+stops working and stays revoked. The audit log records the first use of a key in each hour and
+every call it refuses. A key used by an MCP client needs **Allow changes (write)**: MCP calls are
+all sent as changes, even those that only read.
 
 ## The assistant
 

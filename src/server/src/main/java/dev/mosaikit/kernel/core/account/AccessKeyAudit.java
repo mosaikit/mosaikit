@@ -12,16 +12,21 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * The audit of personal access keys (MK-060): every request made with a key, accepted or refused,
- * is recorded with the key, the method and the path, also during authentication, outside of any
- * request, through the channel {@link AuditEvent.Channel#API_KEY} (MK-059). The secret never is.
+ * The audit of personal access keys (MK-060): every refused request made with a key, and the first
+ * use of a key in each hour, are recorded with the key, the method and the path, also during
+ * authentication, outside of any request, through the channel {@link AuditEvent.Channel#API_KEY}
+ * (MK-059); so are the revocations that a suspension or the removal from an organization cause. The
+ * secret never is.
  */
 @ApplicationScoped
 @ActivateRequestContext
 public class AccessKeyAudit {
 
-    /** A request made with a key, accepted by authentication. */
+    /** A request made with a key, accepted by authentication: the first of each hour. */
     public static final String USED = "account.access-key.used";
+
+    /** A key revoked, by its person, a suspension or the removal from its organization. */
+    public static final String REVOKED = "account.access-key.revoked";
 
     /** A request made with a key, refused. */
     public static final String REFUSED = "account.access-key.refused";
@@ -44,7 +49,22 @@ public class AccessKeyAudit {
         }
     }
 
-    /** A request accepted with a key. */
+    /**
+     * A key revoked.
+     *
+     * @param reason {@code person}, {@code suspended} or {@code removed}
+     */
+    public void revoked(String actor, AccessKey key, String reason) {
+        audit.append(
+                actor,
+                Optional.of(key.getOrganizationId()),
+                REVOKED,
+                key.getPrefix(),
+                AuditEvent.Outcome.SUCCEEDED,
+                Map.of("key", key.getId().toString(), "name", key.getName(), "reason", reason));
+    }
+
+    /** The first request accepted with a key in an hour. */
     public void used(String actor, Key key, String method, String path) {
         append(USED, AuditEvent.Outcome.SUCCEEDED, actor, key, method, path, null);
     }

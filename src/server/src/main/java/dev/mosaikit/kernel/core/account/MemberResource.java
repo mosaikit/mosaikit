@@ -147,7 +147,7 @@ public class MemberResource {
         if (!identity.hasRole(Roles.PLATFORM_ADMIN)) {
             throw new ForbiddenOperationException("Only the platform administrators remove members.");
         }
-        service.removeMember(slug, email);
+        service.removeMember(slug, email, identity.getPrincipal().getName());
         audit("organization.member.removed", slug, email, Map.of());
     }
 

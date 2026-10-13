@@ -209,17 +209,17 @@ class AccessKeyRegistryTest {
     }
 
     @Test
-    void writesTheLastUseAtMostOnceAMinute() {
+    void writesTheLastUseAndAuditsItAtMostOnceAnHour() {
         var created = registry.create(ACCOUNT, ACME, "Polling", null, false);
-        registry.used(registry.find(created.secret()).orElseThrow());
-        clock.now = START.plusSeconds(30);
-        registry.used(registry.find(created.secret()).orElseThrow());
+        assertThat(registry.used(registry.find(created.secret()).orElseThrow())).isTrue();
+        clock.now = START.plus(Duration.ofMinutes(59));
+        assertThat(registry.used(registry.find(created.secret()).orElseThrow())).isFalse();
         assertThat(store.touches).isEqualTo(1);
 
-        clock.now = START.plusSeconds(61);
-        registry.used(registry.find(created.secret()).orElseThrow());
+        clock.now = START.plus(Duration.ofMinutes(61));
+        assertThat(registry.used(registry.find(created.secret()).orElseThrow())).isTrue();
         assertThat(store.touches).isEqualTo(2);
-        assertThat(created.key().getLastUsedAt()).contains(START.plusSeconds(61));
+        assertThat(created.key().getLastUsedAt()).contains(START.plus(Duration.ofMinutes(61)));
     }
 
     @Test
@@ -229,11 +229,13 @@ class AccessKeyRegistryTest {
         registry.find(acme.secret());
         registry.find(green.secret());
 
-        registry.revokeIn(ACCOUNT, ACME);
+        assertThat(registry.revokeIn(ACCOUNT, ACME))
+                .extracting(AccessKey::getName)
+                .containsExactly("Acme");
         assertThat(registry.find(acme.secret()).orElseThrow().live(START)).isFalse();
         assertThat(registry.find(green.secret()).orElseThrow().live(START)).isTrue();
 
-        registry.revokeAllOf(ACCOUNT);
+        assertThat(registry.revokeAllOf(ACCOUNT)).extracting(AccessKey::getName).containsExactly("Green");
         assertThat(registry.find(green.secret()).orElseThrow().live(START)).isFalse();
     }
 

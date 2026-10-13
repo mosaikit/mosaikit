@@ -102,12 +102,16 @@ open sessions or manage keys.
   installation within `mosaikit.accounts.session-cache` (5 seconds by default).
 - Suspending a person revokes all their keys; removing them from an organization revokes their keys
   for it. Reactivated or added again, the person creates new keys.
-- Every request made with a key is in the audit log, through the channel `API_KEY`:
-  `account.access-key.used` with the key, the method and the path, or `account.access-key.refused`
-  with the reason (`revoked`, `expired`, `suspended`, `not-a-member`, `read-only`,
-  `not-with-a-key`); `account.access-key.created` and `account.access-key.revoked` record the
-  actions of the person. The subject of the events is the prefix of the key that people see in
-  their list.
+- The audit log records, through the channel `API_KEY`, every request refused because of its key
+  (`account.access-key.refused`, with the reason: `revoked`, `expired`, `suspended`,
+  `not-a-member`, `read-only`, `not-with-a-key`) and the first use of a key in each hour
+  (`account.access-key.used`, with the method and the path), not every request: a script that
+  polls does not fill the log. `account.access-key.created` and `account.access-key.revoked`
+  record the creations and the revocations, with the reason (`person`, `suspended`, `removed`).
+  Whatever else is recorded during a request made with a key, such as a change of the apps of an
+  organization, also has the channel `API_KEY`. The subject of the events of keys is the prefix that
+  people see in their list.
+- A key without the write switch cannot use the MCP server (`/mcp`): every MCP call is a `POST`.
 - A service that receives keys from its callers, such as a gateway, checks one with `GET
   /api/v1/access-keys/current`, called with that key (see the [API](../development/api.md)).
 
@@ -334,7 +338,9 @@ Extensions may declare actions that assistants use as tools (see
 [extension development](../development/extension-development.md#actions-for-assistants)). An MCP client
 connects to `https://<host>/mcp` with the credentials of a person and the header
 `X-Mosaikit-Organization: <slug>`; it has exactly the rights of that person in that organization,
-and changes wait for the confirmation of the person.
+and changes wait for the confirmation of the person. A client can also use a personal access key
+created with the write switch (MK-060); a read-only key is refused, since every MCP call is a
+`POST`.
 
 ## Published views for external services
 

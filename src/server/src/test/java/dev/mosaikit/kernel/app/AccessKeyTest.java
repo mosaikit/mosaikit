@@ -131,11 +131,55 @@ class AccessKeyTest {
             }
         }
 
-        // Every use is audited, without the secret.
-        String events = asAdmin().get("/api/v1/audit-events?limit=50").asString();
+        // The first use of the hour is audited, not every request, and never the secret.
+        for (int i = 0; i < 3; i++) {
+            withKey(key).get("/api/v1/accounts/me").then().statusCode(200);
+        }
+        String prefix = key.substring(0, 11);
+        List<Map<String, Object>> events = asAdmin()
+                .get("/api/v1/audit-events?limit=500")
+                .then()
+                .extract()
+                .path("findAll { it.subject == '" + prefix + "' }");
         assertThat(events)
-                .contains("account.access-key.created", "account.access-key.used")
-                .doesNotContain(key);
+                .extracting(event -> event.get("action"))
+                .containsExactlyInAnyOrder("account.access-key.created", "account.access-key.used");
+        assertThat(events.toString()).doesNotContain(key);
+        assertThat(events)
+                .filteredOn(event -> "account.access-key.used".equals(event.get("action")))
+                .extracting(event -> event.get("channel"))
+                .containsExactly("API_KEY");
+    }
+
+    @Test
+    void everyEntryOfARequestMadeWithAKeyHasItsChannel() {
+        asAdmin()
+                .body(Map.of("roles", List.of("organization-admin", "organization-user")))
+                .put("/api/v1/organizations/{slug}/members/{email}", organization, person)
+                .then()
+                .statusCode(200);
+        String key = secret(create("Administration", true));
+
+        withKey(key)
+                .body(List.of())
+                .put("/api/v1/organizations/{slug}/apps", organization)
+                .then()
+                .statusCode(200);
+        asPerson()
+                .header("X-Mosaikit-Organization", organization)
+                .body(List.of())
+                .put("/api/v1/organizations/{slug}/apps", organization)
+                .then()
+                .statusCode(200);
+
+        List<String> channels = asAdmin()
+                .get("/api/v1/audit-events?limit=500")
+                .then()
+                .extract()
+                .path("findAll { it.action == 'organization.apps.changed' && it.subject == '" + organization
+                        + "' }.channel");
+        // Newest first: the change made in the console, then the one made with the key.
+        assertThat(channels).containsExactly("WEB", "API_KEY");
     }
 
     @Test
@@ -320,6 +364,14 @@ class AccessKeyTest {
                 .then()
                 .statusCode(200);
         withKey(second).get("/api/v1/accounts/me").then().statusCode(401);
+        List<String> reasons = asAdmin()
+                .get("/api/v1/audit-events?limit=500")
+                .then()
+                .extract()
+                .path("findAll { it.action == 'account.access-key.revoked' && it.actor == 'admin' }.detail");
+        assertThat(reasons)
+                .anyMatch(detail -> detail.contains("\"reason\":\"removed\"") && detail.contains("First"))
+                .anyMatch(detail -> detail.contains("\"reason\":\"suspended\"") && detail.contains("Second"));
         asAdmin()
                 .delete("/api/v1/platform/accounts/{email}/suspension", person)
                 .then()
