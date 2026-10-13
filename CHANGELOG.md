@@ -31,6 +31,21 @@ project follows [Semantic Versioning](https://semver.org/).
   their teams; any other identifier answers 404. Files over `mosaikit.files.max-size` (10 MB) are
   refused with 413; storing and deleting are audited.
 
+- Service identities (MK-124), for the internal callers of the APIs of extensions that are not
+  people, such as a gateway in front of a map server. A platform administrator creates one in the
+  new **Service identities** page (`GET, POST /api/v1/platform/service-identities`) with a name, a
+  description, the APIs of extensions it may call, the endpoints of the kernel meant for services and
+  the organizations it may name; its key, `Authorization: Bearer mks_...`, is shown once and kept as
+  a digest in the new tables `service_identity` and `service_key` (migration V25). A call reaches the
+  APIs it was given with the principal `service:<name>`, the role `service` and no person nor
+  organization, unless it names one it was allowed with `X-Mosaikit-Organization`; every other path,
+  the shell included, answers 403. Each identity has at most two live keys, to rotate them
+  (`POST /api/v1/platform/service-identities/{id}/keys`); a revoked key is refused at the next call
+  (`DELETE .../keys/{key}`), and grants changed with `PUT /api/v1/platform/service-identities/{id}`
+  apply at the next call. The audit log has the new channel `SERVICE`: every refused call and the
+  first call of each identity to each API in an hour. A gateway checks the session cookie or the
+  personal access key of a person with `POST /api/v1/services/check` (endpoints `check-session`
+  and `check-key`), which answers the person, the organization and the roles, or 401.
 - Read-only views of people, organizations, memberships and teams for external services (MK-123),
   such as a map server that reads the roles of people from the database: `account`,
   `organization`, `membership`, `team` and `team_member` in the new schema `mk_published`

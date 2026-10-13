@@ -20,7 +20,8 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
  * same key, as {@code Authorization: Bearer}, and learns whom the key acts for. The key is its own
  * credential, so the service needs no secret of its own and learns nothing about other keys; a
  * revoked or expired key, or one of a suspended person, is refused with 401 like on every other API.
- * Service identities (MK-124) may later check keys with credentials of their own.
+ * Service identities (MK-124) check keys and sessions with credentials of their own, with {@code POST
+ * /api/v1/services/check}.
  */
 @Path("/api/v1/access-keys/current")
 @Produces(MediaType.APPLICATION_JSON)

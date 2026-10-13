@@ -54,6 +54,7 @@ export const GROUPS: readonly Group[] = [
       '20-teams',
       '22-permissions',
       '23-access-keys',
+      '24-service-identities',
     ],
     preinstall: ['activities', 'estimates', 'notes', 'hello'],
     installs: { '09-data': ['todo'], '15-theme-extension': ['theme'] },

@@ -40,7 +40,9 @@ public class AuditEvent {
         /** An assistant or an MCP client acting on behalf of a person. */
         ASSISTANT,
         /** The Java code of an extension, through kernel-api. */
-        EXTENSION
+        EXTENSION,
+        /** A service identity (MK-124): an internal caller that is not a person, with a key of its own. */
+        SERVICE
     }
 
     @Id

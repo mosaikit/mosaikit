@@ -85,6 +85,56 @@ export interface NewAccessKey {
   readonly write: boolean;
 }
 
+/** A live key of a service identity (MK-124); its secret only once, at its creation. */
+export interface ServiceKey {
+  readonly id: string;
+  /** The first characters of the key, to tell it apart. */
+  readonly prefix: string;
+  readonly createdAt: string;
+  readonly lastUsedAt: string | null;
+  /** The whole key, only in the answer to its creation. */
+  readonly secret?: string;
+}
+
+/** A service identity (MK-124): a caller of the APIs of extensions that is not a person. */
+export interface ServiceIdentity {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
+  /** The names of the APIs of extensions it may call, as in `/api/v1/ext/<api>/`. */
+  readonly apis: readonly string[];
+  /** The endpoints of the kernel meant for services it may call. */
+  readonly endpoints: readonly string[];
+  /** The slugs of the organizations it may name. */
+  readonly organizations: readonly string[];
+  readonly createdAt: string;
+  readonly createdBy: string;
+  /** Its live keys, the newest first. */
+  readonly keys: readonly ServiceKey[];
+}
+
+/** The service identities, with what they may be given. */
+export interface ServiceIdentities {
+  readonly identities: readonly ServiceIdentity[];
+  /** The endpoints of the kernel that can be given. */
+  readonly endpoints: readonly string[];
+  /** The live keys an identity may have. */
+  readonly maxKeys: number;
+}
+
+/** What a platform administrator gives a service identity. */
+export interface ServiceGrants {
+  readonly description: string;
+  readonly apis: readonly string[];
+  readonly endpoints: readonly string[];
+  readonly organizations: readonly string[];
+}
+
+/** What a platform administrator asks for when creating a service identity. */
+export interface NewServiceIdentity extends ServiceGrants {
+  readonly name: string;
+}
+
 /** An organization of the signed-in person (MK-017). */
 export interface Membership {
   readonly organizationId: string;
@@ -406,6 +456,9 @@ function tabStorage(): KeyValueStore | undefined {
   }
 }
 
+/** The service identities of the installation (MK-124). */
+const SERVICE_IDENTITIES = '/api/v1/platform/service-identities';
+
 /**
  * Minimal client of the kernel API. A local account signs in once: the kernel keeps the session
  * in an HttpOnly cookie that scripts cannot read, so no password stays in the page and a reload
@@ -719,6 +772,44 @@ export class KernelClient {
   async revokeAccessKey(id: string): Promise<void> {
     const response = await this.request(
       `/api/v1/accounts/me/access-keys/${encodeURIComponent(id)}`,
+      { method: 'DELETE' },
+    );
+    if (!response.ok) {
+      throw await toError(response);
+    }
+  }
+
+  /** The service identities, for platform administrators (MK-124). */
+  serviceIdentities(): Promise<ServiceIdentities> {
+    return this.getJson<ServiceIdentities>(SERVICE_IDENTITIES);
+  }
+
+  /** Creates a service identity: the answer holds the secret of its first key, shown this once. */
+  createServiceIdentity(request: NewServiceIdentity): Promise<ServiceIdentity> {
+    return this.sendJson<ServiceIdentity>(SERVICE_IDENTITIES, 'POST', request);
+  }
+
+  /** Changes what a service identity may call; its next call follows. */
+  grantServiceIdentity(id: string, grants: ServiceGrants): Promise<ServiceIdentity> {
+    return this.sendJson<ServiceIdentity>(
+      `${SERVICE_IDENTITIES}/${encodeURIComponent(id)}`,
+      'PUT',
+      grants,
+    );
+  }
+
+  /** Creates a new key for a service identity, to rotate the old one: its secret, shown this once. */
+  createServiceKey(id: string): Promise<ServiceKey> {
+    return this.sendJson<ServiceKey>(
+      `${SERVICE_IDENTITIES}/${encodeURIComponent(id)}/keys`,
+      'POST',
+    );
+  }
+
+  /** Revokes a key of a service identity: its next call is refused. */
+  async revokeServiceKey(id: string, key: string): Promise<void> {
+    const response = await this.request(
+      `${SERVICE_IDENTITIES}/${encodeURIComponent(id)}/keys/${encodeURIComponent(key)}`,
       { method: 'DELETE' },
     );
     if (!response.ok) {

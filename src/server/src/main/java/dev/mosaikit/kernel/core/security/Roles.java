@@ -20,5 +20,11 @@ public final class Roles {
      */
     public static final String ORGANIZATION_GUEST = "organization-guest";
 
+    /**
+     * A service identity (MK-124): a caller that is not a person, such as a gateway, with a key of its
+     * own; it has no organization unless it names one it was given, and no other role.
+     */
+    public static final String SERVICE = "service";
+
     private Roles() {}
 }
