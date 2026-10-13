@@ -31,8 +31,11 @@ never published from a commit that does not pass them.
 
 The scripts run in Bash (Git Bash on Windows).
 
-1. Make sure `main` is green and `CHANGELOG.md` lists the changes under `## [Unreleased]`.
-2. Set the release version and date the changelog section:
+1. Make sure `main` is green, and that `CHANGELOG.md` and the fragments of `changelog.d/` describe
+   the changes.
+2. Set the release version: `prepare.sh` moves the fragments of `changelog.d/` into
+   `## [Unreleased]` (`node build/changelog.ts assemble`, which deletes them) and dates that
+   section:
 
    ```bash
    distribution/release/prepare.sh 0.2.0
@@ -56,7 +59,18 @@ The scripts run in Bash (Git Bash on Windows).
    ```
 
 `distribution/release/check-version.sh <version>` runs the same check as the pipeline, for
-example before tagging.
+example before tagging; it also fails when `changelog.d/` still holds fragments.
+
+### Changelog fragments
+
+Pull requests do not edit `CHANGELOG.md`: each adds a fragment, `changelog.d/<id>.md`, named after
+its requirement (`MK-093.md`) or a short slug, that starts with a heading of Keep a Changelog
+(`### Added`, `### Changed`, `### Deprecated`, `### Removed`, `### Fixed`, `### Security`) followed
+by its entries as list items ([changelog.d/README.md](../../changelog.d/README.md)). Two pull
+requests never touch the same lines, so they merge in any order. At release time
+`node build/changelog.ts assemble` puts each entry at the top of its subsection of
+`## [Unreleased]`, in the order of the file names, and deletes the fragments;
+`node build/changelog.ts assemble --dry-run` shows the result without writing it.
 
 ## Documentation at every push
 
@@ -65,10 +79,11 @@ The pipeline fails when it no longer matches the code:
 
 | Check | Job | Fails when |
 |---|---|---|
-| `DocumentationTest` | `backend` | an endpoint is missing from `api.md`, or documented but gone; a setting is missing from `configuration.md` |
+| `DocumentationTest` | `backend` | the table of endpoints of `api.md` is not the one generated from the OpenAPI document of the kernel (the failure names the command that rewrites it), or the text names an endpoint that is gone; a setting is missing from `configuration.md` |
 | `docs/test` | `frontend` | a relative link is broken; an ADR is not in the index; the compliance documents name a test, requirement or non-conformity that does not exist |
 | `docs/requirements/test` | `frontend` | a requirement breaks the schema, or is done without a test |
-| `changelog` | merge requests | the product changes without a `CHANGELOG.md` entry (label `no-changelog` to skip) |
+| `changelog` | merge requests | the product changes without a fragment in `changelog.d/` or an edit of `CHANGELOG.md` (label `no-changelog` to skip) |
+| `build/test/changelog.test.ts` | `frontend` | a fragment of `changelog.d/` does not start with a heading such as `### Added`, or its entries are not list items |
 | `docs` | every pipeline | a document cannot be generated |
 
 To build the documents on a workstation (pandoc, xelatex, `pip install openpyxl pyyaml`):

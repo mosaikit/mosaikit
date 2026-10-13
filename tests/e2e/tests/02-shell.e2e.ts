@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
+// e2e-group: A
 import { expect, test } from '@playwright/test';
 import { MARIO } from '../support/env.js';
 import { openApp, signIn, signOut } from '../support/shell.js';

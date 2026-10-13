@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
+// e2e-group: C
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { register } from '../../../sdk/testing/src/bench.js';
 import { ANNA, BASE_URL, MAIL, MARIO, ORGANIZATION, type Person } from '../support/env.js';

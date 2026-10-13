@@ -43,8 +43,17 @@ every pull request.
 | the shell (`src/web`) or the SDK (`sdk/js`, `sdk/ui`) | `npm run check:fast` | under a minute |
 | the same, as people see it | `./mvnw install -DskipTests` once, then `node tests/e2e/run.ts <file>` (such as `13-teams-shell`) | about 35 s for a file |
 | a class of the kernel | `./mvnw -pl src/server test -Dskip.npm -Dtest=<TestClass>` | 1–2 min |
+| an endpoint of the kernel (added, changed, removed) | `./mvnw -pl sdk/java,src/server test -Dskip.npm -Dtest=DocumentationTest -Dsurefire.failIfNoSpecifiedTests=false -Ddocs.write=true`: rewrites the table of [api.md](api.md) from the OpenAPI document, with a row for each new endpoint to complete | 1–2 min |
 | the launcher or the installation of Java extensions | `./mvnw -pl src/server verify -Dskip.npm -DskipITs=false -Dit.test=JavaExtensionInstallationIT -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false` | about 3 min |
 | documentation only | `npx vitest run docs` | seconds |
+| anything, before pushing a pull request | `npm run check:pr` (`-- --no-java` without a JDK, `-- --base <ref>` against another branch than `origin/main`) | about a minute once the kernel is built |
+
+`npm run check:pr` runs the checks on which the CI of a pull request fails most often: lint, type
+check and the unit tests with the coverage thresholds (`docs/` and the requirements included);
+`DocumentationTest`, the architecture tests and the other fast tests of the kernel, at the same
+time; the groups of the end-to-end tests; a changelog fragment against `origin/main` (committed
+changes only, as in the CI); semgrep on the changed files when it is installed, with the
+configuration of the job `sast`. It prints what passed, failed or was skipped, and why.
 
 Before a pull request that touches more than one of these, `npm run check:fast` and
 `./mvnw verify -Dskip.npm` cover the frontend and the backend; `npm run e2e` runs the
@@ -170,12 +179,23 @@ running one.
 
 | Lane | When | What |
 |---|---|---|
-| Fast | pull requests, about 4 minutes | frontend checks, unit and Quarkus tests (without the installation tests and Keycloak) and end-to-end tests at the same time, secrets, SAST; a pull request of documentation only (`docs/`, Markdown files at the root) runs the frontend checks and `DocumentationTest`, in about a minute |
+| Fast | pull requests, about 4 minutes | frontend checks, unit and Quarkus tests (without the installation tests and Keycloak) and end-to-end tests at the same time, secrets, SAST; a pull request of documentation only (`docs/`, `changelog.d/`, Markdown files at the root) runs the frontend checks and `DocumentationTest`, in about a minute |
+| Merge queue | each pull request in the merge queue of `main` (`merge_group`), on the commit that merges it with `main` and the pull requests ahead of it | the fast lane, always whole (no documentation-only shortcut), plus the release documents; not `changelog`, which passed on the pull request |
 | Full | `main`, every night at 02:17 UTC, tags, by hand | everything above, plus the installation tests, the tests with Keycloak, SonarQube, SBOM, dependency scan and the release documents; the portable archives on tags or by hand |
 
-`frontend`, `backend` and `e2e` are required checks of `main`, and pull requests are opened with
-auto-merge (`gh pr merge --auto --rebase`): GitHub merges them when the checks pass, so nobody
-waits for the CI.
+The tests of the backend run in two jobs at the same time, `backend shard 1/2` and
+`backend shard 2/2`: `-Dtest.shard=<n>/2` makes the JUnit Platform filter `TestShards` of the kernel
+keep the test classes of one shard, the slow ones as listed in
+`src/server/src/test/resources/test-shards.properties` and the others by the hash of their name, so
+every class runs in exactly one shard. A class that takes more than a few seconds is worth a line
+there. The job `backend` passes when both shards pass.
+
+`frontend`, `backend`, `e2e`, `docs`, `changelog`, `secrets` and `sast` are the required checks of
+`main` (a job skipped by its condition, such as `docs` on a pull request, counts as passed), and pull
+requests are opened with auto-merge (`gh pr merge --auto --rebase`): GitHub merges them when the
+checks pass, so nobody waits for the CI. With the merge queue of `main` turned on, auto-merge puts
+a pull request in the queue instead, and the workflow runs again on what `main` will be after it;
+pull requests that each passed alone, but not together, no longer break `main`.
 
 The code is analysed on SonarQube Cloud (organization `mosaikit`, project `mosaikit_mosaikit`):
 the `sonarqube` job runs when the repository secret `SONAR_TOKEN` is defined, with Automatic Analysis

@@ -3,7 +3,8 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # Fails when the artifacts of the repository do not all carry the given version, or when a
-# release version has no section in CHANGELOG.md. Used by the release pipeline on tags.
+# release version has no section in CHANGELOG.md or still has fragments in changelog.d/. Used by
+# the release pipeline on tags.
 #
 #   check-version.sh 0.2.0
 set -euo pipefail
@@ -50,6 +51,9 @@ grep -q "^appVersion: \"$version\"$" "$chart" || fail "$chart appVersion is not 
 # Changelog
 if [[ "$version" != *-* ]]; then
   grep -q "^## \[$version\]" CHANGELOG.md || fail "CHANGELOG.md has no section for $version"
+  # Fragments left in changelog.d/ would be missing from the release notes.
+  left="$(git ls-files 'changelog.d/*.md' | grep -vx 'changelog.d/README.md' || true)"
+  [[ -z "$left" ]] || fail "changelog.d/ still has fragments: $(paste -sd ' ' <<<"$left")"
 fi
 
 if ((errors > 0)); then
