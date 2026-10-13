@@ -497,6 +497,57 @@ Do not reference the tables of the kernel nor of other extensions: extend the da
 extension with a table of your own keyed by its identifiers, and read it through the views that
 extension publishes as its data contract.
 
+## Files
+
+Keep files (images, documents, rasters, exports) through the file service of the kernel (MK-041,
+[ADR-0029](../adr/0029-files-on-s3-and-connectors.md)), never in your own tables nor on the disk of
+the server. The kernel writes them to the store of the installation, a directory or an
+S3-compatible bucket whose credentials only it holds, under `<organization>/<extension>/<id>`, and
+keeps their name, type, size, SHA-256 and owner. It applies the rights of the person: a file is of
+the whole organization or of one of its teams (MK-032), a person reads a file of a team only when
+they are in it, a guest only the files of their teams, and a file the person may not read is not
+found, even with its identifier. Storing and deleting are in the audit log.
+
+From Java, inject `FileStorage` (`dev.mosaikit.kernel.api.files`) and name your extension in every
+call, as with `Resources`; content is streamed both ways:
+
+```java
+@Inject FileStorage files;
+
+StoredFile photo = files.store(EXTENSION,
+        FileStorage.NewFile.of("plans/garden.png", "image/png")
+                .forTeam(team)                                   // optional: one team of the person
+                .attachedTo(new ResourceRef(EXTENSION, "album", "summer")),  // optional (MK-054)
+        upload);                                                 // an InputStream, read to its end
+
+try (FileContent content = files.read(EXTENSION, photo.id())) {
+    content.stream().transferTo(output);
+}
+List<StoredFile> mine = files.list(EXTENSION, null, 0, 100);    // or of one team
+files.delete(EXTENSION, photo.id());                            // owner, team owner, administrators
+```
+
+The calls join the transaction of the caller: a file whose transaction rolls back leaves the store
+too. `NoSuchElementException` means not found or not readable, `IllegalArgumentException` a name,
+type or size the kernel refuses (at most `mosaikit.files.max-size`), `SecurityException` a delete
+the person may not make.
+
+From a frontend, use the REST API with the session of the page
+([API](api.md)): `POST /api/v1/files/<extension>?name=<name>` with the content as the body and its
+type in `Content-Type` (`&team=<id>` for a team), `GET /api/v1/files/<extension>` to list,
+`GET /api/v1/files/<extension>/<id>` for the metadata and `.../<id>/content` for the content, which
+answers `Range`, `If-None-Match` and `If-Modified-Since` (the `ETag` is the checksum), so that an
+image or a tile is fetched in parts and revalidated cheaply:
+
+```js
+const response = await fetch(`/api/v1/files/${EXTENSION}?name=${encodeURIComponent(file.name)}`, {
+  method: 'POST',
+  headers: { 'Content-Type': file.type || 'application/octet-stream' },
+  body: file,
+});
+const stored = await response.json(); // { id, name, contentType, size, checksum, ... }
+```
+
 ## Extending another extension
 
 An extension extends another one on three levels ([ADR-0019](../adr/0019-plugins-extending-plugins.md)),
