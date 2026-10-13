@@ -25,7 +25,7 @@ tag should be kept (*Keep* on the job page) or its artefacts attached to the rel
 
 | Evidence | Where |
 |---|---|
-| Requirements and their acceptance criteria | `docs/requirements/MK-*.yaml` |
+| Requirements and their acceptance criteria | `docs/requirements/MK-*.md` |
 | Traceability requirement → test | tests tagged with the requirement identifier: `grep -r '@Tag("MK-' --include=*.java`, `describe('MK-…` in TypeScript |
 | Architecture decisions | `docs/adr/` |
 | Licence and copyright of every file | `LICENSE`, `LICENSES/`, `REUSE.toml` (`reuse lint`) |

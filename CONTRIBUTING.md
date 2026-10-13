@@ -23,7 +23,7 @@ Thank you for considering a contribution. This document describes how the projec
    [Developer Certificate of Origin](https://developercertificate.org/).
 5. Test what you changed before pushing, and let the CI run the rest: the table "Test what you
    changed" of [docs/development/development.md](docs/development/development.md) says what to run
-   for each kind of change, in seconds rather than in the 15 minutes of a whole build. A change to a
+   for each kind of change, in seconds rather than in the 15 minutes of a whole build. A change to an
    extension belongs to the repository of the extension (ADR-0035), not to this one.
 6. Open a pull request with auto-merge (`gh pr merge --auto --rebase`): GitHub merges it with
    rebase once the required checks pass. Changes to `kernel-api`

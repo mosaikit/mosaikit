@@ -48,3 +48,6 @@ Thumbs.db
 
 # Extension JARs built from sources (tests/fixtures/extensions/*/src)
 tests/fixtures/extensions/*/lib/
+
+# Personal rules of a maintainer for Claude Code
+CLAUDE.local.md
