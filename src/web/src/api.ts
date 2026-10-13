@@ -37,6 +37,19 @@ export interface PlatformSettings {
   readonly registration: boolean;
 }
 
+/** A live session of the signed-in person, kept by the kernel (MK-125). */
+export interface AccountSession {
+  readonly id: string;
+  /** `password` for the shell signed in with a password, `realm` for the sign-in of an organization. */
+  readonly kind: 'password' | 'realm';
+  readonly userAgent: string | null;
+  readonly address: string | null;
+  readonly createdAt: string;
+  readonly lastSeenAt: string;
+  /** Whether it is the session of this browser. */
+  readonly current: boolean;
+}
+
 /** An organization of the signed-in person (MK-017). */
 export interface Membership {
   readonly organizationId: string;
@@ -599,6 +612,21 @@ export class KernelClient {
     return this.sendJson<Preferences>('/api/v1/accounts/me/preferences', 'PUT', preferences);
   }
 
+  /** The live sessions of the signed-in person, the most recently seen first (MK-125). */
+  sessions(): Promise<AccountSession[]> {
+    return this.getJson<AccountSession[]>('/api/v1/accounts/me/sessions');
+  }
+
+  /** Ends a session of the signed-in person: its cookie and its "remember me" open nothing any more. */
+  async endSession(id: string): Promise<void> {
+    const response = await this.request(`/api/v1/accounts/me/sessions/${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+    });
+    if (!response.ok) {
+      throw await toError(response);
+    }
+  }
+
   /** The settings of the platform, for platform administrators. */
   platformSettings(): Promise<PlatformSettings> {
     return this.getJson<PlatformSettings>('/api/v1/platform/settings');
@@ -640,13 +668,13 @@ export class KernelClient {
     return this.getJson<Account>('/api/v1/accounts/me');
   }
 
-  /** Forgets the credentials, and ends the session of a local account on the kernel. */
+  /**
+   * Forgets the credentials, and ends the session on the kernel (MK-125): the cookie of a local
+   * account, or the session of the realm that the access token belongs to.
+   */
   signOut(): Promise<void> {
-    const ended = this.cookieSession
-      ? this.fetchImpl('/api/v1/accounts/session', {
-          method: 'DELETE',
-          headers: { [CLIENT_HEADER]: 'shell' },
-        }).then(
+    const ended = this.signedIn
+      ? this.request('/api/v1/accounts/session', { method: 'DELETE' }).then(
           () => undefined,
           () => undefined,
         )

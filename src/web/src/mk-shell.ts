@@ -37,6 +37,7 @@ import './mk-admin-settings.js';
 import './mk-assistant.js';
 import './mk-extension-frame.js';
 import './mk-activity.js';
+import './mk-sessions.js';
 import './mk-settings.js';
 import type { SettingsSection } from './mk-settings.js';
 import './mk-sign-in.js';
@@ -925,7 +926,13 @@ export class MkShell extends LitElement {
       .status=${this.settingsStatus}
       .language=${this.shellLanguage}
       @mk-preferences=${this.savePreferences}
-    ></mk-settings>`;
+    >
+      <mk-sessions
+        slot="sessions"
+        .client=${this.client}
+        @mk-signed-out=${() => void this.signOut()}
+      ></mk-sessions>
+    </mk-settings>`;
   }
 
   /**
@@ -1433,7 +1440,7 @@ export class MkShell extends LitElement {
             this.scheduleRefresh();
           },
           () => {
-            this.clearSession();
+            void this.clearSession();
             this.error = 'The session ended. Sign in again.';
           },
         );
@@ -1537,8 +1544,10 @@ export class MkShell extends LitElement {
 
   private readonly signOut = async (): Promise<void> => {
     const session = this.session;
-    this.clearSession();
+    const ended = this.clearSession();
     if (session) {
+      // The kernel ends the realm session first (MK-125): leaving the page could cancel the request.
+      await ended;
       const url = await this.federated
         .signOutUrl(session.federation, session.tokens.idToken, redirectUri())
         .catch(() => undefined);
@@ -1548,7 +1557,8 @@ export class MkShell extends LitElement {
     }
   };
 
-  private clearSession(): void {
+  /** Forgets the person; resolves when the kernel ended the session. */
+  private clearSession(): Promise<void> {
     this.live.close();
     this.menuOpen = false;
     clearTimeout(this.refreshTimer);
@@ -1556,7 +1566,7 @@ export class MkShell extends LitElement {
     clearInterval(this.watchTimer);
     this.drafts = [];
     this.session = undefined;
-    void this.client.signOut();
+    const ended = this.client.signOut();
     this.account = undefined;
     this.preferences = undefined;
     this.barApps = undefined;
@@ -1566,6 +1576,7 @@ export class MkShell extends LitElement {
     this.loadResults = [];
     this.extensions = [];
     this.loader = undefined;
+    return ended;
   }
 
   private readonly navigate = (event: MouseEvent): void => {

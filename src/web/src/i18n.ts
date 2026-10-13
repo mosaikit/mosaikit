@@ -83,6 +83,20 @@ const ITALIAN: Record<string, string> = {
   'Apps in the app bar': 'App nella barra delle app',
   'Pinned by your organization': 'Fissata dalla tua organizzazione',
   'Saved.': 'Salvato.',
+  // Sessions (MK-125)
+  Sessions: 'Sessioni',
+  'Where you are signed in. End a session you do not recognize: it is signed out at once.':
+    "Dove hai effettuato l'accesso. Termina una sessione che non riconosci: viene chiusa subito.",
+  'No active session.': 'Nessuna sessione attiva.',
+  'This browser': 'Questo browser',
+  'Signed in {created} · last used {seen}': 'Accesso {created} · ultimo uso {seen}',
+  'through your organization': 'tramite la tua organizzazione',
+  'End session': 'Termina sessione',
+  'Session ended: {device}': 'Sessione terminata: {device}',
+  'The session was not ended: {reason}': 'La sessione non è stata terminata: {reason}',
+  'The sessions cannot be read: {reason}': 'Le sessioni non possono essere lette: {reason}',
+  '{browser} on {system}': '{browser} su {system}',
+  'Unknown device': 'Dispositivo sconosciuto',
   'Not saved: {reason}': 'Non salvato: {reason}',
   // Activity (MK-038)
   Activity: 'Attività',
