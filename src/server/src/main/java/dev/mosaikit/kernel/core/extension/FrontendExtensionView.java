@@ -50,7 +50,7 @@ public record FrontendExtensionView(
             List<String> publishes, List<String> subscribes, List<String> services, String api, String data) {}
 
     /** Whether a {@code mosaikit.extensions.unverified-frontends} setting isolates unverified extensions. */
-    static boolean isolatesUnverified(String setting) {
+    public static boolean isolatesUnverified(String setting) {
         String value = setting.strip().toLowerCase(Locale.ROOT);
         if (!value.equals("iframe") && !value.equals("module")) {
             throw new IllegalArgumentException(

@@ -71,7 +71,8 @@ public class SharingLevels {
                     if (extension.manifest().isEmpty()) {
                         continue;
                     }
-                    for (ResourceTypeEntry type : extension.manifest().get().resourceTypes()) {
+                    for (ResourceTypeEntry type :
+                            ResourceTypes.all(extension.manifest().get())) {
                         List<String> levels = type.levelNames();
                         for (int rank = 0; rank < levels.size(); rank++) {
                             insert.setString(1, extension.key());

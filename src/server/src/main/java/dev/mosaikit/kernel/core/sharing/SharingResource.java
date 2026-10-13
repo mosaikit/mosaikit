@@ -37,8 +37,11 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 @Tag(name = "Sharing")
 public class SharingResource {
 
-    /** Who to share with: {@code kind} person, group, organization or public; {@code id} for the first two. */
-    public record SubjectRequest(String kind, UUID id) {}
+    /**
+     * Who to share with: {@code kind} person, group, organization or public; {@code id} for the first
+     * two, or {@code email} in place of the {@code id} of a person.
+     */
+    public record SubjectRequest(String kind, UUID id, String email) {}
 
     /** A grant to make or replace. */
     public record GrantRequest(SubjectRequest subject, String level) {}
@@ -93,6 +96,7 @@ public class SharingResource {
                 ref(extension, type, id),
                 request.subject().kind(),
                 request.subject().id(),
+                request.subject().email(),
                 request.level());
     }
 

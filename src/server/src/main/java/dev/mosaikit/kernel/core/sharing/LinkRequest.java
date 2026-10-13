@@ -26,6 +26,12 @@ public class LinkRequest {
     /** Header with the password of that link. */
     public static final String PASSWORD_HEADER = "X-Mosaikit-Link-Password";
 
+    /**
+     * Data of the routing context: the link that {@link LinkRequestPolicy} already opened for a
+     * request without an account to the API of an extension, so that it is resolved and audited once.
+     */
+    public static final String OPENED = "mosaikit.link.opened";
+
     private final SharedLinks links;
     private final CurrentVertxRequest request;
     private final SecurityIdentity identity;
@@ -49,6 +55,9 @@ public class LinkRequest {
 
     private Optional<SharedLinks.Opened> resolve() {
         RoutingContext routing = request.getCurrent();
+        if (routing != null && routing.get(OPENED) instanceof SharedLinks.Opened already) {
+            return Optional.of(already);
+        }
         String secret = routing == null ? null : routing.request().getHeader(HEADER);
         if (secret == null || secret.isBlank()) {
             return Optional.empty();

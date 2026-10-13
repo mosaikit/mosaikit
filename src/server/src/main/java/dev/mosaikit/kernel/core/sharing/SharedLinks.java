@@ -162,7 +162,7 @@ public class SharedLinks {
                 .findActive(row.resource().extension())
                 .flatMap(InstalledExtension::manifest)
                 .flatMap((ExtensionManifest manifest) ->
-                        manifest.resourceType(row.resource().type()));
+                        ResourceTypes.of(manifest, row.resource().type()));
         if (type.isEmpty() || !type.get().declares(row.level()) || !type.get().accepts(SubjectKind.LINK)) {
             detail.put("reason", "type no longer shared by links");
             throw refused(actor, row, Refusal.NOT_FOUND, detail);

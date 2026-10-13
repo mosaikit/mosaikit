@@ -78,7 +78,7 @@ public class TestExtensions implements QuarkusTestProfile {
             extension("permissions", PermissionsTest.EXTENSION, "Permissions", PermissionsTest.PERMISSIONS);
             // SharingTest: documents shared at four levels with every kind of subject, links up to
             // "use", and memos shared with people, groups and the organization only (MK-055).
-            extension("sharing", SharingTest.EXTENSION, "Sharing", SharingTest.RESOURCES);
+            extension("sharing", SharingTest.EXTENSION, "Sharing", SharingTest.RESOURCES + SharingTest.CONTRIBUTES);
             // ThemeExtensionTest: a theme that names the product and brings its logo (MK-052), and one
             // with a value that is not a color.
             theme("green", "dev.mosaikit.test.green", "Green", "'#1b6e3c'", """
@@ -99,7 +99,11 @@ public class TestExtensions implements QuarkusTestProfile {
                 "dev.mosaikit.test.green",
                 // FileStorageTest: a limit that a test reaches quickly.
                 "mosaikit.files.max-size",
-                "1M");
+                "1M",
+                // SharingTest: the element that shows a resource opened with a link is offered only for
+                // frontends loaded as modules (MK-055); the extensions of the tests are not signed.
+                "mosaikit.extensions.unverified-frontends",
+                "module");
     }
 
     static void extension(String directory, String id, String name, String extra) throws IOException {
