@@ -302,7 +302,57 @@ retention of their organization, oldest first, and records it in the same chain
 (`audit.entries.deleted`, channel `JOB`). The chain stays verifiable: the kernel keeps the hash of the
 last deleted entry, and the verification starts from there (`firstIndex`).
 
-## Assistants and MCP clients
+## Credentials of extensions
+
+Extensions call external services, such as model providers, mail servers or databases, with keys
+and passwords that must not be written into shared documents nor reach the browser. The
+administrators of an organization keep them in **Credentials**, in the administration menu, or with
+`/api/v1/organizations/{slug}/secrets` (see the [API](../development/api.md)). Each credential has a
+name, such as `model-provider`, a kind (password, token, key or other), the value, a description, and
+optionally the extension it is meant for: then only that extension may use it.
+
+A value is encrypted as soon as it arrives and never comes back: lists and details show a hint at
+most, `••••`, followed for a long token or key by its last four characters, never for a password. A
+credential is replaced, with a new value or only a new description, or deleted. Every store,
+replacement and deletion is in the audit log under `secrets.`, without the value; values never
+appear in logs nor in error messages.
+
+### The master key
+
+Each value is encrypted with AES-256-GCM under a data key of its own, and the data key under the
+master key of the installation, which never goes in the database: a copy of the database, or of a
+backup, does not reveal the credentials without it. Both encryptions bind the value to its
+organization and name, so a row moved to another organization or name does not decrypt. Credentials
+are under row-level security like the rest of the data of an organization.
+
+Generate the master key once, keep it with the other secrets of the installation, and back it up
+apart from the database; without it the credentials are lost:
+
+```sh
+openssl rand -base64 32
+```
+
+Give it to the kernel as `MOSAIKIT_SECRETS_MASTER_KEY`, or in a file named by
+`mosaikit.secrets.master-key-file` such as a mounted secret (see
+[configuration](configuration.md#credentials-of-extensions)). Without a valid key the kernel still
+starts, logs that the store of credentials is disabled and why, and its endpoints answer 503. All the
+kernels of an installation need the same keys.
+
+### Rotating the master key
+
+1. Generate a new key.
+2. Make it the current key (`mosaikit.secrets.master-key`), and move the old one to
+   `mosaikit.secrets.previous-keys`; restart the kernels. New and replaced credentials use the new
+   key; the others still decrypt with the old one.
+3. As a platform administrator, call `POST /api/v1/platform/secrets/re-encryption`: it encrypts the
+   data key of every credential, in every organization, under the new key, without decrypting the
+   values, and answers how many moved (`reEncrypted`) and how many it could not read (`unreadable`,
+   when their key is missing from `previous-keys` or a row was altered). It is audited as
+   `secrets.re-encrypted`.
+4. `GET /api/v1/platform/secrets/keys` lists how many credentials each key still holds, by an
+   identifier derived from the key. When the old key holds none, remove it from `previous-keys` and
+   restart.
+
 
 Extensions may declare actions that assistants use as tools (see
 [extension development](../development/extension-development.md#actions-for-assistants)). An MCP client

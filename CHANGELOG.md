@@ -28,6 +28,19 @@ project follows [Semantic Versioning](https://semver.org/).
   ([published views](docs/development/published-views.md)). The setting
   `mosaikit.database.row-security` can now also be set in a configuration file.
 
+- The kernel keeps the credentials and service keys of extensions, encrypted (MK-062). The
+  administrators of an organization store, replace and delete them in the new Credentials page of the
+  console, or with `/api/v1/organizations/{slug}/secrets` (audited as `secrets.stored`,
+  `secrets.replaced`, `secrets.deleted`): name, kind (password, token, key, other), value,
+  description and optionally the extension it is meant for. The value never comes back: answers carry
+  a masked hint at most, and values stay out of logs, error messages and the audit log. Envelope
+  encryption with AES-256-GCM: a data key per value, encrypted under a master key that never goes in
+  the database, both bound to the organization and the name of the credential; new table `secret`
+  under row-level security (migration V23). New settings `mosaikit.secrets.master-key`,
+  `master-key-file` and `previous-keys`: without a master key the store is disabled and its endpoints
+  answer 503, while the kernel starts. Platform administrators follow a rotation with `GET
+  /api/v1/platform/secrets/keys` and end it with `POST /api/v1/platform/secrets/re-encryption`.
+
 - The kernel keeps the sessions of people on the server (MK-125). Signing in with a password opens
   a session recorded in the new table `account_session` (migration V19) and the `mosaikit-session`
   cookie holds only a random value, kept as its digest: after signing out, a copy of the cookie is

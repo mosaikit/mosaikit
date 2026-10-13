@@ -198,6 +198,49 @@ const ITALIAN: Record<string, string> = {
   'Write the email address of the person.': "Scrivi l'indirizzo email della persona.",
   'Not invited: {reason}': 'Non invitata: {reason}',
   '{email} is in the organization.': "{email} è nell'organizzazione.",
+  // Credentials of extensions (MK-062)
+  Credentials: 'Credenziali',
+  'Keys and passwords with which the extensions of your organization call other services. They are encrypted, only the servers of the extensions read them, and nobody sees a value again after saving it.':
+    'Chiavi e password con cui le estensioni della tua organizzazione chiamano altri servizi. Sono cifrate, le leggono solo i server delle estensioni, e nessuno rivede un valore dopo averlo salvato.',
+  'No credential yet.': 'Ancora nessuna credenziale.',
+  Kind: 'Tipo',
+  Value: 'Valore',
+  Changed: 'Modificata',
+  Actions: 'Azioni',
+  Token: 'Token',
+  Key: 'Chiave',
+  Other: 'Altro',
+  'Any extension': 'Qualsiasi estensione',
+  '{when} by {person}': '{when} da {person}',
+  'Replace {name}': 'Sostituisci {name}',
+  'Delete {name}': 'Elimina {name}',
+  Replace: 'Sostituisci',
+  'Store a credential': 'Salva una credenziale',
+  'How the extensions ask for it, such as model-provider.':
+    'Il nome con cui la chiedono le estensioni, come model-provider.',
+  'New value': 'Nuovo valore',
+  'Leave it empty to keep the current value.': 'Lascialo vuoto per mantenere il valore attuale.',
+  'It is encrypted at once and never shown again.':
+    'Viene cifrato subito e non viene più mostrato.',
+  'Only for the extension': "Solo per l'estensione",
+  'Its identifier, such as org.example.reports. Empty: any extension may use it.':
+    'Il suo identificativo, come org.example.reports. Vuoto: può usarla qualsiasi estensione.',
+  'Save changes': 'Salva le modifiche',
+  'Store credential': 'Salva la credenziale',
+  'Delete the credential {name}? The extensions that use it stop working with it.':
+    'Eliminare la credenziale {name}? Le estensioni che la usano smettono di funzionare con essa.',
+  'The name has lowercase letters, digits, dots, dashes and underscores, such as model-provider.':
+    'Il nome ha lettere minuscole, cifre, punti, trattini e trattini bassi, come model-provider.',
+  'Write the value.': 'Scrivi il valore.',
+  'The value is too long.': 'Il valore è troppo lungo.',
+  'The description is too long.': 'La descrizione è troppo lunga.',
+  'The extension is its identifier, such as org.example.reports.':
+    "L'estensione si indica con il suo identificativo, come org.example.reports.",
+  'The credentials cannot be read: {reason}': 'Non è possibile leggere le credenziali: {reason}',
+  'Credential {name} replaced.': 'Credenziale {name} sostituita.',
+  'Credential {name} stored.': 'Credenziale {name} salvata.',
+  'The credential was not deleted: {reason}': 'La credenziale non è stata eliminata: {reason}',
+  'Credential {name} deleted.': 'Credenziale {name} eliminata.',
   // Platform settings
   'Platform settings': 'Impostazioni della piattaforma',
   'People can create their own account': 'Le persone possono creare il proprio account',

@@ -44,6 +44,7 @@ export default defineConfig({
         'src/web/src/mk-sessions.ts',
         'src/web/src/mk-admin-apps.ts',
         'src/web/src/mk-admin-permissions.ts',
+        'src/web/src/mk-admin-secrets.ts',
         'src/web/src/mk-invite-person.ts',
         'src/web/src/mk-permission-list.ts',
         'src/web/src/mk-effective-permissions.ts',
