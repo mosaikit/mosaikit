@@ -24,11 +24,7 @@ export default tseslint.config(
       globals: { ...globals.browser },
       parserOptions: {
         projectService: {
-          allowDefaultProject: [
-            'vitest.config.ts',
-            'src/web/vite.config.ts',
-            'src/plugins/*/vite.config.ts',
-          ],
+          allowDefaultProject: ['vitest.config.ts', 'src/web/vite.config.ts'],
         },
         tsconfigRootDir: import.meta.dirname,
       },

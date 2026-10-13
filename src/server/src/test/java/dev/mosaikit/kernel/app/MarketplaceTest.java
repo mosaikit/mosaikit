@@ -11,10 +11,10 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.nullValue;
 
+import dev.mosaikit.kernel.api.signature.ExtensionIndex;
 import dev.mosaikit.kernel.api.signature.PackageSignatures;
-import dev.mosaikit.kernel.api.signature.PluginIndex;
 import dev.mosaikit.kernel.api.signature.SigningKeys;
-import dev.mosaikit.kernel.core.plugin.PluginRegistry;
+import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
@@ -45,7 +45,7 @@ class MarketplaceTest {
     static final Path ROOT = Path.of("target", "marketplace-test").toAbsolutePath();
     static final Path CATALOG = ROOT.resolve("catalog");
     static final Path TAMPERED = ROOT.resolve("tampered");
-    static final Path PLUGINS = ROOT.resolve("plugins");
+    static final Path EXTENSIONS = ROOT.resolve("extensions");
     static final KeyPair PUBLISHER = SigningKeys.generate();
     static final KeyPair STRANGER = SigningKeys.generate();
     static final String ID = "dev.mosaikit.test.market";
@@ -60,8 +60,8 @@ class MarketplaceTest {
                 throw new UncheckedIOException(e);
             }
             return Map.of(
-                    "mosaikit.plugins.directory", PLUGINS.toString(),
-                    "mosaikit.plugins.trusted-keys-directory",
+                    "mosaikit.extensions.directory", EXTENSIONS.toString(),
+                    "mosaikit.extensions.trusted-keys-directory",
                             ROOT.resolve("trusted").toString(),
                     "mosaikit.marketplace.sources",
                             CATALOG.toUri() + "," + TAMPERED.toUri() + ","
@@ -76,25 +76,25 @@ class MarketplaceTest {
                         .forEach(path -> path.toFile().delete());
             }
         }
-        Files.createDirectories(PLUGINS);
+        Files.createDirectories(EXTENSIONS);
         SigningKeys.write(PUBLISHER, ROOT.resolve("trusted"), "publisher");
         Files.delete(ROOT.resolve("trusted/publisher.key.pem"));
         Files.createDirectories(CATALOG);
         PackageSignatures.sign(pkg(CATALOG.resolve("market-1.0.0.zip"), "1.0.0"), PUBLISHER);
         // 1.1.0 has a schema to migrate, so it takes effect at the next start; 1.0.0 at once.
         PackageSignatures.sign(
-                pkg(CATALOG.resolve("market-1.1.0.zip"), "1.1.0", "A plugin of the marketplace test.", true),
+                pkg(CATALOG.resolve("market-1.1.0.zip"), "1.1.0", "An extension of the marketplace test.", true),
                 PUBLISHER);
-        PluginIndex.write(CATALOG, PUBLISHER, Instant.now());
+        ExtensionIndex.write(CATALOG, PUBLISHER, Instant.now());
         Files.createDirectories(TAMPERED);
         Path changed = pkg(TAMPERED.resolve("market-2.0.0.zip"), "2.0.0");
         PackageSignatures.sign(changed, PUBLISHER);
-        PluginIndex.write(TAMPERED, PUBLISHER, Instant.now());
+        ExtensionIndex.write(TAMPERED, PUBLISHER, Instant.now());
         PackageSignatures.sign(pkg(changed, "2.0.0", "changed after the index"), PUBLISHER);
     }
 
     static Path pkg(Path file, String version) throws IOException {
-        return pkg(file, version, "A plugin of the marketplace test.");
+        return pkg(file, version, "An extension of the marketplace test.");
     }
 
     static Path pkg(Path file, String version, String description) throws IOException {
@@ -106,7 +106,7 @@ class MarketplaceTest {
             out.putNextEntry(new ZipEntry("manifest.yaml"));
             out.write(("id: " + ID + "\nversion: " + version + "\nname: Market (test)\ndescription: " + description
                             + "\nkind: [service]\nplatform: '>=0.1 <1'\n"
-                            + (schema ? "database:\n  schema: p_market\n" : ""))
+                            + (schema ? "database:\n  schema: ext_market\n" : ""))
                     .getBytes(UTF_8));
             out.closeEntry();
         }
@@ -114,7 +114,7 @@ class MarketplaceTest {
     }
 
     @Inject
-    PluginRegistry registry;
+    ExtensionRegistry registry;
 
     @Test
     void listsTheOffersOfVerifiedCatalogsOnly() {
@@ -125,8 +125,8 @@ class MarketplaceTest {
                 .body("sources[0].status", equalTo("verified"))
                 .body("sources[0].keyId", equalTo(SigningKeys.keyId(PUBLISHER.getPublic())))
                 .body("sources[2].status", equalTo("refused"))
-                .body("plugins.findAll { it.source == '" + CATALOG.toUri() + "' }.version", hasItem("1.1.0"))
-                .body("plugins.find { it.version == '1.0.0' }.state", equalTo("available"));
+                .body("extensions.findAll { it.source == '" + CATALOG.toUri() + "' }.version", hasItem("1.1.0"))
+                .body("extensions.find { it.version == '1.0.0' }.state", equalTo("available"));
         anonymous().get("/api/v1/marketplace").then().statusCode(401);
     }
 
@@ -141,12 +141,12 @@ class MarketplaceTest {
                 // Nothing to build or migrate: active at once (ADR-0031).
                 .body("restartRequired", equalTo(false))
                 .body("replaced", nullValue());
-        assertThat(PLUGINS.resolve(ID + "-1.0.0.zip")).exists();
+        assertThat(EXTENSIONS.resolve(ID + "-1.0.0.zip")).exists();
         asAdmin()
                 .get("/api/v1/marketplace")
                 .then()
-                .body("plugins.find { it.version == '1.0.0' }.state", equalTo("installed"))
-                .body("plugins.find { it.version == '1.1.0' }.state", equalTo("update"));
+                .body("extensions.find { it.version == '1.0.0' }.state", equalTo("installed"))
+                .body("extensions.find { it.version == '1.1.0' }.state", equalTo("update"));
 
         // An update with a schema replaces the package and waits for the restart.
         asAdmin()
@@ -156,20 +156,20 @@ class MarketplaceTest {
                 .statusCode(202)
                 .body("restartRequired", equalTo(true))
                 .body("replaced", equalTo(ID + "-1.0.0.zip"));
-        assertThat(PLUGINS.resolve(ID + "-1.1.0.zip")).exists();
+        assertThat(EXTENSIONS.resolve(ID + "-1.1.0.zip")).exists();
         // Until the restart the offer is waiting, so that nobody installs it twice.
         asAdmin()
                 .get("/api/v1/marketplace")
                 .then()
-                .body("plugins.find { it.version == '1.1.0' }.state", equalTo("restart"));
-        assertThat(PLUGINS.resolve(ID + "-1.0.0.zip")).doesNotExist();
-        assertThat(PLUGINS.resolve(".previous").resolve(ID + "-1.0.0.zip")).exists();
+                .body("extensions.find { it.version == '1.1.0' }.state", equalTo("restart"));
+        assertThat(EXTENSIONS.resolve(ID + "-1.0.0.zip")).doesNotExist();
+        assertThat(EXTENSIONS.resolve(".previous").resolve(ID + "-1.0.0.zip")).exists();
         asAdmin()
                 .get("/api/v1/audit-events?limit=50")
                 .then()
-                .body("findAll { it.action == 'plugin.installed' }.subject", hasItem(ID + " 1.1.0"));
+                .body("findAll { it.action == 'extension.installed' }.subject", hasItem(ID + " 1.1.0"));
         // The other tests find the catalog as at the start: nothing installed.
-        Files.deleteIfExists(PLUGINS.resolve(ID + "-1.1.0.zip"));
+        Files.deleteIfExists(EXTENSIONS.resolve(ID + "-1.1.0.zip"));
         registry.reload();
     }
 
@@ -207,10 +207,10 @@ class MarketplaceTest {
         asAdmin()
                 .contentType("application/zip")
                 .body(new byte[0])
-                .post("/api/v1/plugins/packages")
+                .post("/api/v1/extensions/packages")
                 .then()
                 .statusCode(400);
-        Files.delete(PLUGINS.resolve(ID + "-3.0.0.zip"));
+        Files.delete(EXTENSIONS.resolve(ID + "-3.0.0.zip"));
         // Active at once when uploaded: the next tests find nothing installed.
         registry.reload();
     }
@@ -219,6 +219,6 @@ class MarketplaceTest {
         return asAdmin()
                 .contentType("application/zip")
                 .body(Files.readAllBytes(file))
-                .post("/api/v1/plugins/packages");
+                .post("/api/v1/extensions/packages");
     }
 }

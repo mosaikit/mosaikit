@@ -14,12 +14,12 @@ import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 
-import dev.mosaikit.kernel.api.plugin.ManifestParseResult;
-import dev.mosaikit.kernel.api.plugin.PluginManifests;
+import dev.mosaikit.kernel.api.extension.ExtensionManifests;
+import dev.mosaikit.kernel.api.extension.ManifestParseResult;
 import dev.mosaikit.kernel.core.ai.ActionCatalog;
-import dev.mosaikit.kernel.core.ai.PluginResponse;
-import dev.mosaikit.kernel.core.plugin.InstalledPlugin;
-import dev.mosaikit.kernel.core.plugin.PluginStatus;
+import dev.mosaikit.kernel.core.ai.ExtensionResponse;
+import dev.mosaikit.kernel.core.extension.ExtensionStatus;
+import dev.mosaikit.kernel.core.extension.InstalledExtension;
 import io.quarkus.test.junit.QuarkusMock;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.specification.RequestSpecification;
@@ -32,9 +32,9 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
- * The tools of plugins for assistants and MCP clients (MK-015), with a plugin that offers a read
- * and a write action and a fake of its backend. The real call to a plugin is exercised by
- * JavaPluginInstallationIT.
+ * The tools of extensions for assistants and MCP clients (MK-015), with an extension that offers a read
+ * and a write action and a fake of its backend. The real call to an extension is exercised by
+ * JavaExtensionInstallationIT.
  */
 @QuarkusTest
 @Tag("MK-015")
@@ -53,7 +53,7 @@ class AiToolsTest {
 
     @BeforeEach
     void setUp() {
-        QuarkusMock.installMockForType(new ActionCatalog(() -> List.of(trafficPlugin())), ActionCatalog.class);
+        QuarkusMock.installMockForType(new ActionCatalog(() -> List.of(trafficExtension())), ActionCatalog.class);
         backend.reset();
         for (String slug : List.of(ORGANIZATION, OTHER_ORGANIZATION)) {
             asAdmin()
@@ -63,7 +63,7 @@ class AiToolsTest {
         person = register(ORGANIZATION);
     }
 
-    private static InstalledPlugin trafficPlugin() {
+    private static InstalledExtension trafficExtension() {
         Map<String, Object> tree = Map.of(
                 "id", "dev.mosaikit.test.traffic",
                 "version", "1.0.0",
@@ -102,12 +102,12 @@ class AiToolsTest {
                                                         "additionalProperties",
                                                         false),
                                         "call", Map.of("method", "POST", "path", "roads/{road}/closure"))));
-        var manifest = ((ManifestParseResult.Valid) PluginManifests.parse(tree)).manifest();
-        return new InstalledPlugin(
+        var manifest = ((ManifestParseResult.Valid) ExtensionManifests.parse(tree)).manifest();
+        return new InstalledExtension(
                 manifest.id(),
-                Path.of("plugins", "traffic"),
+                Path.of("extensions", "traffic"),
                 java.util.Optional.of(manifest),
-                PluginStatus.ACTIVE,
+                ExtensionStatus.ACTIVE,
                 List.of());
     }
 
@@ -130,7 +130,7 @@ class AiToolsTest {
     }
 
     @Test
-    void listsTheToolsOfTheActivePlugins() {
+    void listsTheToolsOfTheActiveExtensions() {
         member().get("/api/v1/ai/tools")
                 .then()
                 .statusCode(200)
@@ -138,7 +138,7 @@ class AiToolsTest {
                 .body("[0].risk", equalTo("read"))
                 .body("[0].needsConfirmation", equalTo(false))
                 .body("[1].needsConfirmation", equalTo(true))
-                .body("[1].plugin", equalTo("dev.mosaikit.test.traffic"))
+                .body("[1].extension", equalTo("dev.mosaikit.test.traffic"))
                 .body("[1].inputSchema.required", equalTo(List.of("road", "reason")));
 
         anonymous().get("/api/v1/ai/tools").then().statusCode(401);
@@ -157,7 +157,7 @@ class AiToolsTest {
                 .body("draft", nullValue());
 
         assertThat(backend.sent()).singleElement().satisfies(call -> {
-            assertThat(call.call().target()).isEqualTo("/api/v1/p/traffic/closures?area=north");
+            assertThat(call.call().target()).isEqualTo("/api/v1/ext/traffic/closures?area=north");
             assertThat(call.caller().username()).isEqualTo(person);
             assertThat(call.caller().organizationSlug()).isEqualTo(ORGANIZATION);
             assertThat(call.caller().authorization()).startsWith("Basic ");
@@ -193,7 +193,7 @@ class AiToolsTest {
                 .then()
                 .statusCode(404);
 
-        backend.answer(new PluginResponse(201, Map.of("road", "A1", "closed", true)));
+        backend.answer(new ExtensionResponse(201, Map.of("road", "A1", "closed", true)));
         member().post("/api/v1/ai/drafts/{id}/confirmation", draft)
                 .then()
                 .statusCode(200)
@@ -202,7 +202,7 @@ class AiToolsTest {
                 .body("draft.status", equalTo("executed"));
         assertThat(backend.sent()).singleElement().satisfies(call -> {
             assertThat(call.call().method()).isEqualTo("POST");
-            assertThat(call.call().target()).isEqualTo("/api/v1/p/traffic/roads/A1/closure");
+            assertThat(call.call().target()).isEqualTo("/api/v1/ext/traffic/roads/A1/closure");
             assertThat(call.call().body()).isEqualTo(Map.of("reason", "works"));
         });
 
@@ -232,7 +232,7 @@ class AiToolsTest {
     }
 
     @Test
-    void recordsAFailedConfirmationWhenThePluginDoesNotAnswer() {
+    void recordsAFailedConfirmationWhenTheExtensionDoesNotAnswer() {
         String draft = member().body(Map.of("road", "A3", "reason", "flood"))
                 .post("/api/v1/ai/tools/{tool}/invocations", CLOSE)
                 .path("draft.id");
@@ -300,7 +300,7 @@ class AiToolsTest {
                 .body("result.content[0].text", containsString("Nothing has changed yet"));
         assertThat(backend.sent()).hasSize(1);
 
-        backend.answer(new PluginResponse(403, Map.of("detail", "not allowed")));
+        backend.answer(new ExtensionResponse(403, Map.of("detail", "not allowed")));
         mcp(call(6, LIST, Map.of())).then().body("result.isError", equalTo(true));
         mcp(call(7, CLOSE, Map.of("road", "A4"))).then().body("error.code", equalTo(-32602));
         mcp(call(8, "traffic__unknown", Map.of())).then().body("error.code", equalTo(-32602));

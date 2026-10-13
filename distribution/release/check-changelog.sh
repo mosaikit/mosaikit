@@ -15,7 +15,7 @@ if [[ ",${PR_LABELS:-}," == *",no-changelog,"* ]]; then
   exit 0
 fi
 changed="$(git diff --name-only "$base"...HEAD)"
-product="$(grep -E '^(src/server/src/main|sdk/[^/]+/src|src/plugins/|distribution/)' <<<"$changed" || true)"
+product="$(grep -E '^(src/server/src/main|sdk/[^/]+/src|distribution/)' <<<"$changed" || true)"
 if [[ -z "$product" ]]; then
   echo "No change to the product."
   exit 0

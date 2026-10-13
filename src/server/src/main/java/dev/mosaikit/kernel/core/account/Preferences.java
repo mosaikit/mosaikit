@@ -11,13 +11,13 @@ import java.util.List;
  * every sign-in. A missing value means the default of the installation.
  *
  * @param theme a theme of the installation: {@code mosaikit}, {@code pa}, or the identifier of a
- *     theme plugin (MK-028); the shell uses the default when it is not available
+ *     theme extension (MK-028); the shell uses the default when it is not available
  * @param appearance {@code system} (light or dark as the device), {@code light}, {@code dark} or
  *     {@code contrast} (high contrast)
  * @param language {@code en} or {@code it}
- * @param hiddenApps the apps the person does not want in the app bar, as {@code <plugin
+ * @param hiddenApps the apps the person does not want in the app bar, as {@code <extension
  *     id>/<app id>}; pinned apps stay (MK-030)
- * @param mutedNotifications the kinds of notifications the person does not want, as {@code <plugin
+ * @param mutedNotifications the kinds of notifications the person does not want, as {@code <extension
  *     id>/<kind>} (MK-038)
  */
 public record Preferences(

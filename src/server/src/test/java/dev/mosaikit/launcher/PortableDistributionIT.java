@@ -77,7 +77,7 @@ class PortableDistributionIT {
                         password,
                         "{\"slug\":\"demo\",\"name\":\"Demo\",\"selfRegistration\":true}"))
                 .isEqualTo(201);
-        // Plugin data belong to an organization (MK-017): a member of demo writes the notes.
+        // Extension data belong to an organization (MK-017): a member of demo writes the notes.
         assertThat(post(
                         "/api/v1/accounts/registrations",
                         password,
@@ -91,11 +91,11 @@ class PortableDistributionIT {
                 .isFalse();
         assertThat(residentMemoryMegabytes(home)).as("memory at rest in MB").isLessThan(MEMORY_LIMIT_MB);
 
-        // 3. A plugin copied into plugins/ is active after a restart.
+        // 3. An extension copied into extensions/ is active after a restart.
         stop();
         installSampleNotes(home);
         start(home);
-        assertThat(post(MEMBER, "/api/v1/p/sample-notes/notes", MEMBER_PASSWORD, "{\"text\":\"Kept in data/\"}"))
+        assertThat(post(MEMBER, "/api/v1/ext/fixture-notes/notes", MEMBER_PASSWORD, "{\"text\":\"Kept in data/\"}"))
                 .isEqualTo(201);
 
         // 2. Data survive a restart and a backup of data/ restores them on another copy.
@@ -106,7 +106,8 @@ class PortableDistributionIT {
         start(restored);
         assertThat(get("/api/v1/organizations", password).findValuesAsText("slug"))
                 .contains("demo");
-        assertThat(get(MEMBER, "/api/v1/p/sample-notes/notes", MEMBER_PASSWORD).findValuesAsText("text"))
+        assertThat(get(MEMBER, "/api/v1/ext/fixture-notes/notes", MEMBER_PASSWORD)
+                        .findValuesAsText("text"))
                 .contains("Kept in data/");
     }
 
@@ -194,10 +195,11 @@ class PortableDistributionIT {
         }
     }
 
-    /** Copies the package of the sample plugin into plugins/, as it is. */
+    /** Copies the package of the sample extension into extensions/, as it is. */
     private static void installSampleNotes(Path home) throws IOException {
-        Path source = Path.of(System.getProperty("mosaikit.it.plugin"));
-        Files.copy(source, home.resolve("plugins").resolve(source.getFileName()), StandardCopyOption.REPLACE_EXISTING);
+        Path source = Path.of(System.getProperty("mosaikit.it.extension"));
+        Files.copy(
+                source, home.resolve("extensions").resolve(source.getFileName()), StandardCopyOption.REPLACE_EXISTING);
     }
 
     private static void deleteRecursively(Path directory) throws IOException {

@@ -47,7 +47,7 @@ public class MarketplaceResource {
 
     @GET
     @Path("/marketplace")
-    @Operation(summary = "List the plugins that the catalogs offer")
+    @Operation(summary = "List the extensions that the catalogs offer")
     public CatalogView catalog() {
         return marketplace.catalog();
     }
@@ -56,8 +56,8 @@ public class MarketplaceResource {
     @Path("/marketplace/installations")
     @Consumes(MediaType.APPLICATION_JSON)
     @Operation(
-            summary = "Install a plugin from a catalog",
-            description = "The package is placed in the plugins directory and used at the next start.")
+            summary = "Install an extension from a catalog",
+            description = "The package is placed in the extensions directory and used at the next start.")
     public Response install(@Valid @NotNull InstallationRequest request) {
         Installation installation = marketplace.install(request.source(), request.id(), request.version());
         auditInstallation(installation, request.source());
@@ -65,10 +65,10 @@ public class MarketplaceResource {
     }
 
     @POST
-    @Path("/plugins/packages")
+    @Path("/extensions/packages")
     @Consumes({"application/zip", MediaType.APPLICATION_OCTET_STREAM})
     @Operation(
-            summary = "Install an uploaded plugin package",
+            summary = "Install an uploaded extension package",
             description = "For installations without network: the package must be signed by a trusted publisher.")
     public Response upload(byte[] body) {
         Installation installation = marketplace.upload(body);
@@ -80,7 +80,7 @@ public class MarketplaceResource {
         audit.append(
                 identity.getPrincipal().getName(),
                 Optional.empty(),
-                "plugin.installed",
+                "extension.installed",
                 installation.id() + " " + installation.version(),
                 AuditEvent.Outcome.SUCCEEDED,
                 Map.of(

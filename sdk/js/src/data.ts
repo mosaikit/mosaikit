@@ -4,7 +4,7 @@
 import { NO_LIVE, type LiveChannel } from './live.js';
 
 /**
- * The collections of documents that a plugin keeps in the kernel without a backend of its own
+ * The collections of documents that an extension keeps in the kernel without a backend of its own
  * (ADR-0031): JSON documents of the organization of the person, in the collections that the
  * manifest declares in `data.collections`.
  */
@@ -32,7 +32,7 @@ export interface DataDocument<T extends object = Record<string, unknown>> {
   readonly updatedBy: string;
 }
 
-/** One collection of the plugin. */
+/** One collection of the extension. */
 export interface DataCollection<T extends object = Record<string, unknown>> {
   /** Documents, newest first. */
   list(options?: { readonly offset?: number; readonly limit?: number }): Promise<DataDocument<T>[]>;
@@ -75,17 +75,17 @@ async function failure(response: Response): Promise<DataError> {
   return new DataError(response.status, detail);
 }
 
-/** The collections of a plugin, through the `fetch` of its context. */
+/** The collections of an extension, through the `fetch` of its context. */
 export function dataCollections(
   fetch: Fetch,
-  pluginId: string,
+  extensionId: string,
   live: LiveChannel = NO_LIVE,
 ): <T extends object = Record<string, unknown>>(
   collection: string,
   options?: DataOptions,
 ) => DataCollection<T> {
   return <T extends object>(collection: string, options: DataOptions = {}): DataCollection<T> => {
-    const base = `/api/v1/data/${encodeURIComponent(pluginId)}/${encodeURIComponent(collection)}`;
+    const base = `/api/v1/data/${encodeURIComponent(extensionId)}/${encodeURIComponent(collection)}`;
     const team = options.team;
     const shared = team === undefined ? '' : `team=${encodeURIComponent(team)}`;
     const json = { 'Content-Type': 'application/json' };
@@ -117,7 +117,7 @@ export function dataCollections(
         }),
       remove: (id) => send(document(id), { method: 'DELETE' }),
       onChange: (handler) =>
-        live.subscribe(`documents.${pluginId}.${collection}`, (data) => {
+        live.subscribe(`documents.${extensionId}.${collection}`, (data) => {
           const change = data as { id?: unknown; action?: unknown; team?: unknown };
           // The events of the other teams, or of the whole organization, are not for this view.
           if ((change.team ?? undefined) !== team) {

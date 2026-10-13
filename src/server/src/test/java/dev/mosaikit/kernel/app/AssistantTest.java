@@ -15,12 +15,12 @@ import static org.hamcrest.Matchers.hasSize;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import dev.mosaikit.kernel.api.plugin.ManifestParseResult;
-import dev.mosaikit.kernel.api.plugin.PluginManifests;
+import dev.mosaikit.kernel.api.extension.ExtensionManifests;
+import dev.mosaikit.kernel.api.extension.ManifestParseResult;
 import dev.mosaikit.kernel.core.ai.ActionCatalog;
-import dev.mosaikit.kernel.core.ai.PluginResponse;
-import dev.mosaikit.kernel.core.plugin.InstalledPlugin;
-import dev.mosaikit.kernel.core.plugin.PluginStatus;
+import dev.mosaikit.kernel.core.ai.ExtensionResponse;
+import dev.mosaikit.kernel.core.extension.ExtensionStatus;
+import dev.mosaikit.kernel.core.extension.InstalledExtension;
 import io.quarkus.test.junit.QuarkusMock;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.specification.RequestSpecification;
@@ -57,9 +57,9 @@ class AssistantTest {
 
     @BeforeEach
     void setUp() {
-        QuarkusMock.installMockForType(new ActionCatalog(() -> List.of(plugin())), ActionCatalog.class);
+        QuarkusMock.installMockForType(new ActionCatalog(() -> List.of(extension())), ActionCatalog.class);
         backend.reset();
-        backend.answer(new PluginResponse(200, List.of(Map.of("road", "A1", "closed", false))));
+        backend.answer(new ExtensionResponse(200, List.of(Map.of("road", "A1", "closed", false))));
         asAdmin()
                 .body(Map.of("slug", ORGANIZATION, "name", ORGANIZATION, "selfRegistration", true))
                 .post("/api/v1/organizations");
@@ -71,7 +71,7 @@ class AssistantTest {
                 .statusCode(201);
     }
 
-    private static InstalledPlugin plugin() {
+    private static InstalledExtension extension() {
         Map<String, Object> tree = Map.of(
                 "id", "dev.mosaikit.test.roads",
                 "version", "1.0.0",
@@ -97,9 +97,13 @@ class AssistantTest {
                                                         "properties", Map.of("road", Map.of("type", "string")),
                                                         "required", List.of("road")),
                                         "call", Map.of("method", "POST", "path", "roads/{road}/closure"))));
-        var manifest = ((ManifestParseResult.Valid) PluginManifests.parse(tree)).manifest();
-        return new InstalledPlugin(
-                manifest.id(), Path.of("plugins", "roads"), Optional.of(manifest), PluginStatus.ACTIVE, List.of());
+        var manifest = ((ManifestParseResult.Valid) ExtensionManifests.parse(tree)).manifest();
+        return new InstalledExtension(
+                manifest.id(),
+                Path.of("extensions", "roads"),
+                Optional.of(manifest),
+                ExtensionStatus.ACTIVE,
+                List.of());
     }
 
     private RequestSpecification member() {
@@ -147,7 +151,7 @@ class AssistantTest {
         // Only the read ran; the change waits for the person.
         assertThat(backend.sent())
                 .singleElement()
-                .satisfies(sent -> assertThat(sent.call().target()).isEqualTo("/api/v1/p/roads/roads"));
+                .satisfies(sent -> assertThat(sent.call().target()).isEqualTo("/api/v1/ext/roads/roads"));
         member().get("/api/v1/ai/drafts").then().body("tool", hasItem("roads__close-road"));
         ObjectNode first = model.requests().getFirst();
         assertThat(first.path("messages").get(0).path("role").asText()).isEqualTo("system");

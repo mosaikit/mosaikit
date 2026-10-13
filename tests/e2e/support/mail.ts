@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
-import { mails } from '../../../build/smtp.ts';
+import { mails } from '../../../sdk/testing/src/smtp.js';
 import { MAIL } from './env.js';
 
 /** The mails received so far for an address, oldest first. */

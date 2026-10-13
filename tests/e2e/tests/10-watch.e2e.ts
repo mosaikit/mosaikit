@@ -7,13 +7,13 @@ import { INSTALLATION, MARIO } from '../support/env.js';
 import { defaultSettings } from '../support/installation.js';
 import { apps, openApp, restart, signIn } from '../support/shell.js';
 
-const PLUGIN = join(INSTALLATION, 'plugins', 'kiosk');
+const EXTENSION = join(INSTALLATION, 'extensions', 'kiosk');
 
-/** A frontend-only plugin as a directory, as in development: no package, no signature. */
+/** A frontend-only extension as a directory, as in development: no package, no signature. */
 function write(greeting: string): void {
-  mkdirSync(join(PLUGIN, 'web'), { recursive: true });
+  mkdirSync(join(EXTENSION, 'web'), { recursive: true });
   writeFileSync(
-    join(PLUGIN, 'manifest.yaml'),
+    join(EXTENSION, 'manifest.yaml'),
     [
       'id: dev.acme.kiosk',
       'version: 0.1.0',
@@ -29,7 +29,7 @@ function write(greeting: string): void {
     ].join('\n'),
   );
   writeFileSync(
-    join(PLUGIN, 'web', 'index.js'),
+    join(EXTENSION, 'web', 'index.js'),
     `export default {
   activate() {
     customElements.define('acme-kiosk', class extends HTMLElement {
@@ -41,30 +41,33 @@ function write(greeting: string): void {
   );
 }
 
-test.describe('Development mode: changed plugins show at once', () => {
+test.describe('Development mode: changed extensions show at once', () => {
   test.afterAll(async () => {
-    rmSync(PLUGIN, { recursive: true, force: true });
+    rmSync(EXTENSION, { recursive: true, force: true });
     await restart(defaultSettings());
   });
 
-  test('a new plugin and a changed frontend show without a restart or a manual reload', async ({
+  test('a new extension and a changed frontend show without a restart or a manual reload', async ({
     page,
   }) => {
     await restart({
       ...defaultSettings(),
-      'mosaikit.plugins.watch': 'true',
-      'mosaikit.plugins.unverified-frontends': 'module',
+      'mosaikit.extensions.watch': 'true',
+      'mosaikit.extensions.unverified-frontends': 'module',
     });
     await signIn(page, MARIO);
 
+    // The watcher and the live channel of the shell, with other installations running beside this
+    // one (tests/e2e/run.ts), may take longer than the default 15 s.
+    const watched = { timeout: 30_000 };
     write('Benvenuti');
-    await expect(apps(page).getByRole('link', { name: 'Kiosk', exact: true })).toBeVisible();
+    await expect(apps(page).getByRole('link', { name: 'Kiosk', exact: true })).toBeVisible(watched);
     await openApp(page, 'Kiosk');
     await expect(page.getByRole('heading', { name: 'Benvenuti' })).toBeVisible();
 
     // The page reloads by itself and keeps the session.
     write('Welcome');
-    await expect(page.getByRole('heading', { name: 'Welcome' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Welcome' })).toBeVisible(watched);
     await expect(page).toHaveURL(/\/app\/kiosk$/);
   });
 });

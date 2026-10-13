@@ -9,7 +9,7 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 
 /**
- * A set of accepted versions, written with the npm-like syntax used in plugin manifests.
+ * A set of accepted versions, written with the npm-like syntax used in extension manifests.
  *
  * <p>Supported forms:
  *

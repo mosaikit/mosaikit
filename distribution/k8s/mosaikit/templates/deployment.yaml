@@ -69,10 +69,10 @@ spec:
             - name: MOSAIKIT_IDENTITY_DOMAIN
               value: {{ . | quote }}
             {{- end }}
-            - name: MOSAIKIT_PLUGINS_SIGNATURES
-              value: {{ .Values.plugins.signatures | quote }}
-            {{- if .Values.plugins.trustedKeysConfigMap }}
-            - name: MOSAIKIT_PLUGINS_TRUSTED_KEYS_DIRECTORY
+            - name: MOSAIKIT_EXTENSIONS_SIGNATURES
+              value: {{ .Values.extensions.signatures | quote }}
+            {{- if .Values.extensions.trustedKeysConfigMap }}
+            - name: MOSAIKIT_EXTENSIONS_TRUSTED_KEYS_DIRECTORY
               value: /etc/mosaikit/trusted-keys
             {{- end }}
           readinessProbe:
@@ -86,11 +86,11 @@ spec:
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           volumeMounts:
-            {{- if .Values.plugins.persistence.enabled }}
-            - name: plugins
-              mountPath: /opt/mosaikit/plugins
+            {{- if .Values.extensions.persistence.enabled }}
+            - name: extensions
+              mountPath: /opt/mosaikit/extensions
             {{- end }}
-            {{- if .Values.plugins.trustedKeysConfigMap }}
+            {{- if .Values.extensions.trustedKeysConfigMap }}
             - name: trusted-keys
               mountPath: /etc/mosaikit/trusted-keys
               readOnly: true
@@ -98,12 +98,12 @@ spec:
             - name: tmp
               mountPath: /tmp
       volumes:
-        {{- if .Values.plugins.persistence.enabled }}
-        - name: plugins
+        {{- if .Values.extensions.persistence.enabled }}
+        - name: extensions
           persistentVolumeClaim:
-            claimName: {{ include "mosaikit.fullname" . }}-plugins
+            claimName: {{ include "mosaikit.fullname" . }}-extensions
         {{- end }}
-        {{- with .Values.plugins.trustedKeysConfigMap }}
+        {{- with .Values.extensions.trustedKeysConfigMap }}
         - name: trusted-keys
           configMap:
             name: {{ . }}

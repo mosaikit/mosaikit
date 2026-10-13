@@ -23,8 +23,8 @@ public class Notification {
     @Column(name = "account_id", nullable = false, updatable = false)
     private UUID accountId;
 
-    @Column(name = "plugin_id", nullable = false, updatable = false)
-    private String pluginId;
+    @Column(name = "extension_id", nullable = false, updatable = false)
+    private String extensionId;
 
     @Column(nullable = false, updatable = false)
     private String kind;
@@ -50,7 +50,7 @@ public class Notification {
     public Notification(
             UUID organizationId,
             UUID accountId,
-            String pluginId,
+            String extensionId,
             String kind,
             String title,
             String body,
@@ -59,7 +59,7 @@ public class Notification {
         this.id = UUID.randomUUID();
         this.organizationId = organizationId;
         this.accountId = accountId;
-        this.pluginId = pluginId;
+        this.extensionId = extensionId;
         this.kind = kind;
         this.title = title;
         this.body = body;
@@ -85,8 +85,8 @@ public class Notification {
         return organizationId;
     }
 
-    public String getPluginId() {
-        return pluginId;
+    public String getExtensionId() {
+        return extensionId;
     }
 
     public String getKind() {

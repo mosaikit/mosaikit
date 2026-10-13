@@ -19,7 +19,7 @@ const MAX_DELAY_MS = 15_000;
 
 /**
  * The real-time channel of the page (MK-031): one WebSocket to /api/v1/live for the organization of
- * the person, shared by the shell and every plugin. It subscribes to a topic once whatever the
+ * the person, shared by the shell and every extension. It subscribes to a topic once whatever the
  * number of handlers, and after a lost connection it connects again, waiting longer each time, and
  * subscribes again to every topic.
  */

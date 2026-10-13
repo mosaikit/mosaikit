@@ -7,8 +7,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import dev.mosaikit.kernel.api.signature.SigningKeys;
 import dev.mosaikit.kernel.api.version.Version;
-import dev.mosaikit.kernel.core.plugin.PackageTrust;
-import dev.mosaikit.kernel.core.plugin.ProviderState;
+import dev.mosaikit.kernel.core.extension.PackageTrust;
+import dev.mosaikit.kernel.core.extension.ProviderState;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
@@ -44,7 +44,7 @@ class LauncherTest {
         Files.createDirectories(installation.kernel().resolve("quarkus"));
         Files.writeString(installation.kernel().resolve("quarkus/generated-bytecode.jar"), "build 0");
         Files.writeString(installation.kernelJar(), "kernel");
-        Files.createDirectories(installation.plugins());
+        Files.createDirectories(installation.extensions());
     }
 
     /** Stands for the Quarkus re-augmentation: records which build it produced. */
@@ -81,9 +81,9 @@ class LauncherTest {
         return ProviderState.read(installation.providers(), file);
     }
 
-    private void installJavaPlugin(String directory, String id, String code) throws IOException {
+    private void installJavaExtension(String directory, String id, String code) throws IOException {
         Path lib = Files.createDirectories(
-                installation.plugins().resolve(directory).resolve("lib"));
+                installation.extensions().resolve(directory).resolve("lib"));
         Files.writeString(lib.getParent().resolve("manifest.yaml"), """
                 id: %s
                 version: 1.0.0
@@ -98,16 +98,16 @@ class LauncherTest {
     }
 
     @Test
-    void doesNotRebuildAnInstallationWithoutJavaPlugins() {
+    void doesNotRebuildAnInstallationWithoutJavaExtensions() {
         assertThat(prepare()).isZero();
 
         assertThat(rebuilds).hasValue(0);
-        assertThat(output.toString(UTF_8)).contains("0 Java plugin(s), kernel up to date");
+        assertThat(output.toString(UTF_8)).contains("0 Java extension(s), kernel up to date");
     }
 
     @Test
-    void rebuildsOnceWhenAPluginIsAddedThenStaysUpToDate() throws IOException {
-        installJavaPlugin("notes", "dev.example.notes", "v1");
+    void rebuildsOnceWhenAExtensionIsAddedThenStaysUpToDate() throws IOException {
+        installJavaExtension("notes", "dev.example.notes", "v1");
 
         assertThat(prepare()).isZero();
         kernelStarted();
@@ -117,13 +117,13 @@ class LauncherTest {
         assertThat(installation.providers().resolve("dev.example.notes.jar")).hasContent("v1");
         assertThat(state(ProviderState.FILE_NAME).entries())
                 .singleElement()
-                .satisfies(entry -> assertThat(entry.pluginId()).isEqualTo("dev.example.notes"));
+                .satisfies(entry -> assertThat(entry.extensionId()).isEqualTo("dev.example.notes"));
         assertThat(output.toString(UTF_8)).contains("added dev.example.notes").contains("kernel up to date");
     }
 
     @Test
     void keepsNewJarsPendingUntilTheKernelHasStarted() throws IOException {
-        installJavaPlugin("notes", "dev.example.notes", "v1");
+        installJavaExtension("notes", "dev.example.notes", "v1");
 
         prepare();
 
@@ -133,18 +133,18 @@ class LauncherTest {
     }
 
     @Test
-    void rebuildsWhenAPluginIsUpdatedOrRemoved() throws IOException {
-        installJavaPlugin("notes", "dev.example.notes", "v1");
+    void rebuildsWhenAExtensionIsUpdatedOrRemoved() throws IOException {
+        installJavaExtension("notes", "dev.example.notes", "v1");
         prepare();
         kernelStarted();
 
-        installJavaPlugin("notes", "dev.example.notes", "v2");
+        installJavaExtension("notes", "dev.example.notes", "v2");
         prepare();
         kernelStarted();
         assertThat(output.toString(UTF_8)).contains("updated dev.example.notes");
         assertThat(installation.providers().resolve("dev.example.notes.jar")).hasContent("v2");
 
-        Files.writeString(installation.plugins().resolve("notes/manifest.yaml"), "id: Broken\n");
+        Files.writeString(installation.extensions().resolve("notes/manifest.yaml"), "id: Broken\n");
         prepare();
         assertThat(output.toString(UTF_8)).contains("removed dev.example.notes");
         assertThat(installation.providers().resolve("dev.example.notes.jar")).doesNotExist();
@@ -153,7 +153,7 @@ class LauncherTest {
 
     @Test
     void rebuildsAgainWhenSomeoneChangedTheProvidersDirectory() throws IOException {
-        installJavaPlugin("notes", "dev.example.notes", "v1");
+        installJavaExtension("notes", "dev.example.notes", "v1");
         prepare();
         kernelStarted();
 
@@ -166,10 +166,10 @@ class LauncherTest {
 
     @Test
     void restoresThePreviousBuildWhenTheRebuildFails() throws IOException {
-        installJavaPlugin("notes", "dev.example.notes", "v1");
+        installJavaExtension("notes", "dev.example.notes", "v1");
         prepare();
         kernelStarted();
-        installJavaPlugin("board", "dev.example.board", "broken");
+        installJavaExtension("board", "dev.example.board", "broken");
         rebuildExitCode = 3;
 
         assertThat(prepare()).as("the previous kernel can start").isZero();
@@ -179,17 +179,17 @@ class LauncherTest {
                 .isTrue();
         assertThat(state(ProviderState.REJECTED_FILE).entries())
                 .singleElement()
-                .satisfies(entry -> assertThat(entry.pluginId()).isEqualTo("dev.example.board"));
+                .satisfies(entry -> assertThat(entry.extensionId()).isEqualTo("dev.example.board"));
         assertThat(installation.providers().resolve("dev.example.board.jar")).doesNotExist();
         assertThat(output.toString(UTF_8)).contains("could not be rebuilt with dev.example.board");
     }
 
     @Test
     void rollsBackWhenTheKernelDidNotStartWithTheNewJars() throws IOException {
-        installJavaPlugin("notes", "dev.example.notes", "v1");
+        installJavaExtension("notes", "dev.example.notes", "v1");
         prepare();
         kernelStarted();
-        installJavaPlugin("board", "dev.example.board", "fails at start");
+        installJavaExtension("board", "dev.example.board", "fails at start");
         prepare();
         assertThat(build()).isEqualTo("build 2");
 
@@ -203,17 +203,17 @@ class LauncherTest {
                 .isTrue();
         assertThat(output.toString(UTF_8))
                 .contains("did not start with dev.example.board")
-                .contains("1 Java plugin(s), kernel up to date");
+                .contains("1 Java extension(s), kernel up to date");
     }
 
     @Test
-    void acceptsAFixedVersionOfARejectedPlugin() throws IOException {
-        installJavaPlugin("board", "dev.example.board", "broken");
+    void acceptsAFixedVersionOfARejectedExtension() throws IOException {
+        installJavaExtension("board", "dev.example.board", "broken");
         rebuildExitCode = 1;
         prepare();
 
         rebuildExitCode = 0;
-        installJavaPlugin("board", "dev.example.board", "fixed");
+        installJavaExtension("board", "dev.example.board", "fixed");
         prepare();
 
         assertThat(installation.providers().resolve("dev.example.board.jar")).hasContent("fixed");
@@ -222,7 +222,7 @@ class LauncherTest {
 
     @Test
     void leavesNothingPendingWhenBuildingAnImage() throws IOException {
-        installJavaPlugin("notes", "dev.example.notes", "v1");
+        installJavaExtension("notes", "dev.example.notes", "v1");
 
         assertThat(prepare(false)).isZero();
 
@@ -321,13 +321,14 @@ class LauncherTest {
         Files.createDirectories(installation.config());
         Files.writeString(
                 installation.config().resolve("application.properties"),
-                "mosaikit.plugins.signatures=required\nmosaikit.plugins.trusted-keys-directory=keys\n");
+                "mosaikit.extensions.signatures=required\nmosaikit.extensions.trusted-keys-directory=keys\n");
         SigningKeys.write(SigningKeys.generate(), home.resolve("keys"), "publisher");
 
         assertThat(Launcher.trust(installation, NO_ENVIRONMENT))
                 .satisfies(trust -> assertThat(trust.signaturesRequired()).isTrue())
                 .satisfies(trust -> assertThat(trust.trustedKeys()).hasSize(1));
-        assertThat(Launcher.trust(installation, name -> name.equals("MOSAIKIT_PLUGINS_SIGNATURES") ? "optional" : null)
+        assertThat(Launcher.trust(
+                                installation, name -> name.equals("MOSAIKIT_EXTENSIONS_SIGNATURES") ? "optional" : null)
                         .signaturesRequired())
                 .isFalse();
         assertThat(Launcher.trust(new Installation(home.resolve("other")), NO_ENVIRONMENT))
@@ -341,7 +342,7 @@ class LauncherTest {
 
         assertThat(run(
                         err,
-                        name -> name.equals("MOSAIKIT_PLUGINS_SIGNATURES") ? "maybe" : null,
+                        name -> name.equals("MOSAIKIT_EXTENSIONS_SIGNATURES") ? "maybe" : null,
                         "prepare",
                         home.toString()))
                 .isEqualTo(1);
@@ -365,6 +366,6 @@ class LauncherTest {
     }
 
     private Path jar(String directory) {
-        return installation.plugins().resolve(directory).resolve("lib/code.jar");
+        return installation.extensions().resolve(directory).resolve("lib/code.jar");
     }
 }

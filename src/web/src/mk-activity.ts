@@ -13,7 +13,7 @@ declare global {
 }
 
 /**
- * The activity feed of the person (MK-038): the notifications of the plugins, newest first. Opening
+ * The activity feed of the person (MK-038): the notifications of the extensions, newest first. Opening
  * one marks it as read and goes where it points; the shell does both.
  */
 @customElement('mk-activity')

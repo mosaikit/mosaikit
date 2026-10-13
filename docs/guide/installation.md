@@ -1,6 +1,6 @@
 # Installation
 
-Mosaikit comes in four forms, all built from the same kernel and accepting the same plugin
+Mosaikit comes in four forms, all built from the same kernel and accepting the same extension
 packages. A build writes them to `target/dist` (see [building](../development/development.md));
 a release publishes them on the GitHub release page.
 
@@ -26,8 +26,8 @@ database and the administrator password in `config/application.properties` first
 ```
 mosaikit, mosaikit.cmd   start scripts
 README.md
-config/                  application.properties, trusted-keys/ (keys of trusted plugin publishers)
-plugins/                 plugin packages (*.zip), copied as they are
+config/                  application.properties, trusted-keys/ (keys of trusted extension publishers)
+extensions/                 extension packages (*.zip), copied as they are
 data/                    portable only: database and generated secrets
 bin/                     kernel (with UI and launcher), java/ and pgsql/ (portable only)
 ```
@@ -40,8 +40,8 @@ bin/                     kernel (with UI and launcher), java/ and pgsql/ (portab
    Compose, or in `data/initial-admin-password.txt` for the portable archive.
 3. Change that password, then remove it from the configuration (or delete the file): it is used
    only when the database is empty.
-4. Create the organizations ([administration](administration.md)) and install the plugins
-   ([plugins](plugins.md)).
+4. Create the organizations ([administration](administration.md)) and install the extensions
+   ([extensions](extensions.md)).
 
 Behind a reverse proxy, serve Mosaikit over HTTPS only: in production the kernel sends
 `Strict-Transport-Security`.

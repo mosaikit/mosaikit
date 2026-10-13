@@ -1,17 +1,21 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
-import type { FrontendPlugin } from '@mosaikit/sdk';
+import type { FrontendExtension } from '@mosaikit/sdk';
 import type { SignInOptions } from './federation.js';
 
 /** Public information returned before sign-in. */
 export interface SystemInfo {
   readonly name: string;
   readonly version: string;
-  readonly activePlugins: number;
+  readonly activeExtensions: number;
   /** The theme of the installation (`mosaikit.ui.theme`). */
   readonly theme: string;
   /** How many days "remember me" keeps a person signed in. */
   readonly rememberDays: number;
+  /** The logo of the product for light backgrounds, when the theme of the installation brings one (MK-052). */
+  readonly logo?: string | null;
+  /** The logo for dark backgrounds: the dark scheme and the bar of the shell. */
+  readonly logoDark?: string | null;
 }
 
 /** Whether the sign-in page offers to create an account (MK-048). */
@@ -60,7 +64,7 @@ export interface Account {
 
 /** An app of the app bar of an organization, with its settings (MK-030). */
 export interface OrganizationApp {
-  readonly pluginId: string;
+  readonly extensionId: string;
   readonly appId: string;
   readonly title: string;
   readonly enabled: boolean;
@@ -71,13 +75,13 @@ export interface OrganizationApp {
 
 /** An app that the signed-in person sees, in the order of the app bar (MK-030). */
 export interface ShellApp {
-  readonly pluginId: string;
+  readonly extensionId: string;
   readonly appId: string;
   readonly pinned: boolean;
 }
 
-/** A theme of a theme plugin (MK-028): only the values it sets. */
-export interface PluginTheme {
+/** A theme of a theme extension (MK-028): only the values it sets. */
+export interface ExtensionTheme {
   readonly id: string;
   readonly title: string;
   readonly font: string | null;
@@ -91,16 +95,16 @@ export interface Preferences {
   readonly theme: string | null;
   readonly appearance: 'system' | 'light' | 'dark' | 'contrast' | null;
   readonly language: 'en' | 'it' | null;
-  /** `<plugin id>/<app id>` of the apps hidden from the app bar. */
+  /** `<extension id>/<app id>` of the apps hidden from the app bar. */
   readonly hiddenApps: readonly string[];
-  /** `<plugin id>/<kind>` of the notifications the person does not want (MK-038). */
+  /** `<extension id>/<kind>` of the notifications the person does not want (MK-038). */
   readonly mutedNotifications?: readonly string[];
 }
 
 /** A notification of the activity feed (MK-038). */
 export interface ActivityNotification {
   readonly id: string;
-  readonly pluginId: string;
+  readonly extensionId: string;
   readonly kind: string;
   readonly title: string;
   readonly body: string;
@@ -110,7 +114,7 @@ export interface ActivityNotification {
   readonly read: boolean;
 }
 
-/** A notification that a frontend plugin sends (MK-038). */
+/** A notification that a frontend extension sends (MK-038). */
 export interface SentNotification {
   /** Email addresses of people of the organization. */
   readonly to: readonly string[];
@@ -157,10 +161,10 @@ export interface Offer {
 /** The catalogs of the marketplace and what they offer. */
 export interface Catalog {
   sources: { uri: string; status: 'verified' | 'refused'; keyId?: string; error?: string }[];
-  plugins: Offer[];
+  extensions: Offer[];
 }
 
-/** A package placed in the plugins directory, used at the next start. */
+/** A package placed in the extensions directory, used at the next start. */
 export interface Installation {
   id: string;
   version: string;
@@ -324,9 +328,9 @@ export class KernelClient {
     await this.send('/api/v1/accounts/confirmations/requests', { email });
   }
 
-  /** The themes of the active theme plugins (MK-028); anyone can read them, before signing in too. */
-  themes(): Promise<PluginTheme[]> {
-    return this.getJson<PluginTheme[]>('/api/v1/system/themes');
+  /** The themes of the active theme extensions (MK-028); anyone can read them, before signing in too. */
+  themes(): Promise<ExtensionTheme[]> {
+    return this.getJson<ExtensionTheme[]>('/api/v1/system/themes');
   }
 
   /** The activity feed of the signed-in person in the organization, newest first (MK-038). */
@@ -342,9 +346,9 @@ export class KernelClient {
     await this.send('/api/v1/notifications/read', {});
   }
 
-  /** Notifies people of the organization as a plugin. */
-  async notify(pluginId: string, notification: SentNotification): Promise<void> {
-    await this.send('/api/v1/notifications', { plugin: pluginId, ...notification });
+  /** Notifies people of the organization as an extension. */
+  async notify(extensionId: string, notification: SentNotification): Promise<void> {
+    await this.send('/api/v1/notifications', { extension: extensionId, ...notification });
   }
 
   /** The apps that the signed-in person sees, in order (MK-030). */
@@ -442,16 +446,16 @@ export class KernelClient {
     return this.getJson<SystemInfo>('/api/v1/system/info');
   }
 
-  shellPlugins(): Promise<FrontendPlugin[]> {
-    return this.getJson<FrontendPlugin[]>('/api/v1/shell/plugins');
+  shellExtensions(): Promise<FrontendExtension[]> {
+    return this.getJson<FrontendExtension[]>('/api/v1/shell/extensions');
   }
 
   /**
-   * The revision of the installed plugins when the kernel watches their directory (development
+   * The revision of the installed extensions when the kernel watches their directory (development
    * mode), or `undefined` when it does not.
    */
-  async pluginRevision(): Promise<number | undefined> {
-    const response = await this.request('/api/v1/shell/plugins/revision');
+  async extensionRevision(): Promise<number | undefined> {
+    const response = await this.request('/api/v1/shell/extensions/revision');
     if (response.status !== 200) {
       return undefined;
     }
@@ -492,7 +496,12 @@ export class KernelClient {
 
   /** Installs a package file, for an installation without network. */
   upload(file: Blob): Promise<Installation> {
-    return this.sendJson<Installation>('/api/v1/plugins/packages', 'POST', file, 'application/zip');
+    return this.sendJson<Installation>(
+      '/api/v1/extensions/packages',
+      'POST',
+      file,
+      'application/zip',
+    );
   }
 
   /** Whether the installation has an assistant, and its model (MK-024). */
@@ -505,7 +514,7 @@ export class KernelClient {
     return this.sendJson<AssistantReply>('/api/v1/ai/assistant/replies', 'POST', { messages });
   }
 
-  /** Calls the API with the stored credentials. Used by plugins through their context. */
+  /** Calls the API with the stored credentials. Used by extensions through their context. */
   request(path: string, init: RequestInit = {}): Promise<Response> {
     const headers = new Headers(init.headers);
     if (this.authorization) {

@@ -1,8 +1,14 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
-import { contributionsTo, stringAttribute, type FrontendPlugin } from '@mosaikit/sdk';
+import {
+  contributionsTo,
+  stringAttribute,
+  textAttribute,
+  type FrontendExtension,
+} from '@mosaikit/sdk';
+import { language as shellLanguage } from './i18n.js';
 
-/** Extension point through which a plugin adds an app to the app bar (MK-025, ADR-0026). */
+/** Extension point through which an extension adds an app to the app bar (MK-025, ADR-0026). */
 export const RAIL_POINT = 'rail.app';
 
 /** The extension point that rail.app replaces; still read during the 0.x versions. */
@@ -10,13 +16,13 @@ export const LAUNCHER_POINT = 'launcher.app';
 
 /** An app offered in the app bar. */
 export interface LauncherEntry {
-  readonly pluginId: string;
+  readonly extensionId: string;
   readonly id: string;
   readonly title: string;
   readonly route: string;
   /** Custom element that renders the app. */
   readonly element: string;
-  /** Address of the icon of the app, an SVG or PNG file of the plugin; a tile with its initials otherwise. */
+  /** Address of the icon of the app, an SVG or PNG file of the extension; a tile with its initials otherwise. */
   readonly icon?: string;
 }
 
@@ -26,16 +32,19 @@ const ICON = /^(?!.*\.\.)[A-Za-z0-9_][A-Za-z0-9_./-]*\.(svg|png)$/;
 const DEFAULT_ORDER = 100;
 
 /**
- * Builds the app bar from the contributions of active plugins: rail.app first, then launcher.app
+ * Builds the app bar from the contributions of active extensions: rail.app first, then launcher.app
  * for the routes that rail.app does not have, sorted by their `order` (100 by default) and then as
- * the plugins come. Contributions without a valid route or custom element name are ignored, so that
- * a broken plugin cannot break the shell.
+ * the extensions come. Contributions without a valid route or custom element name are ignored, so that
+ * a broken extension cannot break the shell.
  */
-export function launcherEntries(plugins: readonly FrontendPlugin[]): LauncherEntry[] {
+export function launcherEntries(
+  extensions: readonly FrontendExtension[],
+  language: string = shellLanguage(),
+): LauncherEntry[] {
   const seen = new Set<string>();
   const entries: { entry: LauncherEntry; order: number }[] = [];
   for (const point of [RAIL_POINT, LAUNCHER_POINT]) {
-    for (const contribution of contributionsTo(plugins, point)) {
+    for (const contribution of contributionsTo(extensions, point)) {
       const route = stringAttribute(contribution, 'route');
       const element = stringAttribute(contribution, 'element');
       if (!route || !ROUTE.test(route) || !element || !CUSTOM_ELEMENT.test(element)) {
@@ -49,20 +58,20 @@ export function launcherEntries(plugins: readonly FrontendPlugin[]): LauncherEnt
       const order = contribution.attributes.order;
       entries.push({
         entry: {
-          pluginId: contribution.pluginId,
+          extensionId: contribution.extensionId,
           id: contribution.id,
-          title: stringAttribute(contribution, 'title') ?? contribution.id,
+          title: textAttribute(contribution, 'title', language) ?? contribution.id,
           route,
           element,
           ...(icon && ICON.test(icon)
-            ? { icon: `/api/v1/plugin-assets/${contribution.pluginId}/${icon}` }
+            ? { icon: `/api/v1/extension-assets/${contribution.extensionId}/${icon}` }
             : {}),
         },
         order: typeof order === 'number' && Number.isFinite(order) ? order : DEFAULT_ORDER,
       });
     }
   }
-  // A stable sort keeps the order of the plugins among apps of the same order.
+  // A stable sort keeps the order of the extensions among apps of the same order.
   return entries.sort((a, b) => a.order - b.order).map(({ entry }) => entry);
 }
 
