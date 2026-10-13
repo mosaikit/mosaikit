@@ -1,0 +1,40 @@
+{
+  "realm": "REPLACE-WITH-REALM",
+  "displayName": "REPLACE-WITH-ORGANIZATION-NAME",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": true,
+  "bruteForceProtected": true,
+  "roles": {
+    "realm": [
+      {
+        "name": "organization-admin",
+        "description": "Manager of the organization in Mosaikit: members, enabled extensions, data rules."
+      }
+    ]
+  },
+  "clients": [
+    {
+      "clientId": "mosaikit",
+      "name": "Mosaikit",
+      "description": "The Mosaikit web UI. Public client: authorization code flow with PKCE only.",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "frontchannelLogout": true,
+      "redirectUris": ["https://REPLACE-WITH-HOST/*"],
+      "webOrigins": ["+"],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+"
+      },
+      "defaultClientScopes": ["basic", "profile", "email", "roles", "web-origins", "acr"]
+    }
+  ]
+}

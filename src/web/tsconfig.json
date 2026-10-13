@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["vite/client"],
+    "paths": {
+      "@mosaikit/sdk": ["../../sdk/js/src/index.ts"],
+      "@mosaikit/ui": ["../../sdk/ui/src/index.ts"],
+      "@mosaikit/ui/components": ["../../sdk/ui/src/components.ts"]
+    }
+  },
+  "include": ["src", "test"]
+}

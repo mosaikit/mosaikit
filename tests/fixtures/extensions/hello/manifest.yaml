@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Massimo Antonini
+# SPDX-License-Identifier: MPL-2.0
+id: dev.mosaikit.fixture.hello
+version: 0.1.0
+name: Hello
+description: Minimal app written as a plain Web Component, without any framework.
+kind: [app]
+platform: '>=0.1 <1'
+frontend:
+  entry: web/index.js
+  isolation: module
+  # Used when the shell isolates the frontend in an iframe (MK-014).
+  bridge:
+    publishes: [fixture.hello.greeted]
+    subscribes: [fixture.hello.greeted]
+contributes:
+  # The app bar of the shell (MK-025).
+  rail.app:
+    - id: hello
+      title: Hello
+      route: /app/hello
+      element: mk-fixture-hello
+      icon: web/icon.svg
+      order: 90

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 /**
  * Defines the Fluent UI web components (`fluent-*` elements) once for the page. The shell imports
- * this module; plugins use the elements it defines and style themselves with the `--mk-*` tokens.
+ * this module; extensions use the elements it defines and style themselves with the `--mk-*` tokens.
  */
 import '@fluentui/web-components/accordion/define.js';
 import '@fluentui/web-components/accordion-item/define.js';

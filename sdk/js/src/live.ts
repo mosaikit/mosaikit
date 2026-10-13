@@ -4,12 +4,12 @@
 /**
  * The real-time channel of the shell (MK-031): events that the kernel sends when something changes,
  * such as a document of a collection or a notification. The shell keeps one WebSocket for the page;
- * a plugin subscribes to the topics it may read and is called for each event.
+ * an extension subscribes to the topics it may read and is called for each event.
  */
 export interface LiveChannel {
   /**
    * Calls `handler` with the data of every event of the topic, until the returned function is
-   * called. Topics: `documents.<plugin id>.<collection>`, `plugin.<plugin id>.<name>`, `notifications`.
+   * called. Topics: `documents.<extension id>.<collection>`, `extension.<extension id>.<name>`, `notifications`.
    */
   subscribe(topic: string, handler: (data: unknown) => void): () => void;
 }

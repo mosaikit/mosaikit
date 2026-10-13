@@ -14,7 +14,7 @@
     <packaging>pom</packaging>
 
     <name>Mosaikit</name>
-    <description>Domain-agnostic plugin platform for multi-organization web applications.</description>
+    <description>Domain-agnostic extension platform for multi-organization web applications.</description>
     <url>https://github.com/mosaikit/mosaikit</url>
     <inceptionYear>2026</inceptionYear>
 
@@ -50,21 +50,18 @@
     </issueManagement>
 
     <modules>
-        <!-- Order of the build: the plugin API, the sample plugins, the kernel, the distributions.
+        <!-- Order of the build: the extension API, the sample extensions, the kernel, the distributions.
              The frontend (npm workspaces) is built and tested by this POM before them. -->
         <module>sdk/java</module>
-        <module>plugins/sample-hello</module>
-        <module>plugins/sample-notes</module>
-        <module>plugins/sample-activities</module>
-        <module>plugins/sample-estimates</module>
-        <module>plugins/sample-react</module>
-        <module>plugins/sample-vue</module>
-        <module>plugins/sample-todo</module>
-        <module>plugins/app-teams</module>
-        <module>plugins/app-chat</module>
-        <module>plugins/sample-theme</module>
-        <module>kernel</module>
-        <module>distributions</module>
+        <module>sdk/extension-parent</module>
+        <module>tests/fixtures/extensions/hello</module>
+        <module>tests/fixtures/extensions/notes</module>
+        <module>tests/fixtures/extensions/activities</module>
+        <module>tests/fixtures/extensions/estimates</module>
+        <module>tests/fixtures/extensions/todo</module>
+        <module>tests/fixtures/extensions/theme</module>
+        <module>src/server</module>
+        <module>distribution</module>
     </modules>
 
     <properties>
@@ -73,7 +70,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <project.build.outputTimestamp>2026-09-29T00:00:00Z</project.build.outputTimestamp>
 
-        <!-- Platform versions (see docs/adr/0003 and docs/developer/versions.md) -->
+        <!-- Platform versions (see docs/adr/0003 and docs/development/versions.md) -->
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
         <quarkus.platform.version>3.39.5</quarkus.platform.version>
@@ -85,44 +82,46 @@
         <!-- Test libraries not managed by the Quarkus BOM -->
         <assertj.version>3.27.7</assertj.version>
 
-        <!-- Build plugins (all lifecycle plugins are pinned so the build does not depend on the Maven version) -->
-        <clean-plugin.version>3.4.1</clean-plugin.version>
-        <resources-plugin.version>3.3.1</resources-plugin.version>
-        <jar-plugin.version>3.4.2</jar-plugin.version>
-        <install-plugin.version>3.1.4</install-plugin.version>
-        <deploy-plugin.version>3.1.4</deploy-plugin.version>
-        <site-plugin.version>3.21.0</site-plugin.version>
-        <compiler-plugin.version>3.15.0</compiler-plugin.version>
-        <surefire-plugin.version>3.5.4</surefire-plugin.version>
-        <enforcer-plugin.version>3.6.1</enforcer-plugin.version>
-        <jandex-plugin.version>3.3.1</jandex-plugin.version>
-        <jacoco-plugin.version>0.8.15</jacoco-plugin.version>
-        <spotless-plugin.version>3.10.3</spotless-plugin.version>
-        <!-- Pinned so formatting does not change with the plugin default; needs 2.72+ on JDK 25. -->
+        <!-- Build extensions (all lifecycle extensions are pinned so the build does not depend on the Maven version) -->
+        <clean-extension.version>3.4.1</clean-extension.version>
+        <resources-extension.version>3.3.1</resources-extension.version>
+        <jar-extension.version>3.4.2</jar-extension.version>
+        <install-extension.version>3.1.4</install-extension.version>
+        <deploy-extension.version>3.1.4</deploy-extension.version>
+        <site-extension.version>3.21.0</site-extension.version>
+        <compiler-extension.version>3.15.0</compiler-extension.version>
+        <surefire-extension.version>3.5.4</surefire-extension.version>
+        <enforcer-extension.version>3.6.1</enforcer-extension.version>
+        <jandex-extension.version>3.3.1</jandex-extension.version>
+        <jacoco-extension.version>0.8.15</jacoco-extension.version>
+        <spotless-extension.version>3.10.3</spotless-extension.version>
+        <!-- Pinned so formatting does not change with the extension default; needs 2.72+ on JDK 25. -->
         <palantir-java-format.version>2.98.0</palantir-java-format.version>
-        <pitest-plugin.version>1.30.0</pitest-plugin.version>
+        <pitest-extension.version>1.30.0</pitest-extension.version>
         <pitest-junit5.version>1.2.3</pitest-junit5.version>
-        <versions-plugin.version>2.22.0</versions-plugin.version>
-        <cyclonedx-plugin.version>2.9.1</cyclonedx-plugin.version>
-        <exec-plugin.version>3.5.1</exec-plugin.version>
-        <antrun-plugin.version>3.1.0</antrun-plugin.version>
-        <assembly-plugin.version>3.7.1</assembly-plugin.version>
+        <versions-extension.version>2.22.0</versions-extension.version>
+        <cyclonedx-extension.version>2.9.1</cyclonedx-extension.version>
+        <exec-extension.version>3.5.1</exec-extension.version>
+        <antrun-extension.version>3.1.0</antrun-extension.version>
 
         <!-- Frontend in the Maven build: -Dskip.npm skips it; its checks follow -DskipTests. -->
         <skip.npm>false</skip.npm>
         <skipTests>false</skipTests>
         <npm.check.skip>${skipTests}</npm.check.skip>
+        <!-- The installation tests (failsafe, minutes) run in CI on main and every night; locally
+             only with -DskipITs=false, or when the launcher changed. -->
+        <skipITs>true</skipITs>
         <!-- Platforms of mvnw install -Pportable, separated by commas. -->
         <portable.platforms>linux-x64,windows-x64,macos-arm64,macos-x64</portable.platforms>
 
         <!-- SonarQube Cloud: keys shown in the project information page; override with -D if they differ. -->
         <sonar.organization>mosaikit</sonar.organization>
         <sonar.projectKey>mosaikit_mosaikit</sonar.projectKey>
-        <sonar.coverage.jacoco.xmlReportPaths>${maven.multiModuleProjectDirectory}/kernel/target/jacoco-report/jacoco.xml,${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
+        <sonar.coverage.jacoco.xmlReportPaths>${maven.multiModuleProjectDirectory}/src/server/target/jacoco-report/jacoco.xml,${project.build.directory}/site/jacoco/jacoco.xml</sonar.coverage.jacoco.xmlReportPaths>
         <!-- The TypeScript SDK sits outside the Maven modules, so the root project analyses it; every
              module sets its own sonar.sources and sonar.tests, since these properties are inherited. -->
-        <sonar.sources>pom.xml,package.json,sdk/js/src,sdk/js/package.json,sdk/create-plugin/src,sdk/create-plugin/package.json</sonar.sources>
-        <sonar.tests>sdk/js/test,sdk/create-plugin/test</sonar.tests>
+        <sonar.sources>pom.xml,package.json,sdk/js/src,sdk/js/package.json,sdk/create-extension/src,sdk/create-extension/package.json</sonar.sources>
+        <sonar.tests>sdk/js/test,sdk/create-extension/test</sonar.tests>
         <!-- Written by npm run test:coverage (the frontend job); paths relative to the repository root. -->
         <sonar.javascript.lcov.reportPaths>${maven.multiModuleProjectDirectory}/coverage/lcov.info</sonar.javascript.lcov.reportPaths>
         <!-- Excluded from the coverage in vitest.config.ts as well: bootstrap code, tried in the browser. -->
@@ -137,7 +136,7 @@
         <sonar.issue.ignore.multicriteria.e1.resourceKey>**/application-dev.properties</sonar.issue.ignore.multicriteria.e1.resourceKey>
         <sonar.issue.ignore.multicriteria.e2.ruleKey>java:S2077</sonar.issue.ignore.multicriteria.e2.ruleKey>
         <sonar.issue.ignore.multicriteria.e2.resourceKey>**/kernel/core/data/RowSecurity.java</sonar.issue.ignore.multicriteria.e2.resourceKey>
-        <sonar.coverage.exclusions>**/webui/src/main.ts,**/webui/src/mk-shell.ts,**/webui/src/mk-plugin-frame.ts,**/webui/src/mk-admin-plugins.ts,**/webui/src/mk-assistant.ts</sonar.coverage.exclusions>
+        <sonar.coverage.exclusions>**/web/src/main.ts,**/web/src/mk-shell.ts,**/web/src/mk-extension-frame.ts,**/web/src/mk-admin-extensions.ts,**/web/src/mk-assistant.ts</sonar.coverage.exclusions>
     </properties>
 
     <dependencyManagement>
@@ -187,32 +186,32 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-clean-plugin</artifactId>
-                    <version>${clean-plugin.version}</version>
+                    <version>${clean-extension.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-resources-plugin</artifactId>
-                    <version>${resources-plugin.version}</version>
+                    <version>${resources-extension.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-jar-plugin</artifactId>
-                    <version>${jar-plugin.version}</version>
+                    <version>${jar-extension.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-install-plugin</artifactId>
-                    <version>${install-plugin.version}</version>
+                    <version>${install-extension.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-deploy-plugin</artifactId>
-                    <version>${deploy-plugin.version}</version>
+                    <version>${deploy-extension.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-site-plugin</artifactId>
-                    <version>${site-plugin.version}</version>
+                    <version>${site-extension.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>${quarkus.platform.group-id}</groupId>
@@ -223,7 +222,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
-                    <version>${compiler-plugin.version}</version>
+                    <version>${compiler-extension.version}</version>
                     <configuration>
                         <release>${maven.compiler.release}</release>
                         <parameters>true</parameters>
@@ -235,7 +234,7 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-surefire-plugin</artifactId>
-                    <version>${surefire-plugin.version}</version>
+                    <version>${surefire-extension.version}</version>
                     <configuration>
                         <systemPropertyVariables>
                             <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
@@ -245,65 +244,42 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-failsafe-plugin</artifactId>
-                    <version>${surefire-plugin.version}</version>
+                    <version>${surefire-extension.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>io.smallrye</groupId>
                     <artifactId>jandex-maven-plugin</artifactId>
-                    <version>${jandex-plugin.version}</version>
-                </plugin>
-                <plugin>
-                    <!-- Packages a plugin as one zip (plugins/plugin-package.xml): see plugins/README.md. -->
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-assembly-plugin</artifactId>
-                    <version>${assembly-plugin.version}</version>
-                    <executions>
-                        <execution>
-                            <id>plugin-package</id>
-                            <phase>package</phase>
-                            <goals>
-                                <goal>single</goal>
-                            </goals>
-                            <configuration>
-                                <descriptors>
-                                    <descriptor>${maven.multiModuleProjectDirectory}/plugins/plugin-package.xml</descriptor>
-                                </descriptors>
-                                <finalName>${plugin.package.name}-${project.version}</finalName>
-                                <appendAssemblyId>false</appendAssemblyId>
-                                <attach>false</attach>
-                            </configuration>
-                        </execution>
-                    </executions>
+                    <version>${jandex-extension.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-antrun-plugin</artifactId>
-                    <version>${antrun-plugin.version}</version>
+                    <version>${antrun-extension.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>exec-maven-plugin</artifactId>
-                    <version>${exec-plugin.version}</version>
+                    <version>${exec-extension.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.jacoco</groupId>
                     <artifactId>jacoco-maven-plugin</artifactId>
-                    <version>${jacoco-plugin.version}</version>
+                    <version>${jacoco-extension.version}</version>
                 </plugin>
                 <plugin>
-                    <!-- Used by distributions/release/prepare.sh -->
+                    <!-- Used by distribution/release/prepare.sh -->
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>versions-maven-plugin</artifactId>
-                    <version>${versions-plugin.version}</version>
+                    <version>${versions-extension.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.pitest</groupId>
                     <artifactId>pitest-maven</artifactId>
-                    <version>${pitest-plugin.version}</version>
+                    <version>${pitest-extension.version}</version>
                     <dependencies>
                         <dependency>
                             <groupId>org.pitest</groupId>
-                            <artifactId>pitest-junit5-plugin</artifactId>
+                            <artifactId>pitest-junit5-extension</artifactId>
                             <version>${pitest-junit5.version}</version>
                         </dependency>
                     </dependencies>
@@ -315,7 +291,7 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>
-                <version>${enforcer-plugin.version}</version>
+                <version>${enforcer-extension.version}</version>
                 <executions>
                     <execution>
                         <id>enforce-build-environment</id>
@@ -339,7 +315,7 @@
             <plugin>
                 <groupId>com.diffplug.spotless</groupId>
                 <artifactId>spotless-maven-plugin</artifactId>
-                <version>${spotless-plugin.version}</version>
+                <version>${spotless-extension.version}</version>
                 <configuration>
                     <java>
                         <palantirJavaFormat>
@@ -449,7 +425,7 @@
             <plugin>
                 <groupId>org.cyclonedx</groupId>
                 <artifactId>cyclonedx-maven-plugin</artifactId>
-                <version>${cyclonedx-plugin.version}</version>
+                <version>${cyclonedx-extension.version}</version>
                 <inherited>false</inherited>
                 <configuration>
                     <projectType>application</projectType>

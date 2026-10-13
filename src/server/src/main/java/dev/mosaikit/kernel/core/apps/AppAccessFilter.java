@@ -1,0 +1,75 @@
+// SPDX-FileCopyrightText: 2026 Massimo Antonini
+// SPDX-License-Identifier: MPL-2.0
+package dev.mosaikit.kernel.core.apps;
+
+import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
+import dev.mosaikit.kernel.core.identity.RequestOrganization;
+import io.quarkus.security.identity.SecurityIdentity;
+import jakarta.annotation.Priority;
+import jakarta.ws.rs.Priorities;
+import jakarta.ws.rs.container.ContainerRequestContext;
+import jakarta.ws.rs.container.ContainerRequestFilter;
+import jakarta.ws.rs.core.Response;
+import jakarta.ws.rs.ext.Provider;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
+
+/**
+ * Refuses the API and the documents of an extension to the people of an organization that turned all
+ * its apps off (MK-030): {@code /api/v1/ext/<api>/…} and {@code /api/v1/data/<extension id>/…}.
+ */
+@Provider
+@Priority(Priorities.AUTHORIZATION + 10)
+public class AppAccessFilter implements ContainerRequestFilter {
+
+    private final SecurityIdentity identity;
+    private final AppSettings settings;
+    private final ExtensionRegistry registry;
+
+    public AppAccessFilter(SecurityIdentity identity, AppSettings settings, ExtensionRegistry registry) {
+        this.identity = identity;
+        this.settings = settings;
+        this.registry = registry;
+    }
+
+    @Override
+    public void filter(ContainerRequestContext request) {
+        String path = request.getUriInfo().getPath();
+        Optional<UUID> organization = RequestOrganization.of(identity);
+        if (organization.isEmpty()) {
+            return;
+        }
+        extensionOf(path)
+                .filter(extension -> settings.isOff(organization.get(), extension))
+                .ifPresent(extension -> request.abortWith(Response.status(Response.Status.FORBIDDEN)
+                        .type("application/problem+json")
+                        .entity(Map.of(
+                                "type", "about:blank",
+                                "title", "Forbidden",
+                                "status", 403,
+                                "detail", "This app is turned off for your organization."))
+                        .build()));
+    }
+
+    private Optional<String> extensionOf(String path) {
+        String clean = path.startsWith("/") ? path.substring(1) : path;
+        String[] parts = clean.split("/");
+        if (parts.length >= 4 && "api".equals(parts[0]) && "v1".equals(parts[1])) {
+            if ("data".equals(parts[2])) {
+                return Optional.of(parts[3]);
+            }
+            if ("ext".equals(parts[2])) {
+                String api = parts[3];
+                return registry.active().stream()
+                        .flatMap(extension -> extension.manifest().stream())
+                        .filter(manifest -> manifest.backend()
+                                .filter(backend -> api.equals(backend.api()))
+                                .isPresent())
+                        .map(manifest -> manifest.id())
+                        .findFirst();
+            }
+        }
+        return Optional.empty();
+    }
+}

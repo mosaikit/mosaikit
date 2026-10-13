@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SPDX-FileCopyrightText: 2026 Massimo Antonini
+  SPDX-License-Identifier: MPL-2.0
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.github.mosaikit</groupId>
+        <artifactId>mosaikit-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+        <relativePath>../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mosaikit-distributions</artifactId>
+    <packaging>pom</packaging>
+    <name>Mosaikit :: Distributions</name>
+    <description>
+        Everything that can be delivered, in target/dist of the project: the installation, the
+        Docker Compose and Kubernetes deployments and, with -Pportable, the portable archives. No
+        extension is bundled: products choose theirs (ADR-0035).
+    </description>
+
+    <properties>
+        <!-- SonarQube: what this module contributes to the analysis (the root pom.xml sets the default). -->
+        <sonar.sources>pom.xml</sonar.sources>
+        <sonar.tests></sonar.tests>
+        <dist.directory>${maven.multiModuleProjectDirectory}/target/dist</dist.directory>
+        <kernel.directory>${maven.multiModuleProjectDirectory}/src/server/target/kernel</kernel.directory>
+        <!-- Bash for -Pportable; on Windows Git Bash (see the windows profile), override with -Dportable.bash. -->
+        <portable.bash>bash</portable.bash>
+    </properties>
+
+    <dependencies>
+        <!-- Only to build the kernel before this module. -->
+        <dependency>
+            <groupId>io.github.mosaikit</groupId>
+            <artifactId>mosaikit-kernel</artifactId>
+            <version>${project.version}</version>
+            <scope>provided</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-antrun-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>dist</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>run</goal>
+                        </goals>
+                        <configuration>
+                            <target>
+                                <!-- target/dist/mosaikit: the installation (Java 25 and PostgreSQL 18 needed). -->
+                                <delete dir="${dist.directory}/mosaikit"/>
+                                <copy todir="${dist.directory}/mosaikit">
+                                    <fileset dir="${project.basedir}/install">
+                                        <include name="mosaikit"/>
+                                        <include name="mosaikit.cmd"/>
+                                        <include name="README.md"/>
+                                        <include name="bin/**"/>
+                                    </fileset>
+                                </copy>
+                                <copy file="${project.basedir}/install/application.properties"
+                                      todir="${dist.directory}/mosaikit/config"/>
+                                <copy file="${project.basedir}/install/trusted-keys.md"
+                                      tofile="${dist.directory}/mosaikit/config/trusted-keys/README.md"/>
+                                <copy todir="${dist.directory}/mosaikit/bin/kernel">
+                                    <fileset dir="${kernel.directory}"/>
+                                </copy>
+                                <mkdir dir="${dist.directory}/mosaikit/extensions"/>
+                                <chmod file="${dist.directory}/mosaikit/mosaikit" perm="755"/>
+                                <!-- target/dist/mosaikit-docker: Docker Compose with PostgreSQL and Keycloak.
+                                     Not deleted first: a running compose keeps it open, and the user's .env and
+                                     extensions/ must survive a rebuild. -->
+                                <copy todir="${dist.directory}/mosaikit-docker" overwrite="true">
+                                    <fileset dir="${project.basedir}/docker">
+                                        <exclude name="Containerfile"/>
+                                        <exclude name="env.example"/>
+                                    </fileset>
+                                </copy>
+                                <!-- Docker Compose reads .env; the repository keeps it as env.example. Created only once. -->
+                                <copy todir="${dist.directory}/mosaikit-docker">
+                                    <fileset dir="${project.basedir}/docker" includes="env.example">
+                                        <present present="srconly" targetdir="${dist.directory}/mosaikit-docker">
+                                            <globmapper from="env.example" to=".env"/>
+                                        </present>
+                                    </fileset>
+                                    <globmapper from="env.example" to=".env"/>
+                                </copy>
+                                <chmod file="${dist.directory}/mosaikit-docker/postgres/init-keycloak.sh" perm="755"/>
+
+                                <!-- target/dist/mosaikit-k8s: the Helm chart. -->
+                                <delete dir="${dist.directory}/mosaikit-k8s"/>
+                                <copy todir="${dist.directory}/mosaikit-k8s">
+                                    <fileset dir="${project.basedir}/k8s"/>
+                                </copy>
+
+                                <!-- The installation as a Maven artifact (classifier installation), on which
+                                     products build their distributions: io.github.mosaikit:
+                                     mosaikit-distributions:<version>:zip:installation. -->
+                                <zip destfile="${project.build.directory}/mosaikit-installation-${project.version}.zip"
+                                     basedir="${dist.directory}" includes="mosaikit/**"/>
+                                <!-- The builder of the portable archives, which products run on their own
+                                     installation (classifier portable-tools, see portable/build.sh). -->
+                                <zip destfile="${project.build.directory}/mosaikit-portable-tools-${project.version}.zip">
+                                    <zipfileset dir="${project.basedir}/portable" prefix="portable"/>
+                                </zip>
+                                <!-- Docker Compose and the Helm chart, which products extend with their own
+                                     services (classifiers docker and helm). -->
+                                <zip destfile="${project.build.directory}/mosaikit-docker-${project.version}.zip">
+                                    <zipfileset dir="${project.basedir}/docker" prefix="mosaikit-docker" excludes="extensions/*.zip"/>
+                                </zip>
+                                <zip destfile="${project.build.directory}/mosaikit-helm-${project.version}.zip">
+                                    <zipfileset dir="${project.basedir}/k8s/mosaikit" prefix="mosaikit"/>
+                                </zip>
+                            </target>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>3.6.1</version>
+                <executions>
+                    <execution>
+                        <id>attach-installation</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>attach-artifact</goal>
+                        </goals>
+                        <configuration>
+                            <artifacts>
+                                <artifact>
+                                    <file>${project.build.directory}/mosaikit-installation-${project.version}.zip</file>
+                                    <type>zip</type>
+                                    <classifier>installation</classifier>
+                                </artifact>
+                                <artifact>
+                                    <file>${project.build.directory}/mosaikit-portable-tools-${project.version}.zip</file>
+                                    <type>zip</type>
+                                    <classifier>portable-tools</classifier>
+                                </artifact>
+                                <artifact>
+                                    <file>${project.build.directory}/mosaikit-docker-${project.version}.zip</file>
+                                    <type>zip</type>
+                                    <classifier>docker</classifier>
+                                </artifact>
+                                <artifact>
+                                    <file>${project.build.directory}/mosaikit-helm-${project.version}.zip</file>
+                                    <type>zip</type>
+                                    <classifier>helm</classifier>
+                                </artifact>
+                            </artifacts>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <profile>
+            <!-- On Windows "bash" is usually the WSL launcher of System32: use the Bash of Git for Windows. -->
+            <id>windows-bash</id>
+            <activation>
+                <os>
+                    <family>windows</family>
+                </os>
+            </activation>
+            <properties>
+                <!-- Maven reads the environment of Windows with upper-case names. -->
+                <portable.bash>${env.PROGRAMFILES}\Git\bin\bash.exe</portable.bash>
+            </properties>
+        </profile>
+        <profile>
+            <!-- mvnw install -Pportable: also the portable archives for Windows, Linux and macOS
+                 (target/dist/mosaikit-portable/mosaikit-portable-<version>-<platform>.zip|tar.gz). Needs Bash (Git Bash on Windows). -->
+            <id>portable</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>portable</id>
+                                <phase>package</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>${portable.bash}</executable>
+                                    <workingDirectory>${maven.multiModuleProjectDirectory}</workingDirectory>
+                                    <arguments>
+                                        <argument>distribution/portable/build.sh</argument>
+                                        <argument>${portable.platforms}</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>

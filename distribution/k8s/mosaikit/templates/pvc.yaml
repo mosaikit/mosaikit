@@ -1,0 +1,16 @@
+{{- if .Values.extensions.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "mosaikit.fullname" . }}-extensions
+  labels:
+    {{- include "mosaikit.labels" . | nindent 4 }}
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- with .Values.extensions.persistence.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.extensions.persistence.size }}
+{{- end }}

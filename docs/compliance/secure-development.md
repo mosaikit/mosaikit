@@ -5,8 +5,8 @@ sviluppo del software sicuro. Gaps are listed in [non-conformities](non-conformi
 
 ## Requirements
 
-- Every feature starts as a requirement (`docs/requirements/MK-*.yaml`) with acceptance
-  criteria; security requirements are requirements like the others (MK-001 headers, MK-007 plugin
+- Every feature starts as a requirement (`docs/requirements/MK-*.md`) with acceptance
+  criteria; security requirements are requirements like the others (MK-001 headers, MK-007 extension
   assets, MK-010 errors, MK-012 federated identity, MK-013 signed packages, MK-014 isolation of
   untrusted frontends).
 - Decisions with security consequences are recorded as ADRs, with their consequences.
@@ -14,10 +14,10 @@ sviluppo del software sicuro. Gaps are listed in [non-conformities](non-conformi
 
 ## Design rules
 
-- The kernel carries every measure that must hold for all plugins (authentication, authorization
-  of plugin APIs, headers, errors, signatures), so that a plugin cannot lower the level.
-- Plugins talk through the event bus and declared services, each with its own database schema.
-- Nothing is trusted from a plugin package without its signature being checked (ADR-0014).
+- The kernel carries every measure that must hold for all extensions (authentication, authorization
+  of extension APIs, headers, errors, signatures), so that an extension cannot lower the level.
+- Extensions talk through the event bus and declared services, each with its own database schema.
+- Nothing is trusted from an extension package without its signature being checked (ADR-0014).
 - Personal data are the minimum needed; secrets are never stored in the code nor in the images.
 
 ## Implementation
@@ -26,7 +26,7 @@ sviluppo del software sicuro. Gaps are listed in [non-conformities](non-conformi
   Prettier), all compiler warnings enabled (`-Xlint:all`), ESLint strict type-checked rules, ArchUnit rules on the
   dependencies of the kernel and of the SDK.
 - Input is validated at the boundary (Bean Validation on requests, JSON Schema on manifests);
-  paths from packages and URLs are normalised and confined (`StaticFiles`, `PluginPackages`).
+  paths from packages and URLs are normalised and confined (`StaticFiles`, `ExtensionPackages`).
 - Passwords: PBKDF2-HMAC-SHA256 with 600 000 iterations; tokens: OpenID Connect with PKCE, issuer
   and audience checked per organization.
 
@@ -48,7 +48,7 @@ Dynamic testing and penetration tests are to be added (NC-06).
 
 ## Release and maintenance
 
-- Releases come from signed tags (`docs/developer/release.md`); the pipeline of the tag builds,
+- Releases come from signed tags (`docs/development/release.md`); the pipeline of the tag builds,
   tests and publishes everything; the SBOM goes with the release.
 - Dependencies are updated by Renovate, which waits seven days after a release before proposing
   it, to avoid compromised versions.

@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mosaikit.fullname" . }}
+  labels:
+    {{- include "mosaikit.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "mosaikit.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "mosaikit.selectorLabels" . | nindent 8 }}
+    spec:
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: kernel
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: QUARKUS_DATASOURCE_JDBC_URL
+              value: {{ .Values.database.url | quote }}
+            - name: QUARKUS_DATASOURCE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.existingSecret }}
+                  key: username
+            - name: QUARKUS_DATASOURCE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.database.existingSecret }}
+                  key: password
+            {{- if .Values.bootstrap.existingSecret }}
+            - name: MOSAIKIT_BOOTSTRAP_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.bootstrap.existingSecret }}
+                  key: password
+            {{- end }}
+            {{- with .Values.identity.keycloakUrl }}
+            - name: MOSAIKIT_IDENTITY_KEYCLOAK_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.identity.keycloakInternalUrl }}
+            - name: MOSAIKIT_IDENTITY_KEYCLOAK_INTERNAL_URL
+              value: {{ . | quote }}
+            {{- end }}
+            {{- with .Values.identity.adminSecret }}
+            - name: MOSAIKIT_IDENTITY_ADMIN_CLIENT_ID
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: client-id
+            - name: MOSAIKIT_IDENTITY_ADMIN_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ . }}
+                  key: client-secret
+            {{- end }}
+            {{- with .Values.identity.domain }}
+            - name: MOSAIKIT_IDENTITY_DOMAIN
+              value: {{ . | quote }}
+            {{- end }}
+            - name: MOSAIKIT_EXTENSIONS_SIGNATURES
+              value: {{ .Values.extensions.signatures | quote }}
+            {{- if .Values.extensions.trustedKeysConfigMap }}
+            - name: MOSAIKIT_EXTENSIONS_TRUSTED_KEYS_DIRECTORY
+              value: /etc/mosaikit/trusted-keys
+            {{- end }}
+          readinessProbe:
+            httpGet:
+              path: /q/health/ready
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /q/health/live
+              port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            {{- if .Values.extensions.persistence.enabled }}
+            - name: extensions
+              mountPath: /opt/mosaikit/extensions
+            {{- end }}
+            {{- if .Values.extensions.trustedKeysConfigMap }}
+            - name: trusted-keys
+              mountPath: /etc/mosaikit/trusted-keys
+              readOnly: true
+            {{- end }}
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        {{- if .Values.extensions.persistence.enabled }}
+        - name: extensions
+          persistentVolumeClaim:
+            claimName: {{ include "mosaikit.fullname" . }}-extensions
+        {{- end }}
+        {{- with .Values.extensions.trustedKeysConfigMap }}
+        - name: trusted-keys
+          configMap:
+            name: {{ . }}
+        {{- end }}
+        - name: tmp
+          emptyDir: {}

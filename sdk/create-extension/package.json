@@ -1,0 +1,26 @@
+{
+  "name": "@mosaikit/create-extension",
+  "version": "0.1.0-SNAPSHOT",
+  "description": "Creates a Mosaikit extension: manifest, frontend and, optionally, Java backend with its schema (MK-023).",
+  "license": "MPL-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mosaikit/mosaikit.git",
+    "directory": "sdk/create-extension"
+  },
+  "author": "Massimo Antonini",
+  "type": "module",
+  "bin": {
+    "create-mosaikit-extension": "dist/bin.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.0"
+  }
+}

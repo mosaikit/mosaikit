@@ -71,8 +71,8 @@ describe('documentation', () => {
     );
     const requirements = new Set(
       readdirSync(join(root, 'docs/requirements'))
-        .filter((name) => name.endsWith('.yaml'))
-        .map((name) => name.replace('.yaml', '')),
+        .filter((name) => /^MK-\d{3,}\.md$/.test(name))
+        .map((name) => name.replace('.md', '')),
     );
     const nonConformities = readFileSync(join(root, 'docs/compliance/non-conformities.md'), 'utf8');
 

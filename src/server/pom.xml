@@ -1,0 +1,289 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SPDX-FileCopyrightText: 2026 Massimo Antonini
+  SPDX-License-Identifier: MPL-2.0
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>io.github.mosaikit</groupId>
+        <artifactId>mosaikit-parent</artifactId>
+        <version>0.1.0-SNAPSHOT</version>
+        <relativePath>../../pom.xml</relativePath>
+    </parent>
+
+    <artifactId>mosaikit-kernel</artifactId>
+    <name>Mosaikit :: Kernel</name>
+    <description>
+        The kernel: organizations, accounts, identity, extension registry and the web UI, packaged as a
+        Quarkus mutable JAR, plus the launcher that loads the Java code of extensions (MK-011).
+    </description>
+
+    <properties>
+        <!-- SonarQube: what this module contributes to the analysis (the root pom.xml sets the default). -->
+        <sonar.sources>pom.xml,src/main/java,src/main/resources,../web/src,../web/index.html</sonar.sources>
+        <sonar.tests>src/test/java,../web/test</sonar.tests>
+        <!-- Tests that need Keycloak (Docker): run with -Dtest.groups.excluded= (the nightly CI). -->
+        <test.groups.excluded>keycloak</test.groups.excluded>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>io.github.mosaikit</groupId>
+            <artifactId>mosaikit-kernel-api</artifactId>
+        </dependency>
+
+        <!-- HTTP: REST API, user interface routes, validation, OpenAPI, health -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-vertx-http</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-rest-jackson</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-hibernate-validator</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-smallrye-openapi</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-smallrye-health</artifactId>
+        </dependency>
+        <!-- The real-time channel of the shell (MK-031) -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-websockets-next</artifactId>
+        </dependency>
+        <!-- Mails to people, such as the confirmation of a registration -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-mailer</artifactId>
+        </dependency>
+
+        <!-- Persistence -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-hibernate-orm</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>jakarta.data</groupId>
+            <artifactId>jakarta.data-api</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-jdbc-postgresql</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-agroal</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-flyway</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.flywaydb</groupId>
+            <artifactId>flyway-database-postgresql</artifactId>
+        </dependency>
+
+        <!-- Security -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-security</artifactId>
+        </dependency>
+        <!-- Federated sign-in: one Keycloak realm per organization (MK-012) -->
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-oidc</artifactId>
+        </dependency>
+
+        <!-- Extension manifests -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.dataformat</groupId>
+            <artifactId>jackson-dataformat-yaml</artifactId>
+        </dependency>
+
+        <!-- Kernel UI: served with live reload by Quinoa in development mode only -->
+        <dependency>
+            <groupId>io.quarkiverse.quinoa</groupId>
+            <artifactId>quarkus-quinoa</artifactId>
+        </dependency>
+
+        <!-- Tests -->
+        <dependency>
+            <groupId>org.junit.jupiter</groupId>
+            <artifactId>junit-jupiter</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.assertj</groupId>
+            <artifactId>assertj-core</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.tngtech.archunit</groupId>
+            <artifactId>archunit-junit6</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-junit</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.quarkus</groupId>
+            <artifactId>quarkus-jacoco</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>io.rest-assured</groupId>
+            <artifactId>rest-assured</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Keycloak for the federation tests (tag keycloak, excluded by default) -->
+        <dependency>
+            <groupId>org.testcontainers</groupId>
+            <artifactId>testcontainers</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <!-- Only to build the fixture Java extensions before the installation tests. -->
+        <dependency>
+            <groupId>io.github.mosaikit.fixtures</groupId>
+            <artifactId>mosaikit-fixture-notes</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>io.github.mosaikit.fixtures</groupId>
+            <artifactId>mosaikit-fixture-activities</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>io.github.mosaikit.fixtures</groupId>
+            <artifactId>mosaikit-fixture-estimates</artifactId>
+            <version>${project.version}</version>
+            <scope>test</scope>
+            <exclusions>
+                <exclusion>
+                    <groupId>*</groupId>
+                    <artifactId>*</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <resources>
+            <resource>
+                <directory>src/main/resources</directory>
+                <filtering>false</filtering>
+                <excludes>
+                    <exclude>dev/mosaikit/launcher/launcher.properties</exclude>
+                </excludes>
+            </resource>
+            <resource>
+                <!-- The launcher and the kernel always have the same version. -->
+                <directory>src/main/resources</directory>
+                <filtering>true</filtering>
+                <includes>
+                    <include>dev/mosaikit/launcher/launcher.properties</include>
+                </includes>
+            </resource>
+            <resource>
+                <!-- The built UI (npm run build, run by the parent POM), served by the kernel from the
+                     class path. Rebuilding the kernel for a Java extension therefore never needs Node.js. -->
+                <directory>../web/dist</directory>
+                <targetPath>mosaikit-ui</targetPath>
+            </resource>
+        </resources>
+        <plugins>
+            <plugin>
+                <groupId>${quarkus.platform.group-id}</groupId>
+                <artifactId>quarkus-maven-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>build</goal>
+                            <goal>generate-code</goal>
+                            <goal>generate-code-tests</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <!-- Lets the Quarkus BOM manage the annotation processor versions. -->
+                    <annotationProcessorPathsUseDepMgmt>true</annotationProcessorPathsUseDepMgmt>
+                    <annotationProcessorPaths>
+                        <!-- Generates the static metamodel and the Jakarta Data repository implementations. -->
+                        <path>
+                            <groupId>io.quarkus</groupId>
+                            <artifactId>quarkus-data-processor</artifactId>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <configuration>
+                    <excludedGroups>${test.groups.excluded}</excludedGroups>
+                    <systemPropertyVariables>
+                        <java.util.logging.manager>org.jboss.logmanager.LogManager</java.util.logging.manager>
+                        <maven.home>${maven.home}</maven.home>
+                        <!-- The PostgreSQL of the tests comes from node_modules (EmbeddedPostgres). -->
+                        <test.root>${maven.multiModuleProjectDirectory}</test.root>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+            <plugin>
+                <!-- End-to-end tests of an installation (MK-011) and of the portable archive (MK-016).
+                     They start PostgreSQL from node_modules (EmbeddedPostgres), or use an external
+                     PostgreSQL 18 given with -Dmosaikit.it.jdbc-url, -username and -password. -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <systemPropertyVariables>
+                        <mosaikit.it.kernel>${project.build.directory}/kernel</mosaikit.it.kernel>
+                        <mosaikit.it.extension>${maven.multiModuleProjectDirectory}/tests/fixtures/extensions/notes/target/fixture-notes-${project.version}.zip</mosaikit.it.extension>
+                        <mosaikit.it.activities>${maven.multiModuleProjectDirectory}/tests/fixtures/extensions/activities/target/fixture-activities-${project.version}.zip</mosaikit.it.activities>
+                        <mosaikit.it.estimates>${maven.multiModuleProjectDirectory}/tests/fixtures/extensions/estimates/target/fixture-estimates-${project.version}.zip</mosaikit.it.estimates>
+                        <mosaikit.it.work>${project.build.directory}/it</mosaikit.it.work>
+                        <test.root>${maven.multiModuleProjectDirectory}</test.root>
+                    </systemPropertyVariables>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+</project>

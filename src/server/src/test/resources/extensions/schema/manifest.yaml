@@ -1,0 +1,8 @@
+id: dev.mosaikit.test.schema
+version: 1.0.0
+name: Schema (test)
+description: Owns a database schema, migrated by the kernel at start.
+kind: [service]
+platform: ">=0.1 <1"
+database:
+  schema: ext_test_schema

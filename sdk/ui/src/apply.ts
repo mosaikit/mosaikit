@@ -29,7 +29,7 @@ function write(name: ThemeName, scheme: ColorScheme): void {
 
 /**
  * Applies a theme to the page: the tokens of Fluent UI and the `--mk-*` tokens, which cross the
- * Shadow DOM of plugins. Without a `scheme` it follows the light or dark preference of the system,
+ * Shadow DOM of extensions. Without a `scheme` it follows the light or dark preference of the system,
  * also when it changes.
  */
 export function applyTheme(name: ThemeName, scheme?: ColorScheme): void {

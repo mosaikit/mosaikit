@@ -1,0 +1,42 @@
+id: dev.mosaikit.fixture.estimates
+version: 0.1.0
+name: Estimates (fixture)
+description: >-
+  Sample extension of the prototype: adds an estimate in hours to each activity of the Activities
+  app, as a field, a widget and an event (MK-020).
+kind: [extension, service]
+platform: '>=0.1 <1'
+requires:
+  dev.mosaikit.fixture.activities: '^0.1'
+backend:
+  jar: lib/fixture-estimates.jar
+  api: fixture-estimates
+database:
+  schema: ext_fixture_estimates
+frontend:
+  entry: web/index.js
+  isolation: module
+actions:
+  - name: estimate-activity
+    title: Estimate an activity
+    description: Sets how many hours an activity of the organization should take.
+    risk: write
+    input:
+      type: object
+      properties:
+        activityId:
+          type: string
+          format: uuid
+        hours:
+          type: number
+          minimum: 0
+          maximum: 10000
+      required: [activityId, hours]
+      additionalProperties: false
+    call:
+      method: PUT
+      path: estimates/{activityId}
+contributes:
+  activities.detail:
+    - id: estimate
+      element: mk-activity-estimate
