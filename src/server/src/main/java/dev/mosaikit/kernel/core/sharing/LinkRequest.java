@@ -29,7 +29,8 @@ public class LinkRequest {
     private final SharedLinks links;
     private final CurrentVertxRequest request;
     private final SecurityIdentity identity;
-    private Optional<SharedLinks.Opened> opened;
+    private Optional<SharedLinks.Opened> opened = Optional.empty();
+    private boolean resolved;
 
     public LinkRequest(SharedLinks links, CurrentVertxRequest request, SecurityIdentity identity) {
         this.links = links;
@@ -39,8 +40,9 @@ public class LinkRequest {
 
     /** The link of the request, when it has one that works. */
     public Optional<SharedLinks.Opened> opened() {
-        if (opened == null) {
+        if (!resolved) {
             opened = resolve();
+            resolved = true;
         }
         return opened;
     }
