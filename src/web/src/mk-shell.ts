@@ -1364,6 +1364,11 @@ export class MkShell extends LitElement {
         await this.enter(account);
       }
     } catch (error) {
+      if (error instanceof KernelError && error.status === 503) {
+        // The account was created but its mail did not go out: offer to send the link again.
+        this.sentTo = registration.email;
+        this.signInMode = 'sent';
+      }
       this.error = error instanceof KernelError ? error.message : 'The account was not created.';
     } finally {
       this.busy = false;

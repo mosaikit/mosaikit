@@ -141,8 +141,11 @@ with a link: until they open it the account does not sign in. The link works onc
   recorded in the audit log, and with it off the sign-in page offers no registration.
 - The mails need a mail server: set `quarkus.mailer.host`, `port`, `username`, `password` and
   `quarkus.mailer.from` in `config/application.properties`, and `mosaikit.public-url` so that the
-  links point to the address people use. Without a mail server, registrations fail with a
-  message and nothing is created.
+  links point to the address people use.
+- When the mail server does not take a mail within `mosaikit.accounts.mail-timeout` (15 seconds),
+  or refuses it, the person sees that the mail could not be sent; the account is created all the
+  same, and they ask for the link again from the sign-in page once the mail server works. The
+  kernel never keeps a database transaction open while it talks to the mail server.
 
 ## Apps of an organization
 
