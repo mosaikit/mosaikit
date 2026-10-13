@@ -56,6 +56,24 @@ class FileLinkTest {
     }
 
     @Test
+    @Tag("MK-055")
+    void aLinkSignsItsCreatorWhichCannotBeDroppedOrChanged() {
+        UUID ada = UUID.randomUUID();
+        FileLink withoutCreator = new FileLink(ACME, "org.example.maps", null, "tiles/", null, EXPIRES);
+        FileLink ofAda = new FileLink(ACME, "org.example.maps", null, "tiles/", null, EXPIRES, ada);
+        String signature = ofAda.signature(key(1));
+        assertThat(ofAda.verifies(signature, List.of(key(1)))).isTrue();
+        assertThat(withoutCreator.verifies(signature, List.of(key(1)))).isFalse();
+        assertThat(new FileLink(ACME, "org.example.maps", null, "tiles/", null, EXPIRES, UUID.randomUUID())
+                        .verifies(signature, List.of(key(1))))
+                .isFalse();
+        assertThat(ofAda.query(signature)).contains("&expires=").contains("&creator=" + ada + "&signature=");
+        // A link without a creator keeps the signed text, and the query, of the first version.
+        assertThat(withoutCreator.signed()).startsWith("mosaikit.files.link.v1\n");
+        assertThat(withoutCreator.query("s")).doesNotContain("creator");
+    }
+
+    @Test
     void aLinkToAPrefixSignsItsTeam() {
         UUID team = UUID.randomUUID();
         FileLink link = new FileLink(ACME, "org.example.maps", null, "tiles/", team, EXPIRES);

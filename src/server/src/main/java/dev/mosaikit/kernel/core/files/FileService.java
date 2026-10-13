@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.core.files;
 
+import dev.mosaikit.kernel.api.extension.ResourceTypeEntry;
 import dev.mosaikit.kernel.api.resource.ResourceRef;
 import dev.mosaikit.kernel.core.audit.AuditEvent;
 import dev.mosaikit.kernel.core.audit.AuditLog;
@@ -13,11 +14,14 @@ import dev.mosaikit.kernel.core.error.InvalidInputException;
 import dev.mosaikit.kernel.core.error.ResourceNotFoundException;
 import dev.mosaikit.kernel.core.error.ServiceUnavailableException;
 import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
+import dev.mosaikit.kernel.core.extension.InstalledExtension;
 import dev.mosaikit.kernel.core.identity.RequestOrganization;
 import dev.mosaikit.kernel.core.quotas.Measure;
 import dev.mosaikit.kernel.core.quotas.QuotaService;
 import dev.mosaikit.kernel.core.resources.RegisteredResource;
 import dev.mosaikit.kernel.core.resources.RegisteredResources;
+import dev.mosaikit.kernel.core.sharing.KernelSharing;
+import dev.mosaikit.kernel.core.sharing.ResourceTypes;
 import dev.mosaikit.kernel.core.teams.TeamMember;
 import dev.mosaikit.kernel.core.teams.TeamRepository;
 import io.quarkus.narayana.jta.QuarkusTransaction;
@@ -60,6 +64,13 @@ import org.jboss.logging.Logger;
  * teams. A file that the person may not read does not exist for them: an identifier of another
  * organization, or of a team they are not in, answers not found. The REST API and the Java API apply
  * the same checks, here.
+ *
+ * <p>A file attached to a registered resource (MK-054) follows the sharing of that resource instead
+ * (MK-055): the person reads it when they hold any level on the resource, and replaces or deletes it
+ * with a level that edits; the person who stored it keeps both, and so do the owner of the resource
+ * and the administrators of the organization, except on the kernel's types private to their subjects
+ * (ADR-0037). A request without a person, the code of an extension acting alone, keeps the rules of the
+ * organization and its teams. The row-level security says the same ({@code V29}).
  *
  * <p>An upload is first written to a temporary file of the server, which gives its size and its
  * checksum without holding it in memory and refuses it beyond {@code mosaikit.files.max-size}; only
@@ -138,6 +149,7 @@ public class FileService {
     private final AuditLog audit;
     private final TransactionSynchronizationRegistry transactions;
     private final QuotaService quotas;
+    private final KernelSharing sharing;
     private final long maxSize;
     private final Clock clock = Clock.systemUTC();
 
@@ -153,6 +165,7 @@ public class FileService {
             AuditLog audit,
             TransactionSynchronizationRegistry transactions,
             QuotaService quotas,
+            KernelSharing sharing,
             KernelConfig config) {
         this.files = files;
         this.store = store;
@@ -164,6 +177,7 @@ public class FileService {
         this.audit = audit;
         this.transactions = transactions;
         this.quotas = quotas;
+        this.sharing = sharing;
         this.maxSize = config.files().maxSize().asLongValue();
     }
 
@@ -263,7 +277,7 @@ public class FileService {
             List<StoredFile> found;
             if (team != null) {
                 requireIn(team);
-                found = files.listOfTeam(org, extension, team, page);
+                found = files.listOfTeam(org, extension, team, account().orElseThrow(), page);
             } else {
                 Optional<UUID> account = account();
                 found = account.isPresent()
@@ -276,15 +290,19 @@ public class FileService {
 
     /**
      * Deletes a file: its owner, an owner of its team or an administrator of the organization may;
-     * so may the code of an extension that acts without a person. The content leaves the store when
+     * so may the code of an extension that acts without a person. A file attached to a resource: its
+     * owner, or a person with a level that edits the resource. The content leaves the store when
      * the transaction commits.
      */
     public void delete(String extension, UUID id) {
         transaction(() -> {
             StoredFile file = readable(extension, id);
             if (!mayDelete(file)) {
-                throw new ForbiddenOperationException("Only the owner of the file " + id
-                        + ", an owner of its team or an administrator of the organization delete it.");
+                throw new ForbiddenOperationException(
+                        file.getResourceId() != null
+                                ? "Only the owner of the file " + id + " or a person who edits its resource delete it."
+                                : "Only the owner of the file " + id
+                                        + ", an owner of its team or an administrator of the organization delete it.");
             }
             files.delete(file);
             String key = file.getStorageKey();
@@ -336,8 +354,15 @@ public class FileService {
                 .orElseThrow(() -> new ResourceNotFoundException("No file " + id + "."));
     }
 
-    /** As the row-level security decides too: as the documents of extensions (MK-032). */
+    /**
+     * As the row-level security decides too: a file attached to a resource as its sharing (MK-055),
+     * the others as the documents of extensions (MK-032).
+     */
     private boolean readable(StoredFile file) {
+        Optional<Access> attached = attached(file);
+        if (attached.isPresent()) {
+            return attached.get() != Access.NONE;
+        }
         if (file.getTeamId() == null) {
             return !organization.guest();
         }
@@ -366,7 +391,14 @@ public class FileService {
 
     private boolean mayDelete(StoredFile file) {
         Optional<UUID> account = account();
-        if (account.isEmpty() || RequestOrganization.administrator(identity)) {
+        if (account.isEmpty()) {
+            return true;
+        }
+        Optional<Access> attached = attached(file);
+        if (attached.isPresent()) {
+            return attached.get() == Access.WRITE;
+        }
+        if (RequestOrganization.administrator(identity)) {
             return true;
         }
         if (account.get().equals(file.getOwnerId())) {
@@ -395,10 +427,74 @@ public class FileService {
         if (!ref.extension().equals(extension)) {
             throw new InvalidInputException(List.of("resource must be a resource of " + extension));
         }
-        return resources
+        RegisteredResource entry = resources
                 .find(org, ref.extension(), ref.type(), ref.id())
-                .map(RegisteredResource::getId)
                 .orElseThrow(() -> new InvalidInputException(List.of("resource " + ref + " is not registered")));
+        if (account().isPresent()) {
+            // Attaching a file to a resource changes it: a level that edits it (MK-055). A resource
+            // the person does not reach answers as one that is not registered.
+            Access access = access(entry);
+            if (access == Access.NONE) {
+                throw new InvalidInputException(List.of("resource " + ref + " is not registered"));
+            }
+            if (access == Access.READ) {
+                throw new ForbiddenOperationException("You may read " + ref + ", not attach files to it.");
+            }
+        }
+        return entry.getId();
+    }
+
+    /** What the person of the request may do with a file attached to a resource. */
+    enum Access {
+        NONE,
+        READ,
+        WRITE
+    }
+
+    /**
+     * What the person of the request may do with a file attached to a resource: empty when the file
+     * is attached to none, or when no person asks, so that the rules of the organization and its
+     * teams apply.
+     */
+    private Optional<Access> attached(StoredFile file) {
+        Optional<UUID> account = account();
+        if (file.getResourceId() == null || account.isEmpty()) {
+            return Optional.empty();
+        }
+        if (account.get().equals(file.getOwnerId())) {
+            return Optional.of(Access.WRITE);
+        }
+        return resources.findById(file.getResourceId()).map(this::access);
+    }
+
+    /**
+     * What the person of the request may do with the files of a resource, as its sharing says
+     * (MK-055): read them with any level, change them with a level that edits. The owner of the
+     * resource and the administrators of the organization change them too, as they hold every level
+     * (not the administrators on the kernel's types private to their subjects, ADR-0037). A type that
+     * the extension no longer declares leaves the files to the administrators only.
+     */
+    private Access access(RegisteredResource entry) {
+        ResourceRef ref = entry.ref();
+        Optional<ResourceTypeEntry> type = extensions
+                .findActive(ref.extension())
+                .flatMap(InstalledExtension::manifest)
+                .flatMap(manifest -> ResourceTypes.of(manifest, ref.type()));
+        boolean administrator = RequestOrganization.administrator(identity);
+        if (type.isEmpty()) {
+            return administrator ? Access.WRITE : Access.NONE;
+        }
+        Optional<String> held = sharing.level(ref);
+        if (held.isEmpty()) {
+            return Access.NONE;
+        }
+        boolean owner = account().filter(me -> me.equals(entry.getOwnerId())).isPresent();
+        boolean edits =
+                type.get().levels().stream().anyMatch(level -> level.name().equals(held.get()) && level.edits());
+        if (edits || owner || (administrator && ResourceTypes.administratorsHoldEveryLevel(type.get()))) {
+            return Access.WRITE;
+        }
+        return Access.READ;
     }
 
     /** Only an active extension has files; the files of another one do not exist. */

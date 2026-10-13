@@ -448,8 +448,10 @@ Extensions keep files through the kernel (MK-041): the content goes to the store
 installation, under `<organization id>/<extension id>/<file id>`, and the database keeps the name,
 type, size, SHA-256 checksum, owner and team of each file. Extensions never see the credentials of
 the store. A person reads a file of their organization, or of a team they are in; a guest only the
-files of their teams. A file that a person may not read answers "not found", even with its
-identifier. Every file stored or deleted is in the audit log, as `file.stored` and `file.deleted`.
+files of their teams. A file attached to a resource of the extension, such as the cover of an
+album, follows the sharing of that resource instead: it is read by the people the resource is shared
+with, and replaced or deleted by those with a level that edits it. A file that a person may not read
+answers "not found", even with its identifier. Every file stored or deleted is in the audit log, as `file.stored` and `file.deleted`.
 
 Choose the store with `mosaikit.files.store` (see [configuration](configuration.md#files)):
 
@@ -496,10 +498,14 @@ cache validators, until it expires: at most `mosaikit.files.link-max-validity` (
 after it was made. An expired or altered link answers 404, as a file that does not exist, so that a
 link never tells whether a file is there. Making a link is in the audit log as `file.link.created`;
 its use as `file.link.used`, the first time in each hour for each link on each kernel, not every
-download. A link opens the files it names until it expires, also when the person who made it leaves
-the team or the organization: deleting the file, or rotating the key, stops it.
+download. A link made by a person opens only what that person still reads: a file attached to a
+resource of the extension while they hold a level on the resource, and nothing once they left the
+organization; revoking a share stops their links to the files of that resource. Otherwise a link opens
+the files it names until it expires, also when the person who made it leaves the team: deleting the
+file, or rotating the key, stops it.
 
-No table keeps the links: each carries its organization, extension, file or prefix and expiry,
+No table keeps the links: each carries its organization, extension, file or prefix, expiry and the
+account of the person who made it,
 signed with HMAC-SHA256 by the key of the installation. The key is:
 
 - `mosaikit.files.link-key` when set: 32 random bytes or more in base64 (`openssl rand -base64 32`),

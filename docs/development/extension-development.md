@@ -520,6 +520,14 @@ the whole organization or of one of its teams (MK-032), a person reads a file of
 they are in it, a guest only the files of their teams, and a file the person may not read is not
 found, even with its identifier. Storing and deleting are in the audit log.
 
+A file attached to a registered resource (`attachedTo`, MK-054) follows the sharing of that resource
+instead (MK-055): a person reads it, finds it in lists and links to it when they hold any level on the
+resource, and attaches, replaces or deletes files of it with a level that `edits`; the person who
+stored a file keeps it. The owner of the resource and the administrators of the organization hold
+every level (not on the kernel's types private to their subjects, ADR-0037). So declare a level that
+edits on a type whose files others should change. Code that runs without a person keeps the rules of
+the organization and its teams; a signed link carries its own grant.
+
 From Java, inject `FileStorage` (`dev.mosaikit.kernel.api.files`) and name your extension in every
 call, as with `Resources`; content is streamed both ways:
 
@@ -536,7 +544,8 @@ try (FileContent content = files.read(EXTENSION, photo.id())) {
     content.stream().transferTo(output);
 }
 List<StoredFile> mine = files.list(EXTENSION, null, 0, 100);    // or of one team
-files.delete(EXTENSION, photo.id());                            // owner, team owner, administrators
+files.delete(EXTENSION, photo.id());                            // owner, team owner, administrators;
+                                                                 // of a resource: a level that edits
 ```
 
 The calls join the transaction of the caller: a file whose transaction rolls back leaves the store
@@ -582,6 +591,13 @@ From a frontend, `POST /api/v1/files/<extension>/links` with `{"file": "<id>"}`,
 and `query`; a file under a prefix is at `` `${base}${name}?${query}` ``, so a tile template is
 `` `${base}tiles/{z}/{x}/{y}.png?${query}` ``. The newest file of a name answers. A link stays valid
 until it expires even when the person leaves the team: give the shortest validity that serves.
+
+A link made by a person carries their account and their rights (MK-055): a file attached to a
+resource is served only while they hold a level on that resource, so a link to `tiles/` never hands
+out the files of an album they cannot read, and revoking their share stops their links to its files;
+once they leave the organization their links answer 404. Files without a resource, such as tiles, are
+served as the scope of the link says. A link made by code that runs without a person has no creator
+and covers its whole scope.
 
 ## Extending another extension
 

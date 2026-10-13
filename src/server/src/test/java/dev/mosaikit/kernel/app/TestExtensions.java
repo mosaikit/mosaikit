@@ -66,12 +66,13 @@ public class TestExtensions implements QuarkusTestProfile {
                         title: Note
                         levels: [{ name: view, title: View }]
                     """);
-            // FileStorageTest: an extension that stores files, some attached to its albums (MK-041).
+            // FileStorageTest: an extension that stores files, some attached to its albums, which
+            // FilesFollowSharingTest shares to view or to edit (MK-041, MK-055).
             extension("files", FileStorageTest.EXTENSION, "Files", """
                     resources:
                       - type: album
                         title: Album
-                        levels: [{ name: view, title: View }]
+                        levels: [{ name: view, title: View }, { name: edit, title: Edit, edits: true }]
                     """);
             // QuotaApiTest: an extension that meters renders and tiles, and keeps maps (MK-076).
             extension("quotas", QuotaApiTest.EXTENSION, "Quotas", """

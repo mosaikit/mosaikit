@@ -30,19 +30,31 @@ public interface StoredFiles {
             order by f.createdAt desc, f.id""")
     List<StoredFile> listOfOrganization(UUID organizationId, String extensionId, Limit limit);
 
-    /** The files of a team, newest first. */
+    /**
+     * The files of a team that a person of the team reads, newest first: those attached to a
+     * resource only when they stored them or hold a level on the resource (MK-055).
+     */
     @Query("""
             from StoredFile f
             where f.organizationId = :organizationId and f.extensionId = :extensionId and f.teamId = :teamId
+              and (f.resourceId is null or f.ownerId = :accountId
+                or function('mk_kernel.reads_resource', f.resourceId) = true)
             order by f.createdAt desc, f.id""")
-    List<StoredFile> listOfTeam(UUID organizationId, String extensionId, UUID teamId, Limit limit);
+    List<StoredFile> listOfTeam(UUID organizationId, String extensionId, UUID teamId, UUID accountId, Limit limit);
 
-    /** The files of the organization and of the teams of a person, newest first. */
+    /**
+     * The files that a person reads, newest first: those attached to a resource that they stored or
+     * on which they hold a level (MK-055, {@code mk_kernel.reads_resource}); the others of the
+     * organization, unless a guest, and of their teams.
+     */
     @Query("""
             from StoredFile f
             where f.organizationId = :organizationId and f.extensionId = :extensionId
-              and ((f.teamId is null and :guest = false)
-                or f.teamId in (select m.teamId from TeamMember m where m.accountId = :accountId))
+              and ((f.resourceId is not null
+                    and (f.ownerId = :accountId or function('mk_kernel.reads_resource', f.resourceId) = true))
+                or (f.resourceId is null
+                    and ((f.teamId is null and :guest = false)
+                      or f.teamId in (select m.teamId from TeamMember m where m.accountId = :accountId))))
             order by f.createdAt desc, f.id""")
     List<StoredFile> listReadable(UUID organizationId, String extensionId, boolean guest, UUID accountId, Limit limit);
 
