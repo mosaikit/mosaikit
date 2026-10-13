@@ -153,6 +153,19 @@ The administrators of each organization decide which apps appear, in which order
 (`/api/v1/ext/<api>/…`) and its documents (`/api/v1/data/<extension id>/…`) to that organization with
 403, so the extension needs no check of its own.
 
+Every app has a permission, `use-<app id>` (`dev.example.hello:use-hello` for the app above), which
+the kernel declares for the extension next to those of its manifest (MK-056): the administrators
+see it in their profiles, teams and exceptions, titled "Use <title of the app>". It matters only
+when the organization restricts the app to the people who hold its permission; otherwise everyone
+sees the app. The extension does not declare it; if its manifest declares a permission with the
+same name, that one counts, with its title. The app permission does not guard the API of the
+extension: check the permissions of the manifest there.
+
+A contribution to `rail.app`, `launcher.app` or `settings.section` can name a permission in
+`permission` (a name of the manifest, or `<extension>:<permission>`): the shell hides it from people
+who do not hold it, reading `GET /api/v1/shell/permissions`. Hiding is for the interface only: the
+backend still checks.
+
 `launcher.app`, the point of the first versions, is still shown in the app bar during the 0.x
 versions, with a warning in the status of the extension (`warnings` in `GET /api/v1/extensions`): rename
 it to `rail.app`.
@@ -524,8 +537,9 @@ who has to confirm it, not for the assistant only.
 > [ADR-0037](../adr/0037-resources-and-one-sharing-model.md) and
 > [ADR-0038](../adr/0038-permissions-from-manifests-and-profiles.md). The counterpart in
 > `@mosaikit/sdk` (permissions to hide what is not available, the sharing dialog) comes with the
-> next versions; the shell can already read the permissions of the person from
-> `GET /api/v1/shell/permissions`.
+> next versions; the shell already reads the permissions of the person from
+> `GET /api/v1/shell/permissions` and hides the contributions that name one the person lacks
+> (`permission`, see the app bar above).
 
 Permissions say **what** a person may do in an extension; sharing says **on which resources**. The
 extension declares both in its manifest, and the kernel keeps who has what:
@@ -696,9 +710,9 @@ What the registry does today (MK-054):
 - When an extension is no longer in the installation, the kernel removes its entries, in every
   organization, at the next start.
 
-Two mechanisms of today **move onto this model** next: the apps per role of an organization
-(MK-030) become permissions in profiles, and the sharing of the rows of a data
-collection with a team (MK-032) becomes a grant to a group.
+The apps per role of an organization (MK-030) **moved onto this model**: an app restricted by the
+organization shows to the people who hold its permission `use-<app>` (see the app bar above). The
+sharing of the rows of a data collection with a team (MK-032) becomes a grant to a group next.
 
 ## Rules
 

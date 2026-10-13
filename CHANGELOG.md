@@ -6,6 +6,14 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- The apps per role (MK-030) moved onto permissions (MK-056): every app has the permission
+  `<extension>:use-<app>`, and an app is shown to everyone or restricted to the people who hold it
+  (`restricted` in `/api/v1/organizations/{slug}/apps`; `roles` is deprecated, and
+  `[organization-admin]` reads as restricted). Apps for the administrators only stay so; apps for
+  members only are now seen by guests too.
+
 ### Added
 
 - The kernel implements permissions (MK-056, ADR-0038): the `Permissions` bean of `kernel-api`
@@ -23,6 +31,14 @@ project follows [Semantic Versioning](https://semver.org/).
   preview for invitations without side effects), every change in the audit log, and
   `GET /api/v1/shell/permissions` for the shell. The console and the move of the apps per role onto
   permissions follow.
+
+- The console of the organization has **Permissions** (MK-056): profiles with their permissions by
+  extension and the default profile of members; for each person the profile, the personal
+  exceptions and what they can do with its source; the permissions of each team. **Invite a person**
+  chooses role, profile and teams and shows the resulting permissions before sending:
+  `PUT /api/v1/organizations/{slug}/members/{email}` accepts `profile` and `teams`, and the
+  administrators of the organization, signed in to it, list and invite its members. The shell hides
+  the contributions whose `permission` the person lacks.
 
 - The kernel implements the registry of resources (MK-054): the `Resources` bean of `kernel-api`
   lets Java extensions register, update, remove, find and list their resources (type, identifier,

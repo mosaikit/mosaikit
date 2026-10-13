@@ -3,6 +3,7 @@
 package dev.mosaikit.fixture.notes;
 
 import dev.mosaikit.kernel.api.context.CurrentOrganization;
+import dev.mosaikit.kernel.api.permission.Permissions;
 import io.quarkus.security.Authenticated;
 import jakarta.transaction.Transactional;
 import jakarta.validation.Valid;
@@ -41,12 +42,17 @@ public class NoteResource {
         }
     }
 
+    /** The identifier of this extension, which it gives to the kernel when it asks for a permission. */
+    static final String EXTENSION = "dev.mosaikit.fixture.notes";
+
     private final Notes notes;
     private final CurrentOrganization organization;
+    private final Permissions permissions;
 
-    public NoteResource(Notes notes, CurrentOrganization organization) {
+    public NoteResource(Notes notes, CurrentOrganization organization, Permissions permissions) {
         this.notes = notes;
         this.organization = organization;
+        this.permissions = permissions;
     }
 
     @GET
@@ -55,6 +61,18 @@ public class NoteResource {
         return notes.findByOrganization(organization.require()).stream()
                 .map(NoteView::of)
                 .toList();
+    }
+
+    /**
+     * Every note of the organization at once, for the people who hold the permission export-notes
+     * (MK-056): the others get 403, whatever their interface shows.
+     */
+    @GET
+    @Path("export")
+    @Transactional
+    public List<NoteView> export() {
+        permissions.require(EXTENSION, "export-notes");
+        return list();
     }
 
     @POST
