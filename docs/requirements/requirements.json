@@ -1,0 +1,5 @@
+{
+  "prefix": "MK",
+  "dependsOn": [],
+  "areas": ["kernel", "extensions", "shell", "sdk", "security", "distribution", "marketplace", "ai"]
+}
