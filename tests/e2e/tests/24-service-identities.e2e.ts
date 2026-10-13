@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
+// e2e-group: C
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 import { ADMIN, BASE_URL, MARIO, ORGANIZATION } from '../support/env.js';

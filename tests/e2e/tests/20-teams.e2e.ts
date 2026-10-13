@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
+// e2e-group: C
 import { expect, test } from '@playwright/test';
 import { ADMIN, ANNA, MARIO, ORGANIZATION, type Person } from '../support/env.js';
 import { otherOrganizationPerson } from '../support/people.js';

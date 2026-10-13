@@ -44,3 +44,22 @@ for a run that starts from scratch.
   that the following files use.
 - One test per case of the manual test plan, named after it (`22.4 …`), in a `describe` named after
   the requirement.
+
+## Groups
+
+`run.ts` runs the files in groups at the same time, each on a bench of its own. A file names its
+group in a comment at its top, after the SPDX lines, and the fixture extensions it installs for the
+files after it:
+
+```ts
+// e2e-group: C
+// e2e-installs: todo
+```
+
+No shared list is edited for a new file. Within a group the files run in the order of their names;
+a file without `// e2e-group:` runs in group B, the lightest. A group that does not exist, two
+`// e2e-group:` lines, or a file of `tests/` that is not named `*.e2e.ts` stop the run with the
+list of the files that would run in no group; `node tests/e2e/run.ts --check` shows the groups
+without running anything (`npm run check:pr` and the frontend tests run it). What holds for a
+whole group, such as the fixtures installed before its first file, is in `GROUP_SETTINGS` of
+`groups.ts`.
