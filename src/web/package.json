@@ -13,9 +13,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@mosaikit/sdk": "0.1.0-SNAPSHOT",
+    "@mosaikit/sdk": "file:../../sdk/js",
     "lit": "^3.3.3",
-    "@mosaikit/ui": "0.1.0-SNAPSHOT"
+    "@mosaikit/ui": "file:../../sdk/ui"
   },
   "devDependencies": {
     "vite": "^8.3.1"
