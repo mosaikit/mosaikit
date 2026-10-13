@@ -251,6 +251,9 @@ jobs:
             tests/e2e/.work/*/results/
             tests/e2e/.work/*/installation.log
             tests/e2e/.work/*/mail/
+          # The benches work in tests/e2e/.work, a hidden directory, which upload-artifact skips by
+          # default: without this the report of a failed run was never kept.
+          include-hidden-files: true
           retention-days: 7
 
   # Snapshot of main (ADR-0035): what the repositories of extensions build and test against until the
