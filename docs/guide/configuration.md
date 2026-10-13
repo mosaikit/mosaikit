@@ -57,6 +57,13 @@ Terminate TLS at a reverse proxy or an ingress; in production the kernel sends
 |---|---|---|
 | `mosaikit.database.row-security` | `true` | requests run as the member role of the installation, so that the row-level security policies of extensions apply (MK-019); the database user needs `CREATEROLE` once |
 
+## Audit log
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `mosaikit.audit.min-retention` | `365d` | the shortest retention of the audit log, rounded up to whole days: organizations and the platform may keep their entries longer, never less, and no entry younger is ever deleted (MK-059) |
+| `mosaikit.audit.retention-check` | `6h` | how often each kernel deletes the entries older than their retention |
+
 ## Extensions
 
 | Setting | Default | Meaning |

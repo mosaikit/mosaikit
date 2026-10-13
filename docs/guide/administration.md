@@ -244,11 +244,63 @@ is refused, with the list of those grants: revoke them first.
 ## Audit log
 
 The kernel records who proposed, confirmed, rejected or ran an action of an assistant, and who
-created an organization, changed its identity settings or its members. Platform administrators
-read the latest events with `GET /api/v1/audit-events?limit=100` (up to 500, and
-`organization=<id>` for one organization). The same events are written to the log category
-`mosaikit.audit`, which can be sent to a SIEM. The events are never changed nor deleted by the
-kernel; sign-ins are not recorded yet.
+created an organization, changed its identity settings, its members, its apps, its permissions or
+the retention of its audit log. Each entry says who (`actor`), what (`action`), on which object
+(`subject`), when (`occurredAt`), with which `outcome`, and through which `channel`: `WEB` (the
+console, or a client signed in as a person), `API_KEY`, `JOB` (a job of the kernel, such as the
+retention), `ASSISTANT` (an assistant or an MCP client) or `EXTENSION`. The same entries are written to
+the log category `mosaikit.audit`, which can be sent to a SIEM. Sign-ins are not recorded yet.
+
+### Reading it
+
+The administrators of an organization, signed in to it, read the entries of their organization, and
+of no other, with `GET /api/v1/organizations/{slug}/audit-events`, newest first. They filter them by
+`actor`, `action` (one action, or every action under a prefix that ends with a dot, such as
+`permissions.`), `subject`, `channel`, and time with `from` and `to` (such as
+`2026-10-13T08:00:00Z`), and page with `offset` and `limit` (100 by default, up to 500).
+
+Platform administrators read the entries of the platform, those without organization, with
+`GET /api/v1/audit-events?platform=true`, and those of one organization with `organization=<id>`;
+the same filters apply.
+
+### Verifying it
+
+No API changes or deletes an entry, and requests cannot either in the database: the role they run
+as may only read and add entries of their organization. Each organization has its own chain of
+entries, and the platform one: every entry carries its position in the chain (`index`), the hash of
+the entry before it (`previousHash`) and its own (`hash`, SHA-256 over its content and the previous
+hash). Someone who changes, removes or inserts an entry directly in the database breaks the chain at
+that position.
+
+`GET /api/v1/organizations/{slug}/audit-events/verification` walks the chain of the organization
+(`GET /api/v1/audit-events/verification` that of the platform, or of any organization with
+`organization=<id>`) and answers `{"intact": true, "checked": 120, "firstIndex": 1, "lastIndex": 120}`,
+or the first entry that is not as it was written:
+
+```json
+{"intact": false, "checked": 41, "altered": {"index": 42, "id": "…", "problem": "CHANGED"}}
+```
+
+`CHANGED` means the content of the entry, or its link to the entry before it, is not what the kernel
+wrote; `MISSING` that the entry at that position is gone and the retention did not delete it. The
+chain proves that the log was not altered after the fact by someone without access to the kernel;
+whoever administers the database could rewrite a whole chain, so keep copies of the `mosaikit.audit`
+log category, or of the last `hash`, outside the database.
+
+### Retention
+
+Entries are kept until the administrators set a retention: `PUT
+/api/v1/organizations/{slug}/audit-events/retention` with `{"retentionDays": 730}`, or `null` to keep
+every entry again (`/api/v1/audit-events/retention` for the platform). The installation sets a
+minimum, `mosaikit.audit.min-retention` (365 days by default, see
+[configuration](configuration.md#audit-log)): a shorter retention is refused, and no entry younger
+than the minimum is ever deleted, even when the minimum is raised later. `GET` on the same path
+answers the `retentionDays` set, the `minimumDays` and the `effectiveDays`.
+
+Every few hours (`mosaikit.audit.retention-check`) each kernel deletes the entries older than the
+retention of their organization, oldest first, and records it in the same chain
+(`audit.entries.deleted`, channel `JOB`). The chain stays verifiable: the kernel keeps the hash of the
+last deleted entry, and the verification starts from there (`firstIndex`).
 
 ## Assistants and MCP clients
 

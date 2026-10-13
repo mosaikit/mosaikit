@@ -99,6 +99,7 @@ public class AiActions {
             return draft;
         });
         audit.append(
+                AuditEvent.Channel.ASSISTANT,
                 caller.username(),
                 Optional.of(caller.organizationId()),
                 PROPOSED,
@@ -135,6 +136,7 @@ public class AiActions {
         if (tool.isEmpty()) {
             complete(draft, false, null, "No active extension offers the tool any more.");
             audit.append(
+                    AuditEvent.Channel.ASSISTANT,
                     caller.username(),
                     Optional.of(caller.organizationId()),
                     CONFIRMED,
@@ -165,6 +167,7 @@ public class AiActions {
         Instant now = Instant.now(clock);
         ActionDraft draft = decide(id, caller, now, ActionDraft::reject);
         audit.append(
+                AuditEvent.Channel.ASSISTANT,
                 caller.username(),
                 Optional.of(caller.organizationId()),
                 REJECTED,
@@ -221,6 +224,7 @@ public class AiActions {
         } catch (RuntimeException e) {
             detail.put("error", String.valueOf(e.getMessage()));
             audit.append(
+                    AuditEvent.Channel.ASSISTANT,
                     caller.username(),
                     Optional.of(caller.organizationId()),
                     action,
@@ -232,6 +236,7 @@ public class AiActions {
         }
         detail.put("status", response.status());
         audit.append(
+                AuditEvent.Channel.ASSISTANT,
                 caller.username(),
                 Optional.of(caller.organizationId()),
                 action,

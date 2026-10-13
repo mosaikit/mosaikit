@@ -50,6 +50,19 @@ project follows [Semantic Versioning](https://semver.org/).
   sharing dialog, the `@mosaikit/sdk` counterpart and the move of the team sharing of documents
   (MK-032) onto this model come next.
 
+- The audit log is tamper-evident (MK-059, kernel part): each organization has one hash chain of
+  entries, and the platform one, appended under a row lock of the chain so that concurrent writers
+  and several kernels keep it in order; every entry carries its `channel` (`WEB`, `API_KEY`, `JOB`,
+  `ASSISTANT`, `EXTENSION`), its `index`, `previousHash` and `hash`. Migration V20 adds the columns,
+  the table `audit_chain` and chains the existing entries; the table is under row-level security and
+  the member role of requests may no longer update or delete it. Administrators of an organization
+  list and filter its entries only (`/api/v1/organizations/{slug}/audit-events`: actor, action or
+  prefix, subject, channel, time range, paging), verify its chain (`/verification`, which reports
+  the first entry `CHANGED` or `MISSING` at its position) and set its retention (`/retention`), never
+  below `mosaikit.audit.min-retention` (365 days by default); a scheduled job
+  (`mosaikit.audit.retention-check`, 6 hours) deletes older entries and keeps the hash of the last one
+  as the anchor of the chain. `GET /api/v1/audit-events` gains the same filters and `platform=true`.
+
 - The kernel implements permissions (MK-056, ADR-0038): the `Permissions` bean of `kernel-api`
   answers for the person and the organization of the request, deny by default, with profiles
   (one per member, the assigned one or the default profile of members), teams and personal

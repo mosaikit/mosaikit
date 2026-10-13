@@ -49,6 +49,24 @@ public interface KernelConfig {
         Duration linkMaxValidity();
     }
 
+    /** The audit log (MK-059). */
+    Audit audit();
+
+    /** Settings of the audit log. */
+    interface Audit {
+
+        /**
+         * The shortest retention of the entries of the audit log: organizations may keep their entries
+         * longer, never less. Rounded up to whole days.
+         */
+        @WithDefault("365d")
+        Duration minRetention();
+
+        /** How often each kernel deletes the entries older than their retention. */
+        @WithDefault("6h")
+        Duration retentionCheck();
+    }
+
     /** Settings of local accounts. */
     interface Accounts {
 
