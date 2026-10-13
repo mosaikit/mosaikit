@@ -74,6 +74,7 @@ public class RowSecurity {
                 grant(statement, schema, name);
             }
             appendOnly(statement, name);
+            readOnly(statement, name);
             role = name;
             LOG.infof("Row-level security on: requests of organizations run as role %s", name);
         } catch (SQLException e) {
@@ -120,6 +121,39 @@ public class RowSecurity {
         statement.execute("revoke update, delete, truncate on " + s + ".audit_event from " + r);
         // nosemgrep: java.lang.security.audit.formatted-sql-string.formatted-sql-string
         statement.execute("revoke all on " + s + ".audit_chain from " + r);
+    }
+
+    /**
+     * The tables of the installation that requests may read but only the kernel writes, as the owner
+     * ({@link KernelWrites}): accounts and what signs them in, service identities, organizations, the
+     * settings of the platform and the levels of sharing. They have no row-level security and no
+     * organization, so a statement of an extension run as the member role would change them for the
+     * whole installation.
+     */
+    static final List<String> READ_ONLY = List.of(
+            "platform_setting",
+            "user_account",
+            "account_session",
+            "remember_token",
+            "email_confirmation",
+            "access_key",
+            "service_identity",
+            "service_key",
+            "organization",
+            "organization_email_domain",
+            "sharing_level");
+
+    /*
+     * Table names are constants of this class and the schema and the role are quoted by quote(), so
+     * they cannot end the identifier nor add SQL.
+     */
+    private void readOnly(Statement statement, String role) throws SQLException {
+        String r = quote(role);
+        String s = quote(kernelSchema);
+        for (String table : READ_ONLY) {
+            // nosemgrep: java.lang.security.audit.formatted-sql-string.formatted-sql-string
+            statement.execute("revoke insert, update, delete, truncate on " + s + "." + quote(table) + " from " + r);
+        }
     }
 
     private static String database(Connection connection) throws SQLException {

@@ -54,6 +54,19 @@ The audit log (`audit_event`) is now under row-level security, and the request r
 and read it (MK-059). The registry of resources, the grants of sharing and the permissions of
 profiles, teams and members (MK-054, MK-055, MK-056) are kernel tables under row-level security too.
 
+### Refined on 2026-10-14
+
+The tables of the installation that have neither row-level security nor an organization (accounts,
+sessions, remember-me tokens, email confirmations, access keys, service identities and their keys,
+organizations and their email domains, the settings of the platform, the levels of sharing) are
+read-only for the request role: a statement of an extension that forgets where it is cannot change
+them for the whole installation. The kernel writes them as the owner: the services marked
+`@KernelWrites` run their transaction with `set_config('role', 'none', true)`.
+
+The request role keeps extensions from reaching data by mistake; it is not a barrier against
+hostile SQL, which runs on a connection of the owner and can reset its role. Extensions are
+installed by platform administrators, and signed packages (MK-013) say who published them.
+
 ## Alternatives considered
 
 - **A schema per organization.** Strong separation, but one migration per organization and plugin,

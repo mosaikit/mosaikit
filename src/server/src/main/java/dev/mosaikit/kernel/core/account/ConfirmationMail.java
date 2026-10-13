@@ -3,6 +3,7 @@
 package dev.mosaikit.kernel.core.account;
 
 import dev.mosaikit.kernel.core.config.KernelConfig;
+import dev.mosaikit.kernel.core.data.KernelWrites;
 import dev.mosaikit.kernel.core.error.ServiceUnavailableException;
 import io.quarkus.mailer.Mail;
 import io.quarkus.mailer.reactive.ReactiveMailer;
@@ -30,6 +31,7 @@ import org.jboss.logging.Logger;
  * most {@code mosaikit.accounts.mail-timeout}, so that a slow or stuck mail server never holds a
  * database transaction.
  */
+@KernelWrites
 @ApplicationScoped
 public class ConfirmationMail {
 

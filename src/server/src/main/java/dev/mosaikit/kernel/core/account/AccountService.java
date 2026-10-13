@@ -5,6 +5,7 @@ package dev.mosaikit.kernel.core.account;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.mosaikit.kernel.core.config.KernelConfig;
+import dev.mosaikit.kernel.core.data.KernelWrites;
 import dev.mosaikit.kernel.core.error.ConflictException;
 import dev.mosaikit.kernel.core.error.ForbiddenOperationException;
 import dev.mosaikit.kernel.core.error.InvalidInputException;
@@ -38,6 +39,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /** Creates local accounts, resolves the current one and manages memberships (MK-003, MK-017). */
+@KernelWrites
 @ApplicationScoped
 @Transactional
 public class AccountService {

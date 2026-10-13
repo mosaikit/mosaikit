@@ -3,6 +3,7 @@
 package dev.mosaikit.kernel.core.organization;
 
 import dev.mosaikit.kernel.api.events.PlatformEvents;
+import dev.mosaikit.kernel.core.data.KernelWrites;
 import dev.mosaikit.kernel.core.error.ConflictException;
 import dev.mosaikit.kernel.core.error.ResourceNotFoundException;
 import dev.mosaikit.kernel.core.events.PlatformEventLog;
@@ -21,6 +22,7 @@ import java.util.TreeSet;
 import java.util.stream.Collectors;
 
 /** Creates and looks up organizations. */
+@KernelWrites
 @ApplicationScoped
 @Transactional
 public class OrganizationService {
