@@ -26,6 +26,17 @@ project follows [Semantic Versioning](https://semver.org/).
   HMAC-SHA256 by `mosaikit.files.link-key` or a key derived from the master key of the store of
   credentials, with former keys accepted during a rotation (migration V26). Making a link is
   audited, and its use once an hour.
+- Quotas of organizations (MK-076): the kernel measures the storage of each organization (its
+  files and the space that extensions report for their resources, new tables `quota_limit`,
+  `quota_total`, `quota_usage` and `quota_space` under row-level security, migration V27) and
+  refuses an upload beyond its limit with `403 Quota exceeded`, a problem detail that names the
+  limit in `detail` and in the member `quota`; two uploads at the same time cannot both pass it.
+  Limits are the defaults of the installation (`mosaikit.quotas.storage`,
+  `mosaikit.quotas.limits.*`) or those that platform administrators set for one organization
+  (`PUT, DELETE /api/v1/organizations/{slug}/quotas/{measure}`, audited). The administrators of the
+  organization see each measure with its limit and the consumption of a month by person, current at
+  every action, on the new page Administration > Quotas and through
+  `GET /api/v1/organizations/{slug}/quotas` and `GET /api/v1/organizations/{slug}/quotas/usage`.
 - Files of extensions (MK-041): the kernel keeps them in a directory of the server (the default,
   `files/` of the installation, `data/files/` of the portable, a volume in compose and Helm) or in a
   bucket of an S3-compatible object store such as Amazon S3, MinIO, Ceph or Garage

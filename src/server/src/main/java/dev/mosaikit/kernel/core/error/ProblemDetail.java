@@ -3,6 +3,7 @@
 package dev.mosaikit.kernel.core.error;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import dev.mosaikit.kernel.core.error.QuotaExceededException.Quota;
 import java.util.List;
 
 /**
@@ -13,9 +14,11 @@ import java.util.List;
  * @param status HTTP status code
  * @param detail explanation specific to this occurrence, telling the caller what to do
  * @param errors field-level errors, present for validation problems
+ * @param quota the limit that refused the action, present for a quota exceeded (MK-076)
  */
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
-public record ProblemDetail(String type, String title, int status, String detail, List<FieldError> errors) {
+public record ProblemDetail(
+        String type, String title, int status, String detail, List<FieldError> errors, Quota quota) {
 
     /** Media type of problem details. */
     public static final String MEDIA_TYPE = "application/problem+json";
@@ -25,5 +28,9 @@ public record ProblemDetail(String type, String title, int status, String detail
 
     public ProblemDetail {
         errors = errors == null ? List.of() : List.copyOf(errors);
+    }
+
+    public ProblemDetail(String type, String title, int status, String detail, List<FieldError> errors) {
+        this(type, title, status, detail, errors, null);
     }
 }
