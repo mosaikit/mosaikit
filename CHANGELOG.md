@@ -466,6 +466,12 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Security
 
+- A file attached to a registered resource (MK-041, MK-054) follows the sharing of the resource
+  (MK-055): reading, listing and linking it take a level on the resource, attaching, replacing and
+  deleting a level that edits; the person who stored it keeps it. Before, every member of the
+  organization read the files of a resource not shared with them, and the people it was shared with
+  to edit could not delete them. The REST API, the `FileStorage` bean and the row-level security
+  (migration V29, `mk_kernel.reads_resource()`) apply it; files without a resource do not change.
 - jackson-databind 2.22.3 over the version of the Quarkus BOM, for CVE-2026-91776 and
   CVE-2026-91777.
 - The marketplace inspects a package in a directory of the extensions directory, ignored by the

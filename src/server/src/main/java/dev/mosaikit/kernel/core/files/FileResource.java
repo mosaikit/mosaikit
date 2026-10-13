@@ -85,7 +85,8 @@ public class FileResource {
     @Operation(
             summary = "List the files of an extension, newest first",
             description = "Those of the organization and of the teams of the person, or, with ?team=<id>, "
-                    + "those of that team of the person only.")
+                    + "those of that team of the person only; a file attached to a resource only when the person "
+                    + "holds a level on it or stored the file.")
     public List<FileView> list(
             @PathParam("extension") String extension,
             @QueryParam("team") UUID team,
@@ -101,7 +102,8 @@ public class FileResource {
             summary = "Store a file",
             description = "The body is the content, Content-Type its media type, ?name= its name. With "
                     + "?team=<id>, shared with that team of the person only; with ?resource=<type>/<id>, "
-                    + "attached to a registered resource of the extension. 413 beyond mosaikit.files.max-size.")
+                    + "attached to a registered resource of the extension, which takes a level that edits it. 413 beyond "
+                    + "mosaikit.files.max-size.")
     public Response store(
             @PathParam("extension") String extension,
             @QueryParam("name") String name,
@@ -172,7 +174,8 @@ public class FileResource {
     @Path("/{id}")
     @Operation(
             summary = "Delete a file",
-            description = "Its owner, an owner of its team or an administrator of the organization may.")
+            description = "Its owner, an owner of its team or an administrator of the organization may; for a "
+                    + "file attached to a resource, its owner or a person with a level that edits the resource.")
     public Response delete(@PathParam("extension") String extension, @PathParam("id") UUID id) {
         files.delete(extension, id);
         return Response.noContent().build();

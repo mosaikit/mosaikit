@@ -520,6 +520,14 @@ the whole organization or of one of its teams (MK-032), a person reads a file of
 they are in it, a guest only the files of their teams, and a file the person may not read is not
 found, even with its identifier. Storing and deleting are in the audit log.
 
+A file attached to a registered resource (`attachedTo`, MK-054) follows the sharing of that resource
+instead (MK-055): a person reads it, finds it in lists and links to it when they hold any level on the
+resource, and attaches, replaces or deletes files of it with a level that `edits`; the person who
+stored a file keeps it. The owner of the resource and the administrators of the organization hold
+every level (not on the kernel's types private to their subjects, ADR-0037). So declare a level that
+edits on a type whose files others should change. Code that runs without a person keeps the rules of
+the organization and its teams; a signed link carries its own grant.
+
 From Java, inject `FileStorage` (`dev.mosaikit.kernel.api.files`) and name your extension in every
 call, as with `Resources`; content is streamed both ways:
 
@@ -536,7 +544,8 @@ try (FileContent content = files.read(EXTENSION, photo.id())) {
     content.stream().transferTo(output);
 }
 List<StoredFile> mine = files.list(EXTENSION, null, 0, 100);    // or of one team
-files.delete(EXTENSION, photo.id());                            // owner, team owner, administrators
+files.delete(EXTENSION, photo.id());                            // owner, team owner, administrators;
+                                                                 // of a resource: a level that edits
 ```
 
 The calls join the transaction of the caller: a file whose transaction rolls back leaves the store

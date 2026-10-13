@@ -448,8 +448,10 @@ Extensions keep files through the kernel (MK-041): the content goes to the store
 installation, under `<organization id>/<extension id>/<file id>`, and the database keeps the name,
 type, size, SHA-256 checksum, owner and team of each file. Extensions never see the credentials of
 the store. A person reads a file of their organization, or of a team they are in; a guest only the
-files of their teams. A file that a person may not read answers "not found", even with its
-identifier. Every file stored or deleted is in the audit log, as `file.stored` and `file.deleted`.
+files of their teams. A file attached to a resource of the extension, such as the cover of an
+album, follows the sharing of that resource instead: it is read by the people the resource is shared
+with, and replaced or deleted by those with a level that edits it. A file that a person may not read
+answers "not found", even with its identifier. Every file stored or deleted is in the audit log, as `file.stored` and `file.deleted`.
 
 Choose the store with `mosaikit.files.store` (see [configuration](configuration.md#files)):
 
