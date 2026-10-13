@@ -13,7 +13,7 @@ export function jdkTool(name: string): string {
   return home ? join(home, 'bin', exe) : exe;
 }
 
-/** The JAR of the plugin API in an installation, which holds PackageSigningTool. */
+/** The JAR of the extension API in an installation, which holds PackageSigningTool. */
 export function kernelApiJar(installation: string): string {
   const lib = join(installation, 'bin', 'kernel', 'lib', 'main');
   const jar = readdirSync(lib).find((name) => /mosaikit-kernel-api-.*\.jar$/.test(name));
@@ -24,7 +24,7 @@ export function kernelApiJar(installation: string): string {
 }
 
 /**
- * The signing tool of the plugin packages (MK-013) of an installation, with a key of its own in
+ * The signing tool of the extension packages (MK-013) of an installation, with a key of its own in
  * `keys`: keygen, sign, index, trust.
  */
 export class Signing {

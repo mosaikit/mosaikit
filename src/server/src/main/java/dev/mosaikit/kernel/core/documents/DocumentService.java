@@ -5,16 +5,16 @@ package dev.mosaikit.kernel.core.documents;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dev.mosaikit.kernel.api.plugin.PluginManifest;
+import dev.mosaikit.kernel.api.extension.ExtensionManifest;
 import dev.mosaikit.kernel.core.error.ConflictException;
 import dev.mosaikit.kernel.core.error.ForbiddenOperationException;
 import dev.mosaikit.kernel.core.error.InvalidInputException;
 import dev.mosaikit.kernel.core.error.ResourceNotFoundException;
+import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
+import dev.mosaikit.kernel.core.extension.InstalledExtension;
 import dev.mosaikit.kernel.core.identity.RequestOrganization;
 import dev.mosaikit.kernel.core.live.LiveBus;
 import dev.mosaikit.kernel.core.live.LiveEvent;
-import dev.mosaikit.kernel.core.plugin.InstalledPlugin;
-import dev.mosaikit.kernel.core.plugin.PluginRegistry;
 import dev.mosaikit.kernel.core.teams.TeamService;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.data.Limit;
@@ -29,8 +29,8 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * The collections of documents of plugins without a backend (ADR-0031, MK-046): only an active
- * plugin that declares a collection in its manifest has it, and a request reads and writes only the
+ * The collections of documents of extensions without a backend (ADR-0031, MK-046): only an active
+ * extension that declares a collection in its manifest has it, and a request reads and writes only the
  * documents of its organization.
  */
 @ApplicationScoped
@@ -46,8 +46,8 @@ public class DocumentService {
     /** Most documents of one page. */
     static final int MAX_PAGE = 500;
 
-    private final PluginDocuments documents;
-    private final PluginRegistry registry;
+    private final ExtensionDocuments documents;
+    private final ExtensionRegistry registry;
     private final RequestOrganization organization;
     private final TeamService teams;
     private final SecurityIdentity identity;
@@ -57,8 +57,8 @@ public class DocumentService {
 
     @Inject
     public DocumentService(
-            PluginDocuments documents,
-            PluginRegistry registry,
+            ExtensionDocuments documents,
+            ExtensionRegistry registry,
             RequestOrganization organization,
             SecurityIdentity identity,
             ObjectMapper json,
@@ -68,8 +68,8 @@ public class DocumentService {
     }
 
     DocumentService(
-            PluginDocuments documents,
-            PluginRegistry registry,
+            ExtensionDocuments documents,
+            ExtensionRegistry registry,
             RequestOrganization organization,
             SecurityIdentity identity,
             ObjectMapper json,
@@ -90,45 +90,46 @@ public class DocumentService {
      * The documents of a collection, newest first: those of the whole organization, or those shared
      * with a team of the person (MK-032). A guest of the organization has only those of its teams.
      */
-    public List<DocumentView> list(String plugin, String collection, UUID team, int offset, int limit) {
+    public List<DocumentView> list(String extension, String collection, UUID team, int offset, int limit) {
         UUID org = organization.require();
-        declared(plugin, collection);
+        declared(extension, collection);
         int size = Math.clamp(limit, 1, MAX_PAGE);
         int start = Math.max(offset, 0);
         Limit page = Limit.range(start + 1L, start + (long) size);
         if (team != null) {
             teams.requireIn(team);
-            return documents.listOfTeam(org, plugin, collection, team, page).stream()
+            return documents.listOfTeam(org, extension, collection, team, page).stream()
                     .map(this::view)
                     .toList();
         }
         if (organization.guest()) {
             return List.of();
         }
-        return documents.list(org, plugin, collection, page).stream()
+        return documents.list(org, extension, collection, page).stream()
                 .map(this::view)
                 .toList();
     }
 
-    public DocumentView get(String plugin, String collection, UUID id) {
-        return view(find(plugin, collection, id));
+    public DocumentView get(String extension, String collection, UUID id) {
+        return view(find(extension, collection, id));
     }
 
     /** Adds a document for the whole organization, or shared with a team of the person (MK-032). */
-    public DocumentView create(String plugin, String collection, UUID team, JsonNode data) {
+    public DocumentView create(String extension, String collection, UUID team, JsonNode data) {
         UUID org = organization.require();
-        declared(plugin, collection);
+        declared(extension, collection);
         if (team != null) {
             teams.requireIn(team);
         } else if (organization.guest()) {
             throw new ForbiddenOperationException("A guest shares documents only with their teams.");
         }
         String text = checked(data);
-        if (documents.count(org, plugin, collection) >= MAX_DOCUMENTS) {
+        if (documents.count(org, extension, collection) >= MAX_DOCUMENTS) {
             throw new ConflictException("The collection " + collection + " has " + MAX_DOCUMENTS
                     + " documents already, the most it can hold.");
         }
-        PluginDocument document = new PluginDocument(org, plugin, collection, team, text, author(), clock.instant());
+        ExtensionDocument document =
+                new ExtensionDocument(org, extension, collection, team, text, author(), clock.instant());
         documents.insert(document);
         changed(document, "created");
         return view(document);
@@ -139,8 +140,8 @@ public class DocumentService {
      *
      * @param expectedVersion the version the caller read, or {@code null} to overwrite any version
      */
-    public DocumentView replace(String plugin, String collection, UUID id, JsonNode data, Integer expectedVersion) {
-        PluginDocument document = find(plugin, collection, id);
+    public DocumentView replace(String extension, String collection, UUID id, JsonNode data, Integer expectedVersion) {
+        ExtensionDocument document = find(extension, collection, id);
         if (expectedVersion != null && expectedVersion != document.getVersion()) {
             throw new ConflictException("The document changed since version " + expectedVersion
                     + ": read it again, it is at version " + document.getVersion() + ".");
@@ -151,8 +152,8 @@ public class DocumentService {
         return view(document);
     }
 
-    public void delete(String plugin, String collection, UUID id) {
-        PluginDocument document = find(plugin, collection, id);
+    public void delete(String extension, String collection, UUID id) {
+        ExtensionDocument document = find(extension, collection, id);
         documents.delete(document);
         changed(document, "deleted");
     }
@@ -162,7 +163,7 @@ public class DocumentService {
      * which document changed, so that each page reads it again with its own rights; for a document
      * of a team, only to its members (MK-032).
      */
-    private void changed(PluginDocument document, String action) {
+    private void changed(ExtensionDocument document, String action) {
         Map<String, Object> data = new HashMap<>();
         data.put("id", document.getId().toString());
         data.put("action", action);
@@ -170,20 +171,20 @@ public class DocumentService {
             data.put("team", document.getTeamId().toString());
         }
         live.publish(new LiveEvent(
-                "documents." + document.getPluginId() + "." + document.getCollection(),
+                "documents." + document.getExtensionId() + "." + document.getCollection(),
                 organization.require(),
                 null,
                 document.getTeamId(),
                 data));
     }
 
-    private PluginDocument find(String plugin, String collection, UUID id) {
+    private ExtensionDocument find(String extension, String collection, UUID id) {
         UUID org = organization.require();
-        declared(plugin, collection);
+        declared(extension, collection);
         return documents
                 .findById(id)
                 .filter(document -> document.getOrganizationId().equals(org)
-                        && document.getPluginId().equals(plugin)
+                        && document.getExtensionId().equals(extension)
                         && document.getCollection().equals(collection)
                         && readable(document))
                 .orElseThrow(() -> new ResourceNotFoundException("No document " + id + " in " + collection + "."));
@@ -193,7 +194,7 @@ public class DocumentService {
      * Whether the person reads a document, as the row-level security decides too: one of the whole
      * organization unless a guest, one of a team if in the team (MK-032).
      */
-    private boolean readable(PluginDocument document) {
+    private boolean readable(ExtensionDocument document) {
         if (document.getTeamId() == null) {
             return !organization.guest();
         }
@@ -202,16 +203,16 @@ public class DocumentService {
                 .isPresent();
     }
 
-    /** The collection must be declared by an active plugin; otherwise it does not exist. */
-    private void declared(String plugin, String collection) {
-        boolean declared = registry.findActive(plugin)
-                .flatMap(InstalledPlugin::manifest)
-                .flatMap(PluginManifest::data)
+    /** The collection must be declared by an active extension; otherwise it does not exist. */
+    private void declared(String extension, String collection) {
+        boolean declared = registry.findActive(extension)
+                .flatMap(InstalledExtension::manifest)
+                .flatMap(ExtensionManifest::data)
                 .filter(data -> data.declares(collection))
                 .isPresent();
         if (!declared) {
             throw new ResourceNotFoundException(
-                    "No active plugin " + plugin + " declares the collection " + collection + ".");
+                    "No active extension " + extension + " declares the collection " + collection + ".");
         }
     }
 
@@ -234,7 +235,7 @@ public class DocumentService {
         return identity.getPrincipal().getName();
     }
 
-    private DocumentView view(PluginDocument document) {
+    private DocumentView view(ExtensionDocument document) {
         try {
             return new DocumentView(
                     document.getId(),

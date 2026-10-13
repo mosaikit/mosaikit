@@ -31,11 +31,11 @@ import org.junit.jupiter.api.Test;
 
 /** Teams with owners, members and guests, and the documents shared with a team (MK-032). */
 @QuarkusTest
-@TestProfile(TestPlugins.class)
+@TestProfile(TestExtensions.class)
 @Tag("MK-032")
 class TeamTest {
 
-    static final Path PLUGINS = TestPlugins.PLUGINS;
+    static final Path EXTENSIONS = TestExtensions.EXTENSIONS;
     static final String NOTES = "/api/v1/data/dev.mosaikit.test.notes/notes";
     static final String PASSWORD = "a long enough password";
 
@@ -161,7 +161,7 @@ class TeamTest {
         asGuest.body(Map.of("text", "x")).post(NOTES).then().statusCode(403);
         asGuest.body(Map.of("name", "Mine")).post("/api/v1/teams").then().statusCode(403);
         // No API of the organization beyond their teams.
-        asGuest.get("/api/v1/shell/plugins").then().statusCode(200);
+        asGuest.get("/api/v1/shell/extensions").then().statusCode(200);
         asGuest.get("/api/v1/ai/tools").then().statusCode(403);
         asGuest.get("/api/v1/organizations/" + town + "/apps").then().statusCode(403);
 
@@ -250,7 +250,7 @@ class TeamTest {
                 set.execute();
             }
             try (var count =
-                    connection.prepareStatement("select count(*) from mk_kernel.plugin_document where id = ?")) {
+                    connection.prepareStatement("select count(*) from mk_kernel.extension_document where id = ?")) {
                 count.setObject(1, UUID.fromString(document));
                 try (var result = count.executeQuery()) {
                     result.next();

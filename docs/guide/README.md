@@ -8,7 +8,7 @@ For the people who install, run and use Mosaikit. Developers find their guide in
 | [Installation](installation.md) | Choosing a distribution and starting it the first time |
 | [Using Mosaikit](using.md) | Everyone: signing in, the launcher, apps |
 | [Administration](administration.md) | Platform administrators: organizations, sign-in through Keycloak, roles |
-| [Plugins](plugins.md) | Administrators: installing, updating and trusting plugins |
+| [Extensions](extensions.md) | Administrators: installing, updating and trusting extensions |
 | [Configuration](configuration.md) | Operators: every setting and its environment variable |
 | [Operations](operations.md) | Operators: health, logs, backup and restore, upgrades, troubleshooting |
 

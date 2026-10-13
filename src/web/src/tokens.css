@@ -2,7 +2,7 @@
  * SPDX-FileCopyrightText: 2026 Massimo Antonini
  * SPDX-License-Identifier: MPL-2.0
  *
- * Design tokens of the shell. Plugins read them through CSS custom properties, which cross the
+ * Design tokens of the shell. Extensions read them through CSS custom properties, which cross the
  * Shadow DOM boundary.
  */
 :root {

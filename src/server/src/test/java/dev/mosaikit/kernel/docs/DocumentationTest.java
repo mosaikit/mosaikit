@@ -46,8 +46,8 @@ class DocumentationTest {
         Set<String> served = new TreeSet<>();
         for (Iterator<String> paths = openApi.path("paths").fieldNames(); paths.hasNext(); ) {
             String path = paths.next();
-            if (path.startsWith("/api/v1/test/") || path.startsWith("/api/v1/p/")) {
-                continue; // resources of the tests, and APIs of plugins, documented by the plugins
+            if (path.startsWith("/api/v1/test/") || path.startsWith("/api/v1/ext/")) {
+                continue; // resources of the tests, and APIs of extensions, documented by the extensions
             }
             openApi.path("paths").path(path).fieldNames().forEachRemaining(method -> {
                 if (Set.of("get", "post", "put", "delete", "patch").contains(method)) {

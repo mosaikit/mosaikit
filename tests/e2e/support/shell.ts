@@ -80,11 +80,11 @@ export interface Activity {
 }
 
 export async function activities(person: Person): Promise<Activity[]> {
-  return (await api(person, '/api/v1/p/fixture-activities/activities')).body as Activity[];
+  return (await api(person, '/api/v1/ext/fixture-activities/activities')).body as Activity[];
 }
 
 export async function createActivity(person: Person, title: string): Promise<Activity> {
-  const { status, body } = await api(person, '/api/v1/p/fixture-activities/activities', {
+  const { status, body } = await api(person, '/api/v1/ext/fixture-activities/activities', {
     method: 'POST',
     body: JSON.stringify({ title }),
   });
@@ -92,7 +92,7 @@ export async function createActivity(person: Person, title: string): Promise<Act
   return body as Activity;
 }
 
-export interface PluginStatus {
+export interface ExtensionStatus {
   readonly id: string;
   readonly version: string;
   readonly status: string;
@@ -101,11 +101,11 @@ export interface PluginStatus {
   readonly warnings: readonly string[];
 }
 
-export async function plugins(): Promise<PluginStatus[]> {
-  const { body } = await api(ADMIN, '/api/v1/plugins');
+export async function extensions(): Promise<ExtensionStatus[]> {
+  const { body } = await api(ADMIN, '/api/v1/extensions');
   return Array.isArray(body)
-    ? (body as PluginStatus[])
-    : (body as { plugins: PluginStatus[] }).plugins;
+    ? (body as ExtensionStatus[])
+    : (body as { extensions: ExtensionStatus[] }).extensions;
 }
 
 /** A title that no other run of the tests used. */

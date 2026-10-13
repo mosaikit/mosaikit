@@ -24,7 +24,7 @@ import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 /**
- * The tools of the active plugins, for assistants (MK-015). They act on the organization of the
+ * The tools of the active extensions, for assistants (MK-015). They act on the organization of the
  * request, with the permissions of the person; the tools that change data wait for the person to
  * confirm them.
  */
@@ -66,7 +66,7 @@ public class AiResource {
     @Path("/assistant/replies")
     @Operation(
             summary = "Ask the assistant",
-            description = "It answers the last message with the tools of the plugins; changes become drafts.")
+            description = "It answers the last message with the tools of the extensions; changes become drafts.")
     public Assistant.Reply ask(
             @HeaderParam(HttpHeaders.AUTHORIZATION) String authorization,
             @CookieParam(SessionResource.COOKIE) String session,
@@ -76,7 +76,7 @@ public class AiResource {
 
     @GET
     @Path("/tools")
-    @Operation(summary = "List the tools of the active plugins")
+    @Operation(summary = "List the tools of the active extensions")
     public List<ToolView> tools() {
         organization.require();
         return actions.tools().stream().map(ToolView::of).toList();
@@ -130,7 +130,7 @@ public class AiResource {
     }
 
     /**
-     * The person, with the credentials that the call to the plugin carries: the {@code
+     * The person, with the credentials that the call to the extension carries: the {@code
      * Authorization} header, or the session cookie of the shell.
      */
     private Caller caller(String authorization, String session) {

@@ -4,11 +4,11 @@
 /** Handler of an event published on a topic. */
 export type EventHandler = (payload: unknown, topic: string) => void;
 
-/** Receives failures of event handlers, so that one plugin cannot break another. */
+/** Receives failures of event handlers, so that one extension cannot break another. */
 export type HandlerErrorListener = (error: unknown, topic: string) => void;
 
 /**
- * Publish and subscribe channel between plugins in the browser.
+ * Publish and subscribe channel between extensions in the browser.
  *
  * Topics are dotted names such as `maps.selection.changed`. A subscription may end with `.*`
  * to receive every topic below a prefix. Handlers run synchronously; an error thrown by one handler

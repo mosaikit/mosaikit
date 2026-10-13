@@ -12,8 +12,8 @@ SPDX-FileCopyrightText = "The Apache Software Foundation"
 SPDX-License-Identifier = "Apache-2.0"
 
 [[annotations]]
-# Placeholder standing for a plugin JAR in the kernel tests.
-path = "src/server/src/test/resources/plugins/java/lib/code.jar"
+# Placeholder standing for an extension JAR in the kernel tests.
+path = "src/server/src/test/resources/extensions/java/lib/code.jar"
 SPDX-FileCopyrightText = "2026 Massimo Antonini"
 SPDX-License-Identifier = "MPL-2.0"
 

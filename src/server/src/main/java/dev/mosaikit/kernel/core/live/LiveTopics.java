@@ -3,8 +3,8 @@
 package dev.mosaikit.kernel.core.live;
 
 import dev.mosaikit.kernel.core.apps.AppSettings;
-import dev.mosaikit.kernel.core.plugin.InstalledPlugin;
-import dev.mosaikit.kernel.core.plugin.PluginRegistry;
+import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
+import dev.mosaikit.kernel.core.extension.InstalledExtension;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.util.Optional;
 import java.util.UUID;
@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 
 /**
  * Which topics a person may subscribe to (MK-031): the changes of the documents of a collection of
- * an active plugin, the events of an active plugin, and their own notifications. The plugins
+ * an active extension, the events of an active extension, and their own notifications. The extensions
  * that the organization turned off are refused, as their API is (MK-030).
  */
 @ApplicationScoped
@@ -23,12 +23,12 @@ public class LiveTopics {
     public static final String NOTIFICATIONS = "notifications";
 
     static final Pattern DOCUMENTS = Pattern.compile("^documents\\.([a-z0-9][a-z0-9.-]*)\\.([a-z][a-z0-9-]{0,63})$");
-    static final Pattern PLUGIN = Pattern.compile("^plugin\\.([a-z0-9][a-z0-9.-]*?)\\.([a-z][a-z0-9.-]{0,99})$");
+    static final Pattern EXTENSION = Pattern.compile("^extension\\.([a-z0-9][a-z0-9.-]*?)\\.([a-z][a-z0-9.-]{0,99})$");
 
-    private final PluginRegistry registry;
+    private final ExtensionRegistry registry;
     private final AppSettings apps;
 
-    public LiveTopics(PluginRegistry registry, AppSettings apps) {
+    public LiveTopics(ExtensionRegistry registry, AppSettings apps) {
         this.registry = registry;
         this.apps = apps;
     }
@@ -39,42 +39,42 @@ public class LiveTopics {
             return Optional.empty();
         }
         if (organization.isEmpty()) {
-            return Optional.of("choose an organization: the topics of plugins belong to one");
+            return Optional.of("choose an organization: the topics of extensions belong to one");
         }
         Matcher documents = DOCUMENTS.matcher(topic);
         if (documents.matches()) {
-            return pluginRefusal(documents.group(1), organization.get())
+            return extensionRefusal(documents.group(1), organization.get())
                     .or(() -> declares(documents.group(1), documents.group(2))
                             ? Optional.empty()
-                            : Optional.of("the plugin declares no such collection"));
+                            : Optional.of("the extension declares no such collection"));
         }
-        Matcher plugin = PLUGIN.matcher(topic);
-        if (plugin.matches()) {
+        Matcher extension = EXTENSION.matcher(topic);
+        if (extension.matches()) {
             return registry.active().stream()
                     .flatMap(installed -> installed.manifest().stream())
                     .map(manifest -> manifest.id())
-                    .filter(id -> topic.startsWith("plugin." + id + "."))
+                    .filter(id -> topic.startsWith("extension." + id + "."))
                     .findFirst()
-                    .map(id -> pluginRefusal(id, organization.get()))
-                    .orElse(Optional.of("no active plugin has this topic"));
+                    .map(id -> extensionRefusal(id, organization.get()))
+                    .orElse(Optional.of("no active extension has this topic"));
         }
         return Optional.of("not a topic of the real-time channel");
     }
 
-    private Optional<String> pluginRefusal(String pluginId, UUID organization) {
-        Optional<InstalledPlugin> plugin = registry.findActive(pluginId);
-        if (plugin.isEmpty()) {
-            return Optional.of("the plugin is not active");
+    private Optional<String> extensionRefusal(String extensionId, UUID organization) {
+        Optional<InstalledExtension> extension = registry.findActive(extensionId);
+        if (extension.isEmpty()) {
+            return Optional.of("the extension is not active");
         }
-        if (apps.isOff(organization, pluginId)) {
-            return Optional.of("the plugin is turned off for the organization");
+        if (apps.isOff(organization, extensionId)) {
+            return Optional.of("the extension is turned off for the organization");
         }
         return Optional.empty();
     }
 
-    private boolean declares(String pluginId, String collection) {
-        return registry.findActive(pluginId)
-                .flatMap(InstalledPlugin::manifest)
+    private boolean declares(String extensionId, String collection) {
+        return registry.findActive(extensionId)
+                .flatMap(InstalledExtension::manifest)
                 .flatMap(manifest -> manifest.data())
                 .filter(data -> data.declares(collection))
                 .isPresent();

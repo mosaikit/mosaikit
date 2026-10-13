@@ -36,13 +36,13 @@ export interface BenchOptions {
   /** An installation to copy; by default MOSAIKIT_INSTALLATION or the snapshot of this version. */
   readonly installation?: string;
   /**
-   * Plugins installed before the first start: packages (zips), signed with the key of the bench,
-   * or plugin directories, copied unsigned.
+   * Extensions installed before the first start: packages (zips), signed with the key of the bench,
+   * or extension directories, copied unsigned.
    */
-  readonly plugins?: readonly string[];
+  readonly extensions?: readonly string[];
   /**
-   * Plugins offered by a signed catalog of the installation (catalog/), not installed: packages,
-   * or plugin directories, which the bench packs.
+   * Extensions offered by a signed catalog of the installation (catalog/), not installed: packages,
+   * or extension directories, which the bench packs.
    */
   readonly catalog?: readonly string[];
   /** The port of the kernel; a free one by default. */
@@ -92,7 +92,7 @@ export interface BenchInfo {
 
 export const ENVIRONMENT = 'MOSAIKIT_BENCH';
 
-/** A test installation with plugins, a database and a mail server of its own. */
+/** A test installation with extensions, a database and a mail server of its own. */
 export class Bench {
   private constructor(
     public info: BenchInfo,
@@ -110,25 +110,25 @@ export class Bench {
     mkdirSync(work, { recursive: true });
     const installation = join(work, 'mosaikit');
     copyInstallation(source, installation);
-    for (const directory of ['plugins', 'catalog', join('config', 'trusted-keys')]) {
+    for (const directory of ['extensions', 'catalog', join('config', 'trusted-keys')]) {
       mkdirSync(join(installation, directory), { recursive: true });
     }
     const signing = new Signing(installation, join(work, 'keys'));
     mkdirSync(signing.keys, { recursive: true });
     signing.setUp();
-    place(signing, options.plugins ?? [], join(installation, 'plugins'));
+    place(signing, options.extensions ?? [], join(installation, 'extensions'));
     if (options.catalog) {
       const catalog = join(installation, 'catalog');
       place(
         signing,
-        options.catalog.map((plugin) =>
-          statSync(plugin).isDirectory() ? pack(plugin, join(work, 'packages')) : plugin,
+        options.catalog.map((extension) =>
+          statSync(extension).isDirectory() ? pack(extension, join(work, 'packages')) : extension,
         ),
         catalog,
       );
       signing.index(catalog);
     }
-    phase('installation and signed plugins');
+    phase('installation and signed extensions');
 
     const closers: (() => Promise<void>)[] = [];
     let database = options.database;
@@ -312,24 +312,24 @@ function phases(): (name: string) => void {
   };
 }
 
-/** What a plugin directory holds for the kernel; sources and build files stay out. */
-const PLUGIN_FILES = new Set(['manifest.yaml', 'README.md', 'web', 'dist', 'db', 'lib', 'i18n']);
+/** What an extension directory holds for the kernel; sources and build files stay out. */
+const EXTENSION_FILES = new Set(['manifest.yaml', 'README.md', 'web', 'dist', 'db', 'lib', 'i18n']);
 
 /**
- * Copies plugins into a directory: packages (zips) are signed with the key of the bench, plugin
+ * Copies extensions into a directory: packages (zips) are signed with the key of the bench, extension
  * directories are copied unsigned, with only what the kernel reads.
  */
-function place(signing: Signing, plugins: readonly string[], directory: string): void {
+function place(signing: Signing, extensions: readonly string[], directory: string): void {
   const packages: string[] = [];
-  for (const plugin of plugins) {
-    const copy = join(directory, basename(plugin));
-    if (statSync(plugin).isDirectory()) {
+  for (const extension of extensions) {
+    const copy = join(directory, basename(extension));
+    if (statSync(extension).isDirectory()) {
       mkdirSync(copy, { recursive: true });
-      for (const entry of readdirSync(plugin).filter((name) => PLUGIN_FILES.has(name))) {
-        cpSync(join(plugin, entry), join(copy, entry), { recursive: true });
+      for (const entry of readdirSync(extension).filter((name) => EXTENSION_FILES.has(name))) {
+        cpSync(join(extension, entry), join(copy, entry), { recursive: true });
       }
     } else {
-      copyFileSync(plugin, copy);
+      copyFileSync(extension, copy);
       packages.push(copy);
     }
   }
@@ -337,22 +337,22 @@ function place(signing: Signing, plugins: readonly string[], directory: string):
 }
 
 /**
- * Packs a plugin directory into `<directory name>-<version>.zip`, with only what the kernel reads,
+ * Packs an extension directory into `<directory name>-<version>.zip`, with only what the kernel reads,
  * as a published package is; the catalog of a marketplace offers packages, not directories.
  */
-export function pack(plugin: string, target: string): string {
+export function pack(extension: string, target: string): string {
   const version = /^version:\s*(\S+)/m.exec(
-    readFileSync(join(plugin, 'manifest.yaml'), 'utf8'),
+    readFileSync(join(extension, 'manifest.yaml'), 'utf8'),
   )?.[1];
   if (!version) {
-    throw new Error(`No version in ${join(plugin, 'manifest.yaml')}`);
+    throw new Error(`No version in ${join(extension, 'manifest.yaml')}`);
   }
   mkdirSync(target, { recursive: true });
-  const file = join(target, `${basename(plugin)}-${version}.zip`);
+  const file = join(target, `${basename(extension)}-${version}.zip`);
   rmSync(file, { force: true });
-  const parts = readdirSync(plugin)
-    .filter((name) => PLUGIN_FILES.has(name))
-    .flatMap((name) => ['-C', plugin, name]);
+  const parts = readdirSync(extension)
+    .filter((name) => EXTENSION_FILES.has(name))
+    .flatMap((name) => ['-C', extension, name]);
   execFileSync(jdkTool('jar'), ['--create', '--no-manifest', '--file', file, ...parts]);
   return file;
 }

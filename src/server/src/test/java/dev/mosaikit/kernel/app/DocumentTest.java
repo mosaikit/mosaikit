@@ -20,15 +20,15 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-/** The collections of documents of plugins without a backend (ADR-0031). */
+/** The collections of documents of extensions without a backend (ADR-0031). */
 @QuarkusTest
-@TestProfile(TestPlugins.class)
+@TestProfile(TestExtensions.class)
 @Tag("MK-046")
 class DocumentTest {
 
-    static final Path PLUGINS = TestPlugins.PLUGINS;
-    static final String PLUGIN = "dev.mosaikit.test.todo";
-    static final String ITEMS = "/api/v1/data/" + PLUGIN + "/items";
+    static final Path EXTENSIONS = TestExtensions.EXTENSIONS;
+    static final String EXTENSION = "dev.mosaikit.test.todo";
+    static final String ITEMS = "/api/v1/data/" + EXTENSION + "/items";
     static final String PASSWORD = "a long enough password";
 
     private String ada;
@@ -129,8 +129,8 @@ class DocumentTest {
     }
 
     @Test
-    void offersOnlyTheDeclaredCollectionsOfActivePlugins() {
-        in(ada, "data-acme").get("/api/v1/data/" + PLUGIN + "/other").then().statusCode(404);
+    void offersOnlyTheDeclaredCollectionsOfActiveExtensions() {
+        in(ada, "data-acme").get("/api/v1/data/" + EXTENSION + "/other").then().statusCode(404);
         in(ada, "data-acme").get("/api/v1/data/dev.mosaikit.none/items").then().statusCode(404);
         in(ada, "data-acme").body("[1, 2]").post(ITEMS).then().statusCode(400);
         // Without an organization there is nothing to read; without an account, nothing at all.
@@ -141,9 +141,9 @@ class DocumentTest {
     @Test
     void showsTheCollectionsToTheShell() {
         in(ada, "data-acme")
-                .get("/api/v1/shell/plugins")
+                .get("/api/v1/shell/extensions")
                 .then()
                 .statusCode(200)
-                .body("find { it.id == '" + PLUGIN + "' }.bridge.data", equalTo("/api/v1/data/" + PLUGIN + "/"));
+                .body("find { it.id == '" + EXTENSION + "' }.bridge.data", equalTo("/api/v1/data/" + EXTENSION + "/"));
     }
 }

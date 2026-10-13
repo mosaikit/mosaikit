@@ -1,51 +1,121 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://mosaikit.github.io/schemas/requirement/0.1.json",
-  "title": "Mosaikit requirement",
+  "$id": "https://mosaikit.github.io/schemas/requirement/1.0.json",
+  "title": "Requirement",
+  "description": "The front matter of a requirement: one Markdown file per requirement, named after its id, with this YAML front matter and the description in the body. The same format serves Mosaikit and the products built on it; each repository says its prefix and its areas in requirements.json.",
   "type": "object",
-  "required": ["id", "title", "area", "priority", "status", "description", "acceptance"],
+  "required": ["id", "title", "area", "priority", "status"],
   "additionalProperties": false,
   "properties": {
     "id": {
+      "description": "The prefix of the product and three or more digits, never reused.",
       "type": "string",
-      "pattern": "^MK-\\d{3}$"
+      "pattern": "^[A-Z]{2,4}-\\d{3,}$"
     },
     "title": {
+      "description": "What the product does, in one line.",
       "type": "string",
       "minLength": 5,
       "maxLength": 120
     },
     "area": {
-      "enum": ["kernel", "plugins", "shell", "sdk", "security", "distribution", "marketplace", "ai"]
+      "description": "One of the areas listed in requirements.json.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$"
     },
     "priority": {
       "enum": ["P1", "P2", "P3"]
     },
     "status": {
-      "enum": ["planned", "in-progress", "done"]
+      "description": "proposed: written, not yet planned; planned: in a milestone of the plan; in-progress; done: its acceptance is verified by tests; dropped: no longer wanted; moved: carried on by another requirement (moved-to).",
+      "enum": ["proposed", "planned", "in-progress", "done", "dropped", "moved"]
     },
-    "description": {
+    "moved-to": {
+      "description": "The requirement that carries this one on, possibly of another product (status moved).",
       "type": "string",
-      "minLength": 10
-    },
-    "acceptance": {
-      "type": "array",
-      "items": {
-        "type": "string"
-      },
-      "minItems": 1
+      "pattern": "^[A-Z]{2,4}-\\d{3,}$"
     },
     "depends": {
+      "description": "Requirements that must be done first, possibly of the platform the product builds on.",
       "type": "array",
       "items": {
         "type": "string",
-        "pattern": "^MK-\\d{3}$"
-      }
+        "pattern": "^[A-Z]{2,4}-\\d{3,}$"
+      },
+      "uniqueItems": true
+    },
+    "ui": {
+      "description": "Screens of the mockup that the requirement realizes, as <mockup>:<screen>.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z][a-z0-9-]*:[a-z0-9][a-z0-9/-]*$"
+      },
+      "uniqueItems": true
+    },
+    "decisions": {
+      "description": "Architecture decision records of the repository that shape it.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^ADR-\\d{4}$"
+      },
+      "uniqueItems": true
+    },
+    "estimate": {
+      "description": "Days of work, from the least to the most.",
+      "type": "array",
+      "items": {
+        "type": "number",
+        "minimum": 0
+      },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "legacy": {
+      "description": "The identifier the requirement had in the tracker it comes from.",
+      "type": "string",
+      "minLength": 1
     },
     "verified-in": {
-      "description": "Repository whose tests verify the requirement, when they are not in this one (ADR-0035), for example mosaikit/app-teams.",
+      "description": "Repository whose tests verify the requirement, when they are not in this one (ADR-0035), for example mosaikit/mosaikit-samples.",
       "type": "string",
       "pattern": "^[a-z0-9-]+/[a-z0-9.-]+$"
+    },
+    "acceptance": {
+      "description": "Verifiable criteria: the requirement is done when tests show each of them. Required unless the requirement is dropped or moved.",
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 10
+      },
+      "minItems": 1
     }
-  }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "moved"
+          }
+        }
+      },
+      "then": {
+        "required": ["moved-to"]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "enum": ["proposed", "planned", "in-progress", "done"]
+          }
+        }
+      },
+      "then": {
+        "required": ["acceptance"]
+      }
+    }
+  ]
 }

@@ -22,11 +22,11 @@ import org.junit.jupiter.api.Test;
 
 /** The apps of the app bar of an organization, set by its administrators (MK-030). */
 @QuarkusTest
-@TestProfile(TestPlugins.class)
+@TestProfile(TestExtensions.class)
 @Tag("MK-030")
 class OrganizationAppsTest {
 
-    static final Path PLUGINS = TestPlugins.PLUGINS;
+    static final Path EXTENSIONS = TestExtensions.EXTENSIONS;
     static final String TODO = "dev.mosaikit.test.todo";
     static final String BOARD = "dev.mosaikit.test.board";
     static final String SLUG = "apps-town";
@@ -69,12 +69,12 @@ class OrganizationAppsTest {
     }
 
     private static Map<String, Object> app(
-            String pluginId, String appId, boolean enabled, boolean pinned, List<String> roles) {
-        return Map.of("pluginId", pluginId, "appId", appId, "enabled", enabled, "pinned", pinned, "roles", roles);
+            String extensionId, String appId, boolean enabled, boolean pinned, List<String> roles) {
+        return Map.of("extensionId", extensionId, "appId", appId, "enabled", enabled, "pinned", pinned, "roles", roles);
     }
 
     @Test
-    void showsEveryAppInTheOrderOfThePluginsByDefault() {
+    void showsEveryAppInTheOrderOfTheExtensionsByDefault() {
         in(manager)
                 .get("/api/v1/organizations/{slug}/apps", SLUG)
                 .then()
@@ -99,9 +99,9 @@ class OrganizationAppsTest {
                 .then()
                 .body("appId", contains("board"))
                 .body("[0].pinned", equalTo(true));
-        // The documents of the plugin that is off are refused to the organization.
+        // The documents of the extension that is off are refused to the organization.
         in(member)
-                .get("/api/v1/data/{plugin}/items", TODO)
+                .get("/api/v1/data/{extension}/items", TODO)
                 .then()
                 .statusCode(403)
                 .body("detail", equalTo("This app is turned off for your organization."));
@@ -113,7 +113,7 @@ class OrganizationAppsTest {
                 .put("/api/v1/organizations/{slug}/apps", SLUG)
                 .then()
                 .statusCode(200);
-        in(member).get("/api/v1/data/{plugin}/items", TODO).then().statusCode(200);
+        in(member).get("/api/v1/data/{extension}/items", TODO).then().statusCode(200);
     }
 
     @Test

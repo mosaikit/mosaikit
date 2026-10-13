@@ -128,6 +128,11 @@ export class MkSignIn extends LitElement {
       font-weight: 700;
       font-size: 18px;
     }
+    .brand .logo {
+      width: 28px;
+      height: 28px;
+      flex: none;
+    }
     h1 {
       margin: 0;
       font-size: 26px;
@@ -315,6 +320,8 @@ export class MkSignIn extends LitElement {
 
   /** Name and version of the installation. */
   @property() product = 'Mosaikit';
+  /** The logo of the product, from the theme of the installation (MK-052); the mark of Mosaikit otherwise. */
+  @property() logo: string | undefined;
   @property() version: string | undefined;
   /** `undefined` for the first step; the address, possibly empty, for the password. */
   @property() email: string | undefined;
@@ -350,7 +357,11 @@ export class MkSignIn extends LitElement {
       </section>
       <div class="panel">
         <div class="card">
-          <div class="brand">${mark}<span>${this.product}</span></div>
+          <div class="brand">
+            ${this.logo ? html`<img class="logo" src=${this.logo} alt="" />` : mark}<span
+              >${this.product}</span
+            >
+          </div>
           ${this.renderPage()}
           <footer>
             <span

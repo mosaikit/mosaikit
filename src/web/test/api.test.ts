@@ -24,7 +24,7 @@ describe('KernelClient (MK-008)', () => {
     const client = new KernelClient(fetchMock, memory());
 
     const account = await client.signIn('ada@example.org', 'secret');
-    await client.shellPlugins();
+    await client.shellExtensions();
 
     expect(account.username).toBe('ada@example.org');
     expect(client.signedIn).toBe(true);
@@ -120,7 +120,7 @@ describe('KernelClient (MK-008)', () => {
 
     await client.signInWithToken('token-1');
     client.useToken('token-2');
-    await client.shellPlugins();
+    await client.shellExtensions();
 
     expect(new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get('Authorization')).toBe(
       'Bearer token-1',
@@ -159,7 +159,7 @@ describe('KernelClient (MK-008)', () => {
     await client.signIn('ada@example.org', 'secret');
 
     const account = await client.useOrganization('globex');
-    await client.shellPlugins();
+    await client.shellExtensions();
     await client.signOut();
     await client.systemInfo();
 
@@ -193,7 +193,7 @@ describe('KernelClient (MK-008)', () => {
 
   it('reads the marketplace and installs packages (MK-022)', async () => {
     const fetchMock = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>(() =>
-      Promise.resolve(json(200, { sources: [], plugins: [] })),
+      Promise.resolve(json(200, { sources: [], extensions: [] })),
     );
     const client = new KernelClient(fetchMock);
 
@@ -205,7 +205,7 @@ describe('KernelClient (MK-008)', () => {
     expect(calls.map(([path, init]) => `${init?.method ?? ''} ${path}`)).toEqual([
       'GET /api/v1/marketplace',
       'POST /api/v1/marketplace/installations',
-      'POST /api/v1/plugins/packages',
+      'POST /api/v1/extensions/packages',
     ]);
     expect(JSON.parse(calls[1]?.[1]?.body as string)).toEqual({
       source: 'file:/catalog/',
@@ -232,15 +232,15 @@ describe('KernelClient (MK-008)', () => {
     });
   });
 
-  it('gives the revision of the plugins only when the kernel watches them', async () => {
+  it('gives the revision of the extensions only when the kernel watches them', async () => {
     const watched = new KernelClient(() => Promise.resolve(json(200, { revision: 7 })), memory());
     const unwatched = new KernelClient(
       () => Promise.resolve(new Response(null, { status: 404 })),
       memory(),
     );
 
-    expect(await watched.pluginRevision()).toBe(7);
-    expect(await unwatched.pluginRevision()).toBeUndefined();
+    expect(await watched.extensionRevision()).toBe(7);
+    expect(await unwatched.extensionRevision()).toBeUndefined();
   });
 });
 
@@ -257,7 +257,7 @@ describe('KernelClient settings, themes and apps (MK-027, MK-028, MK-030)', () =
       hiddenApps: [],
     } as const;
     const apps = [
-      { pluginId: 'p', appId: 'a', title: 'A', enabled: false, pinned: true, roles: [] },
+      { extensionId: 'p', appId: 'a', title: 'A', enabled: false, pinned: true, roles: [] },
     ];
 
     await client.changePreferences(preferences);
@@ -280,7 +280,7 @@ describe('KernelClient settings, themes and apps (MK-027, MK-028, MK-030)', () =
 });
 
 describe('KernelClient activity (MK-038)', () => {
-  it('reads the feed, marks notifications read and notifies as a plugin', async () => {
+  it('reads the feed, marks notifications read and notifies as an extension', async () => {
     const fetchMock = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>(() =>
       Promise.resolve(json(200, { unread: 0, notifications: [] })),
     );
@@ -302,7 +302,7 @@ describe('KernelClient activity (MK-038)', () => {
       ['/api/v1/notifications', 'POST'],
     ]);
     expect(JSON.parse(fetchMock.mock.calls[3]?.[1]?.body as string)).toEqual({
-      plugin: 'dev.example.notes',
+      extension: 'dev.example.notes',
       to: ['ada@example.org'],
       kind: 'mention',
       title: 'T',

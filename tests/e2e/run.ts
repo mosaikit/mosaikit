@@ -17,9 +17,9 @@ import { fileURLToPath } from 'node:url';
 interface Group {
   readonly name: string;
   readonly files: readonly string[];
-  /** Fixture plugins installed before the first start, as the files before them left them. */
+  /** Fixture extensions installed before the first start, as the files before them left them. */
   readonly preinstall?: readonly string[];
-  /** The fixture plugins that a file installs, which the next files of the group use. */
+  /** The fixture extensions that a file installs, which the next files of the group use. */
   readonly installs?: Readonly<Record<string, readonly string[]>>;
 }
 
@@ -44,14 +44,14 @@ export const GROUPS: readonly Group[] = [
       '09-data',
       '13-teams-shell',
       '14-settings',
-      '15-theme-plugin',
+      '15-theme-extension',
       '16-organization-apps',
       '18-live',
       '19-activity',
       '20-teams',
     ],
     preinstall: ['activities', 'estimates', 'notes', 'hello'],
-    installs: { '09-data': ['todo'], '15-theme-plugin': ['theme'] },
+    installs: { '09-data': ['todo'], '15-theme-extension': ['theme'] },
   },
 ];
 

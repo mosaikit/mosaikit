@@ -32,13 +32,13 @@ import org.junit.jupiter.api.Test;
 
 /** The real-time channel of the shell (MK-031). */
 @QuarkusTest
-@TestProfile(TestPlugins.class)
+@TestProfile(TestExtensions.class)
 @Tag("MK-031")
 class LiveTest {
 
-    static final Path PLUGINS = TestPlugins.PLUGINS;
-    static final String PLUGIN = "dev.mosaikit.test.live";
-    static final String TOPIC = "documents." + PLUGIN + ".items";
+    static final Path EXTENSIONS = TestExtensions.EXTENSIONS;
+    static final String EXTENSION = "dev.mosaikit.test.live";
+    static final String TOPIC = "documents." + EXTENSION + ".items";
     static final String PASSWORD = "a long enough password";
 
     @TestHTTPResource("/")
@@ -119,7 +119,7 @@ class LiveTest {
         String id = as(ada, PASSWORD)
                 .header("X-Mosaikit-Organization", "live-acme")
                 .body(Map.of("title", "Paint the fence"))
-                .post("/api/v1/data/" + PLUGIN + "/items")
+                .post("/api/v1/data/" + EXTENSION + "/items")
                 .then()
                 .statusCode(201)
                 .extract()
@@ -139,7 +139,7 @@ class LiveTest {
     void refusesTopicsThatThePersonMayNotRead() throws Exception {
         Page page = connect(ada, "live-acme");
         for (String topic :
-                new String[] {"documents." + PLUGIN + ".secrets", "documents.dev.none.items", "admin.everything"}) {
+                new String[] {"documents." + EXTENSION + ".secrets", "documents.dev.none.items", "admin.everything"}) {
             page.send(Map.of("type", "subscribe", "topic", topic));
             JsonObject answer = page.next();
             assertThat(answer.getString("type")).as(topic).isEqualTo("refused");

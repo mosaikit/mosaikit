@@ -4,8 +4,8 @@ import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 
 /**
- * The plugin packages (zips) in the given directories: `target/` of a Maven build, `dist/` of the
- * workflow of the plugins, or a directory of packages.
+ * The extension packages (zips) in the given directories: `target/` of a Maven build, `dist/` of the
+ * workflow of the extensions, or a directory of packages.
  */
 export function packagesIn(...directories: string[]): string[] {
   return directories

@@ -19,14 +19,14 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-/** The activity feed and the notifications of plugins (MK-038). */
+/** The activity feed and the notifications of extensions (MK-038). */
 @QuarkusTest
-@TestProfile(TestPlugins.class)
+@TestProfile(TestExtensions.class)
 @Tag("MK-038")
 class ActivityTest {
 
-    static final Path PLUGINS = TestPlugins.PLUGINS;
-    static final String PLUGIN = "dev.mosaikit.test.notify";
+    static final Path EXTENSIONS = TestExtensions.EXTENSIONS;
+    static final String EXTENSION = "dev.mosaikit.test.notify";
     static final String SLUG = "activity-town";
     static final String PASSWORD = "a long enough password";
 
@@ -61,8 +61,8 @@ class ActivityTest {
     }
 
     private static void notify(String from, List<String> to, String kind, String link, int status) {
-        var body = new java.util.HashMap<String, Object>(
-                Map.of("plugin", PLUGIN, "to", to, "kind", kind, "title", "Ada mentioned you", "body", "In Notes"));
+        var body = new java.util.HashMap<String, Object>(Map.of(
+                "extension", EXTENSION, "to", to, "kind", kind, "title", "Ada mentioned you", "body", "In Notes"));
         if (link != null) {
             body.put("link", link);
         }
@@ -101,7 +101,7 @@ class ActivityTest {
 
     @Test
     void leavesOutTheKindsThatThePersonTurnedOff() {
-        in(bea).body(Map.of("hiddenApps", List.of(), "mutedNotifications", List.of(PLUGIN + "/mention")))
+        in(bea).body(Map.of("hiddenApps", List.of(), "mutedNotifications", List.of(EXTENSION + "/mention")))
                 .put("/api/v1/accounts/me/preferences")
                 .then()
                 .statusCode(200);
@@ -121,7 +121,7 @@ class ActivityTest {
         notify(ada, List.of(bea), "Mention!", null, 400);
         notify(ada, List.of(bea), "mention", "https://elsewhere.example/phish", 400);
         notify(ada, List.of(bea), "mention", "//elsewhere.example", 400);
-        in(ada).body(Map.of("plugin", "dev.mosaikit.none", "to", List.of(bea), "kind", "x", "title", "T"))
+        in(ada).body(Map.of("extension", "dev.mosaikit.none", "to", List.of(bea), "kind", "x", "title", "T"))
                 .post("/api/v1/notifications")
                 .then()
                 .statusCode(400);

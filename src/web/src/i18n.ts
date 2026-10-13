@@ -55,7 +55,7 @@ const ITALIAN: Record<string, string> = {
     'Abbiamo inviato un nuovo link. I precedenti non funzionano più.',
   // The shell
   Home: 'Home',
-  Plugins: 'Plugin',
+  Extensions: 'Estensioni',
   Platform: 'Piattaforma',
   Settings: 'Impostazioni',
   Apps: 'App',
@@ -66,7 +66,7 @@ const ITALIAN: Record<string, string> = {
   'Sign out': 'Esci',
   'Welcome, {name}': 'Benvenuto, {name}',
   '{count} apps available.': '{count} app disponibili.',
-  '{count} plugins could not be loaded.': '{count} plugin non sono stati caricati.',
+  '{count} extensions could not be loaded.': '{count} estensioni non sono state caricate.',
   'Your apps': 'Le tue app',
   'You are signed in, but the apps could not be loaded: {reason} Reload the page; if it happens again, tell your administrator.':
     "Hai effettuato l'accesso, ma le app non sono state caricate: {reason} Ricarica la pagina; se succede di nuovo, avvisa l'amministratore.",

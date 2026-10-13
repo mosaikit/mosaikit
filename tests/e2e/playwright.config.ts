@@ -6,8 +6,8 @@ import { BASE_URL, WORK } from './support/env.js';
 
 /**
  * End-to-end tests on a real installation built by `./mvnw install` (target/dist): launcher,
- * kernel, shell and plugins, in a browser. Only the language model is a fake. The files run in
- * order, in one worker: later files use the plugins that earlier ones installed.
+ * kernel, shell and extensions, in a browser. Only the language model is a fake. The files run in
+ * order, in one worker: later files use the extensions that earlier ones installed.
  */
 export default defineConfig({
   testDir: './tests',
