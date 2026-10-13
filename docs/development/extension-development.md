@@ -808,6 +808,8 @@ shareButton.addEventListener('click', () => {
 });
 ```
 
+`@mosaikit/sdk` has the same as `openSharing(context, 'dashboard', id)`, and
+`sharingLevel(context, 'dashboard', id)` for the level described below.
 A frontend isolated in an iframe (MK-014) declares the topic in its bridge,
 `frontend.bridge.publishes: [shell.share]`. The dialog shows each level by its `title`, in the
 language of the person when `i18n` gives one.
