@@ -17,7 +17,8 @@ import java.util.Set;
  *     restricted, empty otherwise; read only when {@code restricted} is not given
  * @param restricted whether only the people who hold the permission of the app see it (MK-056):
  *     the administrators of the organization, and the people a profile, a team or a personal
- *     exception grants it to; otherwise everyone of the organization sees it
+ *     exception grants it to; otherwise the members and administrators see it, and guests only
+ *     when its permission is granted to them
  * @param permission the permission of the app, {@code <extension>:use-<app>}, read-only
  */
 public record AppView(

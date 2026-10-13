@@ -112,6 +112,7 @@ const ITALIAN: Record<string, string> = {
   'Move {app} down': 'Sposta {app} in basso',
   Save: 'Salva',
   'Who holds its permission': 'Chi ha il suo permesso',
+  'Members and administrators': 'Membri e amministratori',
   'An app for who holds its permission shows to the administrators and to the people it is granted to in Permissions, through a profile, a team or a personal exception.':
     "Un'app per chi ha il suo permesso è visibile agli amministratori e alle persone a cui è concesso in Permessi, con un profilo, un team o un'eccezione personale.",
   // Permissions of the organization (MK-056)
@@ -171,6 +172,10 @@ const ITALIAN: Record<string, string> = {
   Role: 'Ruolo',
   Member: 'Membro',
   Administrator: 'Amministratore',
+  Guest: 'Ospite',
+  Apply: 'Applica',
+  'This person is not a member yet: a platform administrator adds them, until invitations by link arrive. The preview shows what they would hold.':
+    "Questa persona non è ancora membro: la aggiunge un amministratore della piattaforma, finché non arrivano gli inviti tramite link. L'anteprima mostra cosa avrebbe.",
   'Administrators hold every permission.': 'Gli amministratori hanno tutti i permessi.',
   'What they will be able to do': 'Cosa potrà fare',
   Cancel: 'Annulla',

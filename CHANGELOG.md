@@ -9,10 +9,12 @@ project follows [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - The apps per role (MK-030) moved onto permissions (MK-056): every app has the permission
-  `<extension>:use-<app>`, and an app is shown to everyone or restricted to the people who hold it
-  (`restricted` in `/api/v1/organizations/{slug}/apps`; `roles` is deprecated, and
-  `[organization-admin]` reads as restricted). Apps for the administrators only stay so; apps for
-  members only are now seen by guests too.
+  `<extension>:use-<app>`, and an app is shown to the members and administrators of the
+  organization or restricted to the people who hold it (`restricted` in
+  `/api/v1/organizations/{slug}/apps`; `roles` is deprecated, and `[organization-admin]` reads as
+  restricted, so apps for the administrators only stay so). Members and administrators see the same
+  apps as before; guests, already refused the backends of extensions, see an app only when a team of
+  theirs or a personal exception grants its permission.
 
 ### Added
 
@@ -36,9 +38,11 @@ project follows [Semantic Versioning](https://semver.org/).
   extension and the default profile of members; for each person the profile, the personal
   exceptions and what they can do with its source; the permissions of each team. **Invite a person**
   chooses role, profile and teams and shows the resulting permissions before sending:
-  `PUT /api/v1/organizations/{slug}/members/{email}` accepts `profile` and `teams`, and the
-  administrators of the organization, signed in to it, list and invite its members. The shell hides
-  the contributions whose `permission` the person lacks.
+  `PUT /api/v1/organizations/{slug}/members/{email}` accepts `profile` and `teams`, all or nothing.
+  The administrators of the organization, signed in to it, list its members and give profile and
+  teams to those who are already members; adding people and changing roles stay with the platform
+  administrators until invitations by link (MK-068). The shell hides the contributions whose
+  `permission` the person lacks.
 
 - The kernel implements the registry of resources (MK-054): the `Resources` bean of `kernel-api`
   lets Java extensions register, update, remove, find and list their resources (type, identifier,

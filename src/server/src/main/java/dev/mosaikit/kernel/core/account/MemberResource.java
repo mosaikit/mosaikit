@@ -30,16 +30,18 @@ import jakarta.ws.rs.core.MediaType;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 /**
- * The members of an organization (MK-017), managed by the platform administrators and by the
- * administrators of the organization signed in to it, who also invite people with a profile and
- * teams (MK-056). Only platform administrators remove members.
+ * The members of an organization (MK-017), managed by the platform administrators: they add people,
+ * change their roles and remove them. The administrators of the organization, signed in to it, list
+ * its members and give profile and teams to those who are already members (MK-056).
  */
 @Path("/api/v1/organizations/{slug}/members")
 @Produces(MediaType.APPLICATION_JSON)
@@ -82,8 +84,9 @@ public class MemberResource {
     @Transactional
     @Operation(
             summary = "Add a person to an organization, or change their roles in it",
-            description = "The administrators of the organization, signed in to it, can also give a profile and"
-                    + " teams; POST .../permissions/preview shows what the person will hold (MK-056).")
+            description = "Platform administrators add people and change roles. Signed in to the organization,"
+                    + " profile and teams are given too, and its administrators give them to people who are"
+                    + " already members; POST .../permissions/preview shows what the person will hold (MK-056).")
     public MemberView put(
             @PathParam("slug") String slug,
             @PathParam("email") @Email @Size(max = 254) String email,
@@ -97,7 +100,9 @@ public class MemberResource {
             throw new InvalidInputException(
                     List.of("profile and teams are given by the administrators of the organization, signed in to it"));
         }
-        MemberView member = service.putMember(slug, email, request);
+        MemberView member = identity.hasRole(Roles.PLATFORM_ADMIN)
+                ? service.putMember(slug, email, request)
+                : existing(slug, email, request);
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("roles", member.roles());
         if (profile != null) {
@@ -111,6 +116,27 @@ public class MemberResource {
             detail.put("teams", joined.stream().map(UUID::toString).toList());
         }
         audit("organization.member.updated", slug, email, detail);
+        return member;
+    }
+
+    /**
+     * A person who is already a member, for an administrator of the organization: they give profile
+     * and teams, but adding people and changing roles stay with the platform administrators until
+     * invitations that the person accepts (MK-068).
+     */
+    private MemberView existing(String slug, String email, MemberRequest request) {
+        String username = email.trim().toLowerCase(Locale.ROOT);
+        MemberView member = service.members(slug).stream()
+                .filter(found -> found.username().equals(username))
+                .findFirst()
+                .orElseThrow(() -> new ForbiddenOperationException(
+                        "Only the platform administrators add people to the organization."));
+        if (request != null
+                && request.roles() != null
+                && !request.roles().isEmpty()
+                && !Set.copyOf(request.roles()).equals(member.roles())) {
+            throw new ForbiddenOperationException("Only the platform administrators change the roles of members.");
+        }
         return member;
     }
 

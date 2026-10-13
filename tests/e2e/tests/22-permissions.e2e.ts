@@ -44,7 +44,6 @@ test.describe('MK-056 Permissions declared by extensions, granted through profil
         await api(ANNA, `${PERMISSIONS}/profiles/${found.id}`, { method: 'DELETE' });
       }
     }
-    await api(ADMIN, `/api/v1/organizations/${SLUG}/members/${invited}`, { method: 'DELETE' });
     await api(ADMIN, MEMBER, {
       method: 'PUT',
       body: JSON.stringify({ roles: ['organization-user'] }),
@@ -89,18 +88,25 @@ test.describe('MK-056 Permissions declared by extensions, granted through profil
       page.locator(`mk-effective-permissions li[data-permission="${EXPORT}"]`),
     ).toContainText(`Team ${team}`);
 
-    // 56.4 The invitation shows the permissions before it is sent.
+    // 56.4 The invitation shows the permissions before it is sent. Anna administers the
+    // organization, not the platform: for a new person she sees the preview, and adding them waits
+    // for a platform administrator or an invitation by link (MK-068).
     await page.getByRole('button', { name: 'Invite a person' }).click();
     const dialog = page.getByRole('dialog', { name: 'Invite a person' });
     await dialog.getByRole('textbox', { name: 'Email' }).fill(invited);
     await dialog.getByRole('combobox', { name: 'Profile' }).selectOption({ label: profile });
     await dialog.getByRole('checkbox', { name: team }).check();
     await expect(dialog.locator(`li[data-permission="${EXPORT}"]`)).toContainText(`Team ${team}`);
+    await expect(dialog.getByText('This person is not a member yet')).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Invite' })).toBeDisabled();
     expect((await api(ANNA, `${PERMISSIONS}/members/${invited}`)).status).toBe(404);
-    await dialog.getByRole('button', { name: 'Invite' }).click();
+    // For a member, the same dialog gives profile and teams, after the same preview.
+    await dialog.getByRole('textbox', { name: 'Email' }).fill(MARIO.user);
+    await expect(dialog.locator(`li[data-permission="${EXPORT}"]`)).toContainText(`Team ${team}`);
+    await dialog.getByRole('button', { name: 'Apply' }).click();
     await expect(dialog).toBeHidden();
-    await expect(page.getByRole('status')).toContainText(`${invited} is in the organization.`);
-    const member = (await api(ANNA, `${PERMISSIONS}/members/${invited}`)).body as {
+    await expect(page.getByRole('status')).toContainText(`${MARIO.user} is in the organization.`);
+    const member = (await api(ANNA, `${PERMISSIONS}/members/${MARIO.user}`)).body as {
       profile: { name: string };
       permissions: { id: string }[];
     };

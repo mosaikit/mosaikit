@@ -4,6 +4,7 @@ import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, query, state } from 'lit/decorators.js';
 import type {
   KernelClient,
+  OrganizationMember,
   OrganizationTeam,
   PermissionPreview,
   PermissionProfile,
@@ -12,12 +13,15 @@ import type {
 import { t } from './i18n.js';
 import './mk-effective-permissions.js';
 
-type Role = 'organization-user' | 'organization-admin';
+type Role = ProposedMember['role'];
 
 /**
  * The dialog with which the administrators of an organization invite a person (MK-056): email,
  * role, profile and teams, and, before anything is sent, the permissions the person will hold with
- * where each comes from. Sending adds the person to the organization; `mk-invited` tells the page.
+ * where each comes from. A platform administrator adds the person to the organization; an
+ * administrator of the organization gives profile and teams to a person who is already a member,
+ * and for someone else sees the preview only: adding people waits for invitations by link (MK-068).
+ * `mk-invited` tells the page.
  */
 @customElement('mk-invite-person')
 export class MkInvitePerson extends LitElement {
@@ -104,6 +108,10 @@ export class MkInvitePerson extends LitElement {
   @property() organization: string | undefined;
   @property({ attribute: false }) profiles: readonly PermissionProfile[] = [];
   @property({ attribute: false }) teams: readonly OrganizationTeam[] = [];
+  /** The members of the organization, to recognise a person who is already one. */
+  @property({ attribute: false }) members: readonly OrganizationMember[] = [];
+  /** Whether the person using the dialog is a platform administrator, who adds people. */
+  @property({ type: Boolean }) platformAdmin = false;
 
   @state() private email = '';
   @state() private personName = '';
@@ -129,7 +137,38 @@ export class MkInvitePerson extends LitElement {
     await this.refreshPreview();
   }
 
+  /** The member with the email address written, if any. */
+  private existing(): OrganizationMember | undefined {
+    const email = this.email.trim().toLowerCase();
+    return this.members.find((member) => member.username === email);
+  }
+
+  /** Whether the role is the one the person has, which only a platform administrator changes. */
+  private roleFixed(): boolean {
+    return !this.platformAdmin && this.existing() !== undefined;
+  }
+
+  /** The role of the proposal: the one the member has when it cannot change, the chosen one otherwise. */
+  private proposedRole(): Role {
+    const existing = this.roleFixed() ? this.existing() : undefined;
+    if (!existing) {
+      return this.memberRole;
+    }
+    return existing.roles.includes('organization-admin')
+      ? 'organization-admin'
+      : existing.roles.includes('organization-user')
+        ? 'organization-user'
+        : 'organization-guest';
+  }
+
+  /** Whether the dialog can send: a platform administrator, or a person already a member. */
+  private canSend(): boolean {
+    return this.platformAdmin || this.existing() !== undefined;
+  }
+
   override render(): unknown {
+    const role = this.proposedRole();
+    const fresh = this.email.trim() !== '' && !this.canSend();
     const fallback = this.profiles.find(
       (profile) => profile.defaultForRole === 'organization-user',
     );
@@ -145,7 +184,11 @@ export class MkInvitePerson extends LitElement {
             autocomplete="off"
             .value=${this.email}
             @input=${(event: Event) => {
+              const before = this.proposedRole();
               this.email = (event.target as HTMLInputElement).value;
+              if (this.proposedRole() !== before) {
+                void this.refreshPreview();
+              }
             }}
           />
         </div>
@@ -164,23 +207,25 @@ export class MkInvitePerson extends LitElement {
         </div>
         <div class="field">
           <label for="invite-role">${t('Role')}</label>
-          <select id="invite-role" @change=${this.changeRole}>
-            <option value="organization-user" ?selected=${this.memberRole === 'organization-user'}>
+          <select id="invite-role" ?disabled=${this.roleFixed()} @change=${this.changeRole}>
+            <option value="organization-user" ?selected=${role === 'organization-user'}>
               ${t('Member')}
             </option>
-            <option
-              value="organization-admin"
-              ?selected=${this.memberRole === 'organization-admin'}
-            >
+            <option value="organization-admin" ?selected=${role === 'organization-admin'}>
               ${t('Administrator')}
             </option>
+            ${
+              role === 'organization-guest'
+                ? html`<option value="organization-guest" selected>${t('Guest')}</option>`
+                : nothing
+            }
           </select>
         </div>
         <div class="field">
           <label for="invite-profile">${t('Profile')}</label>
           <select
             id="invite-profile"
-            ?disabled=${this.memberRole !== 'organization-user'}
+            ?disabled=${role !== 'organization-user'}
             @change=${this.changeProfile}
           >
             <option value="" ?selected=${this.profile === ''}>
@@ -198,7 +243,7 @@ export class MkInvitePerson extends LitElement {
             )}
           </select>
           ${
-            this.memberRole === 'organization-admin'
+            role === 'organization-admin'
               ? html`<span class="hint">${t('Administrators hold every permission.')}</span>`
               : nothing
           }
@@ -234,10 +279,26 @@ export class MkInvitePerson extends LitElement {
               : nothing
           }
         </section>
+        ${
+          fresh
+            ? html`<p class="hint" id="invite-new">
+                ${t(
+                  'This person is not a member yet: a platform administrator adds them, until invitations by link arrive. The preview shows what they would hold.',
+                )}
+              </p>`
+            : nothing
+        }
         <p class="error" role="alert">${this.message || nothing}</p>
         <div class="actions">
           <button type="button" @click=${this.cancel}>${t('Cancel')}</button>
-          <button class="primary" type="submit" ?disabled=${this.sending}>${t('Invite')}</button>
+          <button
+            class="primary"
+            type="submit"
+            aria-describedby=${fresh ? 'invite-new' : nothing}
+            ?disabled=${this.sending || fresh}
+          >
+            ${this.roleFixed() ? t('Apply') : t('Invite')}
+          </button>
         </div>
       </form>
     </dialog>`;
@@ -245,9 +306,10 @@ export class MkInvitePerson extends LitElement {
 
   /** What the dialog proposes, for the preview. */
   private proposed(): ProposedMember {
+    const role = this.proposedRole();
     return {
-      role: this.memberRole,
-      profile: this.memberRole === 'organization-user' && this.profile ? this.profile : null,
+      role,
+      profile: role === 'organization-user' && this.profile ? this.profile : null,
       teams: this.chosenTeams,
     };
   }
@@ -295,13 +357,19 @@ export class MkInvitePerson extends LitElement {
       this.message = t('Write the email address of the person.');
       return;
     }
+    if (!this.canSend()) {
+      return;
+    }
     this.sending = true;
     this.message = '';
     const proposed = this.proposed();
+    const existing = this.roleFixed() ? this.existing() : undefined;
     try {
       await this.client.invite(this.organization, email, {
-        roles:
-          this.memberRole === 'organization-admin'
+        // An administrator of the organization keeps the roles the member has.
+        roles: existing
+          ? existing.roles
+          : proposed.role === 'organization-admin'
             ? ['organization-admin', 'organization-user']
             : ['organization-user'],
         ...(this.personName.trim() ? { displayName: this.personName.trim() } : {}),

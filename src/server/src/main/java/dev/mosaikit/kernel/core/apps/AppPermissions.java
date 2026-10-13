@@ -17,9 +17,10 @@ import java.util.Set;
 /**
  * The permission that opens each app (MK-030 on MK-056, ADR-0038): every app that an extension adds
  * to the app bar has one, {@code use-<app>}, which the kernel declares for the extension next to the
- * permissions of its manifest. While the organization shows an app to everyone the permission does
- * not matter; when it limits the app to the people who hold its permission, profiles, teams and
- * personal exceptions grant it like any other, and the administrators of the organization hold it.
+ * permissions of its manifest. While the organization shows an app to its members the permission
+ * matters only for guests, who see the app when a team or a personal exception grants it; when the
+ * organization limits the app to the people who hold its permission, profiles, teams and personal
+ * exceptions grant it like any other, and the administrators of the organization hold it.
  */
 public final class AppPermissions {
 

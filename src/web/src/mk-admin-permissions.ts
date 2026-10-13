@@ -154,6 +154,8 @@ export class MkAdminPermissions extends LitElement {
   @property({ attribute: false }) client: KernelClient | undefined;
   /** The organization whose permissions are managed. */
   @property() organization: string | undefined;
+  /** Whether the person is also a platform administrator, who adds people to the organization. */
+  @property({ type: Boolean }) platformAdmin = false;
 
   @state() private tab: Tab = 'profiles';
   @state() private declared: DeclaredPermission[] = [];
@@ -250,6 +252,8 @@ export class MkAdminPermissions extends LitElement {
         .organization=${this.organization}
         .profiles=${this.profiles}
         .teams=${this.teams}
+        .members=${this.members}
+        ?platformAdmin=${this.platformAdmin}
         @mk-invited=${this.invited}
       ></mk-invite-person>
     `;

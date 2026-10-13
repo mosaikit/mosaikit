@@ -37,13 +37,14 @@ public class ShellAppsResource {
     @GET
     @Operation(
             summary = "Get the apps the signed-in person sees in the app bar, in order",
-            description = "An app restricted to the people who hold its permission shows only to them (MK-056).")
+            description = "An app restricted to the people who hold its permission shows only to them; a guest"
+                    + " sees only the apps whose permission a team or a personal exception grants (MK-056).")
     public List<ShellApp> forShell() {
         Optional<UUID> organization = RequestOrganization.of(identity);
         if (organization.isEmpty()) {
-            return settings.forPerson(organization, _ -> false);
+            return settings.forPerson(organization, false, _ -> false);
         }
         Set<String> held = permissions.heldIds();
-        return settings.forPerson(organization, held::contains);
+        return settings.forPerson(organization, RequestOrganization.guest(identity), held::contains);
     }
 }

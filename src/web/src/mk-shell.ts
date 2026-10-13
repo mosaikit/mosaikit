@@ -1640,6 +1640,9 @@ export class MkShell extends LitElement {
         if (admin instanceof MkAdminApps || admin instanceof MkAdminPermissions) {
           admin.organization = this.account?.organization ?? undefined;
         }
+        if (admin instanceof MkAdminPermissions) {
+          admin.platformAdmin = this.isPlatformAdmin();
+        }
         area.replaceChildren(admin);
       }
       return;

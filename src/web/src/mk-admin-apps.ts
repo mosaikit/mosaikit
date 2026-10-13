@@ -145,7 +145,9 @@ export class MkAdminApps extends LitElement {
                       this.changeApp(index, { restricted, roles: [] });
                     }}
                   >
-                    <option value="" ?selected=${!app.restricted}>${t('Everyone')}</option>
+                    <option value="" ?selected=${!app.restricted}>
+                      ${t('Members and administrators')}
+                    </option>
                     <option value="restricted" ?selected=${app.restricted === true}>
                       ${t('Who holds its permission')}
                     </option>

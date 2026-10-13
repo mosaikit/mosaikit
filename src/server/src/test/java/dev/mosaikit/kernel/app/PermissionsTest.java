@@ -693,53 +693,62 @@ class PermissionsTest {
                 .put(admin(acme) + "/teams/{id}/{permission}", roads, ADD_ITEM)
                 .then()
                 .statusCode(200);
-        String newcomer = unique("invited") + "@example.org";
-        Map<String, Object> invitation = Map.of(
-                "roles",
-                List.of("organization-user"),
-                "displayName",
-                "New Comer",
-                "profile",
-                builders,
-                "teams",
-                List.of(roads));
+        Map<String, Object> invitation =
+                Map.of("roles", List.of("organization-user"), "profile", builders, "teams", List.of(roads));
 
         in(boss, acme)
                 .body(Map.of("role", "organization-user", "profile", builders, "teams", List.of(roads)))
                 .post(admin(acme) + "/preview")
                 .then()
                 .body("permissions.id", contains(CREATE, ADD_ITEM));
-        // The administrators of the organization invite, signed in to it.
+        // The administrators of the organization give profile and teams to a member, all at once.
         in(boss, acme)
                 .body(invitation)
-                .put("/api/v1/organizations/{slug}/members/{email}", acme, newcomer)
+                .put("/api/v1/organizations/{slug}/members/{email}", acme, bea)
                 .then()
                 .statusCode(200)
-                .body("displayName", equalTo("New Comer"))
                 .body("roles", contains("organization-user"));
         in(boss, acme)
-                .get(admin(acme) + "/members/{email}", newcomer)
+                .get(admin(acme) + "/members/{email}", bea)
                 .then()
                 .statusCode(200)
                 .body("profile.name", equalTo("Builders"))
                 .body("profileAssigned", equalTo(true))
                 .body("permissions.id", contains(CREATE, ADD_ITEM))
                 .body("permissions.find { it.id == '" + ADD_ITEM + "' }.sources[0].name", equalTo("Roads"));
-        in(boss, acme).get("/api/v1/organizations/{slug}/members", acme).then().body("username", hasItem(newcomer));
+        in(boss, acme).get("/api/v1/organizations/{slug}/members", acme).then().body("username", hasItem(bea));
 
-        // Nothing is kept of an invitation that fails.
-        String other = unique("invited") + "@example.org";
+        // Nothing is kept of a call that fails.
+        String viewers = profile("Viewers", null, VIEW);
         in(boss, acme)
-                .body(Map.of("teams", List.of("00000000-0000-0000-0000-000000000001")))
-                .put("/api/v1/organizations/{slug}/members/{email}", acme, other)
+                .body(Map.of("profile", viewers, "teams", List.of("00000000-0000-0000-0000-000000000001")))
+                .put("/api/v1/organizations/{slug}/members/{email}", acme, bea)
                 .then()
                 .statusCode(404);
-        in(boss, acme).get("/api/v1/organizations/{slug}/members", acme).then().body("username", not(hasItem(other)));
+        in(boss, acme).get(admin(acme) + "/members/{email}", bea).then().body("profile.name", equalTo("Builders"));
+
+        // Adding people and changing roles stay with the platform administrators (MK-068 brings
+        // invitations that the person accepts).
+        String newcomer = unique("invited") + "@example.org";
+        in(boss, acme)
+                .body(invitation)
+                .put("/api/v1/organizations/{slug}/members/{email}", acme, newcomer)
+                .then()
+                .statusCode(403);
+        in(boss, acme)
+                .body(Map.of("roles", List.of("organization-admin", "organization-user")))
+                .put("/api/v1/organizations/{slug}/members/{email}", acme, bea)
+                .then()
+                .statusCode(403);
+        in(boss, acme)
+                .get("/api/v1/organizations/{slug}/members", acme)
+                .then()
+                .body("username", not(hasItem(newcomer)));
 
         // Only the administrators of the organization, signed in to it, and the platform administrators.
         in(ada, acme).get("/api/v1/organizations/{slug}/members", acme).then().statusCode(403);
         in(ada, acme)
-                .body(Map.of("roles", List.of("organization-admin")))
+                .body(Map.of("profile", builders))
                 .put("/api/v1/organizations/{slug}/members/{email}", acme, ada)
                 .then()
                 .statusCode(403);
@@ -748,13 +757,13 @@ class PermissionsTest {
                 .then()
                 .statusCode(403);
         in(boss, acme)
-                .delete("/api/v1/organizations/{slug}/members/{email}", acme, newcomer)
+                .delete("/api/v1/organizations/{slug}/members/{email}", acme, bea)
                 .then()
                 .statusCode(403);
         // A platform administrator outside the organization gives roles, not profiles and teams.
         asAdmin()
                 .body(Map.of("profile", builders))
-                .put("/api/v1/organizations/{slug}/members/{email}", acme, newcomer)
+                .put("/api/v1/organizations/{slug}/members/{email}", acme, bea)
                 .then()
                 .statusCode(400);
     }

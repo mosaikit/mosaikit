@@ -156,8 +156,8 @@ The administrators of each organization decide which apps appear, in which order
 Every app has a permission, `use-<app id>` (`dev.example.hello:use-hello` for the app above), which
 the kernel declares for the extension next to those of its manifest (MK-056): the administrators
 see it in their profiles, teams and exceptions, titled "Use <title of the app>". It matters only
-when the organization restricts the app to the people who hold its permission; otherwise everyone
-sees the app. The extension does not declare it; if its manifest declares a permission with the
+when the organization restricts the app to the people who hold its permission, and for guests,
+who see an app only when it is granted to them; otherwise members and administrators see it. The extension does not declare it; if its manifest declares a permission with the
 same name, that one counts, with its title. The app permission does not guard the API of the
 extension: check the permissions of the manifest there.
 

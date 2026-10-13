@@ -151,13 +151,15 @@ public class AppSettings {
     }
 
     /**
-     * The apps that a person of an organization sees, in order: enabled, and either shown to everyone
-     * or restricted to the people who hold their permission, which the person holds (MK-056). Without
-     * an organization, every app.
+     * The apps that a person of an organization sees, in order: those enabled whose permission the
+     * person holds, and, for members and administrators, also those not restricted (MK-056). Guests
+     * hold no permission unless granted explicitly (ADR-0038), so they see an app only when a team of
+     * theirs or a personal exception grants its permission. Without an organization, every app.
      *
+     * @param guest whether the person is only a guest of the organization
      * @param holds whether the person holds a permission, by qualified identifier
      */
-    public List<ShellApp> forPerson(Optional<UUID> organizationId, Predicate<String> holds) {
+    public List<ShellApp> forPerson(Optional<UUID> organizationId, boolean guest, Predicate<String> holds) {
         if (organizationId.isEmpty()) {
             return available().stream()
                     .map(app -> new ShellApp(app.extensionId(), app.appId(), false))
@@ -165,7 +167,7 @@ public class AppSettings {
         }
         return list(organizationId.get()).stream()
                 .filter(AppView::enabled)
-                .filter(app -> !app.isRestricted() || holds.test(app.permission()))
+                .filter(app -> (!app.isRestricted() && !guest) || holds.test(app.permission()))
                 .map(app -> new ShellApp(app.extensionId(), app.appId(), app.pinned()))
                 .toList();
     }

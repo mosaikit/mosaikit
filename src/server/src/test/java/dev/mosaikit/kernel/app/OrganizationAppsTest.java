@@ -7,6 +7,7 @@ import static dev.mosaikit.kernel.app.Credentials.as;
 import static dev.mosaikit.kernel.app.Credentials.asAdmin;
 import static dev.mosaikit.kernel.app.TestData.unique;
 import static org.hamcrest.Matchers.contains;
+import static org.hamcrest.Matchers.empty;
 import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
 
@@ -196,6 +197,41 @@ class OrganizationAppsTest {
                 .then()
                 .statusCode(200);
         in(member).get("/api/v1/shell/apps").then().body("appId", contains("todo", "board"));
+    }
+
+    @Test
+    @Tag("MK-056")
+    void aGuestSeesAnAppOnlyWhenGrantedItsPermission() {
+        asAdmin()
+                .body(Map.of("slug", "apps-village", "name", "Apps Village", "selfRegistration", true))
+                .post("/api/v1/organizations");
+        String guest = unique("guest") + "@example.org";
+        anonymous()
+                .body(Map.of("organization", "apps-village", "email", guest, "displayName", "G", "password", PASSWORD))
+                .post("/api/v1/accounts/registrations")
+                .then()
+                .statusCode(201);
+        String team = in(manager)
+                .body(Map.of("name", unique("Guests"), "description", "", "visibility", "private"))
+                .post("/api/v1/teams")
+                .then()
+                .statusCode(201)
+                .extract()
+                .path("id");
+        in(manager)
+                .body(Map.of("role", "guest"))
+                .put("/api/v1/teams/{id}/members/{email}", team, guest)
+                .then()
+                .statusCode(200);
+
+        // Guests hold no permission unless granted explicitly: apps for everyone are for members.
+        in(member).get("/api/v1/shell/apps").then().body("appId", contains("todo", "board"));
+        in(guest).get("/api/v1/shell/apps").then().statusCode(200).body("appId", empty());
+        in(manager)
+                .put("/api/v1/organizations/{slug}/permissions/teams/{id}/{permission}", SLUG, team, TODO + ":use-todo")
+                .then()
+                .statusCode(200);
+        in(guest).get("/api/v1/shell/apps").then().body("appId", contains("todo"));
     }
 
     @Test
