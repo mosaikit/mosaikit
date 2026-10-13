@@ -132,6 +132,29 @@ change in the audit log. Apps of extensions installed later are shown, after the
 administrators decide. Platform administrators can do the same through
 `PUT /api/v1/organizations/{slug}/apps`.
 
+## Permissions of an organization
+
+Extensions declare permissions, such as "create dashboards" (MK-056). A permission is off until the
+administrators of the organization grant it:
+
+- through a **profile**, a named set of permissions: each member has one profile, the one assigned
+  to them or else the **default profile** of members;
+- to a **team**, for its members and its guests;
+- to a person, as a **personal exception**.
+
+Grants only add. The administrators of the organization hold every permission; guests hold only
+what their teams and their exceptions grant; platform administrators hold none for being platform
+administrators. A permission that an update of an extension adds is in no profile, and when all
+the apps of an extension are off its permissions are held by nobody. Every change is in the audit
+log.
+
+The console for profiles comes with a later version; until then the administrators of the
+organization use the API under `/api/v1/organizations/{slug}/permissions`, signed in to that
+organization: the declared permissions, `profiles`, `members/{email}` (what a member holds and
+where each permission comes from, `profile`, `exceptions/{permission}`), `teams/{id}/{permission}`
+and `preview` (what a proposed member with a role, a profile and teams would hold, without changing
+anything). Permissions are named `<extension>:<permission>`.
+
 ## Audit log
 
 The kernel records who proposed, confirmed, rejected or ran an action of an assistant, and who
