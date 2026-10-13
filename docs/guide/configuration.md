@@ -28,8 +28,13 @@ start). The kernel keeps its tables in the `mk_kernel` schema and each extension
 |---|---|---|
 | `quarkus.http.port` | `8080` | port |
 | `quarkus.http.host` | `0.0.0.0` | address to listen on |
-| `quarkus.http.auth.form.timeout` | `PT8H` | how long the session of the shell of a local account lasts without activity |
-| `quarkus.http.auth.session.encryption-key` | random at each start | key (at least 16 characters) that encrypts the session cookie; set the same on every kernel of a cluster, or sessions end at each restart |
+| `mosaikit.accounts.session-timeout` | `8h` | how long a session of the shell opened with a password lasts without activity (at least one minute) |
+| `mosaikit.accounts.session-max-life` | `24h` | how long a session lasts at most, whatever its activity; "remember me" then opens a new one. The record of an ended realm session is kept at least this long |
+| `mosaikit.accounts.session-cache` | `5s` | how long a kernel keeps what it read about a session; a session ended on another kernel of the installation is refused within this time, on the same kernel at once; `0s` reads the database at every request |
+
+Sessions are kept in the database (MK-125): the cookie holds only a random value, so no key needs
+to be configured, sessions survive a restart, and every kernel of a cluster accepts them. Expired
+sessions are removed every 15 minutes.
 
 Terminate TLS at a reverse proxy or an ingress; in production the kernel sends
 `Strict-Transport-Security` and a `Content-Security-Policy`.

@@ -25,9 +25,15 @@ APIs without an organization answer `403`. `GET /api/v1/accounts/me` gives the o
 request and every membership of the person.
 
 The shell signs a local account in once, with a form posted to `/api/v1/accounts/session` (fields
-`username` and `password`; 200, or 401), which the form authentication of Quarkus answers: the
-kernel keeps the session in an encrypted, HttpOnly, SameSite=Strict cookie, `mosaikit-session`, so
-that a reload keeps it and no script of the page holds the password. Requests marked `X-Mosaikit-Client: shell` get a 401 without
+`username` and `password`; 200 with the account, or 401). The kernel opens a session that it keeps
+in its database (MK-125) and sets an HttpOnly, SameSite=Strict cookie, `mosaikit-session`, that
+holds only a random value: a reload keeps the session, no script of the page holds the password, and
+signing out, a suspension or the removal from the organization end the session on the server, so
+that a copy of the cookie is refused at once (401). Every request with the cookie is checked against
+the session, so a service that validates a session by calling the kernel with it, such as a gateway
+in front of data, sees the end at once too. A bearer token of a realm belongs to the session of the
+realm (its `sid`): signing out with it (`DELETE /api/v1/accounts/session`) ends that session on the
+kernel, and its tokens are refused before they expire. Requests marked `X-Mosaikit-Client: shell` get a 401 without
 `WWW-Authenticate`, so that the browser never opens its own sign-in dialog. Other clients keep using
 HTTP Basic or bearer tokens.
 
@@ -45,7 +51,11 @@ HTTP Basic or bearer tokens.
 | `GET /api/v1/accounts/me` | signed in | the current account, with its personal settings |
 | `GET, PUT /api/v1/accounts/me/preferences` | signed in | the personal settings (MK-027): `theme`, `appearance` (`system`, `light`, `dark`, `contrast`), `language` (`en`, `it`), `hiddenApps` (`<extension id>/<app id>`) |
 | `GET /api/v1/accounts/session` | anyone | the account of the session of the shell, or 204 without one |
-| `DELETE /api/v1/accounts/session` | anyone | end the session of the shell, and forget the browser if it was remembered |
+| `POST /api/v1/accounts/session` | anyone | sign in with the form fields `username` and `password`: 200 with the account and the session cookie, or 401 (MK-125) |
+| `DELETE /api/v1/accounts/session` | anyone | end the session of the request on the server (the cookie of the shell, or the realm session of a bearer token), and forget the browser if it was remembered |
+| `GET /api/v1/accounts/me/sessions` | signed in | the live sessions of the person (MK-125): `id`, `kind` (`password` or `realm`), `userAgent`, `address`, `createdAt`, `lastSeenAt`, `current` |
+| `DELETE /api/v1/accounts/me/sessions/{id}` | signed in | end a session of the person: its cookie, its "remember me" and the tokens of its realm session are refused at once; 404 when it is not a live session of the person (audited) |
+| `PUT, DELETE /api/v1/platform/accounts/{email}/suspension` | `platform-admin` | suspend an account, which ends all its sessions and "remember me" tokens and refuses every sign-in, or reactivate it; not one's own account (MK-125, audited) |
 | `POST /api/v1/accounts/session/remembrance` | signed in, with a password | remember this browser: an HttpOnly cookie signs the person in again for `mosaikit.accounts.remember-for` |
 | `GET /api/v1/shell/extensions` | signed in | frontends of the active extensions, for the shell; not those turned off for the organization of the request, nor what they contribute to other extensions (MK-030, MK-035) |
 | `WS /api/v1/live` (WebSocket) | signed in | the real-time channel (MK-031): `?organization=<slug>`; send `{"type": "subscribe", "topic": "…"}`, receive `subscribed`, `refused` or `{"type": "event", "topic", "data"}` |

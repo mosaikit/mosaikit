@@ -29,15 +29,33 @@ public class RememberToken {
     @Column(name = "expires_at", nullable = false, updatable = false)
     private Instant expiresAt;
 
+    /** The session the token was asked in, or that it opened last (MK-125). */
+    @Column(name = "session_id")
+    private UUID sessionId;
+
     /** Required by JPA. */
     protected RememberToken() {}
 
     public RememberToken(UUID accountId, String tokenDigest, Instant createdAt, Instant expiresAt) {
+        this(accountId, null, tokenDigest, createdAt, expiresAt);
+    }
+
+    public RememberToken(UUID accountId, UUID sessionId, String tokenDigest, Instant createdAt, Instant expiresAt) {
         this.id = UUID.randomUUID();
         this.accountId = accountId;
+        this.sessionId = sessionId;
         this.tokenDigest = tokenDigest;
         this.createdAt = createdAt;
         this.expiresAt = expiresAt;
+    }
+
+    public UUID getId() {
+        return id;
+    }
+
+    /** The session of the token; empty for a token issued before MK-125. */
+    public java.util.Optional<UUID> getSessionId() {
+        return java.util.Optional.ofNullable(sessionId);
     }
 
     public UUID getAccountId() {

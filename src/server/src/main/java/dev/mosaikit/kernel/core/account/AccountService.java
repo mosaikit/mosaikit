@@ -52,6 +52,7 @@ public class AccountService {
     private final ObjectMapper json;
     private final PlatformSettingsService settings;
     private final ConfirmationMail confirmationMail;
+    private final SessionRegistry sessions;
     private final boolean confirmEmail;
     private final Clock clock;
 
@@ -63,6 +64,7 @@ public class AccountService {
             ObjectMapper json,
             PlatformSettingsService settings,
             ConfirmationMail confirmationMail,
+            SessionRegistry sessions,
             KernelConfig config,
             Clock clock) {
         this.accounts = accounts;
@@ -72,6 +74,7 @@ public class AccountService {
         this.json = json;
         this.settings = settings;
         this.confirmationMail = confirmationMail;
+        this.sessions = sessions;
         this.confirmEmail = config.accounts().confirmEmail();
         this.clock = clock;
     }
@@ -234,20 +237,64 @@ public class AccountService {
         return MemberView.of(account, member);
     }
 
-    /** Removes a person from an organization; the account stays, with its other memberships. */
+    /**
+     * Removes a person from an organization; the account stays, with its other memberships. The
+     * sessions of the person that act on the organization, or on none, end at once (MK-125).
+     */
     public void removeMember(String slug, String email) {
         Organization organization = organizations.require(slug);
-        accounts.findByUsername(normalize(email))
-                .flatMap(account -> members.findByAccountIdAndOrganizationId(account.getId(), organization.getId()))
-                .ifPresentOrElse(members::delete, () -> {
-                    throw new ResourceNotFoundException("No member '" + email + "' in organization '" + slug + "'.");
-                });
+        UserAccount account = accounts.findByUsername(normalize(email)).orElseThrow(() -> noMember(slug, email));
+        OrganizationMember member = members.findByAccountIdAndOrganizationId(account.getId(), organization.getId())
+                .orElseThrow(() -> noMember(slug, email));
+        members.delete(member);
+        sessions.endIn(account.getId(), organization.getId());
+    }
+
+    private static ResourceNotFoundException noMember(String slug, String email) {
+        return new ResourceNotFoundException("No member '" + email + "' in organization '" + slug + "'.");
+    }
+
+    /**
+     * Suspends an account (MK-125): it signs in by no means, and its sessions and "remember me"
+     * tokens end at once, until it is reactivated.
+     *
+     * @param actor the username of the administrator, who cannot suspend their own account
+     */
+    public AccountStatus suspend(String email, String actor) {
+        UserAccount account = accounts.findByUsername(normalize(email))
+                .orElseThrow(() -> new ResourceNotFoundException("No account '" + email + "'."));
+        if (account.getUsername().equals(normalize(actor))) {
+            throw new ForbiddenOperationException("You cannot suspend your own account.");
+        }
+        if (!account.isSuspended()) {
+            account.suspend(Instant.now(clock));
+            accounts.update(account);
+        }
+        sessions.endAllOf(account.getId());
+        return AccountStatus.of(account);
+    }
+
+    /** Lets a suspended account sign in again; the sessions it had stay ended. */
+    public AccountStatus reactivate(String email) {
+        UserAccount account = accounts.findByUsername(normalize(email))
+                .orElseThrow(() -> new ResourceNotFoundException("No account '" + email + "'."));
+        if (account.isSuspended()) {
+            account.reactivate();
+            accounts.update(account);
+        }
+        return AccountStatus.of(account);
     }
 
     /** Looks up an account for authentication, which runs outside of any HTTP request context. */
     @ActivateRequestContext
     Optional<UserAccount> findForAuthentication(String username) {
         return accounts.findByUsername(normalize(username));
+    }
+
+    /** Looks up the account of a session for authentication. */
+    @ActivateRequestContext
+    Optional<UserAccount> findForAuthentication(UUID id) {
+        return accounts.findById(id);
     }
 
     private AccountView view(UserAccount account, Set<String> roles, Optional<UUID> organizationId) {

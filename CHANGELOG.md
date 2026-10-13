@@ -18,6 +18,22 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The kernel keeps the sessions of people on the server (MK-125). Signing in with a password opens
+  a session recorded in the new table `account_session` (migration V19) and the `mosaikit-session`
+  cookie holds only a random value, kept as its digest: after signing out, a copy of the cookie is
+  refused at once (401). The session of a realm is recorded from the `sid` of its tokens, so that
+  signing out with a bearer token, or ending it, refuses its tokens before they expire. Platform
+  administrators suspend and reactivate accounts (`PUT, DELETE
+  /api/v1/platform/accounts/{email}/suspension`, audited): a suspended account signs in by no means
+  and its sessions and "remember me" tokens end at once; removing a person from an organization
+  ends their sessions in it. People see their live sessions in their settings (browser, address,
+  opened, last used, this browser marked) and end any of them (`GET, DELETE
+  /api/v1/accounts/me/sessions`); ending one revokes its "remember me" token too. Every request is
+  checked against its session, with what was read kept for `mosaikit.accounts.session-cache` (5
+  seconds) and dropped at once when this kernel ends the session; new settings
+  `mosaikit.accounts.session-timeout` (8 hours without activity) and `session-max-life` (24 hours);
+  expired sessions are removed every 15 minutes.
+
 - The kernel implements sharing (MK-055, ADR-0037): the `Sharing` bean of `kernel-api` shares a
   registered resource with a person, a team, the organization, a link or the public at the levels
   that the manifest declares, ordered as listed; deny by default, every level to the owner and to
@@ -186,6 +202,11 @@ project follows [Semantic Versioning](https://semver.org/).
   by itself.
 
 ### Changed
+
+- The session cookie of the shell is no longer the encrypted cookie of the form authentication of
+  Quarkus (MK-125): `quarkus.http.auth.form.timeout` and `quarkus.http.auth.session.encryption-key`
+  are not used any more, and sessions no longer end when the kernel restarts. Sessions open before
+  the update end with it: people sign in again once.
 
 - Plugins are called extensions (ADR-0036), everywhere: code, API (`/api/v1/extensions`,
   `/api/v1/ext/<api>/`), settings (`mosaikit.extensions.*`), the `extensions/` directory of an

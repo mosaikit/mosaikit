@@ -82,6 +82,32 @@ A person without an account gets one without password: they sign in through the 
 organization, which links the account at the first sign-in (if the realm verified the address).
 A realm can link an existing account only when that account is a member of its organization.
 
+Removing a person from an organization ends at once their sessions in it (MK-125): a browser left
+open, a copy of its cookie or a gateway that checks the session with the kernel are refused at the
+next request.
+
+## Suspending a person
+
+A platform administrator suspends an account, for example when a person leaves or a device is
+lost, and reactivates it later (MK-125):
+
+```bash
+curl -u admin -X PUT https://mosaikit.example.org/api/v1/platform/accounts/ada@acme.com/suspension
+curl -u admin -X DELETE https://mosaikit.example.org/api/v1/platform/accounts/ada@acme.com/suspension
+```
+
+A suspended person signs in by no means: not with the password, not with **Remember me**, not
+through the realm of an organization. All their sessions end at once, on every browser, and their
+"remember me" tokens are revoked; the list of members shows `"suspended": true`. Reactivated, the
+person signs in again; the sessions ended by the suspension stay ended. You cannot suspend your own
+account. Both actions are in the audit log (`account.suspended`, `account.reactivated`).
+
+A kernel ends a session at once; when several kernels serve the installation, the others refuse it
+within `mosaikit.accounts.session-cache` (5 seconds by default). People also see and end their own
+sessions in their settings. With Keycloak, the kernel ends its own side of the realm session (the
+tokens of that session are refused); to end the session in Keycloak too, use its administration
+console.
+
 ## How members sign in
 
 Each organization has a sign-in policy, `signIn`:

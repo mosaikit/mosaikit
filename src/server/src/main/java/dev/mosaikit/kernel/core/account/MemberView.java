@@ -11,9 +11,16 @@ import java.util.UUID;
  *
  * @param linked whether the person has signed in through the realm of the organization
  * @param password whether the account has a local password
+ * @param suspended whether an administrator suspended the account (MK-125)
  */
 public record MemberView(
-        UUID accountId, String username, String displayName, Set<String> roles, boolean linked, boolean password) {
+        UUID accountId,
+        String username,
+        String displayName,
+        Set<String> roles,
+        boolean linked,
+        boolean password,
+        boolean suspended) {
 
     static MemberView of(UserAccount account, OrganizationMember member) {
         return new MemberView(
@@ -22,6 +29,7 @@ public record MemberView(
                 account.getDisplayName(),
                 member.getRoles(),
                 member.getIdentitySubject().isPresent(),
-                account.getPasswordHash().isPresent());
+                account.getPasswordHash().isPresent(),
+                account.isSuspended());
     }
 }

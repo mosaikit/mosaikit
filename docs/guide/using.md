@@ -14,7 +14,8 @@ organization you belong to and on the extensions your administrator installed.
    - otherwise you enter your Mosaikit password. Tick **Remember me** to stay signed in on that
      browser for 30 days, also after closing it, until you sign out.
 3. To sign out, open the menu of your avatar, on the right of the top bar, and choose **Sign out**;
-   with an identity provider you are signed out there too.
+   with an identity provider you are signed out there too. Signing out ends the session on the
+   server: a copy of it, kept by anyone, opens nothing any more.
 
 If your organization allows self-registration, choose **Create an account** on the sign-in page:
 enter your name, your email address and a password of at least 12 characters. Mosaikit sends you a
@@ -112,9 +113,17 @@ Open the menu of your avatar and choose **Settings**:
   once;
 - **Organization**, if you belong to several: the apps reload for the one you choose;
 - **Apps in the app bar**: untick the apps you do not use; the apps your organization pinned stay;
+- **Sessions**: where you are signed in, with the browser and system, the address, when you signed
+  in and when the session was last used; **This browser** marks the one you are using. **End
+  session** signs that browser out at once, and it is no longer remembered; on this browser the
+  button is **Sign out**. End any session you do not recognize, then change your password;
 - the sections that apps add, such as their own preferences.
 
 Your choices are kept with your account: you find them at the next sign-in, on any device.
+
+A session of the shell ends after 8 hours without activity, and after 24 hours in any case;
+**Remember me** then signs you in again on that browser. An administrator can end your sessions by
+suspending your account or removing you from an organization.
 
 ## The assistant
 
