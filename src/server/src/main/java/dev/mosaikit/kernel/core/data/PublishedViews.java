@@ -73,6 +73,8 @@ public class PublishedViews {
             String name = roleName(database);
             try (Statement statement = connection.createStatement()) {
                 if (!exists(connection, name)) {
+                    // Role names cannot be bound as parameters; they are quoted identifiers.
+                    // nosemgrep: java.lang.security.audit.formatted-sql-string.formatted-sql-string
                     statement.execute("create role " + RowSecurity.quote(name) + " nologin");
                 }
                 String r = RowSecurity.quote(name);
@@ -112,6 +114,8 @@ public class PublishedViews {
         if (existing.isEmpty()) {
             try (Statement statement = connection.createStatement()) {
                 String u = RowSecurity.quote(user);
+                // Role names cannot be bound as parameters; they are quoted identifiers.
+                // nosemgrep: java.lang.security.audit.formatted-sql-string.formatted-sql-string
                 statement.execute("create role " + u + " login nosuperuser nocreatedb nocreaterole");
             }
             try (PreparedStatement statement =
@@ -132,6 +136,8 @@ public class PublishedViews {
                 .unwrap(PGConnection.class)
                 .alterUserPassword(user, password.orElseThrow().toCharArray(), "scram-sha-256");
         try (Statement statement = connection.createStatement()) {
+            // Role names cannot be bound as parameters; they are quoted identifiers.
+            // nosemgrep: java.lang.security.audit.formatted-sql-string.formatted-sql-string
             statement.execute("grant " + RowSecurity.quote(reader) + " to " + RowSecurity.quote(user));
         }
         LOG.infof("Published views: login %s reads them", user);
