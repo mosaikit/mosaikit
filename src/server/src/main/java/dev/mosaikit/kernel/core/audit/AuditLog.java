@@ -159,8 +159,9 @@ public class AuditLog {
             parameters.put("actor", query.actor());
         }
         if (query.action() != null) {
-            // An action, or every action under a prefix that ends with a dot, such as "permissions.".
-            if (query.action().endsWith(".")) {
+            // An action, or every action under a prefix that ends with a dot or a colon, such as "permissions."
+            // or the "dev.example.dashboards:" of the entries of an extension.
+            if (query.action().endsWith(".") || query.action().endsWith(":")) {
                 where.add("e.action like :action escape '!'");
                 parameters.put("action", query.action().replaceAll("([!%_])", "!$1") + "%");
             } else {

@@ -12,7 +12,7 @@ import java.util.UUID;
  * @param organization the entries of one organization, or of every one when empty
  * @param platform only the entries of the platform, without organization
  * @param actor who did it, exactly
- * @param action an action, or every action that starts with it when it ends with a dot
+ * @param action an action, or every action that starts with it when it ends with a dot or a colon
  * @param subject the object of the action, exactly
  * @param channel the channel the action came through
  * @param from the entries at or after this time

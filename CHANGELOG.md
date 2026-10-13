@@ -110,6 +110,12 @@ project follows [Semantic Versioning](https://semver.org/).
   `master-key-file` and `previous-keys`: without a master key the store is disabled and its endpoints
   answer 503, while the kernel starts. Platform administrators follow a rotation with `GET
   /api/v1/platform/secrets/keys` and end it with `POST /api/v1/platform/secrets/re-encryption`.
+- Extensions write the audit log of the organization (MK-059): the `AuditLog` bean of `kernel-api`
+  (`dev.mosaikit.kernel.api.audit`) records an entry with the action, its object and optional details
+  given by the extension, which names itself as in `Notifications.send`; the kernel adds the person
+  and the organization of the request, the time and the channel `EXTENSION`, qualifies the action as
+  `<extension>:<action>` and writes it in its own transaction, chained with the others. The list of
+  the audit log filters by a prefix ending with a colon, such as `dev.example.dashboards:`.
 
 - The kernel keeps the sessions of people on the server (MK-125). Signing in with a password opens
   a session recorded in the new table `account_session` (migration V19) and the `mosaikit-session`
