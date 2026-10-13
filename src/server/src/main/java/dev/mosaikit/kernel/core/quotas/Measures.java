@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.core.quotas;
 
+import dev.mosaikit.kernel.api.extension.ExtensionManifest;
+import dev.mosaikit.kernel.api.extension.MeasureEntry;
+import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import java.util.ArrayList;
@@ -11,8 +14,8 @@ import java.util.Optional;
 import java.util.function.Supplier;
 
 /**
- * The measures that organizations consume (MK-076): the storage of the kernel, then those of the
- * active extensions.
+ * The measures that organizations consume (MK-076): the storage of the kernel, then those that the
+ * active extensions declare in {@code measures} of their manifests, as {@code <extension>/<id>}.
  */
 @ApplicationScoped
 public class Measures {
@@ -20,8 +23,11 @@ public class Measures {
     private final Supplier<List<Measure>> ofExtensions;
 
     @Inject
-    public Measures() {
-        this(List::of);
+    public Measures(ExtensionRegistry extensions) {
+        this(() -> extensions.active().stream()
+                .flatMap(extension -> extension.manifest().stream())
+                .flatMap(manifest -> manifest.measures().stream().map(entry -> of(manifest, entry)))
+                .toList());
     }
 
     Measures(Supplier<List<Measure>> ofExtensions) {
@@ -34,6 +40,16 @@ public class Measures {
         all.add(Measure.STORAGE);
         ofExtensions.get().stream().sorted(Comparator.comparing(Measure::id)).forEach(all::add);
         return all;
+    }
+
+    /** The measure of the kernel for an entry of a manifest. */
+    static Measure of(ExtensionManifest manifest, MeasureEntry entry) {
+        return new Measure(
+                Measure.of(manifest.id(), entry.id()),
+                entry.label(),
+                entry.unit(),
+                entry.kind() == MeasureEntry.Kind.COUNTER ? Measure.Kind.COUNTER : Measure.Kind.GAUGE,
+                manifest.id());
     }
 
     /** A measure by its identifier, when the kernel or an active extension declares it. */

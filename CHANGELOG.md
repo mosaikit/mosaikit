@@ -26,6 +26,12 @@ project follows [Semantic Versioning](https://semver.org/).
   HMAC-SHA256 by `mosaikit.files.link-key` or a key derived from the master key of the store of
   credentials, with former keys accepted during a rotation (migration V26). Making a link is
   audited, and its use once an hour.
+- Quotas for extensions (MK-076): `measures` in the manifest (`id`, `label`, `unit`, `kind`
+  `counter` per month or `gauge`) declares what an extension meters, as `<extension>/<id>`, with
+  limits per organization and consumption by person like storage; the `Quotas` bean of the Java API
+  checks an amount, consumes a counter, sets a gauge, and reports the space kept for a registered
+  resource, which counts to the storage of the organization with its files and goes with the
+  resource. `QuotaExceededException` is answered as `403 Quota exceeded`, naming the limit.
 - Quotas of organizations (MK-076): the kernel measures the storage of each organization (its
   files and the space that extensions report for their resources, new tables `quota_limit`,
   `quota_total`, `quota_usage` and `quota_space` under row-level security, migration V27) and

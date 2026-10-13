@@ -636,6 +636,80 @@ class ExtensionManifestsTest {
     }
 
     @Test
+    @Tag("MK-076")
+    void readsTheMeasuresOfAnExtension() {
+        Map<String, Object> tree = validTree();
+        tree.put(
+                "measures",
+                List.of(
+                        Map.of(
+                                "id",
+                                "renders",
+                                "label",
+                                "Renders",
+                                "unit",
+                                "renders",
+                                "kind",
+                                "counter",
+                                "i18n",
+                                Map.of("it", Map.of("label", "Rendering"))),
+                        Map.of("id", "tiles", "label", "Tiles", "unit", "bytes", "kind", "gauge")));
+
+        assertThat(parseValid(tree).measures())
+                .containsExactly(
+                        new MeasureEntry(
+                                "renders",
+                                "Renders",
+                                "renders",
+                                MeasureEntry.Kind.COUNTER,
+                                Map.of("it", Map.of("label", "Rendering"))),
+                        new MeasureEntry("tiles", "Tiles", "bytes", MeasureEntry.Kind.GAUGE, null));
+        assertThat(MeasureEntry.Kind.GAUGE.value()).isEqualTo("gauge");
+        assertThat(parseValid(validTree()).measures()).isEmpty();
+    }
+
+    @Test
+    @Tag("MK-076")
+    void rejectsMeasuresThatTheKernelCannotCount() {
+        Map<String, Object> tree = validTree();
+        tree.put(
+                "measures",
+                List.of(
+                        Map.of("id", "Renders", "label", "x", "unit", "calls", "kind", "counter"),
+                        Map.of("id", "calls", "unit", "calls", "kind", "counter"),
+                        Map.of("id", "twice", "label", "x", "unit", "calls", "kind", "counter"),
+                        Map.of("id", "twice", "label", "y", "unit", "calls", "kind", "counter"),
+                        Map.of("id", "credits", "label", "x", "unit", "AI credits", "kind", "counter"),
+                        Map.of("id", "rate", "label", "x", "unit", "calls", "kind", "per-second"),
+                        Map.of(
+                                "id",
+                                "texts",
+                                "label",
+                                "x",
+                                "unit",
+                                "calls",
+                                "kind",
+                                "gauge",
+                                "i18n",
+                                Map.of("it", Map.of("title", "x"))),
+                        "not an object"));
+
+        assertThat(parseInvalid(tree))
+                .extracting(ManifestViolation::field)
+                .containsExactlyInAnyOrder(
+                        "measures[0].id",
+                        "measures[1].label",
+                        "measures[3].id",
+                        "measures[4].unit",
+                        "measures[5].kind",
+                        "measures[6].i18n.it.title",
+                        "measures[7]");
+
+        tree.put("measures", "all of them");
+        assertThat(parseInvalid(tree)).extracting(ManifestViolation::field).containsExactly("measures");
+    }
+
+    @Test
     @Tag("MK-055")
     void readsTheResourceTypesAndTheirSharingLevels() {
         Map<String, Object> tree = validTree();

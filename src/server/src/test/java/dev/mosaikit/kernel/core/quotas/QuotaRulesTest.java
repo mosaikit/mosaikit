@@ -87,6 +87,6 @@ class QuotaRulesTest {
         assertThat(measures.all()).containsExactly(Measure.STORAGE, RENDERS);
         assertThat(measures.find("storage")).contains(Measure.STORAGE);
         assertThat(measures.find("org.example.maps/calls")).isEmpty();
-        assertThat(new Measures().all()).containsExactly(Measure.STORAGE);
+        assertThat(new Measures(List::of).all()).containsExactly(Measure.STORAGE);
     }
 }

@@ -271,6 +271,41 @@
         "additionalProperties": false
       }
     },
+    "measures": {
+      "description": "What the extension meters for each organization: platform administrators set a limit per organization, the extension asks the kernel before an action, and the administrators of the organization see the consumption (MK-076). In the kernel a measure is <extension>/<id>.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "label", "unit", "kind"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,47}$"
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "unit": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$"
+          },
+          "kind": {
+            "description": "counter: what is used in a calendar month (UTC); gauge: what is kept now.",
+            "enum": ["counter", "gauge"]
+          },
+          "i18n": {
+            "$ref": "#/$defs/i18n",
+            "additionalProperties": {
+              "propertyNames": {
+                "enum": ["label"]
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
     "resources": {
       "description": "Types of the resources the extension registers with the kernel (MK-054) and shares at the levels it declares (MK-055).",
       "type": "array",

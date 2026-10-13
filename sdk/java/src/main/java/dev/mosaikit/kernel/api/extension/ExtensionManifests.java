@@ -40,6 +40,12 @@ public final class ExtensionManifests {
     /** Name of a permission of an extension (MK-056), such as {@code create-dashboard}. */
     public static final Pattern PERMISSION_PATTERN = Pattern.compile("^[a-z][a-z0-9-]{0,47}$");
 
+    /** Identifier of a measure of an extension (MK-076), such as {@code renders}. */
+    public static final Pattern MEASURE_PATTERN = Pattern.compile("^[a-z][a-z0-9-]{0,47}$");
+
+    /** Unit of a measure of an extension (MK-076), such as {@code calls} or {@code credits}. */
+    public static final Pattern UNIT_PATTERN = Pattern.compile("^[a-z][a-z0-9-]{0,31}$");
+
     /** Name of a resource type of an extension (MK-054), such as {@code dashboard}. */
     public static final Pattern RESOURCE_TYPE_PATTERN = Pattern.compile("^[a-z][a-z0-9-]{0,47}$");
 
@@ -51,6 +57,8 @@ public final class ExtensionManifests {
     private static final String PERMISSIONS = "permissions";
 
     private static final String RESOURCES = "resources";
+
+    private static final String MEASURES = "measures";
 
     private static final String TITLE = "title";
 
@@ -131,6 +139,7 @@ public final class ExtensionManifests {
             List<ActionEntry> actions = readActions(backend);
             List<PermissionEntry> permissions = readPermissions();
             List<ResourceTypeEntry> resourceTypes = readResourceTypes();
+            List<MeasureEntry> measures = readMeasures();
 
             if (!violations.isEmpty()) {
                 return new ManifestParseResult.Invalid(violations);
@@ -151,7 +160,8 @@ public final class ExtensionManifests {
                     contributions,
                     actions,
                     permissions,
-                    resourceTypes));
+                    resourceTypes,
+                    measures));
         }
 
         /** The permissions of the extension (MK-056): {@code permissions: [{ name, title }]}. */
@@ -189,6 +199,55 @@ public final class ExtensionManifests {
                 return Optional.empty();
             }
             return Optional.of(new PermissionEntry(name, title, description, i18n));
+        }
+
+        /** What the extension meters (MK-076): {@code measures: [{ id, label, unit, kind }]}. */
+        private List<MeasureEntry> readMeasures() {
+            List<MeasureEntry> measures = new ArrayList<>();
+            Set<String> ids = new HashSet<>();
+            List<?> list = optionalList(MEASURES, "a list of measures");
+            for (int i = 0; i < list.size(); i++) {
+                String field = MEASURES + "[" + i + "]";
+                readMeasure(field, list.get(i)).ifPresent(measure -> {
+                    if (!ids.add(measure.id())) {
+                        violation(field + ".id", "the measure '" + measure.id() + "' is declared twice");
+                    }
+                    measures.add(measure);
+                });
+            }
+            return measures;
+        }
+
+        private Optional<MeasureEntry> readMeasure(String field, Object item) {
+            Map<String, ?> measure = objectItem(field, item).orElse(null);
+            if (measure == null) {
+                return Optional.empty();
+            }
+            int before = violations.size();
+            String id = requiredText(measure, "id", field + ".id");
+            if (id != null && !MEASURE_PATTERN.matcher(id).matches()) {
+                violation(field + ".id", "must be lowercase letters, digits and '-', for example renders");
+            }
+            String label = requiredText(measure, "label", field + ".label");
+            String unit = requiredText(measure, "unit", field + ".unit");
+            if (unit != null && !UNIT_PATTERN.matcher(unit).matches()) {
+                violation(field + ".unit", "must be lowercase letters, digits and '-', for example calls");
+            }
+            String kind = requiredText(measure, "kind", field + ".kind");
+            MeasureEntry.Kind parsed = null;
+            if ("counter".equals(kind)) {
+                parsed = MeasureEntry.Kind.COUNTER;
+            } else if ("gauge".equals(kind)) {
+                parsed = MeasureEntry.Kind.GAUGE;
+            } else if (kind != null) {
+                violation(field + ".kind", "must be counter, what is used in a month, or gauge, what is kept now");
+            }
+            Map<String, Map<String, String>> i18n =
+                    readTranslations(field + "." + I18N, measure.get(I18N), Set.of("label"));
+            if (violations.size() > before) {
+                return Optional.empty();
+            }
+            return Optional.of(new MeasureEntry(id, label, unit, parsed, i18n));
         }
 
         /** The resource types of the extension (MK-054, MK-055), with their sharing levels. */

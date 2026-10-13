@@ -73,6 +73,16 @@ public class TestExtensions implements QuarkusTestProfile {
                         title: Album
                         levels: [{ name: view, title: View }]
                     """);
+            // QuotaApiTest: an extension that meters renders and tiles, and keeps maps (MK-076).
+            extension("quotas", QuotaApiTest.EXTENSION, "Quotas", """
+                    measures:
+                      - { id: renders, label: Renders, unit: renders, kind: counter }
+                      - { id: layers, label: Layers, unit: layers, kind: gauge }
+                    resources:
+                      - type: map
+                        title: Map
+                        levels: [{ name: view, title: View }]
+                    """);
             // PermissionsTest: an extension that declares permissions (MK-056); the test changes
             // its manifest as an update would.
             extension("permissions", PermissionsTest.EXTENSION, "Permissions", PermissionsTest.PERMISSIONS);

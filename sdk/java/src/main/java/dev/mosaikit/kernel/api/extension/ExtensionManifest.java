@@ -35,6 +35,7 @@ public final class ExtensionManifest {
     private final List<ActionEntry> actions;
     private final List<PermissionEntry> permissions;
     private final List<ResourceTypeEntry> resourceTypes;
+    private final List<MeasureEntry> measures;
 
     @SuppressWarnings("java:S107") // Mirrors the manifest fields; only ExtensionManifests creates it.
     ExtensionManifest(
@@ -53,7 +54,8 @@ public final class ExtensionManifest {
             List<Contribution> contributions,
             List<ActionEntry> actions,
             List<PermissionEntry> permissions,
-            List<ResourceTypeEntry> resourceTypes) {
+            List<ResourceTypeEntry> resourceTypes,
+            List<MeasureEntry> measures) {
         this.id = Objects.requireNonNull(id, "id");
         this.version = Objects.requireNonNull(version, "version");
         this.name = Objects.requireNonNull(name, "name");
@@ -70,6 +72,12 @@ public final class ExtensionManifest {
         this.actions = List.copyOf(actions);
         this.permissions = List.copyOf(permissions);
         this.resourceTypes = List.copyOf(resourceTypes);
+        this.measures = List.copyOf(measures);
+    }
+
+    /** What the extension meters for each organization, with limits and consumption (MK-076). */
+    public List<MeasureEntry> measures() {
+        return measures;
     }
 
     /** Permissions the extension declares, off until administrators grant them (MK-056). */
