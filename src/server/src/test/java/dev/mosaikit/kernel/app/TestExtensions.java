@@ -69,6 +69,9 @@ public class TestExtensions implements QuarkusTestProfile {
             // PermissionsTest: an extension that declares permissions (MK-056); the test changes
             // its manifest as an update would.
             extension("permissions", PermissionsTest.EXTENSION, "Permissions", PermissionsTest.PERMISSIONS);
+            // SharingTest: documents shared at four levels with every kind of subject, links up to
+            // "use", and memos shared with people, groups and the organization only (MK-055).
+            extension("sharing", SharingTest.EXTENSION, "Sharing", SharingTest.RESOURCES);
             // ThemeExtensionTest: a theme that names the product and brings its logo (MK-052), and one
             // with a value that is not a color.
             theme("green", "dev.mosaikit.test.green", "Green", "'#1b6e3c'", """
