@@ -15,6 +15,19 @@ Extensions with Java code are loaded by rebuilding the kernel at the next start,
 seconds; if the kernel cannot start with a new extension, the extension is rolled back and Mosaikit
 starts with the previous extensions.
 
+## Settings
+
+The settings of Mosaikit and of the installed extensions are in `config/application.properties`; for
+example, an extension whose documentation names the setting `example.reports.endpoint`:
+
+```properties
+example.reports.endpoint=https://reports.example.org
+```
+
+An environment variable wins over the file: the name of the setting in upper case, with every
+character that is not a letter or a digit replaced by `_` (`EXAMPLE_REPORTS_ENDPOINT`). Start
+Mosaikit again after a change.
+
 ## Contents
 
 | Path | Content |

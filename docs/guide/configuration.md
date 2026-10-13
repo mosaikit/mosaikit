@@ -4,6 +4,16 @@ Settings are read from `config/application.properties` of the installation, and 
 variables, which win. The name of a variable is the setting in upper case with every `.` and `-`
 replaced by `_`: `mosaikit.identity.keycloak-url` is `MOSAIKIT_IDENTITY_KEYCLOAK_URL`.
 
+Extensions read settings of their own in the same way, such as `example.reports.endpoint`: their
+documentation names them. Every distribution accepts the settings of the kernel and of extensions
+without changing its files (MK-129):
+
+| Distribution | Where |
+|---|---|
+| Installation, portable | `config/application.properties`, or environment variables of the launcher |
+| Docker Compose | `mosaikit.env` next to `compose.yaml`, one `VARIABLE=value` per line; secret settings also in a file mounted as a secret of Compose ([docker](../../distribution/docker/README.md#settings-of-the-kernel-and-of-extensions)) |
+| Kubernetes | `kernel.extraSettings` and `extensions.<id>.settings` of the Helm chart, secret values from a Kubernetes secret with `valueFrom.secretKeyRef` ([k8s](../../distribution/k8s/README.md#settings-of-the-kernel-and-of-extensions)) |
+
 ## Database
 
 | Setting | Default | Meaning |

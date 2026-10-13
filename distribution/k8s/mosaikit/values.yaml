@@ -25,7 +25,38 @@ identity:
   adminSecret: ""
   domain: ""
 
+kernel:
+  # Settings of the kernel that the chart does not name (MK-129), as in config/application.properties
+  # of an installation (see docs/guide/configuration.md): the name of the setting, and its value or a
+  # reference to a Secret or a ConfigMap. Each becomes an environment variable, the name in upper case
+  # with every character that is not a letter or a digit replaced by "_", which the kernel reads in
+  # place of the file. A setting of the chart given here as well takes this value. Never write a
+  # password, a token or a key here: refer to a Secret.
+  #
+  #   extraSettings:
+  #     mosaikit.accounts.session-timeout: 4h
+  #     quarkus.log.category."dev.mosaikit".level: DEBUG
+  #     mosaikit.secrets.master-key:
+  #       valueFrom:
+  #         secretKeyRef: { name: mosaikit-secrets, key: master-key }
+  extraSettings: {}
+  # More environment variables, as in a container: name with value or valueFrom.
+  extraEnv: []
+  # Secrets and ConfigMaps whose keys are environment variables, as in a container (envFrom), such
+  # as a Secret with MOSAIKIT_SECRETS_MASTER_KEY.
+  extraEnvFrom: []
+
 extensions:
+  # The settings of an extension (MK-129), under its identifier: the same form as
+  # kernel.extraSettings, read by the extension as settings of the installation.
+  #
+  #   org.example.reports:
+  #     settings:
+  #       example.reports.endpoint: https://reports.example.org
+  #       example.reports.api-key:
+  #         valueFrom:
+  #           secretKeyRef: { name: reports, key: api-key }
+  #
   # Extensions with Java code are built into a derived image (see distribution/docker/Containerfile),
   # so that the container keeps a read-only root filesystem. A volume can hold extensions without
   # Java code (frontend, migrations); Java extensions found there stay RESTART_REQUIRED.
