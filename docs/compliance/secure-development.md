@@ -5,7 +5,7 @@ sviluppo del software sicuro. Gaps are listed in [non-conformities](non-conformi
 
 ## Requirements
 
-- Every feature starts as a requirement (`docs/requirements/MK-*.yaml`) with acceptance
+- Every feature starts as a requirement (`docs/requirements/MK-*.md`) with acceptance
   criteria; security requirements are requirements like the others (MK-001 headers, MK-007 extension
   assets, MK-010 errors, MK-012 federated identity, MK-013 signed packages, MK-014 isolation of
   untrusted frontends).

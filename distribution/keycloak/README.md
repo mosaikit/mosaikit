@@ -1,7 +1,7 @@
 # Keycloak realm of an organization
 
 Each organization that signs in through Keycloak has its own realm
-([MK-012](../../docs/requirements/MK-012.yaml),
+([MK-012](../../docs/requirements/MK-012.md),
 [ADR-0011](../../docs/adr/0011-federated-identity-per-organization.md)). The realm has the
 `mosaikit` client of the kernel UI (authorization code with PKCE) and the `organization-admin`
 role, as in the template
@@ -10,7 +10,7 @@ role, as in the template
 ## Automatically (recommended)
 
 Give the kernel a service account of the `master` realm with the `admin` role, and it creates
-the realm when an organization is created with `federation` ([MK-018](../../docs/requirements/MK-018.yaml)):
+the realm when an organization is created with `federation` ([MK-018](../../docs/requirements/MK-018.md)):
 
 | Setting | Environment variable |
 |---|---|

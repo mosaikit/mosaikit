@@ -21,7 +21,7 @@ sdk/testing        @mosaikit/testing, the bench: a real installation for the tes
 sdk/create-extension  create-mosaikit-extension
 distribution/      installation, portable, Docker Compose, Helm, release scripts
 tests/e2e/         end-to-end tests of the kernel, in three groups; tests/fixtures/ their extensions
-docs/              adr/, requirements/ (MK-xxx.yaml), development/, guide/, compliance/
+docs/              adr/, requirements/ (MK-xxx.md), development/, guide/, compliance/
 ```
 
 The words are **extension** (never plugin, ADR-0036), **organization**, **person**, **app**.
@@ -50,7 +50,7 @@ of change; a whole build with every test takes about 11 minutes and is rarely ne
 
 ## Every change
 
-- Linked to a requirement: `docs/requirements/MK-xxx.yaml` (a new one for a new capability), with
+- Linked to a requirement: `docs/requirements/MK-xxx.md` (a new one for a new capability), with
   its tests tagged by its id (`@Tag("MK-xxx")` in Java, `MK-xxx` in the title of the e2e
   `describe`). Big decisions get an ADR in `docs/adr/`.
 - Documented in the same pull request: the guide for extension developers
