@@ -431,8 +431,11 @@ public class PermissionAdministration {
      * nothing and writes nothing in the audit log.
      */
     public PreviewView preview(UUID organization, PreviewRequest request) {
+        if (request == null) {
+            throw new InvalidInputException(List.of("role must be one of " + new TreeSet<>(PREVIEW_ROLES)));
+        }
         List<String> problems = new ArrayList<>();
-        String role = request == null ? null : request.role();
+        String role = request.role();
         if (role == null || !PREVIEW_ROLES.contains(role)) {
             problems.add("role must be one of " + new TreeSet<>(PREVIEW_ROLES));
         }

@@ -278,6 +278,8 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The preview of permissions and the link of a shared resource no longer leave a null case to
+  the analyzer: a missing request is refused up front, and the link is cached with a flag.
 - A slow or stuck mail server no longer makes a registration fail with 500 after 60 s (MK-048):
   the confirmation mail goes out after the account and its link are committed, outside of any
   database transaction, and the kernel waits for the mail server at most
