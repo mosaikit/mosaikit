@@ -560,6 +560,29 @@ const response = await fetch(`/api/v1/files/${EXTENSION}?name=${encodeURICompone
 const stored = await response.json(); // { id, name, contentType, size, checksum, ... }
 ```
 
+### Signed links to files
+
+A viewer, an external tool, an embedded page or a link in a notification downloads files without the
+session of the person through a signed, expiring link (MK-093). Ask for a link to a file the person
+reads, or to every file whose name starts with a prefix, such as `tiles/`, of the organization or of
+one team of the person; whoever holds it downloads those files, with ranges and cache validators,
+until it expires, at most `mosaikit.files.link-max-validity` (7 days unless set) after it is made.
+An expired or altered link answers 404, as a file that does not exist. Making a link is audited.
+
+```java
+SignedLink report = files.link(EXTENSION, photo.id(), Duration.ofHours(2)); // null: the longest
+notify(person, report.path());                  // relative to the root of the kernel
+
+SignedLink tiles = files.linkToPrefix(EXTENSION, "tiles/", team, Duration.ofDays(1)); // team or null
+String tile = tiles.file("tiles/3/4/2.png");    // base + encoded name + "?" + query
+```
+
+From a frontend, `POST /api/v1/files/<extension>/links` with `{"file": "<id>"}`, or
+`{"prefix": "tiles/", "team": "<id>"}`, and an optional `expires`, answers `url` (absolute), `base`
+and `query`; a file under a prefix is at `` `${base}${name}?${query}` ``, so a tile template is
+`` `${base}tiles/{z}/{x}/{y}.png?${query}` ``. The newest file of a name answers. A link stays valid
+until it expires even when the person leaves the team: give the shortest validity that serves.
+
 ## Extending another extension
 
 An extension extends another one on three levels ([ADR-0019](../adr/0019-plugins-extending-plugins.md)),
