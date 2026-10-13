@@ -25,6 +25,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.regex.Matcher;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.junit.jupiter.api.AfterAll;
@@ -57,7 +58,10 @@ class StuckMailServerTest {
             }
             return Map.of(
                     "mosaikit.accounts.confirm-email", "true",
-                    "mosaikit.accounts.mail-timeout", "3s",
+                    "mosaikit.accounts.mail-timeout", "6s",
+                    // A new connection for each mail, so that the connections the tests make stuck
+                    // are the ones each mail uses.
+                    "quarkus.mailer.keep-alive", "false",
                     "quarkus.mailer.mock", "false",
                     "quarkus.mailer.host", "127.0.0.1",
                     "quarkus.mailer.port", String.valueOf(port),
@@ -138,6 +142,34 @@ class StuckMailServerTest {
     }
 
     @Test
+    void aConnectionThatHangsAfterTheGreetingIsTriedOnceMoreOnAnotherOne() {
+        smtp.answering = true;
+        smtp.stuckConnections.set(1);
+        int before = smtp.connections.get();
+        String email = unique("retry") + "@example.org";
+        long started = System.nanoTime();
+        anonymous()
+                .body(Map.of("organization", ORGANIZATION, "email", email, "displayName", "Acme", "password", PASSWORD))
+                .post("/api/v1/accounts/registrations")
+                .then()
+                .statusCode(202);
+        assertThat(Duration.ofNanos(System.nanoTime() - started)).isLessThan(Duration.ofSeconds(6));
+        assertThat(smtp.stuckConnections.get())
+                .as("the first connection was the stuck one")
+                .isLessThanOrEqualTo(0);
+        assertThat(smtp.connections.get() - before).isEqualTo(2);
+        assertThat(smtp.mails).hasSize(1);
+        Matcher link = RegistrationTest.LINK.matcher(smtp.mails.getFirst());
+        assertThat(link.find()).isTrue();
+        anonymous()
+                .body(Map.of("token", link.group(1)))
+                .post("/api/v1/accounts/confirmations")
+                .then()
+                .statusCode(204);
+        as(email, PASSWORD).get("/api/v1/accounts/me").then().statusCode(200);
+    }
+
+    @Test
     void askingForTheLinkAgainAnswers503InTimeWhileTheMailServerIsStuck() {
         smtp.answering = true;
         String email = unique("again") + "@example.org";
@@ -159,7 +191,8 @@ class StuckMailServerTest {
 
     /**
      * A mail server on the loopback: it greets every connection; while {@link #answering} is false
-     * it then reads the commands and never answers them, otherwise it takes every mail. The bodies
+     * it then reads the commands and never answers them, otherwise it takes every mail. The next
+     * {@link #stuckConnections} connections never answer, whatever {@link #answering} says. The bodies
      * of the mails taken are in {@link #mails}, quoted-printable soft breaks joined.
      */
     static final class Smtp {
@@ -167,6 +200,8 @@ class StuckMailServerTest {
         final ServerSocket server;
         final List<String> mails = new CopyOnWriteArrayList<>();
         volatile boolean answering;
+        final AtomicInteger stuckConnections = new AtomicInteger();
+        final AtomicInteger connections = new AtomicInteger();
 
         Smtp(int port) {
             try {
@@ -178,7 +213,9 @@ class StuckMailServerTest {
                 while (!server.isClosed()) {
                     try {
                         Socket socket = server.accept();
-                        Thread.ofVirtual().start(() -> serve(socket));
+                        connections.incrementAndGet();
+                        boolean stuck = stuckConnections.getAndDecrement() > 0;
+                        Thread.ofVirtual().start(() -> serve(socket, stuck));
                     } catch (IOException e) {
                         return;
                     }
@@ -186,7 +223,7 @@ class StuckMailServerTest {
             });
         }
 
-        private void serve(Socket socket) {
+        private void serve(Socket socket, boolean stuck) {
             try (socket) {
                 var in = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
                 OutputStream out = socket.getOutputStream();
@@ -196,7 +233,7 @@ class StuckMailServerTest {
                 while ((line = in.readLine()) != null) {
                     // A command read while not answering stays without a reply, even on a connection
                     // that the client keeps open for the next mail.
-                    if (!answering) {
+                    if (stuck || !answering) {
                         continue;
                     }
                     if (data != null) {

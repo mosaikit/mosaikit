@@ -6,6 +6,7 @@ import dev.mosaikit.kernel.core.config.KernelConfig;
 import dev.mosaikit.kernel.core.error.ServiceUnavailableException;
 import io.quarkus.mailer.Mail;
 import io.quarkus.mailer.reactive.ReactiveMailer;
+import io.smallrye.mutiny.TimeoutException;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
@@ -96,15 +97,27 @@ public class ConfirmationMail {
 
     /**
      * Sends a mail written by {@link #prepare}, outside of any transaction, waiting for the mail
-     * server at most {@code mosaikit.accounts.mail-timeout}.
+     * server at most {@code mosaikit.accounts.mail-timeout} in all. The time is split in two
+     * attempts: when the first one times out, the mail is sent once more, on another connection. A
+     * connection can hang right after it opens, when the greeting of the server is lost before the
+     * mail client reads it; the stuck connection is not reused, but the mail client offers no way to
+     * close it, so it stays open until the server drops it.
      *
      * @throws ServiceUnavailableException when the mail server refuses the mail or does not take it in
      *     time
      */
     @Transactional(TxType.NOT_SUPPORTED)
     public void deliver(Mail mail) {
+        Duration attempt = mailTimeout.dividedBy(2);
         try {
-            mailer.send(mail).await().atMost(mailTimeout);
+            try {
+                mailer.send(mail).await().atMost(attempt);
+            } catch (TimeoutException first) {
+                // The same mail, with the same link: if the first attempt went through after all, the
+                // person gets the link twice, and either one works.
+                LOG.infof("The confirmation mail to %s timed out after %s: trying once more", mail.getTo(), attempt);
+                mailer.send(mail).await().atMost(attempt);
+            }
         } catch (RuntimeException e) {
             LOG.warnf("The confirmation mail to %s could not be sent: %s", mail.getTo(), e);
             throw new ServiceUnavailableException(

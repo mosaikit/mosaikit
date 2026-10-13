@@ -142,8 +142,10 @@ with a link: until they open it the account does not sign in. The link works onc
 - The mails need a mail server: set `quarkus.mailer.host`, `port`, `username`, `password` and
   `quarkus.mailer.from` in `config/application.properties`, and `mosaikit.public-url` so that the
   links point to the address people use.
-- When the mail server does not take a mail within `mosaikit.accounts.mail-timeout` (15 seconds),
-  or refuses it, the person sees that the mail could not be sent; the account is created all the
+- The kernel gives the mail server `mosaikit.accounts.mail-timeout` (15 seconds) in all, in two
+  attempts of half each: when the first one times out, it sends the mail once more on another
+  connection (a person may then receive the same link twice; either works). When the mail server
+  does not take the mail in time, or refuses it, the person sees that the mail could not be sent; the account is created all the
   same, and they ask for the link again from the sign-in page once the mail server works. The
   kernel never keeps a database transaction open while it talks to the mail server.
 
