@@ -112,6 +112,39 @@ describe('KernelClient (MK-008)', () => {
     expect(last?.[1]?.method).toBe('DELETE');
   });
 
+  it('ends the session of the realm on the kernel at sign-out (MK-125)', async () => {
+    const fetchMock = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>(() =>
+      Promise.resolve(json(200, { username: 'ada@acme.com' })),
+    );
+    const client = new KernelClient(fetchMock);
+    await client.signInWithToken('token-1');
+
+    await client.signOut();
+
+    const last = fetchMock.mock.calls.at(-1);
+    expect(last?.[0]).toBe('/api/v1/accounts/session');
+    expect(last?.[1]?.method).toBe('DELETE');
+    expect(new Headers(last?.[1]?.headers).get('Authorization')).toBe('Bearer token-1');
+    expect(client.signedIn).toBe(false);
+  });
+
+  it('lists and ends the sessions of the person (MK-125)', async () => {
+    const fetchMock = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>((path) =>
+      Promise.resolve(
+        path === '/api/v1/accounts/me/sessions'
+          ? json(200, [{ id: 's-1', kind: 'password', current: true }])
+          : new Response(null, { status: 204 }),
+      ),
+    );
+    const client = new KernelClient(fetchMock);
+
+    expect(await client.sessions()).toEqual([{ id: 's-1', kind: 'password', current: true }]);
+    await client.endSession('s 2');
+
+    expect(fetchMock.mock.calls.at(-1)?.[0]).toBe('/api/v1/accounts/me/sessions/s%202');
+    expect(fetchMock.mock.calls.at(-1)?.[1]?.method).toBe('DELETE');
+  });
+
   it('signs in with an access token of a realm (MK-012)', async () => {
     const fetchMock = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>(() =>
       Promise.resolve(json(200, { username: 'ada@acme.com' })),

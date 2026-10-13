@@ -14,17 +14,24 @@ import jakarta.enterprise.context.ApplicationScoped;
 
 /**
  * The identity of a request signed in by its "remember me" token: the same as with the password
- * (see {@link LocalIdentityProvider#identityOf}), with roles and organization read again.
+ * (see {@link LocalIdentityProvider#identityOf}), with roles and organization read again. The request
+ * belongs to the session of the token (MK-125); when that session ended by itself, the token opens a
+ * new one and moves to it.
  */
 @ApplicationScoped
 public class RememberMeIdentityProvider implements IdentityProvider<RememberMeAuthenticationRequest> {
 
     private final RememberMe rememberMe;
     private final LocalIdentityProvider local;
+    private final SessionRegistry sessions;
+    private final SessionStore store;
 
-    public RememberMeIdentityProvider(RememberMe rememberMe, LocalIdentityProvider local) {
+    public RememberMeIdentityProvider(
+            RememberMe rememberMe, LocalIdentityProvider local, SessionRegistry sessions, SessionStore store) {
         this.rememberMe = rememberMe;
         this.local = local;
+        this.sessions = sessions;
+        this.store = store;
     }
 
     @Override
@@ -40,9 +47,20 @@ public class RememberMeIdentityProvider implements IdentityProvider<RememberMeAu
         String host = routing == null || routing.request().authority() == null
                 ? null
                 : routing.request().authority().host();
-        return context.runBlocking(() -> rememberMe
-                .accountOf(request.getToken())
-                .map(account -> local.identityOf(account, requested, host))
-                .orElseThrow(AuthenticationFailedException::new));
+        return context.runBlocking(() -> {
+            RememberMe.Remembered remembered =
+                    rememberMe.find(request.getToken()).orElseThrow(AuthenticationFailedException::new);
+            SessionRegistry.Active session = remembered
+                    .session()
+                    .flatMap(sessions::byId)
+                    .orElseGet(() -> {
+                        var opened = sessions.open(remembered.account().getId(), null, SessionClient.of(routing));
+                        store.moveToken(remembered.tokenId(), opened.id());
+                        return sessions.byId(opened.id()).orElseThrow(AuthenticationFailedException::new);
+                    });
+            SecurityIdentity identity = local.identityOf(remembered.account(), requested, host, session.id());
+            sessions.seen(session, LocalIdentityProvider.organizationOf(identity));
+            return identity;
+        });
     }
 }

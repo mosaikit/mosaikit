@@ -52,6 +52,10 @@ public class UserAccount {
     @Column(name = "email_confirmed_at")
     private Instant emailConfirmedAt;
 
+    /** When an administrator suspended the account; empty while it may sign in (MK-125). */
+    @Column(name = "suspended_at")
+    private Instant suspendedAt;
+
     /** The personal settings, as JSON (MK-027). */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false)
@@ -106,6 +110,21 @@ public class UserAccount {
     /** Whether the address is confirmed; only confirmed accounts sign in. */
     public boolean isEmailConfirmed() {
         return emailConfirmedAt != null;
+    }
+
+    /** Whether an administrator suspended the account: it signs in by no means until reactivated. */
+    public boolean isSuspended() {
+        return suspendedAt != null;
+    }
+
+    /** Suspends the account; its sessions are ended by {@link SessionRegistry}. */
+    public void suspend(Instant now) {
+        this.suspendedAt = Objects.requireNonNull(now, "now");
+    }
+
+    /** Lets a suspended account sign in again. */
+    public void reactivate() {
+        this.suspendedAt = null;
     }
 
     public UUID getId() {

@@ -28,8 +28,13 @@ start). The kernel keeps its tables in the `mk_kernel` schema and each extension
 |---|---|---|
 | `quarkus.http.port` | `8080` | port |
 | `quarkus.http.host` | `0.0.0.0` | address to listen on |
-| `quarkus.http.auth.form.timeout` | `PT8H` | how long the session of the shell of a local account lasts without activity |
-| `quarkus.http.auth.session.encryption-key` | random at each start | key (at least 16 characters) that encrypts the session cookie; set the same on every kernel of a cluster, or sessions end at each restart |
+| `mosaikit.accounts.session-timeout` | `8h` | how long a session of the shell opened with a password lasts without activity (at least one minute) |
+| `mosaikit.accounts.session-max-life` | `24h` | how long a session lasts at most, whatever its activity; "remember me" then opens a new one. The record of an ended realm session is kept at least this long |
+| `mosaikit.accounts.session-cache` | `5s` | how long a kernel keeps what it read about a session; a session ended on another kernel of the installation is refused within this time, on the same kernel at once; `0s` reads the database at every request |
+
+Sessions are kept in the database (MK-125): the cookie holds only a random value, so no key needs
+to be configured, sessions survive a restart, and every kernel of a cluster accepts them. Expired
+sessions are removed every 15 minutes.
 
 Terminate TLS at a reverse proxy or an ingress; in production the kernel sends
 `Strict-Transport-Security` and a `Content-Security-Policy`.
@@ -52,6 +57,13 @@ Terminate TLS at a reverse proxy or an ingress; in production the kernel sends
 |---|---|---|
 | `mosaikit.database.row-security` | `true` | requests run as the member role of the installation, so that the row-level security policies of extensions apply (MK-019); the database user needs `CREATEROLE` once |
 
+## Audit log
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `mosaikit.audit.min-retention` | `365d` | the shortest retention of the audit log, rounded up to whole days: organizations and the platform may keep their entries longer, never less, and no entry younger is ever deleted (MK-059) |
+| `mosaikit.audit.retention-check` | `6h` | how often each kernel deletes the entries older than their retention |
+
 ## Extensions
 
 | Setting | Default | Meaning |
@@ -65,6 +77,7 @@ Terminate TLS at a reverse proxy or an ingress; in production the kernel sends
 | `mosaikit.accounts.remember-for` | `30d` | how long "Remember me" keeps a person signed in on a browser, unless they sign out |
 | `mosaikit.accounts.confirm-email` | `true` | self-registered people confirm their address with a link sent by mail before signing in |
 | `mosaikit.accounts.confirmation-valid-for` | `24h` | how long the link that confirms an address works |
+| `mosaikit.accounts.mail-timeout` | `15s` | how long the kernel waits for the mail server to take a mail, in all: two attempts of half each, the second on another connection when the first times out; after it the person can ask for the link again |
 | `mosaikit.sharing.link-max-validity` | `30d` | the longest validity of a link to a resource of an extension (MK-055): every link expires, at the latest this long after it is made |
 | `mosaikit.public-url` | | the address of the installation as people reach it, such as `https://mosaikit.example.org`, for the links in mails; without it, the address of the request |
 | `quarkus.mailer.host`, `port`, `username`, `password`, `tls`, `start-tls` | `localhost`, `25` | the mail server that sends the confirmation links |

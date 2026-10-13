@@ -49,6 +49,24 @@ public interface KernelConfig {
         Duration linkMaxValidity();
     }
 
+    /** The audit log (MK-059). */
+    Audit audit();
+
+    /** Settings of the audit log. */
+    interface Audit {
+
+        /**
+         * The shortest retention of the entries of the audit log: organizations may keep their entries
+         * longer, never less. Rounded up to whole days.
+         */
+        @WithDefault("365d")
+        Duration minRetention();
+
+        /** How often each kernel deletes the entries older than their retention. */
+        @WithDefault("6h")
+        Duration retentionCheck();
+    }
+
     /** Settings of local accounts. */
     interface Accounts {
 
@@ -66,6 +84,39 @@ public interface KernelConfig {
         /** How long the link that confirms an email address works. */
         @WithDefault("24h")
         Duration confirmationValidFor();
+
+        /**
+         * How long a session of the shell opened with a password lasts without requests (MK-125). At
+         * least one minute.
+         */
+        @WithDefault("8h")
+        Duration sessionTimeout();
+
+        /**
+         * How long a session lasts at most, whatever its activity; "remember me" then opens a new one.
+         * The record of an ended session of a realm is kept at least this long, so that the tokens the
+         * realm still refreshes for it are refused. At least one minute.
+         */
+        @WithDefault("24h")
+        Duration sessionMaxLife();
+
+        /**
+         * How long a kernel keeps what it read about a session before reading it again. A session ended
+         * on this kernel is refused at once; one ended on another kernel of the same installation is
+         * refused after at most this long. {@code 0s} reads the database on every request.
+         */
+        @WithDefault("5s")
+        Duration sessionCache();
+
+        /**
+         * How long the kernel waits for the mail server to take a mail, such as the confirmation
+         * link, in all. The time is split in two attempts: when the first one times out, the mail is
+         * sent once more on another connection. The mail is sent outside of any database
+         * transaction; when the server does not take it in time, the person gets an answer that the
+         * mail could not be sent, and can ask for it again.
+         */
+        @WithDefault("15s")
+        Duration mailTimeout();
     }
 
     /**

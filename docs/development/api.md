@@ -25,9 +25,15 @@ APIs without an organization answer `403`. `GET /api/v1/accounts/me` gives the o
 request and every membership of the person.
 
 The shell signs a local account in once, with a form posted to `/api/v1/accounts/session` (fields
-`username` and `password`; 200, or 401), which the form authentication of Quarkus answers: the
-kernel keeps the session in an encrypted, HttpOnly, SameSite=Strict cookie, `mosaikit-session`, so
-that a reload keeps it and no script of the page holds the password. Requests marked `X-Mosaikit-Client: shell` get a 401 without
+`username` and `password`; 200 with the account, or 401). The kernel opens a session that it keeps
+in its database (MK-125) and sets an HttpOnly, SameSite=Strict cookie, `mosaikit-session`, that
+holds only a random value: a reload keeps the session, no script of the page holds the password, and
+signing out, a suspension or the removal from the organization end the session on the server, so
+that a copy of the cookie is refused at once (401). Every request with the cookie is checked against
+the session, so a service that validates a session by calling the kernel with it, such as a gateway
+in front of data, sees the end at once too. A bearer token of a realm belongs to the session of the
+realm (its `sid`): signing out with it (`DELETE /api/v1/accounts/session`) ends that session on the
+kernel, and its tokens are refused before they expire. Requests marked `X-Mosaikit-Client: shell` get a 401 without
 `WWW-Authenticate`, so that the browser never opens its own sign-in dialog. Other clients keep using
 HTTP Basic or bearer tokens.
 
@@ -45,7 +51,11 @@ HTTP Basic or bearer tokens.
 | `GET /api/v1/accounts/me` | signed in | the current account, with its personal settings |
 | `GET, PUT /api/v1/accounts/me/preferences` | signed in | the personal settings (MK-027): `theme`, `appearance` (`system`, `light`, `dark`, `contrast`), `language` (`en`, `it`), `hiddenApps` (`<extension id>/<app id>`) |
 | `GET /api/v1/accounts/session` | anyone | the account of the session of the shell, or 204 without one |
-| `DELETE /api/v1/accounts/session` | anyone | end the session of the shell, and forget the browser if it was remembered |
+| `POST /api/v1/accounts/session` | anyone | sign in with the form fields `username` and `password`: 200 with the account and the session cookie, or 401 (MK-125) |
+| `DELETE /api/v1/accounts/session` | anyone | end the session of the request on the server (the cookie of the shell, or the realm session of a bearer token), and forget the browser if it was remembered |
+| `GET /api/v1/accounts/me/sessions` | signed in | the live sessions of the person (MK-125): `id`, `kind` (`password` or `realm`), `userAgent`, `address`, `createdAt`, `lastSeenAt`, `current` |
+| `DELETE /api/v1/accounts/me/sessions/{id}` | signed in | end a session of the person: its cookie, its "remember me" and the tokens of its realm session are refused at once; 404 when it is not a live session of the person (audited) |
+| `PUT, DELETE /api/v1/platform/accounts/{email}/suspension` | `platform-admin` | suspend an account, which ends all its sessions and "remember me" tokens and refuses every sign-in, or reactivate it; not one's own account (MK-125, audited) |
 | `POST /api/v1/accounts/session/remembrance` | signed in, with a password | remember this browser: an HttpOnly cookie signs the person in again for `mosaikit.accounts.remember-for` |
 | `GET /api/v1/shell/extensions` | signed in | frontends of the active extensions, for the shell; not those turned off for the organization of the request, nor what they contribute to other extensions (MK-030, MK-035) |
 | `WS /api/v1/live` (WebSocket) | signed in | the real-time channel (MK-031): `?organization=<slug>`; send `{"type": "subscribe", "topic": "…"}`, receive `subscribed`, `refused` or `{"type": "event", "topic", "data"}` |
@@ -87,7 +97,12 @@ HTTP Basic or bearer tokens.
 | `GET, POST /api/v1/data/{extension}/{collection}` | signed in, with an organization | the documents of a collection declared by an active extension, newest first (`offset`, `limit`); add one (MK-046); with `team`, those shared with that team of the person only (MK-032) |
 | `GET, PUT, DELETE /api/v1/data/{extension}/{collection}/{id}` | signed in, with an organization | one document; `PUT` with `If-Match: <version>` answers 409 if it changed since |
 | `GET, PUT /api/v1/platform/settings` | `platform-admin` | the settings of the platform: `{"registration": true}` turns self-registration on or off (audited) |
-| `GET /api/v1/audit-events` | `platform-admin` | the latest audit events (`limit`, `organization`) |
+| `GET /api/v1/audit-events` | `platform-admin` | audit events, newest first: of every organization, of one (`organization=<id>`) or of the platform only (`platform=true`); with the filters of the list of an organization (MK-059) |
+| `GET /api/v1/audit-events/verification` | `platform-admin` | verify the chain of the platform, or of one organization with `organization=<id>`: `{"intact": true, "checked", "firstIndex", "lastIndex"}`, or `{"intact": false, "altered": {"index", "id", "problem"}}` with the first entry `CHANGED` or `MISSING` (MK-059) |
+| `GET, PUT /api/v1/audit-events/retention` | `platform-admin` | the retention of the entries of the platform: `{"retentionDays": 730}`, or `null` to keep every entry; never below the minimum of the installation, `minimumDays`, or the answer is 400 (audited) |
+| `GET /api/v1/organizations/{slug}/audit-events` | the administrators of the organization, signed in to it, `platform-admin` | the audit events of the organization only, newest first, each with its `channel` (`WEB`, `API_KEY`, `JOB`, `ASSISTANT`, `EXTENSION`), `index` in the chain, `previousHash` and `hash`; filters `actor`, `action` (exact, or a prefix ending with a dot such as `permissions.`), `subject`, `channel`, `from` and `to` (times such as `2026-10-13T08:00:00Z`), `offset`, `limit` (up to 500) (MK-059) |
+| `GET /api/v1/organizations/{slug}/audit-events/verification` | the administrators of the organization, signed in to it, `platform-admin` | verify the chain of the organization, as for the platform (MK-059) |
+| `GET, PUT /api/v1/organizations/{slug}/audit-events/retention` | the administrators of the organization, signed in to it, `platform-admin` | the retention of the entries of the organization, as for the platform (audited) |
 | `GET /api/v1/ai/tools` | signed in, with an organization | the tools of the active extensions (MK-015) |
 | `POST /api/v1/ai/tools/{tool}/invocations` | signed in, with an organization | invoke a tool: 200 with the result, or 202 with a draft |
 | `GET /api/v1/ai/drafts`, `GET /api/v1/ai/drafts/{id}` | the person who proposed them | open drafts, one draft |

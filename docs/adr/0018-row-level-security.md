@@ -48,6 +48,12 @@ care of each plugin (C-28 of the compliance matrix).
 - Kernel tables are not under row-level security: the kernel filters its own queries and keeps
   cross-organization tables (accounts, memberships, audit).
 
+### Refined on 2026-10-13
+
+The audit log (`audit_event`) is now under row-level security, and the request role may only insert
+and read it (MK-059). The registry of resources, the grants of sharing and the permissions of
+profiles, teams and members (MK-054, MK-055, MK-056) are kernel tables under row-level security too.
+
 ## Alternatives considered
 
 - **A schema per organization.** Strong separation, but one migration per organization and plugin,

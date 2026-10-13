@@ -39,6 +39,15 @@ change (MK-015). What they do must be traceable (C-29, C-45 of the compliance ma
   records every proposal, run, confirmation and rejection of a tool, and the changes of
   organizations and memberships. Platform administrators read it at `/api/v1/audit-events`.
 
+### Refined on 2026-10-13 (MK-059)
+
+The audit log became tamper-evident and per organization: each entry carries its position and a
+SHA-256 hash over its content and the previous entry's hash, in one chain per organization and one
+for the platform; the request role may only insert and read it, under row-level security; an
+organization administrator lists, filters and verifies the entries of their organization, and the
+oldest entries are removed only past a retention never shorter than `mosaikit.audit.min-retention`.
+The consequence below on tamper evidence no longer holds.
+
 ## Consequences
 
 - Plugins get assistant support by declaring what they already expose; no code of theirs runs in

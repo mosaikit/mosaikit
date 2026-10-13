@@ -18,6 +18,22 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The kernel keeps the sessions of people on the server (MK-125). Signing in with a password opens
+  a session recorded in the new table `account_session` (migration V19) and the `mosaikit-session`
+  cookie holds only a random value, kept as its digest: after signing out, a copy of the cookie is
+  refused at once (401). The session of a realm is recorded from the `sid` of its tokens, so that
+  signing out with a bearer token, or ending it, refuses its tokens before they expire. Platform
+  administrators suspend and reactivate accounts (`PUT, DELETE
+  /api/v1/platform/accounts/{email}/suspension`, audited): a suspended account signs in by no means
+  and its sessions and "remember me" tokens end at once; removing a person from an organization
+  ends their sessions in it. People see their live sessions in their settings (browser, address,
+  opened, last used, this browser marked) and end any of them (`GET, DELETE
+  /api/v1/accounts/me/sessions`); ending one revokes its "remember me" token too. Every request is
+  checked against its session, with what was read kept for `mosaikit.accounts.session-cache` (5
+  seconds) and dropped at once when this kernel ends the session; new settings
+  `mosaikit.accounts.session-timeout` (8 hours without activity) and `session-max-life` (24 hours);
+  expired sessions are removed every 15 minutes.
+
 - The kernel implements sharing (MK-055, ADR-0037): the `Sharing` bean of `kernel-api` shares a
   registered resource with a person, a team, the organization, a link or the public at the levels
   that the manifest declares, ordered as listed; deny by default, every level to the owner and to
@@ -33,6 +49,19 @@ project follows [Semantic Versioning](https://semver.org/).
   Grants are kept in `mk_kernel.resource_grant` (migration V18) under row-level security. The
   sharing dialog, the `@mosaikit/sdk` counterpart and the move of the team sharing of documents
   (MK-032) onto this model come next.
+
+- The audit log is tamper-evident (MK-059, kernel part): each organization has one hash chain of
+  entries, and the platform one, appended under a row lock of the chain so that concurrent writers
+  and several kernels keep it in order; every entry carries its `channel` (`WEB`, `API_KEY`, `JOB`,
+  `ASSISTANT`, `EXTENSION`), its `index`, `previousHash` and `hash`. Migration V20 adds the columns,
+  the table `audit_chain` and chains the existing entries; the table is under row-level security and
+  the member role of requests may no longer update or delete it. Administrators of an organization
+  list and filter its entries only (`/api/v1/organizations/{slug}/audit-events`: actor, action or
+  prefix, subject, channel, time range, paging), verify its chain (`/verification`, which reports
+  the first entry `CHANGED` or `MISSING` at its position) and set its retention (`/retention`), never
+  below `mosaikit.audit.min-retention` (365 days by default); a scheduled job
+  (`mosaikit.audit.retention-check`, 6 hours) deletes older entries and keeps the hash of the last one
+  as the anchor of the chain. `GET /api/v1/audit-events` gains the same filters and `platform=true`.
 
 - The kernel implements permissions (MK-056, ADR-0038): the `Permissions` bean of `kernel-api`
   answers for the person and the organization of the request, deny by default, with profiles
@@ -187,6 +216,11 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The session cookie of the shell is no longer the encrypted cookie of the form authentication of
+  Quarkus (MK-125): `quarkus.http.auth.form.timeout` and `quarkus.http.auth.session.encryption-key`
+  are not used any more, and sessions no longer end when the kernel restarts. Sessions open before
+  the update end with it: people sign in again once.
+
 - Plugins are called extensions (ADR-0036), everywhere: code, API (`/api/v1/extensions`,
   `/api/v1/ext/<api>/`), settings (`mosaikit.extensions.*`), the `extensions/` directory of an
   installation, database (schemas `ext_<name>`; migration V15), SDK (`@mosaikit/create-extension`,
@@ -234,6 +268,13 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- A slow or stuck mail server no longer makes a registration fail with 500 after 60 s (MK-048):
+  the confirmation mail goes out after the account and its link are committed, outside of any
+  database transaction, and the kernel waits for the mail server at most
+  `mosaikit.accounts.mail-timeout` (15 s), in two attempts of half each: when the first times out,
+  the mail is sent once more on another connection. When the mail is not sent the answer is 503, the
+  account stays, and the sign-in page offers to send the link again. The same holds when the link
+  is asked for again.
 - The test bench and `npm run dev` send mail to `127.0.0.1`, where their mail server listens: on
   Linux `localhost` resolved to `::1` too, and every other mail failed the registration that sent it.
 - The shell no longer misses an extension that changes in a watched directory while it loads its

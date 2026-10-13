@@ -82,6 +82,32 @@ A person without an account gets one without password: they sign in through the 
 organization, which links the account at the first sign-in (if the realm verified the address).
 A realm can link an existing account only when that account is a member of its organization.
 
+Removing a person from an organization ends at once their sessions in it (MK-125): a browser left
+open, a copy of its cookie or a gateway that checks the session with the kernel are refused at the
+next request.
+
+## Suspending a person
+
+A platform administrator suspends an account, for example when a person leaves or a device is
+lost, and reactivates it later (MK-125):
+
+```bash
+curl -u admin -X PUT https://mosaikit.example.org/api/v1/platform/accounts/ada@acme.com/suspension
+curl -u admin -X DELETE https://mosaikit.example.org/api/v1/platform/accounts/ada@acme.com/suspension
+```
+
+A suspended person signs in by no means: not with the password, not with **Remember me**, not
+through the realm of an organization. All their sessions end at once, on every browser, and their
+"remember me" tokens are revoked; the list of members shows `"suspended": true`. Reactivated, the
+person signs in again; the sessions ended by the suspension stay ended. You cannot suspend your own
+account. Both actions are in the audit log (`account.suspended`, `account.reactivated`).
+
+A kernel ends a session at once; when several kernels serve the installation, the others refuse it
+within `mosaikit.accounts.session-cache` (5 seconds by default). People also see and end their own
+sessions in their settings. With Keycloak, the kernel ends its own side of the realm session (the
+tokens of that session are refused); to end the session in Keycloak too, use its administration
+console.
+
 ## How members sign in
 
 Each organization has a sign-in policy, `signIn`:
@@ -115,8 +141,13 @@ with a link: until they open it the account does not sign in. The link works onc
   recorded in the audit log, and with it off the sign-in page offers no registration.
 - The mails need a mail server: set `quarkus.mailer.host`, `port`, `username`, `password` and
   `quarkus.mailer.from` in `config/application.properties`, and `mosaikit.public-url` so that the
-  links point to the address people use. Without a mail server, registrations fail with a
-  message and nothing is created.
+  links point to the address people use.
+- The kernel gives the mail server `mosaikit.accounts.mail-timeout` (15 seconds) in all, in two
+  attempts of half each: when the first one times out, it sends the mail once more on another
+  connection (a person may then receive the same link twice; either works). When the mail server
+  does not take the mail in time, or refuses it, the person sees that the mail could not be sent; the account is created all the
+  same, and they ask for the link again from the sign-in page once the mail server works. The
+  kernel never keeps a database transaction open while it talks to the mail server.
 
 ## Apps of an organization
 
@@ -213,11 +244,63 @@ is refused, with the list of those grants: revoke them first.
 ## Audit log
 
 The kernel records who proposed, confirmed, rejected or ran an action of an assistant, and who
-created an organization, changed its identity settings or its members. Platform administrators
-read the latest events with `GET /api/v1/audit-events?limit=100` (up to 500, and
-`organization=<id>` for one organization). The same events are written to the log category
-`mosaikit.audit`, which can be sent to a SIEM. The events are never changed nor deleted by the
-kernel; sign-ins are not recorded yet.
+created an organization, changed its identity settings, its members, its apps, its permissions or
+the retention of its audit log. Each entry says who (`actor`), what (`action`), on which object
+(`subject`), when (`occurredAt`), with which `outcome`, and through which `channel`: `WEB` (the
+console, or a client signed in as a person), `API_KEY`, `JOB` (a job of the kernel, such as the
+retention), `ASSISTANT` (an assistant or an MCP client) or `EXTENSION`. The same entries are written to
+the log category `mosaikit.audit`, which can be sent to a SIEM. Sign-ins are not recorded yet.
+
+### Reading it
+
+The administrators of an organization, signed in to it, read the entries of their organization, and
+of no other, with `GET /api/v1/organizations/{slug}/audit-events`, newest first. They filter them by
+`actor`, `action` (one action, or every action under a prefix that ends with a dot, such as
+`permissions.`), `subject`, `channel`, and time with `from` and `to` (such as
+`2026-10-13T08:00:00Z`), and page with `offset` and `limit` (100 by default, up to 500).
+
+Platform administrators read the entries of the platform, those without organization, with
+`GET /api/v1/audit-events?platform=true`, and those of one organization with `organization=<id>`;
+the same filters apply.
+
+### Verifying it
+
+No API changes or deletes an entry, and requests cannot either in the database: the role they run
+as may only read and add entries of their organization. Each organization has its own chain of
+entries, and the platform one: every entry carries its position in the chain (`index`), the hash of
+the entry before it (`previousHash`) and its own (`hash`, SHA-256 over its content and the previous
+hash). Someone who changes, removes or inserts an entry directly in the database breaks the chain at
+that position.
+
+`GET /api/v1/organizations/{slug}/audit-events/verification` walks the chain of the organization
+(`GET /api/v1/audit-events/verification` that of the platform, or of any organization with
+`organization=<id>`) and answers `{"intact": true, "checked": 120, "firstIndex": 1, "lastIndex": 120}`,
+or the first entry that is not as it was written:
+
+```json
+{"intact": false, "checked": 41, "altered": {"index": 42, "id": "…", "problem": "CHANGED"}}
+```
+
+`CHANGED` means the content of the entry, or its link to the entry before it, is not what the kernel
+wrote; `MISSING` that the entry at that position is gone and the retention did not delete it. The
+chain proves that the log was not altered after the fact by someone without access to the kernel;
+whoever administers the database could rewrite a whole chain, so keep copies of the `mosaikit.audit`
+log category, or of the last `hash`, outside the database.
+
+### Retention
+
+Entries are kept until the administrators set a retention: `PUT
+/api/v1/organizations/{slug}/audit-events/retention` with `{"retentionDays": 730}`, or `null` to keep
+every entry again (`/api/v1/audit-events/retention` for the platform). The installation sets a
+minimum, `mosaikit.audit.min-retention` (365 days by default, see
+[configuration](configuration.md#audit-log)): a shorter retention is refused, and no entry younger
+than the minimum is ever deleted, even when the minimum is raised later. `GET` on the same path
+answers the `retentionDays` set, the `minimumDays` and the `effectiveDays`.
+
+Every few hours (`mosaikit.audit.retention-check`) each kernel deletes the entries older than the
+retention of their organization, oldest first, and records it in the same chain
+(`audit.entries.deleted`, channel `JOB`). The chain stays verifiable: the kernel keeps the hash of the
+last deleted entry, and the verification starts from there (`firstIndex`).
 
 ## Assistants and MCP clients
 
