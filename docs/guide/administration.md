@@ -427,6 +427,38 @@ does not move the files already stored: copy the objects to the new store, keepi
 A file of a team goes with the team, and the files of an organization with the organization; their
 content stays in the store, and is not yet removed with them.
 
+### Signed links to files
+
+Viewers, external tools, embedded pages and links in notifications download files without the
+session of a person through signed, expiring links (MK-093). A person, or an extension, asks for a
+link to a file they read, or to every file under a prefix of names, such as `tiles/`, of the
+organization or of one of their teams; whoever holds the link downloads those files, with ranges and
+cache validators, until it expires: at most `mosaikit.files.link-max-validity` (7 days unless set)
+after it was made. An expired or altered link answers 404, as a file that does not exist, so that a
+link never tells whether a file is there. Making a link is in the audit log as `file.link.created`;
+its use as `file.link.used`, the first time in each hour for each link on each kernel, not every
+download. A link opens the files it names until it expires, also when the person who made it leaves
+the team or the organization: deleting the file, or rotating the key, stops it.
+
+No table keeps the links: each carries its organization, extension, file or prefix and expiry,
+signed with HMAC-SHA256 by the key of the installation. The key is:
+
+- `mosaikit.files.link-key` when set: 32 random bytes or more in base64 (`openssl rand -base64 32`),
+  from a secret (`MOSAIKIT_FILES_LINK_KEY`);
+- otherwise a key derived with HKDF-SHA256 from the master key of the store of credentials
+  (`mosaikit.secrets.master-key`), under a label of its own, so that the master key never signs
+  anything itself;
+- without either, links to files are disabled: making one answers 503, and the kernel logs why at
+  start.
+
+All the kernels of an installation need the same keys. To **rotate** the key, make the new one
+current and move the old one to `mosaikit.files.link-previous-keys`, then restart the kernels: new
+links are signed with the new key, and those already given keep working until they expire. After
+`mosaikit.files.link-max-validity` remove the old key. Removing a key at once, without moving it to
+the former keys, stops every link it signed: the way to revoke all links after a leak. A key derived
+from the master key rotates with it: the former master keys in `mosaikit.secrets.previous-keys` keep
+their links working.
+
 ## Assistants and MCP clients
 
 Extensions may declare actions that assistants use as tools (see

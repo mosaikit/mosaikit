@@ -92,8 +92,13 @@ public class FileService {
         private final String key;
 
         Content(StoredFile stored) {
-            this.file = FileView.of(stored);
-            this.key = stored.getStorageKey();
+            this(FileView.of(stored), stored.getStorageKey());
+        }
+
+        /** A file found without the person of the request, such as through a signed link (MK-093). */
+        Content(FileView file, String key) {
+            this.file = file;
+            this.key = key;
         }
 
         public FileView file() {
@@ -275,6 +280,26 @@ public class FileService {
         });
     }
 
+    /**
+     * Checks that the person may make a link to every file of an extension under a prefix (MK-093):
+     * those of one of their teams, or, unless a guest, those of the organization.
+     *
+     * @throws ResourceNotFoundException when the extension is not active, or the team not theirs
+     * @throws ForbiddenOperationException when a guest asks for the files of the organization
+     */
+    public void permitsPrefix(String extension, UUID team) {
+        transaction(() -> {
+            organization.require();
+            active(extension);
+            if (team != null) {
+                requireIn(team);
+            } else if (organization.guest()) {
+                throw new ForbiddenOperationException("A guest makes links only to the files of their teams.");
+            }
+            return null;
+        });
+    }
+
     private StoredFile readable(String extension, UUID id) {
         UUID org = organization.require();
         active(extension);
@@ -380,6 +405,32 @@ public class FileService {
             }
         }
         return name;
+    }
+
+    /**
+     * A prefix of names of files (MK-093): empty for every file, or the start of a name, such as
+     * {@code tiles/} or {@code report-2026}, whose complete segments are neither empty, nor {@code .}
+     * or {@code ..}.
+     */
+    static String prefix(String value) {
+        if (value == null || value.isEmpty()) {
+            return "";
+        }
+        if (value.length() > MAX_NAME) {
+            throw new InvalidInputException(List.of("prefix must have at most " + MAX_NAME + " characters"));
+        }
+        if (value.chars().anyMatch(c -> Character.isISOControl(c) || c == '\\')) {
+            throw new InvalidInputException(List.of("prefix must not contain control characters nor backslashes"));
+        }
+        String[] segments = value.split("/", -1);
+        for (int index = 0; index < segments.length; index++) {
+            String segment = segments[index];
+            boolean last = index == segments.length - 1;
+            if ((segment.isEmpty() && !last) || segment.equals(".") || segment.equals("..")) {
+                throw new InvalidInputException(List.of("prefix must not start with /, nor contain //, /./ or /../"));
+            }
+        }
+        return value;
     }
 
     /** A media type such as {@code image/png}; {@code application/octet-stream} when absent. */

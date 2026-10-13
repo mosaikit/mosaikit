@@ -10,6 +10,8 @@ import io.quarkus.runtime.configuration.MemorySize;
 import java.math.BigInteger;
 import java.net.URI;
 import java.nio.file.Path;
+import java.time.Duration;
+import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
@@ -66,6 +68,21 @@ class FileStoresTest {
             @Override
             public MemorySize maxSize() {
                 return new MemorySize(BigInteger.valueOf(1024));
+            }
+
+            @Override
+            public Duration linkMaxValidity() {
+                return Duration.ofDays(7);
+            }
+
+            @Override
+            public Optional<String> linkKey() {
+                return Optional.empty();
+            }
+
+            @Override
+            public Optional<List<String>> linkPreviousKeys() {
+                return Optional.empty();
             }
 
             @Override

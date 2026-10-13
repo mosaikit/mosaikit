@@ -135,6 +135,27 @@ public interface KernelConfig {
         @WithDefault("10M")
         MemorySize maxSize();
 
+        /**
+         * The longest validity of a signed link to files (MK-093): every link expires, at the latest
+         * this long after it is made.
+         */
+        @WithDefault("7d")
+        Duration linkMaxValidity();
+
+        /**
+         * The key that signs the links to files (MK-093): at least 32 random bytes in base64, such as
+         * the output of {@code openssl rand -base64 32}. Absent, the key is derived from the master
+         * key of the store of credentials ({@code mosaikit.secrets.master-key}); without either, no
+         * link can be made.
+         */
+        Optional<String> linkKey();
+
+        /**
+         * The former keys of a rotation of {@code link-key}, in base64: links signed with them are
+         * still accepted until they expire; new links are signed with {@code link-key}.
+         */
+        Optional<List<String>> linkPreviousKeys();
+
         /** The {@code s3} store. */
         S3 s3();
 

@@ -21,6 +21,8 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
 import java.io.InputStream;
+import java.net.URI;
+import java.time.Instant;
 import java.util.List;
 import java.util.OptionalLong;
 import java.util.UUID;
@@ -41,9 +43,41 @@ public class FileResource {
     static final String CACHE_CONTROL = "private, no-cache";
 
     private final FileService files;
+    private final FileLinks links;
 
-    public FileResource(FileService files) {
+    public FileResource(FileService files, FileLinks links) {
         this.files = files;
+        this.links = links;
+    }
+
+    /**
+     * A request for a signed link (MK-093): to one {@code file}, or to every file under a
+     * {@code prefix} of names, of the organization or of a {@code team}; until {@code expires}, the
+     * longest validity when absent.
+     */
+    public record NewLink(UUID file, String prefix, UUID team, Instant expires) {}
+
+    /**
+     * A signed link (MK-093): {@code url} opens the file, or the file named as the prefix; a file
+     * under a prefix is at {@code base + name + "?" + query}.
+     */
+    public record LinkView(
+            String url, String base, String query, UUID file, String prefix, UUID team, Instant expires) {
+
+        static LinkView of(FileLinks.Made made, URI root) {
+            String origin = root.toString().endsWith("/")
+                    ? root.toString().substring(0, root.toString().length() - 1)
+                    : root.toString();
+            FileLink link = made.link();
+            return new LinkView(
+                    origin + made.path(),
+                    origin + made.base(),
+                    made.query(),
+                    link.file(),
+                    link.prefix(),
+                    link.team(),
+                    link.expires());
+        }
     }
 
     @GET
@@ -107,6 +141,31 @@ public class FileResource {
     public Response content(
             @PathParam("extension") String extension, @PathParam("id") UUID id, @Context HttpHeaders headers) {
         return FileResponses.content(files.content(extension, id), headers, CACHE_CONTROL);
+    }
+
+    @POST
+    @Path("/links")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Produces(MediaType.APPLICATION_JSON)
+    @Operation(
+            summary = "Make a signed, expiring link to a file or to a prefix of names",
+            description = "Body {\"file\": <id>} for a file the person reads, or {\"prefix\": \"tiles/\", "
+                    + "\"team\"?: <id>} for every file under the prefix of the organization or of a team of the "
+                    + "person; \"expires\" at most mosaikit.files.link-max-validity from now. Anyone with the "
+                    + "link downloads the files without a session until it expires (audited).")
+    public Response link(@PathParam("extension") String extension, NewLink request, @Context UriInfo uri) {
+        if (request == null || (request.file() == null) == (request.prefix() == null)) {
+            throw new InvalidInputException(List.of("give either file or prefix"));
+        }
+        if (request.file() != null && request.team() != null) {
+            throw new InvalidInputException(List.of("team goes with a prefix, not with a file"));
+        }
+        FileLinks.Made made = request.file() != null
+                ? links.toFile(extension, request.file(), request.expires())
+                : links.toPrefix(extension, request.prefix(), request.team(), request.expires());
+        return Response.status(Response.Status.CREATED)
+                .entity(LinkView.of(made, uri.getBaseUri()))
+                .build();
     }
 
     @DELETE
