@@ -437,7 +437,7 @@ A Java backend reads the teams of the person and their people through `Teams` of
 
 ## Data of organizations
 
-Every request to an extension API acts on one organization of the signed-in person (MK-017,
+Every request of a person to an extension API acts on one organization of the signed-in person (MK-017,
 [ADR-0016](../adr/0016-membership-of-several-organizations.md)). Store the organization with
 every row and filter on it, so that data of other organizations are never visible:
 
@@ -454,7 +454,26 @@ public class NoteResource {
 ```
 
 `require()` answers `403` when a request has no organization; the kernel already refuses such
-requests to extension APIs.
+requests of people to extension APIs. Calls of services are the exception (below).
+
+### Calls of services
+
+A platform administrator can give the API of an extension to a service identity (MK-124), for
+callers that are not people, such as a gateway or a map server. Such a call reaches the extension
+with no person and, unless the service names an organization it was allowed with
+`X-Mosaikit-Organization`, no organization: `CurrentOrganization.id()` is empty and row-level
+security shows no row of any organization. Recognize it with the security identity of Quarkus:
+
+```java
+@Inject SecurityIdentity identity;   // io.quarkus.security.identity
+
+boolean service = identity.hasRole("service");          // a service identity, not a person
+String caller = identity.getPrincipal().getName();      // "service:<name>" for a service
+```
+
+Endpoints meant for services check the role, for example with `@RolesAllowed("service")`; endpoints
+for people keep their own roles (`organization-user`, ...), which a service never has. A service
+identity has no permissions of an organization (MK-056) and no account.
 
 Then let the database enforce it (MK-019, [ADR-0018](../adr/0018-row-level-security.md)): give
 each table of organization data a row-level security policy on `mk_kernel.current_organization()`,

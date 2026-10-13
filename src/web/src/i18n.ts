@@ -286,6 +286,49 @@ const ITALIAN: Record<string, string> = {
     "Nella pagina di accesso, nelle organizzazioni che lo consentono. Un link inviato per email conferma l'indirizzo prima del primo accesso.",
   'People can create their own account.': 'Le persone possono creare il proprio account.',
   'Self-registration is off.': 'La registrazione autonoma è disattivata.',
+  // Service identities (MK-124)
+  'Service identities': 'Identità di servizio',
+  'For the services that call the APIs of extensions without a person, such as a gateway. Each has its own key, the APIs it may call and no organization; it never opens the shell.':
+    'Per i servizi che chiamano le API delle estensioni senza una persona, come un gateway. Ognuna ha la sua chiave, le API che può chiamare e nessuna organizzazione; non apre mai la shell.',
+  'No service identity.': 'Nessuna identità di servizio.',
+  'New service identity': 'Nuova identità di servizio',
+  'Create service identity': 'Crea identità di servizio',
+  'APIs of extensions': 'API delle estensioni',
+  'The names in /api/v1/ext/<api>/, separated by commas, such as catalog.':
+    'I nomi in /api/v1/ext/<api>/, separati da virgole, come catalog.',
+  'Endpoints of the kernel': 'Endpoint del kernel',
+  'Check the sessions of people': 'Verifica le sessioni delle persone',
+  'Check the access keys of people': 'Verifica le chiavi di accesso delle persone',
+  'Organizations it may name': 'Organizzazioni che può indicare',
+  'Slugs, separated by commas; with the X-Mosaikit-Organization header, a call acts on one of them. Leave empty for none.':
+    "Slug, separati da virgole; con l'intestazione X-Mosaikit-Organization, una chiamata agisce su una di esse. Lascia vuoto per nessuna.",
+  'The new key of {name}': 'La nuova chiave di {name}',
+  'Copy it now and put it in the configuration of the service: it will not be shown again.':
+    'Copiala ora e mettila nella configurazione del servizio: non verrà più mostrata.',
+  'The new key of the service': 'La nuova chiave del servizio',
+  'No live key: create one to use this identity.':
+    'Nessuna chiave attiva: creane una per usare questa identità.',
+  'Keys of {name}': 'Chiavi di {name}',
+  'New key': 'Nuova chiave',
+  'Change what it may call': 'Cambia cosa può chiamare',
+  'Change {name}': 'Modifica {name}',
+  '{prefix}… · created {created} · last used {used}':
+    '{prefix}… · creata {created} · ultimo uso {used}',
+  'APIs: {apis}': 'API: {apis}',
+  'No API of extensions': 'Nessuna API delle estensioni',
+  'Kernel: {endpoints}': 'Kernel: {endpoints}',
+  'Organizations: {organizations}': 'Organizzazioni: {organizations}',
+  'The service identities cannot be read: {reason}':
+    'Le identità di servizio non possono essere lette: {reason}',
+  'Name the service identity after the service that uses it.':
+    "Dai all'identità di servizio il nome del servizio che la usa.",
+  'Service identity created: {name}. Copy its key now, it will not be shown again.':
+    'Identità di servizio creata: {name}. Copia ora la sua chiave, non verrà più mostrata.',
+  'The service identity was not created: {reason}':
+    "L'identità di servizio non è stata creata: {reason}",
+  'Saved: {name}': 'Salvato: {name}',
+  'New key for {name}. Copy it now, put it in the service, then revoke the old key.':
+    'Nuova chiave per {name}. Copiala ora, mettila nel servizio, poi revoca la vecchia chiave.',
 };
 
 const TRANSLATIONS: Record<Language, Record<string, string>> = { en: {}, it: ITALIAN };

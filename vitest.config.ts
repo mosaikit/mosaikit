@@ -53,6 +53,7 @@ export default defineConfig({
         'sdk/ui/src/apply.ts',
         'sdk/ui/src/components.ts',
         'src/web/src/mk-admin-extensions.ts',
+        'src/web/src/mk-admin-services.ts',
         'src/web/src/mk-assistant.ts',
         'src/web/src/mk-extension-frame.ts',
       ],

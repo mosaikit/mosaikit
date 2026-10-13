@@ -7,9 +7,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.mosaikit.kernel.core.account.AccessKeyRegistry;
 import dev.mosaikit.kernel.core.config.KernelConfig;
 import dev.mosaikit.kernel.core.error.InvalidInputException;
+import dev.mosaikit.kernel.core.service.ServiceRegistry;
 import io.quarkus.arc.Arc;
 import io.quarkus.arc.ArcContainer;
 import io.quarkus.arc.InstanceHandle;
+import io.quarkus.security.identity.SecurityIdentity;
 import io.quarkus.vertx.http.runtime.CurrentVertxRequest;
 import io.quarkus.vertx.http.runtime.security.QuarkusHttpUser;
 import io.vertx.ext.web.RoutingContext;
@@ -70,7 +72,8 @@ public class AuditLog {
 
     /**
      * Records an event, through the channel of the current call: {@link AuditEvent.Channel#API_KEY} in
-     * a request authenticated with a personal access key (MK-060), {@link AuditEvent.Channel#WEB} in
+     * a request authenticated with a personal access key (MK-060), {@link AuditEvent.Channel#SERVICE}
+     * in a request of a service identity (MK-124), {@link AuditEvent.Channel#WEB} in
      * other requests, {@link AuditEvent.Channel#JOB} outside requests.
      */
     @Transactional(Transactional.TxType.REQUIRES_NEW)
@@ -419,20 +422,24 @@ public class AuditLog {
         if (container == null || !container.requestContext().isActive()) {
             return AuditEvent.Channel.JOB;
         }
-        return withAccessKey(container) ? AuditEvent.Channel.API_KEY : AuditEvent.Channel.WEB;
+        SecurityIdentity identity = identityOfTheRequest(container);
+        if (identity != null && identity.getAttribute(ServiceRegistry.ATTRIBUTE) != null) {
+            return AuditEvent.Channel.SERVICE;
+        }
+        return identity != null && identity.getAttribute(AccessKeyRegistry.ATTRIBUTE) != null
+                ? AuditEvent.Channel.API_KEY
+                : AuditEvent.Channel.WEB;
     }
 
     /**
-     * Whether the HTTP request of the current context was authenticated with a personal access key
-     * (MK-060): read from the identity already set on the request, so that nothing is authenticated
-     * again here.
+     * The identity of the HTTP request of the current context, to tell a personal access key (MK-060)
+     * or a service identity (MK-124): read from the identity already set on the request, so that
+     * nothing is authenticated again here.
      */
-    private static boolean withAccessKey(ArcContainer container) {
+    private static SecurityIdentity identityOfTheRequest(ArcContainer container) {
         InstanceHandle<CurrentVertxRequest> request = container.instance(CurrentVertxRequest.class);
         RoutingContext routing = request.isAvailable() ? request.get().getCurrent() : null;
-        return routing != null
-                && routing.user() instanceof QuarkusHttpUser user
-                && user.getSecurityIdentity().getAttribute(AccessKeyRegistry.ATTRIBUTE) != null;
+        return routing != null && routing.user() instanceof QuarkusHttpUser user ? user.getSecurityIdentity() : null;
     }
 
     private String write(Map<String, ?> detail) {

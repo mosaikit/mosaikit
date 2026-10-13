@@ -55,8 +55,8 @@ with a key has the channel `API_KEY` too.
 A service that receives a key from its own callers checks it with `GET
 /api/v1/access-keys/current`, called with that same key: the key is its own credential, so the
 service needs no secret of its own and cannot learn about other keys, and the call follows the
-same rules as any other (401 once revoked). Service identities (MK-124) will let services check keys
-with credentials of their own.
+same rules as any other (401 once revoked). A service with a service identity checks keys, and
+sessions, with credentials of its own (below).
 
 ```bash
 curl -H "Authorization: Bearer $KEY" https://mosaikit.example.org/api/v1/access-keys/current
@@ -64,6 +64,34 @@ curl -H "Authorization: Bearer $KEY" https://mosaikit.example.org/api/v1/access-
 #  "account": {"id": "...", "username": "ada@example.org", "displayName": "Ada"},
 #  "organization": {"id": "...", "slug": "acme"}, "roles": ["organization-user"]}
 ```
+
+Callers that are not people, such as a gateway in front of a map server or a map server that maps a
+key to a person through an extension, use a service identity (MK-124), created by a platform
+administrator, with a key of its own sent as `Authorization: Bearer mks_...`. A bearer token that
+starts with `mks_` is always read as the key of a service. The request then has the principal
+`service:<name>`, the single role `service`, no account and no organization: it reaches the APIs of
+extensions the identity was given (`/api/v1/ext/<api>/`), and `POST /api/v1/services/check` when it
+was given `check-session` or `check-key`; every other path, the shell and the other APIs of the
+kernel included, answers 403. It acts on an organization only when it names one with
+`X-Mosaikit-Organization` that the identity was allowed; another one answers 403. An unknown or
+revoked key answers 401. The audit log records through the channel `SERVICE` every refused call
+(`service.refused`, with the reason: `revoked`, `not-granted`, `organization`) and the first call of
+each identity to each API in an hour (`service.used`). An identity has at most two live keys, so
+that a key is rotated without a pause.
+
+A gateway checks the session cookie of the shell, or a personal access key, that a person sent it:
+
+```bash
+curl -H "Authorization: Bearer $SERVICE_KEY" -H 'Content-Type: application/json'   -d '{"session": "<value of the mosaikit-session cookie>", "organization": "acme"}'   https://mosaikit.example.org/api/v1/services/check
+# {"kind": "session", "account": {"id": "...", "username": "ada@example.org", "displayName": "Ada"},
+#  "organization": {"id": "...", "slug": "acme"}, "roles": ["organization-user"]}
+curl -H "Authorization: Bearer $SERVICE_KEY" -H 'Content-Type: application/json'   -d '{"key": "mk_..."}' https://mosaikit.example.org/api/v1/services/check
+# {"kind": "key", "account": {...}, "organization": {...}, "roles": [...],
+#  "key": {"id": "...", "name": "Map client", "prefix": "mk_AbCdEfGh", "write": false, "expiresAt": "..."}}
+```
+
+Credentials that open nothing (an ended session, a revoked or expired key, a suspended person)
+answer 401, as when the person sends them to the kernel.
 
 ## Endpoints of the kernel
 
@@ -88,6 +116,11 @@ curl -H "Authorization: Bearer $KEY" https://mosaikit.example.org/api/v1/access-
 | `POST /api/v1/accounts/me/access-keys` | signed in, not with a key | create a key (`{"name", "organization": "<slug>", "expiresAt"?, "write"?}`) for one organization of the person, expiring at most `mosaikit.accounts.access-key-max-validity` from now (the longest when absent), read-only unless `write` is true: 201 with the key and its `secret`, shown this once (audited) |
 | `DELETE /api/v1/accounts/me/access-keys/{id}` | signed in, not with a key | revoke a key of the person: the next request with it is refused, the sessions go on; 404 when it is not a key of the person (audited) |
 | `GET /api/v1/access-keys/current` | with an access key | validate the key of the request, for services: `id`, `name`, `prefix`, `write`, `expiresAt`, the `account` and the `organization` it acts for, and the `roles` of the person there now; 404 without a key (MK-060) |
+| `POST /api/v1/services/check` | a service identity given `check-session` or `check-key` | check the credentials of a person for a service (MK-124): `{"session": "<cookie value>", "organization"?: "<slug>"}` or `{"key": "mk_..."}`; 200 with `kind` (`session` or `key`), the `account`, the `organization` (or `null`), the `roles` there now and, for a key, the `key`; 401 when they open nothing; 403 without the endpoint |
+| `GET, POST /api/v1/platform/service-identities` | `platform-admin` | the service identities (MK-124): `identities`, each with `id`, `name`, `description`, `apis`, `endpoints`, `organizations` (slugs), `createdAt`, `createdBy` and its live `keys` (`id`, `prefix`, `createdAt`, `lastUsedAt`), with the `endpoints` that can be given and `maxKeys`; create one (`{"name", "description"?, "apis": ["<api>"], "endpoints"?: ["check-session", "check-key"], "organizations"?: ["<slug>"]}`): 201 with its first key and its `secret`, shown this once; 409 when the name is taken (audited) |
+| `PUT /api/v1/platform/service-identities/{id}` | `platform-admin` | change the `description`, `apis`, `endpoints` and `organizations` of an identity; its next call follows them (audited) |
+| `POST /api/v1/platform/service-identities/{id}/keys` | `platform-admin` | a new key for an identity, to rotate the old one, which goes on until revoked: 201 with its `secret`, shown this once; 409 when the identity already has two live keys (audited) |
+| `DELETE /api/v1/platform/service-identities/{id}/keys/{key}` | `platform-admin` | revoke a key of an identity: its next call is refused; 404 when it is not a live key of the identity (audited) |
 | `POST /api/v1/accounts/session/remembrance` | signed in, with a password | remember this browser: an HttpOnly cookie signs the person in again for `mosaikit.accounts.remember-for` |
 | `GET /api/v1/shell/extensions` | signed in | frontends of the active extensions, for the shell; not those turned off for the organization of the request, nor what they contribute to other extensions (MK-030, MK-035) |
 | `WS /api/v1/live` (WebSocket) | signed in | the real-time channel (MK-031): `?organization=<slug>`; send `{"type": "subscribe", "topic": "…"}`, receive `subscribed`, `refused` or `{"type": "event", "topic", "data"}` |

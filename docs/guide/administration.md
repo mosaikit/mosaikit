@@ -12,6 +12,7 @@ manage organizations and extensions. Today this is done through the REST API; th
 | `organization-admin` | the managers of an organization | manage their organization (in its realm) |
 | `organization-user` | the people of an organization | use the apps of the installation |
 | `organization-guest` | people of another organization, added to a team | see the teams where they were added and what is shared with them, nothing else of the organization |
+| `service` | service identities (MK-124), not people | call the APIs of extensions and the endpoints of the kernel they were given, nothing else |
 
 ## Organizations
 
@@ -113,7 +114,46 @@ open sessions or manage keys.
   people see in their list.
 - A key without the write switch cannot use the MCP server (`/mcp`): every MCP call is a `POST`.
 - A service that receives keys from its callers, such as a gateway, checks one with `GET
-  /api/v1/access-keys/current`, called with that key (see the [API](../development/api.md)).
+  /api/v1/access-keys/current`, called with that key, or, with a service identity, with `POST
+  /api/v1/services/check` (see below and the [API](../development/api.md)).
+
+## Service identities
+
+Some callers of the APIs of extensions are not people: a gateway in front of a map server that asks
+whether a request may pass, or a map server whose key filter asks an extension which person a key
+belongs to. Give each one a service identity (MK-124) rather than an account of a fake person: as a
+platform administrator, open **Service identities** in the administration of the shell, or call
+`POST /api/v1/platform/service-identities`.
+
+- Name the identity after the service (`gateway`, `map-server`), describe it, and give it the APIs
+  of extensions it calls: the names in `/api/v1/ext/<api>/`, such as `catalog`. Give it the endpoint
+  `check-session` or `check-key` when it checks the sessions or the access keys of people (below).
+- The secret of its key, which starts with `mks_`, is shown once: put it in the configuration of the
+  service, which sends it as `Authorization: Bearer mks_...`. The kernel keeps only a digest.
+- The identity has no organization and no password: it never opens the shell, and every other API
+  answers 403. An extension sees a caller with the role `service` and the name
+  `service:<name>`; a call acts on an organization only when the service names one with the
+  `X-Mosaikit-Organization` header among those the identity was allowed.
+- To rotate a key, create a new one (**New key**), put it in the service, then revoke the old one:
+  an identity has at most two live keys. A revoked key is refused at once on the kernel that revoked
+  it, and on the other kernels of the installation within `mosaikit.accounts.session-cache`; so
+  are the APIs taken away from an identity.
+- The audit log records, through the channel `SERVICE`, every refused call (`service.refused`, with
+  the reason: `revoked`, `not-granted`, `organization`) and the first call of each identity to each
+  API in an hour on each kernel (`service.used`, with the method and the path), with the actor
+  `service:<name>` and the prefix of the key as subject. `service.identity.created`,
+  `service.identity.changed`, `service.key.created` and `service.key.revoked` record what platform
+  administrators did.
+
+### Checking people at a gateway
+
+A gateway in front of another server lets a request pass when the person who sent it is signed in.
+Give its identity `check-session` and `check-key`; for each request it calls `POST
+/api/v1/services/check` with the value of the `mosaikit-session` cookie it received (and the
+organization the shell named, from `X-Mosaikit-Organization`), or with the personal access key of
+the `Authorization` header. The kernel answers the person, the organization and the roles, or 401
+when the session ended or the key was revoked, with the same rules as when the person calls the
+kernel. Cache the answer for a few seconds at most, so that an ended session closes the gateway too.
 
 ## Suspending a person
 

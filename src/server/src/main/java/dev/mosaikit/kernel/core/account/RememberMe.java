@@ -115,7 +115,8 @@ public class RememberMe {
         }
     }
 
-    static String digest(String token) {
+    /** The SHA-256 digest of a secret, in hexadecimal: what the kernel keeps of its tokens and keys. */
+    public static String digest(String token) {
         try {
             return HexFormat.of()
                     .formatHex(MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8)));
