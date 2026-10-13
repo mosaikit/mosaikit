@@ -160,6 +160,50 @@ export interface Account {
   readonly preferences?: Preferences;
 }
 
+/** How a measure counts: per calendar month, or what is kept now (MK-076). */
+export type QuotaKind = 'counter' | 'gauge';
+
+/** Where the limit of a measure comes from. */
+export type QuotaSource = 'organization' | 'installation' | 'none';
+
+/** A measure of an organization with its limit and what it used (MK-076). */
+export interface Quota {
+  /** `storage`, or `<extension>/<measure>`. */
+  readonly measure: string;
+  readonly label: string;
+  /** `bytes` for storage; what an extension counts otherwise, such as `calls`. */
+  readonly unit: string;
+  readonly kind: QuotaKind;
+  readonly extension: string | null;
+  /** The limit in force, `null` for none. */
+  readonly limit: number | null;
+  readonly source: QuotaSource;
+  readonly installationLimit: number | null;
+  /** The month of a counter, such as `2026-10`; `null` for a gauge. */
+  readonly period: string | null;
+  readonly used: number;
+}
+
+/** What a person, or nobody, used of a measure. */
+export interface QuotaUsageRow {
+  readonly measure: string;
+  readonly period: string | null;
+  readonly person: {
+    readonly id: string;
+    readonly name: string | null;
+    readonly email: string | null;
+  } | null;
+  readonly amount: number;
+  readonly updatedAt: string | null;
+}
+
+/** The consumption of an organization in a month, with the gauges now. */
+export interface QuotaUsage {
+  readonly period: string;
+  readonly periods: readonly string[];
+  readonly rows: readonly QuotaUsageRow[];
+}
+
 /** An app of the app bar of an organization, with its settings (MK-030). */
 /** The kinds of credential that the kernel keeps (MK-062). */
 export type SecretKind = 'password' | 'token' | 'key' | 'other';
@@ -614,6 +658,27 @@ export class KernelClient {
     );
   }
 
+  /** The measures of an organization with their limits and consumption (MK-076). */
+  quotas(slug: string): Promise<Quota[]> {
+    return this.getJson<Quota[]>(quotasPath(slug));
+  }
+
+  /** The consumption of an organization by measure and person, in a month or this month. */
+  quotaUsage(slug: string, period?: string): Promise<QuotaUsage> {
+    const query = period ? `?period=${encodeURIComponent(period)}` : '';
+    return this.getJson<QuotaUsage>(`${quotasPath(slug)}/usage${query}`);
+  }
+
+  /** Sets the limit of a measure for an organization, `null` for none (platform administrators). */
+  setQuota(slug: string, measure: string, limit: number | null): Promise<Quota> {
+    return this.sendJson<Quota>(`${quotasPath(slug)}/${measurePath(measure)}`, 'PUT', { limit });
+  }
+
+  /** Removes the limit set for an organization: the default of the installation applies. */
+  removeQuota(slug: string, measure: string): Promise<Quota> {
+    return this.sendJson<Quota>(`${quotasPath(slug)}/${measurePath(measure)}`, 'DELETE');
+  }
+
   /** The credentials of an organization, without their values, for its administrators (MK-062). */
   secrets(slug: string): Promise<Secret[]> {
     return this.getJson<Secret[]>(secretsPath(slug));
@@ -990,6 +1055,16 @@ export class KernelClient {
     }
     return (await response.json()) as T;
   }
+}
+
+/** The quotas of an organization (MK-076). */
+function quotasPath(slug: string): string {
+  return `/api/v1/organizations/${encodeURIComponent(slug)}/quotas`;
+}
+
+/** A measure in a path: `<extension>/<measure>` keeps its slash. */
+function measurePath(measure: string): string {
+  return measure.split('/').map(encodeURIComponent).join('/');
 }
 
 /** The credentials of an organization, for its administrators (MK-062). */
