@@ -46,6 +46,9 @@ project follows [Semantic Versioning](https://semver.org/).
   first call of each identity to each API in an hour. A gateway checks the session cookie or the
   personal access key of a person with `POST /api/v1/services/check` (endpoints `check-session`
   and `check-key`), which answers the person, the organization and the roles, or 401.
+- `ServiceCaller` in `mosaikit-kernel-api` (`dev.mosaikit.kernel.api.context`), with which the Java
+  code of an extension recognizes a call of a service identity (MK-124): `isService(roles)` and
+  `name(principal)`.
 - Read-only views of people, organizations, memberships and teams for external services (MK-123),
   such as a map server that reads the roles of people from the database: `account`,
   `organization`, `membership`, `team` and `team_member` in the new schema `mk_published`
