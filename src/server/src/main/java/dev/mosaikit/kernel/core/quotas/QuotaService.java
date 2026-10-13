@@ -239,6 +239,32 @@ public class QuotaService {
         });
     }
 
+    /**
+     * Sets what an organization keeps now of a gauge of an extension, counted to nobody in
+     * particular. More than before must fit the limit; less always passes.
+     *
+     * @return the state of the quota before the change, with the increase as requested
+     * @throws QuotaExceededException when the increase does not fit
+     */
+    public Check set(UUID organization, Measure measure, long amount) {
+        requirePositive(amount);
+        if (measure.kind() != Measure.Kind.GAUGE || Measure.STORAGE_ID.equals(measure.id())) {
+            throw new InvalidInputException(List.of(measure.id() + " is not a gauge of an extension"));
+        }
+        return transaction(() -> {
+            OptionalLong limit = limit(organization, measure);
+            long used = locked(organization, measure.id(), NOW);
+            Check check = new Check(measure, null, limit, used, Math.max(0, amount - used));
+            if (!check.fits()) {
+                throw check.refusal();
+            }
+            if (amount != used) {
+                add(organization, null, measure.id(), NOW, amount - used);
+            }
+            return check;
+        });
+    }
+
     /** The space reported for a resource, 0 when none. */
     public long space(UUID resource) {
         return transaction(() -> {
