@@ -1,6 +1,6 @@
 # 0037. A registry of resources and one sharing model
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-10-13
 - Deciders: Massimo Antonini
 
@@ -21,6 +21,30 @@ work across them.
   person do this on this resource", and every grant is audited (MK-059).
 - Favorites, trash, versions, tags, presence, search of resources and transfer of resources build on
   the registry.
+
+### Refined on 2026-10-13
+
+Answers of the maintainer to the review of the extension API (pull request #42), before acceptance:
+
+- The calling extension passes its identifier in every call, as `Notifications.send` does; the
+  kernel checks it against an installed extension and its manifest.
+- A resource registered without a person (a job, an import, a migration) is owned by the
+  organization, and the administrators of the organization manage it.
+- Grants do not pass from a parent resource to its children, for now; to revisit when folders exist.
+- The owner, the people with the highest level and the administrators of the organization share.
+  The administrators of the organization hold every level on every resource of their organization;
+  platform administrators hold none.
+- Links and the public get at most the lowest ("view") level by default; a resource type may raise
+  links, not the public, to its "use" level, never to a level that edits. A link always expires,
+  within a longest validity set by the installation.
+- The Java API answers with sets for list pages; the implementation adds a SQL function, such as
+  `mk_kernel.allows(...)`, that extensions use in their own queries to filter large lists in the
+  database.
+- Granting again to the same subject replaces its level, also lowering it, and is audited.
+- An extension update that removes a resource type or a level on which grants exist is refused,
+  with the list of those grants; a declared migration may come later.
+- The frontend counterpart in `@mosaikit/sdk` and the REST API come with the implementation.
+- The team sharing of data collections (MK-032) moves onto this model in the implementation.
 
 ## Consequences
 
