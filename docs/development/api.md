@@ -15,8 +15,12 @@ The kernel finds the organization of a bearer token from the sub-domain of the r
 (`mosaikit.identity.domain`), or from the issuer of the token. `GET /api/v1/identity/sign-in-options?email=`
 tells a client how a person signs in.
 
-Every extension API requires an authenticated person (`quarkus.http.auth.permission.extension-api`),
-and only APIs of active extensions answer.
+Every extension API requires an authenticated person (`quarkus.http.auth.permission.extension-api`,
+policy `person-or-link`), and only APIs of active extensions answer. The one exception is a request
+without an account that carries, in `X-Mosaikit-Link`, a link that works and opens a resource of
+that same extension (MK-055): it acts on the organization of the resource only after the extension
+asked `Sharing` about that resource, so only routes annotated `@PermitAll` that call
+`Sharing.require` serve it.
 
 Every request acts on at most one organization of the person (MK-017): the one of the realm of a
 bearer token; with a password, the one named by the `X-Mosaikit-Organization` header or by the
@@ -146,12 +150,12 @@ answer 401, as when the person sends them to the kernel.
 | `GET /api/v1/organizations/{slug}/quotas` | the administrators of the organization, signed in to it; `platform-admin` | its measures (MK-076): `storage`, then those of the active extensions, each with `measure`, `label`, `unit`, `kind` (`counter` per month or `gauge`), `extension`, `limit` (`null` for none), `source` (`organization`, `installation` or `none`), `installationLimit`, `period` (this month for a counter, `null` for a gauge) and `used`, current at every call |
 | `GET /api/v1/organizations/{slug}/quotas/usage?period=` | the administrators of the organization, signed in to it; `platform-admin` | its consumption by measure and person: the counters of a month (`period`, such as `2026-10`, this month by default) and the gauges now, as `rows` of `measure`, `period`, `person` (`id`, `name`, `email`, or `null` for none or a person who left), `amount`, `updatedAt`; `periods` lists the months with consumption |
 | `GET, PUT, DELETE /api/v1/organizations/{slug}/quotas/{measure}` | reading: as above; changing: `platform-admin` | one measure; set its limit for the organization (`{"limit": n}` in its unit, bytes for `storage`, per month for a counter; `{"limit": null}` for none), over the default of the installation (`mosaikit.quotas.*`); remove it, back to the default (audited) |
-| `GET /api/v1/sharing/resources/{extension}/{type}/{id}` | signed in, or a link (`X-Mosaikit-Link`) | a registered resource with the level of the request on it and whether the person may share it (MK-055) |
+| `GET /api/v1/sharing/resources/{extension}/{type}/{id}` | signed in | a registered resource with its owner (`ownerName`), the level of the request on it (the one `Sharing.level` gives the extension) and whether the person may share it (MK-055); 404 without a level |
 | `GET /api/v1/sharing/resources/{extension}/{type}/{id}/grants` | who may share the resource | its grants, links included, with the names of their subjects |
-| `PUT /api/v1/sharing/resources/{extension}/{type}/{id}/grants` | who may share the resource | grants a level to a person, a team, the organization or the public; granting again replaces the level |
+| `PUT /api/v1/sharing/resources/{extension}/{type}/{id}/grants` | who may share the resource | grants a level to a person (`subject.id`, or `subject.email` of a person of the organization), a team, the organization or the public; granting again replaces the level |
 | `POST /api/v1/sharing/resources/{extension}/{type}/{id}/links` | who may share the resource | creates a link with a level, an expiry within `mosaikit.sharing.link-max-validity` and an optional password; the token is returned once |
 | `DELETE /api/v1/sharing/grants/{grant}` | who may share the resource | revokes a grant or a link |
-| `POST /api/v1/sharing/links/open` | anyone | opens a link with its token and password: the resource and the level, `404` when unknown, expired or revoked, `403` when the password is wrong; every use is audited |
+| `POST /api/v1/sharing/links/open` | anyone | opens a link with its token and password: the resource, the level and the `shared.view` element of the extension that shows it (`view`), `404` when unknown, expired or revoked, `403` when the password is wrong; every use is audited |
 | `GET /api/v1/shell/extensions/revision` | signed in | changes when the watched extensions directory changes (`mosaikit.extensions.watch`); 404 when it is not watched |
 | `GET /api/v1/extension-assets/{id}/{path}` | anyone | web files of active extensions |
 | `GET /api/v1/extensions` | `platform-admin` | every extension found, with status, problems and publisher |
@@ -164,8 +168,8 @@ answer 401, as when the person sends them to the kernel.
 | `GET /api/v1/marketplace` | `platform-admin` | the catalogs and what they offer, compared with what is installed (MK-022) |
 | `POST /api/v1/marketplace/installations` | `platform-admin` | install a package of a catalog (`source`, `id`, `version`); 202, active at once or at the next start (`restartRequired`) |
 | `POST /api/v1/extensions/packages` | `platform-admin` | install an uploaded package (`application/zip`); 202, active at once or at the next start (`restartRequired`) |
-| `GET, POST /api/v1/data/{extension}/{collection}` | signed in, with an organization | the documents of a collection declared by an active extension, newest first (`offset`, `limit`); add one (MK-046); with `team`, those shared with that team of the person only (MK-032) |
-| `GET, PUT, DELETE /api/v1/data/{extension}/{collection}/{id}` | signed in, with an organization | one document; `PUT` with `If-Match: <version>` answers 409 if it changed since |
+| `GET, POST /api/v1/data/{extension}/{collection}` | signed in, with an organization | the documents of a collection declared by an active extension, newest first (`offset`, `limit`); add one (MK-046); with `team`, those shared with that team of the person (MK-032), each a resource `data-document` of the sharing model with the team at the level `edit` (MK-055) |
+| `GET, PUT, DELETE /api/v1/data/{extension}/{collection}/{id}` | signed in, with an organization | one document; `PUT` with `If-Match: <version>` answers 409 if it changed since; a document of a team needs the level `view` to read and `edit` to change or delete (403) |
 | `GET /api/v1/files/{extension}` | signed in, with an organization | the files of an active extension that the person reads, newest first: of the organization and of their teams, or with `team` of that team of theirs only (`offset`, `limit`) (MK-041) |
 | `POST /api/v1/files/{extension}?name=` | signed in, with an organization | store a file: the body is the content, streamed, `Content-Type` its media type, `name` its name or a path such as `tiles/3/4/2.png`; with `team`, shared with that team of the person only; with `resource=<type>/<id>`, attached to a registered resource of the extension (MK-054); 201 with its metadata, 413 beyond `mosaikit.files.max-size` (audited) |
 | `GET /api/v1/files/{extension}/{id}` | signed in, with an organization: its people for a file of the organization, the people of its team for a file of a team | its metadata: `name`, `contentType`, `size`, `checksum` (SHA-256), `owner`, `team`, `resource`, `createdAt`, `updatedAt` |

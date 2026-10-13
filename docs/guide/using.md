@@ -68,9 +68,9 @@ a team owns it, and adds or removes people; a **public** team is listed to every
 organization, who can join it, a **private** one only to its people. An owner can also add a
 **guest**: a person of another organization with an account on this installation. A guest signs in
 with their password, chooses the organization, and sees only the teams where they were added and
-what the apps share with them. What an app shares with a team is read by its people and by no one
-else, not even the administrators. Out of their last team, a guest is no longer in the
-organization.
+what the apps share with them. What an app shares with a team is read by its people and by the
+administrators of the organization, and by whoever it is then shared with (see "Sharing"). Out of
+their last team, a guest is no longer in the organization.
 
 ### The app Teams
 
@@ -94,6 +94,28 @@ person is always the same one. Enter sends a message, Shift+Enter starts a new l
 messages you see who is typing and who has read your last message. Every message also reaches
 the others in **Activity**; turn the kind **message** off in your settings if you prefer. Apps can
 post cards in a chat, with buttons that act as you when you choose them.
+
+## Sharing
+
+What you create in an app, such as a document, a dashboard or a memo, is yours: nobody else of the
+organization sees it, except its administrators, until you share it (MK-055). Apps that support it
+have a **Share** button, which opens the same dialog in every app:
+
+- **Who has access** lists the people, teams and links that have it, each with its level; change a
+  level from the list, or **Remove** an access.
+- **Share with** gives access to **a person** (by email address), **a team**, **everyone in the
+  organization** or, when the app allows it, **everyone, also without an account**, at a level the
+  app defines, such as View or Edit. Sharing again with the same person or team changes their level.
+- **Link** makes an address that opens the resource for whoever has it, also without an account,
+  at a level that never lets them change it, until the day you choose (at most 30 days unless the
+  installation sets otherwise). Add a password if you like: they will be asked for it. The address
+  is shown only once: copy it and give it to the people you choose. Removing the link makes it stop
+  working at once: whoever opens it then reads that the link does not exist.
+- The dialog says who can share: who owns the resource, the people with its highest level and the
+  administrators of the organization; the others see their level and who to ask.
+
+Whoever opens a link sees the page of the installation with the resource, as the app shows it to
+links; an app that cannot show it there asks to sign in.
 
 ## Activity
 
