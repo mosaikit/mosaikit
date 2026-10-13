@@ -381,13 +381,16 @@ and passwords that must not be written into shared documents nor reach the brows
 administrators of an organization keep them in **Credentials**, in the administration menu, or with
 `/api/v1/organizations/{slug}/secrets` (see the [API](../development/api.md)). Each credential has a
 name, such as `model-provider`, a kind (password, token, key or other), the value, a description, and
-optionally the extension it is meant for: then only that extension may use it.
+optionally the extension it is meant for: then only that extension reads it. The backend of an
+extension reads a credential by name, on the server, in the organization of the request; the
+browser never receives it. Tell the extensions which names to read from their documentation.
 
 A value is encrypted as soon as it arrives and never comes back: lists and details show a hint at
 most, `••••`, followed for a long token or key by its last four characters, never for a password. A
 credential is replaced, with a new value or only a new description, or deleted. Every store,
-replacement and deletion is in the audit log under `secrets.`, without the value; values never
-appear in logs nor in error messages.
+replacement and deletion, and every read by an extension (`secrets.read`, channel `EXTENSION`), is in
+the audit log under `secrets.`, without the value; values never appear in logs nor in error
+messages.
 
 ### The master key
 

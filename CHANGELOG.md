@@ -98,6 +98,14 @@ project follows [Semantic Versioning](https://semver.org/).
   read-only key cannot use `/mcp`, whose calls are all `POST`. New setting
   `mosaikit.accounts.access-key-max-validity` (365 days).
 
+- The `Secrets` bean of `kernel-api` (MK-062, new package `dev.mosaikit.kernel.api.secrets`):
+  an extension backend reads a credential of the organization of the request by name, naming
+  itself, on the server; a credential meant for one extension is read by that extension only. The
+  value comes as a `SecretValue` whose `toString` masks it, usable as characters, bytes or a string,
+  and closed to overwrite it. Every read is audited as `secrets.read` through the channel
+  `EXTENSION`, without the value; `SecretsUnavailableException` answers 503 when the installation
+  has no master key or a credential does not decrypt.
+
 - The kernel keeps the credentials and service keys of extensions, encrypted (MK-062). The
   administrators of an organization store, replace and delete them in the new Credentials page of the
   console, or with `/api/v1/organizations/{slug}/secrets` (audited as `secrets.stored`,
