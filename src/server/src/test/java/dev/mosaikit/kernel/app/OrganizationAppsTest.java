@@ -116,6 +116,7 @@ class OrganizationAppsTest {
         in(member).get("/api/v1/data/{extension}/items", TODO).then().statusCode(200);
     }
 
+    /** The roles of the settings before MK-056: for the administrators only is now restricted. */
     @Test
     void showsAnAppOnlyToTheRolesChosen() {
         in(manager)
@@ -128,6 +129,73 @@ class OrganizationAppsTest {
 
         in(member).get("/api/v1/shell/apps").then().body("appId", contains("board"));
         in(manager).get("/api/v1/shell/apps").then().body("appId", contains("todo", "board"));
+    }
+
+    @Test
+    @Tag("MK-056")
+    void aRestrictedAppShowsOnlyToThePeopleWhoHoldItsPermission() {
+        String permission = TODO + ":use-todo";
+        // Every app has a permission, declared by the kernel for its extension.
+        in(manager)
+                .get("/api/v1/organizations/{slug}/apps", SLUG)
+                .then()
+                .body("find { it.appId == 'todo' }.permission", equalTo(permission))
+                .body("find { it.appId == 'todo' }.restricted", equalTo(false));
+        in(manager)
+                .get("/api/v1/organizations/{slug}/permissions", SLUG)
+                .then()
+                .statusCode(200)
+                .body("find { it.id == '" + permission + "' }.app", equalTo("todo"))
+                .body("find { it.id == '" + permission + "' }.title", equalTo("Use To do"));
+
+        in(manager)
+                .body(List.of(
+                        Map.of(
+                                "extensionId",
+                                TODO,
+                                "appId",
+                                "todo",
+                                "enabled",
+                                true,
+                                "pinned",
+                                false,
+                                "restricted",
+                                true),
+                        app(BOARD, "board", true, false, List.of())))
+                .put("/api/v1/organizations/{slug}/apps", SLUG)
+                .then()
+                .statusCode(200)
+                .body("find { it.appId == 'todo' }.restricted", equalTo(true))
+                .body("find { it.appId == 'todo' }.roles", contains("organization-admin"));
+        // The administrators hold every permission; the member holds it once granted.
+        in(member).get("/api/v1/shell/apps").then().body("appId", contains("board"));
+        in(manager).get("/api/v1/shell/apps").then().body("appId", contains("todo", "board"));
+        in(manager)
+                .put(
+                        "/api/v1/organizations/{slug}/permissions/members/{email}/exceptions/{permission}",
+                        SLUG,
+                        member,
+                        permission)
+                .then()
+                .statusCode(200);
+        in(member).get("/api/v1/shell/apps").then().body("appId", contains("todo", "board"));
+        in(member).get("/api/v1/shell/permissions").then().body("$", contains(permission));
+
+        // Shown to everyone again: the permission no longer matters.
+        in(manager)
+                .delete(
+                        "/api/v1/organizations/{slug}/permissions/members/{email}/exceptions/{permission}",
+                        SLUG,
+                        member,
+                        permission)
+                .then()
+                .statusCode(200);
+        in(manager)
+                .body(List.of(app(TODO, "todo", true, false, List.of()), app(BOARD, "board", true, false, List.of())))
+                .put("/api/v1/organizations/{slug}/apps", SLUG)
+                .then()
+                .statusCode(200);
+        in(member).get("/api/v1/shell/apps").then().body("appId", contains("todo", "board"));
     }
 
     @Test
