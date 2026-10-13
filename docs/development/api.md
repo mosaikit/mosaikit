@@ -130,6 +130,11 @@ curl -H "Authorization: Bearer $KEY" https://mosaikit.example.org/api/v1/access-
 | `POST /api/v1/extensions/packages` | `platform-admin` | install an uploaded package (`application/zip`); 202, active at once or at the next start (`restartRequired`) |
 | `GET, POST /api/v1/data/{extension}/{collection}` | signed in, with an organization | the documents of a collection declared by an active extension, newest first (`offset`, `limit`); add one (MK-046); with `team`, those shared with that team of the person only (MK-032) |
 | `GET, PUT, DELETE /api/v1/data/{extension}/{collection}/{id}` | signed in, with an organization | one document; `PUT` with `If-Match: <version>` answers 409 if it changed since |
+| `GET /api/v1/files/{extension}` | signed in, with an organization | the files of an active extension that the person reads, newest first: of the organization and of their teams, or with `team` of that team of theirs only (`offset`, `limit`) (MK-041) |
+| `POST /api/v1/files/{extension}?name=` | signed in, with an organization | store a file: the body is the content, streamed, `Content-Type` its media type, `name` its name or a path such as `tiles/3/4/2.png`; with `team`, shared with that team of the person only; with `resource=<type>/<id>`, attached to a registered resource of the extension (MK-054); 201 with its metadata, 413 beyond `mosaikit.files.max-size` (audited) |
+| `GET /api/v1/files/{extension}/{id}` | signed in, with an organization: its people for a file of the organization, the people of its team for a file of a team | its metadata: `name`, `contentType`, `size`, `checksum` (SHA-256), `owner`, `team`, `resource`, `createdAt`, `updatedAt` |
+| `GET /api/v1/files/{extension}/{id}/content` | signed in, with an organization: its people for a file of the organization, the people of its team for a file of a team | its content, streamed: one `Range` of bytes (206, or 416), `If-Range`, `If-None-Match` and `If-Modified-Since` (304); `ETag` is the checksum. Shown inline only for types a browser does not run, otherwise as an attachment, always with `nosniff` and a sandbox policy |
+| `DELETE /api/v1/files/{extension}/{id}` | its owner, an owner of its team, the administrators of the organization | delete a file (audited) |
 | `GET, PUT /api/v1/platform/settings` | `platform-admin` | the settings of the platform: `{"registration": true}` turns self-registration on or off (audited) |
 | `GET /api/v1/platform/secrets/keys` | `platform-admin` | the master keys of the store of credentials: `enabled`, `problem` when disabled, `currentKey` and `previousKeys` (identifiers, never keys), and `credentials`, how many each key holds in every organization (MK-062) |
 | `POST /api/v1/platform/secrets/re-encryption` | `platform-admin` | after a rotation, encrypt the data key of every credential under the current master key, without decrypting the values: `{"reEncrypted", "unreadable", "currentKey"}` (audited) |
@@ -195,7 +200,8 @@ internal messages:
 | `401`, `403` | not signed in, or not allowed |
 | `404` | not found, or an API of an extension that is not active |
 | `409` | conflict, for example a slug, an email domain or a realm already in use |
-| `503` | a service the request needs (Keycloak) cannot be reached |
+| `413` | the content is too large, such as a file over `mosaikit.files.max-size` |
+| `503` | a service the request needs (Keycloak, the store of files) cannot be reached |
 
 ## Versioning
 

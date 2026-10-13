@@ -40,6 +40,27 @@ extensions:
   # keys of the image, config/trusted-keys, which include the key that signed its sample extensions.
   trustedKeysConfigMap: ""
 
+files:
+  # Where the kernel keeps the files of extensions (MK-041): "filesystem", a volume mounted at
+  # /var/lib/mosaikit/files, or "s3", a bucket of an S3-compatible object store.
+  store: filesystem
+  # Largest file; the HTTP limit of the kernel is raised to the same size.
+  maxSize: 10M
+  persistence:
+    # With more than one replica the volume must be shared (ReadWriteMany), or use s3.
+    size: 10Gi
+    storageClass: ""
+    accessMode: ReadWriteOnce
+  s3:
+    # Empty for Amazon S3, whose URL follows from the region.
+    endpoint: ""
+    region: us-east-1
+    bucket: ""
+    pathStyle: false
+    # Secret with keys access-key-id and secret-access-key. Empty: the credentials of the pod, such
+    # as the role of its service account.
+    existingSecret: ""
+
 resources:
   requests:
     cpu: 250m

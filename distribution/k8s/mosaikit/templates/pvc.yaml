@@ -14,3 +14,20 @@ spec:
     requests:
       storage: {{ .Values.extensions.persistence.size }}
 {{- end }}
+{{- if eq .Values.files.store "filesystem" }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "mosaikit.fullname" . }}-files
+  labels:
+    {{- include "mosaikit.labels" . | nindent 4 }}
+spec:
+  accessModes: [{{ .Values.files.persistence.accessMode }}]
+  {{- with .Values.files.persistence.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.files.persistence.size }}
+{{- end }}

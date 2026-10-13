@@ -23,4 +23,17 @@ COPY --chown=185 my-extension-1.0.0.zip /opt/mosaikit/extensions/
 RUN /opt/mosaikit/mosaikit build
 ```
 
+The files of extensions (MK-041) go to a volume claimed by the chart (`files.persistence`), or with
+`files.store=s3` to a bucket of an S3-compatible store (`files.s3.*`, with the access key in the
+secret `files.s3.existingSecret`, keys `access-key-id` and `secret-access-key`):
+
+```bash
+kubectl create secret generic mosaikit-files \
+  --from-literal=access-key-id=mosaikit --from-literal=secret-access-key='<secret>'
+helm upgrade mosaikit ./mosaikit --reuse-values \
+  --set files.store=s3 --set files.s3.endpoint=https://s3.example.org \
+  --set files.s3.bucket=mosaikit-files --set files.s3.pathStyle=true \
+  --set files.s3.existingSecret=mosaikit-files
+```
+
 Every value is described in `mosaikit/values.yaml`.

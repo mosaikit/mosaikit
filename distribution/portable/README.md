@@ -21,7 +21,7 @@ starts with the previous extensions.
 |---|---|
 | `mosaikit`, `mosaikit.cmd` | the launcher |
 | `config/` | settings |
-| `data/` | the database and the generated passwords, created at the first start |
+| `data/` | the database, the files of extensions (`data/files/`) and the generated passwords, created at the first start |
 | `extensions/` | installed extensions |
 | `bin/` | the kernel, the Java runtime, PostgreSQL and their licenses |
 

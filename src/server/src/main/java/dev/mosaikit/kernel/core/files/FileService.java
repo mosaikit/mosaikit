@@ -1,0 +1,513 @@
+// SPDX-FileCopyrightText: 2026 Massimo Antonini
+// SPDX-License-Identifier: MPL-2.0
+package dev.mosaikit.kernel.core.files;
+
+import dev.mosaikit.kernel.api.resource.ResourceRef;
+import dev.mosaikit.kernel.core.audit.AuditEvent;
+import dev.mosaikit.kernel.core.audit.AuditLog;
+import dev.mosaikit.kernel.core.config.KernelConfig;
+import dev.mosaikit.kernel.core.error.ContentTooLargeException;
+import dev.mosaikit.kernel.core.error.DomainException;
+import dev.mosaikit.kernel.core.error.ForbiddenOperationException;
+import dev.mosaikit.kernel.core.error.InvalidInputException;
+import dev.mosaikit.kernel.core.error.ResourceNotFoundException;
+import dev.mosaikit.kernel.core.error.ServiceUnavailableException;
+import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
+import dev.mosaikit.kernel.core.identity.RequestOrganization;
+import dev.mosaikit.kernel.core.resources.RegisteredResource;
+import dev.mosaikit.kernel.core.resources.RegisteredResources;
+import dev.mosaikit.kernel.core.teams.TeamMember;
+import dev.mosaikit.kernel.core.teams.TeamRepository;
+import io.quarkus.narayana.jta.QuarkusTransaction;
+import io.quarkus.narayana.jta.TransactionExceptionResult;
+import io.quarkus.security.identity.SecurityIdentity;
+import jakarta.data.Limit;
+import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.transaction.Status;
+import jakarta.transaction.Synchronization;
+import jakarta.transaction.TransactionSynchronizationRegistry;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.DigestOutputStream;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
+import java.util.OptionalLong;
+import java.util.UUID;
+import java.util.concurrent.Callable;
+import java.util.function.IntConsumer;
+import java.util.regex.Pattern;
+import org.jboss.logging.Logger;
+
+/**
+ * The file service of the kernel (MK-041, ADR-0029): extensions store and read files through it,
+ * never through the store, whose credentials only the kernel holds. Every call acts on the
+ * organization of the request, and a person reads a file only when it is of their organization and
+ * either not of a team, or of a team they are in (MK-032): a guest reads only the files of their
+ * teams. A file that the person may not read does not exist for them: an identifier of another
+ * organization, or of a team they are not in, answers not found. The REST API and the Java API apply
+ * the same checks, here.
+ *
+ * <p>An upload is first written to a temporary file of the server, which gives its size and its
+ * checksum without holding it in memory and refuses it beyond {@code mosaikit.files.max-size}; only
+ * then is it put in the store, and recorded. Reads are streamed from the store, by range.
+ */
+@ApplicationScoped
+public class FileService {
+
+    private static final Logger LOG = Logger.getLogger(FileService.class);
+
+    /** Longest name of a file. */
+    static final int MAX_NAME = 255;
+
+    /** Longest media type. */
+    static final int MAX_TYPE = 255;
+
+    /** Most files of one page of a list. */
+    static final int MAX_PAGE = 500;
+
+    static final String DEFAULT_TYPE = "application/octet-stream";
+
+    private static final Pattern MEDIA_TYPE =
+            Pattern.compile("^[a-zA-Z0-9][\\w!#$&^.+-]{0,126}/[a-zA-Z0-9][\\w!#$&^.+-]{0,126}(\\s*;.*)?$");
+
+    /** What a caller says of a file it stores. */
+    public record Upload(String name, String contentType, UUID team, ResourceRef resource) {}
+
+    /** A file that the person may read, with its content to open. */
+    public final class Content {
+
+        private final FileView file;
+        private final String key;
+
+        Content(StoredFile stored) {
+            this.file = FileView.of(stored);
+            this.key = stored.getStorageKey();
+        }
+
+        public FileView file() {
+            return file;
+        }
+
+        /**
+         * Opens a part of the content, streamed from the store: the caller closes the stream.
+         *
+         * @throws ServiceUnavailableException when the store cannot give it
+         */
+        public InputStream open(ByteRange range) {
+            if (range.last() >= file.size()) {
+                throw new IllegalArgumentException("The file " + file.id() + " has " + file.size() + " bytes.");
+            }
+            try {
+                return store.read(key, range.first(), range.length());
+            } catch (IOException e) {
+                LOG.errorf("Cannot read the file %s from %s: %s", file.id(), store.describe(), e.getMessage());
+                throw new ServiceUnavailableException("The content of the file " + file.id() + " cannot be read now.");
+            }
+        }
+    }
+
+    private final StoredFiles files;
+    private final FileStore store;
+    private final ExtensionRegistry extensions;
+    private final RequestOrganization organization;
+    private final TeamRepository teamMembers;
+    private final RegisteredResources resources;
+    private final SecurityIdentity identity;
+    private final AuditLog audit;
+    private final TransactionSynchronizationRegistry transactions;
+    private final long maxSize;
+    private final Clock clock = Clock.systemUTC();
+
+    @SuppressWarnings("java:S107") // the beans it needs
+    public FileService(
+            StoredFiles files,
+            FileStore store,
+            ExtensionRegistry extensions,
+            RequestOrganization organization,
+            TeamRepository teamMembers,
+            RegisteredResources resources,
+            SecurityIdentity identity,
+            AuditLog audit,
+            TransactionSynchronizationRegistry transactions,
+            KernelConfig config) {
+        this.files = files;
+        this.store = store;
+        this.extensions = extensions;
+        this.organization = organization;
+        this.teamMembers = teamMembers;
+        this.resources = resources;
+        this.identity = identity;
+        this.audit = audit;
+        this.transactions = transactions;
+        this.maxSize = config.files().maxSize().asLongValue();
+    }
+
+    /** The largest file, in bytes ({@code mosaikit.files.max-size}). */
+    public long maxSize() {
+        return maxSize;
+    }
+
+    /**
+     * Stores a file of an extension in the organization of the request, owned by the person of the
+     * request: for the whole organization, or shared with a team of the person.
+     *
+     * @param content the content, read to its end and not closed
+     * @param declaredSize the size announced by the caller, such as {@code Content-Length}, to refuse
+     *     a file too large before reading it
+     */
+    public FileView store(String extension, Upload upload, InputStream content, OptionalLong declaredSize) {
+        String name = name(upload.name());
+        String type = contentType(upload.contentType());
+        if (declaredSize.isPresent() && declaredSize.getAsLong() > maxSize) {
+            throw tooLarge();
+        }
+        UUID resource = transaction(() -> permitted(extension, upload));
+        Spooled spooled = spool(content);
+        UUID org = organization.require();
+        UUID id = UUID.randomUUID();
+        String key = FileStore.key(org, extension, id);
+        try {
+            store.put(key, spooled.path(), spooled.size(), type);
+        } catch (IOException e) {
+            LOG.errorf("Cannot store a file in %s: %s", store.describe(), e.getMessage());
+            throw new ServiceUnavailableException("The file cannot be stored now.");
+        } finally {
+            spooled.discard();
+        }
+        try {
+            return transaction(() -> {
+                deleteUnlessCommitted(key);
+                permitted(extension, upload);
+                StoredFile file = new StoredFile(
+                        id,
+                        org,
+                        extension,
+                        account().orElse(null),
+                        upload.team(),
+                        name,
+                        type,
+                        spooled.size(),
+                        spooled.checksum(),
+                        resource,
+                        Instant.now(clock).truncatedTo(ChronoUnit.MICROS));
+                files.insert(file);
+                audited("file.stored", file);
+                return FileView.of(file);
+            });
+        } catch (RuntimeException e) {
+            deleteQuietly(key);
+            throw e;
+        }
+    }
+
+    /**
+     * A file of an extension that the person may read.
+     *
+     * @throws ResourceNotFoundException when there is no such file, or the person may not read it
+     */
+    public FileView metadata(String extension, UUID id) {
+        return transaction(() -> FileView.of(readable(extension, id)));
+    }
+
+    /** A file of an extension that the person may read, with its content to open. */
+    public Content content(String extension, UUID id) {
+        return transaction(() -> new Content(readable(extension, id)));
+    }
+
+    /**
+     * The files of an extension that the person reads, newest first: of the organization and of
+     * their teams, or of one team of theirs.
+     */
+    public List<FileView> list(String extension, UUID team, int offset, int limit) {
+        return transaction(() -> {
+            UUID org = organization.require();
+            active(extension);
+            int size = Math.clamp(limit, 1, MAX_PAGE);
+            int start = Math.max(offset, 0);
+            Limit page = Limit.range(start + 1L, start + (long) size);
+            List<StoredFile> found;
+            if (team != null) {
+                requireIn(team);
+                found = files.listOfTeam(org, extension, team, page);
+            } else {
+                Optional<UUID> account = account();
+                found = account.isPresent()
+                        ? files.listReadable(org, extension, organization.guest(), account.get(), page)
+                        : files.listOfOrganization(org, extension, page);
+            }
+            return found.stream().map(FileView::of).toList();
+        });
+    }
+
+    /**
+     * Deletes a file: its owner, an owner of its team or an administrator of the organization may;
+     * so may the code of an extension that acts without a person. The content leaves the store when
+     * the transaction commits.
+     */
+    public void delete(String extension, UUID id) {
+        transaction(() -> {
+            StoredFile file = readable(extension, id);
+            if (!mayDelete(file)) {
+                throw new ForbiddenOperationException("Only the owner of the file " + id
+                        + ", an owner of its team or an administrator of the organization delete it.");
+            }
+            files.delete(file);
+            String key = file.getStorageKey();
+            transactions.registerInterposedSynchronization(new AfterCompletion(status -> {
+                if (status == Status.STATUS_COMMITTED) {
+                    deleteQuietly(key);
+                }
+            }));
+            audited("file.deleted", file);
+            return null;
+        });
+    }
+
+    private StoredFile readable(String extension, UUID id) {
+        UUID org = organization.require();
+        active(extension);
+        return files.findById(id)
+                .filter(file -> file.getOrganizationId().equals(org)
+                        && file.getExtensionId().equals(extension)
+                        && readable(file))
+                .orElseThrow(() -> new ResourceNotFoundException("No file " + id + "."));
+    }
+
+    /** As the row-level security decides too: as the documents of extensions (MK-032). */
+    private boolean readable(StoredFile file) {
+        if (file.getTeamId() == null) {
+            return !organization.guest();
+        }
+        return account()
+                .flatMap(account -> teamMembers.member(file.getTeamId(), account))
+                .isPresent();
+    }
+
+    /**
+     * Refuses a team that the person is not in, as if it did not exist. Read here rather than with
+     * the team service, whose refusal would roll back the transaction of the caller.
+     */
+    private void requireIn(UUID team) {
+        UUID org = organization.require();
+        boolean in = teamMembers
+                        .findById(team)
+                        .filter(found -> found.getOrganizationId().equals(org))
+                        .isPresent()
+                && account()
+                        .flatMap(account -> teamMembers.member(team, account))
+                        .isPresent();
+        if (!in) {
+            throw new ResourceNotFoundException("You are not in the team " + team + ".");
+        }
+    }
+
+    private boolean mayDelete(StoredFile file) {
+        Optional<UUID> account = account();
+        if (account.isEmpty() || RequestOrganization.administrator(identity)) {
+            return true;
+        }
+        if (account.get().equals(file.getOwnerId())) {
+            return true;
+        }
+        return file.getTeamId() != null
+                && teamMembers
+                        .member(file.getTeamId(), account.get())
+                        .filter(member -> TeamMember.OWNER.equals(member.getRole()))
+                        .isPresent();
+    }
+
+    /** Checks that the person may store the file; the id of its registered resource, if any. */
+    private UUID permitted(String extension, Upload upload) {
+        UUID org = organization.require();
+        active(extension);
+        if (upload.team() != null) {
+            requireIn(upload.team());
+        } else if (organization.guest()) {
+            throw new ForbiddenOperationException("A guest stores files only for their teams.");
+        }
+        ResourceRef ref = upload.resource();
+        if (ref == null) {
+            return null;
+        }
+        if (!ref.extension().equals(extension)) {
+            throw new InvalidInputException(List.of("resource must be a resource of " + extension));
+        }
+        return resources
+                .find(org, ref.extension(), ref.type(), ref.id())
+                .map(RegisteredResource::getId)
+                .orElseThrow(() -> new InvalidInputException(List.of("resource " + ref + " is not registered")));
+    }
+
+    /** Only an active extension has files; the files of another one do not exist. */
+    private void active(String extension) {
+        if (extension == null || extensions.findActive(extension).isEmpty()) {
+            throw new ResourceNotFoundException("No active extension " + extension + ".");
+        }
+    }
+
+    private Optional<UUID> account() {
+        return RequestOrganization.account(identity);
+    }
+
+    /**
+     * A name of a file: a few words, or a path such as {@code tiles/3/4/2.png} whose segments are
+     * neither empty, nor {@code .} or {@code ..}.
+     */
+    static String name(String value) {
+        String name = value == null ? "" : value.strip();
+        if (name.isEmpty() || name.length() > MAX_NAME) {
+            throw new InvalidInputException(List.of("name must have 1 to " + MAX_NAME + " characters"));
+        }
+        if (name.chars().anyMatch(c -> Character.isISOControl(c) || c == '\\')) {
+            throw new InvalidInputException(List.of("name must not contain control characters nor backslashes"));
+        }
+        for (String segment : name.split("/", -1)) {
+            if (segment.isEmpty() || segment.equals(".") || segment.equals("..")) {
+                throw new InvalidInputException(
+                        List.of("name must not start or end with /, nor contain //, /./ or /../"));
+            }
+        }
+        return name;
+    }
+
+    /** A media type such as {@code image/png}; {@code application/octet-stream} when absent. */
+    static String contentType(String value) {
+        if (value == null || value.isBlank()) {
+            return DEFAULT_TYPE;
+        }
+        String type = value.strip();
+        if (type.length() > MAX_TYPE || !MEDIA_TYPE.matcher(type).matches()) {
+            throw new InvalidInputException(List.of("the content type must be a media type such as image/png"));
+        }
+        int parameters = type.indexOf(';');
+        return parameters < 0
+                ? type.toLowerCase(Locale.ROOT)
+                : type.substring(0, parameters).strip().toLowerCase(Locale.ROOT) + type.substring(parameters);
+    }
+
+    /** A content written to a temporary file, with its size and checksum. */
+    record Spooled(Path path, long size, String checksum) {
+
+        void discard() {
+            try {
+                Files.deleteIfExists(path);
+            } catch (IOException e) {
+                LOG.warnf("Cannot delete the temporary file %s: %s", path, e.getMessage());
+            }
+        }
+    }
+
+    private Spooled spool(InputStream content) {
+        Path path;
+        try {
+            path = Files.createTempFile("mosaikit-file-", ".upload");
+        } catch (IOException e) {
+            throw new IllegalStateException("Cannot create a temporary file for an upload", e);
+        }
+        MessageDigest digest = sha256();
+        long size = 0;
+        try (OutputStream out = new DigestOutputStream(Files.newOutputStream(path), digest)) {
+            byte[] buffer = new byte[64 * 1024];
+            int read;
+            while ((read = content.read(buffer)) >= 0) {
+                size += read;
+                if (size > maxSize) {
+                    throw tooLarge();
+                }
+                out.write(buffer, 0, read);
+            }
+        } catch (IOException | RuntimeException e) {
+            new Spooled(path, size, "").discard();
+            if (e instanceof RuntimeException runtime) {
+                throw runtime;
+            }
+            throw new InvalidInputException(List.of("the content could not be read to its end"));
+        }
+        return new Spooled(path, size, HexFormat.of().formatHex(digest.digest()));
+    }
+
+    private ContentTooLargeException tooLarge() {
+        return new ContentTooLargeException("A file has at most " + maxSize + " bytes (mosaikit.files.max-size).");
+    }
+
+    private static MessageDigest sha256() {
+        try {
+            return MessageDigest.getInstance("SHA-256");
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is not available", e);
+        }
+    }
+
+    private void deleteUnlessCommitted(String key) {
+        transactions.registerInterposedSynchronization(new AfterCompletion(status -> {
+            if (status != Status.STATUS_COMMITTED) {
+                deleteQuietly(key);
+            }
+        }));
+    }
+
+    private void deleteQuietly(String key) {
+        try {
+            store.delete(key);
+        } catch (IOException | RuntimeException e) {
+            LOG.warnf("Cannot delete %s from %s, which keeps it: %s", key, store.describe(), e.getMessage());
+        }
+    }
+
+    private void audited(String action, StoredFile file) {
+        Map<String, String> detail = new LinkedHashMap<>();
+        detail.put("extension", file.getExtensionId());
+        detail.put("name", file.getName());
+        detail.put("size", String.valueOf(file.getSize()));
+        if (file.getTeamId() != null) {
+            detail.put("team", file.getTeamId().toString());
+        }
+        audit.append(
+                identity.isAnonymous()
+                        ? file.getExtensionId()
+                        : identity.getPrincipal().getName(),
+                Optional.of(file.getOrganizationId()),
+                action,
+                file.getId().toString(),
+                AuditEvent.Outcome.SUCCEEDED,
+                detail);
+    }
+
+    /**
+     * In the transaction of the caller, or in one of its own. A refusal, which happens before any
+     * write, leaves the transaction of the caller as it was.
+     */
+    private static <T> T transaction(Callable<T> work) {
+        return QuarkusTransaction.joiningExisting()
+                .exceptionHandler(e -> e instanceof DomainException
+                        ? TransactionExceptionResult.COMMIT
+                        : TransactionExceptionResult.ROLLBACK)
+                .call(work);
+    }
+
+    /** Runs after the transaction ends, with its status. */
+    private record AfterCompletion(IntConsumer then) implements Synchronization {
+
+        @Override
+        public void beforeCompletion() {
+            // Nothing before.
+        }
+
+        @Override
+        public void afterCompletion(int status) {
+            then.accept(status);
+        }
+    }
+}

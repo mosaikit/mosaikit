@@ -34,5 +34,6 @@ previous extensions.
 | `mosaikit`, `mosaikit.cmd` | the launcher |
 | `config/` | settings; every setting can also be an environment variable (`QUARKUS_*`, `MOSAIKIT_*`) |
 | `extensions/` | installed extensions |
+| `files/` | the files of extensions, created when the first is stored (`mosaikit.files.directory`); back it up with the database |
 | `catalog/` | signed catalog of the sample extensions, offered on the Extensions page (`mosaikit.marketplace.sources`) |
 | `bin/kernel/` | the kernel, with the web interface |

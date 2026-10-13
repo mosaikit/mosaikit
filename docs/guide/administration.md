@@ -383,6 +383,51 @@ kernels of an installation need the same keys.
    identifier derived from the key. When the old key holds none, remove it from `previous-keys` and
    restart.
 
+## Files of extensions
+
+Extensions keep files through the kernel (MK-041): the content goes to the store of the
+installation, under `<organization id>/<extension id>/<file id>`, and the database keeps the name,
+type, size, SHA-256 checksum, owner and team of each file. Extensions never see the credentials of
+the store. A person reads a file of their organization, or of a team they are in; a guest only the
+files of their teams. A file that a person may not read answers "not found", even with its
+identifier. Every file stored or deleted is in the audit log, as `file.stored` and `file.deleted`.
+
+Choose the store with `mosaikit.files.store` (see [configuration](configuration.md#files)):
+
+- **`filesystem`** (the default): a directory of the server, `files/` in the installation directory
+  unless `mosaikit.files.directory` says otherwise. Right for the portable distribution and for an
+  installation on one server. Back it up with the database: a copy of one without the other gives
+  files without metadata, or metadata without files. On Kubernetes the root filesystem of the kernel
+  is read-only: the chart mounts a volume (`files.persistence`), which with more than one replica
+  must be shared (`ReadWriteMany`), or use `s3`.
+- **`s3`**: a bucket of an S3-compatible object store, such as Amazon S3, MinIO, Ceph or Garage; the
+  choice for a cluster and for large volumes. Create the bucket first, keep it private (the kernel
+  serves every download itself), and give the kernel an access key allowed to read, write and
+  delete objects in it, from a secret:
+
+  ```properties
+  mosaikit.files.store=s3
+  mosaikit.files.s3.endpoint=https://s3.example.org
+  mosaikit.files.s3.bucket=mosaikit-files
+  mosaikit.files.s3.path-style=true
+  mosaikit.files.s3.access-key-id=mosaikit
+  # from a secret: MOSAIKIT_FILES_S3_SECRET_ACCESS_KEY
+  ```
+
+  Without `endpoint`, the kernel talks to Amazon S3 in `mosaikit.files.s3.region`; without the
+  access key, it uses the credentials of its environment (variables, profile, role of the machine
+  or of the pod). At start the kernel logs where files are kept and warns when the bucket cannot be
+  reached; it never logs the secret.
+
+Files larger than `mosaikit.files.max-size` (10 MB unless set) are refused; to accept larger ones
+through the REST API, raise `quarkus.http.limits.max-body-size` too. An upload is first written to
+the temporary directory of the server, so it needs room for the largest file. Changing the store
+does not move the files already stored: copy the objects to the new store, keeping their keys.
+
+A file of a team goes with the team, and the files of an organization with the organization; their
+content stays in the store, and is not yet removed with them.
+
+## Assistants and MCP clients
 
 Extensions may declare actions that assistants use as tools (see
 [extension development](../development/extension-development.md#actions-for-assistants)). An MCP client

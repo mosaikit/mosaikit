@@ -18,6 +18,19 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Files of extensions (MK-041): the kernel keeps them in a directory of the server (the default,
+  `files/` of the installation, `data/files/` of the portable, a volume in compose and Helm) or in a
+  bucket of an S3-compatible object store such as Amazon S3, MinIO, Ceph or Garage
+  (`mosaikit.files.store`, `mosaikit.files.s3.*`, credentials never logged), under
+  `<organization>/<extension>/<id>`, and their name, type, size, SHA-256 and owner in the new table
+  `stored_file` under row-level security (migration V24). `GET, POST /api/v1/files/{extension}`,
+  `GET, DELETE /api/v1/files/{extension}/{id}` and `GET /api/v1/files/{extension}/{id}/content`
+  store, list, describe, delete and stream them, with `Range`, `If-Range`, `ETag`, `If-None-Match`
+  and `If-Modified-Since`. A file is of the organization or of a team: a person reads it only in
+  their organization and, for a file of a team, in the team, so a guest reads only the files of
+  their teams; any other identifier answers 404. Files over `mosaikit.files.max-size` (10 MB) are
+  refused with 413; storing and deleting are audited.
+
 - Read-only views of people, organizations, memberships and teams for external services (MK-123),
   such as a map server that reads the roles of people from the database: `account`,
   `organization`, `membership`, `team` and `team_member` in the new schema `mk_published`
