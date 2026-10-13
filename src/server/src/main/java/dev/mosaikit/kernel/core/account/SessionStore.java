@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.core.account;
 
+import dev.mosaikit.kernel.core.data.KernelWrites;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.context.control.ActivateRequestContext;
 import jakarta.transaction.Transactional;
@@ -15,6 +16,7 @@ import java.util.UUID;
  * during authentication, outside of any request. Ending sessions commits at once, in a transaction of
  * its own, so that no request reads them as live once the registry forgot them.
  */
+@KernelWrites
 @ApplicationScoped
 @Transactional
 @ActivateRequestContext

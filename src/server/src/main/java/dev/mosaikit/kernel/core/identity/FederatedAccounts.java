@@ -4,6 +4,7 @@ package dev.mosaikit.kernel.core.identity;
 
 import dev.mosaikit.kernel.core.account.UserAccount;
 import dev.mosaikit.kernel.core.account.UserAccounts;
+import dev.mosaikit.kernel.core.data.KernelWrites;
 import dev.mosaikit.kernel.core.organization.OrganizationMember;
 import dev.mosaikit.kernel.core.organization.OrganizationMembers;
 import io.quarkus.security.AuthenticationFailedException;
@@ -25,6 +26,7 @@ import org.jboss.logging.Logger;
  * membership that a manager created for it in this organization, and only if the realm verified
  * the address: a realm can never take over an account that does not belong to its organization.
  */
+@KernelWrites
 @ApplicationScoped
 public class FederatedAccounts {
 

@@ -63,6 +63,10 @@ public class SharingLevels {
     public void refresh(Collection<InstalledExtension> active) {
         try (Connection connection = dataSource.getConnection()) {
             try (Statement statement = connection.createStatement()) {
+                // The levels decide who reads what (mk_kernel.allows()): the member role of requests
+                // may only read them, so the kernel writes them as the owner, also when an extension
+                // is installed during a request.
+                statement.execute("select set_config('role', 'none', true)");
                 statement.executeUpdate("delete from mk_kernel.sharing_level");
             }
             try (PreparedStatement insert = connection.prepareStatement(

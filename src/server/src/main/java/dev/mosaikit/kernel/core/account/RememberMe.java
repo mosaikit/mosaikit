@@ -3,6 +3,7 @@
 package dev.mosaikit.kernel.core.account;
 
 import dev.mosaikit.kernel.core.config.KernelConfig;
+import dev.mosaikit.kernel.core.data.KernelWrites;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
@@ -25,6 +26,7 @@ import java.util.UUID;
  * SHA-256 digest. Signing out deletes it. A token belongs to the session it was asked in (MK-125):
  * ending that session revokes it, and when the session ends by itself, the token opens a new one.
  */
+@KernelWrites
 @ApplicationScoped
 @Transactional
 public class RememberMe {

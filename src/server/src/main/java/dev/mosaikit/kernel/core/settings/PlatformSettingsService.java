@@ -2,12 +2,14 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.core.settings;
 
+import dev.mosaikit.kernel.core.data.KernelWrites;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 import java.time.Clock;
 import java.time.Instant;
 
 /** Reads and changes the settings of the platform, with their defaults. */
+@KernelWrites
 @ApplicationScoped
 @Transactional
 public class PlatformSettingsService {
