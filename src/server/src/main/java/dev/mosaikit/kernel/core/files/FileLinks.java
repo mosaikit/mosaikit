@@ -37,7 +37,10 @@ import org.jboss.logging.Logger;
  * <p>A link is stateless: it carries the organization, the extension, the file or the prefix (with
  * its team), and its expiry, signed with HMAC-SHA256 by a key of {@link LinkKeys}. An expired, altered
  * or unknown link, a file that no longer exists or is outside the link, and an extension no longer
- * active all answer the same not found, so that a link never tells whether a file exists. Making a
+ * active all answer the same not found, so that a link never tells whether a file exists. A link made
+ * by a person carries their account and serves only what they still read (MK-055): a file attached to
+ * a resource while they hold a level on it, and nothing once they left the organization; the same not
+ * found otherwise. Making a
  * link is audited; its use at most once an hour for each link and each node, as access keys are
  * (MK-060), so that a viewer that fetches many tiles does not fill the audit log.
  */
@@ -59,6 +62,7 @@ public class FileLinks {
             + " checksum, storage_key, resource_id, created_at, updated_at from ";
     private static final String BY_ID = COLUMNS + "mk_kernel.signed_file(?, ?, ?)";
     private static final String BY_NAME = COLUMNS + "mk_kernel.signed_file_named(?, ?, ?, ?)";
+    private static final String CREATOR_READS = "select mk_kernel.signed_link_reads(?, ?, ?)";
 
     /** A link made: what it grants, its signature, and its path with its query. */
     public record Made(FileLink link, String signature) {
@@ -130,7 +134,7 @@ public class FileLinks {
     public Made toFile(String extension, UUID id, Instant expires) {
         Instant until = expiry(expires);
         FileView file = files.metadata(extension, id);
-        Made made = sign(new FileLink(organization.require(), extension, file.id(), null, null, until));
+        Made made = sign(new FileLink(organization.require(), extension, file.id(), null, null, until, creator()));
         created(made, Map.of("file", file.id().toString(), "name", file.name()));
         return made;
     }
@@ -146,7 +150,7 @@ public class FileLinks {
         Instant until = expiry(expires);
         String start = FileService.prefix(prefix);
         files.permitsPrefix(extension, team);
-        Made made = sign(new FileLink(organization.require(), extension, null, start, team, until));
+        Made made = sign(new FileLink(organization.require(), extension, null, start, team, until, creator()));
         Map<String, String> detail = new LinkedHashMap<>();
         detail.put("prefix", start);
         if (team != null) {
@@ -161,8 +165,10 @@ public class FileLinks {
      *
      * @throws ResourceNotFoundException when the link is not valid, or the file is not there
      */
-    public FileService.Content open(UUID org, String extension, UUID id, String expires, String signature) {
-        FileLink link = verified(() -> new FileLink(org, extension, id, null, null, instant(expires)), signature);
+    public FileService.Content open(
+            UUID org, String extension, UUID id, UUID creator, String expires, String signature) {
+        FileLink link =
+                verified(() -> new FileLink(org, extension, id, null, null, instant(expires), creator), signature);
         Found found = lookup(BY_ID, statement -> {
                     statement.setObject(1, org);
                     statement.setString(2, extension);
@@ -178,9 +184,16 @@ public class FileLinks {
      * @throws ResourceNotFoundException when the link is not valid, or no file of that name is under it
      */
     public FileService.Content openNamed(
-            UUID org, String extension, String prefix, UUID team, String name, String expires, String signature) {
+            UUID org,
+            String extension,
+            String prefix,
+            UUID team,
+            UUID creator,
+            String name,
+            String expires,
+            String signature) {
         FileLink link = verified(
-                () -> new FileLink(org, extension, null, prefix == null ? "" : prefix, team, instant(expires)),
+                () -> new FileLink(org, extension, null, prefix == null ? "" : prefix, team, instant(expires), creator),
                 signature);
         if (name == null || !name.startsWith(link.prefix())) {
             throw refused();
@@ -265,7 +278,37 @@ public class FileLinks {
         return new ResourceNotFoundException("No such file, or the link is not valid.");
     }
 
+    /** The account of the person who makes a link, or {@code null} for the code of an extension or the kernel. */
+    private UUID creator() {
+        return RequestOrganization.account(identity).orElse(null);
+    }
+
+    /**
+     * Whether the person who made a link still reads a file of it: a member of the organization, who
+     * holds a level on its resource, if any ({@code mk_kernel.signed_link_reads}). A link without a
+     * creator covers its whole scope.
+     */
+    private boolean creatorReads(FileLink link, FileView file) {
+        if (link.creator() == null) {
+            return true;
+        }
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(CREATOR_READS)) {
+            statement.setObject(1, link.organization());
+            statement.setObject(2, link.creator());
+            statement.setObject(3, file.resource());
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next() && result.getBoolean(1);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Cannot check the creator of a link", e);
+        }
+    }
+
     private FileService.Content used(FileLink link, String signature, Found found) {
+        if (!creatorReads(link, found.file())) {
+            throw refused();
+        }
         String id = FileLink.id(signature);
         Instant now = Instant.now(clock);
         Instant last = audited.get(id);

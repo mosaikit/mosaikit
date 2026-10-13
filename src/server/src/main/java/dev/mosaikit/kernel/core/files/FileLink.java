@@ -25,18 +25,29 @@ import javax.crypto.spec.SecretKeySpec;
  * <p>A link to a prefix covers the files of the organization ({@code team} absent) or of one team,
  * never both: the scope that the person who made it could read as a whole.
  *
+ * <p>A link made by a person carries their account ({@code creator}), and serves only what they still
+ * read when it is used: a file attached to a resource (MK-055) only while they hold a level on it, and
+ * nothing once they left the organization. A link made without a person, by the code of an extension
+ * or of the kernel, has no creator and covers its whole scope.
+ *
  * @param file the file of a link to one file, or {@code null}
  * @param prefix the prefix of a link to a prefix, possibly empty for every file, or {@code null}
  * @param team the team of a link to a prefix, or {@code null} for the files of the organization
  * @param expires when the link stops working, to the second
+ * @param creator the account of the person who made the link, or {@code null} for one made without a
+ *     person
  */
-public record FileLink(UUID organization, String extension, UUID file, String prefix, UUID team, Instant expires) {
+public record FileLink(
+        UUID organization, String extension, UUID file, String prefix, UUID team, Instant expires, UUID creator) {
 
     /** The path under which links are served. */
     public static final String ROOT = "/api/v1/files/signed";
 
     /** The version of the signed text, so that a later form never verifies against this one. */
     private static final String VERSION = "mosaikit.files.link.v1";
+
+    /** The version of the signed text of a link with a creator. */
+    private static final String VERSION_WITH_CREATOR = "mosaikit.files.link.v2";
 
     private static final String HMAC = "HmacSHA256";
 
@@ -49,16 +60,22 @@ public record FileLink(UUID organization, String extension, UUID file, String pr
         }
     }
 
+    /** A link made without a person. */
+    public FileLink(UUID organization, String extension, UUID file, String prefix, UUID team, Instant expires) {
+        this(organization, extension, file, prefix, team, expires, null);
+    }
+
     /** The text that is signed: every part of the grant, one per line, none of which has a line break. */
     String signed() {
-        return String.join(
+        String grant = String.join(
                 "\n",
-                VERSION,
                 organization.toString(),
                 extension,
                 file != null ? "file:" + file : "prefix:" + prefix,
                 team == null ? "" : team.toString(),
                 Long.toString(expires.getEpochSecond()));
+        // Without a creator, the text of the first version, so that the links already made still verify.
+        return creator == null ? VERSION + "\n" + grant : VERSION_WITH_CREATOR + "\n" + grant + "\ncreator:" + creator;
     }
 
     /** The signature with a key, in base64url without padding. */
@@ -123,6 +140,9 @@ public record FileLink(UUID organization, String extension, UUID file, String pr
             parts.add("team=" + team);
         }
         parts.add("expires=" + expires.getEpochSecond());
+        if (creator != null) {
+            parts.add("creator=" + creator);
+        }
         parts.add("signature=" + signature);
         return parts.build().collect(Collectors.joining("&"));
     }

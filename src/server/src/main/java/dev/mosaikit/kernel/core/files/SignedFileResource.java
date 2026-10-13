@@ -38,18 +38,20 @@ public class SignedFileResource {
     @Produces(MediaType.WILDCARD)
     @Operation(
             summary = "Download a file through a signed link to it, without a session",
-            description = "?expires=<epoch seconds>&signature=<base64url>, as POST /api/v1/files/{extension}/links "
-                    + "made them; with Range, If-Range, If-None-Match and If-Modified-Since. 404 when the link "
-                    + "expired, was altered, or the file is not there.")
+            description = "?expires=<epoch seconds>&creator=<account>?&signature=<base64url>, as POST "
+                    + "/api/v1/files/{extension}/links made them; with Range, If-Range, If-None-Match and "
+                    + "If-Modified-Since. 404 when the link expired, was altered, the file is not there, or the "
+                    + "person who made the link no longer reads it.")
     public Response file(
             @PathParam("organization") String organization,
             @PathParam("extension") String extension,
             @PathParam("id") String id,
+            @QueryParam("creator") String creator,
             @QueryParam("expires") String expires,
             @QueryParam("signature") String signature,
             @Context HttpHeaders headers) {
         return FileResponses.content(
-                links.open(uuid(organization), extension, uuid(id), expires, signature),
+                links.open(uuid(organization), extension, uuid(id), optional(creator), expires, signature),
                 headers,
                 FileResource.CACHE_CONTROL);
     }
@@ -59,14 +61,17 @@ public class SignedFileResource {
     @Produces(MediaType.WILDCARD)
     @Operation(
             summary = "Download a file under a signed link to a prefix, by its name, without a session",
-            description = "?prefix=<prefix>&team=<id>?&expires=<epoch seconds>&signature=<base64url>; the newest "
-                    + "file of that name, which must start with the prefix. As GET of a signed link to a file.")
+            description =
+                    "?prefix=<prefix>&team=<id>?&expires=<epoch seconds>&creator=<account>?&signature=<base64url>; the newest "
+                            + "file of that name, which must start with the prefix; a file attached to a resource only while "
+                            + "the person who made the link holds a level on it. As GET of a signed link to a file.")
     public Response named(
             @PathParam("organization") String organization,
             @PathParam("extension") String extension,
             @PathParam("name") String name,
             @QueryParam("prefix") String prefix,
             @QueryParam("team") String team,
+            @QueryParam("creator") String creator,
             @QueryParam("expires") String expires,
             @QueryParam("signature") String signature,
             @Context HttpHeaders headers) {
@@ -75,12 +80,18 @@ public class SignedFileResource {
                         uuid(organization),
                         extension,
                         prefix,
-                        team == null || team.isEmpty() ? null : uuid(team),
+                        optional(team),
+                        optional(creator),
                         name,
                         expires,
                         signature),
                 headers,
                 FileResource.CACHE_CONTROL);
+    }
+
+    /** An identifier of the query that may be absent. */
+    private static UUID optional(String value) {
+        return value == null || value.isEmpty() ? null : uuid(value);
     }
 
     /** An identifier of the path; a malformed one is refused as any other link. */

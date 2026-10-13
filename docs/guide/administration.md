@@ -498,10 +498,14 @@ cache validators, until it expires: at most `mosaikit.files.link-max-validity` (
 after it was made. An expired or altered link answers 404, as a file that does not exist, so that a
 link never tells whether a file is there. Making a link is in the audit log as `file.link.created`;
 its use as `file.link.used`, the first time in each hour for each link on each kernel, not every
-download. A link opens the files it names until it expires, also when the person who made it leaves
-the team or the organization: deleting the file, or rotating the key, stops it.
+download. A link made by a person opens only what that person still reads: a file attached to a
+resource of the extension while they hold a level on the resource, and nothing once they left the
+organization; revoking a share stops their links to the files of that resource. Otherwise a link opens
+the files it names until it expires, also when the person who made it leaves the team: deleting the
+file, or rotating the key, stops it.
 
-No table keeps the links: each carries its organization, extension, file or prefix and expiry,
+No table keeps the links: each carries its organization, extension, file or prefix, expiry and the
+account of the person who made it,
 signed with HMAC-SHA256 by the key of the installation. The key is:
 
 - `mosaikit.files.link-key` when set: 32 random bytes or more in base64 (`openssl rand -base64 32`),

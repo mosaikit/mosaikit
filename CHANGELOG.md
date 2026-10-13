@@ -472,6 +472,12 @@ project follows [Semantic Versioning](https://semver.org/).
   organization read the files of a resource not shared with them, and the people it was shared with
   to edit could not delete them. The REST API, the `FileStorage` bean and the row-level security
   (migration V29, `mk_kernel.reads_resource()`) apply it; files without a resource do not change.
+- A signed link to files (MK-093) made by a person carries their account, signed with the rest of the
+  link (`creator=` in its query), and serves only what they still read: a file attached to a resource
+  while they hold a level on it, nothing once they left the organization (`mk_kernel.signed_link_reads()`,
+  migration V29). Before, a link to a prefix handed out the files of resources its creator could not
+  read, and a revoked share left their links working. Links made without a person, and the links
+  made before this change, cover their scope as before until they expire.
 - jackson-databind 2.22.3 over the version of the Quarkus BOM, for CVE-2026-91776 and
   CVE-2026-91777.
 - The marketplace inspects a package in a directory of the extensions directory, ignored by the

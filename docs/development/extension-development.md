@@ -592,6 +592,13 @@ and `query`; a file under a prefix is at `` `${base}${name}?${query}` ``, so a t
 `` `${base}tiles/{z}/{x}/{y}.png?${query}` ``. The newest file of a name answers. A link stays valid
 until it expires even when the person leaves the team: give the shortest validity that serves.
 
+A link made by a person carries their account and their rights (MK-055): a file attached to a
+resource is served only while they hold a level on that resource, so a link to `tiles/` never hands
+out the files of an album they cannot read, and revoking their share stops their links to its files;
+once they leave the organization their links answer 404. Files without a resource, such as tiles, are
+served as the scope of the link says. A link made by code that runs without a person has no creator
+and covers its whole scope.
+
 ## Extending another extension
 
 An extension extends another one on three levels ([ADR-0019](../adr/0019-plugins-extending-plugins.md)),
