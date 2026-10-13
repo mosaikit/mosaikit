@@ -182,6 +182,8 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 
+- The continuous integration keeps the report, screenshots and logs of the end-to-end tests:
+  they are in a hidden directory, which the upload skipped.
 - The test bench and `npm run dev` send mail to `127.0.0.1`, where their mail server listens: on
   Linux `localhost` resolved to `::1` too, and every other mail failed the registration that sent it.
 - The shell no longer misses an extension that changes in a watched directory while it loads its
