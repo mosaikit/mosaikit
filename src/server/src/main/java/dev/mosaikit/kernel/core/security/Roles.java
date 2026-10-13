@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.core.security;
 
+import dev.mosaikit.kernel.api.context.ServiceCaller;
+
 /** Roles defined by the kernel. Extensions define their own permissions on top of these. */
 public final class Roles {
 
@@ -24,7 +26,7 @@ public final class Roles {
      * A service identity (MK-124): a caller that is not a person, such as a gateway, with a key of its
      * own; it has no organization unless it names one it was given, and no other role.
      */
-    public static final String SERVICE = "service";
+    public static final String SERVICE = ServiceCaller.ROLE;
 
     private Roles() {}
 }

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.core.service;
 
+import dev.mosaikit.kernel.api.context.ServiceCaller;
 import dev.mosaikit.kernel.core.audit.AuditEvent;
 import dev.mosaikit.kernel.core.audit.AuditLog;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -35,7 +36,7 @@ public class ServiceAudit {
     }
 
     /** The prefix of the actor of every entry written by a service identity. */
-    static final String ACTOR_START = "service:";
+    static final String ACTOR_START = ServiceCaller.PRINCIPAL_START;
 
     /** The actor of the entries of a service identity: {@code service:<name>}. */
     public static String actor(String name) {

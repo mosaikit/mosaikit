@@ -462,13 +462,14 @@ A platform administrator can give the API of an extension to a service identity 
 callers that are not people, such as a gateway or a map server. Such a call reaches the extension
 with no person and, unless the service names an organization it was allowed with
 `X-Mosaikit-Organization`, no organization: `CurrentOrganization.id()` is empty and row-level
-security shows no row of any organization. Recognize it with the security identity of Quarkus:
+security shows no row of any organization. Recognize it with the security identity of Quarkus and
+`ServiceCaller` (`dev.mosaikit.kernel.api.context`):
 
 ```java
 @Inject SecurityIdentity identity;   // io.quarkus.security.identity
 
-boolean service = identity.hasRole("service");          // a service identity, not a person
-String caller = identity.getPrincipal().getName();      // "service:<name>" for a service
+boolean service = ServiceCaller.isService(identity.getRoles());                       // not a person
+Optional<String> name = ServiceCaller.name(identity.getPrincipal().getName());   // its name
 ```
 
 Endpoints meant for services check the role, for example with `@RolesAllowed("service")`; endpoints

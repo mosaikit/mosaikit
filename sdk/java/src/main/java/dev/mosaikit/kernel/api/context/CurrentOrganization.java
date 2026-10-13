@@ -11,9 +11,10 @@ import java.util.UUID;
  * selector of the shell or by the realm the person signed in with, and only if the person is a
  * member and the organization accepts the way the person signed in.
  *
- * <p>The kernel provides this bean to extensions; the requests that reach an extension API always have an
- * organization. An extension reads and writes only the data of {@link #require()}, so that data of
- * other organizations are never visible.
+ * <p>The kernel provides this bean to extensions; the requests of people that reach an extension API
+ * always have an organization. A call of a service identity (MK-124, {@link ServiceCaller}) has one
+ * only when it names one it was allowed. An extension reads and writes only the data of {@link
+ * #require()}, so that data of other organizations are never visible.
  */
 public interface CurrentOrganization {
 
