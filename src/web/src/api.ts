@@ -69,8 +69,121 @@ export interface OrganizationApp {
   readonly title: string;
   readonly enabled: boolean;
   readonly pinned: boolean;
-  /** The roles that see it; empty for everyone. */
+  /** Deprecated by `restricted`: `['organization-admin']` when restricted, empty otherwise. */
+  readonly roles?: readonly string[];
+  /** Whether only the people who hold the permission of the app see it (MK-056). */
+  readonly restricted?: boolean;
+  /** The permission of the app, `<extension>:use-<app>`. */
+  readonly permission?: string;
+}
+
+/** A permission declared by an active extension, or the permission of one of its apps (MK-056). */
+export interface DeclaredPermission {
+  /** `<extension>:<permission>`. */
+  readonly id: string;
+  readonly extension: string;
+  readonly extensionName: string;
+  readonly name: string;
+  readonly title: string;
+  readonly description: string;
+  /** `title` and `description` by language, as the manifest gives them. */
+  readonly i18n?: Readonly<Record<string, Readonly<Record<string, string>>>>;
+  /** Whether all the apps of the extension are off for the organization: nobody holds it. */
+  readonly off: boolean;
+  /** The app the permission opens, for the permission of an app. */
+  readonly app?: string;
+}
+
+/** A profile of permissions of an organization. */
+export interface PermissionProfile {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
+  /** `organization-user` for the default profile of members, `null` otherwise. */
+  readonly defaultForRole: string | null;
+  readonly permissions: readonly string[];
+}
+
+/** What a profile is made of, to create or change it. */
+export interface ProfileDraft {
+  readonly name: string;
+  readonly description: string;
+  readonly defaultForRole: string | null;
+  readonly permissions: readonly string[];
+}
+
+/** Where a permission of a person comes from. */
+export interface PermissionSource {
+  readonly kind: 'administrator' | 'profile' | 'team' | 'exception';
+  /** The profile or the team. */
+  readonly id?: string;
+  readonly name?: string;
+}
+
+/** A permission that a person holds, or that is granted while the apps of its extension are off. */
+export interface EffectivePermission {
+  readonly id: string;
+  readonly extension: string;
+  readonly name: string;
+  readonly title: string;
+  readonly granted: boolean;
+  /** `apps-off` when granted but not held. */
+  readonly withheld: string | null;
+  readonly sources: readonly PermissionSource[];
+}
+
+/** The permissions of a member of the organization, with their sources. */
+export interface MemberPermissions {
+  readonly email: string;
+  readonly standing: 'administrator' | 'member' | 'guest';
+  readonly profile: { readonly id: string; readonly name: string } | null;
+  readonly profileAssigned: boolean;
+  readonly exceptions: readonly string[];
+  readonly permissions: readonly EffectivePermission[];
+}
+
+/** The permissions granted to a team. */
+export interface TeamPermissions {
+  readonly id: string;
+  readonly name: string;
+  readonly permissions: readonly string[];
+}
+
+/** A proposed member, for the preview of an invitation. */
+export interface ProposedMember {
+  readonly role: 'organization-admin' | 'organization-user' | 'organization-guest';
+  readonly profile: string | null;
+  readonly teams: readonly string[];
+}
+
+/** What a proposed member would hold. */
+export interface PermissionPreview {
+  readonly standing: 'administrator' | 'member' | 'guest';
+  readonly profile: { readonly id: string; readonly name: string } | null;
+  readonly permissions: readonly EffectivePermission[];
+}
+
+/** A member of an organization (MK-017). */
+export interface OrganizationMember {
+  readonly accountId: string;
+  readonly username: string;
+  readonly displayName: string;
   readonly roles: readonly string[];
+}
+
+/** A person invited by the administrators of the organization, with a role, a profile and teams. */
+export interface Invitation {
+  readonly roles: readonly string[];
+  readonly displayName?: string;
+  readonly profile?: string | null;
+  readonly teams?: readonly string[];
+}
+
+/** A team of the organization (MK-032). */
+export interface OrganizationTeam {
+  readonly id: string;
+  readonly name: string;
+  readonly kind?: string;
 }
 
 /** An app that the signed-in person sees, in the order of the app bar (MK-030). */
@@ -374,6 +487,113 @@ export class KernelClient {
     );
   }
 
+  /** The permissions of the signed-in person in the organization, `<extension>:<permission>` (MK-056). */
+  shellPermissions(): Promise<string[]> {
+    return this.getJson<string[]>('/api/v1/shell/permissions');
+  }
+
+  /** The permissions that the active extensions declare, for the administrators of the organization. */
+  declaredPermissions(slug: string): Promise<DeclaredPermission[]> {
+    return this.getJson<DeclaredPermission[]>(permissionsPath(slug));
+  }
+
+  permissionProfiles(slug: string): Promise<PermissionProfile[]> {
+    return this.getJson<PermissionProfile[]>(`${permissionsPath(slug)}/profiles`);
+  }
+
+  createProfile(slug: string, profile: ProfileDraft): Promise<PermissionProfile> {
+    return this.sendJson<PermissionProfile>(`${permissionsPath(slug)}/profiles`, 'POST', profile);
+  }
+
+  changeProfile(slug: string, id: string, profile: ProfileDraft): Promise<PermissionProfile> {
+    return this.sendJson<PermissionProfile>(
+      `${permissionsPath(slug)}/profiles/${encodeURIComponent(id)}`,
+      'PUT',
+      profile,
+    );
+  }
+
+  async deleteProfile(slug: string, id: string): Promise<void> {
+    await this.sendJson<undefined>(
+      `${permissionsPath(slug)}/profiles/${encodeURIComponent(id)}`,
+      'DELETE',
+    );
+  }
+
+  /** What a member holds and why. */
+  memberPermissions(slug: string, email: string): Promise<MemberPermissions> {
+    return this.getJson<MemberPermissions>(
+      `${permissionsPath(slug)}/members/${encodeURIComponent(email)}`,
+    );
+  }
+
+  /** Assigns a profile to a member, or with `null` gives back the default profile. */
+  assignProfile(slug: string, email: string, profile: string | null): Promise<MemberPermissions> {
+    return this.sendJson<MemberPermissions>(
+      `${permissionsPath(slug)}/members/${encodeURIComponent(email)}/profile`,
+      'PUT',
+      { profile },
+    );
+  }
+
+  /** Grants (`true`) or revokes a permission of a member as a personal exception. */
+  setException(
+    slug: string,
+    email: string,
+    permission: string,
+    granted: boolean,
+  ): Promise<MemberPermissions> {
+    return this.sendJson<MemberPermissions>(
+      `${permissionsPath(slug)}/members/${encodeURIComponent(email)}/exceptions/${encodeURIComponent(permission)}`,
+      granted ? 'PUT' : 'DELETE',
+    );
+  }
+
+  teamPermissions(slug: string, team: string): Promise<TeamPermissions> {
+    return this.getJson<TeamPermissions>(
+      `${permissionsPath(slug)}/teams/${encodeURIComponent(team)}`,
+    );
+  }
+
+  /** Grants (`true`) or revokes a permission of a team. */
+  setTeamPermission(
+    slug: string,
+    team: string,
+    permission: string,
+    granted: boolean,
+  ): Promise<TeamPermissions> {
+    return this.sendJson<TeamPermissions>(
+      `${permissionsPath(slug)}/teams/${encodeURIComponent(team)}/${encodeURIComponent(permission)}`,
+      granted ? 'PUT' : 'DELETE',
+    );
+  }
+
+  /** What a proposed member would hold, without changing anything: for invitations. */
+  previewPermissions(slug: string, proposed: ProposedMember): Promise<PermissionPreview> {
+    return this.sendJson<PermissionPreview>(`${permissionsPath(slug)}/preview`, 'POST', proposed);
+  }
+
+  /** The members of an organization, for its administrators. */
+  organizationMembers(slug: string): Promise<OrganizationMember[]> {
+    return this.getJson<OrganizationMember[]>(
+      `/api/v1/organizations/${encodeURIComponent(slug)}/members`,
+    );
+  }
+
+  /** Adds a person to the organization with a role, a profile and teams (MK-056). */
+  invite(slug: string, email: string, invitation: Invitation): Promise<OrganizationMember> {
+    return this.sendJson<OrganizationMember>(
+      `/api/v1/organizations/${encodeURIComponent(slug)}/members/${encodeURIComponent(email)}`,
+      'PUT',
+      invitation,
+    );
+  }
+
+  /** The teams that the signed-in person sees: all the teams, for an administrator (MK-032). */
+  teams(): Promise<OrganizationTeam[]> {
+    return this.getJson<OrganizationTeam[]>('/api/v1/teams');
+  }
+
   /** The personal settings of the signed-in person (MK-027). */
   changePreferences(preferences: Preferences): Promise<Preferences> {
     return this.sendJson<Preferences>('/api/v1/accounts/me/preferences', 'PUT', preferences);
@@ -547,8 +767,16 @@ export class KernelClient {
     if (!response.ok) {
       throw await toError(response);
     }
+    if (response.status === 204) {
+      return undefined as T;
+    }
     return (await response.json()) as T;
   }
+}
+
+/** The permissions of an organization, for its administrators (MK-056). */
+function permissionsPath(slug: string): string {
+  return `/api/v1/organizations/${encodeURIComponent(slug)}/permissions`;
 }
 
 async function toError(response: Response): Promise<KernelError> {

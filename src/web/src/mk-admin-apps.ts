@@ -7,7 +7,9 @@ import { t } from './i18n.js';
 
 /**
  * The apps of the app bar of the organization, for its administrators (MK-030): which ones appear,
- * in which order, pinned or not, and for whom. The order of the table is the order of the bar.
+ * in which order, pinned or not, and for whom: everyone, or the people who hold the permission of
+ * the app, granted in Permissions like any other (MK-056). The order of the table is the order of
+ * the bar.
  */
 @customElement('mk-admin-apps')
 export class MkAdminApps extends LitElement {
@@ -93,6 +95,11 @@ export class MkAdminApps extends LitElement {
     return html`
       <h1>${t('Organization apps')}</h1>
       <p>${t('The apps of the app bar of your organization, in their order.')}</p>
+      <p>
+        ${t(
+          'An app for who holds its permission shows to the administrators and to the people it is granted to in Permissions, through a profile, a team or a personal exception.',
+        )}
+      </p>
       <table>
         <thead>
           <tr>
@@ -134,16 +141,13 @@ export class MkAdminApps extends LitElement {
                   <select
                     aria-label=${t('Who sees {app}', { app: app.title })}
                     @change=${(event: Event) => {
-                      const value = (event.target as HTMLSelectElement).value;
-                      this.changeApp(index, { roles: value ? [value] : [] });
+                      const restricted = (event.target as HTMLSelectElement).value === 'restricted';
+                      this.changeApp(index, { restricted, roles: [] });
                     }}
                   >
-                    <option value="" ?selected=${app.roles.length === 0}>${t('Everyone')}</option>
-                    <option
-                      value="organization-admin"
-                      ?selected=${app.roles.length === 1 && app.roles[0] === 'organization-admin'}
-                    >
-                      ${t('Administrators')}
+                    <option value="" ?selected=${!app.restricted}>${t('Everyone')}</option>
+                    <option value="restricted" ?selected=${app.restricted === true}>
+                      ${t('Who holds its permission')}
                     </option>
                   </select>
                 </td>

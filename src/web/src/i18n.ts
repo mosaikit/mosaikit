@@ -111,6 +111,74 @@ const ITALIAN: Record<string, string> = {
   'Move {app} up': 'Sposta {app} in alto',
   'Move {app} down': 'Sposta {app} in basso',
   Save: 'Salva',
+  'Who holds its permission': 'Chi ha il suo permesso',
+  'An app for who holds its permission shows to the administrators and to the people it is granted to in Permissions, through a profile, a team or a personal exception.':
+    "Un'app per chi ha il suo permesso è visibile agli amministratori e alle persone a cui è concesso in Permessi, con un profilo, un team o un'eccezione personale.",
+  // Permissions of the organization (MK-056)
+  Permissions: 'Permessi',
+  'What the people of your organization may do in each extension. A permission is off until a profile, a team or a personal exception grants it; administrators hold every permission.':
+    "Cosa possono fare le persone della tua organizzazione in ogni estensione. Un permesso è spento finché un profilo, un team o un'eccezione personale non lo concede; gli amministratori hanno tutti i permessi.",
+  Profiles: 'Profili',
+  People: 'Persone',
+  Teams: 'Team',
+  Team: 'Team',
+  'Team {name}': 'Team {name}',
+  Profile: 'Profilo',
+  'Profile {name}': 'Profilo {name}',
+  'New profile': 'Nuovo profilo',
+  default: 'predefinito',
+  'No profiles yet: members hold no permission.':
+    'Ancora nessun profilo: i membri non hanno permessi.',
+  Name: 'Nome',
+  Description: 'Descrizione',
+  'Default profile of members: for those without a profile of their own':
+    'Profilo predefinito dei membri: per chi non ha un profilo proprio',
+  'Default profile of members ({name})': 'Profilo predefinito dei membri ({name})',
+  'Default profile of members (none)': 'Profilo predefinito dei membri (nessuno)',
+  Delete: 'Elimina',
+  'Deleted.': 'Eliminato.',
+  'Delete the profile {name}? Its members go back to the default profile.':
+    'Eliminare il profilo {name}? I suoi membri tornano al profilo predefinito.',
+  'No active extension declares permissions.': 'Nessuna estensione attiva dichiara permessi.',
+  'All the apps of this extension are off: nobody holds its permissions.':
+    'Tutte le app di questa estensione sono spente: nessuno ha i suoi permessi.',
+  Person: 'Persona',
+  Choose: 'Scegli',
+  'Administrator of the organization': "Amministratore dell'organizzazione",
+  'Administrator of the organization: holds every permission.':
+    "Amministratore dell'organizzazione: ha tutti i permessi.",
+  'Guest: no profile; only what their teams and personal exceptions grant.':
+    'Ospite: nessun profilo; solo ciò che concedono i suoi team e le sue eccezioni personali.',
+  'Member: their profile, their teams and their personal exceptions.':
+    'Membro: il suo profilo, i suoi team e le sue eccezioni personali.',
+  'Personal exception': 'Eccezione personale',
+  'Personal exceptions': 'Eccezioni personali',
+  'Permissions given to this person only, on top of the others.':
+    'Permessi dati solo a questa persona, in aggiunta agli altri.',
+  'What they can do': 'Cosa può fare',
+  'Granted.': 'Concesso.',
+  'Revoked.': 'Revocato.',
+  'Granted to every member and guest of the team.': 'Concessi a ogni membro e ospite del team.',
+  'The organization has no teams.': "L'organizzazione non ha team.",
+  'Not loaded: {reason}': 'Non caricato: {reason}',
+  'No permissions.': 'Nessun permesso.',
+  'From: {sources}': 'Da: {sources}',
+  'Not held: all the apps of its extension are off.':
+    'Non attivo: tutte le app della sua estensione sono spente.',
+  // Invitations (MK-056)
+  'Invite a person': 'Invita una persona',
+  'For a person who has no account yet.': 'Per una persona che non ha ancora un account.',
+  Role: 'Ruolo',
+  Member: 'Membro',
+  Administrator: 'Amministratore',
+  'Administrators hold every permission.': 'Gli amministratori hanno tutti i permessi.',
+  'What they will be able to do': 'Cosa potrà fare',
+  Cancel: 'Annulla',
+  Invite: 'Invita',
+  'The preview failed: {reason}': "L'anteprima non è riuscita: {reason}",
+  'Write the email address of the person.': "Scrivi l'indirizzo email della persona.",
+  'Not invited: {reason}': 'Non invitata: {reason}',
+  '{email} is in the organization.': "{email} è nell'organizzazione.",
   // Platform settings
   'Platform settings': 'Impostazioni della piattaforma',
   'People can create their own account': 'Le persone possono creare il proprio account',
