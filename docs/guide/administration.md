@@ -319,7 +319,7 @@ The documents that apps without a backend share with a team (MK-032) are resourc
 too: the team holds the level Edit on each of them, and the dialog can give access to other people
 or teams, or take it away from the team. The administrators of the organization read and change
 them, as every resource of their organization. The documents shared with teams before this version
-were moved onto the model when the kernel was updated (migration `V27`).
+were moved onto the model when the kernel was updated (migration `V28`).
 
 An update of an extension that removes a resource type, or a level of one, on which grants exist
 is refused, with the list of those grants: revoke them first.

@@ -10,7 +10,7 @@ project follows [Semantic Versioning](https://semver.org/).
 
 - The documents of collections shared with a team (MK-032) moved onto the one sharing model
   (MK-055, ADR-0037): each is a resource of type `data-document` of its extension, owned by the
-  organization, and its team holds the level `edit` (migration V27 moves the existing ones). The
+  organization, and its team holds the level `edit` (migration V28 moves the existing ones). The
   row-level security reads them through `mk_kernel.allows()`: the members of the team read and change
   them as before, the sharing dialog can give access to other people and teams, and the
   administrators of the organization now read them too, as every resource of their organization.
