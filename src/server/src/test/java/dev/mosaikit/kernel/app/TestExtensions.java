@@ -47,6 +47,23 @@ public class TestExtensions implements QuarkusTestProfile {
                     data:
                       collections: [notes]
                     """);
+            // ResourceRegistryTest: an extension that registers notes in folders, and one that is
+            // uninstalled (MK-054).
+            extension("resources", "dev.mosaikit.test.resources", "Resources", """
+                    resources:
+                      - type: note
+                        title: Note
+                        levels: [{ name: view, title: View }, { name: edit, title: Edit, edits: true }]
+                      - type: folder
+                        title: Folder
+                        levels: [{ name: view, title: View }]
+                    """);
+            extension("parting", "dev.mosaikit.test.parting", "Parting", """
+                    resources:
+                      - type: note
+                        title: Note
+                        levels: [{ name: view, title: View }]
+                    """);
             // ThemeExtensionTest: a theme that names the product and brings its logo (MK-052), and one
             // with a value that is not a color.
             theme("green", "dev.mosaikit.test.green", "Green", "'#1b6e3c'", """
