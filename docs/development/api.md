@@ -37,6 +37,34 @@ kernel, and its tokens are refused before they expire. Requests marked `X-Mosaik
 `WWW-Authenticate`, so that the browser never opens its own sign-in dialog. Other clients keep using
 HTTP Basic or bearer tokens.
 
+Scripts and other clients use a personal access key (MK-060), created by the person in their
+settings, sent as `Authorization: Bearer mk_...`. A bearer token that starts with `mk_` is always
+read as a key, never as a token of a realm. The key acts for its person in the organization chosen
+when it was created (the `X-Mosaikit-Organization` header is ignored), with the roles and
+permissions the person has there at the time of each request; the roles of the platform are never
+given to a key. An unknown, revoked or expired key, a key of a suspended person or of a person no
+longer in its organization answers 401. A key created without the write switch passes only `GET`,
+`HEAD` and `OPTIONS`, on the APIs of the kernel and of extensions: any other method answers 403. No
+key reaches the sessions (`/api/v1/accounts/session`, `/api/v1/accounts/me/sessions`) or the keys
+(`/api/v1/accounts/me/access-keys`): 403. The MCP server (`/mcp`) takes only `POST`, so it refuses
+read-only keys. The audit log records through the channel `API_KEY` every refused request
+(`account.access-key.refused`, with the reason) and the first use of a key in each hour
+(`account.access-key.used`), not every request; every other entry written during a request made
+with a key has the channel `API_KEY` too.
+
+A service that receives a key from its own callers checks it with `GET
+/api/v1/access-keys/current`, called with that same key: the key is its own credential, so the
+service needs no secret of its own and cannot learn about other keys, and the call follows the
+same rules as any other (401 once revoked). Service identities (MK-124) will let services check keys
+with credentials of their own.
+
+```bash
+curl -H "Authorization: Bearer $KEY" https://mosaikit.example.org/api/v1/access-keys/current
+# {"id": "...", "name": "Gateway", "prefix": "mk_AbCdEfGh", "write": false, "expiresAt": "...",
+#  "account": {"id": "...", "username": "ada@example.org", "displayName": "Ada"},
+#  "organization": {"id": "...", "slug": "acme"}, "roles": ["organization-user"]}
+```
+
 ## Endpoints of the kernel
 
 | Method and path | Who | Purpose |
@@ -55,7 +83,11 @@ HTTP Basic or bearer tokens.
 | `DELETE /api/v1/accounts/session` | anyone | end the session of the request on the server (the cookie of the shell, or the realm session of a bearer token), and forget the browser if it was remembered |
 | `GET /api/v1/accounts/me/sessions` | signed in | the live sessions of the person (MK-125): `id`, `kind` (`password` or `realm`), `userAgent`, `address`, `createdAt`, `lastSeenAt`, `current` |
 | `DELETE /api/v1/accounts/me/sessions/{id}` | signed in | end a session of the person: its cookie, its "remember me" and the tokens of its realm session are refused at once; 404 when it is not a live session of the person (audited) |
-| `PUT, DELETE /api/v1/platform/accounts/{email}/suspension` | `platform-admin` | suspend an account, which ends all its sessions and "remember me" tokens and refuses every sign-in, or reactivate it; not one's own account (MK-125, audited) |
+| `PUT, DELETE /api/v1/platform/accounts/{email}/suspension` | `platform-admin` | suspend an account, which ends all its sessions and "remember me" tokens, revokes its access keys and refuses every sign-in, or reactivate it; not one's own account (MK-125, audited) |
+| `GET /api/v1/accounts/me/access-keys` | signed in, not with a key | the access keys of the person not revoked, expired ones included (MK-060): `maxValidityDays` and `keys`, each with `id`, `name`, `prefix`, `organizationId`, `organization`, `write`, `createdAt`, `lastUsedAt` (to the hour), `expiresAt`, `expired`; never the secret |
+| `POST /api/v1/accounts/me/access-keys` | signed in, not with a key | create a key (`{"name", "organization": "<slug>", "expiresAt"?, "write"?}`) for one organization of the person, expiring at most `mosaikit.accounts.access-key-max-validity` from now (the longest when absent), read-only unless `write` is true: 201 with the key and its `secret`, shown this once (audited) |
+| `DELETE /api/v1/accounts/me/access-keys/{id}` | signed in, not with a key | revoke a key of the person: the next request with it is refused, the sessions go on; 404 when it is not a key of the person (audited) |
+| `GET /api/v1/access-keys/current` | with an access key | validate the key of the request, for services: `id`, `name`, `prefix`, `write`, `expiresAt`, the `account` and the `organization` it acts for, and the `roles` of the person there now; 404 without a key (MK-060) |
 | `POST /api/v1/accounts/session/remembrance` | signed in, with a password | remember this browser: an HttpOnly cookie signs the person in again for `mosaikit.accounts.remember-for` |
 | `GET /api/v1/shell/extensions` | signed in | frontends of the active extensions, for the shell; not those turned off for the organization of the request, nor what they contribute to other extensions (MK-030, MK-035) |
 | `WS /api/v1/live` (WebSocket) | signed in | the real-time channel (MK-031): `?organization=<slug>`; send `{"type": "subscribe", "topic": "…"}`, receive `subscribed`, `refused` or `{"type": "event", "topic", "data"}` |

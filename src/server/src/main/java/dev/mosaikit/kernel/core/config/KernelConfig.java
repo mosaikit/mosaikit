@@ -136,6 +136,15 @@ public interface KernelConfig {
         Duration sessionCache();
 
         /**
+         * How long a personal access key lasts at most from its creation (MK-060): people choose a
+         * shorter expiry, never a longer one, and a key created without one lasts this long. A key
+         * revoked on another kernel of the same installation is refused after at most {@link
+         * #sessionCache()}.
+         */
+        @WithDefault("365d")
+        Duration accessKeyMaxValidity();
+
+        /**
          * How long the kernel waits for the mail server to take a mail, such as the confirmation
          * link, in all. The time is split in two attempts: when the first one times out, the mail is
          * sent once more on another connection. The mail is sent outside of any database

@@ -98,6 +98,44 @@ const ITALIAN: Record<string, string> = {
   '{browser} on {system}': '{browser} su {system}',
   'Unknown device': 'Dispositivo sconosciuto',
   'Not saved: {reason}': 'Non salvato: {reason}',
+  // Access keys (MK-060)
+  'Access keys': 'Chiavi di accesso',
+  'Keys let your scripts and other programs call the platform as you, in one organization. Treat a key like a password; revoke it when you no longer need it.':
+    'Le chiavi permettono ai tuoi script e ad altri programmi di usare la piattaforma come te, in una organizzazione. Tratta una chiave come una password; revocala quando non ti serve più.',
+  'No access key.': 'Nessuna chiave di accesso.',
+  'New access key': 'Nuova chiave di accesso',
+  'Expires after': 'Scade dopo',
+  '{days} days': '{days} giorni',
+  'Allow changes (write)': 'Consenti modifiche (scrittura)',
+  'Create key': 'Crea chiave',
+  'Your new key {name}': 'La tua nuova chiave {name}',
+  'Copy it now and keep it somewhere safe: it will not be shown again.':
+    'Copiala ora e conservala in un posto sicuro: non verrà più mostrata.',
+  'The new access key': 'La nuova chiave di accesso',
+  Copy: 'Copia',
+  Done: 'Fatto',
+  Expired: 'Scaduta',
+  Revoke: 'Revoca',
+  'Reads and writes': 'Legge e scrive',
+  'Read only': 'Solo lettura',
+  never: 'mai',
+  'expired {date}': 'scaduta il {date}',
+  'expires {date}': 'scade il {date}',
+  '{prefix}… · created {created} · last used {used} · {expiry}':
+    '{prefix}… · creata {created} · ultimo uso {used} · {expiry}',
+  'The access keys cannot be read: {reason}':
+    'Le chiavi di accesso non possono essere lette: {reason}',
+  'Name the key, so that you recognize it later.':
+    'Dai un nome alla chiave, per riconoscerla in seguito.',
+  'Key created: {name}. Copy it now, it will not be shown again.':
+    'Chiave creata: {name}. Copiala ora, non verrà più mostrata.',
+  'The key was not created: {reason}': 'La chiave non è stata creata: {reason}',
+  'no clipboard': 'appunti non disponibili',
+  'Key copied.': 'Chiave copiata.',
+  'The key was not copied: {reason}. Select it and copy it.':
+    'La chiave non è stata copiata: {reason}. Selezionala e copiala.',
+  'The key was not revoked: {reason}': 'La chiave non è stata revocata: {reason}',
+  'Key revoked: {name}': 'Chiave revocata: {name}',
   // Activity (MK-038)
   Activity: 'Attività',
   'Activity, {count} unread': 'Attività, {count} non lette',

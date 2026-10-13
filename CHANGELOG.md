@@ -27,6 +27,26 @@ project follows [Semantic Versioning](https://semver.org/).
   contract: a change is announced here as a breaking change of the platform
   ([published views](docs/development/published-views.md)). The setting
   `mosaikit.database.row-security` can now also be set in a configuration file.
+- Personal access keys (MK-060), for scripts, command-line tools and other clients that cannot use
+  the session of the browser. People create them in their settings (**Access keys**: name,
+  organization, expiry, write switch), see the secret once with a copy button, and find them listed
+  with their prefix, creation, last use and expiry (`GET, POST /api/v1/accounts/me/access-keys`,
+  `DELETE /api/v1/accounts/me/access-keys/{id}`); the kernel keeps only a digest, in the new table
+  `access_key` (migration V22). A key is sent as `Authorization: Bearer mk_...` and acts for its
+  person in its organization with the roles and permissions they have there at each call, never the
+  roles of the platform; without the write switch it passes only `GET`, `HEAD` and `OPTIONS`, on the
+  APIs of the kernel and of extensions (403 otherwise). A revoked key is refused at the next request
+  (within `mosaikit.accounts.session-cache` on other kernels) while the sessions go on; a suspension
+  revokes all the keys of the person, the removal from an organization those for it. Keys cannot
+  sign in to the shell, open sessions or manage keys. Services validate a key they received with `GET
+  /api/v1/access-keys/current`, called with the key, which answers the person, the organization,
+  the roles, the write switch and the expiry. The audit log records, through the channel `API_KEY`,
+  every refused request (`account.access-key.refused`) and the first use of a key in each hour
+  (`account.access-key.used`), not every request, so that a polling script does not fill it; the
+  creations and revocations (by the person, a suspension or the removal) are recorded too, and
+  every other entry written during a request made with a key has the channel `API_KEY`. A
+  read-only key cannot use `/mcp`, whose calls are all `POST`. New setting
+  `mosaikit.accounts.access-key-max-validity` (365 days).
 
 - The kernel keeps the sessions of people on the server (MK-125). Signing in with a password opens
   a session recorded in the new table `account_session` (migration V19) and the `mosaikit-session`

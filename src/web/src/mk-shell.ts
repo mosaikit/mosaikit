@@ -37,6 +37,7 @@ import './mk-admin-settings.js';
 import './mk-assistant.js';
 import './mk-extension-frame.js';
 import './mk-activity.js';
+import './mk-access-keys.js';
 import './mk-sessions.js';
 import './mk-settings.js';
 import type { SettingsSection } from './mk-settings.js';
@@ -935,6 +936,15 @@ export class MkShell extends LitElement {
           this.settingsStatus = event.detail;
         }}
       ></mk-sessions>
+      <mk-access-keys
+        slot="access-keys"
+        .client=${this.client}
+        .memberships=${this.account?.memberships ?? []}
+        organization=${this.account?.organization ?? ''}
+        @mk-settings-status=${(event: CustomEvent<string>) => {
+          this.settingsStatus = event.detail;
+        }}
+      ></mk-access-keys>
     </mk-settings>`;
   }
 

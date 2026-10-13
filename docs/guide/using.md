@@ -117,6 +117,8 @@ Open the menu of your avatar and choose **Settings**:
   in and when the session was last used; **This browser** marks the one you are using. **End
   session** signs that browser out at once, and it is no longer remembered; on this browser the
   button is **Sign out**. End any session you do not recognize, then change your password;
+- **Access keys**: keys for your scripts and other programs, which cannot use the session of the
+  browser (see below);
 - the sections that apps add, such as their own preferences.
 
 Your choices are kept with your account: you find them at the next sign-in, on any device.
@@ -124,6 +126,30 @@ Your choices are kept with your account: you find them at the next sign-in, on a
 A session of the shell ends after 8 hours without activity, and after 24 hours in any case;
 **Remember me** then signs you in again on that browser. An administrator can end your sessions by
 suspending your account or removing you from an organization.
+
+### Access keys
+
+A script, a command-line tool or an MCP client calls the platform with a personal access key
+instead of your password. In **Settings**, under **Access keys**, give the key a name you will
+recognize (for example "Nightly export"), choose the organization it acts on and when it expires
+(at most 365 days, unless your administrator chose otherwise), and tick **Allow changes (write)**
+only if the program must change data: without it, the key only reads. Choose **Create key**: the key
+is shown once, with a **Copy** button. Copy it and keep it like a password; choose **Done** and it
+is never shown again, not even to you.
+
+The program sends the key in the `Authorization` header:
+
+```bash
+curl -H "Authorization: Bearer mk_..." https://mosaikit.example.org/api/v1/accounts/me
+```
+
+A key acts as you, in its organization, with the rights you have there at the time of each call,
+never more. It cannot sign in to the shell, nor create other keys. The list shows each key with its
+first characters, when it was created and last used, and when it expires; **Revoke** stops it at
+once, while your sessions go on. If you are suspended or leave the organization of a key, the key
+stops working and stays revoked. The audit log records the first use of a key in each hour and
+every call it refuses. A key used by an MCP client needs **Allow changes (write)**: MCP calls are
+all sent as changes, even those that only read.
 
 ## The assistant
 

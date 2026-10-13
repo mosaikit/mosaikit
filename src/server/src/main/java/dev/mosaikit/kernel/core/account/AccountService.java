@@ -57,6 +57,8 @@ public class AccountService {
     private final PlatformSettingsService settings;
     private final ConfirmationMail confirmationMail;
     private final SessionRegistry sessions;
+    private final AccessKeyRegistry keys;
+    private final AccessKeyAudit keyAudit;
     private final boolean confirmEmail;
     private final Clock clock;
 
@@ -69,6 +71,8 @@ public class AccountService {
             PlatformSettingsService settings,
             ConfirmationMail confirmationMail,
             SessionRegistry sessions,
+            AccessKeyRegistry keys,
+            AccessKeyAudit keyAudit,
             KernelConfig config,
             Clock clock) {
         this.accounts = accounts;
@@ -79,6 +83,8 @@ public class AccountService {
         this.settings = settings;
         this.confirmationMail = confirmationMail;
         this.sessions = sessions;
+        this.keys = keys;
+        this.keyAudit = keyAudit;
         this.confirmEmail = config.accounts().confirmEmail();
         this.clock = clock;
     }
@@ -273,15 +279,19 @@ public class AccountService {
 
     /**
      * Removes a person from an organization; the account stays, with its other memberships. The
-     * sessions of the person that act on the organization, or on none, end at once (MK-125).
+     * sessions of the person that act on the organization, or on none, end at once (MK-125), and
+     * their access keys in it are revoked (MK-060).
+     *
+     * @param actor the username of the administrator, for the audit of the revoked keys
      */
-    public void removeMember(String slug, String email) {
+    public void removeMember(String slug, String email, String actor) {
         Organization organization = organizations.require(slug);
         UserAccount account = accounts.findByUsername(normalize(email)).orElseThrow(() -> noMember(slug, email));
         OrganizationMember member = members.findByAccountIdAndOrganizationId(account.getId(), organization.getId())
                 .orElseThrow(() -> noMember(slug, email));
         members.delete(member);
         sessions.endIn(account.getId(), organization.getId());
+        keys.revokeIn(account.getId(), organization.getId()).forEach(key -> keyAudit.revoked(actor, key, "removed"));
     }
 
     private static ResourceNotFoundException noMember(String slug, String email) {
@@ -290,7 +300,7 @@ public class AccountService {
 
     /**
      * Suspends an account (MK-125): it signs in by no means, and its sessions and "remember me"
-     * tokens end at once, until it is reactivated.
+     * tokens end at once, until it is reactivated; its access keys are revoked (MK-060).
      *
      * @param actor the username of the administrator, who cannot suspend their own account
      */
@@ -305,6 +315,7 @@ public class AccountService {
             accounts.update(account);
         }
         sessions.endAllOf(account.getId());
+        keys.revokeAllOf(account.getId()).forEach(key -> keyAudit.revoked(actor, key, "suspended"));
         return AccountStatus.of(account);
     }
 

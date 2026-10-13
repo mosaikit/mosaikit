@@ -84,7 +84,36 @@ A realm can link an existing account only when that account is a member of its o
 
 Removing a person from an organization ends at once their sessions in it (MK-125): a browser left
 open, a copy of its cookie or a gateway that checks the session with the kernel are refused at the
-next request.
+next request. Their personal access keys for that organization are revoked too (MK-060).
+
+## Personal access keys
+
+People create personal access keys in their settings for scripts and other clients (MK-060). A key
+acts for its person in one organization, with the roles and permissions the person has there at
+the time of each call; it never carries the roles of the platform, so platform administration
+needs a password. A key without the write switch only reads. Keys cannot sign in to the shell,
+open sessions or manage keys.
+
+- How long a key may last is set by `mosaikit.accounts.access-key-max-validity` (365 days by
+  default); people choose a shorter expiry.
+- The kernel keeps only a digest of each key; nobody, administrators included, can read a key
+  again after its creation.
+- A revoked key is refused at once on the kernel that revoked it, and on the other kernels of the
+  installation within `mosaikit.accounts.session-cache` (5 seconds by default).
+- Suspending a person revokes all their keys; removing them from an organization revokes their keys
+  for it. Reactivated or added again, the person creates new keys.
+- The audit log records, through the channel `API_KEY`, every request refused because of its key
+  (`account.access-key.refused`, with the reason: `revoked`, `expired`, `suspended`,
+  `not-a-member`, `read-only`, `not-with-a-key`) and the first use of a key in each hour
+  (`account.access-key.used`, with the method and the path), not every request: a script that
+  polls does not fill the log. `account.access-key.created` and `account.access-key.revoked`
+  record the creations and the revocations, with the reason (`person`, `suspended`, `removed`).
+  Whatever else is recorded during a request made with a key, such as a change of the apps of an
+  organization, also has the channel `API_KEY`. The subject of the events of keys is the prefix that
+  people see in their list.
+- A key without the write switch cannot use the MCP server (`/mcp`): every MCP call is a `POST`.
+- A service that receives keys from its callers, such as a gateway, checks one with `GET
+  /api/v1/access-keys/current`, called with that key (see the [API](../development/api.md)).
 
 ## Suspending a person
 
@@ -99,7 +128,8 @@ curl -u admin -X DELETE https://mosaikit.example.org/api/v1/platform/accounts/ad
 A suspended person signs in by no means: not with the password, not with **Remember me**, not
 through the realm of an organization. All their sessions end at once, on every browser, and their
 "remember me" tokens are revoked; the list of members shows `"suspended": true`. Reactivated, the
-person signs in again; the sessions ended by the suspension stay ended. You cannot suspend your own
+person signs in again; the sessions ended by the suspension stay ended, and their personal access
+keys (MK-060) stay revoked. You cannot suspend your own
 account. Both actions are in the audit log (`account.suspended`, `account.reactivated`).
 
 A kernel ends a session at once; when several kernels serve the installation, the others refuse it
@@ -308,7 +338,9 @@ Extensions may declare actions that assistants use as tools (see
 [extension development](../development/extension-development.md#actions-for-assistants)). An MCP client
 connects to `https://<host>/mcp` with the credentials of a person and the header
 `X-Mosaikit-Organization: <slug>`; it has exactly the rights of that person in that organization,
-and changes wait for the confirmation of the person.
+and changes wait for the confirmation of the person. A client can also use a personal access key
+created with the write switch (MK-060); a read-only key is refused, since every MCP call is a
+`POST`.
 
 ## Published views for external services
 

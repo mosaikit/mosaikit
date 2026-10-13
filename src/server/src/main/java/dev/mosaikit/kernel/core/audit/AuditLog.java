@@ -4,10 +4,15 @@ package dev.mosaikit.kernel.core.audit;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.mosaikit.kernel.core.account.AccessKeyRegistry;
 import dev.mosaikit.kernel.core.config.KernelConfig;
 import dev.mosaikit.kernel.core.error.InvalidInputException;
 import io.quarkus.arc.Arc;
 import io.quarkus.arc.ArcContainer;
+import io.quarkus.arc.InstanceHandle;
+import io.quarkus.vertx.http.runtime.CurrentVertxRequest;
+import io.quarkus.vertx.http.runtime.security.QuarkusHttpUser;
+import io.vertx.ext.web.RoutingContext;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.TypedQuery;
@@ -64,8 +69,9 @@ public class AuditLog {
     }
 
     /**
-     * Records an event, through the channel of the current call: {@link AuditEvent.Channel#WEB} in a
-     * request, {@link AuditEvent.Channel#JOB} outside requests.
+     * Records an event, through the channel of the current call: {@link AuditEvent.Channel#API_KEY} in
+     * a request authenticated with a personal access key (MK-060), {@link AuditEvent.Channel#WEB} in
+     * other requests, {@link AuditEvent.Channel#JOB} outside requests.
      */
     @Transactional(Transactional.TxType.REQUIRES_NEW)
     public void append(
@@ -410,9 +416,23 @@ public class AuditLog {
 
     private static AuditEvent.Channel currentChannel() {
         ArcContainer container = Arc.container();
-        return container != null && container.requestContext().isActive()
-                ? AuditEvent.Channel.WEB
-                : AuditEvent.Channel.JOB;
+        if (container == null || !container.requestContext().isActive()) {
+            return AuditEvent.Channel.JOB;
+        }
+        return withAccessKey(container) ? AuditEvent.Channel.API_KEY : AuditEvent.Channel.WEB;
+    }
+
+    /**
+     * Whether the HTTP request of the current context was authenticated with a personal access key
+     * (MK-060): read from the identity already set on the request, so that nothing is authenticated
+     * again here.
+     */
+    private static boolean withAccessKey(ArcContainer container) {
+        InstanceHandle<CurrentVertxRequest> request = container.instance(CurrentVertxRequest.class);
+        RoutingContext routing = request.isAvailable() ? request.get().getCurrent() : null;
+        return routing != null
+                && routing.user() instanceof QuarkusHttpUser user
+                && user.getSecurityIdentity().getAttribute(AccessKeyRegistry.ATTRIBUTE) != null;
     }
 
     private String write(Map<String, ?> detail) {

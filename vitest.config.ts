@@ -42,6 +42,7 @@ export default defineConfig({
         'src/web/src/mk-sign-in.ts',
         'src/web/src/mk-settings.ts',
         'src/web/src/mk-sessions.ts',
+        'src/web/src/mk-access-keys.ts',
         'src/web/src/mk-admin-apps.ts',
         'src/web/src/mk-admin-permissions.ts',
         'src/web/src/mk-invite-person.ts',

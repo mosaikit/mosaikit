@@ -50,6 +50,41 @@ export interface AccountSession {
   readonly current: boolean;
 }
 
+/** A personal access key of the signed-in person (MK-060); its secret only once, at its creation. */
+export interface AccessKey {
+  readonly id: string;
+  readonly name: string;
+  /** The first characters of the key, to tell it apart. */
+  readonly prefix: string;
+  readonly organizationId: string;
+  /** The slug of the organization the key acts on. */
+  readonly organization: string;
+  /** Whether the key may change anything, or only read. */
+  readonly write: boolean;
+  readonly createdAt: string;
+  readonly lastUsedAt: string | null;
+  readonly expiresAt: string;
+  readonly expired: boolean;
+  /** The whole key, only in the answer to its creation. */
+  readonly secret?: string;
+}
+
+/** The access keys of the signed-in person, with the longest a new key may last. */
+export interface AccessKeys {
+  readonly maxValidityDays: number;
+  readonly keys: readonly AccessKey[];
+}
+
+/** What the person asks for when they create an access key. */
+export interface NewAccessKey {
+  readonly name: string;
+  /** The slug of the organization the key acts on. */
+  readonly organization: string;
+  /** When the key stops working; the longest the installation allows when absent. */
+  readonly expiresAt?: string;
+  readonly write: boolean;
+}
+
 /** An organization of the signed-in person (MK-017). */
 export interface Membership {
   readonly organizationId: string;
@@ -622,6 +657,27 @@ export class KernelClient {
     const response = await this.request(`/api/v1/accounts/me/sessions/${encodeURIComponent(id)}`, {
       method: 'DELETE',
     });
+    if (!response.ok) {
+      throw await toError(response);
+    }
+  }
+
+  /** The access keys of the signed-in person, the newest first (MK-060). */
+  accessKeys(): Promise<AccessKeys> {
+    return this.getJson<AccessKeys>('/api/v1/accounts/me/access-keys');
+  }
+
+  /** Creates an access key: the answer holds its secret, shown this once. */
+  createAccessKey(request: NewAccessKey): Promise<AccessKey> {
+    return this.sendJson<AccessKey>('/api/v1/accounts/me/access-keys', 'POST', request);
+  }
+
+  /** Revokes an access key: the next request with it is refused. */
+  async revokeAccessKey(id: string): Promise<void> {
+    const response = await this.request(
+      `/api/v1/accounts/me/access-keys/${encodeURIComponent(id)}`,
+      { method: 'DELETE' },
+    );
     if (!response.ok) {
       throw await toError(response);
     }

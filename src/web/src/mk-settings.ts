@@ -257,6 +257,10 @@ export class MkSettings extends LitElement {
         <legend>${t('Sessions')}</legend>
         <slot name="sessions"></slot>
       </fieldset>
+      <fieldset>
+        <legend>${t('Access keys')}</legend>
+        <slot name="access-keys"></slot>
+      </fieldset>
       ${this.sections.map(
         (section) =>
           html`<fieldset>
