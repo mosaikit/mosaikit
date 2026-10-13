@@ -174,6 +174,13 @@ running one.
 | Fast | pull requests, about 4 minutes | frontend checks, unit and Quarkus tests (without the installation tests and Keycloak) and end-to-end tests at the same time, secrets, SAST; a pull request of documentation only (`docs/`, Markdown files at the root) runs the frontend checks and `DocumentationTest`, in about a minute |
 | Full | `main`, every night at 02:17 UTC, tags, by hand | everything above, plus the installation tests, the tests with Keycloak, SonarQube, SBOM, dependency scan and the release documents; the portable archives on tags or by hand |
 
+The tests of the backend run in two jobs at the same time, `backend shard 1/2` and
+`backend shard 2/2`: `-Dtest.shard=<n>/2` makes the JUnit Platform filter `TestShards` of the kernel
+keep the test classes of one shard, the slow ones as listed in
+`src/server/src/test/resources/test-shards.properties` and the others by the hash of their name, so
+every class runs in exactly one shard. A class that takes more than a few seconds is worth a line
+there. The job `backend` passes when both shards pass.
+
 `frontend`, `backend` and `e2e` are required checks of `main`, and pull requests are opened with
 auto-merge (`gh pr merge --auto --rebase`): GitHub merges them when the checks pass, so nobody
 waits for the CI.
