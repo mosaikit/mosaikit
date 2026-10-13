@@ -85,7 +85,7 @@ export class MkShareDialog extends LitElement {
       gap: 8px;
       align-items: end;
     }
-    label {
+    .field {
       display: grid;
       gap: 4px;
       flex: 1 1 140px;
@@ -316,9 +316,10 @@ export class MkShareDialog extends LitElement {
       <fieldset>
         <legend>${t('Share with')}</legend>
         <div class="row">
-          <label
-            >${t('Who')}
-            <select
+          <span class="field"
+            ><label for="share-who">${t('Who')}</label
+            ><select
+              id="share-who"
               .value=${this.who}
               @change=${(event: Event) => {
                 this.who = (event.target as HTMLSelectElement).value as Who;
@@ -331,13 +332,14 @@ export class MkShareDialog extends LitElement {
                     ${names[kind]}
                   </option>`,
               )}
-            </select></label
+            </select></span
           >
           ${
             this.who === 'person'
-              ? html`<label
-                  >${t('Email')}
-                  <input
+              ? html`<span class="field"
+                  ><label for="share-email">${t('Email')}</label
+                  ><input
+                    id="share-email"
                     type="email"
                     required
                     autocomplete="off"
@@ -345,14 +347,15 @@ export class MkShareDialog extends LitElement {
                     @input=${(event: Event) => {
                       this.email = (event.target as HTMLInputElement).value;
                     }}
-                /></label>`
+                /></span>`
               : nothing
           }
           ${
             this.who === 'group'
-              ? html`<label
-                  >${t('Team')}
-                  <select
+              ? html`<span class="field"
+                  ><label for="share-team">${t('Team')}</label
+                  ><select
+                    id="share-team"
                     required
                     .value=${this.team}
                     @change=${(event: Event) => {
@@ -365,13 +368,14 @@ export class MkShareDialog extends LitElement {
                           ${team.name}
                         </option>`,
                     )}
-                  </select></label
+                  </select></span
                 >`
               : nothing
           }
-          <label
-            >${t('Level')}
-            <select
+          <span class="field"
+            ><label for="share-level">${t('Level')}</label
+            ><select
+              id="share-level"
               .value=${this.level}
               @change=${(event: Event) => {
                 this.level = (event.target as HTMLSelectElement).value;
@@ -383,7 +387,7 @@ export class MkShareDialog extends LitElement {
                     ${levelTitle(resource.levels, level.name)}
                   </option>`,
               )}
-            </select></label
+            </select></span
           >
           <button class="primary" type="submit">${t('Share')}</button>
         </div>
@@ -419,9 +423,10 @@ export class MkShareDialog extends LitElement {
           ${t('Anyone with the link opens it, also without an account, until it expires or is removed.')}
         </p>
         <div class="row">
-          <label
-            >${t('Link level')}
-            <select
+          <span class="field"
+            ><label for="link-level">${t('Link level')}</label
+            ><select
+              id="link-level"
               .value=${this.linkLevel}
               @change=${(event: Event) => {
                 this.linkLevel = (event.target as HTMLSelectElement).value;
@@ -433,11 +438,12 @@ export class MkShareDialog extends LitElement {
                     ${levelTitle(resource.levels, level.name)}
                   </option>`,
               )}
-            </select></label
+            </select></span
           >
-          <label
-            >${t('Expires on')}
-            <input
+          <span class="field"
+            ><label for="link-expires">${t('Expires on')}</label
+            ><input
+              id="link-expires"
               type="date"
               required
               min=${tomorrow}
@@ -446,26 +452,31 @@ export class MkShareDialog extends LitElement {
               @input=${(event: Event) => {
                 this.linkDay = (event.target as HTMLInputElement).value;
               }}
-          /></label>
-          <label
-            >${t('Password (optional)')}
-            <input
+          /></span>
+          <span class="field"
+            ><label for="link-password">${t('Password (optional)')}</label
+            ><input
+              id="link-password"
               type="password"
               autocomplete="new-password"
               .value=${this.linkPassword}
               @input=${(event: Event) => {
                 this.linkPassword = (event.target as HTMLInputElement).value;
               }}
-          /></label>
+          /></span>
           <button class="primary" type="submit">${t('Create link')}</button>
         </div>
         ${
           made
             ? html`<div class="made">
-                <label
-                  >${t('Address of the link')}
-                  <input readonly .value=${linkAddress(made.token)} @focus=${this.selectAll}
-                /></label>
+                <span class="field"
+                  ><label for="link-address">${t('Address of the link')}</label
+                  ><input
+                    id="link-address"
+                    readonly
+                    .value=${linkAddress(made.token)}
+                    @focus=${this.selectAll}
+                /></span>
                 <p class="hint">
                   ${t('Shown only now: copy it and give it to the people you choose.')}
                 </p>

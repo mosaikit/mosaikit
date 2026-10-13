@@ -49,7 +49,7 @@ export class MkSharedLink extends LitElement {
       align-items: end;
       margin-top: 12px;
     }
-    label {
+    .field {
       display: grid;
       gap: 4px;
       flex: 1 1 220px;
@@ -150,9 +150,10 @@ export class MkSharedLink extends LitElement {
               void this.open(this.password);
             }}
           >
-            <label
-              >${t('Password of the link')}
-              <input
+            <span class="field"
+              ><label for="link-password">${t('Password of the link')}</label
+              ><input
+                id="link-password"
                 type="password"
                 required
                 autocomplete="off"
@@ -160,7 +161,7 @@ export class MkSharedLink extends LitElement {
                 @input=${(event: Event) => {
                   this.password = (event.target as HTMLInputElement).value;
                 }}
-            /></label>
+            /></span>
             <button type="submit">${t('Open')}</button>
           </form>`;
       case 'opened':
