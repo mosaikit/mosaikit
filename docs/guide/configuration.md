@@ -67,6 +67,21 @@ Terminate TLS at a reverse proxy or an ingress; in production the kernel sends
 | `mosaikit.audit.min-retention` | `365d` | the shortest retention of the audit log, rounded up to whole days: organizations and the platform may keep their entries longer, never less, and no entry younger is ever deleted (MK-059) |
 | `mosaikit.audit.retention-check` | `6h` | how often each kernel deletes the entries older than their retention |
 
+## Events of the platform
+
+The kernel delivers events, such as an organization created or a file stored, to the Java code of
+extensions that subscribe to them (MK-085). The events wait in the database until each subscriber took
+them, so they survive a restart; every kernel of the installation delivers, and a delivery is never
+handed to two kernels at once. A delivery given up is recorded in the audit log of its organization
+(`events.delivery.failed`, channel `JOB`).
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `mosaikit.events.poll-interval` | `2s` | how often each kernel looks for events to deliver; the longest wait of an event before its first delivery |
+| `mosaikit.events.retry-delay` | `10s` | how long a delivery that failed waits before the next attempt; each next one waits twice as long, at most an hour |
+| `mosaikit.events.max-attempts` | `10` | how many times an event is given to a subscriber before the kernel gives up on it |
+| `mosaikit.events.keep` | `7d` | how long events stay in the database once every subscriber received them or was given up on |
+
 ## Credentials of extensions
 
 The store of credentials (MK-062) encrypts each value under a data key of its own, and each data key

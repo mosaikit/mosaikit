@@ -3,10 +3,12 @@
 package dev.mosaikit.kernel.core.resources;
 
 import dev.mosaikit.kernel.api.context.CurrentOrganization;
+import dev.mosaikit.kernel.api.events.PlatformEvents;
 import dev.mosaikit.kernel.api.extension.ExtensionManifest;
 import dev.mosaikit.kernel.api.resource.Resource;
 import dev.mosaikit.kernel.api.resource.ResourceRef;
 import dev.mosaikit.kernel.api.resource.Resources;
+import dev.mosaikit.kernel.core.events.PlatformEventLog;
 import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
 import dev.mosaikit.kernel.core.extension.ExtensionsLoaded;
 import dev.mosaikit.kernel.core.extension.InstalledExtension;
@@ -20,6 +22,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -53,20 +56,29 @@ public class ResourceRegistry implements Resources {
     private final CurrentOrganization organization;
     private final Supplier<Optional<UUID>> person;
     private final Clock clock;
+    private final Raise raise;
+
+    /** Raises an event of the platform in an organization (MK-085). */
+    @FunctionalInterface
+    interface Raise {
+        void raise(UUID organization, String type, Map<String, ?> payload);
+    }
 
     @Inject
     public ResourceRegistry(
             RegisteredResources entries,
             ExtensionRegistry extensions,
             CurrentOrganization organization,
-            SecurityIdentity identity) {
+            SecurityIdentity identity,
+            PlatformEventLog events) {
         this(
                 entries,
                 id -> extensions.findActive(id).flatMap(InstalledExtension::manifest),
                 () -> extensions.all().stream().map(InstalledExtension::key).toList(),
                 organization,
                 () -> RequestOrganization.account(identity),
-                Clock.systemUTC());
+                Clock.systemUTC(),
+                events::raise);
     }
 
     ResourceRegistry(
@@ -76,12 +88,24 @@ public class ResourceRegistry implements Resources {
             CurrentOrganization organization,
             Supplier<Optional<UUID>> person,
             Clock clock) {
+        this(entries, manifests, installed, organization, person, clock, (org, type, payload) -> {});
+    }
+
+    ResourceRegistry(
+            RegisteredResources entries,
+            Function<String, Optional<ExtensionManifest>> manifests,
+            Supplier<Collection<String>> installed,
+            CurrentOrganization organization,
+            Supplier<Optional<UUID>> person,
+            Clock clock,
+            Raise raise) {
         this.entries = entries;
         this.manifests = manifests;
         this.installed = installed;
         this.organization = organization;
         this.person = person;
         this.clock = clock;
+        this.raise = raise;
     }
 
     @Override
@@ -101,6 +125,12 @@ public class ResourceRegistry implements Resources {
         RegisteredResource entry = new RegisteredResource(
                 org, ref, person.get().orElse(null), details.title(), details.link(), parent, now);
         entries.insert(entry);
+        Map<String, Object> payload = new LinkedHashMap<>(refPayload(ref));
+        payload.put("title", entry.getTitle());
+        if (entry.getOwnerId() != null) {
+            payload.put("owner", entry.getOwnerId().toString());
+        }
+        raise.raise(org, PlatformEvents.RESOURCE_REGISTERED, payload);
         return view(entry, details.parent());
     }
 
@@ -121,7 +151,14 @@ public class ResourceRegistry implements Resources {
     public void remove(ResourceRef ref) {
         declared(ref);
         UUID org = organization.require();
-        entries.find(org, ref.extension(), ref.type(), ref.id()).ifPresent(entries::delete);
+        entries.find(org, ref.extension(), ref.type(), ref.id()).ifPresent(entry -> {
+            entries.delete(entry);
+            raise.raise(org, PlatformEvents.RESOURCE_REMOVED, refPayload(ref));
+        });
+    }
+
+    private static Map<String, Object> refPayload(ResourceRef ref) {
+        return Map.of("extension", ref.extension(), "type", ref.type(), "id", ref.id());
     }
 
     @Override

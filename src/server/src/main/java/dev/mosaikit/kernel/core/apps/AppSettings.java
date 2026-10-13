@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.core.apps;
 
+import dev.mosaikit.kernel.api.events.PlatformEvents;
 import dev.mosaikit.kernel.api.extension.Contribution;
 import dev.mosaikit.kernel.api.extension.ExtensionManifest;
 import dev.mosaikit.kernel.core.error.InvalidInputException;
+import dev.mosaikit.kernel.core.events.PlatformEventLog;
 import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
 import dev.mosaikit.kernel.core.extension.InstalledExtension;
 import dev.mosaikit.kernel.core.security.Roles;
@@ -15,6 +17,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -40,10 +43,12 @@ public class AppSettings {
 
     private final ExtensionRegistry registry;
     private final OrganizationApps apps;
+    private final PlatformEventLog events;
 
-    public AppSettings(ExtensionRegistry registry, OrganizationApps apps) {
+    public AppSettings(ExtensionRegistry registry, OrganizationApps apps, PlatformEventLog events) {
         this.registry = registry;
         this.apps = apps;
+        this.events = events;
     }
 
     /** An app of an active extension, as the shell would show it without settings. */
@@ -135,6 +140,10 @@ public class AppSettings {
         if (!problems.isEmpty()) {
             throw new InvalidInputException(problems);
         }
+        Set<String> extensions = new LinkedHashSet<>();
+        available().forEach(app -> extensions.add(app.extensionId()));
+        Set<String> offBefore = new HashSet<>();
+        extensions.stream().filter(id -> isOff(organizationId, id)).forEach(offBefore::add);
         apps.deleteByOrganizationId(organizationId);
         for (int i = 0; i < changed.size(); i++) {
             AppView app = changed.get(i);
@@ -147,7 +156,24 @@ public class AppSettings {
                     app.pinned(),
                     app.isRestricted()));
         }
+        raiseTurned(organizationId, extensions, offBefore);
         return list(organizationId);
+    }
+
+    /**
+     * Raises an event for each extension that the change turned off or on in the organization
+     * (MK-085), so that it releases or prepares what it keeps for it.
+     */
+    private void raiseTurned(UUID organizationId, Set<String> extensions, Set<String> offBefore) {
+        for (String extension : extensions) {
+            boolean off = isOff(organizationId, extension);
+            if (off != offBefore.contains(extension)) {
+                events.raise(
+                        organizationId,
+                        off ? PlatformEvents.EXTENSION_DISABLED : PlatformEvents.EXTENSION_ENABLED,
+                        Map.of("extension", extension));
+            }
+        }
     }
 
     /**

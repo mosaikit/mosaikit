@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.mosaikit.kernel.core.account.AccessKeyRegistry;
 import dev.mosaikit.kernel.core.config.KernelConfig;
 import dev.mosaikit.kernel.core.error.InvalidInputException;
+import dev.mosaikit.kernel.core.jobs.OrganizationJob;
 import dev.mosaikit.kernel.core.service.ServiceRegistry;
 import io.quarkus.arc.Arc;
 import io.quarkus.arc.ArcContainer;
@@ -74,7 +75,8 @@ public class AuditLog {
      * Records an event, through the channel of the current call: {@link AuditEvent.Channel#API_KEY} in
      * a request authenticated with a personal access key (MK-060), {@link AuditEvent.Channel#SERVICE}
      * in a request of a service identity (MK-124), {@link AuditEvent.Channel#WEB} in
-     * other requests, {@link AuditEvent.Channel#JOB} outside requests.
+     * other requests, {@link AuditEvent.Channel#JOB} outside requests and in the work of an extension
+     * for an organization (MK-126).
      */
     @Transactional(Transactional.TxType.REQUIRES_NEW)
     public void append(
@@ -420,7 +422,9 @@ public class AuditLog {
 
     private static AuditEvent.Channel currentChannel() {
         ArcContainer container = Arc.container();
-        if (container == null || !container.requestContext().isActive()) {
+        if (container == null
+                || !container.requestContext().isActive()
+                || OrganizationJob.current().isPresent()) {
             return AuditEvent.Channel.JOB;
         }
         SecurityIdentity identity = identityOfTheRequest(container);

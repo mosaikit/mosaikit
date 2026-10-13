@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.core.files;
 
+import dev.mosaikit.kernel.api.events.PlatformEvents;
 import dev.mosaikit.kernel.api.extension.ResourceTypeEntry;
 import dev.mosaikit.kernel.api.resource.ResourceRef;
 import dev.mosaikit.kernel.core.audit.AuditEvent;
@@ -13,6 +14,7 @@ import dev.mosaikit.kernel.core.error.ForbiddenOperationException;
 import dev.mosaikit.kernel.core.error.InvalidInputException;
 import dev.mosaikit.kernel.core.error.ResourceNotFoundException;
 import dev.mosaikit.kernel.core.error.ServiceUnavailableException;
+import dev.mosaikit.kernel.core.events.PlatformEventLog;
 import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
 import dev.mosaikit.kernel.core.extension.InstalledExtension;
 import dev.mosaikit.kernel.core.identity.RequestOrganization;
@@ -150,6 +152,7 @@ public class FileService {
     private final TransactionSynchronizationRegistry transactions;
     private final QuotaService quotas;
     private final KernelSharing sharing;
+    private final PlatformEventLog events;
     private final long maxSize;
     private final Clock clock = Clock.systemUTC();
 
@@ -166,6 +169,7 @@ public class FileService {
             TransactionSynchronizationRegistry transactions,
             QuotaService quotas,
             KernelSharing sharing,
+            PlatformEventLog events,
             KernelConfig config) {
         this.files = files;
         this.store = store;
@@ -178,6 +182,7 @@ public class FileService {
         this.transactions = transactions;
         this.quotas = quotas;
         this.sharing = sharing;
+        this.events = events;
         this.maxSize = config.files().maxSize().asLongValue();
     }
 
@@ -241,6 +246,7 @@ public class FileService {
                         Instant.now(clock).truncatedTo(ChronoUnit.MICROS));
                 files.insert(file);
                 audited("file.stored", file);
+                raise(PlatformEvents.FILE_STORED, file);
                 return FileView.of(file);
             });
         } catch (RuntimeException e) {
@@ -312,6 +318,7 @@ public class FileService {
                 }
             }));
             audited("file.deleted", file);
+            raise(PlatformEvents.FILE_DELETED, file);
             return null;
         });
     }
@@ -664,6 +671,25 @@ public class FileService {
                 file.getId().toString(),
                 AuditEvent.Outcome.SUCCEEDED,
                 detail);
+    }
+
+    /** Raises an event of a file for the subscribers of extensions (MK-085), in the transaction of the change. */
+    private void raise(String type, StoredFile file) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("extension", file.getExtensionId());
+        payload.put("file", file.getId().toString());
+        payload.put("name", file.getName());
+        payload.put("contentType", file.getContentType());
+        payload.put("size", file.getSize());
+        if (file.getTeamId() != null) {
+            payload.put("team", file.getTeamId().toString());
+        }
+        if (file.getResourceId() != null) {
+            resources
+                    .findById(file.getResourceId())
+                    .ifPresent(entry -> payload.put("resource", entry.ref().toString()));
+        }
+        events.raise(file.getOrganizationId(), type, payload);
     }
 
     /**

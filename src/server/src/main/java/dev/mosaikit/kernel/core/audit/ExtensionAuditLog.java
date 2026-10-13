@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.mosaikit.kernel.api.audit.AuditLog.Entry;
 import dev.mosaikit.kernel.api.context.CurrentOrganization;
 import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
+import dev.mosaikit.kernel.core.jobs.OrganizationJob;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.util.Optional;
@@ -14,7 +15,8 @@ import java.util.UUID;
 
 /**
  * The audit log offered to extensions (MK-059): an entry of the organization of the request, by its
- * person, through the channel {@code EXTENSION}, with the action qualified by the extension.
+ * person, through the channel {@code EXTENSION}, with the action qualified by the extension; in the
+ * work of an extension for an organization (MK-126), by the extension through the channel {@code JOB}.
  */
 @ApplicationScoped
 public class ExtensionAuditLog implements dev.mosaikit.kernel.api.audit.AuditLog {
@@ -58,9 +60,12 @@ public class ExtensionAuditLog implements dev.mosaikit.kernel.api.audit.AuditLog
             throw new IllegalArgumentException("The details must be at most " + MAX_DETAILS + " characters as JSON");
         }
         UUID org = organization.require();
-        String actor = identity.isAnonymous() ? SYSTEM : identity.getPrincipal().getName();
+        // In the work of an extension for an organization (MK-126), the extension is the actor.
+        Optional<String> job = OrganizationJob.current();
+        String actor = job.orElseGet(
+                () -> identity.isAnonymous() ? SYSTEM : identity.getPrincipal().getName());
         log.append(
-                AuditEvent.Channel.EXTENSION,
+                job.isPresent() ? AuditEvent.Channel.JOB : AuditEvent.Channel.EXTENSION,
                 actor,
                 Optional.of(org),
                 action,

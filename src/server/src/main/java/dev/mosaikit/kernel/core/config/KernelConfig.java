@@ -223,6 +223,29 @@ public interface KernelConfig {
         Map<String, Long> limits();
     }
 
+    /** Events of the platform for the Java code of extensions (MK-085). */
+    Events events();
+
+    /** Settings of the events of the platform. */
+    interface Events {
+
+        /** How often each kernel looks for events to deliver. */
+        @WithDefault("2s")
+        Duration pollInterval();
+
+        /** How long the first retry of a failed delivery waits; each next one waits twice as long, up to an hour. */
+        @WithDefault("10s")
+        Duration retryDelay();
+
+        /** How many times an event is given to a subscriber before the kernel gives up on it. */
+        @WithDefault("10")
+        int maxAttempts();
+
+        /** How long events stay once every subscriber received them, or was given up on. */
+        @WithDefault("7d")
+        Duration keep();
+    }
+
     /** Settings of the audit log. */
     interface Audit {
 
