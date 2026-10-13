@@ -103,6 +103,21 @@ public class OrganizationAccess {
                         .map(member -> new Access(found.id(), found.slug(), member.getRoles())));
     }
 
+    /**
+     * The organization of a request made with a personal access key (MK-060): the organization of the
+     * key, while the person is still a member of it, with the roles they have there now. The sign-in
+     * policy of the organization was met when the key was created, from a session in it.
+     */
+    @ActivateRequestContext
+    @Transactional
+    public Optional<Access> forKey(UUID accountId, UUID organizationId) {
+        return directory
+                .routing()
+                .byId(organizationId)
+                .flatMap(found -> members.findByAccountIdAndOrganizationId(accountId, found.id())
+                        .map(member -> new Access(found.id(), found.slug(), member.getRoles())));
+    }
+
     private static Optional<OrganizationIdentity> onlyOrganizationWithPassword(
             IdentityRouting routing, List<OrganizationMember> memberships) {
         List<OrganizationIdentity> usable = memberships.stream()

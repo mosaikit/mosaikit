@@ -145,6 +145,38 @@ describe('KernelClient (MK-008)', () => {
     expect(fetchMock.mock.calls.at(-1)?.[1]?.method).toBe('DELETE');
   });
 
+  it('lists, creates and revokes the access keys of the person (MK-060)', async () => {
+    const fetchMock = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>(
+      (path, init) =>
+        Promise.resolve(
+          init?.method === 'DELETE'
+            ? new Response(null, { status: 204 })
+            : init?.method === 'POST'
+              ? json(201, { id: 'k-1', secret: 'mk_secret' })
+              : path === '/api/v1/accounts/me/access-keys'
+                ? json(200, { maxValidityDays: 365, keys: [] })
+                : json(404, {}),
+        ),
+    );
+    const client = new KernelClient(fetchMock);
+
+    expect(await client.accessKeys()).toEqual({ maxValidityDays: 365, keys: [] });
+    expect(
+      await client.createAccessKey({ name: 'Script', organization: 'acme', write: false }),
+    ).toEqual({ id: 'k-1', secret: 'mk_secret' });
+    expect(JSON.parse(fetchMock.mock.calls.at(-1)?.[1]?.body as string)).toEqual({
+      name: 'Script',
+      organization: 'acme',
+      write: false,
+    });
+    await client.revokeAccessKey('k 1');
+    expect(fetchMock.mock.calls.at(-1)?.[0]).toBe('/api/v1/accounts/me/access-keys/k%201');
+    expect(fetchMock.mock.calls.at(-1)?.[1]?.method).toBe('DELETE');
+
+    fetchMock.mockResolvedValueOnce(json(404, { title: 'Not Found', detail: 'No such key.' }));
+    await expect(client.revokeAccessKey('k-2')).rejects.toThrow('No such key.');
+  });
+
   it('signs in with an access token of a realm (MK-012)', async () => {
     const fetchMock = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>(() =>
       Promise.resolve(json(200, { username: 'ada@acme.com' })),
