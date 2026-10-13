@@ -68,6 +68,12 @@ project follows [Semantic Versioning](https://semver.org/).
 - `ServiceCaller` in `mosaikit-kernel-api` (`dev.mosaikit.kernel.api.context`), with which the Java
   code of an extension recognizes a call of a service identity (MK-124): `isService(roles)` and
   `name(principal)`.
+- `FileStorage` in `kernel-api` (`dev.mosaikit.kernel.api.files`, MK-041): Java extensions store a
+  file from an `InputStream` with its name, type, team and registered resource, read it as a stream
+  with its metadata (`FileContent`, `StoredFile`), list and delete their files, naming their
+  extension in every call, with the rights of the person as through the REST API and without the
+  credentials of the store. The calls join the transaction of the caller.
+
 - Read-only views of people, organizations, memberships and teams for external services (MK-123),
   such as a map server that reads the roles of people from the database: `account`,
   `organization`, `membership`, `team` and `team_member` in the new schema `mk_published`
