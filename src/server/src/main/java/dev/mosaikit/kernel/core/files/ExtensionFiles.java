@@ -12,6 +12,7 @@ import dev.mosaikit.kernel.core.error.ContentTooLargeException;
 import dev.mosaikit.kernel.core.error.DomainException;
 import dev.mosaikit.kernel.core.error.ForbiddenOperationException;
 import dev.mosaikit.kernel.core.error.InvalidInputException;
+import dev.mosaikit.kernel.core.error.QuotaExceededException;
 import dev.mosaikit.kernel.core.error.ResourceNotFoundException;
 import dev.mosaikit.kernel.core.error.ServiceUnavailableException;
 import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
@@ -165,6 +166,8 @@ public class ExtensionFiles implements FileStorage {
             case ServiceUnavailableException unavailable ->
                 new UncheckedIOException(new IOException(unavailable.getMessage(), unavailable));
             case ConflictException conflict -> new IllegalStateException(conflict.getMessage(), conflict);
+            // MK-076: a write beyond the storage quota of the organization.
+            case QuotaExceededException quota -> new IllegalStateException(quota.getMessage(), quota);
         };
     }
 }
