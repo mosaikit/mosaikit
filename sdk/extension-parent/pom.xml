@@ -54,6 +54,9 @@
              built for. -->
         <mosaikit.version>${project.parent.version}</mosaikit.version>
         <quarkus.platform.version>3.39.5</quarkus.platform.version>
+        <!-- As in the kernel: over the version of the Quarkus BOM (2.22.2), for CVE-2026-89407 and
+             CVE-2026-89425; remove it when the Quarkus BOM brings 2.22.3 or later. -->
+        <jackson-bom.version>2.22.3</jackson-bom.version>
         <!-- The name of the package and of the JAR, as manifest.yaml names it (backend.jar). -->
         <extension.package.name>${project.artifactId}</extension.package.name>
         <skip.npm>false</skip.npm>
@@ -62,6 +65,15 @@
 
     <dependencyManagement>
         <dependencies>
+            <!-- Before the Quarkus BOM: the first import that manages an artifact wins, so extensions
+                 compile against the same Jackson as the kernel. -->
+            <dependency>
+                <groupId>com.fasterxml.jackson</groupId>
+                <artifactId>jackson-bom</artifactId>
+                <version>${jackson-bom.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
             <dependency>
                 <groupId>io.quarkus.platform</groupId>
                 <artifactId>quarkus-bom</artifactId>
