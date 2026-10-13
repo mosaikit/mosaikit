@@ -28,6 +28,8 @@ public class TestExtensions implements QuarkusTestProfile {
             extension("todo", "dev.mosaikit.test.todo", "To do", """
                     data:
                       collections: [items]
+                    permissions:
+                      - { name: add-item, title: Add items }
                     contributes:
                       rail.app:
                         - { id: todo, title: To do, route: /app/todo, element: test-todo-app, order: 10 }
@@ -64,6 +66,9 @@ public class TestExtensions implements QuarkusTestProfile {
                         title: Note
                         levels: [{ name: view, title: View }]
                     """);
+            // PermissionsTest: an extension that declares permissions (MK-056); the test changes
+            // its manifest as an update would.
+            extension("permissions", PermissionsTest.EXTENSION, "Permissions", PermissionsTest.PERMISSIONS);
             // ThemeExtensionTest: a theme that names the product and brings its logo (MK-052), and one
             // with a value that is not a color.
             theme("green", "dev.mosaikit.test.green", "Green", "'#1b6e3c'", """
@@ -81,7 +86,7 @@ public class TestExtensions implements QuarkusTestProfile {
                 "mosaikit.extensions.directory", EXTENSIONS.toString(), "mosaikit.ui.theme", "dev.mosaikit.test.green");
     }
 
-    private static void extension(String directory, String id, String name, String extra) throws IOException {
+    static void extension(String directory, String id, String name, String extra) throws IOException {
         Path web = Files.createDirectories(EXTENSIONS.resolve(directory).resolve("web"));
         Files.writeString(web.resolve("index.js"), "export default { activate() {} };\n");
         Files.writeString(web.getParent().resolve("manifest.yaml"), """
