@@ -22,6 +22,7 @@ import jakarta.ws.rs.core.Response;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
@@ -83,6 +84,26 @@ public class FilesProbe {
     @GET
     public Response list(@PathParam("extension") String extension, @QueryParam("team") UUID team) {
         return answer(() -> files.list(extension, team, 0, 100));
+    }
+
+    @POST
+    @Path("/{id}/link")
+    public Response link(
+            @PathParam("extension") String extension,
+            @PathParam("id") UUID id,
+            @QueryParam("validFor") String validFor) {
+        return answer(() -> files.link(extension, id, validFor == null ? null : Duration.parse(validFor)));
+    }
+
+    @POST
+    @Path("/links")
+    public Response linkToPrefix(
+            @PathParam("extension") String extension,
+            @QueryParam("prefix") String prefix,
+            @QueryParam("team") UUID team,
+            @QueryParam("validFor") String validFor) {
+        return answer(() -> files.linkToPrefix(
+                extension, prefix == null ? "" : prefix, team, validFor == null ? null : Duration.parse(validFor)));
     }
 
     @DELETE

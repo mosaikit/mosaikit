@@ -5,6 +5,7 @@ package dev.mosaikit.kernel.core.files;
 import dev.mosaikit.kernel.api.context.CurrentOrganization;
 import dev.mosaikit.kernel.api.files.FileContent;
 import dev.mosaikit.kernel.api.files.FileStorage;
+import dev.mosaikit.kernel.api.files.SignedLink;
 import dev.mosaikit.kernel.api.files.StoredFile;
 import dev.mosaikit.kernel.api.resource.ResourceRef;
 import dev.mosaikit.kernel.core.error.ConflictException;
@@ -22,6 +23,8 @@ import jakarta.enterprise.context.ApplicationScoped;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -44,13 +47,16 @@ public class ExtensionFiles implements FileStorage {
     private final ExtensionRegistry extensions;
     private final RegisteredResources resources;
     private final CurrentOrganization organization;
+    private final FileLinks links;
 
     public ExtensionFiles(
             FileService files,
             ExtensionRegistry extensions,
             RegisteredResources resources,
-            CurrentOrganization organization) {
+            CurrentOrganization organization,
+            FileLinks links) {
         this.files = files;
+        this.links = links;
         this.extensions = extensions;
         this.resources = resources;
         this.organization = organization;
@@ -107,6 +113,38 @@ public class ExtensionFiles implements FileStorage {
             files.delete(extension, id);
             return null;
         });
+    }
+
+    @Override
+    public SignedLink link(String extension, UUID id, Duration validFor) {
+        Objects.requireNonNull(id, "id");
+        active(extension);
+        Instant expires = expiry(validFor);
+        return signed(call(() -> links.toFile(extension, id, expires)));
+    }
+
+    @Override
+    public SignedLink linkToPrefix(String extension, String prefix, UUID team, Duration validFor) {
+        Objects.requireNonNull(prefix, "prefix");
+        active(extension);
+        Instant expires = expiry(validFor);
+        return signed(call(() -> links.toPrefix(extension, prefix, team, expires)));
+    }
+
+    /** The expiry of a link valid for a time; {@code null} for the longest validity. */
+    private static Instant expiry(Duration validFor) {
+        if (validFor == null) {
+            return null;
+        }
+        if (validFor.isNegative() || validFor.isZero()) {
+            throw new IllegalArgumentException("A link is valid for a positive time.");
+        }
+        return Instant.now().plus(validFor);
+    }
+
+    private static SignedLink signed(FileLinks.Made made) {
+        return new SignedLink(
+                made.path(), made.base(), made.query(), made.link().expires());
     }
 
     /** The calling extension must be active, as for the other beans of the kernel. */

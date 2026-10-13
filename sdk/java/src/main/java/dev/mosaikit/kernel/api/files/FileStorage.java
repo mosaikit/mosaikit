@@ -5,6 +5,7 @@ package dev.mosaikit.kernel.api.files;
 import dev.mosaikit.kernel.api.resource.ResourceRef;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.time.Duration;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -116,6 +117,39 @@ public interface FileStorage {
      * @throws NoSuchElementException when the team is not a team of the person
      */
     List<StoredFile> list(String extension, UUID team, int offset, int limit);
+
+    /**
+     * A signed, expiring link to a file of the extension that the person of the request reads
+     * (MK-093): whoever holds it downloads the file without a session until it expires, such as a
+     * viewer, an external tool or the reader of a notification. Making it is audited.
+     *
+     * @param extension identifier of the calling extension
+     * @param validFor how long it works, at most what the installation allows
+     *     ({@code mosaikit.files.link-max-validity}, 7 days unless set); {@code null} for the longest
+     * @throws NoSuchElementException when there is no such file, or the person may not read it
+     * @throws IllegalArgumentException when the extension is not active, or the validity is not
+     *     positive or too long
+     * @throws UncheckedIOException when the installation has no key to sign links
+     */
+    SignedLink link(String extension, UUID id, Duration validFor);
+
+    /**
+     * A signed, expiring link to every file of the extension whose name starts with a prefix, such as
+     * {@code tiles/} (MK-093): the files of one team of the person, or with no team those of the
+     * organization. A file under it is at {@link SignedLink#file(String)}; the newest file of a name
+     * answers. Making it is audited.
+     *
+     * @param extension identifier of the calling extension
+     * @param prefix the start of the names; empty for every file of the scope
+     * @param team a team of the person, or {@code null} for the files of the organization
+     * @param validFor as for {@link #link(String, UUID, Duration)}
+     * @throws NoSuchElementException when the team is not a team of the person
+     * @throws SecurityException when a guest asks for the files of the organization
+     * @throws IllegalArgumentException when the extension is not active, the prefix is not the start
+     *     of a valid name, or the validity is not positive or too long
+     * @throws UncheckedIOException when the installation has no key to sign links
+     */
+    SignedLink linkToPrefix(String extension, String prefix, UUID team, Duration validFor);
 
     /**
      * Deletes a file: the person who stored it, an owner of its team or an administrator of the

@@ -43,6 +43,9 @@ project follows [Semantic Versioning](https://semver.org/).
   organization see each measure with its limit and the consumption of a month by person, current at
   every action, on the new page Administration > Quotas and through
   `GET /api/v1/organizations/{slug}/quotas` and `GET /api/v1/organizations/{slug}/quotas/usage`.
+- `FileStorage.link` and `FileStorage.linkToPrefix` in the Java API (`dev.mosaikit.kernel.api.files`):
+  an extension makes a signed link to a file or to a prefix of names, valid for a given time
+  (MK-093).
 - Files of extensions (MK-041): the kernel keeps them in a directory of the server (the default,
   `files/` of the installation, `data/files/` of the portable, a volume in compose and Helm) or in a
   bucket of an S3-compatible object store such as Amazon S3, MinIO, Ceph or Garage
