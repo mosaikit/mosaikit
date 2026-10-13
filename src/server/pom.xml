@@ -99,7 +99,7 @@
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-security</artifactId>
         </dependency>
-        <!-- The cleanup of expired sessions (MK-125) -->
+        <!-- Scheduled jobs: the cleanup of expired sessions (MK-125), the retention of the audit log (MK-059) -->
         <dependency>
             <groupId>io.quarkus</groupId>
             <artifactId>quarkus-scheduler</artifactId>
