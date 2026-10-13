@@ -327,6 +327,32 @@ const ITALIAN: Record<string, string> = {
     "Nella pagina di accesso, nelle organizzazioni che lo consentono. Un link inviato per email conferma l'indirizzo prima del primo accesso.",
   'People can create their own account.': 'Le persone possono creare il proprio account.',
   'Self-registration is off.': 'La registrazione autonoma è disattivata.',
+  // External origins of the content security policy (MK-128)
+  'External origins': 'Origini esterne',
+  'Services outside the installation that the shell and the extensions may contact from the browser, for images, data and tiles. Every other address stays blocked by the content security policy of the browser.':
+    "Servizi fuori dall'installazione che la shell e le estensioni possono contattare dal browser, per immagini, dati e tile. Ogni altro indirizzo resta bloccato dalla politica di sicurezza dei contenuti del browser.",
+  'No external origin: the browser contacts this installation only.':
+    'Nessuna origine esterna: il browser contatta solo questa installazione.',
+  Origin: 'Origine',
+  'Allowed since': 'Consentita dal',
+  'Set in the configuration of the installation':
+    "Impostata nella configurazione dell'installazione",
+  'Allow an origin': "Consenti un'origine",
+  'Scheme, host and port only, such as https://tiles.example.org or https://*.tiles.example.org.':
+    'Solo schema, host e porta, come https://tiles.example.org o https://*.tiles.example.org.',
+  Allow: 'Consenti',
+  'Remove {origin}': 'Rimuovi {origin}',
+  'Remove {origin}? Images, data and tiles of that service stop loading in the browser.':
+    'Rimuovere {origin}? Immagini, dati e tile di quel servizio smettono di caricarsi nel browser.',
+  'Write an origin such as https://tiles.example.org: a scheme (https, wss, http or ws), a host and a port, without a path.':
+    "Scrivi un'origine come https://tiles.example.org: uno schema (https, wss, http o ws), un host e una porta, senza percorso.",
+  '{origin} allowed.': '{origin} consentita.',
+  '{origin} removed.': '{origin} rimossa.',
+  'The origins cannot be read: {reason}': 'Non è possibile leggere le origini: {reason}',
+  'Not allowed: {reason}': 'Non consentita: {reason}',
+  'Not removed: {reason}': 'Non rimossa: {reason}',
+  'The kernel sends the policy in production only: in this installation the browser is not restricted.':
+    'Il kernel invia la politica solo in produzione: in questa installazione il browser non è limitato.',
   // Service identities (MK-124)
   'Service identities': 'Identità di servizio',
   'For the services that call the APIs of extensions without a person, such as a gateway. Each has its own key, the APIs it may call and no organization; it never opens the shell.':

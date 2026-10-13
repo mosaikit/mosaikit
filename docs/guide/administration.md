@@ -388,6 +388,23 @@ retention of their organization, oldest first, and records it in the same chain
 (`audit.entries.deleted`, channel `JOB`). The chain stays verifiable: the kernel keeps the hash of the
 last deleted entry, and the verification starts from there (`firstIndex`).
 
+## External origins
+
+The browser loads and contacts only the installation, so the shell and the frontends of extensions
+cannot read an external service directly, even one that allows cross-origin calls. Platform
+administrators list the external services that the browser may contact for images, data and tiles
+in **External origins**, in the administration menu, or with
+`/api/v1/platform/content-security-policy` (MK-128): an origin is `scheme://host[:port]`, such as
+`https://tiles.example.org`, or `https://*.tiles.example.org` for its sub-domains. The page also
+shows the origins set in `mosaikit.content-security-policy.allowed-origins`, which only the
+configuration removes (see [configuration](configuration.md#content-security-policy)). Every other
+address stays blocked.
+
+Each origin added or removed is in the audit log of the platform (`content-security-policy.origin-added`,
+`content-security-policy.origin-removed`). Every kernel of the installation applies a change within
+30 seconds, the one that received it at once. Administrators of organizations and extensions cannot
+change the list: the table belongs to the installation, and requests have no right on it.
+
 ## Credentials of extensions
 
 Extensions call external services, such as model providers, mail servers or databases, with keys
