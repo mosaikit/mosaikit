@@ -67,7 +67,19 @@ Terminate TLS at a reverse proxy or an ingress; in production the kernel sends
 | `mosaikit.audit.min-retention` | `365d` | the shortest retention of the audit log, rounded up to whole days: organizations and the platform may keep their entries longer, never less, and no entry younger is ever deleted (MK-059) |
 | `mosaikit.audit.retention-check` | `6h` | how often each kernel deletes the entries older than their retention |
 
-## Extensions
+## Credentials of extensions
+
+The store of credentials (MK-062) encrypts each value under a data key of its own, and each data key
+under a master key that never goes in the database. Without a valid master key the store is
+disabled: the kernel starts, logs why, and the endpoints of credentials answer 503. See
+[administration](administration.md#credentials-of-extensions) for how to generate and rotate the key.
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `mosaikit.secrets.master-key` | | the current master key, 32 random bytes in base64 (`openssl rand -base64 32`); prefer the environment variable `MOSAIKIT_SECRETS_MASTER_KEY` or a file to a file of settings |
+| `mosaikit.secrets.master-key-file` | | a file that holds the current master key in base64, such as a mounted secret of Kubernetes or Docker; set this or `master-key`, not both |
+| `mosaikit.secrets.previous-keys` | | former master keys in base64, separated by commas, kept during a rotation: credentials not yet encrypted again still decrypt, and new writes use the current key |
+
 
 | Setting | Default | Meaning |
 |---|---|---|

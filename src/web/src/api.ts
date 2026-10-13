@@ -111,6 +111,32 @@ export interface Account {
 }
 
 /** An app of the app bar of an organization, with its settings (MK-030). */
+/** The kinds of credential that the kernel keeps (MK-062). */
+export type SecretKind = 'password' | 'token' | 'key' | 'other';
+
+/** A credential of the organization as its administrators see it: never its value (MK-062). */
+export interface Secret {
+  readonly name: string;
+  readonly kind: SecretKind;
+  readonly description: string;
+  /** The extension it is meant for, the only one that uses it; `null` for any extension. */
+  readonly extension: string | null;
+  /** The value masked: `••••`, with the last four characters of a long token or key. */
+  readonly hint: string;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly updatedBy: string;
+}
+
+/** A credential to store or replace; without `value` a replacement keeps the value. */
+export interface SecretDraft {
+  readonly name?: string;
+  readonly kind: SecretKind;
+  readonly value?: string;
+  readonly description?: string;
+  readonly extension?: string | null;
+}
+
 export interface OrganizationApp {
   readonly extensionId: string;
   readonly appId: string;
@@ -535,6 +561,23 @@ export class KernelClient {
     );
   }
 
+  /** The credentials of an organization, without their values, for its administrators (MK-062). */
+  secrets(slug: string): Promise<Secret[]> {
+    return this.getJson<Secret[]>(secretsPath(slug));
+  }
+
+  storeSecret(slug: string, draft: SecretDraft): Promise<Secret> {
+    return this.sendJson<Secret>(secretsPath(slug), 'POST', draft);
+  }
+
+  replaceSecret(slug: string, name: string, draft: SecretDraft): Promise<Secret> {
+    return this.sendJson<Secret>(`${secretsPath(slug)}/${encodeURIComponent(name)}`, 'PUT', draft);
+  }
+
+  async deleteSecret(slug: string, name: string): Promise<void> {
+    await this.sendJson<undefined>(`${secretsPath(slug)}/${encodeURIComponent(name)}`, 'DELETE');
+  }
+
   /** The permissions of the signed-in person in the organization, `<extension>:<permission>` (MK-056). */
   shellPermissions(): Promise<string[]> {
     return this.getJson<string[]>('/api/v1/shell/permissions');
@@ -856,6 +899,11 @@ export class KernelClient {
     }
     return (await response.json()) as T;
   }
+}
+
+/** The credentials of an organization, for its administrators (MK-062). */
+function secretsPath(slug: string): string {
+  return `/api/v1/organizations/${encodeURIComponent(slug)}/secrets`;
 }
 
 /** The permissions of an organization, for its administrators (MK-056). */

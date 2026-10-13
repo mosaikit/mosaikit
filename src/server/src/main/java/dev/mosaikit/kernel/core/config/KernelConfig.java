@@ -76,6 +76,33 @@ public interface KernelConfig {
         Duration linkMaxValidity();
     }
 
+    /** The encrypted store of credentials for extensions (MK-062). */
+    Secrets secrets();
+
+    /**
+     * The master keys of the store of credentials (MK-062). Each credential is encrypted with a data
+     * key of its own, and the data key with the current master key, which never goes in the
+     * database. Without a master key the store is disabled: the kernel starts, and the endpoints of
+     * credentials answer 503.
+     */
+    interface Secrets {
+
+        /**
+         * The current master key: 32 random bytes in base64, such as the output of {@code openssl
+         * rand -base64 32}. Prefer an environment variable or a key file to a file of settings.
+         */
+        Optional<String> masterKey();
+
+        /** A file that holds the current master key in base64, instead of {@code master-key}. */
+        Optional<Path> masterKeyFile();
+
+        /**
+         * Former master keys, in base64, kept during a rotation to read the credentials not yet
+         * encrypted again with the current key. New writes always use the current key.
+         */
+        Optional<List<String>> previousKeys();
+    }
+
     /** The audit log (MK-059). */
     Audit audit();
 
