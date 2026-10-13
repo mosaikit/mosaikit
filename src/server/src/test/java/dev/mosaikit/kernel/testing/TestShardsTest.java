@@ -10,6 +10,11 @@ import java.io.InputStream;
 import java.util.Properties;
 import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
+import org.junit.platform.engine.TestSource;
+import org.junit.platform.engine.UniqueId;
+import org.junit.platform.engine.support.descriptor.AbstractTestDescriptor;
+import org.junit.platform.engine.support.descriptor.ClassSource;
+import org.junit.platform.engine.support.descriptor.MethodSource;
 
 /** The shards in which the CI runs the tests of the kernel. */
 class TestShardsTest {
@@ -64,6 +69,45 @@ class TestShardsTest {
                     .as("%s, listed in test-shards.properties", type)
                     .isNotNull();
         }
+    }
+
+    @Test
+    void keepsTheMethodsRulesAndNestedClassesOfAClassInItsShard() {
+        Properties listed = new Properties();
+        listed.setProperty("a.Rules", "2");
+        TestShards first = new TestShards("1/2", listed);
+        TestShards second = new TestShards("2/2", listed);
+
+        for (TestSource source : new TestSource[] {
+            ClassSource.from("a.Rules"), ClassSource.from("a.Rules$Nested"), MethodSource.from("a.Rules", "test")
+        }) {
+            assertThat(first.apply(descriptor(source)).excluded())
+                    .as("%s", source)
+                    .isTrue();
+            assertThat(second.apply(descriptor(source)).included())
+                    .as("%s", source)
+                    .isTrue();
+        }
+        // A rule of ArchUnit has a source of its own, a field: it goes with the class that holds it.
+        AbstractTestDescriptor rules = descriptor(ClassSource.from("a.Rules"));
+        AbstractTestDescriptor rule = descriptor(new TestSource() {});
+        rules.addChild(rule);
+        assertThat(first.apply(rule).excluded()).isTrue();
+        assertThat(second.apply(rule).included()).isTrue();
+        assertThat(first.apply(descriptor(null)).included()).isTrue();
+        assertThat(new TestShards("", listed)
+                        .apply(descriptor(MethodSource.from("a.Rules", "test")))
+                        .included())
+                .isTrue();
+    }
+
+    private static AbstractTestDescriptor descriptor(TestSource source) {
+        return new AbstractTestDescriptor(UniqueId.forEngine("test"), "test", source) {
+            @Override
+            public Type getType() {
+                return Type.TEST;
+            }
+        };
     }
 
     @Test

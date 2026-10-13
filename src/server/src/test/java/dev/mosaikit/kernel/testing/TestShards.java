@@ -63,7 +63,14 @@ public final class TestShards implements PostDiscoveryFilter {
         if (count == 1) {
             return FilterResult.included("not sharded");
         }
-        Optional<String> type = descriptor.getSource().flatMap(TestShards::className);
+        // A test with another kind of source, such as a rule of ArchUnit (a field), goes with the
+        // class that holds it.
+        Optional<String> type = Optional.empty();
+        for (Optional<TestDescriptor> at = Optional.of(descriptor);
+                type.isEmpty() && at.isPresent();
+                at = at.get().getParent()) {
+            type = at.get().getSource().flatMap(TestShards::className);
+        }
         if (type.isEmpty()) {
             return FilterResult.included("not a test class");
         }
@@ -86,7 +93,10 @@ public final class TestShards implements PostDiscoveryFilter {
         return Math.floorMod(simple.hashCode(), count) + 1;
     }
 
-    /** The top-level class of a test, so that a nested class runs with the class around it. */
+    /**
+     * The top-level class of a test method or class, so that a nested class runs with the class
+     * around it.
+     */
     private static Optional<String> className(TestSource source) {
         String name = null;
         if (source instanceof ClassSource type) {
