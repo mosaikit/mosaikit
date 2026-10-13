@@ -39,6 +39,17 @@ permissions:
   - name: export-notes
     title: Export notes
     description: Download every note of the organization at once.
+# Memos are resources that the kernel shares (MK-054, MK-055): the sharing dialog of the shell is the
+# same for every type, and a link opens a memo without an account until it expires or is revoked.
+resources:
+  - type: memo
+    title: Memo
+    levels:
+      - { name: view, title: View, i18n: { it: { title: Lettura } } }
+      - { name: edit, title: Edit, edits: true, i18n: { it: { title: Modifica } } }
+    subjects: [person, group, organization, link]
+    i18n:
+      it: { title: Promemoria }
 database:
   schema: ext_fixture_notes
 frontend:
@@ -47,6 +58,8 @@ frontend:
   # Used when the shell isolates the frontend in an iframe (MK-014).
   bridge:
     services: [api]
+    # Opens the sharing dialog of the shell (MK-055).
+    publishes: [shell.share]
 contributes:
   # The app bar of the shell (MK-025).
   rail.app:
@@ -56,3 +69,8 @@ contributes:
       element: mk-fixture-notes
       icon: web/icon.svg
       order: 30
+  # Shows a memo opened with a link, also to people without an account (MK-055).
+  shared.view:
+    - id: memo
+      type: memo
+      element: mk-fixture-memo
