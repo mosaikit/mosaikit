@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.core.organization;
 
+import dev.mosaikit.kernel.api.events.PlatformEvents;
 import dev.mosaikit.kernel.core.error.ConflictException;
 import dev.mosaikit.kernel.core.error.ResourceNotFoundException;
+import dev.mosaikit.kernel.core.events.PlatformEventLog;
 import dev.mosaikit.kernel.core.identity.RealmProvisioning;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
@@ -12,6 +14,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
@@ -26,6 +29,7 @@ public class OrganizationService {
     private final EmailDomains emailDomains;
     private final Event<IdentityChanged> identityChanged;
     private final RealmProvisioning realms;
+    private final PlatformEventLog events;
     private final Clock clock;
 
     public OrganizationService(
@@ -33,11 +37,13 @@ public class OrganizationService {
             EmailDomains emailDomains,
             Event<IdentityChanged> identityChanged,
             RealmProvisioning realms,
+            PlatformEventLog events,
             Clock clock) {
         this.organizations = organizations;
         this.emailDomains = emailDomains;
         this.identityChanged = identityChanged;
         this.realms = realms;
+        this.events = events;
         this.clock = clock;
     }
 
@@ -69,6 +75,11 @@ public class OrganizationService {
         organization.setSignIn(signIn);
         organizations.insert(organization);
         identityChanged.fire(new IdentityChanged(organization.getId()));
+        // MK-085: extensions prepare what they keep for the organization; delivered once it commits.
+        events.raise(
+                organization.getId(),
+                PlatformEvents.ORGANIZATION_CREATED,
+                Map.of("slug", organization.getSlug(), "name", organization.getName()));
         if (request.federation() == null) {
             return OrganizationView.of(organization, List.of());
         }

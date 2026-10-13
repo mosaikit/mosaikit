@@ -84,6 +84,14 @@ public class TestExtensions implements QuarkusTestProfile {
                         title: Map
                         levels: [{ name: view, title: View }]
                     """);
+            // PlatformEventsTest: an extension whose Java code subscribes to events of the platform and
+            // registers an inbox in every new organization (MK-085).
+            extension("events", PlatformEventsTest.EXTENSION, "Events", """
+                    resources:
+                      - type: folder
+                        title: Folder
+                        levels: [{ name: view, title: View }]
+                    """);
             // PermissionsTest: an extension that declares permissions (MK-056); the test changes
             // its manifest as an update would.
             extension("permissions", PermissionsTest.EXTENSION, "Permissions", PermissionsTest.PERMISSIONS);

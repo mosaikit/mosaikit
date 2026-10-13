@@ -1038,6 +1038,97 @@ public class DashboardExport {
   to the entries before it, never changed nor deleted, except by the retention the administrators set
   (see [administration](../guide/administration.md#audit-log)).
 
+## Events on the server
+
+The Java code of an extension can start work when something happens in the platform, without polling
+and without a page open (MK-085): prepare what it keeps for an organization when it is created, release
+it when the organization turns the extension off, index a file when it is stored. Unlike the real-time
+channel to the pages (`LiveEvents`), delivery is durable: an event waits in the database until the
+subscriber took it, through failures and restarts.
+
+Subscribe with an `@ApplicationScoped` bean that implements `PlatformEventSubscriber`
+(`dev.mosaikit.kernel.api.events`); the kernel finds it at start:
+
+```java
+@ApplicationScoped
+public class PrepareOrganization implements PlatformEventSubscriber {
+    private static final String EXTENSION = "dev.example.notes";
+
+    @Inject Resources resources;          // dev.mosaikit.kernel.api.resource
+    @Inject FileStorage files;            // dev.mosaikit.kernel.api.files
+
+    @Override public String extension() { return EXTENSION; }
+
+    @Override public Set<String> types() {
+        return Set.of(PlatformEvents.ORGANIZATION_CREATED, PlatformEvents.FILE_STORED);
+    }
+
+    @Override public void handle(PlatformEvent event) {
+        switch (event.type()) {
+            // Registering by a fixed identifier is idempotent: a second delivery changes nothing.
+            case PlatformEvents.ORGANIZATION_CREATED -> resources.register(
+                    new ResourceRef(EXTENSION, "folder", "inbox"), Resources.Details.of("Inbox", "/app/notes/inbox"));
+            case PlatformEvents.FILE_STORED -> {
+                if ((EXTENSION + "/folder/inbox").equals(event.text("resource"))) {
+                    index(UUID.fromString(event.text("file")));
+                }
+            }
+            default -> { }
+        }
+    }
+}
+```
+
+The kernel raises these events (constants of `PlatformEvents`), with their payload:
+
+| Type | When | Payload |
+|---|---|---|
+| `organization.created` | an organization was created | `slug`, `name` |
+| `organization.deleted` | an organization was deleted; reserved: the kernel does not delete organizations yet | `slug` |
+| `extension.enabled` | an organization turned an extension on: one of its apps, after all were off (MK-030) | `extension` |
+| `extension.disabled` | an organization turned an extension off: all its apps | `extension` |
+| `file.stored`, `file.deleted` | a file of any extension was stored or deleted (MK-041) | `extension`, `file`, `name`, `contentType`, `size`, and `team` and `resource` (`<extension>/<type>/<id>`) when it has them |
+| `resource.registered`, `resource.removed` | a resource of any extension was registered or removed (MK-054) | `extension`, `type`, `id`; `title` and `owner` when registered |
+
+An extension raises its own events with `PlatformEvents`, naming itself as with
+`Notifications.send`; the type becomes `<extension>:<name>`, such as `dev.example.notes:note.created`,
+which other extensions subscribe to:
+
+```java
+@Inject PlatformEvents events;
+
+events.raise(EXTENSION, "note.created", Map.of("note", note.id().toString(), "folder", folder));
+```
+
+- **Written with the change.** An event is written in the transaction of the change that raises it,
+  in the organization of the request, and delivered only if that transaction commits. The payload is
+  JSON, at most 8192 characters: say what happened, such as identifiers, and let the subscriber read
+  the rest. Never put secrets in it. The name is lowercase letters, digits, `.` and `-`; an extension
+  that is not active, or a name or payload not valid, is refused with `IllegalArgumentException`.
+- **In the organization where it happened.** The handler runs in a transaction of its own, in the
+  organization of the event and without a person (MK-126): `CurrentOrganization` is that
+  organization, row-level security shows its data only, and the beans of the kernel act in it. What
+  the handler stores or registers belongs to the organization, not to a person, and the audit log
+  records the extension as actor with the channel `JOB`. An organization that turned the extension
+  off sends it no event, except `extension.disabled` and `extension.enabled` about the extension
+  itself, so that it releases and prepares what it keeps.
+- **At least once.** When `handle` throws, its transaction rolls back and the kernel gives the event
+  again later, waiting twice as long each time (`mosaikit.events.retry-delay`), up to
+  `mosaikit.events.max-attempts`; then it gives up and records `events.delivery.failed` in the audit log
+  of the organization. An event raised while the kernel is stopped, or while the subscriber fails, is
+  delivered when it is back; `PlatformEvent.attempt()` says which attempt this is.
+- **Make handlers idempotent.** An event may arrive twice: the kernel stopped after the handler
+  committed and before it marked the event delivered, or a handler took longer than five minutes and
+  another kernel took the event again. Register and store by fixed identifiers, check whether the work
+  is already done, or keep the handled `PlatformEvent.id()` in a table of the extension in the same
+  transaction as the work. Events come roughly in the order they were raised, not strictly when some
+  were retried: do not rely on their order.
+- **From installation on.** A subscriber receives the events raised after it was installed, not the
+  earlier ones. Keep `name()` (`default` unless the extension has several subscribers) stable across
+  versions: the kernel keeps what it delivered to each subscriber by that name.
+- Each kernel looks for events every `mosaikit.events.poll-interval` (two seconds by default): a
+  handler runs a few seconds after the change, not during the request.
+
 ## Credentials of external services
 
 An extension that calls an external service, such as a model provider, a mail server or a
