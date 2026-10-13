@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 
-/** An organization: the unit of isolation for users, data and enabled plugins. */
+/** An organization: the unit of isolation for users, data and enabled extensions. */
 @Entity
 @Table(name = "organization")
 public class Organization {

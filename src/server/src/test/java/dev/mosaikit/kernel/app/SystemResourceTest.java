@@ -4,6 +4,7 @@ package dev.mosaikit.kernel.app;
 
 import static dev.mosaikit.kernel.app.Credentials.anonymous;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.startsWith;
 
 import io.quarkus.test.junit.QuarkusTest;
@@ -22,9 +23,12 @@ class SystemResourceTest {
                 .statusCode(200)
                 .body("name", equalTo("Mosaikit"))
                 .body("version", startsWith("0.1.0"))
-                .body("activePlugins", equalTo(2))
+                .body("activeExtensions", equalTo(2))
                 .body("theme", equalTo("mosaikit"))
-                .body("rememberDays", equalTo(30));
+                .body("rememberDays", equalTo(30))
+                // No theme names another product (MK-052).
+                .body("logo", nullValue())
+                .body("logoDark", nullValue());
     }
 
     @Test

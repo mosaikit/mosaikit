@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: MPL-2.0
 #
 # Starts Mosaikit with PowerShell (Windows PowerShell 5.1 or PowerShell 7). The Java code of new or
-# updated plugins is loaded first: the kernel is rebuilt only when the set of plugin JARs changed
+# updated extensions is loaded first: the kernel is rebuilt only when the set of extension JARs changed
 # (MK-011, ADR-0004). If the kernel does not start with the new JARs, they are rolled back and the
-# kernel starts again with the previous plugins. In the portable distribution (MK-016) the bundled
+# kernel starts again with the previous extensions. In the portable distribution (MK-016) the bundled
 # PostgreSQL is started before the kernel and stopped after it.
 #
 #   mosaikit.cmd [start]   prepare and start the kernel (default), or bin\mosaikit.ps1
@@ -48,9 +48,9 @@ function Invoke-Kernel {
     # A location is a URI: a Windows path such as C:\... would be read as the scheme "C".
     if (Test-Path $DatabaseConfig) { $JavaOpts += "-Dquarkus.config.locations=$([Uri]::new((Resolve-Path -LiteralPath $DatabaseConfig).Path).AbsoluteUri)" }
     & $Java @JavaOpts `
-        "-Dmosaikit.plugins.directory=$(Join-Path $MosaikitHome 'plugins')" `
-        "-Dmosaikit.plugins.providers-directory=$Providers" `
-        "-Dmosaikit.plugins.packages-directory=$(Join-Path $Kernel 'plugin-packages')" `
+        "-Dmosaikit.extensions.directory=$(Join-Path $MosaikitHome 'extensions')" `
+        "-Dmosaikit.extensions.providers-directory=$Providers" `
+        "-Dmosaikit.extensions.packages-directory=$(Join-Path $Kernel 'extension-packages')" `
         -jar (Join-Path $Kernel 'quarkus-run.jar')
     # Called as a statement, so that the output of the kernel goes to the console.
     $script:Status = $LASTEXITCODE
@@ -67,7 +67,7 @@ Invoke-Launcher 'database' 'start'
 try {
     Invoke-Kernel
     if ($Status -ne 0 -and (Test-Path $Pending)) {
-        Write-Warning "The kernel stopped (exit code $Status) before starting with the new plugin JARs."
+        Write-Warning "The kernel stopped (exit code $Status) before starting with the new extension JARs."
         Invoke-Launcher 'prepare'
         Invoke-Kernel
     }

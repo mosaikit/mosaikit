@@ -10,7 +10,7 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import java.util.Map;
 
-/** Stands for the Java code of a plugin that reads the organization of the request (MK-017). */
+/** Stands for the Java code of an extension that reads the organization of the request (MK-017). */
 @Path("/api/v1/test/current-organization")
 @Produces(MediaType.APPLICATION_JSON)
 @Authenticated

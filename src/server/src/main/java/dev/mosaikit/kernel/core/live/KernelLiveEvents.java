@@ -9,7 +9,7 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
-/** The real-time events of plugins and of the kernel (MK-031), for the organization of the request. */
+/** The real-time events of extensions and of the kernel (MK-031), for the organization of the request. */
 @ApplicationScoped
 public class KernelLiveEvents implements LiveEvents {
 

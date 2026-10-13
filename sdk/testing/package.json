@@ -1,7 +1,7 @@
 {
   "name": "@mosaikit/testing",
   "version": "0.1.0-SNAPSHOT",
-  "description": "Test bench for Mosaikit plugins: a real installation with the plugin, on an embedded PostgreSQL, for Playwright.",
+  "description": "Test bench for Mosaikit extensions: a real installation with the extension, on an embedded PostgreSQL, for Playwright.",
   "license": "MPL-2.0",
   "repository": {
     "type": "git",
@@ -11,7 +11,7 @@
   "author": "Massimo Antonini",
   "type": "module",
   "bin": {
-    "mosaikit-bench": "./dist/cli.js"
+    "mosaikit-bench": "dist/cli.js"
   },
   "exports": {
     ".": {

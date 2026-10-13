@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 import EmbeddedPostgres from 'embedded-postgres';
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
@@ -24,6 +24,27 @@ function pgCtl(): string | undefined {
   } catch {
     return undefined;
   }
+}
+
+/**
+ * On Windows an I/O worker of PostgreSQL 18 can outlive its server, and keeps the files of
+ * node_modules locked so that the next npm ci fails: ends the processes of these binaries whose
+ * server is gone. The servers still running, such as those of other benches, are left alone.
+ */
+function endOrphans(ctl: string): void {
+  if (process.platform !== 'win32') {
+    return;
+  }
+  const binaries = dirname(ctl).replaceAll('\\', '/');
+  const script = [
+    'Get-CimInstance Win32_Process -Filter "Name=\'postgres.exe\'"',
+    `| Where-Object { $_.CommandLine -and $_.CommandLine.Replace('\\', '/') -like '*${binaries}/*'`,
+    '-and -not (Get-Process -Id $_.ParentProcessId -ErrorAction SilentlyContinue) }',
+    '| ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }',
+  ].join(' ');
+  spawnSync('powershell', ['-NoProfile', '-NonInteractive', '-Command', script], {
+    stdio: 'ignore',
+  });
 }
 
 /**
@@ -108,7 +129,28 @@ export async function startPostgres(options: {
           stdio: 'ignore',
         });
       }
-      await server.stop();
+      let failure: Error | undefined;
+      try {
+        await server.stop();
+      } catch (error) {
+        failure = error instanceof Error ? error : new Error('PostgreSQL did not stop');
+      }
+      if (ctl) {
+        endOrphans(ctl);
+      }
+      if (failure !== undefined) {
+        // On Windows the files of a server that just stopped can stay locked for a moment, and
+        // the package fails to delete the cluster (EBUSY): retry for a few seconds.
+        if (options.persistent) {
+          throw failure;
+        }
+        rmSync(options.directory, {
+          recursive: true,
+          force: true,
+          maxRetries: 20,
+          retryDelay: 250,
+        });
+      }
     },
   };
 }

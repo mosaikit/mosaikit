@@ -6,12 +6,12 @@ import { api, apps, signIn } from '../support/shell.js';
 
 const PREFERENCES = '/api/v1/accounts/me/preferences';
 
-/** Anna notifies Mario as the sample To do, as a frontend plugin does with context.notify. */
+/** Anna notifies Mario as the sample To do, as a frontend extension does with context.notify. */
 async function annaNotifiesMario(kind: string, title: string): Promise<number> {
   const response = await api(ANNA, '/api/v1/notifications', {
     method: 'POST',
     body: JSON.stringify({
-      plugin: 'dev.mosaikit.fixture.todo',
+      extension: 'dev.mosaikit.fixture.todo',
       to: [MARIO.user],
       kind,
       title,
@@ -22,7 +22,7 @@ async function annaNotifiesMario(kind: string, title: string): Promise<number> {
   return response.status;
 }
 
-test.describe('MK-038 Activity feed and notifications for plugins', () => {
+test.describe('MK-038 Activity feed and notifications for extensions', () => {
   test.afterAll(async () => {
     await api(MARIO, PREFERENCES, {
       method: 'PUT',

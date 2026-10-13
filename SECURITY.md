@@ -10,7 +10,7 @@ Do not open a public issue. Send a private report to the maintainer at the addre
 `publiccode.yml` (`maintenance.contacts`), or use the confidential issue option of the project
 tracker. Include:
 
-- affected version and component (kernel, shell, SDK, plugin);
+- affected version and component (kernel, shell, SDK, extension);
 - description and impact;
 - steps or a proof of concept to reproduce.
 

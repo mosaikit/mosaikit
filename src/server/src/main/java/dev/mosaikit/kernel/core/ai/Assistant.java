@@ -20,7 +20,7 @@ import java.util.Set;
 
 /**
  * The assistant of Mosaikit (MK-024, ADR-0022): a language model that answers the person with the
- * tools of the active plugins (MK-015). It runs the tools with the rights of the person; tools that
+ * tools of the active extensions (MK-015). It runs the tools with the rights of the person; tools that
  * change data become drafts that the person confirms, so the model never changes data by itself.
  */
 @ApplicationScoped

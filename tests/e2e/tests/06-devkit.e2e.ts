@@ -4,20 +4,21 @@ import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { expect, test } from '@playwright/test';
 import { MARIO, WORK } from '../support/env.js';
-import { openApp, plugins, restart, signIn, unique } from '../support/shell.js';
-import { createPlugin, maven, sign, zip } from '../support/tools.js';
+import { openApp, extensions, restart, signIn, unique } from '../support/shell.js';
+import { createExtension, maven, sign, zip } from '../support/tools.js';
 
 const TRAFFIC = join(WORK, 'traffic');
 const SIGNAGE = join(WORK, 'signage');
 
-test.describe('MK-023 Devkit for third-party plugin developers', () => {
-  test('23.1–23.3 generated plugins build, are refused unsigned, and install signed', async ({
+test.describe('MK-023 Devkit for third-party extension developers', () => {
+  test('23.1–23.3 generated extensions build, are refused unsigned, and install signed', async ({
     page,
   }) => {
-    createPlugin('dev.acme.traffic', '--name', 'Traffic', '--backend', '--directory', TRAFFIC);
-    createPlugin('dev.acme.signage', '--name', 'Signage', '--directory', SIGNAGE);
-    // The Java plugin builds with Maven against the plugin API of this repository.
-    maven(join(TRAFFIC, 'pom.xml'), 'package', '-DskipTests');
+    createExtension('dev.acme.traffic', '--name', 'Traffic', '--backend', '--directory', TRAFFIC);
+    createExtension('dev.acme.signage', '--name', 'Signage', '--directory', SIGNAGE);
+    // The Java extension builds with Maven against the extension API of this repository.
+    // Only the Java build: the npm part of the parent needs the published test bench.
+    maven(join(TRAFFIC, 'pom.xml'), 'package', '-DskipTests', '-Dskip.npm');
     const built = readdirSync(join(TRAFFIC, 'target')).find((f) => f.endsWith('.zip'));
     expect(built).toBe('traffic-0.1.0.zip');
     const traffic = join(TRAFFIC, 'target', built ?? '');
@@ -25,9 +26,9 @@ test.describe('MK-023 Devkit for third-party plugin developers', () => {
     zip(SIGNAGE, signage);
 
     await signIn(page);
-    await openApp(page, 'Plugins');
-    const status = page.locator('mk-admin-plugins').getByRole('status');
-    const upload = page.getByLabel('Plugin package');
+    await openApp(page, 'Extensions');
+    const status = page.locator('mk-admin-extensions').getByRole('status');
+    const upload = page.getByLabel('Extension package');
     await upload.setInputFiles(traffic);
     await expect(status).toContainText('Only packages signed by a trusted publisher');
 
@@ -38,10 +39,10 @@ test.describe('MK-023 Devkit for third-party plugin developers', () => {
     await expect(status).toContainText('dev.acme.signage 0.1.0 is installed');
 
     const log = await restart();
-    // Only the Java plugin needs a rebuild of the kernel.
+    // Only the Java extension needs a rebuild of the kernel.
     expect(log).toMatch(/added dev\.acme\.traffic/);
     expect(log).not.toMatch(/added dev\.acme\.signage/);
-    const statuses = await plugins();
+    const statuses = await extensions();
     expect(statuses.find((p) => p.id === 'dev.acme.traffic')?.status).toBe('ACTIVE');
     expect(statuses.find((p) => p.id === 'dev.acme.signage')?.status).toBe('ACTIVE');
   });

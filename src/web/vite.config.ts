@@ -28,7 +28,7 @@ export default defineConfig({
     target: 'es2023',
     sourcemap: true,
     rollupOptions: {
-      // The runtime of isolated plugin frontends (MK-014) is a second entry, at a fixed address
+      // The runtime of isolated extension frontends (MK-014) is a second entry, at a fixed address
       // that the shell puts in the frames it creates.
       input: {
         index: fileURLToPath(new URL('index.html', import.meta.url)),

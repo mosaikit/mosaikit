@@ -4,7 +4,7 @@ import { expect, test } from '@playwright/test';
 import { MARIO } from '../support/env.js';
 import { openApp, signIn, unique } from '../support/shell.js';
 
-test.describe('MK-020 Plugins that extend other plugins', () => {
+test.describe('MK-020 Extensions that extend other extensions', () => {
   test('22.3 Estimates adds a field and a total to Activities', async ({ page }) => {
     await signIn(page, MARIO);
     await openApp(page, 'Activities');

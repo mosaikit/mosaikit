@@ -37,9 +37,9 @@ SKIPPED = {"node_modules", "target", "dist", "coverage"}
 
 GUIDES = {
     "User-Guide": ("User and administrator guide", "user",
-                   ["README", "installation", "using", "administration", "plugins", "configuration", "operations"]),
+                   ["README", "installation", "using", "administration", "extensions", "configuration", "operations"]),
     "Developer-Guide": ("Developer guide", "developer",
-                        ["README", "architecture", "development", "plugin-development", "api", "versions", "release", "roadmap"]),
+                        ["README", "architecture", "development", "extension-development", "api", "versions", "release", "roadmap"]),
     "Compliance": ("Compliance: AgID, ACN QC2 and GDPR", "compliance",
                    ["README", "matrix", "non-conformities", "evidence", "secure-development"]),
 }
@@ -229,7 +229,7 @@ def overview(version: str) -> str:
             slides.append("# Open non-conformities\n\n"
                           + "\n".join(f"- {row[0]} {row[1]} ({row[2]})" for row in open_nc[chunk:chunk + 6]) + "\n")
     slides.append("# Get it\n\n- Portable archives for Windows, Linux and macOS\n- Container image, Docker Compose"
-                  " and Helm chart\n- Plugins as a signed catalog for the marketplace\n- Guides, compliance"
+                  " and Helm chart\n- Extensions as a signed catalog for the marketplace\n- Guides, compliance"
                   " workbook and this overview in the documents bundle\n")
     return "\n\n".join(slides)
 

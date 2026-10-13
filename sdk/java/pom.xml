@@ -16,8 +16,8 @@
     </parent>
 
     <artifactId>mosaikit-kernel-api</artifactId>
-    <name>Mosaikit :: SDK :: Java plugin API</name>
-    <description>Public and stable API for plugins. It has no dependency on frameworks.</description>
+    <name>Mosaikit :: SDK :: Java extension API</name>
+    <description>Public and stable API for extensions. It has no dependency on frameworks.</description>
 
     <properties>
         <!-- SonarQube: what this module contributes to the analysis (the root pom.xml sets the default). -->

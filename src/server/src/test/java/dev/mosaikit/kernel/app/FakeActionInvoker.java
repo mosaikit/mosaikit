@@ -4,8 +4,8 @@ package dev.mosaikit.kernel.app;
 
 import dev.mosaikit.kernel.core.ai.ActionInvoker;
 import dev.mosaikit.kernel.core.ai.Caller;
-import dev.mosaikit.kernel.core.ai.PluginCall;
-import dev.mosaikit.kernel.core.ai.PluginResponse;
+import dev.mosaikit.kernel.core.ai.ExtensionCall;
+import dev.mosaikit.kernel.core.ai.ExtensionResponse;
 import io.quarkus.test.Mock;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.io.IOException;
@@ -14,16 +14,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
-/** Stands for the backends of plugins in tests: records the calls and gives a set answer. */
+/** Stands for the backends of extensions in tests: records the calls and gives a set answer. */
 @Mock
 @ApplicationScoped
 public class FakeActionInvoker implements ActionInvoker {
 
     /** A call and the person it was sent for. */
-    public record Sent(PluginCall call, Caller caller) {}
+    public record Sent(ExtensionCall call, Caller caller) {}
 
     private final List<Sent> sent = new CopyOnWriteArrayList<>();
-    private volatile PluginResponse answer;
+    private volatile ExtensionResponse answer;
     private volatile boolean unreachable;
 
     public FakeActionInvoker() {
@@ -33,11 +33,11 @@ public class FakeActionInvoker implements ActionInvoker {
     /** Forgets the calls and answers 200 with one closure again. */
     public final void reset() {
         sent.clear();
-        answer = new PluginResponse(200, List.of(Map.of("road", "A1")));
+        answer = new ExtensionResponse(200, List.of(Map.of("road", "A1")));
         unreachable = false;
     }
 
-    public void answer(PluginResponse response) {
+    public void answer(ExtensionResponse response) {
         this.answer = response;
     }
 
@@ -50,7 +50,7 @@ public class FakeActionInvoker implements ActionInvoker {
     }
 
     @Override
-    public PluginResponse invoke(PluginCall call, Caller caller) {
+    public ExtensionResponse invoke(ExtensionCall call, Caller caller) {
         if (unreachable) {
             throw new UncheckedIOException(new IOException("connection refused"));
         }

@@ -6,12 +6,12 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;
 
 /**
- * The plugins that the catalogs of the installation offer.
+ * The extensions that the catalogs of the installation offer.
  *
  * @param sources each catalog, and whether its index could be read and verified
- * @param plugins the offered packages, with what is installed of them
+ * @param extensions the offered packages, with what is installed of them
  */
-public record CatalogView(List<Source> sources, List<Offer> plugins) {
+public record CatalogView(List<Source> sources, List<Offer> extensions) {
 
     /**
      * A catalog.
@@ -28,14 +28,14 @@ public record CatalogView(List<Source> sources, List<Offer> plugins) {
      * A package offered by a catalog.
      *
      * @param source directory of the catalog
-     * @param id identifier of the plugin
+     * @param id identifier of the extension
      * @param version version of the package
      * @param name human readable name
      * @param size size of the package in bytes
      * @param publisherKey key that signed the package
      * @param installedVersion version installed, if any
      * @param state {@code available}, {@code installed}, {@code update}, {@code older}, or {@code restart}
-     *     when the package of this version is in the plugins directory and waits for a restart
+     *     when the package of this version is in the extensions directory and waits for a restart
      */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record Offer(

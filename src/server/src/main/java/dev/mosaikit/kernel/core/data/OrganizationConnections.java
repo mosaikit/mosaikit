@@ -41,7 +41,7 @@ public class OrganizationConnections implements AgroalPoolInterceptor {
             return;
         }
         // Every request runs as the member role, so that a request without organization sees no row
-        // of the plugins; outside requests (start, migrations) the connection keeps the owner.
+        // of the extensions; outside requests (start, migrations) the connection keeps the owner.
         Optional<Request> request = currentRequest();
         if (request.isEmpty()) {
             apply(connection, NONE, Request.NONE);

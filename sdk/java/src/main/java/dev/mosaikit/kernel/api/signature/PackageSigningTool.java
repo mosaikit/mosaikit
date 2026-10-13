@@ -16,7 +16,7 @@ import java.util.Locale;
 import java.util.stream.Stream;
 
 /**
- * Command-line tool for plugin publishers and administrators, in the JAR of the Java plugin API:
+ * Command-line tool for extension publishers and administrators, in the JAR of the Java extension API:
  *
  * <pre>
  * java -cp mosaikit-kernel-api.jar dev.mosaikit.kernel.api.signature.PackageSigningTool keygen &lt;directory&gt; &lt;name&gt;
@@ -30,7 +30,7 @@ import java.util.stream.Stream;
  * directory of installations ({@code trust} does it), and {@code <name>.key.pem}, to keep secret.
  * A package argument that is a directory stands for every package ({@code *.zip}) in it. {@code
  * verify} exits with 0 only when every package is signed with a trusted key. {@code index} writes
- * the signed catalog of a directory of packages ({@link PluginIndex}), for a marketplace (MK-022).
+ * the signed catalog of a directory of packages ({@link ExtensionIndex}), for a marketplace (MK-022).
  */
 public final class PackageSigningTool {
 
@@ -101,10 +101,10 @@ public final class PackageSigningTool {
         KeyPair pair = new KeyPair(
                 SigningKeys.readPublic(Path.of(key + SigningKeys.PUBLIC_SUFFIX)),
                 SigningKeys.readPrivate(Path.of(key + SigningKeys.PRIVATE_SUFFIX)));
-        var entries = PluginIndex.write(directory, pair, Instant.now());
+        var entries = ExtensionIndex.write(directory, pair, Instant.now());
         out.printf(
                 "Index of %d packages written to %s and signed with key %s.%n",
-                entries.size(), directory.resolve(PluginIndex.INDEX_FILE), SigningKeys.keyId(pair.getPublic()));
+                entries.size(), directory.resolve(ExtensionIndex.INDEX_FILE), SigningKeys.keyId(pair.getPublic()));
         return 0;
     }
 

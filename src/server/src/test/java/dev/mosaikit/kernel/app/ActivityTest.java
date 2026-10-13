@@ -10,12 +10,8 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasSize;
 
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import io.restassured.specification.RequestSpecification;
-import java.io.IOException;
-import java.io.UncheckedIOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
@@ -23,39 +19,16 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
-/** The activity feed and the notifications of plugins (MK-038). */
+/** The activity feed and the notifications of extensions (MK-038). */
 @QuarkusTest
-@TestProfile(ActivityTest.NotesPlugin.class)
+@TestProfile(TestExtensions.class)
 @Tag("MK-038")
 class ActivityTest {
 
-    static final Path PLUGINS = Path.of("target", "activity-test", "plugins").toAbsolutePath();
-    static final String PLUGIN = "dev.mosaikit.test.notify";
+    static final Path EXTENSIONS = TestExtensions.EXTENSIONS;
+    static final String EXTENSION = "dev.mosaikit.test.notify";
     static final String SLUG = "activity-town";
     static final String PASSWORD = "a long enough password";
-
-    /** A plugin that sends notifications. */
-    public static class NotesPlugin implements QuarkusTestProfile {
-        @Override
-        public Map<String, String> getConfigOverrides() {
-            try {
-                Path plugin = Files.createDirectories(PLUGINS.resolve("notify").resolve("web"));
-                Files.writeString(plugin.resolve("index.js"), "export default { activate() {} };\n");
-                Files.writeString(plugin.getParent().resolve("manifest.yaml"), """
-                        id: dev.mosaikit.test.notify
-                        version: 1.0.0
-                        name: Notify (test)
-                        kind: [app]
-                        platform: '>=0.1 <1'
-                        frontend:
-                          entry: web/index.js
-                        """);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-            return Map.of("mosaikit.plugins.directory", PLUGINS.toString());
-        }
-    }
 
     private String ada;
     private String bea;
@@ -88,8 +61,8 @@ class ActivityTest {
     }
 
     private static void notify(String from, List<String> to, String kind, String link, int status) {
-        var body = new java.util.HashMap<String, Object>(
-                Map.of("plugin", PLUGIN, "to", to, "kind", kind, "title", "Ada mentioned you", "body", "In Notes"));
+        var body = new java.util.HashMap<String, Object>(Map.of(
+                "extension", EXTENSION, "to", to, "kind", kind, "title", "Ada mentioned you", "body", "In Notes"));
         if (link != null) {
             body.put("link", link);
         }
@@ -128,7 +101,7 @@ class ActivityTest {
 
     @Test
     void leavesOutTheKindsThatThePersonTurnedOff() {
-        in(bea).body(Map.of("hiddenApps", List.of(), "mutedNotifications", List.of(PLUGIN + "/mention")))
+        in(bea).body(Map.of("hiddenApps", List.of(), "mutedNotifications", List.of(EXTENSION + "/mention")))
                 .put("/api/v1/accounts/me/preferences")
                 .then()
                 .statusCode(200);
@@ -148,7 +121,7 @@ class ActivityTest {
         notify(ada, List.of(bea), "Mention!", null, 400);
         notify(ada, List.of(bea), "mention", "https://elsewhere.example/phish", 400);
         notify(ada, List.of(bea), "mention", "//elsewhere.example", 400);
-        in(ada).body(Map.of("plugin", "dev.mosaikit.none", "to", List.of(bea), "kind", "x", "title", "T"))
+        in(ada).body(Map.of("extension", "dev.mosaikit.none", "to", List.of(bea), "kind", "x", "title", "T"))
                 .post("/api/v1/notifications")
                 .then()
                 .statusCode(400);

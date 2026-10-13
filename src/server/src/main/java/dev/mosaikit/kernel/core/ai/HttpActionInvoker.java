@@ -20,9 +20,9 @@ import java.util.List;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 
 /**
- * Calls the backend APIs of plugins over HTTP on the loopback interface of the kernel itself, so
- * that each call goes through authentication, the organization of the request, the plugin guard
- * and the permission checks of the plugin, exactly like a call of the web UI.
+ * Calls the backend APIs of extensions over HTTP on the loopback interface of the kernel itself, so
+ * that each call goes through authentication, the organization of the request, the extension guard
+ * and the permission checks of the extension, exactly like a call of the web UI.
  */
 @ApplicationScoped
 public class HttpActionInvoker implements ActionInvoker {
@@ -62,7 +62,7 @@ public class HttpActionInvoker implements ActionInvoker {
     }
 
     @Override
-    public PluginResponse invoke(PluginCall call, Caller caller) {
+    public ExtensionResponse invoke(ExtensionCall call, Caller caller) {
         HttpRequest.Builder request = HttpRequest.newBuilder(base.resolve(call.target()))
                 .timeout(TIMEOUT)
                 .header("Accept", "application/json")
@@ -81,7 +81,7 @@ public class HttpActionInvoker implements ActionInvoker {
         try {
             HttpResponse<String> response = http.send(request.build(), HttpResponse.BodyHandlers.ofString());
             String type = response.headers().firstValue("Content-Type").orElse("");
-            return new PluginResponse(response.statusCode(), read(response.body(), type));
+            return new ExtensionResponse(response.statusCode(), read(response.body(), type));
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot call " + call.path(), e);
         } catch (InterruptedException e) {

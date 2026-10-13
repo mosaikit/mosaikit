@@ -25,19 +25,19 @@ identity:
   adminSecret: ""
   domain: ""
 
-plugins:
-  # Plugins with Java code are built into a derived image (see distribution/docker/Containerfile),
-  # so that the container keeps a read-only root filesystem. A volume can hold plugins without
-  # Java code (frontend, migrations); Java plugins found there stay RESTART_REQUIRED.
+extensions:
+  # Extensions with Java code are built into a derived image (see distribution/docker/Containerfile),
+  # so that the container keeps a read-only root filesystem. A volume can hold extensions without
+  # Java code (frontend, migrations); Java extensions found there stay RESTART_REQUIRED.
   persistence:
     enabled: false
     size: 1Gi
     storageClass: ""
-  # Signed packages (MK-013): "optional" accepts unsigned plugins and refuses changed packages,
+  # Signed packages (MK-013): "optional" accepts unsigned extensions and refuses changed packages,
   # "required" accepts only packages signed with a trusted key.
   signatures: optional
   # ConfigMap whose entries are the public keys (<name>.pub.pem) of trusted publishers. Empty: the
-  # keys of the image, config/trusted-keys, which include the key that signed its sample plugins.
+  # keys of the image, config/trusted-keys, which include the key that signed its sample extensions.
   trustedKeysConfigMap: ""
 
 resources:

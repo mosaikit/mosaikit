@@ -26,14 +26,14 @@ class KernelCoreArchitectureTest {
             .should()
             .dependOnClassesThat()
             .resideInAnyPackage("..map..", "..layer..", "..geo..")
-            .because("the kernel is domain-agnostic: domain concepts belong to plugins");
+            .because("the kernel is domain-agnostic: domain concepts belong to extensions");
 
     @ArchTest
     static final ArchRule noVertxEventBus = noClasses()
             .should()
             .dependOnClassesThat()
             .resideInAnyPackage("io.vertx.core.eventbus..", "io.vertx.mutiny.core.eventbus..")
-            .because("plugins communicate through the kernel event bus, which keeps Quarkus 4 migration local");
+            .because("extensions communicate through the kernel event bus, which keeps Quarkus 4 migration local");
 
     @ArchTest
     static final ArchRule noPanache = noClasses()

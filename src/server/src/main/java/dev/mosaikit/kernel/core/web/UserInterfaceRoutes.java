@@ -31,7 +31,7 @@ import org.jboss.logging.Logger;
  * ({@code /q}) are never served from here.
  *
  * <p>The UI is built by npm before the kernel is compiled and is only copied into it, so that
- * rebuilding the kernel for a Java plugin never needs Node.js. In development mode Quinoa serves
+ * rebuilding the kernel for a Java extension never needs Node.js. In development mode Quinoa serves
  * the UI sources with live reload instead.
  */
 @ApplicationScoped
@@ -129,7 +129,7 @@ public class UserInterfaceRoutes {
         context.response()
                 .putHeader(HttpHeaders.CONTENT_TYPE, served.mediaType())
                 .putHeader("X-Content-Type-Options", "nosniff")
-                // The runtime of isolated plugin frontends (frame.js and its chunks) is loaded by
+                // The runtime of isolated extension frontends (frame.js and its chunks) is loaded by
                 // sandboxed iframes with an opaque origin, as cross-origin requests (MK-014).
                 .putHeader("Access-Control-Allow-Origin", "*")
                 .putHeader(

@@ -18,7 +18,7 @@ describe('repository layout (MK-049)', () => {
   it.each([
     'src/server',
     'src/web',
-    'tests/fixtures/plugins',
+    'tests/fixtures/extensions',
     'sdk',
     'distribution',
     'tests/e2e',
@@ -29,8 +29,8 @@ describe('repository layout (MK-049)', () => {
 
   it.each([
     'kernel',
-    'plugins',
-    'src/plugins',
+    'extensions',
+    'src/extensions',
     'distributions',
     'e2e',
     'tools',

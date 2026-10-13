@@ -10,7 +10,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * The organization of the current request, for the kernel and for the Java code of plugins
+ * The organization of the current request, for the kernel and for the Java code of extensions
  * (MK-017): the one chosen at authentication by {@link OrganizationAccess} or by the realm.
  */
 @RequestScoped

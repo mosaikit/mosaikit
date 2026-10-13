@@ -65,7 +65,7 @@ public class ActionDraft {
     @Column(name = "result_status")
     private Integer resultStatus;
 
-    /** What the plugin answered, as JSON. */
+    /** What the extension answered, as JSON. */
     private String result;
 
     /** Keeps two confirmations of one draft from both running it. */
@@ -139,7 +139,7 @@ public class ActionDraft {
         decide(Status.REJECTED, now);
     }
 
-    /** Records what the plugin answered. */
+    /** Records what the extension answered. */
     void complete(boolean succeeded, Integer answeredStatus, String answer) {
         if (status != Status.CONFIRMED) {
             throw new IllegalStateException("Draft " + id + " is " + status + ", not confirmed");
