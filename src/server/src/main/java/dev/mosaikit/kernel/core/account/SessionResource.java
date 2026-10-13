@@ -26,7 +26,7 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
  * The session of the shell for local accounts. {@code POST /api/v1/accounts/session} with the form
  * fields {@code username} and {@code password} is answered by the form authentication of Quarkus,
  * with the same {@link LocalIdentityProvider} as HTTP Basic: it sets an encrypted, HttpOnly cookie,
- * so that a reload of the page keeps the session and no script of the page, plugins included, ever
+ * so that a reload of the page keeps the session and no script of the page, extensions included, ever
  * holds the password. API and MCP clients keep using HTTP Basic or bearer tokens.
  */
 @Path("/api/v1/accounts/session")

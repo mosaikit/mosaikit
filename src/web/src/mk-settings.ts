@@ -6,9 +6,9 @@ import type { Preferences } from './api.js';
 import { LANGUAGES, t } from './i18n.js';
 import type { LauncherEntry } from './navigation.js';
 
-/** A section that a plugin adds to the settings with the point settings.section (MK-027). */
+/** A section that an extension adds to the settings with the point settings.section (MK-027). */
 export interface SettingsSection {
-  readonly pluginId: string;
+  readonly extensionId: string;
   readonly id: string;
   readonly title: string;
   /** Custom element that renders the section. */
@@ -36,7 +36,7 @@ const APPEARANCES = [
 
 /**
  * The personal settings (MK-027): appearance, theme, language, the apps of the app bar and the
- * sections of the plugins. Each change goes at once to the shell, which saves and applies it.
+ * sections of the extensions. Each change goes at once to the shell, which saves and applies it.
  */
 @customElement('mk-settings')
 export class MkSettings extends LitElement {
@@ -103,7 +103,7 @@ export class MkSettings extends LitElement {
   @property({ attribute: false }) themes: readonly { id: string; title: string }[] = [];
   @property({ attribute: false }) apps: readonly BarApp[] = [];
   @property({ attribute: false }) sections: readonly SettingsSection[] = [];
-  /** The kinds of notifications the person received, as `<plugin id>/<kind>` (MK-038). */
+  /** The kinds of notifications the person received, as `<extension id>/<kind>` (MK-038). */
   @property({ attribute: false }) notificationKinds: readonly string[] = [];
   /** The organization switch of the shell, rendered in the page. */
   @property({ attribute: false }) organizations: unknown = nothing;
@@ -191,7 +191,7 @@ export class MkSettings extends LitElement {
               <legend>${t('Apps in the app bar')}</legend>
               <ul class="apps">
                 ${this.apps.map(({ entry, pinned }) => {
-                  const key = `${entry.pluginId}/${entry.id}`;
+                  const key = `${entry.extensionId}/${entry.id}`;
                   return html`<li>
                     <label
                       ><input
@@ -257,21 +257,21 @@ export class MkSettings extends LitElement {
         (section) =>
           html`<fieldset>
             <legend>${section.title}</legend>
-            <div class="section" data-section=${`${section.pluginId}/${section.id}`}></div>
+            <div class="section" data-section=${`${section.extensionId}/${section.id}`}></div>
           </fieldset>`,
       )}
       <p class="status" role="status" aria-live="polite">${this.status}</p>
     `;
   }
 
-  /** Mounts the custom element of each section of a plugin in its place. */
+  /** Mounts the custom element of each section of an extension in its place. */
   protected override updated(changed: PropertyValues): void {
     super.updated(changed);
     // A section reads context.locale when it connects: a new language mounts it again.
     const remount = changed.has('language') && changed.get('language') !== undefined;
     for (const section of this.sections) {
       const host = this.renderRoot.querySelector<HTMLElement>(
-        `[data-section="${section.pluginId}/${section.id}"]`,
+        `[data-section="${section.extensionId}/${section.id}"]`,
       );
       if (host && (remount || host.firstElementChild?.localName !== section.element)) {
         host.replaceChildren(document.createElement(section.element));

@@ -16,7 +16,7 @@
 npm ci                                  # once: also brings PostgreSQL 18 (@embedded-postgres)
 npm run dev                             # kernel and shell in development mode, with database and sample data
 npm run check:fast                      # frontend: lint, type check, unit tests
-./mvnw verify -Dskip.npm -DskipITs      # backend: unit and Quarkus tests, without the slow ones
+./mvnw verify -Dskip.npm                # backend: unit and Quarkus tests (the installation tests need -DskipITs=false)
 npm run e2e                             # end-to-end tests on a real installation (after ./mvnw install)
 ./mvnw install                          # everything: frontend and backend checks, tests, target/dist
 ./mvnw install -DskipTests              # without tests (and without the frontend checks)
@@ -31,13 +31,37 @@ npm run format                          # format frontend sources
 The Maven build runs npm itself: `npm ci`, then `npm run build` (SDK and UI, before the kernel,
 which packages the UI), then `npm run check` in the test phase.
 
+## Test what you changed
+
+A whole build with every test takes 15 to 20 minutes on a laptop; nobody needs it to change one
+thing. Run the tests of what you changed, and leave the rest to the CI, which runs everything on
+every pull request.
+
+| You changed | Run | Takes |
+|---|---|---|
+| an extension | `npm test` in the repository of the extension, on the bench of `@mosaikit/testing` (ADR-0035) | 20–40 s |
+| the shell (`src/web`) or the SDK (`sdk/js`, `sdk/ui`) | `npm run check:fast` | under a minute |
+| the same, as people see it | `./mvnw install -DskipTests` once, then `node tests/e2e/run.ts <file>` (such as `13-teams-shell`) | about 35 s for a file |
+| a class of the kernel | `./mvnw -pl src/server test -Dskip.npm -Dtest=<TestClass>` | 1–2 min |
+| the launcher or the installation of Java extensions | `./mvnw -pl src/server verify -Dskip.npm -DskipITs=false -Dit.test=JavaExtensionInstallationIT -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false` | about 3 min |
+| documentation only | `npx vitest run docs` | seconds |
+
+Before a pull request that touches more than one of these, `npm run check:fast` and
+`./mvnw verify -Dskip.npm` cover the frontend and the backend; `npm run e2e` runs the
+whole end-to-end suite in three groups at the same time, each on a bench of its own (about 3–4
+minutes; `node tests/e2e/run.ts B` runs one group).
+
+On Windows an antivirus scans each new file when a program first opens it, and a build writes
+thousands: a [Dev Drive](https://learn.microsoft.com/windows/dev-drive/) for the sources, the
+Maven repository and the npm cache makes builds and tests much faster.
+
 ## Development mode
 
 ```bash
 npm run dev                      # npm run dev -- --reset starts again from an empty database
 ```
 
-`build/dev.ts` builds the plugin API at every start (a few seconds: the dev mode takes its classes from `sdk/java/target`), starts PostgreSQL 18 from `node_modules`
+`build/dev.ts` builds the extension API at every start (a few seconds: the dev mode takes its classes from `sdk/java/target`), starts PostgreSQL 18 from `node_modules`
 (its data in `.dev/postgres`, kept between runs), a fake language model for the assistant, and
 `./mvnw -pl kernel quarkus:dev`; once the kernel is ready it creates the organization `demo` with
 two people and prints how to sign in. Nothing to install or start by hand but Java and Node.
@@ -45,11 +69,11 @@ two people and prints how to sign in. Nothing to install or start by hand but Ja
 - Kernel and UI on <http://localhost:8080>, with live reload of Java code and hot module
   replacement of the UI (Quinoa runs Vite on `src/web`).
 - A platform administrator `admin` / `admin-dev-only` is created at first start.
-- Plugins are read from the `plugins/` directory of the repository. Plugins with Java code, such
+- Extensions are read from the `extensions/` directory of the repository. Extensions with Java code, such
   as `sample-notes`, stay `RESTART_REQUIRED`: their code is loaded only by the launcher (next
   section).
-- The `plugins/` directory is watched (`mosaikit.plugins.watch`): save a file of a frontend, or
-  add a plugin without Java code, and the open shells reload their page by themselves, keeping
+- The `extensions/` directory is watched (`mosaikit.extensions.watch`): save a file of a frontend, or
+  add an extension without Java code, and the open shells reload their page by themselves, keeping
   the session.
 - Swagger UI: <http://localhost:8080/q/swagger-ui>. Dev UI: <http://localhost:8080/q/dev-ui>.
 
@@ -59,16 +83,16 @@ To work on the UI alone against a running kernel: `npm run dev -w src/web`
 ## Running an installation
 
 `./mvnw install` leaves an installation in `target/dist/mosaikit` (see its `README.md`). To try
-the launcher and Java plugins as they run in production:
+the launcher and Java extensions as they run in production:
 
 ```bash
 ./mvnw install -DskipTests
-cp target/dist/plugins/sample-notes-*.zip target/dist/mosaikit/plugins/   # a Java plugin, as it is
+cp target/dist/extensions/sample-notes-*.zip target/dist/mosaikit/extensions/   # a Java extension, as it is
 # edit target/dist/mosaikit/config/application.properties (database, admin password)
 target/dist/mosaikit/mosaikit              # mosaikit.cmd on Windows
 ```
 
-The first start after adding, updating or removing a Java plugin rebuilds the kernel. A plugin can
+The first start after adding, updating or removing a Java extension rebuilds the kernel. An extension can
 also be a directory with the same content as its package, which is handy while writing it.
 
 ## Building the portable distribution
@@ -110,14 +134,14 @@ curl -u admin -X PUT localhost:8080/api/v1/organizations/<slug>/identity \
 
 ## Tests and traceability
 
-- Java unit tests live next to the code (`sdk/java`, `kernel`); the integration tests with
+- Java unit tests live next to the code (`sdk/java`, `src/server`); the integration tests with
   `@QuarkusTest` and REST Assured are in `src/server/src/test/java/dev/mosaikit/kernel/app`.
 - The tests need no Docker: `EmbeddedPostgres` (`src/server/src/test/java/dev/mosaikit/testing`)
   starts PostgreSQL 18 from `node_modules` for every `@QuarkusTest`, in a temporary directory on a
   free port. The tests with Keycloak are tagged `keycloak` and run only with
   `-Dtest.groups.excluded=` (they start Keycloak in Docker).
-- `JavaPluginInstallationIT` (`kernel`, run by Failsafe in `verify`, skipped with `-DskipITs`)
-  installs the package of the sample Java plugin in a real installation and checks MK-011 end to
+- `JavaExtensionInstallationIT` (`src/server`, run by Failsafe in `verify` only with `-DskipITs=false`, as the CI does on `main` and every night)
+  installs the package of the fixture Java extension in a real installation and checks MK-011 end to
   end. It starts PostgreSQL the same way, or uses a server given with `-Dmosaikit.it.jdbc-url=…` (plus `-username`,
   `-password`) on which it creates and drops its own database.
 - Frontend tests use Vitest; the JSON Schema of the manifest is tested against every manifest
@@ -128,7 +152,9 @@ curl -u admin -X PUT localhost:8080/api/v1/organizations/<slug>/identity \
 ## End-to-end tests
 
 [`tests/e2e/`](../../tests/e2e/README.md) runs Playwright on a real installation built by `./mvnw install`:
-launcher, kernel, shell and plugins, in Chromium, with a fake language model only. Every
+launcher, kernel, shell and the fixture extensions of `tests/fixtures/extensions`, in Chromium, with a
+fake language model only. The installation runs on the bench of `@mosaikit/testing` (`sdk/testing`),
+the same that the repositories of extensions use. Every
 requirement has its e2e cases there, one per acceptance criterion; a requirement is done when they
 pass in CI (job `e2e`), not only its unit tests.
 
@@ -144,7 +170,7 @@ running one.
 
 | Lane | When | What |
 |---|---|---|
-| Fast | pull requests, about 4 minutes | frontend checks, unit and Quarkus tests (`-DskipITs`, without Keycloak) and end-to-end tests at the same time, secrets, SAST; a pull request of documentation only (`docs/`, Markdown files at the root) runs the frontend checks and `DocumentationTest`, in about a minute |
+| Fast | pull requests, about 4 minutes | frontend checks, unit and Quarkus tests (without the installation tests and Keycloak) and end-to-end tests at the same time, secrets, SAST; a pull request of documentation only (`docs/`, Markdown files at the root) runs the frontend checks and `DocumentationTest`, in about a minute |
 | Full | `main`, every night at 02:17 UTC, tags, by hand | everything above, plus the installation tests, the tests with Keycloak, SonarQube, SBOM, dependency scan and the release documents; the portable archives on tags or by hand |
 
 `frontend`, `backend` and `e2e` are required checks of `main`, and pull requests are opened with

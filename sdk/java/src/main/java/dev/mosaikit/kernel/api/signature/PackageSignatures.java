@@ -30,7 +30,7 @@ import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
 /**
- * Signs and verifies plugin packages (MK-013).
+ * Signs and verifies extension packages (MK-013).
  *
  * <p>A signed package is an ordinary package with two more entries:
  *

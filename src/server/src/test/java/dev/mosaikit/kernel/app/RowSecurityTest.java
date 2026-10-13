@@ -23,7 +23,7 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
- * Row-level security of the data of organizations (MK-019): a plugin that reads its table without
+ * Row-level security of the data of organizations (MK-019): an extension that reads its table without
  * any filter still sees only the rows of the organization of the request.
  */
 @QuarkusTest
@@ -76,7 +76,7 @@ class RowSecurityTest {
                         config.getValue("quarkus.datasource.password", String.class));
                 var statement = connection.createStatement();
                 var result = statement.executeQuery(
-                        "select count(*) from p_test_schema.scoped_note where text in ('from acme', 'from globex')")) {
+                        "select count(*) from ext_test_schema.scoped_note where text in ('from acme', 'from globex')")) {
             result.next();
             assertThat(result.getInt(1)).isGreaterThanOrEqualTo(2);
         }

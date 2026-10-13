@@ -13,12 +13,12 @@ import java.util.Objects;
  * ├── mosaikit, mosaikit.cmd   the launcher scripts
  * ├── README.md
  * ├── config/     application.properties (read by the kernel from the working directory)
- * ├── plugins/    the installed plugins: packages (*.zip) or directories
+ * ├── extensions/    the installed extensions: packages (*.zip) or directories
  * ├── data/       PostgreSQL cluster and generated secrets (portable distribution only)
  * └── bin/
  *     ├── mosaikit.ps1
  *     ├── kernel/ the kernel as Quarkus mutable JAR, with the UI and this launcher; providers/
- *     │           holds the plugin JARs, plugin-packages/ the unpacked plugin packages
+ *     │           holds the extension JARs, extension-packages/ the unpacked extension packages
  *     ├── java/   Java runtime (portable distribution only)
  *     └── pgsql/  PostgreSQL binaries (portable distribution only)
  * </pre>
@@ -31,8 +31,8 @@ public record Installation(Path home) {
         home = Objects.requireNonNull(home, "home").toAbsolutePath().normalize();
     }
 
-    public Path plugins() {
-        return home.resolve("plugins");
+    public Path extensions() {
+        return home.resolve("extensions");
     }
 
     public Path bin() {
@@ -43,9 +43,9 @@ public record Installation(Path home) {
         return bin().resolve("kernel");
     }
 
-    /** Where plugin packages are unpacked, for the launcher and the kernel alike. */
+    /** Where extension packages are unpacked, for the launcher and the kernel alike. */
     public Path packages() {
-        return kernel().resolve("plugin-packages");
+        return kernel().resolve("extension-packages");
     }
 
     public Path providers() {

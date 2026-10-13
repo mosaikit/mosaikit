@@ -2,11 +2,11 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.core.apps;
 
-import dev.mosaikit.kernel.api.plugin.Contribution;
-import dev.mosaikit.kernel.api.plugin.PluginManifest;
+import dev.mosaikit.kernel.api.extension.Contribution;
+import dev.mosaikit.kernel.api.extension.ExtensionManifest;
 import dev.mosaikit.kernel.core.error.InvalidInputException;
-import dev.mosaikit.kernel.core.plugin.InstalledPlugin;
-import dev.mosaikit.kernel.core.plugin.PluginRegistry;
+import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
+import dev.mosaikit.kernel.core.extension.InstalledExtension;
 import dev.mosaikit.kernel.core.security.Roles;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
@@ -30,30 +30,30 @@ import java.util.UUID;
 @Transactional
 public class AppSettings {
 
-    /** The points through which plugins add apps to the app bar (launcher.app is deprecated). */
+    /** The points through which extensions add apps to the app bar (launcher.app is deprecated). */
     static final List<String> POINTS = List.of("rail.app", "launcher.app");
 
     private static final Set<String> ROLES = Set.of(Roles.ORGANIZATION_USER, Roles.ORGANIZATION_ADMIN);
     private static final int DEFAULT_ORDER = 100;
 
-    private final PluginRegistry registry;
+    private final ExtensionRegistry registry;
     private final OrganizationApps apps;
 
-    public AppSettings(PluginRegistry registry, OrganizationApps apps) {
+    public AppSettings(ExtensionRegistry registry, OrganizationApps apps) {
         this.registry = registry;
         this.apps = apps;
     }
 
-    /** An app of an active plugin, as the shell would show it without settings. */
-    record App(String pluginId, String appId, String title, int order) {}
+    /** An app of an active extension, as the shell would show it without settings. */
+    record App(String extensionId, String appId, String title, int order) {}
 
-    /** The apps of the active plugins, in the default order of the app bar. */
+    /** The apps of the active extensions, in the default order of the app bar. */
     List<App> available() {
         Set<String> routes = new HashSet<>();
         List<App> found = new ArrayList<>();
         for (String point : POINTS) {
-            for (InstalledPlugin plugin : registry.active()) {
-                for (PluginManifest manifest : plugin.manifest().stream().toList()) {
+            for (InstalledExtension extension : registry.active()) {
+                for (ExtensionManifest manifest : extension.manifest().stream().toList()) {
                     for (Contribution contribution : manifest.contributionsTo(point)) {
                         Object route = contribution.attributes().get("route");
                         if (!(route instanceof String text) || !routes.add(text)) {
@@ -81,38 +81,39 @@ public class AppSettings {
         Map<String, Integer> defaultPosition = new HashMap<>();
         for (int i = 0; i < available.size(); i++) {
             defaultPosition.put(
-                    key(available.get(i).pluginId(), available.get(i).appId()), i);
+                    key(available.get(i).extensionId(), available.get(i).appId()), i);
         }
         available.sort(Comparator.comparingInt(app -> {
-            OrganizationApp setting = settings.get(key(app.pluginId(), app.appId()));
-            // Apps without a setting, such as those of plugins installed later, come after.
+            OrganizationApp setting = settings.get(key(app.extensionId(), app.appId()));
+            // Apps without a setting, such as those of extensions installed later, come after.
             return setting == null
-                    ? 10_000 + defaultPosition.get(key(app.pluginId(), app.appId()))
+                    ? 10_000 + defaultPosition.get(key(app.extensionId(), app.appId()))
                     : setting.getPosition();
         }));
         return available.stream()
-                .map(app -> Optional.ofNullable(settings.get(key(app.pluginId(), app.appId())))
+                .map(app -> Optional.ofNullable(settings.get(key(app.extensionId(), app.appId())))
                         .map(setting -> new AppView(
-                                app.pluginId(),
+                                app.extensionId(),
                                 app.appId(),
                                 app.title(),
                                 setting.isEnabled(),
                                 setting.isPinned(),
                                 setting.getRoles()))
-                        .orElseGet(() -> new AppView(app.pluginId(), app.appId(), app.title(), true, false, Set.of())))
+                        .orElseGet(
+                                () -> new AppView(app.extensionId(), app.appId(), app.title(), true, false, Set.of())))
                 .toList();
     }
 
     /** Replaces the settings of an organization; the order of the list is the order of the app bar. */
     public List<AppView> change(UUID organizationId, List<AppView> changed) {
         Set<String> known = new HashSet<>();
-        available().forEach(app -> known.add(key(app.pluginId(), app.appId())));
+        available().forEach(app -> known.add(key(app.extensionId(), app.appId())));
         List<String> problems = new ArrayList<>();
         Set<String> seen = new HashSet<>();
         for (AppView app : changed) {
-            String key = key(app.pluginId(), app.appId());
+            String key = key(app.extensionId(), app.appId());
             if (!known.contains(key)) {
-                problems.add("apps " + key + " is not an app of an active plugin");
+                problems.add("apps " + key + " is not an app of an active extension");
             } else if (!seen.add(key)) {
                 problems.add("apps " + key + " is listed twice");
             }
@@ -127,7 +128,7 @@ public class AppSettings {
         for (int i = 0; i < changed.size(); i++) {
             AppView app = changed.get(i);
             apps.insert(new OrganizationApp(
-                    organizationId, app.pluginId(), app.appId(), app.enabled(), i, app.pinned(), app.roles()));
+                    organizationId, app.extensionId(), app.appId(), app.enabled(), i, app.pinned(), app.roles()));
         }
         return list(organizationId);
     }
@@ -139,28 +140,28 @@ public class AppSettings {
     public List<ShellApp> forPerson(Optional<UUID> organizationId, Set<String> roles) {
         if (organizationId.isEmpty()) {
             return available().stream()
-                    .map(app -> new ShellApp(app.pluginId(), app.appId(), false))
+                    .map(app -> new ShellApp(app.extensionId(), app.appId(), false))
                     .toList();
         }
         return list(organizationId.get()).stream()
                 .filter(AppView::enabled)
                 .filter(app -> app.roles().isEmpty() || app.roles().stream().anyMatch(roles::contains))
-                .map(app -> new ShellApp(app.pluginId(), app.appId(), app.pinned()))
+                .map(app -> new ShellApp(app.extensionId(), app.appId(), app.pinned()))
                 .toList();
     }
 
     /**
-     * Whether a plugin is turned off for an organization: it has apps, and all of them are off. Its
+     * Whether an extension is turned off for an organization: it has apps, and all of them are off. Its
      * API and its documents then refuse the people of the organization.
      */
-    public boolean isOff(UUID organizationId, String pluginId) {
+    public boolean isOff(UUID organizationId, String extensionId) {
         Map<String, OrganizationApp> settings = settingsOf(organizationId);
-        List<App> ofPlugin = available().stream()
-                .filter(app -> app.pluginId().equals(pluginId))
+        List<App> ofExtension = available().stream()
+                .filter(app -> app.extensionId().equals(extensionId))
                 .toList();
-        return !ofPlugin.isEmpty()
-                && ofPlugin.stream().allMatch(app -> {
-                    OrganizationApp setting = settings.get(key(app.pluginId(), app.appId()));
+        return !ofExtension.isEmpty()
+                && ofExtension.stream().allMatch(app -> {
+                    OrganizationApp setting = settings.get(key(app.extensionId(), app.appId()));
                     return setting != null && !setting.isEnabled();
                 });
     }
@@ -168,11 +169,11 @@ public class AppSettings {
     private Map<String, OrganizationApp> settingsOf(UUID organizationId) {
         Map<String, OrganizationApp> settings = new LinkedHashMap<>();
         apps.findByOrganizationId(organizationId)
-                .forEach(app -> settings.put(key(app.getPluginId(), app.getAppId()), app));
+                .forEach(app -> settings.put(key(app.getExtensionId(), app.getAppId()), app));
         return settings;
     }
 
-    private static String key(String pluginId, String appId) {
-        return pluginId + "/" + appId;
+    private static String key(String extensionId, String appId) {
+        return extensionId + "/" + appId;
     }
 }

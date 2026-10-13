@@ -34,7 +34,7 @@ describe('EventBus (MK-009)', () => {
     const bus = new EventBus(errors);
     const healthy = vi.fn();
     bus.on('a.b', () => {
-      throw new Error('broken plugin');
+      throw new Error('broken extension');
     });
     bus.on('a.b', healthy);
 

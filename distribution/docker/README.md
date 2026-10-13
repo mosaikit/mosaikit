@@ -20,14 +20,14 @@ Change the passwords in `.env` before the first start: they are used only when t
 the administrators are created.
 
 A rebuild of the project refreshes the other files of this folder but keeps `.env` and the packages
-in `plugins/`, so the folder can stay in use (even with the stack running) across builds.
+in `extensions/`, so the folder can stay in use (even with the stack running) across builds.
 
 ## Everyday use
 
 | To | Run |
 |---|---|
 | see the logs | `docker compose logs -f mosaikit` |
-| install a plugin | copy its package (`<name>.zip`, for example from `../plugins`) into `plugins/`, then `docker compose restart mosaikit` |
+| install an extension | copy its package (`<name>.zip`, for example from `../extensions`) into `extensions/`, then `docker compose restart mosaikit` |
 | stop | `docker compose down` (the data stay in the `mosaikit_postgres-data` volume) |
 | delete everything, data included | `docker compose down -v` |
 | back up the data | `docker compose exec postgres pg_dumpall -U mosaikit > backup.sql` |

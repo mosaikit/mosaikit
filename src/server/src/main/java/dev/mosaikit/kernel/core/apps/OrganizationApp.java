@@ -23,8 +23,8 @@ public class OrganizationApp {
     @Column(name = "organization_id", nullable = false, updatable = false)
     private UUID organizationId;
 
-    @Column(name = "plugin_id", nullable = false, updatable = false)
-    private String pluginId;
+    @Column(name = "extension_id", nullable = false, updatable = false)
+    private String extensionId;
 
     @Column(name = "app_id", nullable = false, updatable = false)
     private String appId;
@@ -47,7 +47,7 @@ public class OrganizationApp {
 
     public OrganizationApp(
             UUID organizationId,
-            String pluginId,
+            String extensionId,
             String appId,
             boolean enabled,
             int position,
@@ -55,7 +55,7 @@ public class OrganizationApp {
             Set<String> roles) {
         this.id = UUID.randomUUID();
         this.organizationId = organizationId;
-        this.pluginId = pluginId;
+        this.extensionId = extensionId;
         this.appId = appId;
         this.enabled = enabled;
         this.position = position;
@@ -63,8 +63,8 @@ public class OrganizationApp {
         this.roles = String.join(",", new TreeSet<>(roles));
     }
 
-    public String getPluginId() {
-        return pluginId;
+    public String getExtensionId() {
+        return extensionId;
     }
 
     public String getAppId() {

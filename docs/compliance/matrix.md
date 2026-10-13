@@ -29,7 +29,7 @@ Linee guida AgID per lo sviluppo del software sicuro, and OWASP ASVS 5.0 level 2
 | C-09 | Dependency scanning and SBOM | Compliant | jobs `sbom` (CycloneDX) and `dependency-scan` (Trivy) | |
 | C-10 | Dependency updates with a delay against compromised releases | Compliant | `.github/renovate.json` (`minimumReleaseAge`) | |
 | C-11 | Code review of every change | Partial | `.github/CODEOWNERS`, pull request template | NC-03 |
-| C-12 | Threat model of kernel and plugin model | Non-compliant | | NC-04 |
+| C-12 | Threat model of kernel and extension model | Non-compliant | | NC-04 |
 | C-13 | Verification against ASVS 5.0 level 2 | Non-compliant | | NC-05 |
 | C-14 | Dynamic testing and penetration test | Non-compliant | | NC-06 |
 | C-15 | Secure HTTP headers (CSP, HSTS, nosniff, frame options, referrer) | Compliant | `src/server/src/main/resources/application.properties`, `SystemResourceTest` (MK-001) | |
@@ -63,7 +63,7 @@ Legge 4/2004, Linee guida AgID sull'accessibilità degli strumenti informatici, 
 | C-25 | Strong authentication (MFA) for administrators and users | Partial | Keycloak supports it; not required by the realm template, not available for local accounts | NC-12 |
 | C-26 | Protection against password guessing | Partial | `bruteForceProtected` in `realm-template.json`; no lockout for local accounts | NC-13 |
 | C-27 | Password policy | Partial | 12 to 128 characters for local accounts (`RegistrationRequest`); no policy in the realm template | NC-14 |
-| C-28 | Least privilege and separation of organizations | Compliant | roles per organization, platform roles only with a password; one realm per organization; plugin APIs refused without an organization (MK-017, `MembershipTest`, `JavaPluginInstallationIT`); row-level security of plugin data (MK-019, [ADR-0018](../adr/0018-row-level-security.md), `RowSecurityTest`) | |
+| C-28 | Least privilege and separation of organizations | Compliant | roles per organization, platform roles only with a password; one realm per organization; extension APIs refused without an organization (MK-017, `MembershipTest`, `JavaExtensionInstallationIT`); row-level security of extension data (MK-019, [ADR-0018](../adr/0018-row-level-security.md), `RowSecurityTest`) | |
 
 ## ACN QC2: logging and audit
 
@@ -97,8 +97,8 @@ Legge 4/2004, Linee guida AgID sull'accessibilità degli strumenti informatici, 
 
 | ID | Measure | Status | Evidence | NC |
 |---|---|---|---|---|
-| C-37 | Plugins signed and verified before installation | Compliant | MK-013, [ADR-0014](../adr/0014-signed-plugin-packages.md), `SignedPackagesTest`, `PackageSignaturesTest` | |
-| C-37a | Code of unverified publishers isolated from the shell and the credentials | Compliant | MK-014, [ADR-0015](../adr/0015-isolated-plugin-frontends.md), `shell-bridge.test.ts`, `frame.test.ts`, `FrontendPluginViewTest` | |
+| C-37 | Extensions signed and verified before installation | Compliant | MK-013, [ADR-0014](../adr/0014-signed-plugin-packages.md), `SignedPackagesTest`, `PackageSignaturesTest` | |
+| C-37a | Code of unverified publishers isolated from the shell and the credentials | Compliant | MK-014, [ADR-0015](../adr/0015-isolated-plugin-frontends.md), `shell-bridge.test.ts`, `frame.test.ts`, `FrontendExtensionViewTest` | |
 | C-38 | Signed release artefacts (container image, archives) with provenance | Partial | signed Git tags; `sign` job: cosign keyless signature of the image and of the `SHA256SUMS` of archives and documents ([ADR-0023](../adr/0023-documentation-and-release-documents.md)); not yet verified on a release, SBOM not attested | NC-22 |
 | C-39 | Vulnerability management of the components | Compliant | jobs `dependency-scan` and `sbom`, Renovate, `SECURITY.md` | |
 
@@ -126,4 +126,4 @@ Regulation (EU) 2024/1689 (AI Act), for the assistant of MK-015.
 
 | ID | Measure | Status | Evidence | NC |
 |---|---|---|---|---|
-| C-45 | Human oversight: actions of an assistant confirmed by a person and audited | Compliant | MK-015, MK-024, [ADR-0017](../adr/0017-ai-tools-drafts-and-audit.md), [ADR-0022](../adr/0022-assistant-on-plugin-tools.md), `AiToolsTest`, `AssistantTest`, `JavaPluginInstallationIT` | |
+| C-45 | Human oversight: actions of an assistant confirmed by a person and audited | Compliant | MK-015, MK-024, [ADR-0017](../adr/0017-ai-tools-drafts-and-audit.md), [ADR-0022](../adr/0022-assistant-on-plugin-tools.md), `AiToolsTest`, `AssistantTest`, `JavaExtensionInstallationIT` | |

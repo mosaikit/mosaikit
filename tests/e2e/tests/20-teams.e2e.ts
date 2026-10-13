@@ -7,7 +7,7 @@ import { api } from '../support/shell.js';
 
 const TEAMS = '/api/v1/teams';
 // The collection of the sample To do, which 09-data installs.
-const ITEMS = '/api/v1/data/dev.mosaikit.sample.todo/items';
+const ITEMS = '/api/v1/data/dev.mosaikit.fixture.todo/items';
 
 interface Team {
   readonly id: string;
@@ -92,7 +92,7 @@ test.describe('MK-032 Teams with roles and guests', () => {
     expect(teams.every((team) => team.role === 'guest')).toBe(true);
     expect((await api(guest, ITEMS)).body).toEqual([]);
     expect((await api(guest, ITEMS, { method: 'POST', body: '{"title":"x"}' })).status).toBe(403);
-    // Nor the assistant or the administration (nor the backends of plugins: GuestAccessFilter).
+    // Nor the assistant or the administration (nor the backends of extensions: GuestAccessFilter).
     expect((await api(guest, `/api/v1/organizations/${ORGANIZATION.slug}/apps`)).status).toBe(403);
     expect((await api(guest, '/api/v1/ai/tools')).status).toBe(403);
     expect((await api(guest, `${TEAMS}/${open.id}`)).status).toBe(404);

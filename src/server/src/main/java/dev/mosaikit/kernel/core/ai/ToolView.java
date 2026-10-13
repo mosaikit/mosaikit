@@ -12,7 +12,7 @@ import java.util.Map;
  * @param description what it does
  * @param risk {@code read}, {@code write} or {@code execute}
  * @param needsConfirmation whether invoking it produces a draft that the person confirms
- * @param plugin identifier of the plugin that offers it
+ * @param extension identifier of the extension that offers it
  * @param inputSchema JSON Schema of the arguments
  */
 public record ToolView(
@@ -21,7 +21,7 @@ public record ToolView(
         String description,
         String risk,
         boolean needsConfirmation,
-        String plugin,
+        String extension,
         Map<String, Object> inputSchema) {
 
     static ToolView of(AiTool tool) {
@@ -31,7 +31,7 @@ public record ToolView(
                 tool.action().description(),
                 tool.action().risk().value(),
                 tool.needsConfirmation(),
-                tool.plugin(),
+                tool.extension(),
                 tool.action().input().tree());
     }
 }

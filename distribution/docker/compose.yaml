@@ -82,14 +82,14 @@ services:
       MOSAIKIT_IDENTITY_KEYCLOAK_INTERNAL_URL: http://keycloak:8080
       MOSAIKIT_IDENTITY_ADMIN_CLIENT_ID: mosaikit-admin
       MOSAIKIT_IDENTITY_ADMIN_CLIENT_SECRET: ${KEYCLOAK_ADMIN_CLIENT_SECRET}
-      # Signed plugin packages (MK-013): "required" accepts only packages signed with a key of
-      # /opt/mosaikit/config/trusted-keys, which includes the key that signed ../plugins.
-      MOSAIKIT_PLUGINS_SIGNATURES: ${MOSAIKIT_PLUGINS_SIGNATURES:-optional}
+      # Signed extension packages (MK-013): "required" accepts only packages signed with a key of
+      # /opt/mosaikit/config/trusted-keys, which includes the key that signed ../extensions.
+      MOSAIKIT_EXTENSIONS_SIGNATURES: ${MOSAIKIT_EXTENSIONS_SIGNATURES:-optional}
     ports:
       - '8080:8080'
     volumes:
-      # Copy plugin packages (*.zip) here and run: docker compose restart mosaikit
-      - ./plugins:/opt/mosaikit/plugins
+      # Copy extension packages (*.zip) here and run: docker compose restart mosaikit
+      - ./extensions:/opt/mosaikit/extensions
     depends_on:
       postgres:
         condition: service_healthy

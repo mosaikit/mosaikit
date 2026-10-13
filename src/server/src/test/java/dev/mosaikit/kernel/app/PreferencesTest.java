@@ -53,7 +53,7 @@ class PreferencesTest {
                         "theme", "pa",
                         "appearance", "contrast",
                         "language", "it",
-                        "hiddenApps", List.of("dev.mosaikit.sample.notes/notes")))
+                        "hiddenApps", List.of("dev.mosaikit.fixture.notes/notes")))
                 .put("/api/v1/accounts/me/preferences")
                 .then()
                 .statusCode(200)
@@ -65,7 +65,7 @@ class PreferencesTest {
                 .then()
                 .body("preferences.theme", equalTo("pa"))
                 .body("preferences.language", equalTo("it"))
-                .body("preferences.hiddenApps", contains("dev.mosaikit.sample.notes/notes"));
+                .body("preferences.hiddenApps", contains("dev.mosaikit.fixture.notes/notes"));
     }
 
     @Test

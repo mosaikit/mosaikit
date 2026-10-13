@@ -11,18 +11,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import io.quarkus.test.common.http.TestHTTPResource;
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.QuarkusTestProfile;
 import io.quarkus.test.junit.TestProfile;
 import io.vertx.core.Vertx;
 import io.vertx.core.http.WebSocket;
 import io.vertx.core.http.WebSocketClient;
 import io.vertx.core.http.WebSocketConnectOptions;
 import io.vertx.core.json.JsonObject;
-import java.io.IOException;
-import java.io.UncheckedIOException;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.Base64;
@@ -36,39 +32,14 @@ import org.junit.jupiter.api.Test;
 
 /** The real-time channel of the shell (MK-031). */
 @QuarkusTest
-@TestProfile(LiveTest.TodoPlugin.class)
+@TestProfile(TestExtensions.class)
 @Tag("MK-031")
 class LiveTest {
 
-    static final Path PLUGINS = Path.of("target", "live-test", "plugins").toAbsolutePath();
-    static final String PLUGIN = "dev.mosaikit.test.live";
-    static final String TOPIC = "documents." + PLUGIN + ".items";
+    static final Path EXTENSIONS = TestExtensions.EXTENSIONS;
+    static final String EXTENSION = "dev.mosaikit.test.live";
+    static final String TOPIC = "documents." + EXTENSION + ".items";
     static final String PASSWORD = "a long enough password";
-
-    /** A plugin with a collection of documents. */
-    public static class TodoPlugin implements QuarkusTestProfile {
-        @Override
-        public Map<String, String> getConfigOverrides() {
-            try {
-                Path plugin = Files.createDirectories(PLUGINS.resolve("live").resolve("web"));
-                Files.writeString(plugin.resolve("index.js"), "export default { activate() {} };\n");
-                Files.writeString(plugin.getParent().resolve("manifest.yaml"), """
-                        id: dev.mosaikit.test.live
-                        version: 1.0.0
-                        name: Live (test)
-                        kind: [app]
-                        platform: '>=0.1 <1'
-                        frontend:
-                          entry: web/index.js
-                        data:
-                          collections: [items]
-                        """);
-            } catch (IOException e) {
-                throw new UncheckedIOException(e);
-            }
-            return Map.of("mosaikit.plugins.directory", PLUGINS.toString());
-        }
-    }
 
     @TestHTTPResource("/")
     URI base;
@@ -148,7 +119,7 @@ class LiveTest {
         String id = as(ada, PASSWORD)
                 .header("X-Mosaikit-Organization", "live-acme")
                 .body(Map.of("title", "Paint the fence"))
-                .post("/api/v1/data/" + PLUGIN + "/items")
+                .post("/api/v1/data/" + EXTENSION + "/items")
                 .then()
                 .statusCode(201)
                 .extract()
@@ -168,7 +139,7 @@ class LiveTest {
     void refusesTopicsThatThePersonMayNotRead() throws Exception {
         Page page = connect(ada, "live-acme");
         for (String topic :
-                new String[] {"documents." + PLUGIN + ".secrets", "documents.dev.none.items", "admin.everything"}) {
+                new String[] {"documents." + EXTENSION + ".secrets", "documents.dev.none.items", "admin.everything"}) {
             page.send(Map.of("type", "subscribe", "topic", topic));
             JsonObject answer = page.next();
             assertThat(answer.getString("type")).as(topic).isEqualTo("refused");

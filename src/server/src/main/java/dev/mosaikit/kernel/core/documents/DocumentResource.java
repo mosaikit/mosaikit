@@ -25,14 +25,14 @@ import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
 /**
- * The collections of documents of plugins without a backend (ADR-0031, MK-046), in the organization
- * of the request: {@code /api/v1/data/<plugin id>/<collection>}.
+ * The collections of documents of extensions without a backend (ADR-0031, MK-046), in the organization
+ * of the request: {@code /api/v1/data/<extension id>/<collection>}.
  */
-@Path("/api/v1/data/{plugin}/{collection}")
+@Path("/api/v1/data/{extension}/{collection}")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
 @Authenticated
-@Tag(name = "Plugin data")
+@Tag(name = "Extension data")
 public class DocumentResource {
 
     private final DocumentService documents;
@@ -46,12 +46,12 @@ public class DocumentResource {
             summary = "List the documents of a collection, newest first",
             description = "Those of the whole organization, or, with ?team=<id>, those shared with that team.")
     public List<DocumentView> list(
-            @PathParam("plugin") String plugin,
+            @PathParam("extension") String extension,
             @PathParam("collection") String collection,
             @QueryParam("team") UUID team,
             @QueryParam("offset") @DefaultValue("0") int offset,
             @QueryParam("limit") @DefaultValue("100") int limit) {
-        return documents.list(plugin, collection, team, offset, limit);
+        return documents.list(extension, collection, team, offset, limit);
     }
 
     @POST
@@ -59,12 +59,12 @@ public class DocumentResource {
             summary = "Add a document to a collection",
             description = "With ?team=<id>, shared with that team of the person only (MK-032).")
     public Response create(
-            @PathParam("plugin") String plugin,
+            @PathParam("extension") String extension,
             @PathParam("collection") String collection,
             @QueryParam("team") UUID team,
             JsonNode data,
             @jakarta.ws.rs.core.Context UriInfo uri) {
-        DocumentView created = documents.create(plugin, collection, team, data);
+        DocumentView created = documents.create(extension, collection, team, data);
         return Response.created(uri.getAbsolutePathBuilder()
                         .path(created.id().toString())
                         .build())
@@ -76,8 +76,10 @@ public class DocumentResource {
     @Path("/{id}")
     @Operation(summary = "Get a document")
     public DocumentView get(
-            @PathParam("plugin") String plugin, @PathParam("collection") String collection, @PathParam("id") UUID id) {
-        return documents.get(plugin, collection, id);
+            @PathParam("extension") String extension,
+            @PathParam("collection") String collection,
+            @PathParam("id") UUID id) {
+        return documents.get(extension, collection, id);
     }
 
     @PUT
@@ -86,20 +88,22 @@ public class DocumentResource {
             summary = "Replace a document",
             description = "With If-Match: <version>, refused with 409 if the document changed since.")
     public DocumentView replace(
-            @PathParam("plugin") String plugin,
+            @PathParam("extension") String extension,
             @PathParam("collection") String collection,
             @PathParam("id") UUID id,
             @HeaderParam("If-Match") String ifMatch,
             JsonNode data) {
-        return documents.replace(plugin, collection, id, data, version(ifMatch));
+        return documents.replace(extension, collection, id, data, version(ifMatch));
     }
 
     @DELETE
     @Path("/{id}")
     @Operation(summary = "Delete a document")
     public Response delete(
-            @PathParam("plugin") String plugin, @PathParam("collection") String collection, @PathParam("id") UUID id) {
-        documents.delete(plugin, collection, id);
+            @PathParam("extension") String extension,
+            @PathParam("collection") String collection,
+            @PathParam("id") UUID id) {
+        documents.delete(extension, collection, id);
         return Response.noContent().build();
     }
 

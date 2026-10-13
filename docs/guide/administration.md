@@ -1,14 +1,14 @@
 # Administration
 
 Platform administrators (role `platform-admin`, the `admin` account created at the first start)
-manage organizations and plugins. Today this is done through the REST API; the examples use
+manage organizations and extensions. Today this is done through the REST API; the examples use
 `curl`, which asks for the password of `admin`. The whole API is described at `/q/openapi`.
 
 ## Roles
 
 | Role | Who | Can |
 |---|---|---|
-| `platform-admin` | the administrators of the installation | manage organizations, their identity settings and the plugins |
+| `platform-admin` | the administrators of the installation | manage organizations, their identity settings and the extensions |
 | `organization-admin` | the managers of an organization | manage their organization (in its realm) |
 | `organization-user` | the people of an organization | use the apps of the installation |
 | `organization-guest` | people of another organization, added to a team | see the teams where they were added and what is shared with them, nothing else of the organization |
@@ -119,16 +119,16 @@ with a link: until they open it the account does not sign in. The link works onc
 ## Apps of an organization
 
 The administrators of an organization (role `organization-admin`) open **Organization apps** at
-the bottom of the app bar, and for each app of the active plugins choose:
+the bottom of the app bar, and for each app of the active extensions choose:
 
 - **Shown**: an app that is off leaves the app bar of the organization; when all the apps of a
-  plugin are off, its API and its documents answer 403 to the people of the organization;
+  extension are off, its API and its documents answer 403 to the people of the organization;
 - **Pinned**: people cannot hide it in their settings;
 - **For**: everyone, or the administrators only;
 - the **order** of the app bar, with the arrows.
 
 **Save** applies the settings to everyone in the organization at their next page, and records the
-change in the audit log. Apps of plugins installed later are shown, after the others, until the
+change in the audit log. Apps of extensions installed later are shown, after the others, until the
 administrators decide. Platform administrators can do the same through
 `PUT /api/v1/organizations/{slug}/apps`.
 
@@ -143,13 +143,13 @@ kernel; sign-ins are not recorded yet.
 
 ## Assistants and MCP clients
 
-Plugins may declare actions that assistants use as tools (see
-[plugin development](../development/plugin-development.md#actions-for-assistants)). An MCP client
+Extensions may declare actions that assistants use as tools (see
+[extension development](../development/extension-development.md#actions-for-assistants)). An MCP client
 connects to `https://<host>/mcp` with the credentials of a person and the header
 `X-Mosaikit-Organization: <slug>`; it has exactly the rights of that person in that organization,
 and changes wait for the confirmation of the person.
 
-## Plugins
+## Extensions
 
-See [plugins](plugins.md). `GET /api/v1/plugins` lists every plugin found, with its status, its
+See [extensions](extensions.md). `GET /api/v1/extensions` lists every extension found, with its status, its
 problems and, for signed packages of a trusted publisher, `publisherKey`.

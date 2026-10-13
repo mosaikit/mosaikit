@@ -24,7 +24,7 @@ import java.util.Map;
 import java.util.stream.Stream;
 
 /**
- * Ed25519 keys of plugin publishers, stored as PEM files: {@code <name>.pub.pem} (public, to give
+ * Ed25519 keys of extension publishers, stored as PEM files: {@code <name>.pub.pem} (public, to give
  * to installations) and {@code <name>.key.pem} (private, to keep secret).
  */
 public final class SigningKeys {

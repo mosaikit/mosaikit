@@ -17,7 +17,6 @@ import io.quarkus.websockets.next.OpenConnections;
 import io.quarkus.websockets.next.WebSocket;
 import io.quarkus.websockets.next.WebSocketConnection;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -35,23 +34,27 @@ import java.util.concurrent.ConcurrentHashMap;
 @Authenticated
 public class LiveSocket {
 
-    @Inject
-    SecurityIdentity identity;
+    private final SecurityIdentity identity;
+    private final WebSocketConnection connection;
+    private final LiveTopics topics;
+    private final AccountDirectory accounts;
+    private final LivePages pages;
+    private final ObjectMapper json;
 
-    @Inject
-    WebSocketConnection connection;
-
-    @Inject
-    LiveTopics topics;
-
-    @Inject
-    AccountDirectory accounts;
-
-    @Inject
-    LivePages pages;
-
-    @Inject
-    ObjectMapper json;
+    public LiveSocket(
+            SecurityIdentity identity,
+            WebSocketConnection connection,
+            LiveTopics topics,
+            AccountDirectory accounts,
+            LivePages pages,
+            ObjectMapper json) {
+        this.identity = identity;
+        this.connection = connection;
+        this.topics = topics;
+        this.accounts = accounts;
+        this.pages = pages;
+        this.json = json;
+    }
 
     @OnOpen
     void open() {

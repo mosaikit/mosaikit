@@ -2,9 +2,9 @@
 # SPDX-FileCopyrightText: 2026 Massimo Antonini
 # SPDX-License-Identifier: MPL-2.0
 #
-# Starts Mosaikit. The Java code of new or updated plugins is loaded first: the kernel is rebuilt
-# only when the set of plugin JARs changed (MK-011, ADR-0004). If the kernel does not start with
-# the new JARs, they are rolled back and the kernel starts again with the previous plugins. In the
+# Starts Mosaikit. The Java code of new or updated extensions is loaded first: the kernel is rebuilt
+# only when the set of extension JARs changed (MK-011, ADR-0004). If the kernel does not start with
+# the new JARs, they are rolled back and the kernel starts again with the previous extensions. In the
 # portable distribution (MK-016) the bundled PostgreSQL is started before the kernel and stopped
 # after it.
 #
@@ -63,9 +63,9 @@ kernel() {
   fi
   # shellcheck disable=SC2086 # JAVA_OPTS holds several options
   "$JAVA" ${JAVA_OPTS:-} "$@" \
-    -Dmosaikit.plugins.directory="$MOSAIKIT_HOME/plugins" \
-    -Dmosaikit.plugins.providers-directory="$KERNEL/providers" \
-    -Dmosaikit.plugins.packages-directory="$KERNEL/plugin-packages" \
+    -Dmosaikit.extensions.directory="$MOSAIKIT_HOME/extensions" \
+    -Dmosaikit.extensions.providers-directory="$KERNEL/providers" \
+    -Dmosaikit.extensions.packages-directory="$KERNEL/extension-packages" \
     -jar "$KERNEL/quarkus-run.jar" &
   KERNEL_PID=$!
   trap 'kill -TERM "$KERNEL_PID" 2>/dev/null' TERM INT
@@ -90,7 +90,7 @@ trap 'launcher database stop' EXIT
 STATUS=0
 kernel || STATUS=$?
 if [ "$STATUS" -ne 0 ] && [ -f "$PENDING" ]; then
-  echo "Mosaikit: the kernel stopped (exit code $STATUS) before starting with the new plugin JARs." >&2
+  echo "Mosaikit: the kernel stopped (exit code $STATUS) before starting with the new extension JARs." >&2
   launcher prepare
   STATUS=0
   kernel || STATUS=$?

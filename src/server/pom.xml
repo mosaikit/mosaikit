@@ -18,8 +18,8 @@
     <artifactId>mosaikit-kernel</artifactId>
     <name>Mosaikit :: Kernel</name>
     <description>
-        The kernel: organizations, accounts, identity, plugin registry and the web UI, packaged as a
-        Quarkus mutable JAR, plus the launcher that loads the Java code of plugins (MK-011).
+        The kernel: organizations, accounts, identity, extension registry and the web UI, packaged as a
+        Quarkus mutable JAR, plus the launcher that loads the Java code of extensions (MK-011).
     </description>
 
     <properties>
@@ -105,7 +105,7 @@
             <artifactId>quarkus-oidc</artifactId>
         </dependency>
 
-        <!-- Plugin manifests -->
+        <!-- Extension manifests -->
         <dependency>
             <groupId>com.fasterxml.jackson.dataformat</groupId>
             <artifactId>jackson-dataformat-yaml</artifactId>
@@ -154,10 +154,10 @@
             <artifactId>testcontainers</artifactId>
             <scope>test</scope>
         </dependency>
-        <!-- Only to build the sample Java plugin before the installation tests. -->
+        <!-- Only to build the fixture Java extensions before the installation tests. -->
         <dependency>
-            <groupId>io.github.mosaikit.samples</groupId>
-            <artifactId>mosaikit-sample-notes</artifactId>
+            <groupId>io.github.mosaikit.fixtures</groupId>
+            <artifactId>mosaikit-fixture-notes</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
             <exclusions>
@@ -168,8 +168,8 @@
             </exclusions>
         </dependency>
         <dependency>
-            <groupId>io.github.mosaikit.samples</groupId>
-            <artifactId>mosaikit-sample-activities</artifactId>
+            <groupId>io.github.mosaikit.fixtures</groupId>
+            <artifactId>mosaikit-fixture-activities</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
             <exclusions>
@@ -180,8 +180,8 @@
             </exclusions>
         </dependency>
         <dependency>
-            <groupId>io.github.mosaikit.samples</groupId>
-            <artifactId>mosaikit-sample-estimates</artifactId>
+            <groupId>io.github.mosaikit.fixtures</groupId>
+            <artifactId>mosaikit-fixture-estimates</artifactId>
             <version>${project.version}</version>
             <scope>test</scope>
             <exclusions>
@@ -212,7 +212,7 @@
             </resource>
             <resource>
                 <!-- The built UI (npm run build, run by the parent POM), served by the kernel from the
-                     class path. Rebuilding the kernel for a Java plugin therefore never needs Node.js. -->
+                     class path. Rebuilding the kernel for a Java extension therefore never needs Node.js. -->
                 <directory>../web/dist</directory>
                 <targetPath>mosaikit-ui</targetPath>
             </resource>
@@ -276,9 +276,9 @@
                 <configuration>
                     <systemPropertyVariables>
                         <mosaikit.it.kernel>${project.build.directory}/kernel</mosaikit.it.kernel>
-                        <mosaikit.it.plugin>${maven.multiModuleProjectDirectory}/src/plugins/sample-notes/target/sample-notes-${project.version}.zip</mosaikit.it.plugin>
-                        <mosaikit.it.activities>${maven.multiModuleProjectDirectory}/src/plugins/sample-activities/target/sample-activities-${project.version}.zip</mosaikit.it.activities>
-                        <mosaikit.it.estimates>${maven.multiModuleProjectDirectory}/src/plugins/sample-estimates/target/sample-estimates-${project.version}.zip</mosaikit.it.estimates>
+                        <mosaikit.it.extension>${maven.multiModuleProjectDirectory}/tests/fixtures/extensions/notes/target/fixture-notes-${project.version}.zip</mosaikit.it.extension>
+                        <mosaikit.it.activities>${maven.multiModuleProjectDirectory}/tests/fixtures/extensions/activities/target/fixture-activities-${project.version}.zip</mosaikit.it.activities>
+                        <mosaikit.it.estimates>${maven.multiModuleProjectDirectory}/tests/fixtures/extensions/estimates/target/fixture-estimates-${project.version}.zip</mosaikit.it.estimates>
                         <mosaikit.it.work>${project.build.directory}/it</mosaikit.it.work>
                         <test.root>${maven.multiModuleProjectDirectory}</test.root>
                     </systemPropertyVariables>

@@ -74,8 +74,8 @@ describe('themes (MK-026)', () => {
   });
 });
 
-describe('themes of plugins and high contrast (MK-027, MK-028)', () => {
-  it('fills a theme of a plugin with the default theme, and ignores invalid values', () => {
+describe('themes of extensions and high contrast (MK-027, MK-028)', () => {
+  it('fills a theme of an extension with the default theme, and ignores invalid values', () => {
     registerTheme('dev.example.green', {
       title: 'Green',
       radius: 99,

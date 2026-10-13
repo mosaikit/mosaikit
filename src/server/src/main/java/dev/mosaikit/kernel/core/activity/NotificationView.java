@@ -8,7 +8,7 @@ import java.util.UUID;
 /** A notification of the activity feed, as the shell shows it (MK-038). */
 public record NotificationView(
         UUID id,
-        String pluginId,
+        String extensionId,
         String kind,
         String title,
         String body,
@@ -19,7 +19,7 @@ public record NotificationView(
     static NotificationView of(Notification notification) {
         return new NotificationView(
                 notification.getId(),
-                notification.getPluginId(),
+                notification.getExtensionId(),
                 notification.getKind(),
                 notification.getTitle(),
                 notification.getBody(),

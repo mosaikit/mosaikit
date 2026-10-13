@@ -18,9 +18,9 @@ import org.jboss.logging.Logger;
 /**
  * Row-level security of the data of organizations (MK-019, ADR-0018). During a request that acts
  * on an organization, every connection runs as a member role of the installation, which owns no
- * table, and carries the organization in {@code mosaikit.organization}: the policies of the plugin
+ * table, and carries the organization in {@code mosaikit.organization}: the policies of the extension
  * tables ({@code organization_id = mk_kernel.current_organization()}) then apply to every query,
- * including those of third-party plugins, even when they forget to filter. Owners and superusers
+ * including those of third-party extensions, even when they forget to filter. Owners and superusers
  * bypass policies, so that migrations and the kernel at start see every row.
  */
 @ApplicationScoped
@@ -53,14 +53,14 @@ public class RowSecurity {
 
     /**
      * Creates the member role of the installation if needed and grants it the data of the kernel and
-     * of the given plugin schemas. Called at start, after the migrations.
+     * of the given extension schemas. Called at start, after the migrations.
      *
      * @throws IllegalStateException when the database user may not create or use the role
      */
-    public void prepare(List<String> pluginSchemas) {
+    public void prepare(List<String> extensionSchemas) {
         if (!enabled) {
             LOG.warn("Row-level security is off (mosaikit.database.row-security=false): the data of "
-                    + "organizations are kept apart only by the code of the plugins.");
+                    + "organizations are kept apart only by the code of the extensions.");
             return;
         }
         try (Connection connection = dataSource.getConnection();
@@ -70,7 +70,7 @@ public class RowSecurity {
                 statement.execute("create role " + quote(name) + " nologin");
             }
             statement.execute("grant " + quote(name) + " to current_user");
-            for (String schema : schemas(pluginSchemas)) {
+            for (String schema : schemas(extensionSchemas)) {
                 grant(statement, schema, name);
             }
             role = name;
@@ -84,8 +84,8 @@ public class RowSecurity {
         }
     }
 
-    private List<String> schemas(List<String> pluginSchemas) {
-        return java.util.stream.Stream.concat(java.util.stream.Stream.of(kernelSchema), pluginSchemas.stream())
+    private List<String> schemas(List<String> extensionSchemas) {
+        return java.util.stream.Stream.concat(java.util.stream.Stream.of(kernelSchema), extensionSchemas.stream())
                 .distinct()
                 .toList();
     }

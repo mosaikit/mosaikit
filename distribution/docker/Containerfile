@@ -6,11 +6,11 @@
 #
 #   docker build -f distribution/docker/Containerfile -t mosaikit:dev .
 #
-# Plugins with Java code are added by building a derived image, so that the kernel is rebuilt at
+# Extensions with Java code are added by building a derived image, so that the kernel is rebuilt at
 # image build time and the container can run with a read-only root filesystem:
 #
 #   FROM ghcr.io/mosaikit/mosaikit:<version>
-#   COPY --chown=185 my-plugin-1.0.0.zip /opt/mosaikit/plugins/
+#   COPY --chown=185 my-extension-1.0.0.zip /opt/mosaikit/extensions/
 #   RUN /opt/mosaikit/mosaikit build
 
 FROM node:24 AS node

@@ -30,10 +30,12 @@ public class PlatformSetting {
 
     public PlatformSetting(String name, String value, String updatedBy, Instant updatedAt) {
         this.name = name;
-        change(value, updatedBy, updatedAt);
+        this.value = value;
+        this.updatedBy = updatedBy;
+        this.updatedAt = updatedAt;
     }
 
-    public final void change(String value, String updatedBy, Instant updatedAt) {
+    public void change(String value, String updatedBy, Instant updatedAt) {
         this.value = value;
         this.updatedBy = updatedBy;
         this.updatedAt = updatedAt;

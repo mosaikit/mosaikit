@@ -15,11 +15,11 @@ helm install mosaikit ./mosaikit \
 ```
 
 The released chart is also in the Helm registry of the project (`docs/development/release.md` in the
-repository). Plugins with Java code are added by building a derived image:
+repository). Extensions with Java code are added by building a derived image:
 
 ```dockerfile
 FROM ghcr.io/mosaikit/mosaikit:<version>
-COPY --chown=185 my-plugin-1.0.0.zip /opt/mosaikit/plugins/
+COPY --chown=185 my-extension-1.0.0.zip /opt/mosaikit/extensions/
 RUN /opt/mosaikit/mosaikit build
 ```
 

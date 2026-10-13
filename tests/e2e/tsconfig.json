@@ -6,6 +6,6 @@
     "allowImportingTsExtensions": true,
     "types": ["node"]
   },
-  "include": ["**/*.ts", "../../build/postgres.ts", "../../build/smtp.ts"],
+  "include": ["**/*.ts", "../../sdk/testing/src/**/*.ts"],
   "exclude": [".work", "report"]
 }

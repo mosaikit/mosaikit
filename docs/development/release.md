@@ -13,7 +13,7 @@ A signed tag `vX.Y.Z` (or `vX.Y.Z-rc.N` for a pre-release) starts the release pi
 | `release-check` | — | Fails unless every artifact is at `X.Y.Z` and `CHANGELOG.md` has a `## [X.Y.Z]` section |
 | `container-image` | GitHub Container Registry | `ghcr.io/mosaikit/mosaikit:vX.Y.Z` built from `distribution/docker/Containerfile` |
 | `portable` | GitHub release | `mosaikit-portable-vX.Y.Z-<platform>.zip` / `.tar.gz` for Windows, Linux and macOS, tested on Linux by `portable-test` |
-| `publish-maven` | Maven Central | `mosaikit-parent` and `mosaikit-kernel-api`, the API that Java plugins compile against |
+| `publish-maven` | Maven Central | `mosaikit-parent` and `mosaikit-kernel-api`, the API that Java extensions compile against |
 | `publish-npm` | npmjs.org | `@mosaikit/sdk` (dist-tag `latest`, or `next` for pre-releases), with provenance |
 | `publish-helm` | GitHub Container Registry (OCI) | Chart `oci://ghcr.io/mosaikit/charts/mosaikit`, version `X.Y.Z` |
 | `docs` | GitHub release | `mosaikit-docs-X.Y.Z.zip`: guides in Word and PDF, compliance workbook (Excel), release overview (PowerPoint), extended release notes, `SHA256SUMS` |
@@ -93,7 +93,7 @@ sha256sum --check --ignore-missing SHA256SUMS
 
 ## Consuming the published artifacts
 
-Maven: `io.github.mosaikit:mosaikit-kernel-api` is on Maven Central, so a plugin needs no repository
+Maven: `io.github.mosaikit:mosaikit-kernel-api` is on Maven Central, so an extension needs no repository
 configuration:
 
 ```xml

@@ -10,7 +10,7 @@ import com.tngtech.archunit.junit.ArchTest;
 import com.tngtech.archunit.lang.ArchRule;
 
 /**
- * The kernel API is the contract with plugins. It must stay free of frameworks, so that plugins
+ * The kernel API is the contract with extensions. It must stay free of frameworks, so that extensions
  * never depend on the kernel's implementation choices (see ADR-0004).
  */
 @AnalyzeClasses(packages = "dev.mosaikit.kernel.api", importOptions = ImportOption.DoNotIncludeTests.class)
@@ -21,5 +21,5 @@ class KernelApiArchitectureTest {
             .should()
             .onlyDependOnClassesThat()
             .resideInAnyPackage("dev.mosaikit.kernel.api..", "java..")
-            .because("the plugin contract must not expose framework types such as Jackson, Vert.x or Hibernate");
+            .because("the extension contract must not expose framework types such as Jackson, Vert.x or Hibernate");
 }

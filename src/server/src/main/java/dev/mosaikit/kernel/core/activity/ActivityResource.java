@@ -24,7 +24,7 @@ import java.util.UUID;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
-/** The activity feed of the signed-in person, and the notifications of frontend plugins (MK-038). */
+/** The activity feed of the signed-in person, and the notifications of frontend extensions (MK-038). */
 @Path("/api/v1/notifications")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
@@ -43,13 +43,13 @@ public class ActivityResource {
     }
 
     /**
-     * A notification sent by a frontend plugin.
+     * A notification sent by a frontend extension.
      *
-     * @param plugin the plugin that sends it
+     * @param extension the extension that sends it
      * @param to the email addresses of people of the organization
      */
     public record Sent(
-            @NotBlank String plugin,
+            @NotBlank String extension,
             @NotNull @Size(min = 1, max = 500) List<@NotBlank String> to,
             @NotBlank String kind,
             @NotBlank String title,
@@ -65,11 +65,11 @@ public class ActivityResource {
 
     @POST
     @Operation(
-            summary = "Notify people of the organization, as a plugin",
+            summary = "Notify people of the organization, as an extension",
             description = "The people who turned the kind off, or who are not in the organization, receive nothing.")
     public Response send(@Valid @NotNull Sent sent) {
         activity.sendToAddresses(
-                sent.plugin(),
+                sent.extension(),
                 sent.to(),
                 new Notifications.Notification(sent.kind(), sent.title(), sent.body(), sent.link()));
         return Response.accepted().build();
