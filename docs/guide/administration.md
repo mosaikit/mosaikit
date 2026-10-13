@@ -315,7 +315,8 @@ is refused, with the list of those grants: revoke them first.
 
 The kernel records who proposed, confirmed, rejected or ran an action of an assistant, and who
 created an organization, changed its identity settings, its members, its apps, its permissions or
-the retention of its audit log. Each entry says who (`actor`), what (`action`), on which object
+the retention of its audit log. Extensions record their own sensitive actions in the same log, with
+the action named after the extension, such as `dev.example.dashboards:dashboard.exported`. Each entry says who (`actor`), what (`action`), on which object
 (`subject`), when (`occurredAt`), with which `outcome`, and through which `channel`: `WEB` (the
 console, or a client signed in as a person), `API_KEY`, `JOB` (a job of the kernel, such as the
 retention), `ASSISTANT` (an assistant or an MCP client) or `EXTENSION`. The same entries are written to
@@ -325,9 +326,10 @@ the log category `mosaikit.audit`, which can be sent to a SIEM. Sign-ins are not
 
 The administrators of an organization, signed in to it, read the entries of their organization, and
 of no other, with `GET /api/v1/organizations/{slug}/audit-events`, newest first. They filter them by
-`actor`, `action` (one action, or every action under a prefix that ends with a dot, such as
-`permissions.`), `subject`, `channel`, and time with `from` and `to` (such as
-`2026-10-13T08:00:00Z`), and page with `offset` and `limit` (100 by default, up to 500).
+`actor`, `action` (one action, or every action under a prefix that ends with a dot or a colon,
+such as `permissions.`, or `dev.example.dashboards:` for the entries recorded by that extension),
+`subject`, `channel`, and time with `from` and `to` (such as `2026-10-13T08:00:00Z`), and page with
+`offset` and `limit` (100 by default, up to 500).
 
 Platform administrators read the entries of the platform, those without organization, with
 `GET /api/v1/audit-events?platform=true`, and those of one organization with `organization=<id>`;
