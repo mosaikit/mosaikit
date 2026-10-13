@@ -27,6 +27,21 @@ with Java code are loaded by rebuilding the kernel at the next start, which take
 the kernel cannot start with a new extension, the extension is rolled back and Mosaikit starts with the
 previous extensions.
 
+## Settings
+
+The settings of the kernel and of the installed extensions are in `config/application.properties`
+([configuration](../../docs/guide/configuration.md)), or in environment variables, which win: the
+name of the setting in upper case, with every character that is not a letter or a digit replaced by
+`_`. For example, an extension whose documentation names the setting `example.reports.endpoint`:
+
+```properties
+example.reports.endpoint=https://reports.example.org
+```
+
+or `EXAMPLE_REPORTS_ENDPOINT=https://reports.example.org` in the environment of the launcher. Keep
+passwords and keys in the environment, or keep `config/application.properties` readable only by the
+account that runs Mosaikit. Restart Mosaikit after a change.
+
 ## Contents
 
 | Path | Content |

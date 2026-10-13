@@ -108,6 +108,13 @@ spec:
                   key: secret-access-key
             {{- end }}
             {{- end }}
+            {{- with include "mosaikit.extraEnv" . | trim }}
+            {{- . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.kernel.extraEnvFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
           readinessProbe:
             httpGet:
               path: /q/health/ready

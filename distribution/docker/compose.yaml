@@ -87,6 +87,12 @@ services:
       MOSAIKIT_EXTENSIONS_SIGNATURES: ${MOSAIKIT_EXTENSIONS_SIGNATURES:-optional}
       # Files of extensions (MK-041): in the mosaikit-files volume. For an S3-compatible store set
       # MOSAIKIT_FILES_STORE=s3 and the MOSAIKIT_FILES_S3_* variables (see README.md).
+    # Settings of the kernel and of extensions that this file does not name (MK-129), one
+    # VARIABLE=value per line, such as EXAMPLE_REPORTS_ENDPOINT=https://reports.example.org for the
+    # setting example.reports.endpoint: copy mosaikit.env.example to mosaikit.env (see README.md).
+    env_file:
+      - path: mosaikit.env
+        required: false
     ports:
       - '8080:8080'
     volumes:
