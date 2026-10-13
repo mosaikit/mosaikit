@@ -30,6 +30,39 @@ describe('extension manifest schema', () => {
     expect(valid).toBe(true);
   });
 
+  it('MK-055 MK-056: accepts permissions and resource types with their sharing levels', () => {
+    const manifest = {
+      id: 'dev.example.dashboards',
+      version: '1.0.0',
+      name: 'Dashboards',
+      kind: 'app',
+      platform: '>=0.1',
+      permissions: [
+        {
+          name: 'create-dashboard',
+          title: 'Create dashboards',
+          description: 'Create new dashboards of the organization',
+          i18n: { it: { title: 'Creare cruscotti' } },
+        },
+      ],
+      resources: [
+        {
+          type: 'dashboard',
+          title: 'Dashboard',
+          i18n: { it: { title: 'Cruscotto' } },
+          levels: [
+            { name: 'view', title: 'View', i18n: { it: { title: 'Vedere' } } },
+            { name: 'edit', title: 'Edit' },
+          ],
+          subjects: ['person', 'group', 'organization', 'link'],
+        },
+      ],
+    };
+    const valid = validate(manifest);
+    expect(validate.errors ?? []).toEqual([]);
+    expect(valid).toBe(true);
+  });
+
   it.each([
     ['an id that is not reverse-DNS', { id: 'Traffic' }],
     ['a partial version', { version: '1.0' }],
@@ -44,6 +77,33 @@ describe('extension manifest schema', () => {
     ['a backend without api', { backend: { jar: 'lib/code.jar' } }],
     ['a backend api that is not a path segment', { backend: { jar: 'lib/code.jar', api: 'a/b' } }],
     ['a contribution without id', { contributes: { 'launcher.app': [{ route: '/x' }] } }],
+    ['MK-056: a permission without title', { permissions: [{ name: 'export' }] }],
+    [
+      'MK-056: a permission name with spaces',
+      { permissions: [{ name: 'Export all', title: 'x' }] },
+    ],
+    [
+      'MK-056: a translation of a permission attribute that is not a text',
+      { permissions: [{ name: 'export', title: 'x', i18n: { it: { icon: 'x' } } }] },
+    ],
+    ['MK-055: a resource type without levels', { resources: [{ type: 'dashboard', title: 'x' }] }],
+    [
+      'MK-055: a resource type with no level',
+      { resources: [{ type: 'dashboard', title: 'x', levels: [] }] },
+    ],
+    [
+      'MK-055: an unknown subject',
+      {
+        resources: [
+          {
+            type: 'dashboard',
+            title: 'x',
+            levels: [{ name: 'view', title: 'View' }],
+            subjects: ['everyone'],
+          },
+        ],
+      },
+    ],
   ])('rejects %s', (_label, change) => {
     const manifest = {
       id: 'dev.example.extension',

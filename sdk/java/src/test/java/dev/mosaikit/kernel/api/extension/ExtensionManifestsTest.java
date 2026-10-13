@@ -5,10 +5,12 @@ package dev.mosaikit.kernel.api.extension;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import dev.mosaikit.kernel.api.sharing.SubjectKind;
 import dev.mosaikit.kernel.api.version.Version;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
@@ -574,5 +576,190 @@ class ExtensionManifestsTest {
 
         tree.put("frontend", Map.of("entry", "web/index.js", "points", "activities.detail"));
         assertThat(parseInvalid(tree)).extracting(ManifestViolation::field).containsExactly("frontend.points");
+    }
+
+    @Test
+    @Tag("MK-056")
+    void readsThePermissionsOfAnExtension() {
+        Map<String, Object> tree = validTree();
+        tree.put(
+                "permissions",
+                List.of(
+                        Map.of(
+                                "name",
+                                "create-dashboard",
+                                "title",
+                                "Create dashboards",
+                                "description",
+                                "Create new dashboards of the organization",
+                                "i18n",
+                                Map.of("it", Map.of("title", "Creare cruscotti"))),
+                        Map.of("name", "export", "title", "Export")));
+
+        assertThat(parseValid(tree).permissions())
+                .containsExactly(
+                        new PermissionEntry(
+                                "create-dashboard",
+                                "Create dashboards",
+                                "Create new dashboards of the organization",
+                                Map.of("it", Map.of("title", "Creare cruscotti"))),
+                        new PermissionEntry("export", "Export", null, null));
+        assertThat(parseValid(validTree()).permissions()).isEmpty();
+    }
+
+    @Test
+    @Tag("MK-056")
+    void rejectsPermissionsThatTheProfileEditorCannotShow() {
+        Map<String, Object> tree = validTree();
+        tree.put(
+                "permissions",
+                List.of(
+                        Map.of("name", "Create Dashboard", "title", "x"),
+                        Map.of("name", "export"),
+                        Map.of("name", "twice", "title", "x"),
+                        Map.of("name", "twice", "title", "y"),
+                        Map.of("name", "label", "title", "x", "i18n", Map.of("it", Map.of("icon", "x"))),
+                        Map.of("name", "texts", "title", "x", "i18n", Map.of("Italian", Map.of("title", "x"))),
+                        "not an object"));
+
+        assertThat(parseInvalid(tree))
+                .extracting(ManifestViolation::field)
+                .containsExactlyInAnyOrder(
+                        "permissions[0].name",
+                        "permissions[1].title",
+                        "permissions[3].name",
+                        "permissions[4].i18n.it.icon",
+                        "permissions[5].i18n.Italian",
+                        "permissions[6]");
+
+        tree.put("permissions", "all of them");
+        assertThat(parseInvalid(tree)).extracting(ManifestViolation::field).containsExactly("permissions");
+    }
+
+    @Test
+    @Tag("MK-055")
+    void readsTheResourceTypesAndTheirSharingLevels() {
+        Map<String, Object> tree = validTree();
+        tree.put(
+                "resources",
+                List.of(
+                        Map.of(
+                                "type",
+                                "dashboard",
+                                "title",
+                                "Dashboard",
+                                "i18n",
+                                Map.of("it", Map.of("title", "Cruscotto")),
+                                "levels",
+                                List.of(
+                                        Map.of(
+                                                "name",
+                                                "view",
+                                                "title",
+                                                "View",
+                                                "i18n",
+                                                Map.of("it", Map.of("title", "Vedere"))),
+                                        Map.of("name", "edit", "title", "Edit"),
+                                        Map.of("name", "manage", "title", "Manage")),
+                                "subjects",
+                                List.of("person", "group", "organization", "link")),
+                        Map.of(
+                                "type",
+                                "folder",
+                                "title",
+                                "Folder",
+                                "levels",
+                                List.of(Map.of("name", "view", "title", "View")))));
+
+        ExtensionManifest manifest = parseValid(tree);
+
+        ResourceTypeEntry dashboard = manifest.resourceType("dashboard").orElseThrow();
+        assertThat(dashboard.title()).isEqualTo("Dashboard");
+        assertThat(dashboard.i18n()).containsEntry("it", Map.of("title", "Cruscotto"));
+        assertThat(dashboard.levelNames()).containsExactly("view", "edit", "manage");
+        assertThat(dashboard.levels().getFirst().i18n()).containsEntry("it", Map.of("title", "Vedere"));
+        assertThat(dashboard.declares("edit")).isTrue();
+        assertThat(dashboard.declares("own")).isFalse();
+        assertThat(dashboard.includes("manage", "view")).isTrue();
+        assertThat(dashboard.includes("edit", "edit")).isTrue();
+        assertThat(dashboard.includes("view", "edit")).isFalse();
+        assertThat(dashboard.includes("own", "view")).isFalse();
+        assertThat(dashboard.includes("view", "own")).isFalse();
+        assertThat(dashboard.accepts(SubjectKind.LINK)).isTrue();
+        assertThat(dashboard.accepts(SubjectKind.PUBLIC)).isFalse();
+        assertThat(manifest.resourceType("folder").orElseThrow().subjects()).isEqualTo(SubjectKind.DEFAULT);
+        assertThat(manifest.resourceType("chart")).isEmpty();
+        assertThat(parseValid(validTree()).resourceTypes()).isEmpty();
+    }
+
+    @Test
+    @Tag("MK-054")
+    @Tag("MK-055")
+    void rejectsResourceTypesThatTheKernelCannotShare() {
+        Map<String, Object> tree = validTree();
+        Map<String, Object> view = Map.of("name", "view", "title", "View");
+        tree.put(
+                "resources",
+                List.of(
+                        Map.of("type", "Dashboard", "title", "x", "levels", List.of(view)),
+                        Map.of("type", "no-levels", "title", "x"),
+                        Map.of("type", "empty-levels", "title", "x", "levels", List.of()),
+                        Map.of(
+                                "type",
+                                "bad-levels",
+                                "title",
+                                "x",
+                                "levels",
+                                List.of(
+                                        view,
+                                        Map.of("name", "view", "title", "Again"),
+                                        Map.of("name", "Edit", "title", "x"),
+                                        Map.of("name", "manage"),
+                                        "not an object")),
+                        Map.of(
+                                "type",
+                                "bad-subjects",
+                                "title",
+                                "x",
+                                "levels",
+                                List.of(view),
+                                "subjects",
+                                List.of("person", "everyone", "person")),
+                        Map.of("type", "no-subjects", "title", "x", "levels", List.of(view), "subjects", List.of()),
+                        Map.of("type", "twice", "title", "x", "levels", List.of(view)),
+                        Map.of("type", "twice", "title", "y", "levels", List.of(view)),
+                        Map.of("title", "x", "levels", List.of(view), "i18n", Map.of("it", Map.of("description", "x"))),
+                        "not an object"));
+
+        assertThat(parseInvalid(tree))
+                .extracting(ManifestViolation::field)
+                .containsExactlyInAnyOrder(
+                        "resources[0].type",
+                        "resources[1].levels",
+                        "resources[2].levels",
+                        "resources[3].levels[1].name",
+                        "resources[3].levels[2].name",
+                        "resources[3].levels[3].title",
+                        "resources[3].levels[4]",
+                        "resources[4].subjects[1]",
+                        "resources[4].subjects[2]",
+                        "resources[5].subjects",
+                        "resources[7].type",
+                        "resources[8].type",
+                        "resources[8].i18n.it.description",
+                        "resources[9]");
+
+        tree.put("resources", Map.of("dashboard", view));
+        assertThat(parseInvalid(tree)).extracting(ManifestViolation::field).containsExactly("resources");
+    }
+
+    @Test
+    @Tag("MK-055")
+    void aResourceTypeHasAtLeastOneLevel() {
+        List<SharingLevelEntry> none = List.of();
+        Set<SubjectKind> subjects = SubjectKind.DEFAULT;
+
+        assertThatThrownBy(() -> new ResourceTypeEntry("dashboard", "Dashboard", none, subjects, null))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

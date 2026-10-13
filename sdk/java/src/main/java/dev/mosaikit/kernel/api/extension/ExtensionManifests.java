@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.api.extension;
 
+import dev.mosaikit.kernel.api.sharing.SubjectKind;
 import dev.mosaikit.kernel.api.version.InvalidVersionException;
 import dev.mosaikit.kernel.api.version.Version;
 import dev.mosaikit.kernel.api.version.VersionRange;
@@ -16,6 +17,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.function.Function;
 import java.util.regex.Pattern;
 
@@ -36,8 +38,24 @@ public final class ExtensionManifests {
     /** Name of an action of an extension (MK-015). */
     public static final Pattern ACTION_PATTERN = Pattern.compile("^[a-z][a-z0-9-]{0,47}$");
 
-    /** HTTP methods an action can call. */
+    /** Name of a permission of an extension (MK-056), such as {@code create-dashboard}. */
+    public static final Pattern PERMISSION_PATTERN = Pattern.compile("^[a-z][a-z0-9-]{0,47}$");
+
+    /** Name of a resource type of an extension (MK-054), such as {@code dashboard}. */
+    public static final Pattern RESOURCE_TYPE_PATTERN = Pattern.compile("^[a-z][a-z0-9-]{0,47}$");
+
+    /** Name of a sharing level of a resource type (MK-055), such as {@code view}. */
+    public static final Pattern LEVEL_PATTERN = Pattern.compile("^[a-z][a-z0-9-]{0,31}$");
+
     private static final String ACTIONS = "actions";
+
+    private static final String PERMISSIONS = "permissions";
+
+    private static final String RESOURCES = "resources";
+
+    private static final String TITLE = "title";
+
+    private static final String I18N = "i18n";
 
     /** Prefixes of the extension points of the kernel, which extensions may not declare. */
     private static final List<String> KERNEL_POINTS = List.of("launcher.", "rail.", "settings.", "shell.", "kernel.");
@@ -112,6 +130,8 @@ public final class ExtensionManifests {
             ThemeEntry theme = readTheme(kinds);
             List<Contribution> contributions = readContributions();
             List<ActionEntry> actions = readActions(backend);
+            List<PermissionEntry> permissions = readPermissions();
+            List<ResourceTypeEntry> resourceTypes = readResourceTypes();
 
             if (!violations.isEmpty()) {
                 return new ManifestParseResult.Invalid(violations);
@@ -130,7 +150,183 @@ public final class ExtensionManifests {
                     data,
                     theme,
                     contributions,
-                    actions));
+                    actions,
+                    permissions,
+                    resourceTypes));
+        }
+
+        /** The permissions of the extension (MK-056): {@code permissions: [{ name, title }]}. */
+        private List<PermissionEntry> readPermissions() {
+            List<PermissionEntry> permissions = new ArrayList<>();
+            Set<String> names = new HashSet<>();
+            List<?> list = optionalList(PERMISSIONS, "a list of permissions");
+            for (int i = 0; i < list.size(); i++) {
+                String field = PERMISSIONS + "[" + i + "]";
+                readPermission(field, list.get(i)).ifPresent(permission -> {
+                    if (!names.add(permission.name())) {
+                        violation(field + ".name", "the permission '" + permission.name() + "' is declared twice");
+                    }
+                    permissions.add(permission);
+                });
+            }
+            return permissions;
+        }
+
+        private Optional<PermissionEntry> readPermission(String field, Object item) {
+            Map<String, ?> permission = objectItem(field, item).orElse(null);
+            if (permission == null) {
+                return Optional.empty();
+            }
+            int before = violations.size();
+            String name = requiredText(permission, "name", field + ".name");
+            if (name != null && !PERMISSION_PATTERN.matcher(name).matches()) {
+                violation(field + ".name", "must be lowercase letters, digits and '-', for example create-dashboard");
+            }
+            String title = requiredText(permission, TITLE, field + "." + TITLE);
+            String description = optionalText(permission, "description");
+            Map<String, Map<String, String>> i18n =
+                    readTranslations(field + "." + I18N, permission.get(I18N), Set.of(TITLE, "description"));
+            if (violations.size() > before) {
+                return Optional.empty();
+            }
+            return Optional.of(new PermissionEntry(name, title, description, i18n));
+        }
+
+        /** The resource types of the extension (MK-054, MK-055), with their sharing levels. */
+        private List<ResourceTypeEntry> readResourceTypes() {
+            List<ResourceTypeEntry> types = new ArrayList<>();
+            Set<String> names = new HashSet<>();
+            List<?> list = optionalList(RESOURCES, "a list of resource types");
+            for (int i = 0; i < list.size(); i++) {
+                String field = RESOURCES + "[" + i + "]";
+                readResourceType(field, list.get(i)).ifPresent(type -> {
+                    if (!names.add(type.type())) {
+                        violation(field + ".type", "the resource type '" + type.type() + "' is declared twice");
+                    }
+                    types.add(type);
+                });
+            }
+            return types;
+        }
+
+        private Optional<ResourceTypeEntry> readResourceType(String field, Object item) {
+            Map<String, ?> type = objectItem(field, item).orElse(null);
+            if (type == null) {
+                return Optional.empty();
+            }
+            int before = violations.size();
+            String name = requiredText(type, "type", field + ".type");
+            if (name != null && !RESOURCE_TYPE_PATTERN.matcher(name).matches()) {
+                violation(field + ".type", "must be lowercase letters, digits and '-', for example dashboard");
+            }
+            String title = requiredText(type, TITLE, field + "." + TITLE);
+            List<SharingLevelEntry> levels = readLevels(field + ".levels", type.get("levels"));
+            Set<SubjectKind> subjects = readSubjects(field + ".subjects", type.get("subjects"));
+            Map<String, Map<String, String>> i18n = readTranslations(field + "." + I18N, type.get(I18N), Set.of(TITLE));
+            if (violations.size() > before) {
+                return Optional.empty();
+            }
+            return Optional.of(new ResourceTypeEntry(name, title, levels, subjects, i18n));
+        }
+
+        private List<SharingLevelEntry> readLevels(String field, Object raw) {
+            if (!(raw instanceof List<?> list) || list.isEmpty()) {
+                violation(field, "must be a list of at least one level, from the lowest to the highest");
+                return List.of();
+            }
+            List<SharingLevelEntry> levels = new ArrayList<>();
+            Set<String> names = new HashSet<>();
+            for (int i = 0; i < list.size(); i++) {
+                String levelField = field + "[" + i + "]";
+                Map<String, ?> level = objectItem(levelField, list.get(i)).orElse(null);
+                if (level == null) {
+                    continue;
+                }
+                int before = violations.size();
+                String name = requiredText(level, "name", levelField + ".name");
+                if (name != null && !LEVEL_PATTERN.matcher(name).matches()) {
+                    violation(levelField + ".name", "must be lowercase letters, digits and '-', for example view");
+                } else if (name != null && !names.add(name)) {
+                    violation(levelField + ".name", "the level '" + name + "' is declared twice");
+                }
+                String title = requiredText(level, TITLE, levelField + "." + TITLE);
+                Map<String, Map<String, String>> i18n =
+                        readTranslations(levelField + "." + I18N, level.get(I18N), Set.of(TITLE));
+                if (violations.size() == before) {
+                    levels.add(new SharingLevelEntry(name, title, i18n));
+                }
+            }
+            return levels;
+        }
+
+        private Set<SubjectKind> readSubjects(String field, Object raw) {
+            if (raw == null) {
+                return SubjectKind.DEFAULT;
+            }
+            if (!(raw instanceof List<?> list) || list.isEmpty()) {
+                violation(field, "must be a list of at least one of person, group, organization, link, public");
+                return Set.of();
+            }
+            Set<SubjectKind> subjects = EnumSet.noneOf(SubjectKind.class);
+            for (int i = 0; i < list.size(); i++) {
+                Object value = list.get(i);
+                Optional<SubjectKind> kind = SubjectKind.fromValue(String.valueOf(value));
+                if (kind.isEmpty()) {
+                    violation(
+                            field + "[" + i + "]",
+                            "unknown subject '" + value + "': use person, group, organization, link or public");
+                } else if (!subjects.add(kind.get())) {
+                    violation(field + "[" + i + "]", "is declared twice");
+                }
+            }
+            return subjects;
+        }
+
+        /** The texts of an entry by language (MK-053), only for the attributes of the entry that are texts. */
+        private Map<String, Map<String, String>> readTranslations(String field, Object i18n, Set<String> texts) {
+            int before = violations.size();
+            checkTranslations(field, i18n);
+            if (!(i18n instanceof Map<?, ?> languages) || violations.size() > before) {
+                return Map.of();
+            }
+            Map<String, Map<String, String>> result = new LinkedHashMap<>();
+            languages.forEach((language, values) -> {
+                Map<String, String> translated = new LinkedHashMap<>();
+                ((Map<?, ?>) values).forEach((attribute, text) -> {
+                    if (texts.contains(String.valueOf(attribute))) {
+                        translated.put(String.valueOf(attribute), String.valueOf(text));
+                    } else {
+                        violation(
+                                field + "." + language + "." + attribute,
+                                "is not a text of this entry: translate " + String.join(" or ", new TreeSet<>(texts)));
+                    }
+                });
+                result.put(String.valueOf(language), translated);
+            });
+            return result;
+        }
+
+        private List<?> optionalList(String key, String what) {
+            Object raw = tree.get(key);
+            if (raw == null) {
+                return List.of();
+            }
+            if (!(raw instanceof List<?> list)) {
+                violation(key, "must be " + what);
+                return List.of();
+            }
+            return list;
+        }
+
+        /** An entry of a list that must be an object; empty, with a violation, otherwise. */
+        private Optional<Map<String, ?>> objectItem(String field, Object item) {
+            if (!(item instanceof Map<?, ?> raw)) {
+                violation(field, MUST_BE_OBJECT);
+                return Optional.empty();
+            }
+            Map<String, Object> result = new LinkedHashMap<>();
+            raw.forEach((key, value) -> result.put(String.valueOf(key), value));
+            return Optional.of(result);
         }
 
         private List<ActionEntry> readActions(BackendEntry backend) {

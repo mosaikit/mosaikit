@@ -8,6 +8,15 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Preview of the extension API for resources, sharing and permissions (MK-054, MK-055, MK-056;
+  ADR-0037, ADR-0038), for review before the kernel implements it: `permissions` and `resources`
+  (resource types with their sharing levels and accepted subjects) in the manifest, validated by
+  the JSON Schema and by `ExtensionManifests`; in `kernel-api` the packages
+  `dev.mosaikit.kernel.api.resource` (`ResourceRef`, `Resource`, `Resources`),
+  `dev.mosaikit.kernel.api.sharing` (`Subject`, `SubjectKind`, `Grant`, `SharedLink`, `Sharing`) and
+  `dev.mosaikit.kernel.api.permission` (`Permissions`, `AccessDeniedException`). The kernel does not
+  provide the beans yet.
+
 - A theme extension can name the product and bring its logo (MK-052, `theme.product` and
   `theme.logo` with `light` and `dark`): as the theme of the installation, the shell shows them in
   its bar and on the sign-in page, and uses them as the title and the icon of the page.

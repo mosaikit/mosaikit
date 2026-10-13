@@ -241,6 +241,100 @@
         "additionalProperties": false
       }
     },
+    "permissions": {
+      "description": "Permissions of the extension, off until the administrators of an organization grant them through profiles, groups or personal exceptions (MK-056).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "title"],
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,47}$"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "i18n": {
+            "$ref": "#/$defs/i18n",
+            "additionalProperties": {
+              "propertyNames": {
+                "enum": ["title", "description"]
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "resources": {
+      "description": "Types of the resources the extension registers with the kernel (MK-054) and shares at the levels it declares (MK-055).",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["type", "title", "levels"],
+        "properties": {
+          "type": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,47}$"
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "levels": {
+            "description": "Sharing levels from the lowest to the highest; each includes those before it.",
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "required": ["name", "title"],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-z0-9-]{0,31}$"
+                },
+                "title": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "i18n": {
+                  "$ref": "#/$defs/i18n",
+                  "additionalProperties": {
+                    "propertyNames": {
+                      "enum": ["title"]
+                    }
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "subjects": {
+            "description": "Who a resource of the type may be shared with; person, group and organization when left out.",
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "enum": ["person", "group", "organization", "link", "public"]
+            }
+          },
+          "i18n": {
+            "$ref": "#/$defs/i18n",
+            "additionalProperties": {
+              "propertyNames": {
+                "enum": ["title"]
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
     "theme": {
       "description": "The theme of an extension of kind theme (MK-028): colors of the light and dark schemes; what is left out comes from the default theme.",
       "type": "object",
@@ -390,6 +484,19 @@
       "description": "Dotted event topic, or a prefix ending with .*",
       "type": "string",
       "pattern": "^[a-z][a-zA-Z0-9-]*(\\.[a-z][a-zA-Z0-9-]*)*\\.([a-z][a-zA-Z0-9-]*|\\*)$"
+    },
+    "i18n": {
+      "description": "Text attributes in other languages, by language tag (MK-053), such as { \"it\": { \"title\": \"Cruscotto\" } }.",
+      "type": "object",
+      "propertyNames": {
+        "pattern": "^[a-z]{2,3}(-[A-Z][A-Za-z0-9]{1,7})?$"
+      },
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": {
+          "type": "string"
+        }
+      }
     },
     "relativePath": {
       "type": "string",

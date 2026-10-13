@@ -32,6 +32,8 @@ public final class ExtensionManifest {
     private final ThemeEntry theme;
     private final List<Contribution> contributions;
     private final List<ActionEntry> actions;
+    private final List<PermissionEntry> permissions;
+    private final List<ResourceTypeEntry> resourceTypes;
 
     @SuppressWarnings("java:S107") // Mirrors the manifest fields; only ExtensionManifests creates it.
     ExtensionManifest(
@@ -48,7 +50,9 @@ public final class ExtensionManifest {
             DataEntry data,
             ThemeEntry theme,
             List<Contribution> contributions,
-            List<ActionEntry> actions) {
+            List<ActionEntry> actions,
+            List<PermissionEntry> permissions,
+            List<ResourceTypeEntry> resourceTypes) {
         this.id = Objects.requireNonNull(id, "id");
         this.version = Objects.requireNonNull(version, "version");
         this.name = Objects.requireNonNull(name, "name");
@@ -63,6 +67,23 @@ public final class ExtensionManifest {
         this.theme = theme;
         this.contributions = List.copyOf(contributions);
         this.actions = List.copyOf(actions);
+        this.permissions = List.copyOf(permissions);
+        this.resourceTypes = List.copyOf(resourceTypes);
+    }
+
+    /** Permissions the extension declares, off until administrators grant them (MK-056). */
+    public List<PermissionEntry> permissions() {
+        return permissions;
+    }
+
+    /** Types of the resources the extension registers and shares (MK-054, MK-055). */
+    public List<ResourceTypeEntry> resourceTypes() {
+        return resourceTypes;
+    }
+
+    /** The resource type declared with this name, if any. */
+    public Optional<ResourceTypeEntry> resourceType(String type) {
+        return resourceTypes.stream().filter(entry -> entry.type().equals(type)).findFirst();
     }
 
     /** Typed actions that an assistant can use (MK-015). */

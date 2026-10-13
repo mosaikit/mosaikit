@@ -514,6 +514,106 @@ Choose the risk honestly: `read` for calls without effects, `write` for changes 
 for processes, messages or anything that leaves the installation. Describe the action for a person
 who has to confirm it, not for the assistant only.
 
+## Resources, sharing and permissions
+
+> **API preview.** The manifest entries below are already validated, and the Java types are in
+> `kernel-api`, but the kernel implements them with MK-054 (registry of resources), MK-055 (sharing)
+> and MK-056 (permissions). Until then the beans `Resources`, `Sharing` and `Permissions` are not
+> provided: write against the contract, do not ship on it. See
+> [ADR-0037](../adr/0037-resources-and-one-sharing-model.md) and
+> [ADR-0038](../adr/0038-permissions-from-manifests-and-profiles.md).
+
+Permissions say **what** a person may do in an extension; sharing says **on which resources**. The
+extension declares both in its manifest, and the kernel keeps who has what:
+
+```yaml
+permissions:                   # off until administrators grant them (MK-056)
+  - name: create-dashboard     # [a-z][a-z0-9-]*, unique in the extension
+    title: Create dashboards   # shown in the profile editor of the organization
+    description: Create new dashboards of the organization.
+    i18n: { it: { title: Creare cruscotti } }   # title and description only
+resources:                     # types of the resources the extension registers (MK-054)
+  - type: dashboard            # [a-z][a-z0-9-]*, unique in the extension
+    title: Dashboard
+    i18n: { it: { title: Cruscotto } }
+    levels:                    # from the lowest to the highest; each includes those before it
+      - { name: view, title: View, i18n: { it: { title: Vedere } } }
+      - { name: edit, title: Edit }
+      - { name: manage, title: Manage }
+    subjects: [person, group, organization, link]   # person, group, organization when left out
+```
+
+The rules the kernel applies:
+
+- **Deny by default.** A person has a permission only through their profile, a group of theirs or a
+  personal exception, and a level on a resource only as its owner or through a grant to them, to a
+  group of theirs, to the organization, to a link they opened or to the public.
+- **Grants only add.** Profiles, groups and exceptions add permissions, grants add levels; nothing
+  takes away what another grants. A grant on a parent resource does not extend to its children.
+- **New permissions arrive switched off.** A permission that an update of the extension adds is in
+  no profile until an administrator puts it there.
+- **The kernel is the authority**: it keeps profiles and grants, offers the same sharing dialog for
+  every type, and writes every grant, revocation and use of a link in the audit log (MK-059).
+- **The extension enforces the answers in its backend**, at every request: the interface only hides
+  what is not available.
+
+In the Java backend, register each resource when it is created, and check both the permission and
+the level before acting:
+
+```java
+@Path("/api/v1/ext/dashboards/dashboards")
+public class DashboardResource {
+    private static final String EXTENSION = "dev.example.dashboards";
+
+    @Inject Resources resources;       // dev.mosaikit.kernel.api.resource
+    @Inject Sharing sharing;           // dev.mosaikit.kernel.api.sharing
+    @Inject Permissions permissions;   // dev.mosaikit.kernel.api.permission
+
+    @POST
+    @Transactional
+    public DashboardView create(NewDashboard body) {
+        permissions.require(EXTENSION, "create-dashboard");               // 403 without it
+        Dashboard dashboard = dashboards.insert(body);
+        resources.register(                                               // owner: the person of the request
+                new ResourceRef(EXTENSION, "dashboard", dashboard.id().toString()),
+                Resources.Details.of(dashboard.title(), "/app/dashboards/" + dashboard.id()));
+        return DashboardView.of(dashboard);
+    }
+
+    @PUT
+    @Path("{id}")
+    @Transactional
+    public DashboardView update(@PathParam("id") UUID id, DashboardChange body) {
+        ResourceRef ref = new ResourceRef(EXTENSION, "dashboard", id.toString());
+        sharing.require(ref, "edit");      // 403 with a lower level, 404 with none
+        Dashboard dashboard = dashboards.update(id, body);
+        resources.update(ref, Resources.Details.of(dashboard.title(), "/app/dashboards/" + id));
+        return DashboardView.of(dashboard);
+    }
+
+    @GET
+    public List<DashboardView> list() {
+        Set<String> visible = sharing.visible(EXTENSION, "dashboard", "view");
+        return dashboards.findByIds(visible).stream().map(DashboardView::of).toList();
+    }
+
+    @POST
+    @Path("{id}/share")
+    @Transactional
+    public void share(@PathParam("id") UUID id, UUID team) {
+        sharing.grant(new ResourceRef(EXTENSION, "dashboard", id.toString()), Subject.group(team), "view");
+    }
+}
+```
+
+`require` throws `AccessDeniedException` (`dev.mosaikit.kernel.api.permission`), which the kernel
+answers with 403, or with 404 when the person may not see the resource at all, so that its existence
+is not revealed. `grant`, `createLink` and `revoke` act as the person of the request: the owner, the
+administrators of the organization and the people with the highest level of the type share, never
+above their own level. Remove the entry with `resources.remove(ref)` when the resource is deleted:
+its grants go with it. The registration joins the transaction of the request, so a rollback undoes
+both.
+
 ## Rules
 
 - Import only `kernel-api`, the Jakarta APIs and the extensions provided by the kernel (Java) and
