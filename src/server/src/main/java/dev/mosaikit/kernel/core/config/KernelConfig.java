@@ -38,6 +38,33 @@ public interface KernelConfig {
     /** Sharing of the resources of extensions (MK-055). */
     Sharing sharing();
 
+    /** The database of the installation. */
+    Database database();
+
+    /** Settings of the database. */
+    interface Database {
+
+        /**
+         * Whether requests run as the member role of the installation, so that the row-level security
+         * policies of extensions apply (MK-019). Read by {@code RowSecurity}.
+         */
+        @WithDefault("true")
+        boolean rowSecurity();
+
+        /** The login of external services on the published views (MK-123). */
+        PublishedViews publishedViews();
+
+        /** Settings of the published views. */
+        interface PublishedViews {
+
+            /** A login the kernel creates at start, which reads the published views and nothing else. */
+            Optional<String> login();
+
+            /** Its password, from a secret: the kernel never logs it. */
+            Optional<String> password();
+        }
+    }
+
     /** Settings of sharing. */
     interface Sharing {
 
