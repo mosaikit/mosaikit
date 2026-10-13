@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.core.sharing;
 
-import dev.mosaikit.kernel.api.context.CurrentOrganization;
 import dev.mosaikit.kernel.api.extension.ExtensionManifest;
 import dev.mosaikit.kernel.api.extension.ResourceTypeEntry;
 import dev.mosaikit.kernel.api.extension.SubjectKind;
@@ -13,6 +12,7 @@ import dev.mosaikit.kernel.api.sharing.SharedLink;
 import dev.mosaikit.kernel.api.sharing.Sharing;
 import dev.mosaikit.kernel.api.sharing.Subject;
 import dev.mosaikit.kernel.core.account.AccountDirectory;
+import dev.mosaikit.kernel.core.apps.AppSettings;
 import dev.mosaikit.kernel.core.audit.AuditEvent;
 import dev.mosaikit.kernel.core.audit.AuditLog;
 import dev.mosaikit.kernel.core.config.KernelConfig;
@@ -28,9 +28,13 @@ import dev.mosaikit.kernel.core.security.Roles;
 import dev.mosaikit.kernel.core.teams.Team;
 import dev.mosaikit.kernel.core.teams.TeamMember;
 import dev.mosaikit.kernel.core.teams.TeamRepository;
+import io.agroal.api.AgroalDataSource;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -71,7 +75,7 @@ public class KernelSharing implements Sharing {
     private final ResourceGrants grants;
     private final RegisteredResources entries;
     private final ExtensionRegistry extensions;
-    private final CurrentOrganization organization;
+    private final RequestOrganization organization;
     private final SecurityIdentity identity;
     private final AccountDirectory directory;
     private final OrganizationMembers members;
@@ -80,12 +84,14 @@ public class KernelSharing implements Sharing {
     private final PasswordHasher hasher;
     private final Duration linkMaxValidity;
     private final Clock clock;
+    private final AgroalDataSource dataSource;
+    private final AppSettings apps;
 
     public KernelSharing(
             ResourceGrants grants,
             RegisteredResources entries,
             ExtensionRegistry extensions,
-            CurrentOrganization organization,
+            RequestOrganization organization,
             SecurityIdentity identity,
             AccountDirectory directory,
             OrganizationMembers members,
@@ -93,7 +99,9 @@ public class KernelSharing implements Sharing {
             AuditLog audit,
             PasswordHasher hasher,
             KernelConfig config,
-            Clock clock) {
+            Clock clock,
+            AgroalDataSource dataSource,
+            AppSettings apps) {
         this.grants = grants;
         this.entries = entries;
         this.extensions = extensions;
@@ -106,6 +114,8 @@ public class KernelSharing implements Sharing {
         this.hasher = hasher;
         this.linkMaxValidity = config.sharing().linkMaxValidity();
         this.clock = clock;
+        this.dataSource = dataSource;
+        this.apps = apps;
     }
 
     // --- Sharing -------------------------------------------------------------------------------
@@ -278,8 +288,11 @@ public class KernelSharing implements Sharing {
         Optional<SharedLinks.Opened> link = LinkRequest.current();
         Optional<UUID> org = organization.id();
         if (org.isEmpty()) {
-            // A request without an organization: only the link it was opened with gives a level.
-            return link.filter(opened -> opened.resource().equals(resource)).map(SharedLinks.Opened::level);
+            // A request without an organization: only the link it was opened with gives a level, and
+            // from now on the request acts on the organization of that resource (admit).
+            return link.filter(found -> found.resource().equals(resource))
+                    .filter(found -> admit(found.organization(), resource.extension()))
+                    .map(SharedLinks.Opened::level);
         }
         Optional<RegisteredResource> entry =
                 entries.find(org.get(), resource.extension(), resource.type(), resource.id());
@@ -390,6 +403,40 @@ public class KernelSharing implements Sharing {
                 .collect(Collectors.toUnmodifiableSet());
     }
 
+    /**
+     * Lets a request without an account, opened with a link that gives a level on a resource, act on
+     * the organization of the resource (MK-055): the extension asked {@code Sharing} about the
+     * resource of the link and got a level, so it may now read it under the row-level security of
+     * that organization. The connection that the request may hold already gets the organization too.
+     * Not when the organization turned the apps of the extension off (MK-030): its links then open
+     * nothing, as its API refuses its own people.
+     *
+     * @return whether the request acts on the organization of the link
+     */
+    private boolean admit(UUID org, String extension) {
+        if (!organization.admitLink(org)) {
+            return false;
+        }
+        organizationOfConnection(org.toString());
+        if (apps.isOff(org, extension)) {
+            organization.forgetLink();
+            organizationOfConnection("");
+            return false;
+        }
+        return true;
+    }
+
+    private void organizationOfConnection(String org) {
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement =
+                        connection.prepareStatement("select set_config('mosaikit.organization', ?, false)")) {
+            statement.setString(1, org);
+            statement.execute();
+        } catch (SQLException e) {
+            throw new IllegalStateException("Cannot act on the organization of the link", e);
+        }
+    }
+
     // --- For the REST API of the kernel ---------------------------------------------------------
 
     /** The type of a resource, checked against the active extension that declares it. */
@@ -425,6 +472,26 @@ public class KernelSharing implements Sharing {
             throw denied(type, entry, org);
         }
         return liveGrants(org, entry);
+    }
+
+    /**
+     * Shares a resource that the kernel keeps for an extension, such as a document of a collection
+     * shared with a team (MK-032), with a team at a level, as the person of the request: the kernel
+     * decides it, so who shares is not checked. Audited as every grant.
+     */
+    public void shareWithTeam(ResourceRef resource, UUID team, String level) {
+        ResourceTypeEntry type = type(resource);
+        grantable(type, SubjectKind.GROUP, level);
+        UUID org = organization.require();
+        RegisteredResource entry = entry(org, resource);
+        UUID me = me().orElseThrow(() -> new AccessDeniedException("Sign in to share.", false));
+        grants.insert(
+                ResourceGrant.of(org, entry.getId(), SubjectKind.GROUP, null, team, level, me, Instant.now(clock)));
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("subject", SubjectKind.GROUP.value());
+        detail.put("subjectId", team.toString());
+        detail.put("level", level);
+        audited(org, GRANTED, resource, detail);
     }
 
     /** The longest validity of a link. */
@@ -554,7 +621,7 @@ public class KernelSharing implements Sharing {
                 .findActive(ref.extension())
                 .flatMap(InstalledExtension::manifest)
                 .orElseThrow(() -> new IllegalArgumentException(ref.extension() + " is not an active extension."));
-        return manifest.resourceType(ref.type())
+        return ResourceTypes.of(manifest, ref.type())
                 .orElseThrow(() -> new IllegalArgumentException("The extension " + ref.extension()
                         + " does not declare the resource type " + ref.type() + "."));
     }

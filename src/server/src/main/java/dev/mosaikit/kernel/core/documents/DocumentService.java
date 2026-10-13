@@ -5,7 +5,10 @@ package dev.mosaikit.kernel.core.documents;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.mosaikit.kernel.api.extension.Contribution;
 import dev.mosaikit.kernel.api.extension.ExtensionManifest;
+import dev.mosaikit.kernel.api.resource.Resource;
+import dev.mosaikit.kernel.api.resource.ResourceRef;
 import dev.mosaikit.kernel.core.error.ConflictException;
 import dev.mosaikit.kernel.core.error.ForbiddenOperationException;
 import dev.mosaikit.kernel.core.error.InvalidInputException;
@@ -15,6 +18,10 @@ import dev.mosaikit.kernel.core.extension.InstalledExtension;
 import dev.mosaikit.kernel.core.identity.RequestOrganization;
 import dev.mosaikit.kernel.core.live.LiveBus;
 import dev.mosaikit.kernel.core.live.LiveEvent;
+import dev.mosaikit.kernel.core.resources.RegisteredResource;
+import dev.mosaikit.kernel.core.resources.RegisteredResources;
+import dev.mosaikit.kernel.core.sharing.KernelSharing;
+import dev.mosaikit.kernel.core.sharing.ResourceTypes;
 import dev.mosaikit.kernel.core.teams.TeamService;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.data.Limit;
@@ -32,6 +39,12 @@ import java.util.UUID;
  * The collections of documents of extensions without a backend (ADR-0031, MK-046): only an active
  * extension that declares a collection in its manifest has it, and a request reads and writes only the
  * documents of its organization.
+ *
+ * <p>A document shared with a team (MK-032) is a resource of the kernel's sharing model (MK-055,
+ * ADR-0037): the kernel registers it, owned by the organization, as a resource of type
+ * {@value ResourceTypes#DOCUMENT} of the extension and grants the team the level
+ * {@value ResourceTypes#EDIT}; it reads it with {@code Sharing} and the row-level security with
+ * {@code mk_kernel.allows()}. A document of the whole organization stays for its members.
  */
 @ApplicationScoped
 @Transactional
@@ -54,6 +67,8 @@ public class DocumentService {
     private final ObjectMapper json;
     private final Clock clock;
     private final LiveBus live;
+    private final KernelSharing sharing;
+    private final RegisteredResources resources;
 
     @Inject
     public DocumentService(
@@ -63,8 +78,10 @@ public class DocumentService {
             SecurityIdentity identity,
             ObjectMapper json,
             LiveBus live,
-            TeamService teams) {
-        this(documents, registry, organization, identity, json, live, teams, Clock.systemUTC());
+            TeamService teams,
+            KernelSharing sharing,
+            RegisteredResources resources) {
+        this(documents, registry, organization, identity, json, live, teams, sharing, resources, Clock.systemUTC());
     }
 
     DocumentService(
@@ -75,8 +92,12 @@ public class DocumentService {
             ObjectMapper json,
             LiveBus live,
             TeamService teams,
+            KernelSharing sharing,
+            RegisteredResources resources,
             Clock clock) {
         this.live = live;
+        this.sharing = sharing;
+        this.resources = resources;
         this.teams = teams;
         this.documents = documents;
         this.registry = registry;
@@ -130,6 +151,13 @@ public class DocumentService {
         }
         ExtensionDocument document =
                 new ExtensionDocument(org, extension, collection, team, text, author(), clock.instant());
+        if (team != null) {
+            // Registered and shared before it is written: the row-level security lets the document in
+            // only with the grant to the team.
+            resources.insert(new RegisteredResource(
+                    org, ref(document), null, title(collection, data), link(extension), null, clock.instant()));
+            sharing.shareWithTeam(ref(document), team, ResourceTypes.EDIT);
+        }
         documents.insert(document);
         changed(document, "created");
         return view(document);
@@ -141,7 +169,7 @@ public class DocumentService {
      * @param expectedVersion the version the caller read, or {@code null} to overwrite any version
      */
     public DocumentView replace(String extension, String collection, UUID id, JsonNode data, Integer expectedVersion) {
-        ExtensionDocument document = find(extension, collection, id);
+        ExtensionDocument document = writable(find(extension, collection, id));
         if (expectedVersion != null && expectedVersion != document.getVersion()) {
             throw new ConflictException("The document changed since version " + expectedVersion
                     + ": read it again, it is at version " + document.getVersion() + ".");
@@ -153,8 +181,13 @@ public class DocumentService {
     }
 
     public void delete(String extension, String collection, UUID id) {
-        ExtensionDocument document = find(extension, collection, id);
+        ExtensionDocument document = writable(find(extension, collection, id));
         documents.delete(document);
+        if (document.getTeamId() != null) {
+            resources
+                    .find(document.getOrganizationId(), extension, ResourceTypes.DOCUMENT, id.toString())
+                    .ifPresent(resources::delete);
+        }
         changed(document, "deleted");
     }
 
@@ -192,15 +225,57 @@ public class DocumentService {
 
     /**
      * Whether the person reads a document, as the row-level security decides too: one of the whole
-     * organization unless a guest, one of a team if in the team (MK-032).
+     * organization unless a guest, one shared with a team at the level {@value ResourceTypes#VIEW}
+     * of the sharing model (MK-032, MK-055): its members, through the grant to the team, and whoever
+     * it was shared with; not the administrators of the organization for being administrators.
      */
     private boolean readable(ExtensionDocument document) {
         if (document.getTeamId() == null) {
             return !organization.guest();
         }
-        return RequestOrganization.account(identity)
-                .filter(account -> teams.isMember(document.getTeamId(), account))
-                .isPresent();
+        return sharing.allows(ref(document), ResourceTypes.VIEW);
+    }
+
+    /** A document the person may change or delete: for one of a team, the level {@value ResourceTypes#EDIT}. */
+    private ExtensionDocument writable(ExtensionDocument document) {
+        if (document.getTeamId() != null && !sharing.allows(ref(document), ResourceTypes.EDIT)) {
+            throw new ForbiddenOperationException("You may read this document, not change it.");
+        }
+        return document;
+    }
+
+    /** The document as a resource of the sharing model (MK-055). */
+    private static ResourceRef ref(ExtensionDocument document) {
+        return new ResourceRef(
+                document.getExtensionId(),
+                ResourceTypes.DOCUMENT,
+                document.getId().toString());
+    }
+
+    /** What the sharing dialog calls a document: its title or text, if it has one, or its collection. */
+    static String title(String collection, JsonNode data) {
+        for (String field : List.of("title", "name", "text")) {
+            JsonNode value = data == null ? null : data.get(field);
+            if (value != null && value.isTextual() && !value.asText().isBlank()) {
+                String text = value.asText().strip();
+                return text.length() > Resource.MAX_TITLE ? text.substring(0, Resource.MAX_TITLE) : text;
+            }
+        }
+        return "Document of " + collection;
+    }
+
+    /** Where a document opens: the first app of its extension, or the home of the shell. */
+    private String link(String extension) {
+        return registry.findActive(extension)
+                .flatMap(InstalledExtension::manifest)
+                .flatMap(manifest -> manifest.contributions().stream()
+                        .filter(contribution -> contribution.point().equals("rail.app"))
+                        .map(Contribution::attributes)
+                        .map(attributes -> attributes.get("route"))
+                        .filter(route -> route instanceof String path && path.startsWith("/app/"))
+                        .map(String.class::cast)
+                        .findFirst())
+                .orElse("/");
     }
 
     /** The collection must be declared by an active extension; otherwise it does not exist. */

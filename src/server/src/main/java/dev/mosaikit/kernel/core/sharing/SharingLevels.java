@@ -66,18 +66,21 @@ public class SharingLevels {
                 statement.executeUpdate("delete from mk_kernel.sharing_level");
             }
             try (PreparedStatement insert = connection.prepareStatement(
-                    "insert into mk_kernel.sharing_level (extension_id, type, level, rank) values (?, ?, ?, ?)")) {
+                    "insert into mk_kernel.sharing_level (extension_id, type, level, rank, administrators)"
+                            + " values (?, ?, ?, ?, ?)")) {
                 for (InstalledExtension extension : active) {
                     if (extension.manifest().isEmpty()) {
                         continue;
                     }
-                    for (ResourceTypeEntry type : extension.manifest().get().resourceTypes()) {
+                    for (ResourceTypeEntry type :
+                            ResourceTypes.all(extension.manifest().get())) {
                         List<String> levels = type.levelNames();
                         for (int rank = 0; rank < levels.size(); rank++) {
                             insert.setString(1, extension.key());
                             insert.setString(2, type.type());
                             insert.setString(3, levels.get(rank));
                             insert.setInt(4, rank);
+                            insert.setBoolean(5, ResourceTypes.administratorsHoldEveryLevel(type));
                             insert.addBatch();
                         }
                     }

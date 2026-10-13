@@ -16,7 +16,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Gives each connection taken from the pool the organization of the current request, the person,
+ * Gives each connection taken from the pool the organization of the current request (for a request
+ * opened with a link, the organization of its resource once admitted, MK-055), the person,
  * whether they are a guest (MK-032) or an administrator of the organization (MK-055), and the member
  * role that makes the row-level security
  * policies apply (MK-019); takes them away when the connection goes back to the pool.
@@ -80,6 +81,17 @@ public class OrganizationConnections implements AgroalPoolInterceptor {
         static final Request NONE = new Request(Optional.empty(), Optional.empty(), false, false);
     }
 
+    /**
+     * The organization of the resource that the link of a request without an account opens, once
+     * {@code Sharing} admitted it (MK-055); empty otherwise.
+     */
+    private static Optional<UUID> linkOrganization(ArcContainer container) {
+        var organization = container.instance(RequestOrganization.class);
+        return organization.isAvailable() && organization.get().admittedByLink()
+                ? organization.get().id()
+                : Optional.empty();
+    }
+
     /** The request on this thread, if there is one. */
     static Optional<Request> currentRequest() {
         ArcContainer container = Arc.container();
@@ -90,7 +102,7 @@ public class OrganizationConnections implements AgroalPoolInterceptor {
         SecurityIdentity identity =
                 association.isAvailable() ? association.get().getIdentity() : null;
         return Optional.of(new Request(
-                RequestOrganization.of(identity),
+                RequestOrganization.of(identity).or(() -> linkOrganization(container)),
                 RequestOrganization.account(identity),
                 RequestOrganization.guest(identity),
                 RequestOrganization.administrator(identity)));

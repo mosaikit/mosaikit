@@ -57,6 +57,8 @@ export default defineConfig({
         'src/web/src/mk-admin-services.ts',
         'src/web/src/mk-assistant.ts',
         'src/web/src/mk-extension-frame.ts',
+        'src/web/src/mk-share-dialog.ts',
+        'src/web/src/mk-shared-link.ts',
       ],
       reporter: ['text', 'lcov', 'html'],
       thresholds: { lines: 85, branches: 80, functions: 85, statements: 85 },

@@ -305,8 +305,22 @@ address is shown once, when it is made.
 
 Every grant, change of level, revocation and use of a link is in the audit log, as
 `sharing.granted`, `sharing.revoked`, `sharing.link.created`, `sharing.link.revoked` and
-`sharing.link.used` (also when refused). The REST API is under `/api/v1/sharing` (see the OpenAPI
-document of the installation); the sharing dialog of the shell comes next.
+`sharing.link.used` (also when refused). People share in the sharing dialog of the shell, the same
+for every app (see the [user guide](using.md)); the REST API is under `/api/v1/sharing` (see the
+OpenAPI document of the installation).
+
+A link opens its resource at `/shared/<secret>` of the installation, also for people without an
+account: the page asks for its password when it has one, and shows the resource as its app shows it
+to links. The APIs of extensions answer a request without an account only when it carries a link
+that works and opens a resource of that same extension, and only for that resource. When the
+organization turns the apps of an extension off, its links open nothing.
+
+The documents that apps without a backend share with a team (MK-032) are resources of this model
+too: the team holds the level Edit on each of them, and the dialog can give access to other people
+or teams, or take it away from the team. As before, the administrators of the organization do not
+read them for being administrators: only the members of the team and whoever a document is shared
+with do (an exception to the rule above). The documents shared with teams before this version
+were moved onto the model when the kernel was updated (migration `V28`).
 
 An update of an extension that removes a resource type, or a level of one, on which grants exist
 is refused, with the list of those grants: revoke them first.

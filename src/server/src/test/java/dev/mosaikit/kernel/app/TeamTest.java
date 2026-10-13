@@ -13,6 +13,7 @@ import static org.hamcrest.Matchers.equalTo;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasSize;
 import static org.hamcrest.Matchers.not;
+import static org.hamcrest.Matchers.nullValue;
 
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
@@ -228,7 +229,106 @@ class TeamTest {
         in(owner).get("/api/v1/teams/" + roads).then().statusCode(404);
     }
 
+    @Test
+    @Tag("MK-055")
+    void aDocumentSharedWithATeamIsAResourceOfTheOneSharingModel() {
+        String roads = createTeam("Roads", "private");
+        put(roads, member, "member", 200);
+        String id = in(member)
+                .queryParam("team", roads)
+                .body(Map.of("text", "Pothole in Via Roma"))
+                .post(NOTES)
+                .then()
+                .statusCode(201)
+                .extract()
+                .path("id");
+        String sharing = "/api/v1/sharing/resources/dev.mosaikit.test.notes/data-document/" + id;
+
+        // The kernel registered it, owned by the organization, and gave the team the level edit.
+        in(member)
+                .get(sharing)
+                .then()
+                .statusCode(200)
+                .body("title", equalTo("Pothole in Via Roma"))
+                .body("owner", nullValue())
+                .body("level", equalTo("edit"))
+                .body("canShare", equalTo(true))
+                .body("levels.name", contains("view", "edit"))
+                .body("subjects", containsInAnyOrder("group", "organization", "person"));
+        in(member)
+                .get(sharing + "/grants")
+                .then()
+                .statusCode(200)
+                .body("subject.kind", contains("group"))
+                .body("subject.name", contains("Roads"))
+                .body("level", contains("edit"));
+        in(outsider).get(sharing).then().statusCode(404);
+
+        // Shared in the dialog with a person for viewing: they read it, and do not change it.
+        in(member)
+                .body(Map.of("subject", Map.of("kind", "person", "email", outsider), "level", "view"))
+                .put(sharing + "/grants")
+                .then()
+                .statusCode(200);
+        in(outsider).get(NOTES + "/" + id).then().statusCode(200);
+        in(outsider)
+                .body(Map.of("text", "Changed"))
+                .put(NOTES + "/" + id)
+                .then()
+                .statusCode(403);
+
+        // Without the grant to the team, its members no longer read it.
+        String teamGrant =
+                in(member).get(sharing + "/grants").then().extract().path("find { it.subject.kind == 'group' }.id");
+        in(member).delete("/api/v1/sharing/grants/" + teamGrant).then().statusCode(204);
+        in(member).get(NOTES + "/" + id).then().statusCode(404);
+        in(outsider).get(NOTES + "/" + id).then().statusCode(200);
+    }
+
+    @Test
+    @Tag("MK-055")
+    void anAdministratorOutsideTheTeamGetsNoLevelOnItsDocuments() throws SQLException {
+        String administrator = register(town);
+        asAdmin()
+                .body(Map.of("roles", List.of("organization-admin", "organization-user")))
+                .put("/api/v1/organizations/{slug}/members/{email}", town, administrator)
+                .then()
+                .statusCode(200);
+        String roads = createTeam("Roads", "private");
+        put(roads, member, "member", 200);
+        String id = in(member)
+                .queryParam("team", roads)
+                .body(Map.of("text", "Salaries"))
+                .post(NOTES)
+                .then()
+                .statusCode(201)
+                .extract()
+                .path("id");
+
+        // As MK-032 decided: the documents of a team are for its members, not for the administrators
+        // of the organization by being administrators (ADR-0037, refined); Java and SQL agree.
+        in(administrator).get(NOTES + "/" + id).then().statusCode(404);
+        in(administrator)
+                .get("/api/v1/sharing/resources/dev.mosaikit.test.notes/data-document/" + id)
+                .then()
+                .statusCode(404);
+        in(administrator).body(Map.of("text", "x")).put(NOTES + "/" + id).then().statusCode(404);
+        in(administrator).delete(NOTES + "/" + id).then().statusCode(404);
+        assertThat(visibleRows(id, administrator, false, true)).isZero();
+        assertThat(visibleRows(id, member, false, false)).isEqualTo(1);
+
+        // An administrator who is in the team reads it as a member.
+        put(roads, administrator, "member", 200);
+        in(administrator).get(NOTES + "/" + id).then().statusCode(200);
+        assertThat(visibleRows(id, administrator, false, true)).isEqualTo(1);
+    }
+
     private int visibleRows(String document, String person, boolean asGuest) throws SQLException {
+        return visibleRows(document, person, asGuest, false);
+    }
+
+    private int visibleRows(String document, String person, boolean asGuest, boolean administrator)
+            throws SQLException {
         Config config = ConfigProvider.getConfig();
         String organization = asAdmin().get("/api/v1/organizations/" + town).path("id");
         String account = as(person, PASSWORD).get("/api/v1/accounts/me").path("id");
@@ -242,11 +342,12 @@ class TeamTest {
             String member = roles.getString(1);
             try (var set = connection.prepareStatement("select set_config('role', ?, false),"
                     + " set_config('mosaikit.organization', ?, false), set_config('mosaikit.account', ?, false),"
-                    + " set_config('mosaikit.guest', ?, false)")) {
+                    + " set_config('mosaikit.guest', ?, false), set_config('mosaikit.administrator', ?, false)")) {
                 set.setString(1, member);
                 set.setString(2, organization);
                 set.setString(3, account);
                 set.setString(4, String.valueOf(asGuest));
+                set.setString(5, String.valueOf(administrator));
                 set.execute();
             }
             try (var count =

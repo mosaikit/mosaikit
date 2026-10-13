@@ -432,6 +432,18 @@ await notes.create({ text: 'Agenda of Monday' });
 notes.onChange(() => refresh()); // only the changes of that team
 ```
 
+A document shared with a team is a resource of the one sharing model (MK-055, ADR-0037), with no
+code of the extension: the kernel registers it as a resource of type `data-document` of the
+extension, owned by the organization, with the title of its `title`, `name` or `text` field, and
+gives the team the level `edit` (the type has `view` and `edit`, and is shared with people, teams
+and the organization, never with links or the public). The sharing dialog opens it like any other
+resource (`context.events.publish('shell.share', { extension, type: 'data-document', id })`), to give
+other people or teams access, for reading only or for changing it, or to take the team away. Unlike
+the types of extensions, `data-document` is **private to its subjects**: the administrators of the
+organization hold no level on it for being administrators, so a document of a team is read only by
+the members of the team and by whoever it is shared with, as MK-032 decided. The name
+`data-document` belongs to the kernel in an extension with collections.
+
 A Java backend reads the teams of the person and their people through `Teams` of `kernel-api`
 (`dev.mosaikit.kernel.api.teams`). Guests of an organization cannot call the APIs of backends.
 
@@ -602,9 +614,9 @@ who has to confirm it, not for the assistant only.
 
 > **Registry, permissions and sharing implemented.** The kernel provides the `Resources` bean
 > (MK-054), the `Permissions` bean (MK-056) and the `Sharing` bean (MK-055): Java extensions
-> register their resources, check permissions and share resources today, and the REST API of the
-> sharing dialog is under `/api/v1/sharing`; the dialog itself and its `@mosaikit/sdk` counterpart
-> come next. See
+> register their resources, check permissions and share resources, the shell offers the sharing
+> dialog for every resource type and opens links without an account, and the REST API of sharing
+> is under `/api/v1/sharing`. See
 > [ADR-0037](../adr/0037-resources-and-one-sharing-model.md) and
 > [ADR-0038](../adr/0038-permissions-from-manifests-and-profiles.md). The counterpart in
 > `@mosaikit/sdk` (permissions to hide what is not available, the sharing dialog) comes with the
@@ -641,7 +653,9 @@ The rules the kernel applies:
   group of theirs, to the organization, to a link they opened or to the public.
 - **Administrators of the organization hold everything in it**: every permission of every
   extension, implicitly, and every level on every resource of the organization, so they read and
-  edit everything. **Platform administrators hold none** in an organization for being platform
+  edit everything. The only exception are types of the kernel private to their subjects, such as
+  the documents of a team (`data-document`); the types of extensions cannot opt out yet (a later
+  change of `kernel-api` may let them). **Platform administrators hold none** in an organization for being platform
   administrators. **Guests hold no permission** unless a group of theirs or a personal exception
   grants it explicitly.
 - **Grants only add.** Profiles, groups and exceptions add permissions, grants add levels; nothing
@@ -746,8 +760,7 @@ registered in the organization of the request and the person is its owner, an ad
 organization, or reached by a grant at that level or above (to them, to a team of theirs, to the
 organization unless they are a guest, or to the public, which counts as the lowest level). An
 undeclared level, a type of no active extension or a resource that is not registered give `false`.
-Links are not considered: a request opened with a link has no organization, and the Java API answers
-for it.
+Links are not considered: for a request opened with a link, ask the Java API (see "Links" below).
 
 `require` throws `AccessDeniedException` (`dev.mosaikit.kernel.api.permission`), which the kernel
 answers with 403, or with 404 when the person may not see the resource at all, so that its existence
@@ -756,6 +769,77 @@ administrators of the organization and the people with the highest level of the 
 above their own level. Remove the entry with `resources.remove(ref)` when the resource is deleted:
 its grants go with it. The registration joins the transaction of the request, so a rollback undoes
 both.
+
+### The sharing dialog
+
+The kernel offers one sharing dialog for every resource type of every extension (MK-055): who has
+access, with the names of people and teams; sharing with a person (by email address), a team, the
+whole organization or the public, at the levels the manifest declares for the type; links with an
+expiry and an optional password, whose address is shown once; revocation; and who may share. An
+extension opens it for one of its resources by publishing `shell.share` on the event bus of its
+context; it has no sharing code of its own:
+
+```js
+shareButton.addEventListener('click', () => {
+  context.events.publish('shell.share', { extension: context.extension.id, type: 'dashboard', id });
+});
+```
+
+A frontend isolated in an iframe (MK-014) declares the topic in its bridge,
+`frontend.bridge.publishes: [shell.share]`. The dialog shows each level by its `title`, in the
+language of the person when `i18n` gives one.
+
+To know the level of the person, for example to hide an Edit button, a frontend asks the kernel
+what the dialog shows: `GET /api/v1/sharing/resources/<extension>/<type>/<id>` answers `level` (the
+highest level of the person), `canShare`, the levels and the subjects of the type, and `404` when the
+person has no level. The Java answer of `sharing.level(ref)` is the same; the backend still checks
+with `require` at every request.
+
+### Links
+
+A link opens one resource, at most at the `linkLevel` of its type, until it expires or is revoked,
+also for people without an account. Its address is `/shared/<secret>` of the installation: the shell
+opens it with `POST /api/v1/sharing/links/open`, asks for the password when the link has one, and
+then places the element that the extension contributes to `shared.view` for the type:
+
+```yaml
+contributes:
+  shared.view:
+    - id: dashboard
+      type: dashboard            # the resource type it shows; every type of the extension when left out
+      element: acme-shared-dashboard
+```
+
+The shell loads the frontend module of the extension when it did not (a person without an account
+gets a context with an empty `user`, no notifications and no real time), creates the element and
+gives it three properties before placing it: `resource` (`{ extension, type, id }`), `level` (the
+level of the link) and `request`, a function like `context.fetch` that calls the kernel with the
+link (`X-Mosaikit-Link`, and `X-Mosaikit-Link-Password` when it has one) and without the credentials
+of the browser. Only frontends that the shell loads as modules show a link: for an isolated one the
+page says to sign in.
+
+The element reads the resource from the backend of the extension with `request`. The APIs of
+extensions refuse requests without an account, except one that carries a link that works and opens
+a resource of that same extension. Such a request has **no organization** at first, so the
+row-level security shows it no row of the extension; it acts on the organization of the resource
+only once `Sharing` (`level`, `allows` or `require`) answered for that very resource. A route serves
+links when it is annotated `@PermitAll` and calls `require` first; every other route, and every
+route annotated `@Authenticated`, stays closed to them:
+
+```java
+@GET
+@Path("{id}")
+@PermitAll                                   // also for a link, which Sharing checks
+@Transactional
+public DashboardView get(@PathParam("id") UUID id) {
+    sharing.require(new ResourceRef(EXTENSION, "dashboard", id.toString()), "view");
+    return DashboardView.of(dashboards.findById(id).orElseThrow(NotFoundException::new));
+}
+```
+
+After `require`, read only that resource: the request now sees the rows of its organization. When
+the organization turned the apps of the extension off (MK-030), its links open nothing. The fixture
+`tests/fixtures/extensions/notes` shows the whole of it with its memos.
 
 What the permissions do today (MK-056):
 
@@ -799,8 +883,9 @@ What sharing does today (MK-055):
   missing or wrong. A request that carries the secret in the header `X-Mosaikit-Link` (and the
   password in `X-Mosaikit-Link-Password`) gets the level of the link from `level`, `allows`,
   `require` and `visible`. Every use of a link, refused or not, is in the audit log
-  (`sharing.link.used`). The APIs of extension backends (`/api/v1/ext/*`) still require an account:
-  serving a resource to a link without an account comes with the sharing dialog.
+  (`sharing.link.used`). A request without an account reaches the API of an extension only with a
+  link that works and opens a resource of that extension, and acts on the organization of the
+  resource only once `Sharing` answered for that very resource (see "Links" above).
 - Grants live in the kernel table `mk_kernel.resource_grant`, under row-level security: another
   organization never sees them.
 
@@ -821,8 +906,9 @@ What the registry does today (MK-054):
   organization, at the next start.
 
 The apps per role of an organization (MK-030) **moved onto this model**: an app restricted by the
-organization shows to the people who hold its permission `use-<app>` (see the app bar above). The
-sharing of the rows of a data collection with a team (MK-032) becomes a grant to a group next.
+organization shows to the people who hold its permission `use-<app>` (see the app bar above). So did
+the documents of a data collection shared with a team (MK-032): each is a resource of type
+`data-document` that the kernel registers and shares with the team (see "Sharing with a team").
 
 ## Quotas
 

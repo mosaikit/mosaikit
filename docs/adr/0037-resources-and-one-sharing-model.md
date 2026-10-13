@@ -45,6 +45,11 @@ Answers of the maintainer to the review of the extension API (pull request #42),
   with the list of those grants; a declared migration may come later.
 - The frontend counterpart in `@mosaikit/sdk` and the REST API come with the implementation.
 - The team sharing of data collections (MK-032) moves onto this model in the implementation.
+- 2026-10-13, review of the implementation (pull request #76): resource types of the kernel may
+  exclude the implicit level of the administrators of the organization, being private to their
+  subjects; the documents of a team (`data-document`) do, so that they stay readable only by the
+  members of the team, as MK-032 decided. The owner and explicit grants still apply. Types of
+  extensions cannot opt out for now; a later change of `kernel-api` may let them.
 
 ## Consequences
 

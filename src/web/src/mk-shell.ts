@@ -44,6 +44,9 @@ import './mk-access-keys.js';
 import './mk-sessions.js';
 import './mk-settings.js';
 import type { SettingsSection } from './mk-settings.js';
+import './mk-share-dialog.js';
+import './mk-shared-link.js';
+import { SHARE_TOPIC, resourceOf, tokenOf } from './sharing.js';
 import './mk-sign-in.js';
 import { browserLanguage, isLanguage, language, setLanguage, t } from './i18n.js';
 import type { PasswordSignIn } from './mk-sign-in.js';
@@ -689,6 +692,11 @@ export class MkShell extends LitElement {
       : html`<p class="offline" role="status">
           ${t('You are offline: what you see may not be up to date, and changes wait for the network.')}
         </p>`;
+    // A link opens its resource also without an account (MK-055).
+    const token = tokenOf(this.path);
+    if (token) {
+      return html`${offline}<mk-shared-link token=${token}></mk-shared-link>`;
+    }
     if (!this.account) {
       // Until the kernel answers, nothing: the page would show the name and the colors of Mosaikit
       // and then change to those of the installation.
@@ -705,6 +713,7 @@ export class MkShell extends LitElement {
           ${this.renderSearch()} ${this.renderAccount()}
         </header>
         ${this.renderWorkspace()}
+        <mk-share-dialog .client=${this.client}></mk-share-dialog>
       </div>`;
   }
 
@@ -1511,6 +1520,13 @@ export class MkShell extends LitElement {
       undefined,
       this.live,
     );
+    // The sharing dialog of the kernel, the same for the resources of every extension (MK-055).
+    loader.events.on(SHARE_TOPIC, (payload) => {
+      const resource = resourceOf(payload);
+      if (resource) {
+        void this.renderRoot.querySelector('mk-share-dialog')?.openFor(resource);
+      }
+    });
     // One real-time channel for the page, in the organization of the person (MK-031).
     this.live.connect(account.organization ?? undefined);
     this.stopActivity?.();

@@ -18,6 +18,12 @@ public class RequestOrganization implements CurrentOrganization {
 
     private final SecurityIdentity identity;
 
+    /**
+     * The organization of the resource whose link opened this request without an account (MK-055),
+     * once {@code Sharing} answered that the link gives a level on it; {@code null} before.
+     */
+    private UUID admitted;
+
     public RequestOrganization(SecurityIdentity identity) {
         this.identity = identity;
     }
@@ -59,9 +65,39 @@ public class RequestOrganization implements CurrentOrganization {
         return guest(identity);
     }
 
+    /**
+     * Lets a request without an account act on the organization of the resource that its link opens
+     * (MK-055), from now on: called by {@code Sharing} when it found that the link gives a level on
+     * the resource the extension asked about. Before, such a request has no organization, so that
+     * the row-level security shows it no row: a route of an extension that never asks
+     * {@code Sharing} reads nothing for a link. A request of a person keeps its own organization.
+     *
+     * @return whether the request acts on that organization now
+     */
+    public boolean admitLink(UUID organization) {
+        if (of(identity).isPresent() || (identity != null && !identity.isAnonymous())) {
+            return false;
+        }
+        if (admitted != null && !admitted.equals(organization)) {
+            return false;
+        }
+        admitted = organization;
+        return true;
+    }
+
+    /** Takes back {@link #admitLink}: the request has no organization again. */
+    public void forgetLink() {
+        admitted = null;
+    }
+
+    /** Whether the request is one without an account admitted on the organization of its link. */
+    public boolean admittedByLink() {
+        return admitted != null && of(identity).isEmpty();
+    }
+
     @Override
     public Optional<UUID> id() {
-        return of(identity);
+        return of(identity).or(() -> Optional.ofNullable(admitted));
     }
 
     @Override

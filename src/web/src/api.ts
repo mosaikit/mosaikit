@@ -1077,7 +1077,8 @@ function permissionsPath(slug: string): string {
   return `/api/v1/organizations/${encodeURIComponent(slug)}/permissions`;
 }
 
-async function toError(response: Response): Promise<KernelError> {
+/** The error of a refused call of the kernel API, from its problem (RFC 9457). */
+export async function toError(response: Response): Promise<KernelError> {
   if (response.status === 401) {
     return new KernelError(401, 'Unauthorized', 'The email or the password is not correct.');
   }

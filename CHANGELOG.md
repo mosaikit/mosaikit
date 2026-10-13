@@ -8,6 +8,19 @@ project follows [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- The documents of collections shared with a team (MK-032) moved onto the one sharing model
+  (MK-055, ADR-0037): each is a resource of type `data-document` of its extension, owned by the
+  organization, and its team holds the level `edit` (migration V28 moves the existing ones). The
+  row-level security reads them through `mk_kernel.allows()`: the members of the team read and change
+  them as before, and the sharing dialog can give access to other people and teams. As MK-032
+  decided, the administrators of the organization do not read them for being administrators:
+  `data-document` is a type of the kernel private to its subjects, where the implicit level of
+  administrators does not apply (`sharing_level.administrators`, read by `mk_kernel.allows()`).
+- The APIs of extensions (`/api/v1/ext/*`) answer a request without an account that carries a link
+  that works and opens a resource of that same extension (policy `person-or-link`): it acts on the
+  organization of the resource only once `Sharing` answered for that resource, so routes that do not
+  ask, or are `@Authenticated`, stay closed to links.
+
 - The apps per role (MK-030) moved onto permissions (MK-056): every app has the permission
   `<extension>:use-<app>`, and an app is shown to the members and administrators of the
   organization or restricted to the people who hold it (`restricted` in
@@ -17,6 +30,17 @@ project follows [Semantic Versioning](https://semver.org/).
   theirs or a personal exception grants its permission.
 
 ### Added
+
+- The sharing dialog of the shell (MK-055), the same for every resource type of every extension,
+  which an extension opens by publishing `shell.share` with the resource: the level of the person,
+  who has access with the names of people and teams, sharing with a person by email address, a team,
+  the organization or the public, links with an expiry and an optional password whose address is
+  shown once with a copy button, revocation, and who may share. The page `/shared/<secret>` opens a
+  link without an account, asks for its password, and places the element that the extension
+  contributes to `shared.view`, which calls its API with the link. `PUT
+  /api/v1/sharing/resources/.../grants` takes a person by `email`, the resource of the dialog names
+  its owner (`ownerName`), and opening a link names the element that shows it (`view`). The notes
+  fixture shares memos this way (MK-054).
 
 - Signed, expiring links to the files of extensions (MK-093): `POST /api/v1/files/{extension}/links`
   makes a link to a file the person reads, or to every file under a prefix of names of the

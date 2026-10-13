@@ -7,6 +7,7 @@ import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
 import dev.mosaikit.kernel.core.extension.InstalledExtension;
 import dev.mosaikit.kernel.core.identity.RequestOrganization;
 import dev.mosaikit.kernel.core.service.ServiceRegistry;
+import dev.mosaikit.kernel.core.sharing.LinkRequest;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.quarkus.vertx.http.runtime.security.QuarkusHttpUser;
 import io.vertx.core.http.HttpHeaders;
@@ -23,7 +24,8 @@ import java.util.stream.Collectors;
  * of an extension can stay built into the kernel after it was disabled, rolled back or removed, until
  * the next rebuild; its endpoints must not answer in the meantime. Paths that no active extension
  * declares answer 404, as a problem detail. A request of a person must act on an organization; one of a
- * service identity (MK-124) may act on none.
+ * service identity (MK-124) may act on none, and so may one without an account that its link let in
+ * ({@code LinkRequestPolicy}, MK-055) until {@code Sharing} admits it on the organization of the resource.
  */
 @ApplicationScoped
 public class ExtensionApiGuard {
@@ -63,7 +65,11 @@ public class ExtensionApiGuard {
         // Every request of a person to an extension acts on one organization of the person (MK-017); a
         // service identity (MK-124), already held to its APIs by ServiceGuard, may act on none.
         SecurityIdentity identity = context.user() instanceof QuarkusHttpUser user ? user.getSecurityIdentity() : null;
-        if (RequestOrganization.of(identity).isEmpty() && !isService(identity)) {
+        // A request without an account let in by its link (MK-055) acts on the organization of the
+        // resource once the extension asked Sharing about it.
+        if (RequestOrganization.of(identity).isEmpty()
+                && !isService(identity)
+                && context.get(LinkRequest.OPENED) == null) {
             problem(context, 403, NO_ORGANIZATION);
             return;
         }

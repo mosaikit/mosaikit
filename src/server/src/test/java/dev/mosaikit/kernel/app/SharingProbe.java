@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.app;
 
+import dev.mosaikit.kernel.api.context.CurrentOrganization;
 import dev.mosaikit.kernel.api.resource.ResourceRef;
 import dev.mosaikit.kernel.api.sharing.Sharing;
 import dev.mosaikit.kernel.api.sharing.Subject;
 import io.agroal.api.AgroalDataSource;
 import jakarta.annotation.security.PermitAll;
+import jakarta.transaction.Transactional;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
@@ -18,6 +20,7 @@ import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
@@ -41,10 +44,61 @@ public class SharingProbe {
 
     private final Sharing sharing;
     private final AgroalDataSource dataSource;
+    private final CurrentOrganization organization;
 
-    public SharingProbe(Sharing sharing, AgroalDataSource dataSource) {
+    public SharingProbe(Sharing sharing, AgroalDataSource dataSource, CurrentOrganization organization) {
         this.sharing = sharing;
         this.dataSource = dataSource;
+        this.organization = organization;
+    }
+
+    /**
+     * What a request opened with a link sees before and after it asks {@code Sharing} about a
+     * resource, as the route of an extension served to a link does (MK-055): its organization and the
+     * registered resources that the row-level security shows it, with one connection held across, as
+     * in a transaction, and with a new one after.
+     */
+    @GET
+    @Path("/{id}/admission")
+    @Transactional
+    public Response admission(
+            @PathParam("extension") String extension, @PathParam("type") String type, @PathParam("id") String id) {
+        Map<String, Object> seen = new LinkedHashMap<>();
+        try (var held = dataSource.getConnection()) {
+            seen.put("organizationBefore", organization.id().map(UUID::toString).orElse(""));
+            seen.put("rowsBefore", resources(held));
+            seen.put(
+                    "level", sharing.level(new ResourceRef(extension, type, id)).orElse(""));
+            seen.put("organizationAfter", organization.id().map(UUID::toString).orElse(""));
+            seen.put("rowsAfter", resources(held));
+        } catch (SQLException e) {
+            throw new IllegalStateException(e);
+        }
+        return Response.ok(seen).build();
+    }
+
+    /** The same, without asking about the resource: the route stays without organization. */
+    @GET
+    @Path("/{id}/no-admission")
+    @Transactional
+    public Response noAdmission() {
+        try (var held = dataSource.getConnection()) {
+            return Response.ok(Map.of(
+                            "organization",
+                                    organization.id().map(UUID::toString).orElse(""),
+                            "rows", resources(held)))
+                    .build();
+        } catch (SQLException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static int resources(java.sql.Connection connection) throws SQLException {
+        try (var statement = connection.prepareStatement("select count(*) from mk_kernel.resource");
+                var result = statement.executeQuery()) {
+            result.next();
+            return result.getInt(1);
+        }
     }
 
     /** The level of the request, or of {@code person}, as {@code {"level": ...}}. */

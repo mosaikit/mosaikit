@@ -66,6 +66,13 @@ class SharingTest {
                 title: Memo
                 levels: [{ name: view, title: View }, { name: edit, title: Edit, edits: true }]
             """;
+    /** The element that shows a doc opened with a link (MK-055). */
+    static final String CONTRIBUTES = """
+            contributes:
+              shared.view:
+                - { id: doc-view, type: doc, element: test-doc-view }
+            """;
+
     static final String PASSWORD = "a long enough password";
     static final String REGISTRY = "/api/v1/test/resources/" + EXTENSION + "/";
     static final String PROBE = "/api/v1/test/sharing/" + EXTENSION + "/";
@@ -756,6 +763,155 @@ class SharingTest {
         ManifestParseResult result = ExtensionManifests.parse(tree);
         assertThat(result).isInstanceOf(ManifestParseResult.Valid.class);
         return ((ManifestParseResult.Valid) result).manifest();
+    }
+
+    // --- The dialog of the shell and the answers to the extension (acceptance 1 and 4) ------------
+
+    @Test
+    void theExtensionAndTheDialogGiveEveryoneTheSameLevel() {
+        resource(ada, acme, "doc", "d1");
+        String team = team(ada, acme, bea);
+        share(ada, acme, "doc", "d1", "group", team, "use").then().statusCode(200);
+        in(ada, acme)
+                .body(Map.of("subject", Map.of("kind", "person", "email", cleo), "level", "edit"))
+                .put(API + "doc/d1/grants")
+                .then()
+                .statusCode(200)
+                .body("subject.email", equalTo(cleo));
+
+        for (String person : List.of(ada, bea, cleo, manager)) {
+            String java = level(person, acme, "doc", "d1");
+            String dialog = in(person, acme)
+                    .get(API + "doc/d1")
+                    .then()
+                    .statusCode(200)
+                    .extract()
+                    .path("level");
+            assertThat(dialog).as(person).isEqualTo(java);
+            // The answer for a person, asked by another one, is the same as well.
+            assertThat(level(in(manager, acme).queryParam("person", id(person, acme)), "doc", "d1"))
+                    .as(person)
+                    .isEqualTo(java);
+        }
+        assertThat(level(bea, acme, "doc", "d1")).isEqualTo("use");
+        assertThat(level(cleo, acme, "doc", "d1")).isEqualTo("edit");
+        // Without a level: nothing for the extension, not found for the dialog.
+        String outsider = register(acme);
+        assertThat(level(outsider, acme, "doc", "d1")).isEmpty();
+        in(outsider, acme).get(API + "doc/d1").then().statusCode(404);
+        // A link: the level that opening it shows is the level the extension gets.
+        String token = link(ada, acme, "doc", "d1", "use", Instant.now().plus(Duration.ofDays(1)), null)
+                .then()
+                .statusCode(201)
+                .extract()
+                .path("token");
+        String opened = open(token, null).then().statusCode(200).extract().path("level");
+        assertThat(level(anonymous().header("X-Mosaikit-Link", token), "doc", "d1"))
+                .isEqualTo(opened);
+    }
+
+    @Test
+    void theDialogNamesTheOwnerFindsPeopleByEmailAndOffersTheViewOfLinks() {
+        resource(ada, acme, "doc", "d1");
+        in(ada, acme).get(API + "doc/d1").then().statusCode(200).body("ownerName", equalTo("P " + ada));
+
+        Map<String, Object> elsewhere = Map.of("subject", Map.of("kind", "person", "email", dan), "level", "view");
+        in(ada, acme).body(elsewhere).put(API + "doc/d1/grants").then().statusCode(400);
+        Map<String, Object> nobody =
+                Map.of("subject", Map.of("kind", "person", "email", "nobody@example.org"), "level", "view");
+        in(ada, acme)
+                .body(nobody)
+                .put(API + "doc/d1/grants")
+                .then()
+                .statusCode(400)
+                .body("detail", containsString("not of the organization"));
+        Map<String, Object> noOne = Map.of("subject", Map.of("kind", "person"), "level", "view");
+        in(ada, acme).body(noOne).put(API + "doc/d1/grants").then().statusCode(400);
+
+        // Opening a link names the element of the extension that shows the resource.
+        String token = link(ada, acme, "doc", "d1", "view", Instant.now().plus(Duration.ofDays(1)), null)
+                .then()
+                .statusCode(201)
+                .extract()
+                .path("token");
+        open(token, null)
+                .then()
+                .statusCode(200)
+                .body("view.extension", equalTo(EXTENSION))
+                .body("view.element", equalTo("test-doc-view"))
+                .body("view.entry", startsWith("/api/v1/extension-assets/" + EXTENSION + "/"));
+    }
+
+    // --- Requests opened with a link (acceptance 3) ---------------------------------------------
+
+    @Test
+    void aRequestOpenedWithALinkActsOnTheOrganizationOfItsResourceOnlyOnceSharingAnswered() {
+        resource(ada, acme, "doc", "d1");
+        resource(ada, acme, "doc", "d2");
+        String acmeId = asAdmin().get("/api/v1/organizations/{slug}", acme).path("id");
+        String globexId = asAdmin().get("/api/v1/organizations/{slug}", globex).path("id");
+        JsonPath made = link(ada, acme, "doc", "d1", "view", Instant.now().plus(Duration.ofDays(1)), null)
+                .then()
+                .statusCode(201)
+                .extract()
+                .jsonPath();
+        String token = made.getString("token");
+
+        // Before asking Sharing, no organization and no row; after, the organization of the resource,
+        // on the connection held across too.
+        anonymous()
+                .header("X-Mosaikit-Link", token)
+                .get(PROBE + "doc/d1/admission")
+                .then()
+                .statusCode(200)
+                .body("organizationBefore", equalTo(""))
+                .body("rowsBefore", equalTo(0))
+                .body("level", equalTo("view"))
+                .body("organizationAfter", equalTo(acmeId))
+                .body("rowsAfter", equalTo(2));
+        // Asking about another resource admits nothing, and neither does not asking.
+        anonymous()
+                .header("X-Mosaikit-Link", token)
+                .get(PROBE + "doc/d2/admission")
+                .then()
+                .body("level", equalTo(""))
+                .body("organizationAfter", equalTo(""))
+                .body("rowsAfter", equalTo(0));
+        anonymous()
+                .header("X-Mosaikit-Link", token)
+                .get(PROBE + "doc/d1/no-admission")
+                .then()
+                .body("organization", equalTo(""))
+                .body("rows", equalTo(0));
+        // A person keeps their own organization, where the link gives nothing.
+        in(dan, globex)
+                .header("X-Mosaikit-Link", token)
+                .get(PROBE + "doc/d1/admission")
+                .then()
+                .body("level", equalTo(""))
+                .body("organizationAfter", equalTo(globexId));
+
+        // The APIs of extensions: never anonymous, unless a working link opens a resource of the
+        // extension that provides the API; no extension of the tests provides an active one.
+        anonymous().get("/api/v1/ext/test-java/anything").then().statusCode(401);
+        anonymous()
+                .header("X-Mosaikit-Link", token)
+                .get("/api/v1/ext/test-java/anything")
+                .then()
+                .statusCode(401);
+
+        // Revoked: nothing again.
+        in(ada, acme)
+                .delete("/api/v1/sharing/grants/" + made.getString("grant.id"))
+                .then()
+                .statusCode(204);
+        anonymous()
+                .header("X-Mosaikit-Link", token)
+                .get(PROBE + "doc/d1/admission")
+                .then()
+                .body("level", equalTo(""))
+                .body("organizationAfter", equalTo(""))
+                .body("rowsAfter", equalTo(0));
     }
 
     private long rows(String sql) throws SQLException {
