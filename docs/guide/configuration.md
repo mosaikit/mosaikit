@@ -38,6 +38,7 @@ start). The kernel keeps its tables in the `mk_kernel` schema and each extension
 |---|---|---|
 | `quarkus.http.port` | `8080` | port |
 | `quarkus.http.host` | `0.0.0.0` | address to listen on |
+| `quarkus.http.limits.max-body-size` | `10M` | the largest body of a request, such as `512M`; a request that declares a larger body is refused with 413 and a problem detail that names the limit. Uploads of files need it at least as large as `mosaikit.files.max-size` |
 | `mosaikit.accounts.session-timeout` | `8h` | how long a session of the shell opened with a password lasts without activity (at least one minute) |
 | `mosaikit.accounts.session-max-life` | `24h` | how long a session lasts at most, whatever its activity; "remember me" then opens a new one. The record of an ended realm session is kept at least this long |
 | `mosaikit.accounts.session-cache` | `5s` | how long a kernel keeps what it read about a session; a session ended on another kernel of the installation is refused within this time, on the same kernel at once; `0s` reads the database at every request. The same time applies to personal access keys (MK-060) and to the keys and grants of service identities (MK-124) |
