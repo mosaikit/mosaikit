@@ -108,6 +108,23 @@ spec:
                   key: secret-access-key
             {{- end }}
             {{- end }}
+            {{- if .Values.proxy.forwardedHeaders }}
+            {{- if and (not .Values.proxy.trustedProxies) (ne .Values.service.type "ClusterIP") }}
+            {{- fail (printf "proxy.trustedProxies: with service.type %s clients reach the kernel directly and could forward a scheme of their choice; name the addresses of the proxy, or set proxy.forwardedHeaders=false" .Values.service.type) }}
+            {{- end }}
+            - name: QUARKUS_HTTP_PROXY_PROXY_ADDRESS_FORWARDING
+              value: "true"
+            - name: QUARKUS_HTTP_PROXY_ALLOW_X_FORWARDED
+              value: "true"
+            {{- with .Values.proxy.trustedProxies }}
+            - name: QUARKUS_HTTP_PROXY_TRUSTED_PROXIES
+              value: {{ . | quote }}
+            {{- end }}
+            {{- end }}
+            {{- if .Values.proxy.secureCookies }}
+            - name: MOSAIKIT_ACCOUNTS_SECURE_COOKIES
+              value: "true"
+            {{- end }}
             {{- with include "mosaikit.extraEnv" . | trim }}
             {{- . | nindent 12 }}
             {{- end }}

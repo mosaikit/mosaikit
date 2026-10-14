@@ -115,6 +115,30 @@ extensions:
       expect(container.envFrom).toBeUndefined();
     });
 
+    it('has the kernel believe the forwarded headers of the ingress, from named proxies outside ClusterIP (#97)', () => {
+      const variables = (container: Container) =>
+        new Map(container.env.map((variable) => [variable.name, variable.value]));
+      const byDefault = variables(render('{}\n'));
+      expect(byDefault.get('QUARKUS_HTTP_PROXY_PROXY_ADDRESS_FORWARDING')).toBe('true');
+      expect(byDefault.get('QUARKUS_HTTP_PROXY_ALLOW_X_FORWARDED')).toBe('true');
+      expect(byDefault.has('QUARKUS_HTTP_PROXY_TRUSTED_PROXIES')).toBe(false);
+      expect(byDefault.has('MOSAIKIT_ACCOUNTS_SECURE_COOKIES')).toBe(false);
+
+      const named = variables(
+        render(
+          'service:\n  type: LoadBalancer\nproxy:\n  trustedProxies: 10.244.0.0/16\n  secureCookies: true\n',
+        ),
+      );
+      expect(named.get('QUARKUS_HTTP_PROXY_TRUSTED_PROXIES')).toBe('10.244.0.0/16');
+      expect(named.get('MOSAIKIT_ACCOUNTS_SECURE_COOKIES')).toBe('true');
+
+      expect(refused('service:\n  type: NodePort\n')).toContain('proxy.trustedProxies');
+      const off = variables(
+        render('service:\n  type: NodePort\nproxy:\n  forwardedHeaders: false\n'),
+      );
+      expect(off.has('QUARKUS_HTTP_PROXY_PROXY_ADDRESS_FORWARDING')).toBe(false);
+    });
+
     it('refuses a name that is not a setting and a value that is neither clear nor a reference', () => {
       expect(refused('kernel:\n  extraSettings:\n    "bad name": x\n')).toContain(
         'is not the name of a setting',

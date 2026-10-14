@@ -87,6 +87,14 @@ services:
       MOSAIKIT_EXTENSIONS_SIGNATURES: ${MOSAIKIT_EXTENSIONS_SIGNATURES:-optional}
       # Files of extensions (MK-041): in the mosaikit-files volume. For an S3-compatible store set
       # MOSAIKIT_FILES_STORE=s3 and the MOSAIKIT_FILES_S3_* variables (see README.md).
+      # Behind a reverse proxy that terminates TLS: the kernel takes the scheme and the address of
+      # the client from X-Forwarded-Proto and X-Forwarded-For, so that its cookies carry Secure, but
+      # only from MOSAIKIT_TRUSTED_PROXIES of .env, the addresses of the proxy as the container sees
+      # them. The default trusts nobody else than the container itself: a client that reaches port
+      # 8080 directly cannot choose the scheme (see README.md, "Behind a reverse proxy").
+      QUARKUS_HTTP_PROXY_PROXY_ADDRESS_FORWARDING: 'true'
+      QUARKUS_HTTP_PROXY_ALLOW_X_FORWARDED: 'true'
+      QUARKUS_HTTP_PROXY_TRUSTED_PROXIES: ${MOSAIKIT_TRUSTED_PROXIES:-127.0.0.1}
     # Settings of the kernel and of extensions that this file does not name (MK-129), one
     # VARIABLE=value per line, such as EXAMPLE_REPORTS_ENDPOINT=https://reports.example.org for the
     # setting example.reports.endpoint: copy mosaikit.env.example to mosaikit.env (see README.md).

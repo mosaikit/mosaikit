@@ -323,6 +323,16 @@ public interface KernelConfig {
          */
         @WithDefault("15s")
         Duration mailTimeout();
+
+        /**
+         * Whether the cookies of the kernel (the session of the shell and "remember me") always carry
+         * {@code Secure}. When {@code false} they carry it when the request is HTTPS as the kernel
+         * sees it: the scheme of the connection, or the one forwarded by a trusted reverse proxy
+         * ({@code quarkus.http.proxy.*}). {@code true} for an installation reached only over HTTPS,
+         * whatever the proxy in front of it forwards.
+         */
+        @WithDefault("false")
+        boolean secureCookies();
     }
 
     /**

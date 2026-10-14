@@ -42,6 +42,10 @@ or `EXAMPLE_REPORTS_ENDPOINT=https://reports.example.org` in the environment of 
 passwords and keys in the environment, or keep `config/application.properties` readable only by the
 account that runs Mosaikit. Restart Mosaikit after a change.
 
+Behind a reverse proxy that terminates TLS, enable the forwarded headers from the address of the
+proxy (commented in `config/application.properties`), or the session cookie lacks `Secure`; see
+[installation](../../docs/guide/installation.md#behind-a-reverse-proxy).
+
 ## Contents
 
 | Path | Content |

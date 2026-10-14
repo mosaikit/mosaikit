@@ -22,7 +22,6 @@ import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.NewCookie;
 import jakarta.ws.rs.core.Response;
-import jakarta.ws.rs.core.UriInfo;
 import java.util.UUID;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
@@ -52,18 +51,21 @@ public class SessionResource {
     private final RememberMe rememberMe;
     private final LocalIdentityProvider local;
     private final SessionRegistry sessions;
+    private final SecureCookies secureCookies;
 
     public SessionResource(
             AccountService service,
             SecurityIdentity identity,
             RememberMe rememberMe,
             LocalIdentityProvider local,
-            SessionRegistry sessions) {
+            SessionRegistry sessions,
+            SecureCookies secureCookies) {
         this.service = service;
         this.identity = identity;
         this.rememberMe = rememberMe;
         this.local = local;
         this.sessions = sessions;
+        this.secureCookies = secureCookies;
     }
 
     @POST
@@ -77,8 +79,7 @@ public class SessionResource {
             @FormParam("username") String username,
             @FormParam("password") String password,
             @CookieParam(COOKIE) String previous,
-            @Context HttpServerRequest request,
-            @Context UriInfo uri) {
+            @Context HttpServerRequest request) {
         if (username == null || username.isBlank() || password == null || password.length() > MAX_PASSWORD) {
             return Response.status(Response.Status.UNAUTHORIZED).build();
         }
@@ -100,7 +101,7 @@ public class SessionResource {
                 .value(opened.token())
                 .path("/")
                 .httpOnly(true)
-                .secure("https".equals(uri.getBaseUri().getScheme()))
+                .secure(secureCookies.secure(request))
                 .sameSite(NewCookie.SameSite.STRICT)
                 .build();
         return Response.ok(service.get(
@@ -128,7 +129,7 @@ public class SessionResource {
             summary = "Remember the signed-in person on this browser",
             description = "Sets an HttpOnly cookie that signs the person in again when the session ends,"
                     + " for mosaikit.accounts.remember-for, until they sign out or the session is ended.")
-    public Response remember(@Context UriInfo uri) {
+    public Response remember(@Context HttpServerRequest request) {
         String token = rememberMe
                 .issue(
                         identity.getPrincipal().getName(),
@@ -141,7 +142,7 @@ public class SessionResource {
                 .path("/")
                 .maxAge((int) rememberMe.duration().toSeconds())
                 .httpOnly(true)
-                .secure("https".equals(uri.getBaseUri().getScheme()))
+                .secure(secureCookies.secure(request))
                 .sameSite(NewCookie.SameSite.STRICT)
                 .build();
         return Response.noContent().cookie(remembered).build();
@@ -152,20 +153,27 @@ public class SessionResource {
     @Operation(
             summary = "End the session of the request, and forget the browser if it was remembered",
             description = "The cookie, or the tokens of the realm session, open nothing any more.")
-    public Response end(@CookieParam(RememberMe.COOKIE) String remembered) {
+    public Response end(@CookieParam(RememberMe.COOKIE) String remembered, @Context HttpServerRequest request) {
         SessionRegistry.of(identity).ifPresent(sessions::end);
         rememberMe.revoke(remembered);
+        boolean secure = secureCookies.secure(request);
         return Response.noContent()
-                .cookie(expired(COOKIE), expired(RememberMe.COOKIE))
+                .cookie(expired(COOKIE, secure), expired(RememberMe.COOKIE, secure))
                 .build();
     }
 
     static NewCookie expired(String name) {
+        return expired(name, false);
+    }
+
+    /** A cookie that the browser deletes, with {@code Secure} like the cookie it replaces. */
+    static NewCookie expired(String name, boolean secure) {
         return new NewCookie.Builder(name)
                 .value("")
                 .path("/")
                 .maxAge(0)
                 .httpOnly(true)
+                .secure(secure)
                 .sameSite(NewCookie.SameSite.STRICT)
                 .build();
     }

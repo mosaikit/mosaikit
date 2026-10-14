@@ -48,6 +48,7 @@ scheduled restore test is still to be provided
 | An extension is missing from the launcher | `GET /api/v1/extensions`: its status and `problems` say why |
 | `RESTART_REQUIRED` | the kernel was started without its launcher script, or a JAR changed while it ran |
 | "Refused package" | the package was changed after signing, or signatures are required and the publisher is not trusted |
+| Behind a TLS proxy the session cookie lacks `Secure` | the kernel does not believe the `X-Forwarded-Proto` of the proxy: forwarded headers off, or the proxy not in `quarkus.http.proxy.trusted-proxies` ([installation](installation.md#behind-a-reverse-proxy)) |
 | Sign-in through Keycloak fails with a `503` | the kernel cannot reach Keycloak at `mosaikit.identity.keycloak-internal-url` or `keycloak-url` |
 | The portable distribution does not start: "Port 54329 … in use" | another program uses the port: set `MOSAIKIT_DATABASE_PORT` |
 | Windows: "Unable to delete directory" while building | a program keeps the folder open (a running compose, a terminal, Explorer) |
