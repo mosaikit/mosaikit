@@ -4,6 +4,7 @@ package dev.mosaikit.kernel.core.files;
 
 import dev.mosaikit.kernel.core.audit.AuditEvent;
 import dev.mosaikit.kernel.core.audit.AuditLog;
+import dev.mosaikit.kernel.core.audit.FirstUses;
 import dev.mosaikit.kernel.core.config.KernelConfig;
 import dev.mosaikit.kernel.core.error.InvalidInputException;
 import dev.mosaikit.kernel.core.error.ResourceNotFoundException;
@@ -26,7 +27,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
 import org.jboss.logging.Logger;
 
 /**
@@ -94,7 +94,7 @@ public class FileLinks {
     private final AuditLog audit;
     private final AgroalDataSource dataSource;
     private final Duration maxValidity;
-    private final Map<String, Instant> audited = new ConcurrentHashMap<>();
+    private final FirstUses audited = new FirstUses(AUDIT_EVERY, REMEMBERED);
     private final Clock clock;
 
     @SuppressWarnings("java:S107") // the beans it needs
@@ -310,16 +310,7 @@ public class FileLinks {
             throw refused();
         }
         String id = FileLink.id(signature);
-        Instant now = Instant.now(clock);
-        Instant last = audited.get(id);
-        if (last == null || !now.isBefore(last.plus(AUDIT_EVERY))) {
-            if (audited.size() >= REMEMBERED) {
-                audited.values().removeIf(at -> !now.isBefore(at.plus(AUDIT_EVERY)));
-                if (audited.size() >= REMEMBERED) {
-                    audited.clear();
-                }
-            }
-            audited.put(id, now);
+        if (audited.first(id, Instant.now(clock))) {
             Map<String, String> detail = new LinkedHashMap<>();
             detail.put("extension", link.extension());
             detail.put("link", id);

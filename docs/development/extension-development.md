@@ -1035,8 +1035,9 @@ What sharing does today (MK-055):
   link and the level, 404 once the link expired or was revoked, and 403 when its password is
   missing or wrong. A request that carries the secret in the header `X-Mosaikit-Link` (and the
   password in `X-Mosaikit-Link-Password`) gets the level of the link from `level`, `allows`,
-  `require` and `visible`. Every use of a link, refused or not, is in the audit log
-  (`sharing.link.used`). A request without an account reaches the API of an extension only with a
+  `require` and `visible`. Every refused use of a link is in the audit log
+  (`sharing.link.used`), and the first use that works in each hour for each link, not every
+  request. A request without an account reaches the API of an extension only with a
   link that works and opens a resource of that extension, and acts on the organization of the
   resource only once `Sharing` answered for that very resource (see "Links" above).
 - Grants live in the kernel table `mk_kernel.resource_grant`, under row-level security: another

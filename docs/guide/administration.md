@@ -389,9 +389,10 @@ revoked; after its expiry or revocation it answers "not found". No link lasts lo
 [configuration](configuration.md)). The kernel keeps only a hash of the secret of a link, so its
 address is shown once, when it is made.
 
-Every grant, change of level, revocation and use of a link is in the audit log, as
-`sharing.granted`, `sharing.revoked`, `sharing.link.created`, `sharing.link.revoked` and
-`sharing.link.used` (also when refused). People share in the sharing dialog of the shell, the same
+Every grant, change of level and revocation is in the audit log, as `sharing.granted`,
+`sharing.revoked`, `sharing.link.created` and `sharing.link.revoked`. The use of a link is
+`sharing.link.used`: every refused use, and the first use that works in each hour for each link on
+each kernel, not every request, since a map read through a link asks for every tile with it. People share in the sharing dialog of the shell, the same
 for every app (see the [user guide](using.md)); the REST API is under `/api/v1/sharing` (see the
 OpenAPI document of the installation).
 

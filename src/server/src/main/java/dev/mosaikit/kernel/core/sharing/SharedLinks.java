@@ -8,6 +8,7 @@ import dev.mosaikit.kernel.api.extension.SubjectKind;
 import dev.mosaikit.kernel.api.resource.ResourceRef;
 import dev.mosaikit.kernel.core.audit.AuditEvent;
 import dev.mosaikit.kernel.core.audit.AuditLog;
+import dev.mosaikit.kernel.core.audit.FirstUses;
 import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
 import dev.mosaikit.kernel.core.extension.InstalledExtension;
 import dev.mosaikit.kernel.core.security.PasswordHasher;
@@ -22,6 +23,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.HexFormat;
@@ -32,8 +34,9 @@ import java.util.UUID;
 
 /**
  * The secrets of links (MK-055): makes them, keeps only their SHA-256, and resolves a secret into
- * the resource it opens, for requests without an account and so without an organization. Every use
- * of a link, refused or not, is in the audit log.
+ * the resource it opens, for requests without an account and so without an organization. Every
+ * refused use of a link is in the audit log, and the first use that works of each hour, for each link
+ * and each node, as for access keys (MK-060): a map read through a link asks for every tile with it.
  */
 @ApplicationScoped
 public class SharedLinks {
@@ -41,8 +44,14 @@ public class SharedLinks {
     /** The path of the installation that opens a link, followed by its secret. */
     public static final String PATH = "/shared/";
 
-    /** Audit action of every use of a link. */
+    /** Audit action of the use of a link. */
     static final String USED = "sharing.link.used";
+
+    /** How often a use of one link that works is audited, at most. */
+    static final Duration AUDIT_EVERY = Duration.ofHours(1);
+
+    /** How many links the memory of uses keeps before it forgets the old ones. */
+    static final int REMEMBERED = 10_000;
 
     private static final int SECRET_BYTES = 32;
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -95,6 +104,7 @@ public class SharedLinks {
     private final PasswordHasher hasher;
     private final AuditLog audit;
     private final Clock clock;
+    private final FirstUses audited = new FirstUses(AUDIT_EVERY, REMEMBERED);
 
     public SharedLinks(
             AgroalDataSource dataSource,
@@ -133,7 +143,7 @@ public class SharedLinks {
 
     /**
      * Opens a link with its secret and, when it has one, its password, and writes the use in the
-     * audit log.
+     * audit log: always when it is refused, the first time of each hour when it works.
      *
      * @param actor who opens it, {@code anonymous} without an account
      * @throws RefusedException when the link does not open
@@ -180,13 +190,15 @@ public class SharedLinks {
         ResourceTypeEntry entry = type.get();
         String level = entry.includes(entry.linkLevel(), row.level()) ? row.level() : entry.linkLevel();
         detail.put("level", level);
-        audit.append(
-                actor,
-                Optional.of(row.organization()),
-                USED,
-                row.resource().toString(),
-                AuditEvent.Outcome.SUCCEEDED,
-                detail);
+        if (audited.first(row.grant().toString(), now)) {
+            audit.append(
+                    actor,
+                    Optional.of(row.organization()),
+                    USED,
+                    row.resource().toString(),
+                    AuditEvent.Outcome.SUCCEEDED,
+                    detail);
+        }
         return new Opened(
                 row.grant(),
                 row.organization(),
