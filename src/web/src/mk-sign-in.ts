@@ -21,6 +21,7 @@ declare global {
     'mk-show-register': CustomEvent<undefined>;
     'mk-register': CustomEvent<Registration>;
     'mk-resend': CustomEvent<undefined>;
+    'mk-set-password': CustomEvent<{ password: string }>;
   }
 }
 
@@ -330,7 +331,7 @@ export class MkSignIn extends LitElement {
   /** How many days "remember me" lasts, as the kernel says. */
   @property({ type: Number }) rememberDays = 30;
   /** Which page: signing in, creating an account, or waiting for the confirmation of the address. */
-  @property() mode: 'sign-in' | 'register' | 'sent' = 'sign-in';
+  @property() mode: 'sign-in' | 'register' | 'sent' | 'set-password' = 'sign-in';
   /** Whether the page offers to create an account (MK-048). */
   @property({ attribute: false }) registration: RegistrationOptions | undefined;
   /** Where the confirmation link went. */
@@ -386,6 +387,12 @@ export class MkSignIn extends LitElement {
       case 'sent':
         return html`<h1 id="sign-in-title">${t('Check your email')}</h1>
           ${this.renderSent()}`;
+      case 'set-password':
+        return html`<h1 id="sign-in-title">${t('Choose your password')}</h1>
+          <p class="lead">
+            ${t('An administrator created your account. Choose a password, then sign in with your email address and this password.')}
+          </p>
+          ${this.renderSetPassword()}`;
       default:
         return html`<h1 id="sign-in-title">${t('Sign in')}</h1>
           <p class="lead">${t('Welcome back to {product}.', { product: this.product })}</p>
@@ -469,6 +476,51 @@ export class MkSignIn extends LitElement {
           size="large"
           ?disabled=${this.busy}
           >${t('Create account')}</fluent-button
+        >
+        <fluent-button role="button" type="button" appearance="subtle" @click=${this.back}
+          >${t('Back to sign in')}</fluent-button
+        >
+      </form>
+    `;
+  }
+
+  /** The password of an account an administrator created, set with the link they gave (MK-048). */
+  private renderSetPassword(): unknown {
+    return html`
+      <form @submit=${this.setPassword} aria-labelledby="sign-in-title">
+        <div class="field">
+          <label for="chosen-password">${t('New password')}</label>
+          <span class="control">
+            <input
+              id="chosen-password"
+              name="password"
+              type=${this.revealed ? 'text' : 'password'}
+              autocomplete="new-password"
+              minlength="12"
+              maxlength="128"
+              aria-describedby="chosen-password-hint"
+              required
+            />
+            <button
+              class="reveal"
+              type="button"
+              aria-pressed=${this.revealed ? 'true' : 'false'}
+              aria-label=${this.revealed ? t('Hide the password') : t('Show the password')}
+              @click=${this.toggleReveal}
+            >
+              ${this.revealed ? t('Hide') : t('Show')}
+            </button>
+          </span>
+          <small id="chosen-password-hint" class="hint">${t('At least 12 characters.')}</small>
+        </div>
+        ${this.renderError()}
+        <fluent-button
+          role="button"
+          type="submit"
+          appearance="primary"
+          size="large"
+          ?disabled=${this.busy}
+          >${t('Set the password')}</fluent-button
         >
         <fluent-button role="button" type="button" appearance="subtle" @click=${this.back}
           >${t('Back to sign in')}</fluent-button
@@ -609,7 +661,8 @@ export class MkSignIn extends LitElement {
       | 'mk-sign-in'
       | 'mk-show-register'
       | 'mk-register'
-      | 'mk-resend',
+      | 'mk-resend'
+      | 'mk-set-password',
   >(type: K, detail: HTMLElementEventMap[K]['detail']): void {
     this.dispatchEvent(new CustomEvent(type, { detail, bubbles: true, composed: true }));
   }
@@ -647,6 +700,13 @@ export class MkSignIn extends LitElement {
 
   private readonly resend = (): void => {
     this.emit('mk-resend', undefined);
+  };
+
+  private readonly setPassword = (event: SubmitEvent): void => {
+    event.preventDefault();
+    const data = new FormData(event.target as HTMLFormElement);
+    this.revealed = false;
+    this.emit('mk-set-password', { password: text(data, 'password') });
   };
 
   private readonly toggleReveal = (): void => {

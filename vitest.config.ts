@@ -50,6 +50,7 @@ export default defineConfig({
         'src/web/src/mk-admin-origins.ts',
         'src/web/src/mk-admin-quotas.ts',
         'src/web/src/mk-invite-person.ts',
+        'src/web/src/mk-create-account.ts',
         'src/web/src/mk-permission-list.ts',
         'src/web/src/mk-effective-permissions.ts',
         'src/web/src/mk-activity.ts',

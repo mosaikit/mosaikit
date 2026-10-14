@@ -92,3 +92,31 @@ Prefer a values file to `--set`, where the dots of a name must be escaped
 (`--set 'extensions.org\.example\.reports.settings.example\.reports\.endpoint=https://reports.example.org'`).
 
 Every value is described in `mosaikit/values.yaml`.
+
+## Mail
+
+The kernel sends the links of registrations and of the accounts that administrators create through a
+mail server, given as settings of the kernel, with the password in a secret:
+
+```yaml
+kernel:
+  extraSettings:
+    quarkus.mailer.host: smtp.example.org
+    quarkus.mailer.port: "587"
+    quarkus.mailer.start-tls: REQUIRED
+    quarkus.mailer.username: mosaikit@example.org
+    quarkus.mailer.password:
+      valueFrom:
+        secretKeyRef: { name: mosaikit-mail, key: password }
+    quarkus.mailer.from: Mosaikit <mosaikit@example.org>
+    mosaikit.public-url: https://mosaikit.example.org
+```
+
+```bash
+kubectl create secret generic mosaikit-mail --from-literal=password='<password>'
+```
+
+Without `quarkus.mailer.host` the installation sends no mail: an administrator creates the accounts
+of people and passes on the link to set the password, which the console shows once; self-registration
+then needs `mosaikit.accounts.confirm-email=false`, or stays off. See
+[Sending mail](../../docs/guide/administration.md#sending-mail).

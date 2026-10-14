@@ -16,6 +16,9 @@ import { t } from './i18n.js';
 import './mk-effective-permissions.js';
 import './mk-invite-person.js';
 import type { MkInvitePerson } from './mk-invite-person.js';
+import './mk-create-account.js';
+import type { MkCreateAccount } from './mk-create-account.js';
+import { awaitsPassword } from './password-links.js';
 import './mk-permission-list.js';
 import type { PermissionToggle } from './mk-permission-list.js';
 import { byExtension, toggled, type PermissionGroup } from './permissions.js';
@@ -174,6 +177,7 @@ export class MkAdminPermissions extends LitElement {
   @state() private failed = false;
 
   @query('mk-invite-person') private inviteDialog!: MkInvitePerson;
+  @query('mk-create-account') private createDialog!: MkCreateAccount;
 
   override connectedCallback(): void {
     super.connectedCallback();
@@ -256,6 +260,11 @@ export class MkAdminPermissions extends LitElement {
         ?platformAdmin=${this.platformAdmin}
         @mk-invited=${this.invited}
       ></mk-invite-person>
+      <mk-create-account
+        .client=${this.client}
+        .organization=${this.organization}
+        @mk-account-created=${this.accountCreated}
+      ></mk-create-account>
     `;
   }
 
@@ -482,6 +491,7 @@ export class MkAdminPermissions extends LitElement {
     return html`
       <div class="actions">
         <button class="primary" type="button" @click=${this.invite}>${t('Invite a person')}</button>
+        <button type="button" @click=${this.createAccount}>${t('Create an account')}</button>
       </div>
       <div class="field">
         <label for="member">${t('Person')}</label>
@@ -507,6 +517,7 @@ export class MkAdminPermissions extends LitElement {
           ? html`<section aria-labelledby="member-title">
               <h2 id="member-title">${this.memberName(member.email)}</h2>
               <p>${this.standing(member.standing)}</p>
+              ${this.renderPasswordLink(member.email)}
               ${
                 member.standing === 'member'
                   ? html`<div class="field">
@@ -559,6 +570,20 @@ export class MkAdminPermissions extends LitElement {
           : nothing
       }
     `;
+  }
+
+  /** For a created account whose person has not chosen a password yet, a new link (MK-048). */
+  private renderPasswordLink(email: string): unknown {
+    const person = this.members.find((candidate) => candidate.username === email);
+    if (!person || !awaitsPassword(person)) {
+      return nothing;
+    }
+    return html`<p class="muted">${t('Has not chosen a password yet.')}</p>
+      <div class="actions">
+        <button type="button" ?disabled=${this.busy} @click=${this.issueLink}>
+          ${t('New link to set the password')}
+        </button>
+      </div>`;
   }
 
   private memberName(email: string): string {
@@ -627,6 +652,37 @@ export class MkAdminPermissions extends LitElement {
 
   private readonly invite = (): void => {
     void this.inviteDialog.openDialog();
+  };
+
+  private readonly createAccount = (): void => {
+    void this.createDialog.openDialog();
+  };
+
+  private readonly accountCreated = async (
+    event: CustomEvent<OrganizationMember>,
+  ): Promise<void> => {
+    const { client, organization } = this;
+    if (!client || !organization) {
+      return;
+    }
+    this.members = await client.organizationMembers(organization).catch(() => this.members);
+    await this.openMember(event.detail.username);
+  };
+
+  /** Issues a new link for the member shown; the previous one stops working. */
+  private readonly issueLink = async (): Promise<void> => {
+    const { client, organization, memberEmail } = this;
+    if (!client || !organization || !memberEmail) {
+      return;
+    }
+    this.busy = true;
+    try {
+      await this.createDialog.showLink(await client.issuePasswordLink(organization, memberEmail));
+    } catch (error) {
+      this.show(t('No new link: {reason}', { reason: String(error) }), true);
+    } finally {
+      this.busy = false;
+    }
   };
 
   private readonly invited = async (event: CustomEvent<string>): Promise<void> => {

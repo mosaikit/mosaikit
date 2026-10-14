@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.core.account;
 
+import dev.mosaikit.kernel.core.audit.AuditEvent;
+import dev.mosaikit.kernel.core.audit.AuditLog;
 import dev.mosaikit.kernel.core.error.ResourceNotFoundException;
 import dev.mosaikit.kernel.core.identity.RequestOrganization;
 import io.quarkus.security.Authenticated;
@@ -26,7 +28,7 @@ import java.util.Map;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
-/** Self-registration and information about the signed-in account. */
+/** Self-registration, setting the password of a created account, and the signed-in account. */
 @Path("/api/v1/accounts")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
@@ -35,10 +37,12 @@ public class AccountResource {
 
     private final AccountService service;
     private final SecurityIdentity identity;
+    private final AuditLog audit;
 
-    public AccountResource(AccountService service, SecurityIdentity identity) {
+    public AccountResource(AccountService service, SecurityIdentity identity, AuditLog audit) {
         this.service = service;
         this.identity = identity;
+        this.audit = audit;
     }
 
     @GET
@@ -89,6 +93,46 @@ public class AccountResource {
     public Response resend(@Valid @NotNull ResendRequest request, @Context UriInfo uri) {
         service.resendConfirmation(request.email(), uri.getBaseUri());
         return Response.accepted().build();
+    }
+
+    @POST
+    @Path("/passwords")
+    @PermitAll
+    @Operation(
+            summary = "Set the password of an account an administrator created, with the token of its link",
+            description = "204, then the person signs in with the password; 404 when the link was used or expired.")
+    public Response setPassword(@Valid @NotNull SetPasswordRequest request) {
+        PasswordLinkService.Used used = service.setPassword(
+                        request.token(), request.password().toCharArray())
+                .orElseThrow(() -> new ResourceNotFoundException("This link does not work any more: it was used or"
+                        + " it expired. Ask the administrator for a new one."));
+        String username = used.account().getUsername();
+        audit.append(
+                username,
+                used.organization(),
+                "account.password-link.used",
+                username,
+                AuditEvent.Outcome.SUCCEEDED,
+                Map.of());
+        return Response.noContent().build();
+    }
+
+    /**
+     * The token of a link that sets a password, and the password.
+     *
+     * @param password password of at least 12 characters, as for registration
+     */
+    public record SetPasswordRequest(
+            @NotBlank @Size(max = 100) String token,
+
+            @NotBlank @Size(min = 12, max = 128, message = "must be between 12 and 128 characters")
+            String password) {
+
+        /** Hides the token and the password from logs and error messages. */
+        @Override
+        public String toString() {
+            return "SetPasswordRequest[]";
+        }
     }
 
     /** The token of a confirmation link. */

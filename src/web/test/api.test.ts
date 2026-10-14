@@ -374,3 +374,61 @@ describe('KernelClient activity (MK-038)', () => {
     });
   });
 });
+
+describe('KernelClient accounts created by administrators (MK-048)', () => {
+  it('creates an account, issues a new link and sets the password with its token', async () => {
+    const link = {
+      member: { accountId: 'a', username: 'luigi@example.org', displayName: 'Luigi', roles: [] },
+      mailed: false,
+      link: 'https://mosaikit.example.org/?set-password=t',
+      expiresAt: '2026-10-21T00:00:00Z',
+    };
+    const fetchMock = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>(
+      (path: string) =>
+        Promise.resolve(
+          path === '/api/v1/accounts/passwords'
+            ? new Response(null, { status: 204 })
+            : json(201, link),
+        ),
+    );
+    const client = new KernelClient(fetchMock, memory());
+    const account = {
+      email: 'luigi@example.org',
+      displayName: 'Luigi',
+      roles: ['organization-user'],
+    };
+
+    expect(await client.createAccount('comune di prova', account)).toEqual(link);
+    await client.issuePasswordLink('comune di prova', 'luigi@example.org');
+    await client.setPassword('t', 'a long enough password');
+
+    const calls = fetchMock.mock.calls.map(([path, init]) => [path, init?.method ?? 'GET']);
+    expect(calls).toEqual([
+      ['/api/v1/organizations/comune%20di%20prova/accounts', 'POST'],
+      [
+        '/api/v1/organizations/comune%20di%20prova/accounts/luigi%40example.org/password-link',
+        'POST',
+      ],
+      ['/api/v1/accounts/passwords', 'POST'],
+    ]);
+    expect(fetchMock.mock.calls[0]?.[1]?.body).toBe(JSON.stringify(account));
+    expect(fetchMock.mock.calls[2]?.[1]?.body).toBe(
+      JSON.stringify({ token: 't', password: 'a long enough password' }),
+    );
+  });
+
+  it('reports a link that was used or expired', async () => {
+    const client = new KernelClient(
+      () =>
+        Promise.resolve(
+          json(404, { title: 'Not Found', detail: 'This link does not work any more.' }),
+        ),
+      memory(),
+    );
+
+    await expect(client.setPassword('used', 'a long enough password')).rejects.toMatchObject({
+      status: 404,
+      message: 'This link does not work any more.',
+    });
+  });
+});

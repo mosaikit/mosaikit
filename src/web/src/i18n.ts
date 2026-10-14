@@ -236,6 +236,32 @@ const ITALIAN: Record<string, string> = {
   'Write the email address of the person.': "Scrivi l'indirizzo email della persona.",
   'Not invited: {reason}': 'Non invitata: {reason}',
   '{email} is in the organization.': "{email} è nell'organizzazione.",
+  // Accounts created by administrators (MK-048)
+  'Choose your password': 'Scegli la tua password',
+  'An administrator created your account. Choose a password, then sign in with your email address and this password.':
+    'Un amministratore ha creato il tuo account. Scegli una password, poi accedi con il tuo indirizzo email e questa password.',
+  'New password': 'Nuova password',
+  'Set the password': 'Imposta la password',
+  'Your password is set. Sign in with your email address and the new password.':
+    'La tua password è impostata. Accedi con il tuo indirizzo email e la nuova password.',
+  'For a person who has no account yet. They choose their password with a link that works once: mailed to them, or shown here for you to pass on when this installation sends no mail.':
+    'Per una persona che non ha ancora un account. Sceglie la password con un link che funziona una volta sola: le arriva per email, oppure, se questa installazione non invia email, lo vedi qui per consegnarglielo.',
+  'Name of the person': 'Nome della persona',
+  'Email address': 'Indirizzo email',
+  'Role in the organization': "Ruolo nell'organizzazione",
+  'Link to set the password': 'Link per impostare la password',
+  'Link for {name}': 'Link per {name}',
+  'Copy the link': 'Copia il link',
+  'Copied.': 'Copiato.',
+  'Select the link and copy it.': 'Seleziona il link e copialo.',
+  'Not created: {reason}': 'Non creato: {reason}',
+  'We mailed {email} a link to choose the password. It works once, until {until}.':
+    'Abbiamo inviato a {email} un link per scegliere la password. Funziona una volta sola, fino al {until}.',
+  'This installation sends no mail: give this link to {email}. It is shown only now, and works once, until {until}.':
+    'Questa installazione non invia email: consegna questo link a {email}. È mostrato solo ora e funziona una volta sola, fino al {until}.',
+  'Has not chosen a password yet.': 'Non ha ancora scelto una password.',
+  'New link to set the password': 'Nuovo link per impostare la password',
+  'No new link: {reason}': 'Nessun nuovo link: {reason}',
   // Credentials of extensions (MK-062)
   Credentials: 'Credenziali',
   'Keys and passwords with which the extensions of your organization call other services. They are encrypted, only the servers of the extensions read them, and nobody sees a value again after saving it.':

@@ -107,6 +107,13 @@ public class UserAccount {
         this.emailConfirmedAt = Objects.requireNonNull(now, "now");
     }
 
+    /**
+     * Gives a password to an account that has none, with the link an administrator issued (MK-048).
+     */
+    public void setPasswordHash(String passwordHash) {
+        this.passwordHash = Objects.requireNonNull(passwordHash, "passwordHash");
+    }
+
     /** Whether the address is confirmed; only confirmed accounts sign in. */
     public boolean isEmailConfirmed() {
         return emailConfirmedAt != null;

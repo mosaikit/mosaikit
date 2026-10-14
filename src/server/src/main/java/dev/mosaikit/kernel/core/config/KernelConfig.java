@@ -283,6 +283,13 @@ public interface KernelConfig {
         Duration confirmationValidFor();
 
         /**
+         * How long the link works with which a person sets the password of an account that an
+         * administrator created (MK-048). The link works once; a new one replaces it.
+         */
+        @WithDefault("7d")
+        Duration setPasswordValidFor();
+
+        /**
          * How long a session of the shell opened with a password lasts without requests (MK-125). At
          * least one minute.
          */
