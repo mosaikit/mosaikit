@@ -588,8 +588,28 @@ through the REST API, raise `quarkus.http.limits.max-body-size` too. An upload i
 the temporary directory of the server, so it needs room for the largest file. Changing the store
 does not move the files already stored: copy the objects to the new store, keeping their keys.
 
-A file of a team goes with the team, and the files of an organization with the organization; their
-content stays in the store, and is not yet removed with them.
+### Removing the content of files whose record is gone
+
+A file of a team goes with the team, and the files of an organization with the organization; the
+files of an extension stay recorded when it is uninstalled. In every case the content stays in the
+store until a platform administrator removes it, explicitly, after a retention:
+
+- Every file whose record is deleted (the file, its team or its organization) is queued for removal
+  at once, by the database.
+- The files of an uninstalled extension are queued only when you ask, for that extension:
+  `POST /api/v1/platform/files/removals/extensions/<extension id>`. It is refused while the extension
+  is installed, and while no extension at all is installed, which says more of a wrong
+  `mosaikit.extensions.directory` than of the extension. Their records stay until the clean-up,
+  which keeps them if the extension has been installed again.
+- `GET /api/v1/platform/files/removals` tells how many contents wait, how many are past the
+  retention, and which extensions that are no longer installed still have files.
+- `POST /api/v1/platform/files/clean-up` removes from the store what was queued at least
+  `mosaikit.files.removal-retention` before (30 days unless set, one day at least), so that a
+  database restored from a backup of that time still finds its files. It refuses to run, and removes
+  nothing, when the store does not hold the newest files the database records, as when
+  `mosaikit.files.*` names another directory or bucket. A content that cannot be removed stays queued
+  for the next clean-up. Each request for an extension (`files.removal.queued`) and each clean-up
+  (`files.cleaned`, with how many contents and bytes, and why) is in the audit log of the platform.
 
 ### Signed links to files
 

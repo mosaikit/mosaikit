@@ -86,6 +86,11 @@ class FileStoresTest {
             }
 
             @Override
+            public Duration removalRetention() {
+                return Duration.ofDays(30);
+            }
+
+            @Override
             public S3 s3() {
                 return s3;
             }
