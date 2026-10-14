@@ -148,7 +148,9 @@ curl -u admin -X PUT localhost:8080/api/v1/organizations/<slug>/identity \
 - The tests need no Docker: `EmbeddedPostgres` (`src/server/src/test/java/dev/mosaikit/testing`)
   starts PostgreSQL 18 from `node_modules` for every `@QuarkusTest`, in a temporary directory on a
   free port. The tests with Keycloak are tagged `keycloak` and run only with
-  `-Dtest.groups.excluded=` (they start Keycloak in Docker).
+  `-Dtest.groups.excluded=` (they start Keycloak in Docker, or use the one given with
+  `-Dit.keycloak.url`). In the CI they run in the job `keycloak` of every lane, pull requests
+  included, against a Keycloak that the job starts.
 - `JavaExtensionInstallationIT` (`src/server`, run by Failsafe in `verify` only with `-DskipITs=false`, as the CI does on `main` and every night)
   installs the package of the fixture Java extension in a real installation and checks MK-011 end to
   end. It starts PostgreSQL the same way, or uses a server given with `-Dmosaikit.it.jdbc-url=…` (plus `-username`,
@@ -179,9 +181,9 @@ running one.
 
 | Lane | When | What |
 |---|---|---|
-| Fast | pull requests, about 4 minutes | frontend checks, unit and Quarkus tests (without the installation tests and Keycloak) and end-to-end tests at the same time, secrets, SAST; a pull request of documentation only (`docs/`, `changelog.d/`, Markdown files at the root) runs the frontend checks and `DocumentationTest`, in about a minute |
+| Fast | pull requests, about 4 minutes | frontend checks, unit and Quarkus tests (without the installation tests), the tests with Keycloak and end-to-end tests at the same time, secrets, SAST; a pull request of documentation only (`docs/`, `changelog.d/`, Markdown files at the root) runs the frontend checks and `DocumentationTest`, in about a minute |
 | Merge queue | each pull request in the merge queue of `main` (`merge_group`), on the commit that merges it with `main` and the pull requests ahead of it | the fast lane, always whole (no documentation-only shortcut), plus the release documents; not `changelog`, which passed on the pull request |
-| Full | `main`, every night at 02:17 UTC, tags, by hand | everything above, plus the installation tests, the tests with Keycloak, SonarQube, SBOM, dependency scan and the release documents; the portable archives on tags or by hand |
+| Full | `main`, every night at 02:17 UTC, tags, by hand | everything above, plus the installation tests, SonarQube, SBOM, dependency scan and the release documents; the portable archives on tags or by hand |
 
 The tests of the backend run in two jobs at the same time, `backend shard 1/2` and
 `backend shard 2/2`: `-Dtest.shard=<n>/2` makes the JUnit Platform filter `TestShards` of the kernel

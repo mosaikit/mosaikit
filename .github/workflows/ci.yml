@@ -197,10 +197,11 @@ jobs:
       - run: npm ci --prefer-offline
       # The UI that the kernel packages (the frontend job checks it at the same time).
       - run: npm run build
-      # Pull requests run the fast lane: the installation tests (MK-011, minutes each) and the tests
-      # with Keycloak (in Docker) run on main, every night and on tags; the merge queue runs the fast
-      # lane too, as main runs the full one right after the merge. A pull request of
-      # documentation only runs the test that the documentation follows the code, in shard 1.
+      # Pull requests run the fast lane: the installation tests (MK-011, minutes each) run on main,
+      # every night and on tags; the merge queue runs the fast lane too, as main runs the full one
+      # right after the merge. The tests with Keycloak run in the job "keycloak", in every lane. A
+      # pull request of documentation only runs the test that the documentation follows the code,
+      # in shard 1.
       - name: Tests
         env:
           SLOW: ${{ github.event_name != 'pull_request' && github.event_name != 'merge_group' }}
@@ -214,7 +215,7 @@ jobs:
               echo "Documentation only: shard 1/2 runs DocumentationTest."
             fi
           elif [[ "$SLOW" == true ]]; then
-            ./mvnw $MAVEN_CLI_OPTS verify -Dskip.npm -DskipITs=false -Dtest.groups.excluded= -Dtest.shard="$SHARD"
+            ./mvnw $MAVEN_CLI_OPTS verify -Dskip.npm -DskipITs=false -Dtest.groups.excluded=keycloak -Dtest.shard="$SHARD"
           else
             ./mvnw $MAVEN_CLI_OPTS verify -Dskip.npm -DskipITs -Dtest.shard="$SHARD"
           fi
@@ -259,6 +260,60 @@ jobs:
         run: |
           echo "Shards of the backend: $RESULT"
           [[ "$RESULT" == success ]]
+
+  # The tests tagged keycloak (federated sign-in MK-012, realms MK-018, memberships MK-017, the
+  # sessions of a realm MK-125), on pull requests too (issue #124): they run against a Keycloak
+  # started here, the same image as KeycloakTestResource.IMAGE, given to them with -Dit.keycloak.url.
+  keycloak:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    env:
+      KEYCLOAK_IMAGE: quay.io/keycloak/keycloak:26.7.4
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      # Started first, so that it boots while Java and the dependencies are set up. A service
+      # container cannot be given the command start-dev, hence docker run.
+      - name: Start Keycloak
+        run: |
+          docker run -d --name keycloak -p 8080:8080             -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin             "$KEYCLOAK_IMAGE" start-dev
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+      # PostgreSQL of the tests comes from node_modules, as in the backend job.
+      - run: npm ci --prefer-offline
+      - run: npm run build
+      - name: Wait for Keycloak
+        run: |
+          for _ in $(seq 1 90); do
+            curl -fsS -o /dev/null http://localhost:8080/realms/master && exit 0
+            sleep 2
+          done
+          docker logs keycloak
+          exit 1
+      - name: Tests with Keycloak
+        run: >-
+          ./mvnw $MAVEN_CLI_OPTS -pl src/server -am test -Dskip.npm
+          -Dgroups=keycloak -Dtest.groups.excluded= -Dit.keycloak.url=http://localhost:8080
+          -Dsurefire.failIfNoSpecifiedTests=false
+      - name: Test report
+        if: always()
+        uses: mikepenz/action-junit-report@3585e9575db828022551b4231f165eb59a0e74e3 # v5.6.2
+        with:
+          report_paths: '**/target/*-reports/TEST-*.xml'
+          check_name: JUnit Test Report (keycloak)
+      - name: Keycloak log
+        if: failure()
+        run: docker logs keycloak
 
   # End-to-end tests (tests/e2e/): an installation built here, at the same time as the backend job runs
   # the unit tests, started by its launcher on a PostgreSQL 18 of its own, driven in Chromium by

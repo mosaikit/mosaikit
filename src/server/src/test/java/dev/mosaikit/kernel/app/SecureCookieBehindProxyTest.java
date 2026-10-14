@@ -21,7 +21,8 @@ import org.junit.jupiter.api.Test;
 /**
  * Behind a reverse proxy that terminates TLS (issue #97), the cookies of the kernel carry {@code
  * Secure} when the trusted proxy forwards {@code X-Forwarded-Proto: https}: the session of the shell
- * (MK-125), "remember me" (MK-047) and the cookies that sign-out deletes. A plain HTTP request
+ * (MK-125), "remember me" (MK-047) and the cookies that sign-out, or ending the current session in
+ * the settings (issue #124), deletes. A plain HTTP request
  * without the header gets them without {@code Secure}, so that an installation reached over HTTP
  * keeps working.
  */
@@ -90,6 +91,40 @@ class SecureCookieBehindProxyTest {
                 secure(setCookie(remembered, REMEMBER)),
                 secure(setCookie(ended, SESSION)),
                 secure(setCookie(ended, REMEMBER)));
+    }
+
+    /**
+     * Signs in and ends the current session from the settings, and tells whether each deleted cookie
+     * carries Secure.
+     */
+    static List<Boolean> cookiesEndedInSettings(boolean forwardedHttps) {
+        Response opened = request(forwardedHttps)
+                .formParam("username", ADMIN)
+                .formParam("password", ADMIN_PASSWORD)
+                .post("/api/v1/accounts/session");
+        opened.then().statusCode(200);
+        String session = opened.getCookie(SESSION);
+        String current = request(forwardedHttps)
+                .cookie(SESSION, session)
+                .get("/api/v1/accounts/me/sessions")
+                .then()
+                .statusCode(200)
+                .extract()
+                .path("find { it.current }.id");
+        Response ended =
+                request(forwardedHttps).cookie(SESSION, session).delete("/api/v1/accounts/me/sessions/{id}", current);
+        ended.then().statusCode(204);
+        return List.of(secure(setCookie(ended, SESSION)), secure(setCookie(ended, REMEMBER)));
+    }
+
+    @Test
+    void endingTheCurrentSessionInTheSettingsDeletesSecureCookiesBehindHttps() {
+        assertThat(cookiesEndedInSettings(true)).containsExactly(true, true);
+    }
+
+    @Test
+    void endingTheCurrentSessionInTheSettingsOverPlainHttpDeletesCookiesWithoutSecure() {
+        assertThat(cookiesEndedInSettings(false)).containsExactly(false, false);
     }
 
     @Test
