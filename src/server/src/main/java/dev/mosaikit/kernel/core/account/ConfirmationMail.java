@@ -6,7 +6,6 @@ import dev.mosaikit.kernel.core.config.KernelConfig;
 import dev.mosaikit.kernel.core.data.KernelWrites;
 import dev.mosaikit.kernel.core.error.ServiceUnavailableException;
 import io.quarkus.mailer.Mail;
-import io.quarkus.mailer.reactive.ReactiveMailer;
 import io.smallrye.mutiny.TimeoutException;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -40,7 +39,7 @@ public class ConfirmationMail {
 
     private final EmailConfirmations confirmations;
     private final UserAccounts accounts;
-    private final ReactiveMailer mailer;
+    private final EventLoopMailer mailer;
     private final Duration validFor;
     private final Duration mailTimeout;
     private final Optional<URI> publicUrl;
@@ -50,7 +49,7 @@ public class ConfirmationMail {
     public ConfirmationMail(
             EmailConfirmations confirmations,
             UserAccounts accounts,
-            ReactiveMailer mailer,
+            EventLoopMailer mailer,
             KernelConfig config,
             Clock clock) {
         this.confirmations = confirmations;
@@ -100,10 +99,9 @@ public class ConfirmationMail {
     /**
      * Sends a mail written by {@link #prepare}, outside of any transaction, waiting for the mail
      * server at most {@code mosaikit.accounts.mail-timeout} in all. The time is split in two
-     * attempts: when the first one times out, the mail is sent once more, on another connection. A
-     * connection can hang right after it opens, when the greeting of the server is lost before the
-     * mail client reads it; the stuck connection is not reused, but the mail client offers no way to
-     * close it, so it stays open until the server drops it.
+     * attempts: when the first one times out, the mail is sent once more, on another connection. The
+     * mail starts on an event loop ({@link EventLoopMailer}), where the greeting of the server is no
+     * longer lost (#94); the second attempt remains for a server that is slow once.
      *
      * @throws ServiceUnavailableException when the mail server refuses the mail or does not take it in
      *     time
