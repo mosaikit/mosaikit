@@ -1176,6 +1176,24 @@ The kernel raises these events (constants of `PlatformEvents`), with their paylo
 | `extension.disabled` | an organization turned an extension off: all its apps | `extension` |
 | `file.stored`, `file.deleted` | a file of any extension was stored or deleted (MK-041) | `extension`, `file`, `name`, `contentType`, `size`, and `team` and `resource` (`<extension>/<type>/<id>`) when it has them |
 | `resource.registered`, `resource.removed` | a resource of any extension was registered or removed (MK-054) | `extension`, `type`, `id`; `title` and `owner` when registered |
+| `sharing.granted` | a resource of any extension was shared with a subject, or a link to it made (MK-055) | `extension`, `type`, `id` of the resource, `grant`, `subject` (`person`, `group`, `organization`, `public`, `link`), `subjectId` (the account or the team) for a person or a group, `level` |
+| `sharing.changed` | the level of a grant changed: the resource was shared again with the same subject | as `sharing.granted`, and `previousLevel` |
+| `sharing.revoked` | a grant or a link was revoked; a link that expires raises nothing | as `sharing.granted` |
+| `team.member.added` | a person was added to a team or to a group of a team, also its first owner when it was created (MK-032); never for a chat | `team`, `account`, `role` (`owner`, `member`, `guest`), `parent` for a group |
+| `team.member.changed` | the role of a person in a team or group changed | as `team.member.added`, and `previousRole` |
+| `team.member.removed` | a person left a team or group or was removed, also when the team was deleted | as `team.member.added`, with the role they had |
+| `permissions.profile.changed` | a permission profile was created, changed or deleted, or stopped being the default of its role (MK-056) | `profile`, `change` (`created`, `changed`, `deleted`), `defaultForRole` (empty for none), `added` and `removed`, the qualified permissions it gained and lost |
+| `permissions.profile.assigned` | a profile was assigned to a member, or taken back for the default of their role | `account`, `profile` (empty for the default) |
+| `permissions.team.changed` | a permission was granted to a team or revoked | `team`, `permission` (`<extension>:<permission>`), `granted` (boolean) |
+| `permissions.exception.changed` | a personal exception was granted or revoked | `account`, `permission`, `granted` (boolean) |
+
+The events of sharing, teams and permissions let an extension that translates grants, teams and
+permissions into the rules of another server, such as a map server, follow every change without
+polling: on an event, recompute what changed, such as the people of a team or who holds a
+permission. They say what changed, not who holds what now. Some changes reach people without an event of their own: a link that expires, a person added to or
+removed from the organization, a change of their roles in it, and the apps of an extension turned
+off or on (which raise `extension.disabled` and `extension.enabled`); deleting a team raises
+`team.member.removed` for its people, and its grants go with it.
 
 An extension raises its own events with `PlatformEvents`, naming itself as with
 `Notifications.send`; the type becomes `<extension>:<name>`, such as `dev.example.notes:note.created`,
