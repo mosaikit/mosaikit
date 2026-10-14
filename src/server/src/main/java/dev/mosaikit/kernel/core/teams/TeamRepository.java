@@ -24,6 +24,10 @@ public interface TeamRepository {
             order by lower(t.name)""")
     List<Team> ofOrganization(UUID organizationId);
 
+    /** The teams of an organization and the groups of teams, never chats, by name. */
+    @Query("from Team t where t.organizationId = :organizationId and t.kind = 'team' order by lower(t.name)")
+    List<Team> teamsAndGroupsOf(UUID organizationId);
+
     @Query("""
             select t from Team t, TeamMember m
             where m.teamId = t.id and m.accountId = :accountId and t.organizationId = :organizationId

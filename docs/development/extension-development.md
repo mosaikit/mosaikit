@@ -447,6 +447,36 @@ the members of the team and by whoever it is shared with, as MK-032 decided. The
 A Java backend reads the teams of the person and their people through `Teams` of `kernel-api`
 (`dev.mosaikit.kernel.api.teams`). Guests of an organization cannot call the APIs of backends.
 
+### People and teams of the organization
+
+`Teams` answers what the person of the request sees. An extension that names people and teams
+outside the kernel, such as in the rules of a map server, needs them for the whole organization,
+also in a subscriber of events where there is no person: it reads them through `People`
+(`dev.mosaikit.kernel.api.teams`), read-only, without a database login of its own (the published
+views of [MK-123](published-views.md) are for services outside the kernel).
+
+```java
+@Inject People people;   // dev.mosaikit.kernel.api.teams
+
+Optional<People.Person> ada = people.findByUsername("ada@example.org"); // username, standing, active
+for (People.OrganizationTeam team : people.teams()) {                   // teams and groups, never chats
+    List<String> users = people.members(team.id()).stream().map(Teams.Member::email).toList();
+    rules.put(team.id().toString(), users);
+}
+List<People.OrganizationTeam> hers = people.teamsOf(ada.orElseThrow().account());
+```
+
+- **One organization.** Every method acts on the organization of the request, or of the event being
+  handled. A person who is neither a member nor a guest of it is not found; a team of another
+  organization, or a chat, has no people. `Person.username()` is the e-mail address the person signs
+  in with, in lower case (`email()` returns the same); `standing()` is `administrator`, `member` or
+  `guest`; `active()` is `false` while the account is suspended.
+- **Teams, not chats.** `teams()` lists the teams and the groups of teams (`parent()` is the team of
+  a group), private ones too: an extension that shows them to a person uses `Teams.visible()`.
+- **Guests read their teams only.** When the person of the request is a guest of the organization,
+  `People` answers with the teams and groups where they are, the people of those teams and the guest
+  themselves. A request opened through a shared link gets nobody.
+
 ## Data of organizations
 
 Every request of a person to an extension API acts on one organization of the signed-in person (MK-017,
