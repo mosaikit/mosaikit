@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { LiveClient, type Socket } from '../src/live.js';
+import { LiveClient, SESSION_ENDED, type Socket } from '../src/live.js';
 
 class FakeSocket implements Socket {
   readyState = 0;
@@ -30,9 +30,9 @@ class FakeSocket implements Socket {
     this.onmessage?.({ data: JSON.stringify(message) } as MessageEvent);
   }
 
-  drops(): void {
+  drops(code = 1006): void {
     this.readyState = 3;
-    this.onclose?.({} as CloseEvent);
+    this.onclose?.({ code } as CloseEvent);
   }
 }
 
@@ -114,6 +114,21 @@ describe('LiveClient (MK-031)', () => {
     expect(sockets[1]?.closed).toBe(true);
     sockets[1]?.drops();
     vi.advanceTimersByTime(60_000);
+    expect(sockets).toHaveLength(2);
+  });
+
+  it('does not connect again when the kernel closes it because the session ended (MK-125)', () => {
+    const { live, sockets, warnings } = client();
+    live.subscribe('notifications', () => undefined);
+    live.connect('acme');
+    sockets[0]?.opens();
+    sockets[0]?.drops(SESSION_ENDED);
+    vi.advanceTimersByTime(60_000);
+    expect(sockets).toHaveLength(1);
+    expect(warnings).toEqual(['The live channel closed: the session ended.']);
+
+    // A new sign-in connects again.
+    live.connect('acme');
     expect(sockets).toHaveLength(2);
   });
 
