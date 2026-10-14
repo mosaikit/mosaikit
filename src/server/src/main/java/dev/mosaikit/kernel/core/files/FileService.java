@@ -8,6 +8,7 @@ import dev.mosaikit.kernel.api.resource.ResourceRef;
 import dev.mosaikit.kernel.core.audit.AuditEvent;
 import dev.mosaikit.kernel.core.audit.AuditLog;
 import dev.mosaikit.kernel.core.config.KernelConfig;
+import dev.mosaikit.kernel.core.error.ConflictException;
 import dev.mosaikit.kernel.core.error.ContentTooLargeException;
 import dev.mosaikit.kernel.core.error.DomainException;
 import dev.mosaikit.kernel.core.error.ForbiddenOperationException;
@@ -205,6 +206,7 @@ public class FileService {
         if (declaredSize.isPresent() && declaredSize.getAsLong() > maxSize) {
             throw tooLarge();
         }
+        notDoomed();
         UUID resource = transaction(() -> permitted(extension, upload));
         UUID org = organization.require();
         if (declaredSize.isPresent()) {
@@ -312,11 +314,15 @@ public class FileService {
             }
             files.delete(file);
             String key = file.getStorageKey();
-            transactions.registerInterposedSynchronization(new AfterCompletion(status -> {
-                if (status == Status.STATUS_COMMITTED) {
-                    deleteQuietly(key);
-                }
-            }));
+            // In a transaction already marked for rollback the row stays, and so does the content: the
+            // transaction manager refuses a synchronization there (#93), and none is needed.
+            if (transactions.getTransactionStatus() == Status.STATUS_ACTIVE) {
+                transactions.registerInterposedSynchronization(new AfterCompletion(status -> {
+                    if (status == Status.STATUS_COMMITTED) {
+                        deleteQuietly(key);
+                    }
+                }));
+            }
             audited("file.deleted", file);
             raise(PlatformEvents.FILE_DELETED, file);
             return null;
@@ -638,7 +644,23 @@ public class FileService {
         }
     }
 
+    /**
+     * Refuses to store a file in a transaction of the caller that can no longer commit: marked for
+     * rollback after an earlier failure of the caller, or ended by its timeout. Nothing recorded now
+     * would be kept, and the transaction manager refuses the synchronization that removes the content
+     * if the record does not commit (#93). A conflict, which leaves the transaction of the caller as
+     * it was.
+     */
+    private void notDoomed() {
+        int status = transactions.getTransactionStatus();
+        if (status != Status.STATUS_ACTIVE && status != Status.STATUS_NO_TRANSACTION) {
+            throw new ConflictException("The transaction of the caller can no longer commit (an earlier step"
+                    + " failed, or it timed out): the file is not stored.");
+        }
+    }
+
     private void deleteUnlessCommitted(String key) {
+        notDoomed();
         transactions.registerInterposedSynchronization(new AfterCompletion(status -> {
             if (status != Status.STATUS_COMMITTED) {
                 deleteQuietly(key);
