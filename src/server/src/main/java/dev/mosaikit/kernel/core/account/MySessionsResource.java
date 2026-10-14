@@ -8,11 +8,13 @@ import dev.mosaikit.kernel.core.error.ResourceNotFoundException;
 import dev.mosaikit.kernel.core.identity.RequestOrganization;
 import io.quarkus.security.Authenticated;
 import io.quarkus.security.identity.SecurityIdentity;
+import io.vertx.core.http.HttpServerRequest;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.List;
@@ -31,11 +33,14 @@ public class MySessionsResource {
     private final SessionRegistry sessions;
     private final SecurityIdentity identity;
     private final AuditLog audit;
+    private final SecureCookies secureCookies;
 
-    public MySessionsResource(SessionRegistry sessions, SecurityIdentity identity, AuditLog audit) {
+    public MySessionsResource(
+            SessionRegistry sessions, SecurityIdentity identity, AuditLog audit, SecureCookies secureCookies) {
         this.sessions = sessions;
         this.identity = identity;
         this.audit = audit;
+        this.secureCookies = secureCookies;
     }
 
     @GET
@@ -55,7 +60,7 @@ public class MySessionsResource {
             summary = "End a session of the signed-in person",
             description = "Its cookie, its \"remember me\" token and the tokens of its realm session open"
                     + " nothing any more. Ending the current session signs this browser out.")
-    public Response end(@PathParam("id") UUID id) {
+    public Response end(@PathParam("id") UUID id, @Context HttpServerRequest request) {
         if (!sessions.endOwn(account(), id)) {
             throw new ResourceNotFoundException("You have no live session with this identifier.");
         }
@@ -69,7 +74,11 @@ public class MySessionsResource {
                 Map.of("current", current));
         Response.ResponseBuilder ended = Response.noContent();
         if (current) {
-            ended.cookie(SessionResource.expired(SessionResource.COOKIE), SessionResource.expired(RememberMe.COOKIE));
+            // With Secure like the cookies it replaces, as signing out does (issue #109).
+            boolean secure = secureCookies.secure(request);
+            ended.cookie(
+                    SessionResource.expired(SessionResource.COOKIE, secure),
+                    SessionResource.expired(RememberMe.COOKIE, secure));
         }
         return ended.build();
     }

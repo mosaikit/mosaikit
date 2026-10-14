@@ -162,10 +162,6 @@ public class SessionResource {
                 .build();
     }
 
-    static NewCookie expired(String name) {
-        return expired(name, false);
-    }
-
     /** A cookie that the browser deletes, with {@code Secure} like the cookie it replaces. */
     static NewCookie expired(String name, boolean secure) {
         return new NewCookie.Builder(name)
