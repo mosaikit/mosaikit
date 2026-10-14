@@ -39,6 +39,7 @@ class KernelTableRightsTest {
             "account_session",
             "remember_token",
             "email_confirmation",
+            "password_link",
             "access_key",
             "service_identity",
             "service_key",

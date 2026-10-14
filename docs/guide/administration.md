@@ -211,13 +211,72 @@ with a link: until they open it the account does not sign in. The link works onc
   recorded in the audit log, and with it off the sign-in page offers no registration.
 - The mails need a mail server: set `quarkus.mailer.host`, `port`, `username`, `password` and
   `quarkus.mailer.from` in `config/application.properties`, and `mosaikit.public-url` so that the
-  links point to the address people use.
+  links point to the address people use (see [Sending mail](#sending-mail)). Without a mail server,
+  administrators create the accounts instead ([Accounts created by an
+  administrator](#accounts-created-by-an-administrator)).
 - The kernel gives the mail server `mosaikit.accounts.mail-timeout` (15 seconds) in all, in two
   attempts of half each: when the first one times out, it sends the mail once more on another
   connection (a person may then receive the same link twice; either works). When the mail server
   does not take the mail in time, or refuses it, the person sees that the mail could not be sent; the account is created all the
   same, and they ask for the link again from the sign-in page once the mail server works. The
   kernel never keeps a database transaction open while it talks to the mail server.
+
+## Accounts created by an administrator
+
+An administrator can create a local account for a person, who then chooses the password: this works
+with or without a mail server (MK-048). The administrators of an organization, signed in to it,
+create accounts in their organization; platform administrators in any organization that signs in
+with a password.
+
+In **Permissions**, tab **People**, **Create an account** asks for the name of the person, the email
+address and the role in the organization (member or administrator). The account cannot sign in
+until the person chooses a password with a link that works once, for
+`mosaikit.accounts.set-password-valid-for` (7 days):
+
+- When the installation sends mail (a mail server is set, see below), the link goes to the person
+  by mail and is never shown to the administrator.
+- When it sends no mail, the link is shown this once, with **Copy the link**: give it to the person
+  through a channel you trust. The kernel keeps only a digest of it, so nobody can show it again.
+
+The person opens the link, chooses a password (at least 12 characters, as for registration) and
+signs in with the email address and that password. A used or expired link does not work; for a
+person who has not chosen a password yet, **New link to set the password** in their page issues
+another one, and the previous one stops working. An administrator of the organization issues it
+only for people who belong to no other organization; a platform administrator for anyone. Creating
+the account, issuing a link and using it are recorded in the audit log of the organization
+(`organization.account.created`, `account.password-link.issued`, `account.password-link.used`),
+never with the link.
+
+The same through the API (`link` is `null` when the link was mailed, and `mailed` says so):
+
+```bash
+curl -u admin -X POST https://mosaikit.example.org/api/v1/organizations/acme/accounts   -H 'Content-Type: application/json'   -d '{"email": "ada@acme.com", "displayName": "Ada Lovelace", "roles": ["organization-user"]}'
+# {"member": {...}, "mailed": false, "link": "https://mosaikit.example.org/?set-password=...", "expiresAt": "..."}
+curl -u admin -X POST https://mosaikit.example.org/api/v1/organizations/acme/accounts/ada@acme.com/password-link
+```
+
+### Sending mail
+
+The kernel sends mail (registration links and the links of created accounts) when
+`quarkus.mailer.host` names a mail server, in `config/application.properties` or as the environment
+variable `QUARKUS_MAILER_HOST`. Without it, the installation sends no mail: created accounts get a
+link to copy, and self-registration needs `mosaikit.accounts.confirm-email=false` (or stays off).
+A mail server on the same machine is named too, `quarkus.mailer.host=localhost`.
+
+```properties
+quarkus.mailer.host=smtp.example.org
+quarkus.mailer.port=587
+quarkus.mailer.start-tls=REQUIRED
+quarkus.mailer.username=mosaikit@example.org
+quarkus.mailer.password=change-me
+quarkus.mailer.from=Mosaikit <mosaikit@example.org>
+mosaikit.public-url=https://mosaikit.example.org
+```
+
+`mosaikit.public-url` makes the links point to the address people use. Each distribution sets them
+its own way: see the README of the [installation](../../distribution/install/README.md), of
+[Docker Compose](../../distribution/docker/README.md), of [Helm](../../distribution/k8s/README.md)
+and of the [portable](../../distribution/portable/README.md) installation.
 
 ## Apps of an organization
 
@@ -279,7 +338,9 @@ be able to do**, with the source of each permission, before anything is sent. Fo
 already a member, **Apply** gives them that profile and those teams (their role stays). A person
 who is not a member yet is added by a platform administrator, whose **Invite** adds them with role,
 profile and teams; the administrators of the organization see the preview only, until invitations
-by link, accepted by the person, come with MK-068.
+by link, accepted by the person, come with MK-068. For a person who has no account at all, **Create
+an account** creates a local one in the organization ([Accounts created by an
+administrator](#accounts-created-by-an-administrator)).
 
 The same through the API, signed in to the organization: `/api/v1/organizations/{slug}/permissions`
 (the declared permissions, `profiles`, `members/{email}`, its `profile` and

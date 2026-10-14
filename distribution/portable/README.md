@@ -32,6 +32,24 @@ Behind a reverse proxy on this computer that serves Mosaikit over HTTPS, enable 
 commented in `config/application.properties`, or the session cookie lacks `Secure`; see
 [installation](../../docs/guide/installation.md#behind-a-reverse-proxy).
 
+## Mail
+
+The portable installation sends no mail until a mail server is set: an administrator creates the
+accounts of people, and the console shows once the link with which each person chooses the password.
+To send the links by mail, add the mail server to `config/application.properties`:
+
+```properties
+quarkus.mailer.host=smtp.example.org
+quarkus.mailer.port=587
+quarkus.mailer.start-tls=REQUIRED
+quarkus.mailer.username=mosaikit@example.org
+quarkus.mailer.password=change-me
+quarkus.mailer.from=Mosaikit <mosaikit@example.org>
+```
+
+Self-registration without a mail server needs `mosaikit.accounts.confirm-email=false`, or stays off.
+See [Sending mail](../../docs/guide/administration.md#sending-mail).
+
 ## Contents
 
 | Path | Content |

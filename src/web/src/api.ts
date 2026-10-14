@@ -353,6 +353,29 @@ export interface OrganizationMember {
   readonly username: string;
   readonly displayName: string;
   readonly roles: readonly string[];
+  /** Whether the person signed in through the realm of the organization. */
+  readonly linked?: boolean;
+  /** Whether the account has a local password; false until the person sets it (MK-048). */
+  readonly password?: boolean;
+}
+
+/** A local account that an administrator creates for a person (MK-048). */
+export interface NewAccount {
+  readonly email: string;
+  readonly displayName: string;
+  readonly roles: readonly string[];
+}
+
+/**
+ * The link with which a person sets the password of an account an administrator created (MK-048):
+ * mailed to the person, or, when the installation sends no mail, returned this once.
+ */
+export interface PasswordLink {
+  readonly member: OrganizationMember;
+  readonly mailed: boolean;
+  /** The link to pass on, when it was not mailed; the kernel never shows it again. */
+  readonly link: string | null;
+  readonly expiresAt: string;
 }
 
 /** A person invited by the administrators of the organization, with a role, a profile and teams. */
@@ -835,6 +858,31 @@ export class KernelClient {
       'PUT',
       invitation,
     );
+  }
+
+  /**
+   * Creates a local account in the organization for a person (MK-048), who sets the password with
+   * the link of the answer.
+   */
+  createAccount(slug: string, account: NewAccount): Promise<PasswordLink> {
+    return this.sendJson<PasswordLink>(
+      `/api/v1/organizations/${encodeURIComponent(slug)}/accounts`,
+      'POST',
+      account,
+    );
+  }
+
+  /** Issues a new link to set the password of a member who has none yet; the previous one stops working. */
+  issuePasswordLink(slug: string, email: string): Promise<PasswordLink> {
+    return this.sendJson<PasswordLink>(
+      `/api/v1/organizations/${encodeURIComponent(slug)}/accounts/${encodeURIComponent(email)}/password-link`,
+      'POST',
+    );
+  }
+
+  /** Sets the password of an account with the token of the link an administrator issued (MK-048). */
+  async setPassword(token: string, password: string): Promise<void> {
+    await this.send('/api/v1/accounts/passwords', { token, password });
   }
 
   /** The teams that the signed-in person sees: all the teams, for an administrator (MK-032). */

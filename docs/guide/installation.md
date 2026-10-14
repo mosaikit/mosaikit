@@ -42,6 +42,10 @@ bin/                     kernel (with UI and launcher), java/ and pgsql/ (portab
    only when the database is empty.
 4. Create the organizations ([administration](administration.md)) and install the extensions
    ([extensions](extensions.md)).
+5. To send mail (the links of registrations and of the accounts administrators create), set the
+   mail server, `quarkus.mailer.*`, as the README of each distribution shows
+   ([sending mail](administration.md#sending-mail)). Without it, administrators create the
+   accounts of people and pass on the link to set the password, which the console shows once.
 
 ## Behind a reverse proxy
 

@@ -119,6 +119,26 @@ The proxy sets `X-Forwarded-Proto` and `X-Forwarded-For` and keeps the `Host` of
 `MOSAIKIT_ACCOUNTS_SECURE_COOKIES=true` in `mosaikit.env` the cookies are `Secure` whatever the proxy
 forwards. Then `docker compose up -d mosaikit`.
 
+## Mail
+
+The kernel sends the links of registrations and of the accounts that administrators create through a
+mail server, set in `mosaikit.env` (keep the password there or in a secret file, as above):
+
+```ini
+QUARKUS_MAILER_HOST=smtp.example.org
+QUARKUS_MAILER_PORT=587
+QUARKUS_MAILER_START_TLS=REQUIRED
+QUARKUS_MAILER_USERNAME=mosaikit@example.org
+QUARKUS_MAILER_PASSWORD=change-me
+QUARKUS_MAILER_FROM=Mosaikit <mosaikit@example.org>
+MOSAIKIT_PUBLIC_URL=https://mosaikit.example.org
+```
+
+Without `quarkus.mailer.host` the installation sends no mail: an administrator creates the accounts
+of people and passes on the link to set the password, which the console shows once; self-registration
+then needs `mosaikit.accounts.confirm-email=false`, or stays off. See
+[Sending mail](../../docs/guide/administration.md#sending-mail).
+
 ## Production
 
 This setup is for development, demonstrations and small installations on one machine. For

@@ -596,7 +596,9 @@ export class MkShell extends LitElement {
   private saving: Promise<void> = Promise.resolve();
   @state() private shellLanguage = browserLanguage();
   /** The page of the sign-in: signing in, creating an account, or waiting for the confirmation. */
-  @state() private signInMode: 'sign-in' | 'register' | 'sent' = 'sign-in';
+  @state() private signInMode: 'sign-in' | 'register' | 'sent' | 'set-password' = 'sign-in';
+  /** The token of the link that sets the password of an account an administrator created (MK-048). */
+  private passwordToken: string | undefined;
   @state() private registration: RegistrationOptions | undefined;
   @state() private sentTo: string | undefined;
   @state() private notice: string | undefined;
@@ -646,10 +648,51 @@ export class MkShell extends LitElement {
       },
       () => undefined,
     );
+    this.passwordFromLink();
     void this.confirmFromLink()
       .then(() => this.completeFederatedSignIn())
       .then(() => this.resumeSession());
   }
+
+  /**
+   * Asks for the password when the page is the link an administrator issued for a created account
+   * (MK-048). The token leaves the address bar at once, so that it is not kept in the history.
+   */
+  private passwordFromLink(): void {
+    const url = new URL(location.href);
+    const token = url.searchParams.get('set-password');
+    if (!token) {
+      return;
+    }
+    url.searchParams.delete('set-password');
+    history.replaceState(null, '', url.pathname + url.search);
+    this.passwordToken = token;
+    this.signInMode = 'set-password';
+  }
+
+  /** Sets the password with the token of the link; then the person signs in with it. */
+  private readonly setPassword = async (
+    event: CustomEvent<{ password: string }>,
+  ): Promise<void> => {
+    if (!this.passwordToken) {
+      return;
+    }
+    this.busy = true;
+    this.error = undefined;
+    try {
+      await this.client.setPassword(this.passwordToken, event.detail.password);
+      this.passwordToken = undefined;
+      this.signInMode = 'sign-in';
+      this.email = '';
+      this.notice = t(
+        'Your password is set. Sign in with your email address and the new password.',
+      );
+    } catch (error) {
+      this.error = error instanceof KernelError ? error.message : 'The password could not be set.';
+    } finally {
+      this.busy = false;
+    }
+  };
 
   /** Confirms the address when the page is the link of a confirmation mail (MK-048). */
   private async confirmFromLink(): Promise<void> {
@@ -672,7 +715,8 @@ export class MkShell extends LitElement {
 
   /** After a reload, enters again with the session of a local account, when there is one. */
   private async resumeSession(): Promise<void> {
-    if (this.account || this.session) {
+    // A link that sets a password is for the person it was issued to, not for a session of the browser.
+    if (this.account || this.session || this.passwordToken) {
       return;
     }
     try {
@@ -1152,6 +1196,7 @@ export class MkShell extends LitElement {
       @mk-show-register=${this.showRegister}
       @mk-register=${this.register}
       @mk-resend=${this.resend}
+      @mk-set-password=${this.setPassword}
     ></mk-sign-in>`;
   }
 
@@ -1395,6 +1440,7 @@ export class MkShell extends LitElement {
     this.error = undefined;
     this.notice = undefined;
     this.email = undefined;
+    this.passwordToken = undefined;
     this.signInMode = 'sign-in';
   };
 

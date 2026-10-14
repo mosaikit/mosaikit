@@ -61,6 +61,7 @@ public class AccountService {
     private final SessionRegistry sessions;
     private final AccessKeyRegistry keys;
     private final AccessKeyAudit keyAudit;
+    private final PasswordLinkService passwordLinks;
     private final boolean confirmEmail;
     private final Clock clock;
 
@@ -75,6 +76,7 @@ public class AccountService {
             SessionRegistry sessions,
             AccessKeyRegistry keys,
             AccessKeyAudit keyAudit,
+            PasswordLinkService passwordLinks,
             KernelConfig config,
             Clock clock) {
         this.accounts = accounts;
@@ -87,6 +89,7 @@ public class AccountService {
         this.sessions = sessions;
         this.keys = keys;
         this.keyAudit = keyAudit;
+        this.passwordLinks = passwordLinks;
         this.confirmEmail = config.accounts().confirmEmail();
         this.clock = clock;
     }
@@ -277,6 +280,96 @@ public class AccountService {
             members.insert(member);
         }
         return MemberView.of(account, member);
+    }
+
+    /**
+     * A link that sets the password of an account an administrator created (MK-048), with the
+     * member it is for and, when the installation sends mail, the mail that carries it, to send once
+     * the transaction has committed.
+     */
+    public record PasswordLinkIssue(MemberView member, PasswordLinkService.Issued issued, Optional<Mail> mail) {}
+
+    /**
+     * Creates a local account in an organization for a person who has none (MK-048): without a
+     * password, so that it signs in only after the person sets one with the link returned.
+     *
+     * @param mail whether the installation sends mail: then the link goes in a mail to the person
+     * @param base the address of the installation, for the link
+     */
+    public PasswordLinkIssue createLocalAccount(String slug, NewAccountRequest request, boolean mail, URI base) {
+        Organization organization = organizations.require(slug);
+        requirePassword(organization);
+        Set<String> roles = request.roles() == null || request.roles().isEmpty()
+                ? Set.of(Roles.ORGANIZATION_USER)
+                : Set.copyOf(request.roles());
+        if (!ORGANIZATION_ROLES.containsAll(roles)) {
+            throw new InvalidInputException(
+                    List.of("roles must be among " + new TreeSet<>(ORGANIZATION_ROLES) + ", not " + roles));
+        }
+        String username = normalize(request.email());
+        if (accounts.countByUsername(username) > 0) {
+            throw new ConflictException(
+                    "An account with this email already exists: add the person to the" + " organization instead.");
+        }
+        Instant now = Instant.now(clock);
+        UserAccount account =
+                UserAccount.withoutPassword(username, request.displayName().trim(), now);
+        accounts.insert(account);
+        OrganizationMember member = new OrganizationMember(account.getId(), organization.getId(), roles, now);
+        members.insert(member);
+        return issue(account, member, organization, mail, base);
+    }
+
+    /**
+     * Issues a new link for an account an administrator created, which has no password yet; the
+     * previous link stops working.
+     *
+     * @param platformAdmin whether a platform administrator asks: an administrator of the organization
+     *     issues links only for people who belong to no other organization
+     */
+    public PasswordLinkIssue reissuePasswordLink(
+            String slug, String email, boolean platformAdmin, boolean mail, URI base) {
+        Organization organization = organizations.require(slug);
+        requirePassword(organization);
+        UserAccount account = accounts.findByUsername(normalize(email)).orElseThrow(() -> noMember(slug, email));
+        OrganizationMember member = members.findByAccountIdAndOrganizationId(account.getId(), organization.getId())
+                .orElseThrow(() -> noMember(slug, email));
+        if (account.getPasswordHash().isPresent()) {
+            throw new ConflictException("This person has set a password already.");
+        }
+        if (member.getIdentitySubject().isPresent()) {
+            throw new ConflictException("This person signs in through the identity provider of the organization.");
+        }
+        boolean elsewhere = members.findByAccountId(account.getId()).stream()
+                .anyMatch(other -> !other.getOrganizationId().equals(organization.getId()));
+        if (elsewhere && !platformAdmin) {
+            throw new ForbiddenOperationException(
+                    "This person belongs to other organizations too: a platform" + " administrator issues the link.");
+        }
+        return issue(account, member, organization, mail, base);
+    }
+
+    private PasswordLinkIssue issue(
+            UserAccount account, OrganizationMember member, Organization organization, boolean mail, URI base) {
+        PasswordLinkService.Issued issued = passwordLinks.issue(account, organization.getId(), base);
+        Optional<Mail> message =
+                mail ? Optional.of(passwordLinks.mail(account, organization.getName(), issued)) : Optional.empty();
+        return new PasswordLinkIssue(MemberView.of(account, member), issued, message);
+    }
+
+    private static void requirePassword(Organization organization) {
+        if (!organization.getSignIn().allowsPassword()) {
+            throw new ForbiddenOperationException("Organization '" + organization.getSlug()
+                    + "' signs in through its identity provider: its people have no password here.");
+        }
+    }
+
+    /**
+     * Sets the password of the account of a link (MK-048); empty when the link is unknown, used or
+     * expired.
+     */
+    public Optional<PasswordLinkService.Used> setPassword(String token, char[] password) {
+        return passwordLinks.use(token, password);
     }
 
     /**

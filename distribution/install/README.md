@@ -46,6 +46,26 @@ Behind a reverse proxy that terminates TLS, enable the forwarded headers from th
 proxy (commented in `config/application.properties`), or the session cookie lacks `Secure`; see
 [installation](../../docs/guide/installation.md#behind-a-reverse-proxy).
 
+## Mail
+
+The kernel sends the links of registrations and of the accounts that administrators create through a
+mail server, in `config/application.properties` (or the variables `QUARKUS_MAILER_HOST` and so on):
+
+```properties
+quarkus.mailer.host=smtp.example.org
+quarkus.mailer.port=587
+quarkus.mailer.start-tls=REQUIRED
+quarkus.mailer.username=mosaikit@example.org
+quarkus.mailer.password=change-me
+quarkus.mailer.from=Mosaikit <mosaikit@example.org>
+mosaikit.public-url=https://mosaikit.example.org
+```
+
+Without `quarkus.mailer.host` the installation sends no mail: an administrator creates the accounts
+of people and passes on the link to set the password, which the console shows once; self-registration
+then needs `mosaikit.accounts.confirm-email=false`, or stays off. See
+[Sending mail](../../docs/guide/administration.md#sending-mail).
+
 ## Contents
 
 | Path | Content |
