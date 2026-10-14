@@ -42,6 +42,22 @@ public interface RegisteredResources {
             order by r.title, r.refId""")
     List<RegisteredResource> listOwnedBy(UUID organizationId, String extensionId, String resourceType, UUID ownerId);
 
+    /**
+     * How many resources of an extension a person owns or reaches through a grant to them or to a team
+     * of theirs (MK-032, MK-055): what the organization gave a guest of that extension. Grants to the
+     * organization, links and the public are not counted.
+     */
+    @Query("""
+            select count(r) from RegisteredResource r
+            where r.organizationId = :organizationId and r.extensionId = :extensionId
+              and (r.ownerId = :accountId or exists (
+                select g.id from ResourceGrant g
+                where g.resourceId = r.id and g.organizationId = :organizationId
+                  and ((g.subjectKind = 'person' and g.accountId = :accountId)
+                    or (g.subjectKind = 'group' and g.teamId in
+                        (select m.teamId from TeamMember m where m.accountId = :accountId)))))""")
+    long reachableBy(UUID organizationId, String extensionId, UUID accountId);
+
     @Query("from RegisteredResource r where r.organizationId = :organizationId and r.id in :ids")
     List<RegisteredResource> findByIds(UUID organizationId, List<UUID> ids);
 

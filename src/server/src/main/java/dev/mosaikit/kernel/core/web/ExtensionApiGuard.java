@@ -97,7 +97,7 @@ public class ExtensionApiGuard {
     }
 
     /** The API name of a path under {@link #PREFIX}, if it has one. */
-    static Optional<String> apiName(String path) {
+    public static Optional<String> apiName(String path) {
         if (path == null || !path.startsWith(PREFIX)) {
             return Optional.empty();
         }
