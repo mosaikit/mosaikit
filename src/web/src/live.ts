@@ -16,12 +16,15 @@ type Handler = (data: unknown) => void;
 
 const OPEN = 1;
 const MAX_DELAY_MS = 15_000;
+/** The close code of the kernel when the session of the page ended (MK-125). */
+export const SESSION_ENDED = 4401;
 
 /**
  * The real-time channel of the page (MK-031): one WebSocket to /api/v1/live for the organization of
  * the person, shared by the shell and every extension. It subscribes to a topic once whatever the
  * number of handlers, and after a lost connection it connects again, waiting longer each time, and
- * subscribes again to every topic.
+ * subscribes again to every topic. When the kernel closes it because the session ended (MK-125), it
+ * does not connect again: that session opens nothing any more.
  */
 export class LiveClient implements LiveChannel {
   private readonly handlers = new Map<string, Set<Handler>>();
@@ -88,11 +91,16 @@ export class LiveClient implements LiveChannel {
     socket.onmessage = (event) => {
       this.receive(event.data);
     };
-    socket.onclose = () => {
+    socket.onclose = (event) => {
       if (this.socket !== socket || !this.url) {
         return;
       }
       this.socket = undefined;
+      if (event.code === SESSION_ENDED) {
+        this.url = undefined;
+        this.report('The live channel closed: the session ended.');
+        return;
+      }
       this.timer = setTimeout(() => {
         this.start();
       }, this.delay);

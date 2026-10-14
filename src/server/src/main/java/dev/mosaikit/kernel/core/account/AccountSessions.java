@@ -21,6 +21,9 @@ public interface AccountSessions {
     @Find
     Optional<AccountSession> findById(UUID id);
 
+    @Query("select s from AccountSession s where s.id in :ids")
+    List<AccountSession> findByIds(List<UUID> ids);
+
     @Insert
     void insert(AccountSession accountSession);
 

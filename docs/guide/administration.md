@@ -178,6 +178,14 @@ sessions in their settings. With Keycloak, the kernel ends its own side of the r
 tokens of that session are refused); to end the session in Keycloak too, use its administration
 console.
 
+The real-time connection of a page (MK-031) lives as long as the session it was opened with. When the
+session ends, in any of the ways above (signing out, ending it in the settings, a suspension or the
+removal from the organization), the kernel sends that page no more events and closes its connection
+with the code `4401` ("The session ended"); the shell does not connect again with it. The kernel
+that ended the session closes it at once, the other kernels of the installation within 5 seconds. A
+suspension also closes the connections the person opened without a session, such as with an access
+key.
+
 ## How members sign in
 
 Each organization has a sign-in policy, `signIn`:

@@ -38,6 +38,10 @@ public class SessionStore {
         return sessions.findById(id);
     }
 
+    List<AccountSession> byIds(List<UUID> ids) {
+        return sessions.findByIds(ids);
+    }
+
     /** In a transaction of its own, so that losing a race on the digest fails only the insert. */
     @Transactional(Transactional.TxType.REQUIRES_NEW)
     void insert(AccountSession session) {

@@ -11,14 +11,19 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 import org.jboss.logging.Logger;
 
 /**
@@ -96,6 +101,30 @@ public class SessionRegistry {
         }
     }
 
+    /**
+     * Sessions that this kernel just ended, for what was opened with them, such as the real-time
+     * channel of a page: one session, every session of an account, or those of an account that act on
+     * an organization or on none.
+     *
+     * @param session the session ended, or {@code null} when the end is about an account
+     * @param accountId the account whose sessions ended, or {@code null} for one session
+     * @param organizationId the organization the account left, or {@code null} for all its sessions
+     */
+    public record Ended(UUID session, UUID accountId, UUID organizationId) {
+
+        static Ended session(UUID id) {
+            return new Ended(id, null, null);
+        }
+
+        static Ended allOf(UUID accountId) {
+            return new Ended(null, accountId, null);
+        }
+
+        static Ended in(UUID accountId, UUID organizationId) {
+            return new Ended(null, accountId, organizationId);
+        }
+    }
+
     private record Cached(Active active, Instant readAt) {}
 
     private final SessionStore store;
@@ -106,6 +135,8 @@ public class SessionRegistry {
     private final Map<String, Cached> cache = new ConcurrentHashMap<>();
     /** Counts the ends, so that a session read before an end is not put in memory after it. */
     private final AtomicLong ends = new AtomicLong();
+    /** Told of every end, once the database committed it. */
+    private final List<Consumer<Ended>> listeners = new CopyOnWriteArrayList<>();
 
     @Inject
     public SessionRegistry(SessionStore store, KernelConfig config, Clock clock) {
@@ -237,6 +268,7 @@ public class SessionRegistry {
         Instant now = Instant.now(clock);
         boolean ended = store.end(id, now, now.plus(maxLife));
         forget(active -> active.id().equals(id));
+        tell(Ended.session(id));
         return ended;
     }
 
@@ -256,6 +288,7 @@ public class SessionRegistry {
         Instant now = Instant.now(clock);
         store.endAllOf(accountId, now, now.plus(maxLife));
         forget(active -> active.accountId().equals(accountId));
+        tell(Ended.allOf(accountId));
     }
 
     /**
@@ -266,6 +299,39 @@ public class SessionRegistry {
         Instant now = Instant.now(clock);
         store.endIn(accountId, organizationId, now, now.plus(maxLife));
         forget(active -> active.accountId().equals(accountId));
+        tell(Ended.in(accountId, organizationId));
+    }
+
+    /**
+     * Tells a listener of the sessions this kernel ends, right after the end commits; the other
+     * kernels of an installation learn it from {@link #liveAmong}.
+     */
+    public void onEnd(Consumer<Ended> listener) {
+        listeners.add(listener);
+    }
+
+    /** Which of some sessions still open requests, read from the database in one query. */
+    public Set<UUID> liveAmong(Collection<UUID> ids) {
+        if (ids.isEmpty()) {
+            return Set.of();
+        }
+        Instant now = Instant.now(clock);
+        return store.byIds(List.copyOf(ids)).stream()
+                .map(session -> Active.of(session, null))
+                .filter(session -> live(session, now))
+                .map(Active::id)
+                .collect(Collectors.toSet());
+    }
+
+    private void tell(Ended ended) {
+        for (Consumer<Ended> listener : listeners) {
+            try {
+                listener.accept(ended);
+            } catch (RuntimeException e) {
+                // The session ended all the same: what was opened with it ends at the next check.
+                LOG.warnf("A listener of the end of sessions failed: %s", e.getMessage());
+            }
+        }
     }
 
     /** The live sessions of an account, the most recently seen first. */

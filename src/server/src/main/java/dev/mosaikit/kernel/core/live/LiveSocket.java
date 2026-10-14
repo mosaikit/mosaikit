@@ -6,10 +6,13 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dev.mosaikit.kernel.core.account.AccountDirectory;
+import dev.mosaikit.kernel.core.account.SessionRegistry;
 import dev.mosaikit.kernel.core.identity.RequestOrganization;
 import dev.mosaikit.kernel.core.teams.TeamService;
+import io.quarkus.scheduler.Scheduled;
 import io.quarkus.security.Authenticated;
 import io.quarkus.security.identity.SecurityIdentity;
+import io.quarkus.websockets.next.CloseReason;
 import io.quarkus.websockets.next.OnClose;
 import io.quarkus.websockets.next.OnOpen;
 import io.quarkus.websockets.next.OnTextMessage;
@@ -17,11 +20,13 @@ import io.quarkus.websockets.next.OpenConnections;
 import io.quarkus.websockets.next.WebSocket;
 import io.quarkus.websockets.next.WebSocketConnection;
 import jakarta.enterprise.context.ApplicationScoped;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * The WebSocket of the shell (MK-031, ADR-0028): one per page, authenticated like the API, for the
@@ -29,6 +34,13 @@ import java.util.concurrent.ConcurrentHashMap;
  * "subscribe", "topic": "…"}} and {@code unsubscribe}; the kernel answers {@code subscribed} or
  * {@code refused}, and sends {@code {"type": "event", "topic", "data"}} for every event of a
  * subscribed topic that reaches the person.
+ *
+ * <p>A page opened with a session of the kernel lives as long as that session (MK-125): when the
+ * session ends (sign-out, ended in the settings, suspension of the account, removal from the
+ * organization) the kernel sends it nothing more and closes the socket with {@link
+ * LivePages#SESSION_ENDED}, at once on the kernel that ended it and within {@link
+ * LivePages#CHECK_EVERY} on the others. A suspension closes every page of the account, also those
+ * opened without a session.
  */
 @WebSocket(path = "/api/v1/live")
 @Authenticated
@@ -59,7 +71,12 @@ public class LiveSocket {
     @OnOpen
     void open() {
         UUID account = accounts.idOf(identity.getPrincipal().getName()).orElseThrow();
-        pages.open(connection.id(), account, RequestOrganization.of(identity), RequestOrganization.guest(identity));
+        pages.open(
+                connection.id(),
+                account,
+                SessionRegistry.of(identity),
+                RequestOrganization.of(identity),
+                RequestOrganization.guest(identity));
     }
 
     @OnTextMessage
@@ -102,24 +119,49 @@ public class LiveSocket {
     @ApplicationScoped
     public static class LivePages {
 
-        /** A page connected to the channel. */
-        record Page(String connection, UUID account, Optional<UUID> organization, boolean guest, Set<String> topics) {}
+        /** The close code of a socket whose session ended: the page must not connect again with it. */
+        public static final int SESSION_ENDED = 4401;
+
+        /** How often the sessions of the pages are read again, for the ends of other kernels. */
+        public static final String CHECK_EVERY = "5s";
+
+        /**
+         * A page connected to the channel.
+         *
+         * @param session the session of the kernel it was opened with, if any (MK-125)
+         */
+        record Page(
+                String connection,
+                UUID account,
+                Optional<UUID> session,
+                Optional<UUID> organization,
+                boolean guest,
+                Set<String> topics) {}
 
         private final Map<String, Page> pages = new ConcurrentHashMap<>();
         private final OpenConnections connections;
         private final ObjectMapper json;
-
         private final TeamService teams;
+        private final SessionRegistry sessions;
 
-        public LivePages(OpenConnections connections, ObjectMapper json, LiveBus bus, TeamService teams) {
+        public LivePages(
+                OpenConnections connections,
+                ObjectMapper json,
+                LiveBus bus,
+                TeamService teams,
+                SessionRegistry sessions) {
             this.teams = teams;
             this.connections = connections;
             this.json = json;
+            this.sessions = sessions;
             bus.listen(this::deliver);
+            sessions.onEnd(this::ended);
         }
 
-        void open(String connection, UUID account, Optional<UUID> organization, boolean guest) {
-            pages.put(connection, new Page(connection, account, organization, guest, ConcurrentHashMap.newKeySet()));
+        void open(String connection, UUID account, Optional<UUID> session, Optional<UUID> organization, boolean guest) {
+            pages.put(
+                    connection,
+                    new Page(connection, account, session, organization, guest, ConcurrentHashMap.newKeySet()));
         }
 
         Optional<Page> get(String connection) {
@@ -132,7 +174,61 @@ public class LiveSocket {
 
         /** The accounts with at least one open page, for the presence (MK-033). */
         public Set<UUID> accountsOnline() {
-            return pages.values().stream().map(Page::account).collect(java.util.stream.Collectors.toSet());
+            return pages.values().stream().map(Page::account).collect(Collectors.toSet());
+        }
+
+        /** Closes the pages of the sessions this kernel just ended, before another event reaches them. */
+        void ended(SessionRegistry.Ended end) {
+            List<Page> closing =
+                    pages.values().stream().filter(page -> endedBy(end, page)).toList();
+            closing.forEach(this::end);
+        }
+
+        private boolean endedBy(SessionRegistry.Ended end, Page page) {
+            if (end.session() != null) {
+                return page.session().filter(end.session()::equals).isPresent();
+            }
+            if (!page.account().equals(end.accountId())) {
+                return false;
+            }
+            if (end.organizationId() == null) {
+                // A suspension: every page of the account, whatever opened it.
+                return true;
+            }
+            // The removal from an organization: the pages in it, and those whose session it ended.
+            return page.organization().filter(end.organizationId()::equals).isPresent()
+                    || page.session()
+                            .filter(id -> sessions.liveAmong(Set.of(id)).isEmpty())
+                            .isPresent();
+        }
+
+        /** Closes the pages whose session another kernel ended, or that expired. */
+        @Scheduled(every = CHECK_EVERY, delayed = CHECK_EVERY, concurrentExecution = Scheduled.ConcurrentExecution.SKIP)
+        void closeEndedSessions() {
+            Set<UUID> open = pages.values().stream()
+                    .flatMap(page -> page.session().stream())
+                    .collect(Collectors.toSet());
+            if (open.isEmpty()) {
+                return;
+            }
+            Set<UUID> live = sessions.liveAmong(open);
+            pages.values().stream()
+                    .filter(page ->
+                            page.session().filter(id -> !live.contains(id)).isPresent())
+                    .toList()
+                    .forEach(this::end);
+        }
+
+        private void end(Page page) {
+            pages.remove(page.connection());
+            connections
+                    .findByConnectionId(page.connection())
+                    .ifPresent(connection -> connection
+                            .close(new CloseReason(SESSION_ENDED, "The session ended"))
+                            .subscribe()
+                            .with(closed -> {}, failure -> {
+                                // The page went away by itself.
+                            }));
         }
 
         private void deliver(LiveEvent event) {
@@ -155,6 +251,10 @@ public class LiveSocket {
         }
 
         void send(Page page, Map<String, Object> message) {
+            if (pages.get(page.connection()) != page) {
+                // Closed meanwhile, such as when its session ended.
+                return;
+            }
             Optional<WebSocketConnection> target = connections.findByConnectionId(page.connection());
             if (target.isEmpty()) {
                 pages.remove(page.connection());
