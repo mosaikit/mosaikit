@@ -1189,8 +1189,10 @@ The kernel raises these events (constants of `PlatformEvents`), with their paylo
 
 The events of sharing, teams and permissions let an extension that translates grants, teams and
 permissions into the rules of another server, such as a map server, follow every change without
-polling: on an event, recompute what changed, such as the people of a team or who holds a
-permission. They say what changed, not who holds what now. Some changes reach people without an event of their own: a link that expires, a person added to or
+polling: on an event, recompute what changed, such as the people of a team with `People` (see
+[People and teams of the organization](#people-and-teams-of-the-organization)) or who holds a
+permission with `PermissionHolders` (see [Who holds a permission](#who-holds-a-permission)). They
+say what changed, not who holds what now. Some changes reach people without an event of their own: a link that expires, a person added to or
 removed from the organization, a change of their roles in it, and the apps of an extension turned
 off or on (which raise `extension.disabled` and `extension.enabled`); deleting a team raises
 `team.member.removed` for its people, and its grants go with it.
