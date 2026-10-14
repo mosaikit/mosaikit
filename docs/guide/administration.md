@@ -158,19 +158,29 @@ kernel. Cache the answer for a few seconds at most, so that an ended session clo
 ## Suspending a person
 
 A platform administrator suspends an account, for example when a person leaves or a device is
-lost, and reactivates it later (MK-125):
+lost, and reinstates it later (MK-125). In the console, **Accounts** finds an account by its email
+address and shows whether it is suspended, since when, by whom and why; **Suspend** asks for the
+reason, and the list of suspended accounts has a **Reinstate** button for each. The same through
+the API:
 
 ```bash
-curl -u admin -X PUT https://mosaikit.example.org/api/v1/platform/accounts/ada@acme.com/suspension
+curl -u admin -X PUT -H 'Content-Type: application/json' -d '{"reason": "Laptop reported stolen"}'   https://mosaikit.example.org/api/v1/platform/accounts/ada@acme.com/suspension
+curl -u admin https://mosaikit.example.org/api/v1/platform/accounts/ada@acme.com/suspension
+curl -u admin https://mosaikit.example.org/api/v1/platform/accounts/suspended
 curl -u admin -X DELETE https://mosaikit.example.org/api/v1/platform/accounts/ada@acme.com/suspension
 ```
+
+The reason, at most 500 characters, is shown to the other platform administrators until the account
+is reinstated, and stays in the audit log with the suspension; an account already suspended keeps
+its first reason.
 
 A suspended person signs in by no means: not with the password, not with **Remember me**, not
 through the realm of an organization. All their sessions end at once, on every browser, and their
 "remember me" tokens are revoked; the list of members shows `"suspended": true`. Reactivated, the
 person signs in again; the sessions ended by the suspension stay ended, and their personal access
 keys (MK-060) stay revoked. You cannot suspend your own
-account. Both actions are in the audit log (`account.suspended`, `account.reactivated`).
+account. Both actions are in the audit log (`account.suspended`, with the reason, and
+`account.reactivated`).
 
 A kernel ends a session at once; when several kernels serve the installation, the others refuse it
 within `mosaikit.accounts.session-cache` (5 seconds by default). People also see and end their own
