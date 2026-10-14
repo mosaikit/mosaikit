@@ -26,8 +26,9 @@ import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 /**
- * The published views of people, organizations, memberships and teams (MK-123): what a login of an
- * external service reads, what it cannot, and the columns that are a contract across releases.
+ * The published views of people, organizations, memberships, teams and holders of permissions
+ * (MK-123): what a login of an external service reads, what it cannot, and the columns that are a
+ * contract across releases.
  */
 @QuarkusTest
 @Tag("MK-123")
@@ -55,7 +56,15 @@ class PublishedViewsTest {
             "organization", List.of("id uuid", "slug character varying", "name character varying"),
             "membership", List.of("account_id uuid", "organization_id uuid", "roles ARRAY"),
             "team", List.of("id uuid", "organization_id uuid", "parent_id uuid", "name character varying"),
-            "team_member", List.of("team_id uuid", "account_id uuid", "role character varying"));
+            "team_member", List.of("team_id uuid", "account_id uuid", "role character varying"),
+            "permission_holder",
+                    List.of(
+                            "organization_id uuid",
+                            "extension_id character varying",
+                            "permission character varying",
+                            "source character varying",
+                            "account_id uuid",
+                            "team_id uuid"));
 
     private static Connection connect(String user, String password) throws SQLException {
         Config config = ConfigProvider.getConfig();

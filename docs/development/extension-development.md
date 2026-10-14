@@ -866,6 +866,34 @@ above their own level. Remove the entry with `resources.remove(ref)` when the re
 its grants go with it. The registration joins the transaction of the request, so a rollback undoes
 both.
 
+### Who holds a permission
+
+`Permissions` answers for the person of the request. An extension that translates its permissions
+into the rules of another server, such as the roles of a map server, needs everyone who holds one:
+it asks `PermissionHolders` (`dev.mosaikit.kernel.api.permission`), naming itself as with
+`Permissions`.
+
+```java
+@Inject PermissionHolders holders;   // dev.mosaikit.kernel.api.permission
+
+PermissionHolders.Holders editors = holders.of(EXTENSION, "edit-layer");
+editors.people();   // the accounts that hold it now: administrators, profile, teams, exceptions
+editors.teams();    // the teams and groups granted it; their people are also in people()
+editors.holds(account);
+```
+
+The rules are those of `Permissions`: the administrators of the organization hold every permission,
+a guest holds only what their teams and exceptions grant, and a permission the extension does not
+declare, or of an extension whose apps are all off for the organization, is held by nobody. It acts
+on the organization of the request, or of the event a subscriber handles; a guest of the organization
+reads only the holders among the people of their teams, and a request opened through a link gets
+nobody. Name the people with `People` (see [People and teams of the
+organization](#people-and-teams-of-the-organization)) and follow the changes with the events of
+permissions instead of polling (see [Events on the server](#events-on-the-server)).
+
+Services outside the kernel read the same through the published view
+`mk_published.permission_holder` ([published views](published-views.md)).
+
 ### The sharing dialog
 
 The kernel offers one sharing dialog for every resource type of every extension (MK-055): who has
