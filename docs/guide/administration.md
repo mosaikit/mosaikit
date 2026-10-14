@@ -606,8 +606,8 @@ created with the write switch (MK-060); a read-only key is refused, since every 
 
 Services that read who belongs to which organization and team from the database, such as a map
 server with a JDBC role service, read the [published views](../development/published-views.md) of
-schema `mk_published`: accounts, organizations, memberships, teams and their members, never
-passwords or secrets. Their names and columns are a contract that changes only with a breaking
+schema `mk_published`: accounts, organizations, memberships, teams and their members, and who
+holds the permissions of extensions, never passwords or secrets. Their names and columns are a contract that changes only with a breaking
 change of the platform.
 
 At each start the installation creates the role `mk_<database>_reader` (for the database `mosaikit`,

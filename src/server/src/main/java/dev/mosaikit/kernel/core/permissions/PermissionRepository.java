@@ -52,6 +52,10 @@ public interface PermissionRepository {
     @Query("from MemberProfile m where m.organizationId = :organizationId and m.accountId = :accountId")
     Optional<MemberProfile> memberProfile(UUID organizationId, UUID accountId);
 
+    /** The profiles assigned to the members of an organization. */
+    @Query("from MemberProfile m where m.organizationId = :organizationId")
+    List<MemberProfile> memberProfiles(UUID organizationId);
+
     @Insert
     void insert(MemberProfile profile);
 
@@ -92,6 +96,13 @@ public interface PermissionRepository {
             where g.organizationId = :organizationId and g.accountId = :accountId
             order by g.extensionId, g.permission""")
     List<PermissionGrant> ofMember(UUID organizationId, UUID accountId);
+
+    /** The grants of one permission in an organization: to profiles, teams and members. */
+    @Query("""
+            from PermissionGrant g
+            where g.organizationId = :organizationId and g.extensionId = :extensionId
+              and g.permission = :permission""")
+    List<PermissionGrant> ofPermission(UUID organizationId, String extensionId, String permission);
 
     @Insert
     void insert(PermissionGrant grant);
