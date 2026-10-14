@@ -160,7 +160,12 @@ build() {
   mkdir -p "$staging/bin/licenses"
   cp "$pg_cache/package/LICENSE.md" "$staging/bin/licenses/embedded-postgres-LICENSE.md"
   cp "$here"/licenses/* "$staging/bin/licenses/"
-  cp LICENSE "$staging/bin/licenses/Mosaikit-MPL-2.0.txt"
+  # Mosaikit's licence and notice: next to this script in the portable-tools artifact, at the root
+  # of the repository otherwise (never the LICENSE of the product that runs the script).
+  local legal="$here"
+  [[ -f "$legal/LICENSE" ]] || legal="$here/../.."
+  cp "$legal/LICENSE" "$staging/bin/licenses/Mosaikit-MPL-2.0.txt"
+  cp "$legal/NOTICE" "$staging/bin/licenses/Mosaikit-NOTICE.txt"
 
   # 5. The archive.
   local archive

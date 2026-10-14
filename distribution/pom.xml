@@ -118,7 +118,21 @@
                                      installation (classifier portable-tools, see portable/build.sh). -->
                                 <zip destfile="${project.build.directory}/mosaikit-portable-tools-${project.version}.zip">
                                     <zipfileset dir="${project.basedir}/portable" prefix="portable"/>
+                                    <!-- Mosaikit's licence and notice, which build.sh puts in every portable
+                                         archive, also when a product runs it on its own installation (#116). -->
+                                    <zipfileset file="${maven.multiModuleProjectDirectory}/LICENSE" prefix="portable"/>
+                                    <zipfileset file="${maven.multiModuleProjectDirectory}/NOTICE" prefix="portable"/>
                                 </zip>
+                                <fail message="mosaikit-portable-tools lacks portable/LICENSE or portable/NOTICE">
+                                    <condition>
+                                        <not>
+                                            <resourcecount count="2">
+                                                <zipfileset src="${project.build.directory}/mosaikit-portable-tools-${project.version}.zip"
+                                                            includes="portable/LICENSE,portable/NOTICE"/>
+                                            </resourcecount>
+                                        </not>
+                                    </condition>
+                                </fail>
                                 <!-- Docker Compose and the Helm chart, which products extend with their own
                                      services (classifiers docker and helm). -->
                                 <zip destfile="${project.build.directory}/mosaikit-docker-${project.version}.zip">

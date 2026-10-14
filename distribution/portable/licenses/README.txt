@@ -8,4 +8,5 @@ pgsql/    PostgreSQL 18 (PostgreSQL License, PostgreSQL-COPYRIGHT.txt), binaries
           (MIT, embedded-postgres-LICENSE.md).
 kernel/   The Java libraries of the kernel; their licenses are listed in the SBOM of the release.
 
-Mosaikit itself is licensed under the Mozilla Public License 2.0 (Mosaikit-MPL-2.0.txt).
+Mosaikit itself is licensed under the Mozilla Public License 2.0 (Mosaikit-MPL-2.0.txt, notice in
+Mosaikit-NOTICE.txt).
