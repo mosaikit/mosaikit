@@ -101,9 +101,27 @@ secrets:
 and write the settings in `secret-settings.properties`, for example `example.reports.api-key=<key>`.
 Variables of `mosaikit.env` and of `compose.yaml` win over the file.
 
+## Behind a reverse proxy
+
+A proxy that terminates TLS in front of Mosaikit talks to it over HTTP: the kernel takes the scheme
+from its `X-Forwarded-Proto` header, so that the session cookie carries `Secure`, but only when the
+request comes from an address of `MOSAIKIT_TRUSTED_PROXIES` in `.env` (addresses, CIDR ranges or host
+names, comma-separated). Unset, the kernel believes nobody but itself, so that a client that reaches
+port 8080 directly cannot choose the scheme. For example:
+
+- the proxy is a service of this Compose project, or of another one attached to its network:
+  `MOSAIKIT_TRUSTED_PROXIES=proxy`, its service name;
+- the proxy runs on the host: `MOSAIKIT_TRUSTED_PROXIES=172.16.0.0/12` (the networks of Docker; the
+  host reaches the container from the gateway of its network), and publish the port on the loopback
+  only, `'127.0.0.1:8080:8080'` in `compose.yaml`, so that nobody else connects without the proxy.
+
+The proxy sets `X-Forwarded-Proto` and `X-Forwarded-For` and keeps the `Host` of the request. With
+`MOSAIKIT_ACCOUNTS_SECURE_COOKIES=true` in `mosaikit.env` the cookies are `Secure` whatever the proxy
+forwards. Then `docker compose up -d mosaikit`.
+
 ## Production
 
 This setup is for development, demonstrations and small installations on one machine. For
-production put a reverse proxy with HTTPS in front of both services, run Keycloak with `start`
+production put a reverse proxy with HTTPS in front of both services (for Mosaikit, see above), run Keycloak with `start`
 instead of `start-dev` (see the Keycloak documentation), keep `.env` out of version control and
 back up the volume. On Kubernetes use `../mosaikit-k8s`.

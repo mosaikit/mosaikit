@@ -36,6 +36,24 @@ helm upgrade mosaikit ./mosaikit --reuse-values \
   --set files.s3.existingSecret=mosaikit-files
 ```
 
+## Behind an ingress
+
+The ingress, or a load balancer, terminates TLS and talks to the kernel over HTTP. The chart has the
+kernel take the scheme and the address of the client from `X-Forwarded-Proto` and `X-Forwarded-For`
+(`proxy.forwardedHeaders`, on by default), so that the session cookie carries `Secure`. With the
+default `ClusterIP` service only the cluster reaches the pod, and the headers are believed from any
+address; name the proxies with `proxy.trustedProxies`, such as the pod network of the ingress
+controller, so that other pods cannot set them either. With `service.type` `NodePort` or
+`LoadBalancer` clients reach the kernel directly, and the chart refuses to render without
+`proxy.trustedProxies`:
+
+```bash
+helm upgrade mosaikit ./mosaikit --reuse-values --set proxy.trustedProxies=10.244.0.0/16
+```
+
+`proxy.secureCookies=true` makes the cookies `Secure` whatever the ingress forwards, for an
+installation reached only over HTTPS.
+
 ## Settings of the kernel and of extensions
 
 The chart names the settings it needs. Every other setting of the kernel

@@ -103,6 +103,22 @@ service:
   type: ClusterIP
   port: 80
 
+proxy:
+  # The ingress or load balancer in front of the kernel terminates TLS and forwards the scheme and the
+  # address of the client in X-Forwarded-Proto and X-Forwarded-For: the kernel takes them, so that its
+  # cookies carry Secure and sessions record the address of the person. Set it to false only when
+  # nothing in front of the kernel sets these headers.
+  forwardedHeaders: true
+  # Comma-separated addresses, CIDR ranges or host names of the proxies whose forwarded headers the
+  # kernel believes, such as the pod network of the ingress controller (10.244.0.0/16). Empty: any
+  # address that reaches the pod, accepted only with service.type ClusterIP, which only the cluster
+  # reaches; with NodePort or LoadBalancer the chart refuses to render without it, since a client
+  # could then send the headers itself.
+  trustedProxies: ""
+  # Cookies of the kernel always Secure (mosaikit.accounts.secure-cookies), for an installation
+  # reached only over HTTPS whatever the proxy forwards.
+  secureCookies: false
+
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 185

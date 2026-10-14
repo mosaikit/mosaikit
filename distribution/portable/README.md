@@ -28,6 +28,10 @@ An environment variable wins over the file: the name of the setting in upper cas
 character that is not a letter or a digit replaced by `_` (`EXAMPLE_REPORTS_ENDPOINT`). Start
 Mosaikit again after a change.
 
+Behind a reverse proxy on this computer that serves Mosaikit over HTTPS, enable the forwarded headers
+commented in `config/application.properties`, or the session cookie lacks `Secure`; see
+[installation](../../docs/guide/installation.md#behind-a-reverse-proxy).
+
 ## Contents
 
 | Path | Content |

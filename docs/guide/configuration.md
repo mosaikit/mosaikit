@@ -42,6 +42,10 @@ start). The kernel keeps its tables in the `mk_kernel` schema and each extension
 | `mosaikit.accounts.session-max-life` | `24h` | how long a session lasts at most, whatever its activity; "remember me" then opens a new one. The record of an ended realm session is kept at least this long |
 | `mosaikit.accounts.session-cache` | `5s` | how long a kernel keeps what it read about a session; a session ended on another kernel of the installation is refused within this time, on the same kernel at once; `0s` reads the database at every request. The same time applies to personal access keys (MK-060) and to the keys and grants of service identities (MK-124) |
 | `mosaikit.accounts.access-key-max-validity` | `365d` | how long a personal access key lasts at most from its creation (MK-060): people choose a shorter expiry, and a key created without one lasts this long |
+| `mosaikit.accounts.secure-cookies` | `false` | `true`: the cookies of the kernel (the session of the shell, "remember me") always carry `Secure`; `false`: they carry it when the request is HTTPS as the kernel sees it, the scheme forwarded by a trusted proxy included |
+| `quarkus.http.proxy.proxy-address-forwarding` | `false` | `true` behind a reverse proxy: the kernel takes the scheme, and the address of the client, from the headers of the proxy |
+| `quarkus.http.proxy.allow-x-forwarded` | `false` | with the setting above, read `X-Forwarded-Proto` and `X-Forwarded-For` (`quarkus.http.proxy.allow-forwarded` reads the standard `Forwarded` header instead) |
+| `quarkus.http.proxy.trusted-proxies` | | comma-separated addresses, CIDR ranges or host names of the proxies whose headers the kernel believes; empty, every client is believed |
 
 Sessions are kept in the database (MK-125): the cookie holds only a random value, so no key needs
 to be configured, sessions survive a restart, and every kernel of a cluster accepts them. Expired
@@ -49,6 +53,27 @@ sessions are removed every 15 minutes.
 
 Terminate TLS at a reverse proxy or an ingress; in production the kernel sends
 `Strict-Transport-Security` and a `Content-Security-Policy`.
+
+### Behind a reverse proxy
+
+A proxy that terminates TLS talks to the kernel over plain HTTP. Unless the kernel takes the scheme
+from the headers of the proxy, it sees `http` and sets its cookies without `Secure`, so that a
+browser would also send them over an unencrypted connection to the same host. Have the proxy set
+`X-Forwarded-Proto` (and `X-Forwarded-For`, which sessions record as the address of the person), keep
+the `Host` of the request, and tell the kernel to believe these headers from the proxy only:
+
+```properties
+quarkus.http.proxy.proxy-address-forwarding=true
+quarkus.http.proxy.allow-x-forwarded=true
+quarkus.http.proxy.trusted-proxies=10.0.0.5
+```
+
+Never leave `trusted-proxies` empty on a kernel that clients can also reach directly: any client
+could then send `X-Forwarded-Proto` or `X-Forwarded-For` of its choice. The Docker Compose
+distribution and the Helm chart set the first two settings; they differ in whom they trust
+([installation](installation.md#behind-a-reverse-proxy)). An installation reached only over HTTPS
+can also set `mosaikit.accounts.secure-cookies=true`, which makes the cookies `Secure` whatever the
+proxy forwards; a browser then refuses them over plain HTTP, `localhost` excepted.
 
 ## Content security policy
 
