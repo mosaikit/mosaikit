@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.core.permissions;
 
+import dev.mosaikit.kernel.api.context.NoOrganizationException;
 import dev.mosaikit.kernel.api.extension.ExtensionManifest;
 import dev.mosaikit.kernel.api.permission.PermissionHolders;
 import dev.mosaikit.kernel.api.permission.PermissionId;
@@ -30,9 +31,12 @@ import java.util.stream.Collectors;
  * The kernel's {@link PermissionHolders} bean (MK-056): who holds a permission of the calling
  * extension in the organization of the request, by the rules of {@link PermissionResolver}, read in
  * a few queries for the whole organization instead of one person at a time.
+ *
+ * <p>A documented exception of the API is thrown before anything is read, and leaves the transaction
+ * of the caller usable (#126): an extension that catches it goes on writing in the same transaction.
  */
 @ApplicationScoped
-@Transactional
+@Transactional(dontRollbackOn = {IllegalArgumentException.class, NoOrganizationException.class})
 public class KernelPermissionHolders implements PermissionHolders {
 
     private final PermissionRepository permissions;

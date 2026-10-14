@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.core.sharing;
 
+import dev.mosaikit.kernel.api.context.NoOrganizationException;
 import dev.mosaikit.kernel.api.events.PlatformEvents;
 import dev.mosaikit.kernel.api.extension.ExtensionManifest;
 import dev.mosaikit.kernel.api.extension.ResourceTypeEntry;
@@ -56,9 +57,18 @@ import java.util.stream.Collectors;
  * {@link Sharing} bean. Every call acts on the organization of the request and joins the transaction
  * of the caller; every grant, change of level and revocation is in the audit log, and so is every
  * use of a link ({@link SharedLinks}).
+ *
+ * <p>A documented exception of the API is thrown before anything is written, and leaves the transaction
+ * of the caller usable (#126): an extension that catches it goes on writing in the same transaction.
  */
 @ApplicationScoped
-@Transactional
+@Transactional(
+        dontRollbackOn = {
+            IllegalArgumentException.class,
+            AccessDeniedException.class,
+            NoSuchElementException.class,
+            NoOrganizationException.class
+        })
 public class KernelSharing implements Sharing {
 
     static final String GRANTED = "sharing.granted";

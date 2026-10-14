@@ -20,6 +20,7 @@ import jakarta.transaction.Transactional;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
@@ -35,9 +36,19 @@ import org.jboss.logging.Logger;
  * refusal to decrypt, is in the audit log through the channel {@code EXTENSION}, without the value: a
  * credential of an organization in the log of that organization, one of the installation in the log
  * of the platform.
+ *
+ * <p>A documented exception of the API is thrown before anything is written in the transaction of the
+ * caller (the audit entry of a refusal has its own), and leaves it usable (#126): an extension that
+ * catches it goes on writing in the same transaction.
  */
 @ApplicationScoped
-@Transactional
+@Transactional(
+        dontRollbackOn = {
+            SecretsUnavailableException.class,
+            IllegalArgumentException.class,
+            NoSuchElementException.class,
+            NoOrganizationException.class
+        })
 public class SecretVault implements Secrets {
 
     private static final Logger LOG = Logger.getLogger(SecretVault.class);
