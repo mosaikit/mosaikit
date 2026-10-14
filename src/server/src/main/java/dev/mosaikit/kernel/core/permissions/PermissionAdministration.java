@@ -3,6 +3,7 @@
 package dev.mosaikit.kernel.core.permissions;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import dev.mosaikit.kernel.api.events.PlatformEvents;
 import dev.mosaikit.kernel.api.extension.PermissionEntry;
 import dev.mosaikit.kernel.api.permission.PermissionId;
 import dev.mosaikit.kernel.core.account.UserAccount;
@@ -14,6 +15,7 @@ import dev.mosaikit.kernel.core.audit.AuditLog;
 import dev.mosaikit.kernel.core.error.ConflictException;
 import dev.mosaikit.kernel.core.error.InvalidInputException;
 import dev.mosaikit.kernel.core.error.ResourceNotFoundException;
+import dev.mosaikit.kernel.core.events.PlatformEventLog;
 import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
 import dev.mosaikit.kernel.core.extension.ExtensionsLoaded;
 import dev.mosaikit.kernel.core.extension.InstalledExtension;
@@ -157,6 +159,7 @@ public class PermissionAdministration {
     private final OrganizationMembers members;
     private final AuditLog audit;
     private final SecurityIdentity identity;
+    private final PlatformEventLog events;
     private final Clock clock;
 
     @Inject
@@ -169,7 +172,8 @@ public class PermissionAdministration {
             UserAccounts accounts,
             OrganizationMembers members,
             AuditLog audit,
-            SecurityIdentity identity) {
+            SecurityIdentity identity,
+            PlatformEventLog events) {
         this.repository = repository;
         this.resolver = resolver;
         this.catalog = catalog;
@@ -179,6 +183,7 @@ public class PermissionAdministration {
         this.members = members;
         this.audit = audit;
         this.identity = identity;
+        this.events = events;
         this.clock = Clock.systemUTC();
     }
 
@@ -248,6 +253,7 @@ public class PermissionAdministration {
                         "name", profile.getName(),
                         "defaultForRole", checked.defaultForRole().orElse(""),
                         "permissions", permissions));
+        profileChanged(organization, profile, "created", permissions, List.of());
         return view(profile, permissions);
     }
 
@@ -288,13 +294,16 @@ public class PermissionAdministration {
                         added,
                         "removed",
                         removed));
+        profileChanged(organization, profile, "changed", added, removed);
         return view(profile, permissionsOf(organization, id));
     }
 
     public void deleteProfile(UUID organization, UUID id) {
         PermissionProfile profile = requireProfile(organization, id);
+        List<String> permissions = permissionsOf(organization, id);
         repository.delete(profile);
         record(organization, "permissions.profile.deleted", "profile/" + id, Map.of("name", profile.getName()));
+        profileChanged(organization, profile, "deleted", List.of(), permissions);
     }
 
     // Members.
@@ -326,6 +335,14 @@ public class PermissionAdministration {
                 "permissions.profile.assigned",
                 normalize(email),
                 Map.of("profile", profileId == null ? "" : profileId.toString(), "name", name));
+        events.raise(
+                organization,
+                PlatformEvents.PERMISSIONS_PROFILE_ASSIGNED,
+                Map.of(
+                        "account",
+                        member.getAccountId().toString(),
+                        "profile",
+                        profileId == null ? "" : profileId.toString()));
         return member(organization, email);
     }
 
@@ -360,6 +377,7 @@ public class PermissionAdministration {
                     "permissions.exception.granted",
                     normalize(email),
                     Map.of("permission", id.toString()));
+            exceptionChanged(organization, member.getAccountId(), id, true);
         }
         return member(organization, email);
     }
@@ -376,6 +394,7 @@ public class PermissionAdministration {
                             "permissions.exception.revoked",
                             normalize(email),
                             Map.of("permission", id.toString()));
+                    exceptionChanged(organization, member.getAccountId(), id, false);
                 });
         return member(organization, email);
     }
@@ -404,6 +423,7 @@ public class PermissionAdministration {
                     "permissions.team.granted",
                     "team/" + teamId,
                     Map.of("team", team.getName(), "permission", id.toString()));
+            teamChanged(organization, teamId, id, true);
         }
         return team(organization, teamId);
     }
@@ -420,6 +440,7 @@ public class PermissionAdministration {
                             "permissions.team.revoked",
                             "team/" + teamId,
                             Map.of("team", team.getName(), "permission", id.toString()));
+                    teamChanged(organization, teamId, id, false);
                 });
         return team(organization, teamId);
     }
@@ -585,6 +606,7 @@ public class PermissionAdministration {
                 .ifPresent(previous -> {
                     previous.notDefault(now);
                     repository.update(previous);
+                    profileChanged(organization, previous, "changed", List.of(), List.of());
                 });
     }
 
@@ -671,6 +693,41 @@ public class PermissionAdministration {
                     List.copyOf(sources)));
         });
         return views;
+    }
+
+    // Events of the platform (MK-085), for the extensions that translate permissions into the rules of
+    // other servers.
+
+    private void profileChanged(
+            UUID organization, PermissionProfile profile, String change, List<String> added, List<String> removed) {
+        events.raise(
+                organization,
+                PlatformEvents.PERMISSIONS_PROFILE_CHANGED,
+                Map.of(
+                        "profile",
+                        profile.getId().toString(),
+                        "change",
+                        change,
+                        "defaultForRole",
+                        profile.getDefaultForRole().orElse(""),
+                        "added",
+                        List.copyOf(added),
+                        "removed",
+                        List.copyOf(removed)));
+    }
+
+    private void teamChanged(UUID organization, UUID team, PermissionId permission, boolean granted) {
+        events.raise(
+                organization,
+                PlatformEvents.PERMISSIONS_TEAM_CHANGED,
+                Map.of("team", team.toString(), "permission", permission.toString(), "granted", granted));
+    }
+
+    private void exceptionChanged(UUID organization, UUID account, PermissionId permission, boolean granted) {
+        events.raise(
+                organization,
+                PlatformEvents.PERMISSIONS_EXCEPTION_CHANGED,
+                Map.of("account", account.toString(), "permission", permission.toString(), "granted", granted));
     }
 
     private void record(UUID organization, String action, String subject, Map<String, ?> detail) {

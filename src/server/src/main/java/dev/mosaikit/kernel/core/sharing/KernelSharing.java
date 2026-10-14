@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.core.sharing;
 
+import dev.mosaikit.kernel.api.events.PlatformEvents;
 import dev.mosaikit.kernel.api.extension.ExtensionManifest;
 import dev.mosaikit.kernel.api.extension.ResourceTypeEntry;
 import dev.mosaikit.kernel.api.extension.SubjectKind;
@@ -16,6 +17,7 @@ import dev.mosaikit.kernel.core.apps.AppSettings;
 import dev.mosaikit.kernel.core.audit.AuditEvent;
 import dev.mosaikit.kernel.core.audit.AuditLog;
 import dev.mosaikit.kernel.core.config.KernelConfig;
+import dev.mosaikit.kernel.core.events.PlatformEventLog;
 import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
 import dev.mosaikit.kernel.core.extension.InstalledExtension;
 import dev.mosaikit.kernel.core.identity.RequestOrganization;
@@ -86,6 +88,7 @@ public class KernelSharing implements Sharing {
     private final Clock clock;
     private final AgroalDataSource dataSource;
     private final AppSettings apps;
+    private final PlatformEventLog events;
 
     public KernelSharing(
             ResourceGrants grants,
@@ -101,7 +104,8 @@ public class KernelSharing implements Sharing {
             KernelConfig config,
             Clock clock,
             AgroalDataSource dataSource,
-            AppSettings apps) {
+            AppSettings apps,
+            PlatformEventLog events) {
         this.grants = grants;
         this.entries = entries;
         this.extensions = extensions;
@@ -116,6 +120,7 @@ public class KernelSharing implements Sharing {
         this.clock = clock;
         this.dataSource = dataSource;
         this.apps = apps;
+        this.events = events;
     }
 
     // --- Sharing -------------------------------------------------------------------------------
@@ -170,12 +175,17 @@ public class KernelSharing implements Sharing {
         ResourceGrant saved;
         if (existing.isPresent()) {
             saved = existing.get();
-            detail.put("previousLevel", saved.getLevel());
+            String previous = saved.getLevel();
+            detail.put("previousLevel", previous);
             saved.regrant(level, me, now);
             grants.update(saved);
+            if (!previous.equals(level)) {
+                raise(org, PlatformEvents.SHARING_CHANGED, resource, saved, previous);
+            }
         } else {
             saved = ResourceGrant.of(org, entry.getId(), subject.kind(), account, team, level, me, now);
             grants.insert(saved);
+            raise(org, PlatformEvents.SHARING_GRANTED, resource, saved, null);
         }
         audited(org, GRANTED, resource, detail);
         return view(saved, resource);
@@ -231,6 +241,7 @@ public class KernelSharing implements Sharing {
         detail.put("expires", expires.toString());
         detail.put("password", password != null);
         audited(org, LINK_CREATED, resource, detail);
+        raise(org, PlatformEvents.SHARING_GRANTED, resource, link, null);
         return new MadeLink(link, resource, secret);
     }
 
@@ -266,6 +277,7 @@ public class KernelSharing implements Sharing {
             grants.delete(revoked);
             audited(org, REVOKED, ref, detail);
         }
+        raise(org, PlatformEvents.SHARING_REVOKED, ref, revoked, null);
     }
 
     @Override
@@ -485,8 +497,10 @@ public class KernelSharing implements Sharing {
         UUID org = organization.require();
         RegisteredResource entry = entry(org, resource);
         UUID me = me().orElseThrow(() -> new AccessDeniedException("Sign in to share.", false));
-        grants.insert(
-                ResourceGrant.of(org, entry.getId(), SubjectKind.GROUP, null, team, level, me, Instant.now(clock)));
+        ResourceGrant shared =
+                ResourceGrant.of(org, entry.getId(), SubjectKind.GROUP, null, team, level, me, Instant.now(clock));
+        grants.insert(shared);
+        raise(org, PlatformEvents.SHARING_GRANTED, resource, shared, null);
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("subject", SubjectKind.GROUP.value());
         detail.put("subjectId", team.toString());
@@ -638,6 +652,29 @@ public class KernelSharing implements Sharing {
     private RegisteredResource entry(UUID org, ResourceRef ref) {
         return entries.find(org, ref.extension(), ref.type(), ref.id())
                 .orElseThrow(() -> new NoSuchElementException("The resource " + ref + " is not registered."));
+    }
+
+    /**
+     * Raises an event of the platform for a grant made, changed or revoked (MK-085), so that extensions
+     * that translate grants into the rules of other servers follow it. Never the secret of a link.
+     */
+    private void raise(UUID org, String type, ResourceRef ref, ResourceGrant grant, String previousLevel) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("extension", ref.extension());
+        payload.put("type", ref.type());
+        payload.put("id", ref.id());
+        payload.put("grant", grant.getId().toString());
+        payload.put("subject", grant.kind().value());
+        if (grant.getAccountId() != null) {
+            payload.put("subjectId", grant.getAccountId().toString());
+        } else if (grant.getTeamId() != null) {
+            payload.put("subjectId", grant.getTeamId().toString());
+        }
+        payload.put("level", grant.getLevel());
+        if (previousLevel != null) {
+            payload.put("previousLevel", previousLevel);
+        }
+        events.raise(org, type, payload);
     }
 
     private void audited(UUID org, String action, ResourceRef ref, Map<String, ?> detail) {

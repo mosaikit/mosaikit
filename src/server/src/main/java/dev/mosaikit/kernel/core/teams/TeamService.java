@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.core.teams;
 
+import dev.mosaikit.kernel.api.events.PlatformEvents;
 import dev.mosaikit.kernel.api.teams.Teams;
 import dev.mosaikit.kernel.core.account.AccountDirectory;
 import dev.mosaikit.kernel.core.account.UserAccount;
@@ -12,6 +13,7 @@ import dev.mosaikit.kernel.core.error.ConflictException;
 import dev.mosaikit.kernel.core.error.ForbiddenOperationException;
 import dev.mosaikit.kernel.core.error.InvalidInputException;
 import dev.mosaikit.kernel.core.error.ResourceNotFoundException;
+import dev.mosaikit.kernel.core.events.PlatformEventLog;
 import dev.mosaikit.kernel.core.identity.RequestOrganization;
 import dev.mosaikit.kernel.core.organization.OrganizationMember;
 import dev.mosaikit.kernel.core.organization.OrganizationMembers;
@@ -29,6 +31,7 @@ import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -64,6 +67,7 @@ public class TeamService implements Teams {
     private final AgroalDataSource dataSource;
     private final String accountsOfTeam;
     private final Clock clock;
+    private final PlatformEventLog events;
 
     @Inject
     public TeamService(
@@ -76,7 +80,8 @@ public class TeamService implements Teams {
             AuditLog audit,
             AgroalDataSource dataSource,
             @ConfigProperty(name = "quarkus.hibernate-orm.database.default-schema", defaultValue = "mk_kernel")
-                    String kernelSchema) {
+                    String kernelSchema,
+            PlatformEventLog events) {
         this(
                 teams,
                 organizationMembers,
@@ -87,7 +92,8 @@ public class TeamService implements Teams {
                 audit,
                 dataSource,
                 kernelSchema,
-                Clock.systemUTC());
+                Clock.systemUTC(),
+                events);
     }
 
     TeamService(
@@ -100,8 +106,10 @@ public class TeamService implements Teams {
             AuditLog audit,
             AgroalDataSource dataSource,
             String kernelSchema,
-            Clock clock) {
+            Clock clock,
+            PlatformEventLog events) {
         this.dataSource = dataSource;
+        this.events = events;
         // The schema is a quoted identifier, which cannot end it nor add SQL.
         this.accountsOfTeam =
                 "select account_id from \"" + kernelSchema.replace("\"", "\"\"") + "\".team_member where team_id = ?";
@@ -277,6 +285,7 @@ public class TeamService implements Teams {
         teams.insert(team);
         teams.insert(new TeamMember(team.getId(), me(), TeamMember.OWNER, clock.instant()));
         audited("team.created", team, Map.of("name", team.getName(), "visibility", team.getVisibility()));
+        raise(PlatformEvents.TEAM_MEMBER_ADDED, team, me(), TeamMember.OWNER, null);
         return get(team.getId());
     }
 
@@ -295,12 +304,14 @@ public class TeamService implements Teams {
         for (var group : teams.groupsOf(id)) {
             for (TeamMember member : teams.members(group.getId())) {
                 teams.delete(member);
+                raise(PlatformEvents.TEAM_MEMBER_REMOVED, group, member.getAccountId(), member.getRole(), null);
             }
             teams.delete(group);
         }
         List<TeamMember> people = teams.members(id);
         for (TeamMember member : people) {
             teams.delete(member);
+            raise(PlatformEvents.TEAM_MEMBER_REMOVED, team, member.getAccountId(), member.getRole(), null);
         }
         teams.delete(team);
         for (TeamMember member : people) {
@@ -365,14 +376,19 @@ public class TeamService implements Teams {
             if (TeamMember.OWNER.equals(existing.get().getRole()) && !TeamMember.OWNER.equals(role)) {
                 requireAnotherOwner(id, person.getId());
             }
+            String previous = existing.get().getRole();
             existing.get().changeRole(role);
             teams.update(existing.get());
+            if (!previous.equals(role)) {
+                raise(PlatformEvents.TEAM_MEMBER_CHANGED, team, person.getId(), role, previous);
+            }
         } else {
             if (TeamMember.GUEST.equals(role) && inOrganization.isEmpty()) {
                 organizationMembers.insert(new OrganizationMember(
                         person.getId(), team.getOrganizationId(), Set.of(Roles.ORGANIZATION_GUEST), clock.instant()));
             }
             teams.insert(new TeamMember(id, person.getId(), role, clock.instant()));
+            raise(PlatformEvents.TEAM_MEMBER_ADDED, team, person.getId(), role, null);
         }
         audited("team.member.put", team, Map.of("email", person.getUsername(), "role", role));
         return get(id);
@@ -399,10 +415,15 @@ public class TeamService implements Teams {
             if (TeamMember.OWNER.equals(existing.get().getRole()) && !TeamMember.OWNER.equals(role)) {
                 requireAnotherOwner(group.getId(), person.getId());
             }
+            String previous = existing.get().getRole();
             existing.get().changeRole(role);
             teams.update(existing.get());
+            if (!previous.equals(role)) {
+                raise(PlatformEvents.TEAM_MEMBER_CHANGED, group, person.getId(), role, previous);
+            }
         } else {
             teams.insert(new TeamMember(group.getId(), person.getId(), role, clock.instant()));
+            raise(PlatformEvents.TEAM_MEMBER_ADDED, group, person.getId(), role, null);
         }
         audited("team.member.put", group, Map.of("email", person.getUsername(), "role", role));
         return get(group.getId());
@@ -419,13 +440,23 @@ public class TeamService implements Teams {
                 continue;
             }
             teams.delete(member.get());
+            raise(
+                    PlatformEvents.TEAM_MEMBER_REMOVED,
+                    group,
+                    account,
+                    member.get().getRole(),
+                    null);
             List<TeamMember> rest = teams.members(group.getId());
             if (rest.isEmpty()) {
                 teams.delete(group);
             } else if (rest.stream().noneMatch(other -> TeamMember.OWNER.equals(other.getRole()))) {
                 TeamMember heir = rest.getFirst();
+                String previous = heir.getRole();
                 heir.changeRole(TeamMember.GUEST.equals(heir.getRole()) ? TeamMember.GUEST : TeamMember.OWNER);
                 teams.update(heir);
+                if (!previous.equals(heir.getRole())) {
+                    raise(PlatformEvents.TEAM_MEMBER_CHANGED, group, heir.getAccountId(), heir.getRole(), previous);
+                }
             }
         }
     }
@@ -453,6 +484,7 @@ public class TeamService implements Teams {
             requireAnotherOwner(id, person.getId());
         }
         teams.delete(member);
+        raise(PlatformEvents.TEAM_MEMBER_REMOVED, team, person.getId(), member.getRole(), null);
         leaveGroups(id, person.getId());
         if (TeamMember.GUEST.equals(member.getRole())) {
             dismissGuest(person.getId(), team.getOrganizationId());
@@ -630,6 +662,28 @@ public class TeamService implements Teams {
 
     private String actor() {
         return identity.getPrincipal().getName();
+    }
+
+    /**
+     * Raises an event of the platform for a change of the people of a team or group (MK-085), so that
+     * extensions that translate teams into the rules of other servers follow it; never for a chat.
+     */
+    private void raise(
+            String type, dev.mosaikit.kernel.core.teams.Team team, UUID account, String role, String previousRole) {
+        if (team.isChat()) {
+            return;
+        }
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("team", team.getId().toString());
+        if (team.getParentId() != null) {
+            payload.put("parent", team.getParentId().toString());
+        }
+        payload.put("account", account.toString());
+        payload.put("role", role);
+        if (previousRole != null) {
+            payload.put("previousRole", previousRole);
+        }
+        events.raise(team.getOrganizationId(), type, payload);
     }
 
     private void audited(String action, dev.mosaikit.kernel.core.teams.Team team, Map<String, ?> detail) {
