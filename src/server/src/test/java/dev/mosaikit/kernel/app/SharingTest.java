@@ -536,16 +536,26 @@ class SharingTest {
         open(other, null).then().statusCode(404);
         open("no-such-link", null).then().statusCode(404);
 
-        // Every use is in the audit log, refused or not.
+        // Every refused use is in the audit log; a use that works, the first time of each hour for each
+        // link (#96): the link above was used five times, the other one once.
         List<Map<String, Object>> uses = audit(acme).stream()
                 .filter(event -> "sharing.link.used".equals(event.get("action")))
                 .toList();
         assertThat(uses).extracting(event -> event.get("outcome")).contains("SUCCEEDED", "FAILED");
         assertThat(uses).extracting(event -> event.get("actor")).containsOnly("anonymous");
-        assertThat(uses.stream()
-                        .filter(event -> "SUCCEEDED".equals(event.get("outcome")))
-                        .count())
-                .isGreaterThanOrEqualTo(3);
+        String grant = made.getString("grant.id");
+        assertThat(uses)
+                .filteredOn(event -> "SUCCEEDED".equals(event.get("outcome")))
+                .filteredOn(event -> String.valueOf(event.get("detail")).contains(grant))
+                .hasSize(1);
+        assertThat(uses)
+                .filteredOn(event -> "SUCCEEDED".equals(event.get("outcome")))
+                .hasSize(2);
+        assertThat(uses)
+                .filteredOn(event -> "FAILED".equals(event.get("outcome")))
+                .extracting(event -> String.valueOf(event.get("detail")))
+                .anySatisfy(detail -> assertThat(detail).contains("revoked"))
+                .anySatisfy(detail -> assertThat(detail).contains("expired"));
         assertThat(audit(acme))
                 .extracting(event -> event.get("action"))
                 .contains("sharing.link.created", "sharing.link.revoked");
@@ -570,10 +580,11 @@ class SharingTest {
                         "doc",
                         "d1"))
                 .isEqualTo("view");
+        // Each refusal is audited, however often it comes; the uses that work, once.
         assertThat(audit(acme))
                 .filteredOn(event -> "sharing.link.used".equals(event.get("action")))
                 .extracting(event -> event.get("outcome"))
-                .contains("DENIED", "SUCCEEDED");
+                .containsExactlyInAnyOrder("DENIED", "DENIED", "DENIED", "SUCCEEDED");
     }
 
     // --- The SQL function --------------------------------------------------------------------
