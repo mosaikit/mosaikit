@@ -67,9 +67,11 @@ npm test        # the Playwright tests of tests/, on a bench started for them
 With `npm run dev` the extension directory is linked into the installation and watched: a changed
 frontend shows at once in the open page; Java code and migrations are read at the next start.
 `npm test` starts a bench in `tests/global-setup.ts` (`Bench.start`) and the tests use the helpers
-of `@mosaikit/testing/playwright`: `signIn`, `openApp`, `api`, `member`, `restart`. A run with one
-test takes about 20 seconds for a frontend-only extension and 35 seconds with Java code, which the
-launcher builds into the kernel at the first start. `MOSAIKIT_BENCH_DEBUG=1` prints how long each
+of `@mosaikit/testing/playwright`: `signIn`, `openApp`, `api`, `member`, `restart`. The bench
+generates a random master key at each start, so an extension that reads credentials (`Secrets`) can
+store them first in its tests, through the API of the credentials of the organization or of the
+installation. A run with one test takes about 20 seconds for a frontend-only extension and 35
+seconds with Java code, which the launcher builds into the kernel at the first start. `MOSAIKIT_BENCH_DEBUG=1` prints how long each
 phase of the start takes.
 
 On Windows an antivirus scans each new file when a program first opens it: the bench links the

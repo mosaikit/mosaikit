@@ -45,6 +45,11 @@ export const DATABASE = {
   },
 };
 
+/** The master key of the store of credentials, which the bench generates for each run (MK-062). */
+export function masterKey(): string {
+  return benchSetting('mosaikit.secrets.master-key', '');
+}
+
 /** Signs the packages and the index that the tests add; trusted by the test installation. */
 export const KEY_NAME = 'bench';
 

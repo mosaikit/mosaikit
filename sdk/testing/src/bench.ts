@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
 import { execFileSync } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import {
   copyFileSync,
   cpSync,
@@ -166,6 +167,9 @@ export class Bench {
       // One connection for each mail: a pooled connection to the fake mail server once hung the
       // client, and a registration waited 22 s for its mail.
       'quarkus.mailer.keep-alive': 'false',
+      // A master key of its own for each bench (MK-062), so that the store of credentials works
+      // and extensions that read credentials can be tested; a setting of the caller replaces it.
+      'mosaikit.secrets.master-key': randomBytes(32).toString('base64'),
       ...(options.catalog ? { 'mosaikit.marketplace.sources': 'catalog/' } : {}),
       ...options.settings,
     };
