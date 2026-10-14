@@ -66,9 +66,10 @@ public class ConfirmationMail {
      * returns the mail that carries it, for {@link #deliver} once the transaction has committed.
      *
      * @param base the address of the installation, used when {@code mosaikit.public-url} is not set
+     * @param language the language of the mail, {@code en} or {@code it} ({@link MailLanguage})
      */
     @Transactional
-    public Mail prepare(UserAccount account, URI base) {
+    public Mail prepare(UserAccount account, URI base, String language) {
         Instant now = Instant.now(clock);
         confirmations.deleteByAccountId(account.getId());
         byte[] random = new byte[32];
@@ -77,23 +78,40 @@ public class ConfirmationMail {
         confirmations.insert(new EmailConfirmation(account.getId(), RememberMe.digest(token), now, now.plus(validFor)));
         String link = publicUrl.orElse(base).resolve("/?confirm=" + token).toString();
         long hours = validFor.toHours();
-        String text = """
-                Hello %s,
+        String name = account.getDisplayName();
+        if ("it".equals(language)) {
+            return Mail.withText(
+                            account.getUsername(), "Conferma il tuo indirizzo email", """
+                            Ciao %s,
 
-                to finish creating your account, confirm your email address by opening this link:
+                            per finire di creare il tuo account, conferma il tuo indirizzo email aprendo questo link:
 
-                %s
+                            %s
 
-                The link works for %d hours. If you did not ask for an account, ignore this message.
-                """.formatted(account.getDisplayName(), link, hours);
-        String html = """
-                <p>Hello %s,</p>
-                <p>to finish creating your account, confirm your email address:</p>
-                <p><a href="%s">Confirm my email address</a></p>
-                <p>The link works for %d hours. If you did not ask for an account, ignore this message.</p>
-                """.formatted(escape(account.getDisplayName()), link, hours);
-        return Mail.withText(account.getUsername(), "Confirm your email address", text)
-                .setHtml(html);
+                            Il link vale per %d ore. Se non hai chiesto un account, ignora questo messaggio.
+                            """.formatted(name, link, hours))
+                    .setHtml("""
+                            <p>Ciao %s,</p>
+                            <p>per finire di creare il tuo account, conferma il tuo indirizzo email:</p>
+                            <p><a href="%s">Conferma il mio indirizzo email</a></p>
+                            <p>Il link vale per %d ore. Se non hai chiesto un account, ignora questo messaggio.</p>
+                            """.formatted(escape(name), link, hours));
+        }
+        return Mail.withText(account.getUsername(), "Confirm your email address", """
+                        Hello %s,
+
+                        to finish creating your account, confirm your email address by opening this link:
+
+                        %s
+
+                        The link works for %d hours. If you did not ask for an account, ignore this message.
+                        """.formatted(name, link, hours))
+                .setHtml("""
+                        <p>Hello %s,</p>
+                        <p>to finish creating your account, confirm your email address:</p>
+                        <p><a href="%s">Confirm my email address</a></p>
+                        <p>The link works for %d hours. If you did not ask for an account, ignore this message.</p>
+                        """.formatted(escape(name), link, hours));
     }
 
     /**

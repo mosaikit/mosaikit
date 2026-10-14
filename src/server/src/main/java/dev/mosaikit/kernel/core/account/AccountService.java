@@ -62,6 +62,7 @@ public class AccountService {
     private final AccessKeyRegistry keys;
     private final AccessKeyAudit keyAudit;
     private final PasswordLinkService passwordLinks;
+    private final MailLanguage mailLanguage;
     private final boolean confirmEmail;
     private final Clock clock;
 
@@ -77,6 +78,7 @@ public class AccountService {
             AccessKeyRegistry keys,
             AccessKeyAudit keyAudit,
             PasswordLinkService passwordLinks,
+            MailLanguage mailLanguage,
             KernelConfig config,
             Clock clock) {
         this.accounts = accounts;
@@ -90,6 +92,7 @@ public class AccountService {
         this.keys = keys;
         this.keyAudit = keyAudit;
         this.passwordLinks = passwordLinks;
+        this.mailLanguage = mailLanguage;
         this.confirmEmail = config.accounts().confirmEmail();
         this.clock = clock;
     }
@@ -123,12 +126,12 @@ public class AccountService {
      * written in a transaction of its own, and the mail goes out after it has committed.
      */
     @Transactional(TxType.NOT_SUPPORTED)
-    public void resendConfirmation(String email, URI base) {
+    public void resendConfirmation(String email, URI base, List<Locale> languages) {
         QuarkusTransaction.requiringNew()
                 .call(() -> accounts.findByUsername(normalize(email))
                         .filter(account -> !account.isEmailConfirmed())
                         .filter(account -> account.getPasswordHash().isPresent())
-                        .map(account -> confirmationMail.prepare(account, base)))
+                        .map(account -> confirmationMail.prepare(account, base, mailLanguage.of(account, languages))))
                 .ifPresent(confirmationMail::deliver);
     }
 
@@ -149,7 +152,7 @@ public class AccountService {
      * @param base the address of the installation, for the link
      */
     @Transactional(TxType.NOT_SUPPORTED)
-    public Registration register(RegistrationRequest request, URI base) {
+    public Registration register(RegistrationRequest request, URI base, List<Locale> languages) {
         record Created(Registration registration, Optional<Mail> mail) {}
         Created created = QuarkusTransaction.requiringNew().call(() -> {
             Registration registration = createAccount(request);
@@ -157,7 +160,7 @@ public class AccountService {
             if (confirmEmail) {
                 UserAccount account =
                         accounts.findById(registration.account().id()).orElseThrow();
-                mail = Optional.of(confirmationMail.prepare(account, base));
+                mail = Optional.of(confirmationMail.prepare(account, base, mailLanguage.of(account, languages)));
             }
             return new Created(registration, mail);
         });
@@ -353,7 +356,11 @@ public class AccountService {
             UserAccount account, OrganizationMember member, Organization organization, boolean mail, URI base) {
         PasswordLinkService.Issued issued = passwordLinks.issue(account, organization.getId(), base);
         Optional<Mail> message =
-                mail ? Optional.of(passwordLinks.mail(account, organization.getName(), issued)) : Optional.empty();
+                // Not the language of the administrator who asks: the one of the person, or of the installation.
+                mail
+                        ? Optional.of(passwordLinks.mail(
+                                account, organization.getName(), issued, mailLanguage.of(account, List.of())))
+                        : Optional.empty();
         return new PasswordLinkIssue(MemberView.of(account, member), issued, message);
     }
 

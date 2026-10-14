@@ -238,6 +238,11 @@ with a link: until they open it the account does not sign in. The link works onc
   does not take the mail in time, or refuses it, the person sees that the mail could not be sent; the account is created all the
   same, and they ask for the link again from the sign-in page once the mail server works. The
   kernel never keeps a database transaction open while it talks to the mail server.
+- The mails of the kernel are written in English or Italian: in the language the person chose in
+  their settings; else, for a mail they ask for themselves (registration, a new confirmation link),
+  in the language of their browser; else in the language of the installation, `mosaikit.language`
+  (`en` unless set). The mail that sets the password of an account an administrator created is in
+  the language of the person or of the installation, never in that of the administrator.
 
 ## Accounts created by an administrator
 

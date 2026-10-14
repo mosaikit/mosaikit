@@ -21,6 +21,7 @@ import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.Context;
+import jakarta.ws.rs.core.HttpHeaders;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriInfo;
@@ -59,8 +60,10 @@ public class AccountResource {
     @Operation(
             summary = "Register in an organization that allows self-registration",
             description = "201 with the account, or 202 when a link was sent to confirm the address first.")
-    public Response register(@Valid @NotNull RegistrationRequest request, @Context UriInfo uri) {
-        AccountService.Registration registration = service.register(request, uri.getBaseUri());
+    public Response register(
+            @Valid @NotNull RegistrationRequest request, @Context UriInfo uri, @Context HttpHeaders headers) {
+        AccountService.Registration registration =
+                service.register(request, uri.getBaseUri(), headers.getAcceptableLanguages());
         if (registration.confirmationSent()) {
             return Response.accepted(Map.of("email", registration.account().username(), "confirmation", "sent"))
                     .build();
@@ -90,8 +93,8 @@ public class AccountResource {
     @Operation(
             summary = "Send the link that confirms an email address again",
             description = "Always 202, so that nobody learns which addresses have an account.")
-    public Response resend(@Valid @NotNull ResendRequest request, @Context UriInfo uri) {
-        service.resendConfirmation(request.email(), uri.getBaseUri());
+    public Response resend(@Valid @NotNull ResendRequest request, @Context UriInfo uri, @Context HttpHeaders headers) {
+        service.resendConfirmation(request.email(), uri.getBaseUri(), headers.getAcceptableLanguages());
         return Response.accepted().build();
     }
 

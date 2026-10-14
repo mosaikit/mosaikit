@@ -357,6 +357,14 @@ public interface KernelConfig {
      */
     Optional<URI> publicUrl();
 
+    /**
+     * The language of the installation, {@code en} or {@code it}: the mails of the kernel to a person
+     * who chose no language, and who does not ask in one, are written in it (#95). Another value
+     * counts as {@code en}.
+     */
+    @WithDefault("en")
+    String language();
+
     /** Settings of the user interface. */
     interface Ui {
 
