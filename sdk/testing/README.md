@@ -78,7 +78,10 @@ test('a person of the organization opens the app', async ({ page }) => {
 
 The bench also has `restart(settings?)`, `stop()`, `signing` (to sign packages and catalogs with
 its key), and `info`. Mails go to a fake mail server, readable with `mails(directory)` and
-`confirmationLink(directory, address)`.
+`confirmationLink(directory, address)`. Each bench generates a random master key
+(`mosaikit.secrets.master-key`), so that the store of credentials works and an extension that reads
+credentials with `Secrets` can store them in its tests; `settings` can give another one, as it
+should with a `database` that keeps its credentials from one run to the next.
 
 ## Which installation
 
