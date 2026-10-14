@@ -3,6 +3,7 @@
 package dev.mosaikit.kernel.core.resources;
 
 import dev.mosaikit.kernel.api.context.CurrentOrganization;
+import dev.mosaikit.kernel.api.context.NoOrganizationException;
 import dev.mosaikit.kernel.api.events.PlatformEvents;
 import dev.mosaikit.kernel.api.extension.ExtensionManifest;
 import dev.mosaikit.kernel.api.resource.Resource;
@@ -40,9 +41,13 @@ import org.jboss.logging.Logger;
  * bean. Every call acts on the organization of the request and joins the transaction of the caller.
  * The calling extension names itself in the reference; only an active extension that declares the
  * type in {@code resources} of its manifest registers, reads and removes entries of that type.
+ *
+ * <p>A documented exception of the API is thrown before anything is written, and leaves the transaction
+ * of the caller usable (#126): an extension that catches it goes on writing in the same transaction.
  */
 @ApplicationScoped
-@Transactional
+@Transactional(
+        dontRollbackOn = {IllegalArgumentException.class, NoSuchElementException.class, NoOrganizationException.class})
 public class ResourceRegistry implements Resources {
 
     private static final Logger LOG = Logger.getLogger(ResourceRegistry.class);

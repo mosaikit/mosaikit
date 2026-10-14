@@ -373,6 +373,34 @@ COPY --chown=185 my-extension-1.0.0.zip /opt/mosaikit/extensions/
 RUN /opt/mosaikit/mosaikit build
 ```
 
+### Transactions and the beans of the kernel
+
+The beans of `kernel-api` (`Secrets`, `Resources`, `Sharing`, `Permissions`, `PermissionHolders`,
+`FileStorage`, `Quotas`, `AuditLog`, `PlatformEvents`) join the transaction of the caller: what they
+write commits or rolls back with the work of the extension.
+
+**Documented exceptions leave your transaction usable.** An exception that a method of the API
+declares in its `@throws`, such as `SecretsUnavailableException`, `NoSuchElementException`,
+`IllegalArgumentException`, `AccessDeniedException` or `QuotaExceededException`, is thrown before
+the bean writes anything in your transaction, and does not mark it for rollback. Catch it and go on
+in the same transaction:
+
+```java
+@Transactional
+public Report create(ReportRequest request) {
+    String summary;
+    try (SecretValue key = secrets.require("org.example.reports", "model-provider")) {
+        summary = client.summarize(request.text(), key.reveal());
+    } catch (SecretsUnavailableException | NoSuchElementException e) {
+        summary = null; // no credential here: save the report without a summary
+    }
+    return reports.insert(new Report(request.title(), summary)); // commits
+}
+```
+
+Any other failure of a bean, such as an error of the database, still marks the transaction for
+rollback: let it go, and the kernel answers the request with an error.
+
 ## Signing a package
 
 Installations can refuse packages that are not signed by a publisher they trust (MK-013,
@@ -1301,7 +1329,9 @@ String summarize(String text) {
   that take only strings, `reveal()`, where the call needs it, and close it when done. Never return
   it to the browser, write it into a document or put it in a log or an error message.
 - `SecretsUnavailableException` (answered with 503) means that the installation has no master key,
-  or that the credential does not decrypt with its keys.
+  or that the credential does not decrypt with its keys. Catching it leaves the transaction of the
+  request usable (see [Transactions](#transactions-and-the-beans-of-the-kernel)): an extension can go
+  on without the credential, such as on an installation without a master key.
 - Every read is in the audit log of the organization (`secrets.read`, channel `EXTENSION`), with the
   name of the credential and the extension, never the value.
 - Tell the administrators in the documentation of the extension which names it reads, and of which
