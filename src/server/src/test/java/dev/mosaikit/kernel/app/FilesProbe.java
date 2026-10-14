@@ -7,6 +7,9 @@ import dev.mosaikit.kernel.api.files.FileStorage;
 import dev.mosaikit.kernel.api.files.StoredFile;
 import dev.mosaikit.kernel.api.resource.ResourceRef;
 import io.quarkus.security.Authenticated;
+import jakarta.transaction.SystemException;
+import jakarta.transaction.TransactionManager;
+import jakarta.transaction.Transactional;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
@@ -42,9 +45,11 @@ public class FilesProbe {
     public record Read(StoredFile file, String content) {}
 
     private final FileStorage files;
+    private final TransactionManager transactions;
 
-    public FilesProbe(FileStorage files) {
+    public FilesProbe(FileStorage files, TransactionManager transactions) {
         this.files = files;
+        this.transactions = transactions;
     }
 
     @POST
@@ -63,6 +68,51 @@ public class FilesProbe {
         }
         FileStorage.NewFile stored = file;
         return answer(() -> files.store(extension, stored, content));
+    }
+
+    /**
+     * Stores a file in a transaction of the extension, as an extension that stores files in a
+     * {@code @Transactional} method does; {@code failed} first marks it for rollback, as an earlier
+     * step of the extension that failed (#93). A refusal of the bean answers 409.
+     */
+    @POST
+    @Path("/in-transaction")
+    @Consumes(MediaType.WILDCARD)
+    @Transactional
+    public Response storeInTransaction(
+            @PathParam("extension") String extension,
+            @QueryParam("name") String name,
+            @QueryParam("failed") boolean failed,
+            @HeaderParam(HttpHeaders.CONTENT_TYPE) String type,
+            InputStream content)
+            throws SystemException {
+        if (failed) {
+            // An earlier step that read the database, then failed.
+            files.list(extension, null, 0, 1);
+            transactions.setRollbackOnly();
+        }
+        try {
+            return answer(() -> files.store(extension, FileStorage.NewFile.of(name, type), content));
+        } catch (IllegalStateException e) {
+            return Response.status(Response.Status.CONFLICT)
+                    .entity(List.of(String.valueOf(e.getCause().getMessage())))
+                    .build();
+        }
+    }
+
+    /** Deletes a file in a transaction of the extension marked for rollback (#93). */
+    @DELETE
+    @Path("/{id}/in-failed-transaction")
+    @Transactional
+    public Response deleteInFailedTransaction(@PathParam("extension") String extension, @PathParam("id") UUID id)
+            throws SystemException {
+        // An earlier step that read the database, then failed.
+        files.find(extension, id);
+        transactions.setRollbackOnly();
+        return answer(() -> {
+            files.delete(extension, id);
+            return null;
+        });
     }
 
     @GET

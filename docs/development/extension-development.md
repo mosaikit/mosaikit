@@ -579,7 +579,9 @@ files.delete(EXTENSION, photo.id());                            // owner, team o
 ```
 
 The calls join the transaction of the caller: a file whose transaction rolls back leaves the store
-too. `NoSuchElementException` means not found or not readable, `IllegalArgumentException` a name,
+too. A transaction that can no longer commit, because an earlier step marked it for rollback or it
+timed out, stores nothing: `store` throws `IllegalStateException` before reading the content, and
+`delete` leaves the file, as the rollback will. `NoSuchElementException` means not found or not readable, `IllegalArgumentException` a name,
 type or size the kernel refuses (at most `mosaikit.files.max-size`), `SecurityException` a delete
 the person may not make.
 
