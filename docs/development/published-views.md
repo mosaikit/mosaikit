@@ -7,6 +7,10 @@ so that they read a contract instead of the internal tables of the kernel, which
 release. How an administrator gives a service a login on them is in the
 [administration guide](../guide/administration.md#published-views-for-external-services).
 
+The Java code of an extension does not need them: it reads the same people and teams of its
+organization through the `People` bean of `kernel-api`, without a database login (see the
+[extension guide](extension-development.md#people-and-teams-of-the-organization)).
+
 ## The contract
 
 The views are in schema `mk_published` of the database of the installation. They are plain views:
