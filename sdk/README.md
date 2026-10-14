@@ -26,7 +26,7 @@ my-extension/
 
 The build produces `target/my-extension-<version>.zip` with `manifest.yaml`, `lib/`, `db/` and
 `web/`; it is installed by copying it into `extensions/` of an installation, as it is. The samples in
-[`mosaikit/mosaikit-samples`](https://github.com/mosaikit/mosaikit-samples) are complete examples, and
+[`mosaikit/mosaikit-ext-samples`](https://github.com/mosaikit/mosaikit-ext-samples) are complete examples, and
 [docs/development/extension-development.md](../docs/development/extension-development.md) is the full guide.
 
 ## Rules

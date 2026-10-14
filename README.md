@@ -29,7 +29,7 @@ can in turn be extended by other extensions.
 | `src/server/` | The kernel: one Quarkus application with the services and the launcher that loads Java extensions. |
 | `src/web/` | The web shell (Lit + Vite), built by npm and packaged in the kernel. |
 | `sdk/` | What third parties need to write extensions: `sdk/java` (the Java extension API and the manifest schema), `sdk/js` (`@mosaikit/sdk` for extension frontends) and `sdk/create-extension` (a generator of new extensions). See [sdk/README.md](sdk/README.md). |
-| `tests/fixtures/extensions/` | The extensions that the tests of the kernel install: small, owned by the tests. The sample extensions are in [mosaikit/mosaikit-samples](https://github.com/mosaikit/mosaikit-samples), the apps Teams and Chat in repositories of their own (ADR-0035). |
+| `tests/fixtures/extensions/` | The extensions that the tests of the kernel install: small, owned by the tests. The sample extensions are in [mosaikit/mosaikit-ext-samples](https://github.com/mosaikit/mosaikit-ext-samples), the apps Teams and Chat in repositories of their own (ADR-0035). |
 | `distribution/` | How Mosaikit is delivered: installation, portable archives, Docker, Kubernetes, Keycloak realm, release scripts. |
 | `tests/e2e/` | End-to-end tests with Playwright on a real installation. See [tests/e2e/README.md](tests/e2e/README.md). |
 | `build/` | Scripts for development: `npm run dev`, which starts the kernel with an embedded PostgreSQL and a fake mail server from `sdk/testing`. |
