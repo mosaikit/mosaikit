@@ -447,7 +447,30 @@ the members of the team and by whoever it is shared with, as MK-032 decided. The
 `data-document` belongs to the kernel in an extension with collections.
 
 A Java backend reads the teams of the person and their people through `Teams` of `kernel-api`
-(`dev.mosaikit.kernel.api.teams`). Guests of an organization cannot call the APIs of backends.
+(`dev.mosaikit.kernel.api.teams`).
+
+### Guests
+
+A guest of the organization (MK-032) reaches the API of a backend only once the organization gave
+them something of that extension: a permission of it through a team of theirs or a personal
+exception (MK-056), or a resource of it that they own or that is shared with them or with a team of
+theirs (MK-055). Otherwise the kernel answers 403 before the extension runs. Once let in, a guest
+gets exactly what the checks of the extension give them, with the same rules as members:
+`Permissions` answers with the permissions of their teams and exceptions (never a profile), and
+`Sharing` with the grants to them and to their teams (never those to the organization). So every
+route that a guest may reach must check a permission or a level: a route that lists the rows of the
+organization without asking `Sharing` would show them to the guest. Keep the routes for the people
+of the organization to their roles, which guests do not have:
+
+```java
+@GET
+@Path("report")
+@RolesAllowed({"organization-user", "organization-admin"})   // never a guest
+public Report report() { ... }
+```
+
+In SQL, `mk_kernel.current_guest()` tells whether the request is of a guest, for a row-level security
+policy that keeps the rows of the organization from guests, as the kernel does for its documents.
 
 ### People and teams of the organization
 
@@ -990,8 +1013,8 @@ What the permissions do today (MK-056):
   `mk_kernel.member_profile` and `mk_kernel.permission_grant`, under row-level security; the
   administrators of the organization manage them through
   `/api/v1/organizations/{slug}/permissions` (see the [administration guide](../guide/administration.md)).
-- Guests are refused the backends of extensions (`/api/v1/ext/…`) as before (MK-032): a permission
-  granted to a guest matters for the frontend and for the documents of the extension.
+- A permission granted to a guest also opens the backend of the extension to them (`/api/v1/ext/…`,
+  see "Guests" above), where the extension checks what they reach.
 
 What sharing does today (MK-055):
 

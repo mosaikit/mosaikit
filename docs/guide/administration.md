@@ -364,7 +364,9 @@ person, a team, the whole organization, anyone with a link or the public, at the
 extension declares, such as view, use, edit and manage (MK-055). The administrators of an
 organization hold every level on every resource of their organization and may share any of them;
 platform administrators hold none for being platform administrators. A guest gets what is shared
-with them or with their teams, never what is shared with the organization.
+with them or with their teams, never what is shared with the organization. A guest reaches an
+extension only when the organization gave them something of it, a permission through a team or an
+exception, or a resource shared with them or their teams; then they get exactly that.
 
 A link carries a level (never one that edits), an expiry and an optional password, and can be
 revoked; after its expiry or revocation it answers "not found". No link lasts longer than
