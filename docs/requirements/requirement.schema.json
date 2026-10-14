@@ -78,7 +78,7 @@
       "minLength": 1
     },
     "verified-in": {
-      "description": "Repository whose tests verify the requirement, when they are not in this one (ADR-0035), for example mosaikit/mosaikit-samples.",
+      "description": "Repository whose tests verify the requirement, when they are not in this one (ADR-0035), for example mosaikit/mosaikit-ext-samples.",
       "type": "string",
       "pattern": "^[a-z0-9-]+/[a-z0-9.-]+$"
     },

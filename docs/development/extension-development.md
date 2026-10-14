@@ -23,7 +23,7 @@ repository, `node sdk/create-extension/dist/bin.js` does the same after `npm run
 To install the extension elsewhere, copy `target/traffic-0.1.0.zip` into `extensions/` of an
 installation, or upload it from the Extensions page; sign it first for an installation that accepts
 only trusted publishers ([Signing a package](#signing-a-package)). The samples in
-[mosaikit/mosaikit-samples](https://github.com/mosaikit/mosaikit-samples) are complete extensions built the same way.
+[mosaikit/mosaikit-ext-samples](https://github.com/mosaikit/mosaikit-ext-samples) are complete extensions built the same way.
 The rest of this guide explains what each part does.
 
 ## Build an extension
@@ -281,7 +281,7 @@ people who choose another theme in their settings. The bar of the shell has the 
 shows the logo for dark backgrounds; without one, the logo for light backgrounds. Draw the logo
 square: it is shown at 22 to 28 pixels. Choose colors with enough
 contrast (WCAG 2.1 AA: 4.5:1 for text): the high contrast appearance stays available to everyone.
-[`sample-theme`](https://github.com/mosaikit/mosaikit-samples/tree/main/theme) is a complete example.
+[`sample-theme`](https://github.com/mosaikit/mosaikit-ext-samples/tree/main/theme) is a complete example.
 
 ### Components and themes
 
@@ -307,8 +307,8 @@ Bootstrap Italia) and with the light or dark preference of the system; never har
 
 A frontend may use React, Vue or any framework ([ADR-0020](../adr/0020-frontends-in-any-framework.md)):
 bundle it with the framework into one ES module (Vite library mode, `formats: ['es']`) and declare
-that module as `frontend.entry`, as [`sample-react`](https://github.com/mosaikit/mosaikit-samples/tree/main/react) and
-[`sample-vue`](https://github.com/mosaikit/mosaikit-samples/tree/main/vue) do. Render inside the shadow root of your custom element,
+that module as `frontend.entry`, as [`sample-react`](https://github.com/mosaikit/mosaikit-ext-samples/tree/main/react) and
+[`sample-vue`](https://github.com/mosaikit/mosaikit-ext-samples/tree/main/vue) do. Render inside the shadow root of your custom element,
 unmount in `disconnectedCallback`, style with the `--mk-*` tokens and talk to other extensions only
 through `context.events` and extension points.
 
@@ -335,7 +335,7 @@ even if you plan to run as a module: installations that isolate unverified exten
 
 ## Java code
 
-[`samples/notes`](https://github.com/mosaikit/mosaikit-samples/tree/main/notes) is a complete example: an entity, a Jakarta
+[`samples/notes`](https://github.com/mosaikit/mosaikit-ext-samples/tree/main/notes) is a complete example: an entity, a Jakarta
 Data repository and a REST resource, with the migration of its schema.
 
 - Build the extension as a Maven module whose dependencies all have scope `provided`: `mosaikit-kernel-api` (sdk/java),
@@ -414,7 +414,7 @@ await items.remove(created.id);
 A document is a JSON object of at most 256 KiB, and a collection holds at most 10,000 of them.
 Errors are `DataError`s with the HTTP status and the detail of the kernel. Such an extension is active
 as soon as it is installed: the marketplace answers `restartRequired: false` and the shell shows
-the app without a reload. [`sample-todo`](https://github.com/mosaikit/mosaikit-samples/tree/main/todo) is a complete example, and
+the app without a reload. [`sample-todo`](https://github.com/mosaikit/mosaikit-ext-samples/tree/main/todo) is a complete example, and
 `create-mosaikit-extension` without `--backend` writes one. When an app needs queries beyond listing
 and paging, give it a backend and a schema.
 
@@ -602,8 +602,8 @@ and covers its whole scope.
 ## Extending another extension
 
 An extension extends another one on three levels ([ADR-0019](../adr/0019-plugins-extending-plugins.md)),
-as [`sample-estimates`](https://github.com/mosaikit/mosaikit-samples/tree/main/estimates) extends
-[`sample-activities`](https://github.com/mosaikit/mosaikit-samples/tree/main/activities):
+as [`sample-estimates`](https://github.com/mosaikit/mosaikit-ext-samples/tree/main/estimates) extends
+[`sample-activities`](https://github.com/mosaikit/mosaikit-ext-samples/tree/main/activities):
 
 1. **Require it**, so that the kernel migrates it first and refuses yours without it:
    `requires: { dev.mosaikit.sample.activities: '^0.1' }`.
@@ -637,6 +637,33 @@ as [`sample-estimates`](https://github.com/mosaikit/mosaikit-samples/tree/main/e
    ```
 4. **Behaviour**: publish and subscribe to events on the bus (`estimates.changed`,
    `activities.completed`).
+
+## Composing products and common extensions
+
+A product built on Mosaikit is its branding (a [theme extension](#theme-extensions)), a set of common
+extensions and its own extensions; its distribution lists the extensions it installs
+([ADR-0041](../adr/0041-common-extensions-composed-by-products.md)). The common extensions, such as
+a file catalog, dashboards and processes, are in
+[mosaikit/mosaikit-ext](https://github.com/mosaikit/mosaikit-ext), under the MPL-2.0 licence like
+Mosaikit, with requirements of their own (`EXT-nnn`, in its `docs/requirements`). The sample
+extensions of this guide are in
+[mosaikit/mosaikit-ext-samples](https://github.com/mosaikit/mosaikit-ext-samples).
+
+- **Names.** The folder, the Maven artifact and the npm package of an extension are
+  `ext-<extension>[-<sub-extension>]...`, such as `ext-catalog` and its connector
+  `ext-catalog-connection-postgres`. The manifest id is the reverse-DNS name of the owner followed
+  by the same segments: `io.github.mosaikit.ext.catalog.connection.postgres` in mosaikit-ext,
+  `org.example.ext.permits` for an extension of a product whose domain is `example.org`.
+- **Independence.** An extension works without the others it can use: it hides or explains what
+  needs a missing extension, and takes it up again when that extension comes back. Declare a
+  required dependency in `requires` only when the extension cannot work at all without the other.
+
+> **Coming with the phase "Composition".** Libraries brought by Java extensions (MK-131), optional
+> dependencies and installation that respects dependents (MK-132), knowing whether another
+> extension is active (MK-133), versioned contracts between extensions on the server and in the
+> frontend (MK-134), and references between resources of different extensions that survive the
+> absence of one of them (MK-135). Until then a Java extension brings no libraries, and extensions
+> talk through extension points and events as described above.
 
 ## Actions for assistants
 

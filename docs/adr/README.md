@@ -45,3 +45,4 @@ by a new record that supersedes the old one, never by editing it.
 | [0038](0038-permissions-from-manifests-and-profiles.md) | Permissions declared by extensions, granted through profiles | Accepted |
 | [0039](0039-console-layout.md) | A console with a sidebar for work, organization and platform | Accepted |
 | [0040](0040-accounts-in-keycloak-and-emergency-access.md) | Accounts in Keycloak, and one emergency administrator account | Accepted |
+| [0041](0041-common-extensions-composed-by-products.md) | Common extensions in mosaikit-ext, composed by products | Accepted |
