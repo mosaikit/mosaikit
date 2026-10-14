@@ -398,20 +398,38 @@ public class AccountService {
      * tokens end at once, until it is reactivated; its access keys are revoked (MK-060).
      *
      * @param actor the username of the administrator, who cannot suspend their own account
+     * @param reason why, or {@code null}; an account already suspended keeps its first reason
      */
-    public AccountStatus suspend(String email, String actor) {
+    public AccountStatus suspend(String email, String actor, String reason) {
+        String why = reason == null || reason.isBlank() ? null : reason.strip();
+        if (why != null && why.length() > SuspensionRequest.MAX_REASON) {
+            throw new InvalidInputException(
+                    List.of("reason is longer than " + SuspensionRequest.MAX_REASON + " characters"));
+        }
         UserAccount account = accounts.findByUsername(normalize(email))
                 .orElseThrow(() -> new ResourceNotFoundException("No account '" + email + "'."));
         if (account.getUsername().equals(normalize(actor))) {
             throw new ForbiddenOperationException("You cannot suspend your own account.");
         }
         if (!account.isSuspended()) {
-            account.suspend(Instant.now(clock));
+            account.suspend(Instant.now(clock), normalize(actor), why);
             accounts.update(account);
         }
         sessions.endAllOf(account.getId());
         keys.revokeAllOf(account.getId()).forEach(key -> keyAudit.revoked(actor, key, "suspended"));
         return AccountStatus.of(account);
+    }
+
+    /** Whether an account may sign in, and why not (MK-125). */
+    public AccountStatus status(String email) {
+        return accounts.findByUsername(normalize(email))
+                .map(AccountStatus::of)
+                .orElseThrow(() -> new ResourceNotFoundException("No account '" + email + "'."));
+    }
+
+    /** The suspended accounts, the most recently suspended first (MK-125). */
+    public List<AccountStatus> suspended() {
+        return accounts.findSuspended().stream().map(AccountStatus::of).toList();
     }
 
     /** Lets a suspended account sign in again; the sessions it had stay ended. */

@@ -53,6 +53,18 @@ export interface ContentSecurityPolicy {
   readonly origins: AllowedOrigin[];
 }
 
+/** Whether an account may sign in, for platform administrators (MK-125). */
+export interface AccountStatus {
+  readonly accountId: string;
+  readonly username: string;
+  readonly displayName: string;
+  readonly suspended: boolean;
+  readonly suspendedAt: string | null;
+  /** The username of the administrator who suspended it. */
+  readonly suspendedBy: string | null;
+  readonly reason: string | null;
+}
+
 /** A live session of the signed-in person, kept by the kernel (MK-125). */
 export interface AccountSession {
   readonly id: string;
@@ -543,6 +555,7 @@ function tabStorage(): KeyValueStore | undefined {
 const SERVICE_IDENTITIES = '/api/v1/platform/service-identities';
 const INSTALLATION_SECRETS = '/api/v1/platform/credentials';
 const CONTENT_SECURITY_POLICY = '/api/v1/platform/content-security-policy';
+const PLATFORM_ACCOUNTS = '/api/v1/platform/accounts';
 
 /**
  * Minimal client of the kernel API. A local account signs in once: the kernel keeps the session
@@ -990,6 +1003,35 @@ export class KernelClient {
   async disallowOrigin(origin: string): Promise<void> {
     await this.sendJson<undefined>(
       `${CONTENT_SECURITY_POLICY}/origins?origin=${encodeURIComponent(origin)}`,
+      'DELETE',
+    );
+  }
+
+  /** The suspended accounts, the most recently suspended first (MK-125). */
+  suspendedAccounts(): Promise<AccountStatus[]> {
+    return this.getJson<AccountStatus[]>(`${PLATFORM_ACCOUNTS}/suspended`);
+  }
+
+  /** Whether an account may sign in, and why not (MK-125). */
+  accountStatus(email: string): Promise<AccountStatus> {
+    return this.getJson<AccountStatus>(
+      `${PLATFORM_ACCOUNTS}/${encodeURIComponent(email)}/suspension`,
+    );
+  }
+
+  /** Suspends an account, which ends its sessions at once (MK-125). */
+  suspendAccount(email: string, reason: string): Promise<AccountStatus> {
+    return this.sendJson<AccountStatus>(
+      `${PLATFORM_ACCOUNTS}/${encodeURIComponent(email)}/suspension`,
+      'PUT',
+      { reason },
+    );
+  }
+
+  /** Lets a suspended account sign in again (MK-125). */
+  reinstateAccount(email: string): Promise<AccountStatus> {
+    return this.sendJson<AccountStatus>(
+      `${PLATFORM_ACCOUNTS}/${encodeURIComponent(email)}/suspension`,
       'DELETE',
     );
   }

@@ -56,6 +56,14 @@ public class UserAccount {
     @Column(name = "suspended_at")
     private Instant suspendedAt;
 
+    /** Why an administrator suspended the account, as they wrote it; empty without a suspension. */
+    @Column(name = "suspension_reason")
+    private String suspensionReason;
+
+    /** The username of the administrator who suspended the account. */
+    @Column(name = "suspended_by")
+    private String suspendedBy;
+
     /** The personal settings, as JSON (MK-027). */
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(nullable = false)
@@ -124,14 +132,35 @@ public class UserAccount {
         return suspendedAt != null;
     }
 
-    /** Suspends the account; its sessions are ended by {@link SessionRegistry}. */
-    public void suspend(Instant now) {
+    /**
+     * Suspends the account; its sessions are ended by {@link SessionRegistry}.
+     *
+     * @param by the username of the administrator
+     * @param reason why, or {@code null}
+     */
+    public void suspend(Instant now, String by, String reason) {
         this.suspendedAt = Objects.requireNonNull(now, "now");
+        this.suspendedBy = by;
+        this.suspensionReason = reason;
     }
 
     /** Lets a suspended account sign in again. */
     public void reactivate() {
         this.suspendedAt = null;
+        this.suspendedBy = null;
+        this.suspensionReason = null;
+    }
+
+    public Optional<Instant> getSuspendedAt() {
+        return Optional.ofNullable(suspendedAt);
+    }
+
+    public Optional<String> getSuspendedBy() {
+        return Optional.ofNullable(suspendedBy);
+    }
+
+    public Optional<String> getSuspensionReason() {
+        return Optional.ofNullable(suspensionReason);
     }
 
     public UUID getId() {

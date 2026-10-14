@@ -482,6 +482,39 @@ const ITALIAN: Record<string, string> = {
   'Shared with you through a link, until {date}.': 'Condiviso con te con un link, fino al {date}.',
   'Its app cannot show it here. Sign in to open it.':
     'La sua app non lo può mostrare qui. Accedi per aprirlo.',
+  // The suspension of accounts by platform administrators (MK-125)
+  Accounts: 'Account',
+  'Suspend the account of a person who must not sign in any more, for example when they leave or lose a device: their sessions end at once, on every browser, and they sign in by no means until reinstated.':
+    "Sospendi l'account di una persona che non deve più accedere, per esempio quando se ne va o perde un dispositivo: le sue sessioni terminano subito, su ogni browser, e non può accedere in alcun modo finché non viene riattivata.",
+  'Find an account': 'Trova un account',
+  'Email address of the account': "Indirizzo email dell'account",
+  Find: 'Trova',
+  'Suspended accounts': 'Account sospesi',
+  'No account is suspended.': 'Nessun account è sospeso.',
+  Reinstate: 'Riattiva',
+  'Reason for the suspension': 'Motivo della sospensione',
+  'Shown to the other platform administrators and kept in the audit log.':
+    'Visibile agli altri amministratori della piattaforma e conservato nel registro di audit.',
+  Suspend: 'Sospendi',
+  Suspension: 'Sospensione',
+  'Reinstate {name}': 'Riattiva {name}',
+  'Suspend {name}? Their sessions end at once and they cannot sign in until reinstated.':
+    'Sospendere {name}? Le sue sessioni terminano subito e non può accedere finché non viene riattivato.',
+  'Active: the person signs in.': 'Attivo: la persona può accedere.',
+  'Suspended {when} by {person}.': 'Sospeso il {when} da {person}.',
+  'Reason: {reason}': 'Motivo: {reason}',
+  'No reason was given.': 'Nessun motivo indicato.',
+  'The suspended accounts cannot be read: {reason}':
+    'Gli account sospesi non si possono leggere: {reason}',
+  'Write the email address of the account.': "Scrivi l'indirizzo email dell'account.",
+  'No account has the email address {address}.': "Nessun account ha l'indirizzo email {address}.",
+  'The account cannot be read: {reason}': "L'account non si può leggere: {reason}",
+  'Write the reason for the suspension.': 'Scrivi il motivo della sospensione.',
+  'The reason is longer than {max} characters.': 'Il motivo supera i {max} caratteri.',
+  '{name} is suspended: their sessions ended.': '{name} è sospeso: le sue sessioni sono terminate.',
+  'The account cannot be suspended: {reason}': "L'account non si può sospendere: {reason}",
+  '{name} is reinstated and can sign in again.': '{name} è riattivato e può accedere di nuovo.',
+  'The account cannot be reinstated: {reason}': "L'account non si può riattivare: {reason}",
 };
 
 const TRANSLATIONS: Record<Language, Record<string, string>> = { en: {}, it: ITALIAN };

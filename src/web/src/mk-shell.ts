@@ -38,6 +38,7 @@ import { MkAdminSecrets } from './mk-admin-secrets.js';
 import './mk-admin-services.js';
 import './mk-admin-installation-secrets.js';
 import './mk-admin-origins.js';
+import './mk-admin-accounts.js';
 import './mk-admin-settings.js';
 import './mk-assistant.js';
 import './mk-extension-frame.js';
@@ -65,8 +66,8 @@ const EXTENSION_WATCH_MS = 1_000;
  * The pages of administrators: the apps, the permissions, the credentials and the quotas of the
  * organization for its administrators (MK-030, MK-056, MK-062, MK-076), the extensions (MK-022),
  * the platform (MK-048), the service identities (MK-124), the credentials of the installation
- * (MK-127) and the external origins of the content security policy (MK-128) for platform
- * administrators.
+ * (MK-127), the external origins of the content security policy (MK-128) and the suspension of
+ * accounts (MK-125) for platform administrators.
  */
 const ADMIN_PAGES = [
   {
@@ -121,6 +122,12 @@ const ADMIN_PAGES = [
     path: '/admin/origins',
     title: 'External origins',
     element: 'mk-admin-origins',
+    role: 'platform-admin',
+  },
+  {
+    path: '/admin/accounts',
+    title: 'Accounts',
+    element: 'mk-admin-accounts',
     role: 'platform-admin',
   },
 ] as const;

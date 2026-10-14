@@ -7,6 +7,7 @@ import jakarta.data.repository.Insert;
 import jakarta.data.repository.Query;
 import jakarta.data.repository.Repository;
 import jakarta.data.repository.Update;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -25,6 +26,9 @@ public interface UserAccounts {
 
     @Query("select count(a) from UserAccount a where a.username = :username")
     long countByUsername(String username);
+
+    @Query("select a from UserAccount a where a.suspendedAt is not null order by a.suspendedAt desc")
+    List<UserAccount> findSuspended();
 
     @Insert
     void insert(UserAccount account);
