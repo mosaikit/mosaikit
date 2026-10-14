@@ -160,6 +160,15 @@ public interface KernelConfig {
          */
         Optional<List<String>> linkPreviousKeys();
 
+        /**
+         * How long the content of a file whose record is gone stays in the store before a clean-up
+         * may remove it (#102): the record of a deleted file, team or organization, or of an
+         * uninstalled extension once a platform administrator asks. One day at least, whatever is
+         * set, so that a database restored from a backup of that time still finds its files.
+         */
+        @WithDefault("30d")
+        Duration removalRetention();
+
         /** The {@code s3} store. */
         S3 s3();
 

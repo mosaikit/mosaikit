@@ -173,6 +173,9 @@ public class RowSecurity {
         String s = quote(kernelSchema);
         // nosemgrep: java.lang.security.audit.formatted-sql-string.formatted-sql-string
         statement.execute("revoke all on " + s + ".installation_secret from " + r);
+        // The contents of files queued for removal (#102) may be of any organization, or of none left.
+        // nosemgrep: java.lang.security.audit.formatted-sql-string.formatted-sql-string
+        statement.execute("revoke all on " + s + ".file_removal from " + r);
     }
 
     private static String database(Connection connection) throws SQLException {
