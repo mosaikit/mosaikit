@@ -631,6 +631,40 @@ public class KernelSharing implements Sharing {
         return entry(organization.require(), resource);
     }
 
+    /**
+     * Of some entries of the organization of the request, the ids of those on which the request has a
+     * level, also through the resources above them (MK-136), read in a few queries whatever their
+     * number (MK-097). An entry of a type that no active extension declares is left out.
+     */
+    public Set<UUID> readable(List<RegisteredResource> targets) {
+        Optional<UUID> org = organization.id();
+        if (targets.isEmpty() || org.isEmpty()) {
+            return Set.of();
+        }
+        Lineage lineage = lineage(org.get(), targets);
+        Reach.Viewer viewer = requestViewer(org.get(), linkOf(org.get(), LinkRequest.current()));
+        Instant now = Instant.now(clock);
+        Set<UUID> readable = new HashSet<>();
+        for (RegisteredResource entry : targets) {
+            declaredType(entry.ref())
+                    .flatMap(type -> lineage.level(type, entry, viewer, ANY, now))
+                    .ifPresent(level -> readable.add(entry.getId()));
+        }
+        return Set.copyOf(readable);
+    }
+
+    /**
+     * Whether the request may change what the kernel keeps about a resource for people, such as its
+     * tags (MK-097): it holds a level that edits, or the highest level of a type without one.
+     */
+    public boolean mayEdit(ResourceRef resource) {
+        ResourceTypeEntry type = type(resource);
+        return level(resource)
+                .map(held -> held.equals(type.levelNames().getLast())
+                        || type.levels().stream().anyMatch(found -> found.edits() && type.includes(held, found.name())))
+                .orElse(false);
+    }
+
     /** Whether the person of the request may share the resource. */
     public boolean mayShare(ResourceRef resource) {
         ResourceTypeEntry type = type(resource);
