@@ -25,7 +25,8 @@ import org.jboss.logging.Logger;
 
 /**
  * The levels of sharing of the installed extensions (MK-055): writes the order of the levels of
- * every active type in {@code mk_kernel.sharing_level}, which {@code mk_kernel.allows()} reads, and
+ * every active type in {@code mk_kernel.sharing_level}, with whether the type inherits the levels of
+ * the parent (MK-136), which {@code mk_kernel.allows()} reads, and
  * refuses an update that removes a type or a level on which grants exist.
  */
 @ApplicationScoped
@@ -70,8 +71,8 @@ public class SharingLevels {
                 statement.executeUpdate("delete from mk_kernel.sharing_level");
             }
             try (PreparedStatement insert = connection.prepareStatement(
-                    "insert into mk_kernel.sharing_level (extension_id, type, level, rank, administrators)"
-                            + " values (?, ?, ?, ?, ?)")) {
+                    "insert into mk_kernel.sharing_level (extension_id, type, level, rank, administrators,"
+                            + " inherits) values (?, ?, ?, ?, ?, ?)")) {
                 for (InstalledExtension extension : active) {
                     if (extension.manifest().isEmpty()) {
                         continue;
@@ -85,6 +86,7 @@ public class SharingLevels {
                             insert.setString(3, levels.get(rank));
                             insert.setInt(4, rank);
                             insert.setBoolean(5, ResourceTypes.administratorsHoldEveryLevel(type));
+                            insert.setBoolean(6, type.inheritsFromParent());
                             insert.addBatch();
                         }
                     }

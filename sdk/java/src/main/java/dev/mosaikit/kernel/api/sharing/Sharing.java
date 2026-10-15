@@ -32,9 +32,15 @@ import java.util.UUID;
  *       by being platform administrators.
  *   <li><strong>Grants only add.</strong> The level of a person is the highest of the levels that
  *       reach them; there is no grant that removes a level.
- *   <li><strong>No inheritance from the parent, for now.</strong> A grant on a parent resource, such
- *       as a folder, does not pass to the resources it contains; this is a decision to revisit when
- *       the kernel has folders.
+ *   <li><strong>Inheritance from the parent, when the type declares it.</strong> A resource type
+ *       that declares {@code inherits: parent} in the manifest (MK-136) passes the levels of the
+ *       resources above to its resources, through their {@code parent} in the registry: the level of
+ *       a person on a resource is the highest of their own and of their level on each resource above
+ *       it, as long as the types on the way inherit too ({@link ResourceTypeEntry#carried}). Every
+ *       answer of the kernel uses it: these methods, {@code mk_kernel.allows()}, the sharing dialog,
+ *       the file service and its signed links. A person with the highest level on a folder shares
+ *       what it holds. For every other type, a grant on a parent does not pass to the resources it
+ *       contains.
  *   <li><strong>Who shares.</strong> The owner, the people with the highest level of the type and the
  *       administrators of the organization grant and revoke; a grant never gives a level higher than
  *       the one of the person who makes it.
@@ -112,6 +118,17 @@ public interface Sharing {
 
     /** The grants of a resource, links included, as the sharing dialog shows them. */
     List<Grant> grants(ResourceRef resource);
+
+    /**
+     * The grants of the resources above a resource that reach it (MK-136), links included, from its
+     * parent upwards: those of each resource above it as long as the types on the way declare
+     * {@code inherits: parent}. Each grant names in {@link Grant#resource()} the resource above that
+     * carries it, and its level is a level of that resource's type. Empty for a type that does not
+     * inherit, or a resource without a parent.
+     */
+    default List<Grant> inheritedGrants(ResourceRef resource) {
+        return List.of();
+    }
 
     /** The highest level the request has on a resource, or empty when it has none. */
     Optional<String> level(ResourceRef resource);

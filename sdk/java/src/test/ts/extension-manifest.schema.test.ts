@@ -179,4 +179,24 @@ describe('extension manifest schema', () => {
     expect(validate({ ...manifest, optional: { Maps: '^3' } })).toBe(false);
     expect(validate({ ...manifest, optional: { 'dev.example.maps': '' } })).toBe(false);
   });
+
+  it('MK-136: accepts a resource type whose resources inherit the levels of their parent', () => {
+    const type = {
+      type: 'file',
+      title: 'File',
+      levels: [{ name: 'view', title: 'View' }],
+      inherits: 'parent',
+    };
+    const manifest = {
+      id: 'dev.example.drive',
+      version: '1.0.0',
+      name: 'Drive',
+      kind: 'app',
+      platform: '>=0.1',
+      resources: [type],
+    };
+    expect(validate(manifest)).toBe(true);
+    expect(validate({ ...manifest, resources: [{ ...type, inherits: 'children' }] })).toBe(false);
+    expect(validate({ ...manifest, resources: [{ ...type, inherits: true }] })).toBe(false);
+  });
 });

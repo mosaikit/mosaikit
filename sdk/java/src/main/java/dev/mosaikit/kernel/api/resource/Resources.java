@@ -30,8 +30,8 @@ import java.util.UUID;
  * organization manage it.
  *
  * <p><strong>Parent.</strong> A resource may name the resource that contains it, such as a folder.
- * For now grants do not pass from a parent to its children: each resource is shared on its own. This
- * is a decision to revisit when the kernel has folders.
+ * Grants on the parent pass to the resources of a type that declares {@code inherits: parent} in the
+ * manifest (MK-136); the resources of any other type are shared on their own.
  *
  * <p>{@link #find} and {@link #list} do not check sharing: they serve the extension's own
  * bookkeeping. What a person may see and do is answered by {@link dev.mosaikit.kernel.api.sharing.Sharing}.
@@ -46,8 +46,8 @@ public interface Resources {
      * @param title what people see in the lists and dialogs of the kernel, at most
      *     {@value Resource#MAX_TITLE} characters
      * @param link where the resource opens, a path of the shell such as {@code /app/dashboards/42}
-     * @param parent the resource that contains this one, or {@code null}; grants on the parent do not
-     *     pass to it
+     * @param parent the resource that contains this one, or {@code null}; grants on the parent pass
+     *     to it only when its type declares {@code inherits: parent} (MK-136)
      */
     record Details(String title, String link, ResourceRef parent) {
 

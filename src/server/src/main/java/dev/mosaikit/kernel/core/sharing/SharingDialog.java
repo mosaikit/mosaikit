@@ -117,6 +117,25 @@ public class SharingDialog {
             Boolean password) {}
 
     /**
+     * The accesses to a resource that come from a resource above it (MK-136), for a type that inherits
+     * the levels of its parent: who owns that resource and its grants, at the levels of its type.
+     *
+     * @param resource the resource above, which the dialog names
+     * @param owner the account of the person who owns it, {@code null} when the organization owns it
+     * @param ownerName the display name of that person
+     * @param levels the levels of its type, which its grants give
+     * @param grants its grants that give something now, links included
+     */
+    public record InheritedView(
+            ResourceRef resource,
+            String title,
+            String link,
+            UUID owner,
+            String ownerName,
+            List<LevelView> levels,
+            List<GrantView> grants) {}
+
+    /**
      * A link just made.
      *
      * @param address the address to give to people, with the secret
@@ -188,16 +207,10 @@ public class SharingDialog {
                     entry.getTitle(),
                     entry.getLink(),
                     entry.getOwnerId(),
-                    entry.getOwnerId() == null
-                            ? null
-                            : accounts.findById(entry.getOwnerId())
-                                    .map(UserAccount::getDisplayName)
-                                    .orElse(null),
+                    ownerName(entry.getOwnerId()),
                     level,
                     sharing.mayShare(ref),
-                    type.levels().stream()
-                            .map(found -> new LevelView(found.name(), found.title(), found.edits(), found.i18n()))
-                            .toList(),
+                    levels(type),
                     type.subjects().stream().sorted().map(SubjectKind::value).toList(),
                     type.linkLevel(),
                     type.accepts(SubjectKind.LINK) ? Instant.now().plus(sharing.linkMaxValidity()) : null);
@@ -207,6 +220,35 @@ public class SharingDialog {
     /** The grants of a resource, with the names of their subjects, for a person who may share it. */
     public List<GrantView> grants(ResourceRef ref) {
         return call(() -> sharing.grantsToShow(ref).stream().map(this::view).toList());
+    }
+
+    /**
+     * The accesses inherited from each resource above a resource (MK-136), from its parent upwards,
+     * for a person who may share it; empty for a type that does not inherit.
+     */
+    public List<InheritedView> inherited(ResourceRef ref) {
+        return call(() -> sharing.inheritedToShow(ref).stream()
+                .map(above -> new InheritedView(
+                        above.resource().ref(),
+                        above.resource().getTitle(),
+                        above.resource().getLink(),
+                        above.resource().getOwnerId(),
+                        ownerName(above.resource().getOwnerId()),
+                        levels(above.type()),
+                        above.grants().stream().map(this::view).toList()))
+                .toList());
+    }
+
+    private String ownerName(UUID owner) {
+        return owner == null
+                ? null
+                : accounts.findById(owner).map(UserAccount::getDisplayName).orElse(null);
+    }
+
+    private static List<LevelView> levels(ResourceTypeEntry type) {
+        return type.levels().stream()
+                .map(found -> new LevelView(found.name(), found.title(), found.edits(), found.i18n()))
+                .toList();
     }
 
     /**

@@ -287,10 +287,23 @@ public final class ExtensionManifests {
             Set<SubjectKind> subjects = readSubjects(field + ".subjects", type.get("subjects"));
             String linkLevel = readLinkLevel(field + ".linkLevel", type.get("linkLevel"), levels, subjects);
             Map<String, Map<String, String>> i18n = readTranslations(field + "." + I18N, type.get(I18N), Set.of(TITLE));
+            String inherits = readInherits(field + ".inherits", type.get("inherits"));
             if (violations.size() > before) {
                 return Optional.empty();
             }
-            return Optional.of(new ResourceTypeEntry(name, title, levels, subjects, linkLevel, i18n));
+            return Optional.of(new ResourceTypeEntry(name, title, levels, subjects, linkLevel, i18n, inherits));
+        }
+
+        /** Whether the resources of a type inherit the levels of their parent (MK-136): only {@code parent}. */
+        private String readInherits(String field, Object raw) {
+            if (raw == null) {
+                return null;
+            }
+            if (!ResourceTypeEntry.INHERITS_PARENT.equals(raw)) {
+                violation(field, "must be parent: the resources of the type inherit the levels of their parent");
+                return null;
+            }
+            return ResourceTypeEntry.INHERITS_PARENT;
         }
 
         /**

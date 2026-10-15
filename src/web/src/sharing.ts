@@ -78,6 +78,20 @@ export interface SharingGrant {
   readonly password?: boolean;
 }
 
+/**
+ * The accesses that a resource inherits from a resource above it (MK-136): who owns that resource and
+ * its grants, at the levels of its type.
+ */
+export interface InheritedAccess {
+  readonly resource: ResourceRef;
+  readonly title: string;
+  readonly link: string;
+  readonly owner: string | null;
+  readonly ownerName: string | null;
+  readonly levels: readonly SharingLevel[];
+  readonly grants: readonly SharingGrant[];
+}
+
 /** A link just made: its token is shown this once. */
 export interface MadeLink {
   readonly grant: SharingGrant;
@@ -157,6 +171,13 @@ export class SharingApi {
   grants(ref: ResourceRef): Promise<SharingGrant[]> {
     return this.request(`${resourcePath(ref)}/grants`).then((response) =>
       json<SharingGrant[]>(response),
+    );
+  }
+
+  /** The accesses inherited from each resource above, from the parent upwards (MK-136). */
+  inherited(ref: ResourceRef): Promise<InheritedAccess[]> {
+    return this.request(`${resourcePath(ref)}/inherited`).then((response) =>
+      json<InheritedAccess[]>(response),
     );
   }
 
@@ -325,6 +346,8 @@ function reason(error: unknown): string {
 export class ShareDialogState {
   resource: SharedResource | undefined;
   grants: readonly SharingGrant[] = [];
+  /** The accesses that come from the resources above, from the parent upwards (MK-136). */
+  inherited: readonly InheritedAccess[] = [];
   teams: readonly OrganizationTeam[] = [];
   /** The link just made, whose token is shown once. */
   madeLink: MadeLink | undefined;
@@ -333,7 +356,10 @@ export class ShareDialogState {
   private ref: ResourceRef | undefined;
 
   constructor(
-    private readonly api: Pick<SharingApi, 'open' | 'grants' | 'grant' | 'createLink' | 'revoke'>,
+    private readonly api: Pick<
+      SharingApi,
+      'open' | 'grants' | 'inherited' | 'grant' | 'createLink' | 'revoke'
+    >,
     private readonly listTeams: () => Promise<OrganizationTeam[]>,
     private readonly events: ShareDialogEvents,
   ) {}
@@ -343,16 +369,19 @@ export class ShareDialogState {
     this.ref = ref;
     this.resource = undefined;
     this.grants = [];
+    this.inherited = [];
     this.madeLink = undefined;
     this.failure = undefined;
     try {
       this.resource = await this.api.open(ref);
       if (this.resource.canShare) {
-        const [grants, teams] = await Promise.all([
+        const [grants, inherited, teams] = await Promise.all([
           this.api.grants(ref),
+          this.api.inherited(ref),
           this.resource.subjects.includes('group') ? this.listTeams().catch(() => []) : [],
         ]);
         this.grants = grants;
+        this.inherited = inherited;
         this.teams = teams;
       }
     } catch (error) {

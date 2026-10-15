@@ -50,6 +50,10 @@ Answers of the maintainer to the review of the extension API (pull request #42),
   subjects; the documents of a team (`data-document`) do, so that they stay readable only by the
   members of the team, as MK-032 decided. The owner and explicit grants still apply. Types of
   extensions cannot opt out for now; a later change of `kernel-api` may let them.
+- 2026-10-15, with folders in extensions (MK-136): grants pass from a parent to its children for the
+  resource types that declare `inherits: parent` in the manifest; the level on a resource is the
+  highest of its own and of those on the resources above it, and every answer of the kernel uses it.
+  Types that do not declare it keep no inheritance.
 
 ## Consequences
 

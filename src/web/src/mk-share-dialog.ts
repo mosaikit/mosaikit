@@ -14,6 +14,7 @@ import {
   linkAddress,
   subjectLabel,
   whoShares,
+  type InheritedAccess,
   type NewSubject,
   type ResourceRef,
   type SharingGrant,
@@ -47,6 +48,11 @@ export class MkShareDialog extends LitElement {
     }
     h2 {
       margin: 0 0 4px;
+      overflow-wrap: anywhere;
+    }
+    h3.from {
+      margin: 16px 0 0;
+      font-size: 14px;
       overflow-wrap: anywhere;
     }
     .muted,
@@ -238,8 +244,39 @@ export class MkShareDialog extends LitElement {
             : model.grants.map((grant) => this.renderGrant(model, grant))
         }
       </ul>
-      ${this.renderShare(model)} ${this.renderLink(model)}
+      ${model.inherited.map((above) => this.renderInherited(above))} ${this.renderShare(model)}
+      ${this.renderLink(model)}
       <p class="hint">${whoShares(resource)}</p>`;
+  }
+
+  /** The accesses that come from a resource above (MK-136): changed there, not here. */
+  private renderInherited(above: InheritedAccess): unknown {
+    const label = t('Access from {title}', { title: above.title });
+    return html`<h3 class="from">${label}</h3>
+      <ul aria-label=${label}>
+        ${
+          above.ownerName
+            ? html`<li>
+                <span class="who">${above.ownerName}</span>
+                <span class="muted">${t('Owner')}</span>
+              </li>`
+            : nothing
+        }
+        ${above.grants.map(
+          (grant) =>
+            html`<li>
+              <span class="who">${subjectLabel(grant)}</span>
+              <span>${levelTitle(above.levels, grant.level)}</span>
+            </li>`,
+        )}
+        ${
+          !above.ownerName && above.grants.length === 0
+            ? html`<li>
+                <span class="who muted">${t('Only who owns it and the administrators.')}</span>
+              </li>`
+            : nothing
+        }
+      </ul>`;
   }
 
   private renderGrant(model: ShareDialogState, grant: SharingGrant): unknown {

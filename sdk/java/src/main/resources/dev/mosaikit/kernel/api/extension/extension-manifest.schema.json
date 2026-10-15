@@ -388,6 +388,10 @@
             "type": "string",
             "pattern": "^[a-z][a-z0-9-]{0,31}$"
           },
+          "inherits": {
+            "description": "parent: a level on the parent of a resource (MK-054) reaches it, as on the resources above the parent whose types inherit too (MK-136). A level above counts as the highest level of this type of the same name that it includes. Left out, each resource is shared on its own.",
+            "const": "parent"
+          },
           "i18n": {
             "$ref": "#/$defs/i18n",
             "additionalProperties": {
