@@ -2,6 +2,29 @@
 // SPDX-License-Identifier: MPL-2.0
 export { applyTheme } from './apply.js';
 export {
+  DEFAULT_LABELS,
+  EMPTY_KINDS,
+  MEDIUM_BREAKPOINT,
+  PANE_LARGE_STEP,
+  PANE_STEP,
+  clampWidth,
+  emptyKind,
+  emptyStateText,
+  filtersButtonText,
+  labelsOf,
+  listLayout,
+  paneStorageKey,
+  readPaneWidth,
+  widthAfterKey,
+  writePaneWidth,
+  type EmptyKind,
+  type EmptyStateText,
+  type ListLayout,
+  type PaneBounds,
+  type PaneStorage,
+  type PatternLabels,
+} from './patterns.js';
+export {
   THEMES,
   brandVariants,
   isThemeName,

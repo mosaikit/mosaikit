@@ -27,7 +27,13 @@
   ],
   "sideEffects": [
     "./dist/components.js",
+    "./dist/empty-state.js",
+    "./dist/list-page.js",
+    "./dist/split-pane.js",
     "./src/components.ts",
+    "./src/empty-state.ts",
+    "./src/list-page.ts",
+    "./src/split-pane.ts",
     "./src/fonts.css"
   ],
   "scripts": {

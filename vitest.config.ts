@@ -32,6 +32,7 @@ export default defineConfig({
       include: [
         'sdk/js/src/**',
         'sdk/ui/src/themes.ts',
+        'sdk/ui/src/patterns.ts',
         'sdk/create-extension/src/**',
         'src/web/src/**',
       ],
