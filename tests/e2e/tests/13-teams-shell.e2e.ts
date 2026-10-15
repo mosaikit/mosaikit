@@ -51,6 +51,19 @@ test.describe('MK-025 Shell with app bar, top bar and work area', () => {
     await search.press('Enter');
     await expect(page).toHaveURL(/\/app\/todo$/);
 
+    // Its last option searches the whole organization, with the pills (MK-040).
+    await search.fill('zzqx');
+    await page.getByRole('option', { name: 'Search for “zzqx”' }).click();
+    await expect(page).toHaveURL(/\/search\?q=zzqx$/);
+    await expect(page.getByRole('heading', { name: 'Results for “zzqx”' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'All', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await page.getByRole('button', { name: 'People', exact: true }).click();
+    await expect(page).toHaveURL(/\/search\?q=zzqx&in=people$/);
+    await expect(page.getByText('Nothing found for “zzqx” in People.')).toBeVisible();
+
     // Home shows the apps too.
     await bar.getByRole('link', { name: 'Home', exact: true }).click();
     await expect(page.getByRole('list', { name: 'Your apps' }).getByRole('link')).not.toHaveCount(
