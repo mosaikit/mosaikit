@@ -38,6 +38,7 @@ lead to the topic.
   - <a id="references-to-resources-of-other-extensions"></a>[References to resources of other extensions](extensions/references.md)
   - <a id="contracts-between-extensions"></a>[Contracts between extensions](extensions/contracts.md)
 - <a id="actions-for-assistants"></a>[Actions for assistants](extensions/assistants.md)
+- <a id="search-providers"></a>[Search providers](extensions/search.md)
 - <a id="resources-sharing-and-permissions"></a>[Resources, sharing and permissions](extensions/resources-and-sharing.md)
   - <a id="who-holds-a-permission"></a>[Who holds a permission](extensions/resources-and-sharing.md#who-holds-a-permission)
   - <a id="the-sharing-dialog"></a>[The sharing dialog](extensions/resources-and-sharing.md#the-sharing-dialog)

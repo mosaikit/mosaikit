@@ -37,6 +37,9 @@ public interface KernelConfig {
     /** The look of the user interface. */
     Ui ui();
 
+    /** The global search of the shell (MK-040). */
+    Search search();
+
     /** Local accounts. */
     Accounts accounts();
 
@@ -431,6 +434,17 @@ public interface KernelConfig {
 
         /** How long one answer of the model may take. */
         @WithDefault("120s")
+        Duration timeout();
+    }
+
+    /** The global search of the shell (MK-040). */
+    interface Search {
+
+        /**
+         * How long the search waits for the providers of extensions; one that has not answered by then
+         * is shown as incomplete, and the others are shown anyway.
+         */
+        @WithDefault("3s")
         Duration timeout();
     }
 

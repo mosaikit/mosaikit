@@ -557,6 +557,30 @@ const ITALIAN: Record<string, string> = {
   'Deleted for good on {date}': 'Eliminato definitivamente il {date}',
   '{kind}, with 1 item inside': '{kind}, con 1 elemento dentro',
   '{kind}, with {count} items inside': '{kind}, con {count} elementi dentro',
+  // The global search (MK-040)
+  Search: 'Cerca',
+  'Search people, teams, apps and their data': 'Cerca persone, team, app e i loro dati',
+  Suggestions: 'Suggerimenti',
+  'Search for “{text}”': 'Cerca “{text}”',
+  'Type in the search box to find people, teams and the data of your apps.':
+    'Scrivi nella casella di ricerca per trovare persone, team e i dati delle tue app.',
+  'Results for “{query}”': 'Risultati per “{query}”',
+  'Search in': 'Cerca in',
+  All: 'Tutto',
+  'Searching…': 'Ricerca in corso…',
+  'The search failed. Try again.': 'La ricerca non è riuscita. Riprova.',
+  'Nothing found for “{query}”.': 'Nessun risultato per “{query}”.',
+  'Nothing found for “{query}” in {title}.': 'Nessun risultato per “{query}” in {title}.',
+  'More in {title}': 'Altro in {title}',
+  'Try other words, or only the beginning of a word.':
+    "Prova con altre parole, o solo con l'inizio di una parola.",
+  'Try other words, or look in All.': 'Prova con altre parole, o cerca in Tutto.',
+  Previous: 'Precedenti',
+  Next: 'Successivi',
+  '{title} did not answer in time: its results are missing.':
+    '{title} non ha risposto in tempo: i suoi risultati mancano.',
+  '{title} could not search: its results are missing.':
+    '{title} non ha potuto cercare: i suoi risultati mancano.',
 };
 
 const TRANSLATIONS: Record<Language, Record<string, string>> = { en: {}, it: ITALIAN };
