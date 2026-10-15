@@ -31,12 +31,12 @@ final class ImageFormats {
 
     /** The start of an SVG document: an XML declaration, comments and a doctype, then the svg element. */
     private static final Pattern SVG_START = Pattern.compile(
-            "^(<\?xml[^>]*\?>\s*)?(<!--.*?-->\s*)*(<!DOCTYPE[^>]*>\s*)?(<!--.*?-->\s*)*<svg[\s>]",
+            "^(<\\?xml[^>]*\\?>\\s*)?(<!--.*?-->\\s*)*(<!DOCTYPE[^>]*>\\s*)?(<!--.*?-->\\s*)*<svg[\\s>]",
             Pattern.DOTALL | Pattern.CASE_INSENSITIVE);
 
     /** What an image has no reason to contain. */
     private static final Pattern SVG_ACTIVE = Pattern.compile(
-            "<script|<foreignobject|<iframe|<embed|<object|\son[a-z]+\s*=|javascript:", Pattern.CASE_INSENSITIVE);
+            "<script|<foreignobject|<iframe|<embed|<object|\\son[a-z]+\\s*=|javascript:", Pattern.CASE_INSENSITIVE);
 
     private ImageFormats() {}
 
@@ -96,7 +96,9 @@ final class ImageFormats {
     }
 
     private static boolean looksLikeText(byte[] head) {
-        String text = new String(head, StandardCharsets.UTF_8).toLowerCase(Locale.ROOT).replace("﻿", "");
+        String text = new String(head, StandardCharsets.UTF_8)
+                .toLowerCase(Locale.ROOT)
+                .replace("﻿", "");
         return text.stripLeading().startsWith("<");
     }
 

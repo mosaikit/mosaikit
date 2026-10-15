@@ -29,6 +29,7 @@ export {
   brandVariants,
   isThemeName,
   registerTheme,
+  themeDefinition,
   themeTitle,
   themeTokens,
   themes,

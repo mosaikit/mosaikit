@@ -245,8 +245,8 @@ public class FileService {
         long most = Math.min(limit, maxSize);
         notDoomed();
         UUID org = organization.require();
-        Spooled spooled = spool(
-                content, most, () -> new ContentTooLargeException("This file has at most " + most + " bytes."));
+        Spooled spooled =
+                spool(content, most, () -> new ContentTooLargeException("This file has at most " + most + " bytes."));
         String type;
         try {
             type = contentType(check.check(spooled.path()));

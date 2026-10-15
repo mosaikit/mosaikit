@@ -43,7 +43,13 @@ public class BrandImage {
     protected BrandImage() {}
 
     public BrandImage(
-            UUID fileId, UUID organizationId, ImageKind kind, String contentType, long size, String checksum, Instant now) {
+            UUID fileId,
+            UUID organizationId,
+            ImageKind kind,
+            String contentType,
+            long size,
+            String checksum,
+            Instant now) {
         this.fileId = fileId;
         this.organizationId = organizationId;
         this.kind = kind.id();

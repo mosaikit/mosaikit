@@ -18,6 +18,8 @@ import {
   type ExtensionTheme,
   type ActionDraft,
   type ActivityNotification,
+  type Branding,
+  type BrandingDraft,
   type Preferences,
   type ShellApp,
   type Registration,
@@ -34,6 +36,16 @@ import {
   type LauncherEntry,
 } from './navigation.js';
 import { MkAdminApps } from './mk-admin-apps.js';
+import { MkAdminBranding } from './mk-admin-branding.js';
+import {
+  ORGANIZATION_THEME,
+  PREVIEW_THEME,
+  chooseTheme,
+  marks,
+  registerBranding,
+  signInOrganization,
+  type Marks,
+} from './branding.js';
 import './mk-admin-extensions.js';
 import { MkAdminPermissions } from './mk-admin-permissions.js';
 import { MkAdminQuotas } from './mk-admin-quotas.js';
@@ -72,7 +84,7 @@ const EXTENSION_WATCH_MS = 1_000;
 
 /**
  * The pages of administrators: the apps, the permissions, the credentials and the quotas of the
- * organization for its administrators (MK-030, MK-056, MK-062, MK-076), the extensions (MK-022),
+ * organization for its administrators (MK-030, MK-056, MK-062, MK-076), its branding (MK-074), the extensions (MK-022),
  * the platform (MK-048), the service identities (MK-124), the credentials of the installation
  * (MK-127), the external origins of the content security policy (MK-128) and the suspension of
  * accounts (MK-125) and the organizations, which they may delete (MK-130), for platform administrators.
@@ -100,6 +112,12 @@ const ADMIN_PAGES = [
     path: '/admin/quotas',
     title: 'Quotas',
     element: 'mk-admin-quotas',
+    role: 'organization-admin',
+  },
+  {
+    path: '/admin/branding',
+    title: 'Branding',
+    element: 'mk-admin-branding',
     role: 'organization-admin',
   },
   {
@@ -648,6 +666,13 @@ export class MkShell extends LitElement {
     this.address.moved();
   };
 
+  /** The branding of the organization of the person (MK-074). */
+  @state() private branding: Branding | undefined;
+  /** The branding of the organization whose sign-in page this is, `?organization=<slug>` (MK-074). */
+  @state() private signInBranding: Branding | undefined;
+  /** The draft of the branding that its administrator is changing, shown before it is saved. */
+  @state() private brandingPreview: BrandingDraft | undefined;
+
   /** The light or dark scheme the theme applied, for the logo of the sign-in page (MK-052). */
   @state() private scheme = document.documentElement.dataset.mkScheme;
   private readonly schemeObserver = new MutationObserver(() => {
@@ -666,6 +691,15 @@ export class MkShell extends LitElement {
     // The administrators of the organization changed its apps (MK-030) or its permissions (MK-056).
     this.addEventListener('mk-apps-changed', () => void this.loadBarApps());
     this.addEventListener('mk-permissions-changed', () => void this.loadBarApps());
+    // The editor of the branding shows its draft on the open application, then saves it (MK-074).
+    this.addEventListener('mk-branding-preview', (event) => {
+      this.brandingPreview = event.detail;
+      this.applyAppearance();
+    });
+    this.addEventListener('mk-branding-changed', (event) => {
+      this.branding = event.detail;
+      this.applyAppearance();
+    });
     window.addEventListener('popstate', this.onPopState);
     window.addEventListener('online', this.onNetwork);
     window.addEventListener('offline', this.onNetwork);
@@ -676,7 +710,6 @@ export class MkShell extends LitElement {
       ([info, themes]) => {
         registerThemes(themes);
         this.info = info;
-        showProduct(info);
         this.applyAppearance();
         void this.loadVisitorHome();
       },
@@ -684,6 +717,17 @@ export class MkShell extends LitElement {
         this.error = 'The kernel is not reachable.';
       },
     );
+    // The sign-in page of an organization shows its branding (MK-074).
+    const organization = signInOrganization(location.href);
+    if (organization) {
+      this.client.branding(organization).then(
+        (branding) => {
+          this.signInBranding = branding;
+          this.applyAppearance();
+        },
+        () => undefined,
+      );
+    }
     this.client.registrationOptions().then(
       (options) => {
         this.registration = options;
@@ -785,6 +829,28 @@ export class MkShell extends LitElement {
     if (changed.has('path') || changed.has('entries')) {
       this.renderApp();
     }
+    // Leaving the editor of the branding ends its preview (MK-074).
+    if (changed.has('path') && this.brandingPreview && this.path !== '/admin/branding') {
+      this.brandingPreview = undefined;
+      this.applyAppearance();
+    }
+    if (
+      changed.has('info') ||
+      changed.has('branding') ||
+      changed.has('signInBranding') ||
+      changed.has('account') ||
+      changed.has('brandingPreview')
+    ) {
+      showMarks(this.marks());
+    }
+  }
+
+  /** The name and the logos shown: those of the organization over those of the installation. */
+  private marks(): Marks {
+    const own = this.account ? this.branding : this.signInBranding;
+    const name = this.brandingPreview?.displayName;
+    const found = marks(this.info, own, this.scheme);
+    return name ? { ...found, name } : found;
   }
 
   override render(): unknown {
@@ -810,8 +876,7 @@ export class MkShell extends LitElement {
       <div class="frame" @keydown=${this.keyFrame}>
         <header class="top">
           <span class="brand"
-            >${productMark(this.info?.logoDark ?? this.info?.logo)}<span class="name"
-              >${this.info?.name ?? 'Mosaikit'}</span
+            >${productMark(this.marks().bar)}<span class="name">${this.marks().name}</span
             ><span class="version">${this.info ? `v${this.info.version}` : nothing}</span></span
           >
           ${this.renderSearch()} ${this.renderAccount()}
@@ -1066,7 +1131,7 @@ export class MkShell extends LitElement {
     const all = launcherEntries(this.extensions);
     return html`<mk-settings
       .preferences=${this.preferences}
-      .themes=${uiThemes()}
+      .themes=${uiThemes().filter((theme) => theme.id !== ORGANIZATION_THEME && theme.id !== PREVIEW_THEME)}
       .apps=${this.barEntries(all)}
       .sections=${this.settingsSections()}
       .notificationKinds=${this.notificationKinds()}
@@ -1178,12 +1243,20 @@ export class MkShell extends LitElement {
   private applyAppearance(): void {
     const preferences = this.preferences;
     const installation = this.info?.theme;
-    const theme =
-      preferences?.theme && isThemeName(preferences.theme)
-        ? preferences.theme
-        : installation && isThemeName(installation)
-          ? installation
-          : 'mosaikit';
+    const base = installation && isThemeName(installation) ? installation : 'mosaikit';
+    // The theme the person chose wins over the colors of the organization, which win over the
+    // theme of the installation (MK-074); the draft of the editor shows while it is changed.
+    const own = this.account ? this.branding : this.signInBranding;
+    const theme = this.brandingPreview
+      ? registerBranding(PREVIEW_THEME, this.brandingPreview, base)
+        ? PREVIEW_THEME
+        : base
+      : chooseTheme(
+          preferences?.theme,
+          own && registerBranding(ORGANIZATION_THEME, own, base) ? ORGANIZATION_THEME : undefined,
+          installation,
+          isThemeName,
+        );
     const appearance = preferences?.appearance ?? 'system';
     applyTheme(theme, appearance === 'system' ? undefined : appearance);
     const lang =
@@ -1270,8 +1343,8 @@ export class MkShell extends LitElement {
   /** The sign-in page (mk-sign-in), which tells the shell what the person asked for. */
   private renderSignIn(): unknown {
     return html`<mk-sign-in
-      .product=${this.info?.name ?? 'Mosaikit'}
-      .logo=${(this.scheme === 'dark' ? this.info?.logoDark : undefined) ?? this.info?.logo ?? undefined}
+      .product=${this.marks().name}
+      .logo=${this.marks().signIn}
       .version=${this.info?.version}
       .email=${this.email}
       .busy=${this.busy}
@@ -1731,6 +1804,10 @@ export class MkShell extends LitElement {
     void this.loadActivity();
     this.extensions = extensions;
     await this.loadBarApps();
+    // The branding of the organization of the person, not that of the sign-in page (MK-074).
+    this.branding = account.organization
+      ? await this.client.branding(account.organization).catch(() => undefined)
+      : undefined;
     this.applyAppearance();
     this.email = undefined;
     this.notice = undefined;
@@ -1819,6 +1896,8 @@ export class MkShell extends LitElement {
     const ended = this.client.signOut();
     this.account = undefined;
     this.preferences = undefined;
+    this.branding = undefined;
+    this.brandingPreview = undefined;
     this.barApps = undefined;
     this.held = undefined;
     this.applyAppearance();
@@ -1912,6 +1991,11 @@ export class MkShell extends LitElement {
           admin instanceof MkAdminQuotas
         ) {
           admin.organization = this.account?.organization ?? undefined;
+        }
+        if (admin instanceof MkAdminBranding) {
+          admin.organization = this.account?.organization ?? undefined;
+          const installation = this.info?.theme;
+          admin.base = installation && isThemeName(installation) ? installation : 'mosaikit';
         }
         if (admin instanceof MkAdminPermissions || admin instanceof MkAdminQuotas) {
           admin.platformAdmin = this.isPlatformAdmin();
@@ -2044,16 +2128,27 @@ function productMark(logo: string | null | undefined): unknown {
   return logo ? html`<img class="logo" src=${logo} alt="" />` : mark;
 }
 
+/** The icon of index.html, the mark of Mosaikit. */
+let defaultIcon: { href: string; type: string } | undefined;
+
 /**
- * Names the page and its icon after the product, when the theme of the installation brings them
- * (MK-052); index.html carries those of Mosaikit until the kernel answers.
+ * Names the page and its icon after the organization (MK-074) or the product, when the theme of the
+ * installation brings them (MK-052); index.html carries those of Mosaikit until the kernel answers.
  */
-function showProduct(info: SystemInfo): void {
-  document.title = info.name;
+function showMarks(shown: Marks): void {
+  document.title = shown.name;
   const icon = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
-  if (info.logo && icon) {
-    icon.href = info.logo;
-    icon.type = info.logo.endsWith('.png') ? 'image/png' : 'image/svg+xml';
+  if (!icon) {
+    return;
+  }
+  defaultIcon ??= { href: icon.getAttribute('href') ?? '', type: icon.type };
+  if (shown.favicon) {
+    icon.href = shown.favicon;
+    // The browser reads the type of an image of an organization from its content.
+    icon.removeAttribute('type');
+  } else {
+    icon.setAttribute('href', defaultIcon.href);
+    icon.type = defaultIcon.type;
   }
 }
 
