@@ -33,7 +33,7 @@ test.describe('MK-022 Minimal marketplace with signed catalogs', () => {
         // Until the restart the package waits, and cannot be installed twice.
         await expect(row).toContainText('installed, restart Mosaikit to use it');
       }
-      await expect(row.getByRole('button')).toHaveCount(0);
+      await expect(row.getByRole('button', { name: /^(Install|Update)$/ })).toHaveCount(0);
     }
 
     const log = await restart();

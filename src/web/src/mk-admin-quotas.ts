@@ -2,8 +2,11 @@
 // SPDX-License-Identifier: MPL-2.0
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+import { filterQuotas, quotaMetrics } from './admin-pages.js';
+import { adminStyles } from './admin-styles.js';
 import type { KernelClient, Quota } from './api.js';
 import { t } from './i18n.js';
+import './mk-admin-view.js';
 import {
   QuotaBoard,
   formatAmount,
@@ -21,85 +24,69 @@ import {
  */
 @customElement('mk-admin-quotas')
 export class MkAdminQuotas extends LitElement {
-  static override readonly styles = css`
-    :host {
-      display: block;
-      max-width: 960px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: var(--mk-surface);
-      margin-bottom: 24px;
-    }
-    th,
-    td {
-      text-align: left;
-      padding: 8px 10px;
-      border-top: 1px solid var(--mk-line);
-      vertical-align: top;
-      overflow-wrap: anywhere;
-    }
-    th {
-      font-size: 13px;
-      color: var(--mk-muted);
-    }
-    td.number {
-      text-align: right;
-      font-variant-numeric: tabular-nums;
-    }
-    .muted {
-      color: var(--mk-muted);
-      font-size: 13px;
-    }
-    meter {
-      width: 100%;
-      max-width: 220px;
-      display: block;
-    }
-    .limit {
-      display: flex;
-      gap: 6px;
-      flex-wrap: wrap;
-      margin-top: 6px;
-    }
-    label {
-      font-weight: 600;
-    }
-    input,
-    select,
-    button {
-      font: inherit;
-      padding: 6px 8px;
-      border-radius: var(--mk-radius);
-      border: 1px solid var(--mk-line);
-      background: var(--mk-surface);
-      color: var(--mk-fg);
-    }
-    input {
-      width: 9em;
-    }
-    button {
-      cursor: pointer;
-    }
-    :focus-visible {
-      outline: 2px solid var(--mk-focus);
-      outline-offset: 2px;
-    }
-    .period {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-    .status {
-      min-height: 1.5em;
-      color: var(--mk-muted);
-    }
-    .error {
-      color: var(--mk-danger);
-    }
-  `;
+  static override readonly styles = [
+    adminStyles,
+    css`
+      table {
+        margin-bottom: 24px;
+      }
+      td.number {
+        text-align: right;
+        font-variant-numeric: tabular-nums;
+      }
+      .muted {
+        color: var(--mk-muted);
+        font-size: 13px;
+      }
+      meter {
+        width: 100%;
+        max-width: 220px;
+        display: block;
+      }
+      .limit {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        margin-top: 6px;
+      }
+      label {
+        font-weight: 600;
+      }
+      input,
+      select,
+      button:not(.link) {
+        font: inherit;
+        padding: 6px 8px;
+        border-radius: var(--mk-radius);
+        border: 1px solid var(--mk-line);
+        background: var(--mk-surface);
+        color: var(--mk-fg);
+      }
+      input {
+        width: 9em;
+      }
+      button {
+        cursor: pointer;
+      }
+      :focus-visible {
+        outline: 2px solid var(--mk-focus);
+        outline-offset: 2px;
+      }
+      .period {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+      .status {
+        min-height: 1.5em;
+        color: var(--mk-muted);
+      }
+      .error {
+        color: var(--mk-danger);
+      }
+    `,
+  ];
 
   @property({ attribute: false }) client: KernelClient | undefined;
   /** The organization whose quotas are shown. */
@@ -109,6 +96,9 @@ export class MkAdminQuotas extends LitElement {
 
   @state() private message = '';
   @state() private failed = false;
+  @state() private search = '';
+  /** The measure in the side pane. */
+  @state() private selected: string | undefined;
   /** What platform administrators typed as limits, by measure. */
   @state() private drafts: Record<string, string> = {};
 
@@ -129,15 +119,67 @@ export class MkAdminQuotas extends LitElement {
   }
 
   override render(): unknown {
-    const quotas = this.board?.quotas;
+    const board = this.board;
+    const quotas = board?.quotas;
+    const shown = filterQuotas(quotas ?? [], this.search);
+    const selected = quotas?.find((quota) => quota.measure === this.selected);
+    const usage = board?.usage;
     return html`
-      <h1>${t('Quotas')}</h1>
-      <p>
-        ${t(
+      <mk-admin-view
+        heading=${t('Quotas')}
+        description=${t(
           'What your organization keeps and uses of each measure, against its limit. The figures are current: they change with every action.',
         )}
-      </p>
-      ${quotas === undefined ? nothing : this.renderQuotas(quotas)} ${this.renderUsage()}
+        name="mosaikit.admin.quotas"
+        .metrics=${quotaMetrics(quotas)}
+        ?detail-open=${selected !== undefined}
+        @mk-detail-close=${() => {
+          this.selected = undefined;
+        }}
+      >
+        <label slot="filters" class="filter"
+          >${t('Search measures')}
+          <input
+            type="search"
+            .value=${this.search}
+            @input=${(event: Event) => {
+              this.search = (event.target as HTMLInputElement).value;
+            }}
+        /></label>
+        ${
+          board && usage
+            ? html`<label slot="filters" class="filter"
+                >${t('Month')}
+                <select
+                  id="quota-period"
+                  @change=${(event: Event) => {
+                    void board.load((event.target as HTMLSelectElement).value);
+                  }}
+                >
+                  ${board
+                    .periods()
+                    .map(
+                      (period) =>
+                        html`<option value=${period} ?selected=${period === usage.period}>
+                          ${period}
+                        </option>`,
+                    )}
+                </select></label
+              >`
+            : nothing
+        }
+        ${
+          quotas === undefined
+            ? nothing
+            : shown.length === 0
+              ? html`<p>${t('No measure matches the filters.')}</p>`
+              : this.renderQuotas(shown)
+        }
+        ${this.renderUsage()}
+        <aside slot="detail" class="pane" aria-label=${selected?.label ?? t('Detail')}>
+          ${selected ? this.renderDetail(selected) : nothing}
+        </aside>
+      </mk-admin-view>
       <p class="status ${this.failed ? 'error' : ''}" role="status" aria-live="polite">
         ${this.message || nothing}
       </p>
@@ -155,14 +197,24 @@ export class MkAdminQuotas extends LitElement {
           <th scope="col">${t('Used')}</th>
           <th scope="col">${t('Limit')}</th>
           <th scope="col"><span class="muted">${t('Share of the limit')}</span></th>
+          <th scope="col"><span class="muted">${t('Actions')}</span></th>
         </tr>
       </thead>
       <tbody>
         ${quotas.map((quota) => {
           const used = share(quota);
-          return html`<tr>
+          return html`<tr class=${quota.measure === this.selected ? 'selected' : ''}>
             <th scope="row">
-              ${quota.label}
+              <button
+                type="button"
+                class="link"
+                aria-label=${t('Details of {name}', { name: quota.label })}
+                @click=${() => {
+                  this.selected = quota.measure;
+                }}
+              >
+                ${quota.label}
+              </button>
               <div class="muted">${quota.extension ?? t('Built in')}</div>
             </th>
             <td>
@@ -172,7 +224,6 @@ export class MkAdminQuotas extends LitElement {
             <td>
               ${limitLabel(quota)}
               <div class="muted">${sourceLabel(quota.source)}</div>
-              ${this.platformAdmin ? this.renderLimitForm(quota) : nothing}
             </td>
             <td>
               ${
@@ -193,12 +244,53 @@ export class MkAdminQuotas extends LitElement {
                       <span class="muted">${used}%</span>`
               }
             </td>
+            <td>
+              ${
+                this.platformAdmin
+                  ? html`<button
+                      type="button"
+                      aria-label=${t('Change the limit of {measure}', { measure: quota.label })}
+                      @click=${() => {
+                        this.selected = quota.measure;
+                      }}
+                    >
+                      ${t('Change the limit')}
+                    </button>`
+                  : nothing
+              }
+            </td>
           </tr>`;
         })}
       </tbody>
     </table>`;
   }
 
+  private renderDetail(quota: Quota): unknown {
+    const rows = this.board?.rowsOf(quota.measure) ?? [];
+    return html`<h2>${quota.label}</h2>
+      <dl>
+        <dt>${t('Measure')}</dt>
+        <dd>${quota.measure}</dd>
+        <dt>${t('Used')}</dt>
+        <dd>${formatAmount(quota.used, quota.unit)} · ${periodLabel(quota.period)}</dd>
+        <dt>${t('Limit')}</dt>
+        <dd>${limitLabel(quota)} · ${sourceLabel(quota.source)}</dd>
+        <dt>${t('Default of the platform')}</dt>
+        <dd>${limitLabel({ ...quota, limit: quota.installationLimit })}</dd>
+      </dl>
+      ${this.platformAdmin ? this.renderLimitForm(quota) : nothing}
+      <h2 id="measure-usage">${t('Consumption by person')}</h2>
+      ${
+        rows.length === 0
+          ? html`<p class="muted">${t('Nothing used in this month.')}</p>`
+          : html`<ul aria-labelledby="measure-usage">
+              ${rows.map(
+                (row) =>
+                  html`<li>${personLabel(row)}: ${formatAmount(row.amount, quota.unit)}</li>`,
+              )}
+            </ul>`
+      }`;
+  }
   private renderLimitForm(quota: Quota): unknown {
     const id = `limit-${quota.measure.replace(/[^A-Za-z0-9_-]/g, '-')}`;
     return html`<form
@@ -247,25 +339,11 @@ export class MkAdminQuotas extends LitElement {
       return nothing;
     }
     return html`<h2>${t('Consumption by person')}</h2>
-      <div class="period">
-        <label for="quota-period">${t('Month')}</label>
-        <select
-          id="quota-period"
-          @change=${(event: Event) => {
-            void board.load((event.target as HTMLSelectElement).value);
-          }}
-        >
-          ${board
-            .periods()
-            .map(
-              (period) =>
-                html`<option value=${period} ?selected=${period === usage.period}>
-                  ${period}
-                </option>`,
-            )}
-        </select>
-        <span class="muted">${t('Storage is shown as it is now.')}</span>
-      </div>
+      <p class="muted">
+        ${t('In {month}, chosen above the table. Storage is shown as it is now.', {
+          month: usage.period,
+        })}
+      </p>
       ${
         usage.rows.length === 0
           ? html`<p>${t('Nothing used in this month.')}</p>`

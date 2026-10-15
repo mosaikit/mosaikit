@@ -2,8 +2,11 @@
 // SPDX-License-Identifier: MPL-2.0
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+import { filterSecrets, secretMetrics } from './admin-pages.js';
+import { adminStyles } from './admin-styles.js';
 import type { KernelClient, Secret, SecretKind } from './api.js';
 import { t } from './i18n.js';
+import './mk-admin-view.js';
 import {
   SECRET_KINDS,
   SecretList,
@@ -24,86 +27,71 @@ import {
  */
 @customElement('mk-admin-secrets')
 export class MkAdminSecrets extends LitElement {
-  static override readonly styles = css`
-    :host {
-      display: block;
-      max-width: 900px;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      background: var(--mk-surface);
-      margin-bottom: 24px;
-    }
-    th,
-    td {
-      text-align: left;
-      padding: 8px 10px;
-      border-top: 1px solid var(--mk-line);
-      vertical-align: top;
-      overflow-wrap: anywhere;
-    }
-    th {
-      font-size: 13px;
-      color: var(--mk-muted);
-    }
-    .hint {
-      font-family: var(--mk-font-mono, monospace);
-    }
-    .muted {
-      color: var(--mk-muted);
-      font-size: 13px;
-    }
-    form {
-      display: grid;
-      gap: 12px;
-      padding: 16px 20px;
-      background: var(--mk-surface);
-      border: 1px solid var(--mk-line);
-      border-radius: calc(var(--mk-radius) * 2);
-    }
-    .field {
-      display: grid;
-      gap: 4px;
-    }
-    label {
-      font-weight: 600;
-    }
-    input,
-    select,
-    button {
-      font: inherit;
-      padding: 6px 8px;
-      border-radius: var(--mk-radius);
-      border: 1px solid var(--mk-line);
-      background: var(--mk-surface);
-      color: var(--mk-fg);
-    }
-    button {
-      cursor: pointer;
-    }
-    .actions {
-      display: flex;
-      gap: 8px;
-    }
-    button.primary {
-      border-color: var(--mk-accent);
-      background: var(--mk-accent);
-      color: var(--mk-accent-fg);
-      font-weight: 600;
-    }
-    :focus-visible {
-      outline: 2px solid var(--mk-focus);
-      outline-offset: 2px;
-    }
-    .status {
-      min-height: 1.5em;
-      color: var(--mk-muted);
-    }
-    .error {
-      color: var(--mk-danger);
-    }
-  `;
+  static override readonly styles = [
+    adminStyles,
+    css`
+      .hint {
+        font-family: var(--mk-font-mono, monospace);
+      }
+      .muted {
+        color: var(--mk-muted);
+        font-size: 13px;
+      }
+      form {
+        display: grid;
+        gap: 12px;
+        padding: 16px 20px;
+        background: var(--mk-surface);
+        border: 1px solid var(--mk-line);
+        border-radius: calc(var(--mk-radius) * 2);
+      }
+      .field {
+        display: grid;
+        gap: 4px;
+      }
+      label {
+        font-weight: 600;
+      }
+      input,
+      select,
+      button:not(.link) {
+        font: inherit;
+        padding: 6px 8px;
+        border-radius: var(--mk-radius);
+        border: 1px solid var(--mk-line);
+        background: var(--mk-surface);
+        color: var(--mk-fg);
+      }
+      button {
+        cursor: pointer;
+      }
+      form h2 {
+        margin: 0;
+        font-size: 1.1em;
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+      }
+      button.primary {
+        border-color: var(--mk-accent);
+        background: var(--mk-accent);
+        color: var(--mk-accent-fg);
+        font-weight: 600;
+      }
+      :focus-visible {
+        outline: 2px solid var(--mk-focus);
+        outline-offset: 2px;
+      }
+      .status {
+        min-height: 1.5em;
+        color: var(--mk-muted);
+      }
+      .error {
+        color: var(--mk-danger);
+      }
+    `,
+  ];
 
   @property({ attribute: false }) client: KernelClient | undefined;
   /** The organization whose credentials are shown. */
@@ -112,6 +100,9 @@ export class MkAdminSecrets extends LitElement {
   @state() private form: SecretForm = emptyForm();
   /** The name of the credential being replaced, or undefined for a new one. */
   @state() private replacing: string | undefined;
+  /** Whether the side pane stores a new credential. */
+  @state() private creating = false;
+  @state() private search = '';
   @state() private message = '';
   @state() private failed = false;
 
@@ -150,21 +141,76 @@ export class MkAdminSecrets extends LitElement {
 
   override render(): unknown {
     const secrets = this.list?.secrets;
+    const shown = filterSecrets(secrets ?? [], this.search);
+    const replaced = secrets?.find((secret) => secret.name === this.replacing);
     return html`
-      <h1>${this.heading()}</h1>
-      <p>${this.introduction()}</p>
-      ${
-        secrets === undefined
-          ? nothing
-          : secrets.length === 0
-            ? html`<p>${t('No credential yet.')}</p>`
-            : this.renderTable(secrets)
-      }
-      ${this.renderForm()}
+      <mk-admin-view
+        heading=${this.heading()}
+        description=${this.introduction()}
+        name="mosaikit.admin.credentials"
+        .metrics=${secretMetrics(secrets)}
+        ?detail-open=${this.creating || replaced !== undefined}
+        @mk-detail-close=${this.cancel}
+      >
+        <button
+          slot="actions"
+          type="button"
+          class="primary"
+          @click=${() => {
+            this.replacing = undefined;
+            this.form = emptyForm();
+            this.creating = true;
+          }}
+        >
+          ${t('Store a credential')}
+        </button>
+        <label slot="filters" class="filter"
+          >${t('Search credentials')}
+          <input
+            type="search"
+            .value=${this.search}
+            @input=${(event: Event) => {
+              this.search = (event.target as HTMLInputElement).value;
+            }}
+        /></label>
+        ${
+          secrets === undefined
+            ? nothing
+            : secrets.length === 0
+              ? html`<p>${t('No credential yet.')}</p>`
+              : shown.length === 0
+                ? html`<p>${t('No credential matches the filters.')}</p>`
+                : this.renderTable(shown)
+        }
+        <aside
+          slot="detail"
+          class="pane"
+          aria-label=${replaced ? replaced.name : t('Store a credential')}
+        >
+          ${replaced ? this.renderDetail(replaced) : nothing}
+          ${this.creating || replaced ? this.renderForm() : nothing}
+        </aside>
+      </mk-admin-view>
       <p class="status ${this.failed ? 'error' : ''}" role="status" aria-live="polite">
         ${this.message || nothing}
       </p>
     `;
+  }
+
+  private renderDetail(secret: Secret): unknown {
+    return html`<h2>${secret.name}</h2>
+      <dl>
+        <dt>${t('Kind')}</dt>
+        <dd>${kindLabel(secret.kind)}</dd>
+        <dt>${t('Value')}</dt>
+        <dd class="hint">${secret.hint}</dd>
+        <dt>${t('For')}</dt>
+        <dd>${audience(secret)}</dd>
+        <dt>${t('Description')}</dt>
+        <dd>${secret.description || t('None')}</dd>
+        <dt>${t('Changed')}</dt>
+        <dd>${describeChange(secret)}</dd>
+      </dl>`;
   }
 
   private renderTable(secrets: readonly Secret[]): unknown {
@@ -182,9 +228,18 @@ export class MkAdminSecrets extends LitElement {
       <tbody>
         ${secrets.map(
           (secret) =>
-            html`<tr>
+            html`<tr class=${secret.name === this.replacing ? 'selected' : ''}>
               <th scope="row">
-                ${secret.name}
+                <button
+                  type="button"
+                  class="link"
+                  aria-label=${t('Details of {name}', { name: secret.name })}
+                  @click=${() => {
+                    this.edit(secret);
+                  }}
+                >
+                  ${secret.name}
+                </button>
                 ${secret.description ? html`<div class="muted">${secret.description}</div>` : nothing}
               </th>
               <td>${kindLabel(secret.kind)}</td>
@@ -322,6 +377,7 @@ export class MkAdminSecrets extends LitElement {
   }
 
   private edit(secret: Secret): void {
+    this.creating = false;
     this.replacing = secret.name;
     this.form = formFor(secret);
     void this.updateComplete.then(() => {
@@ -331,6 +387,7 @@ export class MkAdminSecrets extends LitElement {
 
   private readonly cancel = (): void => {
     this.replacing = undefined;
+    this.creating = false;
     this.form = emptyForm();
   };
 
@@ -342,6 +399,7 @@ export class MkAdminSecrets extends LitElement {
     this.form = saved ? emptyForm() : { ...this.form, value: '' };
     if (saved) {
       this.replacing = undefined;
+      this.creating = false;
     }
   };
 

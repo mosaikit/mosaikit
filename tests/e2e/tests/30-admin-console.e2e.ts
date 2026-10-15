@@ -3,7 +3,7 @@
 // e2e-group: C
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
-import { ADMIN, BASE_URL, MARIO } from '../support/env.js';
+import { ADMIN, ANNA, BASE_URL, MARIO, type Person } from '../support/env.js';
 import { OTHER, otherOrganizationPerson } from '../support/people.js';
 import { api, apps, openApp, signIn } from '../support/shell.js';
 
@@ -175,5 +175,58 @@ test.describe('MK-072 Administration pages of the platform and of organizations 
     await expect(pane).toContainText('Active: the person signs in.');
     await expect(pane.getByRole('list', { name: 'Organizations' })).toContainText(OTHER.name);
     await accessible(page);
+  });
+
+  /** Opens a page from the app bar and checks the model: metrics, filters, rows and detail. */
+  async function followsTheModel(page: Page, link: string, heading: string): Promise<void> {
+    await openApp(page, link);
+    await expect(page.getByRole('heading', { name: heading, level: 1 })).toBeVisible();
+    await expect(
+      page.getByRole('list', { name: 'Metrics' }).getByRole('listitem').first(),
+    ).toBeVisible();
+    const filters = page.getByRole('search', { name: 'Filters' });
+    await expect(filters.getByRole('searchbox').first()).toBeVisible();
+    const details = page.getByRole('button', { name: /^Details of / });
+    if ((await details.count()) > 0) {
+      await details.first().click();
+      await expect(page.locator('aside[slot="detail"]')).toBeVisible();
+      await page.getByRole('button', { name: 'Close the detail', exact: true }).click();
+      await expect(page.locator('aside[slot="detail"]')).toBeHidden();
+    }
+    await accessible(page);
+  }
+
+  async function asPerson(page: Page, person: Person): Promise<void> {
+    await page.context().clearCookies();
+    await signIn(page, person);
+  }
+
+  test('72.4 every page of the platform administrators follows the model', async ({ page }) => {
+    await asPerson(page, ADMIN);
+    for (const [link, heading] of [
+      ['Extensions', 'Extensions'],
+      ['Service identities', 'Service identities'],
+      ['Installation credentials', 'Installation credentials'],
+      ['External origins', 'External origins'],
+      ['Platform', 'Platform settings'],
+      ['Organizations', 'Organizations'],
+      ['People', 'People'],
+    ] as const) {
+      await followsTheModel(page, link, heading);
+    }
+  });
+
+  test('72.5 every page of the administrators of an organization follows the model', async ({
+    page,
+  }) => {
+    await asPerson(page, ANNA);
+    for (const [link, heading] of [
+      ['Organization apps', 'Organization apps'],
+      ['Permissions', 'Permissions'],
+      ['Credentials', 'Credentials'],
+      ['Quotas', 'Quotas'],
+    ] as const) {
+      await followsTheModel(page, link, heading);
+    }
   });
 });
