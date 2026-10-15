@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
 import {
+  type AppAddress,
   patternCovers,
   topicMatches,
   type EventBus,
@@ -29,6 +30,8 @@ export class ShellBridge {
     private readonly report: (message: string) => void = (message) => {
       console.warn(message);
     },
+    /** The state of the app in the address of the page (MK-099), which the frame writes. */
+    private readonly address?: AppAddress,
   ) {
     this.bridge = extension.bridge ?? { publishes: [], subscribes: [], services: [] };
   }
@@ -54,6 +57,17 @@ export class ShellBridge {
       case 'call':
         void this.call(data);
         return false;
+      case 'address':
+        this.writeAddress(data.state, data.replace === true);
+        return false;
+    }
+  }
+
+  private writeAddress(state: string, replace: boolean): void {
+    try {
+      this.address?.write(state, { replace });
+    } catch (error) {
+      this.report(`Extension ${this.extension.id} wrote an invalid address: ${String(error)}`);
     }
   }
 

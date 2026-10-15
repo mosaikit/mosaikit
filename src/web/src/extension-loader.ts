@@ -9,6 +9,7 @@ import {
   contributionsTo,
   isMosaikitExtension,
   PresenceStore,
+  type AppAddress,
   type CurrentUser,
   type ExtensionPresence,
   type FrontendExtension,
@@ -35,6 +36,8 @@ export class ExtensionLoader {
     },
     private readonly live: LiveChannel = NO_LIVE,
     private readonly presence: ExtensionPresence = new PresenceStore(),
+    /** The state of the app of an extension in the address of the page (MK-099). */
+    private readonly address?: (extensionId: string) => AppAddress,
   ) {
     this.events = new EventBus((error, topic) => {
       reportError(`A handler of '${topic}' failed`, error);
@@ -89,6 +92,7 @@ export class ExtensionLoader {
         data: dataCollections(this.request, extension.id, this.live),
         live: this.live,
         extensions: this.presence,
+        ...(this.address ? { address: this.address(extension.id) } : {}),
         notify: async (notification) => {
           const response = await this.request('/api/v1/notifications', {
             method: 'POST',

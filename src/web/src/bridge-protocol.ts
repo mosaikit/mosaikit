@@ -47,7 +47,20 @@ export interface CallMessage {
   readonly body?: string;
 }
 
-export type FrameMessage = ReadyMessage | PublishMessage | SubscriptionMessage | CallMessage;
+/**
+ * The state of the app in the address of the page (MK-099): written by the frame, with `replace` to
+ * take the place of the current entry of the history; sent by the shell when the person moved to
+ * another state with the back or forward button.
+ */
+export interface AddressMessage {
+  readonly mk: 1;
+  readonly type: 'address';
+  readonly state: string;
+  readonly replace?: boolean;
+}
+
+export type FrameMessage =
+  ReadyMessage | PublishMessage | SubscriptionMessage | CallMessage | AddressMessage;
 
 /** What the frame needs to activate the extension and render one of its apps. */
 export interface InitMessage {
@@ -63,6 +76,8 @@ export interface InitMessage {
   readonly theme: Readonly<Record<string, string>>;
   /** The extensions active in the organization of the session (MK-133). */
   readonly extensions?: readonly ActiveExtension[];
+  /** The state of the app in the address of the page (MK-099). */
+  readonly address?: string;
 }
 
 /** An extension that became active or inactive in the organization of the session (MK-133). */
@@ -91,7 +106,8 @@ export interface ResultMessage {
   readonly error?: string;
 }
 
-export type ShellMessage = InitMessage | EventMessage | ResultMessage | PresenceMessage;
+export type ShellMessage =
+  InitMessage | EventMessage | ResultMessage | PresenceMessage | AddressMessage;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -123,6 +139,11 @@ export function isFrameMessage(data: unknown): data is FrameMessage {
         isStringRecord(data.headers) &&
         (data.body === undefined || typeof data.body === 'string')
       );
+    case 'address':
+      return (
+        typeof data.state === 'string' &&
+        (data.replace === undefined || typeof data.replace === 'boolean')
+      );
     default:
       return false;
   }
@@ -144,6 +165,8 @@ export function isShellMessage(data: unknown): data is ShellMessage {
       return typeof data.id === 'number';
     case 'presence':
       return isPresenceChange(data.change);
+    case 'address':
+      return typeof data.state === 'string';
     default:
       return false;
   }

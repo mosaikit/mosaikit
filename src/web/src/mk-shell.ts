@@ -25,6 +25,7 @@ import {
   type SystemInfo,
 } from './api.js';
 import { FederatedSignIn, type Federation, type Tokens } from './federation.js';
+import { ShellAddress } from './address.js';
 import {
   entryForPath,
   initials,
@@ -623,8 +624,18 @@ export class MkShell extends LitElement {
   @state() private sentTo: string | undefined;
   @state() private notice: string | undefined;
 
+  /** The state of the apps in the address of the page (MK-099). */
+  private readonly address = new ShellAddress(
+    () => this.entries,
+    () => {
+      this.path = location.pathname;
+    },
+  );
+
   private readonly onPopState = (): void => {
     this.path = location.pathname;
+    // The app shown follows the back and forward buttons and the links of the shell (MK-099).
+    this.address.moved();
   };
 
   /** The light or dark scheme the theme applied, for the logo of the sign-in page (MK-052). */
@@ -1393,7 +1404,9 @@ export class MkShell extends LitElement {
           (entry) =>
             html`<a
               href=${entry.route}
-              aria-current=${this.path === entry.route ? 'page' : 'false'}
+              aria-current=${
+                entryForPath(this.entries, this.path)?.route === entry.route ? 'page' : 'false'
+              }
               @click=${this.navigate}
               >${appIcon(entry)}<span>${entry.title}</span></a
             >`,
@@ -1445,7 +1458,15 @@ export class MkShell extends LitElement {
     try {
       const options = await this.client.signInOptions(email);
       if (options.federation) {
-        location.assign(await this.federated.begin(options.federation, email, redirectUri()));
+        // Back to the address opened before signing in, such as a link to a view of an app (MK-099).
+        location.assign(
+          await this.federated.begin(
+            options.federation,
+            email,
+            redirectUri(),
+            location.pathname + location.search + location.hash,
+          ),
+        );
         return;
       }
       this.email = email;
@@ -1544,7 +1565,8 @@ export class MkShell extends LitElement {
       if (!result) {
         return;
       }
-      history.replaceState(null, '', url.pathname);
+      history.replaceState(null, '', result.returnTo ?? url.pathname);
+      this.path = location.pathname;
       this.busy = true;
       this.session = result;
       await this.enter(await this.client.signInWithToken(result.tokens.accessToken));
@@ -1609,6 +1631,7 @@ export class MkShell extends LitElement {
       undefined,
       this.live,
       presence,
+      (extensionId) => this.address.for(extensionId),
     );
     // The sharing dialog of the kernel, the same for the resources of every extension (MK-055).
     loader.events.on(SHARE_TOPIC, (payload) => {
@@ -1745,6 +1768,8 @@ export class MkShell extends LitElement {
     this.path = link.pathname;
     this.error = undefined;
     this.menuOpen = false;
+    // The app shown, opened again from the app bar, goes back to its first view (MK-099).
+    this.address.moved();
   };
 
   /**
@@ -1844,6 +1869,7 @@ export class MkShell extends LitElement {
       frame.user = this.account;
       frame.events = this.loader?.events;
       frame.presence = this.presence;
+      frame.address = this.address.for(extension.id);
       frame.request = (path, init) => this.client.request(path, init);
       area.replaceChildren(frame);
       return;

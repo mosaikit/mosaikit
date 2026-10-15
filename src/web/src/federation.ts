@@ -34,6 +34,13 @@ interface Pending {
   readonly verifier: string;
   readonly redirectUri: string;
   readonly federation: Federation;
+  /** The address the person opened before signing in, to go back to it (MK-099). */
+  readonly returnTo?: string;
+}
+
+/** An address of the page to go back to after sign-in: a path of this site, never another site. */
+function isReturnAddress(value: unknown): value is string {
+  return typeof value === 'string' && value.startsWith('/') && !/^\/[/\\]/.test(value);
 }
 
 type Fetch = (input: string, init?: RequestInit) => Promise<Response>;
@@ -60,14 +67,25 @@ export class FederatedSignIn {
     private readonly storage: KeyValueStore = sessionStorage,
   ) {}
 
-  /** Returns the URL of the sign-in page of the realm, and remembers how to complete it. */
-  async begin(federation: Federation, loginHint: string, redirectUri: string): Promise<string> {
+  /**
+   * Returns the URL of the sign-in page of the realm, and remembers how to complete it.
+   *
+   * @param returnTo the address of the page, such as a link to the view of an app, where the person
+   *     goes back once signed in (MK-099): the realm sends people back to the registered root only
+   */
+  async begin(
+    federation: Federation,
+    loginHint: string,
+    redirectUri: string,
+    returnTo?: string,
+  ): Promise<string> {
     const endpoints = await this.discover(federation.issuer);
     const pending: Pending = {
       state: randomString(16),
       verifier: randomString(32),
       redirectUri,
       federation,
+      ...(isReturnAddress(returnTo) ? { returnTo } : {}),
     };
     this.storage.setItem(PENDING_KEY, JSON.stringify(pending));
     const url = new URL(endpoints.authorization_endpoint);
@@ -88,7 +106,9 @@ export class FederatedSignIn {
    * Completes a sign-in when the location is the answer of the realm. Returns undefined when the
    * location is not such an answer.
    */
-  async complete(location: URL): Promise<{ tokens: Tokens; federation: Federation } | undefined> {
+  async complete(
+    location: URL,
+  ): Promise<{ tokens: Tokens; federation: Federation; returnTo?: string } | undefined> {
     const code = location.searchParams.get('code');
     const state = location.searchParams.get('state');
     const error = location.searchParams.get('error');
@@ -110,7 +130,11 @@ export class FederatedSignIn {
       redirect_uri: pending.redirectUri,
       code_verifier: pending.verifier,
     });
-    return { tokens, federation: pending.federation };
+    return {
+      tokens,
+      federation: pending.federation,
+      ...(isReturnAddress(pending.returnTo) ? { returnTo: pending.returnTo } : {}),
+    };
   }
 
   /** Gets new tokens with the refresh token, before the access token expires. */

@@ -47,7 +47,7 @@ contributes:
   rail.app:                    # the app bar of the shell (MK-025)
     - id: hello
       title: Hello
-      route: /app/hello        # /app/<name>
+      route: /app/hello        # /app/<name>; the paths under it open the app too
       element: example-hello   # custom element rendered for the route
       icon: web/icon.svg       # 24 × 24 SVG or PNG of the extension; a tile with the initials otherwise
       order: 50                # position in the app bar, smaller first; 100 by default

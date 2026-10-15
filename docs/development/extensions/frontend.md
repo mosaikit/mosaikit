@@ -158,6 +158,7 @@ modes, as long as it uses only its `context`:
 | `events.on(pattern)` | only patterns covered by `bridge.subscribes` receive events |
 | `fetch(path, init)` | only the backend API of the extension (`/api/v1/ext/<api>/…`, or a path relative to it), text bodies, with `bridge.services: [api]` |
 | `data(collection)` | only the collections of the extension, with `bridge.services: [data]` |
+| `address` | as usual, written by the shell ([The state of an app in the address](address.md)) |
 | `user`, `extension`, `contributions`, `locale` | as usual |
 
 In the iframe the extension has no access to the page of the shell, to its storage or to the

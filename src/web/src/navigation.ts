@@ -80,13 +80,18 @@ export function launcherEntries(
   return entries.sort((a, b) => a.order - b.order).map(({ entry }) => entry);
 }
 
-/** Finds the entry for a path, ignoring a trailing slash. */
+/**
+ * Finds the entry for a path: its route, or a path under it such as `/app/files/folders/42`, where
+ * the rest is the state of the app (MK-099).
+ */
 export function entryForPath(
   entries: readonly LauncherEntry[],
   path: string,
 ): LauncherEntry | undefined {
   const normalized = path.length > 1 ? withoutTrailingSlashes(path) : path;
-  return entries.find((entry) => entry.route === normalized);
+  return entries.find(
+    (entry) => entry.route === normalized || normalized.startsWith(`${entry.route}/`),
+  );
 }
 
 /** The apps and pages whose title contains the text, for the search of the top bar. */
