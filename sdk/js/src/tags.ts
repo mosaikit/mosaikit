@@ -71,7 +71,10 @@ export async function suggestTags(
   limit = 10,
 ): Promise<string[]> {
   const query = new URLSearchParams({ prefix, limit: String(limit) });
-  return answer(await context.fetch(`${TAGS_PATH}/suggestions?${query.toString()}`), 'No suggestions');
+  return answer(
+    await context.fetch(`${TAGS_PATH}/suggestions?${query.toString()}`),
+    'No suggestions',
+  );
 }
 
 /**
