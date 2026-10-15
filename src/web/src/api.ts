@@ -1179,6 +1179,14 @@ export class KernelClient {
     return this.getJson<FrontendExtension[]>('/api/v1/shell/extensions');
   }
 
+  /**
+   * The frontends of the widgets that visitors without an account see on the home page, with only
+   * those widgets (MK-101).
+   */
+  publicHomeWidgets(): Promise<FrontendExtension[]> {
+    return this.getJson<FrontendExtension[]>('/api/v1/shell/home/public');
+  }
+
   /** The extensions active in the organization of the person, with or without a frontend (MK-133). */
   activeExtensions(): Promise<ActiveExtension[]> {
     return this.getJson<ActiveExtension[]>('/api/v1/shell/extensions/active');

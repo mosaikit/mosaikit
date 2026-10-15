@@ -47,6 +47,12 @@ The screen has three parts, as in the collaboration suites people already know:
 Home greets you and lists your apps. Apps can talk to each other: an action in one app can update
 another one.
 
+Under the apps, Home shows the **widgets** that the installed extensions bring, chosen for your role:
+a platform administrator, an organization administrator and a member each see what concerns them.
+A widget of an app that your organization turns off disappears at once, without reloading the page.
+The sign-in page shows, under the form, the widgets that extensions make public: that is what
+visitors without an account see of the installation.
+
 If an app cannot be loaded, the home page says how many extensions failed; tell your administrator,
 who sees the reason in the extension list.
 
