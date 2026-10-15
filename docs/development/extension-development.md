@@ -45,6 +45,7 @@ lead to the topic.
   - <a id="links"></a>[Links](extensions/resources-and-sharing.md#links)
 - <a id="the-trash"></a>[The trash](extensions/trash.md)
 - <a id="tags"></a>[Tags](extensions/tags.md)
+- <a id="requests-for-access"></a>[Requests for access](extensions/access-requests.md)
 - <a id="quotas"></a>[Quotas](extensions/quotas.md)
 - <a id="audit-log"></a>[Audit log](extensions/audit.md)
 - <a id="events-on-the-server"></a>[Events on the server](extensions/events.md)
