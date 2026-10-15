@@ -12,10 +12,16 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import org.hibernate.annotations.SQLRestriction;
 
-/** An organization: the unit of isolation for users, data and enabled extensions. */
+/**
+ * An organization: the unit of isolation for users, data and enabled extensions. A deleted
+ * organization (MK-130) is left out of every query of this entity, so that it appears nowhere and
+ * opens nothing; only {@link OrganizationRemovals} and the deletion read it, with SQL of their own.
+ */
 @Entity
 @Table(name = "organization")
+@SQLRestriction("deleted_at is null")
 public class Organization {
 
     @Id

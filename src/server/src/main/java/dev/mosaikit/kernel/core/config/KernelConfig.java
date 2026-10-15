@@ -258,6 +258,22 @@ public interface KernelConfig {
         Duration keep();
     }
 
+    /** Deleted organizations (MK-130). */
+    Organizations organizations();
+
+    /** Settings of deleted organizations. */
+    interface Organizations {
+
+        /**
+         * How long the data of a deleted organization, and of its extensions, stay before a job of the
+         * kernel removes them. One day at least, whatever is set: a missing, zero or negative value
+         * never removes anything at once. Read at the deletion, which fixes when the organization may
+         * be removed.
+         */
+        @WithDefault("30d")
+        Duration removalRetention();
+    }
+
     /** Settings of the audit log. */
     interface Audit {
 

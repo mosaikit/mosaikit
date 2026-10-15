@@ -13,24 +13,29 @@ import jakarta.annotation.security.RolesAllowed;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.core.UriBuilder;
 import jakarta.ws.rs.core.UriInfo;
 import java.net.URI;
+import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
@@ -117,6 +122,44 @@ public class OrganizationResource {
                 .entity(created)
                 .build();
     }
+
+    @DELETE
+    @Path("/{slug}")
+    @Operation(
+            summary = "Delete an organization",
+            description = "Confirmed by its slug in \"confirmation\". It appears nowhere from then on, its"
+                    + " people lose access at once, and extensions are told (organization.deleted); its data"
+                    + " stay until removableFrom, set by mosaikit.organizations.removal-retention.")
+    public DeletedOrganization delete(@PathParam("slug") String slug, @QueryParam("confirmation") String confirmation) {
+        String actor = identity.getPrincipal().getName();
+        OrganizationService.Deleted deleted = service.delete(slug, confirmation, actor);
+        // After the deletion committed: the organization already opens nothing, and now the sessions
+        // and keys opened in it end (MK-125).
+        int people = accounts.endAccessTo(deleted.id(), actor);
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("name", deleted.name());
+        detail.put("removableFrom", deleted.removableFrom().toString());
+        detail.put("members", people);
+        detail.put("emailDomains", deleted.emailDomains());
+        audit.append(
+                actor,
+                Optional.of(deleted.id()),
+                "organization.deleted",
+                deleted.slug(),
+                AuditEvent.Outcome.SUCCEEDED,
+                detail);
+        return new DeletedOrganization(
+                deleted.id(), deleted.slug(), deleted.name(), deleted.deletedAt(), deleted.removableFrom(), people);
+    }
+
+    /**
+     * An organization just deleted.
+     *
+     * @param removableFrom from when a job of the kernel removes its data
+     * @param members how many people lost access to it
+     */
+    public record DeletedOrganization(
+            UUID id, String slug, String name, Instant deletedAt, Instant removableFrom, int members) {}
 
     /**
      * Addresses of the kernel UI that the realm of a new organization accepts: the address of this

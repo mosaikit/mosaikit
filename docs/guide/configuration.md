@@ -120,6 +120,16 @@ cross-origin reads (CORS) for data, and an `http` origin is blocked from a shell
 | `mosaikit.audit.min-retention` | `365d` | the shortest retention of the audit log, rounded up to whole days: organizations and the platform may keep their entries longer, never less, and no entry younger is ever deleted (MK-059) |
 | `mosaikit.audit.retention-check` | `6h` | how often each kernel deletes the entries older than their retention |
 
+## Deleted organizations
+
+A deleted organization appears nowhere and opens nothing at once, but its data, and those of its
+extensions, stay for a retention before a job of the kernel removes them (MK-130, see
+[deleting an organization](administration.md#deleting-an-organization)).
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `mosaikit.organizations.removal-retention` | `30d` | how long the data of a deleted organization and of its extensions stay before they are removed, such as `90d`; one day at least, whatever is set, so that a missing, zero or wrong value never removes anything at once. Read at each deletion, which fixes the time the organization may be removed (`removableFrom`): a later change applies to the next deletions only |
+
 ## Events of the platform
 
 The kernel delivers events, such as an organization created or a file stored, to the Java code of

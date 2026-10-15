@@ -29,6 +29,56 @@ curl -u admin https://mosaikit.example.org/api/v1/organizations        # list
 curl -u admin https://mosaikit.example.org/api/v1/organizations/acme   # one
 ```
 
+In the console, **Organizations** lists them for platform administrators.
+
+### Deleting an organization
+
+A platform administrator deletes an organization in **Organizations**, with **Delete** and then its
+slug written again to confirm, or through the API, where `confirmation` names it too (MK-130):
+
+```bash
+curl -u admin -X DELETE 'https://mosaikit.example.org/api/v1/organizations/acme?confirmation=acme'
+# {"id": "...", "slug": "acme", "name": "Acme", "deletedAt": "...", "removableFrom": "...", "members": 12}
+```
+
+What happens, in order:
+
+- **At once**, the organization appears nowhere: not in the lists of the platform, not among the
+  organizations of its people, not on the sign-in page, not in the
+  [published views](#published-views-for-external-services). Nobody signs in to it any more, with a
+  password, a personal access key, a service identity or its realm: the sessions of its people that
+  act on it end at once, as when a person is removed from it, and their access keys in it are
+  revoked. A person who belongs to other organizations keeps them. Its email domains are released,
+  so another organization may take them; its slug stays taken until it is removed. When several
+  kernels serve the installation, the others refuse its sessions within
+  `mosaikit.accounts.session-cache` (5 seconds) and forget it within `mosaikit.identity.cache-ttl`
+  (30 seconds).
+- **At once, too**, the kernel tells the extensions that subscribe to the event `organization.deleted`
+  (see [events on the server](../development/extension-development.md#events-on-the-server)), so that
+  they release what they keep outside the installation for it, such as a workspace on a map server or
+  scheduled work.
+- **Its data stay** — the data of the kernel (members, teams, apps, resources, permissions,
+  credentials, quotas), those of its extensions in the database and its files — for the retention of
+  the installation, `mosaikit.organizations.removal-retention` (30 days unless set, one day at least),
+  so that a mistake can be undone from the database and audits can still be answered.
+- **Then a job of the kernel removes them**, every hour, only for organizations deleted whose
+  `removableFrom` is past: the rows of the organization in the tables of the kernel and of every
+  extension, also of extensions no longer installed, and its events. The content of its files is
+  queued, as when a file is deleted, and leaves the store at the next
+  [clean-up](#removing-the-content-of-files-whose-record-is-gone).
+
+The audit log records the deletion (`organization.deleted`, with `removableFrom`, the number of
+people who lost access and the email domains released) and the removal (`organization.removed`,
+channel `JOB`, with the rows removed from the tables of extensions and the files queued); its entries
+of the organization stay, under their own retention, and stay readable by the identifier of the
+organization (`GET /api/v1/audit-events?organization=<id>`). The realm of an organization
+that signs in through Keycloak is not deleted: delete it in the administration console of Keycloak
+when it is no longer needed.
+
+There is no undo in the console or the API yet: until the organization is removed, its data are in
+the database, and an operator of the database restores it by clearing `deleted_at`, `deleted_by`
+and `removable_from` of its row in `organization` (its email domains are to be set again).
+
 ## Sign-in through Keycloak
 
 An organization can sign in through its own Keycloak realm: its people are recognised by the

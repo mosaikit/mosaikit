@@ -29,6 +29,9 @@ Every account of the installation.
 
 ### `mk_published.organization`
 
+The organizations not deleted: from the moment a platform administrator deletes one (MK-130),
+none of these views shows it, nor its memberships, teams and holders of permissions.
+
 | Column | Type | Meaning |
 |---|---|---|
 | `id` | `uuid` | identifier of the organization |

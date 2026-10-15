@@ -92,6 +92,16 @@ public class TestExtensions implements QuarkusTestProfile {
                         title: Folder
                         levels: [{ name: view, title: View }]
                     """);
+            // OrganizationDeletionTest: an extension with tables of organization data, one referencing
+            // the other, which the removal of a deleted organization empties (MK-130).
+            extension("removal", OrganizationDeletionTest.EXTENSION, "Removal", """
+                    database:
+                      schema: %s
+                    """.formatted(
+                            OrganizationDeletionTest.SCHEMA));
+            Path migrations =
+                    Files.createDirectories(EXTENSIONS.resolve("removal").resolve("db"));
+            Files.writeString(migrations.resolve("V1__albums.sql"), OrganizationDeletionTest.MIGRATION);
             // PermissionsTest: an extension that declares permissions (MK-056); the test changes
             // its manifest as an update would.
             extension("permissions", PermissionsTest.EXTENSION, "Permissions", PermissionsTest.PERMISSIONS);
