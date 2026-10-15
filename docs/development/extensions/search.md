@@ -54,8 +54,8 @@ shell (`/app/...`): any other address is dropped. `resource` names a resource re
 ([Resources, sharing and permissions](resources-and-sharing.md#resources-sharing-and-permissions)), of
 your extension or, with `extension`, of another one, such as a connection of a connections framework:
 the kernel resolves it as a [reference](references.md#references-to-resources-of-other-extensions), drops
-the result when the person may not read it, its extension is absent or the resource is gone, and takes
-the title and the link of the registry when you leave them out.
+the result when the person may not read it, its extension is absent or the resource is gone or in
+the trash (MK-095), and takes the title and the link of the registry when you leave them out.
 
 **Searching.** Search with PostgreSQL full-text search, under row-level security, and filter what the
 person may read in the same query with `mk_kernel.allows` (MK-136), so that a page is never short of
