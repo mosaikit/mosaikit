@@ -12,7 +12,7 @@ import {
 const extension = { id: 'dev.example.dashboards', version: '1.0.0' };
 
 function answering(status: number, body?: unknown) {
-  return vi.fn((_path: string, _init?: RequestInit) =>
+  return vi.fn<(path: string, init?: RequestInit) => Promise<Response>>(() =>
     Promise.resolve(new Response(body === undefined ? null : JSON.stringify(body), { status })),
   );
 }
@@ -33,9 +33,9 @@ describe('tags of resources from an extension frontend (MK-097)', () => {
     );
 
     const replace = answering(200, ['garden']);
-    expect(await replaceTags({ fetch: replace, extension }, 'dashboard', '42', ['Garden'])).toEqual([
-      'garden',
-    ]);
+    expect(await replaceTags({ fetch: replace, extension }, 'dashboard', '42', ['Garden'])).toEqual(
+      ['garden'],
+    );
     const [path, init] = replace.mock.calls[0] ?? [];
     expect(path).toBe('/api/v1/resources/tags/dev.example.dashboards/dashboard/42');
     expect(init?.method).toBe('PUT');
