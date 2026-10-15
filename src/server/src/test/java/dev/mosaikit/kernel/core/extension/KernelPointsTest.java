@@ -58,7 +58,9 @@ class KernelPointsTest {
             assertThat(point.payload()).isPresent();
         });
         assertThat(KernelPoints.point("console.panel@2")).isEmpty();
-        assertThat(KernelPoints.points()).extracting(ExtensionPoint::id).containsExactly("home.widget", "console.panel");
+        assertThat(KernelPoints.points())
+                .extracting(ExtensionPoint::id)
+                .containsExactly("home.widget", "console.panel");
     }
 
     @Test
