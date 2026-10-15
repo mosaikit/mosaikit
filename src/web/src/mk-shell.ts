@@ -7,6 +7,7 @@ import {
   PresenceStore,
   stringAttribute,
   textAttribute,
+  type Favorite,
   type FrontendExtension,
 } from '@mosaikit/sdk';
 import { LitElement, css, html, nothing, svg, type PropertyValues } from 'lit';
@@ -49,6 +50,7 @@ import './mk-extension-frame.js';
 import './mk-home-widgets.js';
 import { VISITOR } from './home.js';
 import './mk-activity.js';
+import './mk-favorites.js';
 import './mk-access-keys.js';
 import './mk-sessions.js';
 import './mk-trash.js';
@@ -64,6 +66,9 @@ import type { PasswordSignIn } from './mk-sign-in.js';
 import { LiveClient } from './live.js';
 import { ExtensionLoader, type LoadResult } from './extension-loader.js';
 import { allows, requiredPermission } from './permissions.js';
+
+/** The page of the favorites of the person (MK-094). */
+const FAVORITES = '/favorites';
 
 /** How often the shell looks for actions proposed by assistants. */
 const DRAFT_REFRESH_MS = 20_000;
@@ -598,6 +603,8 @@ export class MkShell extends LitElement {
   /** The activity feed of the person (MK-038). */
   @state() private activity: ActivityNotification[] = [];
   @state() private unread = 0;
+  /** The favorites of the person, read when the page of the favorites opens (MK-094). */
+  @state() private favorites: Favorite[] = [];
   /** The real-time channel of the page (MK-031). */
   private readonly live = new LiveClient();
   private stopActivity: (() => void) | undefined;
@@ -785,6 +792,9 @@ export class MkShell extends LitElement {
     if (changed.has('path') || changed.has('entries')) {
       this.renderApp();
     }
+    if (changed.has('path') && this.path === FAVORITES) {
+      void this.loadFavorites();
+    }
   }
 
   override render(): unknown {
@@ -901,6 +911,7 @@ export class MkShell extends LitElement {
     return [
       { title: t('Home'), route: '/' },
       { title: t('Activity'), route: '/activity' },
+      { title: t('Favorites'), route: FAVORITES },
       { title: t('Settings'), route: '/settings' },
       { title: t('Trash'), route: '/trash' },
       ...this.entries.map((entry) => ({ title: entry.title, route: entry.route })),
@@ -1054,6 +1065,50 @@ export class MkShell extends LitElement {
     if (notification.link) {
       this.go(notification.link);
     }
+  };
+
+  /** The activity feed (MK-038) or the favorites (MK-094) of the person. */
+  private renderFeedPage(): unknown {
+    return this.path === FAVORITES ? this.renderFavorites() : this.renderActivity();
+  }
+
+  /** The favorites of the person, across extensions (MK-094). */
+  private renderFavorites(): unknown {
+    const names: Record<string, string> = {};
+    for (const entry of this.entries) {
+      names[entry.extensionId] ??= entry.title;
+    }
+    return html`<mk-favorites
+      .favorites=${this.favorites}
+      .names=${names}
+      language=${language()}
+      @mk-open-favorite=${(event: CustomEvent<Favorite>) => {
+        if (event.detail.link) {
+          this.go(event.detail.link);
+        }
+      }}
+      @mk-remove-favorite=${this.removeFavorite}
+    ></mk-favorites>`;
+  }
+
+  /** Reads the favorites again: when their page opens and when an extension comes or goes. */
+  private async loadFavorites(): Promise<void> {
+    try {
+      this.favorites = await this.client.favorites();
+    } catch (error) {
+      this.error = t('The favorites cannot be read: {reason}', {
+        reason: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  private readonly removeFavorite = async (event: CustomEvent<Favorite>): Promise<void> => {
+    try {
+      await this.client.removeFavorite(event.detail);
+    } catch (error) {
+      this.error = error instanceof Error ? error.message : String(error);
+    }
+    await this.loadFavorites();
   };
 
   private readonly readAll = async (): Promise<void> => {
@@ -1462,6 +1517,12 @@ export class MkShell extends LitElement {
         <a href="/" aria-current=${this.path === '/' ? 'page' : 'false'} @click=${this.navigate}
           >${homeIcon}<span>${t('Home')}</span></a
         >
+        <a
+          href=${FAVORITES}
+          aria-current=${this.path === FAVORITES ? 'page' : 'false'}
+          @click=${this.navigate}
+          >${starIcon}<span>${t('Favorites')}</span></a
+        >
         ${this.entries.map(
           (entry) =>
             html`<a
@@ -1481,8 +1542,8 @@ export class MkShell extends LitElement {
         ${
           this.path === '/settings' || this.path === '/trash'
             ? this.renderPersonalPage()
-            : this.path === '/activity'
-              ? this.renderActivity()
+            : this.path === '/activity' || this.path === FAVORITES
+              ? this.renderFeedPage()
               : entryForPath(this.entries, this.path) || this.showsAdmin()
                 ? nothing
                 : html`${this.renderAssistant()}${this.renderPendingActions()}
@@ -1693,6 +1754,12 @@ export class MkShell extends LitElement {
     }
     const presence = new PresenceStore();
     this.presence = presence;
+    // A favorite whose extension comes back opens again, without a reload (MK-094, MK-135).
+    presence.subscribe(() => {
+      if (this.path === FAVORITES) {
+        void this.loadFavorites();
+      }
+    });
     const loader = new ExtensionLoader(
       (path, init) => this.client.request(path, init),
       undefined,
@@ -1729,6 +1796,9 @@ export class MkShell extends LitElement {
     this.account = account;
     this.preferences = account.preferences ?? NO_PREFERENCES;
     void this.loadActivity();
+    if (this.path === FAVORITES) {
+      void this.loadFavorites();
+    }
     this.extensions = extensions;
     await this.loadBarApps();
     this.applyAppearance();
@@ -1999,6 +2069,9 @@ const homeIcon = icon(
 );
 const extensionsIcon = icon(
   svg`<rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><path d="M16.5 13v7M13 16.5h7" />`,
+);
+const starIcon = icon(
+  svg`<path d="m12 4 2.4 5 5.4.6-4 3.7 1.1 5.4L12 16l-4.9 2.7L8.2 13.3l-4-3.7 5.4-.6z" />`,
 );
 const bellIcon = icon(
   svg`<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2H4.5z" /><path d="M10 20.5a2 2 0 0 0 4 0" />`,

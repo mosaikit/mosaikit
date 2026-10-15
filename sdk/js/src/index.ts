@@ -53,3 +53,11 @@ export {
   suggestTags,
   taggedResources,
 } from './tags.js';
+export {
+  FAVORITES_PATH,
+  isFavorite,
+  listFavorites,
+  markFavorite,
+  unmarkFavorite,
+} from './favorites.js';
+export type { Favorite } from './favorites.js';

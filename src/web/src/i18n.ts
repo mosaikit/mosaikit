@@ -145,6 +145,12 @@ const ITALIAN: Record<string, string> = {
   'Nothing new.': 'Niente di nuovo.',
   Notifications: 'Notifiche',
   'Unread: {title}': 'Non letta: {title}',
+  // Favorites (MK-094)
+  Favorites: 'Preferiti',
+  'No favorites yet. Mark a resource as favorite in its app to find it here.':
+    'Ancora nessun preferito. Segna una risorsa come preferita nella sua app per trovarla qui.',
+  'Remove {title} from favorites': 'Rimuovi {title} dai preferiti',
+  'The favorites cannot be read: {reason}': 'I preferiti non possono essere letti: {reason}',
   // Offline (MK-029)
   'You are offline: what you see may not be up to date, and changes wait for the network.':
     'Sei offline: ciò che vedi potrebbe non essere aggiornato, e le modifiche aspettano la rete.',
