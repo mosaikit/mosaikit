@@ -19,6 +19,7 @@ import type { MkInvitePerson } from './mk-invite-person.js';
 import './mk-create-account.js';
 import type { MkCreateAccount } from './mk-create-account.js';
 import { awaitsPassword } from './password-links.js';
+import './mk-offboard-member.js';
 import './mk-permission-list.js';
 import type { PermissionToggle } from './mk-permission-list.js';
 import { byExtension, toggled, type PermissionGroup } from './permissions.js';
@@ -566,6 +567,13 @@ export class MkAdminPermissions extends LitElement {
                 .permissions=${member.permissions}
                 label=${t('What they can do')}
               ></mk-effective-permissions>
+              <mk-offboard-member
+                .client=${this.client}
+                organization=${this.organization ?? ''}
+                email=${member.email}
+                .members=${this.members}
+                @mk-member-removed=${this.memberRemoved}
+              ></mk-offboard-member>
             </section>`
           : nothing
       }
@@ -683,6 +691,18 @@ export class MkAdminPermissions extends LitElement {
     } finally {
       this.busy = false;
     }
+  };
+
+  /** A member was removed (MK-071): the list no longer has them. */
+  private readonly memberRemoved = async (event: CustomEvent<string>): Promise<void> => {
+    const { client, organization } = this;
+    if (!client || !organization) {
+      return;
+    }
+    this.members = await client.organizationMembers(organization).catch(() => this.members);
+    this.memberEmail = '';
+    this.member = undefined;
+    this.show(t('{email} was removed.', { email: event.detail }), false);
   };
 
   private readonly invited = async (event: CustomEvent<string>): Promise<void> => {

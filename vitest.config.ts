@@ -67,6 +67,7 @@ export default defineConfig({
         'src/web/src/mk-share-dialog.ts',
         'src/web/src/mk-shared-link.ts',
         'src/web/src/mk-trash.ts',
+        'src/web/src/mk-offboard-member.ts',
       ],
       reporter: ['text', 'lcov', 'html'],
       thresholds: { lines: 85, branches: 80, functions: 85, statements: 85 },

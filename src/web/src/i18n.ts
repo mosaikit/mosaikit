@@ -559,6 +559,21 @@ const ITALIAN: Record<string, string> = {
   'Deleted for good on {date}': 'Eliminato definitivamente il {date}',
   '{kind}, with 1 item inside': '{kind}, con 1 elemento dentro',
   '{kind}, with {count} items inside': '{kind}, con {count} elementi dentro',
+  // Offboarding a member (MK-071)
+  'Remove from the organization': "Rimuovi dall'organizzazione",
+  'First you see what they own, and choose who takes it over.':
+    'Prima vedi quello che possiede e scegli chi lo prende in carico.',
+  'Remove {email}…': 'Rimuovi {email}…',
+  '{email} owns nothing in the apps.': '{email} non possiede nulla nelle app.',
+  '{email} owns {count} resources:': '{email} possiede {count} risorse:',
+  'in the trash': 'nel cestino',
+  'New owner, with their shares': 'Nuovo proprietario, con le condivisioni',
+  'What {email} owns cannot be read: {reason}':
+    'Quello che possiede {email} non si può leggere: {reason}',
+  'Choose who takes over what they own.': 'Scegli chi prende in carico quello che possiede.',
+  '{email} was removed; {heir} owns their {count} resources.':
+    '{email} è stato rimosso; {heir} possiede le sue {count} risorse.',
+  '{email} was removed.': '{email} è stato rimosso.',
 };
 
 const TRANSLATIONS: Record<Language, Record<string, string>> = { en: {}, it: ITALIAN };
