@@ -216,6 +216,7 @@ class ContentSecurityPolicyTest {
                     .hasMessageContaining("permission denied");
         }
         assertThat(Optional.ofNullable(header().get("connect-src")).orElseThrow())
+                .isNotEmpty()
                 .doesNotContain("https://evil.example.org");
     }
 }

@@ -58,6 +58,13 @@ public class AuditLog {
     private static final String CHAIN = "coalesce(organization_id, '00000000-0000-0000-0000-000000000000'::uuid)";
 
     private static final Logger LOG = Logger.getLogger("mosaikit.audit");
+    private static final String ENTRIES_OF_ORGANIZATION =
+            "from AuditEvent e where e.organizationId = :organization and e.chainIndex > :after order by e.chainIndex";
+    private static final String ENTRIES_OF_INSTALLATION =
+            "from AuditEvent e where e.organizationId is null and e.chainIndex > :after order by e.chainIndex";
+    private static final String HEAD = "select last_index, last_hash, anchor_index, anchor_hash, retention_days"
+            + " from {h-schema}audit_chain where chain_id = :chain";
+    private static final String HEAD_FOR_UPDATE = HEAD + " for update";
 
     private final EntityManager entityManager;
     private final ObjectMapper json;
@@ -366,11 +373,9 @@ public class AuditLog {
     }
 
     private List<AuditEvent> entries(Optional<UUID> organization, long after) {
-        String jpql = organization.isPresent()
-                ? "from AuditEvent e where e.organizationId = :organization and e.chainIndex > :after"
-                : "from AuditEvent e where e.organizationId is null and e.chainIndex > :after";
         TypedQuery<AuditEvent> query = entityManager
-                .createQuery(jpql + " order by e.chainIndex", AuditEvent.class)
+                .createQuery(
+                        organization.isPresent() ? ENTRIES_OF_ORGANIZATION : ENTRIES_OF_INSTALLATION, AuditEvent.class)
                 .setParameter("after", after)
                 .setMaxResults(VERIFY_BATCH);
         organization.ifPresent(id -> query.setParameter("organization", id));
@@ -391,8 +396,7 @@ public class AuditLog {
 
     private Optional<Head> head(UUID chain, boolean forUpdate) {
         List<?> rows = entityManager
-                .createNativeQuery("select last_index, last_hash, anchor_index, anchor_hash, retention_days"
-                        + " from {h-schema}audit_chain where chain_id = :chain" + (forUpdate ? " for update" : ""))
+                .createNativeQuery(forUpdate ? HEAD_FOR_UPDATE : HEAD)
                 .setParameter("chain", chain)
                 .getResultList();
         return rows.stream()

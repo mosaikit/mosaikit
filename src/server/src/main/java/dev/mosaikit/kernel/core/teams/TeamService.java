@@ -35,6 +35,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -655,8 +656,9 @@ public class TeamService implements Teams {
     }
 
     private UUID me() {
-        return RequestOrganization.account(identity)
-                .or(() -> directory.idOf(identity.getPrincipal().getName()))
+        SecurityIdentity current = Objects.requireNonNull(identity, "a request has an identity");
+        return RequestOrganization.account(current)
+                .or(() -> directory.idOf(current.getPrincipal().getName()))
                 .orElseThrow(() -> new ForbiddenOperationException("Sign in to use teams."));
     }
 

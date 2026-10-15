@@ -218,7 +218,7 @@ public class ServiceRegistry {
     public ServiceIdentity grant(UUID serviceId, String description, ServiceIdentity.Grants grants) {
         ServiceIdentity identity = identity(serviceId);
         List<String> problems = check(description, grants);
-        if (!problems.isEmpty()) {
+        if (grants == null || !problems.isEmpty()) {
             throw new InvalidInputException(problems);
         }
         store.grant(identity, description(description), grants);

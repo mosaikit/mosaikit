@@ -12,6 +12,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.regex.Pattern;
 import org.jboss.logging.Logger;
 
@@ -27,7 +28,7 @@ public class EventSubscribers {
     private static final Pattern NAME = Pattern.compile("^[a-z0-9][a-z0-9-]{0,63}$");
 
     private final Instance<PlatformEventSubscriber> beans;
-    private volatile Map<String, PlatformEventSubscriber> found;
+    private final AtomicReference<Map<String, PlatformEventSubscriber>> found = new AtomicReference<>();
 
     public EventSubscribers(@Any Instance<PlatformEventSubscriber> beans) {
         this.beans = beans;
@@ -57,13 +58,14 @@ public class EventSubscribers {
     }
 
     private Map<String, PlatformEventSubscriber> all() {
-        Map<String, PlatformEventSubscriber> current = found;
+        Map<String, PlatformEventSubscriber> current = found.get();
         if (current == null) {
-            synchronized (this) {
-                if (found == null) {
-                    found = collect();
+            synchronized (found) {
+                current = found.get();
+                if (current == null) {
+                    current = collect();
+                    found.set(current);
                 }
-                current = found;
             }
         }
         return current;

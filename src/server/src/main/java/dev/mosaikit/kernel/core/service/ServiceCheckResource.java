@@ -19,6 +19,7 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
 import org.eclipse.microprofile.openapi.annotations.Operation;
@@ -86,7 +87,7 @@ public class ServiceCheckResource {
     }
 
     private static ServiceIdentityView.Checked view(String kind, CredentialCheck.Person person) {
-        SecurityIdentity checked = person.identity();
+        SecurityIdentity checked = Objects.requireNonNull(person.identity(), "a checked credential has an identity");
         ServiceIdentityView.Place organization = RequestOrganization.of(checked)
                 .map(id -> new ServiceIdentityView.Place(id, checked.getAttribute(OrganizationAccess.SLUG_ATTRIBUTE)))
                 .orElse(null);

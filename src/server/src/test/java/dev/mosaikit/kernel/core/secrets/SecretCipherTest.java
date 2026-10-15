@@ -42,6 +42,18 @@ class SecretCipherTest {
     }
 
     @Test
+    void sealedValuesAreEqualByTheirContent() {
+        SecretCipher.Sealed sealed =
+                SecretCipher.seal(keys.current(), SecretCipher.binding(ACME, "openai"), bytes(VALUE));
+        SecretCipher.Sealed copy = new SecretCipher.Sealed(
+                sealed.keyId(), sealed.wrappedKey().clone(), sealed.ciphertext().clone());
+
+        assertThat(copy).isEqualTo(sealed).hasSameHashCodeAs(sealed);
+        assertThat(SecretCipher.seal(keys.current(), SecretCipher.binding(ACME, "openai"), bytes(VALUE)))
+                .isNotEqualTo(sealed);
+    }
+
+    @Test
     void sealsEachValueWithItsOwnDataKeyAndNonce() {
         MasterKey master = keys.current();
         SecretCipher.Sealed first = SecretCipher.seal(master, SecretCipher.binding(ACME, "openai"), bytes(VALUE));
