@@ -54,7 +54,7 @@ public class SharingDialog {
      */
     public static final String SHARED_VIEW_POINT = "shared.view";
 
-    private static final Pattern CUSTOM_ELEMENT = Pattern.compile("^[a-z][a-z0-9]*(-[a-z0-9]+)+$");
+    private static final Pattern CUSTOM_ELEMENT = Pattern.compile("^[a-z][a-z0-9]*+(?:-[a-z0-9]++)++$");
 
     /**
      * A level of a type.

@@ -38,8 +38,11 @@ import jakarta.transaction.TransactionSynchronizationRegistry;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.attribute.FileAttribute;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.security.DigestOutputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -86,6 +89,18 @@ import org.jboss.logging.Logger;
 public class FileService {
 
     private static final Logger LOG = Logger.getLogger(FileService.class);
+
+    /*
+     * The temporary file of an upload is readable and writable by the kernel only: owner-only
+     * permissions where the file system has them; elsewhere (Windows) the temporary directory is
+     * the account's own.
+     */
+    private static final FileAttribute<?>[] PRIVATE =
+            FileSystems.getDefault().supportedFileAttributeViews().contains("posix")
+                    ? new FileAttribute<?>[] {
+                        PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------"))
+                    }
+                    : new FileAttribute<?>[0];
 
     /** Longest name of a file. */
     static final int MAX_NAME = 255;
@@ -598,7 +613,7 @@ public class FileService {
     private Spooled spool(InputStream content) {
         Path path;
         try {
-            path = Files.createTempFile("mosaikit-file-", ".upload");
+            path = Files.createTempFile("mosaikit-file-", ".upload", PRIVATE);
         } catch (IOException e) {
             throw new IllegalStateException("Cannot create a temporary file for an upload", e);
         }

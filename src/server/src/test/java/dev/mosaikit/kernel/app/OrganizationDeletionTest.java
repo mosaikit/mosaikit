@@ -229,7 +229,9 @@ class OrganizationDeletionTest {
                 .get("/api/v1/accounts/registration-options")
                 .jsonPath()
                 .getList("organizations.slug");
-        assertThat(registration).doesNotContain(slug);
+        assertThat(registration.contains(slug))
+                .as("the deleted organization is offered at registration")
+                .isFalse();
         assertThat(count("select count(*) from mk_published.organization where id = ?", id))
                 .isZero();
         assertThat(count("select count(*) from mk_published.membership where organization_id = ?", id))

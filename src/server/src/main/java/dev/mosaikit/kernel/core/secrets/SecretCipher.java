@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.SecureRandom;
 import java.util.Arrays;
+import java.util.Objects;
 import java.util.UUID;
 import javax.crypto.Cipher;
 import javax.crypto.SecretKey;
@@ -44,6 +45,19 @@ final class SecretCipher {
 
     /** What is stored of a value: the key that encrypts its data key, the data key and the value, sealed. */
     record Sealed(String keyId, byte[] wrappedKey, byte[] ciphertext) {
+
+        @Override
+        public boolean equals(Object other) {
+            return other instanceof Sealed that
+                    && Objects.equals(keyId, that.keyId)
+                    && Arrays.equals(wrappedKey, that.wrappedKey)
+                    && Arrays.equals(ciphertext, that.ciphertext);
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(keyId, Arrays.hashCode(wrappedKey), Arrays.hashCode(ciphertext));
+        }
 
         @Override
         public String toString() {
