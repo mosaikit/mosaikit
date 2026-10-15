@@ -77,14 +77,14 @@ test.describe('MK-056 Permissions declared by extensions, granted through profil
 
     // 56.3 Granted to a team of the member, the same request succeeds.
     await page.getByRole('tab', { name: 'Teams' }).click();
-    await page.getByRole('combobox', { name: 'Team', exact: true }).selectOption({ label: team });
+    await page.getByRole('button', { name: `Details of ${team}`, exact: true }).click();
     await page.getByRole('checkbox', { name: 'Export notes', exact: true }).check();
     await expect(page.getByRole('status')).toContainText('Granted.');
     expect((await api(MARIO, EXPORT_API)).status).toBe(200);
 
     // The person page says where the permission comes from.
     await page.getByRole('tab', { name: 'People' }).click();
-    await page.getByRole('combobox', { name: 'Person', exact: true }).selectOption(MARIO.user);
+    await page.getByRole('button', { name: `Details of ${MARIO.user}`, exact: true }).click();
     await expect(
       page.locator(`mk-effective-permissions li[data-permission="${EXPORT}"]`),
     ).toContainText(`Team ${team}`);
@@ -116,7 +116,7 @@ test.describe('MK-056 Permissions declared by extensions, granted through profil
 
     // Revoked from the team, refused again.
     await page.getByRole('tab', { name: 'Teams' }).click();
-    await page.getByRole('combobox', { name: 'Team', exact: true }).selectOption({ label: team });
+    await page.getByRole('button', { name: `Details of ${team}`, exact: true }).click();
     await page.getByRole('checkbox', { name: 'Export notes', exact: true }).uncheck();
     await expect(page.getByRole('status')).toContainText('Revoked.');
     expect((await api(MARIO, EXPORT_API)).status).toBe(403);

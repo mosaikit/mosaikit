@@ -2,8 +2,11 @@
 // SPDX-License-Identifier: MPL-2.0
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property, state } from 'lit/decorators.js';
+import { filterServices, serviceMetrics } from './admin-pages.js';
+import { adminStyles } from './admin-styles.js';
 import type { KernelClient, ServiceIdentity, ServiceKey } from './api.js';
 import { t } from './i18n.js';
+import './mk-admin-view.js';
 import {
   ServiceIdentityList,
   describeGrants,
@@ -35,139 +38,130 @@ const ENDPOINT_TITLES: Record<string, string> = {
  */
 @customElement('mk-admin-services')
 export class MkAdminServices extends LitElement {
-  static override readonly styles = css`
-    :host {
-      display: block;
-      max-width: 860px;
-    }
-    form {
-      display: grid;
-      gap: 12px;
-      margin: 0 0 24px;
-      padding: 16px 20px;
-      background: var(--mk-surface);
-      border: 1px solid var(--mk-line);
-      border-radius: calc(var(--mk-radius) * 2);
-    }
-    fieldset {
-      border: 0;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px 16px;
-    }
-    legend {
-      font-size: 14px;
-      margin-bottom: 4px;
-    }
-    label {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-      font-size: 14px;
-    }
-    label.check {
-      flex-direction: row;
-      align-items: center;
-      gap: 8px;
-    }
-    input[type='text'] {
-      font: inherit;
-      padding: 6px 8px;
-      border: 1px solid var(--mk-line);
-      border-radius: var(--mk-radius);
-      background: var(--mk-surface);
-      color: var(--mk-fg);
-    }
-    input[type='checkbox'] {
-      accent-color: var(--mk-accent);
-    }
-    .hint,
-    .muted {
-      margin: 2px 0 0;
-      color: var(--mk-muted);
-      font-size: 13px;
-      overflow-wrap: anywhere;
-    }
-    .secret {
-      margin: 0 0 24px;
-      padding: 12px 16px;
-      border: 1px solid var(--mk-accent);
-      border-radius: var(--mk-radius);
-      background: var(--mk-accent-soft);
-    }
-    .secret p {
-      margin: 0 0 8px;
-    }
-    .row {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: center;
-    }
-    .secret input {
-      flex: 1 1 320px;
-      min-width: 0;
-      font-family: var(--mk-font-mono, ui-monospace, monospace);
-    }
-    ul {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-      display: grid;
-      gap: 16px;
-    }
-    li.identity {
-      padding-bottom: 16px;
-      border-bottom: 1px solid var(--mk-line);
-    }
-    li.identity:last-child {
-      border-bottom: 0;
-    }
-    .name {
-      font-weight: 600;
-      overflow-wrap: anywhere;
-    }
-    ul.keys {
-      gap: 8px;
-      margin: 8px 0;
-    }
-    ul.keys li {
-      display: flex;
-      gap: 16px;
-      align-items: center;
-      justify-content: space-between;
-    }
-    button {
-      flex: none;
-      font: inherit;
-      padding: 4px 12px;
-      border-radius: var(--mk-radius);
-      border: 1px solid var(--mk-line);
-      background: var(--mk-surface);
-      color: var(--mk-fg);
-      cursor: pointer;
-    }
-    button.primary {
-      border-color: var(--mk-accent);
-      background: var(--mk-accent);
-      color: var(--mk-accent-fg);
-      justify-self: start;
-    }
-    button[disabled] {
-      cursor: default;
-      opacity: 0.6;
-    }
-    :focus-visible {
-      outline: 2px solid var(--mk-focus);
-      outline-offset: 2px;
-    }
-    .status {
-      min-height: 1.5em;
-      color: var(--mk-muted);
-    }
-  `;
+  static override readonly styles = [
+    adminStyles,
+    css`
+      form {
+        display: grid;
+        gap: 12px;
+        margin: 8px 0 0;
+      }
+      h2.name {
+        margin: 0;
+        font-size: 1.1em;
+      }
+      fieldset {
+        border: 0;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px 16px;
+      }
+      legend {
+        font-size: 14px;
+        margin-bottom: 4px;
+      }
+      label {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        font-size: 14px;
+      }
+      label.check {
+        flex-direction: row;
+        align-items: center;
+        gap: 8px;
+      }
+      input[type='text'] {
+        font: inherit;
+        padding: 6px 8px;
+        border: 1px solid var(--mk-line);
+        border-radius: var(--mk-radius);
+        background: var(--mk-surface);
+        color: var(--mk-fg);
+      }
+      input[type='checkbox'] {
+        accent-color: var(--mk-accent);
+      }
+      .hint,
+      .muted {
+        margin: 2px 0 0;
+        color: var(--mk-muted);
+        font-size: 13px;
+        overflow-wrap: anywhere;
+      }
+      .secret {
+        margin: 0 0 24px;
+        padding: 12px 16px;
+        border: 1px solid var(--mk-accent);
+        border-radius: var(--mk-radius);
+        background: var(--mk-accent-soft);
+      }
+      .secret p {
+        margin: 0 0 8px;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      .secret input {
+        flex: 1 1 320px;
+        min-width: 0;
+        font-family: var(--mk-font-mono, ui-monospace, monospace);
+      }
+      ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 16px;
+      }
+      li.identity {
+        padding-bottom: 16px;
+        border-bottom: 1px solid var(--mk-line);
+      }
+      li.identity:last-child {
+        border-bottom: 0;
+      }
+      .name {
+        font-weight: 600;
+        overflow-wrap: anywhere;
+      }
+      ul.keys {
+        gap: 8px;
+        margin: 8px 0;
+      }
+      ul.keys li {
+        display: flex;
+        gap: 16px;
+        align-items: center;
+        justify-content: space-between;
+      }
+      button:not(.link) {
+        flex: none;
+        font: inherit;
+        padding: 4px 12px;
+        border-radius: var(--mk-radius);
+        border: 1px solid var(--mk-line);
+        background: var(--mk-surface);
+        color: var(--mk-fg);
+        cursor: pointer;
+      }
+      button.primary {
+        border-color: var(--mk-accent);
+        background: var(--mk-accent);
+        color: var(--mk-accent-fg);
+        justify-self: start;
+      }
+      button[disabled] {
+        cursor: default;
+        opacity: 0.6;
+      }
+    `,
+  ];
 
   @property({ attribute: false }) client: KernelClient | undefined;
 
@@ -175,6 +169,11 @@ export class MkAdminServices extends LitElement {
   /** The identity being changed, and its form. */
   @state() private editing: { id: string; form: ServiceIdentityForm } | undefined;
   @state() private message = '';
+  @state() private search = '';
+  /** Whether the side pane creates an identity. */
+  @state() private creating = false;
+  /** The identity in the side pane. */
+  @state() private selected: string | undefined;
 
   private list: ServiceIdentityList | undefined;
 
@@ -193,26 +192,149 @@ export class MkAdminServices extends LitElement {
 
   override render(): unknown {
     const identities = this.list?.identities;
+    const shown = filterServices(identities ?? [], this.search);
+    const selected = identities?.find((identity) => identity.id === this.selected);
     return html`
-      <h1>${t('Service identities')}</h1>
-      <p class="muted">
-        ${t(
+      <mk-admin-view
+        heading=${t('Service identities')}
+        description=${t(
           'For the services that call the APIs of extensions without a person, such as a gateway. Each has its own key, the APIs it may call and no organization; it never opens the shell.',
         )}
-      </p>
-      <p class="status" role="status" aria-live="polite">${this.message}</p>
-      ${this.renderCreated()} ${this.renderNew()}
-      ${
-        identities === undefined
-          ? nothing
-          : identities.length === 0
-            ? html`<p>${t('No service identity.')}</p>`
-            : html`<ul aria-label=${t('Service identities')}>
-                ${identities.map((identity) => this.renderIdentity(identity))}
-              </ul>`
-      }
+        name="mosaikit.admin.services"
+        .metrics=${serviceMetrics(identities, this.list?.maxKeys ?? 2)}
+        ?detail-open=${this.creating || selected !== undefined}
+        @mk-detail-close=${this.closePane}
+      >
+        <button
+          slot="actions"
+          type="button"
+          class="primary"
+          @click=${() => {
+            this.selected = undefined;
+            this.editing = undefined;
+            this.creating = true;
+          }}
+        >
+          ${t('New service identity')}
+        </button>
+        <label slot="filters" class="filter"
+          >${t('Search service identities')}
+          <input
+            type="search"
+            .value=${this.search}
+            @input=${(event: Event) => {
+              this.search = (event.target as HTMLInputElement).value;
+            }}
+        /></label>
+        <p class="status" role="status" aria-live="polite">${this.message}</p>
+        ${this.renderCreated()}
+        ${
+          identities === undefined
+            ? nothing
+            : identities.length === 0
+              ? html`<p>${t('No service identity.')}</p>`
+              : shown.length === 0
+                ? html`<p>${t('No service identity matches the filters.')}</p>`
+                : this.renderTable(shown)
+        }
+        <aside
+          slot="detail"
+          class="pane"
+          aria-label=${selected ? selected.name : t('New service identity')}
+        >
+          ${this.creating ? this.renderNew() : nothing}
+          ${selected ? this.renderIdentity(selected) : nothing}
+        </aside>
+      </mk-admin-view>
     `;
   }
+
+  private renderTable(identities: readonly ServiceIdentity[]): unknown {
+    const list = this.list;
+    return html`<table aria-label=${t('Service identities')}>
+      <thead>
+        <tr>
+          <th scope="col">${t('Name')}</th>
+          <th scope="col">${t('May call')}</th>
+          <th scope="col">${t('Live keys')}</th>
+          <th scope="col"><span class="muted">${t('Actions')}</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        ${identities.map((identity) => {
+          const label = `service-row-${identity.id}`;
+          return html`<tr class=${identity.id === this.selected ? 'selected' : ''}>
+            <th scope="row">
+              <button
+                type="button"
+                class="link"
+                id=${label}
+                aria-label=${t('Details of {name}', { name: identity.name })}
+                @click=${() => {
+                  this.open(identity);
+                }}
+              >
+                ${identity.name}
+              </button>
+              ${identity.description ? html`<p class="muted">${identity.description}</p>` : nothing}
+            </th>
+            <td>${describeGrants(identity)}</td>
+            <td>
+              ${
+                identity.keys.length === 0
+                  ? html`<span class="muted">${t('None')}</span>`
+                  : identity.keys.map((key) => html`<div class="muted">${key.prefix}…</div>`)
+              }
+            </td>
+            <td>
+              <div class="row">
+                <button
+                  type="button"
+                  aria-label=${t('New key for {name}', { name: identity.name })}
+                  ?disabled=${!list?.canRotate(identity) || list.busy}
+                  @click=${() => void list?.rotate(identity)}
+                >
+                  ${t('New key')}
+                </button>
+                <button
+                  type="button"
+                  aria-label=${t('Change what {name} may call', { name: identity.name })}
+                  @click=${() => {
+                    this.open(identity, true);
+                  }}
+                >
+                  ${t('Change')}
+                </button>
+              </div>
+            </td>
+          </tr>`;
+        })}
+      </tbody>
+    </table>`;
+  }
+
+  private open(identity: ServiceIdentity, edit = false): void {
+    this.creating = false;
+    this.selected = identity.id;
+    this.editing = edit
+      ? {
+          id: identity.id,
+          form: {
+            name: identity.name,
+            description: identity.description,
+            apis: identity.apis.join(', '),
+            endpoints: identity.endpoints,
+            organizations: identity.organizations.join(', '),
+          },
+        }
+      : undefined;
+  }
+
+  private readonly closePane = (): void => {
+    this.creating = false;
+    this.selected = undefined;
+    this.editing = undefined;
+  };
 
   private renderNew(): unknown {
     const list = this.list;
@@ -225,6 +347,8 @@ export class MkAdminServices extends LitElement {
         event.preventDefault();
         if (await list.create(this.form)) {
           this.form = EMPTY;
+          // The new key shows above the table, once.
+          this.creating = false;
         }
       }}
     >
@@ -366,8 +490,8 @@ export class MkAdminServices extends LitElement {
     const list = this.list;
     const label = `service-${identity.id}`;
     const editing = this.editing?.id === identity.id ? this.editing : undefined;
-    return html`<li class="identity">
-      <div class="name" id=${label}>${identity.name}</div>
+    return html`<div class="identity">
+      <h2 class="name" id=${label}>${identity.name}</h2>
       ${identity.description ? html`<p class="muted">${identity.description}</p>` : nothing}
       <p class="muted">${describeGrants(identity)}</p>
       ${
@@ -409,7 +533,7 @@ export class MkAdminServices extends LitElement {
         </button>
       </div>
       ${editing ? this.renderEdit(identity, editing.form) : nothing}
-    </li>`;
+    </div>`;
   }
 
   private renderEdit(identity: ServiceIdentity, form: ServiceIdentityForm): unknown {
