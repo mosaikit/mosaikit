@@ -211,8 +211,11 @@ commits, and reaches the pages subscribed to the topic in the same organization:
 live.publish("extension.dev.example.hello.greeted", Map.of("id", greeting.id()));
 ```
 
-Topics are `documents.<extension id>.<collection>`, `extension.<extension id>.<name>` and `notifications`;
-the kernel refuses the others, and those of extensions that the organization turned off. Send what
+Topics are `documents.<extension id>.<collection>`, `extension.<extension id>.<name>`, `notifications`
+and `extensions`, the extensions that become active or inactive in the organization, which
+`context.extensions` already follows (see
+[Whether another extension is present](#whether-another-extension-is-present)); the kernel refuses
+the others, and those of extensions that the organization turned off. Send what
 changed, not the data: pages read it again with the rights of each person.
 
 ### Notifications
@@ -766,11 +769,58 @@ refused, naming that extension, unless both are updated in the same operation
 organization, is refused while an active extension requires it. Extensions that use it optionally
 stay active.
 
-> **Coming with the phase "Composition".** Libraries brought by Java extensions (MK-131), knowing
-> whether another extension is active (MK-133), versioned contracts between extensions on the
-> server and in the frontend (MK-134), and references between resources of different extensions
-> that survive the absence of one of them (MK-135). Until then a Java extension brings no
-> libraries, and extensions talk through extension points and events as described above.
+### Whether another extension is present
+
+An extension that can use another one asks whether it is there before it offers what needs it, and
+reacts when it comes or goes (MK-133). Another extension is **active in an organization** when it is
+installed, compatible with the kernel and with what it requires, and the organization did not turn
+its apps off. Any extension may ask about any other, whether or not it declares it in `optional`;
+of one that is not installed, or not active there, the answer says only that it is absent.
+
+On the server, inject `ExtensionPresence` (`dev.mosaikit.kernel.api.extension`): it answers in the
+organization of the request, or of the event a subscriber handles, and gives the version.
+
+```java
+@Inject ExtensionPresence presence;
+
+if (presence.isActive("org.example.ext.catalog")) {
+    Optional<Version> version = presence.version("org.example.ext.catalog");
+    // offer to open the file in the catalog
+}
+```
+
+To react, subscribe to `extension.activated` and `extension.deactivated` (see
+[Events on the server](#events-on-the-server)): the kernel raises them in every organization where
+another extension becomes active or stops being active, because it was installed, updated, removed,
+no longer able to run, or turned on or off there. An extension installed or removed while the kernel
+is stopped is told at the next start.
+
+In the frontend, `context.extensions` answers the same for the organization of the session, without
+a request to the server: the shell reads the list once with the session and keeps it current through
+the real-time channel, in isolated frontends too.
+
+```ts
+const catalog = 'org.example.ext.catalog';
+const render = () => {
+  button.hidden = !context.extensions.isActive(catalog);
+};
+render();
+const stop = context.extensions.subscribe((change) => {
+  if (change.extension === catalog) render(); // change.active, change.version, change.reason
+});
+```
+
+`context.extensions.version(id)` gives the version, `undefined` when the extension is not active,
+and `active()` the whole list. In the tests of a frontend, build a fixed answer with
+`new PresenceStore([{ id: 'org.example.ext.catalog', version: '1.2.0' }])` of `@mosaikit/sdk`. A page
+opened through a link to a shared resource has no organization of a session: no other extension is
+active there.
+
+> **Coming with the phase "Composition".** Libraries brought by Java extensions (MK-131), versioned
+> contracts between extensions on the server and in the frontend (MK-134), and references between
+> resources of different extensions that survive the absence of one of them (MK-135). Until then a
+> Java extension brings no libraries, and extensions talk through extension points and events as
+> described above.
 
 ## Actions for assistants
 
@@ -1250,6 +1300,8 @@ The kernel raises these events (constants of `PlatformEvents`), with their paylo
 | `organization.deleted` | an organization was deleted; reserved: the kernel does not delete organizations yet | `slug` |
 | `extension.enabled` | an organization turned an extension on: one of its apps, after all were off (MK-030) | `extension` |
 | `extension.disabled` | an organization turned an extension off: all its apps | `extension` |
+| `extension.activated` | any extension became active in the organization: installed or able to run again, updated, or turned on (MK-133) | `extension`, `version`, `active` (`true`), `reason` (`installed`, `updated`, `enabled`), `previousVersion` after an update |
+| `extension.deactivated` | any extension stopped being active in the organization: removed, no longer able to run, or turned off; not raised where the organization had turned it off | `extension`, `version` (the one it had), `active` (`false`), `reason` (`removed`, `incompatible`, `disabled`) |
 | `file.stored`, `file.deleted` | a file of any extension was stored or deleted (MK-041) | `extension`, `file`, `name`, `contentType`, `size`, and `team` and `resource` (`<extension>/<type>/<id>`) when it has them |
 | `resource.registered`, `resource.removed` | a resource of any extension was registered or removed (MK-054) | `extension`, `type`, `id`; `title` and `owner` when registered |
 | `sharing.granted` | a resource of any extension was shared with a subject, or a link to it made (MK-055) | `extension`, `type`, `id` of the resource, `grant`, `subject` (`person`, `group`, `organization`, `public`, `link`), `subjectId` (the account or the team) for a person or a group, `level` |
@@ -1293,8 +1345,9 @@ events.raise(EXTENSION, "note.created", Map.of("note", note.id().toString(), "fo
   organization, row-level security shows its data only, and the beans of the kernel act in it. What
   the handler stores or registers belongs to the organization, not to a person, and the audit log
   records the extension as actor with the channel `JOB`. An organization that turned the extension
-  off sends it no event, except `extension.disabled` and `extension.enabled` about the extension
-  itself, so that it releases and prepares what it keeps.
+  off sends it no event, except `extension.disabled`, `extension.enabled`, `extension.deactivated`
+  and `extension.activated` about the extension itself, so that it releases and prepares what it
+  keeps.
 - **At least once.** When `handle` throws, its transaction rolls back and the kernel gives the event
   again later, waiting twice as long each time (`mosaikit.events.retry-delay`), up to
   `mosaikit.events.max-attempts`; then it gives up and records `events.delivery.failed` in the audit log

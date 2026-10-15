@@ -13,7 +13,8 @@ import java.util.regex.Pattern;
 
 /**
  * Which topics a person may subscribe to (MK-031): the changes of the documents of a collection of
- * an active extension, the events of an active extension, and their own notifications. The extensions
+ * an active extension, the events of an active extension, their own notifications, and the extensions
+ * that become active or inactive in their organization (MK-133). The extensions
  * that the organization turned off are refused, as their API is (MK-030).
  */
 @ApplicationScoped
@@ -21,6 +22,13 @@ public class LiveTopics {
 
     /** The notifications of the person (MK-038). */
     public static final String NOTIFICATIONS = "notifications";
+
+    /**
+     * The extensions that become active or inactive in the organization (MK-133): data
+     * {@code extension}, {@code version}, {@code active}, {@code reason}, and {@code previousVersion}
+     * after an update.
+     */
+    public static final String EXTENSIONS = "extensions";
 
     static final Pattern DOCUMENTS = Pattern.compile("^documents\\.([a-z0-9][a-z0-9.-]*)\\.([a-z][a-z0-9-]{0,63})$");
     static final Pattern EXTENSION = Pattern.compile("^extension\\.([a-z0-9][a-z0-9.-]*?)\\.([a-z][a-z0-9.-]{0,99})$");
@@ -40,6 +48,9 @@ public class LiveTopics {
         }
         if (organization.isEmpty()) {
             return Optional.of("choose an organization: the topics of extensions belong to one");
+        }
+        if (EXTENSIONS.equals(topic)) {
+            return Optional.empty();
         }
         Matcher documents = DOCUMENTS.matcher(topic);
         if (documents.matches()) {

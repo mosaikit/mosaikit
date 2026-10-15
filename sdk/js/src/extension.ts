@@ -4,6 +4,7 @@ import type { LiveChannel } from './live.js';
 import type { Contribution, OwnedContribution } from './contributions.js';
 import type { DataCollection, DataOptions } from './data.js';
 import type { EventBus } from './events.js';
+import type { ExtensionPresence } from './presence.js';
 
 /** Information about the signed-in person, as far as an extension needs it. */
 export interface CurrentUser {
@@ -48,6 +49,12 @@ export interface ExtensionContext {
   ) => DataCollection<T>;
   /** Events of the kernel in real time (MK-031); nothing arrives in an isolated frame. */
   readonly live: LiveChannel;
+  /**
+   * Whether other extensions are present and active in the organization of the session, kept current
+   * without a reload (MK-133): an extension that can use another one asks before offering what needs
+   * it, and subscribes to take it up or put it away when the other one comes or goes.
+   */
+  readonly extensions: ExtensionPresence;
   /**
    * Notifies people of the organization, by email address, in their activity feed (MK-038); the
    * people who turned off the kind receive nothing. Not available in an isolated frame.

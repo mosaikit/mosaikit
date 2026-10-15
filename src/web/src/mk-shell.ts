@@ -3,6 +3,7 @@
 import { applyTheme, isThemeName, registerTheme, themes as uiThemes } from '@mosaikit/ui';
 import {
   contributionsTo,
+  PresenceStore,
   stringAttribute,
   textAttribute,
   type FrontendExtension,
@@ -49,6 +50,7 @@ import './mk-settings.js';
 import type { SettingsSection } from './mk-settings.js';
 import './mk-share-dialog.js';
 import './mk-shared-link.js';
+import { followPresence } from './presence.js';
 import { SHARE_TOPIC, resourceOf, tokenOf } from './sharing.js';
 import './mk-sign-in.js';
 import { browserLanguage, isLanguage, language, setLanguage, t } from './i18n.js';
@@ -582,6 +584,9 @@ export class MkShell extends LitElement {
   /** The real-time channel of the page (MK-031). */
   private readonly live = new LiveClient();
   private stopActivity: (() => void) | undefined;
+  /** The extensions active in the organization, given to the frontends of extensions (MK-133). */
+  private presence = new PresenceStore();
+  private stopPresence: (() => void) | undefined;
   /** Whether the browser has network (MK-029). */
   @state() private online = typeof navigator === 'undefined' ? true : navigator.onLine;
   private readonly onNetwork = (): void => {
@@ -1588,11 +1593,14 @@ export class MkShell extends LitElement {
         { reason: error instanceof Error ? error.message : String(error) },
       );
     }
+    const presence = new PresenceStore();
+    this.presence = presence;
     const loader = new ExtensionLoader(
       (path, init) => this.client.request(path, init),
       undefined,
       undefined,
       this.live,
+      presence,
     );
     // The sharing dialog of the kernel, the same for the resources of every extension (MK-055).
     loader.events.on(SHARE_TOPIC, (payload) => {
@@ -1605,6 +1613,11 @@ export class MkShell extends LitElement {
     this.live.connect(account.organization ?? undefined);
     this.stopActivity?.();
     this.stopActivity = this.live.subscribe('notifications', () => void this.loadActivity());
+    // Which extensions are active in the organization, for the frontends of extensions (MK-133).
+    this.stopPresence?.();
+    this.stopPresence = (
+      await followPresence(this.live, () => this.client.activeExtensions(), presence)
+    ).stop;
     this.loadResults = await loader.loadAll(extensions, account);
     this.extensions = extensions;
     this.loader = loader;
@@ -1663,6 +1676,7 @@ export class MkShell extends LitElement {
       return;
     }
     const extensions = await this.client.shellExtensions();
+    this.presence.replace(await this.client.activeExtensions().catch(() => this.presence.active()));
     const known = new Set(this.extensions.map((extension) => extension.id));
     const added = extensions.filter((extension) => !known.has(extension.id));
     const results = await this.loader.loadAll(added, this.account, extensions);
@@ -1689,6 +1703,9 @@ export class MkShell extends LitElement {
   /** Forgets the person; resolves when the kernel ended the session. */
   private clearSession(): Promise<void> {
     this.live.close();
+    this.stopPresence?.();
+    this.stopPresence = undefined;
+    this.presence = new PresenceStore();
     this.menuOpen = false;
     clearTimeout(this.refreshTimer);
     clearInterval(this.draftTimer);
@@ -1813,6 +1830,7 @@ export class MkShell extends LitElement {
       frame.element = entry.element;
       frame.user = this.account;
       frame.events = this.loader?.events;
+      frame.presence = this.presence;
       frame.request = (path, init) => this.client.request(path, init);
       area.replaceChildren(frame);
       return;

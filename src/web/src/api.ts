@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
-import type { FrontendExtension } from '@mosaikit/sdk';
+import type { ActiveExtension, FrontendExtension } from '@mosaikit/sdk';
 import type { SignInOptions } from './federation.js';
 
 /** Public information returned before sign-in. */
@@ -1096,6 +1096,11 @@ export class KernelClient {
 
   shellExtensions(): Promise<FrontendExtension[]> {
     return this.getJson<FrontendExtension[]>('/api/v1/shell/extensions');
+  }
+
+  /** The extensions active in the organization of the person, with or without a frontend (MK-133). */
+  activeExtensions(): Promise<ActiveExtension[]> {
+    return this.getJson<ActiveExtension[]>('/api/v1/shell/extensions/active');
   }
 
   /**

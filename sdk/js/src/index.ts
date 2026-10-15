@@ -19,5 +19,7 @@ export { DataError, dataCollections } from './data.js';
 export type { DataCollection, DataDocument } from './data.js';
 export { defineExtension, isMosaikitExtension } from './extension.js';
 export type { CurrentUser, MosaikitExtension, ExtensionContext } from './extension.js';
+export { PresenceStore, isPresenceChange } from './presence.js';
+export type { ActiveExtension, ExtensionPresence, ExtensionPresenceChange } from './presence.js';
 export { SHARE_TOPIC, openSharing, sharingLevel } from './sharing.js';
 export type { SharedResourceRef } from './sharing.js';

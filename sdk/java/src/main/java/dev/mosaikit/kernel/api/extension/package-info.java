@@ -3,6 +3,8 @@
 /**
  * The extension manifest: the public contract through which an extension declares what it is, what it
  * needs and what it contributes.
+ * {@link dev.mosaikit.kernel.api.extension.ExtensionPresence} tells whether another extension is
+ * active in an organization.
  *
  * <p>The model is framework-free. The kernel reads manifests from YAML, but validation works on a
  * plain {@code Map} so that the same rules can run in the CLI and in the marketplace.

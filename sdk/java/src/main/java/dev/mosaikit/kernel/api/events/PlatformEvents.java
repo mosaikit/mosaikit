@@ -35,6 +35,24 @@ public interface PlatformEvents {
     String EXTENSION_DISABLED = "extension.disabled";
 
     /**
+     * An extension became active in an organization (MK-133): installed, or able to run again, updated
+     * to another version, or turned on. Payload {@code extension}, {@code version}, {@code active}
+     * ({@code true}), {@code reason} ({@code installed}, {@code updated} or {@code enabled}), and
+     * {@code previousVersion} when it was updated. Raised in every organization where it is active, for
+     * any extension: subscribe to it to take up what another extension offers.
+     */
+    String EXTENSION_ACTIVATED = "extension.activated";
+
+    /**
+     * An extension stopped being active in an organization (MK-133): removed, no longer able to run (an
+     * extension it requires went away, or the kernel changed), or turned off. Payload
+     * {@code extension}, {@code version} (the one it had), {@code active} ({@code false}) and
+     * {@code reason} ({@code removed}, {@code incompatible} or {@code disabled}). Raised in every
+     * organization where it was active.
+     */
+    String EXTENSION_DEACTIVATED = "extension.deactivated";
+
+    /**
      * A file was stored (MK-041); payload {@code extension}, {@code file}, {@code name},
      * {@code contentType}, {@code size}, and {@code team} and {@code resource} when it has them.
      */

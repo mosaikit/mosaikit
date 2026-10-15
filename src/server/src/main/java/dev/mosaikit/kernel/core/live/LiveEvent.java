@@ -12,7 +12,7 @@ import java.util.UUID;
  * @param topic what it is about, such as {@code documents.<extension>.<collection>}
  * @param organization the organization whose pages may receive it
  * @param audience the accounts that receive it, or {@code null} for every member of the organization,
- *     but not its guests (MK-032)
+ *     but not its guests (MK-032), except on the topic {@value LiveTopics#EXTENSIONS}
  * @param team the team whose members only receive it, or {@code null} (MK-032)
  * @param data the content, as a JSON object
  */
@@ -36,6 +36,10 @@ public record LiveEvent(String topic, UUID organization, List<UUID> audience, UU
         if (this.team != null) {
             return team.contains(account);
         }
-        return audience == null ? !guest : audience.contains(account);
+        if (audience == null) {
+            // Which extensions are active in the organization reaches its guests too (MK-133).
+            return !guest || LiveTopics.EXTENSIONS.equals(topic);
+        }
+        return audience.contains(account);
     }
 }

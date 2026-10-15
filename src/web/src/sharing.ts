@@ -3,6 +3,7 @@
 import {
   EventBus,
   NO_LIVE,
+  PresenceStore,
   SHARE_TOPIC,
   dataCollections,
   isMosaikitExtension,
@@ -505,6 +506,8 @@ export async function defineSharedView(
     fetch: request,
     data: dataCollections(request, view.extension, NO_LIVE),
     live: NO_LIVE,
+    // A link has no organization of a session: no other extension is told present (MK-133).
+    extensions: new PresenceStore(),
     notify: () => Promise.reject(new Error('Not available to a link')),
   };
   await candidate.activate(context);
