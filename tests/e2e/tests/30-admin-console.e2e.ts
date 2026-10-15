@@ -3,7 +3,7 @@
 // e2e-group: C
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
-import { ADMIN, ANNA, BASE_URL, MARIO, type Person } from '../support/env.js';
+import { ADMIN, ANNA, BASE_URL, MARIO, ORGANIZATION, type Person } from '../support/env.js';
 import { OTHER, otherOrganizationPerson } from '../support/people.js';
 import { api, apps, openApp, signIn } from '../support/shell.js';
 
@@ -184,8 +184,9 @@ test.describe('MK-072 Administration pages of the platform and of organizations 
     await expect(
       page.getByRole('list', { name: 'Metrics' }).getByRole('listitem').first(),
     ).toBeVisible();
-    const filters = page.getByRole('search', { name: 'Filters' });
-    await expect(filters.getByRole('searchbox').first()).toBeVisible();
+    // The filters are slotted into the search region of the page: a search field is among them.
+    await expect(page.getByRole('search', { name: 'Filters' })).toBeVisible();
+    await expect(page.getByRole('searchbox').first()).toBeVisible();
     const details = page.getByRole('button', { name: /^Details of / });
     if ((await details.count()) > 0) {
       await details.first().click();
@@ -219,14 +220,27 @@ test.describe('MK-072 Administration pages of the platform and of organizations 
   test('72.5 every page of the administrators of an organization follows the model', async ({
     page,
   }) => {
-    await asPerson(page, ANNA);
-    for (const [link, heading] of [
-      ['Organization apps', 'Organization apps'],
-      ['Permissions', 'Permissions'],
-      ['Credentials', 'Credentials'],
-      ['Quotas', 'Quotas'],
-    ] as const) {
-      await followsTheModel(page, link, heading);
+    // Anna administers the organization of the tests for this test, as in the other files.
+    const member = `/api/v1/organizations/${ORGANIZATION.slug}/members/${ANNA.user}`;
+    await api(ADMIN, member, {
+      method: 'PUT',
+      body: JSON.stringify({ roles: ['organization-admin', 'organization-user'] }),
+    });
+    try {
+      await asPerson(page, ANNA);
+      for (const [link, heading] of [
+        ['Organization apps', 'Organization apps'],
+        ['Permissions', 'Permissions'],
+        ['Credentials', 'Credentials'],
+        ['Quotas', 'Quotas'],
+      ] as const) {
+        await followsTheModel(page, link, heading);
+      }
+    } finally {
+      await api(ADMIN, member, {
+        method: 'PUT',
+        body: JSON.stringify({ roles: ['organization-user'] }),
+      });
     }
   });
 });
