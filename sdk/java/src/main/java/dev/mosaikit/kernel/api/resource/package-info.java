@@ -10,5 +10,8 @@
  * {@link dev.mosaikit.kernel.api.resource.ResourceRef}, and
  * {@link dev.mosaikit.kernel.api.resource.ResourceReferences} resolves the reference to the resource
  * or to the reason it is not available, such as an extension that is absent (MK-135).
+ *
+ * <p>{@link dev.mosaikit.kernel.api.resource.Trash} moves a resource to the trash instead of deleting
+ * it, from which its owner or an administrator restores it (MK-095).
  */
 package dev.mosaikit.kernel.api.resource;

@@ -31,7 +31,7 @@ import java.util.function.Predicate;
  *
  * <p>The checks go from what anybody may know to what only a reader may: whether the extension is
  * active in the organization (MK-133, as {@link ExtensionPresence} answers), whether the resource is
- * registered, and whether the person has a level on it (MK-055).
+ * registered and not in the trash (MK-095), and whether the person has a level on it (MK-055).
  */
 @ApplicationScoped
 public class KernelResourceReferences implements ResourceReferences {
@@ -42,6 +42,7 @@ public class KernelResourceReferences implements ResourceReferences {
     private final Resources registry;
     private final Sharing sharing;
     private final CurrentOrganization organization;
+    private final Predicate<ResourceRef> inTrash;
 
     @Inject
     public KernelResourceReferences(
@@ -49,14 +50,16 @@ public class KernelResourceReferences implements ResourceReferences {
             ExtensionPresence presence,
             Resources registry,
             Sharing sharing,
-            CurrentOrganization organization) {
+            CurrentOrganization organization,
+            KernelTrash trash) {
         this(
                 id -> extensions.findActive(id).isPresent(),
                 presence::isActive,
                 id -> extensions.findActive(id).flatMap(InstalledExtension::manifest),
                 registry,
                 sharing,
-                organization);
+                organization,
+                ref -> trash.inTrash(organization.require(), ref));
     }
 
     KernelResourceReferences(
@@ -65,13 +68,15 @@ public class KernelResourceReferences implements ResourceReferences {
             Function<String, Optional<ExtensionManifest>> manifests,
             Resources registry,
             Sharing sharing,
-            CurrentOrganization organization) {
+            CurrentOrganization organization,
+            Predicate<ResourceRef> inTrash) {
         this.callers = callers;
         this.presence = presence;
         this.manifests = manifests;
         this.registry = registry;
         this.sharing = sharing;
         this.organization = organization;
+        this.inTrash = inTrash;
     }
 
     @Override
@@ -97,8 +102,12 @@ public class KernelResourceReferences implements ResourceReferences {
                 .apply(target.extension())
                 .flatMap(manifest -> manifest.resourceType(target.type()))
                 .isPresent();
-        // A type that the extension no longer declares has no resources any more.
+        // A type that the extension no longer declares has no resources any more; a resource in the
+        // trash (MK-095) is deleted for the person, until it is restored.
         Optional<Resource> entry = declared ? registry.find(target) : Optional.empty();
+        if (entry.isPresent() && inTrash.test(target)) {
+            entry = Optional.empty();
+        }
         if (entry.isEmpty()) {
             return ResolvedReference.unavailable(target, Availability.DELETED);
         }

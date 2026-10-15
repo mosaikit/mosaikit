@@ -274,6 +274,21 @@ public interface KernelConfig {
         Duration removalRetention();
     }
 
+    /** The trash of the registered resources (MK-095). */
+    Trash trash();
+
+    /** Settings of the trash. */
+    interface Trash {
+
+        /**
+         * How long a resource stays in the trash before a job of the kernel deletes it for good. One
+         * day at least, whatever is set: a missing, zero or negative value never deletes anything at
+         * once. Read when a resource is trashed, which fixes when it may be deleted.
+         */
+        @WithDefault("30d")
+        Duration retention();
+    }
+
     /** Settings of the audit log. */
     interface Audit {
 

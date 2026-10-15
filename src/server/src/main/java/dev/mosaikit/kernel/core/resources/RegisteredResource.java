@@ -49,6 +49,18 @@ public class RegisteredResource {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    /** When it went to the trash (MK-095), or {@code null} when it is not there. */
+    @Column(name = "trashed_at", insertable = false, updatable = false)
+    private Instant trashedAt;
+
+    /** The resource whose trashing took this one: itself, or the resource that contains it. */
+    @Column(name = "trash_root_id", insertable = false, updatable = false)
+    private UUID trashRootId;
+
+    /** From when the kernel deletes it for good. */
+    @Column(name = "purgeable_from", insertable = false, updatable = false)
+    private Instant purgeableFrom;
+
     /** Required by JPA. */
     protected RegisteredResource() {}
 
@@ -121,5 +133,22 @@ public class RegisteredResource {
 
     public Instant getUpdatedAt() {
         return updatedAt;
+    }
+
+    /** Whether it is in the trash (MK-095); the trash writes these columns with SQL of its own. */
+    public boolean inTrash() {
+        return trashedAt != null;
+    }
+
+    public Instant getTrashedAt() {
+        return trashedAt;
+    }
+
+    public UUID getTrashRootId() {
+        return trashRootId;
+    }
+
+    public Instant getPurgeableFrom() {
+        return purgeableFrom;
     }
 }

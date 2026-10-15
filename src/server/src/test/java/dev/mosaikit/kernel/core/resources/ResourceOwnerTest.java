@@ -167,6 +167,11 @@ class ResourceOwnerTest {
         }
 
         @Override
+        public List<String> trashed(UUID organizationId, String extensionId, String resourceType) {
+            throw new UnsupportedOperationException("not used by the registry");
+        }
+
+        @Override
         public long reachableBy(UUID organizationId, String extensionId, UUID accountId) {
             throw new UnsupportedOperationException("not used by the registry");
         }

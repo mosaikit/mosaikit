@@ -100,6 +100,10 @@ final class Lineage {
             Reach.Viewer viewer,
             Predicate<ResourceGrant> counted,
             Instant now) {
+        if (entry.inTrash()) {
+            // A resource in the trash gives no level to anyone until it is restored (MK-095).
+            return Optional.empty();
+        }
         List<String> names = type.levelNames();
         int best = Reach.level(type, entry.getOwnerId(), viewer, counted(entry, counted), now)
                 .map(names::indexOf)
