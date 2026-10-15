@@ -56,6 +56,15 @@ import './mk-favorites.js';
 import './mk-access-keys.js';
 import './mk-sessions.js';
 import './mk-trash.js';
+import './mk-access-requests.js';
+import './mk-request-access.js';
+import {
+  ACCESS_REQUESTS_PATH,
+  REQUEST_ACCESS_TOPIC,
+  listenForAccessRequests,
+  requestedAccessOf,
+  type RequestedAccess,
+} from './access-requests.js';
 import './mk-settings.js';
 import type { SettingsSection } from './mk-settings.js';
 import './mk-share-dialog.js';
@@ -683,6 +692,10 @@ export class MkShell extends LitElement {
     this.addEventListener('mk-apps-changed', () => void this.loadBarApps());
     this.addEventListener('mk-permissions-changed', () => void this.loadBarApps());
     window.addEventListener('popstate', this.onPopState);
+    // A refused page of an extension offers the request for access (MK-058).
+    this.stopAccessRequests = listenForAccessRequests(document, (access) => {
+      void this.openRequestAccess(access);
+    });
     window.addEventListener('online', this.onNetwork);
     window.addEventListener('offline', this.onNetwork);
     this.schemeObserver.observe(document.documentElement, { attributeFilter: ['data-mk-scheme'] });
@@ -787,10 +800,18 @@ export class MkShell extends LitElement {
     }
   }
 
+  private stopAccessRequests: (() => void) | undefined;
+
+  /** Opens the request for access for a resource a page refused (MK-058). */
+  private async openRequestAccess(access: RequestedAccess): Promise<void> {
+    await this.renderRoot.querySelector('mk-request-access')?.openFor(access);
+  }
+
   override disconnectedCallback(): void {
     clearInterval(this.draftTimer);
     clearInterval(this.watchTimer);
     window.removeEventListener('popstate', this.onPopState);
+    this.stopAccessRequests?.();
     window.removeEventListener('online', this.onNetwork);
     window.removeEventListener('offline', this.onNetwork);
     this.schemeObserver.disconnect();
@@ -837,6 +858,7 @@ export class MkShell extends LitElement {
         </header>
         ${this.renderWorkspace()}
         <mk-share-dialog .client=${this.client}></mk-share-dialog>
+        <mk-request-access .client=${this.client}></mk-request-access>
       </div>`;
   }
 
@@ -910,6 +932,9 @@ export class MkShell extends LitElement {
               <a href=${FAVORITES} @click=${this.navigate}>${t('Favorites')}</a>
               <a href="/settings" @click=${this.navigate}>${t('Settings')}</a>
               <a href="/trash" @click=${this.navigate}>${t('Trash')}</a>
+              <a href=${ACCESS_REQUESTS_PATH} @click=${this.navigate}
+                >${t('Requests for access')}</a
+              >
               <button class="secondary" @click=${this.signOut}>${t('Sign out')}</button>
             </div>`
           : nothing
@@ -924,6 +949,7 @@ export class MkShell extends LitElement {
       { title: t('Favorites'), route: FAVORITES },
       { title: t('Settings'), route: '/settings' },
       { title: t('Trash'), route: '/trash' },
+      { title: t('Requests for access'), route: ACCESS_REQUESTS_PATH },
       ...this.entries.map((entry) => ({ title: entry.title, route: entry.route })),
       ...this.adminPages().map((page) => ({ title: t(page.title), route: page.path })),
     ];
@@ -1026,8 +1052,11 @@ export class MkShell extends LitElement {
     ></mk-activity>`;
   }
 
-  /** The settings of the person, or their trash (MK-095). */
+  /** The settings of the person, their trash (MK-095) or the requests for access to decide (MK-058). */
   private renderPersonalPage(): unknown {
+    if (this.path === ACCESS_REQUESTS_PATH) {
+      return html`<mk-access-requests .client=${this.client}></mk-access-requests>`;
+    }
     if (this.path !== '/trash') {
       return this.renderSettings();
     }
@@ -1544,7 +1573,7 @@ export class MkShell extends LitElement {
         ${this.appsError ? html`<p class="error" role="alert">${this.appsError}</p>` : nothing}
         ${this.renderOrganizationNotice()}
         ${
-          this.path === '/settings' || this.path === '/trash'
+          this.path === '/settings' || this.path === '/trash' || this.path === ACCESS_REQUESTS_PATH
             ? this.renderPersonalPage()
             : this.path === '/activity' || this.path === FAVORITES
               ? this.renderFeedPage()
@@ -1777,6 +1806,13 @@ export class MkShell extends LitElement {
       const resource = resourceOf(payload);
       if (resource) {
         void this.renderRoot.querySelector('mk-share-dialog')?.openFor(resource);
+      }
+    });
+    // The request for access of the kernel, from a page that refused the person (MK-058).
+    loader.events.on(REQUEST_ACCESS_TOPIC, (payload) => {
+      const access = requestedAccessOf(payload);
+      if (access) {
+        void this.openRequestAccess(access);
       }
     });
     // One real-time channel for the page, in the organization of the person (MK-031).

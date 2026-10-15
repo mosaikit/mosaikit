@@ -580,6 +580,36 @@ const ITALIAN: Record<string, string> = {
   '{email} was removed; {heir} owns their {count} resources.':
     '{email} è stato rimosso; {heir} possiede le sue {count} risorse.',
   '{email} was removed.': '{email} è stato rimosso.',
+  // Requests for access (MK-058)
+  'Requests for access': 'Richieste di accesso',
+  'Request access': 'Chiedi accesso',
+  'The owner or an administrator of the organization reads your request and decides. You are notified of the answer.':
+    "Il proprietario o un amministratore dell'organizzazione legge la tua richiesta e decide. Ricevi una notifica con la risposta.",
+  'Message (optional)': 'Messaggio (facoltativo)',
+  'Send the request': 'Invia la richiesta',
+  'Request sent. You will be notified when it is answered.':
+    'Richiesta inviata. Riceverai una notifica quando avrà risposta.',
+  'The request was not sent: {reason}': 'La richiesta non è stata inviata: {reason}',
+  'The message is too long: at most {count} characters.':
+    'Il messaggio è troppo lungo: al massimo {count} caratteri.',
+  'No requests to decide': 'Nessuna richiesta da decidere',
+  'When someone asks for access to a resource you may share, the request shows here.':
+    'Quando qualcuno chiede accesso a una risorsa che puoi condividere, la richiesta compare qui.',
+  'The requests for access cannot be read: {reason}':
+    'Le richieste di accesso non si possono leggere: {reason}',
+  '{name} asks for {level} on {title}': '{name} chiede {level} su {title}',
+  'Level to grant to {name}': 'Livello da concedere a {name}',
+  Approve: 'Approva',
+  'Approve the request of {name}': 'Approva la richiesta di {name}',
+  'Reason (optional)': 'Motivo (facoltativo)',
+  'Reason for declining the request of {name}': 'Motivo del rifiuto della richiesta di {name}',
+  Decline: 'Rifiuta',
+  'Decline the request of {name}': 'Rifiuta la richiesta di {name}',
+  '{name} may now open {title} ({level}).': '{name} ora può aprire {title} ({level}).',
+  'Not approved: {reason}': 'Non approvata: {reason}',
+  'The request of {name} was declined.': 'La richiesta di {name} è stata rifiutata.',
+  'Not declined: {reason}': 'Non rifiutata: {reason}',
+  Someone: 'Qualcuno',
 };
 
 const TRANSLATIONS: Record<Language, Record<string, string>> = { en: {}, it: ITALIAN };

@@ -29,8 +29,14 @@ export { defineExtension, isMosaikitExtension } from './extension.js';
 export type { CurrentUser, MosaikitExtension, ExtensionContext } from './extension.js';
 export { PresenceStore, isPresenceChange } from './presence.js';
 export type { ActiveExtension, ExtensionPresence, ExtensionPresenceChange } from './presence.js';
-export { SHARE_TOPIC, openSharing, sharingLevel } from './sharing.js';
-export type { SharedResourceRef } from './sharing.js';
+export {
+  REQUEST_ACCESS_TOPIC,
+  SHARE_TOPIC,
+  openSharing,
+  requestAccess,
+  sharingLevel,
+} from './sharing.js';
+export type { RequestedAccess, SharedResourceRef } from './sharing.js';
 export { RESOLVE_REFERENCES_PATH, resolveReferences, watchReferences } from './references.js';
 export type {
   MissingExtension,
