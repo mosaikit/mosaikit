@@ -58,6 +58,8 @@ The rules:
   The versions a save removed come back in `Saved.pruned()`: delete their files when nothing else of
   yours uses them. Deleting a file removes the versions that hold it.
 - **Versions go with their resource**: removing the resource from the registry removes its versions.
+  A resource in the [trash](trash.md) keeps them, and nobody lists, opens or restores them until it
+  is restored, since it gives no level meanwhile (MK-095).
 - A documented exception is thrown before anything is written and leaves your transaction usable:
   `IllegalArgumentException` (a type you do not declare, a file that is not yours),
   `NoSuchElementException` (a resource not registered, a version it does not have).
