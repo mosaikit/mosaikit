@@ -559,6 +559,16 @@ were moved onto the model when the kernel was updated (migration `V28`).
 An update of an extension that removes a resource type, or a level of one, on which grants exist
 is refused, with the list of those grants: revoke them first.
 
+### Versions of resources
+
+Apps that keep the history of their resources save a version at every save, with its author and
+time (MK-096). Whoever may read a resource sees its versions and opens them; whoever may edit it,
+or holds a level that edits on a folder above it, restores one: the restore becomes the newest
+version and the history is kept. Each restore is in the audit log as `resource.version.restored`,
+with the number of the version restored and of the new one. The installation keeps
+`mosaikit.versions.max-per-resource` versions of each resource (50 unless set otherwise; see
+[configuration](configuration.md)): a save beyond it removes the oldest.
+
 ## Audit log
 
 The kernel records who proposed, confirmed, rejected or ran an action of an assistant, and who

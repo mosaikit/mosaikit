@@ -156,6 +156,9 @@ public class TestExtensions implements QuarkusTestProfile {
                 // FileStorageTest: a limit that a test reaches quickly.
                 "mosaikit.files.max-size",
                 "1M",
+                // VersionsTest: a number of versions that a test goes over quickly (MK-096).
+                "mosaikit.versions.max-per-resource",
+                "3",
                 // SharingTest: the element that shows a resource opened with a link is offered only for
                 // frontends loaded as modules (MK-055); the extensions of the tests are not signed.
                 "mosaikit.extensions.unverified-frontends",
