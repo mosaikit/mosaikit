@@ -25,10 +25,11 @@ star.addEventListener('click', () =>
   Marking again changes nothing. A person has at most 500 favorites in an organization.
 - `listFavorites(context)` gives the favorites of every extension, the last marked first, each with
   `status` `available` (with `link`) or `extension-absent`.
-- A favorite the person may no longer read, because it was deleted or the access was removed,
-  leaves the list; it comes back if the access is given again. One whose extension is absent stays,
-  with the title it had, as the placeholder of [references](references.md) (MK-135), and opens again
-  when the extension comes back. Nothing is deleted because an extension is absent.
+- A favorite the person may no longer read, because it was deleted, moved to the
+  [trash](trash.md) (MK-095) or the access was removed, leaves the list; it comes back if it is
+  restored or the access is given again. One whose extension is absent stays, with the title it
+  had, as the placeholder of [references](references.md) (MK-135), and opens again when the
+  extension comes back. Nothing is deleted because an extension is absent.
 
 The REST API is `GET /api/v1/favorites` and `GET`, `PUT`, `DELETE
 /api/v1/favorites/{extension}/{type}/{id}`. A frontend isolated in a frame calls only its own

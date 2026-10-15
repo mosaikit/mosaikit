@@ -174,6 +174,18 @@ class FavoritesTest {
         share(town.slug(), town.ada(), MAPS + "/map/m1", town.bea());
         list(town.bea(), town.slug()).body("extension", equalTo(List.of(DASHBOARDS, MAPS)));
 
+        // In the trash (MK-095): out of the list; restored, back.
+        in(town.ada(), town.slug())
+                .post("/api/v1/test/trash/" + MAPS + "/map/m1")
+                .then()
+                .statusCode(200);
+        list(town.bea(), town.slug()).body("extension", equalTo(List.of(DASHBOARDS)));
+        in(town.ada(), town.slug())
+                .post("/api/v1/test/trash/" + MAPS + "/map/m1/restore")
+                .then()
+                .statusCode(200);
+        list(town.bea(), town.slug()).body("extension", equalTo(List.of(DASHBOARDS, MAPS)));
+
         // Deleted by its extension: out of the list.
         in(town.ada(), town.slug())
                 .delete("/api/v1/test/resources/" + DASHBOARDS + "/dashboard/d1")
