@@ -179,7 +179,7 @@ running one.
 
 | Lane | When | What |
 |---|---|---|
-| Fast | pull requests, about 4 minutes | frontend checks, unit and Quarkus tests (without the installation tests and Keycloak) and end-to-end tests at the same time, secrets, SAST; a pull request of documentation only (`docs/`, `changelog.d/`, Markdown files at the root) runs the frontend checks and `DocumentationTest`, in about a minute |
+| Fast | pull requests, about 7 minutes (the backend in four shards) | frontend checks, unit and Quarkus tests (without the installation tests and Keycloak) and end-to-end tests at the same time, secrets, SAST; a pull request of documentation only (`docs/`, `changelog.d/`, Markdown files at the root) runs the frontend checks and `DocumentationTest`, in about a minute |
 | Merge queue | each pull request in the merge queue of `main` (`merge_group`), on the commit that merges it with `main` and the pull requests ahead of it | the fast lane, always whole (no documentation-only shortcut), plus the release documents; not `changelog`, which passed on the pull request |
 | Full | `main`, every night at 02:17 UTC, tags, by hand | everything above, plus the installation tests, the tests with Keycloak, SonarQube, SBOM, dependency scan and the release documents; the portable archives on tags or by hand |
 
