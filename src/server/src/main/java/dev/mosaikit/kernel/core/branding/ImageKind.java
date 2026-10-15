@@ -36,7 +36,7 @@ public enum ImageKind {
         return Arrays.stream(values())
                 .filter(kind -> kind.id.equals(id))
                 .findFirst()
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "No image " + id + ": logo, logo-dark, icon or favicon."));
+                .orElseThrow(
+                        () -> new ResourceNotFoundException("No image " + id + ": logo, logo-dark, icon or favicon."));
     }
 }

@@ -580,6 +580,50 @@ const ITALIAN: Record<string, string> = {
   '{email} was removed; {heir} owns their {count} resources.':
     '{email} è stato rimosso; {heir} possiede le sue {count} risorse.',
   '{email} was removed.': '{email} è stato rimosso.',
+  // Branding of the organization (MK-074)
+  Branding: 'Personalizzazione',
+  'The name, the colors and the images of your organization, on its sign-in page and in the shell of its members. A person who chooses another theme in the settings keeps it.':
+    'Il nome, i colori e le immagini della tua organizzazione, nella sua pagina di accesso e nella shell dei suoi membri. Chi sceglie un altro tema nelle impostazioni lo mantiene.',
+  'The sign-in page of the organization: {address}':
+    "La pagina di accesso dell'organizzazione: {address}",
+  'Name and color': 'Nome e colore',
+  'Display name': 'Nome mostrato',
+  'Accent color': 'Colore principale',
+  'The color of the installation': "Il colore dell'installazione",
+  'Use the color of the installation': "Usa il colore dell'installazione",
+  'White text on this color is hard to read: choose a darker one.':
+    'Il testo bianco su questo colore si legge male: scegline uno più scuro.',
+  'Theme tokens': 'Token del tema',
+  'Every change shows at once on the application; nobody else sees it before you save.':
+    "Ogni modifica si vede subito sull'applicazione; nessun altro la vede prima che tu salvi.",
+  'Discard changes': 'Annulla le modifiche',
+  Images: 'Immagini',
+  'PNG, JPEG, WebP, ICO or SVG, up to 2 MB.': 'PNG, JPEG, WebP, ICO o SVG, fino a 2 MB.',
+  'Light scheme': 'Schema chiaro',
+  'Dark scheme': 'Schema scuro',
+  Color: 'Colore',
+  '{token}, {scheme}': '{token}, {scheme}',
+  'Reset {token}': 'Ripristina {token}',
+  Reset: 'Ripristina',
+  Background: 'Sfondo',
+  Surface: 'Superficie',
+  Text: 'Testo',
+  'Secondary text': 'Testo secondario',
+  Lines: 'Linee',
+  Danger: 'Pericolo',
+  Success: 'Successo',
+  Warning: 'Avviso',
+  'Focus ring': 'Contorno del focus',
+  'Logo for light backgrounds': 'Logo per sfondi chiari',
+  'Logo for dark backgrounds': 'Logo per sfondi scuri',
+  Icon: 'Icona',
+  Favicon: 'Favicon',
+  'None: the one of the installation': "Nessuna: quella dell'installazione",
+  'Remove {image}': 'Togli {image}',
+  'The branding cannot be read: {reason}': 'La personalizzazione non si può leggere: {reason}',
+  'An image has at most 2 MB.': "Un'immagine ha al massimo 2 MB.",
+  'Image saved.': 'Immagine salvata.',
+  'Image removed.': 'Immagine tolta.',
 };
 
 const TRANSLATIONS: Record<Language, Record<string, string>> = { en: {}, it: ITALIAN };
