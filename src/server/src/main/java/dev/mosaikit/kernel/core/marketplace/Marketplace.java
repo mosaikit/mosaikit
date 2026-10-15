@@ -266,7 +266,9 @@ public class Marketplace {
         }
         // A required dependency missing or out of its range, or an update that leaves a dependent
         // out of its range, is refused before anything is placed (MK-132).
-        List<String> unmet = ExtensionDependencies.installed(registry.all()).refuseInstallation(manifests);
+        // The directory as it is now: packages placed before a restart count as installed.
+        List<InstalledExtension> found = registry.scan();
+        List<String> unmet = ExtensionDependencies.installed(found).refuseInstallation(manifests);
         if (!unmet.isEmpty()) {
             throw new ConflictException("Cannot install: " + String.join("; ", unmet) + ".");
         }
@@ -280,7 +282,7 @@ public class Marketplace {
             List<String> files = new ArrayList<>();
             for (Prepared candidate : prepared) {
                 ExtensionManifest manifest = candidate.manifest();
-                replaced.add(setAside(manifest.id()));
+                replaced.add(setAside(manifest.id(), found));
                 String file = packageFile(manifest.id(), manifest.version().toString());
                 Files.copy(
                         candidate.candidate(), registry.directory().resolve(file), StandardCopyOption.REPLACE_EXISTING);
@@ -365,19 +367,20 @@ public class Marketplace {
      * @throws ConflictException when an extension requires it, or it is installed as a directory
      */
     public Removal remove(String id) {
-        InstalledExtension current = registry.all().stream()
+        List<InstalledExtension> found = registry.scan();
+        InstalledExtension current = found.stream()
                 .filter(extension ->
                         extension.key().equals(id) && extension.manifest().isPresent())
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("No extension " + id + " is installed."));
-        List<String> problems = ExtensionDependencies.running(registry.all()).refuseRemoval(List.of(id));
+        List<String> problems = ExtensionDependencies.running(found).refuseRemoval(List.of(id));
         if (!problems.isEmpty()) {
             throw new ConflictException(
                     "Cannot remove " + id + ": " + String.join("; ", problems) + ". Remove or update them first.");
         }
         String file;
         try {
-            file = setAside(id);
+            file = setAside(id, found);
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot remove the package", e);
         }
@@ -425,8 +428,8 @@ public class Marketplace {
     }
 
     /** Moves the package of an installed extension to {@code extensions/.previous}; returns its name. */
-    private String setAside(String id) throws IOException {
-        Optional<InstalledExtension> current = registry.all().stream()
+    private String setAside(String id, List<InstalledExtension> installed) throws IOException {
+        Optional<InstalledExtension> current = installed.stream()
                 .filter(extension -> extension.key().equals(id))
                 .findFirst();
         if (current.isEmpty()) {
