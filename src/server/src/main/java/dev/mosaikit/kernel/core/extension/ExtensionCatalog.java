@@ -236,6 +236,10 @@ public final class ExtensionCatalog {
 
     /** Disables extensions whose requirements are not active, until a fixed point is reached. */
     private static List<InstalledExtension> resolve(List<InstalledExtension> extensions) {
+        Set<String> installed = new HashSet<>();
+        extensions.stream()
+                .filter(extension -> extension.status() != ExtensionStatus.INVALID)
+                .forEach(extension -> installed.add(extension.key()));
         List<InstalledExtension> current = extensions;
         boolean changed = true;
         while (changed) {
@@ -245,7 +249,7 @@ public final class ExtensionCatalog {
                     .forEach(extension ->
                             active.put(extension.key(), extension.manifest().orElseThrow()));
             List<InstalledExtension> next = current.stream()
-                    .map(extension -> checkRequirements(extension, active))
+                    .map(extension -> checkRequirements(extension, active, installed))
                     .toList();
             changed = !next.equals(current);
             current = next;
@@ -255,21 +259,20 @@ public final class ExtensionCatalog {
                 .toList();
     }
 
+    /**
+     * Leaves inactive an extension whose required dependencies are not active, with the explanation
+     * that the marketplace gives when it refuses to install it (MK-132). Optional dependencies are not
+     * checked: the extension runs without them.
+     */
     private static InstalledExtension checkRequirements(
-            InstalledExtension extension, Map<String, ExtensionManifest> active) {
+            InstalledExtension extension, Map<String, ExtensionManifest> active, Set<String> installed) {
         if (!extension.isActive()) {
             return extension;
         }
-        ExtensionManifest manifest = extension.manifest().orElseThrow();
-        List<String> problems = new ArrayList<>();
-        manifest.requires().forEach((required, range) -> {
-            ExtensionManifest provider = active.get(required);
-            if (provider == null) {
-                problems.add("Requires extension " + required + " " + range + ", which is not active");
-            } else if (!range.contains(provider.version())) {
-                problems.add("Requires extension " + required + " " + range + ", found " + provider.version());
-            }
-        });
+        List<String> problems =
+                ExtensionDependencies.unmet(extension.manifest().orElseThrow(), active, installed).stream()
+                        .map(ExtensionDependencies.Unmet::toString)
+                        .toList();
         if (problems.isEmpty()) {
             return extension;
         }

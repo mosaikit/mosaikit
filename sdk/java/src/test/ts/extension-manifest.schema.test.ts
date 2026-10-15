@@ -164,4 +164,19 @@ describe('extension manifest schema', () => {
     };
     expect(validate(manifest)).toBe(false);
   });
+
+  it('MK-132: accepts required and optional dependencies, each with a range of versions', () => {
+    const manifest = {
+      id: 'dev.example.board',
+      version: '1.0.0',
+      name: 'Board',
+      kind: 'app',
+      platform: '>=0.1',
+      requires: { 'dev.example.base': '^2' },
+      optional: { 'dev.example.maps': '>=3 <5' },
+    };
+    expect(validate(manifest)).toBe(true);
+    expect(validate({ ...manifest, optional: { Maps: '^3' } })).toBe(false);
+    expect(validate({ ...manifest, optional: { 'dev.example.maps': '' } })).toBe(false);
+  });
 });

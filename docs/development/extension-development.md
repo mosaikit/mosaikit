@@ -102,8 +102,10 @@ version: 1.0.0                 # semantic version
 name: Hello
 kind: [app]                    # app, extension, service, theme, locale, auth
 platform: ">=0.1 <1"           # kernel versions the extension runs on
-requires:                      # other extensions, with accepted versions
+requires:                      # extensions it cannot work without, with accepted versions (MK-132)
   dev.example.base: "^2"
+optional:                      # extensions it uses when they are there, never needed (MK-132)
+  dev.example.maps: ">=3 <5"
 frontend:
   entry: web/index.js
   isolation: module            # module, or iframe to always run isolated (MK-014)
@@ -743,12 +745,32 @@ extensions of this guide are in
   needs a missing extension, and takes it up again when that extension comes back. Declare a
   required dependency in `requires` only when the extension cannot work at all without the other.
 
-> **Coming with the phase "Composition".** Libraries brought by Java extensions (MK-131), optional
-> dependencies and installation that respects dependents (MK-132), knowing whether another
-> extension is active (MK-133), versioned contracts between extensions on the server and in the
-> frontend (MK-134), and references between resources of different extensions that survive the
-> absence of one of them (MK-135). Until then a Java extension brings no libraries, and extensions
-> talk through extension points and events as described above.
+### Required and optional dependencies
+
+The manifest names the other extensions an extension depends on, each with its id and a range of
+versions (the same syntax as `platform`), in one of two lists (MK-132):
+
+- **`requires`**: the extension cannot work without them. It is not installed while one of them is
+  missing or in a version outside its range: the marketplace refuses it, naming each such
+  dependency and its range, and an extension copied into `extensions/` in that state is
+  `INCOMPATIBLE` with the same explanation (`Requires extension dev.example.base ^2, found 1.4.0`).
+  The kernel migrates it after them, so its migrations may use their views.
+- **`optional`**: the extension uses them when they are installed in an accepted version, and works
+  without them otherwise. A missing optional dependency, or one in another version, never prevents
+  installation or start; the extension sees it as absent.
+
+An id is in one list or the other, not both. The dependencies protect the extensions that declare
+them: an update that takes an extension out of the range that an installed extension requires is
+refused, naming that extension, unless both are updated in the same operation
+(`POST /api/v1/marketplace/operations`); removing an extension, or turning it off in an
+organization, is refused while an active extension requires it. Extensions that use it optionally
+stay active.
+
+> **Coming with the phase "Composition".** Libraries brought by Java extensions (MK-131), knowing
+> whether another extension is active (MK-133), versioned contracts between extensions on the
+> server and in the frontend (MK-134), and references between resources of different extensions
+> that survive the absence of one of them (MK-135). Until then a Java extension brings no
+> libraries, and extensions talk through extension points and events as described above.
 
 ## Actions for assistants
 

@@ -129,7 +129,11 @@ public final class ExtensionManifests {
             String description = optionalText(tree, "description");
             Set<ExtensionKind> kinds = readKinds();
             VersionRange platform = convert("platform", requiredText(tree, "platform"), VersionRange::parse);
-            Map<String, VersionRange> requires = readRequires();
+            Map<String, VersionRange> requires = readDependencies("requires");
+            Map<String, VersionRange> optional = readDependencies("optional");
+            optional.keySet().stream()
+                    .filter(requires::containsKey)
+                    .forEach(both -> violation("optional." + both, "is already in requires: declare it once"));
             FrontendEntry frontend = readFrontend();
             BackendEntry backend = readBackend();
             DatabaseEntry database = readDatabase();
@@ -161,7 +165,8 @@ public final class ExtensionManifests {
                     actions,
                     permissions,
                     resourceTypes,
-                    measures));
+                    measures,
+                    optional));
         }
 
         /** The permissions of the extension (MK-056): {@code permissions: [{ name, title }]}. */
@@ -513,11 +518,12 @@ public final class ExtensionManifests {
             return kinds;
         }
 
-        private Map<String, VersionRange> readRequires() {
-            Map<String, ?> requires = optionalMap(tree, "requires");
+        /** {@code requires} or {@code optional}: extension ids with their accepted versions (MK-132). */
+        private Map<String, VersionRange> readDependencies(String key) {
+            Map<String, ?> dependencies = optionalMap(tree, key);
             Map<String, VersionRange> result = new LinkedHashMap<>();
-            requires.forEach((point, range) -> {
-                String field = "requires." + point;
+            dependencies.forEach((point, range) -> {
+                String field = key + "." + point;
                 if (!POINT_PATTERN.matcher(point).matches()) {
                     violation(field, "must be a dotted extension point or extension name");
                 }

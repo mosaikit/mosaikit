@@ -118,6 +118,48 @@ class ExtensionCatalogTest {
     }
 
     @Test
+    @Tag("MK-132")
+    void explainsACopiedExtensionWithoutItsRequirementAsTheMarketplaceRefusesIt() throws IOException {
+        install("a-base", manifest("dev.example.base", "1.4.0", ">=0.1", ""));
+        install("b-user", manifest("dev.example.user", "1.0.0", ">=0.1", "requires: {dev.example.base: \"^2\"}"));
+        install("c-other", manifest("dev.example.other", "1.0.0", ">=0.1", "requires: {dev.example.gone: \"^1\"}"));
+
+        List<InstalledExtension> found = catalog.scan(extensions);
+        InstalledExtension user = find(found, "dev.example.user");
+        InstalledExtension other = find(found, "dev.example.other");
+
+        assertThat(user.status()).isEqualTo(ExtensionStatus.INCOMPATIBLE);
+        assertThat(user.problems()).containsExactly("Requires extension dev.example.base ^2, found 1.4.0");
+        assertThat(other.problems()).containsExactly("Requires extension dev.example.gone ^1, which is not installed");
+        // The marketplace gives the same explanation when it refuses to install them.
+        ExtensionDependencies installed = ExtensionDependencies.installed(found.stream()
+                .filter(extension -> extension.key().equals("dev.example.base"))
+                .toList());
+        assertThat(installed.refuseInstallation(List.of(user.manifest().orElseThrow())))
+                .containsExactly("dev.example.user 1.0.0: " + user.problems().getFirst());
+        assertThat(installed.refuseInstallation(List.of(other.manifest().orElseThrow())))
+                .containsExactly("dev.example.other 1.0.0: " + other.problems().getFirst());
+    }
+
+    @Test
+    @Tag("MK-132")
+    void startsAnExtensionWhoseOptionalDependencyIsMissingOrInAnotherVersion() throws IOException {
+        install("a-base", manifest("dev.example.base", "1.4.0", ">=0.1", ""));
+        install(
+                "b-viewer",
+                manifest(
+                        "dev.example.viewer",
+                        "1.0.0",
+                        ">=0.1",
+                        "optional: {dev.example.base: \"^2\", dev.example.maps: \"^3\"}"));
+
+        InstalledExtension viewer = find(catalog.scan(extensions), "dev.example.viewer");
+
+        assertThat(viewer.status()).isEqualTo(ExtensionStatus.ACTIVE);
+        assertThat(viewer.problems()).isEmpty();
+    }
+
+    @Test
     void keepsTheFirstOfTwoExtensionsWithTheSameId() throws IOException {
         install("first", manifest("dev.example.twin", "1.0.0", ">=0.1", ""));
         install("second", manifest("dev.example.twin", "2.0.0", ">=0.1", ""));

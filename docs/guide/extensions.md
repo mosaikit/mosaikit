@@ -10,7 +10,7 @@ translations.
 |---|---|
 | install | copy the zip into `extensions/` as it is, and restart Mosaikit |
 | update | replace the zip with the new version, and restart |
-| remove | delete the zip, and restart; its database schema is kept |
+| remove | delete the zip, and restart; its database schema is kept (or ask the kernel, see [Dependencies](#dependencies-between-extensions)) |
 
 Extensions with Java code are built into the kernel by the launcher at the next start, which takes a
 few seconds. If the kernel cannot be rebuilt or does not start with a new extension, the launcher
@@ -30,6 +30,27 @@ and what they offer next to what is installed, with **Install** and **Update** b
 a package file for installations without network. Every package must be signed by a trusted
 publisher and, from a catalog, match its signed index. The package goes into `extensions/` (the one it
 replaces into `extensions/.previous/`) and takes effect at the next restart.
+
+### Dependencies between extensions
+
+An extension may require other extensions in a range of versions, or use them optionally (MK-132):
+
+- **Installing** an extension whose required extension is missing, or installed in a version
+  outside the range it accepts, is refused, naming each of them and the range. Install them
+  together: `POST /api/v1/marketplace/operations` with
+  `{"installations": [{"source": ..., "id": ..., "version": ...}, ...]}` places every package or
+  none. An extension copied into `extensions/` in that state shows as `INCOMPATIBLE` with the same
+  explanation. Optional dependencies never prevent an installation.
+- **Updating** an extension to a version that an installed extension does not accept is refused,
+  naming that extension; update both in the same operation.
+- **Removing** an extension, `DELETE /api/v1/extensions/<id>`, moves its package to
+  `extensions/.previous/` and keeps its schema and data; it stops at once when it has no Java code
+  nor schema, otherwise at the next restart. It is refused while an active extension requires it,
+  naming those extensions: remove them first, or together by hand. Extensions that use it
+  optionally stay active. An extension installed as a directory is removed by hand.
+- **Turning off** an extension in an organization (all its apps off, see
+  [Administration](administration.md)) is refused while an extension that stays on there requires
+  it; turn both off in the same change.
 
 Catalogs are directories with a signed `index.json`, listed in `mosaikit.marketplace.sources`. A
 path without scheme is a directory of the installation:

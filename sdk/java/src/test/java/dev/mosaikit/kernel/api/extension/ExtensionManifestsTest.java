@@ -298,6 +298,26 @@ class ExtensionManifestsTest {
     }
 
     @Test
+    @Tag("MK-132")
+    void readsOptionalDependenciesApartFromRequiredOnes() {
+        Map<String, Object> tree = validTree();
+        tree.put("optional", Map.of("dev.example.weather", ">=1 <3"));
+
+        ExtensionManifest manifest = parseValid(tree);
+
+        assertThat(manifest.requires()).containsOnlyKeys("app.maps");
+        assertThat(manifest.optional()).containsOnlyKeys("dev.example.weather");
+        assertThat(manifest.optional().get("dev.example.weather").contains(Version.of(2, 0, 0)))
+                .isTrue();
+        assertThat(parseValid(validTree()).optional()).isEmpty();
+
+        tree.put("optional", Map.of("app.maps", "^3", "Weather", "^1", "dev.example.sky", "soon"));
+        assertThat(parseInvalid(tree))
+                .extracting(ManifestViolation::field)
+                .containsExactlyInAnyOrder("optional.app.maps", "optional.Weather", "optional.dev.example.sky");
+    }
+
+    @Test
     void reportsInvalidVersionsAndRanges() {
         Map<String, Object> tree = validTree();
         tree.put("version", "2.3");
