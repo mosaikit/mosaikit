@@ -191,6 +191,26 @@ Removing a person from an organization ends at once their sessions in it (MK-125
 open, a copy of its cookie or a gateway that checks the session with the kernel are refused at the
 next request. Their personal access keys for that organization are revoked too (MK-060).
 
+### Offboarding a member
+
+What a person owns in the apps must not be left without an owner when they leave (MK-071). The
+administrators of the organization, signed in to it, and the platform administrators remove a
+member; an administrator does not remove themselves. In **Permissions**, **People**, choose the
+person and **Remove from the organization**: the page first lists what they own, per app, the
+resources in the trash included, and asks for the **New owner**, another member who is not a guest.
+After the removal those resources belong to that person, with their shares and links as they were;
+each app that keeps an owner of its own follows. A member who owns nothing is removed at once.
+
+```bash
+curl -u admin https://mosaikit.example.org/api/v1/organizations/globex/members/ada@acme.com/resources
+# [{"extension": "org.example.drive", "extensionName": "Drive", "resources": [{"type": "file", "title": "Budget", ...}]}]
+curl -u admin -X DELETE   'https://mosaikit.example.org/api/v1/organizations/globex/members/ada@acme.com?transferTo=bea@acme.com'
+```
+
+Without `transferTo`, removing a member who owns resources is refused (409). When an app refuses
+the change, nothing is transferred and the member stays. The transfer is in the audit log
+(`organization.member.resources.transferred`, with the new owner and the count per extension).
+
 ## Personal access keys
 
 People create personal access keys in their settings for scripts and other clients (MK-060). A key
