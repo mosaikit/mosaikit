@@ -2,7 +2,14 @@
 // SPDX-License-Identifier: MPL-2.0
 import { describe, expect, it, vi } from 'vitest';
 import { type DeletedOrganization, KernelClient, type OrganizationSummary } from '../src/api.js';
-import { OrganizationList, confirms } from '../src/organizations.js';
+import {
+  MAX_SUSPENSION_REASON,
+  OrganizationList,
+  confirms,
+  filterOrganizations,
+  organizationMetrics,
+  signInLabel,
+} from '../src/organizations.js';
 
 const ACME: OrganizationSummary = {
   id: '00000000-0000-0000-0000-000000000001',
@@ -35,6 +42,8 @@ function client(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     organizations: vi.fn(() => Promise.resolve([ACME, GREEN])),
     deleteOrganization: vi.fn(() => Promise.resolve(DELETED)),
+    suspendOrganization: vi.fn(() => Promise.resolve({ ...ACME, suspended: true })),
+    reactivateOrganization: vi.fn(() => Promise.resolve(ACME)),
     ...overrides,
   };
 }
@@ -129,6 +138,148 @@ describe('the deletion of an organization (MK-130)', () => {
     expect(calls).toEqual([
       'GET /api/v1/organizations',
       'DELETE /api/v1/organizations/acme?confirmation=acme',
+    ]);
+  });
+});
+
+const SUSPENDED: OrganizationSummary = {
+  ...GREEN,
+  signIn: 'realm',
+  identityRealm: 'green',
+  emailDomains: ['green.example.org'],
+  suspended: true,
+  suspension: { at: '2026-10-15T09:00:00Z', by: 'admin', reason: 'Unpaid' },
+};
+
+describe('the organizations on the model of the administration pages (MK-072)', () => {
+  it('filters by a text in the name, the slug or the domains, and by state', () => {
+    const all = [ACME, SUSPENDED];
+    expect(filterOrganizations(all, '', 'all')).toEqual(all);
+    expect(filterOrganizations(all, 'GREEN.EXAMPLE', 'all')).toEqual([SUSPENDED]);
+    expect(filterOrganizations(all, 'acm', 'all')).toEqual([ACME]);
+    expect(filterOrganizations(all, '', 'suspended')).toEqual([SUSPENDED]);
+    expect(filterOrganizations(all, '', 'active')).toEqual([ACME]);
+    expect(filterOrganizations(all, 'acme', 'suspended')).toEqual([]);
+  });
+
+  it('counts them on top', () => {
+    const metrics = organizationMetrics([ACME, SUSPENDED]);
+    expect(metrics.map((metric) => [metric.label, metric.value])).toEqual([
+      ['Organizations', '2'],
+      ['Active', '1'],
+      ['Suspended', '1'],
+      ['With an identity provider', '1'],
+    ]);
+    expect(metrics[2]?.tone).toBe('warn');
+    expect(organizationMetrics([ACME])[2]?.tone).toBeUndefined();
+  });
+
+  it('names how their members sign in', () => {
+    expect(signInLabel(undefined)).toBe('Password');
+    expect(signInLabel('password')).toBe('Password');
+    expect(signInLabel('realm')).toBe('Through its identity provider');
+    expect(signInLabel('password-or-realm')).toBe('Password or identity provider');
+  });
+
+  it('suspends one with a reason and reactivates it', async () => {
+    const kernel = client({
+      suspendOrganization: vi.fn(() => Promise.resolve({ ...ACME, suspended: true })),
+      reactivateOrganization: vi.fn(() => Promise.resolve(ACME)),
+    });
+    const told = events();
+    const list = new OrganizationList(kernel, told, (iso) => iso);
+    await list.load();
+
+    expect(await list.suspend(ACME, '  ')).toBe(false);
+    expect(told.announce).toHaveBeenLastCalledWith('Write the reason for the suspension.', true);
+    expect(await list.suspend(ACME, 'x'.repeat(MAX_SUSPENSION_REASON + 1))).toBe(false);
+    expect(told.announce).toHaveBeenLastCalledWith(
+      'The reason is longer than 500 characters.',
+      true,
+    );
+    expect(kernel.suspendOrganization).not.toHaveBeenCalled();
+
+    expect(await list.suspend(ACME, ' Unpaid ')).toBe(true);
+    expect(kernel.suspendOrganization).toHaveBeenCalledWith('acme', 'Unpaid');
+    expect(list.organizations?.[0]?.suspended).toBe(true);
+    expect(told.announce).toHaveBeenLastCalledWith(
+      'Acme is suspended: its members cannot sign in to it, and their sessions in it ended.',
+      false,
+    );
+
+    expect(await list.reactivate(ACME)).toBe(true);
+    expect(kernel.reactivateOrganization).toHaveBeenCalledWith('acme');
+    expect(list.organizations?.[0]?.suspended).toBeUndefined();
+    expect(told.announce).toHaveBeenLastCalledWith(
+      'Acme is active again: its members sign in.',
+      false,
+    );
+  });
+
+  it('says what the kernel refused when suspending or reactivating', async () => {
+    const kernel = client({
+      suspendOrganization: vi.fn(() => Promise.reject(new Error('Gone'))),
+      reactivateOrganization: vi.fn(() => Promise.reject(new Error('Gone'))),
+    });
+    const told = events();
+    const list = new OrganizationList(kernel, told, (iso) => iso);
+
+    expect(await list.suspend(ACME, 'why')).toBe(false);
+    expect(told.announce).toHaveBeenLastCalledWith(
+      'The organization cannot be suspended: Gone',
+      true,
+    );
+    expect(await list.reactivate(ACME)).toBe(false);
+    expect(told.announce).toHaveBeenLastCalledWith(
+      'The organization cannot be reactivated: Gone',
+      true,
+    );
+    const idle = new OrganizationList(undefined, told, (iso) => iso);
+    expect(await idle.suspend(ACME, 'why')).toBe(false);
+    expect(await idle.reactivate(ACME)).toBe(false);
+  });
+
+  it('adds one just created in the order of names', async () => {
+    const told = events();
+    const list = new OrganizationList(
+      client({ organizations: vi.fn(() => Promise.resolve([GREEN])) }),
+      told,
+      (iso) => iso,
+    );
+    list.added(ACME);
+    expect(list.organizations).toEqual([ACME]);
+    await list.load();
+    list.added(ACME);
+    expect(list.organizations?.map((organization) => organization.slug)).toEqual(['acme', 'green']);
+  });
+
+  it('asks the kernel to suspend, reactivate and create', async () => {
+    const fetchMock = vi.fn<(input: string, init?: RequestInit) => Promise<Response>>(() =>
+      Promise.resolve(
+        new Response(JSON.stringify(ACME), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    );
+    const kernel = new KernelClient(fetchMock, undefined);
+
+    await kernel.suspendOrganization('acme', 'Unpaid');
+    await kernel.reactivateOrganization('acme');
+    await kernel.createOrganization({
+      slug: 'acme',
+      name: 'Acme',
+      selfRegistration: false,
+      signIn: 'password',
+    });
+
+    const calls = fetchMock.mock.calls.map(([path, init]) =>
+      `${init?.method ?? ''} ${path} ${typeof init?.body === 'string' ? init.body : ''}`.trim(),
+    );
+    expect(calls).toEqual([
+      'PUT /api/v1/organizations/acme/suspension {"reason":"Unpaid"}',
+      'DELETE /api/v1/organizations/acme/suspension',
+      'POST /api/v1/organizations {"slug":"acme","name":"Acme","selfRegistration":false,"signIn":"password"}',
     ]);
   });
 });

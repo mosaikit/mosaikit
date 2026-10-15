@@ -35,6 +35,8 @@ import {
   type LauncherEntry,
 } from './navigation.js';
 import { MkAdminApps } from './mk-admin-apps.js';
+import { MkAdminConsole } from './mk-admin-console.js';
+import { consolePanels } from './admin-console.js';
 import './mk-admin-extensions.js';
 import { MkAdminPermissions } from './mk-admin-permissions.js';
 import { MkAdminQuotas } from './mk-admin-quotas.js';
@@ -80,9 +82,16 @@ const EXTENSION_WATCH_MS = 1_000;
  * organization for its administrators (MK-030, MK-056, MK-062, MK-076), the extensions (MK-022),
  * the platform (MK-048), the service identities (MK-124), the credentials of the installation
  * (MK-127), the external origins of the content security policy (MK-128) and the suspension of
- * accounts (MK-125) and the organizations, which they may delete (MK-130), for platform administrators.
+ * accounts (MK-125) and the organizations, which they may delete (MK-130), for platform administrators,
+ * with the console that shows the state of the installation (MK-072).
  */
 const ADMIN_PAGES = [
+  {
+    path: '/admin/console',
+    title: 'Console',
+    element: 'mk-admin-console',
+    role: 'platform-admin',
+  },
   {
     path: '/admin/apps',
     title: 'Organization apps',
@@ -139,7 +148,7 @@ const ADMIN_PAGES = [
   },
   {
     path: '/admin/accounts',
-    title: 'Accounts',
+    title: 'People',
     element: 'mk-admin-accounts',
     role: 'platform-admin',
   },
@@ -1982,6 +1991,14 @@ export class MkShell extends LitElement {
           admin.platformAdmin = this.isPlatformAdmin();
         }
         area.replaceChildren(admin);
+      }
+      // The panels of extensions, once their frontends are loaded and whenever they change (MK-072).
+      const console = area.firstElementChild;
+      if (console instanceof MkAdminConsole) {
+        const panels = consolePanels(this.extensions, this.held, this.shellLanguage);
+        if (JSON.stringify(panels) !== JSON.stringify(console.panels)) {
+          console.panels = panels;
+        }
       }
       return;
     }

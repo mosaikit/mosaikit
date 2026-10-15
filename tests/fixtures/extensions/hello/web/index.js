@@ -129,6 +129,14 @@ const extension = {
     }
 
     customElements.define('mk-fixture-hello', SampleHello);
+
+    /** A panel of the console of the platform administrators (MK-072), through console.panel. */
+    class HelloConsolePanel extends HTMLElement {
+      connectedCallback() {
+        this.textContent = `Hello ${context.extension.version} greets the platform administrators.`;
+      }
+    }
+    customElements.define('mk-fixture-hello-console', HelloConsolePanel);
   },
 };
 
