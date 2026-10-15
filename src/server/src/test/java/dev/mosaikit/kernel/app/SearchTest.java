@@ -266,6 +266,19 @@ class SearchTest {
                 .statusCode(200)
                 .body("sections[0].results.title", contains("Plain"));
 
+        // In the trash (MK-095), the note is deleted for its owner too, until it is restored.
+        in(ada, acme)
+                .post("/api/v1/test/trash/" + RESOURCES + "/note/" + note)
+                .then()
+                .statusCode(200);
+        in(ada, acme)
+                .queryParam("q", "plans")
+                .queryParam("provider", FINDER + "/items")
+                .get("/api/v1/search")
+                .then()
+                .statusCode(200)
+                .body("sections[0].results.title", contains("Plain"));
+
         // The extension got the text, as a tsquery too, with the credentials of the person.
         assertThat(backends.sent()).isNotEmpty().allSatisfy(sent -> {
             assertThat(sent.call().target()).startsWith(FINDER_PATH + "?q=plans&tsquery=plans%3A*&offset=0&limit=");
