@@ -59,13 +59,7 @@ public class ExtensionRegistry {
 
     /** Reads the installation directory again. */
     public void reload() {
-        BackendCheck backendCheck = providersDirectory
-                .map(providers -> BackendCheck.loadedBy(
-                        ProviderState.read(providers), ProviderState.read(providers, ProviderState.REJECTED_FILE)))
-                .orElseGet(BackendCheck::notLoaded);
-        PackageTrust trust = PackageTrust.read(trustedKeysDirectory, signatures);
-        List<InstalledExtension> found =
-                new ExtensionCatalog(kernelVersion, backendCheck, trust).scan(directory, packagesDirectory);
+        List<InstalledExtension> found = scan();
         extensions.set(found);
         revision.incrementAndGet();
         LOG.infof("Extensions in %s: %d found, %d active", directory, found.size(), active().size());
@@ -73,6 +67,19 @@ public class ExtensionRegistry {
                 .filter(extension -> !extension.isActive())
                 .forEach(extension ->
                         LOG.warnf("Extension %s is %s: %s", extension.key(), extension.status(), extension.problems()));
+    }
+
+    /**
+     * The extensions in the installation directory now, including the packages placed since the
+     * last start that wait for a restart, without changing those in use (MK-132).
+     */
+    public List<InstalledExtension> scan() {
+        BackendCheck backendCheck = providersDirectory
+                .map(providers -> BackendCheck.loadedBy(
+                        ProviderState.read(providers), ProviderState.read(providers, ProviderState.REJECTED_FILE)))
+                .orElseGet(BackendCheck::notLoaded);
+        PackageTrust trust = PackageTrust.read(trustedKeysDirectory, signatures);
+        return new ExtensionCatalog(kernelVersion, backendCheck, trust).scan(directory, packagesDirectory);
     }
 
     /** How many times the installation directory was read: changes after every {@link #reload()}. */

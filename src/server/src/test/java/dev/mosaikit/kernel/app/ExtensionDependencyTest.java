@@ -51,6 +51,8 @@ class ExtensionDependencyTest {
     static final String BASE = "dev.mosaikit.test.base";
     static final String BOARD = "dev.mosaikit.test.board";
     static final String VIEWER = "dev.mosaikit.test.viewer";
+    static final String STORE = "dev.mosaikit.test.store";
+    static final String SHELF = "dev.mosaikit.test.shelf";
     static final String SLUG = "dependency-town";
 
     /** Prepares the key and a signed catalog before the kernel starts. */
@@ -85,6 +87,9 @@ class ExtensionDependencyTest {
         pkg(BASE, "2.0.0", "base", "");
         pkg(BOARD, "1.0.0", "board", "requires: {" + BASE + ": '^1'}\n");
         pkg(BOARD, "2.0.0", "board", "requires: {" + BASE + ": '^2'}\n");
+        // A schema to migrate: placed now, used at the next start.
+        pkg(STORE, "1.0.0", "store", "database:\n  schema: ext_dependency_store\n");
+        pkg(SHELF, "1.0.0", "shelf", "requires: {" + STORE + ": '^1'}\n");
         pkg(VIEWER, "1.0.0", "viewer", "optional: {" + BASE + ": '^1', dev.mosaikit.test.absent: '^1'}\n");
         ExtensionIndex.write(CATALOG, PUBLISHER, Instant.now());
     }
@@ -243,6 +248,24 @@ class ExtensionDependencyTest {
                 .body(
                         "findAll { it.action == 'extension.removed' }.subject",
                         org.hamcrest.Matchers.hasItem(BASE + " 1.0.0"));
+    }
+
+    @Test
+    void countsThePackagesThatWaitForARestart() {
+        install(STORE, "1.0.0").statusCode(202).body("restartRequired", equalTo(true));
+        // Placed but not started: it counts as installed for what requires it, and protects it.
+        install(SHELF, "1.0.0").statusCode(202);
+        asAdmin()
+                .delete("/api/v1/extensions/{id}", STORE)
+                .then()
+                .statusCode(409)
+                .body("detail", containsString(STORE + " is required by " + SHELF + " 1.0.0"));
+        asAdmin().delete("/api/v1/extensions/{id}", SHELF).then().statusCode(200);
+        asAdmin()
+                .delete("/api/v1/extensions/{id}", STORE)
+                .then()
+                .statusCode(200)
+                .body("restartRequired", equalTo(true));
     }
 
     private static Map<String, Object> app(String extensionId, String appId, boolean enabled) {

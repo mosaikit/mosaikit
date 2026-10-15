@@ -59,10 +59,13 @@ public final class ExtensionDependencies {
             found = Objects.requireNonNullElse(found, Optional.empty());
         }
 
+        /** How every explanation of an unmet requirement starts. */
+        static final String PREFIX = "Requires extension ";
+
         /** The explanation shown for the extension, the same at install and at start. */
         @Override
         public String toString() {
-            String requirement = "Requires extension " + id + " " + range;
+            String requirement = PREFIX + id + " " + range;
             return switch (reason) {
                 case NOT_INSTALLED -> requirement + ", which is not installed";
                 case NOT_ACTIVE -> requirement + ", which is not active";
@@ -113,16 +116,26 @@ public final class ExtensionDependencies {
     }
 
     /**
-     * The extensions that run or will run after the next start: active, or waiting for the restart
-     * that builds their Java code. Those that cannot run (another kernel, a missing requirement) are
-     * left out: removing what they need changes nothing for them.
+     * The extensions that run or will run after the next start: active, waiting for the restart that
+     * builds their Java code, or waiting only for extensions they require, such as packages placed
+     * together before a restart. Those that cannot run otherwise (another kernel) are left out:
+     * removing what they need changes nothing for them.
      */
     public static ExtensionDependencies running(Collection<InstalledExtension> extensions) {
         return of(extensions.stream()
-                .filter(extension -> extension.status() == ExtensionStatus.ACTIVE
-                        || extension.status() == ExtensionStatus.RESTART_REQUIRED)
+                .filter(ExtensionDependencies::runsOrWaitsForRequirements)
                 .flatMap(extension -> extension.manifest().stream())
                 .toList());
+    }
+
+    private static boolean runsOrWaitsForRequirements(InstalledExtension extension) {
+        return switch (extension.status()) {
+            case ACTIVE, RESTART_REQUIRED -> true;
+            case INCOMPATIBLE ->
+                !extension.problems().isEmpty()
+                        && extension.problems().stream().allMatch(problem -> problem.startsWith(Unmet.PREFIX));
+            case INVALID -> false;
+        };
     }
 
     /** The manifest of an extension of the set. */

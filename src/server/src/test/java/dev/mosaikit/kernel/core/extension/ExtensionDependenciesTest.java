@@ -120,6 +120,17 @@ class ExtensionDependenciesTest {
 
         assertThat(ExtensionDependencies.running(extensions).refuseRemoval(List.of(BASE_1.id())))
                 .isEmpty();
+        // One that waits only for what it requires, such as a package placed before a restart, counts.
+        List<InstalledExtension> waiting = List.of(
+                extensions.getFirst(),
+                new InstalledExtension(
+                        BOARD_1.id(),
+                        directory,
+                        Optional.of(BOARD_1),
+                        ExtensionStatus.INCOMPATIBLE,
+                        List.of("Requires extension dev.example.base ^1, which is not active")));
+        assertThat(ExtensionDependencies.running(waiting).refuseRemoval(List.of(BASE_1.id())))
+                .hasSize(1);
         assertThat(ExtensionDependencies.installed(extensions).refuseRemoval(List.of(BASE_1.id())))
                 .hasSize(1);
     }
