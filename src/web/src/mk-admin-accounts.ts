@@ -187,7 +187,6 @@ export class MkAdminAccounts extends LitElement {
         name="mosaikit.admin.people"
         .metrics=${directory?.metrics() ?? []}
         ?detail-open=${person !== undefined}
-        detail-label=${person ? accountName(person) : t('Detail')}
         @mk-detail-close=${() => {
           this.selected = undefined;
         }}
@@ -224,7 +223,9 @@ export class MkAdminAccounts extends LitElement {
               ? html`<p>${t('Nobody matches the filters.')}</p>`
               : this.renderTable(people)
         }
-        <div slot="detail" class="pane">${person ? this.renderDetail(person) : nothing}</div>
+        <aside slot="detail" class="pane" aria-label=${person ? accountName(person) : t('Detail')}>
+          ${person ? this.renderDetail(person) : nothing}
+        </aside>
       </mk-admin-view>
       <p class="status ${this.failed ? 'error' : ''}" role="status" aria-live="polite">
         ${this.message || nothing}
