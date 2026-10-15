@@ -74,6 +74,33 @@ public class TestExtensions implements QuarkusTestProfile {
                         title: Album
                         levels: [{ name: view, title: View }, { name: edit, title: Edit, edits: true }]
                     """);
+            // InheritedLevelsTest: folders and files that inherit the levels of the folders above them,
+            // and notes in folders that do not (MK-136).
+            extension("drive", InheritedLevelsTest.EXTENSION, "Drive", """
+                    resources:
+                      - type: folder
+                        title: Folder
+                        levels:
+                          - { name: view, title: View }
+                          - { name: edit, title: Edit, edits: true }
+                          - { name: manage, title: Manage, edits: true }
+                        subjects: [person, group, organization, link, public]
+                        inherits: parent
+                      - type: file
+                        title: File
+                        levels:
+                          - { name: view, title: View }
+                          - { name: edit, title: Edit, edits: true }
+                          - { name: manage, title: Manage, edits: true }
+                        subjects: [person, group, organization, link]
+                        inherits: parent
+                      - type: note
+                        title: Note
+                        levels:
+                          - { name: view, title: View }
+                          - { name: edit, title: Edit, edits: true }
+                          - { name: manage, title: Manage, edits: true }
+                    """);
             // QuotaApiTest: an extension that meters renders and tiles, and keeps maps (MK-076).
             extension("quotas", QuotaApiTest.EXTENSION, "Quotas", """
                     measures:

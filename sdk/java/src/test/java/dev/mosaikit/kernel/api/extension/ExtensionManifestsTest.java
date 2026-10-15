@@ -909,6 +909,57 @@ class ExtensionManifestsTest {
     }
 
     @Test
+    @Tag("MK-136")
+    void aResourceTypeDeclaresThatItsResourcesInheritTheLevelsOfTheirParent() {
+        List<Map<String, Object>> levels = List.of(
+                Map.of("name", "view", "title", "View"),
+                Map.of("name", "edit", "title", "Edit", "edits", true),
+                Map.of("name", "manage", "title", "Manage", "edits", true));
+        Map<String, Object> tree = validTree();
+        tree.put(
+                "resources",
+                List.of(
+                        Map.of("type", "folder", "title", "Folder", "levels", levels, "inherits", "parent"),
+                        Map.of("type", "note", "title", "Note", "levels", levels)));
+
+        ExtensionManifest manifest = parseValid(tree);
+
+        assertThat(manifest.resourceType("folder").orElseThrow().inheritsFromParent())
+                .isTrue();
+        assertThat(manifest.resourceType("folder").orElseThrow().inherits()).isEqualTo("parent");
+        assertThat(manifest.resourceType("note").orElseThrow().inheritsFromParent())
+                .isFalse();
+        assertThat(manifest.resourceType("note").orElseThrow().inherits()).isNull();
+
+        tree.put(
+                "resources",
+                List.of(Map.of("type", "folder", "title", "Folder", "levels", levels, "inherits", "children")));
+        assertThat(parseInvalid(tree)).extracting(ManifestViolation::field).containsExactly("resources[0].inherits");
+    }
+
+    @Test
+    @Tag("MK-136")
+    void aLevelAboveCountsAsTheHighestLevelOfTheSameNameThatItIncludes() {
+        SharingLevelEntry view = new SharingLevelEntry("view", "View", false, null);
+        SharingLevelEntry use = new SharingLevelEntry("use", "Use", false, null);
+        SharingLevelEntry edit = new SharingLevelEntry("edit", "Edit", true, null);
+        SharingLevelEntry manage = new SharingLevelEntry("manage", "Manage", true, null);
+        ResourceTypeEntry folder = new ResourceTypeEntry(
+                "folder", "Folder", List.of(view, edit, manage), SubjectKind.DEFAULT, null, null, "parent");
+        ResourceTypeEntry sheet = new ResourceTypeEntry(
+                "sheet", "Sheet", List.of(view, use, edit), SubjectKind.DEFAULT, null, null, "parent");
+
+        assertThat(folder.carried(folder, "edit")).contains("edit");
+        assertThat(sheet.carried(folder, "manage")).contains("edit");
+        assertThat(sheet.carried(folder, "view")).contains("view");
+        assertThat(folder.carried(sheet, "use")).contains("view");
+        assertThat(folder.carried(folder, "own")).isEmpty();
+        assertThatThrownBy(() -> new ResourceTypeEntry(
+                        "sheet", "Sheet", List.of(view), SubjectKind.DEFAULT, null, null, "children"))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     @Tag("MK-055")
     void rejectsLinkLevelsThatEditOrThatNoLinkUses() {
         Map<String, Object> view = Map.of("name", "view", "title", "View");

@@ -20,6 +20,7 @@ import {
   subjectLabel,
   tokenOf,
   whoShares,
+  type InheritedAccess,
   type SharedResource,
   type SharingGrant,
 } from '../src/sharing.js';
@@ -232,6 +233,7 @@ describe('the sharing dialog of the shell (MK-055)', () => {
     const api = {
       open: vi.fn(() => Promise.resolve(RESOURCE)),
       grants: vi.fn(() => Promise.resolve([GRANT])),
+      inherited: vi.fn(() => Promise.resolve([])),
       grant: vi.fn(() => Promise.resolve({ ...GRANT, level: 'edit' })),
       createLink: vi.fn(() => Promise.resolve({ grant: link, address: '/shared/s', token: 's' })),
       revoke: vi.fn(() => Promise.resolve()),
@@ -269,6 +271,7 @@ describe('the sharing dialog of the shell (MK-055)', () => {
     const failing = {
       open: vi.fn(() => Promise.resolve({ ...RESOURCE, canShare: false, subjects: [] })),
       grants: vi.fn(() => Promise.resolve([])),
+      inherited: vi.fn(() => Promise.resolve([])),
       grant: vi.fn(() => Promise.reject(new Error('refused'))),
       createLink: vi.fn(() => Promise.reject(new Error('too far'))),
       revoke: vi.fn(() => Promise.reject(new Error('gone'))),
@@ -281,6 +284,7 @@ describe('the sharing dialog of the shell (MK-055)', () => {
 
     await dialog.load(REF);
     expect(failing.grants).not.toHaveBeenCalled();
+    expect(failing.inherited).not.toHaveBeenCalled();
     expect(dialog.grants).toEqual([]);
     expect(await dialog.share({ kind: 'organization' }, 'view')).toBe(false);
     expect(told.announce).toHaveBeenLastCalledWith('Not shared: refused');
@@ -403,5 +407,53 @@ describe('a link opened in the shell (MK-055)', () => {
         registry as never,
       ),
     ).toBe(false);
+  });
+});
+
+describe('the accesses a resource inherits from the resources above it (MK-136)', () => {
+  const FOLDER: InheritedAccess = {
+    resource: { extension: 'dev.example.notes', type: 'folder', id: 'f-1' },
+    title: 'Budgets',
+    link: '/app/notes?folder=f-1',
+    owner: 'c-1',
+    ownerName: 'Carla Bianchi',
+    levels: RESOURCE.levels,
+    grants: [{ ...GRANT, id: 'g-9', level: 'manage' }],
+  };
+
+  it('reads them from the REST API of sharing', async () => {
+    const { request, calls } = requests(json(200, [FOLDER]), json(403, { title: 'Forbidden' }));
+    const api = new SharingApi(request);
+
+    expect(await api.inherited(REF)).toEqual([FOLDER]);
+    await expect(api.inherited(REF)).rejects.toMatchObject({ status: 403 });
+    expect(calls.map(([called]) => called)).toEqual([
+      '/api/v1/sharing/resources/dev.example.notes/memo/m-1/inherited',
+      '/api/v1/sharing/resources/dev.example.notes/memo/m-1/inherited',
+    ]);
+  });
+
+  it('lists them, naming each resource above, to who may share', async () => {
+    const api = {
+      open: vi.fn(() => Promise.resolve({ ...RESOURCE, subjects: ['person' as const] })),
+      grants: vi.fn(() => Promise.resolve([])),
+      inherited: vi.fn(() => Promise.resolve([FOLDER])),
+      grant: vi.fn(() => Promise.resolve(GRANT)),
+      createLink: vi.fn(() => Promise.reject(new Error('no links'))),
+      revoke: vi.fn(() => Promise.resolve()),
+    };
+    const dialog = new ShareDialogState(api, () => Promise.resolve([]), events());
+
+    await dialog.load(REF);
+    expect(api.inherited).toHaveBeenCalledWith(REF);
+    expect(dialog.inherited).toEqual([FOLDER]);
+    expect(dialog.inherited[0]?.title).toBe('Budgets');
+    expect(levelTitle(FOLDER.levels, FOLDER.grants[0]?.level ?? '')).toBe('Manage');
+
+    api.open.mockImplementationOnce(() =>
+      Promise.resolve({ ...RESOURCE, canShare: false, subjects: ['person' as const] }),
+    );
+    await dialog.load(REF);
+    expect(dialog.inherited).toEqual([]);
   });
 });

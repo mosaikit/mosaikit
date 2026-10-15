@@ -609,7 +609,9 @@ A file attached to a registered resource (`attachedTo`, MK-054) follows the shar
 instead (MK-055): a person reads it, finds it in lists and links to it when they hold any level on the
 resource, and attaches, replaces or deletes files of it with a level that `edits`; the person who
 stored a file keeps it. The owner of the resource and the administrators of the organization hold
-every level (not on the kernel's types private to their subjects, ADR-0037). So declare a level that
+every level (not on the kernel's types private to their subjects, ADR-0037). For a type that inherits
+(MK-136), a level on a folder above counts too, and removing it stops at their next use the signed
+links that people made through it. So declare a level that
 edits on a type whose files others should change. Code that runs without a person keeps the rules of
 the organization and its teams; a signed link carries its own grant.
 
@@ -817,6 +819,10 @@ resources:                     # types of the resources the extension registers 
       - { name: manage, title: Manage, edits: true }
     subjects: [person, group, organization, link]   # person, group, organization when left out
     linkLevel: use             # the most a link gives (lowest when left out), never one that edits
+  - type: file
+    title: File
+    levels: [{ name: view, title: View }, { name: edit, title: Edit, edits: true }]
+    inherits: parent           # a level on the parent reaches the file (MK-136); left out: it does not
 ```
 
 The rules the kernel applies:
@@ -834,13 +840,23 @@ The rules the kernel applies:
 - **Grants only add.** Profiles, groups and exceptions add permissions, grants add levels; nothing
   takes away what another grants. Granting again to the same subject **replaces** its level, also
   lowering it, and the change is audited.
-- **No inheritance from the parent, for now.** A grant on a parent resource (a folder, a project)
-  does not pass to its children; this is a decision to revisit when the kernel has folders.
+- **Inheritance from the parent, when the type declares it** (MK-136). A type with
+  `inherits: parent` gets the levels of the resource registered as its `parent`
+  (`Resources.Details`): the level of a person on a resource is the highest of their own and of
+  their level on each resource above it, as long as each resource on the way has a type that
+  inherits too (a folder of folders declares it on the folder type as well). A level held above
+  counts as the highest level of this type **of the same name** that it includes, so `manage` on a
+  folder is `manage` on a file with the same levels; name the levels of the types of a tree alike.
+  The owner of a folder holds its highest level on everything inside, and so does a link to a
+  folder (at most its `linkLevel`). Every answer of the kernel uses it: `Sharing`, `mk_kernel.allows`,
+  the sharing dialog, the file service and the signed links that a person makes. For a type without
+  `inherits`, a grant on a parent does not pass to its children.
 - **Owner.** A resource registered in a request with a signed-in person is owned by that person; one
   registered without a person (a job, an import, a migration of existing data) is owned by the
   **organization**, has no owner in `Resource`, and its administrators manage it.
-- **Who shares**: the owner, the people with the highest level of the type and the administrators of
-  the organization, never above their own level.
+- **Who shares**: the owner, the people with the highest level of the type (also through a resource
+  above, for a type that inherits) and the administrators of the organization, never above their own
+  level.
 - **Links and the public get little.** They are opt-in in `subjects`. The public always gets the
   lowest level of the type; a link gets at most `linkLevel`, which a type may raise to its "use"
   level but never to a level with `edits: true`. A link always has an expiry, within a longest
@@ -931,9 +947,18 @@ limit 50 offset 0;
 It answers for the request, as `sharing.allows(ref, level)` does: `true` when the resource is
 registered in the organization of the request and the person is its owner, an administrator of the
 organization, or reached by a grant at that level or above (to them, to a team of theirs, to the
-organization unless they are a guest, or to the public, which counts as the lowest level). An
-undeclared level, a type of no active extension or a resource that is not registered give `false`.
-Links are not considered: for a request opened with a link, ask the Java API (see "Links" below).
+organization unless they are a guest, or to the public, which counts as the lowest level), also on a
+resource above it for a type that inherits: the function follows the parents in the database, so a
+list of files in folders is still filtered and paged by one query. An undeclared level, a type of no
+active extension or a resource that is not registered give `false`. Links are not considered: for a
+request opened with a link, ask the Java API (see "Links" below).
+
+For a tree of resources (MK-136), the extension registers each resource with its `parent` and
+declares `inherits: parent` on the types inside: it then asks `Sharing` and `mk_kernel.allows` as for
+any type and gets the inherited levels, with no code of its own to walk the folders. To show where
+an access comes from, `sharing.inheritedGrants(ref)` lists the grants of the resources above that
+reach a resource, from its parent upwards; each `Grant.resource()` names the resource above that
+carries it, at a level of its type.
 
 `require` throws `AccessDeniedException` (`dev.mosaikit.kernel.api.permission`), which the kernel
 answers with 403, or with 404 when the person may not see the resource at all, so that its existence
@@ -976,7 +1001,9 @@ Services outside the kernel read the same through the published view
 The kernel offers one sharing dialog for every resource type of every extension (MK-055): who has
 access, with the names of people and teams; sharing with a person (by email address), a team, the
 whole organization or the public, at the levels the manifest declares for the type; links with an
-expiry and an optional password, whose address is shown once; revocation; and who may share. An
+expiry and an optional password, whose address is shown once; revocation; and who may share. For a
+type that inherits it also lists, under the name of each resource above, the accesses that come from
+there (MK-136), which are changed on that resource. An
 extension opens it for one of its resources by publishing `shell.share` on the event bus of its
 context; it has no sharing code of its own:
 
@@ -1001,7 +1028,8 @@ with `require` at every request.
 ### Links
 
 A link opens one resource, at most at the `linkLevel` of its type, until it expires or is revoked,
-also for people without an account. Its address is `/shared/<secret>` of the installation: the shell
+also for people without an account; a link to a folder also opens what the folder holds, for the
+types that inherit (MK-136). Its address is `/shared/<secret>` of the installation: the shell
 opens it with `POST /api/v1/sharing/links/open`, asks for the password when the link has one, and
 then places the element that the extension contributes to `shared.view` for the type:
 
@@ -1025,7 +1053,8 @@ The element reads the resource from the backend of the extension with `request`.
 extensions refuse requests without an account, except one that carries a link that works and opens
 a resource of that same extension. Such a request has **no organization** at first, so the
 row-level security shows it no row of the extension; it acts on the organization of the resource
-only once `Sharing` (`level`, `allows` or `require`) answered for that very resource. A route serves
+only once `Sharing` (`level`, `allows` or `require`) answered for that very resource, or for one
+inside it of a type that inherits (MK-136; `visible` too, for such a type). A route serves
 links when it is annotated `@PermitAll` and calls `require` first; every other route, and every
 route annotated `@Authenticated`, stays closed to them:
 

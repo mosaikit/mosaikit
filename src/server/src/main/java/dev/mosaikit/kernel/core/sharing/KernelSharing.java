@@ -37,11 +37,13 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +52,8 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 /**
@@ -75,6 +79,32 @@ public class KernelSharing implements Sharing {
     static final String REVOKED = "sharing.revoked";
     static final String LINK_CREATED = "sharing.link.created";
     static final String LINK_REVOKED = "sharing.link.revoked";
+
+    /** The resources above some resources whose levels reach them (MK-136), as {@code mk_kernel.allows()} follows them. */
+    private static final String ABOVE = "select distinct n.id from unnest(?::uuid[]) as start (id)"
+            + " cross join lateral mk_kernel.lineage(start.id) n where n.depth > 0";
+
+    /** Whether a resource is below the resource of a link, for a request opened with it (MK-136). */
+    private static final String LINK_REACHES = "select mk_kernel.link_reaches(?, ?, ?, ?)";
+
+    /** Whether some resource of a type is below the resource of a link (MK-136). */
+    private static final String LINK_REACHES_TYPE = "select mk_kernel.link_reaches_type(?, ?, ?)";
+
+    /** The grants that let a person share: not links nor the public. */
+    private static final Predicate<ResourceGrant> PERSONAL =
+            grant -> grant.kind() != SubjectKind.LINK && grant.kind() != SubjectKind.PUBLIC;
+
+    /** Every grant. */
+    private static final Predicate<ResourceGrant> ANY = _ -> true;
+
+    /**
+     * The grants of a resource above another one whose levels reach it (MK-136).
+     *
+     * @param resource the resource above, which carries the grants
+     * @param type its type, whose levels the grants give
+     * @param grants its grants that give something now, links included
+     */
+    public record InheritedGrants(RegisteredResource resource, ResourceTypeEntry type, List<ResourceGrant> grants) {}
 
     /**
      * A link just made, with its secret, which the kernel does not keep.
@@ -305,6 +335,35 @@ public class KernelSharing implements Sharing {
     }
 
     @Override
+    public List<Grant> inheritedGrants(ResourceRef resource) {
+        type(resource);
+        Optional<UUID> org = organization.id();
+        if (org.isEmpty()) {
+            return List.of();
+        }
+        return entries.find(org.get(), resource.extension(), resource.type(), resource.id())
+                .map(entry -> inherited(org.get(), entry).stream()
+                        .flatMap(above -> above.grants().stream()
+                                .map(grant -> view(grant, above.resource().ref())))
+                        .toList())
+                .orElse(List.of());
+    }
+
+    /** The resources above a resource whose levels reach it, from its parent upwards, with their live grants. */
+    private List<InheritedGrants> inherited(UUID org, RegisteredResource entry) {
+        Lineage lineage = lineage(org, List.of(entry));
+        Instant now = Instant.now(clock);
+        return lineage.above(entry).stream()
+                .map(above -> new InheritedGrants(
+                        above,
+                        lineage.type(above).orElseThrow(),
+                        lineage.grantsOf(above).stream()
+                                .filter(grant -> grant.live(now))
+                                .toList()))
+                .toList();
+    }
+
+    @Override
     public Optional<String> level(ResourceRef resource) {
         ResourceTypeEntry type = type(resource);
         Optional<SharedLinks.Opened> link = LinkRequest.current();
@@ -312,25 +371,38 @@ public class KernelSharing implements Sharing {
         if (org.isEmpty()) {
             // A request without an organization: only the link it was opened with gives a level, and
             // from now on the request acts on the organization of that resource (admit).
-            return link.filter(found -> found.resource().equals(resource))
-                    .filter(found -> admit(found.organization(), resource.extension()))
-                    .map(SharedLinks.Opened::level);
+            if (link.isEmpty()) {
+                return Optional.empty();
+            }
+            SharedLinks.Opened opened = link.get();
+            if (opened.resource().equals(resource)) {
+                return admit(opened.organization(), resource.extension())
+                        ? Optional.of(opened.level())
+                        : Optional.empty();
+            }
+            // A resource inside the one of the link, of a type that inherits (MK-136): the level the
+            // link gives there, once the request acts on the organization of the link.
+            if (!linkReaches(opened.grant(), type, resource) || !admit(opened.organization(), resource.extension())) {
+                return Optional.empty();
+            }
+            Optional<String> level = levelOfRequest(opened.organization(), type, resource, link);
+            if (level.isEmpty()) {
+                forgetAdmission();
+            }
+            return level;
         }
-        Optional<RegisteredResource> entry =
-                entries.find(org.get(), resource.extension(), resource.type(), resource.id());
+        return levelOfRequest(org.get(), type, resource, link);
+    }
+
+    /** The level of the request on a resource of its organization, also through the resources above it. */
+    private Optional<String> levelOfRequest(
+            UUID org, ResourceTypeEntry type, ResourceRef resource, Optional<SharedLinks.Opened> link) {
+        Optional<RegisteredResource> entry = entries.find(org, resource.extension(), resource.type(), resource.id());
         if (entry.isEmpty()) {
             return Optional.empty();
         }
-        UUID linkId = link.filter(
-                        opened -> opened.resourceId().equals(entry.get().getId()))
-                .map(SharedLinks.Opened::grant)
-                .orElse(null);
-        return Reach.level(
-                type,
-                entry.get().getOwnerId(),
-                requestViewer(org.get(), linkId),
-                grants.of(org.get(), entry.get().getId()),
-                Instant.now(clock));
+        return lineage(org, List.of(entry.get()))
+                .level(type, entry.get(), requestViewer(org, linkOf(org, link)), ANY, Instant.now(clock));
     }
 
     @Override
@@ -339,12 +411,8 @@ public class KernelSharing implements Sharing {
         ResourceTypeEntry type = type(resource);
         UUID org = organization.require();
         return entries.find(org, resource.extension(), resource.type(), resource.id())
-                .flatMap(entry -> Reach.level(
-                        type,
-                        entry.getOwnerId(),
-                        personViewer(org, person),
-                        grants.of(org, entry.getId()),
-                        Instant.now(clock)));
+                .flatMap(entry -> lineage(org, List.of(entry))
+                        .level(type, entry, personViewer(org, person), ANY, Instant.now(clock)));
     }
 
     @Override
@@ -367,13 +435,27 @@ public class KernelSharing implements Sharing {
         Optional<SharedLinks.Opened> link = LinkRequest.current();
         Optional<UUID> org = organization.id();
         if (org.isEmpty()) {
+            // A link to a resource that holds resources of this type, which inherit (MK-136): the
+            // request acts on the organization of the link and finds what the link reaches.
+            if (link.isPresent()
+                    && linkReachesType(link.get().grant(), entry, extension, type)
+                    && admit(link.get().organization(), extension)) {
+                UUID admitted = link.get().organization();
+                return visible(
+                        admitted,
+                        entry,
+                        extension,
+                        type,
+                        level,
+                        requestViewer(admitted, link.get().grant()));
+            }
             return link.filter(opened -> opened.resource().extension().equals(extension)
                             && opened.resource().type().equals(type)
                             && entry.includes(opened.level(), level))
                     .map(opened -> Set.of(opened.resource().id()))
                     .orElse(Set.of());
         }
-        return visible(org.get(), entry, extension, type, level, linkId -> requestViewer(org.get(), linkId), link);
+        return visible(org.get(), entry, extension, type, level, requestViewer(org.get(), linkOf(org.get(), link)));
     }
 
     @Override
@@ -383,46 +465,117 @@ public class KernelSharing implements Sharing {
         Objects.requireNonNull(type, "type");
         ResourceTypeEntry entry = declaredLevel(new ResourceRef(extension, type, "-"), level);
         UUID org = organization.require();
-        Reach.Viewer viewer = personViewer(org, person);
-        return visible(org, entry, extension, type, level, _ -> viewer, Optional.empty());
+        return visible(org, entry, extension, type, level, personViewer(org, person));
     }
 
+    /**
+     * The resources of a type on which a viewer has at least a level, also through the resources
+     * above them (MK-136): the resources, those above them and every grant are read in a few queries,
+     * whatever the number of resources.
+     */
     private Set<String> visible(
-            UUID org,
-            ResourceTypeEntry type,
-            String extension,
-            String typeName,
-            String level,
-            java.util.function.Function<UUID, Reach.Viewer> viewers,
-            Optional<SharedLinks.Opened> link) {
+            UUID org, ResourceTypeEntry type, String extension, String typeName, String level, Reach.Viewer viewer) {
         List<RegisteredResource> all = entries.list(org, extension, typeName);
         if (all.isEmpty()) {
             return Set.of();
         }
-        Map<UUID, List<ResourceGrant>> byResource = new HashMap<>();
-        grants.ofAll(org, all.stream().map(RegisteredResource::getId).toList())
-                .forEach(grant -> byResource
-                        .computeIfAbsent(grant.getResourceId(), _ -> new java.util.ArrayList<>())
-                        .add(grant));
+        Lineage lineage = lineage(org, all);
         Instant now = Instant.now(clock);
-        Reach.Viewer plain = viewers.apply(null);
         return all.stream()
-                .filter(entry -> {
-                    Reach.Viewer viewer = link.filter(
-                                    opened -> opened.resourceId().equals(entry.getId()))
-                            .map(opened -> viewers.apply(opened.grant()))
-                            .orElse(plain);
-                    return Reach.level(
-                                    type,
-                                    entry.getOwnerId(),
-                                    viewer,
-                                    byResource.getOrDefault(entry.getId(), List.of()),
-                                    now)
-                            .map(held -> type.includes(held, level))
-                            .orElse(false);
-                })
+                .filter(entry -> lineage.level(type, entry, viewer, ANY, now)
+                        .map(held -> type.includes(held, level))
+                        .orElse(false))
                 .map(RegisteredResource::getRefId)
                 .collect(Collectors.toUnmodifiableSet());
+    }
+
+    /**
+     * The resources above some resources whose levels reach them, and the grants of all of them, read
+     * in at most three queries (MK-136): the resources above follow the parents in the database, as
+     * {@code mk_kernel.allows()} does.
+     */
+    private Lineage lineage(UUID org, List<RegisteredResource> targets) {
+        Function<ResourceRef, Optional<ResourceTypeEntry>> types = this::declaredType;
+        List<RegisteredResource> all = new ArrayList<>(targets);
+        UUID[] starts = targets.stream()
+                .filter(entry -> entry.getParentId() != null)
+                .filter(entry -> types.apply(entry.ref())
+                        .filter(ResourceTypeEntry::inheritsFromParent)
+                        .isPresent())
+                .map(RegisteredResource::getId)
+                .toArray(UUID[]::new);
+        if (starts.length > 0) {
+            Set<UUID> known = new HashSet<>();
+            targets.forEach(entry -> known.add(entry.getId()));
+            List<UUID> above =
+                    above(starts).stream().filter(id -> !known.contains(id)).toList();
+            if (!above.isEmpty()) {
+                all.addAll(entries.findByIds(org, above));
+            }
+        }
+        List<ResourceGrant> found =
+                grants.ofAll(org, all.stream().map(RegisteredResource::getId).toList());
+        return new Lineage(all, found, types);
+    }
+
+    private List<UUID> above(UUID[] starts) {
+        List<UUID> above = new ArrayList<>();
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(ABOVE)) {
+            statement.setArray(1, connection.createArrayOf("uuid", starts));
+            try (ResultSet rows = statement.executeQuery()) {
+                while (rows.next()) {
+                    above.add(rows.getObject(1, UUID.class));
+                }
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Cannot read the resources above", e);
+        }
+        return above;
+    }
+
+    /** Whether a resource is below the resource of a link, through types that inherit (MK-136). */
+    private boolean linkReaches(UUID link, ResourceTypeEntry type, ResourceRef resource) {
+        if (!type.inheritsFromParent()) {
+            return false;
+        }
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(LINK_REACHES)) {
+            statement.setObject(1, link);
+            statement.setString(2, resource.extension());
+            statement.setString(3, resource.type());
+            statement.setString(4, resource.id());
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next() && result.getBoolean(1);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Cannot follow the link", e);
+        }
+    }
+
+    /** Whether some resource of a type is below the resource of a link (MK-136). */
+    private boolean linkReachesType(UUID link, ResourceTypeEntry type, String extension, String typeName) {
+        if (!type.inheritsFromParent()) {
+            return false;
+        }
+        try (Connection connection = dataSource.getConnection();
+                PreparedStatement statement = connection.prepareStatement(LINK_REACHES_TYPE)) {
+            statement.setObject(1, link);
+            statement.setString(2, extension);
+            statement.setString(3, typeName);
+            try (ResultSet result = statement.executeQuery()) {
+                return result.next() && result.getBoolean(1);
+            }
+        } catch (SQLException e) {
+            throw new IllegalStateException("Cannot follow the link", e);
+        }
+    }
+
+    /** The link of the request, when it was opened with one of this organization. */
+    private static UUID linkOf(UUID org, Optional<SharedLinks.Opened> link) {
+        return link.filter(opened -> opened.organization().equals(org))
+                .map(SharedLinks.Opened::grant)
+                .orElse(null);
     }
 
     /**
@@ -446,6 +599,12 @@ public class KernelSharing implements Sharing {
             return false;
         }
         return true;
+    }
+
+    /** Undoes {@link #admit}: the link gave no level after all. */
+    private void forgetAdmission() {
+        organization.forgetLink();
+        organizationOfConnection("");
     }
 
     private void organizationOfConnection(String org) {
@@ -497,6 +656,22 @@ public class KernelSharing implements Sharing {
     }
 
     /**
+     * The resources above a resource whose levels reach it (MK-136), from its parent upwards, with the
+     * grants that give something now, for a person who may share it, as the sharing dialog lists them.
+     *
+     * @throws AccessDeniedException when the person of the request may not share it
+     */
+    public List<InheritedGrants> inheritedToShow(ResourceRef resource) {
+        ResourceTypeEntry type = type(resource);
+        UUID org = organization.require();
+        RegisteredResource entry = entry(org, resource);
+        if (!shares(type, entry, org)) {
+            throw denied(type, entry, org);
+        }
+        return inherited(org, entry);
+    }
+
+    /**
      * Shares a resource that the kernel keeps for an extension, such as a document of a collection
      * shared with a team (MK-032), with a team at a level, as the person of the request: the kernel
      * decides it, so who shares is not checked. Audited as every grant.
@@ -535,12 +710,8 @@ public class KernelSharing implements Sharing {
         if (!shares(type, entry, org)) {
             throw denied(type, entry, org);
         }
-        String own = Reach.level(
-                        type,
-                        entry.getOwnerId(),
-                        requestViewer(org, null),
-                        grants.of(org, entry.getId()),
-                        Instant.now(clock))
+        String own = lineage(org, List.of(entry))
+                .level(type, entry, requestViewer(org, null), ANY, Instant.now(clock))
                 .orElseThrow();
         if (!type.includes(own, level)) {
             throw new AccessDeniedException("You cannot share " + entry.ref() + " above your level " + own + ".");
@@ -549,29 +720,24 @@ public class KernelSharing implements Sharing {
     }
 
     /**
-     * Whether the person of the request shares the resource. Links and the public are left out: a
-     * level they give never lets anyone share, also for a type with one level.
+     * Whether the person of the request shares the resource: they hold its highest level, also
+     * through a resource above it (MK-136). Links and the public are left out: a level they give
+     * never lets anyone share, also for a type with one level.
      */
     private boolean shares(ResourceTypeEntry type, RegisteredResource entry, UUID org) {
         if (me().isEmpty()) {
             return false;
         }
-        List<ResourceGrant> personal = grants.of(org, entry.getId()).stream()
-                .filter(grant -> grant.kind() != SubjectKind.LINK && grant.kind() != SubjectKind.PUBLIC)
-                .toList();
-        return Reach.level(type, entry.getOwnerId(), requestViewer(org, null), personal, Instant.now(clock))
+        return lineage(org, List.of(entry))
+                .level(type, entry, requestViewer(org, null), PERSONAL, Instant.now(clock))
                 .filter(type.levelNames().getLast()::equals)
                 .isPresent();
     }
 
     /** Refused: {@code 403} with a level on the resource, {@code 404} without. */
     private AccessDeniedException denied(ResourceTypeEntry type, RegisteredResource entry, UUID org) {
-        boolean seen = Reach.level(
-                        type,
-                        entry.getOwnerId(),
-                        requestViewer(org, null),
-                        grants.of(org, entry.getId()),
-                        Instant.now(clock))
+        boolean seen = lineage(org, List.of(entry))
+                .level(type, entry, requestViewer(org, null), ANY, Instant.now(clock))
                 .isPresent();
         return new AccessDeniedException("You may not share " + entry.ref() + ".", !seen);
     }
@@ -636,6 +802,14 @@ public class KernelSharing implements Sharing {
         }
         return RequestOrganization.account(identity)
                 .or(() -> directory.idOf(identity.getPrincipal().getName()));
+    }
+
+    /** The type of a resource, empty when no active extension declares it. */
+    private Optional<ResourceTypeEntry> declaredType(ResourceRef ref) {
+        return extensions
+                .findActive(ref.extension())
+                .flatMap(InstalledExtension::manifest)
+                .flatMap(manifest -> ResourceTypes.of(manifest, ref.type()));
     }
 
     /** Refuses a reference of a type that the named extension does not declare, or of no active extension. */

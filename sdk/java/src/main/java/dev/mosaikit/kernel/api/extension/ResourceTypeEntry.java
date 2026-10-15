@@ -5,6 +5,7 @@ package dev.mosaikit.kernel.api.extension;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -19,6 +20,13 @@ import java.util.Set;
  * <p>An update of the extension that removes a type or a level on which grants exist is refused by the
  * kernel, with the list of those grants ({@link ExtensionManifest#sharingRemovedBy}).
  *
+ * <p>A type that declares {@code inherits: parent} (MK-136) passes the levels of the resources above
+ * to its resources: the level of a person on a resource is the highest of their own and of their
+ * level on each resource above it, through the {@code parent} of the registry (MK-054), as long as
+ * each resource on the way has a type that inherits too. A level held above counts here as the
+ * highest level of this type whose name the type above declares and that the level held includes
+ * ({@link #carried}): {@code manage} on a folder is {@code manage} on a file of the same levels.
+ *
  * @param type identifier within the extension, such as {@code dashboard}
  * @param title short human readable name of the type, such as {@code Dashboard}
  * @param levels the levels at which a resource of the type is shared, from the lowest to the
@@ -27,6 +35,8 @@ import java.util.Set;
  * @param linkLevel the highest level a link may give, such as {@code use}; {@code null} for the lowest
  *     level
  * @param i18n {@code title} in other languages, by language tag (MK-053)
+ * @param inherits {@value #INHERITS_PARENT} when the resources of the type inherit the levels of
+ *     their parent (MK-136), {@code null} when they do not
  */
 public record ResourceTypeEntry(
         String type,
@@ -34,7 +44,11 @@ public record ResourceTypeEntry(
         List<SharingLevelEntry> levels,
         Set<SubjectKind> subjects,
         String linkLevel,
-        Map<String, Map<String, String>> i18n) {
+        Map<String, Map<String, String>> i18n,
+        String inherits) {
+
+    /** The value of {@code inherits} for a type whose resources inherit the levels of their parent. */
+    public static final String INHERITS_PARENT = "parent";
 
     /**
      * Checks the entry.
@@ -65,6 +79,45 @@ public record ResourceTypeEntry(
             throw new IllegalArgumentException("a link never gives a level that edits");
         }
         i18n = Translations.copy(i18n);
+        if (inherits != null && !INHERITS_PARENT.equals(inherits)) {
+            throw new IllegalArgumentException("a resource type inherits only from its parent");
+        }
+    }
+
+    /** A type whose resources do not inherit the levels of their parent. */
+    public ResourceTypeEntry(
+            String type,
+            String title,
+            List<SharingLevelEntry> levels,
+            Set<SubjectKind> subjects,
+            String linkLevel,
+            Map<String, Map<String, String>> i18n) {
+        this(type, title, levels, subjects, linkLevel, i18n, null);
+    }
+
+    /** Whether the resources of the type inherit the levels of their parent (MK-136). */
+    public boolean inheritsFromParent() {
+        return INHERITS_PARENT.equals(inherits);
+    }
+
+    /**
+     * What a level held on a resource of another type counts for on a resource of this type, below
+     * it (MK-136): the highest level of this type whose name {@code above} declares and that
+     * {@code held} includes there; empty when there is none.
+     *
+     * @param above the type of the resource above
+     * @param held the level held on it
+     */
+    public Optional<String> carried(ResourceTypeEntry above, String held) {
+        Objects.requireNonNull(above, "above");
+        List<String> names = levelNames();
+        for (int rank = names.size() - 1; rank >= 0; rank--) {
+            String name = names.get(rank);
+            if (above.declares(name) && above.includes(held, name)) {
+                return Optional.of(name);
+            }
+        }
+        return Optional.empty();
     }
 
     /** Whether every level that edits comes after every level that does not. */

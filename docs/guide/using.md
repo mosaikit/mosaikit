@@ -113,6 +113,13 @@ have a **Share** button, which opens the same dialog in every app:
   working at once: whoever opens it then reads that the link does not exist.
 - The dialog says who can share: who owns the resource, the people with its highest level and the
   administrators of the organization; the others see their level and who to ask.
+- **Folders and what they hold.** In apps whose resources sit inside others, such as files in
+  folders, an app may let an access to a folder reach everything in it, sub-folders included
+  (MK-136). Your level on a file is then the highest of your own and of yours on each folder above
+  it: who can open a folder opens, downloads and finds its files, with the links they make too.
+  Under **Access from** the dialog lists, for each folder above, who owns it and who it is shared
+  with; change those accesses on the folder itself. Whoever has the highest level on a folder shares
+  what is inside it. Removing an access to a folder takes effect on everything in it at once.
 
 Whoever opens a link sees the page of the installation with the resource, as the app shows it to
 links; an app that cannot show it there asks to sign in.

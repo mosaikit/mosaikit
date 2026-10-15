@@ -187,6 +187,14 @@ public class SharingProbe {
         return answer(() -> sharing.grants(new ResourceRef(extension, type, id)));
     }
 
+    /** The grants that reach the resource from the resources above it, as the Java API lists them (MK-136). */
+    @GET
+    @Path("/{id}/inherited")
+    public Response inherited(
+            @PathParam("extension") String extension, @PathParam("type") String type, @PathParam("id") String id) {
+        return answer(() -> sharing.inheritedGrants(new ResourceRef(extension, type, id)));
+    }
+
     private boolean sql(String extension, String type, String id, String level) {
         try (var connection = dataSource.getConnection();
                 var statement = connection.prepareStatement("select mk_kernel.allows(?, ?, ?, ?)")) {

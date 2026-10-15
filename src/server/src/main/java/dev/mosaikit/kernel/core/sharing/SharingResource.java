@@ -79,6 +79,18 @@ public class SharingResource {
         return dialog.grants(ref(extension, type, id));
     }
 
+    @GET
+    @Path("/resources/{extension}/{type}/{id}/inherited")
+    @Operation(
+            summary = "List the accesses a resource inherits from each resource above it",
+            description = "For a type that inherits the levels of its parent (MK-136): from the parent upwards, each"
+                    + " resource above with its owner, the levels of its type and its grants. For the people who may"
+                    + " share the resource: 403 for the others with a level, 404 without.")
+    public List<SharingDialog.InheritedView> inherited(
+            @PathParam("extension") String extension, @PathParam("type") String type, @PathParam("id") String id) {
+        return dialog.inherited(ref(extension, type, id));
+    }
+
     @PUT
     @Path("/resources/{extension}/{type}/{id}/grants")
     @Operation(

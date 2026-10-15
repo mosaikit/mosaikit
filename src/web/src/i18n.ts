@@ -449,6 +449,8 @@ const ITALIAN: Record<string, string> = {
   Close: 'Chiudi',
   'Who has access': 'Chi ha accesso',
   'Only who owns it and the administrators.': 'Solo chi ne è proprietario e gli amministratori.',
+  'Access from {title}': 'Accesso da {title}',
+  Owner: 'Proprietario',
   'Level of {subject}': 'Livello di {subject}',
   'Remove access of {subject}': "Togli l'accesso a {subject}",
   Remove: 'Togli',
