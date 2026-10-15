@@ -47,6 +47,13 @@ another one.
 If an app cannot be loaded, the home page says how many extensions failed; tell your administrator,
 who sees the reason in the extension list.
 
+Apps that list items share the same page: filters in a column on the left (on a narrow window,
+under the **Filters** button, which shows how many are active), the name and count at the top, and,
+when you select items, the actions on the selection. You can switch between cards and rows. An
+empty panel says why: nothing yet, nothing matching the filters, a failed request, no network or no
+access, with what to do. Drag the edge of a list pane, or focus it and use the arrow keys, to make
+it wider or narrower: the app remembers the width in this browser.
+
 ## Mosaikit as an app
 
 Mosaikit can be installed on a computer or a phone, and then opens in its own window, without the

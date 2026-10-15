@@ -46,3 +46,7 @@ import '@fluentui/web-components/toggle-button/define.js';
 import '@fluentui/web-components/tooltip/define.js';
 import '@fluentui/web-components/tree/define.js';
 import '@fluentui/web-components/tree-item/define.js';
+// The page patterns of the UI kit (MK-105): list page, empty and error states, resizable pane.
+import './empty-state.js';
+import './list-page.js';
+import './split-pane.js';

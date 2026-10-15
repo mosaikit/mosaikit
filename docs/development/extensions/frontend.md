@@ -119,7 +119,9 @@ contrast (WCAG 2.1 AA: 4.5:1 for text): the high contrast appearance stays avail
 The shell defines the Fluent UI web components for the page
 ([ADR-0032](../../adr/0032-fluent-ui-and-themes.md)): an extension that runs as a module can use
 `<fluent-button>`, `<fluent-dialog>`, `<fluent-tablist>` and the others without bundling them, and
-they follow the theme of the installation. Style everything else with the tokens:
+they follow the theme of the installation. The list page, the empty and error states and the
+resizable panes of the UI kit are there too ([Page patterns of the UI kit](page-patterns.md)).
+Style everything else with the tokens:
 
 | Token | Use |
 |---|---|

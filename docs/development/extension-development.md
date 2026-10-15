@@ -15,6 +15,7 @@ lead to the topic.
   - <a id="settings-language-and-theme"></a>[Settings, language and theme](extensions/frontend.md#settings-language-and-theme)
   - <a id="theme-extensions"></a>[Theme extensions](extensions/frontend.md#theme-extensions)
   - <a id="components-and-themes"></a>[Components and themes](extensions/frontend.md#components-and-themes)
+  - <a id="page-patterns-of-the-ui-kit"></a>[Page patterns of the UI kit](extensions/page-patterns.md)
   - <a id="frontends-written-with-a-framework"></a>[Frontends written with a framework](extensions/frontend.md#frontends-written-with-a-framework)
   - <a id="isolated-frontends"></a>[Isolated frontends](extensions/frontend.md#isolated-frontends)
 - <a id="java-code"></a>[Java code](extensions/backend.md)
