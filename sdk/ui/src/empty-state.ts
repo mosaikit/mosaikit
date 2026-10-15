@@ -1,6 +1,13 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
-import { emptyKind, emptyStateText, type EmptyStateText } from './patterns.js';
+import {
+  REQUEST_ACCESS_EVENT,
+  emptyKind,
+  emptyStateAction,
+  emptyStateText,
+  requestedResource,
+  type EmptyStateText,
+} from './patterns.js';
 
 const ICONS: Record<EmptyStateText['icon'], string> = {
   inbox: 'M4 13h4l2 3h4l2-3h4M4 13l3-8h10l3 8v6H4z',
@@ -47,10 +54,13 @@ const TEMPLATE = `
  * `empty` (nothing yet), `filtered` (the filters hide everything), `failed`, `offline` or `denied`;
  * each kind has its own icon, tone and default texts. `heading` is the title, the content is the
  * explanation, the slot `action` the action. Without an action of the app, `filtered` offers
- * "Clear the filters" (event `mk-clear-filters`), `failed` and `offline` "Try again" (`mk-retry`).
+ * "Clear the filters" (event `mk-clear-filters`), `failed` and `offline` "Try again" (`mk-retry`),
+ * and `denied` with a `resource` (`<extension>/<type>/<id>`) "Request access" (`mk-request-access`
+ * with `{ resource }`, which the shell answers with the request for access, MK-058); `action-label`
+ * gives that action in another language.
  */
 export class MkEmptyState extends HTMLElement {
-  static readonly observedAttributes = ['kind', 'heading'];
+  static readonly observedAttributes = ['kind', 'heading', 'resource', 'action-label'];
 
   private readonly root: ShadowRoot;
 
@@ -59,9 +69,16 @@ export class MkEmptyState extends HTMLElement {
     this.root = this.attachShadow({ mode: 'open' });
     this.root.innerHTML = TEMPLATE;
     this.root.querySelector('.default-action')?.addEventListener('click', () => {
-      const event = emptyStateText(emptyKind(this.getAttribute('kind'))).action?.event;
+      const resource = requestedResource(this.getAttribute('resource'));
+      const event = emptyStateAction(emptyKind(this.getAttribute('kind')), resource)?.event;
       if (event) {
-        this.dispatchEvent(new CustomEvent(event, { bubbles: true, composed: true }));
+        this.dispatchEvent(
+          new CustomEvent(event, {
+            bubbles: true,
+            composed: true,
+            ...(event === REQUEST_ACCESS_EVENT ? { detail: { resource } } : {}),
+          }),
+        );
       }
     });
 
@@ -86,7 +103,13 @@ export class MkEmptyState extends HTMLElement {
   }
 
   private render(): void {
-    const text = emptyStateText(emptyKind(this.getAttribute('kind')));
+    const kind = emptyKind(this.getAttribute('kind'));
+    const text = emptyStateText(kind);
+    const act = emptyStateAction(
+      kind,
+      requestedResource(this.getAttribute('resource')),
+      this.getAttribute('action-label'),
+    );
     this.dataset.tone = text.tone;
     this.root.querySelector('path')?.setAttribute('d', ICONS[text.icon]);
     const title = this.root.querySelector('h2');
@@ -99,8 +122,8 @@ export class MkEmptyState extends HTMLElement {
     }
     const action = this.root.querySelector<HTMLElement>('.default-action');
     if (action) {
-      action.textContent = text.action?.label ?? '';
-      action.hidden = !text.action;
+      action.textContent = act?.label ?? '';
+      action.hidden = !act;
     }
   }
 }
