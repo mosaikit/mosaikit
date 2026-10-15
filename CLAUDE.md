@@ -59,8 +59,8 @@ of change; a whole build with every test takes about 11 minutes and is rarely ne
   its tests tagged by its id (`@Tag("MK-xxx")` in Java, `MK-xxx` in the title of the e2e
   `describe`). Big decisions get an ADR in `docs/adr/`.
 - Documented in the same pull request: the guide for extension developers
-  (`docs/development/extension-development.md`) when the contract of extensions changes, the user
-  and administrator guide (`docs/guide/`) when behaviour changes, and a changelog fragment in
+  (`docs/development/extensions/`, one page per topic, indexed by `extension-development.md`) when
+  the contract of extensions changes, the user and administrator guide (`docs/guide/`) when behaviour changes, and a changelog fragment in
   `changelog.d/` ([changelog.d/README.md](changelog.d/README.md)).
 - English everywhere; the shell's texts go through `t()` with their translations.
 - Conventional Commits, signed off (`git commit -s`, DCO), SPDX headers on every source file.

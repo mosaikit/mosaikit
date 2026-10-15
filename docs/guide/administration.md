@@ -56,7 +56,7 @@ What happens, in order:
   `mosaikit.accounts.session-cache` (5 seconds) and forget it within `mosaikit.identity.cache-ttl`
   (30 seconds).
 - **At once, too**, the kernel tells the extensions that subscribe to the event `organization.deleted`
-  (see [events on the server](../development/extension-development.md#events-on-the-server)), so that
+  (see [events on the server](../development/extensions/events.md#events-on-the-server)), so that
   they release what they keep outside the installation for it, such as a workspace on a map server or
   scheduled work.
 - **Its data stay** — the data of the kernel (members, teams, apps, resources, permissions,
@@ -758,7 +758,7 @@ who left, counts to nobody in particular.
 ## Assistants and MCP clients
 
 Extensions may declare actions that assistants use as tools (see
-[extension development](../development/extension-development.md#actions-for-assistants)). An MCP client
+[extension development](../development/extensions/assistants.md#actions-for-assistants)). An MCP client
 connects to `https://<host>/mcp` with the credentials of a person and the header
 `X-Mosaikit-Organization: <slug>`; it has exactly the rights of that person in that organization,
 and changes wait for the confirmation of the person. A client can also use a personal access key
