@@ -1,6 +1,11 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
-import { defineExtension, type FrontendExtension, type ExtensionContext } from '@mosaikit/sdk';
+import {
+  PresenceStore,
+  defineExtension,
+  type FrontendExtension,
+  type ExtensionContext,
+} from '@mosaikit/sdk';
 import { describe, expect, it, vi } from 'vitest';
 import { ExtensionLoader } from '../src/extension-loader.js';
 
@@ -97,6 +102,43 @@ describe('ExtensionLoader (MK-008)', () => {
       },
     ]);
     expect(context?.contributionsTo('launcher.app')).toEqual([]);
+  });
+
+  it('tells an extension which others are active in the organization (MK-133)', async () => {
+    let context: ExtensionContext | undefined;
+    const presence = new PresenceStore([{ id: 'org.example.ext.catalog', version: '1.2.0' }]);
+    const loader = new ExtensionLoader(
+      () => Promise.resolve(new Response()),
+      () =>
+        Promise.resolve({
+          default: defineExtension({ activate: (received) => void (context = received) }),
+        }),
+      undefined,
+      undefined,
+      presence,
+    );
+
+    await loader.loadAll([frontend('boards')], user);
+
+    expect(context?.extensions.isActive('org.example.ext.catalog')).toBe(true);
+    presence.apply({
+      extension: 'org.example.ext.catalog',
+      active: false,
+      version: '1.2.0',
+      reason: 'removed',
+    });
+    expect(context?.extensions.isActive('org.example.ext.catalog')).toBe(false);
+
+    // Without a presence, no other extension is active.
+    const alone = new ExtensionLoader(
+      () => Promise.resolve(new Response()),
+      () =>
+        Promise.resolve({
+          default: defineExtension({ activate: (received) => void (context = received) }),
+        }),
+    );
+    await alone.loadAll([frontend('boards')], user);
+    expect(context?.extensions.active()).toEqual([]);
   });
 
   it('reports errors of event handlers without throwing', () => {

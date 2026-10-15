@@ -8,7 +8,9 @@ import {
   EventBus,
   contributionsTo,
   isMosaikitExtension,
+  PresenceStore,
   type CurrentUser,
+  type ExtensionPresence,
   type FrontendExtension,
 } from '@mosaikit/sdk';
 
@@ -32,6 +34,7 @@ export class ExtensionLoader {
       console.error(message, error);
     },
     private readonly live: LiveChannel = NO_LIVE,
+    private readonly presence: ExtensionPresence = new PresenceStore(),
   ) {
     this.events = new EventBus((error, topic) => {
       reportError(`A handler of '${topic}' failed`, error);
@@ -85,6 +88,7 @@ export class ExtensionLoader {
         fetch: this.request,
         data: dataCollections(this.request, extension.id, this.live),
         live: this.live,
+        extensions: this.presence,
         notify: async (notification) => {
           const response = await this.request('/api/v1/notifications', {
             method: 'POST',

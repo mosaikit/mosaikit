@@ -11,6 +11,7 @@ import dev.mosaikit.kernel.core.events.PlatformEventLog;
 import dev.mosaikit.kernel.core.extension.ExtensionDependencies;
 import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
 import dev.mosaikit.kernel.core.extension.InstalledExtension;
+import dev.mosaikit.kernel.core.presence.PresenceNotices;
 import dev.mosaikit.kernel.core.security.Roles;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;
@@ -46,11 +47,14 @@ public class AppSettings {
     private final ExtensionRegistry registry;
     private final OrganizationApps apps;
     private final PlatformEventLog events;
+    private final PresenceNotices presence;
 
-    public AppSettings(ExtensionRegistry registry, OrganizationApps apps, PlatformEventLog events) {
+    public AppSettings(
+            ExtensionRegistry registry, OrganizationApps apps, PlatformEventLog events, PresenceNotices presence) {
         this.registry = registry;
         this.apps = apps;
         this.events = events;
+        this.presence = presence;
     }
 
     /** An app of an active extension, as the shell would show it without settings. */
@@ -201,7 +205,8 @@ public class AppSettings {
 
     /**
      * Raises an event for each extension that the change turned off or on in the organization
-     * (MK-085), so that it releases or prepares what it keeps for it.
+     * (MK-085), so that it releases or prepares what it keeps for it, and tells the other extensions
+     * and the open pages that it became inactive or active there (MK-133).
      */
     private void raiseTurned(UUID organizationId, Set<String> extensions, Set<String> offBefore) {
         for (String extension : extensions) {
@@ -211,6 +216,17 @@ public class AppSettings {
                         organizationId,
                         off ? PlatformEvents.EXTENSION_DISABLED : PlatformEvents.EXTENSION_ENABLED,
                         Map.of("extension", extension));
+                String version = registry.findActive(extension)
+                        .flatMap(InstalledExtension::manifest)
+                        .map(manifest -> manifest.version().toString())
+                        .orElse("");
+                presence.tell(
+                        organizationId,
+                        new PresenceNotices.Change(
+                                extension,
+                                version,
+                                null,
+                                off ? PresenceNotices.Reason.DISABLED : PresenceNotices.Reason.ENABLED));
             }
         }
     }
@@ -256,6 +272,18 @@ public class AppSettings {
                     OrganizationApp setting = settings.get(key(app.extensionId(), app.appId()));
                     return setting != null && !setting.isEnabled();
                 });
+    }
+
+    /**
+     * Whether the settings of an organization turn off every app they list of an extension, which may
+     * no longer be active: the extension was off there before it went away (MK-133). The settings list
+     * every app of the active extensions once an administrator saved them.
+     */
+    public boolean turnedOffBySettings(UUID organizationId, String extensionId) {
+        List<OrganizationApp> ofExtension = apps.findByOrganizationId(organizationId).stream()
+                .filter(app -> app.getExtensionId().equals(extensionId))
+                .toList();
+        return !ofExtension.isEmpty() && ofExtension.stream().noneMatch(OrganizationApp::isEnabled);
     }
 
     private Map<String, OrganizationApp> settingsOf(UUID organizationId) {

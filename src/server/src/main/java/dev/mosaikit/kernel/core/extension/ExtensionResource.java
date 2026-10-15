@@ -5,6 +5,7 @@ package dev.mosaikit.kernel.core.extension;
 import dev.mosaikit.kernel.core.apps.AppSettings;
 import dev.mosaikit.kernel.core.config.KernelConfig;
 import dev.mosaikit.kernel.core.identity.RequestOrganization;
+import dev.mosaikit.kernel.core.presence.KernelExtensionPresence;
 import dev.mosaikit.kernel.core.security.Roles;
 import io.quarkus.security.Authenticated;
 import io.quarkus.security.identity.SecurityIdentity;
@@ -32,10 +33,16 @@ public class ExtensionResource {
     private final ExtensionRegistry registry;
     private final boolean isolateUnverified;
     private final boolean watched;
+    private final KernelExtensionPresence presence;
 
     public ExtensionResource(
-            ExtensionRegistry registry, KernelConfig config, AppSettings apps, SecurityIdentity identity) {
+            ExtensionRegistry registry,
+            KernelConfig config,
+            AppSettings apps,
+            SecurityIdentity identity,
+            KernelExtensionPresence presence) {
         this.registry = registry;
+        this.presence = presence;
         this.apps = apps;
         this.identity = identity;
         this.watched = config.extensions().watch();
@@ -68,6 +75,19 @@ public class ExtensionResource {
                                 .map(frontend -> FrontendExtensionView.of(
                                         manifest, frontend, isolateUnverified && !extension.isVerified()))))
                 .toList();
+    }
+
+    @GET
+    @Path("/shell/extensions/active")
+    @Authenticated
+    @Operation(
+            summary = "List the extensions active in the organization of the request, with their version",
+            description = "Every extension, with or without a frontend, that is installed, compatible and not turned"
+                    + " off for the organization (MK-133); in the installation without an organization. The shell"
+                    + " gives it to the frontends of extensions and keeps it current through the real-time topic"
+                    + " 'extensions'.")
+    public List<KernelExtensionPresence.Active> activeExtensions() {
+        return presence.activeIn(RequestOrganization.of(identity));
     }
 
     @GET

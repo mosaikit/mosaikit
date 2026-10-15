@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
-import { defineExtension, type ExtensionContext } from '@mosaikit/sdk';
+import { PresenceStore, defineExtension, type ExtensionContext } from '@mosaikit/sdk';
 import { describe, expect, it, vi } from 'vitest';
 import {
   isFrameMessage,
@@ -193,6 +193,87 @@ describe('frame runtime (MK-014)', () => {
     expect(doc.body.textContent).toContain('could not be started: Error: 404');
     channel.port1.close();
     channel.port2.close();
+  });
+});
+
+describe('presence of other extensions in an isolated frame (MK-133)', () => {
+  const catalog = { id: 'org.example.ext.catalog', version: '1.2.0' };
+
+  it('starts with the extensions of the init message', async () => {
+    const { doc } = fakeDocument();
+    let context: ExtensionContext | undefined;
+    const importModule = () =>
+      Promise.resolve({ default: defineExtension({ activate: (c) => void (context = c) }) });
+    const fetch = vi.fn(() => Promise.resolve(new Response()));
+
+    await start(
+      { ...init, extensions: [catalog] },
+      new FrameEventBus(() => undefined),
+      fetch,
+      importModule,
+      doc,
+    );
+    expect(context?.extensions.version(catalog.id)).toBe('1.2.0');
+
+    await start(init, new FrameEventBus(() => undefined), fetch, importModule, doc);
+    expect(context?.extensions.active()).toEqual([]);
+
+    const presence = new PresenceStore();
+    await start(init, new FrameEventBus(() => undefined), fetch, importModule, doc, presence);
+    expect(context?.extensions).toBe(presence);
+  });
+
+  it('follows the changes the shell sends, without a reload', async () => {
+    const { doc } = fakeDocument();
+    const seen: boolean[] = [];
+    let context: ExtensionContext | undefined;
+    const importModule = () =>
+      Promise.resolve({
+        default: defineExtension({
+          activate: (received) => {
+            context = received;
+            received.extensions.subscribe((change) => seen.push(change.active));
+          },
+        }),
+      });
+    const channel = new MessageChannel();
+    connect({ postMessage: () => undefined }, doc, importModule, channel);
+    const shell = channel.port2;
+    const tick = () => new Promise((resolve) => setTimeout(resolve, 10));
+
+    // Before the init message there is nothing to update.
+    shell.postMessage({
+      mk: 1,
+      type: 'presence',
+      change: { extension: catalog.id, active: false, version: '1.2.0', reason: 'removed' },
+    });
+    shell.postMessage({ ...init, extensions: [catalog] });
+    await tick();
+    expect(context?.extensions.isActive(catalog.id)).toBe(true);
+    shell.postMessage({
+      mk: 1,
+      type: 'presence',
+      change: { extension: catalog.id, active: false, version: '1.2.0', reason: 'disabled' },
+    });
+    await tick();
+
+    expect(context?.extensions.isActive(catalog.id)).toBe(false);
+    expect(seen).toEqual([false]);
+    channel.port1.close();
+    shell.close();
+  });
+
+  it('accepts only well-formed changes', () => {
+    expect(
+      isShellMessage({
+        mk: 1,
+        type: 'presence',
+        change: { extension: catalog.id, active: true, version: '1.2.0', reason: 'installed' },
+      }),
+    ).toBe(true);
+    expect(isShellMessage({ mk: 1, type: 'presence', change: { extension: catalog.id } })).toBe(
+      false,
+    );
   });
 });
 

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
-import type { CurrentUser, EventBus, FrontendExtension } from '@mosaikit/sdk';
-import type { InitMessage } from './bridge-protocol.js';
+import type { CurrentUser, EventBus, ExtensionPresence, FrontendExtension } from '@mosaikit/sdk';
+import type { InitMessage, PresenceMessage } from './bridge-protocol.js';
 import { ShellBridge } from './shell-bridge.js';
 
 /** URL of the runtime of isolated frontends: a separate entry of the build (see vite.config.ts). */
@@ -38,7 +38,10 @@ export class MkExtensionFrame extends HTMLElement {
   user: CurrentUser | undefined;
   events: EventBus | undefined;
   request: ((path: string, init?: RequestInit) => Promise<Response>) | undefined;
+  /** The extensions active in the organization, which the frame receives and follows (MK-133). */
+  presence: ExtensionPresence | undefined;
 
+  private stopPresence: (() => void) | undefined;
   private frame: HTMLIFrameElement | undefined;
   private bridge: ShellBridge | undefined;
   private port: MessagePort | undefined;
@@ -86,6 +89,8 @@ export class MkExtensionFrame extends HTMLElement {
 
   disconnectedCallback(): void {
     window.removeEventListener('message', this.onMessage);
+    this.stopPresence?.();
+    this.stopPresence = undefined;
     this.port?.close();
     this.port = undefined;
     this.bridge?.dispose();
@@ -109,8 +114,14 @@ export class MkExtensionFrame extends HTMLElement {
       user: { username: user.username, displayName: user.displayName, roles: [...user.roles] },
       locale: navigator.language,
       theme: theme(),
+      extensions: this.presence?.active() ?? [],
     };
     this.port?.postMessage(message);
+    this.stopPresence?.();
+    this.stopPresence = this.presence?.subscribe((change) => {
+      const presence: PresenceMessage = { mk: 1, type: 'presence', change };
+      this.port?.postMessage(presence);
+    });
   }
 }
 

@@ -9,7 +9,8 @@
 export interface LiveChannel {
   /**
    * Calls `handler` with the data of every event of the topic, until the returned function is
-   * called. Topics: `documents.<extension id>.<collection>`, `extension.<extension id>.<name>`, `notifications`.
+   * called. Topics: `documents.<extension id>.<collection>`, `extension.<extension id>.<name>`,
+   * `notifications`, and `extensions` (MK-133), which `context.extensions` already follows.
    */
   subscribe(topic: string, handler: (data: unknown) => void): () => void;
 }

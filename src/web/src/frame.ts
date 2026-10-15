@@ -10,6 +10,7 @@ import {
   NO_LIVE,
   EventBus,
   isMosaikitExtension,
+  PresenceStore,
   type EventHandler,
   type ExtensionContext,
 } from '@mosaikit/sdk';
@@ -140,6 +141,7 @@ export async function start(
   fetch: ExtensionContext['fetch'],
   importModule: (url: string) => Promise<unknown> = (url) => import(/* @vite-ignore */ url),
   doc: FrameDocument = document,
+  presence: PresenceStore = new PresenceStore(init.extensions ?? []),
 ): Promise<void> {
   for (const [name, value] of Object.entries(init.theme)) {
     if (name.startsWith('--mk-')) {
@@ -164,6 +166,8 @@ export async function start(
     data: dataCollections(fetch, init.extension.id),
     // An isolated frame has no real-time channel of its own (MK-031).
     live: NO_LIVE,
+    // Delivered with the init message and kept current by the shell (MK-133).
+    extensions: presence,
     notify: () => Promise.reject(new Error('Notifications are not sent from an isolated frame')),
   });
   doc.body.replaceChildren(doc.createElement(init.element));
@@ -187,6 +191,7 @@ export function connect(
   };
   const events = new FrameEventBus(send);
   const calls = new PendingCalls(send);
+  let presence: PresenceStore | undefined;
   let started = false;
   port.onmessage = (event: MessageEvent<unknown>) => {
     if (!isShellMessage(event.data)) {
@@ -195,13 +200,16 @@ export function connect(
     const message = event.data;
     if (message.type === 'init' && !started) {
       started = true;
-      start(message, events, calls.fetch, importModule, doc).catch((error: unknown) => {
+      presence = new PresenceStore(message.extensions ?? []);
+      start(message, events, calls.fetch, importModule, doc, presence).catch((error: unknown) => {
         doc.body.textContent = `This app could not be started: ${String(error)}`;
       });
     } else if (message.type === 'event') {
       events.deliver(message.topic, message.payload);
     } else if (message.type === 'result') {
       calls.settle(message);
+    } else if (message.type === 'presence') {
+      presence?.apply(message.change);
     }
   };
   const ready: FrameMessage = { mk: 1, type: 'ready' };

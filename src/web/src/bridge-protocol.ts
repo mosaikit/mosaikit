@@ -1,6 +1,12 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
-import type { Contribution, CurrentUser } from '@mosaikit/sdk';
+import {
+  isPresenceChange,
+  type ActiveExtension,
+  type Contribution,
+  type CurrentUser,
+  type ExtensionPresenceChange,
+} from '@mosaikit/sdk';
 
 /**
  * Messages between the shell and an extension frontend isolated in a sandboxed iframe (MK-014). They
@@ -55,6 +61,15 @@ export interface InitMessage {
   readonly locale: string;
   /** Design tokens of the shell (`--mk-*` custom properties), so that the app looks the same. */
   readonly theme: Readonly<Record<string, string>>;
+  /** The extensions active in the organization of the session (MK-133). */
+  readonly extensions?: readonly ActiveExtension[];
+}
+
+/** An extension that became active or inactive in the organization of the session (MK-133). */
+export interface PresenceMessage {
+  readonly mk: 1;
+  readonly type: 'presence';
+  readonly change: ExtensionPresenceChange;
 }
 
 /** An event of a subscription of the frame. */
@@ -76,7 +91,7 @@ export interface ResultMessage {
   readonly error?: string;
 }
 
-export type ShellMessage = InitMessage | EventMessage | ResultMessage;
+export type ShellMessage = InitMessage | EventMessage | ResultMessage | PresenceMessage;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -127,6 +142,8 @@ export function isShellMessage(data: unknown): data is ShellMessage {
       return typeof data.topic === 'string';
     case 'result':
       return typeof data.id === 'number';
+    case 'presence':
+      return isPresenceChange(data.change);
     default:
       return false;
   }

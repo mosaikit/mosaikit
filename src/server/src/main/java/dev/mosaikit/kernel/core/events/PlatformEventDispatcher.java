@@ -57,8 +57,11 @@ public class PlatformEventDispatcher {
     /** Rounds of claims at most in one run, so that one run ends. */
     private static final int MAX_ROUNDS = 20;
 
-    private static final Set<String> ABOUT_AN_EXTENSION =
-            Set.of(PlatformEvents.EXTENSION_ENABLED, PlatformEvents.EXTENSION_DISABLED);
+    private static final Set<String> ABOUT_AN_EXTENSION = Set.of(
+            PlatformEvents.EXTENSION_ENABLED,
+            PlatformEvents.EXTENSION_DISABLED,
+            PlatformEvents.EXTENSION_ACTIVATED,
+            PlatformEvents.EXTENSION_DEACTIVATED);
 
     private final PlatformEventStore store;
     private final EventSubscribers subscribers;

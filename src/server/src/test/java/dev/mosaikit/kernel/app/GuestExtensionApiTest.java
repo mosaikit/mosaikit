@@ -75,7 +75,7 @@ class GuestExtensionApiTest {
         private final List<InstalledExtension> all;
 
         WithProbe(KernelConfig config, KernelVersion version, List<InstalledExtension> real) {
-            super(config, version, null);
+            super(config, version, null, null);
             List<InstalledExtension> extensions = new ArrayList<>(real);
             extensions.add(probe());
             this.all = List.copyOf(extensions);

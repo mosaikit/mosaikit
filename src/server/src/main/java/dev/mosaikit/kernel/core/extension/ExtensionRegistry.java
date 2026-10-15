@@ -32,10 +32,15 @@ public class ExtensionRegistry {
     private final Path trustedKeysDirectory;
     private final String signatures;
     private final Event<ExtensionsLoaded> loaded;
+    private final Event<ExtensionsReloaded> reloaded;
     private final AtomicReference<List<InstalledExtension>> extensions = new AtomicReference<>(List.of());
     private final AtomicLong revision = new AtomicLong();
 
-    public ExtensionRegistry(KernelConfig config, KernelVersion kernelVersion, Event<ExtensionsLoaded> loaded) {
+    public ExtensionRegistry(
+            KernelConfig config,
+            KernelVersion kernelVersion,
+            Event<ExtensionsLoaded> loaded,
+            Event<ExtensionsReloaded> reloaded) {
         this.directory = config.extensions().directory().toAbsolutePath().normalize();
         this.providersDirectory = config.extensions()
                 .providersDirectory()
@@ -50,6 +55,7 @@ public class ExtensionRegistry {
                 config.extensions().trustedKeysDirectory().toAbsolutePath().normalize();
         this.signatures = config.extensions().signatures();
         this.loaded = loaded;
+        this.reloaded = reloaded;
     }
 
     void onStart(@Observes StartupEvent event) {
@@ -57,7 +63,7 @@ public class ExtensionRegistry {
         loaded.fire(new ExtensionsLoaded(active()));
     }
 
-    /** Reads the installation directory again. */
+    /** Reads the installation directory again, and tells {@link ExtensionsReloaded} what it found. */
     public void reload() {
         List<InstalledExtension> found = scan();
         extensions.set(found);
@@ -67,6 +73,9 @@ public class ExtensionRegistry {
                 .filter(extension -> !extension.isActive())
                 .forEach(extension ->
                         LOG.warnf("Extension %s is %s: %s", extension.key(), extension.status(), extension.problems()));
+        if (reloaded != null) {
+            reloaded.fire(new ExtensionsReloaded(found));
+        }
     }
 
     /**
