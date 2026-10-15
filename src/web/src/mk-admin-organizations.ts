@@ -214,9 +214,6 @@ export class MkAdminOrganizations extends LitElement {
         name="mosaikit.admin.organizations"
         .metrics=${organizationMetrics(organizations ?? [])}
         ?detail-open=${this.pane !== undefined}
-        detail-label=${
-          this.pane?.kind === 'new' ? t('New organization') : (selected?.name ?? t('Detail'))
-        }
         @mk-detail-close=${this.closePane}
       >
         <button
@@ -260,7 +257,15 @@ export class MkAdminOrganizations extends LitElement {
                 ? html`<p>${t('No organization matches the filters.')}</p>`
                 : this.renderTable(shown)
         }
-        <div slot="detail" class="pane">${this.renderPane()}</div>
+        <aside
+          slot="detail"
+          class="pane"
+          aria-label=${
+            this.pane?.kind === 'new' ? t('New organization') : (selected?.name ?? t('Detail'))
+          }
+        >
+          ${this.renderPane()}
+        </aside>
       </mk-admin-view>
       <p class="status ${this.failed ? 'error' : ''}" role="status" aria-live="polite">
         ${this.message || nothing}

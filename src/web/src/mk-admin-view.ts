@@ -12,15 +12,16 @@ import { t } from './i18n.js';
  * owns the data; this element lays it out:
  *
  * ```html
- * <mk-admin-view heading="Organizations" .metrics=${metrics} detail-open detail-label="Acme">
+ * <mk-admin-view heading="Organizations" .metrics=${metrics} detail-open>
  *   <button slot="actions">New organization</button>
  *   <label slot="filters">Search <input type="search" /></label>
  *   <table>…</table>
- *   <section slot="detail">…</section>
+ *   <aside slot="detail" aria-label="Acme">…</aside>
  * </mk-admin-view>
  * ```
  *
- * The close button of the pane dispatches `mk-detail-close`.
+ * The page names the detail with its own landmark (an `aside` with a label), so that its content
+ * belongs to it; the close button of the pane dispatches `mk-detail-close`.
  */
 @customElement('mk-admin-view')
 export class MkAdminView extends LitElement {
@@ -112,7 +113,7 @@ export class MkAdminView extends LitElement {
     mk-split-pane .table {
       padding-right: 8px;
     }
-    aside {
+    .detail {
       position: relative;
       min-height: 100%;
       box-sizing: border-box;
@@ -157,9 +158,6 @@ export class MkAdminView extends LitElement {
   /** Whether the side pane shows the detail of a row. */
   @property({ type: Boolean, attribute: 'detail-open', reflect: true }) detailOpen = false;
 
-  /** The name of the side pane, such as the row it details. */
-  @property({ attribute: 'detail-label' }) detailLabel = '';
-
   /** Names the pane in the installation, so that its width is kept for the next visit. */
   @property() name = '';
 
@@ -200,7 +198,7 @@ export class MkAdminView extends LitElement {
                 label=${t('Resize the table and the detail')}
               >
                 <div class="table" slot="pane"><slot></slot></div>
-                <aside aria-label=${this.detailLabel || t('Detail')}>
+                <div class="detail">
                   <button
                     type="button"
                     class="close"
@@ -214,7 +212,7 @@ export class MkAdminView extends LitElement {
                     ×
                   </button>
                   <slot name="detail"></slot>
-                </aside>
+                </div>
               </mk-split-pane>`
             : html`<div class="table"><slot></slot></div>`
         }

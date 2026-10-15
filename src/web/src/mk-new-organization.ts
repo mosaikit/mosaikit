@@ -224,9 +224,9 @@ export class MkNewOrganization extends LitElement {
                 this.change({ slug: (event.target as HTMLInputElement).value });
               }}
             />
-            <span class="hint" id="slug-hint"
-              >${t('In addresses and sub-domains; it cannot change later.')}</span
-            ></label
+          </label>
+          <span class="hint" id="slug-hint"
+            >${t('In addresses and sub-domains; it cannot change later.')}</span
           >
           <label class="check"
             ><input
@@ -258,23 +258,23 @@ export class MkNewOrganization extends LitElement {
           ${
             usesRealm(draft)
               ? html`<label
-                  >${t('Email domains of the organization')}
-                  <textarea
-                    name="email-domains"
-                    rows="2"
-                    spellcheck="false"
-                    aria-describedby="domains-hint"
-                    .value=${draft.emailDomains}
-                    @input=${(event: Event) => {
-                      this.change({ emailDomains: (event.target as HTMLTextAreaElement).value });
-                    }}
-                  ></textarea>
+                    >${t('Email domains of the organization')}
+                    <textarea
+                      name="email-domains"
+                      rows="2"
+                      spellcheck="false"
+                      aria-describedby="domains-hint"
+                      .value=${draft.emailDomains}
+                      @input=${(event: Event) => {
+                        this.change({ emailDomains: (event.target as HTMLTextAreaElement).value });
+                      }}
+                    ></textarea>
+                  </label>
                   <span class="hint" id="domains-hint"
                     >${t(
                       'The kernel creates the identity provider of the organization; people with these domains sign in through it. Separate them with commas.',
                     )}</span
-                  ></label
-                >`
+                  >`
               : html`<p class="hint">
                   ${t('Its members sign in with a password of this installation.')}
                 </p>`
