@@ -6,7 +6,6 @@ import dev.mosaikit.kernel.api.extension.Contribution;
 import dev.mosaikit.kernel.api.extension.ExtensionManifest;
 import dev.mosaikit.kernel.api.extension.ImplementedContract;
 import dev.mosaikit.kernel.api.extension.ProvidedContract;
-import dev.mosaikit.kernel.core.home.HomeWidgets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -96,7 +95,8 @@ public final class ContractChecks {
     }
 
     private static Optional<String> kernelMismatch(Contribution contribution) {
-        return HomeWidgets.kernelPoint(contribution.point())
+        // The typed points of the kernel: home.widget (MK-101) and console.panel (MK-072).
+        return KernelPoints.point(contribution.point())
                 .map(point -> point.validate(contribution))
                 .filter(problems -> !problems.isEmpty())
                 .map(problems -> String.join(", ", problems));

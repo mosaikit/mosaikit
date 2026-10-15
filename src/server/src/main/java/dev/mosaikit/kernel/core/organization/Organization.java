@@ -48,6 +48,18 @@ public class Organization {
     @Column(name = "sign_in", nullable = false, length = 20)
     private SignInPolicy signIn = SignInPolicy.PASSWORD;
 
+    /** When a platform administrator suspended it: its members sign in to it by no means (MK-072). */
+    @Column(name = "suspended_at")
+    private Instant suspendedAt;
+
+    /** The username of the administrator who suspended it. */
+    @Column(name = "suspended_by", length = 255)
+    private String suspendedBy;
+
+    /** Why it was suspended, as the administrator wrote it. */
+    @Column(name = "suspension_reason", length = 500)
+    private String suspensionReason;
+
     /** Required by JPA. */
     protected Organization() {}
 
@@ -89,6 +101,39 @@ public class Organization {
 
     public void setSignIn(SignInPolicy signIn) {
         this.signIn = Objects.requireNonNull(signIn, "signIn");
+    }
+
+    /** Whether a platform administrator suspended it (MK-072). */
+    public boolean isSuspended() {
+        return suspendedAt != null;
+    }
+
+    public Optional<Instant> getSuspendedAt() {
+        return Optional.ofNullable(suspendedAt);
+    }
+
+    public Optional<String> getSuspendedBy() {
+        return Optional.ofNullable(suspendedBy);
+    }
+
+    public Optional<String> getSuspensionReason() {
+        return Optional.ofNullable(suspensionReason);
+    }
+
+    /** Suspends it; one already suspended keeps when, by whom and why it was suspended first. */
+    public void suspend(Instant at, String by, String reason) {
+        if (suspendedAt == null) {
+            this.suspendedAt = Objects.requireNonNull(at, "at");
+            this.suspendedBy = Objects.requireNonNull(by, "by");
+            this.suspensionReason = reason;
+        }
+    }
+
+    /** Lets its members sign in to it again. */
+    public void reactivate() {
+        this.suspendedAt = null;
+        this.suspendedBy = null;
+        this.suspensionReason = null;
     }
 
     /** Sets the Keycloak realm of the organization, or removes it with an empty value. */

@@ -4,6 +4,30 @@ Platform administrators (role `platform-admin`, the `admin` account created at t
 manage organizations and extensions. Today this is done through the REST API; the examples use
 `curl`, which asks for the password of `admin`. The whole API is described at `/q/openapi`.
 
+## The console
+
+Platform administrators find the administration of the installation in the app bar of the shell
+(MK-072, [ADR-0039](../adr/0039-console-layout.md)). **Console** shows the state of the installation
+at a glance: metrics on top (organizations active and suspended, people, active extensions, sign-ins
+refused in the last 24 hours, the memory of the kernel and for how long it has been running), the
+security events of the last 24 hours (refused sign-ins, with the address they came from, and the
+other entries of the audit log of the platform refused or failed), the active extensions, and the
+panels that extensions add (`console.panel`). Only platform administrators see it; the API answers
+403 to the others:
+
+```bash
+curl -u admin https://mosaikit.example.org/api/v1/platform/console
+```
+
+Every refused sign-in on the sign-in page is an entry of the audit log of the platform,
+`account.sign-in.failed` with the outcome `DENIED`: its actor and subject are the name that was
+written, and its detail the address of the client, never the password.
+
+The administration pages share one model: the metrics on top, the filters above the table, the
+actions on each row, and the detail of a row in a side pane, which you widen or narrow by dragging
+its edge (or with the arrow keys on it); the width is kept in the browser. **Organizations** and
+**People** follow it; the other pages move to it in the next versions.
+
 ## Roles
 
 | Role | Who | Can |
@@ -29,7 +53,35 @@ curl -u admin https://mosaikit.example.org/api/v1/organizations        # list
 curl -u admin https://mosaikit.example.org/api/v1/organizations/acme   # one
 ```
 
-In the console, **Organizations** lists them for platform administrators.
+In the console, **Organizations** lists them for platform administrators, with how their members
+sign in and whether they are suspended; the search finds a name, a slug or an email domain.
+**New organization** is a guided flow (MK-072): the name and the slug, how its members sign in
+(a password, its identity provider, or both), its first administrator, and a review. With a
+password, the administrator gets an account with a link to set the password (mailed, or shown once
+to pass on), or, with an account already, becomes an administrator of the organization; with an
+identity provider, the kernel creates the realm of the organization with the administrator in it
+([Sign-in through Keycloak](#sign-in-through-keycloak)) and shows the temporary password once.
+
+### Suspending an organization
+
+A platform administrator suspends an organization, for example at the end of a trial, and
+reactivates it later (MK-072): in **Organizations**, **Suspend** on its row opens its detail, which
+asks for the reason; **Reactivate** lets its members in again. Through the API:
+
+```bash
+curl -u admin -X PUT -H 'Content-Type: application/json' -d '{"reason": "Trial ended"}'   https://mosaikit.example.org/api/v1/organizations/acme/suspension
+curl -u admin -X DELETE https://mosaikit.example.org/api/v1/organizations/acme/suspension
+```
+
+While it is suspended its members sign in to it by no means: with a password, a personal access
+key, a service identity or its realm. The sessions of its people that act on it end at once; a
+request that names it acts on no organization, and it is not among the organizations of its people.
+Its data stay as they are, and their access keys are not revoked: they work again once it is
+reactivated. The organization stays in the list of the platform with `"suspended": true` and
+`suspension` (when, by whom, and the reason, at most 500 characters; a second suspension keeps the
+first). Both actions are in the audit log of the organization (`organization.suspended`, with the
+reason and how many members it has, and `organization.reactivated`). Other kernels of the
+installation see it within `mosaikit.identity.cache-ttl`.
 
 ### Deleting an organization
 
@@ -210,10 +262,12 @@ kernel. Cache the answer for a few seconds at most, so that an ended session clo
 ## Suspending a person
 
 A platform administrator suspends an account, for example when a person leaves or a device is
-lost, and reinstates it later (MK-125). In the console, **Accounts** finds an account by its email
-address and shows whether it is suspended, since when, by whom and why; **Suspend** asks for the
-reason, and the list of suspended accounts has a **Reinstate** button for each. The same through
-the API:
+lost, and reinstates it later (MK-125). In the console, **People** lists every person of the
+installation with their organizations (MK-072); the filters find a name or an address and keep the
+active or the suspended ones. **Suspend** on a row opens the detail of the person, which shows
+whether they are suspended, since when, by whom and why, and asks for the reason; **Reinstate** lets
+them in again. The same through the API, where `GET /api/v1/platform/accounts` lists the people
+(`search`, `state` = `all`, `active` or `suspended`, `offset`, `limit` up to 200, and `total`):
 
 ```bash
 curl -u admin -X PUT -H 'Content-Type: application/json' -d '{"reason": "Laptop reported stolen"}'   https://mosaikit.example.org/api/v1/platform/accounts/ada@acme.com/suspension

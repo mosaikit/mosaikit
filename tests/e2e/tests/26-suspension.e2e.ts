@@ -18,13 +18,17 @@ test.describe('MK-125 Sign-out and administrators end sessions on the server', (
     await api(ADMIN, suspension(luca.user), { method: 'DELETE' });
     try {
       await signIn(page, ADMIN);
-      await openApp(page, 'Accounts');
-      await expect(page.getByRole('heading', { name: 'Accounts', level: 1 })).toBeVisible();
+      // The accounts are among the people of the installation, on the model of MK-072.
+      await openApp(page, 'People');
+      await expect(page.getByRole('heading', { name: 'People', level: 1 })).toBeVisible();
 
-      const find = page.getByRole('form', { name: 'Find an account' });
-      await find.getByLabel('Email address of the account', { exact: true }).fill(luca.user);
-      await find.getByRole('button', { name: 'Find', exact: true }).click();
-      const account = page.getByRole('region', { name: `${luca.name} (${luca.user})` });
+      await page.getByLabel('Search people', { exact: true }).fill(luca.user);
+      const row = page
+        .getByRole('table', { name: 'People' })
+        .getByRole('row')
+        .filter({ hasText: luca.user });
+      await row.getByRole('button', { name: `Suspend ${luca.user}`, exact: true }).click();
+      const account = page.getByRole('complementary', { name: `${luca.name} (${luca.user})` });
       await expect(account).toContainText('Active: the person signs in.');
 
       // The reason is asked for.
@@ -47,11 +51,7 @@ test.describe('MK-125 Sign-out and administrators end sessions on the server', (
         page.getByRole('status').filter({ hasText: 'is suspended: their sessions ended.' }),
       ).toBeVisible();
       await expect(account).toContainText('Reason: Left the office');
-      const row = page
-        .getByRole('table', { name: 'Suspended accounts' })
-        .getByRole('row')
-        .filter({ hasText: luca.user });
-      await expect(row).toContainText('Left the office');
+      await expect(row).toContainText('Suspended');
 
       // The person signs in by no means.
       expect((await api(luca, '/api/v1/accounts/me', {}, OTHER.slug)).status).toBe(401);
@@ -60,7 +60,6 @@ test.describe('MK-125 Sign-out and administrators end sessions on the server', (
       await expect(
         page.getByRole('status').filter({ hasText: 'is reinstated and can sign in again.' }),
       ).toBeVisible();
-      await expect(row).toHaveCount(0);
       await expect(account).toContainText('Active: the person signs in.');
       expect((await api(luca, '/api/v1/accounts/me', {}, OTHER.slug)).status).toBe(200);
     } finally {

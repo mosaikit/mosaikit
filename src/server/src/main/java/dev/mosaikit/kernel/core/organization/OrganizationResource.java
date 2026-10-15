@@ -4,6 +4,7 @@ package dev.mosaikit.kernel.core.organization;
 
 import dev.mosaikit.kernel.core.account.AccountService;
 import dev.mosaikit.kernel.core.account.MemberRequest;
+import dev.mosaikit.kernel.core.account.SuspensionRequest;
 import dev.mosaikit.kernel.core.audit.AuditEvent;
 import dev.mosaikit.kernel.core.audit.AuditLog;
 import dev.mosaikit.kernel.core.config.KernelConfig;
@@ -150,6 +151,50 @@ public class OrganizationResource {
                 detail);
         return new DeletedOrganization(
                 deleted.id(), deleted.slug(), deleted.name(), deleted.deletedAt(), deleted.removableFrom(), people);
+    }
+
+    @PUT
+    @Path("/{slug}/suspension")
+    @Operation(
+            summary = "Suspend an organization and end the sessions of its people in it",
+            description = "Its members sign in to it by no means, with a password, an access key or its realm,"
+                    + " until it is reactivated; its data and their access keys stay. The body may give the"
+                    + " reason, {\"reason\": \"…\"}, at most 500 characters.")
+    public OrganizationView suspend(@PathParam("slug") String slug, SuspensionRequest request) {
+        String actor = identity.getPrincipal().getName();
+        OrganizationView suspended = service.suspend(slug, actor, request == null ? null : request.reason());
+        // After the suspension committed, the sessions opened in it end (MK-125).
+        int people = accounts.endSessionsIn(suspended.id());
+        Map<String, Object> detail = new LinkedHashMap<>();
+        detail.put("members", people);
+        if (suspended.suspension() != null && suspended.suspension().reason() != null) {
+            detail.put("reason", suspended.suspension().reason());
+        }
+        audit.append(
+                actor,
+                Optional.of(suspended.id()),
+                "organization.suspended",
+                suspended.slug(),
+                AuditEvent.Outcome.SUCCEEDED,
+                detail);
+        return suspended;
+    }
+
+    @DELETE
+    @Path("/{slug}/suspension")
+    @Operation(
+            summary = "Reactivate a suspended organization",
+            description = "Its members sign in to it again; the sessions that ended stay ended.")
+    public OrganizationView reactivate(@PathParam("slug") String slug) {
+        OrganizationView reactivated = service.reactivate(slug);
+        audit.append(
+                identity.getPrincipal().getName(),
+                Optional.of(reactivated.id()),
+                "organization.reactivated",
+                reactivated.slug(),
+                AuditEvent.Outcome.SUCCEEDED,
+                Map.of());
+        return reactivated;
     }
 
     /**

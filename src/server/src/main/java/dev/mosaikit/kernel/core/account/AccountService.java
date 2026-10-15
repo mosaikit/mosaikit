@@ -414,6 +414,21 @@ public class AccountService {
         return found.size();
     }
 
+    /**
+     * Ends the sessions of every member that act on a suspended organization, or on none (MK-072), as
+     * a removal from it does (MK-125). Their access keys stay: they open nothing while it is suspended,
+     * and work again once it is reactivated.
+     *
+     * @return how many people it has
+     */
+    public int endSessionsIn(UUID organizationId) {
+        List<OrganizationMember> found = members.findByOrganizationId(organizationId);
+        for (OrganizationMember member : found) {
+            sessions.endIn(member.getAccountId(), organizationId);
+        }
+        return found.size();
+    }
+
     private static ResourceNotFoundException noMember(String slug, String email) {
         return new ResourceNotFoundException("No member '" + email + "' in organization '" + slug + "'.");
     }
@@ -481,8 +496,10 @@ public class AccountService {
     }
 
     private AccountView view(UserAccount account, Set<String> roles, Optional<UUID> organizationId) {
-        Map<UUID, Organization> byId =
-                organizations.all().stream().collect(Collectors.toMap(Organization::getId, Function.identity()));
+        // A suspended organization is not one the person can use (MK-072).
+        Map<UUID, Organization> byId = organizations.all().stream()
+                .filter(organization -> !organization.isSuspended())
+                .collect(Collectors.toMap(Organization::getId, Function.identity()));
         List<AccountView.MembershipView> memberships = members.findByAccountId(account.getId()).stream()
                 .flatMap(member -> Optional.ofNullable(byId.get(member.getOrganizationId())).stream()
                         .map(organization -> new AccountView.MembershipView(
