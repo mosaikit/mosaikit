@@ -898,6 +898,7 @@ export class MkShell extends LitElement {
                 <span><strong>${name}</strong><span class="muted">${account.username}</span></span>
               </div>
               ${this.renderOrganizationSelector()}
+              <a href=${FAVORITES} @click=${this.navigate}>${t('Favorites')}</a>
               <a href="/settings" @click=${this.navigate}>${t('Settings')}</a>
               <a href="/trash" @click=${this.navigate}>${t('Trash')}</a>
               <button class="secondary" @click=${this.signOut}>${t('Sign out')}</button>
@@ -1517,12 +1518,6 @@ export class MkShell extends LitElement {
         <a href="/" aria-current=${this.path === '/' ? 'page' : 'false'} @click=${this.navigate}
           >${homeIcon}<span>${t('Home')}</span></a
         >
-        <a
-          href=${FAVORITES}
-          aria-current=${this.path === FAVORITES ? 'page' : 'false'}
-          @click=${this.navigate}
-          >${starIcon}<span>${t('Favorites')}</span></a
-        >
         ${this.entries.map(
           (entry) =>
             html`<a
@@ -2069,9 +2064,6 @@ const homeIcon = icon(
 );
 const extensionsIcon = icon(
   svg`<rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><path d="M16.5 13v7M13 16.5h7" />`,
-);
-const starIcon = icon(
-  svg`<path d="m12 4 2.4 5 5.4.6-4 3.7 1.1 5.4L12 16l-4.9 2.7L8.2 13.3l-4-3.7 5.4-.6z" />`,
 );
 const bellIcon = icon(
   svg`<path d="M6 16.5V11a6 6 0 0 1 12 0v5.5l1.5 2H4.5z" /><path d="M10 20.5a2 2 0 0 0 4 0" />`,

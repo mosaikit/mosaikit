@@ -168,11 +168,11 @@ change the tags of something you need a level that lets you edit it.
 ## Favorites
 
 Mark what you return to as favorite, in the app where you see it, often with a star (MK-094):
-**Favorites**, in the app bar, lists your favorites of every app, the last marked first. Choose one
-to open it in its app; **Remove** takes it out of the list. What you can no longer open, because it
-was deleted, moved to the trash or its access was taken away, leaves the list by itself. When the app of a favorite is
-turned off in the organization, the favorite stays, marked as not available, and opens again when
-the app comes back.
+**Favorites**, in the menu of your account, lists your favorites of every app, the last marked
+first. Choose one to open it in its app; **Remove** takes it out of the list. What you can no longer
+open, because it was deleted, moved to the trash or its access was taken away, leaves the list by
+itself. When the app of a favorite is turned off in the organization, the favorite stays, marked as
+not available, and opens again when the app comes back.
 
 ## Activity
 

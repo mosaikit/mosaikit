@@ -3,7 +3,7 @@
 // e2e-group: C
 import { expect, test, type Page } from '@playwright/test';
 import { ADMIN, ANNA, MARIO, ORGANIZATION } from '../support/env.js';
-import { api, apps, openApp, signIn, unique } from '../support/shell.js';
+import { api, openApp, signIn, unique } from '../support/shell.js';
 
 const APPS = `/api/v1/organizations/${ORGANIZATION.slug}/apps`;
 const MEMOS = '/api/v1/ext/fixture-notes/memos';
@@ -20,9 +20,13 @@ async function notes(on: boolean): Promise<void> {
   expect(changed.status).toBe(200);
 }
 
-/** Opens the favorites of the person from the app bar. */
+/** Opens the favorites of the person from the menu of their account. */
 async function openFavorites(page: Page): Promise<void> {
-  await apps(page).getByRole('link', { name: 'Favorites', exact: true }).click();
+  await page.getByRole('button', { name: /^Account:/ }).click();
+  await page
+    .getByRole('dialog', { name: 'Account' })
+    .getByRole('link', { name: 'Favorites', exact: true })
+    .click();
   await expect(page.getByRole('heading', { name: 'Favorites', exact: true })).toBeVisible();
 }
 

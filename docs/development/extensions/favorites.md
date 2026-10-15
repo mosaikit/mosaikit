@@ -1,7 +1,7 @@
 # Favorites
 
 People mark resources of any extension as favorite and find them in one list, **Favorites** in the
-app bar of the shell (MK-094). A favorite is a resource that your extension registered with the
+account menu of the shell (MK-094). A favorite is a resource that your extension registered with the
 kernel ([Resources, sharing and permissions](resources-and-sharing.md#resources-sharing-and-permissions)):
 the list shows its title and opens its `link`, so register a link that opens the resource in your
 app, such as `/app/notes?memo=<id>`, and read the query when the app opens. Keep title and link up
