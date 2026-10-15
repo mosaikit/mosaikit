@@ -36,8 +36,7 @@ The screen has three parts, as in the collaboration suites people already know:
 - the **app bar** on the left, with **Home**, one icon per app you can use and, for platform
   administrators, **Extensions** and **Settings** at the bottom; on a phone it is at the bottom of the
   screen;
-- the **top bar**, with the search of apps and pages (type a part of the name, then Enter) and the
-  menu of your avatar;
+- the **top bar**, with the search and the menu of your avatar;
 - the **work area**, where the chosen app opens. Its address (for example `/app/notes`) can be
   bookmarked and reloaded. Apps that support it keep what you are looking at in the address, such as
   a folder (`/app/files/folders/42`): copy it to share the view, and the back and forward buttons of
@@ -56,6 +55,18 @@ when you select items, the actions on the selection. You can switch between card
 empty panel says why: nothing yet, nothing matching the filters, a failed request, no network or no
 access, with what to do. Drag the edge of a list pane, or focus it and use the arrow keys, to make
 it wider or narrower: the app remembers the width in this browser.
+
+## Search
+
+Type in the search box of the top bar: the apps and pages whose name matches come first, then
+**Search for "…"**, which opens the results of the whole organization. **All** shows the first results
+of each kind (**People**, **Teams**, and what your apps add, such as files or messages); choose a pill
+to see only that kind, a page at a time, with **More in …** or the pill itself. The words are
+searched from their beginning, so `ada ros` finds Ada Rossi.
+
+You only find what you may read: the people and teams you would see elsewhere, and the data of the
+apps you may open. When an app does not answer in time, its results are missing and the page says so;
+the others are shown anyway. The address of the results (`/search?q=…`) can be bookmarked.
 
 ## Mosaikit as an app
 

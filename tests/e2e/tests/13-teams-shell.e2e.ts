@@ -45,7 +45,7 @@ test.describe('MK-025 Shell with app bar, top bar and work area', () => {
     await expectAccessible(page);
 
     // The search of the top bar opens apps and pages by name.
-    const search = page.getByRole('combobox', { name: 'Search apps and pages' });
+    const search = page.getByRole('combobox', { name: 'Search', exact: true });
     await search.fill('to d');
     await expect(page.getByRole('option', { name: 'To do' })).toBeVisible();
     await search.press('Enter');

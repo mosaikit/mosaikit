@@ -4,6 +4,8 @@ package dev.mosaikit.kernel.core.extension;
 
 import dev.mosaikit.kernel.api.extension.ExtensionKind;
 import dev.mosaikit.kernel.api.extension.ExtensionManifest;
+import dev.mosaikit.kernel.core.search.SearchProviders;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
@@ -62,6 +64,16 @@ public record ExtensionView(
                 extension.status(),
                 extension.problems(),
                 extension.publisherKey().orElse(null),
-                manifest.contributionsTo(LAUNCHER_POINT).isEmpty() ? List.of() : List.of(LAUNCHER_DEPRECATED));
+                warnings(manifest));
+    }
+
+    /** The deprecated launcher.app, and the search providers that the kernel ignores (MK-040). */
+    private static List<String> warnings(ExtensionManifest manifest) {
+        List<String> warnings = new ArrayList<>();
+        if (!manifest.contributionsTo(LAUNCHER_POINT).isEmpty()) {
+            warnings.add(LAUNCHER_DEPRECATED);
+        }
+        warnings.addAll(SearchProviders.problems(manifest));
+        return List.copyOf(warnings);
     }
 }

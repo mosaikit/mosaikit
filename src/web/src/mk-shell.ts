@@ -47,6 +47,8 @@ import './mk-admin-settings.js';
 import './mk-assistant.js';
 import './mk-extension-frame.js';
 import './mk-activity.js';
+import './mk-search.js';
+import { SEARCH_ROUTE, searchAddress } from './search.js';
 import './mk-access-keys.js';
 import './mk-sessions.js';
 import './mk-trash.js';
@@ -587,6 +589,8 @@ export class MkShell extends LitElement {
   @state() private email: string | undefined;
   @state() private searchText = '';
   @state() private searchIndex = 0;
+  /** The query string of the address, read by the page of the global search (MK-040). */
+  @state() private searchQuery = location.search;
   @state() private menuOpen = false;
   /** The activity feed of the person (MK-038). */
   @state() private activity: ActivityNotification[] = [];
@@ -637,6 +641,7 @@ export class MkShell extends LitElement {
     this.path = location.pathname;
     // The app shown follows the back and forward buttons and the links of the shell (MK-099).
     this.address.moved();
+    this.searchQuery = location.search;
   };
 
   /** The light or dark scheme the theme applied, for the logo of the sign-in page (MK-052). */
@@ -809,7 +814,10 @@ export class MkShell extends LitElement {
       </div>`;
   }
 
-  /** The search of the top bar: apps and pages by title, until the global search (MK-040). */
+  /**
+   * The search of the top bar: apps and pages by title, and the global search of people, teams and the
+   * data of the apps (MK-040), on its own page.
+   */
   private renderSearch(): unknown {
     const found = this.searchResults();
     const open = found.length > 0;
@@ -818,8 +826,8 @@ export class MkShell extends LitElement {
       <input
         type="search"
         role="combobox"
-        aria-label=${t('Search apps and pages')}
-        placeholder=${t('Search apps and pages')}
+        aria-label=${t('Search')}
+        placeholder=${t('Search people, teams, apps and their data')}
         aria-expanded=${open ? 'true' : 'false'}
         aria-controls="search-results"
         aria-autocomplete="list"
@@ -831,7 +839,7 @@ export class MkShell extends LitElement {
       />
       ${
         open
-          ? html`<ul id="search-results" role="listbox" aria-label=${t('Apps and pages')}>
+          ? html`<ul id="search-results" role="listbox" aria-label=${t('Suggestions')}>
               ${found.map(
                 (item, index) =>
                   html`<li
@@ -896,8 +904,16 @@ export class MkShell extends LitElement {
     ];
   }
 
+  /** The apps and pages whose title matches, then the global search of the text (MK-040). */
   private searchResults(): { title: string; route: string }[] {
-    return matching(this.destinations(), this.searchText).slice(0, 8);
+    const text = this.searchText.trim();
+    const found = matching(this.destinations(), this.searchText).slice(0, 7);
+    return text === ''
+      ? found
+      : [
+          ...found,
+          { title: t('Search for “{text}”', { text }), route: searchAddress({ query: text }) },
+        ];
   }
 
   private readonly typeSearch = (event: Event): void => {
@@ -980,6 +996,18 @@ export class MkShell extends LitElement {
       );
       return entry ? [{ entry, pinned: app.pinned }] : [];
     });
+  }
+
+  /** The page of the global search (MK-040), which goes where the person asks through the shell. */
+  private renderGlobalSearch(): unknown {
+    return html`<mk-search
+      .client=${this.client}
+      .address=${this.searchQuery}
+      .language=${this.shellLanguage}
+      @mk-search-go=${(event: CustomEvent<{ route: string }>) => {
+        this.go(event.detail.route);
+      }}
+    ></mk-search>`;
   }
 
   /** The activity feed (MK-038). */
@@ -1435,27 +1463,29 @@ export class MkShell extends LitElement {
             ? this.renderPersonalPage()
             : this.path === '/activity'
               ? this.renderActivity()
-              : entryForPath(this.entries, this.path) || this.showsAdmin()
-                ? nothing
-                : html`${this.renderAssistant()}${this.renderPendingActions()}
-                    <h1>${t('Welcome, {name}', { name: this.account?.displayName ?? '' })}</h1>
-                    <p class="muted">
-                      ${t('{count} apps available.', { count: this.entries.length })} ${failures}
-                    </p>
-                    ${
-                      this.entries.length > 0
-                        ? html`<ul class="apps" aria-label=${t('Your apps')}>
-                            ${this.entries.map(
-                              (entry) =>
-                                html`<li>
-                                  <a href=${entry.route} @click=${this.navigate}
-                                    >${appIcon(entry)}<span>${entry.title}</span></a
-                                  >
-                                </li>`,
-                            )}
-                          </ul>`
-                        : nothing
-                    }`
+              : this.path === SEARCH_ROUTE
+                ? this.renderGlobalSearch()
+                : entryForPath(this.entries, this.path) || this.showsAdmin()
+                  ? nothing
+                  : html`${this.renderAssistant()}${this.renderPendingActions()}
+                      <h1>${t('Welcome, {name}', { name: this.account?.displayName ?? '' })}</h1>
+                      <p class="muted">
+                        ${t('{count} apps available.', { count: this.entries.length })} ${failures}
+                      </p>
+                      ${
+                        this.entries.length > 0
+                          ? html`<ul class="apps" aria-label=${t('Your apps')}>
+                              ${this.entries.map(
+                                (entry) =>
+                                  html`<li>
+                                    <a href=${entry.route} @click=${this.navigate}
+                                      >${appIcon(entry)}<span>${entry.title}</span></a
+                                    >
+                                  </li>`,
+                              )}
+                            </ul>`
+                          : nothing
+                      }`
         }
         <div id="app-host"></div>
       </main>

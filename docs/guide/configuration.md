@@ -232,6 +232,12 @@ has none.
 | `mosaikit.assistant.max-steps` | `6` | most rounds of tool calls for one question |
 | `mosaikit.assistant.timeout` | `120s` | how long one answer of the model may take |
 
+## Search
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `mosaikit.search.timeout` | `3s` | how long the global search waits for the search providers of extensions; one that has not answered by then is shown as incomplete (MK-040) |
+
 ## Marketplace
 
 | Setting | Default | Meaning |
