@@ -16,11 +16,12 @@ The kernel finds the organization of a bearer token from the sub-domain of the r
 tells a client how a person signs in.
 
 Every extension API requires an authenticated person (`quarkus.http.auth.permission.extension-api`,
-policy `person-or-link`), and only APIs of active extensions answer. The one exception is a request
+policy `person-or-link`), and only APIs of active extensions answer. The exceptions are a request
 without an account that carries, in `X-Mosaikit-Link`, a link that works and opens a resource of
-that same extension (MK-055): it acts on the organization of the resource only after the extension
-asked `Sharing` about that resource, so only routes annotated `@PermitAll` that call
-`Sharing.require` serve it.
+that same extension (MK-055), and one that names, in `X-Mosaikit-Public`, the slug of an
+organization that shares a resource of that same extension with the public (MK-100): it acts on the
+organization of the resource only after the extension asked `Sharing` about that resource and got a
+level, so only routes annotated `@PermitAll` that call `Sharing.require` serve it.
 
 Every request acts on at most one organization of the person (MK-017): the one of the realm of a
 bearer token; with a password, the one named by the `X-Mosaikit-Organization` header or by the
@@ -174,6 +175,9 @@ The rows are sorted by path, one row for a path and the methods that share a des
 | `GET /api/v1/organizations/{slug}/audit-events` | the administrators of the organization, signed in to it, `platform-admin` | the audit events of the organization only, newest first, each with its `channel` (`WEB`, `API_KEY`, `JOB`, `ASSISTANT`, `EXTENSION`), `index` in the chain, `previousHash` and `hash`; filters `actor`, `action` (exact, or a prefix ending with a dot or a colon such as `permissions.` or `dev.example.dashboards:`), `subject`, `channel`, `from` and `to` (times such as `2026-10-13T08:00:00Z`), `offset`, `limit` (up to 500) (MK-059) |
 | `GET, PUT /api/v1/organizations/{slug}/audit-events/retention` | the administrators of the organization, signed in to it, `platform-admin` | the retention of the entries of the organization, as for the platform (audited) |
 | `GET /api/v1/organizations/{slug}/audit-events/verification` | the administrators of the organization, signed in to it, `platform-admin` | verify the chain of the organization, as for the platform (MK-059) |
+| `GET /api/v1/organizations/{slug}/embed-sites` | the administrators of the organization, signed in to it, `platform-admin` | the sites that may frame the embedded views of the organization (`/embed/<slug>/...`), with when and by whom each was added (MK-100) |
+| `POST /api/v1/organizations/{slug}/embed-sites` | the administrators of the organization, signed in to it, `platform-admin` | lets a site (`origin`: `https://host[:port]`, or `http://` for a test site, one leading `*.` allowed) frame the embedded views: sent in `frame-ancestors` for `/embed/<slug>/...` only; `409` when already listed (audited) |
+| `DELETE /api/v1/organizations/{slug}/embed-sites` | the administrators of the organization, signed in to it, `platform-admin` | stops a site (`?origin=`) from framing the embedded views (audited) |
 | `PUT /api/v1/organizations/{slug}/identity` | `platform-admin` | realm, email domains and sign-in policy of an organization |
 | `GET /api/v1/organizations/{slug}/members` | `platform-admin`, the administrators of the organization signed in to it | the members of an organization |
 | `PUT /api/v1/organizations/{slug}/members/{email}` | `platform-admin`; the administrators of the organization signed in to it, for people already members | add a person or change their roles (`roles`, `displayName`): `platform-admin` only; signed in to the organization, also `profile` and `teams`, with what `.../permissions/preview` shows (MK-056); all or nothing (audited) |
@@ -218,6 +222,7 @@ The rows are sorted by path, one row for a path and the methods that share a des
 | `POST /api/v1/services/check` | a service identity given `check-session` or `check-key` | check the credentials of a person for a service (MK-124): `{"session": "<cookie value>", "organization"?: "<slug>"}` or `{"key": "mk_..."}`; 200 with `kind` (`session` or `key`), the `account`, the `organization` (or `null`), the `roles` there now and, for a key, the `key`; 401 when they open nothing; 403 without the endpoint |
 | `DELETE /api/v1/sharing/grants/{grant}` | who may share the resource | revokes a grant or a link |
 | `POST /api/v1/sharing/links/open` | anyone | opens a link with its token and password: the resource, the level and the `shared.view` element of the extension that shows it (`view`), `404` when unknown, expired or revoked, `403` when the password is wrong; every use is audited |
+| `GET /api/v1/sharing/public/{organization}/{extension}/{type}/{id}` | anyone | opens a resource that the organization shares with the public, for the embedded views (MK-100): the resource, the level of the public (also through the resources above it, MK-136) and its `shared.view` element (`view`); `404` alike when unknown, in the trash or not shared with the public |
 | `GET /api/v1/sharing/resources/{extension}/{type}/{id}` | signed in | a registered resource with its owner (`ownerName`), the level of the request on it (the one `Sharing.level` gives the extension, also through the resources above it for a type that inherits, MK-136) and whether the person may share it (MK-055); 404 without a level |
 | `GET /api/v1/sharing/resources/{extension}/{type}/{id}/grants` | who may share the resource | its grants, links included, with the names of their subjects |
 | `PUT /api/v1/sharing/resources/{extension}/{type}/{id}/grants` | who may share the resource | grants a level to a person (`subject.id`, or `subject.email` of a person of the organization), a team, the organization or the public; granting again replaces the level |

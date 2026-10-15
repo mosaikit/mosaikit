@@ -93,6 +93,13 @@ and an optional port; one leading `*.` stands for the sub-domains of a name of t
 `blob:` and keywords are refused. The browser still applies its own rules: the service must allow
 cross-origin reads (CORS) for data, and an `http` origin is blocked from a shell served with `https`.
 
+Framing is not a setting. Every answer carries `X-Frame-Options: DENY` and `frame-ancestors 'none'`,
+except the embed mode of the shell, `/embed/<slug>/...`, which carries `frame-ancestors 'self'` and
+the sites that the administrators of the organization list in **Embedded views** (MK-100; see
+[administration](administration.md#embedded-views)). Those addresses carry `frame-ancestors` also when
+`mosaikit.content-security-policy.enabled` is `false`, as the only directive, so that no other site
+may frame them in development either.
+
 ## Identity
 
 | Setting | Default | Meaning |

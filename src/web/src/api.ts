@@ -45,6 +45,13 @@ export interface AllowedOrigin {
   readonly addedBy: string | null;
 }
 
+/** A site that may show the views of an organization in an iframe (MK-100). */
+export interface EmbedSite {
+  readonly origin: string;
+  readonly addedAt: string;
+  readonly addedBy: string;
+}
+
 /** The content security policy of the shell, for platform administrators (MK-128). */
 export interface ContentSecurityPolicy {
   /** Whether the kernel sends the policy (in production). */
@@ -1056,6 +1063,28 @@ export class KernelClient {
   async disallowOrigin(origin: string): Promise<void> {
     await this.sendJson<undefined>(
       `${CONTENT_SECURITY_POLICY}/origins?origin=${encodeURIComponent(origin)}`,
+      'DELETE',
+    );
+  }
+
+  /** The sites that may show the views of an organization in an iframe (MK-100). */
+  embedSites(organization: string): Promise<EmbedSite[]> {
+    return this.getJson<EmbedSite[]>(
+      `/api/v1/organizations/${encodeURIComponent(organization)}/embed-sites`,
+    );
+  }
+
+  addEmbedSite(organization: string, origin: string): Promise<EmbedSite> {
+    return this.sendJson<EmbedSite>(
+      `/api/v1/organizations/${encodeURIComponent(organization)}/embed-sites`,
+      'POST',
+      { origin },
+    );
+  }
+
+  async removeEmbedSite(organization: string, origin: string): Promise<void> {
+    await this.sendJson<undefined>(
+      `/api/v1/organizations/${encodeURIComponent(organization)}/embed-sites?origin=${encodeURIComponent(origin)}`,
       'DELETE',
     );
   }

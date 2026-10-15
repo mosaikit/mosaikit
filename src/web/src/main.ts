@@ -14,8 +14,12 @@ defineReferencePlaceholder();
 applyTheme('mosaikit');
 
 // The shell as an installable app that opens without network (MK-029); not with the dev server of
-// Vite, whose files change at every save.
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+// Vite, whose files change at every save, nor for a view embedded in another site (MK-100).
+if (
+  import.meta.env.PROD &&
+  'serviceWorker' in navigator &&
+  !location.pathname.startsWith('/embed/')
+) {
   navigator.serviceWorker.register('/sw.js').catch((error: unknown) => {
     console.warn('The shell cannot work offline:', error);
   });

@@ -4,6 +4,7 @@ package dev.mosaikit.kernel.core.sharing;
 
 import dev.mosaikit.kernel.api.resource.ResourceRef;
 import dev.mosaikit.kernel.core.error.InvalidInputException;
+import dev.mosaikit.kernel.core.error.ResourceNotFoundException;
 import dev.mosaikit.kernel.core.sharing.SharingDialog.GrantView;
 import dev.mosaikit.kernel.core.sharing.SharingDialog.LinkAccess;
 import dev.mosaikit.kernel.core.sharing.SharingDialog.LinkView;
@@ -49,8 +50,11 @@ public class SharingResource {
     /** A link to make. */
     public record LinkRequestBody(String level, Instant expires, String password) {}
 
-    /** A link to open, with its password if it has one. */
-    public record OpenRequest(String token, String password) {}
+    /**
+     * A link to open, with its password if it has one, and the slug of the organization of the page
+     * that opens it, if any: a link of another organization then answers not found (MK-100).
+     */
+    public record OpenRequest(String token, String password, String organization) {}
 
     private final SharingDialog dialog;
 
@@ -147,7 +151,32 @@ public class SharingResource {
             description = "The resource and the level the link gives. 404 when the link is unknown, expired or"
                     + " revoked; 403 when its password is missing or wrong. Every use is audited.")
     public LinkAccess openLink(OpenRequest request) {
-        return dialog.openLink(request == null ? null : request.token(), request == null ? null : request.password());
+        if (request == null) {
+            return dialog.openLink(null, null);
+        }
+        return dialog.openLink(request.token(), request.password(), request.organization());
+    }
+
+    @GET
+    @Path("/public/{organization}/{extension}/{type}/{id}")
+    @PermitAll
+    @Operation(
+            summary = "Open a resource shared with the public, without an account",
+            description = "The resource and the level that the public has on it, also through the resources above"
+                    + " it; for the embedded views of the shell (MK-100). 404 alike when it is unknown, in the trash or"
+                    + " not shared with the public.")
+    public LinkAccess openPublic(
+            @PathParam("organization") String organization,
+            @PathParam("extension") String extension,
+            @PathParam("type") String type,
+            @PathParam("id") String id) {
+        ResourceRef ref;
+        try {
+            ref = new ResourceRef(extension, type, id);
+        } catch (IllegalArgumentException e) {
+            throw new ResourceNotFoundException("The resource is not shared with the public.");
+        }
+        return dialog.openPublic(organization, ref);
     }
 
     private static ResourceRef ref(String extension, String type, String id) {

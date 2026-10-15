@@ -26,6 +26,8 @@ export const SHARED_PATH = '/shared/';
 /** Headers with which a request carries a link and its password. */
 export const LINK_HEADER = 'X-Mosaikit-Link';
 export const LINK_PASSWORD_HEADER = 'X-Mosaikit-Link-Password';
+/** The header that names the organization whose public resources a request reads (MK-100). */
+export const PUBLIC_HEADER = 'X-Mosaikit-Public';
 
 /** A resource registered by an extension (MK-054). */
 export interface ResourceRef {
@@ -114,13 +116,13 @@ export interface SharedView {
   readonly element: string;
 }
 
-/** What a link opens. */
+/** What a link opens, or what an organization shares with the public (no `expires`). */
 export interface LinkAccess {
   readonly resource: ResourceRef;
   readonly title: string;
   readonly link: string;
   readonly level: string;
-  readonly expires: string;
+  readonly expires?: string;
   readonly view?: SharedView;
 }
 
@@ -458,17 +460,25 @@ export type LinkOutcome =
   | { readonly kind: 'not-found' }
   | { readonly kind: 'failed'; readonly reason: string };
 
-/** Opens a link (`POST /api/v1/sharing/links/open`), with its password if it has one. */
+/**
+ * Opens a link (`POST /api/v1/sharing/links/open`), with its password if it has one; with the
+ * organization of an embedded view (MK-100), a link of another organization is not found.
+ */
 export async function openLink(
   request: Request,
   token: string,
   password?: string,
+  organization?: string,
 ): Promise<LinkOutcome> {
   try {
     const response = await request('/api/v1/sharing/links/open', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ token, ...(password ? { password } : {}) }),
+      body: JSON.stringify({
+        token,
+        ...(password ? { password } : {}),
+        ...(organization ? { organization } : {}),
+      }),
     });
     if (response.status === 404) {
       return { kind: 'not-found' };
@@ -480,6 +490,54 @@ export async function openLink(
   } catch (error) {
     return { kind: 'failed', reason: reason(error) };
   }
+}
+
+/**
+ * Opens a resource that an organization shares with the public (MK-100), without the credentials
+ * of the browser: the level of the public, not that of whoever is signed in.
+ */
+export async function openPublic(
+  request: Request,
+  organization: string,
+  resource: ResourceRef,
+): Promise<LinkOutcome> {
+  const path = [
+    '/api/v1/sharing/public',
+    organization,
+    resource.extension,
+    resource.type,
+    resource.id,
+  ]
+    .map((part, index) => (index === 0 ? part : encodeURIComponent(part)))
+    .join('/');
+  try {
+    const response = await request(path, {
+      headers: { Accept: 'application/json' },
+      credentials: 'omit',
+    });
+    if (response.status === 404) {
+      return { kind: 'not-found' };
+    }
+    return { kind: 'opened', access: await json<LinkAccess>(response) };
+  } catch (error) {
+    return { kind: 'failed', reason: reason(error) };
+  }
+}
+
+/**
+ * Calls the kernel as the public of an organization (MK-100): the slug in its header, without the
+ * credentials of the browser, so that the extension answers with the level of the public.
+ */
+export function publicRequest(
+  organization: string,
+  fetchImpl: typeof fetch = (input, init) => fetch(input, init),
+): Request {
+  return (path, init = {}) => {
+    const headers = new Headers(init.headers);
+    headers.set(PUBLIC_HEADER, organization);
+    headers.set('Accept', headers.get('Accept') ?? 'application/json');
+    return fetchImpl(path, { ...init, headers, credentials: 'omit' });
+  };
 }
 
 /**
