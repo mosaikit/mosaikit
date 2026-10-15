@@ -36,8 +36,8 @@ import org.jboss.logging.Logger;
  *
  * <p>A link is stateless: it carries the organization, the extension, the file or the prefix (with
  * its team), and its expiry, signed with HMAC-SHA256 by a key of {@link LinkKeys}. An expired, altered
- * or unknown link, a file that no longer exists or is outside the link, and an extension no longer
- * active all answer the same not found, so that a link never tells whether a file exists. A link made
+ * or unknown link, a file that no longer exists or is outside the link, an extension no longer
+ * active and an organization deleted (MK-130), from its deletion on, all answer the same not found, so that a link never tells whether a file exists. A link made
  * by a person carries their account and serves only what they still read (MK-055): a file attached to
  * a resource while they hold a level on it, and nothing once they left the organization; the same not
  * found otherwise. Making a

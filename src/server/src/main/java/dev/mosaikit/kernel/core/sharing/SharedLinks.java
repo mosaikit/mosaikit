@@ -76,7 +76,10 @@ public class SharedLinks {
 
     /** Why a link does not open. */
     public enum Refusal {
-        /** Unknown, expired, revoked, or of a type no longer declared: the link answers not found. */
+        /**
+         * Unknown, expired, revoked, of a type no longer declared, or of an organization deleted
+         * (MK-130): the link answers not found.
+         */
         NOT_FOUND,
         /** The link has a password and none was given. */
         PASSWORD_REQUIRED,

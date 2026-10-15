@@ -48,7 +48,9 @@ What happens, in order:
   [published views](#published-views-for-external-services). Nobody signs in to it any more, with a
   password, a personal access key, a service identity or its realm: the sessions of its people that
   act on it end at once, as when a person is removed from it, and their access keys in it are
-  revoked. A person who belongs to other organizations keeps them. Its email domains are released,
+  revoked. The links to its content made before, signed links to files and sharing links, answer
+  not found, as an unknown link, even if they have not expired. A person who belongs to other
+  organizations keeps them. Its email domains are released,
   so another organization may take them; its slug stays taken until it is removed. When several
   kernels serve the installation, the others refuse its sessions within
   `mosaikit.accounts.session-cache` (5 seconds) and forget it within `mosaikit.identity.cache-ttl`

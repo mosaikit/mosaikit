@@ -10,6 +10,7 @@ import static io.restassured.RestAssured.given;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.assertj.core.api.Assertions.fail;
+import static org.hamcrest.Matchers.equalTo;
 
 import dev.mosaikit.kernel.api.events.PlatformEvents;
 import dev.mosaikit.kernel.app.EventSubscribersProbe.Received;
@@ -22,6 +23,9 @@ import dev.mosaikit.kernel.core.organization.OrganizationRemovals;
 import io.agroal.api.AgroalDataSource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
+import io.restassured.path.json.JsonPath;
+import io.restassured.response.Response;
+import io.restassured.specification.RequestSpecification;
 import jakarta.inject.Inject;
 import java.sql.SQLException;
 import java.time.Duration;
@@ -41,7 +45,8 @@ import org.junit.jupiter.api.Test;
  * Deleting an organization (MK-130): a platform administrator deletes it after naming it again; its
  * people lose access at once and it appears nowhere; the extensions subscribed to
  * {@code organization.deleted} are called; its data and those of its extensions stay for the
- * retention of the installation, then a job removes them; the audit log records both.
+ * retention of the installation, then a job removes them; the audit log records both. The links made
+ * before the deletion (MK-093, MK-055) answer not found from it on (#150).
  */
 @QuarkusTest
 @TestProfile(TestExtensions.class)
@@ -246,6 +251,85 @@ class OrganizationDeletionTest {
                 .delete("/api/v1/organizations/{slug}", slug)
                 .then()
                 .statusCode(404);
+    }
+
+    @Test
+    @Tag("MK-093")
+    @Tag("MK-055")
+    void theLinksMadeBeforeTheDeletionAnswerNotFoundFromItOn() {
+        // #150: a signed link to a file, one to a prefix, and a sharing link, all made and working
+        // before the deletion, valid for days after it.
+        String files = "/api/v1/test/files/" + PlatformEventsTest.EXTENSION;
+        String file = in(slug).contentType("text/plain")
+                .body("plans")
+                .post(files + "?name=plan.txt")
+                .then()
+                .statusCode(200)
+                .extract()
+                .path("id");
+        in(slug).contentType("text/plain")
+                .body("tile")
+                .post(files + "?name=tiles/1.txt")
+                .then()
+                .statusCode(200);
+        String toFile = in(slug).post(files + "/" + file + "/link")
+                .then()
+                .statusCode(200)
+                .extract()
+                .path("path");
+        JsonPath toPrefix = in(slug).post(files + "/links?prefix=tiles/")
+                .then()
+                .statusCode(200)
+                .extract()
+                .jsonPath();
+        String tile = toPrefix.getString("base") + "tiles/1.txt?" + toPrefix.getString("query");
+        in(slug).body(Map.of("title", "Plans", "link", "/app/sharing/plans"))
+                .put("/api/v1/test/resources/" + SharingTest.EXTENSION + "/doc/plans")
+                .then()
+                .statusCode(200);
+        String token = in(slug).body(Map.of(
+                        "level",
+                        "use",
+                        "expires",
+                        Instant.now().plus(Duration.ofDays(5)).toString()))
+                .post("/api/v1/sharing/resources/" + SharingTest.EXTENSION + "/doc/plans/links")
+                .then()
+                .statusCode(201)
+                .extract()
+                .path("token");
+        given().urlEncodingEnabled(false).get(toFile).then().statusCode(200).body(equalTo("plans"));
+        given().urlEncodingEnabled(false).get(tile).then().statusCode(200).body(equalTo("tile"));
+        openLink(token).then().statusCode(200);
+        assertThat(linkLevel(token)).isEqualTo("use");
+
+        delete(slug, slug);
+
+        // From the deletion on, while its data are still kept: not found, as an unknown link.
+        given().urlEncodingEnabled(false).get(toFile).then().statusCode(404);
+        given().urlEncodingEnabled(false).get(tile).then().statusCode(404);
+        openLink(token).then().statusCode(404);
+        assertThat(linkLevel(token)).isEmpty();
+        assertThat(count("select count(*) from mk_kernel.stored_file where organization_id = ?", id))
+                .isEqualTo(2);
+    }
+
+    private RequestSpecification in(String organization) {
+        return as(person, PASSWORD).header("X-Mosaikit-Organization", organization);
+    }
+
+    private static Response openLink(String token) {
+        return anonymous().body(Map.of("token", token)).post("/api/v1/sharing/links/open");
+    }
+
+    /** The level that a request opened with a sharing link gets on the doc, or null. */
+    private static String linkLevel(String token) {
+        return anonymous()
+                .header("X-Mosaikit-Link", token)
+                .get("/api/v1/test/sharing/" + SharingTest.EXTENSION + "/doc/plans/level")
+                .then()
+                .statusCode(200)
+                .extract()
+                .path("level");
     }
 
     @Test
