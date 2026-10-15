@@ -65,6 +65,13 @@ public interface RegisteredResources {
               and r.resourceType = :resourceType and r.trashedAt is not null""")
     List<String> trashed(UUID organizationId, String extensionId, String resourceType);
 
+    /** The resources a person owns in an organization, of every extension (MK-071). */
+    @Query("""
+            from RegisteredResource r
+            where r.organizationId = :organizationId and r.ownerId = :ownerId
+            order by r.extensionId, r.resourceType, r.title, r.refId""")
+    List<RegisteredResource> ownedBy(UUID organizationId, UUID ownerId);
+
     @Query("from RegisteredResource r where r.organizationId = :organizationId and r.id in :ids")
     List<RegisteredResource> findByIds(UUID organizationId, List<UUID> ids);
 
