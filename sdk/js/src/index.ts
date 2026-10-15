@@ -45,3 +45,11 @@ export {
   referencePlaceholderText,
 } from './placeholder.js';
 export type { ReferencePlaceholderElement, ReferencePlaceholderText } from './placeholder.js';
+export {
+  TAGS_PATH,
+  normalizeTag,
+  replaceTags,
+  resourceTags,
+  suggestTags,
+  taggedResources,
+} from './tags.js';

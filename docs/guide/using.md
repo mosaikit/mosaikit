@@ -156,6 +156,15 @@ You see what you own. The administrators of the organization also see, with **Sh
 the whole organization**, what everyone deleted, and what belongs to the organization, and restore
 or delete it the same way.
 
+## Tags
+
+Apps that support it let you label what you create with your own words, such as `garden` or
+`spring plans` (MK-097). The tags are the same in every app: while you type one, the app suggests
+the tags already used in the organization, the most used first, and a list filtered by one or more
+tags shows what carries any of them. Tags are kept in lowercase, each once, at most 20 on a
+resource. You see the tags of what you may open, and the suggestions come only from those; to
+change the tags of something you need a level that lets you edit it.
+
 ## Activity
 
 **Activity**, at the top of the app bar, collects what the apps tell you: a mention, a task, a
