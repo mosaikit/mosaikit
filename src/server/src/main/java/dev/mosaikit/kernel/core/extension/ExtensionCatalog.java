@@ -8,6 +8,7 @@ import com.fasterxml.jackson.dataformat.yaml.YAMLFactory;
 import dev.mosaikit.kernel.api.extension.BackendEntry;
 import dev.mosaikit.kernel.api.extension.ExtensionManifest;
 import dev.mosaikit.kernel.api.extension.ExtensionManifests;
+import dev.mosaikit.kernel.api.extension.LibraryEntry;
 import dev.mosaikit.kernel.api.extension.ManifestParseResult;
 import dev.mosaikit.kernel.api.extension.ManifestViolation;
 import dev.mosaikit.kernel.api.signature.PackageSignatureException;
@@ -28,6 +29,7 @@ import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
+import java.util.zip.ZipFile;
 
 /**
  * Reads the extensions of an installation directory and decides which ones can be activated.
@@ -43,6 +45,12 @@ import java.util.stream.Stream;
  * declared JAR: the kernel accepts the JARs loaded by the launcher, the launcher every JAR that
  * exists. Both use this class, so that they always agree on which extensions can run.
  *
+ * <p>The libraries that a Java extension brings (MK-131) must be in its directory with the digest of
+ * the manifest, must not be Quarkus extensions, and must not exist in another version in the kernel
+ * or in another active extension: the kernel holds one copy of each library. Between two extensions
+ * that bring a library in different versions, the one the kernel already runs wins, otherwise the
+ * first by id.
+ *
  * <p>The class has no framework dependency and is safe to use from tests and tools.
  */
 public final class ExtensionCatalog {
@@ -56,6 +64,8 @@ public final class ExtensionCatalog {
     private final Version kernelVersion;
     private final BackendCheck backendCheck;
     private final PackageTrust trust;
+    private final KernelLibraries kernelLibraries;
+    private final Set<String> loaded;
 
     /**
      * Creates a catalog that accepts every declared backend JAR that exists.
@@ -81,10 +91,29 @@ public final class ExtensionCatalog {
      * @param trust the keys of trusted publishers and whether signatures are required (MK-013)
      */
     public ExtensionCatalog(Version kernelVersion, BackendCheck backendCheck, PackageTrust trust) {
+        this(kernelVersion, backendCheck, trust, KernelLibraries.ofKernel(), Set.of());
+    }
+
+    /**
+     * @param kernelVersion version of the running kernel, see {@link #ExtensionCatalog(Version)}
+     * @param backendCheck decides whether the Java code of an extension can be used
+     * @param trust the keys of trusted publishers and whether signatures are required (MK-013)
+     * @param kernelLibraries the libraries the kernel provides (MK-131)
+     * @param loaded the extensions whose Java code the kernel runs: they keep their libraries when
+     *     another extension brings one of them in another version
+     */
+    public ExtensionCatalog(
+            Version kernelVersion,
+            BackendCheck backendCheck,
+            PackageTrust trust,
+            KernelLibraries kernelLibraries,
+            Set<String> loaded) {
         this.kernelVersion =
                 Objects.requireNonNull(kernelVersion, "kernelVersion").core();
         this.backendCheck = Objects.requireNonNull(backendCheck, "backendCheck");
         this.trust = Objects.requireNonNull(trust, "trust");
+        this.kernelLibraries = Objects.requireNonNull(kernelLibraries, "kernelLibraries");
+        this.loaded = Set.copyOf(loaded);
     }
 
     /**
@@ -118,7 +147,7 @@ public final class ExtensionCatalog {
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot list extensions in " + directory, e);
         }
-        return resolve(markDuplicates(found));
+        return resolve(checkSharedLibraries(resolve(markDuplicates(found))));
     }
 
     private InstalledExtension readDirectory(Path directory) {
@@ -194,6 +223,12 @@ public final class ExtensionCatalog {
                     ExtensionStatus.INCOMPATIBLE,
                     List.of("Requires kernel " + manifest.platform() + ", running " + kernelVersion));
         }
+        List<String> libraryProblems = new ArrayList<>();
+        ExtensionStatus libraryStatus = checkLibraries(manifest, directory, libraryProblems);
+        if (!libraryProblems.isEmpty()) {
+            return new InstalledExtension(
+                    manifest.id(), directory, Optional.of(manifest), libraryStatus, libraryProblems);
+        }
         Optional<BackendCheck.Problem> backendProblem =
                 manifest.backend().flatMap(backend -> backendCheck.check(manifest, directory.resolve(backend.jar())));
         if (backendProblem.isPresent()) {
@@ -206,6 +241,111 @@ public final class ExtensionCatalog {
         }
         return new InstalledExtension(
                 manifest.id(), directory, Optional.of(manifest), ExtensionStatus.ACTIVE, List.of());
+    }
+
+    /**
+     * Checks the libraries of an extension alone (MK-131): present with the digest of the manifest, not
+     * Quarkus extensions, and in the version of the kernel when the kernel has them.
+     *
+     * @return {@link ExtensionStatus#INVALID} when the package itself is wrong, {@link
+     *     ExtensionStatus#INCOMPATIBLE} when only the kernel has another version
+     */
+    private ExtensionStatus checkLibraries(ExtensionManifest manifest, Path directory, List<String> problems) {
+        ExtensionStatus status = ExtensionStatus.INCOMPATIBLE;
+        for (LibraryEntry library : manifest.libraries()) {
+            Path jar = directory.resolve(library.jar()).normalize();
+            if (!jar.startsWith(directory.normalize()) || !Files.isRegularFile(jar)) {
+                problems.add(
+                        "Library " + library.coordinates() + ": its JAR " + library.jar() + " is not in the package");
+                status = ExtensionStatus.INVALID;
+            } else if (!ProviderState.sha256(jar).equals(library.sha256())) {
+                problems.add("Library " + library.coordinates() + ": the SHA-256 digest of " + library.jar()
+                        + " is not the one of the manifest");
+                status = ExtensionStatus.INVALID;
+            } else if (isQuarkusExtension(jar)) {
+                problems.add(
+                        "Library " + library.coordinates()
+                                + " is a Quarkus extension: a Java extension can use only the Quarkus extensions of the kernel");
+                status = ExtensionStatus.INVALID;
+            } else {
+                kernelLibraries
+                        .version(library.key())
+                        .filter(version -> !version.equals(library.version()))
+                        .ifPresent(version -> problems.add(conflictWithKernel(library, version)));
+            }
+        }
+        return status;
+    }
+
+    /** Why the kernel refuses a library it has in another version. */
+    public static String conflictWithKernel(LibraryEntry library, String kernelVersion) {
+        return "Library " + library.key() + " " + library.version() + " conflicts with the kernel, which provides"
+                + " version " + kernelVersion + ": use the version of the kernel or relocate the library";
+    }
+
+    /** Why the kernel refuses a library that another extension brings in another version or content. */
+    public static String conflictWithExtension(LibraryEntry library, LibraryEntry other, String extensionId) {
+        if (other.version().equals(library.version())) {
+            return "Library " + library.coordinates() + " is not the same JAR as the one brought by extension "
+                    + extensionId + " (another SHA-256 digest)";
+        }
+        return "Library " + library.key() + " " + library.version() + " conflicts with version " + other.version()
+                + " brought by extension " + extensionId + ": align the versions or relocate the library";
+    }
+
+    /** Whether a JAR is a Quarkus extension, which only the kernel can bring. */
+    static boolean isQuarkusExtension(Path jar) {
+        try (ZipFile zip = new ZipFile(jar.toFile())) {
+            return zip.getEntry("META-INF/quarkus-extension.properties") != null;
+        } catch (IOException _) {
+            return false;
+        }
+    }
+
+    /**
+     * Disables the active extensions that bring a library another active extension has in another
+     * version (MK-131). The extensions the kernel runs claim their libraries first, then the others by
+     * id; a library the kernel provides in the same version is not claimed.
+     */
+    private List<InstalledExtension> checkSharedLibraries(List<InstalledExtension> extensions) {
+        record Claim(LibraryEntry library, String extensionId) {}
+        Map<String, Claim> claims = new HashMap<>();
+        Map<String, InstalledExtension> refused = new HashMap<>();
+        extensions.stream()
+                .filter(InstalledExtension::isActive)
+                .sorted(Comparator.comparing((InstalledExtension extension) -> !loaded.contains(extension.key()))
+                        .thenComparing(InstalledExtension::key))
+                .forEach(extension -> {
+                    List<LibraryEntry> libraries = extension.manifest().orElseThrow().libraries().stream()
+                            .filter(library -> !kernelLibraries.provides(library))
+                            .toList();
+                    List<String> problems = new ArrayList<>();
+                    for (LibraryEntry library : libraries) {
+                        Claim claim = claims.get(library.key());
+                        if (claim != null
+                                && !(claim.library().version().equals(library.version())
+                                        && claim.library().sha256().equals(library.sha256()))) {
+                            problems.add(conflictWithExtension(library, claim.library(), claim.extensionId()));
+                        }
+                    }
+                    if (problems.isEmpty()) {
+                        libraries.forEach(
+                                library -> claims.putIfAbsent(library.key(), new Claim(library, extension.key())));
+                    } else {
+                        refused.put(
+                                extension.key(),
+                                new InstalledExtension(
+                                        extension.key(),
+                                        extension.directory(),
+                                        extension.manifest(),
+                                        ExtensionStatus.INCOMPATIBLE,
+                                        problems,
+                                        extension.publisherKey()));
+                    }
+                });
+        return extensions.stream()
+                .map(extension -> extension.isActive() ? refused.getOrDefault(extension.key(), extension) : extension)
+                .toList();
     }
 
     /** Keeps the first of two extensions with the same id or the same API name. */

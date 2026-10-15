@@ -60,6 +60,7 @@
         <module>tests/fixtures/extensions/estimates</module>
         <module>tests/fixtures/extensions/todo</module>
         <module>tests/fixtures/extensions/theme</module>
+        <module>tests/fixtures/extensions/libraries</module>
         <module>src/server</module>
         <module>distribution</module>
     </modules>
@@ -105,6 +106,7 @@
         <cyclonedx-extension.version>2.9.1</cyclonedx-extension.version>
         <exec-extension.version>3.5.1</exec-extension.version>
         <antrun-extension.version>3.1.0</antrun-extension.version>
+        <dependency-extension.version>3.8.1</dependency-extension.version>
 
         <!-- Frontend in the Maven build: -Dskip.npm skips it; its checks follow -DskipTests. -->
         <skip.npm>false</skip.npm>
@@ -269,6 +271,11 @@
                     <groupId>org.codehaus.mojo</groupId>
                     <artifactId>exec-maven-plugin</artifactId>
                     <version>${exec-extension.version}</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-dependency-plugin</artifactId>
+                    <version>${dependency-extension.version}</version>
                 </plugin>
                 <plugin>
                     <groupId>org.jacoco</groupId>

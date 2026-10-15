@@ -6,6 +6,7 @@ import dev.mosaikit.kernel.api.version.Version;
 import dev.mosaikit.kernel.core.extension.BackendCheck;
 import dev.mosaikit.kernel.core.extension.ExtensionCatalog;
 import dev.mosaikit.kernel.core.extension.InstalledExtension;
+import dev.mosaikit.kernel.core.extension.KernelLibraries;
 import dev.mosaikit.kernel.core.extension.PackageTrust;
 import dev.mosaikit.kernel.core.extension.ProviderState;
 import java.io.IOException;
@@ -45,15 +46,22 @@ public final class Launcher {
     private final PrintStream out;
     private final KernelBuilder builder;
     private final PackageTrust trust;
+    private final KernelLibraries kernelLibraries;
 
     Launcher(PrintStream out, KernelBuilder builder) {
         this(out, builder, PackageTrust.none());
     }
 
     Launcher(PrintStream out, KernelBuilder builder, PackageTrust trust) {
+        this(out, builder, trust, KernelLibraries.ofKernel());
+    }
+
+    /** @param kernelLibraries the libraries of the kernel, against which those of extensions are checked */
+    Launcher(PrintStream out, KernelBuilder builder, PackageTrust trust, KernelLibraries kernelLibraries) {
         this.out = out;
         this.builder = builder;
         this.trust = trust;
+        this.kernelLibraries = kernelLibraries;
     }
 
     /** Rebuilds the kernel of an installation. */
@@ -142,14 +150,27 @@ public final class Launcher {
         }
 
         List<InstalledExtension> extensions = new ExtensionCatalog(
-                        kernelVersion, BackendCheck.available(rejected), trust)
+                        kernelVersion,
+                        BackendCheck.available(rejected),
+                        trust,
+                        kernelLibraries,
+                        ProviderState.read(providers).extensionIds())
                 .scan(installation.extensions(), installation.packages());
-        ProviderSync sync = new ProviderSync(providers);
+        extensions.stream()
+                .filter(extension -> extension.backendJar().isPresent() && !extension.isActive())
+                .forEach(extension -> out.printf(
+                        "Mosaikit: %s is %s: %s%n",
+                        extension.key(), extension.status(), String.join("; ", extension.problems())));
+        ProviderSync sync = new ProviderSync(providers, kernelLibraries);
         ProviderSync.Plan plan = sync.plan(extensions);
         if (plan.upToDate()) {
+            long libraries = plan.sources().stream()
+                    .filter(ProviderSync.Source::isLibrary)
+                    .count();
             out.printf(
-                    "Mosaikit: %d Java extension(s), kernel up to date.%n",
-                    plan.sources().size());
+                    "Mosaikit: %d Java extension(s)%s, kernel up to date.%n",
+                    plan.sources().size() - libraries,
+                    libraries == 0 ? "" : " with " + libraries + " librar" + (libraries == 1 ? "y" : "ies"));
             return 0;
         }
 
@@ -199,7 +220,13 @@ public final class Launcher {
     }
 
     private static String describe(ProviderState state) {
-        return state.entries().stream().map(ProviderState.Entry::extensionId).collect(Collectors.joining(", "));
+        String extensions = state.entries().stream()
+                .map(ProviderState.Entry::extensionId)
+                .filter(id -> !ProviderState.isLibrary(id))
+                .collect(Collectors.joining(", "));
+        return extensions.isEmpty()
+                ? state.entries().stream().map(ProviderState.Entry::extensionId).collect(Collectors.joining(", "))
+                : extensions;
     }
 
     /** Runs the Quarkus re-augmentation of the mutable JAR, which exits once the kernel is rebuilt. */

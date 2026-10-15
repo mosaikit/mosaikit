@@ -22,6 +22,8 @@ import dev.mosaikit.kernel.core.extension.ExtensionDependencies;
 import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
 import dev.mosaikit.kernel.core.extension.ExtensionStatus;
 import dev.mosaikit.kernel.core.extension.InstalledExtension;
+import dev.mosaikit.kernel.core.extension.KernelLibraries;
+import dev.mosaikit.kernel.core.extension.LibraryConflicts;
 import dev.mosaikit.kernel.core.extension.PackageTrust;
 import dev.mosaikit.kernel.core.sharing.SharingLevels;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -271,6 +273,13 @@ public class Marketplace {
         List<String> unmet = ExtensionDependencies.installed(found).refuseInstallation(manifests);
         if (!unmet.isEmpty()) {
             throw new ConflictException("Cannot install: " + String.join("; ", unmet) + ".");
+        }
+        // The installation holds one version of each library (MK-131): a library that the kernel, an
+        // extension that stays or another extension of the operation has in another version is
+        // refused, naming the library and both versions.
+        List<String> conflicts = LibraryConflicts.of(manifests, found, KernelLibraries.ofKernel());
+        if (!conflicts.isEmpty()) {
+            throw new ConflictException("Cannot install: " + String.join("; ", conflicts) + ".");
         }
         // An update that removes a resource type or a level on which grants exist is refused,
         // naming them (MK-055, ADR-0037).

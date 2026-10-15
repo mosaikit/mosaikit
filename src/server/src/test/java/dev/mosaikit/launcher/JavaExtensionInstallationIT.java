@@ -151,6 +151,54 @@ class JavaExtensionInstallationIT {
     }
 
     @Test
+    @Tag("MK-131")
+    void runsTheLibrariesThatAJavaExtensionBrings(TestInfo test) throws Exception {
+        Path source = Path.of(System.getProperty("mosaikit.it.libraries"));
+        // The parent POM put the library and its dependency into the package, without what the kernel
+        // provides, and listed them in the manifest with their coordinates and digests.
+        try (var zip = new java.util.zip.ZipFile(source.toFile())) {
+            List<String> entries =
+                    zip.stream().map(java.util.zip.ZipEntry::getName).toList();
+            assertThat(entries)
+                    .contains(
+                            "lib/fixture-libraries.jar", "lib/commons-text-1.15.0.jar", "lib/commons-lang3-3.20.0.jar")
+                    .noneMatch(entry -> entry.contains("jackson") || entry.contains("kernel-api"));
+            String manifest =
+                    new String(zip.getInputStream(zip.getEntry("manifest.yaml")).readAllBytes(), UTF_8);
+            assertThat(manifest)
+                    .contains("coordinates: 'org.apache.commons:commons-text:1.15.0'")
+                    .contains("coordinates: 'org.apache.commons:commons-lang3:3.20.0'")
+                    .containsPattern("sha256: '[0-9a-f]{64}'");
+        }
+
+        newInstallation(test);
+        Files.copy(source, installation.extensions().resolve(source.getFileName()));
+        List<String> output = new ArrayList<>();
+        assertThat(prepare(output))
+                .as("prepare with the extension and its libraries")
+                .isZero();
+        assertThat(output)
+                .anySatisfy(line -> assertThat(line).contains("added library:org.apache.commons:commons-text:1.15.0"));
+        assertThat(installation.providers().resolve("org.apache.commons_commons-text_1.15.0.jar"))
+                .exists();
+        assertThat(installation.providers().resolve("org.apache.commons_commons-lang3_3.20.0.jar"))
+                .exists();
+        assertThat(startKernel()).as("the kernel starts").isTrue();
+        assertThat(extension("dev.mosaikit.fixture.libraries").path("status").asText())
+                .isEqualTo("ACTIVE");
+
+        HttpResponse<String> words = send(
+                HttpRequest.newBuilder(uri("/api/v1/ext/fixture-libraries/words?text=hello%20world"))
+                        .GET(),
+                member("acme"),
+                MEMBER_PASSWORD);
+        assertThat(words.statusCode()).as(words.body()).isEqualTo(200);
+        assertThat(json.readTree(words.body()).path("capitalized").asText()).isEqualTo("Hello World");
+        assertThat(json.readTree(words.body()).path("reversed").asText()).isEqualTo("dlrow olleh");
+        stopKernel();
+    }
+
+    @Test
     @Tag("MK-020")
     void extendsAnAppWithAnotherExtensionWithoutForeignKeys(TestInfo test) throws Exception {
         newInstallation(test);

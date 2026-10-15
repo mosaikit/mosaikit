@@ -246,6 +246,29 @@
         </resources>
         <plugins>
             <plugin>
+                <!-- The libraries the kernel provides to Java extensions (MK-131): its runtime
+                     dependencies, on its class path for the checks of the launcher and the kernel
+                     (KernelLibraries); KernelLibrariesTest keeps the parent POM of extensions and the
+                     guide in line with them. -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-dependency-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>kernel-libraries</id>
+                        <phase>generate-resources</phase>
+                        <goals>
+                            <goal>list</goal>
+                        </goals>
+                        <configuration>
+                            <includeScope>runtime</includeScope>
+                            <sort>true</sort>
+                            <appendOutput>false</appendOutput>
+                            <outputFile>${project.build.outputDirectory}/dev/mosaikit/kernel/core/extension/kernel-libraries.txt</outputFile>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>${quarkus.platform.group-id}</groupId>
                 <artifactId>quarkus-maven-plugin</artifactId>
                 <executions>
@@ -306,6 +329,7 @@
                         <mosaikit.it.extension>${maven.multiModuleProjectDirectory}/tests/fixtures/extensions/notes/target/fixture-notes-${project.version}.zip</mosaikit.it.extension>
                         <mosaikit.it.activities>${maven.multiModuleProjectDirectory}/tests/fixtures/extensions/activities/target/fixture-activities-${project.version}.zip</mosaikit.it.activities>
                         <mosaikit.it.estimates>${maven.multiModuleProjectDirectory}/tests/fixtures/extensions/estimates/target/fixture-estimates-${project.version}.zip</mosaikit.it.estimates>
+                        <mosaikit.it.libraries>${maven.multiModuleProjectDirectory}/tests/fixtures/extensions/libraries/target/fixture-libraries-${project.version}.zip</mosaikit.it.libraries>
                         <mosaikit.it.work>${project.build.directory}/it</mosaikit.it.work>
                         <test.root>${maven.multiModuleProjectDirectory}</test.root>
                     </systemPropertyVariables>

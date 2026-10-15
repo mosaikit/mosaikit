@@ -38,17 +38,32 @@ public interface BackendCheck {
         BackendCheck exists = jarExists();
         return (manifest, jar) -> exists.check(manifest, jar)
                 .or(() -> rejected.contains(manifest.id(), ProviderState.sha256(jar))
+                                || manifest.libraries().stream()
+                                        .anyMatch(library ->
+                                                rejected.contains(ProviderState.libraryId(library), library.sha256()))
                         ? Optional.of(rolledBack())
                         : Optional.empty());
     }
 
     /** Accepts the JARs that the launcher loaded into the running kernel, as recorded in its state. */
     static BackendCheck loadedBy(ProviderState state, ProviderState rejected) {
+        return loadedBy(state, rejected, KernelLibraries.ofKernel());
+    }
+
+    /**
+     * Accepts the JARs that the launcher loaded into the running kernel, with the libraries they bring
+     * (MK-131) unless the kernel provides them, as recorded in its state.
+     */
+    static BackendCheck loadedBy(ProviderState state, ProviderState rejected, KernelLibraries kernelLibraries) {
         BackendCheck available = available(rejected);
         return (manifest, jar) -> available
                 .check(manifest, jar)
                 .or(
                         () -> state.contains(manifest.id(), ProviderState.sha256(jar))
+                                        && manifest.libraries().stream()
+                                                .allMatch(library -> kernelLibraries.provides(library)
+                                                        || state.contains(
+                                                                ProviderState.libraryId(library), library.sha256()))
                                 ? Optional.empty()
                                 : Optional.of(
                                         new Problem(

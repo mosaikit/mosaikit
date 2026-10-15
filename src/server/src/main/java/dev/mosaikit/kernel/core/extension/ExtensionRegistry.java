@@ -83,12 +83,16 @@ public class ExtensionRegistry {
      * last start that wait for a restart, without changing those in use (MK-132).
      */
     public List<InstalledExtension> scan() {
+        KernelLibraries kernelLibraries = KernelLibraries.ofKernel();
+        ProviderState state = providersDirectory.map(ProviderState::read).orElseGet(() -> new ProviderState(List.of()));
         BackendCheck backendCheck = providersDirectory
                 .map(providers -> BackendCheck.loadedBy(
-                        ProviderState.read(providers), ProviderState.read(providers, ProviderState.REJECTED_FILE)))
+                        state, ProviderState.read(providers, ProviderState.REJECTED_FILE), kernelLibraries))
                 .orElseGet(BackendCheck::notLoaded);
         PackageTrust trust = PackageTrust.read(trustedKeysDirectory, signatures);
-        return new ExtensionCatalog(kernelVersion, backendCheck, trust).scan(directory, packagesDirectory);
+        // The extensions the kernel runs keep their libraries against another extension (MK-131).
+        return new ExtensionCatalog(kernelVersion, backendCheck, trust, kernelLibraries, state.extensionIds())
+                .scan(directory, packagesDirectory);
     }
 
     /** How many times the installation directory was read: changes after every {@link #reload()}. */

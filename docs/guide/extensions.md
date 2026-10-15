@@ -17,6 +17,12 @@ few seconds. If the kernel cannot be rebuilt or does not start with a new extens
 restores the previous build, starts again, and the extension stays disabled ("Rolled back") until a
 different version is installed.
 
+A Java extension may bring libraries of its own (MK-131), which the launcher adds to the kernel with
+it. The installation holds one version of each library: an extension that brings a library the
+kernel has in another version, or that another extension brings in another version, is not loaded,
+and its status names the library and both versions (the marketplace refuses such a package at once).
+Install versions of the extensions that agree, or ask their publisher to align the library.
+
 In Docker Compose, copy the zip into `mosaikit-docker/extensions/` and run
 `docker compose restart mosaikit`. In Kubernetes, build a derived image with the extensions (see the
 [Kubernetes guide](../../distribution/k8s/README.md)); frontend-only extensions can also be put on
@@ -78,7 +84,7 @@ java -cp bin/kernel/lib/main/io.github.mosaikit.mosaikit-kernel-api-*.jar \
 | Status | Meaning | What to do |
 |---|---|---|
 | `ACTIVE` | in use | |
-| `INCOMPATIBLE` | needs another kernel version, or an extension that is missing or disabled | install the right versions |
+| `INCOMPATIBLE` | needs another kernel version, or an extension that is missing or disabled, or brings a library in another version than the kernel or another extension | install the right versions |
 | `RESTART_REQUIRED` | its Java code is not in the running kernel | start Mosaikit with its launcher (`mosaikit`, `mosaikit.cmd`) |
 | `INVALID` | unreadable, broken manifest, refused signature, or rolled back | read `problems`, fix or replace the package |
 
