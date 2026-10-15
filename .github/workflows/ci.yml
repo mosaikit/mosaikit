@@ -390,9 +390,9 @@ jobs:
   # pom.xml. Pull requests from forks get no secrets, so the analysis is skipped there.
   sonarqube:
     needs: [backend, frontend]
-    # Nightly lane: not on pull requests nor in the merge queue (the analysis of main keeps the
-    # quality gate).
-    if: github.event_name != 'pull_request' && github.event_name != 'merge_group'
+    # Only for releases (a version tag) or when started by hand: suspended on main, the nightly lane,
+    # pull requests and the merge queue while the phase Composition is developed (15 October 2026).
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     env:
       SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
