@@ -11,6 +11,7 @@ import dev.mosaikit.kernel.api.extension.FrontendIsolation;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Predicate;
 
 /**
  * What the shell needs to load the frontend of an active extension.
@@ -63,6 +64,16 @@ public record FrontendExtensionView(
      * @param isolate {@code true} to run the frontend in an iframe whatever its manifest says
      */
     static FrontendExtensionView of(ExtensionManifest manifest, FrontendEntry frontend, boolean isolate) {
+        return of(manifest, frontend, isolate, contribution -> true);
+    }
+
+    /**
+     * @param isolate {@code true} to run the frontend in an iframe whatever its manifest says
+     * @param served the contributions to give to the shell: those that match the schema of their point
+     *     (MK-134)
+     */
+    static FrontendExtensionView of(
+            ExtensionManifest manifest, FrontendEntry frontend, boolean isolate, Predicate<Contribution> served) {
         boolean iframe = isolate || frontend.isolation() == FrontendIsolation.IFRAME;
         FrontendBridge bridge = frontend.bridge();
         return new FrontendExtensionView(
@@ -80,6 +91,7 @@ public record FrontendExtensionView(
                                 .orElse(null),
                         manifest.data().map(data -> dataPath(manifest.id())).orElse(null)),
                 manifest.contributions().stream()
+                        .filter(served)
                         .map(FrontendExtensionView::toView)
                         .toList(),
                 frontend.points());

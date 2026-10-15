@@ -107,11 +107,37 @@
           "additionalProperties": false
         },
         "points": {
-          "description": "Extension points the frontend offers to other extensions, which contribute to them (MK-020).",
+          "description": "Extension points the frontend offers to other extensions, which contribute to them (MK-020): a name, untyped in version 1, or one entry per major version with the JSON Schema of the payload of its contributions (MK-134).",
           "type": "array",
           "items": {
-            "type": "string",
-            "pattern": "^[a-z][a-zA-Z0-9-]*(\\.[a-z][a-zA-Z0-9-]*)+$"
+            "oneOf": [
+              {
+                "$ref": "#/$defs/dottedName"
+              },
+              {
+                "type": "object",
+                "required": ["name"],
+                "properties": {
+                  "name": {
+                    "$ref": "#/$defs/dottedName"
+                  },
+                  "version": {
+                    "description": "Major version of the point, 1 when absent; contributions target it as name@version after the first.",
+                    "$ref": "#/$defs/majorVersion"
+                  },
+                  "schema": {
+                    "description": "JSON Schema of the attributes of a contribution, without id and i18n, with type object.",
+                    "type": "object",
+                    "properties": {
+                      "type": {
+                        "const": "object"
+                      }
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
           },
           "uniqueItems": true
         }
@@ -170,6 +196,59 @@
         "additionalProperties": false
       }
     },
+    "contracts": {
+      "description": "Contracts on the server between extensions (MK-134): those the extension owns and those of other extensions it implements.",
+      "type": "object",
+      "properties": {
+        "provides": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "versions"],
+            "properties": {
+              "name": {
+                "$ref": "#/$defs/contractName"
+              },
+              "versions": {
+                "description": "The major versions served; a breaking change adds one, and removing one retires it.",
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "$ref": "#/$defs/majorVersion"
+                }
+              },
+              "api": {
+                "$ref": "#/$defs/contractApi"
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "implements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["contract", "version"],
+            "properties": {
+              "contract": {
+                "description": "<extension id>/<contract name>, such as org.example.catalog/connector.",
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+/[a-z][a-z0-9-]{0,47}$"
+              },
+              "version": {
+                "$ref": "#/$defs/majorVersion"
+              },
+              "api": {
+                "$ref": "#/$defs/contractApi"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
     "data": {
       "description": "Collections of JSON documents that the extension keeps in the kernel, per organization, without a backend of its own (ADR-0031).",
       "type": "object",
@@ -203,10 +282,11 @@
       "additionalProperties": false
     },
     "contributes": {
-      "description": "Contributions grouped by extension point.",
+      "description": "Contributions grouped by extension point; after the first version, the key names the version it targets, such as dashboard.widget@2 (MK-134).",
       "type": "object",
       "propertyNames": {
-        "$ref": "#/$defs/dottedName"
+        "type": "string",
+        "pattern": "^[a-z][a-zA-Z0-9-]*(\\.[a-z][a-zA-Z0-9-]*)+(@[1-9][0-9]{0,2})?$"
       },
       "additionalProperties": {
         "type": "array",
@@ -574,6 +654,20 @@
   "$defs": {
     "kind": {
       "enum": ["app", "extension", "service", "theme", "locale", "auth"]
+    },
+    "majorVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 999
+    },
+    "contractName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,47}$"
+    },
+    "contractApi": {
+      "description": "The API artifact of the contract, groupId:artifactId of one of the libraries, with a semantic version; compatible versions brought by several extensions resolve to the highest.",
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+$"
     },
     "dottedName": {
       "type": "string",

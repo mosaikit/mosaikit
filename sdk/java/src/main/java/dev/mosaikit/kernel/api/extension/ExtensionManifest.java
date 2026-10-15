@@ -38,6 +38,9 @@ public final class ExtensionManifest {
     private final List<MeasureEntry> measures;
     private final Map<String, VersionRange> optional;
     private final List<LibraryEntry> libraries;
+    private final List<ExtensionPoint> points;
+    private final List<ProvidedContract> providedContracts;
+    private final List<ImplementedContract> implementedContracts;
 
     @SuppressWarnings("java:S107") // Mirrors the manifest fields; only ExtensionManifests creates it.
     ExtensionManifest(
@@ -59,7 +62,10 @@ public final class ExtensionManifest {
             List<ResourceTypeEntry> resourceTypes,
             List<MeasureEntry> measures,
             Map<String, VersionRange> optional,
-            List<LibraryEntry> libraries) {
+            List<LibraryEntry> libraries,
+            List<ExtensionPoint> points,
+            List<ProvidedContract> providedContracts,
+            List<ImplementedContract> implementedContracts) {
         this.id = Objects.requireNonNull(id, "id");
         this.version = Objects.requireNonNull(version, "version");
         this.name = Objects.requireNonNull(name, "name");
@@ -79,6 +85,9 @@ public final class ExtensionManifest {
         this.measures = List.copyOf(measures);
         this.optional = Map.copyOf(optional);
         this.libraries = List.copyOf(libraries);
+        this.points = List.copyOf(points);
+        this.providedContracts = List.copyOf(providedContracts);
+        this.implementedContracts = List.copyOf(implementedContracts);
     }
 
     /** What the extension meters for each organization, with limits and consumption (MK-076). */
@@ -92,6 +101,68 @@ public final class ExtensionManifest {
      */
     public List<LibraryEntry> libraries() {
         return libraries;
+    }
+
+    /**
+     * The extension points that the frontend offers, each version with the schema of its payload when it
+     * declares one (MK-020, MK-134); their {@link ExtensionPoint#id() identifiers} are {@link
+     * FrontendEntry#points()}.
+     */
+    public List<ExtensionPoint> extensionPoints() {
+        return points;
+    }
+
+    /** The extension point with this identifier ({@code name} or {@code name@version}), if offered. */
+    public Optional<ExtensionPoint> extensionPoint(String id) {
+        return points.stream().filter(point -> point.id().equals(id)).findFirst();
+    }
+
+    /** The contracts on the server that the extension owns (MK-134). */
+    public List<ProvidedContract> providedContracts() {
+        return providedContracts;
+    }
+
+    /** The contract on the server with this name that the extension owns, if any. */
+    public Optional<ProvidedContract> providedContract(String name) {
+        return providedContracts.stream()
+                .filter(contract -> contract.name().equals(name))
+                .findFirst();
+    }
+
+    /** The contracts of other extensions that the extension implements, with their versions (MK-134). */
+    public List<ImplementedContract> implementedContracts() {
+        return implementedContracts;
+    }
+
+    /** Whether the extension implements this version of a contract of another extension. */
+    public boolean implementsContract(String extension, String name, int version) {
+        return implementedContracts.stream()
+                .anyMatch(contract -> contract.extension().equals(extension)
+                        && contract.name().equals(name)
+                        && contract.version() == version);
+    }
+
+    /**
+     * The libraries that are API artifacts of contracts (MK-134), by {@link LibraryEntry#key() key}:
+     * several extensions bring them, and compatible versions resolve to the highest one instead of
+     * conflicting.
+     */
+    public Set<String> contractApis() {
+        Set<String> apis = new java.util.TreeSet<>();
+        providedContracts.stream()
+                .map(ProvidedContract::api)
+                .filter(api -> !api.isEmpty())
+                .forEach(apis::add);
+        implementedContracts.stream()
+                .map(ImplementedContract::api)
+                .filter(api -> !api.isEmpty())
+                .forEach(apis::add);
+        return Set.copyOf(apis);
+    }
+
+    /** Whether a library of the extension is the API artifact of a contract (MK-134). */
+    public boolean isContractApi(LibraryEntry library) {
+        return contractApis().contains(library.key());
     }
 
     /** Permissions the extension declares, off until administrators grant them (MK-056). */

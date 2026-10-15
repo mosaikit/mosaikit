@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.core.extension;
 
+import dev.mosaikit.kernel.api.extension.ExtensionManifest;
 import dev.mosaikit.kernel.core.apps.AppSettings;
 import dev.mosaikit.kernel.core.config.KernelConfig;
 import dev.mosaikit.kernel.core.identity.RequestOrganization;
@@ -67,13 +68,24 @@ public class ExtensionResource {
                     + " that what they contribute to other extensions is missing too (MK-035).")
     public List<FrontendExtensionView> shellExtensions() {
         Optional<UUID> organization = RequestOrganization.of(identity);
-        return registry.active().stream()
+        List<InstalledExtension> shown = registry.active().stream()
                 .filter(extension ->
                         organization.map(id -> !apps.isOff(id, extension.key())).orElse(true))
+                .toList();
+        // A contribution that does not match the schema of the point it targets never reaches its owner,
+        // such as one installed before the owner (MK-134).
+        List<ExtensionManifest> owners = shown.stream()
+                .flatMap(extension -> extension.manifest().stream())
+                .filter(manifest -> !manifest.extensionPoints().isEmpty())
+                .toList();
+        return shown.stream()
                 .flatMap(extension -> extension.manifest().stream()
                         .flatMap(manifest -> manifest.frontend().stream()
                                 .map(frontend -> FrontendExtensionView.of(
-                                        manifest, frontend, isolateUnverified && !extension.isVerified()))))
+                                        manifest,
+                                        frontend,
+                                        isolateUnverified && !extension.isVerified(),
+                                        contribution -> ContractChecks.matches(contribution, owners)))))
                 .toList();
     }
 

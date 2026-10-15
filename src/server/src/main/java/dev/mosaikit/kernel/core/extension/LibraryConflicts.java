@@ -71,24 +71,37 @@ public final class LibraryConflicts {
                     .filter(other -> !other.key().equals(candidate.id()))
                     .forEach(other -> other.manifest().orElseThrow().libraries().stream()
                             .filter(brought -> brought.key().equals(library.key()))
-                            .filter(brought -> !brought.version().equals(library.version())
-                                    || !brought.sha256().equals(library.sha256()))
+                            .filter(brought -> !ContractApis.compatible(
+                                    library,
+                                    brought,
+                                    api(candidate, other.manifest().orElseThrow(), library)))
                             .findFirst()
-                            .ifPresent(brought -> conflicts.add(
-                                    ExtensionCatalog.conflictWithExtension(library, brought, other.key()))));
+                            .ifPresent(brought -> conflicts.add(ContractApis.conflict(
+                                    library,
+                                    brought,
+                                    other.key(),
+                                    api(candidate, other.manifest().orElseThrow(), library)))));
             // One message per library: the first candidate of the operation that brings it otherwise.
             for (ExtensionManifest other : earlier) {
                 var brought = other.libraries().stream()
                         .filter(entry -> entry.key().equals(library.key()))
-                        .filter(entry -> !entry.version().equals(library.version())
-                                || !entry.sha256().equals(library.sha256()))
+                        .filter(entry -> !ContractApis.compatible(library, entry, api(candidate, other, library)))
                         .findFirst();
                 if (brought.isPresent()) {
-                    conflicts.add(ExtensionCatalog.conflictWithExtension(library, brought.get(), other.id()));
+                    conflicts.add(
+                            ContractApis.conflict(library, brought.get(), other.id(), api(candidate, other, library)));
                     break;
                 }
             }
         }
         return conflicts;
+    }
+
+    /**
+     * Whether either extension declares the library as the API artifact of a contract (MK-134): its
+     * copies in the same major version are compatible.
+     */
+    private static boolean api(ExtensionManifest candidate, ExtensionManifest other, LibraryEntry library) {
+        return candidate.isContractApi(library) || other.isContractApi(library);
     }
 }

@@ -308,7 +308,7 @@ public final class ExtensionCatalog {
      * id; a library the kernel provides in the same version is not claimed.
      */
     private List<InstalledExtension> checkSharedLibraries(List<InstalledExtension> extensions) {
-        record Claim(LibraryEntry library, String extensionId) {}
+        record Claim(LibraryEntry library, String extensionId, boolean api) {}
         Map<String, Claim> claims = new HashMap<>();
         Map<String, InstalledExtension> refused = new HashMap<>();
         extensions.stream()
@@ -319,18 +319,24 @@ public final class ExtensionCatalog {
                     List<LibraryEntry> libraries = extension.manifest().orElseThrow().libraries().stream()
                             .filter(library -> !kernelLibraries.provides(library))
                             .toList();
+                    ExtensionManifest manifest = extension.manifest().orElseThrow();
                     List<String> problems = new ArrayList<>();
                     for (LibraryEntry library : libraries) {
                         Claim claim = claims.get(library.key());
-                        if (claim != null
-                                && !(claim.library().version().equals(library.version())
-                                        && claim.library().sha256().equals(library.sha256()))) {
-                            problems.add(conflictWithExtension(library, claim.library(), claim.extensionId()));
+                        // The API of a contract is compatible in the same major version (MK-134).
+                        boolean api = claim != null && (claim.api() || manifest.isContractApi(library));
+                        if (claim != null && !ContractApis.compatible(library, claim.library(), api)) {
+                            problems.add(ContractApis.conflict(library, claim.library(), claim.extensionId(), api));
                         }
                     }
                     if (problems.isEmpty()) {
-                        libraries.forEach(
-                                library -> claims.putIfAbsent(library.key(), new Claim(library, extension.key())));
+                        libraries.forEach(library -> claims.merge(
+                                library.key(),
+                                new Claim(library, extension.key(), manifest.isContractApi(library)),
+                                (claimed, other) -> new Claim(
+                                        ContractApis.highest(claimed.library(), other.library()),
+                                        claimed.extensionId(),
+                                        claimed.api() || other.api())));
                     } else {
                         refused.put(
                                 extension.key(),

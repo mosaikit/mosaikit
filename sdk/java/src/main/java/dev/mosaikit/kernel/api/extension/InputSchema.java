@@ -18,7 +18,8 @@ import java.util.function.BiConsumer;
 import java.util.regex.Pattern;
 
 /**
- * The JSON Schema of the input of an action (MK-015), limited to the keywords that describe plain
+ * The JSON Schema of the input of an action (MK-015), and of the payload of the contributions to an
+ * extension point (MK-134), limited to the keywords that describe plain
  * data: {@code type}, {@code properties}, {@code required}, {@code additionalProperties} (true or
  * false), {@code items}, {@code enum}, {@code minLength}, {@code maxLength}, {@code minimum},
  * {@code maximum}, {@code minItems}, {@code maxItems}, {@code format}, and the annotations {@code
@@ -111,8 +112,16 @@ public final class InputSchema {
 
     /** Checks a value against the schema; returns the problems, empty when the value is valid. */
     public List<String> validate(Object value) {
+        return validate(value, "input");
+    }
+
+    /**
+     * Checks a value against the schema, naming it {@code path} in the problems, such as the
+     * identifier of a contribution to an extension point (MK-134).
+     */
+    public List<String> validate(Object value, String path) {
         List<String> problems = new ArrayList<>();
-        check(tree, value, "input", problems);
+        check(tree, value, path, problems);
         return problems;
     }
 
@@ -141,7 +150,7 @@ public final class InputSchema {
 
     private static void checkType(Object type, String field, BiConsumer<String, String> violation, boolean root) {
         if (root && !OBJECT.equals(type)) {
-            violation.accept(field + ".type", "must be 'object': an action takes named arguments");
+            violation.accept(field + ".type", "must be 'object', with named properties");
         }
         if (type != null && !(type instanceof String name && TYPES.contains(name))) {
             violation.accept(field + ".type", "must be one of " + TYPES);

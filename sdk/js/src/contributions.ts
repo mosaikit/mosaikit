@@ -3,7 +3,10 @@
 
 /** A contribution of an extension to an extension point, as delivered by the kernel. */
 export interface Contribution {
-  /** Extension point, for example `launcher.app`. */
+  /**
+   * Extension point, for example `launcher.app`; with the major version it targets after the first,
+   * such as `dashboard.widget@2` (MK-134).
+   */
   readonly point: string;
   /** Identifier, unique within the extension and the point. */
   readonly id: string;
@@ -39,7 +42,10 @@ export interface FrontendExtension {
   /** What the frontend may do through the shell when isolated; absent means nothing. */
   readonly bridge?: FrontendBridge;
   readonly contributions: readonly Contribution[];
-  /** Extension points that the frontend offers to other extensions (MK-020). */
+  /**
+   * Extension points that the frontend offers to other extensions (MK-020), one identifier per major
+   * version: `dashboard.widget`, `dashboard.widget@2` (MK-134).
+   */
   readonly points?: readonly string[];
 }
 
@@ -60,6 +66,48 @@ export function contributionsTo(
         .map((contribution) => ({ ...contribution, extensionId: extension.id })),
     )
     .sort((a, b) => a.extensionId.localeCompare(b.extensionId) || a.id.localeCompare(b.id));
+}
+
+/**
+ * A contribution whose attributes have the type of the payload of its extension point (MK-134): the
+ * kernel refuses at installation the contributions that do not match the JSON Schema that the point
+ * declares, and never gives them to the owner.
+ */
+export type TypedContribution<T extends object> = Omit<OwnedContribution, 'attributes'> & {
+  readonly attributes: Readonly<T>;
+};
+
+/**
+ * The identifier of one major version of an extension point (MK-134): the name for version 1, as
+ * points were declared before versions, and `name@version` after it.
+ */
+export function pointId(name: string, version = 1): string {
+  if (!Number.isInteger(version) || version < 1) {
+    throw new RangeError(
+      `The version of an extension point is a whole number from 1, not ${String(version)}`,
+    );
+  }
+  return version === 1 ? name : `${name}@${String(version)}`;
+}
+
+/**
+ * The contributions to one version of an extension point that the extension declares in
+ * `frontend.points`, typed by the payload of that version (MK-134):
+ *
+ * ```ts
+ * interface Widget { readonly element: string; readonly title: string; readonly size?: 'small' | 'large' }
+ * const widgets = typedContributions<Widget>(context, 'dashboard.widget', 2);
+ * ```
+ *
+ * The type parameter states what the JSON Schema of that version of the point guarantees; empty for
+ * a point the extension does not declare.
+ */
+export function typedContributions<T extends object>(
+  context: { readonly contributionsTo: (point: string) => readonly OwnedContribution[] },
+  point: string,
+  version = 1,
+): readonly TypedContribution<T>[] {
+  return context.contributionsTo(pointId(point, version)) as readonly TypedContribution<T>[];
 }
 
 /** Reads a string attribute of a contribution, or returns `undefined` when it is missing or not a string. */

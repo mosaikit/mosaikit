@@ -22,6 +22,9 @@ it. The installation holds one version of each library: an extension that brings
 kernel has in another version, or that another extension brings in another version, is not loaded,
 and its status names the library and both versions (the marketplace refuses such a package at once).
 Install versions of the extensions that agree, or ask their publisher to align the library.
+The API artifact of a contract between extensions (MK-134), such as the one a catalog and its
+connectors share, is the exception: it is loaded once, in the highest of the compatible versions
+that the extensions bring.
 
 In Docker Compose, copy the zip into `mosaikit-docker/extensions/` and run
 `docker compose restart mosaikit`. In Kubernetes, build a derived image with the extensions (see the
@@ -54,6 +57,11 @@ An extension may require other extensions in a range of versions, or use them op
   nor schema, otherwise at the next restart. It is refused while an active extension requires it,
   naming those extensions: remove them first, or together by hand. Extensions that use it
   optionally stay active. An extension installed as a directory is removed by hand.
+- **Contracts** between extensions (MK-134): installing an extension whose contributions do not
+  match the schema that another extension declares for them, or that implements a version of a
+  contract that the installed owner does not serve, is refused with the reason; update them
+  together. An extension that contributes to, or implements, the contract of an extension that is
+  not installed is accepted.
 - **Turning off** an extension in an organization (all its apps off, see
   [Administration](administration.md)) is refused while an extension that stays on there requires
   it; turn both off in the same change.

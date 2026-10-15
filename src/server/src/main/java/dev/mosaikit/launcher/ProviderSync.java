@@ -3,6 +3,7 @@
 package dev.mosaikit.launcher;
 
 import dev.mosaikit.kernel.api.extension.LibraryEntry;
+import dev.mosaikit.kernel.core.extension.ContractApis;
 import dev.mosaikit.kernel.core.extension.InstalledExtension;
 import dev.mosaikit.kernel.core.extension.KernelLibraries;
 import dev.mosaikit.kernel.core.extension.ProviderState;
@@ -24,6 +25,7 @@ import java.util.stream.Stream;
  *
  * <p>Each extension JAR is copied as {@code <extension id>.jar}, and each library that the extensions
  * bring and the kernel does not provide (MK-131) as {@code <groupId>_<artifactId>_<version>.jar}, once
+ * (the API artifact of a contract in the highest compatible version, MK-134)
  * whatever the number of extensions that bring it, for as long as one of them can run. The state file is written only after
  * the kernel has been rebuilt, so that a failed rebuild never leaves the kernel claiming to have
  * loaded code it does not contain.
@@ -69,23 +71,41 @@ final class ProviderSync {
     /** Compares the Java extensions that can run with what the kernel was built with. */
     Plan plan(List<InstalledExtension> extensions) {
         Map<String, Source> byId = new TreeMap<>();
-        extensions.stream()
+        List<InstalledExtension> java = extensions.stream()
                 .filter(InstalledExtension::isActive)
                 .filter(extension -> extension.backendJar().isPresent())
                 .sorted(Comparator.comparing(InstalledExtension::key))
-                .forEach(extension -> {
-                    byId.put(
-                            extension.key(),
-                            new Source(extension.key(), extension.backendJar().orElseThrow()));
-                    for (LibraryEntry library :
-                            extension.manifest().orElseThrow().libraries()) {
-                        if (!kernelLibraries.provides(library)) {
-                            String id = ProviderState.libraryId(library);
-                            byId.putIfAbsent(
-                                    id, new Source(id, extension.directory().resolve(library.jar())));
-                        }
+                .toList();
+        // The API artifacts of contracts (MK-134): the highest of the compatible versions is copied.
+        Set<String> apis = new TreeSet<>();
+        java.forEach(extension -> apis.addAll(extension.manifest().orElseThrow().contractApis()));
+        Map<String, LibraryEntry> highestApis = new TreeMap<>();
+        Map<String, Path> apiJars = new TreeMap<>();
+        java.forEach(extension -> {
+            byId.put(
+                    extension.key(),
+                    new Source(extension.key(), extension.backendJar().orElseThrow()));
+            for (LibraryEntry library : extension.manifest().orElseThrow().libraries()) {
+                if (kernelLibraries.provides(library)) {
+                    continue;
+                }
+                Path jar = extension.directory().resolve(library.jar());
+                if (apis.contains(library.key())) {
+                    LibraryEntry current = highestApis.get(library.key());
+                    if (current == null || ContractApis.highest(current, library) != current) {
+                        highestApis.put(library.key(), library);
+                        apiJars.put(library.key(), jar);
                     }
-                });
+                } else {
+                    String id = ProviderState.libraryId(library);
+                    byId.putIfAbsent(id, new Source(id, jar));
+                }
+            }
+        });
+        highestApis.forEach((key, library) -> {
+            String id = ProviderState.libraryId(library);
+            byId.put(id, new Source(id, apiJars.get(key)));
+        });
         List<Source> sources = List.copyOf(byId.values());
         ProviderState desired = new ProviderState(sources.stream()
                 .map(source -> new ProviderState.Entry(ProviderState.sha256(source.jar()), source.extensionId()))
