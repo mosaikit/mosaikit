@@ -57,13 +57,17 @@ test.describe('MK-135 References between resources of different extensions degra
 
     // Hello keeps a reference to the memo of Notes, and shows it.
     await signIn(page, MARIO);
-    await page.evaluate((id) => localStorage.setItem('fixture.hello.memo', id), memo);
+    await page.evaluate((id) => {
+      localStorage.setItem('fixture.hello.memo', id);
+    }, memo);
     await openApp(page, 'Hello');
     const pinned = page.getByRole('region', { name: 'Pinned memo' });
     await expect(pinned.getByText(text, { exact: true })).toBeVisible();
     const anna = await (await browser.newContext()).newPage();
     await signIn(anna, ANNA);
-    await anna.evaluate((id) => localStorage.setItem('fixture.hello.memo', id), memo);
+    await anna.evaluate((id) => {
+      localStorage.setItem('fixture.hello.memo', id);
+    }, memo);
     await openApp(anna, 'Hello');
     await expect(anna.getByRole('region', { name: 'Pinned memo' }).getByText(text)).toBeVisible();
 
