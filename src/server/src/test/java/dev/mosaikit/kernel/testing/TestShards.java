@@ -16,8 +16,8 @@ import org.junit.platform.launcher.PostDiscoveryFilter;
 
 /**
  * Splits the tests of the kernel into shards that the CI runs at the same time, one job each:
- * {@code -Dtest.shard=1/2} runs the first half of the classes, {@code -Dtest.shard=2/2} the second.
- * Without the property every test runs.
+ * {@code -Dtest.shard=<index>/<count>}, such as {@code 1/4} to {@code 4/4}, runs the classes of shard
+ * {@code index} out of {@code count}. Without the property every test runs.
  *
  * <p>The slow classes are given a shard in {@code test-shards.properties}, so that the shards take
  * about the same time; any other class, a new one included, goes to the shard given by the hash of

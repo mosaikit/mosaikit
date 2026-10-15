@@ -183,12 +183,17 @@ running one.
 | Merge queue | each pull request in the merge queue of `main` (`merge_group`), on the commit that merges it with `main` and the pull requests ahead of it | the fast lane, always whole (no documentation-only shortcut), plus the release documents; not `changelog`, which passed on the pull request |
 | Full | `main`, every night at 02:17 UTC, tags, by hand | everything above, plus the installation tests, the tests with Keycloak, SonarQube, SBOM, dependency scan and the release documents; the portable archives on tags or by hand |
 
-The tests of the backend run in two jobs at the same time, `backend shard 1/2` and
-`backend shard 2/2`: `-Dtest.shard=<n>/2` makes the JUnit Platform filter `TestShards` of the kernel
+The tests of the backend run in four jobs at the same time, `backend shard 1/4` to
+`backend shard 4/4`: `-Dtest.shard=<n>/4` makes the JUnit Platform filter `TestShards` of the kernel
 keep the test classes of one shard, the slow ones as listed in
 `src/server/src/test/resources/test-shards.properties` and the others by the hash of their name, so
 every class runs in exactly one shard. A class that takes more than a few seconds is worth a line
-there. The job `backend` passes when both shards pass.
+there, in the shard that took the least time in the JUnit reports of the last runs. To change the
+number of shards, change the matrix `shard` of the job `backend-shard` in `.github/workflows/ci.yml`
+and the count after the slash, then spread the slow classes again: `TestShardsTest` fails while the
+list does not use every shard of the matrix, or names a shard beyond it. The job `backend` passes
+when every shard passes. Shard 1 runs `DocumentationTest` alone on a pull request of documentation
+only.
 
 `frontend`, `backend`, `e2e`, `docs`, `changelog`, `secrets` and `sast` are the required checks of
 `main` (a job skipped by its condition, such as `docs` on a pull request, counts as passed), and pull
