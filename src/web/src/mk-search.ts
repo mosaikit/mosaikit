@@ -97,9 +97,6 @@ export class MkSearch extends LitElement {
       color: var(--mk-muted);
       font-style: italic;
     }
-    .error {
-      color: var(--mk-danger);
-    }
     .paging {
       display: flex;
       gap: 8px;
@@ -214,7 +211,17 @@ export class MkSearch extends LitElement {
     return html`
       <h1>${t('Results for “{query}”', { query: request.query })}</h1>
       ${this.renderPills(request)}
-      ${this.error ? html`<p class="error" role="alert">${this.error}</p>` : nothing}
+      ${
+        this.error
+          ? html`<mk-empty-state
+              kind="failed"
+              role="alert"
+              heading=${t('The search failed. Try again.')}
+              @mk-retry=${() => void this.load()}
+              >${this.error}</mk-empty-state
+            >`
+          : nothing
+      }
       ${this.busy && !this.answer ? html`<p class="muted">${t('Searching…')}</p>` : nothing}
       ${this.answer ? (request.provider ? this.renderPage(request, this.answer) : this.renderAll(this.answer)) : nothing}
     `;
@@ -252,9 +259,11 @@ export class MkSearch extends LitElement {
       (section) => section.results.length > 0 || section.status === 'incomplete',
     );
     if (shown.length === 0) {
-      return html`<p class="muted">
-        ${t('Nothing found for “{query}”.', { query: answer.query })}
-      </p>`;
+      return html`<mk-empty-state
+        kind="empty"
+        heading=${t('Nothing found for “{query}”.', { query: answer.query })}
+        >${t('Try other words, or only the beginning of a word.')}</mk-empty-state
+      >`;
     }
     return shown.map((section) => {
       const title = this.titleOf(section.provider, section.title);
@@ -287,9 +296,11 @@ export class MkSearch extends LitElement {
     const title = this.titleOf(section.provider, section.title);
     const offset = request.offset ?? 0;
     if (section.status === 'complete' && section.results.length === 0) {
-      return html`<p class="muted">
-        ${t('Nothing found for “{query}” in {title}.', { query: answer.query, title })}
-      </p>`;
+      return html`<mk-empty-state
+        kind="empty"
+        heading=${t('Nothing found for “{query}” in {title}.', { query: answer.query, title })}
+        >${t('Try other words, or look in All.')}</mk-empty-state
+      >`;
     }
     return html`${this.renderSection(title, section)}
       <div class="paging">
