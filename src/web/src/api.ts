@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
-import type { ActiveExtension, FrontendExtension } from '@mosaikit/sdk';
+import type { ActiveExtension, Favorite, FrontendExtension } from '@mosaikit/sdk';
 import type { SignInOptions } from './federation.js';
 
 /** Public information returned before sign-in. */
@@ -724,6 +724,17 @@ export class KernelClient {
 
   async markAllRead(): Promise<void> {
     await this.send('/api/v1/notifications/read', {});
+  }
+
+  /** The favorites of the signed-in person in the organization, the last marked first (MK-094). */
+  favorites(): Promise<Favorite[]> {
+    return this.getJson<Favorite[]>('/api/v1/favorites');
+  }
+
+  /** Removes a resource from the favorites of the signed-in person (MK-094). */
+  async removeFavorite(favorite: Pick<Favorite, 'extension' | 'type' | 'id'>): Promise<void> {
+    const path = [favorite.extension, favorite.type, favorite.id].map(encodeURIComponent).join('/');
+    await this.sendJson<undefined>(`/api/v1/favorites/${path}`, 'DELETE');
   }
 
   /** Notifies people of the organization as an extension. */

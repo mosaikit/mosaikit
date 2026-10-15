@@ -3,16 +3,8 @@
 package dev.mosaikit.kernel.core.resources;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import dev.mosaikit.kernel.api.extension.ExtensionManifest;
-import dev.mosaikit.kernel.api.resource.ResolvedReference;
-import dev.mosaikit.kernel.api.resource.Resource;
 import dev.mosaikit.kernel.api.resource.ResourceRef;
 import dev.mosaikit.kernel.core.error.InvalidInputException;
-import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
-import dev.mosaikit.kernel.core.extension.ExtensionStatus;
-import dev.mosaikit.kernel.core.extension.InstalledExtension;
-import dev.mosaikit.kernel.core.identity.RequestOrganization;
-import dev.mosaikit.kernel.core.security.Roles;
 import io.quarkus.security.Authenticated;
 import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.ws.rs.Consumes;
@@ -22,8 +14,6 @@ import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Locale;
-import java.util.Optional;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 
@@ -63,13 +53,13 @@ public class ResourceReferencesResource {
     public record Missing(String extension, String name, String action) {}
 
     private final KernelResourceReferences references;
-    private final ExtensionRegistry extensions;
+    private final ReferenceViews views;
     private final SecurityIdentity identity;
 
     public ResourceReferencesResource(
-            KernelResourceReferences references, ExtensionRegistry extensions, SecurityIdentity identity) {
+            KernelResourceReferences references, ReferenceViews views, SecurityIdentity identity) {
         this.references = references;
-        this.extensions = extensions;
+        this.views = views;
         this.identity = identity;
     }
 
@@ -101,49 +91,10 @@ public class ResourceReferencesResource {
                 throw new InvalidInputException(List.of("reference " + i + ": " + e.getMessage()));
             }
         }
-        boolean administrator = RequestOrganization.administrator(identity) || identity.hasRole(Roles.PLATFORM_ADMIN);
+        boolean administrator = ReferenceViews.administrator(identity);
         return targets.stream()
                 .map(references::resolve)
-                .map(resolved -> view(resolved, administrator))
+                .map(resolved -> views.view(resolved, administrator))
                 .toList();
-    }
-
-    private ReferenceView view(ResolvedReference resolved, boolean administrator) {
-        ResourceRef target = resolved.target();
-        String status = resolved.availability().name().toLowerCase(Locale.ROOT).replace('_', '-');
-        Resource resource = resolved.resource();
-        Missing missing = administrator && resolved.availability() == ResolvedReference.Availability.EXTENSION_ABSENT
-                ? missing(target.extension())
-                : null;
-        return new ReferenceView(
-                target.extension(),
-                target.type(),
-                target.id(),
-                status,
-                resource == null ? null : resource.title(),
-                resource == null ? null : resource.link(),
-                missing);
-    }
-
-    private Missing missing(String extension) {
-        Optional<InstalledExtension> installed = extensions.all().stream()
-                .filter(found -> found.key().equals(extension))
-                .findFirst();
-        String name = installed
-                .flatMap(InstalledExtension::manifest)
-                .map(ExtensionManifest::name)
-                .orElse(null);
-        String action;
-        if (installed.isEmpty()) {
-            action = "install";
-        } else if (installed.get().isActive()) {
-            // Active in the installation, absent in the organization: its apps are turned off there.
-            action = "turn-on";
-        } else if (installed.get().status() == ExtensionStatus.RESTART_REQUIRED) {
-            action = "restart";
-        } else {
-            action = "repair";
-        }
-        return new Missing(extension, name, action);
     }
 }

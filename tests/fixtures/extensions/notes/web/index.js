@@ -5,11 +5,14 @@
  * Frontend of the sample Java extension: lists and creates notes through the extension API
  * (/api/v1/ext/fixture-notes/notes), with the credentials of the signed-in person, and memos
  * (/api/v1/ext/fixture-notes/memos), which the kernel shares (MK-055): the Share button opens the
- * sharing dialog of the shell, and mk-fixture-memo shows a memo opened with a link.
+ * sharing dialog of the shell, and mk-fixture-memo shows a memo opened with a link. The star button
+ * marks a memo as favorite of the person (MK-094), as `markFavorite` of `@mosaikit/sdk` does, and
+ * the memo named by `?memo=` in the address, where a favorite opens it, is the current one.
  */
 
 const API = '/api/v1/ext/fixture-notes/notes';
 const MEMOS = '/api/v1/ext/fixture-notes/memos';
+const FAVORITES = '/api/v1/favorites';
 
 /** @type {import('@mosaikit/sdk').MosaikitExtension} */
 const extension = {
@@ -42,6 +45,7 @@ const extension = {
             .error { color: var(--mk-danger); }
             section + section { margin-top: 16px; }
             li.memo { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+            li.memo[aria-current] span { font-weight: 600; }
             button.secondary { background: var(--mk-surface); color: var(--mk-fg); border-color: var(--mk-line); }
           </style>
           <section>
@@ -96,6 +100,15 @@ const extension = {
           return;
         }
         const memos = await response.json();
+        const listed = await context.fetch(FAVORITES);
+        const favorites = new Set(
+          listed.ok
+            ? (await listed.json())
+                .filter((favorite) => favorite.extension === context.extension.id)
+                .map((favorite) => favorite.id)
+            : [],
+        );
+        const current = new URLSearchParams(location.search).get('memo');
         this.memos.replaceChildren(
           ...memos.map((memo) => {
             const item = document.createElement('li');
@@ -110,10 +123,36 @@ const extension = {
             button.addEventListener('click', () => {
               share(memo.id);
             });
-            item.append(text, button);
+            if (memo.id === current) {
+              item.setAttribute('aria-current', 'true');
+            }
+            const marked = favorites.has(memo.id);
+            const star = document.createElement('button');
+            star.type = 'button';
+            star.className = 'secondary';
+            star.textContent = marked ? '★' : '☆';
+            star.setAttribute('aria-pressed', String(marked));
+            star.setAttribute('aria-label', `Favorite ${memo.text}`);
+            star.addEventListener('click', () => {
+              void this.favorite(memo.id, !marked);
+            });
+            item.append(text, star, button);
             return item;
           }),
         );
+      }
+
+      /** Marks a memo as favorite of the person, or removes it from their favorites (MK-094). */
+      async favorite(id, marked) {
+        const path = [context.extension.id, 'memo', id].map(encodeURIComponent).join('/');
+        const response = await context.fetch(`${FAVORITES}/${path}`, {
+          method: marked ? 'PUT' : 'DELETE',
+        });
+        if (!response.ok) {
+          this.fail(`The favorite cannot be saved (${response.status}).`);
+          return;
+        }
+        await this.refreshMemos();
       }
 
       async addMemo(text) {
