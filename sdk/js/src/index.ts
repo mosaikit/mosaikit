@@ -23,3 +23,17 @@ export { PresenceStore, isPresenceChange } from './presence.js';
 export type { ActiveExtension, ExtensionPresence, ExtensionPresenceChange } from './presence.js';
 export { SHARE_TOPIC, openSharing, sharingLevel } from './sharing.js';
 export type { SharedResourceRef } from './sharing.js';
+export { RESOLVE_REFERENCES_PATH, resolveReferences, watchReferences } from './references.js';
+export type {
+  MissingExtension,
+  MissingExtensionAction,
+  ReferenceStatus,
+  ResolvedReference,
+} from './references.js';
+export {
+  REFERENCE_PLACEHOLDER_TAG,
+  defineReferencePlaceholder,
+  referencePlaceholderHtml,
+  referencePlaceholderText,
+} from './placeholder.js';
+export type { ReferencePlaceholderElement, ReferencePlaceholderText } from './placeholder.js';

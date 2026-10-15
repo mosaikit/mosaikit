@@ -8,6 +8,15 @@
 
 const TOPIC = 'fixture.hello.greeted';
 
+/**
+ * A memo of the fixture Notes that Hello shows when one is pinned in this browser (MK-135): a
+ * reference to a resource of another extension, which the kernel resolves to the memo or to why it
+ * is not available. A bundled extension uses `watchReferences` of `@mosaikit/sdk`; this plain module
+ * does the same with `context.fetch` and `context.extensions`.
+ */
+const PINNED = 'fixture.hello.memo';
+const NOTES = 'dev.mosaikit.fixture.notes';
+
 /** @type {import('@mosaikit/sdk').MosaikitExtension} */
 const extension = {
   activate(context) {
@@ -32,6 +41,11 @@ const extension = {
             <p></p>
             <button type="button">Publish an event</button>
             <p role="status" aria-live="polite"></p>
+          </section>
+          <section class="pinned" aria-label="Pinned memo" hidden>
+            <h2>Pinned memo</h2>
+            <strong class="memo"></strong>
+            <mk-reference-placeholder label="Pinned memo"></mk-reference-placeholder>
           </section>`;
         const [intro, status] = root.querySelectorAll('p');
         intro.textContent = `Signed in as ${context.user.displayName}. Extension ${context.extension.id} ${context.extension.version}.`;
@@ -41,10 +55,44 @@ const extension = {
         this.unsubscribe = context.events.on(TOPIC, (payload) => {
           status.textContent = `Received ${TOPIC} at ${payload.at}`;
         });
+        this.stopWatching = this.pin(root);
+      }
+
+      /** Shows the pinned memo, or the placeholder of the kernel, again whenever Notes comes or goes. */
+      pin(root) {
+        const id = localStorage.getItem(PINNED);
+        if (!id) {
+          return undefined;
+        }
+        const reference = { extension: NOTES, type: 'memo', id };
+        const memo = root.querySelector('.memo');
+        const placeholder = root.querySelector('mk-reference-placeholder');
+        placeholder.setAttribute('locale', context.locale);
+        root.querySelector('.pinned').hidden = false;
+        const resolve = async () => {
+          const response = await context.fetch('/api/v1/resources/references/resolve', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify([reference]),
+          });
+          if (!response.ok) {
+            return;
+          }
+          const [resolved] = await response.json();
+          memo.textContent = resolved.status === 'available' ? resolved.title : '';
+          placeholder.reference = resolved;
+        };
+        void resolve();
+        return context.extensions.subscribe((change) => {
+          if (change.extension === NOTES) {
+            void resolve();
+          }
+        });
       }
 
       disconnectedCallback() {
         this.unsubscribe?.();
+        this.stopWatching?.();
       }
     }
 

@@ -54,6 +54,9 @@ class ExtensionDependencyTest {
     static final String STORE = "dev.mosaikit.test.store";
     static final String SHELF = "dev.mosaikit.test.shelf";
     static final String SLUG = "dependency-town";
+    // ResourceReferencesTest: dashboards that refer to the maps of another extension (MK-135).
+    static final String DASHBOARDS = "dev.mosaikit.test.dashboards";
+    static final String MAPS = "dev.mosaikit.test.maps";
 
     /** Prepares the key and a signed catalog before the kernel starts. */
     public static class Catalog implements QuarkusTestProfile {
@@ -91,7 +94,15 @@ class ExtensionDependencyTest {
         pkg(STORE, "1.0.0", "store", "database:\n  schema: ext_dependency_store\n");
         pkg(SHELF, "1.0.0", "shelf", "requires: {" + STORE + ": '^1'}\n");
         pkg(VIEWER, "1.0.0", "viewer", "optional: {" + BASE + ": '^1', dev.mosaikit.test.absent: '^1'}\n");
+        pkg(DASHBOARDS, "1.0.0", "dashboards", resources("dashboard"));
+        pkg(MAPS, "1.0.0", "maps", resources("map"));
         ExtensionIndex.write(CATALOG, PUBLISHER, Instant.now());
+    }
+
+    /** A resource type that people share to view, in the place of the dependencies of {@link #pkg}. */
+    private static String resources(String type) {
+        return "resources:\n  - { type: " + type + ", title: " + type + ", levels: [{ name: view, title: View }],"
+                + " subjects: [person] }\n";
     }
 
     static Path pkg(String id, String version, String app, String dependencies) throws IOException {
