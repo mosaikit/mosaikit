@@ -81,6 +81,21 @@ public interface KernelConfig {
         Duration linkMaxValidity();
     }
 
+    /** The version history of the registered resources (MK-096). */
+    Versions versions();
+
+    /** Settings of the version history of resources. */
+    interface Versions {
+
+        /**
+         * How many versions of a resource are kept: a save that goes over it removes the oldest ones,
+         * never the newest. A value below 1 is a mistake of configuration, and then nothing is
+         * removed ({@code mosaikit.versions.max-per-resource}).
+         */
+        @WithDefault("50")
+        int maxPerResource();
+    }
+
     /** The encrypted store of credentials for extensions (MK-062). */
     Secrets secrets();
 

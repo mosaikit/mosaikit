@@ -150,6 +150,15 @@ You see what you own. The administrators of the organization also see, with **Sh
 the whole organization**, what everyone deleted, and what belongs to the organization, and restore
 or delete it the same way.
 
+## Versions
+
+Apps that keep the history of their resources, such as documents or dashboards, save a version each
+time you save, with who saved it and when (MK-096). Whoever can open the resource sees its versions
+and opens an earlier one; whoever can edit it restores one, also with an access to a folder above
+it. A restore does not erase anything: it becomes the newest version, and the earlier ones stay. An
+installation keeps a number of versions of each resource, 50 unless it sets otherwise; beyond it the
+oldest go.
+
 ## Activity
 
 **Activity**, at the top of the app bar, collects what the apps tell you: a mention, a task, a
