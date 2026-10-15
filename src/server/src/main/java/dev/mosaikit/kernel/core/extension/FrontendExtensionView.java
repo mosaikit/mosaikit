@@ -72,7 +72,7 @@ public record FrontendExtensionView(
      * @param served the contributions to give to the shell: those that match the schema of their point
      *     (MK-134)
      */
-    static FrontendExtensionView of(
+    public static FrontendExtensionView of(
             ExtensionManifest manifest, FrontendEntry frontend, boolean isolate, Predicate<Contribution> served) {
         boolean iframe = isolate || frontend.isolation() == FrontendIsolation.IFRAME;
         FrontendBridge bridge = frontend.bridge();

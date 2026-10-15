@@ -68,6 +68,8 @@ const ITALIAN: Record<string, string> = {
   '{count} apps available.': '{count} app disponibili.',
   '{count} extensions could not be loaded.': '{count} estensioni non sono state caricate.',
   'Your apps': 'Le tue app',
+  Widgets: 'Widget',
+  'From {product}': 'Da {product}',
   'You are signed in, but the apps could not be loaded: {reason} Reload the page; if it happens again, tell your administrator.':
     "Hai effettuato l'accesso, ma le app non sono state caricate: {reason} Ricarica la pagina; se succede di nuovo, avvisa l'amministratore.",
   // Personal settings

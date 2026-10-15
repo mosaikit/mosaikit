@@ -19,6 +19,7 @@ lead to the topic.
   - <a id="frontends-written-with-a-framework"></a>[Frontends written with a framework](extensions/frontend.md#frontends-written-with-a-framework)
   - <a id="isolated-frontends"></a>[Isolated frontends](extensions/frontend.md#isolated-frontends)
   - <a id="the-state-of-an-app-in-the-address"></a>[The state of an app in the address](extensions/address.md)
+- <a id="widgets-of-the-home-page"></a>[Widgets of the home page](extensions/home-widgets.md)
 - <a id="java-code"></a>[Java code](extensions/backend.md)
   - <a id="libraries-of-an-extension"></a>[Libraries of an extension](extensions/libraries.md)
   - <a id="transactions-and-the-beans-of-the-kernel"></a>[Transactions and the beans of the kernel](extensions/transactions.md)

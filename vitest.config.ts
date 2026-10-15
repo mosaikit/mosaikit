@@ -57,6 +57,7 @@ export default defineConfig({
         'src/web/src/mk-permission-list.ts',
         'src/web/src/mk-effective-permissions.ts',
         'src/web/src/mk-activity.ts',
+        'src/web/src/mk-home-widgets.ts',
         'sdk/ui/src/apply.ts',
         'sdk/ui/src/components.ts',
         'src/web/src/mk-admin-extensions.ts',

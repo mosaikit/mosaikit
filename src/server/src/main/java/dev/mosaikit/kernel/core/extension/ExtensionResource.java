@@ -5,6 +5,7 @@ package dev.mosaikit.kernel.core.extension;
 import dev.mosaikit.kernel.api.extension.ExtensionManifest;
 import dev.mosaikit.kernel.core.apps.AppSettings;
 import dev.mosaikit.kernel.core.config.KernelConfig;
+import dev.mosaikit.kernel.core.home.HomeWidgets;
 import dev.mosaikit.kernel.core.identity.RequestOrganization;
 import dev.mosaikit.kernel.core.presence.KernelExtensionPresence;
 import dev.mosaikit.kernel.core.security.Roles;
@@ -65,7 +66,8 @@ public class ExtensionResource {
     @Operation(
             summary = "List the frontends the shell must load",
             description = "Not those of the extensions turned off for the organization of the request (MK-030), so"
-                    + " that what they contribute to other extensions is missing too (MK-035).")
+                    + " that what they contribute to other extensions is missing too (MK-035). The widgets of the"
+                    + " home page are only those of the roles of the person (MK-101).")
     public List<FrontendExtensionView> shellExtensions() {
         Optional<UUID> organization = RequestOrganization.of(identity);
         List<InstalledExtension> shown = registry.active().stream()
@@ -85,7 +87,10 @@ public class ExtensionResource {
                                         manifest,
                                         frontend,
                                         isolateUnverified && !extension.isVerified(),
-                                        contribution -> ContractChecks.matches(contribution, owners)))))
+                                        contribution -> ContractChecks.matches(contribution, owners)
+                                                && (!HomeWidgets.isWidget(contribution)
+                                                        || HomeWidgets.appearsFor(
+                                                                contribution, identity.getRoles()))))))
                 .toList();
     }
 

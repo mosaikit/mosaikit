@@ -6,6 +6,7 @@ import dev.mosaikit.kernel.api.extension.Contribution;
 import dev.mosaikit.kernel.api.extension.ExtensionManifest;
 import dev.mosaikit.kernel.api.extension.ImplementedContract;
 import dev.mosaikit.kernel.api.extension.ProvidedContract;
+import dev.mosaikit.kernel.core.home.HomeWidgets;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
@@ -22,7 +23,8 @@ import java.util.stream.Collectors;
  * contract on the server must target a version that its owner serves. Each check applies when both
  * extensions are there: an extension that contributes to, or implements, a contract of a missing
  * extension is installed, as extensions are independent (ADR-0041). An owner that retires a version is
- * not refused: what targets that version is no longer used.
+ * not refused: what targets that version is no longer used. The points that the kernel owns, such as the
+ * widgets of the home page (MK-101), are checked in the same way.
  */
 public final class ContractChecks {
 
@@ -41,6 +43,9 @@ public final class ContractChecks {
         operation.forEach(manifest -> after.put(manifest.id(), manifest));
         Set<String> ids = operation.stream().map(ExtensionManifest::id).collect(Collectors.toSet());
         Set<String> problems = new LinkedHashSet<>();
+        for (ExtensionManifest manifest : operation) {
+            problems.addAll(kernelContributions(manifest));
+        }
         for (ExtensionManifest contributor : after.values()) {
             for (ExtensionManifest owner : after.values()) {
                 // What the operation brings, on either side of a point.
@@ -68,9 +73,33 @@ public final class ContractChecks {
         return problems;
     }
 
-    /** Whether a contribution matches every point it targets among these extensions. */
+    /** The contributions of an extension that do not match the schema of a point of the kernel (MK-101). */
+    public static List<String> kernelContributions(ExtensionManifest contributor) {
+        List<String> problems = new ArrayList<>();
+        for (Contribution contribution : contributor.contributions()) {
+            kernelMismatch(contribution)
+                    .ifPresent(found -> problems.add("the contribution " + contribution.id() + " of "
+                            + contributor.id() + " " + contributor.version() + " to " + contribution.point()
+                            + " does not match the schema of the kernel: " + found));
+        }
+        return problems;
+    }
+
+    /**
+     * Whether a contribution matches every point it targets among these extensions and the points of
+     * the kernel.
+     */
     public static boolean matches(Contribution contribution, Collection<ExtensionManifest> owners) {
-        return owners.stream().allMatch(owner -> mismatch(contribution, owner).isEmpty());
+        return kernelMismatch(contribution).isEmpty()
+                && owners.stream()
+                        .allMatch(owner -> mismatch(contribution, owner).isEmpty());
+    }
+
+    private static Optional<String> kernelMismatch(Contribution contribution) {
+        return HomeWidgets.kernelPoint(contribution.point())
+                .map(point -> point.validate(contribution))
+                .filter(problems -> !problems.isEmpty())
+                .map(problems -> String.join(", ", problems));
     }
 
     private static Optional<String> mismatch(Contribution contribution, ExtensionManifest owner) {

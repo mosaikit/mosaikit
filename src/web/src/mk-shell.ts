@@ -46,6 +46,8 @@ import './mk-admin-organizations.js';
 import './mk-admin-settings.js';
 import './mk-assistant.js';
 import './mk-extension-frame.js';
+import './mk-home-widgets.js';
+import { VISITOR } from './home.js';
 import './mk-activity.js';
 import './mk-access-keys.js';
 import './mk-sessions.js';
@@ -390,6 +392,11 @@ export class MkShell extends LitElement {
       background: color-mix(in srgb, var(--mk-accent) 16%, var(--mk-surface));
       color: var(--mk-accent);
     }
+    /* The public widgets under the sign-in (MK-101). */
+    .visitor {
+      padding: 8px 24px 32px;
+      background: var(--mk-bg);
+    }
     /* The apps on the home page. */
     .apps {
       list-style: none;
@@ -602,6 +609,8 @@ export class MkShell extends LitElement {
   private readonly onNetwork = (): void => {
     this.online = navigator.onLine;
   };
+  /** The frontends of the public widgets, loaded for the home page of visitors (MK-101). */
+  @state() private visitorExtensions: FrontendExtension[] = [];
   /** Why the apps could not be loaded after signing in. */
   @state() private appsError: string | undefined;
   /** The personal settings of the signed-in person (MK-027). */
@@ -669,6 +678,7 @@ export class MkShell extends LitElement {
         this.info = info;
         showProduct(info);
         this.applyAppearance();
+        void this.loadVisitorHome();
       },
       () => {
         this.error = 'The kernel is not reachable.';
@@ -792,7 +802,9 @@ export class MkShell extends LitElement {
     if (!this.account) {
       // Until the kernel answers, nothing: the page would show the name and the colors of Mosaikit
       // and then change to those of the installation.
-      return this.info || this.error ? html`${offline}${this.renderSignIn()}` : offline;
+      return this.info || this.error
+        ? html`${offline}${this.renderSignIn()}${this.renderVisitorHome()}`
+        : offline;
     }
     return html`${offline}
       <div class="frame" @keydown=${this.keyFrame}>
@@ -1219,6 +1231,42 @@ export class MkShell extends LitElement {
     return this.saving;
   };
 
+  /**
+   * Loads the frontends of the widgets that extensions declare public, for the visitors without an
+   * account (MK-101). They get no session: what they show must not need one.
+   */
+  private async loadVisitorHome(): Promise<void> {
+    try {
+      const extensions = await this.client.publicHomeWidgets();
+      if (extensions.length === 0) {
+        return;
+      }
+      const results = await new ExtensionLoader((path, init) =>
+        this.client.request(path, init),
+      ).loadAll(extensions, VISITOR);
+      const loaded = new Set(
+        results.filter((result) => result.loaded).map((result) => result.extensionId),
+      );
+      this.visitorExtensions = extensions.filter((extension) => loaded.has(extension.id));
+    } catch {
+      // No public widget: the sign-in page alone.
+    }
+  }
+
+  /** The public widgets under the sign-in, for visitors (MK-101). */
+  private renderVisitorHome(): unknown {
+    if (this.visitorExtensions.length === 0) {
+      return nothing;
+    }
+    return html`<section class="visitor">
+      <mk-home-widgets
+        .extensions=${this.visitorExtensions}
+        .language=${this.shellLanguage}
+        label=${t('From {product}', { product: this.info?.name ?? 'Mosaikit' })}
+      ></mk-home-widgets>
+    </section>`;
+  }
+
   /** The sign-in page (mk-sign-in), which tells the shell what the person asked for. */
   private renderSignIn(): unknown {
     return html`<mk-sign-in
@@ -1455,7 +1503,13 @@ export class MkShell extends LitElement {
                             )}
                           </ul>`
                         : nothing
-                    }`
+                    }
+                    <mk-home-widgets
+                      .extensions=${this.extensions}
+                      .presence=${this.presence}
+                      .held=${this.held}
+                      .language=${this.shellLanguage}
+                    ></mk-home-widgets>`
         }
         <div id="app-host"></div>
       </main>
