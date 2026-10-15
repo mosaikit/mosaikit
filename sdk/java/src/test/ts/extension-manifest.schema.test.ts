@@ -199,4 +199,58 @@ describe('extension manifest schema', () => {
     expect(validate({ ...manifest, resources: [{ ...type, inherits: 'children' }] })).toBe(false);
     expect(validate({ ...manifest, resources: [{ ...type, inherits: true }] })).toBe(false);
   });
+
+  it('MK-134: accepts versioned points with a schema, contributions to a version, and contracts', () => {
+    const manifest = {
+      id: 'org.example.catalog',
+      version: '1.0.0',
+      name: 'Catalog',
+      kind: 'app',
+      platform: '>=0.1',
+      frontend: {
+        entry: 'web/index.js',
+        points: [
+          'catalog.detail',
+          {
+            name: 'catalog.card',
+            version: 2,
+            schema: {
+              type: 'object',
+              required: ['element'],
+              properties: { element: { type: 'string' } },
+            },
+          },
+        ],
+      },
+      backend: { jar: 'lib/catalog.jar', api: 'catalog' },
+      libraries: [
+        {
+          jar: 'lib/catalog-api-1.2.0.jar',
+          coordinates: 'org.example:catalog-api:1.2.0',
+          sha256: '0'.repeat(64),
+        },
+      ],
+      contracts: {
+        provides: [{ name: 'connector', versions: [1, 2], api: 'org.example:catalog-api' }],
+        implements: [{ contract: 'org.example.dashboard/widget-source', version: 1 }],
+      },
+      contributes: { 'dashboard.widget@2': [{ id: 'items', element: 'catalog-items' }] },
+    };
+    expect(validate(manifest)).toBe(true);
+    expect(validate({ ...manifest, contributes: { 'dashboard.widget@0': [{ id: 'x' }] } })).toBe(
+      false,
+    );
+    expect(
+      validate({ ...manifest, contracts: { provides: [{ name: 'connector', versions: [] }] } }),
+    ).toBe(false);
+    expect(
+      validate({ ...manifest, contracts: { implements: [{ contract: 'catalog', version: 1 }] } }),
+    ).toBe(false);
+    expect(
+      validate({
+        ...manifest,
+        frontend: { entry: 'web/index.js', points: [{ name: 'catalog.card', version: 0 }] },
+      }),
+    ).toBe(false);
+  });
 });

@@ -63,7 +63,13 @@ public interface BackendCheck {
                                         && manifest.libraries().stream()
                                                 .allMatch(library -> kernelLibraries.provides(library)
                                                         || state.contains(
-                                                                ProviderState.libraryId(library), library.sha256()))
+                                                                ProviderState.libraryId(library), library.sha256())
+                                                        // The API of a contract: a higher compatible
+                                                        // version stands for it (MK-134).
+                                                        || (manifest.isContractApi(library)
+                                                                && state.libraries().stream()
+                                                                        .anyMatch(loaded -> ContractApis.satisfies(
+                                                                                loaded, library, true))))
                                 ? Optional.empty()
                                 : Optional.of(
                                         new Problem(

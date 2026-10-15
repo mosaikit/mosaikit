@@ -17,6 +17,7 @@ import dev.mosaikit.kernel.core.error.InvalidInputException;
 import dev.mosaikit.kernel.core.error.ResourceNotFoundException;
 import dev.mosaikit.kernel.core.error.ServiceUnavailableException;
 import dev.mosaikit.kernel.core.extension.BackendCheck;
+import dev.mosaikit.kernel.core.extension.ContractChecks;
 import dev.mosaikit.kernel.core.extension.ExtensionCatalog;
 import dev.mosaikit.kernel.core.extension.ExtensionDependencies;
 import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
@@ -280,6 +281,17 @@ public class Marketplace {
         List<String> conflicts = LibraryConflicts.of(manifests, found, KernelLibraries.ofKernel());
         if (!conflicts.isEmpty()) {
             throw new ConflictException("Cannot install: " + String.join("; ", conflicts) + ".");
+        }
+        // A contribution that does not match the schema of the point it targets, or an implementation
+        // of a version of a contract that its owner does not serve, is refused (MK-134).
+        List<String> broken = ContractChecks.refuseInstallation(
+                manifests,
+                found.stream()
+                        .filter(extension -> extension.status() != ExtensionStatus.INVALID)
+                        .flatMap(extension -> extension.manifest().stream())
+                        .toList());
+        if (!broken.isEmpty()) {
+            throw new ConflictException("Cannot install: " + String.join("; ", broken) + ".");
         }
         // An update that removes a resource type or a level on which grants exist is refused,
         // naming them (MK-055, ADR-0037).

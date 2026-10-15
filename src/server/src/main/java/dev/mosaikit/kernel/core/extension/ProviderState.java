@@ -67,6 +67,19 @@ public record ProviderState(List<Entry> entries) {
         return LIBRARY_PREFIX + library.coordinates();
     }
 
+    /**
+     * The libraries of the set, read from their entries: what the launcher copied, once each, for the
+     * extensions that bring them (MK-131, MK-134).
+     */
+    public List<LibraryEntry> libraries() {
+        return entries.stream()
+                .filter(entry -> isLibrary(entry.extensionId()))
+                .flatMap(entry ->
+                        LibraryEntry.of("", entry.extensionId().substring(LIBRARY_PREFIX.length()), entry.sha256())
+                                .stream())
+                .toList();
+    }
+
     /** Whether an entry name is the one of a library rather than of an extension. */
     public static boolean isLibrary(String id) {
         return id.startsWith(LIBRARY_PREFIX);

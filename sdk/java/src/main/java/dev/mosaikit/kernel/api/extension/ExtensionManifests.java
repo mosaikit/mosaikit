@@ -18,6 +18,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Function;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -98,6 +99,25 @@ public final class ExtensionManifests {
     /** Extension point or requirement name, for example {@code launcher.app}. */
     public static final Pattern POINT_PATTERN = Pattern.compile("^[a-z][a-zA-Z0-9-]*+(?:\\.[a-z][a-zA-Z0-9-]*+)++$");
 
+    /**
+     * The key of a contribution in {@code contributes}: an extension point, with the major version it
+     * targets after {@code @} when it is not the first, such as {@code dashboard.widget@2} (MK-134).
+     */
+    public static final Pattern CONTRIBUTION_POINT_PATTERN =
+            Pattern.compile("^([a-z][a-zA-Z0-9-]*+(?:\\.[a-z][a-zA-Z0-9-]*+)++)(?:@([1-9][0-9]{0,2}))?$");
+
+    /** The name of a contract on the server within its extension (MK-134), such as {@code connector}. */
+    public static final Pattern CONTRACT_NAME_PATTERN = Pattern.compile("^[a-z][a-z0-9-]{0,47}$");
+
+    /** The API artifact of a contract: {@code groupId:artifactId} of one of the libraries (MK-134). */
+    public static final Pattern CONTRACT_API_PATTERN = Pattern.compile("^[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+$");
+
+    private static final String CONTRACTS = "contracts";
+
+    private static final String VERSION = "version";
+
+    private static final Set<String> POINT_KEYS = Set.of("name", VERSION, "schema");
+
     private static final int MAX_NAME_LENGTH = 80;
 
     private ExtensionManifests() {}
@@ -113,6 +133,7 @@ public final class ExtensionManifests {
 
         private final Map<String, ?> tree;
         private final List<ManifestViolation> violations = new ArrayList<>();
+        private List<ExtensionPoint> points = List.of();
 
         Reader(Map<String, ?> tree) {
             this.tree = tree;
@@ -147,6 +168,9 @@ public final class ExtensionManifests {
             List<ResourceTypeEntry> resourceTypes = readResourceTypes();
             List<MeasureEntry> measures = readMeasures();
             List<LibraryEntry> libraries = readLibraries(backend);
+            Map<String, ?> contracts = readContractsSection();
+            List<ProvidedContract> provided = readProvidedContracts(contracts, libraries);
+            List<ImplementedContract> implemented = readImplementedContracts(contracts, id, libraries);
 
             if (!violations.isEmpty()) {
                 return new ManifestParseResult.Invalid(violations);
@@ -170,7 +194,10 @@ public final class ExtensionManifests {
                     resourceTypes,
                     measures,
                     optional,
-                    libraries));
+                    libraries,
+                    points,
+                    provided,
+                    implemented));
         }
 
         /** The permissions of the extension (MK-056): {@code permissions: [{ name, title }]}. */
@@ -568,25 +595,233 @@ public final class ExtensionManifests {
                 violation("frontend.isolation", "must be 'module' or 'iframe'");
             }
             FrontendBridge bridge = readBridge(frontend);
-            List<String> points = readPoints(frontend);
-            return entry == null || isolation == null ? null : new FrontendEntry(entry, isolation, bridge, points);
+            points = readPoints(frontend);
+            List<String> ids = points.stream().map(ExtensionPoint::id).toList();
+            return entry == null || isolation == null ? null : new FrontendEntry(entry, isolation, bridge, ids);
         }
 
-        private List<String> readPoints(Map<String, ?> frontend) {
-            List<String> points = readList(frontend, "points", "frontend.points");
+        /**
+         * The points of a frontend (MK-020): a name, untyped in version 1, or {@code { name, version,
+         * schema }}, one entry per major version with the JSON Schema of the payload (MK-134).
+         */
+        private List<ExtensionPoint> readPoints(Map<String, ?> frontend) {
+            Object raw = frontend.get("points");
+            if (raw == null) {
+                return List.of();
+            }
+            if (!(raw instanceof List<?> list)) {
+                violation("frontend.points", "must be a list");
+                return List.of();
+            }
+            List<ExtensionPoint> result = new ArrayList<>();
             Set<String> seen = new HashSet<>();
-            for (int i = 0; i < points.size(); i++) {
-                String point = points.get(i);
+            for (int i = 0; i < list.size(); i++) {
                 String field = "frontend.points[" + i + "]";
-                if (!POINT_PATTERN.matcher(point).matches()) {
-                    violation(field, "must be a dotted extension point name, such as activities.detail");
-                } else if (KERNEL_POINTS.stream().anyMatch(point::startsWith)) {
-                    violation(field, "belongs to the kernel: use a name of the extension, such as activities.detail");
-                } else if (!seen.add(point)) {
-                    violation(field, "is declared twice");
+                readPoint(field, list.get(i)).ifPresent(point -> {
+                    if (!seen.add(point.id())) {
+                        violation(field, "is declared twice");
+                    } else {
+                        result.add(point);
+                    }
+                });
+            }
+            return result;
+        }
+
+        private Optional<ExtensionPoint> readPoint(String field, Object item) {
+            String name;
+            int version = 1;
+            InputSchema schema = null;
+            String nameField = field;
+            if (item instanceof Map<?, ?>) {
+                Map<String, ?> map = objectItem(field, item).orElseThrow();
+                map.keySet().stream()
+                        .filter(key -> !POINT_KEYS.contains(key))
+                        .forEach(key -> violation(field + "." + key, "is not a property of an extension point"));
+                nameField = field + ".name";
+                name = requiredText(map, "name", nameField);
+                Integer number = readMajor(map.get(VERSION), field + "." + VERSION, false);
+                if (number != null) {
+                    version = number;
+                }
+                if (map.containsKey("schema")) {
+                    schema = InputSchema.parse(map.get("schema"), field + ".schema", this::violation);
+                }
+            } else {
+                name = String.valueOf(item);
+            }
+            if (name == null) {
+                return Optional.empty();
+            }
+            if (!POINT_PATTERN.matcher(name).matches()) {
+                violation(nameField, "must be a dotted extension point name, such as activities.detail");
+                return Optional.empty();
+            }
+            if (KERNEL_POINTS.stream().anyMatch(name::startsWith)) {
+                violation(nameField, "belongs to the kernel: use a name of the extension, such as activities.detail");
+                return Optional.empty();
+            }
+            return Optional.of(new ExtensionPoint(name, version, schema));
+        }
+
+        /** A major version: a whole number from 1; {@code null} when absent and not required, or wrong. */
+        private Integer readMajor(Object raw, String field, boolean required) {
+            if (raw == null) {
+                if (required) {
+                    violation(field, "is required");
+                }
+                return null;
+            }
+            if (raw instanceof Number number
+                    && number.doubleValue() == number.intValue()
+                    && number.intValue() >= 1
+                    && number.intValue() <= 999) {
+                return number.intValue();
+            }
+            violation(field, "must be a major version, a whole number from 1");
+            return null;
+        }
+
+        private Map<String, ?> readContractsSection() {
+            Map<String, ?> contracts = optionalMap(tree, CONTRACTS);
+            contracts.keySet().stream()
+                    .filter(key -> !key.equals("provides") && !key.equals("implements"))
+                    .forEach(key -> violation(CONTRACTS + "." + key, "must be provides or implements"));
+            return contracts;
+        }
+
+        /** {@code contracts.provides: [{ name, versions, api }]}: the contracts the extension owns (MK-134). */
+        private List<ProvidedContract> readProvidedContracts(Map<String, ?> contracts, List<LibraryEntry> libraries) {
+            List<?> list = listIn(contracts, "provides");
+            List<ProvidedContract> result = new ArrayList<>();
+            Set<String> names = new HashSet<>();
+            for (int i = 0; i < list.size(); i++) {
+                String field = CONTRACTS + ".provides[" + i + "]";
+                Map<String, ?> item = objectItem(field, list.get(i)).orElse(null);
+                if (item == null) {
+                    continue;
+                }
+                int before = violations.size();
+                String name = requiredText(item, "name", field + ".name");
+                if (name != null && !CONTRACT_NAME_PATTERN.matcher(name).matches()) {
+                    violation(field + ".name", "must be lowercase letters, digits and '-', such as connector");
+                } else if (name != null && !names.add(name)) {
+                    violation(field + ".name", "the contract '" + name + "' is declared twice");
+                }
+                List<Integer> versions = readVersions(item.get("versions"), field + ".versions");
+                String api = readContractApi(item, field, libraries);
+                if (violations.size() == before) {
+                    result.add(new ProvidedContract(name, versions, api));
                 }
             }
-            return points;
+            return result;
+        }
+
+        /** The major versions a contract serves, sorted: a list of whole numbers from 1, not empty. */
+        private List<Integer> readVersions(Object raw, String field) {
+            if (!(raw instanceof List<?> numbers) || numbers.isEmpty()) {
+                violation(field, "must list the major versions served, such as [1, 2]");
+                return List.of();
+            }
+            List<Integer> versions = new ArrayList<>();
+            for (int v = 0; v < numbers.size(); v++) {
+                Integer version = readMajor(numbers.get(v), field + "[" + v + "]", true);
+                if (version != null && versions.contains(version)) {
+                    violation(field + "[" + v + "]", "is listed twice");
+                } else if (version != null) {
+                    versions.add(version);
+                }
+            }
+            return versions.stream().sorted().toList();
+        }
+
+        /**
+         * {@code contracts.implements: [{ contract, version, api }]}: the contracts of other extensions
+         * that the extension implements, with the version it targets (MK-134).
+         */
+        private List<ImplementedContract> readImplementedContracts(
+                Map<String, ?> contracts, String id, List<LibraryEntry> libraries) {
+            List<?> list = listIn(contracts, "implements");
+            List<ImplementedContract> result = new ArrayList<>();
+            Set<String> seen = new HashSet<>();
+            for (int i = 0; i < list.size(); i++) {
+                String field = CONTRACTS + ".implements[" + i + "]";
+                Map<String, ?> item = objectItem(field, list.get(i)).orElse(null);
+                if (item == null) {
+                    continue;
+                }
+                int before = violations.size();
+                String contract = requiredText(item, "contract", field + ".contract");
+                String owner = null;
+                String name = null;
+                if (contract != null) {
+                    int slash = contract.indexOf(ImplementedContract.SEPARATOR);
+                    owner = slash < 0 ? contract : contract.substring(0, slash);
+                    name = slash < 0 ? "" : contract.substring(slash + 1);
+                    if (!ID_PATTERN.matcher(owner).matches()
+                            || !CONTRACT_NAME_PATTERN.matcher(name).matches()) {
+                        violation(
+                                field + ".contract",
+                                "must be <extension>/<name>, such as org.example.catalog/connector");
+                    } else if (owner.equals(id)) {
+                        violation(field + ".contract", "is a contract of this extension: declare it in provides");
+                    }
+                }
+                Integer version = readMajor(item.get(VERSION), field + "." + VERSION, true);
+                if (contract != null && version != null && !seen.add(contract + "@" + version)) {
+                    violation(field, "is declared twice");
+                }
+                String api = readContractApi(item, field, libraries);
+                if (violations.size() == before) {
+                    result.add(new ImplementedContract(owner, name, version, api));
+                }
+            }
+            return result;
+        }
+
+        /** The API artifact of a contract: one of the libraries, with a semantic version. */
+        private String readContractApi(Map<String, ?> item, String field, List<LibraryEntry> libraries) {
+            String api = optionalText(item, "api");
+            if (api == null) {
+                return "";
+            }
+            if (!CONTRACT_API_PATTERN.matcher(api).matches()) {
+                violation(
+                        field + ".api",
+                        "must be groupId:artifactId of the API artifact, such as org.example:catalog-api");
+                return api;
+            }
+            Optional<LibraryEntry> library =
+                    libraries.stream().filter(entry -> entry.key().equals(api)).findFirst();
+            if (library.isEmpty()) {
+                violation(field + ".api", "must be one of the libraries of the extension: " + api + " is not");
+            } else if (!isSemanticVersion(library.get().version())) {
+                violation(
+                        field + ".api",
+                        "the version " + library.get().version() + " of " + api + " must be a semantic version");
+            }
+            return api;
+        }
+
+        private static boolean isSemanticVersion(String text) {
+            try {
+                Version.parse(text);
+                return true;
+            } catch (InvalidVersionException _) {
+                return false;
+            }
+        }
+
+        private List<?> listIn(Map<String, ?> map, String key) {
+            Object raw = map.get(key);
+            if (raw == null) {
+                return List.of();
+            }
+            if (!(raw instanceof List<?> list)) {
+                violation(CONTRACTS + "." + key, "must be a list");
+                return List.of();
+            }
+            return list;
         }
 
         private FrontendBridge readBridge(Map<String, ?> frontend) {
@@ -824,12 +1059,17 @@ public final class ExtensionManifests {
         private List<Contribution> readContributions() {
             Map<String, ?> contributes = optionalMap(tree, "contributes");
             List<Contribution> result = new ArrayList<>();
-            contributes.forEach((point, items) -> {
-                String field = "contributes." + point;
-                if (!POINT_PATTERN.matcher(point).matches()) {
-                    violation(field, "must be a dotted extension point name");
+            contributes.forEach((key, items) -> {
+                String field = "contributes." + key;
+                Matcher matcher = CONTRIBUTION_POINT_PATTERN.matcher(key);
+                if (!matcher.matches()) {
+                    violation(field, "must be a dotted extension point name, with @<version> after the first");
                     return;
                 }
+                // Version 1 is the point without a version (MK-134).
+                String point = matcher.group(2) == null
+                        ? matcher.group(1)
+                        : ExtensionPoint.id(matcher.group(1), Integer.parseInt(matcher.group(2)));
                 if (!(items instanceof List<?> list)) {
                     violation(field, "must be a list of contributions");
                     return;
