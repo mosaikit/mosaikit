@@ -5,6 +5,15 @@ import { expect, test, type Browser, type Page } from '@playwright/test';
 import { ADMIN, BASE_URL, MARIO, ORGANIZATION } from '../support/env.js';
 import { api, apps, signIn, unique } from '../support/shell.js';
 
+// The installation of the tests runs on localhost, and Chromium refuses a public site that frames a
+// local address (local network access) before it reads frame-ancestors; real sites and installations
+// are both public. Without that check, the browser decides on the headers of the kernel alone.
+test.use({
+  launchOptions: {
+    args: ['--disable-features=LocalNetworkAccessChecks,BlockInsecurePrivateNetworkRequests'],
+  },
+});
+
 /** The memos of the fixture Notes, which it shares through the kernel (MK-055). */
 const MEMOS = '/api/v1/ext/fixture-notes/memos';
 const MEMO_TYPE = 'dev.mosaikit.fixture.notes/memo';
