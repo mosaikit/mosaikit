@@ -164,15 +164,17 @@ jobs:
           PR_LABELS: ${{ join(github.event.pull_request.labels.*.name, ',') }}
         run: bash distribution/release/check-changelog.sh "$BASE_SHA"
 
-  # The tests of the backend in two shards at the same time, one job each: -Dtest.shard=<n>/2 makes
+  # The tests of the backend in four shards at the same time, one job each: -Dtest.shard=<n>/4 makes
   # the JUnit Platform filter TestShards of the kernel keep the test classes of that shard (the slow
   # ones are spread in src/server/src/test/resources/test-shards.properties, the others go by the hash
-  # of their name), so that every class runs in exactly one shard. Each shard compiles the reactor and
-  # runs the tests of sdk/java, which take seconds. Shard 1 packages target/dist and uploads it with
-  # its coverage as the artifact "backend"; shard 2 uploads its coverage as "backend-2", and the
-  # sonarqube job reads both. The job "backend" below is the required check.
+  # of their name), so that every class runs in exactly one shard. Each shard compiles the reactor,
+  # starts the kernel once (about three minutes in all, whatever the number of shards) and runs the
+  # tests of sdk/java, which take seconds. Shard 1 packages target/dist and uploads it with its
+  # coverage as the artifact "backend"; shard <n> uploads its coverage as "backend-<n>", and the
+  # sonarqube job reads them all. The job "backend" below is the required check. TestShardsTest
+  # checks that test-shards.properties is made for the number of shards of the matrix.
   backend-shard:
-    name: backend shard ${{ matrix.shard }}/2
+    name: backend shard ${{ matrix.shard }}/4
     needs: changes
     runs-on: ubuntu-latest
     permissions:
@@ -181,7 +183,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2]
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
@@ -205,13 +207,13 @@ jobs:
         env:
           SLOW: ${{ github.event_name != 'pull_request' && github.event_name != 'merge_group' }}
           CODE: ${{ needs.changes.outputs.code }}
-          SHARD: ${{ matrix.shard }}/2
+          SHARD: ${{ matrix.shard }}/4
         run: |
           if [[ "$CODE" != true ]]; then
-            if [[ "$SHARD" == 1/2 ]]; then
+            if [[ "$SHARD" == 1/4 ]]; then
               ./mvnw $MAVEN_CLI_OPTS -pl src/server -am test -Dskip.npm -Dtest=DocumentationTest -Dsurefire.failIfNoSpecifiedTests=false
             else
-              echo "Documentation only: shard 1/2 runs DocumentationTest."
+              echo "Documentation only: shard 1/4 runs DocumentationTest."
             fi
           elif [[ "$SLOW" == true ]]; then
             ./mvnw $MAVEN_CLI_OPTS verify -Dskip.npm -DskipITs=false -Dtest.groups.excluded= -Dtest.shard="$SHARD"
@@ -223,7 +225,7 @@ jobs:
         uses: mikepenz/action-junit-report@3585e9575db828022551b4231f165eb59a0e74e3 # v5.6.2
         with:
           report_paths: '**/target/*-reports/TEST-*.xml'
-          check_name: JUnit Test Report (backend shard ${{ matrix.shard }}/2)
+          check_name: JUnit Test Report (backend shard ${{ matrix.shard }}/4)
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: matrix.shard == 1
         with:
@@ -235,25 +237,25 @@ jobs:
             target/dist/
           retention-days: 7
       # The common root of the paths, src/server/target, is left out of the artifact: the sonarqube
-      # job puts the files back under shard-2/src/server/target.
+      # job finds the files under shards/backend-<n>.
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: matrix.shard == 2
+        if: matrix.shard != 1
         with:
-          name: backend-2
+          name: backend-${{ matrix.shard }}
           path: |
             src/server/target/site/jacoco/
             src/server/target/jacoco-report/
           if-no-files-found: ignore
           retention-days: 7
 
-  # The required check of the backend, and what the later jobs wait for: it passes when both shards
-  # pass, so that its name does not change with the number of shards.
+  # The required check of the backend, and what the later jobs wait for: it passes when every shard
+  # passes, so that its name does not change with the number of shards.
   backend:
     needs: backend-shard
     if: ${{ !cancelled() }}
     runs-on: ubuntu-latest
     steps:
-      - name: Both shards passed
+      - name: Every shard passed
         env:
           RESULT: ${{ needs.backend-shard.result }}
         run: |
@@ -426,8 +428,8 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
         if: env.SONAR_TOKEN != ''
         with:
-          name: backend-2
-          path: shard-2/src/server/target
+          pattern: backend-*
+          path: shards
       - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         if: env.SONAR_TOKEN != ''
         with:
@@ -440,12 +442,12 @@ jobs:
           # Vitest writes paths relative to the repository root; the scanner resolves them from each
           # Maven module, so they are made absolute.
           sed -i "s#^SF:#SF:$GITHUB_WORKSPACE/#" coverage/lcov.info
-          # The backend ran in two shards: the coverage of the kernel is in the JaCoCo reports of
-          # both, which the scanner adds up.
+          # The backend ran in shards: the coverage of the kernel is in the JaCoCo reports of all
+          # of them, which the scanner adds up.
           reports=""
           for report in sdk/java/target/site/jacoco src/server/target/site/jacoco \
-              src/server/target/jacoco-report shard-2/src/server/target/site/jacoco \
-              shard-2/src/server/target/jacoco-report; do
+              src/server/target/jacoco-report shards/backend-*/site/jacoco \
+              shards/backend-*/jacoco-report; do
             if [[ -f "$report/jacoco.xml" ]]; then
               reports="$reports${reports:+,}$GITHUB_WORKSPACE/$report/jacoco.xml"
             fi
