@@ -595,6 +595,9 @@ const ITALIAN: Record<string, string> = {
   'Nothing found for “{query}”.': 'Nessun risultato per “{query}”.',
   'Nothing found for “{query}” in {title}.': 'Nessun risultato per “{query}” in {title}.',
   'More in {title}': 'Altro in {title}',
+  'Try other words, or only the beginning of a word.':
+    "Prova con altre parole, o solo con l'inizio di una parola.",
+  'Try other words, or look in All.': 'Prova con altre parole, o cerca in Tutto.',
   Previous: 'Precedenti',
   Next: 'Successivi',
   '{title} did not answer in time: its results are missing.':
