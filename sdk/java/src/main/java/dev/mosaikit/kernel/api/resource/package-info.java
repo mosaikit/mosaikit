@@ -5,5 +5,10 @@
  * {@code resources} of the manifest, inject {@link dev.mosaikit.kernel.api.resource.Resources} and
  * register every resource when it is created; sharing and the other generic features of the kernel
  * then work on it. <strong>API preview</strong>: implemented by the kernel with MK-054.
+ *
+ * <p>A resource refers to a resource of another extension by its
+ * {@link dev.mosaikit.kernel.api.resource.ResourceRef}, and
+ * {@link dev.mosaikit.kernel.api.resource.ResourceReferences} resolves the reference to the resource
+ * or to the reason it is not available, such as an extension that is absent (MK-135).
  */
 package dev.mosaikit.kernel.api.resource;

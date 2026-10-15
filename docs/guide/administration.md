@@ -357,7 +357,11 @@ The administrators of an organization (role `organization-admin`) open **Organiz
 the bottom of the app bar, and for each app of the active extensions choose:
 
 - **Shown**: an app that is off leaves the app bar of the organization; when all the apps of a
-  extension are off, its API and its documents answer 403 to the people of the organization;
+  extension are off, its API and its documents answer 403 to the people of the organization.
+  What other extensions show of its resources, such as a map in a dashboard, becomes a placeholder
+  that says what is missing, and tells administrators which extension to turn on (or to install);
+  nothing is deleted, and the placeholders show the resources again, also in pages already open,
+  when the apps are turned on again (MK-135);
 - **Pinned**: people cannot hide it in their settings;
 - **For**: **members and administrators**, or **who holds its permission**: the administrators of
   the organization, and the people to whom **Permissions** grants the permission of the app ("Use

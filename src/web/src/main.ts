@@ -3,7 +3,12 @@
 import '@mosaikit/ui/fonts.css';
 import '@mosaikit/ui/components';
 import { applyTheme } from '@mosaikit/ui';
+import { defineReferencePlaceholder } from '@mosaikit/sdk';
 import './mk-shell.js';
+
+// The placeholder of a reference to a resource whose extension is absent (MK-135), for the
+// extensions loaded as modules; an extension in an isolated frame defines it itself.
+defineReferencePlaceholder();
 
 // The default theme until the kernel says which one the installation uses.
 applyTheme('mosaikit');
