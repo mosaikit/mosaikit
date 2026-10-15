@@ -10,7 +10,7 @@ for the signed-in person, to the resource or to why it is not available:
 |---|---|
 | `available` | the person may read it: `title` and `link` come with it |
 | `extension-absent` | its extension is not installed, cannot run, or is turned off in the organization |
-| `deleted` | its extension no longer registers it |
+| `deleted` | its extension no longer registers it, or it is in the trash ([The trash](trash.md)) |
 | `forbidden` | it exists, but the person has no level on it; nothing more is told |
 
 To administrators, `extension-absent` comes with `missing`: the extension, its name when it is
