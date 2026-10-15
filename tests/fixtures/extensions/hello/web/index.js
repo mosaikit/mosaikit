@@ -42,6 +42,11 @@ const extension = {
             <button type="button">Publish an event</button>
             <p role="status" aria-live="polite"></p>
           </section>
+          <section class="folders" aria-label="Folders">
+            <p class="state"></p>
+            <button type="button" data-folder="alpha">Open folder Alpha</button>
+            <button type="button" data-folder="beta">Open folder Beta</button>
+          </section>
           <section class="pinned" aria-label="Pinned memo" hidden>
             <h2>Pinned memo</h2>
             <strong class="memo"></strong>
@@ -56,6 +61,32 @@ const extension = {
           status.textContent = `Received ${TOPIC} at ${payload.at}`;
         });
         this.stopWatching = this.pin(root);
+        this.stopAddress = this.folders(root);
+      }
+
+      /**
+       * The folder opened is kept in the address of the page (MK-099): a copied address opens the
+       * same folder, and the back and forward buttons move between the folders opened.
+       */
+      folders(root) {
+        const address = context.address;
+        const state = root.querySelector('.state');
+        const show = (value) => {
+          state.textContent = `Address state: ${value || '(none)'}`;
+        };
+        if (!address) {
+          show('');
+          return undefined;
+        }
+        show(address.read());
+        for (const button of root.querySelectorAll('[data-folder]')) {
+          button.addEventListener('click', () => {
+            const value = `/folders/${button.dataset.folder}`;
+            address.write(value);
+            show(value);
+          });
+        }
+        return address.subscribe(show);
       }
 
       /** Shows the pinned memo, or the placeholder of the kernel, again whenever Notes comes or goes. */
@@ -93,6 +124,7 @@ const extension = {
       disconnectedCallback() {
         this.unsubscribe?.();
         this.stopWatching?.();
+        this.stopAddress?.();
       }
     }
 

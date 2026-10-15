@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
+import type { AppAddress } from './address.js';
 import type { LiveChannel } from './live.js';
 import type { Contribution, OwnedContribution } from './contributions.js';
 import type { DataCollection, DataOptions } from './data.js';
@@ -68,6 +69,12 @@ export interface ExtensionContext {
     /** Where it opens: a path of the shell, such as `/app/notes`. */
     readonly link?: string;
   }) => Promise<void>;
+  /**
+   * The state of the app of this extension in the address of the page (MK-099), so that a copied
+   * address reopens the same view; also in an isolated frame. Absent where there is no address to
+   * keep, such as the view of a shared link, and in shells older than MK-099.
+   */
+  readonly address?: AppAddress;
 }
 
 /** The module exported by an extension frontend. */

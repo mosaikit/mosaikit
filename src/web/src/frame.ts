@@ -7,10 +7,12 @@
  */
 import {
   dataCollections,
+  isAppState,
   NO_LIVE,
   EventBus,
   isMosaikitExtension,
   PresenceStore,
+  type AppAddress,
   type EventHandler,
   type ExtensionContext,
 } from '@mosaikit/sdk';
@@ -126,6 +128,63 @@ export class PendingCalls {
   }
 }
 
+/**
+ * The state of the app in the address of the page, seen from the frame (MK-099): the frame has no
+ * address of its own, so it keeps the last state and writes through the shell.
+ */
+export class FrameAddress implements AppAddress {
+  private readonly listeners = new Set<(state: string) => void>();
+
+  constructor(
+    private state: string,
+    private readonly send: (message: FrameMessage) => void,
+  ) {}
+
+  read(): string {
+    return this.state;
+  }
+
+  write(state: string, options?: { readonly replace?: boolean }): boolean {
+    if (!isAppState(state)) {
+      throw new TypeError(
+        `'${state}' is not an address state: empty, or '/', '?' or '#' and encoded parts`,
+      );
+    }
+    if (state !== this.state) {
+      this.state = state;
+      this.send({
+        mk: 1,
+        type: 'address',
+        state,
+        ...(options?.replace ? { replace: true } : {}),
+      });
+    }
+    return true;
+  }
+
+  subscribe(listener: (state: string) => void): () => void {
+    const wrapped = (state: string): void => {
+      listener(state);
+    };
+    this.listeners.add(wrapped);
+    return () => {
+      this.listeners.delete(wrapped);
+    };
+  }
+
+  /** The state the shell sent after the person moved with the back or forward button. */
+  deliver(state: string): void {
+    this.state = state;
+    for (const listener of [...this.listeners]) {
+      try {
+        listener(state);
+      } catch (error) {
+        console.error('A listener of the address failed', error);
+      }
+    }
+  }
+}
+
 /** The parts of the document of the frame that the runtime uses. */
 export interface FrameDocument {
   readonly baseURI: string;
@@ -142,6 +201,7 @@ export async function start(
   importModule: (url: string) => Promise<unknown> = (url) => import(/* @vite-ignore */ url),
   doc: FrameDocument = document,
   presence: PresenceStore = new PresenceStore(init.extensions ?? []),
+  address: AppAddress = new FrameAddress(init.address ?? '', () => undefined),
 ): Promise<void> {
   for (const [name, value] of Object.entries(init.theme)) {
     if (name.startsWith('--mk-')) {
@@ -169,6 +229,8 @@ export async function start(
     // Delivered with the init message and kept current by the shell (MK-133).
     extensions: presence,
     notify: () => Promise.reject(new Error('Notifications are not sent from an isolated frame')),
+    // Through the shell, which writes it after the route of the app (MK-099).
+    address,
   });
   doc.body.replaceChildren(doc.createElement(init.element));
 }
@@ -192,6 +254,7 @@ export function connect(
   const events = new FrameEventBus(send);
   const calls = new PendingCalls(send);
   let presence: PresenceStore | undefined;
+  let address: FrameAddress | undefined;
   let started = false;
   port.onmessage = (event: MessageEvent<unknown>) => {
     if (!isShellMessage(event.data)) {
@@ -201,15 +264,20 @@ export function connect(
     if (message.type === 'init' && !started) {
       started = true;
       presence = new PresenceStore(message.extensions ?? []);
-      start(message, events, calls.fetch, importModule, doc, presence).catch((error: unknown) => {
-        doc.body.textContent = `This app could not be started: ${String(error)}`;
-      });
+      address = new FrameAddress(message.address ?? '', send);
+      start(message, events, calls.fetch, importModule, doc, presence, address).catch(
+        (error: unknown) => {
+          doc.body.textContent = `This app could not be started: ${String(error)}`;
+        },
+      );
     } else if (message.type === 'event') {
       events.deliver(message.topic, message.payload);
     } else if (message.type === 'result') {
       calls.settle(message);
     } else if (message.type === 'presence') {
       presence?.apply(message.change);
+    } else if (message.type === 'address') {
+      address?.deliver(message.state);
     }
   };
   const ready: FrameMessage = { mk: 1, type: 'ready' };

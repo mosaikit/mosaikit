@@ -6,6 +6,7 @@
  * @packageDocumentation
  */
 export { NO_LIVE, type LiveChannel } from './live.js';
+export { isAppState, type AppAddress } from './address.js';
 export {
   contributionsTo,
   pointId,

@@ -1,7 +1,13 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
-import type { CurrentUser, EventBus, ExtensionPresence, FrontendExtension } from '@mosaikit/sdk';
-import type { InitMessage, PresenceMessage } from './bridge-protocol.js';
+import type {
+  AppAddress,
+  CurrentUser,
+  EventBus,
+  ExtensionPresence,
+  FrontendExtension,
+} from '@mosaikit/sdk';
+import type { AddressMessage, InitMessage, PresenceMessage } from './bridge-protocol.js';
 import { ShellBridge } from './shell-bridge.js';
 
 /** URL of the runtime of isolated frontends: a separate entry of the build (see vite.config.ts). */
@@ -40,8 +46,11 @@ export class MkExtensionFrame extends HTMLElement {
   request: ((path: string, init?: RequestInit) => Promise<Response>) | undefined;
   /** The extensions active in the organization, which the frame receives and follows (MK-133). */
   presence: ExtensionPresence | undefined;
+  /** The state of the app in the address of the page, which the frame reads and writes (MK-099). */
+  address: AppAddress | undefined;
 
   private stopPresence: (() => void) | undefined;
+  private stopAddress: (() => void) | undefined;
   private frame: HTMLIFrameElement | undefined;
   private bridge: ShellBridge | undefined;
   private port: MessagePort | undefined;
@@ -79,9 +88,16 @@ export class MkExtensionFrame extends HTMLElement {
     frame.setAttribute('referrerpolicy', 'no-referrer');
     frame.style.cssText = 'border:0;width:100%;height:100%;min-height:70vh;display:block';
     frame.srcdoc = frameDocument(location.origin);
-    this.bridge = new ShellBridge(extension, events, request, (message) => {
-      this.port?.postMessage(message);
-    });
+    this.bridge = new ShellBridge(
+      extension,
+      events,
+      request,
+      (message) => {
+        this.port?.postMessage(message);
+      },
+      undefined,
+      this.address,
+    );
     this.frame = frame;
     window.addEventListener('message', this.onMessage);
     this.replaceChildren(frame);
@@ -91,6 +107,8 @@ export class MkExtensionFrame extends HTMLElement {
     window.removeEventListener('message', this.onMessage);
     this.stopPresence?.();
     this.stopPresence = undefined;
+    this.stopAddress?.();
+    this.stopAddress = undefined;
     this.port?.close();
     this.port = undefined;
     this.bridge?.dispose();
@@ -115,12 +133,18 @@ export class MkExtensionFrame extends HTMLElement {
       locale: navigator.language,
       theme: theme(),
       extensions: this.presence?.active() ?? [],
+      address: this.address?.read() ?? '',
     };
     this.port?.postMessage(message);
     this.stopPresence?.();
     this.stopPresence = this.presence?.subscribe((change) => {
       const presence: PresenceMessage = { mk: 1, type: 'presence', change };
       this.port?.postMessage(presence);
+    });
+    this.stopAddress?.();
+    this.stopAddress = this.address?.subscribe((state) => {
+      const address: AddressMessage = { mk: 1, type: 'address', state };
+      this.port?.postMessage(address);
     });
   }
 }

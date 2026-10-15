@@ -39,7 +39,10 @@ The screen has three parts, as in the collaboration suites people already know:
 - the **top bar**, with the search of apps and pages (type a part of the name, then Enter) and the
   menu of your avatar;
 - the **work area**, where the chosen app opens. Its address (for example `/app/notes`) can be
-  bookmarked and reloaded.
+  bookmarked and reloaded. Apps that support it keep what you are looking at in the address, such as
+  a folder (`/app/files/folders/42`): copy it to share the view, and the back and forward buttons of
+  the browser move between the views. Whoever opens it signs in first, if needed, and then sees the
+  same view, with what they are allowed to see.
 
 Home greets you and lists your apps. Apps can talk to each other: an action in one app can update
 another one.
