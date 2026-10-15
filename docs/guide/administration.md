@@ -25,8 +25,25 @@ written, and its detail the address of the client, never the password.
 
 The administration pages share one model: the metrics on top, the filters above the table, the
 actions on each row, and the detail of a row in a side pane, which you widen or narrow by dragging
-its edge (or with the arrow keys on it); the width is kept in the browser. **Organizations** and
-**People** follow it; the other pages move to it in the next versions.
+its edge (or with the arrow keys on it); the width is kept in the browser. Every page of
+administrators follows it:
+
+| Page | Metrics | Filters | Detail and actions |
+|---|---|---|---|
+| **Console** | organizations, people, extensions, failed sign-ins, memory, uptime | — | security events, panels of extensions |
+| **Organizations** | total, active, suspended, with an identity provider | text, state | detail, suspension, deletion; **New organization** |
+| **People** | people, active, suspended, found | text, state | detail with organizations, suspension, reinstatement |
+| **Extensions** | catalogs, offered, installed, updates, waiting for a restart | text, state | detail of the package; install or update |
+| **Service identities** | identities, live keys, without a key, with two keys | text | what it may call, keys and their revocation, changes; **New service identity** |
+| **Installation credentials**, **Credentials** | credentials, for one extension, for any | text | detail and replacement; **Store a credential** |
+| **External origins** | whether the policy is sent, origins by source | text, source | detail and removal; **Allow an origin** |
+| **Platform** | settings on and off | text | the switch of each setting on its row |
+| **Organization apps** | apps, shown, hidden, pinned, restricted | text | shown, pinned, for whom and order on each row; detail |
+| **Permissions** | permissions, profiles, people, teams | text, by tab | the profile editor, the permissions of a person or of a team |
+| **Quotas** | measures, with a limit, near and at the limit | text, month | detail with the consumption by person; the limit, for platform administrators |
+
+In **Permissions** a person and a team are chosen from their tables (**Details of …**), no longer from
+a list; the profiles of the organization are a table too, edited in the side pane.
 
 ## Roles
 

@@ -33,6 +33,8 @@ test.describe('MK-124 Service identities for internal callers of the APIs of ext
     await openApp(page, 'Service identities');
     await expect(page.getByRole('heading', { name: 'Service identities', level: 1 })).toBeVisible();
 
+    // The model of the administration pages (MK-072): creation and detail in the side pane.
+    await page.getByRole('button', { name: 'New service identity', exact: true }).click();
     const form = page.getByRole('form', { name: 'New service identity' });
     await form.getByLabel('Name', { exact: true }).fill('e2e-gateway');
     await form.getByLabel('Description').fill('In front of the map server');
@@ -59,8 +61,8 @@ test.describe('MK-124 Service identities for internal callers of the APIs of ext
     await expect(secretBox).toHaveCount(0);
 
     const identity = page
-      .getByRole('list', { name: 'Service identities' })
-      .getByRole('listitem')
+      .getByRole('table', { name: 'Service identities' })
+      .getByRole('row')
       .filter({ hasText: 'e2e-gateway' })
       .first();
     await expect(identity).toContainText('APIs: fixture-notes');
@@ -83,7 +85,10 @@ test.describe('MK-124 Service identities for internal callers of the APIs of ext
     expect(fresh).toMatch(/^mks_/);
     await page.getByRole('button', { name: 'Done' }).click();
     await expect(identity.getByRole('button', { name: 'New key' })).toBeDisabled();
-    await identity
+    await identity.getByRole('button', { name: 'Details of e2e-gateway', exact: true }).click();
+    await page
+      .getByRole('complementary', { name: 'e2e-gateway' })
+      .getByRole('list', { name: 'Keys of e2e-gateway' })
       .getByRole('listitem')
       .filter({ hasText: secret.slice(0, 12) })
       .getByRole('button', { name: 'Revoke' })

@@ -22,6 +22,20 @@ import { awaitsPassword } from './password-links.js';
 import './mk-permission-list.js';
 import type { PermissionToggle } from './mk-permission-list.js';
 import { byExtension, toggled, type PermissionGroup } from './permissions.js';
+import { filterMembers, filterProfiles, filterTeams, permissionMetrics } from './admin-pages.js';
+import { adminStyles } from './admin-styles.js';
+import './mk-admin-view.js';
+
+/** The role of a person in the organization, as the table of people shows it. */
+function roleLabel(roles: readonly string[]): string {
+  if (roles.includes('organization-admin')) {
+    return t('Administrator');
+  }
+  if (roles.includes('organization-guest')) {
+    return t('Guest');
+  }
+  return t('Member');
+}
 
 type Tab = 'profiles' | 'people' | 'teams';
 const TABS: readonly Tab[] = ['profiles', 'people', 'teams'];
@@ -37,122 +51,118 @@ const NEW = '';
  */
 @customElement('mk-admin-permissions')
 export class MkAdminPermissions extends LitElement {
-  static override readonly styles = css`
-    :host {
-      display: block;
-      max-width: 960px;
-    }
-    h1 {
-      margin-top: 0;
-    }
-    h2 {
-      font-size: 18px;
-      margin: 0 0 8px;
-    }
-    [role='tablist'] {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 4px;
-      border-bottom: 1px solid var(--mk-line);
-      margin-bottom: 16px;
-    }
-    [role='tab'] {
-      font: inherit;
-      padding: 8px 14px;
-      border: 0;
-      border-bottom: 3px solid transparent;
-      background: none;
-      color: var(--mk-fg);
-      cursor: pointer;
-    }
-    [role='tab'][aria-selected='true'] {
-      border-bottom-color: var(--mk-accent);
-      font-weight: 600;
-    }
-    .split {
-      display: grid;
-      grid-template-columns: minmax(0, 15rem) minmax(0, 1fr);
-      gap: 20px;
-      align-items: start;
-    }
-    @media (max-width: 720px) {
-      .split {
-        grid-template-columns: minmax(0, 1fr);
+  static override readonly styles = [
+    adminStyles,
+    css`
+      h2 {
+        font-size: 18px;
+        margin: 0 0 8px;
       }
-    }
-    .list {
-      list-style: none;
-      margin: 0 0 12px;
-      padding: 0;
-    }
-    .list button {
-      width: 100%;
-      text-align: left;
-      margin-bottom: 4px;
-    }
-    .list button[aria-current='true'] {
-      border-color: var(--mk-accent);
-      font-weight: 600;
-    }
-    .field {
-      display: grid;
-      gap: 4px;
-      margin-bottom: 12px;
-    }
-    .check {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      margin-bottom: 12px;
-    }
-    input[type='text'],
-    select,
-    button {
-      font: inherit;
-      padding: 6px 10px;
-      border-radius: var(--mk-radius);
-      border: 1px solid var(--mk-line);
-      background: var(--mk-surface);
-      color: var(--mk-fg);
-      min-width: 0;
-      max-width: 100%;
-    }
-    input[type='checkbox'] {
-      accent-color: var(--mk-accent);
-    }
-    button {
-      cursor: pointer;
-    }
-    button.primary {
-      border-color: var(--mk-accent);
-      background: var(--mk-accent);
-      color: var(--mk-accent-fg);
-      font-weight: 600;
-    }
-    button.danger {
-      color: var(--mk-danger);
-    }
-    .actions {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      margin: 12px 0;
-    }
-    .muted {
-      color: var(--mk-muted);
-    }
-    .status {
-      min-height: 1.5em;
-      color: var(--mk-muted);
-    }
-    .error {
-      color: var(--mk-danger);
-    }
-    :focus-visible {
-      outline: 2px solid var(--mk-focus);
-      outline-offset: 2px;
-    }
-  `;
+      [role='tablist'] {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px;
+        border-bottom: 1px solid var(--mk-line);
+        margin-bottom: 16px;
+      }
+      [role='tab'] {
+        font: inherit;
+        padding: 8px 14px;
+        border: 0;
+        border-bottom: 3px solid transparent;
+        background: none;
+        color: var(--mk-fg);
+        cursor: pointer;
+      }
+      [role='tab'][aria-selected='true'] {
+        border-bottom-color: var(--mk-accent);
+        font-weight: 600;
+      }
+      .split {
+        display: grid;
+        grid-template-columns: minmax(0, 15rem) minmax(0, 1fr);
+        gap: 20px;
+        align-items: start;
+      }
+      @media (max-width: 720px) {
+        .split {
+          grid-template-columns: minmax(0, 1fr);
+        }
+      }
+      .list {
+        list-style: none;
+        margin: 0 0 12px;
+        padding: 0;
+      }
+      .list button {
+        width: 100%;
+        text-align: left;
+        margin-bottom: 4px;
+      }
+      .list button[aria-current='true'] {
+        border-color: var(--mk-accent);
+        font-weight: 600;
+      }
+      .field {
+        display: grid;
+        gap: 4px;
+        margin-bottom: 12px;
+      }
+      .check {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+      input[type='text'],
+      select,
+      button:not(.link):not([role='tab']) {
+        font: inherit;
+        padding: 6px 10px;
+        border-radius: var(--mk-radius);
+        border: 1px solid var(--mk-line);
+        background: var(--mk-surface);
+        color: var(--mk-fg);
+        min-width: 0;
+        max-width: 100%;
+      }
+      input[type='checkbox'] {
+        accent-color: var(--mk-accent);
+      }
+      button {
+        cursor: pointer;
+      }
+      button.primary {
+        border-color: var(--mk-accent);
+        background: var(--mk-accent);
+        color: var(--mk-accent-fg);
+        font-weight: 600;
+      }
+      button.danger {
+        color: var(--mk-danger);
+      }
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin: 12px 0;
+      }
+      .muted {
+        color: var(--mk-muted);
+      }
+      .status {
+        min-height: 1.5em;
+        color: var(--mk-muted);
+      }
+      .error {
+        color: var(--mk-danger);
+      }
+      :focus-visible {
+        outline: 2px solid var(--mk-focus);
+        outline-offset: 2px;
+      }
+    `,
+  ];
 
   @property({ attribute: false }) client: KernelClient | undefined;
   /** The organization whose permissions are managed. */
@@ -173,6 +183,7 @@ export class MkAdminPermissions extends LitElement {
   @state() private teamId = '';
   @state() private team: TeamPermissions | undefined;
   @state() private busy = false;
+  @state() private search = '';
   @state() private message = '';
   @state() private failed = false;
 
@@ -204,10 +215,6 @@ export class MkAdminPermissions extends LitElement {
       this.profiles = profiles;
       this.members = members;
       this.teams = teams.filter((team) => !team.kind || team.kind === 'team');
-      const first = profiles[0];
-      if (this.profileId === undefined && first) {
-        this.editProfile(first);
-      }
     } catch (error) {
       this.show(t('Not loaded: {reason}', { reason: String(error) }), true);
     }
@@ -215,39 +222,62 @@ export class MkAdminPermissions extends LitElement {
 
   override render(): unknown {
     return html`
-      <h1>${t('Permissions')}</h1>
-      <p>
-        ${t(
+      <mk-admin-view
+        heading=${t('Permissions')}
+        description=${t(
           'What the people of your organization may do in each extension. A permission is off until a profile, a team or a personal exception grants it; administrators hold every permission.',
         )}
-      </p>
-      <div role="tablist" aria-label=${t('Permissions')} @keydown=${this.tabKeys}>
-        ${TABS.map(
-          (tab) =>
-            html`<button
-              type="button"
-              role="tab"
-              id="tab-${tab}"
-              aria-selected=${this.tab === tab ? 'true' : 'false'}
-              aria-controls="panel-${tab}"
-              tabindex=${this.tab === tab ? 0 : -1}
-              @click=${() => {
-                this.select(tab);
-              }}
-            >
-              ${this.tabTitle(tab)}
-            </button>`,
-        )}
-      </div>
-      <div role="tabpanel" id="panel-${this.tab}" aria-labelledby="tab-${this.tab}">
-        ${
-          this.tab === 'profiles'
-            ? this.renderProfiles()
-            : this.tab === 'people'
-              ? this.renderPeople()
-              : this.renderTeams()
-        }
-      </div>
+        name="mosaikit.admin.permissions"
+        .metrics=${permissionMetrics(this.declared, this.profiles, this.members, this.teams)}
+        ?detail-open=${this.paneOpen()}
+        @mk-detail-close=${this.closePane}
+      >
+        <label slot="filters" class="filter"
+          >${t('Search {tab}', { tab: this.tabTitle(this.tab).toLocaleLowerCase() })}
+          <input
+            type="search"
+            .value=${this.search}
+            @input=${(event: Event) => {
+              this.search = (event.target as HTMLInputElement).value;
+            }}
+        /></label>
+        <div role="tablist" aria-label=${t('Permissions')} @keydown=${this.tabKeys}>
+          ${TABS.map(
+            (tab) =>
+              html`<button
+                type="button"
+                role="tab"
+                id="tab-${tab}"
+                aria-selected=${this.tab === tab ? 'true' : 'false'}
+                aria-controls="panel-${tab}"
+                tabindex=${this.tab === tab ? 0 : -1}
+                @click=${() => {
+                  this.select(tab);
+                }}
+              >
+                ${this.tabTitle(tab)}
+              </button>`,
+          )}
+        </div>
+        <div role="tabpanel" id="panel-${this.tab}" aria-labelledby="tab-${this.tab}">
+          ${
+            this.tab === 'profiles'
+              ? this.renderProfiles()
+              : this.tab === 'people'
+                ? this.renderPeople()
+                : this.renderTeams()
+          }
+        </div>
+        <aside slot="detail" class="pane" aria-label=${this.paneLabel()}>
+          ${
+            this.tab === 'profiles'
+              ? this.renderProfileEditor()
+              : this.tab === 'people'
+                ? this.renderMember()
+                : this.renderTeam()
+          }
+        </aside>
+      </mk-admin-view>
       <p class="status ${this.failed ? 'error' : ''}" role="status" aria-live="polite">
         ${this.message || nothing}
       </p>
@@ -268,6 +298,49 @@ export class MkAdminPermissions extends LitElement {
     `;
   }
 
+  /** Whether the side pane shows the detail of a row of the current tab. */
+  private paneOpen(): boolean {
+    switch (this.tab) {
+      case 'profiles':
+        return this.draft !== undefined;
+      case 'people':
+        return this.memberEmail !== '';
+      default:
+        return this.teamId !== '';
+    }
+  }
+
+  private paneLabel(): string {
+    switch (this.tab) {
+      case 'profiles':
+        return this.profileId === NEW
+          ? t('New profile')
+          : t('Profile {name}', { name: this.draft?.name ?? '' });
+      case 'people':
+        return this.memberName(this.memberEmail);
+      default:
+        return t('Team {name}', {
+          name: this.teams.find((team) => team.id === this.teamId)?.name ?? '',
+        });
+    }
+  }
+
+  private readonly closePane = (): void => {
+    switch (this.tab) {
+      case 'profiles':
+        this.profileId = undefined;
+        this.draft = undefined;
+        break;
+      case 'people':
+        this.memberEmail = '';
+        this.member = undefined;
+        break;
+      default:
+        this.teamId = '';
+        this.team = undefined;
+    }
+  };
+
   private tabTitle(tab: Tab): string {
     return tab === 'profiles' ? t('Profiles') : tab === 'people' ? t('People') : t('Teams');
   }
@@ -275,12 +348,7 @@ export class MkAdminPermissions extends LitElement {
   private select(tab: Tab): void {
     this.tab = tab;
     this.message = '';
-    if (tab === 'people' && !this.memberEmail && this.members[0]) {
-      void this.openMember(this.members[0].username);
-    }
-    if (tab === 'teams' && !this.teamId && this.teams[0]) {
-      void this.openTeam(this.teams[0].id);
-    }
+    this.search = '';
   }
 
   /** The arrow keys, Home and End move between the tabs (WAI-ARIA tabs pattern). */
@@ -310,109 +378,131 @@ export class MkAdminPermissions extends LitElement {
   // Profiles.
 
   private renderProfiles(): unknown {
-    const draft = this.draft;
-    return html`<div class="split">
-      <nav aria-label=${t('Profiles')}>
-        <ul class="list">
-          ${this.profiles.map(
-            (profile) =>
-              html`<li>
-                <button
-                  type="button"
-                  aria-current=${this.profileId === profile.id ? 'true' : 'false'}
-                  @click=${() => {
-                    this.editProfile(profile);
-                  }}
-                >
-                  ${profile.name}${
-                    profile.defaultForRole === MEMBER_ROLE
-                      ? html` <span class="muted">(${t('default')})</span>`
-                      : nothing
-                  }
-                </button>
-              </li>`,
-          )}
-        </ul>
-        ${
-          this.profiles.length === 0
-            ? html`<p class="muted">${t('No profiles yet: members hold no permission.')}</p>`
-            : nothing
-        }
-        <button type="button" @click=${this.newProfile}>${t('New profile')}</button>
-      </nav>
+    const profiles = filterProfiles(this.profiles, this.search);
+    return html`<div class="actions">
+        <button type="button" class="primary" @click=${this.newProfile}>${t('New profile')}</button>
+      </div>
       ${
-        draft
-          ? html`<form @submit=${this.saveProfile} aria-labelledby="profile-title">
-              <h2 id="profile-title">
-                ${this.profileId === NEW ? t('New profile') : t('Profile {name}', { name: draft.name })}
-              </h2>
-              <div class="field">
-                <label for="profile-name">${t('Name')}</label>
-                <input
-                  id="profile-name"
-                  type="text"
-                  required
-                  maxlength="100"
-                  .value=${draft.name}
-                  @input=${(event: Event) => {
-                    this.changeDraft({ name: (event.target as HTMLInputElement).value });
-                  }}
-                />
-              </div>
-              <div class="field">
-                <label for="profile-description">${t('Description')}</label>
-                <input
-                  id="profile-description"
-                  type="text"
-                  maxlength="500"
-                  .value=${draft.description}
-                  @input=${(event: Event) => {
-                    this.changeDraft({ description: (event.target as HTMLInputElement).value });
-                  }}
-                />
-              </div>
-              <label class="check">
-                <input
-                  type="checkbox"
-                  .checked=${draft.defaultForRole === MEMBER_ROLE}
-                  @change=${(event: Event) => {
-                    this.changeDraft({
-                      defaultForRole: (event.target as HTMLInputElement).checked
-                        ? MEMBER_ROLE
-                        : null,
-                    });
-                  }}
-                />
-                ${t('Default profile of members: for those without a profile of their own')}
-              </label>
-              <mk-permission-list
-                .groups=${this.groups}
-                .selected=${new Set(draft.permissions)}
-                @mk-permission-toggle=${(event: CustomEvent<PermissionToggle>) => {
-                  this.changeDraft({
-                    permissions: toggled(draft.permissions, event.detail.id, event.detail.on),
-                  });
-                }}
-              ></mk-permission-list>
-              <div class="actions">
-                <button class="primary" type="submit" ?disabled=${this.busy}>${t('Save')}</button>
-                ${
-                  this.profileId !== NEW
-                    ? html`<button
-                        class="danger"
-                        type="button"
-                        ?disabled=${this.busy}
-                        @click=${this.deleteProfile}
-                      >
-                        ${t('Delete')}
-                      </button>`
-                    : nothing
-                }
-              </div>
-            </form>`
-          : nothing
-      }
-    </div>`;
+        this.profiles.length === 0
+          ? html`<p class="muted">${t('No profiles yet: members hold no permission.')}</p>`
+          : profiles.length === 0
+            ? html`<p>${t('No profile matches the filters.')}</p>`
+            : html`<table aria-label=${t('Profiles')}>
+                <thead>
+                  <tr>
+                    <th scope="col">${t('Profile')}</th>
+                    <th scope="col">${t('Permissions')}</th>
+                    <th scope="col">${t('Default of members')}</th>
+                    <th scope="col"><span class="muted">${t('Actions')}</span></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${profiles.map(
+                    (profile) =>
+                      html`<tr class=${this.profileId === profile.id ? 'selected' : ''}>
+                        <th scope="row">
+                          <button
+                            type="button"
+                            class="link"
+                            aria-label=${t('Details of {name}', { name: profile.name })}
+                            @click=${() => {
+                              this.editProfile(profile);
+                            }}
+                          >
+                            ${profile.name}
+                          </button>
+                          ${profile.description ? html`<div class="muted">${profile.description}</div>` : nothing}
+                        </th>
+                        <td>${String(profile.permissions.length)}</td>
+                        <td>${profile.defaultForRole === MEMBER_ROLE ? t('Yes') : t('No')}</td>
+                        <td>
+                          <button
+                            type="button"
+                            aria-label=${t('Change {name}', { name: profile.name })}
+                            @click=${() => {
+                              this.editProfile(profile);
+                            }}
+                          >
+                            ${t('Change')}
+                          </button>
+                        </td>
+                      </tr>`,
+                  )}
+                </tbody>
+              </table>`
+      }`;
+  }
+
+  private renderProfileEditor(): unknown {
+    const draft = this.draft;
+    return draft
+      ? html`<form @submit=${this.saveProfile} aria-labelledby="profile-title">
+          <h2 id="profile-title">
+            ${this.profileId === NEW ? t('New profile') : t('Profile {name}', { name: draft.name })}
+          </h2>
+          <div class="field">
+            <label for="profile-name">${t('Name')}</label>
+            <input
+              id="profile-name"
+              type="text"
+              required
+              maxlength="100"
+              .value=${draft.name}
+              @input=${(event: Event) => {
+                this.changeDraft({ name: (event.target as HTMLInputElement).value });
+              }}
+            />
+          </div>
+          <div class="field">
+            <label for="profile-description">${t('Description')}</label>
+            <input
+              id="profile-description"
+              type="text"
+              maxlength="500"
+              .value=${draft.description}
+              @input=${(event: Event) => {
+                this.changeDraft({ description: (event.target as HTMLInputElement).value });
+              }}
+            />
+          </div>
+          <label class="check">
+            <input
+              type="checkbox"
+              .checked=${draft.defaultForRole === MEMBER_ROLE}
+              @change=${(event: Event) => {
+                this.changeDraft({
+                  defaultForRole: (event.target as HTMLInputElement).checked ? MEMBER_ROLE : null,
+                });
+              }}
+            />
+            ${t('Default profile of members: for those without a profile of their own')}
+          </label>
+          <mk-permission-list
+            .groups=${this.groups}
+            .selected=${new Set(draft.permissions)}
+            @mk-permission-toggle=${(event: CustomEvent<PermissionToggle>) => {
+              this.changeDraft({
+                permissions: toggled(draft.permissions, event.detail.id, event.detail.on),
+              });
+            }}
+          ></mk-permission-list>
+          <div class="actions">
+            <button class="primary" type="submit" ?disabled=${this.busy}>${t('Save')}</button>
+            ${
+              this.profileId !== NEW
+                ? html`<button
+                    class="danger"
+                    type="button"
+                    ?disabled=${this.busy}
+                    @click=${this.deleteProfile}
+                  >
+                    ${t('Delete')}
+                  </button>`
+                : nothing
+            }
+          </div>
+        </form>`
+      : nothing;
   }
 
   private editProfile(profile: PermissionProfile): void {
@@ -475,10 +565,6 @@ export class MkAdminPermissions extends LitElement {
       this.profiles = await client.permissionProfiles(organization);
       this.profileId = undefined;
       this.draft = undefined;
-      const first = this.profiles[0];
-      if (first) {
-        this.editProfile(first);
-      }
       this.show(t('Deleted.'), false);
     });
   };
@@ -486,90 +572,118 @@ export class MkAdminPermissions extends LitElement {
   // People.
 
   private renderPeople(): unknown {
-    const member = this.member;
-    const fallback = this.profiles.find((profile) => profile.defaultForRole === MEMBER_ROLE);
+    const people = filterMembers(this.members, this.search);
     return html`
       <div class="actions">
         <button class="primary" type="button" @click=${this.invite}>${t('Invite a person')}</button>
         <button type="button" @click=${this.createAccount}>${t('Create an account')}</button>
       </div>
-      <div class="field">
-        <label for="member">${t('Person')}</label>
-        <select id="member" @change=${this.changeMember}>
-          ${this.memberEmail ? nothing : html`<option value="" selected>${t('Choose')}</option>`}
-          ${this.members.map(
-            (person) =>
-              html`<option
-                value=${person.username}
-                ?selected=${person.username === this.memberEmail}
-              >
-                ${
-                  person.displayName && person.displayName !== person.username
-                    ? `${person.displayName} (${person.username})`
-                    : person.username
-                }
-              </option>`,
-          )}
-        </select>
-      </div>
       ${
-        member
-          ? html`<section aria-labelledby="member-title">
-              <h2 id="member-title">${this.memberName(member.email)}</h2>
-              <p>${this.standing(member.standing)}</p>
-              ${this.renderPasswordLink(member.email)}
-              ${
-                member.standing === 'member'
-                  ? html`<div class="field">
-                      <label for="member-profile">${t('Profile')}</label>
-                      <select
-                        id="member-profile"
-                        ?disabled=${this.busy}
-                        @change=${this.changeMemberProfile}
-                      >
-                        <option value="" ?selected=${!member.profileAssigned}>
-                          ${
-                            fallback
-                              ? t('Default profile of members ({name})', { name: fallback.name })
-                              : t('Default profile of members (none)')
-                          }
-                        </option>
-                        ${this.profiles.map(
-                          (profile) =>
-                            html`<option
-                              value=${profile.id}
-                              ?selected=${member.profileAssigned && member.profile?.id === profile.id}
-                            >
-                              ${profile.name}
-                            </option>`,
-                        )}
-                      </select>
-                    </div>`
-                  : nothing
-              }
-              ${
-                member.standing === 'administrator'
-                  ? nothing
-                  : html`<h3>${t('Personal exceptions')}</h3>
-                      <p class="muted">
-                        ${t('Permissions given to this person only, on top of the others.')}
-                      </p>
-                      <mk-permission-list
-                        .groups=${this.groups}
-                        .selected=${new Set(member.exceptions)}
-                        ?disabled=${this.busy}
-                        @mk-permission-toggle=${this.toggleException}
-                      ></mk-permission-list>`
-              }
-              <h3>${t('What they can do')}</h3>
-              <mk-effective-permissions
-                .permissions=${member.permissions}
-                label=${t('What they can do')}
-              ></mk-effective-permissions>
-            </section>`
-          : nothing
+        people.length === 0
+          ? html`<p>${t('Nobody matches the filters.')}</p>`
+          : html`<table aria-label=${t('People')}>
+              <thead>
+                <tr>
+                  <th scope="col">${t('Person')}</th>
+                  <th scope="col">${t('Role')}</th>
+                  <th scope="col"><span class="muted">${t('Actions')}</span></th>
+                </tr>
+              </thead>
+              <tbody>
+                ${people.map(
+                  (person) =>
+                    html`<tr class=${person.username === this.memberEmail ? 'selected' : ''}>
+                      <th scope="row">
+                        <button
+                          type="button"
+                          class="link"
+                          aria-label=${t('Details of {name}', { name: person.username })}
+                          @click=${() => void this.openMember(person.username)}
+                        >
+                          ${this.memberName(person.username)}
+                        </button>
+                        ${
+                          awaitsPassword(person)
+                            ? html`<div class="muted">${t('No password yet')}</div>`
+                            : nothing
+                        }
+                      </th>
+                      <td>${roleLabel(person.roles)}</td>
+                      <td>
+                        <button
+                          type="button"
+                          aria-label=${t('Permissions of {name}', { name: person.username })}
+                          @click=${() => void this.openMember(person.username)}
+                        >
+                          ${t('Permissions')}
+                        </button>
+                      </td>
+                    </tr>`,
+                )}
+              </tbody>
+            </table>`
       }
     `;
+  }
+
+  private renderMember(): unknown {
+    const member = this.member;
+    const fallback = this.profiles.find((profile) => profile.defaultForRole === MEMBER_ROLE);
+    return member
+      ? html`<section aria-labelledby="member-title">
+          <h2 id="member-title">${this.memberName(member.email)}</h2>
+          <p>${this.standing(member.standing)}</p>
+          ${this.renderPasswordLink(member.email)}
+          ${
+            member.standing === 'member'
+              ? html`<div class="field">
+                  <label for="member-profile">${t('Profile')}</label>
+                  <select
+                    id="member-profile"
+                    ?disabled=${this.busy}
+                    @change=${this.changeMemberProfile}
+                  >
+                    <option value="" ?selected=${!member.profileAssigned}>
+                      ${
+                        fallback
+                          ? t('Default profile of members ({name})', { name: fallback.name })
+                          : t('Default profile of members (none)')
+                      }
+                    </option>
+                    ${this.profiles.map(
+                      (profile) =>
+                        html`<option
+                          value=${profile.id}
+                          ?selected=${member.profileAssigned && member.profile?.id === profile.id}
+                        >
+                          ${profile.name}
+                        </option>`,
+                    )}
+                  </select>
+                </div>`
+              : nothing
+          }
+          ${
+            member.standing === 'administrator'
+              ? nothing
+              : html`<h3>${t('Personal exceptions')}</h3>
+                  <p class="muted">
+                    ${t('Permissions given to this person only, on top of the others.')}
+                  </p>
+                  <mk-permission-list
+                    .groups=${this.groups}
+                    .selected=${new Set(member.exceptions)}
+                    ?disabled=${this.busy}
+                    @mk-permission-toggle=${this.toggleException}
+                  ></mk-permission-list>`
+          }
+          <h3>${t('What they can do')}</h3>
+          <mk-effective-permissions
+            .permissions=${member.permissions}
+            label=${t('What they can do')}
+          ></mk-effective-permissions>
+        </section>`
+      : nothing;
   }
 
   /** For a created account whose person has not chosen a password yet, a new link (MK-048). */
@@ -603,10 +717,6 @@ export class MkAdminPermissions extends LitElement {
         return t('Member: their profile, their teams and their personal exceptions.');
     }
   }
-
-  private readonly changeMember = (event: Event): void => {
-    void this.openMember((event.target as HTMLSelectElement).value);
-  };
 
   private async openMember(email: string): Promise<void> {
     const { client, organization } = this;
@@ -701,40 +811,60 @@ export class MkAdminPermissions extends LitElement {
     if (this.teams.length === 0) {
       return html`<p class="muted">${t('The organization has no teams.')}</p>`;
     }
-    const team = this.team;
-    return html`
-      <div class="field">
-        <label for="team">${t('Team')}</label>
-        <select id="team" @change=${this.changeTeam}>
-          ${this.teamId ? nothing : html`<option value="" selected>${t('Choose')}</option>`}
-          ${this.teams.map(
-            (candidate) =>
-              html`<option value=${candidate.id} ?selected=${candidate.id === this.teamId}>
-                ${candidate.name}
-              </option>`,
-          )}
-        </select>
-      </div>
-      ${
-        team
-          ? html`<section aria-labelledby="team-title">
-              <h2 id="team-title">${t('Team {name}', { name: team.name })}</h2>
-              <p class="muted">${t('Granted to every member and guest of the team.')}</p>
-              <mk-permission-list
-                .groups=${this.groups}
-                .selected=${new Set(team.permissions)}
-                ?disabled=${this.busy}
-                @mk-permission-toggle=${this.toggleTeam}
-              ></mk-permission-list>
-            </section>`
-          : nothing
-      }
-    `;
+    const teams = filterTeams(this.teams, this.search);
+    return teams.length === 0
+      ? html`<p>${t('No team matches the filters.')}</p>`
+      : html`<table aria-label=${t('Teams')}>
+          <thead>
+            <tr>
+              <th scope="col">${t('Team')}</th>
+              <th scope="col"><span class="muted">${t('Actions')}</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            ${teams.map(
+              (candidate) =>
+                html`<tr class=${candidate.id === this.teamId ? 'selected' : ''}>
+                  <th scope="row">
+                    <button
+                      type="button"
+                      class="link"
+                      aria-label=${t('Details of {name}', { name: candidate.name })}
+                      @click=${() => void this.openTeam(candidate.id)}
+                    >
+                      ${candidate.name}
+                    </button>
+                  </th>
+                  <td>
+                    <button
+                      type="button"
+                      aria-label=${t('Permissions of {name}', { name: candidate.name })}
+                      @click=${() => void this.openTeam(candidate.id)}
+                    >
+                      ${t('Permissions')}
+                    </button>
+                  </td>
+                </tr>`,
+            )}
+          </tbody>
+        </table>`;
   }
 
-  private readonly changeTeam = (event: Event): void => {
-    void this.openTeam((event.target as HTMLSelectElement).value);
-  };
+  private renderTeam(): unknown {
+    const team = this.team;
+    return team
+      ? html`<section aria-labelledby="team-title">
+          <h2 id="team-title">${t('Team {name}', { name: team.name })}</h2>
+          <p class="muted">${t('Granted to every member and guest of the team.')}</p>
+          <mk-permission-list
+            .groups=${this.groups}
+            .selected=${new Set(team.permissions)}
+            ?disabled=${this.busy}
+            @mk-permission-toggle=${this.toggleTeam}
+          ></mk-permission-list>
+        </section>`
+      : nothing;
+  }
 
   private async openTeam(id: string): Promise<void> {
     const { client, organization } = this;
