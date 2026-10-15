@@ -112,6 +112,12 @@ The rows are sorted by path, one row for a path and the methods that share a des
 | Method and path | Who | Purpose |
 |---|---|---|
 | `GET /api/v1/access-keys/current` | with an access key | validate the key of the request, for services: `id`, `name`, `prefix`, `write`, `expiresAt`, the `account` and the `organization` it acts for, and the `roles` of the person there now; 404 without a key (MK-060) |
+| `GET /api/v1/access-requests` | signed in | List the pending requests for access the signed-in person may decide |
+| `POST /api/v1/access-requests` | signed in | ask for access to a resource refused to the signed-in person, with a message (MK-058); 202, the same whether the resource exists or not |
+| `GET /api/v1/access-requests/mine` | signed in | List the requests for access of the signed-in person, newest first, with their outcome |
+| `DELETE /api/v1/access-requests/{id}` | signed in | Withdraw a pending request for access of the signed-in person |
+| `POST /api/v1/access-requests/{id}/approve` | signed in | Approve a request for access: grant the level asked, or the one given |
+| `POST /api/v1/access-requests/{id}/reject` | signed in | Reject a request for access, with an optional reason |
 | `POST /api/v1/accounts/confirmations` | anyone | confirm an address with the token of the link (`{"token": "…"}`); 404 when the link was used or expired |
 | `POST /api/v1/accounts/confirmations/requests` | anyone | send the link again (`{"email": "…"}`); always 202 |
 | `GET /api/v1/accounts/me` | signed in | the current account, with its personal settings |

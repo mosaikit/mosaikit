@@ -8,6 +8,12 @@ import type { ExtensionContext } from './extension.js';
  */
 export const SHARE_TOPIC = 'shell.share';
 
+/**
+ * The topic on which a frontend asks the shell to open the request for access to a resource the
+ * person was refused (MK-058), with a {@link RequestedAccess} as payload.
+ */
+export const REQUEST_ACCESS_TOPIC = 'shell.request-access';
+
 /** A resource that an extension registered with the kernel (MK-054). */
 export interface SharedResourceRef {
   /** The identifier of the extension, such as `dev.example.dashboards`. */
@@ -52,4 +58,31 @@ export async function sharingLevel(
     throw new Error(`The level cannot be read (${String(response.status)})`);
   }
   return ((await response.json()) as { level?: string }).level;
+}
+
+/** A resource the person was refused, and the level they may ask for (MK-058). */
+export interface RequestedAccess extends SharedResourceRef {
+  /** A level of the type; the shell asks for the lowest one when it is absent. */
+  readonly level?: string;
+}
+
+/**
+ * Opens the request for access of the kernel for a resource of the extension that the person was
+ * refused (MK-058): they write a message, and the people who may share the resource decide. Offer it
+ * from the page that refused them, which says nothing more of the resource than it did. A frontend
+ * isolated in an iframe declares `shell.request-access` in `frontend.bridge.publishes`.
+ */
+export function requestAccess(
+  context: Pick<ExtensionContext, 'events' | 'extension'>,
+  type: string,
+  id: string,
+  level?: string,
+): void {
+  const request: RequestedAccess = {
+    extension: context.extension.id,
+    type,
+    id,
+    ...(level ? { level } : {}),
+  };
+  context.events.publish(REQUEST_ACCESS_TOPIC, request);
 }

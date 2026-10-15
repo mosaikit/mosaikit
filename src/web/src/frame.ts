@@ -12,6 +12,7 @@ import {
   EventBus,
   isMosaikitExtension,
   PresenceStore,
+  REQUEST_ACCESS_TOPIC,
   type AppAddress,
   type EventHandler,
   type ExtensionContext,
@@ -236,6 +237,31 @@ export async function start(
 }
 
 /**
+ * Passes to the shell, as the topic `shell.request-access` of the bridge, the requests for access that
+ * the elements of the frame dispatch (`mk-request-access`, such as `<mk-empty-state kind="denied"
+ * resource>` does, MK-058): the frame has no dialog of its own, and the shell checks the topic against
+ * `bridge.publishes` and the payload as for any extension.
+ */
+export function forwardAccessRequests(
+  target: Partial<Pick<EventTarget, 'addEventListener'>>,
+  events: Pick<EventBus, 'publish'>,
+): void {
+  target.addEventListener?.('mk-request-access', (event: Event) => {
+    const detail = (event as CustomEvent<unknown>).detail;
+    if (typeof detail !== 'object' || detail === null) {
+      return;
+    }
+    const { resource, level } = detail as { resource?: unknown; level?: unknown };
+    if (typeof resource === 'object' && resource !== null) {
+      events.publish(REQUEST_ACCESS_TOPIC, {
+        ...(resource as Record<string, unknown>),
+        ...(typeof level === 'string' ? { level } : {}),
+      });
+    }
+  });
+}
+
+/**
  * Connects the frame to the shell that created it. The frame sends the shell, and only the shell
  * origin, one end of a new message channel with its `ready` message: every other message of both
  * sides goes through that channel, which no other window can use.
@@ -253,6 +279,7 @@ export function connect(
   };
   const events = new FrameEventBus(send);
   const calls = new PendingCalls(send);
+  forwardAccessRequests(doc as Partial<Pick<EventTarget, 'addEventListener'>>, events);
   let presence: PresenceStore | undefined;
   let address: FrameAddress | undefined;
   let started = false;

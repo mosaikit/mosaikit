@@ -3,6 +3,7 @@
 package dev.mosaikit.kernel.core.activity;
 
 import dev.mosaikit.kernel.api.context.CurrentOrganization;
+import dev.mosaikit.kernel.api.events.PlatformEvents;
 import dev.mosaikit.kernel.api.live.Notifications;
 import dev.mosaikit.kernel.core.account.AccountService;
 import dev.mosaikit.kernel.core.apps.AppSettings;
@@ -84,6 +85,24 @@ public class ActivityService implements Notifications {
         } else if (apps.isOff(org, extensionId)) {
             throw new ForbiddenOperationException("The extension is turned off for your organization.");
         }
+        deliver(org, extensionId, addressees, notification, problems);
+    }
+
+    /**
+     * Notifies people of the organization of the request as the kernel itself, such as about a request
+     * for access (MK-058): in their feed as the notifications of extensions, under the source
+     * {@value PlatformEvents#KERNEL}, which people turn off by kind as the others.
+     */
+    public void sendFromKernel(Collection<UUID> addressees, Notification notification) {
+        deliver(organization.require(), PlatformEvents.KERNEL, addressees, notification, new ArrayList<>());
+    }
+
+    private void deliver(
+            UUID org,
+            String extensionId,
+            Collection<UUID> addressees,
+            Notification notification,
+            List<String> problems) {
         if (notification.kind() == null || !KIND.matcher(notification.kind()).matches()) {
             problems.add("kind must be lowercase letters, digits and '-', such as mention");
         }

@@ -7,8 +7,11 @@ import {
   MEDIUM_BREAKPOINT,
   clampWidth,
   countOf,
+  REQUEST_ACCESS_EVENT,
   emptyKind,
+  emptyStateAction,
   emptyStateText,
+  requestedResource,
   filtersButtonText,
   labelsOf,
   listLayout,
@@ -172,5 +175,44 @@ describe('resizable pane (MK-105)', () => {
     expect(() => {
       writePaneWidth(undefined, 'notes.list', 300);
     }).not.toThrow();
+  });
+});
+
+describe('the request for access of a refused panel (MK-058)', () => {
+  it('58.1 reads the resource a refused panel names', () => {
+    expect(requestedResource('dev.example.dashboards/dashboard/42')).toEqual({
+      extension: 'dev.example.dashboards',
+      type: 'dashboard',
+      id: '42',
+    });
+    expect(requestedResource('org.example.files/file/a/b')).toEqual({
+      extension: 'org.example.files',
+      type: 'file',
+      id: 'a/b',
+    });
+    for (const value of [
+      null,
+      undefined,
+      '',
+      'dashboards/dashboard/42',
+      'dev.example.dashboards/dashboard',
+      'dev.example.dashboards/Dashboard/42',
+      'dev.example.dashboards/dashboard/ ',
+      `dev.example.dashboards/dashboard/${'x'.repeat(201)}`,
+    ]) {
+      expect(requestedResource(value)).toBeUndefined();
+    }
+  });
+
+  it('58.1 offers Request access on a refused panel that names its resource', () => {
+    const resource = { extension: 'dev.example.dashboards', type: 'dashboard', id: '42' };
+    expect(emptyStateAction('denied', resource)).toEqual({
+      label: 'Request access',
+      event: REQUEST_ACCESS_EVENT,
+    });
+    expect(emptyStateAction('denied', resource, 'Chiedi accesso')?.label).toBe('Chiedi accesso');
+    expect(emptyStateAction('denied', undefined)).toBeUndefined();
+    expect(emptyStateAction('failed', resource)?.event).toBe('mk-retry');
+    expect(REQUEST_ACCESS_EVENT).toBe('mk-request-access');
   });
 });
