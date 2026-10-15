@@ -9,14 +9,18 @@ import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.ws.rs.Consumes;
+import jakarta.ws.rs.DELETE;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
+import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.eclipse.microprofile.openapi.annotations.Operation;
@@ -34,6 +38,12 @@ public class MarketplaceResource {
             @NotBlank String source,
             @NotBlank String id,
             @NotBlank String version) {}
+
+    /** Packages of the catalogs to install together (MK-132). */
+    public record OperationRequest(@NotEmpty List<@Valid @NotNull InstallationRequest> installations) {}
+
+    /** The packages installed by an operation, in the order of the request. */
+    public record OperationResult(List<Installation> installations) {}
 
     private final Marketplace marketplace;
     private final AuditLog audit;
@@ -62,6 +72,45 @@ public class MarketplaceResource {
         Installation installation = marketplace.install(request.source(), request.id(), request.version());
         auditInstallation(installation, request.source());
         return Response.accepted(installation).build();
+    }
+
+    @POST
+    @Path("/marketplace/operations")
+    @Consumes(MediaType.APPLICATION_JSON)
+    @Operation(
+            summary = "Install several extensions from the catalogs together",
+            description = "An extension with the extensions it requires, or an update with the extensions that require"
+                    + " it: nothing is installed unless every package can be (MK-132).")
+    public Response installTogether(@Valid @NotNull OperationRequest request) {
+        List<Installation> installations = marketplace.install(request.installations().stream()
+                .map(item -> new Marketplace.Request(item.source(), item.id(), item.version()))
+                .toList());
+        for (int i = 0; i < installations.size(); i++) {
+            auditInstallation(
+                    installations.get(i), request.installations().get(i).source());
+        }
+        return Response.accepted(new OperationResult(installations)).build();
+    }
+
+    @DELETE
+    @Path("/extensions/{id}")
+    @Operation(
+            summary = "Remove an installed extension",
+            description = "Refused while an extension that runs requires it (MK-132); its schema and data are kept.")
+    public Removal remove(@PathParam("id") String id) {
+        Removal removal = marketplace.remove(id);
+        audit.append(
+                identity.getPrincipal().getName(),
+                Optional.empty(),
+                "extension.removed",
+                removal.id() + " " + removal.version(),
+                AuditEvent.Outcome.SUCCEEDED,
+                Map.of(
+                        "file",
+                        String.valueOf(removal.file()),
+                        "restartRequired",
+                        String.valueOf(removal.restartRequired())));
+        return removal;
     }
 
     @POST

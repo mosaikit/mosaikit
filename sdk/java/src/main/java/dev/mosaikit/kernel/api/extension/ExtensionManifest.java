@@ -36,6 +36,7 @@ public final class ExtensionManifest {
     private final List<PermissionEntry> permissions;
     private final List<ResourceTypeEntry> resourceTypes;
     private final List<MeasureEntry> measures;
+    private final Map<String, VersionRange> optional;
 
     @SuppressWarnings("java:S107") // Mirrors the manifest fields; only ExtensionManifests creates it.
     ExtensionManifest(
@@ -55,7 +56,8 @@ public final class ExtensionManifest {
             List<ActionEntry> actions,
             List<PermissionEntry> permissions,
             List<ResourceTypeEntry> resourceTypes,
-            List<MeasureEntry> measures) {
+            List<MeasureEntry> measures,
+            Map<String, VersionRange> optional) {
         this.id = Objects.requireNonNull(id, "id");
         this.version = Objects.requireNonNull(version, "version");
         this.name = Objects.requireNonNull(name, "name");
@@ -73,6 +75,7 @@ public final class ExtensionManifest {
         this.permissions = List.copyOf(permissions);
         this.resourceTypes = List.copyOf(resourceTypes);
         this.measures = List.copyOf(measures);
+        this.optional = Map.copyOf(optional);
     }
 
     /** What the extension meters for each organization, with limits and consumption (MK-076). */
@@ -157,6 +160,14 @@ public final class ExtensionManifest {
     /** Required extension points or extensions, with their accepted versions. */
     public Map<String, VersionRange> requires() {
         return requires;
+    }
+
+    /**
+     * Extensions this one uses when they are installed in an accepted version, and works without
+     * otherwise (MK-132). They never prevent its installation or start.
+     */
+    public Map<String, VersionRange> optional() {
+        return optional;
     }
 
     /** Frontend of the extension, if any. */

@@ -5,8 +5,10 @@ package dev.mosaikit.kernel.core.apps;
 import dev.mosaikit.kernel.api.events.PlatformEvents;
 import dev.mosaikit.kernel.api.extension.Contribution;
 import dev.mosaikit.kernel.api.extension.ExtensionManifest;
+import dev.mosaikit.kernel.core.error.ConflictException;
 import dev.mosaikit.kernel.core.error.InvalidInputException;
 import dev.mosaikit.kernel.core.events.PlatformEventLog;
+import dev.mosaikit.kernel.core.extension.ExtensionDependencies;
 import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
 import dev.mosaikit.kernel.core.extension.InstalledExtension;
 import dev.mosaikit.kernel.core.security.Roles;
@@ -144,6 +146,7 @@ public class AppSettings {
         available().forEach(app -> extensions.add(app.extensionId()));
         Set<String> offBefore = new HashSet<>();
         extensions.stream().filter(id -> isOff(organizationId, id)).forEach(offBefore::add);
+        refuseRequiredTurnedOff(changed, offBefore);
         apps.deleteByOrganizationId(organizationId);
         for (int i = 0; i < changed.size(); i++) {
             AppView app = changed.get(i);
@@ -158,6 +161,42 @@ public class AppSettings {
         }
         raiseTurned(organizationId, extensions, offBefore);
         return list(organizationId);
+    }
+
+    /**
+     * Refuses a change that turns off an extension while an extension that stays on in the
+     * organization requires it, naming those extensions (MK-132); turning both off together is
+     * accepted. Extensions that use it optionally stay on.
+     */
+    private void refuseRequiredTurnedOff(List<AppView> changed, Set<String> offBefore) {
+        Map<String, List<AppView>> listed = new HashMap<>();
+        changed.forEach(app -> listed.computeIfAbsent(app.extensionId(), id -> new ArrayList<>())
+                .add(app));
+        Map<String, Long> appsOf = new HashMap<>();
+        available().forEach(app -> appsOf.merge(app.extensionId(), 1L, Long::sum));
+        // An extension is off when it has apps and all of them are listed, turned off.
+        Set<String> offAfter = new HashSet<>();
+        appsOf.forEach((id, count) -> {
+            List<AppView> apps = listed.getOrDefault(id, List.of());
+            if (apps.size() == count && apps.stream().noneMatch(AppView::enabled)) {
+                offAfter.add(id);
+            }
+        });
+        ExtensionDependencies running = ExtensionDependencies.running(registry.active());
+        List<String> problems = new ArrayList<>();
+        offAfter.stream().filter(id -> !offBefore.contains(id)).sorted().forEach(id -> {
+            List<String> dependents = running.requiredBy(id).stream()
+                    .filter(dependent -> !offAfter.contains(dependent.id()))
+                    .map(ExtensionDependencies.Dependent::toString)
+                    .toList();
+            if (!dependents.isEmpty()) {
+                problems.add(id + " is required by " + String.join(", ", dependents));
+            }
+        });
+        if (!problems.isEmpty()) {
+            throw new ConflictException("Cannot turn off: " + String.join("; ", problems)
+                    + ". Turn them off in the same change, or remove them first.");
+        }
     }
 
     /**

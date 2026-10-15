@@ -4,6 +4,7 @@ package dev.mosaikit.kernel.core.marketplace;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import dev.mosaikit.kernel.api.extension.ExtensionManifest;
 import dev.mosaikit.kernel.api.signature.ExtensionIndex;
 import dev.mosaikit.kernel.api.signature.PackageSignatureException;
 import dev.mosaikit.kernel.api.signature.PackageSignatures;
@@ -17,6 +18,7 @@ import dev.mosaikit.kernel.core.error.ResourceNotFoundException;
 import dev.mosaikit.kernel.core.error.ServiceUnavailableException;
 import dev.mosaikit.kernel.core.extension.BackendCheck;
 import dev.mosaikit.kernel.core.extension.ExtensionCatalog;
+import dev.mosaikit.kernel.core.extension.ExtensionDependencies;
 import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
 import dev.mosaikit.kernel.core.extension.ExtensionStatus;
 import dev.mosaikit.kernel.core.extension.InstalledExtension;
@@ -33,10 +35,12 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -118,27 +122,76 @@ public class Marketplace {
         return new CatalogView(views, offers);
     }
 
+    /** A package of a catalog to install, in an operation of one or more packages. */
+    public record Request(String source, String id, String version) {}
+
     /**
      * Downloads a package of a catalog and places it in the extensions directory.
      *
      * @throws ResourceNotFoundException when the catalog does not offer that version
+     * @throws ConflictException when a required dependency is missing or the update breaks a dependent
      */
     public Installation install(String source, String id, String version) {
-        URI uri = catalogs.stream()
+        return install(List.of(new Request(source, id, version))).getFirst();
+    }
+
+    /**
+     * Downloads packages of the catalogs and places them together in the extensions directory, so
+     * that an extension and the extensions it requires, or an update and the dependents that need
+     * it, are installed in one operation (MK-132). Nothing is placed unless every package can be.
+     *
+     * @throws ResourceNotFoundException when a catalog does not offer a version
+     * @throws ConflictException when a required dependency is missing or an update breaks a dependent
+     */
+    public List<Installation> install(List<Request> requests) {
+        if (requests.isEmpty()) {
+            throw new InvalidInputException(List.of("installations is empty"));
+        }
+        List<Prepared> prepared = new ArrayList<>();
+        try {
+            for (Request request : requests) {
+                URI uri = catalogUri(request.source());
+                ExtensionIndex.Entry entry = offered(uri, request);
+                prepared.add(prepare(download(uri, request, entry), Optional.of(entry)));
+            }
+            List<Installation> installations = place(prepared);
+            for (int i = 0; i < requests.size(); i++) {
+                Installation installation = installations.get(i);
+                LOG.infof(
+                        "Extension %s %s installed from %s%s",
+                        installation.id(),
+                        installation.version(),
+                        requests.get(i).source(),
+                        installation.restartRequired() ? "; restart to use it" : "");
+            }
+            return installations;
+        } finally {
+            prepared.forEach(candidate -> delete(candidate.work()));
+        }
+    }
+
+    private URI catalogUri(String source) {
+        return catalogs.stream()
                 .filter(catalog -> catalog.toString().equals(source))
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("No catalog " + source + " is configured."));
+    }
+
+    private ExtensionIndex.Entry offered(URI uri, Request request) {
         Catalog catalog = read(uri);
         if (catalog.source().keyId() == null) {
-            throw new ServiceUnavailableException("The catalog " + source + " cannot be used: "
+            throw new ServiceUnavailableException("The catalog " + request.source() + " cannot be used: "
                     + catalog.source().error());
         }
-        ExtensionIndex.Entry entry = catalog.entries().stream()
-                .filter(candidate ->
-                        candidate.id().equals(id) && candidate.version().equals(version))
+        return catalog.entries().stream()
+                .filter(candidate -> candidate.id().equals(request.id())
+                        && candidate.version().equals(request.version()))
                 .findFirst()
-                .orElseThrow(() -> new ResourceNotFoundException(
-                        "The catalog " + source + " does not offer " + id + " " + version + "."));
+                .orElseThrow(() -> new ResourceNotFoundException("The catalog " + request.source() + " does not offer "
+                        + request.id() + " " + request.version() + "."));
+    }
+
+    private byte[] download(URI uri, Request request, ExtensionIndex.Entry entry) {
         byte[] bytes;
         try {
             bytes = sources.read(uri, entry.file(), maxBytes);
@@ -146,14 +199,10 @@ public class Marketplace {
             throw new ServiceUnavailableException("The package cannot be downloaded: " + e.getMessage());
         }
         if (bytes.length != entry.size() || !sha256(bytes).equals(entry.sha256())) {
-            throw new ForbiddenOperationException(
-                    "The package of " + id + " " + version + " does not match the signed index of " + source + ".");
+            throw new ForbiddenOperationException("The package of " + entry.id() + " " + entry.version()
+                    + " does not match the signed index of " + request.source() + ".");
         }
-        Installation installation = place(bytes, Optional.of(entry));
-        LOG.infof(
-                "Extension %s %s installed from %s%s",
-                id, version, source, installation.restartRequired() ? "; restart to use it" : "");
-        return installation;
+        return bytes;
     }
 
     /** Places a package uploaded by an administrator, for an installation without network. */
@@ -164,10 +213,23 @@ public class Marketplace {
         if (bytes.length > maxBytes) {
             throw new InvalidInputException(List.of("package is larger than " + maxBytes + " bytes"));
         }
-        return place(bytes, Optional.empty());
+        Prepared prepared = prepare(bytes, Optional.empty());
+        try {
+            return place(List.of(prepared)).getFirst();
+        } finally {
+            delete(prepared.work());
+        }
     }
 
-    private Installation place(byte[] bytes, Optional<ExtensionIndex.Entry> expected) {
+    /** A package verified and read in its scratch directory, ready to be placed. */
+    private record Prepared(Path work, Path candidate, String keyId, InstalledExtension extension) {
+
+        ExtensionManifest manifest() {
+            return extension.manifest().orElseThrow();
+        }
+    }
+
+    private Prepared prepare(byte[] bytes, Optional<ExtensionIndex.Entry> expected) {
         Path work = null;
         try {
             // An installation may have lost its empty extensions directory (an archive, a copy).
@@ -183,44 +245,150 @@ public class Marketplace {
                             + entry.id() + " " + entry.version() + " as the index says.");
                 }
             });
-            // An update that removes a resource type or a level on which grants exist is refused,
-            // naming them (MK-055, ADR-0037).
-            registry.all().stream()
-                    .filter(installed -> installed.key().equals(extension.key()))
-                    .flatMap(installed -> installed.manifest().stream())
-                    .findFirst()
-                    .ifPresent(current ->
-                            sharing.refuseRemovals(current, extension.manifest().orElseThrow()));
-            String replaced = setAside(extension.key());
-            String file = packageFile(extension.key(), version);
-            Files.copy(candidate, registry.directory().resolve(file), StandardCopyOption.REPLACE_EXISTING);
-            List<String> problems = extension.status() == ExtensionStatus.ACTIVE ? List.of() : extension.problems();
-            // Without Java code nor a schema, nothing has to be built or migrated (ADR-0031): the
-            // extension takes effect at once.
-            boolean restart = needsRestart(extension);
-            if (!restart) {
-                registry.reload();
-                sharing.refresh(registry.active());
-                if (registry.findActive(extension.key()).isPresent()) {
-                    LOG.infof("Extension %s %s is active without a restart", extension.key(), version);
-                } else {
-                    // Say what the kernel found, rather than an activation that did not happen.
-                    problems = registry.all().stream()
-                            .filter(found -> found.key().equals(extension.key()))
-                            .flatMap(found -> found.problems().stream())
-                            .toList();
-                    if (problems.isEmpty()) {
-                        problems = List.of("the kernel did not activate it: see the Extensions page");
-                    }
-                    LOG.warnf("Extension %s %s is installed but not active: %s", extension.key(), version, problems);
-                }
-            }
-            return new Installation(extension.key(), version, file, replaced, keyId, problems, restart);
+            Prepared prepared = new Prepared(work, candidate, keyId, extension);
+            work = null;
+            return prepared;
         } catch (IOException e) {
             throw new UncheckedIOException("Cannot install the package", e);
         } finally {
             delete(work);
         }
+    }
+
+    private List<Installation> place(List<Prepared> prepared) {
+        List<ExtensionManifest> manifests =
+                prepared.stream().map(Prepared::manifest).toList();
+        Set<String> ids = new HashSet<>();
+        for (ExtensionManifest manifest : manifests) {
+            if (!ids.add(manifest.id())) {
+                throw new InvalidInputException(List.of("installations name " + manifest.id() + " more than once"));
+            }
+        }
+        // A required dependency missing or out of its range, or an update that leaves a dependent
+        // out of its range, is refused before anything is placed (MK-132).
+        List<String> unmet = ExtensionDependencies.installed(registry.all()).refuseInstallation(manifests);
+        if (!unmet.isEmpty()) {
+            throw new ConflictException("Cannot install: " + String.join("; ", unmet) + ".");
+        }
+        // An update that removes a resource type or a level on which grants exist is refused,
+        // naming them (MK-055, ADR-0037).
+        for (ExtensionManifest manifest : manifests) {
+            installedManifest(manifest.id()).ifPresent(current -> sharing.refuseRemovals(current, manifest));
+        }
+        try {
+            List<String> replaced = new ArrayList<>();
+            List<String> files = new ArrayList<>();
+            for (Prepared candidate : prepared) {
+                ExtensionManifest manifest = candidate.manifest();
+                replaced.add(setAside(manifest.id()));
+                String file = packageFile(manifest.id(), manifest.version().toString());
+                Files.copy(
+                        candidate.candidate(), registry.directory().resolve(file), StandardCopyOption.REPLACE_EXISTING);
+                files.add(file);
+            }
+            // Without Java code nor a schema, nothing has to be built or migrated (ADR-0031): the
+            // extension takes effect at once.
+            if (prepared.stream().anyMatch(candidate -> !needsRestart(candidate.extension()))) {
+                registry.reload();
+                sharing.refresh(registry.active());
+            }
+            List<Installation> installations = new ArrayList<>();
+            for (int i = 0; i < prepared.size(); i++) {
+                Prepared candidate = prepared.get(i);
+                boolean restart = needsRestart(candidate.extension());
+                installations.add(new Installation(
+                        candidate.extension().key(),
+                        candidate.manifest().version().toString(),
+                        files.get(i),
+                        replaced.get(i),
+                        candidate.keyId(),
+                        restart ? problemsAtInspection(candidate.extension()) : problemsAfterReload(candidate),
+                        restart));
+            }
+            return installations;
+        } catch (IOException e) {
+            throw new UncheckedIOException("Cannot install the package", e);
+        }
+    }
+
+    /**
+     * What the kernel will report at start, as read alone in its scratch directory: without the
+     * requirements, which were checked against the installation and are met.
+     */
+    private static List<String> problemsAtInspection(InstalledExtension extension) {
+        if (extension.status() == ExtensionStatus.ACTIVE) {
+            return List.of();
+        }
+        Set<String> alone = ExtensionDependencies.of(List.of())
+                .unmet(extension.manifest().orElseThrow())
+                .stream()
+                .map(ExtensionDependencies.Unmet::toString)
+                .collect(Collectors.toSet());
+        return extension.problems().stream()
+                .filter(problem -> !alone.contains(problem))
+                .toList();
+    }
+
+    /** What the kernel found for an extension it read again, rather than an activation that did not happen. */
+    private List<String> problemsAfterReload(Prepared candidate) {
+        String id = candidate.extension().key();
+        String version = candidate.manifest().version().toString();
+        if (registry.findActive(id).isPresent()) {
+            LOG.infof("Extension %s %s is active without a restart", id, version);
+            return List.of();
+        }
+        List<String> problems = registry.all().stream()
+                .filter(found -> found.key().equals(id))
+                .flatMap(found -> found.problems().stream())
+                .toList();
+        if (problems.isEmpty()) {
+            problems = List.of("the kernel did not activate it: see the Extensions page");
+        }
+        LOG.warnf("Extension %s %s is installed but not active: %s", id, version, problems);
+        return problems;
+    }
+
+    private Optional<ExtensionManifest> installedManifest(String id) {
+        return registry.all().stream()
+                .filter(installed -> installed.key().equals(id))
+                .flatMap(installed -> installed.manifest().stream())
+                .findFirst();
+    }
+
+    /**
+     * Removes an installed extension: its package goes to {@code extensions/.previous}, and the
+     * extension stops at once when it has neither Java code nor a schema, otherwise at the next
+     * start. Its database schema and its data are kept. Refused while an extension that runs requires
+     * it, naming those extensions; those that use it optionally stay active (MK-132).
+     *
+     * @throws ResourceNotFoundException when no extension with that id is installed
+     * @throws ConflictException when an extension requires it, or it is installed as a directory
+     */
+    public Removal remove(String id) {
+        InstalledExtension current = registry.all().stream()
+                .filter(extension ->
+                        extension.key().equals(id) && extension.manifest().isPresent())
+                .findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("No extension " + id + " is installed."));
+        List<String> problems = ExtensionDependencies.running(registry.all()).refuseRemoval(List.of(id));
+        if (!problems.isEmpty()) {
+            throw new ConflictException(
+                    "Cannot remove " + id + ": " + String.join("; ", problems) + ". Remove or update them first.");
+        }
+        String file;
+        try {
+            file = setAside(id);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Cannot remove the package", e);
+        }
+        boolean restart = needsRestart(current);
+        if (!restart) {
+            registry.reload();
+            sharing.refresh(registry.active());
+        }
+        String version = current.manifest().orElseThrow().version().toString();
+        LOG.infof("Extension %s %s removed%s", id, version, restart ? "; restart to stop it" : "");
+        return new Removal(id, version, file, restart);
     }
 
     private static String verified(Path candidate, PackageTrust trust) throws IOException {

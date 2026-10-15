@@ -46,7 +46,18 @@
       "minLength": 1
     },
     "requires": {
-      "description": "Required extensions with their accepted versions.",
+      "description": "Required extensions with their accepted versions: installation and start need them (MK-132).",
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/$defs/dottedName"
+      },
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "optional": {
+      "description": "Extensions used when they are installed in an accepted version; never needed to install or start (MK-132). An id is either here or in requires.",
       "type": "object",
       "propertyNames": {
         "$ref": "#/$defs/dottedName"
