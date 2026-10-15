@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Massimo Antonini
 // SPDX-License-Identifier: MPL-2.0
-import type { Favorite, ReferencePlaceholderElement } from '@mosaikit/sdk';
+import type { Favorite } from '@mosaikit/sdk';
 import { LitElement, css, html, nothing } from 'lit';
 import { customElement, property } from 'lit/decorators.js';
 import { t } from './i18n.js';
@@ -105,7 +105,7 @@ export class MkFavorites extends LitElement {
         <mk-reference-placeholder
           label=${favorite.title}
           locale=${this.language}
-          .reference=${favorite as ReferencePlaceholderElement['reference']}
+          .reference=${favorite}
         ></mk-reference-placeholder>
         ${remove}
       </li>`;
