@@ -48,6 +48,7 @@ lead to the topic.
 - <a id="the-trash"></a>[The trash](extensions/trash.md)
 - <a id="when-a-member-leaves"></a>[When a member leaves](extensions/ownership-transfer.md)
 - <a id="tags"></a>[Tags](extensions/tags.md)
+- <a id="versions-of-resources"></a>[Versions of resources](extensions/versions.md)
 - <a id="quotas"></a>[Quotas](extensions/quotas.md)
 - <a id="audit-log"></a>[Audit log](extensions/audit.md)
 - <a id="events-on-the-server"></a>[Events on the server](extensions/events.md)
