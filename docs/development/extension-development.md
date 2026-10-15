@@ -119,6 +119,10 @@ data:                          # JSON documents kept by the kernel, without a ba
 backend:
   jar: lib/hello.jar           # Java code, loaded by the launcher at the next start
   api: hello                   # REST resources under /api/v1/ext/hello/
+libraries:                     # written by mvn package from the runtime dependencies (MK-131)
+  - jar: 'lib/commons-text-1.15.0.jar'
+    coordinates: 'org.apache.commons:commons-text:1.15.0'
+    sha256: '58d2da30f058512a1e7f914e39241deca4dff5c27a085b4ed2faa9e7208067f6'
 actions:                       # tools for assistants and MCP clients (MK-015)
   - name: greet                # [a-z][a-z0-9-]*, unique in the extension
     title: Greet someone
@@ -345,10 +349,11 @@ even if you plan to run as a module: installations that isolate unverified exten
 [`samples/notes`](https://github.com/mosaikit/mosaikit-ext-samples/tree/main/notes) is a complete example: an entity, a Jakarta
 Data repository and a REST resource, with the migration of its schema.
 
-- Build the extension as a Maven module whose dependencies all have scope `provided`: `mosaikit-kernel-api` (sdk/java),
+- Build the extension as a Maven module on the parent of extensions. `mosaikit-kernel-api` (sdk/java),
   the Jakarta APIs and the Quarkus extensions the kernel already contains (REST, Hibernate ORM,
-  Hibernate Validator, security). The JAR contains only the extension's classes. An extension cannot
-  bring new Quarkus extensions.
+  Hibernate Validator, security) have scope `provided`. The JAR contains only the extension's
+  classes; other libraries go next to it (see [Libraries of an extension](#libraries-of-an-extension)).
+  An extension cannot bring new Quarkus extensions.
 - Generate the Jakarta Data repositories with the `quarkus-data-processor` annotation processor
   and index the JAR with the Jandex extension, as the sample does.
 - Put REST resources under `/api/v1/ext/<api>/`, with the API name declared in `backend.api`. The
@@ -377,6 +382,35 @@ FROM ghcr.io/mosaikit/mosaikit:0.2.0
 COPY --chown=185 my-extension-1.0.0.zip /opt/mosaikit/extensions/
 RUN /opt/mosaikit/mosaikit build
 ```
+
+### Libraries of an extension
+
+A Java extension can use libraries that the kernel does not have, such as a database driver or a
+reader of a file format (MK-131): declare them as ordinary dependencies in its POM. `mvn package`
+copies its runtime dependencies into `lib/`, next to its JAR, and writes them into `manifest.yaml`
+under `libraries`, with their Maven coordinates and the SHA-256 digest of each JAR; the package
+carries them, and the launcher adds them to the kernel with the JAR of the extension.
+
+- **What the kernel provides is left out.** The parent POM manages the
+  [libraries of the kernel](kernel-libraries.md) in its versions with scope `provided`: a library
+  of the kernel, used directly or through another library, compiles against the kernel's version
+  and stays out of the package. That list is generated from the build of the kernel.
+- **One version of each library.** Extensions run in one application with the kernel, on one class
+  loader, so the kernel and every extension share each library. The installation refuses, naming
+  the library and both versions, an extension that brings a library the kernel has in another
+  version, or one that another installed extension brings in another version; the extension the
+  kernel already runs keeps its version. Align the version, use the one of the kernel, or relocate
+  the library into a package of your own (the Maven Shade plugin with a `relocation`). The same
+  library in the same version brought by two extensions is loaded once, and stays while one of them
+  is installed. A library is identified by `groupId:artifactId` (and its classifier), and versions
+  compare exactly.
+- **No Quarkus extensions.** A library that is a Quarkus extension fails the build and is refused
+  at installation: only the kernel brings them.
+- **Commit the manifest.** The `libraries` block is written by the build; do not edit it, and commit
+  `manifest.yaml` after a change of dependencies, so that the directory of the extension, which
+  `@mosaikit/testing` packs as it is, lists the JARs of `lib/`.
+
+[`tests/fixtures/extensions/libraries`](../../tests/fixtures/extensions/libraries) is a small example.
 
 ### Transactions and the beans of the kernel
 
@@ -883,10 +917,10 @@ Uninstalling an extension, unlike turning it off, removes its entries from the r
 start, with their grants (MK-054); the references of the other extensions stay, and resolve again
 once the extension, installed again, registers its resources again.
 
-> **Coming with the phase "Composition".** Libraries brought by Java extensions (MK-131) and
-> versioned contracts between extensions on the server and in the frontend (MK-134). Until then a
-> Java extension brings no libraries, and extensions talk through extension points and events as
-> described above.
+> **Coming with the phase "Composition".** Versioned contracts between extensions on the server and
+> in the frontend (MK-134). Until then extensions talk through extension points and events as
+> described above. Java extensions can already bring their own libraries
+> ([Libraries of an extension](#libraries-of-an-extension), MK-131).
 
 ## Actions for assistants
 

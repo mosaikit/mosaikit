@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.core.extension;
 
+import dev.mosaikit.kernel.api.extension.LibraryEntry;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
@@ -14,10 +15,13 @@ import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.TreeSet;
 
 /**
  * A set of extension JARs recorded by the launcher in the providers directory, one line per JAR:
- * {@code <sha-256> <extension id>}. Three files use this format:
+ * {@code <sha-256> <extension id>}, or {@code <sha-256> library:<coordinates>} for a library that
+ * extensions bring (MK-131). Three files use this format:
  *
  * <ul>
  *   <li>{@link #FILE_NAME}: the JARs built into the kernel. The kernel trusts only this file, so
@@ -53,6 +57,26 @@ public record ProviderState(List<Entry> entries) {
 
     public ProviderState {
         entries = List.copyOf(entries);
+    }
+
+    /** Prefix of the entries of libraries brought by extensions (MK-131). */
+    public static final String LIBRARY_PREFIX = "library:";
+
+    /** The entry name of a library: {@code library:<groupId>:<artifactId>:<version>[:<classifier>]}. */
+    public static String libraryId(LibraryEntry library) {
+        return LIBRARY_PREFIX + library.coordinates();
+    }
+
+    /** Whether an entry name is the one of a library rather than of an extension. */
+    public static boolean isLibrary(String id) {
+        return id.startsWith(LIBRARY_PREFIX);
+    }
+
+    /** The ids of the extensions of the set, without the libraries. */
+    public Set<String> extensionIds() {
+        Set<String> ids = new TreeSet<>();
+        entries.stream().map(Entry::extensionId).filter(id -> !isLibrary(id)).forEach(ids::add);
+        return ids;
     }
 
     /** Reads the JARs built into the kernel; empty when the kernel was never rebuilt. */

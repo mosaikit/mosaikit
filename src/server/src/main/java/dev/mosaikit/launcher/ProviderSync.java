@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.launcher;
 
+import dev.mosaikit.kernel.api.extension.LibraryEntry;
 import dev.mosaikit.kernel.core.extension.InstalledExtension;
+import dev.mosaikit.kernel.core.extension.KernelLibraries;
 import dev.mosaikit.kernel.core.extension.ProviderState;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -11,23 +13,33 @@ import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.stream.Stream;
 
 /**
  * Keeps the providers directory of the kernel in line with the Java extensions that can run.
  *
- * <p>Each extension JAR is copied as {@code <extension id>.jar}. The state file is written only after
+ * <p>Each extension JAR is copied as {@code <extension id>.jar}, and each library that the extensions
+ * bring and the kernel does not provide (MK-131) as {@code <groupId>_<artifactId>_<version>.jar}, once
+ * whatever the number of extensions that bring it, for as long as one of them can run. The state file is written only after
  * the kernel has been rebuilt, so that a failed rebuild never leaves the kernel claiming to have
  * loaded code it does not contain.
  */
 final class ProviderSync {
 
     private final Path providers;
+    private final KernelLibraries kernelLibraries;
 
     ProviderSync(Path providers) {
+        this(providers, KernelLibraries.none());
+    }
+
+    ProviderSync(Path providers, KernelLibraries kernelLibraries) {
         this.providers = providers;
+        this.kernelLibraries = kernelLibraries;
     }
 
     /**
@@ -42,18 +54,39 @@ final class ProviderSync {
     record Plan(
             ProviderState desired, ProviderState added, List<Source> sources, boolean upToDate, List<String> changes) {}
 
-    /** An extension JAR to copy into the providers directory. */
-    record Source(String extensionId, Path jar) {}
+    /**
+     * A JAR to copy into the providers directory.
+     *
+     * @param extensionId the id of the extension, or {@link ProviderState#libraryId} for a library
+     */
+    record Source(String extensionId, Path jar) {
+
+        boolean isLibrary() {
+            return ProviderState.isLibrary(extensionId);
+        }
+    }
 
     /** Compares the Java extensions that can run with what the kernel was built with. */
     Plan plan(List<InstalledExtension> extensions) {
-        List<Source> sources = extensions.stream()
+        Map<String, Source> byId = new TreeMap<>();
+        extensions.stream()
                 .filter(InstalledExtension::isActive)
                 .filter(extension -> extension.backendJar().isPresent())
-                .map(extension ->
-                        new Source(extension.key(), extension.backendJar().orElseThrow()))
-                .sorted(Comparator.comparing(Source::extensionId))
-                .toList();
+                .sorted(Comparator.comparing(InstalledExtension::key))
+                .forEach(extension -> {
+                    byId.put(
+                            extension.key(),
+                            new Source(extension.key(), extension.backendJar().orElseThrow()));
+                    for (LibraryEntry library :
+                            extension.manifest().orElseThrow().libraries()) {
+                        if (!kernelLibraries.provides(library)) {
+                            String id = ProviderState.libraryId(library);
+                            byId.putIfAbsent(
+                                    id, new Source(id, extension.directory().resolve(library.jar())));
+                        }
+                    }
+                });
+        List<Source> sources = List.copyOf(byId.values());
         ProviderState desired = new ProviderState(sources.stream()
                 .map(source -> new ProviderState.Entry(ProviderState.sha256(source.jar()), source.extensionId()))
                 .toList());
@@ -127,6 +160,10 @@ final class ProviderSync {
     }
 
     static String fileName(String extensionId) {
+        if (ProviderState.isLibrary(extensionId)) {
+            // Extension ids have no '_': a library never takes the file of an extension.
+            return extensionId.substring(ProviderState.LIBRARY_PREFIX.length()).replace(':', '_') + ".jar";
+        }
         return extensionId + ".jar";
     }
 

@@ -60,6 +60,8 @@ public final class ExtensionManifests {
 
     private static final String MEASURES = "measures";
 
+    private static final String LIBRARIES = "libraries";
+
     private static final String TITLE = "title";
 
     private static final String I18N = "i18n";
@@ -144,6 +146,7 @@ public final class ExtensionManifests {
             List<PermissionEntry> permissions = readPermissions();
             List<ResourceTypeEntry> resourceTypes = readResourceTypes();
             List<MeasureEntry> measures = readMeasures();
+            List<LibraryEntry> libraries = readLibraries(backend);
 
             if (!violations.isEmpty()) {
                 return new ManifestParseResult.Invalid(violations);
@@ -166,7 +169,8 @@ public final class ExtensionManifests {
                     permissions,
                     resourceTypes,
                     measures,
-                    optional));
+                    optional,
+                    libraries));
         }
 
         /** The permissions of the extension (MK-056): {@code permissions: [{ name, title }]}. */
@@ -644,6 +648,67 @@ public final class ExtensionManifests {
                 api = null;
             }
             return jar == null || api == null ? null : new BackendEntry(jar, api);
+        }
+
+        /**
+         * The libraries of the Java code (MK-131): {@code libraries: [{ jar, coordinates, sha256 }]},
+         * written by the parent POM of extensions.
+         */
+        private List<LibraryEntry> readLibraries(BackendEntry backend) {
+            List<?> list = optionalList(LIBRARIES, "a list of libraries");
+            if (list.isEmpty()) {
+                return List.of();
+            }
+            if (backend == null && optionalMap(tree, "backend").isEmpty()) {
+                violation(LIBRARIES, "need a backend: libraries are added to the kernel with the JAR of the extension");
+            }
+            List<LibraryEntry> libraries = new ArrayList<>();
+            Set<String> jars = new HashSet<>();
+            Set<String> keys = new HashSet<>();
+            for (int i = 0; i < list.size(); i++) {
+                String field = LIBRARIES + "[" + i + "]";
+                Map<String, ?> item = objectItem(field, list.get(i)).orElse(null);
+                if (item == null) {
+                    continue;
+                }
+                int before = violations.size();
+                String jar = requiredText(item, "jar", field + ".jar");
+                if (jar != null && (!isSafeRelativePath(jar) || !jar.endsWith(".jar"))) {
+                    violation(
+                            field + ".jar",
+                            "must be the relative path of a .jar file inside the extension, without '..'");
+                } else if (jar != null && backend != null && jar.equals(backend.jar())) {
+                    violation(field + ".jar", "is the JAR of the extension, not a library");
+                } else if (jar != null && !jars.add(jar)) {
+                    violation(field + ".jar", "the JAR '" + jar + "' is listed twice");
+                }
+                String coordinates = requiredText(item, "coordinates", field + ".coordinates");
+                String sha256 = requiredText(item, "sha256", field + ".sha256");
+                if (sha256 != null
+                        && !LibraryEntry.SHA256_PATTERN.matcher(sha256).matches()) {
+                    violation(
+                            field + ".sha256",
+                            "must be the SHA-256 digest of the JAR, 64 lowercase hexadecimal digits");
+                }
+                Optional<LibraryEntry> library = coordinates == null
+                        ? Optional.empty()
+                        : LibraryEntry.of(jar == null ? "" : jar, coordinates, sha256 == null ? "" : sha256);
+                if (coordinates != null && library.isEmpty()) {
+                    violation(
+                            field + ".coordinates",
+                            "must be Maven coordinates groupId:artifactId:version[:classifier], for example"
+                                    + " org.example:parser:1.2.0");
+                }
+                if (library.isPresent() && !keys.add(library.get().key())) {
+                    violation(
+                            field + ".coordinates",
+                            "the library '" + library.get().key() + "' is listed twice");
+                }
+                if (violations.size() == before) {
+                    library.ifPresent(libraries::add);
+                }
+            }
+            return libraries;
         }
 
         private DatabaseEntry readDatabase() {

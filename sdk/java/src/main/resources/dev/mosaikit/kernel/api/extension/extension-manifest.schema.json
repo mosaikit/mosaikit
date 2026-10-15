@@ -140,6 +140,36 @@
       },
       "additionalProperties": false
     },
+    "libraries": {
+      "description": "Libraries of the Java code, added to the kernel with the JAR of the extension (MK-131); written by the parent POM of extensions from the runtime dependencies.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["jar", "coordinates", "sha256"],
+        "properties": {
+          "jar": {
+            "allOf": [
+              {
+                "$ref": "#/$defs/relativePath"
+              },
+              {
+                "pattern": "\\.jar$"
+              }
+            ]
+          },
+          "coordinates": {
+            "description": "Maven coordinates, groupId:artifactId:version[:classifier].",
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_.-]+:[A-Za-z0-9_.-]+:[A-Za-z0-9_.+-]+(:[A-Za-z0-9_.-]+)?$"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        },
+        "additionalProperties": false
+      }
+    },
     "data": {
       "description": "Collections of JSON documents that the extension keeps in the kernel, per organization, without a backend of its own (ADR-0031).",
       "type": "object",

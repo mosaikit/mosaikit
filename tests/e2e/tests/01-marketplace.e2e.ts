@@ -19,7 +19,7 @@ test.describe('MK-022 Minimal marketplace with signed catalogs', () => {
     await expect(page.getByText(/verified, key/)).toBeVisible();
     const rows = page.locator('tbody tr');
     // The packages of the fixture extensions (tests/fixtures/extensions).
-    await expect(rows).toHaveCount(6);
+    await expect(rows).toHaveCount(7);
 
     for (const name of FIXTURES) {
       const id = `dev.mosaikit.fixture.${name}`;
