@@ -1084,8 +1084,8 @@ export class KernelClient {
   }
 
   /** Deletes a resource of the trash for good, with what went with it (MK-095). */
-  deleteFromTrash(id: string): Promise<void> {
-    return this.sendJson<void>(`/api/v1/trash/${encodeURIComponent(id)}`, 'DELETE');
+  async deleteFromTrash(id: string): Promise<void> {
+    await this.sendJson<undefined>(`/api/v1/trash/${encodeURIComponent(id)}`, 'DELETE');
   }
 
   /** The suspended accounts, the most recently suspended first (MK-125). */
