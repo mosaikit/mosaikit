@@ -58,6 +58,13 @@ public interface RegisteredResources {
                         (select m.teamId from TeamMember m where m.accountId = :accountId)))))""")
     long reachableBy(UUID organizationId, String extensionId, UUID accountId);
 
+    /** The identifiers of the resources of a type that are in the trash (MK-095). */
+    @Query("""
+            select r.refId from RegisteredResource r
+            where r.organizationId = :organizationId and r.extensionId = :extensionId
+              and r.resourceType = :resourceType and r.trashedAt is not null""")
+    List<String> trashed(UUID organizationId, String extensionId, String resourceType);
+
     @Query("from RegisteredResource r where r.organizationId = :organizationId and r.id in :ids")
     List<RegisteredResource> findByIds(UUID organizationId, List<UUID> ids);
 

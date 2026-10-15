@@ -73,6 +73,29 @@ public interface PlatformEvents {
     String RESOURCE_REMOVED = "resource.removed";
 
     /**
+     * A resource went to the trash (MK-095), because its extension moved it there or because the
+     * resource that contains it went; payload {@code extension}, {@code type}, {@code id},
+     * {@code title}, {@code owner} when a person owns it, and {@code purgeableFrom}, the time from
+     * which the kernel deletes it for good. Its extension hides it.
+     */
+    String RESOURCE_TRASHED = "resource.trashed";
+
+    /**
+     * A resource came back from the trash (MK-095), with its grants; payload {@code extension},
+     * {@code type}, {@code id}, {@code title}, and {@code owner} when a person owns it. Its extension
+     * shows it again.
+     */
+    String RESOURCE_RESTORED = "resource.restored";
+
+    /**
+     * A resource in the trash was deleted for good (MK-095), at the end of the retention or by its owner
+     * or an administrator; the kernel removed its entry and its grants. Payload {@code extension},
+     * {@code type}, {@code id}, {@code title}, and {@code owner} when a person owns it. Its extension
+     * deletes its data.
+     */
+    String RESOURCE_PURGED = "resource.purged";
+
+    /**
      * A resource was shared with a subject (MK-055); payload {@code extension}, {@code type},
      * {@code id} of the resource, {@code grant}, {@code subject} ({@code person}, {@code group},
      * {@code organization}, {@code public} or {@code link}), {@code subjectId} for a person (the

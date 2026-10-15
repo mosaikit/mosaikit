@@ -119,7 +119,12 @@ public class ResourceRegistry implements Resources {
         declared(ref);
         UUID org = organization.require();
         Optional<RegisteredResource> existing = entries.find(org, ref.extension(), ref.type(), ref.id());
-        UUID parent = parent(org, ref, existing.map(RegisteredResource::getId), details.parent());
+        UUID parent = parent(
+                org,
+                ref,
+                existing.map(RegisteredResource::getId),
+                existing.map(RegisteredResource::inTrash).orElse(false),
+                details.parent());
         Instant now = Instant.now(clock);
         if (existing.isPresent()) {
             RegisteredResource entry = existing.get();
@@ -146,7 +151,7 @@ public class ResourceRegistry implements Resources {
         UUID org = organization.require();
         RegisteredResource entry = entries.find(org, ref.extension(), ref.type(), ref.id())
                 .orElseThrow(() -> new NoSuchElementException("The resource " + ref + " is not registered."));
-        UUID parent = parent(org, ref, Optional.of(entry.getId()), details.parent());
+        UUID parent = parent(org, ref, Optional.of(entry.getId()), entry.inTrash(), details.parent());
         entry.change(details.title(), details.link(), parent, Instant.now(clock));
         entries.update(entry);
         return view(entry, details.parent());
@@ -243,9 +248,9 @@ public class ResourceRegistry implements Resources {
 
     /**
      * The id of the entry of the parent: a resource registered in the organization, that is not the
-     * resource itself nor contained in it.
+     * resource itself nor contained in it, and not in the trash unless the resource is there too (MK-095).
      */
-    private UUID parent(UUID org, ResourceRef ref, Optional<UUID> self, ResourceRef parent) {
+    private UUID parent(UUID org, ResourceRef ref, Optional<UUID> self, boolean selfInTrash, ResourceRef parent) {
         if (parent == null) {
             return null;
         }
@@ -255,6 +260,9 @@ public class ResourceRegistry implements Resources {
         RegisteredResource entry = entries.find(org, parent.extension(), parent.type(), parent.id())
                 .orElseThrow(() -> new IllegalArgumentException(
                         "The parent " + parent + " is not a resource of the organization."));
+        if (entry.inTrash() && !selfInTrash) {
+            throw new IllegalArgumentException("The parent " + parent + " is in the trash.");
+        }
         if (self.isPresent()) {
             Set<UUID> seen = new HashSet<>();
             UUID ancestor = entry.getId();
