@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MPL-2.0
 package dev.mosaikit.kernel.core.account;
 
+import dev.mosaikit.kernel.core.audit.AuditEvent;
+import dev.mosaikit.kernel.core.audit.AuditLog;
 import dev.mosaikit.kernel.core.error.ForbiddenOperationException;
 import dev.mosaikit.kernel.core.identity.OrganizationAccess;
 import dev.mosaikit.kernel.core.identity.RequestOrganization;
@@ -22,6 +24,10 @@ import jakarta.ws.rs.core.Context;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.NewCookie;
 import jakarta.ws.rs.core.Response;
+import java.util.LinkedHashMap;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
@@ -43,6 +49,12 @@ public class SessionResource {
     /** The session cookie. */
     public static final String COOKIE = "mosaikit-session";
 
+    /** The action of a refused sign-in in the audit log of the platform (MK-072). */
+    public static final String SIGN_IN_FAILED = "account.sign-in.failed";
+
+    /** Longest name written at a refused sign-in that the audit log keeps. */
+    private static final int MAX_AUDITED_NAME = 254;
+
     /** Longest password verified: longer ones are refused without hashing them. */
     private static final int MAX_PASSWORD = 1024;
 
@@ -52,6 +64,7 @@ public class SessionResource {
     private final LocalIdentityProvider local;
     private final SessionRegistry sessions;
     private final SecureCookies secureCookies;
+    private final AuditLog audit;
 
     public SessionResource(
             AccountService service,
@@ -59,13 +72,15 @@ public class SessionResource {
             RememberMe rememberMe,
             LocalIdentityProvider local,
             SessionRegistry sessions,
-            SecureCookies secureCookies) {
+            SecureCookies secureCookies,
+            AuditLog audit) {
         this.service = service;
         this.identity = identity;
         this.rememberMe = rememberMe;
         this.local = local;
         this.sessions = sessions;
         this.secureCookies = secureCookies;
+        this.audit = audit;
     }
 
     @POST
@@ -80,8 +95,11 @@ public class SessionResource {
             @FormParam("password") String password,
             @CookieParam(COOKIE) String previous,
             @Context HttpServerRequest request) {
-        if (username == null || username.isBlank() || password == null || password.length() > MAX_PASSWORD) {
+        if (username == null || username.isBlank()) {
             return Response.status(Response.Status.UNAUTHORIZED).build();
+        }
+        if (password == null || password.length() > MAX_PASSWORD) {
+            return refused(username, request);
         }
         SecurityIdentity signedIn;
         try {
@@ -91,7 +109,7 @@ public class SessionResource {
                     request.getHeader(OrganizationAccess.HEADER),
                     request.authority() == null ? null : request.authority().host());
         } catch (AuthenticationFailedException e) {
-            return Response.status(Response.Status.UNAUTHORIZED).build();
+            return refused(username, request);
         }
         sessions.byCookie(previous).ifPresent(session -> sessions.end(session.id()));
         UUID account = UUID.fromString(signedIn.getAttribute(OrganizationAccess.ACCOUNT_ATTRIBUTE));
@@ -108,6 +126,24 @@ public class SessionResource {
                         signedIn.getPrincipal().getName(), signedIn.getRoles(), RequestOrganization.of(signedIn)))
                 .cookie(cookie)
                 .build();
+    }
+
+    /**
+     * Refuses a sign-in and records it in the audit log of the platform as a security event (MK-072):
+     * the name that was written, and the address of the client, never the password.
+     */
+    private Response refused(String username, HttpServerRequest request) {
+        String name = username.strip().toLowerCase(Locale.ROOT);
+        if (name.length() > MAX_AUDITED_NAME) {
+            name = name.substring(0, MAX_AUDITED_NAME);
+        }
+        Map<String, Object> detail = new LinkedHashMap<>();
+        SessionClient client = SessionClient.of(request);
+        if (client.address() != null) {
+            detail.put("address", client.address());
+        }
+        audit.append(name, Optional.empty(), SIGN_IN_FAILED, name, AuditEvent.Outcome.DENIED, detail);
+        return Response.status(Response.Status.UNAUTHORIZED).build();
     }
 
     @GET

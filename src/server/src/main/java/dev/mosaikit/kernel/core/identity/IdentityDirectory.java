@@ -22,7 +22,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.stream.Collectors;
 
 /**
- * Identity settings of every organization, kept in memory for the time set by {@code
+ * Identity settings of every organization that is not suspended (MK-072), kept in memory for the time set by {@code
  * mosaikit.identity.cache-ttl} so that routing a sign-in does not query the database. Changes
  * made through this instance take effect at once; changes made by other instances of the kernel
  * within the cache time.
@@ -75,7 +75,9 @@ public class IdentityDirectory {
                 .collect(Collectors.groupingBy(
                         EmailDomain::getOrganizationId,
                         Collectors.mapping(EmailDomain::getDomain, Collectors.toSet())));
+        // A suspended organization routes nothing: its members sign in to it by no means (MK-072).
         var identities = organizations.findAllOrderedByName().stream()
+                .filter(organization -> !organization.isSuspended())
                 .map(organization -> identity(organization, domains.getOrDefault(organization.getId(), Set.of())))
                 .toList();
         var routing = new IdentityRouting(config.keycloakUrl(), config.domain(), identities);

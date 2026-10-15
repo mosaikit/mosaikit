@@ -73,6 +73,103 @@ export interface OrganizationSummary {
   readonly createdAt: string;
   readonly identityRealm: string | null;
   readonly emailDomains: readonly string[];
+  /** How its members sign in (MK-017). */
+  readonly signIn?: SignInMethod;
+  /** Whether a platform administrator suspended it (MK-072). */
+  readonly suspended?: boolean;
+  /** When, by whom and why, while it is suspended. */
+  readonly suspension?: OrganizationSuspension;
+  /** The first manager of an organization created with a realm, with a temporary password, once. */
+  readonly initialAdministrator?: { readonly username: string; readonly temporaryPassword: string };
+}
+
+/** How the members of an organization sign in (MK-017). */
+export type SignInMethod = 'password' | 'realm' | 'password-or-realm';
+
+/** The suspension of an organization (MK-072). */
+export interface OrganizationSuspension {
+  readonly at: string;
+  readonly by: string;
+  readonly reason: string | null;
+}
+
+/** A new organization, as the guided flow of the console asks for it (MK-072). */
+export interface NewOrganization {
+  readonly slug: string;
+  readonly name: string;
+  readonly selfRegistration: boolean;
+  readonly signIn: SignInMethod;
+  /** The realm of the organization, created by the kernel, for a sign-in through it. */
+  readonly federation?: {
+    readonly emailDomains: readonly string[];
+    readonly administrator?: {
+      readonly email: string;
+      readonly firstName: string;
+      readonly lastName: string;
+    };
+  };
+}
+
+/** A person of the installation, for the console of the platform administrators (MK-072). */
+export interface PlatformPerson extends AccountStatus {
+  readonly createdAt: string;
+  readonly platformAdmin: boolean;
+  /** Whether the account has a local password. */
+  readonly password: boolean;
+  readonly organizations: readonly {
+    readonly slug: string;
+    readonly name: string;
+    readonly roles: readonly string[];
+    readonly suspended: boolean;
+  }[];
+}
+
+/** A page of the people of the installation (MK-072). */
+export interface PeoplePage {
+  /** How many people match the search and the state. */
+  readonly total: number;
+  readonly people: readonly PlatformPerson[];
+}
+
+/** Which people the console lists, by whether they may sign in. */
+export type PersonState = 'all' | 'active' | 'suspended';
+
+/** A refused or failed entry of the audit log of the platform (MK-072). */
+export interface SecurityEvent {
+  readonly occurredAt: string;
+  readonly actor: string;
+  readonly action: string;
+  readonly subject: string | null;
+  readonly outcome: 'SUCCEEDED' | 'FAILED' | 'DENIED';
+  readonly detail: string | null;
+}
+
+/** The state of the installation in the console of the platform administrators (MK-072). */
+export interface ConsoleOverview {
+  readonly organizations: {
+    readonly total: number;
+    readonly active: number;
+    readonly suspended: number;
+  };
+  readonly people: { readonly total: number; readonly suspended: number };
+  readonly extensions: {
+    readonly active: number;
+    readonly list: readonly { readonly id: string; readonly version: string }[];
+  };
+  readonly system: {
+    readonly version: string;
+    readonly startedAt: string;
+    readonly uptimeSeconds: number;
+    readonly heapUsedBytes: number;
+    readonly heapMaxBytes: number;
+    readonly processors: number;
+    readonly threads: number;
+  };
+  readonly security: {
+    readonly since: string;
+    readonly failedSignIns: number;
+    readonly events: readonly SecurityEvent[];
+  };
 }
 
 /** A resource in the trash, as the page Trash lists it (MK-095). */
@@ -1097,6 +1194,58 @@ export class KernelClient {
   /** Deletes a resource of the trash for good, with what went with it (MK-095). */
   async deleteFromTrash(id: string): Promise<void> {
     await this.sendJson<undefined>(`/api/v1/trash/${encodeURIComponent(id)}`, 'DELETE');
+  }
+
+  /** Creates an organization, with its realm when it signs in through one (MK-002, MK-072). */
+  createOrganization(organization: NewOrganization): Promise<OrganizationSummary> {
+    return this.sendJson<OrganizationSummary>('/api/v1/organizations', 'POST', organization);
+  }
+
+  /** Suspends an organization: its members sign in to it by no means until it is reactivated (MK-072). */
+  suspendOrganization(slug: string, reason: string): Promise<OrganizationSummary> {
+    return this.sendJson<OrganizationSummary>(
+      `/api/v1/organizations/${encodeURIComponent(slug)}/suspension`,
+      'PUT',
+      { reason },
+    );
+  }
+
+  /** Lets the members of a suspended organization sign in to it again (MK-072). */
+  reactivateOrganization(slug: string): Promise<OrganizationSummary> {
+    return this.sendJson<OrganizationSummary>(
+      `/api/v1/organizations/${encodeURIComponent(slug)}/suspension`,
+      'DELETE',
+    );
+  }
+
+  /** The state of the installation for the console (MK-072). */
+  consoleOverview(): Promise<ConsoleOverview> {
+    return this.getJson<ConsoleOverview>('/api/v1/platform/console');
+  }
+
+  /** The people of the installation that match a search and a state, a page at a time (MK-072). */
+  people(query: {
+    readonly search?: string;
+    readonly state?: PersonState;
+    readonly offset?: number;
+    readonly limit?: number;
+  }): Promise<PeoplePage> {
+    const parameters = new URLSearchParams();
+    if (query.search?.trim()) {
+      parameters.set('search', query.search.trim());
+    }
+    if (query.state && query.state !== 'all') {
+      parameters.set('state', query.state);
+    }
+    if (query.offset) {
+      parameters.set('offset', String(query.offset));
+    }
+    if (query.limit) {
+      parameters.set('limit', String(query.limit));
+    }
+    const encoded = parameters.toString();
+    const suffix = encoded ? `?${encoded}` : '';
+    return this.getJson<PeoplePage>(`${PLATFORM_ACCOUNTS}${suffix}`);
   }
 
   /** The suspended accounts, the most recently suspended first (MK-125). */

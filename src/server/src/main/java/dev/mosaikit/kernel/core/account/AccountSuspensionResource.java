@@ -9,11 +9,13 @@ import io.quarkus.security.identity.SecurityIdentity;
 import jakarta.annotation.security.RolesAllowed;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
+import jakarta.ws.rs.DefaultValue;
 import jakarta.ws.rs.GET;
 import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import java.util.List;
 import java.util.Map;
@@ -25,6 +27,7 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
  * The suspension of an account by a platform administrator (MK-125): a suspended person signs in by
  * no means, with a password, "remember me" or the realm of an organization, and their sessions end
  * at once. The reason the administrator gives is shown with the status and kept in the audit log.
+ * The console lists every person of the installation from here (MK-072).
  */
 @Path("/api/v1/platform/accounts")
 @Produces(MediaType.APPLICATION_JSON)
@@ -33,13 +36,30 @@ import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 public class AccountSuspensionResource {
 
     private final AccountService service;
+    private final PlatformPeople people;
     private final SecurityIdentity identity;
     private final AuditLog audit;
 
-    public AccountSuspensionResource(AccountService service, SecurityIdentity identity, AuditLog audit) {
+    public AccountSuspensionResource(
+            AccountService service, PlatformPeople people, SecurityIdentity identity, AuditLog audit) {
         this.service = service;
+        this.people = people;
         this.identity = identity;
         this.audit = audit;
+    }
+
+    @GET
+    @Operation(
+            summary = "List the people of the installation, with their organizations",
+            description = "By address. \"search\" finds a text in the address or the name; \"state\" is all"
+                    + " (default), active or suspended; \"offset\" and \"limit\" (at most 200, default 50) page"
+                    + " through them, and \"total\" says how many match (MK-072).")
+    public PlatformPeople.Page list(
+            @QueryParam("search") String search,
+            @QueryParam("state") String state,
+            @QueryParam("offset") @DefaultValue("0") int offset,
+            @QueryParam("limit") @DefaultValue("50") int limit) {
+        return people.list(search, PlatformPeople.State.of(state), offset, limit);
     }
 
     @GET

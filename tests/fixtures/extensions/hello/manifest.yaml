@@ -22,3 +22,10 @@ contributes:
       element: mk-fixture-hello
       icon: web/icon.svg
       order: 90
+  # A panel of the console of the platform administrators (MK-072).
+  console.panel:
+    - id: greetings
+      title: Greetings
+      description: A panel that an extension adds to the console.
+      element: mk-fixture-hello-console
+      order: 10

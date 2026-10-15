@@ -34,6 +34,9 @@ import java.util.stream.Collectors;
 @Transactional
 public class OrganizationService {
 
+    /** The longest reason for a suspension (MK-072). */
+    public static final int MAX_SUSPENSION_REASON = 500;
+
     private final Organizations organizations;
     private final EmailDomains emailDomains;
     private final Event<IdentityChanged> identityChanged;
@@ -227,6 +230,37 @@ public class OrganizationService {
         events.raise(organization.getId(), PlatformEvents.ORGANIZATION_DELETED, payload);
         return new Deleted(
                 organization.getId(), organization.getSlug(), organization.getName(), now, removableFrom, domains);
+    }
+
+    /**
+     * Suspends an organization (MK-072): its members sign in to it by no means, with a password, an
+     * access key or its realm, until it is reactivated; its data stay as they are. The caller ends the
+     * sessions of its people. One already suspended keeps its first suspension.
+     *
+     * @param actor the username of the platform administrator
+     * @param reason why, or {@code null}; at most {@value #MAX_SUSPENSION_REASON} characters
+     */
+    public OrganizationView suspend(String slug, String actor, String reason) {
+        String why = reason == null || reason.isBlank() ? null : reason.strip();
+        if (why != null && why.length() > MAX_SUSPENSION_REASON) {
+            throw new InvalidInputException(List.of("reason is longer than " + MAX_SUSPENSION_REASON + " characters"));
+        }
+        Organization organization = require(slug);
+        organization.suspend(Instant.now(clock), actor, why);
+        organizations.update(organization);
+        identityChanged.fire(new IdentityChanged(organization.getId()));
+        return OrganizationView.of(organization, domainsOf(organization));
+    }
+
+    /** Lets the members of a suspended organization sign in to it again (MK-072). */
+    public OrganizationView reactivate(String slug) {
+        Organization organization = require(slug);
+        if (organization.isSuspended()) {
+            organization.reactivate();
+            organizations.update(organization);
+            identityChanged.fire(new IdentityChanged(organization.getId()));
+        }
+        return OrganizationView.of(organization, domainsOf(organization));
     }
 
     /**

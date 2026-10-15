@@ -9,7 +9,8 @@ import java.util.UUID;
 
 /**
  * Public representation of an organization. {@code initialAdministrator} is present only in the
- * answer that created the realm of the organization.
+ * answer that created the realm of the organization; {@code suspension} only while a platform
+ * administrator suspended it (MK-072).
  */
 public record OrganizationView(
         UUID id,
@@ -20,7 +21,18 @@ public record OrganizationView(
         String identityRealm,
         List<String> emailDomains,
         SignInPolicy signIn,
-        @JsonInclude(JsonInclude.Include.NON_NULL) InitialAdministrator initialAdministrator) {
+        @JsonInclude(JsonInclude.Include.NON_NULL) InitialAdministrator initialAdministrator,
+        boolean suspended,
+        @JsonInclude(JsonInclude.Include.NON_NULL) Suspension suspension) {
+
+    /**
+     * The suspension of an organization (MK-072).
+     *
+     * @param at when it was suspended
+     * @param by the username of the platform administrator who suspended it
+     * @param reason why, as they wrote it, or {@code null}
+     */
+    public record Suspension(Instant at, String by, String reason) {}
 
     static OrganizationView of(Organization organization, List<String> emailDomains) {
         return of(organization, emailDomains, null);
@@ -37,6 +49,14 @@ public record OrganizationView(
                 organization.getIdentityRealm().orElse(null),
                 emailDomains.stream().sorted().toList(),
                 organization.getSignIn(),
-                initialAdministrator);
+                initialAdministrator,
+                organization.isSuspended(),
+                organization
+                        .getSuspendedAt()
+                        .map(at -> new Suspension(
+                                at,
+                                organization.getSuspendedBy().orElse(null),
+                                organization.getSuspensionReason().orElse(null)))
+                        .orElse(null));
     }
 }
