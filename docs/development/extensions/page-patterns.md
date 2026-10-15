@@ -56,7 +56,7 @@ like an empty list:
 | `filtered` | there are items, but the filters hide all of them | **Clear the filters**, event `mk-clear-filters` |
 | `failed` | the request failed | **Try again**, event `mk-retry` |
 | `offline` | there is no network | **Try again**, event `mk-retry` |
-| `denied` | the person has no access | none |
+| `denied` | the person has no access | with `resource="<extension>/<type>/<id>"`, **Request access**, event `mk-request-access` with `{ resource }`, which the shell answers ([Requests for access](access-requests.md)); none otherwise |
 
 Each kind has its own icon, tone (`data-tone="problem"` for `failed`, `offline` and `denied`) and
 default title and explanation; `heading`, the content and the slot `action` replace them. The
