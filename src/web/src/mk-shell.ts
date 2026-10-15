@@ -27,6 +27,7 @@ import {
 } from './api.js';
 import { FederatedSignIn, type Federation, type Tokens } from './federation.js';
 import { ShellAddress } from './address.js';
+import { EmbedHistory, EmbedLocation, embedOf, type EmbedAddress } from './embed.js';
 import {
   entryForPath,
   initials,
@@ -42,6 +43,7 @@ import { MkAdminSecrets } from './mk-admin-secrets.js';
 import './mk-admin-services.js';
 import './mk-admin-installation-secrets.js';
 import './mk-admin-origins.js';
+import { MkAdminEmbedSites } from './mk-admin-embed-sites.js';
 import './mk-admin-accounts.js';
 import './mk-admin-organizations.js';
 import './mk-admin-settings.js';
@@ -76,8 +78,9 @@ const DRAFT_REFRESH_MS = 20_000;
 const EXTENSION_WATCH_MS = 1_000;
 
 /**
- * The pages of administrators: the apps, the permissions, the credentials and the quotas of the
- * organization for its administrators (MK-030, MK-056, MK-062, MK-076), the extensions (MK-022),
+ * The pages of administrators: the apps, the permissions, the credentials, the quotas and the sites
+ * that embed the views of the organization for its administrators (MK-030, MK-056, MK-062, MK-076,
+ * MK-100), the extensions (MK-022),
  * the platform (MK-048), the service identities (MK-124), the credentials of the installation
  * (MK-127), the external origins of the content security policy (MK-128) and the suspension of
  * accounts (MK-125) and the organizations, which they may delete (MK-130), for platform administrators.
@@ -105,6 +108,12 @@ const ADMIN_PAGES = [
     path: '/admin/quotas',
     title: 'Quotas',
     element: 'mk-admin-quotas',
+    role: 'organization-admin',
+  },
+  {
+    path: '/admin/embed-sites',
+    title: 'Embedded views',
+    element: 'mk-admin-embed-sites',
     role: 'organization-admin',
   },
   {
@@ -445,6 +454,15 @@ export class MkShell extends LitElement {
       overflow: auto;
       background: var(--mk-surface);
     }
+    /* The embed mode (MK-100): the view fills the frame. */
+    main.embedded {
+      padding: 0;
+      min-height: 100vh;
+    }
+    .embed-note {
+      margin: 0;
+      padding: 16px;
+    }
     @media (max-width: 640px) {
       .frame {
         grid-template-rows: 48px 1fr 60px;
@@ -588,7 +606,15 @@ export class MkShell extends LitElement {
   @state() private account: Account | undefined;
   @state() private entries: LauncherEntry[] = [];
   @state() private loadResults: LoadResult[] = [];
-  @state() private path = location.pathname;
+  /**
+   * The embedded view of the address (MK-100), for the iframe of a site that the organization lists:
+   * no app bar, no top bar, no sign-in form; `undefined` for the console.
+   */
+  private readonly embed: EmbedAddress | undefined = embedOf(location.pathname);
+  /** The path of the shell: in the embed mode, without its prefix, as the apps see it. */
+  @state() private path = this.pagePath();
+  /** Whether the session of the browser was looked for, so that the embed mode may say to sign in. */
+  @state() private resumed = false;
   @state() private error: string | undefined;
   @state() private drafts: ActionDraft[] = [];
   @state() private assistantModel: string | undefined;
@@ -641,16 +667,18 @@ export class MkShell extends LitElement {
   @state() private sentTo: string | undefined;
   @state() private notice: string | undefined;
 
-  /** The state of the apps in the address of the page (MK-099). */
+  /** The state of the apps in the address of the page (MK-099), also in the embed mode (MK-100). */
   private readonly address = new ShellAddress(
     () => this.entries,
     () => {
-      this.path = location.pathname;
+      this.path = this.pagePath();
     },
+    this.embed?.kind === 'app' ? new EmbedLocation(this.embed.organization) : globalThis.location,
+    this.embed?.kind === 'app' ? new EmbedHistory(this.embed.organization) : globalThis.history,
   );
 
   private readonly onPopState = (): void => {
-    this.path = location.pathname;
+    this.path = this.pagePath();
     // The app shown follows the back and forward buttons and the links of the shell (MK-099).
     this.address.moved();
   };
@@ -685,7 +713,9 @@ export class MkShell extends LitElement {
         this.info = info;
         showProduct(info);
         this.applyAppearance();
-        void this.loadVisitorHome();
+        if (!this.embed) {
+          void this.loadVisitorHome();
+        }
       },
       () => {
         this.error = 'The kernel is not reachable.';
@@ -700,7 +730,17 @@ export class MkShell extends LitElement {
     this.passwordFromLink();
     void this.confirmFromLink()
       .then(() => this.completeFederatedSignIn())
-      .then(() => this.resumeSession());
+      .then(() => this.resumeSession())
+      .finally(() => {
+        this.resumed = true;
+      });
+  }
+
+  /** The path of the page as the shell routes it: in the embed mode, without the prefix. */
+  private pagePath(): string {
+    return this.embed?.kind === 'app'
+      ? new EmbedLocation(this.embed.organization).pathname
+      : location.pathname;
   }
 
   /**
@@ -804,6 +844,10 @@ export class MkShell extends LitElement {
       : html`<p class="offline" role="status">
           ${t('You are offline: what you see may not be up to date, and changes wait for the network.')}
         </p>`;
+    // A view embedded in the page of another site (MK-100).
+    if (this.embed) {
+      return html`${offline}${this.renderEmbed(this.embed)}`;
+    }
     // A link opens its resource also without an account (MK-055).
     const token = tokenOf(this.path);
     if (token) {
@@ -829,6 +873,57 @@ export class MkShell extends LitElement {
         ${this.renderWorkspace()}
         <mk-share-dialog .client=${this.client}></mk-share-dialog>
       </div>`;
+  }
+
+  /**
+   * The embed mode (MK-100): the view alone. A resource opened with a link or shared with the public
+   * needs no account; the view of an app needs the session of the browser, which the browser gives a
+   * frame of another site only when that site is of the same site as the installation (SameSite):
+   * otherwise the person opens the view in the installation, in a tab of its own, where they sign in.
+   * Never a sign-in form inside the frame of another site.
+   */
+  private renderEmbed(embed: EmbedAddress): unknown {
+    const product = this.info?.name ?? 'Mosaikit';
+    switch (embed.kind) {
+      case 'link':
+        return html`<mk-shared-link
+          embedded
+          organization=${embed.organization}
+          product=${product}
+          token=${embed.token}
+        ></mk-shared-link>`;
+      case 'public':
+        return html`<mk-shared-link
+          embedded
+          organization=${embed.organization}
+          product=${product}
+          .publicResource=${embed.resource}
+        ></mk-shared-link>`;
+      case 'unknown':
+        return html`<p class="embed-note" role="alert">
+          ${t('There is no view at this address.')}
+        </p>`;
+      case 'app':
+        break;
+    }
+    if (!this.account) {
+      if (!this.resumed) {
+        return nothing;
+      }
+      const address = embed.path + location.search + location.hash;
+      return html`<p class="embed-note">
+        ${t('Sign in to see this view.')}
+        <a href=${address} target="_blank" rel="noopener"
+          >${t('Open it in {product}', { product })}</a
+        >
+      </p>`;
+    }
+    if (this.account.organization !== embed.organization) {
+      return html`<p class="embed-note" role="alert">
+        ${t('This view is of another organization.')}
+      </p>`;
+    }
+    return html`<main id="app-area" class="embedded"><div id="app-host"></div></main>`;
   }
 
   /** The search of the top bar: apps and pages by title, until the global search (MK-040). */
@@ -1961,6 +2056,11 @@ export class MkShell extends LitElement {
    */
   private renderApp(): void {
     const area = this.renderRoot.querySelector('#app-host');
+    // The embed mode shows the views of apps only, never a page of the console (MK-100).
+    if (this.embed && !this.path.startsWith('/app/')) {
+      area?.replaceChildren();
+      return;
+    }
     if (area && !this.showsAdmin() && !entryForPath(this.entries, this.path)) {
       area.replaceChildren();
       return;
@@ -1974,7 +2074,8 @@ export class MkShell extends LitElement {
           admin instanceof MkAdminApps ||
           admin instanceof MkAdminPermissions ||
           admin instanceof MkAdminSecrets ||
-          admin instanceof MkAdminQuotas
+          admin instanceof MkAdminQuotas ||
+          admin instanceof MkAdminEmbedSites
         ) {
           admin.organization = this.account?.organization ?? undefined;
         }

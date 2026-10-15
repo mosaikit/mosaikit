@@ -6,6 +6,7 @@ import dev.mosaikit.kernel.api.extension.BackendEntry;
 import dev.mosaikit.kernel.api.extension.ExtensionManifest;
 import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
 import dev.mosaikit.kernel.core.extension.InstalledExtension;
+import io.agroal.api.AgroalDataSource;
 import io.quarkus.security.identity.SecurityIdentity;
 import io.quarkus.vertx.http.runtime.security.HttpSecurityPolicy;
 import io.smallrye.mutiny.Uni;
@@ -18,11 +19,13 @@ import java.util.Optional;
  * service, as before, or a request without an account that carries, in the {@value LinkRequest#HEADER}
  * header, a link that works and opens a resource of the extension that provides the API. Every other
  * anonymous request is refused with {@code 401}, also one with a link to a resource of another
- * extension.
+ * extension. So is a request without an account that names, in the {@value PublicRequest#HEADER} header,
+ * an organization that shares with the public a resource of that extension (MK-100, the embedded
+ * views of the shell).
  *
  * <p>Such a request has no organization yet, so the row-level security shows it no row: it acts on
  * the organization of the resource only once the extension asked {@code Sharing} about that very
- * resource and the link gave a level ({@link KernelSharing}). A route that never asks reads nothing,
+ * resource and the link, or the public, gave a level ({@link KernelSharing}). A route that never asks reads nothing,
  * and one annotated {@code @Authenticated} still refuses it: an extension opens to links only the
  * routes it annotates {@code @PermitAll} and checks with {@code Sharing.require}.
  */
@@ -36,10 +39,12 @@ public class LinkRequestPolicy implements HttpSecurityPolicy {
 
     private final SharedLinks links;
     private final ExtensionRegistry registry;
+    private final AgroalDataSource dataSource;
 
-    public LinkRequestPolicy(SharedLinks links, ExtensionRegistry registry) {
+    public LinkRequestPolicy(SharedLinks links, ExtensionRegistry registry, AgroalDataSource dataSource) {
         this.links = links;
         this.registry = registry;
+        this.dataSource = dataSource;
     }
 
     @Override
@@ -56,7 +61,12 @@ public class LinkRequestPolicy implements HttpSecurityPolicy {
             }
             String secret = request.request().getHeader(LinkRequest.HEADER);
             if (secret == null || secret.isBlank()) {
-                return CheckResult.deny();
+                String named = request.request().getHeader(PublicRequest.HEADER);
+                if (named == null || named.isBlank()) {
+                    return CheckResult.deny();
+                }
+                return context.runBlocking(
+                        request, Uni.createFrom().item(found), (routing, anonymous) -> checkPublic(routing, named));
             }
             // Opening the link reads the database and writes its use in the audit log.
             return context.runBlocking(
@@ -80,6 +90,17 @@ public class LinkRequestPolicy implements HttpSecurityPolicy {
         } catch (SharedLinks.RefusedException refused) {
             return CheckResult.DENY;
         }
+    }
+
+    /** Lets in a request that names an organization sharing with the public a resource of the extension. */
+    private CheckResult checkPublic(RoutingContext routing, String slug) {
+        Optional<String> extension = extensionOf(routing.normalizedPath());
+        if (extension.isEmpty()) {
+            return CheckResult.DENY;
+        }
+        return PublicRequest.shares(dataSource, slug, extension.get()).isPresent()
+                ? CheckResult.PERMIT
+                : CheckResult.DENY;
     }
 
     /** The active extension that provides the API of a path under {@code /api/v1/ext/}. */

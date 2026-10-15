@@ -286,6 +286,10 @@ After `require`, read only that resource: the request now sees the rows of its o
 the organization turned the apps of the extension off (MK-030), its links open nothing. The fixture
 `tests/fixtures/extensions/notes` shows the whole of it with its memos.
 
+The same element and the same routes show a resource that the organization shares with the public,
+without an account, in the views that its websites embed (MK-100): see
+[Embedded views](embedded-views.md).
+
 What the permissions do today (MK-056):
 
 - `has`, `granted` and `require` act on the person and the organization of the request. They

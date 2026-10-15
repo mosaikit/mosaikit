@@ -62,7 +62,11 @@ class ContentSecurityPolicyTest {
 
     /** The header of an answer of the kernel, by directive. */
     private static Map<String, List<String>> header() {
-        String policy = anonymous().get("/").then().extract().header("Content-Security-Policy");
+        return header("/");
+    }
+
+    private static Map<String, List<String>> header(String path) {
+        String policy = anonymous().get(path).then().extract().header("Content-Security-Policy");
         assertThat(policy).isNotNull();
         Map<String, List<String>> directives = new java.util.LinkedHashMap<>();
         for (String directive : policy.split(";")) {
@@ -218,5 +222,40 @@ class ContentSecurityPolicyTest {
         assertThat(Optional.ofNullable(header().get("connect-src")).orElseThrow())
                 .isNotEmpty()
                 .doesNotContain("https://evil.example.org");
+    }
+
+    // MK-100: the embed mode of the shell keeps the policy and changes frame-ancestors only.
+
+    @Test
+    @Tag("MK-100")
+    void theEmbedModeKeepsThePolicyAndLetsOnlyTheSitesOfItsOrganizationFrameIt() {
+        String slug = unique("embedcsp");
+        asAdmin()
+                .body(Map.of("slug", slug, "name", slug, "selfRegistration", true))
+                .post("/api/v1/organizations")
+                .then()
+                .statusCode(201);
+        asAdmin()
+                .body(Map.of("origin", "https://www.example.org"))
+                .post("/api/v1/organizations/{slug}/embed-sites", slug)
+                .then()
+                .statusCode(201);
+
+        Map<String, List<String>> console = header();
+        Map<String, List<String>> embedded = header("/embed/" + slug + "/app/notes");
+        assertThat(console.get("frame-ancestors")).containsExactly("'none'");
+        assertThat(embedded.get("frame-ancestors")).containsExactly("'self'", "https://www.example.org");
+        assertThat(anonymous()
+                        .get("/embed/" + slug + "/app/notes")
+                        .then()
+                        .extract()
+                        .header("X-Frame-Options"))
+                .isNull();
+        // Every other directive as for the console: the embedded view loads nothing more.
+        Map<String, List<String>> rest = new java.util.LinkedHashMap<>(embedded);
+        rest.remove("frame-ancestors");
+        Map<String, List<String>> consoleRest = new java.util.LinkedHashMap<>(console);
+        consoleRest.remove("frame-ancestors");
+        assertThat(rest).isEqualTo(consoleRest);
     }
 }

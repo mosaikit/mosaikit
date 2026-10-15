@@ -49,6 +49,7 @@ export default defineConfig({
         'src/web/src/mk-admin-secrets.ts',
         'src/web/src/mk-admin-installation-secrets.ts',
         'src/web/src/mk-admin-origins.ts',
+        'src/web/src/mk-admin-embed-sites.ts',
         'src/web/src/mk-admin-accounts.ts',
         'src/web/src/mk-admin-organizations.ts',
         'src/web/src/mk-admin-quotas.ts',

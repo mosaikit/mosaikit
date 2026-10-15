@@ -23,6 +23,7 @@ import dev.mosaikit.kernel.core.extension.ExtensionAssetResource;
 import dev.mosaikit.kernel.core.extension.ExtensionRegistry;
 import dev.mosaikit.kernel.core.extension.FrontendExtensionView;
 import dev.mosaikit.kernel.core.extension.InstalledExtension;
+import dev.mosaikit.kernel.core.identity.RequestOrganization;
 import dev.mosaikit.kernel.core.organization.Organization;
 import dev.mosaikit.kernel.core.organization.Organizations;
 import dev.mosaikit.kernel.core.resources.RegisteredResource;
@@ -171,6 +172,8 @@ public class SharingDialog {
     private final Organizations organizations;
     private final SecurityIdentity identity;
     private final ExtensionRegistry extensions;
+    private final PublicRequest publicRequest;
+    private final RequestOrganization requestOrganization;
     private final boolean isolateUnverified;
 
     public SharingDialog(
@@ -180,6 +183,8 @@ public class SharingDialog {
             Organizations organizations,
             SecurityIdentity identity,
             ExtensionRegistry extensions,
+            PublicRequest publicRequest,
+            RequestOrganization requestOrganization,
             KernelConfig config) {
         this.sharing = sharing;
         this.links = links;
@@ -187,6 +192,8 @@ public class SharingDialog {
         this.organizations = organizations;
         this.identity = identity;
         this.extensions = extensions;
+        this.publicRequest = publicRequest;
+        this.requestOrganization = requestOrganization;
         this.isolateUnverified =
                 FrontendExtensionView.isolatesUnverified(config.extensions().unverifiedFrontends());
     }
@@ -308,10 +315,24 @@ public class SharingDialog {
      * @throws ForbiddenOperationException when its password is missing or wrong
      */
     public LinkAccess openLink(String token, String password) {
+        return openLink(token, password, null);
+    }
+
+    /**
+     * Opens a link, also without an account, for a page that shows the views of one organization
+     * (the embed mode of the shell, MK-100): a link of another organization answers not found, as an
+     * unknown one does, so that a site that the other organization did not list cannot show it there.
+     *
+     * @param organization the slug of the organization of the page, or {@code null} for any
+     */
+    public LinkAccess openLink(String token, String password, String organization) {
         String actor =
                 identity.isAnonymous() ? "anonymous" : identity.getPrincipal().getName();
         try {
             SharedLinks.Opened opened = links.open(token, password, actor);
+            if (organization != null && !organizationId(organization).equals(Optional.of(opened.organization()))) {
+                throw new ResourceNotFoundException("The link does not exist.");
+            }
             return new LinkAccess(
                     opened.resource(),
                     opened.title(),
@@ -326,6 +347,49 @@ public class SharingDialog {
                 case WRONG_PASSWORD -> new ForbiddenOperationException("The password of the link is wrong.");
             };
         }
+    }
+
+    /**
+     * Opens a resource that an organization shares with the public, without an account (MK-055,
+     * MK-100): the level of the public on it, also through the resources above it (MK-136).
+     *
+     * @throws ResourceNotFoundException alike when the organization, the extension, the type or the
+     *     resource are unknown, when the resource is in the trash, and when the public has no level on it
+     */
+    public LinkAccess openPublic(String organization, ResourceRef ref) {
+        ResourceNotFoundException notShared =
+                new ResourceNotFoundException("The resource is not shared with the public.");
+        Optional<UUID> named = organizationId(organization);
+        // A person of another organization would read the resource of that name in their own.
+        if (named.isEmpty()
+                || requestOrganization
+                        .id()
+                        .filter(own -> !own.equals(named.get()))
+                        .isPresent()) {
+            throw notShared;
+        }
+        publicRequest.name(organization);
+        try {
+            String level = sharing.level(ref).orElseThrow(() -> notShared);
+            RegisteredResource entry = sharing.entryOf(ref);
+            return new LinkAccess(
+                    ref,
+                    entry.getTitle(),
+                    entry.getLink(),
+                    level,
+                    null,
+                    sharedView(ref).orElse(null));
+        } catch (IllegalArgumentException | NoSuchElementException e) {
+            throw notShared;
+        }
+    }
+
+    private Optional<UUID> organizationId(String slug) {
+        return slug == null || slug.isBlank()
+                ? Optional.empty()
+                : organizations
+                        .findBySlug(slug.strip().toLowerCase(java.util.Locale.ROOT))
+                        .map(Organization::getId);
     }
 
     private GrantView view(ResourceGrant grant) {

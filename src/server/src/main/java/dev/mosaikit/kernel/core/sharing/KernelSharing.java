@@ -372,7 +372,7 @@ public class KernelSharing implements Sharing {
             // A request without an organization: only the link it was opened with gives a level, and
             // from now on the request acts on the organization of that resource (admit).
             if (link.isEmpty()) {
-                return Optional.empty();
+                return publicLevel(type, resource);
             }
             SharedLinks.Opened opened = link.get();
             if (opened.resource().equals(resource)) {
@@ -392,6 +392,25 @@ public class KernelSharing implements Sharing {
             return level;
         }
         return levelOfRequest(org.get(), type, resource, link);
+    }
+
+    /**
+     * The level of a request without an account and without a link that names an organization sharing
+     * with the public (MK-100, {@link PublicRequest}): the level that the public has on the resource,
+     * also through the resources above it (MK-136), once the request acts on that organization. Never
+     * one for a resource in the trash (MK-095), nor when the organization turned the apps of the
+     * extension off.
+     */
+    private Optional<String> publicLevel(ResourceTypeEntry type, ResourceRef resource) {
+        Optional<UUID> named = PublicRequest.current(resource.extension());
+        if (named.isEmpty() || !admit(named.get(), resource.extension())) {
+            return Optional.empty();
+        }
+        Optional<String> level = levelOfRequest(named.get(), type, resource, Optional.empty());
+        if (level.isEmpty()) {
+            forgetAdmission();
+        }
+        return level;
     }
 
     /** The level of the request on a resource of its organization, also through the resources above it. */

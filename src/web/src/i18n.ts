@@ -361,6 +361,32 @@ const ITALIAN: Record<string, string> = {
     "Nella pagina di accesso, nelle organizzazioni che lo consentono. Un link inviato per email conferma l'indirizzo prima del primo accesso.",
   'People can create their own account.': 'Le persone possono creare il proprio account.',
   'Self-registration is off.': 'La registrazione autonoma è disattivata.',
+  // Embedded views (MK-100)
+  'Embedded views': 'Viste incorporate',
+  'Sites that may show the views of the apps of your organization in their pages, in an iframe. The browser refuses every other site.':
+    'Siti che possono mostrare le viste delle app della tua organizzazione nelle loro pagine, in un iframe. Il browser rifiuta ogni altro sito.',
+  'The address of an embedded view starts with {address}, followed by the address of the view in an app, or by shared/ and the secret of a link, or by public/ and a resource shared with the public.':
+    "L'indirizzo di una vista incorporata inizia con {address}, seguito dall'indirizzo della vista in un'app, oppure da shared/ e dal segreto di un link, oppure da public/ e da una risorsa condivisa con il pubblico.",
+  'No site: only this installation shows your views.':
+    'Nessun sito: solo questa installazione mostra le tue viste.',
+  'Add a site': 'Aggiungi un sito',
+  Site: 'Sito',
+  Add: 'Aggiungi',
+  'Scheme, host and port only, such as https://www.example.org or https://*.example.org.':
+    'Solo schema, host e porta, come https://www.example.org o https://*.example.org.',
+  'Remove {origin}? The views of your organization stop showing in its pages.':
+    'Rimuovere {origin}? Le viste della tua organizzazione smettono di comparire nelle sue pagine.',
+  'The sites cannot be read: {reason}': 'Non è possibile leggere i siti: {reason}',
+  'Write a site such as https://www.example.org: https (or http for a test site), a host and a port, without a path.':
+    'Scrivi un sito come https://www.example.org: https (o http per un sito di prova), un host e una porta, senza percorso.',
+  '{origin} may show your views.': '{origin} può mostrare le tue viste.',
+  'Not added: {reason}': 'Non aggiunto: {reason}',
+  'This view is not shared with the public.': 'Questa vista non è condivisa con il pubblico.',
+  'Sign in to {product} to open it': 'Accedi a {product} per aprirla',
+  'There is no view at this address.': "A questo indirizzo non c'è nessuna vista.",
+  'Sign in to see this view.': 'Accedi per vedere questa vista.',
+  'Open it in {product}': 'Aprila in {product}',
+  'This view is of another organization.': "Questa vista è di un'altra organizzazione.",
   // External origins of the content security policy (MK-128)
   'External origins': 'Origini esterne',
   'Services outside the installation that the shell and the extensions may contact from the browser, for images, data and tiles. Every other address stays blocked by the content security policy of the browser.':

@@ -44,6 +44,7 @@ lead to the topic.
   - <a id="the-sharing-dialog"></a>[The sharing dialog](extensions/resources-and-sharing.md#the-sharing-dialog)
   - <a id="links"></a>[Links](extensions/resources-and-sharing.md#links)
   - <a id="favorites"></a>[Favorites](extensions/favorites.md)
+  - <a id="embedded-views"></a>[Embedded views](extensions/embedded-views.md)
 - <a id="the-trash"></a>[The trash](extensions/trash.md)
 - <a id="tags"></a>[Tags](extensions/tags.md)
 - <a id="quotas"></a>[Quotas](extensions/quotas.md)

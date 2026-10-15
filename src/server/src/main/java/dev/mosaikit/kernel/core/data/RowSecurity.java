@@ -126,6 +126,10 @@ public class RowSecurity {
         // request, and no SQL of an extension, may read or widen them; only the kernel, as the owner.
         // nosemgrep: java.lang.security.audit.formatted-sql-string.formatted-sql-string
         statement.execute("revoke all on " + s + ".csp_origin from " + r);
+        // The sites that may frame the views of an organization (MK-100) decide who may frame the
+        // installation: only the kernel, as the owner, for the administrators of the organization.
+        // nosemgrep: java.lang.security.audit.formatted-sql-string.formatted-sql-string
+        statement.execute("revoke all on " + s + ".embed_site from " + r);
     }
 
     /**
