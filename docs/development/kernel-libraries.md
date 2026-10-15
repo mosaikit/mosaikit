@@ -4,7 +4,7 @@ The libraries the kernel provides to Java extensions (MK-131), with their versio
 dependencies, as the build of the kernel lists them. An extension uses them without bringing them:
 the parent POM of extensions manages them with scope `provided`, so `mvn package` leaves them out of
 the package, and the kernel refuses a package that brings one of them in another version. See
-[Libraries of an extension](extension-development.md#libraries-of-an-extension).
+[Libraries of an extension](extensions/libraries.md#libraries-of-an-extension).
 
 The list is written from the build of the kernel by `KernelLibrariesTest`, which fails when it is
 not up to date; libraries that exist for one operating system only (native code) are left out. Do

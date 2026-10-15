@@ -88,11 +88,20 @@ def pandoc(sources: list[Path], output: Path, metadata: dict[str, str], extra: l
     subprocess.run(command + [str(source) for source in sources], check=True, cwd=ROOT)
 
 
+def pages_of(source: Path) -> list[Path]:
+    """The pages a page stands for: an index of topics (the extension guide) stands for its topics,
+    in the order of its entries; any other page for itself."""
+    if source.name != "extension-development.md" or not source.exists():
+        return [source]
+    topics = re.findall(r"^\s*- .*?\]\((extensions/[\w-]+\.md)\)$", source.read_text(encoding="utf-8"), re.M)
+    return [source.parent / topic for topic in topics]
+
+
 def guides(version: str, output: Path, pdf: bool) -> list[Path]:
     built = []
     date = datetime.date.today().isoformat()
     for name, (title, folder, pages) in GUIDES.items():
-        sources = [DOCS / folder / f"{page}.md" for page in pages]
+        sources = [source for page in pages for source in pages_of(DOCS / folder / f"{page}.md")]
         missing = [str(source) for source in sources if not source.exists()]
         if missing:
             raise SystemExit(f"Missing pages of the {title}: {missing}")

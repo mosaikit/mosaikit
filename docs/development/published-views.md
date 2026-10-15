@@ -9,7 +9,7 @@ kernel, which change in any release. How an administrator gives a service a logi
 
 The Java code of an extension does not need them: it reads the same people and teams of its
 organization through the `People` bean of `kernel-api`, without a database login (see the
-[extension guide](extension-development.md#people-and-teams-of-the-organization)).
+[extension guide](extensions/without-backend.md#people-and-teams-of-the-organization)).
 
 ## The contract
 
