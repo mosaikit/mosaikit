@@ -464,6 +464,28 @@ export interface ExtensionTheme {
   readonly dark: Readonly<Record<string, string>>;
 }
 
+/** The images of the branding of an organization (MK-074). */
+export const BRAND_IMAGES = ['logo', 'logo-dark', 'icon', 'favicon'] as const;
+export type BrandImageKind = (typeof BRAND_IMAGES)[number];
+
+/** What the administrators of an organization set of its branding (MK-074); `null` for the installation's. */
+export interface BrandingDraft {
+  readonly displayName: string | null;
+  /** The brand color, `#rrggbb`. */
+  readonly accent: string | null;
+  /** The tokens of the theme changed in each scheme, by name (those of a palette). */
+  readonly light: Readonly<Record<string, string>>;
+  readonly dark: Readonly<Record<string, string>>;
+}
+
+/** The branding of an organization (MK-074), with the addresses of its images. */
+export interface Branding extends BrandingDraft {
+  readonly logo: string | null;
+  readonly logoDark: string | null;
+  readonly icon: string | null;
+  readonly favicon: string | null;
+}
+
 /** The personal settings of a person (MK-027); `null` means the default of the installation. */
 export interface Preferences {
   readonly theme: string | null;
@@ -773,6 +795,31 @@ export class KernelClient {
   /** Removes the limit set for an organization: the default of the installation applies. */
   removeQuota(slug: string, measure: string): Promise<Quota> {
     return this.sendJson<Quota>(`${quotasPath(slug)}/${measurePath(measure)}`, 'DELETE');
+  }
+
+  /** The branding of an organization (MK-074): public, for its sign-in page too. */
+  branding(slug: string): Promise<Branding> {
+    return this.getJson<Branding>(brandingPath(slug));
+  }
+
+  /** Sets the display name, the accent color and the theme tokens (administrators of the organization). */
+  changeBranding(slug: string, draft: BrandingDraft): Promise<Branding> {
+    return this.sendJson<Branding>(brandingPath(slug), 'PUT', draft);
+  }
+
+  /** Stores an image of the branding, replacing the one before. */
+  storeBrandImage(slug: string, kind: BrandImageKind, image: Blob): Promise<Branding> {
+    return this.sendJson<Branding>(
+      `${brandingPath(slug)}/images/${kind}`,
+      'PUT',
+      image,
+      image.type || 'application/octet-stream',
+    );
+  }
+
+  /** Removes an image of the branding: the one of the installation shows again. */
+  removeBrandImage(slug: string, kind: BrandImageKind): Promise<Branding> {
+    return this.sendJson<Branding>(`${brandingPath(slug)}/images/${kind}`, 'DELETE');
   }
 
   /** The credentials of an organization, without their values, for its administrators (MK-062). */
@@ -1304,6 +1351,11 @@ function quotasPath(slug: string): string {
 /** A measure in a path: `<extension>/<measure>` keeps its slash. */
 function measurePath(measure: string): string {
   return measure.split('/').map(encodeURIComponent).join('/');
+}
+
+/** The branding of an organization (MK-074). */
+function brandingPath(slug: string): string {
+  return `/api/v1/organizations/${encodeURIComponent(slug)}/branding`;
 }
 
 /** The credentials of an organization, for its administrators (MK-062). */

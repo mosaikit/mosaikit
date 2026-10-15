@@ -59,6 +59,7 @@ import java.util.OptionalLong;
 import java.util.UUID;
 import java.util.concurrent.Callable;
 import java.util.function.IntConsumer;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 import org.jboss.logging.Logger;
 
@@ -101,6 +102,13 @@ public class FileService {
                         PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rw-------"))
                     }
                     : new FileAttribute<?>[0];
+
+    /**
+     * The extension under which the kernel records the files it keeps for itself, such as the
+     * branding of an organization (MK-074). Not an extension identifier, which has a dot: no extension
+     * reads, lists or removes them.
+     */
+    public static final String KERNEL = "kernel";
 
     /** Longest name of a file. */
     static final int MAX_NAME = 255;
@@ -208,6 +216,120 @@ public class FileService {
     }
 
     /**
+     * Checks the content of a file of the kernel before it is stored, such as that it is an image of
+     * a known format, and gives its media type.
+     */
+    @FunctionalInterface
+    public interface ContentCheck {
+
+        /**
+         * @param content the whole content, in a temporary file of the server
+         * @return the media type of the content
+         * @throws InvalidInputException when the content is not what the caller accepts
+         */
+        String check(Path content) throws IOException;
+    }
+
+    /**
+     * Stores a file that the kernel keeps for itself in the organization of the request, such as the
+     * logo of its branding (MK-074): recorded as the files of extensions, under {@link #KERNEL}, so it
+     * counts to the storage quota of the organization and its content leaves the store with the
+     * organization; no extension reads it, since no extension has that identifier. The caller decides
+     * who may store it and who reads it ({@link #kernelContent}).
+     *
+     * @param limit the largest content, in bytes, below {@code mosaikit.files.max-size}
+     * @throws ContentTooLargeException beyond {@code limit}
+     */
+    public FileView storeForKernel(String name, InputStream content, long limit, ContentCheck check) {
+        String fileName = name(name);
+        long most = Math.min(limit, maxSize);
+        notDoomed();
+        UUID org = organization.require();
+        Spooled spooled =
+                spool(content, most, () -> new ContentTooLargeException("This file has at most " + most + " bytes."));
+        String type;
+        try {
+            type = contentType(check.check(spooled.path()));
+            fits(org, spooled.size());
+        } catch (IOException e) {
+            spooled.discard();
+            throw new InvalidInputException(List.of("the content could not be read"));
+        } catch (RuntimeException e) {
+            spooled.discard();
+            throw e;
+        }
+        UUID id = UUID.randomUUID();
+        String key = FileStore.key(org, KERNEL, id);
+        try {
+            store.put(key, spooled.path(), spooled.size(), type);
+        } catch (IOException e) {
+            LOG.errorf("Cannot store a file in %s: %s", store.describe(), e.getMessage());
+            throw new ServiceUnavailableException("The file cannot be stored now.");
+        } finally {
+            spooled.discard();
+        }
+        try {
+            return transaction(() -> {
+                deleteUnlessCommitted(key);
+                quotas.reserveStorage(org, spooled.size());
+                StoredFile file = new StoredFile(
+                        id,
+                        org,
+                        KERNEL,
+                        account().orElse(null),
+                        null,
+                        fileName,
+                        type,
+                        spooled.size(),
+                        spooled.checksum(),
+                        null,
+                        Instant.now(clock).truncatedTo(ChronoUnit.MICROS));
+                files.insert(file);
+                audited("file.stored", file);
+                return FileView.of(file);
+            });
+        } catch (RuntimeException e) {
+            deleteQuietly(key);
+            throw e;
+        }
+    }
+
+    /**
+     * Deletes a file of the kernel of the organization of the request (MK-074); its content leaves the
+     * store when the transaction commits. A file that is not there is already gone.
+     */
+    public void deleteForKernel(UUID id) {
+        transaction(() -> {
+            UUID org = organization.require();
+            files.findById(id)
+                    .filter(file -> file.getOrganizationId().equals(org) && KERNEL.equals(file.getExtensionId()))
+                    .ifPresent(file -> {
+                        files.delete(file);
+                        String key = file.getStorageKey();
+                        if (transactions.getTransactionStatus() == Status.STATUS_ACTIVE) {
+                            transactions.registerInterposedSynchronization(new AfterCompletion(status -> {
+                                if (status == Status.STATUS_COMMITTED) {
+                                    deleteQuietly(key);
+                                }
+                            }));
+                        }
+                        audited("file.deleted", file);
+                    });
+            return null;
+        });
+    }
+
+    /**
+     * The content of a file of the kernel that the caller found and may show (MK-074), as it recorded
+     * it: read from the store without the checks of the request, which may have no person.
+     */
+    public Content kernelContent(
+            UUID organization, UUID id, String name, String contentType, long size, String checksum, Instant updated) {
+        FileView file = new FileView(id, KERNEL, name, contentType, size, checksum, null, null, null, updated, updated);
+        return new Content(file, FileStore.key(organization, KERNEL, id));
+    }
+
+    /**
      * Stores a file of an extension in the organization of the request, owned by the person of the
      * request: for the whole organization, or shared with a team of the person.
      *
@@ -227,7 +349,7 @@ public class FileService {
         if (declaredSize.isPresent()) {
             fits(org, declaredSize.getAsLong());
         }
-        Spooled spooled = spool(content);
+        Spooled spooled = spool(content, maxSize, this::tooLarge);
         try {
             fits(org, spooled.size());
         } catch (RuntimeException e) {
@@ -610,7 +732,7 @@ public class FileService {
         }
     }
 
-    private Spooled spool(InputStream content) {
+    private Spooled spool(InputStream content, long limit, Supplier<DomainException> tooLarge) {
         Path path;
         try {
             path = Files.createTempFile("mosaikit-file-", ".upload", PRIVATE);
@@ -624,8 +746,8 @@ public class FileService {
             int read;
             while ((read = content.read(buffer)) >= 0) {
                 size += read;
-                if (size > maxSize) {
-                    throw tooLarge();
+                if (size > limit) {
+                    throw tooLarge.get();
                 }
                 out.write(buffer, 0, read);
             }

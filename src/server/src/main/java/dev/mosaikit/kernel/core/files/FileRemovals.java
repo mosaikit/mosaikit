@@ -139,7 +139,9 @@ public class FileRemovals {
                         + " group by f.extension_id order by f.extension_id")
                 .getResultList();
         return rows.stream()
-                .filter(row -> !installed.contains((String) row[0]))
+                // The files the kernel keeps for itself, such as the branding of organizations (MK-074),
+                // belong to no extension: they are never offered for removal as those of one.
+                .filter(row -> !installed.contains((String) row[0]) && !FileService.KERNEL.equals(row[0]))
                 .map(row -> new Uninstalled((String) row[0], number(row[1]), number(row[2]), number(row[3])))
                 .toList();
     }
@@ -155,6 +157,10 @@ public class FileRemovals {
      */
     public Queued queueExtension(String extension, String actor) {
         Set<String> installed = installed();
+        if (FileService.KERNEL.equals(extension)) {
+            throw new ConflictException("The files of the kernel are not those of an extension: they leave with"
+                    + " what they belong to, such as the branding of an organization.");
+        }
         if (installed.contains(extension)) {
             throw new ConflictException(
                     "The extension " + extension + " is installed: uninstall it before removing" + " its files.");

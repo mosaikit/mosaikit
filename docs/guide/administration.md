@@ -378,6 +378,38 @@ change in the audit log. Apps of extensions installed later are shown, after the
 administrators decide. Platform administrators can do the same through
 `PUT /api/v1/organizations/{slug}/apps`.
 
+## Branding of an organization
+
+The administrators of an organization, and nobody else (not even platform administrators), open
+**Branding** at the bottom of the app bar to give the organization its own mark over the one of the
+installation (MK-074):
+
+- **Display name**: shown instead of the name of the product, in the bar of the shell, on the
+  sign-in page and as the title of the page;
+- **Accent color**: the brand color of buttons, links and the bar of the shell; the page warns
+  when white text on it would miss the contrast of WCAG 2.1 AA;
+- **Theme tokens**: the colors of the light and of the dark scheme (background, surface, text,
+  secondary text, lines, danger, success, warning, focus ring). Every change shows at once on the
+  open application, for the administrator only; **Save** applies it to everyone in the
+  organization, **Discard changes** goes back. **Reset** gives a token back to the theme of the
+  installation;
+- **Images**: a logo for light backgrounds (the sign-in page), a logo for dark backgrounds, an
+  icon (the bar of the shell, square) and a favicon (the tab of the browser), each a PNG, JPEG,
+  WebP, ICO or SVG file of up to 2 MB. An SVG with scripts or embedded content is refused.
+
+Members see the branding of their organization after sign-in; people of other organizations keep
+their own, or the one of the installation. The sign-in page of the organization is the address of
+the installation with `?organization=<slug>`, such as `https://apps.example.org/?organization=acme`:
+share it with the members. A person who chooses a theme in **Settings** keeps it over the colors
+of the organization, which win over the theme of the installation; the high contrast appearance
+stays available to everyone.
+
+The images are kept with the files of the installation and count to the storage quota of the
+organization; they leave the store with the organization. The branding is public, as the sign-in
+page needs it before anyone signs in. Every change is in the audit log
+(`organization.branding.changed`, `organization.branding.image.stored`,
+`organization.branding.image.removed`).
+
 ## Permissions of an organization
 
 Extensions declare permissions, such as "create dashboards" (MK-056). A permission is off until the

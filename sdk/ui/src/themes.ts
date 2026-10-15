@@ -156,10 +156,20 @@ function validColors(palette: Partial<Palette> | undefined): Partial<Palette> {
 
 /**
  * Adds a theme, such as one of a theme extension; every value it misses, or that is not valid, comes
- * from the default theme.
+ * from the default theme, or from the theme named `base` when it is available, such as the theme of
+ * the installation under the branding of an organization (MK-074).
  */
-export function registerTheme(id: ThemeName, input: ThemeInput): void {
-  const base = BUILT_IN.mosaikit;
+export function registerTheme(id: ThemeName, input: ThemeInput, base?: ThemeName): void {
+  const definition = base === undefined ? undefined : DEFINITIONS.get(base);
+  register(id, input, definition ?? BUILT_IN.mosaikit);
+}
+
+/** The complete definition of a theme: the default one for a theme that is not available. */
+export function themeDefinition(name: ThemeName): ThemeDefinition {
+  return DEFINITIONS.get(name) ?? BUILT_IN.mosaikit;
+}
+
+function register(id: ThemeName, input: ThemeInput, base: ThemeDefinition): void {
   const font = input.font && FONT.test(input.font) ? input.font : base.font;
   DEFINITIONS.set(id, {
     title: input.title || id,
