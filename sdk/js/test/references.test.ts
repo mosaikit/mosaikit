@@ -26,7 +26,7 @@ const ABSENT: ResolvedReference = { ...MAP, status: 'extension-absent' };
 
 function answering(...answers: ResolvedReference[][]) {
   const queue = [...answers];
-  return vi.fn((_path: string, _init?: RequestInit) =>
+  return vi.fn<(path: string, init?: RequestInit) => Promise<Response>>(() =>
     Promise.resolve(new Response(JSON.stringify(queue.shift() ?? []), { status: 200 })),
   );
 }
@@ -52,7 +52,7 @@ describe('MK-135 References between resources of different extensions', () => {
     const [path, init] = fetch.mock.calls[0] ?? [];
     expect(path).toBe(RESOLVE_REFERENCES_PATH);
     expect(init?.method).toBe('POST');
-    expect(JSON.parse(String(init?.body))).toEqual([MAP, { ...MAP, id: 'm2' }]);
+    expect(JSON.parse(init?.body as string)).toEqual([MAP, { ...MAP, id: 'm2' }]);
     expect(await resolveReferences({ fetch }, [])).toEqual([]);
     expect(fetch).toHaveBeenCalledTimes(1);
   });
@@ -235,6 +235,15 @@ describe('MK-135 The element <mk-reference-placeholder>', () => {
     }
   }
 
+  /** The element as the tests use it, on top of the fake HTMLElement. */
+  interface Placeholder {
+    hidden: boolean;
+    shadowRoot: { innerHTML: string } | null;
+    reference: ReferencePlaceholderElement['reference'];
+    setAttribute(name: string, value: string): void;
+    connectedCallback(): void;
+  }
+
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -253,8 +262,7 @@ describe('MK-135 The element <mk-reference-placeholder>', () => {
     defineReferencePlaceholder(registry);
     expect(registry.define).toHaveBeenCalledTimes(1);
 
-    const Element = defined.get(REFERENCE_PLACEHOLDER_TAG) as unknown as new () => FakeElement &
-      ReferencePlaceholderElement & { connectedCallback(): void };
+    const Element = defined.get(REFERENCE_PLACEHOLDER_TAG) as unknown as new () => Placeholder;
     const element = new Element();
     element.connectedCallback();
     expect(element.hidden).toBe(true);
@@ -284,8 +292,7 @@ describe('MK-135 The element <mk-reference-placeholder>', () => {
         defined.set(name, constructor);
       },
     });
-    const Element = defined.get(REFERENCE_PLACEHOLDER_TAG) as unknown as new () => FakeElement &
-      ReferencePlaceholderElement;
+    const Element = defined.get(REFERENCE_PLACEHOLDER_TAG) as unknown as new () => Placeholder;
     const element = new Element();
     element.reference = { status: 'deleted' };
     expect(element.shadowRoot?.innerHTML).toContain('È stato eliminato.');
