@@ -27,6 +27,12 @@ public class PublicRequest {
     /** Header with the slug of the organization whose public resources the request reads. */
     public static final String HEADER = "X-Mosaikit-Public";
 
+    /**
+     * Data of the routing context: the organization that {@link LinkRequestPolicy} found sharing with
+     * the public a resource of the extension of the API, for a request without an account.
+     */
+    public static final String NAMED = "mosaikit.public.organization";
+
     private static final String SHARES = "select mk_kernel.public_shares(?, ?)";
 
     private final AgroalDataSource dataSource;

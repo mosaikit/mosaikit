@@ -13,6 +13,7 @@ import io.smallrye.mutiny.Uni;
 import io.vertx.ext.web.RoutingContext;
 import jakarta.enterprise.context.ApplicationScoped;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Who may call the APIs of extensions ({@code /api/v1/ext/<api>/}, MK-055): a signed-in person or
@@ -98,9 +99,12 @@ public class LinkRequestPolicy implements HttpSecurityPolicy {
         if (extension.isEmpty()) {
             return CheckResult.DENY;
         }
-        return PublicRequest.shares(dataSource, slug, extension.get()).isPresent()
-                ? CheckResult.PERMIT
-                : CheckResult.DENY;
+        Optional<UUID> organization = PublicRequest.shares(dataSource, slug, extension.get());
+        if (organization.isEmpty()) {
+            return CheckResult.DENY;
+        }
+        routing.put(PublicRequest.NAMED, organization.get());
+        return CheckResult.PERMIT;
     }
 
     /** The active extension that provides the API of a path under {@code /api/v1/ext/}. */
