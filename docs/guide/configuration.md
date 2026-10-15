@@ -130,6 +130,15 @@ extensions, stay for a retention before a job of the kernel removes them (MK-130
 |---|---|---|
 | `mosaikit.organizations.removal-retention` | `30d` | how long the data of a deleted organization and of its extensions stay before they are removed, such as `90d`; one day at least, whatever is set, so that a missing, zero or wrong value never removes anything at once. Read at each deletion, which fixes the time the organization may be removed (`removableFrom`): a later change applies to the next deletions only |
 
+## Trash
+
+What people delete in the apps that use the trash stays there for a retention, then a job of the
+kernel deletes it for good, every hour (MK-095, see [Trash](using.md#trash)).
+
+| Setting | Default | Meaning |
+|---|---|---|
+| `mosaikit.trash.retention` | `30d` | how long a resource stays in the trash before it is deleted for good, such as `90d`; one day at least, whatever is set, so that a missing, zero or wrong value never deletes anything at once. Read when a resource is trashed, which fixes when it is deleted (`purgeableFrom`): a later change applies to the next deletions only |
+
 ## Events of the platform
 
 The kernel delivers events, such as an organization created or a file stored, to the Java code of

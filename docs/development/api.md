@@ -225,6 +225,9 @@ The rows are sorted by path, one row for a path and the methods that share a des
 | `GET, POST /api/v1/teams` | signed in, with an organization | the teams the person sees (theirs and, unless a guest, the public ones), with their `role`; create one (`name`, `description`, `visibility` `public` or `private`), owned by the person (MK-032, audited); with `parent`, the groups of a team in which the person is, or a new group, always private, such as a private channel (MK-034); with `kind=chat`, the chats of the person with their people, newest first, or a new chat (`kind: chat`, `people`, optional `name`), the same one between two people (MK-036) |
 | `GET, PUT, DELETE /api/v1/teams/{id}` | signed in, with an organization | one team with its `members`; change or delete it: its owners and the administrators of the organization |
 | `PUT, DELETE /api/v1/teams/{id}/members/{email}` | signed in, with an organization | add a person with a `role` (`owner`, `member`, or `guest` for a person of another organization) or change it: the owners; join a public team as `member`, or leave a team: the person (audited) |
+| `GET /api/v1/trash` | signed in | List the trash of the signed-in person in the organization, the most recently trashed first |
+| `DELETE /api/v1/trash/{id}` | signed in | Delete a resource of the trash for good, with what went with it |
+| `POST /api/v1/trash/{id}/restore` | signed in | Restore a resource of the trash, with what went with it and its grants |
 | `GET /mcp` | signed in | answers 405: the MCP server opens no event stream of its own |
 | `POST /mcp` | signed in, with an organization | MCP server with the same tools |
 

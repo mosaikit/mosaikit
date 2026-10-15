@@ -48,6 +48,7 @@ import './mk-extension-frame.js';
 import './mk-activity.js';
 import './mk-access-keys.js';
 import './mk-sessions.js';
+import './mk-trash.js';
 import './mk-settings.js';
 import type { SettingsSection } from './mk-settings.js';
 import './mk-share-dialog.js';
@@ -865,6 +866,7 @@ export class MkShell extends LitElement {
               </div>
               ${this.renderOrganizationSelector()}
               <a href="/settings" @click=${this.navigate}>${t('Settings')}</a>
+              <a href="/trash" @click=${this.navigate}>${t('Trash')}</a>
               <button class="secondary" @click=${this.signOut}>${t('Sign out')}</button>
             </div>`
           : nothing
@@ -877,6 +879,7 @@ export class MkShell extends LitElement {
       { title: t('Home'), route: '/' },
       { title: t('Activity'), route: '/activity' },
       { title: t('Settings'), route: '/settings' },
+      { title: t('Trash'), route: '/trash' },
       ...this.entries.map((entry) => ({ title: entry.title, route: entry.route })),
       ...this.adminPages().map((page) => ({ title: t(page.title), route: page.path })),
     ];
@@ -977,6 +980,17 @@ export class MkShell extends LitElement {
       @mk-open-notification=${this.openNotification}
       @mk-read-all=${this.readAll}
     ></mk-activity>`;
+  }
+
+  /** The settings of the person, or their trash (MK-095). */
+  private renderPersonalPage(): unknown {
+    if (this.path !== '/trash') {
+      return this.renderSettings();
+    }
+    return html`<mk-trash
+      .client=${this.client}
+      ?administrator=${this.account?.roles.includes('organization-admin') === true}
+    ></mk-trash>`;
   }
 
   /** The kinds of notifications the person received or turned off, for the settings. */
@@ -1404,8 +1418,8 @@ export class MkShell extends LitElement {
         ${this.appsError ? html`<p class="error" role="alert">${this.appsError}</p>` : nothing}
         ${this.renderOrganizationNotice()}
         ${
-          this.path === '/settings'
-            ? this.renderSettings()
+          this.path === '/settings' || this.path === '/trash'
+            ? this.renderPersonalPage()
             : this.path === '/activity'
               ? this.renderActivity()
               : entryForPath(this.entries, this.path) || this.showsAdmin()

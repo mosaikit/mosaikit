@@ -535,6 +535,28 @@ const ITALIAN: Record<string, string> = {
   'The account cannot be suspended: {reason}': "L'account non si può sospendere: {reason}",
   '{name} is reinstated and can sign in again.': '{name} è riattivato e può accedere di nuovo.',
   'The account cannot be reinstated: {reason}': "L'account non si può riattivare: {reason}",
+  // The trash (MK-095)
+  Trash: 'Cestino',
+  'What you delete in the apps stays here for a while, with what was inside it: restore it, with its shares, or delete it for good. After the retention of the installation it is deleted for good.':
+    "Quello che elimini nelle app resta qui per un po', con quello che conteneva: ripristinalo, con le sue condivisioni, o eliminalo definitivamente. Dopo il periodo di conservazione dell'installazione viene eliminato definitivamente.",
+  'Show the trash of the whole organization': "Mostra il cestino di tutta l'organizzazione",
+  'The trash is empty.': 'Il cestino è vuoto.',
+  'The trash cannot be read: {reason}': 'Il cestino non si può leggere: {reason}',
+  Deleted: 'Eliminato',
+  'The organization': "L'organizzazione",
+  Restore: 'Ripristina',
+  'Restore {title}': 'Ripristina {title}',
+  'Delete for good': 'Elimina definitivamente',
+  'Delete {title} for good': 'Elimina definitivamente {title}',
+  'Delete {title} for good? It cannot be restored any more.':
+    'Eliminare definitivamente {title}? Non si potrà più ripristinare.',
+  '{title} restored.': '{title} ripristinato.',
+  'Not restored: {reason}': 'Non ripristinato: {reason}',
+  '{title} deleted for good.': '{title} eliminato definitivamente.',
+  'Not deleted for good: {reason}': 'Non eliminato definitivamente: {reason}',
+  'Deleted for good on {date}': 'Eliminato definitivamente il {date}',
+  '{kind}, with 1 item inside': '{kind}, con 1 elemento dentro',
+  '{kind}, with {count} items inside': '{kind}, con {count} elementi dentro',
 };
 
 const TRANSLATIONS: Record<Language, Record<string, string>> = { en: {}, it: ITALIAN };

@@ -124,6 +124,22 @@ have a **Share** button, which opens the same dialog in every app:
 Whoever opens a link sees the page of the installation with the resource, as the app shows it to
 links; an app that cannot show it there asks to sign in.
 
+## Trash
+
+What you delete in an app that uses the trash goes to **Trash**, in the menu of your account, with
+what was inside it, such as the files of a folder (MK-095). It stays there for the retention of the
+installation, 30 days unless the administrators chose otherwise: the page says when each resource is
+deleted for good. Meanwhile nobody opens it, not even through its links or shares.
+
+- **Restore** brings it back where it was, with what went with it, its shares and its links. A file
+  that went with its folder comes back with the folder; one whose folder is in the trash comes back
+  once the folder is restored.
+- **Delete for good** deletes it at once, with what went with it: it cannot be restored any more.
+
+You see what you own. The administrators of the organization also see, with **Show the trash of
+the whole organization**, what everyone deleted, and what belongs to the organization, and restore
+or delete it the same way.
+
 ## Activity
 
 **Activity**, at the top of the app bar, collects what the apps tell you: a mention, a task, a

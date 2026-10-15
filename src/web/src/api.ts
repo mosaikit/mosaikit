@@ -75,6 +75,26 @@ export interface OrganizationSummary {
   readonly emailDomains: readonly string[];
 }
 
+/** A resource in the trash, as the page Trash lists it (MK-095). */
+export interface TrashedResource {
+  /** The entry of the registry, to restore or delete it. */
+  readonly id: string;
+  readonly extension: string;
+  readonly extensionName: string;
+  readonly type: string;
+  readonly typeTitle: string;
+  readonly resourceId: string;
+  readonly title: string;
+  readonly owner: string | null;
+  readonly ownerName: string | null;
+  readonly trashedAt: string;
+  readonly trashedByName: string | null;
+  /** From when a job of the kernel deletes it for good. */
+  readonly purgeableFrom: string;
+  /** How many resources went to the trash with it. */
+  readonly contents: number;
+}
+
 /** An organization just deleted (MK-130). */
 export interface DeletedOrganization {
   readonly id: string;
@@ -1043,6 +1063,29 @@ export class KernelClient {
       `/api/v1/organizations/${encodeURIComponent(slug)}?confirmation=${encodeURIComponent(confirmation)}`,
       'DELETE',
     );
+  }
+
+  /**
+   * The trash of the person (MK-095): the resources they own that were trashed, or, for an
+   * administrator who asks, those of the whole organization; the most recently trashed first.
+   */
+  trash(wholeOrganization = false): Promise<TrashedResource[]> {
+    return this.getJson<TrashedResource[]>(
+      wholeOrganization ? '/api/v1/trash?scope=organization' : '/api/v1/trash',
+    );
+  }
+
+  /** Restores a resource of the trash with what went with it and its shares (MK-095). */
+  restoreFromTrash(id: string): Promise<{ restored: number }> {
+    return this.sendJson<{ restored: number }>(
+      `/api/v1/trash/${encodeURIComponent(id)}/restore`,
+      'POST',
+    );
+  }
+
+  /** Deletes a resource of the trash for good, with what went with it (MK-095). */
+  deleteFromTrash(id: string): Promise<void> {
+    return this.sendJson<void>(`/api/v1/trash/${encodeURIComponent(id)}`, 'DELETE');
   }
 
   /** The suspended accounts, the most recently suspended first (MK-125). */
