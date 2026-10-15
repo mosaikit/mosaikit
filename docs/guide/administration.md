@@ -194,9 +194,9 @@ next request. Their personal access keys for that organization are revoked too (
 ### Offboarding a member
 
 What a person owns in the apps must not be left without an owner when they leave (MK-071). The
-administrators of the organization, signed in to it, and the platform administrators remove a
-member; an administrator does not remove themselves. In **Permissions**, **People**, choose the
-person and **Remove from the organization**: the page first lists what they own, per app, the
+platform administrators remove members; the administrators of the organization see what a member
+owns. In **Permissions**, **People**, a platform administrator signed in to the organization chooses
+the person and **Remove from the organization**: the page first lists what they own, per app, the
 resources in the trash included, and asks for the **New owner**, another member who is not a guest.
 After the removal those resources belong to that person, with their shares and links as they were;
 each app that keeps an owner of its own follows. A member who owns nothing is removed at once.

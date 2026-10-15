@@ -163,25 +163,18 @@ public class MemberResource {
     @Transactional
     @Operation(
             summary = "Remove a person from an organization, giving what they own to another member",
-            description = "For the platform administrators, and the administrators of the organization signed in to"
-                    + " it, who do not remove themselves. A member who owns resources needs transferTo, the email"
+            description = "For the platform administrators. A member who owns resources needs transferTo, the email"
                     + " of the member who takes them over with their grants (409 without it); each extension"
                     + " is told through OwnershipTransfers (MK-071).")
     public void remove(
             @PathParam("slug") String slug,
             @PathParam("email") String email,
             @QueryParam("transferTo") String transferTo) {
+        if (!identity.hasRole(Roles.PLATFORM_ADMIN)) {
+            throw new ForbiddenOperationException("Only the platform administrators remove members.");
+        }
         Organization organization = organizations.require(slug);
-        boolean platform = identity.hasRole(Roles.PLATFORM_ADMIN);
-        if (!platform && !(identity.hasRole(Roles.ORGANIZATION_ADMIN) && actsIn(organization))) {
-            throw new ForbiddenOperationException(
-                    "Only the administrators of the organization and of the platform remove members.");
-        }
         MemberView leaving = member(slug, email);
-        if (!platform
-                && leaving.username().equals(normalize(identity.getPrincipal().getName()))) {
-            throw new ForbiddenOperationException("You cannot remove yourself from the organization.");
-        }
         Map<String, Object> detail = new LinkedHashMap<>();
         List<OwnedByExtension> owned = ownership.owned(organization.getId(), leaving.accountId());
         if (!owned.isEmpty()) {

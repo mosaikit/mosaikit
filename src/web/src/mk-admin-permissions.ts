@@ -567,13 +567,17 @@ export class MkAdminPermissions extends LitElement {
                 .permissions=${member.permissions}
                 label=${t('What they can do')}
               ></mk-effective-permissions>
-              <mk-offboard-member
-                .client=${this.client}
-                organization=${this.organization ?? ''}
-                email=${member.email}
-                .members=${this.members}
-                @mk-member-removed=${this.memberRemoved}
-              ></mk-offboard-member>
+              ${
+                this.platformAdmin
+                  ? html`<mk-offboard-member
+                      .client=${this.client}
+                      organization=${this.organization ?? ''}
+                      email=${member.email}
+                      .members=${this.members}
+                      @mk-member-removed=${this.memberRemoved}
+                    ></mk-offboard-member>`
+                  : nothing
+              }
             </section>`
           : nothing
       }

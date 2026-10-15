@@ -170,7 +170,7 @@ class OffboardingTest {
         in(cleo).get(MEMBERS + "/resources", acme, "nobody@example.org").then().statusCode(404);
 
         // A member who owns something is not removed without someone to take it over.
-        in(cleo).delete(MEMBERS, acme, ada).then().statusCode(409);
+        asAdmin().delete(MEMBERS, acme, ada).then().statusCode(409);
         assertThat(member(ada)).isTrue();
     }
 
@@ -178,7 +178,11 @@ class OffboardingTest {
 
     @Test
     void afterTheRemovalTheResourcesBelongToTheNewOwnerWithTheirSharesIntact() {
-        in(cleo).queryParam("transferTo", bea).delete(MEMBERS, acme, ada).then().statusCode(204);
+        asAdmin()
+                .queryParam("transferTo", bea)
+                .delete(MEMBERS, acme, ada)
+                .then()
+                .statusCode(204);
 
         assertThat(member(ada)).isFalse();
         assertThat(owned(bea)).extracting(group -> group.get("extension")).containsExactly(DRIVE, NOTES);
@@ -210,26 +214,36 @@ class OffboardingTest {
     }
 
     @Test
-    void theNewOwnerIsAnotherMemberAndAdministratorsDoNotRemoveThemselves() {
-        in(cleo).queryParam("transferTo", ada).delete(MEMBERS, acme, ada).then().statusCode(400);
-        in(cleo).queryParam("transferTo", "nobody@example.org")
+    void theNewOwnerIsAnotherMemberAndOnlyPlatformAdministratorsRemove() {
+        asAdmin()
+                .queryParam("transferTo", ada)
+                .delete(MEMBERS, acme, ada)
+                .then()
+                .statusCode(400);
+        asAdmin()
+                .queryParam("transferTo", "nobody@example.org")
                 .delete(MEMBERS, acme, ada)
                 .then()
                 .statusCode(400);
         in(bea).queryParam("transferTo", bea).delete(MEMBERS, acme, ada).then().statusCode(403);
-        in(cleo).delete(MEMBERS, acme, cleo).then().statusCode(403);
+        // Removing stays with the platform administrators.
+        in(cleo).queryParam("transferTo", bea).delete(MEMBERS, acme, ada).then().statusCode(403);
         assertThat(member(ada)).isTrue();
         assertThat(owned(ada)).hasSize(2);
 
         // A member who owns nothing is removed as before.
-        in(cleo).delete(MEMBERS, acme, dan).then().statusCode(204);
+        asAdmin().delete(MEMBERS, acme, dan).then().statusCode(204);
     }
 
     // --- 3. Extensions receive the transfer through an extension point --------------------------
 
     @Test
     void theExtensionReceivesTheTransferOfItsResources() {
-        in(cleo).queryParam("transferTo", bea).delete(MEMBERS, acme, ada).then().statusCode(204);
+        asAdmin()
+                .queryParam("transferTo", bea)
+                .delete(MEMBERS, acme, ada)
+                .then()
+                .statusCode(204);
 
         List<OwnershipRecorder.Transfer> received = recorder.in(acmeId);
         assertThat(received).hasSize(1);
@@ -245,7 +259,8 @@ class OffboardingTest {
     void anExtensionThatRefusesTheTransferKeepsTheMemberAndTheirResources() {
         recorder.refuseTo(beaId);
 
-        int status = in(cleo).queryParam("transferTo", bea)
+        int status = asAdmin()
+                .queryParam("transferTo", bea)
                 .delete(MEMBERS, acme, ada)
                 .statusCode();
 
