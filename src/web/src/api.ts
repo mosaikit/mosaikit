@@ -65,6 +65,28 @@ export interface AccountStatus {
   readonly reason: string | null;
 }
 
+/** An organization, for platform administrators. */
+export interface OrganizationSummary {
+  readonly id: string;
+  readonly slug: string;
+  readonly name: string;
+  readonly createdAt: string;
+  readonly identityRealm: string | null;
+  readonly emailDomains: readonly string[];
+}
+
+/** An organization just deleted (MK-130). */
+export interface DeletedOrganization {
+  readonly id: string;
+  readonly slug: string;
+  readonly name: string;
+  readonly deletedAt: string;
+  /** From when a job of the kernel removes its data. */
+  readonly removableFrom: string;
+  /** How many people lost access to it. */
+  readonly members: number;
+}
+
 /** A live session of the signed-in person, kept by the kernel (MK-125). */
 export interface AccountSession {
   readonly id: string;
@@ -1003,6 +1025,22 @@ export class KernelClient {
   async disallowOrigin(origin: string): Promise<void> {
     await this.sendJson<undefined>(
       `${CONTENT_SECURITY_POLICY}/origins?origin=${encodeURIComponent(origin)}`,
+      'DELETE',
+    );
+  }
+
+  /** Every organization, by name, for platform administrators. */
+  organizations(): Promise<OrganizationSummary[]> {
+    return this.getJson<OrganizationSummary[]>('/api/v1/organizations');
+  }
+
+  /**
+   * Deletes an organization, confirmed by its slug (MK-130): its people lose access at once, and
+   * its data are removed after the retention of the installation.
+   */
+  deleteOrganization(slug: string, confirmation: string): Promise<DeletedOrganization> {
+    return this.sendJson<DeletedOrganization>(
+      `/api/v1/organizations/${encodeURIComponent(slug)}?confirmation=${encodeURIComponent(confirmation)}`,
       'DELETE',
     );
   }

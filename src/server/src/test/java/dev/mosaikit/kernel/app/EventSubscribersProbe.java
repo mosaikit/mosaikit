@@ -120,6 +120,7 @@ public final class EventSubscribersProbe {
         public Set<String> types() {
             return Set.of(
                     PlatformEvents.ORGANIZATION_CREATED,
+                    PlatformEvents.ORGANIZATION_DELETED,
                     PlatformEvents.EXTENSION_DISABLED,
                     PlatformEvents.EXTENSION_ENABLED,
                     PlatformEvents.FILE_STORED,
@@ -179,7 +180,11 @@ public final class EventSubscribersProbe {
 
         @Override
         public Set<String> types() {
-            return Set.of(PlatformEvents.EXTENSION_DISABLED, PlatformEvents.EXTENSION_ENABLED, NOTE_CREATED);
+            return Set.of(
+                    PlatformEvents.ORGANIZATION_DELETED,
+                    PlatformEvents.EXTENSION_DISABLED,
+                    PlatformEvents.EXTENSION_ENABLED,
+                    NOTE_CREATED);
         }
 
         @Override

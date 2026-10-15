@@ -23,8 +23,10 @@ public interface PlatformEvents {
     String ORGANIZATION_CREATED = "organization.created";
 
     /**
-     * An organization was deleted; payload {@code slug}. Reserved: the kernel does not delete
-     * organizations yet, and raises it when it does.
+     * An organization was deleted (MK-130); payload {@code slug}, {@code name} and
+     * {@code removableFrom}, the time from which the kernel removes its data. Release what is kept
+     * outside the database and the files of the kernel for the organization (workspaces of other
+     * servers, scheduled work); its rows and its files stay until then, and the kernel removes them.
      */
     String ORGANIZATION_DELETED = "organization.deleted";
 

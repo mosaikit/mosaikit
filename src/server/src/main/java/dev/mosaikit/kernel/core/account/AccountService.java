@@ -396,6 +396,24 @@ public class AccountService {
         keys.revokeIn(account.getId(), organization.getId()).forEach(key -> keyAudit.revoked(actor, key, "removed"));
     }
 
+    /**
+     * Ends the access of every member to a deleted organization (MK-130), as a removal from it does
+     * (MK-125): their sessions that act on it, or on none, end at once and their access keys in it are
+     * revoked. Their memberships stay with the data of the organization until it is removed.
+     *
+     * @param actor the username of the administrator, for the audit of the revoked keys
+     * @return how many people lost access
+     */
+    public int endAccessTo(UUID organizationId, String actor) {
+        List<OrganizationMember> found = members.findByOrganizationId(organizationId);
+        for (OrganizationMember member : found) {
+            sessions.endIn(member.getAccountId(), organizationId);
+            keys.revokeIn(member.getAccountId(), organizationId)
+                    .forEach(key -> keyAudit.revoked(actor, key, "organization deleted"));
+        }
+        return found.size();
+    }
+
     private static ResourceNotFoundException noMember(String slug, String email) {
         return new ResourceNotFoundException("No member '" + email + "' in organization '" + slug + "'.");
     }

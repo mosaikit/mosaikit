@@ -1326,7 +1326,7 @@ The kernel raises these events (constants of `PlatformEvents`), with their paylo
 | Type | When | Payload |
 |---|---|---|
 | `organization.created` | an organization was created | `slug`, `name` |
-| `organization.deleted` | an organization was deleted; reserved: the kernel does not delete organizations yet | `slug` |
+| `organization.deleted` | a platform administrator deleted an organization (MK-130): see [An organization deleted](#an-organization-deleted) | `slug`, `name`, `removableFrom` |
 | `extension.enabled` | an organization turned an extension on: one of its apps, after all were off (MK-030) | `extension` |
 | `extension.disabled` | an organization turned an extension off: all its apps | `extension` |
 | `extension.activated` | any extension became active in the organization: installed or able to run again, updated, or turned on (MK-133) | `extension`, `version`, `active` (`true`), `reason` (`installed`, `updated`, `enabled`), `previousVersion` after an update |
@@ -1353,6 +1353,42 @@ say what changed, not who holds what now. Some changes reach people without an e
 removed from the organization, a change of their roles in it, and the apps of an extension turned
 off or on (which raise `extension.disabled` and `extension.enabled`); deleting a team raises
 `team.member.removed` for its people, and its grants go with it.
+
+### An organization deleted
+
+When a platform administrator deletes an organization (MK-130), the kernel tells the extensions at
+once and removes the data later. The two moments are distinct, and an extension acts only on the
+first:
+
+- **At the deletion**, the organization appears nowhere and its people lose access; the kernel raises
+  `organization.deleted`, delivered as any event in the organization, which still exists for the
+  handler: `CurrentOrganization` is that organization and row-level security shows its data. Release
+  what you keep **outside** the database and the files of the kernel: a workspace or a layer on a
+  map server, an account on an external service, scheduled or recurring work, a cache, a
+  subscription. Stop starting work for the organization.
+- **After the retention** of the installation (`mosaikit.organizations.removal-retention`, 30 days
+  unless set; `removableFrom` in the payload), a job of the kernel removes the data: the rows of the
+  organization in every table of an extension with an `organization_id` column (the one under
+  row-level security, see [Data of organizations](#data-of-organizations)), its resources, grants
+  and the records of its files, whose content then leaves the store at the clean-up of the files.
+  The extension is not called again.
+
+So release, do not destroy: do not delete your rows or the files of the organization on the event.
+Until `removableFrom` the deletion can be undone from the database, and what you deleted would be
+lost; the kernel deletes them anyway, in one transaction, when the retention is over. Keep every row
+of organization data in a table with `organization_id`: a table without it is not removed. A table
+that references another of your tables should have that column too, or reference it `on delete
+cascade`, or the removal of the organization fails and is retried at each run.
+
+```java
+@Override public Set<String> types() { return Set.of(PlatformEvents.ORGANIZATION_DELETED); }
+
+@Override public void handle(PlatformEvent event) {
+    // Idempotent: a workspace already gone is not an error.
+    mapServer.deleteWorkspaceIfPresent(workspaceOf(event.organization()));
+    schedules.cancelAll();                 // the jobs of the extension for this organization
+}
+```
 
 An extension raises its own events with `PlatformEvents`, naming itself as with
 `Notifications.send`; the type becomes `<extension>:<name>`, such as `dev.example.notes:note.created`,

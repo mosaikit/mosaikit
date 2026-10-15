@@ -3,25 +3,32 @@
 package dev.mosaikit.kernel.core.organization;
 
 import dev.mosaikit.kernel.api.events.PlatformEvents;
+import dev.mosaikit.kernel.core.config.KernelConfig;
 import dev.mosaikit.kernel.core.data.KernelWrites;
 import dev.mosaikit.kernel.core.error.ConflictException;
+import dev.mosaikit.kernel.core.error.InvalidInputException;
 import dev.mosaikit.kernel.core.error.ResourceNotFoundException;
 import dev.mosaikit.kernel.core.events.PlatformEventLog;
 import dev.mosaikit.kernel.core.identity.RealmProvisioning;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
+import jakarta.persistence.EntityManager;
 import jakarta.transaction.Transactional;
+import java.sql.Timestamp;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
-/** Creates and looks up organizations. */
+/** Creates, looks up and deletes organizations. */
 @KernelWrites
 @ApplicationScoped
 @Transactional
@@ -32,6 +39,8 @@ public class OrganizationService {
     private final Event<IdentityChanged> identityChanged;
     private final RealmProvisioning realms;
     private final PlatformEventLog events;
+    private final EntityManager entityManager;
+    private final Duration removalRetention;
     private final Clock clock;
 
     public OrganizationService(
@@ -40,12 +49,17 @@ public class OrganizationService {
             Event<IdentityChanged> identityChanged,
             RealmProvisioning realms,
             PlatformEventLog events,
+            EntityManager entityManager,
+            KernelConfig config,
             Clock clock) {
         this.organizations = organizations;
         this.emailDomains = emailDomains;
         this.identityChanged = identityChanged;
         this.realms = realms;
         this.events = events;
+        this.entityManager = entityManager;
+        this.removalRetention =
+                OrganizationRemovals.retention(config.organizations().removalRetention());
         this.clock = clock;
     }
 
@@ -65,6 +79,11 @@ public class OrganizationService {
         String slug = request.slug().toLowerCase(Locale.ROOT);
         if (organizations.countBySlug(slug) > 0) {
             throw new ConflictException("An organization with slug '" + slug + "' already exists.");
+        }
+        if (deletedWithSlug(slug)) {
+            // Its data are kept until it is removed (MK-130): the slug stays taken until then.
+            throw new ConflictException("The slug '" + slug + "' belongs to a deleted organization, until it is"
+                    + " removed after the retention of the installation.");
         }
         var organization =
                 new Organization(slug, request.name().trim(), request.selfRegistration(), Instant.now(clock));
@@ -166,6 +185,67 @@ public class OrganizationService {
         return emailDomains.findByOrganizationId(organization.getId()).stream()
                 .map(EmailDomain::getDomain)
                 .toList();
+    }
+
+    /**
+     * Deletes an organization (MK-130): it appears nowhere from now on and opens nothing, its email
+     * domains are released, and the extensions subscribed to {@code organization.deleted} are told,
+     * once this commits. Its data, and those of its extensions, stay until {@code removableFrom},
+     * when {@link OrganizationRemovals} removes them. The caller ends the sessions of its people.
+     *
+     * @param confirmation the slug of the organization, written again by the administrator
+     * @param actor who deletes it
+     * @throws InvalidInputException when the confirmation does not name the organization
+     */
+    public Deleted delete(String slug, String confirmation, String actor) {
+        Organization organization = require(slug);
+        if (confirmation == null || !organization.getSlug().equals(confirmation.strip())) {
+            throw new InvalidInputException(List.of("confirmation: write the slug of the organization, '"
+                    + organization.getSlug() + "', to delete it"));
+        }
+        Instant now = Instant.now(clock);
+        Instant removableFrom = now.plus(removalRetention);
+        int marked = entityManager
+                .createNativeQuery("update {h-schema}organization set deleted_at = :now, deleted_by = :actor,"
+                        + " removable_from = :removableFrom where id = :id and deleted_at is null")
+                .setParameter("now", Timestamp.from(now))
+                .setParameter("actor", actor)
+                .setParameter("removableFrom", Timestamp.from(removableFrom))
+                .setParameter("id", organization.getId())
+                .executeUpdate();
+        if (marked == 0) {
+            throw new ResourceNotFoundException("No organization with slug '" + slug + "'.");
+        }
+        entityManager.detach(organization);
+        List<String> domains = domainsOf(organization);
+        emailDomains.deleteByOrganizationId(organization.getId());
+        identityChanged.fire(new IdentityChanged(organization.getId()));
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("slug", organization.getSlug());
+        payload.put("name", organization.getName());
+        payload.put("removableFrom", removableFrom.toString());
+        events.raise(organization.getId(), PlatformEvents.ORGANIZATION_DELETED, payload);
+        return new Deleted(
+                organization.getId(), organization.getSlug(), organization.getName(), now, removableFrom, domains);
+    }
+
+    /**
+     * A deleted organization.
+     *
+     * @param deletedAt when it was deleted
+     * @param removableFrom from when its data may be removed
+     * @param emailDomains the email domains it had, released
+     */
+    public record Deleted(
+            UUID id, String slug, String name, Instant deletedAt, Instant removableFrom, List<String> emailDomains) {}
+
+    private boolean deletedWithSlug(String slug) {
+        Number found = (Number) entityManager
+                .createNativeQuery("select count(*) from {h-schema}organization where slug = :slug"
+                        + " and deleted_at is not null")
+                .setParameter("slug", slug)
+                .getSingleResult();
+        return found.longValue() > 0;
     }
 
     /** Every organization entity, ordered by name. */

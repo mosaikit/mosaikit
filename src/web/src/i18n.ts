@@ -500,6 +500,24 @@ const ITALIAN: Record<string, string> = {
   Suspend: 'Sospendi',
   Suspension: 'Sospensione',
   'Reinstate {name}': 'Riattiva {name}',
+  // Organizations, and their deletion (MK-130)
+  Organizations: 'Organizzazioni',
+  'The organizations of the installation. Deleting one ends the access of its people at once; its data stay for the retention of the installation, then are removed.':
+    "Le organizzazioni dell'installazione. Eliminarne una toglie subito l'accesso alle sue persone; i suoi dati restano per il periodo di conservazione dell'installazione, poi vengono rimossi.",
+  'No organization yet.': 'Ancora nessuna organizzazione.',
+  Slug: 'Slug',
+  Created: 'Creata',
+  'Its people lose access at once and it appears nowhere any more; its extensions are told. Its data stay for the retention of the installation, then are removed for good.':
+    "Le sue persone perdono subito l'accesso e non compare più da nessuna parte; le sue estensioni vengono avvisate. I suoi dati restano per il periodo di conservazione dell'installazione, poi vengono rimossi definitivamente.",
+  'Write {slug} to confirm': 'Scrivi {slug} per confermare',
+  'Delete the organization': "Elimina l'organizzazione",
+  'The organizations cannot be read: {reason}':
+    'Le organizzazioni non si possono leggere: {reason}',
+  'Write {slug} to confirm: nothing was deleted.':
+    'Scrivi {slug} per confermare: non è stato eliminato nulla.',
+  '{name} deleted: {members} people lost access. Its data are removed from {date}.':
+    "{name} eliminata: {members} persone hanno perso l'accesso. I suoi dati vengono rimossi dal {date}.",
+  'Not deleted: {reason}': 'Non eliminata: {reason}',
   'Suspend {name}? Their sessions end at once and they cannot sign in until reinstated.':
     'Sospendere {name}? Le sue sessioni terminano subito e non può accedere finché non viene riattivato.',
   'Active: the person signs in.': 'Attivo: la persona può accedere.',
