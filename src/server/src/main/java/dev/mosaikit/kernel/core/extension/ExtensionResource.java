@@ -75,11 +75,12 @@ public class ExtensionResource {
     @Authenticated
     @Operation(
             summary = "Get the revision of the installed extensions, when the extensions directory is watched",
-            description = "404 when it is not watched (mosaikit.extensions.watch). The shell reloads its page when"
-                    + " the revision changes.")
+            description = "204 without a body when it is not watched (mosaikit.extensions.watch), so that the"
+                    + " shell asking at each page load fails nothing. The shell reloads its page when the revision"
+                    + " changes.")
     public Response revision() {
         if (!watched) {
-            return Response.status(Response.Status.NOT_FOUND).build();
+            return Response.noContent().build();
         }
         return Response.ok(Map.of("revision", registry.revision())).build();
     }

@@ -64,7 +64,7 @@ class ExtensionResourceTest {
 
         anonymous().get("/api/v1/shell/extensions").then().statusCode(401);
         // Not watched outside development mode: the shell does not follow a revision.
-        asAdmin().get("/api/v1/shell/extensions/revision").then().statusCode(404);
+        asAdmin().get("/api/v1/shell/extensions/revision").then().statusCode(204);
     }
 
     @Test

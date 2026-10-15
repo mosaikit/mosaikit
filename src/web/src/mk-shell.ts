@@ -1298,6 +1298,11 @@ export class MkShell extends LitElement {
   }
 
   private async loadAssistant(): Promise<void> {
+    // The kernel refuses the assistant to guests: asking would only fail (#132).
+    if (this.isGuest()) {
+      this.assistantModel = undefined;
+      return;
+    }
     try {
       const assistant = await this.client.assistant();
       this.assistantModel = assistant.enabled ? (assistant.model ?? '') : undefined;
@@ -1307,7 +1312,7 @@ export class MkShell extends LitElement {
   }
 
   private async loadDrafts(): Promise<void> {
-    if (!this.account?.organizationId) {
+    if (!this.account?.organizationId || this.isGuest()) {
       this.drafts = [];
       return;
     }
@@ -1732,6 +1737,11 @@ export class MkShell extends LitElement {
             : 'Ask an administrator to add you to one.'
         }
       </p>`;
+  }
+
+  /** A guest of the organization of the session, to whom the kernel refuses the assistant and its drafts. */
+  private isGuest(): boolean {
+    return this.account?.roles.includes('organization-guest') === true;
   }
 
   private isPlatformAdmin(): boolean {

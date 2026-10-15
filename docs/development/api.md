@@ -214,7 +214,7 @@ The rows are sorted by path, one row for a path and the methods that share a des
 | `POST /api/v1/sharing/resources/{extension}/{type}/{id}/links` | who may share the resource | creates a link with a level, an expiry within `mosaikit.sharing.link-max-validity` and an optional password; the token is returned once |
 | `GET /api/v1/shell/apps` | signed in | the apps the person sees in the app bar, in order, with the pinned ones (MK-030); a restricted app, and any app for a guest, only when the person holds its permission (MK-056) |
 | `GET /api/v1/shell/extensions` | signed in | frontends of the active extensions, for the shell; not those turned off for the organization of the request, nor what they contribute to other extensions (MK-030, MK-035) |
-| `GET /api/v1/shell/extensions/revision` | signed in | changes when the watched extensions directory changes (`mosaikit.extensions.watch`); 404 when it is not watched |
+| `GET /api/v1/shell/extensions/revision` | signed in | changes when the watched extensions directory changes (`mosaikit.extensions.watch`); 204 without a body when it is not watched |
 | `GET /api/v1/shell/permissions` | signed in | the permissions of the person in the organization of the request, as `<extension>:<permission>` (MK-056); empty without an organization; a hint for the interface, the backends check |
 | `GET /api/v1/system/info` | anyone | product, version, active extensions, theme |
 | `GET /api/v1/system/themes` | anyone | the themes of the active theme extensions (MK-028): id, title, font, radius, light and dark colors |
