@@ -162,6 +162,13 @@ class ResourceOwnerTest {
         }
 
         @Override
+        public List<RegisteredResource> ownedBy(UUID organizationId, UUID ownerId) {
+            return rows.stream()
+                    .filter(row -> organizationId.equals(row.getOrganizationId()) && ownerId.equals(row.getOwnerId()))
+                    .toList();
+        }
+
+        @Override
         public List<RegisteredResource> findByIds(UUID organizationId, List<UUID> ids) {
             return rows.stream().filter(row -> ids.contains(row.getId())).toList();
         }

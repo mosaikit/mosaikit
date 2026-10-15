@@ -4,12 +4,16 @@ package dev.mosaikit.kernel.core.account;
 
 import dev.mosaikit.kernel.core.audit.AuditEvent;
 import dev.mosaikit.kernel.core.audit.AuditLog;
+import dev.mosaikit.kernel.core.error.ConflictException;
 import dev.mosaikit.kernel.core.error.ForbiddenOperationException;
 import dev.mosaikit.kernel.core.error.InvalidInputException;
+import dev.mosaikit.kernel.core.error.ResourceNotFoundException;
 import dev.mosaikit.kernel.core.identity.RequestOrganization;
 import dev.mosaikit.kernel.core.organization.Organization;
 import dev.mosaikit.kernel.core.organization.OrganizationService;
 import dev.mosaikit.kernel.core.permissions.PermissionAdministration;
+import dev.mosaikit.kernel.core.resources.OwnershipTransfer;
+import dev.mosaikit.kernel.core.resources.OwnershipTransfer.OwnedByExtension;
 import dev.mosaikit.kernel.core.security.Roles;
 import dev.mosaikit.kernel.core.teams.TeamMember;
 import dev.mosaikit.kernel.core.teams.TeamService;
@@ -26,6 +30,7 @@ import jakarta.ws.rs.PUT;
 import jakarta.ws.rs.Path;
 import jakarta.ws.rs.PathParam;
 import jakarta.ws.rs.Produces;
+import jakarta.ws.rs.QueryParam;
 import jakarta.ws.rs.core.MediaType;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
@@ -56,6 +61,7 @@ public class MemberResource {
     private final TeamService teams;
     private final AuditLog audit;
     private final SecurityIdentity identity;
+    private final OwnershipTransfer ownership;
 
     public MemberResource(
             AccountService service,
@@ -63,13 +69,15 @@ public class MemberResource {
             PermissionAdministration permissions,
             TeamService teams,
             AuditLog audit,
-            SecurityIdentity identity) {
+            SecurityIdentity identity,
+            OwnershipTransfer ownership) {
         this.service = service;
         this.organizations = organizations;
         this.permissions = permissions;
         this.teams = teams;
         this.audit = audit;
         this.identity = identity;
+        this.ownership = ownership;
     }
 
     @GET
@@ -140,15 +148,95 @@ public class MemberResource {
         return member;
     }
 
+    @GET
+    @Path("/{email}/resources")
+    @Operation(
+            summary = "List the resources a member owns, per extension, before removing them (MK-071)",
+            description = "For the administrators of the organization and of the platform.")
+    public List<OwnedByExtension> owned(@PathParam("slug") String slug, @PathParam("email") String email) {
+        Organization organization = managed(slug);
+        return ownership.owned(organization.getId(), member(slug, email).accountId());
+    }
+
     @DELETE
     @Path("/{email}")
-    @Operation(summary = "Remove a person from an organization (platform administrators)")
-    public void remove(@PathParam("slug") String slug, @PathParam("email") String email) {
-        if (!identity.hasRole(Roles.PLATFORM_ADMIN)) {
-            throw new ForbiddenOperationException("Only the platform administrators remove members.");
+    @Transactional
+    @Operation(
+            summary = "Remove a person from an organization, giving what they own to another member",
+            description = "For the platform administrators, and the administrators of the organization signed in to"
+                    + " it, who do not remove themselves. A member who owns resources needs transferTo, the email"
+                    + " of the member who takes them over with their grants (409 without it); each extension"
+                    + " is told through OwnershipTransfers (MK-071).")
+    public void remove(
+            @PathParam("slug") String slug,
+            @PathParam("email") String email,
+            @QueryParam("transferTo") String transferTo) {
+        Organization organization = organizations.require(slug);
+        boolean platform = identity.hasRole(Roles.PLATFORM_ADMIN);
+        if (!platform && !(identity.hasRole(Roles.ORGANIZATION_ADMIN) && actsIn(organization))) {
+            throw new ForbiddenOperationException(
+                    "Only the administrators of the organization and of the platform remove members.");
+        }
+        MemberView leaving = member(slug, email);
+        if (!platform
+                && leaving.username().equals(normalize(identity.getPrincipal().getName()))) {
+            throw new ForbiddenOperationException("You cannot remove yourself from the organization.");
+        }
+        Map<String, Object> detail = new LinkedHashMap<>();
+        List<OwnedByExtension> owned = ownership.owned(organization.getId(), leaving.accountId());
+        if (!owned.isEmpty()) {
+            if (transferTo == null || transferTo.isBlank()) {
+                int count = owned.stream()
+                        .mapToInt(found -> found.resources().size())
+                        .sum();
+                throw new ConflictException(leaving.username() + " owns " + count
+                        + " resources: name the member who takes them over with transferTo.");
+            }
+            MemberView heir = service.members(slug).stream()
+                    .filter(found -> found.username().equals(normalize(transferTo)))
+                    .findFirst()
+                    .orElseThrow(() ->
+                            new InvalidInputException(List.of("transferTo must be a member of the organization")));
+            if (heir.accountId().equals(leaving.accountId())) {
+                throw new InvalidInputException(List.of("transferTo must be another member"));
+            }
+            if (heir.suspended()
+                    || (heir.roles().contains(Roles.ORGANIZATION_GUEST)
+                            && !heir.roles().contains(Roles.ORGANIZATION_USER)
+                            && !heir.roles().contains(Roles.ORGANIZATION_ADMIN))) {
+                throw new InvalidInputException(
+                        List.of("transferTo must be a member who is not a guest and not suspended"));
+            }
+            Map<String, List<dev.mosaikit.kernel.api.resource.ResourceRef>> moved =
+                    ownership.transfer(organization.getId(), leaving.accountId(), heir.accountId());
+            Map<String, Integer> counts = new LinkedHashMap<>();
+            moved.forEach((extension, refs) -> counts.put(extension, refs.size()));
+            detail.put("transferredTo", heir.username());
+            detail.put("resources", counts);
+            audit.append(
+                    identity.getPrincipal().getName(),
+                    Optional.of(organization.getId()),
+                    "organization.member.resources.transferred",
+                    slug + "/" + leaving.username(),
+                    AuditEvent.Outcome.SUCCEEDED,
+                    detail);
         }
         service.removeMember(slug, email, identity.getPrincipal().getName());
-        audit("organization.member.removed", slug, email, Map.of());
+        audit("organization.member.removed", slug, email, detail);
+    }
+
+    /** A member of the organization, by email address. */
+    private MemberView member(String slug, String email) {
+        String username = normalize(email);
+        return service.members(slug).stream()
+                .filter(found -> found.username().equals(username))
+                .findFirst()
+                .orElseThrow(() ->
+                        new ResourceNotFoundException("No member '" + email + "' in organization '" + slug + "'."));
+    }
+
+    private static String normalize(String email) {
+        return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
     }
 
     /**
