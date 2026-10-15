@@ -3,6 +3,7 @@
 import { applyTheme, isThemeName, registerTheme, themes as uiThemes } from '@mosaikit/ui';
 import {
   contributionsTo,
+  NO_LIVE,
   PresenceStore,
   stringAttribute,
   textAttribute,
@@ -1616,7 +1617,12 @@ export class MkShell extends LitElement {
     // Which extensions are active in the organization, for the frontends of extensions (MK-133).
     this.stopPresence?.();
     this.stopPresence = (
-      await followPresence(this.live, () => this.client.activeExtensions(), presence)
+      await followPresence(
+        // The topic belongs to an organization: without one, the list of the installation as read.
+        account.organization ? this.live : NO_LIVE,
+        () => this.client.activeExtensions(),
+        presence,
+      )
     ).stop;
     this.loadResults = await loader.loadAll(extensions, account);
     this.extensions = extensions;
