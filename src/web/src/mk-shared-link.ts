@@ -8,8 +8,11 @@ import {
   defineSharedView,
   linkRequest,
   openLink,
+  openPublic,
+  publicRequest,
   type LinkAccess,
   type LinkOutcome,
+  type ResourceRef,
 } from './sharing.js';
 
 /** A placed element of an extension that shows a resource opened with a link. */
@@ -24,6 +27,10 @@ interface SharedViewElement extends HTMLElement {
  * link with the kernel, asks for its password when it has one, and places the element that the
  * extension contributes to `shared.view` for the type, which calls the API of the extension with the
  * link. A link that expired or was removed answers that it does not exist.
+ *
+ * Embedded in the page of another site (MK-100), it shows the element alone, for a link of the
+ * organization of the address or for a resource that the organization shares with the public
+ * (`publicResource`), which the element reads as the public of the organization.
  */
 @customElement('mk-shared-link')
 export class MkSharedLink extends LitElement {
@@ -34,6 +41,10 @@ export class MkSharedLink extends LitElement {
       margin: 0 auto;
       padding: 24px 16px;
       box-sizing: border-box;
+    }
+    :host([embedded]) {
+      max-width: none;
+      padding: 0;
     }
     h1 {
       margin: 0 0 4px;
@@ -83,6 +94,14 @@ export class MkSharedLink extends LitElement {
   `;
 
   @property() token = '';
+  /** The organization of an embedded view: a link of another one is not found (MK-100). */
+  @property() organization = '';
+  /** A resource the organization shares with the public, in place of a link (MK-100). */
+  @property({ attribute: false }) publicResource: ResourceRef | undefined;
+  /** Without the title and the notes of the page, inside the frame of another site (MK-100). */
+  @property({ type: Boolean, reflect: true }) embedded = false;
+  /** The name of the installation, to say where to sign in. */
+  @property() product = '';
 
   @state() private outcome: LinkOutcome | undefined;
   @state() private password = '';
@@ -97,10 +116,17 @@ export class MkSharedLink extends LitElement {
     if (changed.has('token') && this.token) {
       void this.open();
     }
+    if (changed.has('publicResource') && this.publicResource && this.organization) {
+      void this.open();
+    }
   }
 
   private async open(password?: string): Promise<void> {
-    this.outcome = await openLink((path, init) => this.fetchImpl(path, init), this.token, password);
+    const call = (path: string, init?: RequestInit): Promise<Response> =>
+      this.fetchImpl(path, init);
+    this.outcome = this.publicResource
+      ? await openPublic(call, this.organization, this.publicResource)
+      : await openLink(call, this.token, password, this.organization || undefined);
     if (this.outcome.kind === 'opened') {
       await this.updateComplete;
       await this.place(this.outcome.access, password);
@@ -110,7 +136,9 @@ export class MkSharedLink extends LitElement {
   /** Places the element of the extension that shows the resource, with the link as its credential. */
   private async place(access: LinkAccess, password: string | undefined): Promise<void> {
     const view = access.view;
-    const request = linkRequest(this.token, password, this.fetchImpl);
+    const request = this.publicResource
+      ? publicRequest(this.organization, this.fetchImpl)
+      : linkRequest(this.token, password, this.fetchImpl);
     if (!view || !(await defineSharedView(view, request).catch(() => false))) {
       this.noView = true;
       return;
@@ -129,6 +157,14 @@ export class MkSharedLink extends LitElement {
     }
     switch (outcome.kind) {
       case 'not-found':
+        if (this.publicResource) {
+          return html`<p role="alert">
+            ${t('This view is not shared with the public.')}
+            <a href="/" target="_blank" rel="noopener"
+              >${t('Sign in to {product} to open it', { product: this.product || 'Mosaikit' })}</a
+            >
+          </p>`;
+        }
         return html`<h1>${t('Link not found')}</h1>
           <p role="alert">
             ${t('This link does not exist: it may have expired or been removed. Ask who gave it to you for a new one.')}
@@ -165,9 +201,17 @@ export class MkSharedLink extends LitElement {
             <button type="submit">${t('Open')}</button>
           </form>`;
       case 'opened':
+        if (this.embedded) {
+          return html`${
+              this.noView
+                ? html`<p>${t('Its app cannot show it here. Sign in to open it.')}</p>`
+                : nothing
+            }
+            <div id="view" role="region" aria-label=${outcome.access.title}></div>`;
+        }
         return html`<h1>${outcome.access.title}</h1>
           <p class="muted">
-            ${t('Shared with you through a link, until {date}.', { date: day(outcome.access.expires) })}
+            ${t('Shared with you through a link, until {date}.', { date: day(outcome.access.expires ?? '') })}
           </p>
           ${
             this.noView

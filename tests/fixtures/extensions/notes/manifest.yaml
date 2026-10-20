@@ -47,7 +47,7 @@ resources:
     levels:
       - { name: view, title: View, i18n: { it: { title: Lettura } } }
       - { name: edit, title: Edit, edits: true, i18n: { it: { title: Modifica } } }
-    subjects: [person, group, organization, link]
+    subjects: [person, group, organization, link, public]
     i18n:
       it: { title: Promemoria }
 database:

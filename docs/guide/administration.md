@@ -605,6 +605,65 @@ retention of their organization, oldest first, and records it in the same chain
 (`audit.entries.deleted`, channel `JOB`). The chain stays verifiable: the kernel keeps the hash of the
 last deleted entry, and the verification starts from there (`firstIndex`).
 
+## Embedded views
+
+An organization can show the views of its apps in the pages of its own websites, in an iframe
+(MK-100). Its administrators list the sites that may do so in **Embedded views**, in the
+administration menu, or with `/api/v1/organizations/<slug>/embed-sites`: a site is an origin
+`https://host[:port]` (or `http://` for a test site), such as `https://www.example.org`, or
+`https://*.example.org` for its sub-domains. Each site added or removed is in the audit log of the
+organization (`organization.embed-site.added`, `organization.embed-site.removed`); every kernel of
+the installation applies a change within 30 seconds, the one that received it at once. Platform
+administrators may manage the list of any organization.
+
+A page of a listed site embeds one of these addresses of the installation, in the embed mode of the
+shell, which shows the view alone, without the app bar and the top bar:
+
+| Address | What it shows | Who sees it |
+|---|---|---|
+| `/embed/<slug>/public/<extension>/<type>/<id>` | a resource that the organization shares with the public, as its app shows it to links | anyone, without signing in; the level of the public, also through a folder above it (MK-136) |
+| `/embed/<slug>/shared/<secret>` | a resource opened with a link of the organization | anyone with the link, until it expires or is revoked; a link of another organization is not found |
+| `/embed/<slug>/app/<name>/...` | the view of an app with its state in the address (MK-099), such as a map at a place | a person of the organization who is signed in, see below |
+
+A resource that is not shared with the public, in the trash (MK-095), or of an organization that
+was deleted answers that the view is not shared, with a link that opens the installation in a tab of
+its own, where the person signs in. When the organization turns the apps of an extension off, its
+embedded views show nothing.
+
+```html
+<iframe title="Opening hours of the libraries" width="800" height="600"
+  src="https://mosaikit.example.org/embed/acme/public/org.example.maps/map/libraries"></iframe>
+```
+
+### Security of embedded views
+
+- **Framing is refused by default.** Every answer of the installation carries `X-Frame-Options: DENY`
+  and, in production, `frame-ancestors 'none'`: the console, its sign-in page and the links at
+  `/shared/<secret>` cannot be framed by any site, listed or not, so no site can lay its own page
+  over them to make people click there (clickjacking). Only the addresses `/embed/<slug>/...` carry
+  `frame-ancestors 'self'` followed by the sites of the organization `<slug>`, without
+  `X-Frame-Options`; the other directives of the policy stay as for the console. The browser refuses
+  the frame on every other site. An unknown organization gets `'self'` only.
+- **No session leaks into the frame of another site.** The cookies of the session are
+  `SameSite=Strict`: a browser does not send them, nor accept them, in a frame of a page of another
+  site. In such a frame, the views of resources work without an account, through the public share or
+  the link, and the view of an app says that the person signs in and opens the installation in a tab
+  of its own; the frame never shows a sign-in form, where the page around it could watch what is
+  typed. A site of the same site as the installation (for example `www.example.org` around
+  `mosaikit.example.org`) gets the session of a person who is signed in: list it only if the
+  organization trusts it as much as the installation.
+- **A listed site can still frame what it embeds.** It can place the view under its own content or
+  make it transparent. Embedded views of the public and of links only show; list only the sites of
+  the organization, and do not embed views of apps that change data in pages that the organization
+  does not control.
+- **What the public reaches.** A request without an account that names an organization in the
+  header `X-Mosaikit-Public` reaches the API of an extension only if the organization shares a
+  resource of that extension with the public, and then reads only the resources that the public
+  reaches, through the routes that the extension opens to links (`@PermitAll` with `Sharing.require`).
+  Revoking the public share, or moving the resource to the trash, takes effect at the next request.
+- **The service worker** of the shell never keeps nor serves the embed mode, so the page it keeps to
+  open the console offline is always one that no site may frame.
+
 ## External origins
 
 The browser loads and contacts only the installation, so the shell and the frontends of extensions

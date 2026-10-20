@@ -39,6 +39,11 @@ self.addEventListener('fetch', (event) => {
   ) {
     return;
   }
+  // The embed mode (MK-100) is never kept nor served from the cache: its answer lets other sites
+  // frame it, and the page kept for the shell must stay one that no site may frame.
+  if (url.pathname.startsWith('/embed/')) {
+    return;
+  }
   if (request.mode === 'navigate') {
     // Every route of the shell is the same page: the network, or the last one kept.
     event.respondWith(
