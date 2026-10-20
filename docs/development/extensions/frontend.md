@@ -114,6 +114,17 @@ square: it is shown at 22 to 28 pixels. Choose colors with enough
 contrast (WCAG 2.1 AA: 4.5:1 for text): the high contrast appearance stays available to everyone.
 [`sample-theme`](https://github.com/mosaikit/mosaikit-ext-samples/tree/main/theme) is a complete example.
 
+Over the theme of the installation, each organization may have its own branding (MK-074), set by
+its administrators on the **Branding** page: a display name, logos, an icon, a favicon, an accent
+color and any of the colors above. The shell shows it on the sign-in page of the organization
+(`/?organization=<slug>`) and to its members after sign-in; a theme that the person chose in the
+settings wins over the colors of the organization, which win over the theme of the installation.
+The colors of an organization reach extensions as the same `--mk-*` tokens, and
+`shell.theme.changed` names their theme `organization` (or `organization-preview` while an
+administrator edits them, before saving): read the tokens, never the name of the theme. In
+`@mosaikit/ui`, `registerTheme(id, input, base)` fills a theme from `base` instead of the default
+theme, and `themeDefinition(name)` gives the complete colors of a theme.
+
 ## Components and themes
 
 The shell defines the Fluent UI web components for the page
@@ -134,7 +145,8 @@ Style everything else with the tokens:
 | `--mk-radius`, `--mk-font`, `--mk-font-mono` | shapes and fonts |
 
 The tokens change with the theme (`mosaikit.ui.theme`: `mosaikit`, or `pa` in the style of
-Bootstrap Italia) and with the light or dark preference of the system; never hard-code colors.
+Bootstrap Italia), with the branding of the organization and with the light or dark preference of
+the system; never hard-code colors.
 
 ## Frontends written with a framework
 

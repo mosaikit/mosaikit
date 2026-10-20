@@ -6,6 +6,7 @@ import {
   brandVariants,
   isThemeName,
   registerTheme,
+  themeDefinition,
   themeTitle,
   themeTokens,
   themes,
@@ -110,5 +111,21 @@ describe('themes of extensions and high contrast (MK-027, MK-028)', () => {
     expect(
       contrast(tokens['--mk-accent-fg'] ?? '', tokens['--mk-accent'] ?? ''),
     ).toBeGreaterThanOrEqual(7);
+  });
+});
+
+describe('themes over another theme (MK-074)', () => {
+  it('fills a theme with the theme it is based on, and gives the definition of a theme', () => {
+    registerTheme('dev.example.acme', { title: 'Acme', light: { surface: '#fafafa' } }, 'pa');
+
+    const acme = themeDefinition('dev.example.acme');
+    expect(acme.light.surface).toBe('#fafafa');
+    expect(acme.light.brand).toBe(themeDefinition('pa').light.brand);
+    expect(acme.font).toBe(themeDefinition('pa').font);
+    expect(acme.dark).toEqual(themeDefinition('pa').dark);
+    // A base that is not available: the default theme.
+    registerTheme('dev.example.lost', { title: 'Lost' }, 'dev.example.unknown');
+    expect(themeDefinition('dev.example.lost').light).toEqual(themeDefinition('mosaikit').light);
+    expect(themeDefinition('dev.example.unknown')).toBe(themeDefinition('mosaikit'));
   });
 });
