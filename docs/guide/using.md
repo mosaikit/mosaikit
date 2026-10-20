@@ -174,6 +174,21 @@ open, because it was deleted, moved to the trash or its access was taken away, l
 itself. When the app of a favorite is turned off in the organization, the favorite stays, marked as
 not available, and opens again when the app comes back.
 
+## Requests for access
+
+When an app refuses you something, such as a dashboard a colleague linked, its page may offer
+**Request access** (MK-058). Write a message, if you like, and send it: the owner, or the
+administrators of the organization for what belongs to the organization, are notified and decide.
+The request says nothing to you about what you asked for: not whether it exists, nor who owns it.
+You are notified of the answer: once approved, the notification opens it; a decline carries the
+reason, if one was given.
+
+Whoever may share a resource finds the requests for it in **Requests for access**, in the menu of
+your account: one list for every app, with who asks, for what, at which level and with which
+message. **Approve** grants the level asked, or the one you choose in **Level**, as a share you see
+in the sharing dialog; **Decline** sends the reason you write, if any. The administrators of the
+organization see the requests for everything they may share.
+
 ## Activity
 
 **Activity**, at the top of the app bar, collects what the apps tell you: a mention, a task, a

@@ -142,6 +142,71 @@ export function emptyStateText(kind: EmptyKind): EmptyStateText {
   return EMPTY_TEXTS[kind];
 }
 
+/**
+ * A resource a person was refused, as an app names it to offer a request for access (MK-058): the
+ * extension, a type it declares and the identifier of the resource, as in the sharing model.
+ */
+export interface RequestedResource {
+  readonly extension: string;
+  readonly type: string;
+  readonly id: string;
+}
+
+/**
+ * The event that asks the shell to open the request for access to a resource (MK-058), with
+ * `{ resource: RequestedResource }` as its detail. `<mk-empty-state kind="denied" resource="…">`
+ * dispatches it from its action; an app may dispatch it itself, bubbling and composed.
+ */
+export const REQUEST_ACCESS_EVENT = 'mk-request-access';
+
+/** The action of a refused panel that names its resource. */
+export const REQUEST_ACCESS_LABEL = 'Request access';
+
+const EXTENSION_ID = /^[a-z][a-z0-9-]*(\.[a-z][a-z0-9-]*)+$/;
+const RESOURCE_TYPE = /^[a-z][a-z0-9-]*$/;
+
+/**
+ * The resource an attribute names as `<extension>/<type>/<id>` (the identifier may hold further
+ * slashes), or `undefined` when it names none.
+ */
+export function requestedResource(value: string | null | undefined): RequestedResource | undefined {
+  if (!value) {
+    return undefined;
+  }
+  const first = value.indexOf('/');
+  const second = first < 0 ? -1 : value.indexOf('/', first + 1);
+  if (second < 0) {
+    return undefined;
+  }
+  const extension = value.slice(0, first);
+  const type = value.slice(first + 1, second);
+  const id = value.slice(second + 1);
+  if (
+    !EXTENSION_ID.test(extension) ||
+    !RESOURCE_TYPE.test(type) ||
+    id.trim() === '' ||
+    id.length > 200
+  ) {
+    return undefined;
+  }
+  return { extension, type, id };
+}
+
+/**
+ * The action of an empty state: for a refused panel that names its resource, **Request access**,
+ * which dispatches {@link REQUEST_ACCESS_EVENT}; otherwise the default of its kind.
+ */
+export function emptyStateAction(
+  kind: EmptyKind,
+  resource: RequestedResource | undefined,
+  label?: string | null,
+): EmptyStateText['action'] {
+  if (kind === 'denied' && resource) {
+    return { label: label || REQUEST_ACCESS_LABEL, event: REQUEST_ACCESS_EVENT };
+  }
+  return EMPTY_TEXTS[kind].action;
+}
+
 /** The bounds and the step of a resizable pane, in pixels. */
 export interface PaneBounds {
   readonly min: number;

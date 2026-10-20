@@ -245,7 +245,7 @@ public class SharingDialog {
                 : accounts.findById(owner).map(UserAccount::getDisplayName).orElse(null);
     }
 
-    private static List<LevelView> levels(ResourceTypeEntry type) {
+    static List<LevelView> levels(ResourceTypeEntry type) {
         return type.levels().stream()
                 .map(found -> new LevelView(found.name(), found.title(), found.edits(), found.i18n()))
                 .toList();
