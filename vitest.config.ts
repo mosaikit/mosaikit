@@ -62,6 +62,7 @@ export default defineConfig({
         'src/web/src/mk-activity.ts',
         'src/web/src/mk-home-widgets.ts',
         'src/web/src/mk-favorites.ts',
+        'src/web/src/mk-search.ts',
         'sdk/ui/src/apply.ts',
         'sdk/ui/src/components.ts',
         'src/web/src/mk-admin-extensions.ts',
