@@ -1,0 +1,79 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "ui: dev (Vite HMR, http://localhost:5173)",
+      "type": "shell",
+      "command": "npm run dev",
+      "options": { "cwd": "${workspaceFolder}/mosaikit-ui" },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "ui: build",
+      "type": "shell",
+      "command": "npm run build",
+      "options": { "cwd": "${workspaceFolder}/mosaikit-ui" },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "server: build (principale)",
+      "type": "shell",
+      "command": "cargo build",
+      "options": { "cwd": "${workspaceFolder}/mosaikit-server" },
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": ["$rustc"],
+      "presentation": { "reveal": "silent", "clear": true }
+    },
+    {
+      "label": "server: run (hot restart)",
+      "type": "shell",
+      "command": "cargo watch -w . -w ../mosaikit-kernel -s \"bash dev-run.sh\"",
+      "options": { "cwd": "${workspaceFolder}/mosaikit-server" },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "server: run release",
+      "type": "shell",
+      "command": "cargo run --release",
+      "options": { "cwd": "${workspaceFolder}/mosaikit-server" },
+      "isBackground": true,
+      "problemMatcher": [],
+      "dependsOn": ["ui: build"]
+    },
+    {
+      "label": "plugin: build wasm (.mskp completo)",
+      "type": "shell",
+      "command": "bash",
+      "args": ["build.sh"],
+      "options": { "cwd": "${workspaceFolder}/${input:pluginDir}" },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "kernel: test",
+      "type": "shell",
+      "command": "cargo test",
+      "options": { "cwd": "${workspaceFolder}/mosaikit-kernel" },
+      "group": "test",
+      "problemMatcher": []
+    }
+  ],
+  "inputs": [
+    {
+      "id": "pluginDir",
+      "type": "pickString",
+      "description": "Quale plugin buildare?",
+      "options": [
+        "plugin-notes",
+        "plugin-tasks",
+        "plugin-contacts",
+        "plugin-maps",
+        "plugin-static-site"
+      ],
+      "default": "plugin-notes"
+    }
+  ]
+}

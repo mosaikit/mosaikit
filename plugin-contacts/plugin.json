@@ -1,0 +1,21 @@
+{
+  "id": "com.mosaikit.contacts",
+  "name": "Contatti",
+  "version": "0.1.0",
+  "min_kernel": "0.1.0",
+  "permissions": ["crud.hooks"],
+  "contribution": {
+    "icon": "👥",
+    "label": "Contatti",
+    "resource": {
+      "name": "contacts",
+      "fields": [
+        { "key": "name", "label": "Nome", "kind": "text", "required": true },
+        { "key": "email", "label": "Email", "kind": "text" },
+        { "key": "phone", "label": "Telefono", "kind": "text" },
+        { "key": "company", "label": "Azienda", "kind": "choice", "options": ["Mosaikit", "Cliente", "Partner"] }
+      ]
+    }
+  },
+  "ui": true
+}

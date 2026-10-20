@@ -1,0 +1,13 @@
+Mosaikit — release
+==================
+1. Avvia:      mosaikit-server.exe          (http://127.0.0.1:8080)
+   Porta custom:  PORT=8081 mosaikit-server.exe        (Git Bash)
+                  $env:PORT="8081"; .\mosaikit-server.exe   (PowerShell)
+2. Login:      admin / mosaikit2026!   (gestione plugin)
+               user  / demo1234        (CRUD + attiva/disattiva)
+3. I plugin sono in plugins/ (*.mskp): installali dalla UI
+   (icona a puzzle -> scegli file -> Installa pacchetto -> Attiva).
+4. I dati (plugin installati + CRUD) vengono salvati in ../mosaikit-data/
+   (root del progetto) rispetto alla directory da cui avvii l'eseguibile.
+
+Credenziali e architettura: vedi README.md nella root dei sorgenti.

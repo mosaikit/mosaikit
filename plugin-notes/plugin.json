@@ -1,0 +1,20 @@
+{
+  "id": "com.mosaikit.notes",
+  "name": "Note",
+  "version": "0.1.0",
+  "min_kernel": "0.1.0",
+  "permissions": ["crud.hooks"],
+  "contribution": {
+    "icon": "📝",
+    "label": "Note",
+    "resource": {
+      "name": "notes",
+      "fields": [
+        { "key": "title", "label": "Titolo", "kind": "text", "required": true },
+        { "key": "body", "label": "Testo", "kind": "text", "multiline": true },
+        { "key": "tag", "label": "Tag", "kind": "choice", "options": ["personale", "lavoro", "urgente"] }
+      ]
+    }
+  },
+  "ui": true
+}

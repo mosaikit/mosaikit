@@ -1,0 +1,24 @@
+{
+  "id": "com.mosaikit.static-site",
+  "name": "Siti statici",
+  "version": "0.2.0",
+  "min_kernel": "0.1.0",
+  "permissions": ["crud.hooks", "action.zip", "storage.files"],
+  "contribution": {
+    "icon": "🌐",
+    "label": "Siti statici",
+    "resource": {
+      "name": "sites",
+      "fields": [
+        { "key": "name", "label": "Nome", "kind": "text", "required": true },
+        { "key": "storage", "label": "Cartella storage", "kind": "text", "required": true },
+        { "key": "entry", "label": "Pagina iniziale", "kind": "text", "required": true },
+        { "key": "zip_name", "label": "Zip caricato", "kind": "text" },
+        { "key": "files", "label": "File", "kind": "number" },
+        { "key": "size", "label": "Dimensione (byte)", "kind": "number" },
+        { "key": "updated", "label": "Aggiornato", "kind": "text" }
+      ]
+    }
+  },
+  "ui": true
+}

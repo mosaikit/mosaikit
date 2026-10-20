@@ -1,0 +1,21 @@
+{
+  "id": "com.mosaikit.tasks",
+  "name": "Attività",
+  "version": "0.1.0",
+  "min_kernel": "0.1.0",
+  "permissions": ["crud.hooks"],
+  "contribution": {
+    "icon": "✅",
+    "label": "Attività",
+    "resource": {
+      "name": "tasks",
+      "fields": [
+        { "key": "title", "label": "Titolo", "kind": "text", "required": true },
+        { "key": "due", "label": "Scadenza", "kind": "date" },
+        { "key": "priority", "label": "Priorità", "kind": "choice", "options": ["bassa", "media", "alta"] },
+        { "key": "done", "label": "Fatto", "kind": "bool" }
+      ]
+    }
+  },
+  "ui": true
+}

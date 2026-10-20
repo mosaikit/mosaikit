@@ -1,0 +1,11 @@
+[package]
+name = "mosaikit-plugin-static-site"
+version = "0.1.0"
+edition = "2021"
+description = "Plugin Mosaikit: visualizzatore siti statici da zip"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Nessuna dipendenza: ABI guest inline per tenere il progetto minimale.

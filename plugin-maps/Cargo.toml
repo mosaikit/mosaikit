@@ -1,0 +1,11 @@
+[package]
+name = "mosaikit-plugin-maps"
+version = "0.2.0"
+edition = "2021"
+description = "Plugin Mosaikit: CRUD mappe con integrazione GeoLibre"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Nessuna dipendenza: ABI guest inline per tenere il progetto minimale.

@@ -1,0 +1,11 @@
+[package]
+name = "mosaikit-plugin-contacts"
+version = "0.1.0"
+edition = "2021"
+description = "Plugin Mosaikit: CRUD contatti"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# Nessuna dipendenza: ABI guest inline per tenere il progetto minimale.

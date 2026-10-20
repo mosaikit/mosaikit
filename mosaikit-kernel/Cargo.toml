@@ -1,0 +1,14 @@
+[package]
+name = "mosaikit-kernel"
+version = "0.1.0"
+edition = "2021"
+description = "Mosaikit kernel PoC: auth, registry plugin .mskp, attivazione, motore CRUD generico. Domain-agnostic."
+
+[features]
+default = ["sqlite"]
+# Persistenza CRUD su SQLite (rusqlite, SQLite bundled: richiede un C compiler).
+# Con --no-default-features il kernel torna std-only con persistenza JSON file.
+sqlite = ["dep:rusqlite"]
+
+[dependencies]
+rusqlite = { version = "0.32", features = ["bundled"], optional = true }

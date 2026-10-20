@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "▶ mosaikit-server (debug)",
+      "type": "lldb",
+      "request": "launch",
+      "program": "${workspaceFolder}/mosaikit-server/target/debug/mosaikit-server.exe",
+      "cwd": "${workspaceFolder}/mosaikit-server",
+      "env": { "PORT": "8080" },
+      "preLaunchTask": "server: build (principale)"
+    }
+    // Se hai la toolchain MSVC e l'estensione C/C++: usa type "cppvsdbg"
+    // con lo stesso program/cwd. Con toolchain GNU serve CodeLLDB (estensione).
+  ]
+}

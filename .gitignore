@@ -1,0 +1,12 @@
+# build Rust
+**/target/
+
+# UI node/build
+**/node_modules/
+mosaikit-ui/dist/
+
+# dati runtime del server
+mosaikit-data/
+
+# pacchetti plugin
+plugin-*/dist/
