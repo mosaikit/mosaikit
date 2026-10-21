@@ -13,7 +13,7 @@ pub const DEV_USER: &str = "mosaikit_dev";
 pub const DEV_PASSWORD: &str = "mosaikit_dev";
 const SUPERUSER_PASSWORD: &str = "postgres";
 
-/// URL del database di sviluppo (usato da `mosaikit.dev.toml`).
+/// URL del database di sviluppo (usato da `xtask/mosaikit.dev.toml`).
 pub fn dev_url() -> String {
     format!("postgres://{DEV_USER}:{DEV_PASSWORD}@127.0.0.1:{PORT}/mosaikit")
 }

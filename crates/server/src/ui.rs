@@ -48,11 +48,14 @@ fn branded(b: &mosaikit_kernel::brand::Brand, html: String) -> String {
 }
 
 /// Logo, favicon e icona del marchio (default: il simbolo di Mosaikit).
+/// Simbolo di Mosaikit, incorporato dal sorgente: non dipende dalla UI compilata.
+const DEFAULT_ICON: &str = include_str!("../../../ui/host/public/favicon.svg");
+
 fn brand_file(s: &AppState, which: &str) -> Response {
     let (data, name) = match s.k.brand.file(which).and_then(|p| std::fs::read(&p).ok().map(|d| (d, p))) {
         Some((d, p)) => (d, p.to_string_lossy().into_owned()),
-        None => match (which, HostUi::get("favicon.svg")) {
-            ("logo" | "favicon" | "icon", Some(f)) => (f.data.into_owned(), "favicon.svg".to_string()),
+        None => match which {
+            "logo" | "favicon" | "icon" => (DEFAULT_ICON.as_bytes().to_vec(), "favicon.svg".to_string()),
             _ => return StatusCode::NOT_FOUND.into_response(),
         },
     };

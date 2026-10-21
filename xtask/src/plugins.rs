@@ -362,7 +362,7 @@ pub fn new_plugin(name: &str, id: Option<String>, no_logic: bool, into: Option<P
         ("table", table.as_str()),
         ("plugin_api", api.as_str()),
     ];
-    let template = root().join("templates").join("plugin");
+    let template = root().join("xtask").join("templates").join("plugin");
     for (rel, path) in crate::util::walk_files(&template)? {
         if no_logic && (rel == "Cargo.toml" || rel.starts_with("src/")) {
             continue;

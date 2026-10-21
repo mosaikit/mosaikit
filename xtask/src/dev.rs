@@ -36,7 +36,7 @@ fn server_cmd(plugins: &[Plugin]) -> Result<Command> {
     let mut c = Command::new("cargo");
     c.current_dir(root())
         .args(["run", "-p", "mosaikit-server", "--", "--config"])
-        .arg(root().join("mosaikit.dev.toml"))
+        .arg(root().join("xtask").join("mosaikit.dev.toml"))
         .env(
             "MOSAIKIT_ADMIN_PASSWORD",
             std::env::var("MOSAIKIT_ADMIN_PASSWORD").unwrap_or_else(|_| DEV_ADMIN_PASSWORD.into()),

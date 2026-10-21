@@ -7,9 +7,16 @@
       "type": "cppvsdbg",
       "request": "launch",
       "program": "${workspaceFolder}/target/debug/mosaikit-server.exe",
-      "args": ["--config", "${workspaceFolder}/mosaikit.dev.toml"],
+      "args": ["--config", "${workspaceFolder}/xtask/mosaikit.dev.toml"],
       "cwd": "${workspaceFolder}",
-      "environment": [{ "name": "MOSAIKIT_ADMIN_PASSWORD", "value": "admin-sviluppo" }],
+      "environment": [
+        { "name": "MOSAIKIT_ADMIN_PASSWORD", "value": "admin-sviluppo" },
+        // plugin di sviluppo (come cargo xtask dev): prima compilali con cargo xtask plugin build
+        {
+          "name": "MOSAIKIT_DEV_PLUGINS",
+          "value": "${workspaceFolder}/../mosaikit-plugins/notes;${workspaceFolder}/../mosaikit-plugins/tasks;${workspaceFolder}/../mosaikit-plugins/contacts;${workspaceFolder}/../mosaikit-plugins/maps;${workspaceFolder}/../mosaikit-plugins/static-site;${workspaceFolder}/../mosaikit-plugins/files"
+        }
+      ],
       "preLaunchTask": "mosaikit: server build"
     }
   ]

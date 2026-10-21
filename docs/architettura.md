@@ -552,6 +552,7 @@ mosaikit/
 │   ├── db/                  API dei dati: PostgreSQL (migrazioni, RLS, ruoli) e SQLite (schema, filtri, trigger)
 │   ├── runtime/             wasmi
 │   ├── kernel/              servizi: identity, tenancy, acl, links, kpi, overview, brand, plugins, blobs
+│   │                        (tenancy/: tenants, administrators, members, invitations, groups, settings, directory)
 │   ├── server/              axum, due listener, UI host embedded
 │   ├── desktop/             mosaikit.exe (Windows): senza console, icona nell'area di notifica
 │   └── plugin-sdk/          crate per i plugin (lato guest)
@@ -561,10 +562,11 @@ mosaikit/
 ├── branding/                marchio di Mosaikit (brand.toml documentato)
 ├── distribution.toml        distribuzione "Mosaikit" (§14)
 ├── mosaikit.example.toml    tutte le proprieta' di configurazione
-├── templates/plugin/        scheletro per `cargo xtask plugin new`
 ├── e2e/                     test nel browser (Playwright)
 ├── deploy/                  Dockerfile, compose.yml, compose.dev.yml
 ├── xtask/                   dev, db, plugin, test, e2e, ci, release
+│   ├── templates/plugin/    scheletro per `cargo xtask plugin new`
+│   └── mosaikit.dev.toml    configurazione di `cargo xtask dev`
 ├── docs/
 ../mosaikit-plugins/         plugin ufficiali (notes, tasks, contacts, maps, static-site, files)
 ../geoportal/                distribuzione di esempio (§14)

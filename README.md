@@ -95,10 +95,11 @@ mosaikit/
     host/        UI host (React + Vite)
     plugin-api/  @mosaikit/plugin-api: bridge, CRUD generico, tema
   branding/      marchio di Mosaikit (brand.toml documentato)
-  templates/     scheletro per i nuovi plugin
   e2e/           test nel browser (Playwright)
   deploy/        Dockerfile e compose
   xtask/         automazione: cargo xtask <comando>
+    templates/plugin/    scheletro per `cargo xtask plugin new`
+    mosaikit.dev.toml    configurazione di `cargo xtask dev`
   docs/          architettura
   distribution.toml        la distribuzione "Mosaikit"
   mosaikit.example.toml    tutte le proprieta' di configurazione, descritte
@@ -136,7 +137,7 @@ cargo xtask --dist ../geoportal dev   # oppure una distribuzione (marchio e plug
    Se PostgreSQL ha PostGIS, lo attiva (anche nei database dei test).
 2. Compila logica e UI dei plugin della distribuzione, presi dalle cartelle in
    `[plugins] roots`.
-3. Avvia il **server** in modalità sviluppo con `mosaikit.dev.toml`:
+3. Avvia il **server** in modalità sviluppo con `xtask/mosaikit.dev.toml`:
    - API su :47080;
    - plugin e contenuti su :47081;
    - plugin letti dalle loro cartelle, con `MOSAIKIT_DEV_PLUGINS`.

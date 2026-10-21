@@ -1,5 +1,6 @@
 # Configurazione di sviluppo (usata da `cargo xtask dev`). Le proprieta' sono
-# descritte in mosaikit.example.toml.
+# descritte in mosaikit.example.toml. I percorsi relativi partono da questa
+# cartella (xtask/).
 
 # L'app si apre da Vite (HMR della UI host): Vite inoltra le API al server su :47080
 url = "http://127.0.0.1:5173"
@@ -9,7 +10,7 @@ plugin_url = "http://127.0.0.1:47081"
 listen = "127.0.0.1:47080"
 plugin_listen = "127.0.0.1:47081"
 # dati di sviluppo, separati da quelli reali
-data_dir = ".dev/data"
+data_dir = "../.dev/data"
 # i plugin in sviluppo sono letti dalle cartelle: nessun pacchetto da firmare
 allow_unsigned = true
 # sessioni lunghe per non dover rifare l'accesso

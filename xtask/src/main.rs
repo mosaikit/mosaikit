@@ -91,7 +91,7 @@ enum PluginCmd {
         #[arg(long, default_value = "dist/registry")]
         out: PathBuf,
     },
-    /// Nuovo plugin dal template (templates/plugin di mosaikit)
+    /// Nuovo plugin dal template (xtask/templates/plugin)
     New {
         name: String,
         /// id del plugin (default com.example.<nome>)
