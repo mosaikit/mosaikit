@@ -1,0 +1,114 @@
+// Protocollo del bridge host <-> UI dei plugin (postMessage).
+//
+// plugin -> host: { msk: 1, id, op, args }
+// host -> plugin: { msk: 1, id, ok } | { msk: 1, id, err }
+// host -> plugin (eventi): { msk: 1, event, data }
+
+export interface BridgeRequest {
+  msk: 1
+  id: string
+  op: string
+  args?: unknown
+}
+
+export interface BridgeReply {
+  msk: 1
+  id: string
+  ok?: unknown
+  err?: string
+}
+
+export interface BridgeEvent {
+  msk: 1
+  event: string
+  data?: unknown
+}
+
+export type FieldKind = 'text' | 'number' | 'bool' | 'date' | 'choice'
+
+export interface FieldDecl {
+  key: string
+  label: string
+  kind: FieldKind
+  required?: boolean
+  multiline?: boolean
+  options?: string[]
+  hidden?: boolean
+}
+
+export type Level = 'read' | 'write' | 'manage'
+
+export type Values = Record<string, string | number | boolean | null>
+
+export interface Row {
+  id: string
+  values: Values
+  owner_id: string
+  owner_name: string
+  my_level: Level
+  shared: boolean
+  parent_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface ListResult {
+  resource: string
+  fields: FieldDecl[]
+  rows: Row[]
+}
+
+export interface FileEntry {
+  id: string
+  name: string
+  is_dir: boolean
+  size: number
+  mime: string
+  created: string
+  modified: string
+  owner_id: string
+  owner_name: string
+  my_level: Level
+  shared: boolean
+  parent_id: string | null
+}
+
+export interface Listing {
+  parent: string | null
+  path: { id: string; name: string }[]
+  entries: FileEntry[]
+  my_level: Level
+}
+
+export interface SiteInfo {
+  files: number
+  size: number
+  entry: string
+}
+
+export interface Hello {
+  public: boolean
+  user?: { id: string; username: string; name: string }
+  tenant?: { slug: string; name: string; role: 'manager' | 'member' }
+  plugin?: { id: string; version: string }
+  theme?: Record<string, string>
+  /** solo nei link pubblici: la risorsa condivisa */
+  resource?: PublicResource
+}
+
+export interface PublicResource {
+  plugin: string
+  plugin_label: string
+  id: string
+  kind: string
+  title: string
+  values: Values | null
+}
+
+export function isReply(d: unknown): d is BridgeReply {
+  return !!d && typeof d === 'object' && (d as BridgeReply).msk === 1 && typeof (d as BridgeReply).id === 'string'
+}
+
+export function isEvent(d: unknown): d is BridgeEvent {
+  return !!d && typeof d === 'object' && (d as BridgeEvent).msk === 1 && typeof (d as BridgeEvent).event === 'string'
+}

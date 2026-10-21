@@ -1,0 +1,88 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/mskp",
+    "crates/sql-guard",
+    "crates/db",
+    "crates/runtime",
+    "crates/plugin-sdk",
+    "crates/kernel",
+    "crates/server",
+    "crates/desktop",
+    "xtask",
+]
+
+[workspace.package]
+version = "1.0.0"
+edition = "2021"
+license = "Apache-2.0"
+rust-version = "1.85"
+
+[workspace.lints.rust]
+unsafe_code = "deny"
+
+[workspace.lints.clippy]
+dbg_macro = "warn"
+todo = "warn"
+
+[workspace.dependencies]
+anyhow = "1"
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+tokio = { version = "1", features = ["full"] }
+sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "uuid", "chrono", "json", "migrate", "macros"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde", "std"] }
+sha2 = "0.10"
+hex = "0.4"
+base64 = "0.22"
+rand = "0.8"
+ed25519-dalek = { version = "2", features = ["rand_core"] }
+argon2 = "0.5"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+sqlparser = { version = "=0.52.0", features = ["visitor"] }
+# SQLite incluso nell'eseguibile (versione desktop): nessuna dipendenza esterna
+rusqlite = { version = "0.32", features = ["bundled", "hooks", "functions", "column_decltype"] }
+wasmi = "0.40"
+axum = { version = "0.8", features = ["macros"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["set-header"] }
+rust-embed = "8"
+mime_guess = "2"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+notify = "6"
+clap = { version = "4", features = ["derive", "env"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tempfile = "3"
+futures-util = "0.3"
+tokio-stream = { version = "0.1", features = ["sync"] }
+
+mosaikit-mskp = { path = "crates/mskp" }
+mosaikit-sql-guard = { path = "crates/sql-guard" }
+mosaikit-db = { path = "crates/db" }
+mosaikit-runtime = { path = "crates/runtime" }
+mosaikit-plugin-sdk = { path = "crates/plugin-sdk" }
+mosaikit-kernel = { path = "crates/kernel" }
+
+# in debug le dipendenze crittografiche e l'interprete WASM sono lentissimi:
+# ottimizzate anche nei build di sviluppo e di test
+[profile.dev.package.argon2]
+opt-level = 3
+[profile.dev.package.blake2]
+opt-level = 3
+[profile.dev.package.sha2]
+opt-level = 3
+[profile.dev.package.wasmi]
+opt-level = 3
+[profile.dev.package.wasmi_core]
+opt-level = 3
+[profile.dev.package.miniz_oxide]
+opt-level = 3
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

@@ -1,0 +1,36 @@
+# Distribuzione di default: Mosaikit "puro", con i plugin ufficiali.
+# Un prodotto derivato (es. ../geoportal) ha il proprio distribution.toml e si
+# compila con `cargo xtask --dist ../geoportal <comando>`.
+
+[product]
+# identificatore tecnico: nomi dei file di release e dell'immagine Docker
+id = "mosaikit"
+# nome mostrato agli utenti (titolo, login, icona nell'area di notifica)
+name = "Mosaikit"
+# versione del prodotto
+version = "1.0.0"
+description = "Piattaforma web multi-tenant a plugin"
+# nome dell'eseguibile desktop (senza .exe)
+executable = "mosaikit"
+
+[brand]
+# cartella con brand.toml (colori, testi) e le immagini (logo, favicon, icona)
+dir = "branding"
+
+[plugins]
+# cartelle che contengono i plugin (ognuna con il proprio workspace Cargo e npm)
+roots = ["../mosaikit-plugins"]
+# plugin da includere nelle release: "*" = tutti quelli trovati
+include = ["*"]
+
+[desktop]
+# database della versione desktop: "sqlite" (nessun server da avviare) o "postgres" (PostgreSQL embedded)
+database = "sqlite"
+# porta dell'app desktop; quella di plugin e contenuti e' la successiva
+port = 48080
+
+[docker]
+# nome dell'immagine Docker
+image = "mosaikit"
+# immagine PostgreSQL usata dal compose
+postgres_image = "postgres:17-alpine"

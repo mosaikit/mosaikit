@@ -1,4 +1,0 @@
-[build]
-# L'import env.msk_host_log deve restare un import WASM non risolto a link
-# time: verra' definito dal runtime (wasmtime) in fase di istanziazione.
-rustflags = ["-C", "link-arg=--allow-undefined"]

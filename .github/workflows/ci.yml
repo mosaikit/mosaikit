@@ -1,0 +1,74 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# mosaikit e mosaikit-plugins stanno affiancati come in locale:
+#   $GITHUB_WORKSPACE/mosaikit, $GITHUB_WORKSPACE/mosaikit-plugins
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        # PostGIS: i test delle distribuzioni geografiche lo usano
+        image: postgis/postgis:17-3.5
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      MOSAIKIT_TEST_DATABASE_URL: postgres://mosaikit_dev:mosaikit_dev@127.0.0.1:5432/postgres
+      CARGO_TERM_COLOR: always
+    defaults:
+      run:
+        working-directory: mosaikit
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: mosaikit
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/mosaikit-plugins
+          path: mosaikit-plugins
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            mosaikit
+            mosaikit-plugins
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: ruolo di test (CREATEDB, CREATEROLE) e PostGIS nel template
+        run: |
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -c "create role mosaikit_dev login createdb createrole password 'mosaikit_dev'"
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d template1 -c "create extension if not exists postgis"
+      - name: cargo-deny
+        uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          manifest-path: mosaikit/Cargo.toml
+      - run: npm ci --no-audit --no-fund
+      - name: fmt, clippy, typecheck, lint, build, test (PostgreSQL e SQLite)
+        run: cargo xtask ci
+      - name: test end-to-end (Playwright)
+        run: |
+          npx playwright install --with-deps chromium
+          sudo apt-get install -y postgresql-client
+          E2E_CHANNEL=chromium cargo xtask e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-results
+          path: |
+            mosaikit/e2e/test-results
+            mosaikit/.dev/e2e/*.log

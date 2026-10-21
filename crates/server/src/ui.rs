@@ -1,0 +1,117 @@
+//! UI host (React) incorporata nell'eseguibile, con fallback SPA e CSP.
+
+use axum::extract::State;
+use axum::http::{header, HeaderValue, Method, StatusCode, Uri};
+use axum::response::{Html, IntoResponse, Response};
+use axum::Router;
+
+use crate::AppState;
+
+/// `ui/host/dist`: in debug letta da disco a ogni richiesta, in release incorporata.
+#[derive(rust_embed::Embed)]
+#[folder = "../../ui/host/dist/"]
+#[allow_missing = true]
+struct HostUi;
+
+pub fn router() -> Router<AppState> {
+    Router::new().fallback(serve)
+}
+
+pub fn host_csp(s: &AppState) -> String {
+    format!(
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; \
+         font-src 'self' data:; connect-src 'self'; frame-src {} {}; frame-ancestors 'none'; \
+         object-src 'none'; base-uri 'self'; form-action 'self'",
+        s.k.cfg.plugin_origin(),
+        s.k.cfg.public_origin()
+    )
+}
+
+const MISSING: &str = "<!doctype html><meta charset=utf-8><title>Mosaikit</title>\
+    <body style=\"font:15px system-ui;padding:40px;background:#0b0c0f;color:#ece7db\">\
+    <h1>UI non compilata</h1><p>Esegui <code>npm run build -w ui/host</code> \
+    oppure, in sviluppo, apri l'app da Vite: <code>cargo xtask dev</code> (http://127.0.0.1:5173).</p>";
+
+fn esc(s: &str) -> String {
+    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+}
+
+/// Titolo e colori del marchio nella pagina (niente lampeggio del marchio di default).
+fn branded(b: &mosaikit_kernel::brand::Brand, html: String) -> String {
+    let html = html.replace("<title>Mosaikit</title>", &format!("<title>{}</title>", esc(&b.name)));
+    let css = b.css();
+    if css.is_empty() {
+        html
+    } else {
+        html.replacen("</head>", &format!("<style>{css}</style></head>"), 1)
+    }
+}
+
+/// Logo, favicon e icona del marchio (default: il simbolo di Mosaikit).
+fn brand_file(s: &AppState, which: &str) -> Response {
+    let (data, name) = match s.k.brand.file(which).and_then(|p| std::fs::read(&p).ok().map(|d| (d, p))) {
+        Some((d, p)) => (d, p.to_string_lossy().into_owned()),
+        None => match (which, HostUi::get("favicon.svg")) {
+            ("logo" | "favicon" | "icon", Some(f)) => (f.data.into_owned(), "favicon.svg".to_string()),
+            _ => return StatusCode::NOT_FOUND.into_response(),
+        },
+    };
+    let mime = mime_guess::from_path(&name).first_or_octet_stream();
+    let mut res = data.into_response();
+    let h = res.headers_mut();
+    if let Ok(v) = HeaderValue::from_str(mime.as_ref()) {
+        h.insert(header::CONTENT_TYPE, v);
+    }
+    h.insert(header::CACHE_CONTROL, HeaderValue::from_static("public, max-age=3600"));
+    // un SVG del marchio non esegue script
+    h.insert(
+        header::CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static("default-src 'none'; style-src 'unsafe-inline'; sandbox"),
+    );
+    res
+}
+
+async fn serve(State(s): State<AppState>, method: Method, uri: Uri) -> Response {
+    if method != Method::GET && method != Method::HEAD {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    let path = uri.path().trim_start_matches('/');
+    if path.contains("..") || path.contains('\\') {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+    if let Some(which) = path.strip_prefix("brand/") {
+        return brand_file(&s, which);
+    }
+    if !path.is_empty() && path != "index.html" {
+        if let Some(f) = HostUi::get(path) {
+            let mut res = f.data.into_owned().into_response();
+            let mime = mime_guess::from_path(path).first_or_octet_stream();
+            if let Ok(v) = HeaderValue::from_str(mime.as_ref()) {
+                res.headers_mut().insert(header::CONTENT_TYPE, v);
+            }
+            if path.starts_with("assets/") {
+                res.headers_mut().insert(
+                    header::CACHE_CONTROL,
+                    HeaderValue::from_static("public, max-age=31536000, immutable"),
+                );
+            }
+            return res;
+        }
+        // file statico con estensione inesistente: 404, non la SPA
+        if path.rsplit('/').next().is_some_and(|last| last.contains('.')) {
+            return StatusCode::NOT_FOUND.into_response();
+        }
+    }
+    let body = HostUi::get("index.html")
+        .map(|f| String::from_utf8_lossy(&f.data).into_owned())
+        .unwrap_or_else(|| MISSING.to_string());
+    let body = branded(&s.k.brand, body);
+    let mut res = Html(body).into_response();
+    let h = res.headers_mut();
+    h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
+    h.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
+    if let Ok(v) = HeaderValue::from_str(&host_csp(&s)) {
+        h.insert(header::CONTENT_SECURITY_POLICY, v);
+    }
+    res
+}

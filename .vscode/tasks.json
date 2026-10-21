@@ -2,78 +2,66 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "ui: dev (Vite HMR, http://localhost:5173)",
+      "label": "mosaikit: dev (hot reload, http://127.0.0.1:5173)",
       "type": "shell",
-      "command": "npm run dev",
-      "options": { "cwd": "${workspaceFolder}/mosaikit-ui" },
-      "isBackground": true,
-      "problemMatcher": []
-    },
-    {
-      "label": "ui: build",
-      "type": "shell",
-      "command": "npm run build",
-      "options": { "cwd": "${workspaceFolder}/mosaikit-ui" },
-      "group": "build",
-      "problemMatcher": []
-    },
-    {
-      "label": "server: build (principale)",
-      "type": "shell",
-      "command": "cargo build",
-      "options": { "cwd": "${workspaceFolder}/mosaikit-server" },
-      "group": { "kind": "build", "isDefault": true },
-      "problemMatcher": ["$rustc"],
-      "presentation": { "reveal": "silent", "clear": true }
-    },
-    {
-      "label": "server: run (hot restart)",
-      "type": "shell",
-      "command": "cargo watch -w . -w ../mosaikit-kernel -s \"bash dev-run.sh\"",
-      "options": { "cwd": "${workspaceFolder}/mosaikit-server" },
-      "isBackground": true,
-      "problemMatcher": []
-    },
-    {
-      "label": "server: run release",
-      "type": "shell",
-      "command": "cargo run --release",
-      "options": { "cwd": "${workspaceFolder}/mosaikit-server" },
+      "command": "cargo xtask dev",
       "isBackground": true,
       "problemMatcher": [],
-      "dependsOn": ["ui: build"]
+      "group": "build"
     },
     {
-      "label": "plugin: build wasm (.mskp completo)",
+      "label": "mosaikit: db up",
       "type": "shell",
-      "command": "bash",
-      "args": ["build.sh"],
-      "options": { "cwd": "${workspaceFolder}/${input:pluginDir}" },
-      "group": "build",
+      "command": "cargo xtask db up",
       "problemMatcher": []
     },
     {
-      "label": "kernel: test",
+      "label": "mosaikit: test",
       "type": "shell",
-      "command": "cargo test",
-      "options": { "cwd": "${workspaceFolder}/mosaikit-kernel" },
+      "command": "cargo xtask test",
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "mosaikit: e2e (browser)",
+      "type": "shell",
+      "command": "cargo xtask e2e",
       "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "mosaikit: ci",
+      "type": "shell",
+      "command": "cargo xtask ci",
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "mosaikit: server build",
+      "type": "shell",
+      "command": "cargo build -p mosaikit-server",
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": ["$rustc"]
+    },
+    {
+      "label": "mosaikit: nuovo plugin",
+      "type": "shell",
+      "command": "cargo xtask plugin new ${input:pluginName}",
+      "problemMatcher": []
+    },
+    {
+      "label": "mosaikit: release desktop",
+      "type": "shell",
+      "command": "cargo xtask release desktop",
+      "problemMatcher": []
+    },
+    {
+      "label": "mosaikit: release docker",
+      "type": "shell",
+      "command": "cargo xtask release docker",
       "problemMatcher": []
     }
   ],
   "inputs": [
-    {
-      "id": "pluginDir",
-      "type": "pickString",
-      "description": "Quale plugin buildare?",
-      "options": [
-        "plugin-notes",
-        "plugin-tasks",
-        "plugin-contacts",
-        "plugin-maps",
-        "plugin-static-site"
-      ],
-      "default": "plugin-notes"
-    }
+    { "id": "pluginName", "type": "promptString", "description": "Nome del plugin (minuscole e '-')" }
   ]
 }

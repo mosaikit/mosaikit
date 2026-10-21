@@ -1,0 +1,13 @@
+[package]
+name = "mosaikit-sql-guard"
+description = "Whitelist delle istruzioni SQL dei plugin Mosaikit (runtime e migrazioni)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+sqlparser.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

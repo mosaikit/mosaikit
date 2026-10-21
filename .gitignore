@@ -1,12 +1,19 @@
-# build Rust
+# build
 **/target/
-
-# UI node/build
 **/node_modules/
-mosaikit-ui/dist/
+**/dist/
+/dist/
 
-# dati runtime del server
-mosaikit-data/
+# ambiente di sviluppo locale: cluster PostgreSQL, dati, chiave di firma di sviluppo
+/.dev/
 
-# pacchetti plugin
-plugin-*/dist/
+# dati di runtime
+/data/
+initial-admin-password.txt
+
+# test end-to-end
+e2e/test-results/
+e2e/playwright-report/
+
+# chiavi di firma
+*.key

@@ -1,0 +1,109 @@
+# =============================================================================
+#  mosaikit.toml - configurazione di Mosaikit
+# =============================================================================
+#  Ogni proprieta' e' facoltativa: quelle commentate mostrano il valore di default.
+#  Ogni proprieta' si puo' anche impostare con una variabile d'ambiente (indicata
+#  accanto), che ha la precedenza sul file.
+#  I percorsi relativi sono relativi alla cartella di questo file.
+# =============================================================================
+
+# Indirizzo con cui gli utenti aprono Mosaikit, con l'eventuale percorso base.
+# E' l'unico indirizzo da impostare: gli altri si ricavano da questo.
+# Esempi: "http://127.0.0.1:8080"  "http://127.0.0.1:8080/mosaikit"  "https://gis.esempio.it/mosaikit"
+# Env: MOSAIKIT_URL
+url = "http://127.0.0.1:8080/mosaikit"
+
+# Indirizzo delle UI dei plugin, dei file caricati e dei link pubblici.
+# Per sicurezza deve essere un'ORIGINE DIVERSA da `url` (altro host o altra porta):
+# il codice dei plugin cosi' non puo' leggere i cookie ne' chiamare le API dell'app.
+# Default: stesso indirizzo di `url` sulla porta successiva (es. :8081).
+# Dietro un reverse proxy si usa di norma un secondo hostname.
+# Env: MOSAIKIT_PLUGIN_URL
+# plugin_url = "https://plugins.esempio.it/mosaikit"
+
+# Indirizzo e porta su cui il server ascolta per l'app.
+# Default: la porta di `url`; solo locale (127.0.0.1) se l'host di `url` e' locale,
+# altrimenti tutte le interfacce (0.0.0.0). Serve impostarlo dietro un reverse proxy.
+# Env: MOSAIKIT_LISTEN
+# listen = "0.0.0.0:8080"
+
+# Come `listen`, per plugin, file e link pubblici. Default: la porta di `plugin_url`.
+# Env: MOSAIKIT_PLUGIN_LISTEN
+# plugin_listen = "0.0.0.0:8081"
+
+# Cartella dei dati: file caricati, pacchetti dei plugin, log, database SQLite.
+# Env: MOSAIKIT_DATA_DIR
+# data_dir = "data"
+
+# Cartella del branding (brand.toml con nome, colori e testi, piu' logo e favicon).
+# Se assente si usa il marchio Mosaikit incluso nell'eseguibile.
+# Env: MOSAIKIT_BRAND
+# brand = "branding"
+
+# Accetta pacchetti di plugin non firmati. Solo per lo sviluppo: in produzione false.
+# Env: MOSAIKIT_ALLOW_UNSIGNED
+# allow_unsigned = false
+
+# Chiavi pubbliche ed25519 (base64) degli editori di plugin fidati: si installano
+# solo pacchetti firmati da una di queste chiavi.
+# Env: MOSAIKIT_TRUSTED_KEYS (separate da virgola, si aggiungono a quelle del file)
+# trusted_keys = ["MCowBQYDK2VwAyEA..."]
+
+# Catalogo dei plugin installabili (file index.json con nome, versione e sha256 dei pacchetti).
+# Env: MOSAIKIT_REGISTRY
+# registry = "registry/index.json"
+
+# All'avvio installa e attiva i plugin del catalogo non ancora installati.
+# Env: MOSAIKIT_PREINSTALL
+# preinstall = false
+
+# Durata di una sessione di accesso, in ore.
+# session_ttl_hours = 12
+
+# Apre il browser su `url` all'avvio (versione desktop).
+# Env: MOSAIKIT_OPEN_BROWSER
+# open_browser = false
+
+# Usa l'header X-Forwarded-For per l'indirizzo del client (limiti sui tentativi di accesso).
+# Attivalo SOLO dietro un reverse proxy che lo imposta: altrimenti e' falsificabile.
+# Env: MOSAIKIT_TRUST_PROXY
+# trust_proxy = false
+
+[database]
+# Database: "sqlite" oppure "postgres".
+# Default: "postgres" se e' impostato `url` o `embedded`, altrimenti "sqlite".
+# Env: MOSAIKIT_DATABASE
+# backend = "sqlite"
+
+# SQLite: file del database. Default: <data_dir>/mosaikit.db
+# file = "data/mosaikit.db"
+
+# PostgreSQL: stringa di connessione. L'utente deve poter creare ruoli e schemi
+# (CREATEROLE, CREATE sul database): ogni plugin ha il proprio schema e il proprio ruolo.
+# Env: MOSAIKIT_DATABASE_URL (oppure DATABASE_URL)
+# url = "postgres://mosaikit:password@127.0.0.1:5432/mosaikit"
+
+# PostgreSQL embedded: avvia un PostgreSQL privato in <data_dir>/pg (desktop).
+# embedded = false
+
+# Cartella `bin` di PostgreSQL per la modalita' embedded.
+# Default: `pgsql/bin` accanto all'eseguibile.
+# pg_bin = "pgsql/bin"
+
+# Porta del PostgreSQL embedded (se occupata se ne cerca una libera). Default 55433.
+# embedded_port = 55433
+
+# Numero massimo di connessioni al database dell'app.
+# max_connections = 20
+
+[dev]
+# Modalita' sviluppo: i plugin si leggono dalle cartelle sorgente con hot reload
+# di logica e UI. Mai in produzione. La attiva `cargo xtask dev`.
+# enabled = false
+
+# Cartelle dei plugin in sviluppo.
+# Env: MOSAIKIT_DEV_PLUGINS (separate come nel PATH: ';' su Windows, ':' altrove)
+# plugins = ["../mosaikit-plugins/notes"]
+
+# Cartella `target` di cargo usata se il plugin non e' in un workspace cargo.
+# target_dir = "target"

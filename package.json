@@ -1,0 +1,27 @@
+{
+  "name": "mosaikit-workspace",
+  "private": true,
+  "description": "UI di Mosaikit: host e plugin-api (i plugin sono in ../mosaikit-plugins)",
+  "workspaces": [
+    "ui/plugin-api",
+    "ui/host",
+    "e2e"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "oxlint ui e2e --deny-warnings"
+  },
+  "devDependencies": {
+    "@types/node": "^24.19.2",
+    "oxlint": "^1.89.0",
+    "typescript": "~7.0.2",
+    "vite": "^8.3.4",
+    "vitest": "^5.0.5",
+    "happy-dom": "^21.0.3"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

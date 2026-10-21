@@ -2,15 +2,15 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "▶ mosaikit-server (debug)",
-      "type": "lldb",
+      // richiede il DB di sviluppo (cargo xtask db up) e l'estensione C/C++ (toolchain MSVC)
+      "name": "mosaikit-server (debug, configurazione di sviluppo)",
+      "type": "cppvsdbg",
       "request": "launch",
-      "program": "${workspaceFolder}/mosaikit-server/target/debug/mosaikit-server.exe",
-      "cwd": "${workspaceFolder}/mosaikit-server",
-      "env": { "PORT": "8080" },
-      "preLaunchTask": "server: build (principale)"
+      "program": "${workspaceFolder}/target/debug/mosaikit-server.exe",
+      "args": ["--config", "${workspaceFolder}/mosaikit.dev.toml"],
+      "cwd": "${workspaceFolder}",
+      "environment": [{ "name": "MOSAIKIT_ADMIN_PASSWORD", "value": "admin-sviluppo" }],
+      "preLaunchTask": "mosaikit: server build"
     }
-    // Se hai la toolchain MSVC e l'estensione C/C++: usa type "cppvsdbg"
-    // con lo stesso program/cwd. Con toolchain GNU serve CodeLLDB (estensione).
   ]
 }

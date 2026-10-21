@@ -1,0 +1,906 @@
+//! API REST dell'origine app.
+
+use std::collections::HashMap;
+
+use axum::body::Bytes;
+use axum::extract::{DefaultBodyLimit, Path, Query, State};
+use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
+use axum::response::sse::{Event, KeepAlive, Sse};
+use axum::response::{IntoResponse, Response};
+use axum::routing::{delete, get, post, put};
+use axum::{Json, Router};
+use futures_util::StreamExt;
+use mosaikit_kernel::acl::{self, Level, ResourceFilter};
+use mosaikit_kernel::tenancy::{self, NewTenant};
+use mosaikit_kernel::{content, crud, files, identity, kpi, links, plugins, Error, Role, TenantSettings};
+use serde::Deserialize;
+use serde_json::{json, Map, Value};
+use uuid::Uuid;
+
+use crate::auth::{session_cookie, Auth, ClientIp, Tenant};
+use crate::{bad, ApiResult, AppState};
+
+const UPLOAD_LIMIT: usize = 512 << 20;
+const PACKAGE_LIMIT: usize = 64 << 20;
+
+pub fn router() -> Router<AppState> {
+    let uploads = Router::new()
+        .route("/api/t/{t}/p/{plugin}/files/upload", post(files_upload))
+        .route("/api/t/{t}/p/{plugin}/content/{id}", post(content_upload))
+        .layer(DefaultBodyLimit::max(UPLOAD_LIMIT));
+    let packages = Router::new()
+        .route("/api/admin/plugins", get(admin_plugins).post(admin_install))
+        .layer(DefaultBodyLimit::max(PACKAGE_LIMIT));
+    Router::new()
+        .route("/api/health", get(health))
+        .route("/api/brand", get(brand))
+        .route("/api/auth/login", post(login))
+        .route("/api/auth/logout", post(logout))
+        .route("/api/session", get(session))
+        .route("/api/me/password", post(change_password))
+        .route("/api/me/invitations", get(my_invitations))
+        .route("/api/me/invitations/{id}/{answer}", post(answer_invitation))
+        .route("/api/dev/events", get(dev_events))
+        // tenant
+        .route("/api/t/{t}/context", get(context))
+        .route("/api/t/{t}/overview", get(overview))
+        .route("/api/t/{t}/prefs", put(set_prefs))
+        .route("/api/t/{t}/directory", get(directory))
+        .route("/api/t/{t}/resources/{rid}", get(resource_meta))
+        .route("/api/t/{t}/resources/{rid}/grants", get(resource_grants).put(resource_set_grant))
+        .route("/api/t/{t}/resources/{rid}/owner", post(resource_owner))
+        .route("/api/t/{t}/resources/{rid}/links", get(resource_links).post(resource_link_create))
+        .route("/api/t/{t}/links/{id}", delete(link_revoke))
+        // operazioni dei plugin (sempre limitate al plugin del percorso)
+        .route("/api/t/{t}/p/{plugin}/r/{res}", get(crud_list).post(crud_create))
+        .route("/api/t/{t}/p/{plugin}/r/{res}/{id}", get(crud_get).put(crud_update).delete(crud_delete))
+        .route("/api/t/{t}/p/{plugin}/call/{name}", post(plugin_call))
+        .route("/api/t/{t}/p/{plugin}/files", get(files_list))
+        .route("/api/t/{t}/p/{plugin}/files/folder", post(files_mkdir))
+        .route("/api/t/{t}/p/{plugin}/files/{id}/content", get(files_content))
+        .route("/api/t/{t}/p/{plugin}/files/{id}/zip", get(files_zip))
+        .route("/api/t/{t}/p/{plugin}/files/{id}/rename", post(files_rename))
+        .route("/api/t/{t}/p/{plugin}/files/{id}/move", post(files_move))
+        .route("/api/t/{t}/p/{plugin}/files/{id}/copy", post(files_copy))
+        .route("/api/t/{t}/p/{plugin}/files/{id}", delete(files_delete))
+        .route("/api/t/{t}/p/{plugin}/ticket/{id}", post(ticket))
+        // gestore del tenant
+        .route("/api/t/{t}/manage/members", get(m_members).post(m_create_member))
+        .route("/api/t/{t}/manage/members/{uid}", delete(m_remove_member))
+        .route("/api/t/{t}/manage/members/{uid}/role", put(m_set_role))
+        .route("/api/t/{t}/manage/members/{uid}/password", post(m_reset_password))
+        .route("/api/t/{t}/manage/invitations", get(m_invitations).post(m_invite))
+        .route("/api/t/{t}/manage/invitations/{id}", delete(m_revoke_invitation))
+        .route("/api/t/{t}/manage/groups", get(m_groups).post(m_create_group))
+        .route("/api/t/{t}/manage/groups/{gid}", delete(m_delete_group))
+        .route("/api/t/{t}/manage/groups/{gid}/members/{uid}", put(m_group_add).delete(m_group_remove))
+        .route("/api/t/{t}/manage/resources", get(m_resources))
+        .route("/api/t/{t}/manage/resources/reassign", post(m_reassign))
+        .route("/api/t/{t}/manage/settings", get(m_settings).put(m_set_settings))
+        .route("/api/t/{t}/manage/kpi", get(m_kpi))
+        // amministratore di sistema
+        .route("/api/admin/tenants", get(a_tenants).post(a_create_tenant))
+        .route("/api/admin/tenants/{id}/status", put(a_tenant_status))
+        .route("/api/admin/plugins/{id}/{action}", post(a_plugin_action))
+        .route("/api/admin/plugins/{id}", delete(a_plugin_uninstall))
+        .route("/api/admin/catalog", get(a_catalog))
+        .route("/api/admin/catalog/{id}/install", post(a_catalog_install))
+        .route("/api/admin/kpi", get(a_kpi))
+        .route("/api/admin/administrators", get(a_admins).put(a_set_admin))
+        .route("/api/{*rest}", axum::routing::any(api_not_found))
+        .merge(uploads)
+        .merge(packages)
+        .layer(DefaultBodyLimit::max(16 << 20))
+}
+
+async fn api_not_found() -> ApiResult<()> {
+    Err(Error::not_found("API inesistente").into())
+}
+
+fn uuid(s: &str) -> ApiResult<Uuid> {
+    s.parse().map_err(|_| bad(format!("id non valido: {s}")))
+}
+
+fn ok() -> Json<Value> {
+    Json(json!({ "ok": true }))
+}
+
+// ------------------------------------------------------------------ autenticazione
+
+async fn health(State(s): State<AppState>) -> Json<Value> {
+    Json(json!({ "ok": true, "version": mosaikit_kernel::KERNEL_VERSION, "dev": s.k.cfg.dev.enabled }))
+}
+
+async fn brand(State(s): State<AppState>) -> Json<Value> {
+    Json(s.k.brand.public())
+}
+
+#[derive(Deserialize)]
+struct LoginReq {
+    tenant: String,
+    username: String,
+    password: String,
+}
+
+async fn session_body(s: &AppState, user: &mosaikit_kernel::SessionUser) -> ApiResult<Value> {
+    Ok(json!({
+        "user": user,
+        "csrf": user.csrf,
+        "memberships": identity::memberships(&s.k, user).await?,
+        "invitations": tenancy::my_invitations(&s.k, user).await?.len(),
+        "plugin_origin": s.k.cfg.plugin_origin(),
+        "plugin_url": s.k.cfg.plugin_url,
+        "public_origin": s.k.cfg.public_origin(),
+        "dev": s.k.cfg.dev.enabled,
+    }))
+}
+
+async fn login(
+    State(s): State<AppState>,
+    ClientIp(ip): ClientIp,
+    Json(r): Json<LoginReq>,
+) -> ApiResult<Response> {
+    let lr = identity::login(&s.k, &r.tenant, &r.username, &r.password, &ip).await?;
+    let body = session_body(&s, &lr.user).await?;
+    let mut res = Json(body).into_response();
+    res.headers_mut().insert(header::SET_COOKIE, session_cookie(&s, Some(&lr.token)));
+    Ok(res)
+}
+
+async fn logout(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Response> {
+    identity::logout(&s.k, &u).await?;
+    let mut res = ok().into_response();
+    res.headers_mut().insert(header::SET_COOKIE, session_cookie(&s, None));
+    Ok(res)
+}
+
+async fn session(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Json<Value>> {
+    Ok(Json(session_body(&s, &u).await?))
+}
+
+#[derive(Deserialize)]
+struct PasswordReq {
+    old: String,
+    new: String,
+}
+
+async fn change_password(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Json(r): Json<PasswordReq>,
+) -> ApiResult<Json<Value>> {
+    identity::change_password(&s.k, &u, &r.old, &r.new).await?;
+    Ok(ok())
+}
+
+async fn my_invitations(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(tenancy::my_invitations(&s.k, &u).await?)))
+}
+
+async fn answer_invitation(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Path((id, answer)): Path<(String, String)>,
+) -> ApiResult<Json<Value>> {
+    let accept = match answer.as_str() {
+        "accept" => true,
+        "decline" => false,
+        _ => return Err(bad("risposta: accept o decline")),
+    };
+    tenancy::respond_invitation(&s.k, &u, uuid(&id)?, accept).await?;
+    Ok(ok())
+}
+
+/// Eventi di sviluppo (hot reload), solo in modalita' dev.
+async fn dev_events(State(s): State<AppState>, Auth(_u): Auth) -> ApiResult<Response> {
+    if !s.k.cfg.dev.enabled {
+        return Err(Error::not_found("modalita' sviluppo non attiva").into());
+    }
+    let rx = s.k.dev_events.subscribe();
+    let stream = tokio_stream::wrappers::BroadcastStream::new(rx).filter_map(|e| async move {
+        e.ok().map(|ev| {
+            Ok::<_, std::convert::Infallible>(
+                Event::default().data(serde_json::to_string(&ev).unwrap_or_default()),
+            )
+        })
+    });
+    Ok(Sse::new(stream).keep_alive(KeepAlive::default()).into_response())
+}
+
+// ------------------------------------------------------------------ tenant
+
+async fn context(State(s): State<AppState>, Tenant(c): Tenant) -> ApiResult<Json<Value>> {
+    Ok(Json(json!({
+        "tenant": { "id": c.tenant.tenant_id, "slug": c.tenant.slug, "name": c.tenant.name,
+                    "role": c.tenant.role, "settings": c.tenant.settings },
+        "plugins": plugins::active_views(&s.k),
+        "prefs": tenancy::prefs(&s.k, &c).await?,
+    })))
+}
+
+async fn set_prefs(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Json(v): Json<Value>,
+) -> ApiResult<Json<Value>> {
+    tenancy::set_prefs(&s.k, &c, &v).await?;
+    Ok(ok())
+}
+
+async fn directory(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Query(q): Query<HashMap<String, String>>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(tenancy::directory(&s.k, &c, q.get("q").map(String::as_str).unwrap_or("")).await?)))
+}
+
+#[derive(Deserialize)]
+struct RidPath {
+    #[allow(dead_code)]
+    t: String,
+    rid: String,
+}
+
+async fn resource_meta(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<RidPath>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(acl::meta(&s.k, &c, uuid(&p.rid)?).await?)))
+}
+
+async fn resource_grants(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<RidPath>,
+) -> ApiResult<Json<Value>> {
+    let rid = uuid(&p.rid)?;
+    let m = acl::meta(&s.k, &c, rid).await?;
+    Ok(Json(json!({ "resource": m, "grants": acl::grants(&s.k, &c, rid).await? })))
+}
+
+#[derive(Deserialize)]
+struct GrantReq {
+    principal_type: String,
+    principal_id: Uuid,
+    /// read | write | manage; assente o null = revoca
+    level: Option<String>,
+}
+
+async fn resource_set_grant(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<RidPath>,
+    Json(r): Json<GrantReq>,
+) -> ApiResult<Json<Value>> {
+    let level = r.level.as_deref().map(Level::parse).transpose()?;
+    acl::set_grant(&s.k, &c, uuid(&p.rid)?, &r.principal_type, r.principal_id, level).await?;
+    Ok(ok())
+}
+
+#[derive(Deserialize)]
+struct OwnerReq {
+    user_id: Uuid,
+}
+
+async fn resource_owner(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<RidPath>,
+    Json(r): Json<OwnerReq>,
+) -> ApiResult<Json<Value>> {
+    acl::transfer_owner(&s.k, &c, uuid(&p.rid)?, r.user_id).await?;
+    Ok(ok())
+}
+
+async fn resource_links(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<RidPath>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(links::list(&s.k, &c, uuid(&p.rid)?).await?)))
+}
+
+#[derive(Deserialize)]
+struct LinkReq {
+    days: Option<u32>,
+    password: Option<String>,
+}
+
+async fn resource_link_create(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<RidPath>,
+    Json(r): Json<LinkReq>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(links::create(&s.k, &c, uuid(&p.rid)?, r.days, r.password.as_deref()).await?)))
+}
+
+async fn link_revoke(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path((_t, id)): Path<(String, String)>,
+) -> ApiResult<Json<Value>> {
+    links::revoke(&s.k, &c, uuid(&id)?).await?;
+    Ok(ok())
+}
+
+// ------------------------------------------------------------------ CRUD e comandi
+
+#[derive(Deserialize)]
+struct ResPath {
+    #[allow(dead_code)]
+    t: String,
+    plugin: String,
+    res: String,
+    #[serde(default)]
+    id: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct RowReq {
+    values: Map<String, Value>,
+    #[serde(default)]
+    parent: Option<Uuid>,
+}
+
+async fn crud_list(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<ResPath>,
+    Query(q): Query<HashMap<String, String>>,
+) -> ApiResult<Json<Value>> {
+    let parent = q.get("parent").filter(|v| !v.is_empty()).map(|v| uuid(v)).transpose()?;
+    Ok(Json(json!(
+        crud::list(&s.k, &c, &p.plugin, &p.res, q.get("filter").map(String::as_str), parent).await?
+    )))
+}
+
+async fn crud_get(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<ResPath>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(crud::get(&s.k, &c, &p.plugin, &p.res, uuid(p.id.as_deref().unwrap_or_default())?).await?))
+}
+
+async fn crud_create(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<ResPath>,
+    Json(r): Json<RowReq>,
+) -> ApiResult<(StatusCode, Json<Value>)> {
+    let row = crud::create(&s.k, &c, &p.plugin, &p.res, &r.values, r.parent).await?;
+    Ok((StatusCode::CREATED, Json(row)))
+}
+
+async fn crud_update(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<ResPath>,
+    Json(r): Json<RowReq>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(
+        crud::update(&s.k, &c, &p.plugin, &p.res, uuid(p.id.as_deref().unwrap_or_default())?, &r.values)
+            .await?,
+    ))
+}
+
+async fn crud_delete(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<ResPath>,
+) -> ApiResult<Json<Value>> {
+    crud::delete(&s.k, &c, &p.plugin, &p.res, uuid(p.id.as_deref().unwrap_or_default())?).await?;
+    Ok(ok())
+}
+
+#[derive(Deserialize)]
+struct CallPath {
+    #[allow(dead_code)]
+    t: String,
+    plugin: String,
+    name: String,
+}
+
+async fn plugin_call(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<CallPath>,
+    body: Option<Json<Value>>,
+) -> ApiResult<Json<Value>> {
+    let args = body.map(|b| b.0).unwrap_or(Value::Null);
+    let args = args.get("args").cloned().unwrap_or(args);
+    Ok(Json(json!({ "result": crud::call(&s.k, &c, &p.plugin, &p.name, args).await? })))
+}
+
+// ------------------------------------------------------------------ file e contenuti
+
+#[derive(Deserialize)]
+struct PluginPath {
+    #[allow(dead_code)]
+    t: String,
+    plugin: String,
+    #[serde(default)]
+    id: Option<String>,
+}
+
+impl PluginPath {
+    fn id(&self) -> ApiResult<Uuid> {
+        uuid(self.id.as_deref().unwrap_or_default())
+    }
+}
+
+fn opt_uuid(v: Option<&String>) -> ApiResult<Option<Uuid>> {
+    v.filter(|s| !s.is_empty() && *s != "null").map(|s| uuid(s)).transpose()
+}
+
+async fn files_list(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<PluginPath>,
+    Query(q): Query<HashMap<String, String>>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(files::list(&s.k, &c, &p.plugin, opt_uuid(q.get("parent"))?).await?)))
+}
+
+#[derive(Deserialize)]
+struct FolderReq {
+    parent: Option<Uuid>,
+    name: String,
+}
+
+async fn files_mkdir(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<PluginPath>,
+    Json(r): Json<FolderReq>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(files::mkdir(&s.k, &c, &p.plugin, r.parent, &r.name).await?)))
+}
+
+async fn files_upload(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<PluginPath>,
+    Query(q): Query<HashMap<String, String>>,
+    body: Bytes,
+) -> ApiResult<Json<Value>> {
+    let name = q.get("name").ok_or_else(|| bad("manca name"))?;
+    let replace = q.get("replace").is_some_and(|v| v == "1" || v == "true");
+    Ok(Json(json!(
+        files::upload(&s.k, &c, &p.plugin, opt_uuid(q.get("parent"))?, name, &body, replace).await?
+    )))
+}
+
+/// Contenuto come download: `application/octet-stream` + attachment, mai interpretato dal browser.
+fn attachment(name: &str, data: Vec<u8>) -> Response {
+    let safe: String = name.chars().map(|c| if c == '"' || c.is_control() { '_' } else { c }).collect();
+    let ascii: String = safe.chars().map(|c| if c.is_ascii() { c } else { '_' }).collect();
+    let encoded: String = safe
+        .bytes()
+        .map(|b| {
+            if b.is_ascii_alphanumeric() || b"-._~".contains(&b) {
+                (b as char).to_string()
+            } else {
+                format!("%{b:02X}")
+            }
+        })
+        .collect();
+    let mut res = data.into_response();
+    let h = res.headers_mut();
+    h.insert(header::CONTENT_TYPE, HeaderValue::from_static("application/octet-stream"));
+    if let Ok(v) =
+        HeaderValue::from_str(&format!("attachment; filename=\"{ascii}\"; filename*=UTF-8''{encoded}"))
+    {
+        h.insert(header::CONTENT_DISPOSITION, v);
+    }
+    h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    res
+}
+
+async fn files_content(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<PluginPath>,
+) -> ApiResult<Response> {
+    let (e, data) = files::read(&s.k, &c, &p.plugin, p.id()?).await?;
+    Ok(attachment(&e.name, data))
+}
+
+async fn files_zip(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<PluginPath>,
+) -> ApiResult<Response> {
+    let (name, data) = files::zip_folder(&s.k, &c, &p.plugin, p.id()?).await?;
+    Ok(attachment(&name, data))
+}
+
+#[derive(Deserialize)]
+struct NameReq {
+    name: String,
+}
+
+async fn files_rename(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<PluginPath>,
+    Json(r): Json<NameReq>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(files::rename(&s.k, &c, &p.plugin, p.id()?, &r.name).await?)))
+}
+
+#[derive(Deserialize)]
+struct ParentReq {
+    parent: Option<Uuid>,
+}
+
+async fn files_move(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<PluginPath>,
+    Json(r): Json<ParentReq>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(files::move_to(&s.k, &c, &p.plugin, p.id()?, r.parent).await?)))
+}
+
+async fn files_copy(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<PluginPath>,
+    Json(r): Json<ParentReq>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(files::copy_to(&s.k, &c, &p.plugin, p.id()?, r.parent).await?)))
+}
+
+async fn files_delete(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<PluginPath>,
+) -> ApiResult<Json<Value>> {
+    files::delete(&s.k, &c, &p.plugin, p.id()?).await?;
+    Ok(ok())
+}
+
+async fn content_upload(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<PluginPath>,
+    body: Bytes,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(content::upload_site(&s.k, &c, &p.plugin, p.id()?, &body).await?)))
+}
+
+#[derive(Deserialize, Default)]
+struct TicketReq {
+    #[serde(default)]
+    download: bool,
+}
+
+async fn ticket(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<PluginPath>,
+    body: Option<Json<TicketReq>>,
+) -> ApiResult<Json<Value>> {
+    let download = body.map(|b| b.0.download).unwrap_or(false);
+    Ok(Json(json!(content::ticket(&s.k, &c, &p.plugin, p.id()?, download).await?)))
+}
+
+// ------------------------------------------------------------------ gestore del tenant
+
+#[derive(Deserialize)]
+struct UidPath {
+    #[allow(dead_code)]
+    t: String,
+    uid: String,
+}
+
+async fn m_members(State(s): State<AppState>, Tenant(c): Tenant) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(tenancy::members(&s.k, &c).await?)))
+}
+
+#[derive(Deserialize)]
+struct NewMemberReq {
+    username: String,
+    #[serde(default)]
+    display_name: String,
+    password: String,
+    #[serde(default = "member_role")]
+    role: String,
+}
+
+fn member_role() -> String {
+    "user".into()
+}
+
+async fn m_create_member(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Json(r): Json<NewMemberReq>,
+) -> ApiResult<Json<Value>> {
+    let id =
+        tenancy::create_member(&s.k, &c, &r.username, &r.display_name, &r.password, Role::parse(&r.role)?)
+            .await?;
+    Ok(Json(json!({ "user_id": id })))
+}
+
+async fn m_remove_member(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<UidPath>,
+    Query(q): Query<HashMap<String, String>>,
+) -> ApiResult<Json<Value>> {
+    let new_owner = opt_uuid(q.get("new_owner"))?;
+    Ok(Json(json!(tenancy::remove_member(&s.k, &c, uuid(&p.uid)?, new_owner).await?)))
+}
+
+#[derive(Deserialize)]
+struct RoleReq {
+    role: String,
+}
+
+async fn m_set_role(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<UidPath>,
+    Json(r): Json<RoleReq>,
+) -> ApiResult<Json<Value>> {
+    tenancy::set_role(&s.k, &c, uuid(&p.uid)?, Role::parse(&r.role)?).await?;
+    Ok(ok())
+}
+
+#[derive(Deserialize)]
+struct ResetReq {
+    password: String,
+}
+
+async fn m_reset_password(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<UidPath>,
+    Json(r): Json<ResetReq>,
+) -> ApiResult<Json<Value>> {
+    tenancy::reset_member_password(&s.k, &c, uuid(&p.uid)?, &r.password).await?;
+    Ok(ok())
+}
+
+async fn m_invitations(State(s): State<AppState>, Tenant(c): Tenant) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(tenancy::tenant_invitations(&s.k, &c).await?)))
+}
+
+#[derive(Deserialize)]
+struct InviteReq {
+    tenant: String,
+    username: String,
+    #[serde(default = "member_role")]
+    role: String,
+}
+
+async fn m_invite(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Json(r): Json<InviteReq>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(tenancy::invite(&s.k, &c, &r.tenant, &r.username, Role::parse(&r.role)?).await?)))
+}
+
+async fn m_revoke_invitation(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path((_t, id)): Path<(String, String)>,
+) -> ApiResult<Json<Value>> {
+    tenancy::revoke_invitation(&s.k, &c, uuid(&id)?).await?;
+    Ok(ok())
+}
+
+async fn m_groups(State(s): State<AppState>, Tenant(c): Tenant) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(tenancy::groups(&s.k, &c).await?)))
+}
+
+async fn m_create_group(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Json(r): Json<NameReq>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!({ "id": tenancy::create_group(&s.k, &c, &r.name).await? })))
+}
+
+async fn m_delete_group(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path((_t, gid)): Path<(String, String)>,
+) -> ApiResult<Json<Value>> {
+    tenancy::delete_group(&s.k, &c, uuid(&gid)?).await?;
+    Ok(ok())
+}
+
+async fn m_group_add(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path((_t, gid, uid)): Path<(String, String, String)>,
+) -> ApiResult<Json<Value>> {
+    tenancy::set_group_member(&s.k, &c, uuid(&gid)?, uuid(&uid)?, true).await?;
+    Ok(ok())
+}
+
+async fn m_group_remove(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path((_t, gid, uid)): Path<(String, String, String)>,
+) -> ApiResult<Json<Value>> {
+    tenancy::set_group_member(&s.k, &c, uuid(&gid)?, uuid(&uid)?, false).await?;
+    Ok(ok())
+}
+
+async fn m_resources(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Query(f): Query<ResourceFilter>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(acl::manager_resources(&s.k, &c, &f).await?)))
+}
+
+#[derive(Deserialize)]
+struct ReassignReq {
+    from: Uuid,
+    to: Uuid,
+}
+
+async fn m_reassign(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Json(r): Json<ReassignReq>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!({ "reassigned": acl::reassign_all(&s.k, &c, r.from, r.to).await? })))
+}
+
+async fn m_settings(Tenant(c): Tenant) -> ApiResult<Json<Value>> {
+    c.require_manager()?;
+    Ok(Json(json!(c.tenant.settings)))
+}
+
+async fn m_set_settings(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Json(r): Json<TenantSettings>,
+) -> ApiResult<Json<Value>> {
+    tenancy::set_settings(&s.k, &c, &r).await?;
+    Ok(ok())
+}
+
+async fn m_kpi(State(s): State<AppState>, Tenant(c): Tenant) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(kpi::tenant(&s.k, &c).await?)))
+}
+
+// ------------------------------------------------------------------ amministratore di sistema
+
+async fn overview(State(s): State<AppState>, Tenant(c): Tenant) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(mosaikit_kernel::overview::overview(&s.k, &c).await?)))
+}
+
+async fn a_admins(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(tenancy::administrators(&s.k, &u).await?)))
+}
+
+#[derive(Deserialize)]
+struct SetAdminReq {
+    tenant: String,
+    username: String,
+    administrator: bool,
+}
+
+async fn a_set_admin(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Json(r): Json<SetAdminReq>,
+) -> ApiResult<Json<Value>> {
+    tenancy::set_administrator(&s.k, &u, r.tenant.trim(), r.username.trim(), r.administrator).await?;
+    Ok(Json(json!(tenancy::administrators(&s.k, &u).await?)))
+}
+
+async fn a_tenants(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(tenancy::list_tenants(&s.k, &u).await?)))
+}
+
+#[derive(Deserialize)]
+struct NewTenantReq {
+    slug: String,
+    name: String,
+    manager_username: String,
+    #[serde(default)]
+    manager_display_name: String,
+    manager_password: String,
+}
+
+async fn a_create_tenant(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Json(r): Json<NewTenantReq>,
+) -> ApiResult<Json<Value>> {
+    let t = tenancy::create_tenant(
+        &s.k,
+        &u,
+        NewTenant {
+            slug: &r.slug,
+            name: &r.name,
+            manager_username: &r.manager_username,
+            manager_display_name: &r.manager_display_name,
+            manager_password: &r.manager_password,
+        },
+    )
+    .await?;
+    Ok(Json(json!(t)))
+}
+
+#[derive(Deserialize)]
+struct StatusReq {
+    status: String,
+}
+
+async fn a_tenant_status(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Path(id): Path<String>,
+    Json(r): Json<StatusReq>,
+) -> ApiResult<Json<Value>> {
+    tenancy::set_tenant_status(&s.k, &u, uuid(&id)?, &r.status).await?;
+    Ok(ok())
+}
+
+async fn admin_plugins(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(plugins::admin_views(&s.k, &u)?)))
+}
+
+async fn admin_install(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    _h: HeaderMap,
+    body: Bytes,
+) -> ApiResult<Json<Value>> {
+    let p = plugins::install_package(&s.k, Some(&u), &body, plugins::InstallSource::Upload).await?;
+    Ok(Json(
+        json!({ "id": p.id, "version": p.manifest.version, "status": p.status, "signed_by": p.signed_by }),
+    ))
+}
+
+async fn a_plugin_action(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Path((id, action)): Path<(String, String)>,
+) -> ApiResult<Json<Value>> {
+    match action.as_str() {
+        "activate" => plugins::set_active(&s.k, Some(&u), &id, true).await?,
+        "deactivate" => plugins::set_active(&s.k, Some(&u), &id, false).await?,
+        _ => return Err(bad("azione: activate o deactivate")),
+    }
+    Ok(ok())
+}
+
+async fn a_plugin_uninstall(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Value>> {
+    plugins::uninstall(&s.k, &u, &id).await?;
+    Ok(ok())
+}
+
+async fn a_catalog(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(plugins::registry::catalog(&s.k, &u)?)))
+}
+
+async fn a_catalog_install(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Value>> {
+    plugins::registry::install_from_catalog(&s.k, &u, &id).await?;
+    Ok(ok())
+}
+
+async fn a_kpi(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(kpi::global(&s.k, &u).await?)))
+}

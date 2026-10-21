@@ -1,0 +1,14 @@
+{
+  "name": "@mosaikit-plugin/{{name}}",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "vite build",
+    "watch": "vite build --watch --mode development",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "dependencies": {
+    "@mosaikit/plugin-api": "file:{{plugin_api}}"
+  }
+}

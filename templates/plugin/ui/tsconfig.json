@@ -1,0 +1,4 @@
+{
+  "extends": "{{plugin_api}}/tsconfig.json",
+  "include": ["src"]
+}

@@ -1,0 +1,14 @@
+# Contesto: la cartella che contiene mosaikit, mosaikit-plugins e le distribuzioni.
+# Si includono solo i progetti necessari, senza build, dipendenze e dati.
+*
+!mosaikit
+!mosaikit-plugins
+!geoportal
+
+**/target
+**/node_modules
+**/dist
+**/.dev
+**/.git
+**/test-results
+**/playwright-report

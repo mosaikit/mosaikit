@@ -1,0 +1,34 @@
+id = "{{id}}"
+name = "{{label}}"
+version = "0.1.0"
+description = "Descrivi qui il plugin {{label}}"
+
+[contribution]
+icon = "🧱"
+label = "{{label}}"
+
+# Risorsa CRUD: la tabella `{{table}}` (con resource_id, tenant_id e la RLS) la crea l'host.
+# Ogni riga e' una risorsa del kernel: ha un proprietario e si condivide.
+[[resources]]
+name = "{{table}}"
+label = "{{label}}"
+title_field = "title"
+fields = [
+  { key = "title", label = "Titolo", kind = "text", required = true },
+  { key = "notes", label = "Note", kind = "text", multiline = true },
+  { key = "status", label = "Stato", kind = "choice", options = ["bozza", "attivo", "chiuso"] },
+]
+
+[ui]
+entry = "index.html"
+
+[permissions]
+hooks = ["{{table}}"]
+files = false
+content = false
+network = []
+frame_src = []
+
+[[kpi]]
+view = "kpi_{{table}}_by_status"
+label = "{{label}} per stato"

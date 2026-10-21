@@ -1,0 +1,21 @@
+[package]
+name = "mosaikit-mskp"
+description = "Formato dei pacchetti plugin Mosaikit (.mskp v3): manifest, hash, firma ed25519"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+thiserror.workspace = true
+sha2.workspace = true
+hex.workspace = true
+base64.workspace = true
+rand.workspace = true
+ed25519-dalek.workspace = true
+zip.workspace = true
+
+[lints]
+workspace = true

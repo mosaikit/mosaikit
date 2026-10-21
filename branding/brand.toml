@@ -1,0 +1,49 @@
+# =============================================================================
+#  brand.toml - marchio del prodotto
+# =============================================================================
+#  Mosaikit usa questi valori per titolo della pagina, accesso, barra di stato,
+#  area di notifica (desktop) e colori del tema. Una distribuzione basata su
+#  Mosaikit (es. geoportal) ha la propria cartella `branding/` con questo file
+#  e le immagini indicate. Ogni proprieta' e' facoltativa.
+#  I file (logo, favicon, icon) sono nomi di file in questa cartella.
+# =============================================================================
+
+# Nome del prodotto.
+name = "Mosaikit"
+
+# Versione mostrata agli utenti (default: la versione di Mosaikit).
+# version = "1.0.0"
+
+# Frase sotto il nome nella pagina di accesso.
+tagline = "applicazioni, dati e condivisione per ogni tenant"
+
+# Messaggio nella pagina di accesso (es. a chi chiedere un account).
+# login_message = "Per un account scrivi a supporto@esempio.it"
+
+# Testo a pie' della pagina di accesso (default: il nome).
+# footer = "© 2026 Esempio S.p.A."
+
+# Indirizzo di supporto o documentazione.
+# support_url = "https://esempio.it/supporto"
+
+# Logo (svg, png o webp; altezza consigliata 64 px). Default: il simbolo di Mosaikit.
+# logo = "logo.svg"
+
+# Favicon del browser (svg, png o ico).
+# favicon = "favicon.svg"
+
+# Icona per l'area di notifica e l'eseguibile desktop (.ico con 16-256 px).
+# icon = "icon.ico"
+
+# Colori del tema (solo #rrggbb). Le varianti trasparenti dell'accento si
+# calcolano da `accent`. Le UI dei plugin ricevono gli stessi colori.
+[colors]
+# accent = "#f0b23e"  # accento: pulsanti, selezione, grafici
+# bg     = "#0b0c0f"  # sfondo della pagina
+# panel  = "#14161b"  # pannelli e schede
+# panel2 = "#1b1e24"  # pannelli secondari
+# line   = "#2a2e37"  # bordi
+# fg     = "#ece7db"  # testo
+# dim    = "#8f887a"  # testo secondario
+# ok     = "#5cb887"  # esito positivo
+# err    = "#e0615c"  # errori
