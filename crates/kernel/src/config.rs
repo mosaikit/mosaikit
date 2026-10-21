@@ -52,6 +52,9 @@ pub struct Config {
     /// al primo avvio crea anche questo tenant di lavoro con il Tenant Manager `utente` (desktop)
     #[serde(default)]
     pub initial_tenant: Option<String>,
+    /// password di `admin` e `utente` creati al primo avvio (default: generate); desktop
+    #[serde(default)]
+    pub initial_password: Option<String>,
     /// secondo fattore (TOTP) obbligatorio per gli Administrator
     #[serde(default = "d_admin_totp")]
     pub admin_totp: bool,
@@ -298,6 +301,7 @@ impl Config {
                 "MOSAIKIT_TRUST_PROXY" => self.trust_proxy = truthy(&v),
                 "MOSAIKIT_OPEN_BROWSER" => self.open_browser = truthy(&v),
                 "MOSAIKIT_ADMIN_TOTP" => self.admin_totp = truthy(&v),
+                "MOSAIKIT_INITIAL_PASSWORD" => self.initial_password = Some(v).filter(|s| !s.is_empty()),
                 "MOSAIKIT_INITIAL_TENANT" => self.initial_tenant = Some(v).filter(|s| !s.is_empty()),
                 "MOSAIKIT_REGISTRY" => self.registry = Some(v.into()),
                 "MOSAIKIT_TRUSTED_KEYS" => self

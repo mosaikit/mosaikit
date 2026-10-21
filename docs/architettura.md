@@ -568,7 +568,9 @@ tenant `system` e l'Administrator `admin`: la password è `MOSAIKIT_ADMIN_PASSWO
 oppure viene generata e scritta in `credenziali-iniziali.txt`. Con
 `initial_tenant` (release desktop: `"locale"`) il primo avvio crea anche un
 tenant di lavoro, con il nome del prodotto, e il suo Tenant Manager `utente`
-(password generata, nello stesso file): sul desktop si lavora subito, senza
+(password generata, nello stesso file; con `initial_password`, release desktop:
+`"mosaikit"`, entrambi gli account hanno quella, anche se piu' corta della
+policy, che vale di nuovo al cambio): sul desktop si lavora subito, senza
 passare dall'amministrazione. La migrazione `0003_admins`
 porta le installazioni precedenti al modello attuale: un Administrator di un
 altro tenant diventa un account di `system` con la stessa password (con

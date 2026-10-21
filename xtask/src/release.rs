@@ -44,6 +44,8 @@ fn config(flavor: Flavor, trusted: &str, brand: bool) -> String {
             push("admin_totp = false");
             push("# al primo avvio crea il tenant di lavoro con il suo utente");
             push("initial_tenant = \"locale\"");
+            push("# password iniziale di admin e utente (da cambiare dalla pagina Account)");
+            push("initial_password = \"mosaikit\"");
         }
         Flavor::Server => {
             push(&format!("# {name} server. Tutte le proprieta' sono descritte in mosaikit.example.toml;"));
@@ -165,9 +167,9 @@ fn avvio(postgres: bool) -> String {
             Per riaprire l'app: clic sull'icona.\n\
          3. Primo accesso: utente \"utente\", gia' pronto per lavorare. Per\n   \
             l'amministrazione (plugin, altri tenant e utenti): link \"Accesso\n   \
-            amministratori\", utente \"admin\". Le password sono in\n   \
-            data\\credenziali-iniziali.txt (menu dell'icona > Credenziali iniziali):\n   \
-            cambiale (Account) ed elimina il file.\n\
+            amministratori\", utente \"admin\". Password iniziale di entrambi:\n   \
+            \"mosaikit\" (anche in data\\credenziali-iniziali.txt, menu dell'icona >\n   \
+            Credenziali iniziali): cambiala subito dalla pagina Account.\n\
          4. Per fermare: menu dell'icona > Esci{stop}.\n\n\
          Log: data\\logs\\mosaikit.log (menu dell'icona > Log).\n\
          Backup: a programma fermo copia l'intera cartella data\\.\n\

@@ -74,6 +74,12 @@ url = "http://127.0.0.1:8080/mosaikit"
 # Env: MOSAIKIT_INITIAL_TENANT
 # initial_tenant = "locale"
 
+# Password degli account creati al primo avvio (admin e, con initial_tenant, utente) al posto
+# di quelle generate. Vale anche se piu' corta della policy (10 caratteri): da cambiare al
+# primo accesso. Solo per l'uso locale (desktop); MOSAIKIT_ADMIN_PASSWORD ha la precedenza per admin.
+# Env: MOSAIKIT_INITIAL_PASSWORD
+# initial_password = "mosaikit"
+
 # Apre il browser su `url` all'avvio (versione desktop).
 # Env: MOSAIKIT_OPEN_BROWSER
 # open_browser = false

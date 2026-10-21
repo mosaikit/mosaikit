@@ -110,10 +110,13 @@ pub async fn bootstrap(k: &Kernel) -> Result<()> {
             .await?;
     if !exists {
         let (password, generated) = match std::env::var("MOSAIKIT_ADMIN_PASSWORD") {
-            Ok(p) if !p.is_empty() => (p, false),
-            _ => (random_token(9), true),
+            Ok(p) if !p.is_empty() => {
+                check_password_policy(&p)?;
+                (p, false)
+            }
+            // `initial_password` (desktop) vale anche se piu' corta della policy: si cambia dall'Account
+            _ => (initial_password(k), true),
         };
-        check_password_policy(&password)?;
         let hash = hash_password(k, &password).await?;
         let mut tx = k.db.begin_app().await?;
         let tenant: Uuid = mosaikit_db::query_scalar(
@@ -156,6 +159,11 @@ pub async fn bootstrap(k: &Kernel) -> Result<()> {
     Ok(())
 }
 
+/// Password degli account creati al primo avvio: `initial_password` oppure generata.
+fn initial_password(k: &Kernel) -> String {
+    k.cfg.initial_password.clone().filter(|p| !p.is_empty()).unwrap_or_else(|| random_token(9))
+}
+
 /// Tenant di lavoro del primo avvio (nome del prodotto) con il Tenant Manager `utente`,
 /// se non esiste ancora nessun tenant oltre a quello di sistema. Ritorna le credenziali.
 async fn initial_tenant(k: &Kernel, slug: &str) -> Result<Option<String>> {
@@ -170,7 +178,7 @@ async fn initial_tenant(k: &Kernel, slug: &str) -> Result<Option<String>> {
     if !crate::tenancy::valid_slug(&slug) {
         return Err(Error::bad(format!("initial_tenant non valido: {slug} (minuscole, cifre e '-')")));
     }
-    let password = random_token(9);
+    let password = initial_password(k);
     let hash = hash_password(k, &password).await?;
     let mut tx = k.db.begin_app().await?;
     let tenant: Uuid =

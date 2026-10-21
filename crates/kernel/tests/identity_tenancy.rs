@@ -397,3 +397,19 @@ async fn tenant_di_lavoro_al_primo_avvio() {
     mosaikit_kernel::identity::bootstrap(&t).await.unwrap();
     assert_eq!(login_tenants(&t).await.unwrap().len(), 1);
 }
+
+#[tokio::test]
+async fn password_iniziale_della_distribuzione() {
+    let t = start_with(|c| {
+        c.initial_tenant = Some("locale".into());
+        c.initial_password = Some("mosaikit".into());
+    })
+    .await;
+    // anche se piu' corta della policy, per entrambi gli account del primo avvio
+    let u = login(&t, "locale", "utente", "mosaikit", "t").await.unwrap().user;
+    let file =
+        std::fs::read_to_string(t.cfg.data_dir.join(mosaikit_kernel::identity::INITIAL_CREDENTIALS)).unwrap();
+    assert_eq!(file.matches("password: mosaikit").count(), 2, "{file}");
+    // cambiandola vale di nuovo la policy
+    assert_eq!(change_password(&t, &u, "mosaikit", "corta").await.unwrap_err().kind, Kind::BadRequest);
+}

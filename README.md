@@ -412,9 +412,10 @@ in `data\pg`, con PostGIS se disponibile.
    un clic sull'icona o un nuovo doppio clic.
 4. Il primo avvio crea anche il tenant di lavoro (`initial_tenant = "locale"`,
    con il nome del prodotto) e il suo utente `utente`: si lavora subito.
-   L'Administrator `admin` entra da *Accesso amministratori*. Le password
-   iniziali sono in `data\credenziali-iniziali.txt` (menu dell'icona →
-   *Credenziali iniziali*).
+   L'Administrator `admin` entra da *Accesso amministratori*. La password
+   iniziale di entrambi è `mosaikit` (`initial_password`; anche in
+   `data\credenziali-iniziali.txt`, menu dell'icona → *Credenziali iniziali*):
+   va cambiata subito dalla pagina Account.
 5. Menu dell'icona → *Esci*: ferma tutto. Gli errori di avvio compaiono in una
    finestra di messaggio.
 
