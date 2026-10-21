@@ -152,10 +152,13 @@ fn avvio(postgres: bool) -> String {
     let stop = if postgres { " (ferma anche PostgreSQL)" } else { "" };
     format!(
         "{title}\n{}\n\n\
-         1. Avvia {name} (doppio clic su {exe}.exe). Non apre finestre: compare\n   \
-            l'icona di {name} nell'area di notifica (accanto all'orologio).\n   \
+         1. Avvia {name} (doppio clic su {exe}.exe). Compare l'icona di {name}\n   \
+            nell'area di notifica (accanto all'orologio); se l'avvio richiede qualche\n   \
+            secondo, una finestrella ne mostra versione e avanzamento.\n   \
             {db}\n\
-         2. Il browser si apre su http://127.0.0.1:{port} (clic sull'icona per riaprirlo).\n\
+         2. Al primo avvio il browser si apre su http://127.0.0.1:{port}; dai successivi\n   \
+            compare una notifica di Windows con l'indirizzo (clic per aprirlo).\n   \
+            Per riaprire l'app: clic sull'icona.\n\
          3. Primo accesso: tenant \"system\", utente \"admin\". La password e' in\n   \
             data\\initial-admin-password.txt (menu dell'icona > Credenziali iniziali):\n   \
             cambiala (Account) ed elimina il file.\n\
@@ -220,7 +223,7 @@ fn zip_dir(dir: &Path, prefix: &str, dest: &Path) -> Result<()> {
 }
 
 /// Cartella delle release della distribuzione: `<distribuzione>/dist`
-/// (mosaikit/dist per Mosaikit, geoportal/dist per Geoportal).
+/// (mosaikit/dist per Mosaikit).
 fn dist_dir(d: &crate::dist::Distribution) -> PathBuf {
     d.dir.join("dist")
 }
@@ -271,19 +274,37 @@ pub fn docker(tag: Option<String>) -> Result<()> {
         bail!("docker non trovato");
     }
     let d = crate::dist::current();
-    let context = root().parent().context("cartella superiore di mosaikit")?.to_path_buf();
-    let rel = |p: &Path| -> Result<String> {
+    // contesto di build: mosaikit, le cartelle dei plugin e la distribuzione, copiati
+    // (senza build, dipendenze e dati) in una cartella temporanea con la stessa
+    // disposizione relativa che hanno in locale
+    let parent = root().parent().context("cartella superiore di mosaikit")?.to_path_buf();
+    let rel = |p: &Path| -> Result<PathBuf> {
         let abs = std::path::absolute(p)?;
-        let base = std::path::absolute(&context)?;
-        let r = abs.strip_prefix(&base).map_err(|_| {
-            anyhow::anyhow!("{} deve stare accanto a mosaikit ({})", p.display(), base.display())
-        })?;
-        Ok(r.to_string_lossy().replace('\\', "/"))
+        let base = std::path::absolute(&parent)?;
+        Ok(abs
+            .strip_prefix(&base)
+            .map_err(|_| {
+                anyhow::anyhow!("{} deve stare accanto a mosaikit ({})", p.display(), base.display())
+            })?
+            .to_path_buf())
     };
-    let dist_rel = rel(&d.dir)?;
+    let mut dirs: Vec<PathBuf> = vec![rel(&root())?, rel(&d.dir)?];
     for r in &d.plugins.roots {
-        rel(r)?;
+        dirs.push(rel(r)?);
     }
+    dirs.sort();
+    dirs.dedup();
+    // una cartella gia' dentro un'altra della lista si copia con quella
+    let tops: Vec<PathBuf> =
+        dirs.iter().filter(|x| !dirs.iter().any(|y| y != *x && x.starts_with(y))).cloned().collect();
+    let context = std::env::temp_dir().join(format!("mosaikit-docker-{}", d.product.id));
+    if context.exists() {
+        std::fs::remove_dir_all(&context)?;
+    }
+    for t in &tops {
+        copy_sources(&parent.join(t), &context.join(t))?;
+    }
+    let dist_rel = rel(&d.dir)?.to_string_lossy().replace('\\', "/");
     let image = d.docker.image.clone().unwrap_or_else(|| d.product.id.clone());
     let tag = tag.unwrap_or_else(|| format!("{image}:{}", d.product.version));
     let (key, source) = plugins::signing_key()?;
@@ -300,6 +321,7 @@ pub fn docker(tag: Option<String>) -> Result<()> {
         .arg(format!("id=signing_key,src={}", key_file.display()))
         .arg("."));
     let _ = std::fs::remove_file(&key_file);
+    let _ = std::fs::remove_dir_all(&context);
     res?;
 
     // distribuzione Docker pronta all'uso in <distribuzione>/dist/<id>-<versione>-docker
@@ -318,9 +340,117 @@ pub fn docker(tag: Option<String>) -> Result<()> {
     let tar = format!("{}-{}-image.tar", d.product.id, d.product.version);
     eprintln!("salvo l'immagine in {}", out.join(&tar).display());
     run(Command::new("docker").args(["save", "-o"]).arg(out.join(&tar)).arg(&tag))?;
-    std::fs::write(out.join("AVVIO.txt"), docker_avvio(&tar, &pg))?;
+    let vars = deploy_vars(img, ver, &pg);
+    std::fs::write(
+        out.join("README.md"),
+        render(&std::fs::read_to_string(root().join("deploy").join("README.docker.md"))?, &vars),
+    )?;
+    // la stessa immagine anche per Kubernetes
+    let k = k8s_dir(img, ver)?;
     checksums(&dist)?;
-    println!("\nimmagine pronta: {tag}\ndistribuzione Docker: {}", out.display());
+    println!(
+        "\nimmagine pronta: {tag}\ndistribuzione Docker:     {}\ndistribuzione Kubernetes: {}",
+        out.display(),
+        k.display()
+    );
+    Ok(())
+}
+
+/// Segnaposto dei modelli di deploy (`{{id}}`, `{{image}}`...).
+fn deploy_vars(image: &str, version: &str, pg: &str) -> Vec<(&'static str, String)> {
+    let d = crate::dist::current();
+    let (pg_repo, pg_tag) = pg.rsplit_once(':').unwrap_or((pg, "latest"));
+    vec![
+        ("id", d.product.id.clone()),
+        ("name", d.product.name.clone()),
+        ("version", version.to_string()),
+        ("image", image.to_string()),
+        ("postgres_image", pg.to_string()),
+        ("postgres_repo", pg_repo.to_string()),
+        ("postgres_tag", pg_tag.to_string()),
+    ]
+}
+
+fn render(text: &str, vars: &[(&str, String)]) -> String {
+    vars.iter().fold(text.to_string(), |acc, (k, v)| acc.replace(&format!("{{{{{k}}}}}"), v))
+}
+
+/// Manifest Kubernetes (kustomize) in `<distribuzione>/dist/<id>-<versione>-k8s`,
+/// dai modelli di `deploy/k8s`.
+fn k8s_dir(image: &str, version: &str) -> Result<PathBuf> {
+    let d = crate::dist::current();
+    let pg = d.docker.postgres_image.clone().unwrap_or_else(|| "postgres:17-alpine".into());
+    let vars = deploy_vars(image, version, &pg);
+    let out = dist_dir(d).join(format!("{}-{}-k8s", d.product.id, d.product.version));
+    if out.exists() {
+        std::fs::remove_dir_all(&out)?;
+    }
+    std::fs::create_dir_all(&out)?;
+    for (rel, path) in walk_files(&root().join("deploy").join("k8s"))? {
+        let dest = out.join(&rel);
+        std::fs::create_dir_all(dest.parent().expect("cartella"))?;
+        std::fs::write(&dest, render(&std::fs::read_to_string(&path)?, &vars))?;
+    }
+    copy_dir(&root().join("deploy").join("initdb"), &out.join("initdb"))?;
+    // verifica dei manifest, se kubectl c'e' (kustomize incluso, nessun cluster richiesto)
+    if which("kubectl").is_some() {
+        let o = Command::new("kubectl").arg("kustomize").arg(&out).output()?;
+        if !o.status.success() {
+            bail!("manifest Kubernetes non validi: {}", String::from_utf8_lossy(&o.stderr));
+        }
+        eprintln!("manifest Kubernetes verificati con kubectl kustomize");
+    }
+    Ok(out)
+}
+
+/// Solo i manifest Kubernetes (senza costruire l'immagine).
+pub fn k8s(tag: Option<String>) -> Result<()> {
+    let d = crate::dist::current();
+    let image = d.docker.image.clone().unwrap_or_else(|| d.product.id.clone());
+    let tag = tag.unwrap_or_else(|| format!("{image}:{}", d.product.version));
+    let (img, ver) = tag.rsplit_once(':').unwrap_or((tag.as_str(), "latest"));
+    let out = k8s_dir(img, ver)?;
+    println!(
+        "\ndistribuzione Kubernetes: {}\n(l'immagine {tag} si costruisce con `release docker`)",
+        out.display()
+    );
+    Ok(())
+}
+
+/// Tutte le release della distribuzione: desktop, Docker e Kubernetes. Senza Docker
+/// attivo si generano solo i manifest Kubernetes (l'immagine va costruita dopo).
+pub fn all(pg_dir: Option<PathBuf>, no_pg: bool) -> Result<()> {
+    desktop(pg_dir, no_pg)?;
+    let docker_ok = which("docker").is_some()
+        && Command::new("docker").arg("info").output().map(|o| o.status.success()).unwrap_or(false);
+    if docker_ok {
+        docker(None)
+    } else {
+        eprintln!(
+            "Docker non disponibile: salto l'immagine e la cartella Docker, genero i manifest Kubernetes"
+        );
+        k8s(None)
+    }
+}
+
+/// Copia i sorgenti di un progetto per il contesto Docker: niente build, dipendenze,
+/// release, dati di sviluppo ne' repository git.
+fn copy_sources(from: &Path, to: &Path) -> Result<()> {
+    const SKIP: &[&str] =
+        &["target", "node_modules", "dist", ".dev", ".git", "test-results", "playwright-report"];
+    std::fs::create_dir_all(to)?;
+    for e in std::fs::read_dir(from).with_context(|| format!("lettura {}", from.display()))? {
+        let e = e?;
+        let name = e.file_name();
+        if e.file_type()?.is_dir() {
+            if !SKIP.contains(&name.to_string_lossy().as_ref()) {
+                copy_sources(&e.path(), &to.join(&name))?;
+            }
+        } else if !name.to_string_lossy().ends_with(".key") {
+            std::fs::copy(e.path(), to.join(&name))
+                .with_context(|| format!("copia {}", e.path().display()))?;
+        }
+    }
     Ok(())
 }
 
@@ -345,24 +475,5 @@ fn docker_env(image: &str, version: &str, pg: &str) -> String {
          MOSAIKIT_PLUGIN_PORT=8081\n\
          # true solo dietro un reverse proxy che imposta X-Forwarded-For\n\
          MOSAIKIT_TRUST_PROXY=false\n"
-    )
-}
-
-fn docker_avvio(tar: &str, pg: &str) -> String {
-    let d = crate::dist::current();
-    let title = format!("{} {} - distribuzione Docker", d.product.name, d.product.version);
-    format!(
-        "{title}\n{}\n\n\
-         1. Carica l'immagine:            docker load -i {tar}\n\
-         2. Modifica .env: password, indirizzi (MOSAIKIT_URL, MOSAIKIT_PLUGIN_URL) e porte.\n\
-         3. Avvia:                         docker compose up -d\n\
-            (PostgreSQL: {pg}, scaricato da Docker Hub al primo avvio)\n\
-         4. Apri MOSAIKIT_URL: tenant \"system\", utente \"admin\", password MOSAIKIT_ADMIN_PASSWORD.\n\n\
-         Produzione: un reverse proxy HTTPS con due hostname, uno per l'app (porta\n\
-         MOSAIKIT_HTTP_PORT) e uno per plugin e contenuti (MOSAIKIT_PLUGIN_PORT).\n\
-         Dati: volumi pgdata (database) e appdata (file caricati, plugin).\n\
-         Aggiornamento: docker load della nuova immagine, MOSAIKIT_VERSION in .env,\n\
-         docker compose up -d (le migrazioni si applicano all'avvio).\n",
-        "=".repeat(title.chars().count())
     )
 }

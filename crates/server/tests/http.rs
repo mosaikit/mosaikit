@@ -605,13 +605,13 @@ async fn marchio_della_distribuzione() {
     std::fs::write(brand.path().join("logo.svg"), "<svg xmlns=\"http://www.w3.org/2000/svg\"/>").unwrap();
     std::fs::write(
         brand.path().join("brand.toml"),
-        "name = \"Geoportal <beta>\"\nversion = \"2.0.0\"\nlogo = \"logo.svg\"\ntagline = \"dati territoriali\"\n[colors]\naccent = \"#1e88e5\"\n",
+        "name = \"Atlante <beta>\"\nversion = \"2.0.0\"\nlogo = \"logo.svg\"\ntagline = \"dati territoriali\"\n[colors]\naccent = \"#1e88e5\"\n",
     )
     .unwrap();
     let dir = brand.path().to_path_buf();
     let a = App::with(start_with(move |c| c.brand = Some(dir)).await);
     let b = a.call(None, Method::GET, "/api/brand", None).await.json();
-    assert_eq!(b["name"], "Geoportal <beta>");
+    assert_eq!(b["name"], "Atlante <beta>");
     assert_eq!(b["version"], "2.0.0");
     assert_eq!(b["logo"], true);
     let logo = a.call(None, Method::GET, "/brand/logo", None).await;
@@ -623,7 +623,7 @@ async fn marchio_della_distribuzione() {
     assert_eq!(a.call(None, Method::GET, "/brand/altro", None).await.status, StatusCode::NOT_FOUND);
     let page = a.call(None, Method::GET, "/", None).await.text();
     if page.contains("<title>") && !page.contains("UI non compilata") {
-        assert!(page.contains("<title>Geoportal &lt;beta&gt;</title>"), "{page}");
+        assert!(page.contains("<title>Atlante &lt;beta&gt;</title>"), "{page}");
         assert!(page.contains("--acc:#1e88e5;"), "{page}");
     }
 }

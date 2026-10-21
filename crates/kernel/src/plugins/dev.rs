@@ -123,7 +123,7 @@ pub fn watch(k: Arc<Kernel>) {
             tracing::warn!("watch {}: {e}", d.display());
         }
     }
-    // cartelle dei .wasm: una per workspace dei plugin (es. mosaikit-plugins, geoportal)
+    // cartelle dei .wasm: una per workspace dei plugin (es. mosaikit-plugins e quelli di una distribuzione)
     let mut wasm_dirs: Vec<PathBuf> =
         dirs.iter().filter_map(|d| wasm_path(&k, d)?.parent().map(Path::to_path_buf)).collect();
     wasm_dirs.push(wasm_dir);

@@ -134,10 +134,23 @@ enum ReleaseCmd {
         #[arg(long)]
         no_pg: bool,
     },
-    /// Immagine Docker del server
+    /// Immagine Docker del server + cartelle Docker (compose) e Kubernetes in dist/
     Docker {
         #[arg(long)]
         tag: Option<String>,
+    },
+    /// Solo i manifest Kubernetes (kustomize) in dist/, senza costruire l'immagine
+    K8s {
+        /// immagine (default <immagine della distribuzione>:<versione>)
+        #[arg(long)]
+        tag: Option<String>,
+    },
+    /// Tutte le release in dist/: desktop, Docker e Kubernetes
+    All {
+        #[arg(long)]
+        pg_dir: Option<PathBuf>,
+        #[arg(long)]
+        no_pg: bool,
     },
 }
 
@@ -183,6 +196,8 @@ fn main() -> Result<()> {
             ReleaseCmd::Bundle { out, skip_ui, flavor } => release::bundle(&out, skip_ui, flavor),
             ReleaseCmd::Desktop { pg_dir, no_pg } => release::desktop(pg_dir, no_pg),
             ReleaseCmd::Docker { tag } => release::docker(tag),
+            ReleaseCmd::K8s { tag } => release::k8s(tag),
+            ReleaseCmd::All { pg_dir, no_pg } => release::all(pg_dir, no_pg),
         },
     }
 }

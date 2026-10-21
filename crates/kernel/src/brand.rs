@@ -1,6 +1,6 @@
 //! Marchio del prodotto: nome, versione, testi, logo, favicon, colori.
 //!
-//! Una distribuzione basata su Mosaikit (es. geoportal) fornisce una cartella con
+//! Una distribuzione basata su Mosaikit fornisce una cartella con
 //! `brand.toml` e i file indicati; senza cartella si usa il marchio Mosaikit.
 //! Vedi `branding/brand.toml` per l'elenco delle proprieta'.
 
@@ -183,11 +183,11 @@ mod tests {
         std::fs::write(dir.path().join("logo.svg"), "<svg/>").unwrap();
         std::fs::write(
             dir.path().join("brand.toml"),
-            "name = \"Geoportal\"\nversion = \"2.1.0\"\nlogo = \"logo.svg\"\n[colors]\naccent = \"#1e88e5\"\n",
+            "name = \"Atlante\"\nversion = \"2.1.0\"\nlogo = \"logo.svg\"\n[colors]\naccent = \"#1e88e5\"\n",
         )
         .unwrap();
         let b = Brand::load(dir.path()).unwrap();
-        assert_eq!(b.name, "Geoportal");
+        assert_eq!(b.name, "Atlante");
         assert_eq!(b.version(), "2.1.0");
         assert!(b.css().contains("--acc:#1e88e5;--acc-soft:rgba(30,136,229,0.12)"));
         assert!(b.file("logo").unwrap().ends_with("logo.svg"));

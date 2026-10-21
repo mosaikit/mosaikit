@@ -1,0 +1,41 @@
+# Due hostname, due origini: l'app e plugin/contenuti/link pubblici devono stare su
+# origini diverse (sicurezza: il codice dei plugin non vede i cookie dell'app).
+# Sostituisci gli hostname e allinea config.env (MOSAIKIT_URL, MOSAIKIT_PLUGIN_URL).
+# Con cert-manager i certificati si ottengono aggiungendo l'annotazione del suo issuer.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{id}}
+  annotations:
+    # caricamenti di file e pacchetti di plugin (ingress-nginx)
+    nginx.ingress.kubernetes.io/proxy-body-size: "256m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    # cert-manager.io/cluster-issuer: letsencrypt
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - {{id}}.esempio.it
+        - plugins.{{id}}.esempio.it
+      secretName: {{id}}-tls
+  rules:
+    - host: {{id}}.esempio.it
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{id}}
+                port:
+                  name: app
+    - host: plugins.{{id}}.esempio.it
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{id}}
+                port:
+                  name: plugins

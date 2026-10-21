@@ -22,7 +22,18 @@ tray-icon = "0.21"
 windows-sys = { version = "0.59", features = [
   "Win32_Foundation",
   "Win32_System_Console",
+  "Win32_System_LibraryLoader",
+  "Win32_Graphics_Gdi",
   "Win32_UI_WindowsAndMessaging",
+] }
+
+# notifiche di Windows (toast) e registrazione del nome dell'app
+windows = { version = "0.61", features = [
+  "Data_Xml_Dom",
+  "UI_Notifications",
+  "Win32_Security",
+  "Win32_System_Registry",
+  "Win32_System_WinRT",
 ] }
 
 [target.'cfg(windows)'.build-dependencies]

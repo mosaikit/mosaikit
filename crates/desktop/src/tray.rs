@@ -38,6 +38,23 @@ pub fn attach_parent_console() {
     }
 }
 
+/// App pronta: al primo avvio si apre il browser, poi una notifica con l'indirizzo
+/// (un clic la apre). Con `open_browser = false` sempre e solo la notifica.
+fn announce(app: &App) {
+    if app.first_run && app.open_browser {
+        mosaikit_server::open_browser(&app.app_url);
+        let _ = std::fs::write(crate::first_run_marker(&app.data_dir), "");
+        return;
+    }
+    if let Err(e) = crate::notify::ready(app) {
+        // senza notifiche (es. disattivate): si ripiega sul browser
+        tracing::warn!("notifica non mostrata: {e}");
+        if app.open_browser {
+            mosaikit_server::open_browser(&app.app_url);
+        }
+    }
+}
+
 /// Smista i messaggi Windows in attesa (necessario per icona e menu).
 fn pump(timeout: Duration) {
     // SAFETY: chiamate Win32 standard sul thread che possiede l'icona; MSG e' POD.
@@ -94,17 +111,26 @@ pub fn run(app: &App, stop: tokio::sync::oneshot::Sender<()>, status: Receiver<S
 
     let mut stop = Some(stop);
     let mut ready = false;
+    let started = std::time::Instant::now();
     loop {
-        pump(Duration::from_millis(250));
+        pump(Duration::from_millis(100));
+        // avvio lento (primo avvio, PostgreSQL embedded): finestra con fase e spinner
+        if !ready && stop.is_some() && started.elapsed() > Duration::from_millis(500) {
+            crate::splash::show(app);
+        }
         match status.try_recv() {
+            Ok(Status::Progress(p)) => {
+                tracing::info!("avvio: {p}");
+                crate::splash::set_phase(&p);
+            }
             Ok(Status::Ready) => {
                 ready = true;
+                crate::splash::close();
                 let _ = tray.set_tooltip(Some(format!("{} — {}", app.name, app.app_url)));
-                if app.open_browser {
-                    mosaikit_server::open_browser(&app.app_url);
-                }
+                announce(app);
             }
             Ok(Status::Failed(e)) => {
+                crate::splash::close();
                 drop(tray);
                 crate::fatal(&format!("{e}\n\nDettagli nel log: {}", app.log_file.display()));
             }

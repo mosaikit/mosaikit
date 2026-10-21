@@ -8,8 +8,9 @@ dominio vive in un plugin:
 - dati propri, protetti con le stesse regole su **PostgreSQL** (Row-Level
   Security) o su **SQLite** (riscrittura delle query, trigger e authorizer).
 
-Su Mosaikit si costruiscono **distribuzioni** con un proprio marchio e una
-propria scelta di plugin, ad esempio [Geoportal](../geoportal/README.md).
+Su Mosaikit si costruiscono **distribuzioni**: prodotti con un proprio marchio,
+una propria scelta di plugin ed eventuali plugin propri. Una distribuzione e' un
+progetto separato che fa riferimento a Mosaikit; Mosaikit non ne conosce nessuna.
 
 Architettura completa: **[docs/architettura.md](docs/architettura.md)**.
 
@@ -25,6 +26,7 @@ Architettura completa: **[docs/architettura.md](docs/architettura.md)**.
 - [Test](#test)
 - [Release desktop](#release-desktop)
 - [Release server con Docker](#release-server-con-docker)
+- [Release Kubernetes](#release-kubernetes)
 - [Configurazione](#configurazione)
 - [Amministrazione](#amministrazione)
 - [Comandi xtask](#comandi-xtask)
@@ -72,12 +74,12 @@ Plugin ufficiali (in `../mosaikit-plugins`): Note, Attività, Contatti, Mappe
 
 ## Progetti e struttura
 
-Tre progetti affiancati nella stessa cartella:
+Progetti affiancati nella stessa cartella:
 
 ```
 mosaikit/            piattaforma (questo repository)
 mosaikit-plugins/    plugin ufficiali: workspace Cargo e npm propri
-geoportal/           distribuzione di esempio: marchio, plugin scelti, plugin propri
+<prodotto>/          eventuali distribuzioni: fanno riferimento a ../mosaikit
 ```
 
 ```
@@ -111,7 +113,7 @@ mosaikit/
 |---|---|---|
 | Rust | stabile recente | `rustup target add wasm32-unknown-unknown` |
 | Node.js | 20 o successivo | npm workspaces |
-| PostgreSQL | 15 o successivo | per sviluppo e test (binari locali o Docker); PostGIS per Geoportal |
+| PostgreSQL | 15 o successivo | per sviluppo e test (binari locali o Docker); PostGIS se una distribuzione lo richiede |
 | Docker | facoltativo | per l'immagine server, o come PostgreSQL di sviluppo |
 
 SQLite è incluso nell'eseguibile: non serve installarlo.
@@ -128,7 +130,7 @@ Il repository `mosaikit-plugins` deve stare accanto a `mosaikit`.
 rustup target add wasm32-unknown-unknown
 npm install
 cargo xtask dev                       # Mosaikit
-cargo xtask --dist ../geoportal dev   # oppure una distribuzione (marchio e plugin suoi)
+cargo xtask --dist ../prodotto dev    # oppure una distribuzione (marchio e plugin suoi)
 ```
 
 `cargo xtask dev` fa quattro cose:
@@ -169,24 +171,24 @@ cambiano nome, versione, marchio e plugin. È descritta da `distribution.toml`:
 
 ```toml
 [product]
-id = "geoportal"            # nomi dei file di release e dell'immagine Docker
-name = "Geoportal"
+id = "prodotto"             # nomi dei file di release e dell'immagine Docker
+name = "Prodotto"
 version = "0.1.0"
-executable = "geoportal"    # geoportal.exe nella versione desktop
+executable = "prodotto"     # prodotto.exe nella versione desktop
 
 [brand]
 dir = "branding"            # brand.toml + logo, favicon, icona
 
 [plugins]
 roots = ["../mosaikit-plugins", "plugins"]   # cartelle dei plugin
-include = ["com.mosaikit.notes", "com.geoportal.geofiles"]   # o "*"
+include = ["com.mosaikit.notes", "com.esempio.catasto"]   # o "*"
 
 [desktop]
 database = "sqlite"         # o "postgres" (PostgreSQL embedded, es. per PostGIS)
 port = 48080
 
 [docker]
-image = "geoportal"
+image = "prodotto"
 postgres_image = "postgis/postgis:17-3.5-alpine"
 
 [tests]
@@ -215,7 +217,7 @@ I colori accettano solo `#rrggbb`, quindi niente CSS arbitrario nella pagina.
 
 ```powershell
 cargo xtask plugin new catasto --id com.comune.catasto                  # in ../mosaikit-plugins
-cargo xtask --dist ../geoportal plugin new rilievi --id com.geoportal.rilievi   # nei plugin della distribuzione
+cargo xtask --dist ../prodotto plugin new rilievi --id com.esempio.rilievi   # nei plugin della distribuzione
 cargo xtask dev
 ```
 
@@ -332,7 +334,7 @@ Le regole sono verificate dagli stessi test sui due backend (vedi [Test](#test))
 
 ```powershell
 cargo xtask test                         # Rust su PostgreSQL e su SQLite, plugin, UI
-cargo xtask --dist ../geoportal test     # in piu' i plugin e i test di Geoportal
+cargo xtask --dist ../prodotto test      # in piu' i plugin e i test della distribuzione
 cargo xtask e2e                          # nel browser, su un'installazione completa
 cargo xtask ci                           # fmt, clippy -D warnings, cargo-deny, typecheck, lint, build, test
 ```
@@ -359,12 +361,12 @@ Per gli e2e, su Windows Playwright usa Edge già installato; altrove
 ```powershell
 $env:MOSAIKIT_SIGNING_KEY_FILE = "editore.key"   # senza: chiave di sviluppo .dev/signing.key
 cargo xtask release desktop                       # Mosaikit, con SQLite
-cargo xtask --dist ../geoportal release desktop   # Geoportal, PostgreSQL embedded con PostGIS
-cargo xtask --dist ../geoportal release desktop --pg-dir "C:\pgsql"   # PostgreSQL da una cartella
+cargo xtask --dist ../prodotto release desktop    # una distribuzione (SQLite o PostgreSQL embedded)
+cargo xtask --dist ../prodotto release desktop --pg-dir "C:\pgsql"   # PostgreSQL da una cartella
 ```
 
 Le release vanno nella cartella `dist/` **della distribuzione**: quelle di
-Mosaikit in `mosaikit/dist`, quelle di Geoportal in `geoportal/dist`.
+Mosaikit in `mosaikit/dist`, quelle di una distribuzione in `<prodotto>/dist`.
 
 ```
 mosaikit/dist/
@@ -378,6 +380,7 @@ mosaikit/dist/
 │   └── AVVIO.txt
 ├── mosaikit-1.0.0-desktop-windows-x86_64.zip
 ├── mosaikit-1.0.0-docker/       (da `release docker`, vedi sotto)
+├── mosaikit-1.0.0-k8s/          (da `release docker` o `release k8s`, vedi sotto)
 └── SHA256SUMS                   zip e immagini Docker
 ```
 
@@ -387,12 +390,17 @@ in `data\pg`, con PostGIS se disponibile.
 
 **Uso:**
 
-1. Doppio clic sull'eseguibile. Non si apre nessuna finestra: compare l'icona
-   del prodotto nell'area di notifica.
+1. Doppio clic sull'eseguibile: compare l'icona del prodotto nell'area di
+   notifica. Se l'avvio dura più di mezzo secondo (tipicamente il primo, o con
+   PostgreSQL embedded), una finestrella mostra logo, nome, **versione** e fase in
+   corso, con uno spinner.
 2. Al primo avvio crea il database (`data\mosaikit.db` oppure `data\pg`), poi
    installa e attiva i plugin.
-3. Il browser si apre su http://127.0.0.1:48080 (`url` in `mosaikit.toml`).
-   Per riaprirlo basta un clic sull'icona o un nuovo doppio clic.
+3. Quando è pronto, al **primo avvio** si apre il browser su
+   http://127.0.0.1:48080 (`url` in `mosaikit.toml`). **Dai successivi** compare
+   una notifica di Windows con l'indirizzo, che si apre con un clic. Con
+   `open_browser = false` c'è sempre e solo la notifica. Per riaprire l'app basta
+   un clic sull'icona o un nuovo doppio clic.
 4. La password iniziale di `admin` è in `data\initial-admin-password.txt`
    (menu dell'icona → *Credenziali iniziali*).
 5. Menu dell'icona → *Esci*: ferma tutto. Gli errori di avvio compaiono in una
@@ -405,8 +413,12 @@ cartella `data\`.
 
 ```powershell
 cargo xtask release docker                        # immagine mosaikit:<versione> + mosaikit/dist/mosaikit-<versione>-docker
-cargo xtask --dist ../geoportal release docker    # immagine geoportal:<versione> + geoportal/dist/geoportal-<versione>-docker
+cargo xtask --dist ../prodotto release docker     # immagine prodotto:<versione> + prodotto/dist/prodotto-<versione>-docker
+cargo xtask release all                           # desktop + Docker + Kubernetes (senza Docker attivo: desktop + Kubernetes)
 ```
+
+`release docker` genera anche la cartella Kubernetes (vedi sotto), con la stessa
+immagine.
 
 La distribuzione Docker è una cartella pronta da copiare sul server:
 
@@ -416,16 +428,18 @@ mosaikit/dist/mosaikit-1.0.0-docker/
 ├── compose.yml                  PostgreSQL (o PostGIS) + app
 ├── .env                         immagine, password, indirizzi e porte da modificare
 ├── initdb/                      creazione di ruolo, database ed eventuale PostGIS
-└── AVVIO.txt
+└── README.md                    installazione, produzione, backup, aggiornamento
 ```
 
 Sul server: `docker load -i mosaikit-1.0.0-image.tar`, poi si modifica `.env`
 e si lancia `docker compose up -d`. Dal repository, senza la cartella, basta
 `docker compose -f deploy/compose.yml up -d`.
 
-**Build.** Il contesto di build è la cartella che contiene `mosaikit`,
-`mosaikit-plugins` e le distribuzioni; `deploy/Dockerfile.dockerignore` lo
-limita a quei progetti. Il Dockerfile multi-stage:
+Il `README.md` della cartella nasce da `deploy/README.docker.md`.
+
+**Build.** `xtask` prepara un contesto di build temporaneo con mosaikit, le
+cartelle dei plugin e la cartella della distribuzione, letti da
+`distribution.toml`, senza build, dipendenze e dati. Il Dockerfile multi-stage:
 - compila UI, server e plugin della distribuzione (`--build-arg DIST=...`);
 - firma i plugin con la chiave passata come *secret* di BuildKit;
 - l'immagine gira come utente non root, con i dati nel volume `/data`.
@@ -439,7 +453,7 @@ limita a quei progetti. Il Dockerfile multi-stage:
 | `MOSAIKIT_DATABASE_URL` | `postgres://mosaikit_app:***@db:5432/mosaikit` |
 | `MOSAIKIT_ADMIN_PASSWORD` | password iniziale di `admin` (solo al primo avvio) |
 | `MOSAIKIT_TRUST_PROXY` | `true` dietro un reverse proxy (X-Forwarded-For) |
-| `MOSAIKIT_IMAGE`, `POSTGRES_IMAGE` | `geoportal`, `postgis/postgis:17-3.5-alpine` |
+| `MOSAIKIT_IMAGE`, `POSTGRES_IMAGE` | `prodotto`, `postgis/postgis:17-3.5-alpine` |
 
 **Database.** `deploy/initdb/01-mosaikit.sh` crea il ruolo applicativo
 `mosaikit_app` (non superutente, con `CREATEROLE` per i ruoli dei plugin), il
@@ -448,6 +462,34 @@ database e, se l'immagine la include, l'estensione PostGIS.
 **Produzione.** Metti un reverse proxy HTTPS davanti, con **due hostname**: uno
 per l'app (→ 8080) e uno per plugin, contenuti e link pubblici (→ 8081). Con
 `https://` il cookie di sessione diventa `Secure`.
+
+## Release Kubernetes
+
+```powershell
+cargo xtask release k8s                           # solo i manifest: mosaikit/dist/mosaikit-<versione>-k8s
+cargo xtask release k8s --tag registry.esempio.it/mosaikit:1.0.0
+```
+
+Manifest **kustomize** generati dai modelli di `deploy/k8s` (segnaposto
+`{{id}}`, `{{image}}`, `{{version}}`... sostituiti con i dati della
+distribuzione):
+
+```
+mosaikit/dist/mosaikit-1.0.0-k8s/
+├── kustomization.yaml   namespace, immagini, ConfigMap e Secret generati
+├── namespace.yaml
+├── postgres.yaml        StatefulSet PostgreSQL (o PostGIS) + volume
+├── app.yaml             Deployment (1 replica, Recreate) + Service + volume /data
+├── ingress.yaml         due hostname: app e plugin (origini separate)
+├── config.env           MOSAIKIT_URL, MOSAIKIT_PLUGIN_URL... (ConfigMap)
+├── secret.env           password (Secret)
+├── initdb/
+└── README.md            requisiti, installazione, database gestito, backup
+```
+
+Installazione: immagine nel registry del cluster, hostname e password da
+modificare, poi `kubectl apply -k .`. Se `kubectl` è installato, la release
+verifica i manifest con `kubectl kustomize` (non serve un cluster).
 
 ## Configurazione
 
@@ -509,4 +551,4 @@ Tutti accettano `--dist <cartella della distribuzione>`.
 | `cargo xtask plugin keygen [--out]` | chiavi di firma dell'editore |
 | `cargo xtask plugin db-reset <id>` | azzera i dati di un plugin (sviluppo) |
 | `cargo xtask test` / `e2e` / `ci` | test e controlli |
-| `cargo xtask release bundle\|desktop\|docker` | release della distribuzione |
+| `cargo xtask release bundle\|desktop\|docker\|k8s\|all` | release della distribuzione |

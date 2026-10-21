@@ -1,8 +1,8 @@
 # Server di una distribuzione Mosaikit + PostgreSQL.
 #   cargo xtask release docker                 # costruisce l'immagine mosaikit:<versione>
 #   MOSAIKIT_VERSION=1.0.0 docker compose -f deploy/compose.yml up -d
-# Un'altra distribuzione (es. geoportal, con PostGIS):
-#   MOSAIKIT_IMAGE=geoportal POSTGRES_IMAGE=postgis/postgis:17-3.5-alpine docker compose ... up -d
+# Una distribuzione (eventualmente con PostGIS):
+#   MOSAIKIT_IMAGE=prodotto POSTGRES_IMAGE=postgis/postgis:17-3.5-alpine docker compose ... up -d
 # App:   http://localhost:8080   (tenant system, utente admin, password MOSAIKIT_ADMIN_PASSWORD)
 # Plugin e contenuti: http://localhost:8081
 # In produzione metti un reverse proxy HTTPS davanti con DUE hostname

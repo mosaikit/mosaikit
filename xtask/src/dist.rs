@@ -1,7 +1,7 @@
 //! Distribuzione: cosa compone un prodotto basato su Mosaikit (nome, versione,
 //! branding, plugin inclusi, cartelle dei plugin). Mosaikit stesso e' la
-//! distribuzione di default (`distribution.toml` nella radice); geoportal ne
-//! ha una propria (`cargo xtask --dist ../geoportal ...`).
+//! distribuzione di default (`distribution.toml` nella radice); un prodotto
+//! derivato ha la propria nel suo progetto (`cargo xtask --dist ../<prodotto> ...`).
 
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;

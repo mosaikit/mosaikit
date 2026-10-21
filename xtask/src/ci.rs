@@ -32,7 +32,7 @@ pub fn test(skip_db: bool) -> Result<()> {
             .env_remove("CARGO_TARGET_DIR")
             .args(["test", "--workspace"]))?;
     }
-    // test di integrazione della distribuzione (es. geoportal/tests)
+    // test di integrazione della distribuzione (`[tests] cargo` in distribution.toml)
     for dir in &crate::dist::current().tests.cargo {
         eprintln!("== test della distribuzione in {}", dir.display());
         run(Command::new("cargo").current_dir(dir).args(["test"]).env("MOSAIKIT_TEST_DATABASE_URL", &url))?;

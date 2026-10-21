@@ -1,6 +1,6 @@
 # Distribuzione di default: Mosaikit "puro", con i plugin ufficiali.
-# Un prodotto derivato (es. ../geoportal) ha il proprio distribution.toml e si
-# compila con `cargo xtask --dist ../geoportal <comando>`.
+# Un prodotto derivato ha il proprio distribution.toml nel suo progetto e si
+# compila con `cargo xtask --dist ../<prodotto> <comando>`.
 
 [product]
 # identificatore tecnico: nomi dei file di release e dell'immagine Docker

@@ -1,10 +1,6 @@
-# Contesto: la cartella che contiene mosaikit, mosaikit-plugins e le distribuzioni.
-# Si includono solo i progetti necessari, senza build, dipendenze e dati.
-*
-!mosaikit
-!mosaikit-plugins
-!geoportal
-
+# Contesto: mosaikit, le cartelle dei plugin e la distribuzione (vedi Dockerfile).
+# `cargo xtask release docker` li copia gia' senza build e dipendenze; queste
+# regole valgono anche per una build fatta a mano o in CI.
 **/target
 **/node_modules
 **/dist
@@ -12,3 +8,4 @@
 **/.git
 **/test-results
 **/playwright-report
+**/*.key

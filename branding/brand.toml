@@ -3,7 +3,7 @@
 # =============================================================================
 #  Mosaikit usa questi valori per titolo della pagina, accesso, barra di stato,
 #  area di notifica (desktop) e colori del tema. Una distribuzione basata su
-#  Mosaikit (es. geoportal) ha la propria cartella `branding/` con questo file
+#  Mosaikit ha la propria cartella `branding/` con questo file
 #  e le immagini indicate. Ogni proprieta' e' facoltativa.
 #  I file (logo, favicon, icon) sono nomi di file in questa cartella.
 # =============================================================================

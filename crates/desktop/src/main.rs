@@ -6,6 +6,10 @@
 //! il PostgreSQL embedded. Log in `<data_dir>/logs/mosaikit.log`.
 //! Una seconda esecuzione, con Mosaikit gia' attivo, apre solo il browser.
 //!
+//! Durante l'avvio, se dura piu' di mezzo secondo, una finestrella mostra nome,
+//! versione e fase in corso. Quando l'app e' pronta: al primo avvio si apre il
+//! browser, ai successivi compare una notifica di Windows con l'indirizzo.
+//!
 //! E' l'unico eseguibile della versione desktop: da un terminale accetta anche
 //! i comandi di amministrazione (`migrate`, `reset-password`, `config`, `--help`),
 //! scrivendo nella console da cui e' stato lanciato.
@@ -14,6 +18,10 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 mod icon;
+#[cfg(windows)]
+mod notify;
+#[cfg(windows)]
+mod splash;
 #[cfg(windows)]
 mod tray;
 
@@ -65,6 +73,8 @@ fn run_admin(path: Option<PathBuf>, base: PathBuf, cmd: AdminCmd) -> i32 {
 
 /// Notifiche dal thread del server al thread dell'interfaccia.
 pub enum Status {
+    /// fase dell'avvio (finestra di avvio)
+    Progress(String),
     Ready,
     Failed(String),
     Stopped(Option<String>),
@@ -73,8 +83,16 @@ pub enum Status {
 pub struct App {
     /// nome del prodotto (marchio)
     pub name: String,
+    /// versione del prodotto (marchio)
+    pub version: String,
+    /// colori del marchio (finestra di avvio)
+    pub colors: std::collections::BTreeMap<String, String>,
     /// icona del marchio per l'area di notifica (.ico), se presente
     pub icon: Option<PathBuf>,
+    /// icona in un file .ico (finestra di avvio, notifiche): del marchio o quella di Mosaikit
+    pub icon_file: PathBuf,
+    /// primo avvio: si apre il browser; poi solo la notifica
+    pub first_run: bool,
     pub app_url: String,
     pub data_dir: PathBuf,
     pub log_file: PathBuf,
@@ -96,6 +114,11 @@ fn init_log(dir: &Path) -> PathBuf {
         Err(_) => tracing_subscriber::fmt().with_env_filter(filter).init(),
     }
     file
+}
+
+/// File che segna che l'app e' gia' stata avviata (e il browser gia' aperto una volta).
+pub fn first_run_marker(data_dir: &Path) -> PathBuf {
+    data_dir.join(".avviato")
 }
 
 /// Mosaikit risponde gia' su questo indirizzo?
@@ -120,8 +143,12 @@ fn spawn_server(
                 return;
             }
         };
+        let progress = status.clone();
         rt.block_on(async move {
-            let k = match Kernel::start(cfg).await {
+            let report = move |p: &str| {
+                let _ = progress.send(Status::Progress(p.to_string()));
+            };
+            let k = match Kernel::start_with_progress(cfg, &report).await {
                 Ok(k) => k,
                 Err(e) => {
                     tracing::error!("avvio non riuscito: {e}");
@@ -185,9 +212,19 @@ fn main() {
         Some(dir) => mosaikit_kernel::brand::Brand::load(dir).unwrap_or_else(|e| fatal(&e.to_string())),
         None => mosaikit_kernel::brand::Brand::default(),
     };
+    let icon_file = brand.file("icon").unwrap_or_else(|| {
+        // icona di Mosaikit in un .ico temporaneo (la finestra e le notifiche leggono un file)
+        let f = std::env::temp_dir().join("mosaikit-icon.ico");
+        let _ = std::fs::write(&f, icon::ico());
+        f
+    });
     let app = App {
         name: brand.name.clone(),
+        version: brand.version().to_string(),
+        colors: brand.colors.clone(),
         icon: brand.file("icon"),
+        icon_file,
+        first_run: !first_run_marker(&cfg.data_dir).is_file(),
         app_url: cfg.app_url.clone(),
         data_dir: cfg.data_dir.clone(),
         log_file,
@@ -217,6 +254,7 @@ fn main() {
         });
         for s in status_rx {
             match s {
+                Status::Progress(p) => tracing::info!("avvio: {p}"),
                 Status::Ready => {
                     if app.open_browser {
                         mosaikit_server::open_browser(&app.app_url);

@@ -454,7 +454,7 @@ firmati, segnalandoli.
 ### 8.6 Chiamate tra plugin
 
 Un plugin non legge mai le tabelle di un altro. Puo' pero' chiamarne i comandi:
-`ctx.call_plugin("com.geoportal.geofiles", "geofiles.layers", args)`, se il
+`ctx.call_plugin("com.esempio.dati", "dati.elenco", args)`, se il
 plugin chiamato e' dichiarato in `[permissions] calls`. Il comando chiamato:
 
 - gira con **lo stesso utente e tenant**, in una **sua transazione** e con il
@@ -569,7 +569,7 @@ mosaikit/
 │   └── mosaikit.dev.toml    configurazione di `cargo xtask dev`
 ├── docs/
 ../mosaikit-plugins/         plugin ufficiali (notes, tasks, contacts, maps, static-site, files)
-../geoportal/                distribuzione di esempio (§14)
+../<prodotto>/               eventuali distribuzioni (§14): fanno riferimento a mosaikit
 ```
 
 ## 12. Sviluppo
@@ -604,9 +604,11 @@ modalità dev esiste solo nelle build debug.
 | Release | Comando | Contenuto |
 |---|---|---|
 | Desktop | `cargo xtask [--dist ..] release desktop` | zip con eseguibile (nome, icona e descrizione del marchio), configurazione commentata, plugin firmati, registry; SQLite oppure PostgreSQL embedded (`[desktop] database`) |
-| Server | `cargo xtask [--dist ..] release docker` | immagine Docker della distribuzione (contesto: la cartella con mosaikit, mosaikit-plugins e le distribuzioni) e cartella pronta all'uso: immagine salvata, `compose.yml` con PostgreSQL (o PostGIS), `.env`, `initdb/` |
+| Server | `cargo xtask [--dist ..] release docker` | immagine Docker della distribuzione (contesto temporaneo: mosaikit, cartelle dei plugin e distribuzione, da distribution.toml) e cartella pronta all'uso: immagine salvata, `compose.yml` con PostgreSQL (o PostGIS), `.env`, `initdb/`, `README.md`; in più la cartella Kubernetes |
+| Kubernetes | `cargo xtask [--dist ..] release k8s` | manifest kustomize da `deploy/k8s`: namespace, PostgreSQL (StatefulSet), app (Deployment `Recreate`, volume `/data`), Ingress con due hostname, ConfigMap e Secret da `config.env`/`secret.env`, `README.md`; verificati con `kubectl kustomize` |
+| Tutte | `cargo xtask [--dist ..] release all` | desktop, Docker e Kubernetes (senza Docker attivo: desktop e Kubernetes) |
 
-Le release vanno in `<distribuzione>/dist` (`mosaikit/dist`, `geoportal/dist`).
+Le release vanno in `<distribuzione>/dist` (`mosaikit/dist` per Mosaikit).
 La versione desktop ha **un solo eseguibile**: senza argomenti avvia l'app con
 l'icona nell'area di notifica; da un terminale esegue i comandi di
 amministrazione (`migrate`, `reset-password`, `config`) nella sua console.
@@ -640,10 +642,9 @@ tema (solo `#rrggbb`, convertiti in variabili CSS). Ecco come si applica:
 - **app desktop**: lo mostra nell'area di notifica;
 - **release desktop**: incorpora nell'eseguibile nome, versione e icona.
 
-Esempio: **Geoportal** (`../geoportal`):
-- plugin propri: Dati geografici in PostGIS, Elaborazioni come job, Cruscotti;
-- scelta di plugin ufficiali;
-- PostgreSQL anche sul desktop.
+La dipendenza va in un solo verso: la distribuzione fa riferimento a Mosaikit
+(SDK, `@mosaikit/plugin-api`, kernel per i test, xtask per build e release),
+Mosaikit non fa riferimento a nessuna distribuzione.
 
 ## 15. Limiti noti e prossimi passi
 
@@ -662,6 +663,3 @@ Esempio: **Geoportal** (`../geoportal`):
 - **SQLite**: niente `plugin.call` ne' estensioni; scritture serializzate (adatto
   al desktop e a installazioni piccole); `ILIKE` diventa `LIKE`, che non
   distingue maiuscole e minuscole solo per i caratteri ASCII.
-- **Geoportal**: import di GeoJSON e CSV (gli shapefile vanno convertiti prima);
-  anteprime SVG senza mappe di sfondo; le elaborazioni girano in modo sincrono
-  (il job registra stato ed esito, senza una coda in background).

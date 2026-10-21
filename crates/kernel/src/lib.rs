@@ -173,18 +173,29 @@ pub struct Kernel {
 
 impl Kernel {
     /// Avvio completo: database (o PostgreSQL embedded), bootstrap, plugin.
-    pub async fn start(mut cfg: Config) -> Result<Arc<Kernel>> {
+    pub async fn start(cfg: Config) -> Result<Arc<Kernel>> {
+        Kernel::start_with_progress(cfg, &|_| {}).await
+    }
+
+    /// Come `start`, comunicando le fasi dell'avvio (es. alla finestra di avvio desktop).
+    pub async fn start_with_progress(
+        mut cfg: Config,
+        progress: &(dyn Fn(&str) + Send + Sync),
+    ) -> Result<Arc<Kernel>> {
         cfg.derive()?;
         std::fs::create_dir_all(&cfg.data_dir)?;
         let mut embedded = None;
         let max = cfg.database.max_connections.max(2);
+        progress("Preparazione del database");
         let db = if cfg.backend() == config::Backend::Sqlite {
             let file = cfg.sqlite_file();
             tracing::info!("database SQLite: {}", file.display());
             Db::open_sqlite(&file, max).await?
         } else {
             let url = if cfg.database.embedded {
+                progress("Avvio di PostgreSQL");
                 let pg = embedded::EmbeddedPg::start(&cfg).await?;
+                progress("Preparazione del database");
                 let url = pg.url.clone();
                 embedded = Some(pg);
                 url
@@ -231,12 +242,14 @@ impl Kernel {
         });
         let _ = kernel.me.set(Arc::downgrade(&kernel));
         identity::bootstrap(&kernel).await?;
+        progress("Caricamento dei plugin");
         plugins::load_installed(&kernel).await?;
         if kernel.cfg.dev.enabled {
             plugins::dev::load_all(&kernel).await;
             plugins::dev::watch(kernel.clone());
         }
         if kernel.cfg.preinstall {
+            progress("Installazione dei plugin");
             plugins::registry::preinstall(&kernel).await?;
         }
         blobs::gc(&kernel).await;

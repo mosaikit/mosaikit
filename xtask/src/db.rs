@@ -111,7 +111,7 @@ fn up_local(bin: &std::path::Path) -> Result<()> {
     if psql("select 1 from pg_database where datname = 'mosaikit'")?.trim() != "1" {
         psql(&format!("create database mosaikit owner {DEV_USER}"))?;
     }
-    // PostGIS (plugin geospaziali, es. geoportal) se installato: nel template, cosi'
+    // PostGIS (plugin che lo richiedono) se installato: nel template, cosi'
     // lo ereditano anche i database dei test, e nel database di sviluppo
     if psql("select 1 from pg_available_extensions where name = 'postgis'")?.trim() == "1" {
         for db in ["template1", "mosaikit"] {

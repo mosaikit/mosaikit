@@ -1,0 +1,46 @@
+# {{name}} {{version}} su Kubernetes (kustomize). Installazione:
+#   1. modifica config.env (indirizzi) e secret.env (password)
+#   2. imposta l'immagine qui sotto (registry raggiungibile dal cluster)
+#   3. modifica gli hostname in ingress.yaml
+#   4. kubectl apply -k .
+# Dettagli in README.md.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: {{id}}
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: {{id}}
+    includeSelectors: false
+
+resources:
+  - namespace.yaml
+  - postgres.yaml
+  - app.yaml
+  - ingress.yaml
+
+# indirizzi pubblici e opzioni dell'app (non segreti)
+configMapGenerator:
+  - name: {{id}}-config
+    envs:
+      - config.env
+  # script di prima inizializzazione del database (ruolo applicativo, PostGIS)
+  - name: {{id}}-postgres-initdb
+    files:
+      - initdb/01-mosaikit.sh
+
+# password: in produzione meglio un gestore di segreti (Sealed Secrets, External Secrets...)
+secretGenerator:
+  - name: {{id}}-secret
+    envs:
+      - secret.env
+
+# immagine dell'app: caricala in un registry raggiungibile dal cluster e scrivila qui
+images:
+  - name: {{image}}
+    newName: {{image}}
+    newTag: "{{version}}"
+  - name: postgres-image
+    newName: {{postgres_repo}}
+    newTag: "{{postgres_tag}}"

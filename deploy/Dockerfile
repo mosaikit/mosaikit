@@ -1,11 +1,12 @@
 # syntax=docker/dockerfile:1.7
 # Immagine del server di una distribuzione Mosaikit (multi-stage).
 #
-# Il contesto di build e' la cartella che contiene mosaikit, mosaikit-plugins e
-# le eventuali distribuzioni (es. geoportal): i plugin stanno in progetti separati.
-# Costruzione (passa la chiave di firma come secret):
+# Il contesto contiene mosaikit, le cartelle dei plugin (es. mosaikit-plugins) e la
+# cartella della distribuzione, affiancati come in locale: `cargo xtask release docker`
+# lo prepara in una cartella temporanea leggendo distribution.toml e passa la chiave
+# di firma come secret:
 #   cargo xtask release docker                       # Mosaikit
-#   cargo xtask --dist ../geoportal release docker   # un'altra distribuzione
+#   cargo xtask --dist ../prodotto release docker    # una distribuzione
 # oppure a mano, dalla cartella superiore:
 #   docker build -f mosaikit/deploy/Dockerfile --build-arg DIST=mosaikit \
 #     --secret id=signing_key,src=<file> -t mosaikit:1.0.0 .

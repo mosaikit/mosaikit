@@ -1,0 +1,122 @@
+# {{name}}: un'istanza dell'app con volume persistente per file caricati e pacchetti
+# dei plugin (/data). Una sola replica: i contenuti stanno sul volume (ReadWriteOnce);
+# sessioni e dati sono nel database. Aggiornamento "Recreate": la vecchia istanza si
+# ferma prima che parta la nuova (le migrazioni girano all'avvio).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{id}}-data
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{id}}
+  labels:
+    app.kubernetes.io/name: {{id}}
+spec:
+  selector:
+    app.kubernetes.io/name: {{id}}
+  ports:
+    # app: UI e API
+    - name: app
+      port: 8080
+      targetPort: app
+    # UI dei plugin, file caricati e link pubblici (origine separata)
+    - name: plugins
+      port: 8081
+      targetPort: plugins
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{id}}
+  labels:
+    app.kubernetes.io/name: {{id}}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{id}}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{id}}
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      containers:
+        - name: app
+          image: {{image}}
+          ports:
+            - name: app
+              containerPort: 8080
+            - name: plugins
+              containerPort: 8081
+          envFrom:
+            - configMapRef:
+                name: {{id}}-config
+          env:
+            - name: MOSAIKIT_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{id}}-secret
+                  key: MOSAIKIT_DB_PASSWORD
+            - name: MOSAIKIT_DATABASE_URL
+              value: postgres://mosaikit_app:$(MOSAIKIT_DB_PASSWORD)@{{id}}-postgres:5432/mosaikit
+            # password iniziale di admin (tenant system): usata solo al primo avvio
+            - name: MOSAIKIT_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{id}}-secret
+                  key: MOSAIKIT_ADMIN_PASSWORD
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          # salute: /api/health sotto il percorso base di MOSAIKIT_URL (come nel Dockerfile)
+          startupProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - p=$(printf '%s' "${MOSAIKIT_URL:-}" | sed -E 's#^[a-z]+://[^/]*##; s#/$##'); curl -fsS "http://127.0.0.1:8080${p}/api/health"
+            periodSeconds: 5
+            failureThreshold: 60
+          readinessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - p=$(printf '%s' "${MOSAIKIT_URL:-}" | sed -E 's#^[a-z]+://[^/]*##; s#/$##'); curl -fsS "http://127.0.0.1:8080${p}/api/health"
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command:
+                - sh
+                - -c
+                - p=$(printf '%s' "${MOSAIKIT_URL:-}" | sed -E 's#^[a-z]+://[^/]*##; s#/$##'); curl -fsS "http://127.0.0.1:8080${p}/api/health"
+            periodSeconds: 20
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 1Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{id}}-data
