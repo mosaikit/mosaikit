@@ -31,7 +31,8 @@ use uuid::Uuid;
 use crate::value::{ts_text, Param, Row, Val};
 use crate::{Ctx, DbError, Query, Result};
 
-const MIGRATIONS: &[(i64, &str, &str)] = &[(1, "core", include_str!("0001_core.sql"))];
+const MIGRATIONS: &[(i64, &str, &str)] =
+    &[(1, "core", include_str!("0001_core.sql")), (2, "admins", include_str!("0002_admins.sql"))];
 
 /// Contesto della transazione sulla connessione (letto da `core_ctx_*()`).
 #[derive(Debug, Clone, Default)]
@@ -778,7 +779,10 @@ fn authorize(prefix: &str, a: &AuthContext<'_>) -> Authorization {
         AuthAction::Read { table_name, column_name } => {
             let secret_table =
                 matches!(table_name, "core_secrets" | "core_sessions" | "core_tickets" | "core_migrations");
-            let secret_col = matches!(column_name, "password_hash" | "role_password" | "token_hash" | "csrf");
+            let secret_col = matches!(
+                column_name,
+                "password_hash" | "role_password" | "token_hash" | "csrf" | "totp_secret" | "totp_recovery"
+            );
             if secret_table || secret_col || table_name.starts_with("sqlite_") {
                 Authorization::Deny
             } else {

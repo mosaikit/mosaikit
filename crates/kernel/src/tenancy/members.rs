@@ -24,13 +24,17 @@ pub struct MemberInfo {
 
 pub async fn members(k: &Kernel, c: &Caller) -> Result<Vec<MemberInfo>> {
     c.require_manager()?;
+    members_of(k, c.tenant.tenant_id).await
+}
+
+pub(super) async fn members_of(k: &Kernel, tenant: Uuid) -> Result<Vec<MemberInfo>> {
     let rows = mosaikit_db::query(
         "select u.id, u.username, u.display_name, h.slug, u.home_tenant_id <> m.tenant_id, m.role, u.status, m.joined_at,
                 (select count(*) from core.resources r where r.tenant_id = m.tenant_id and r.owner_id = u.id)
          from core.memberships m join core.users u on u.id = m.user_id join core.tenants h on h.id = u.home_tenant_id
          where m.tenant_id = $1 order by u.username",
     )
-    .bind(c.tenant.tenant_id)
+    .bind(tenant)
     .fetch_all(&k.db)
     .await?;
     rows.iter()
@@ -60,6 +64,19 @@ pub async fn create_member(
     role: Role,
 ) -> Result<Uuid> {
     c.require_manager()?;
+    create_member_in(k, c.tenant.tenant_id, c.user.user_id, username, display_name, password, role).await
+}
+
+/// Crea un utente locale di `tenant` (anche per l'Administrator, che nomina un gestore).
+pub(super) async fn create_member_in(
+    k: &Kernel,
+    tenant: Uuid,
+    actor: Uuid,
+    username: &str,
+    display_name: &str,
+    password: &str,
+    role: Role,
+) -> Result<Uuid> {
     let username = username.trim().to_lowercase();
     if !valid_username(&username) {
         return Err(Error::bad("username non valido: minuscole, cifre, '.', '-', '_' (2-64)"));
@@ -70,7 +87,7 @@ pub async fn create_member(
     let id: Uuid = mosaikit_db::query_scalar(
         "insert into core.users (home_tenant_id, username, display_name, password_hash) values ($1, $2, $3, $4) returning id",
     )
-    .bind(c.tenant.tenant_id)
+    .bind(tenant)
     .bind(&username)
     .bind(display_name.trim())
     .bind(hash)
@@ -83,17 +100,17 @@ pub async fn create_member(
     mosaikit_db::query(
         "insert into core.memberships (tenant_id, user_id, role, invited_by) values ($1, $2, $3, $4)",
     )
-    .bind(c.tenant.tenant_id)
+    .bind(tenant)
     .bind(id)
     .bind(role.as_str())
-    .bind(c.user.user_id)
+    .bind(actor)
     .execute(&mut *tx)
     .await?;
     tx.commit().await?;
     events::record(
         k,
-        Some(c.tenant.tenant_id),
-        Some(c.user.user_id),
+        Some(tenant),
+        Some(actor),
         None,
         None,
         "member.create",
@@ -106,11 +123,18 @@ pub async fn create_member(
 /// Reimposta la password di un membro che ha questo tenant come tenant di appartenenza.
 pub async fn reset_member_password(k: &Kernel, c: &Caller, user_id: Uuid, password: &str) -> Result<()> {
     c.require_manager()?;
-    let home: Option<Uuid> = mosaikit_db::query_scalar("select home_tenant_id from core.users where id = $1")
-        .bind(user_id)
-        .fetch_optional(&k.db)
-        .await?;
-    if home != Some(c.tenant.tenant_id) {
+    reset_password_in(k, c.tenant.tenant_id, user_id, password).await
+}
+
+pub(super) async fn reset_password_in(k: &Kernel, tenant: Uuid, user_id: Uuid, password: &str) -> Result<()> {
+    // mai un Administrator: e' un account del tenant di sistema, gestito solo dagli Administrator
+    let home: Option<Uuid> = mosaikit_db::query_scalar(
+        "select home_tenant_id from core.users where id = $1 and not is_system_admin",
+    )
+    .bind(user_id)
+    .fetch_optional(&k.db)
+    .await?;
+    if home != Some(tenant) {
         return Err(Error::forbidden("puoi reimpostare solo le password degli utenti del tuo tenant"));
     }
     crate::identity::set_password(k, user_id, password).await?;
@@ -140,25 +164,31 @@ pub(super) async fn member_role(k: &Kernel, tenant: Uuid, user: Uuid) -> Result<
 
 pub async fn set_role(k: &Kernel, c: &Caller, user_id: Uuid, role: Role) -> Result<()> {
     c.require_manager()?;
-    let current = member_role(k, c.tenant.tenant_id, user_id)
-        .await?
-        .ok_or_else(|| Error::not_found("membro non trovato"))?;
-    if current == Role::TenantManager
-        && role == Role::User
-        && managers_count(k, c.tenant.tenant_id).await? <= 1
-    {
+    set_role_in(k, c.tenant.tenant_id, c.user.user_id, user_id, role).await
+}
+
+pub(super) async fn set_role_in(
+    k: &Kernel,
+    tenant: Uuid,
+    actor: Uuid,
+    user_id: Uuid,
+    role: Role,
+) -> Result<()> {
+    let current =
+        member_role(k, tenant, user_id).await?.ok_or_else(|| Error::not_found("membro non trovato"))?;
+    if current == Role::TenantManager && role == Role::User && managers_count(k, tenant).await? <= 1 {
         return Err(Error::bad("il tenant deve avere almeno un gestore"));
     }
     mosaikit_db::query("update core.memberships set role = $3 where tenant_id = $1 and user_id = $2")
-        .bind(c.tenant.tenant_id)
+        .bind(tenant)
         .bind(user_id)
         .bind(role.as_str())
         .execute(&k.db)
         .await?;
     events::record(
         k,
-        Some(c.tenant.tenant_id),
-        Some(c.user.user_id),
+        Some(tenant),
+        Some(actor),
         None,
         None,
         "member.role",
@@ -218,6 +248,26 @@ pub async fn remove_member(
         .fetch_one(&k.db)
         .await?;
     let disabled = home == tenant;
+    if disabled {
+        // l'account viene disabilitato: nessun altro tenant deve restare senza gestore
+        let orphan: Option<String> = mosaikit_db::query_scalar(
+            "select t.slug from core.memberships m join core.tenants t on t.id = m.tenant_id
+             where m.user_id = $1 and m.tenant_id <> $2 and m.role = 'tenant_manager'
+               and not exists (select 1 from core.memberships o join core.users u on u.id = o.user_id
+                               where o.tenant_id = m.tenant_id and o.user_id <> $1
+                                 and o.role = 'tenant_manager' and u.status = 'active')
+             limit 1",
+        )
+        .bind(user_id)
+        .bind(tenant)
+        .fetch_optional(&k.db)
+        .await?;
+        if let Some(slug) = orphan {
+            return Err(Error::conflict(format!(
+                "l'utente e' l'unico Tenant Manager del tenant '{slug}': prima nominane un altro"
+            )));
+        }
+    }
 
     let mut tx = k.db.begin_app().await?;
     let reassigned = match new_owner {

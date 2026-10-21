@@ -49,6 +49,12 @@ pub struct Config {
     pub preinstall: bool,
     #[serde(default = "d_session_hours")]
     pub session_ttl_hours: i64,
+    /// al primo avvio crea anche questo tenant di lavoro con il Tenant Manager `utente` (desktop)
+    #[serde(default)]
+    pub initial_tenant: Option<String>,
+    /// secondo fattore (TOTP) obbligatorio per gli Administrator
+    #[serde(default = "d_admin_totp")]
+    pub admin_totp: bool,
     /// desktop: apre il browser sull'app all'avvio
     #[serde(default)]
     pub open_browser: bool,
@@ -159,6 +165,9 @@ fn d_data_dir() -> PathBuf {
 }
 fn d_session_hours() -> i64 {
     12
+}
+fn d_admin_totp() -> bool {
+    true
 }
 fn d_max_conn() -> u32 {
     20
@@ -288,6 +297,8 @@ impl Config {
                 "MOSAIKIT_PREINSTALL" => self.preinstall = truthy(&v),
                 "MOSAIKIT_TRUST_PROXY" => self.trust_proxy = truthy(&v),
                 "MOSAIKIT_OPEN_BROWSER" => self.open_browser = truthy(&v),
+                "MOSAIKIT_ADMIN_TOTP" => self.admin_totp = truthy(&v),
+                "MOSAIKIT_INITIAL_TENANT" => self.initial_tenant = Some(v).filter(|s| !s.is_empty()),
                 "MOSAIKIT_REGISTRY" => self.registry = Some(v.into()),
                 "MOSAIKIT_TRUSTED_KEYS" => self
                     .trusted_keys

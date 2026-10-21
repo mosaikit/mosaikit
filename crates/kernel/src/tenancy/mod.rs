@@ -10,9 +10,13 @@ mod groups;
 mod invitations;
 mod members;
 mod settings;
+mod support;
 mod tenants;
 
-pub use administrators::{administrators, set_administrator, AdminInfo};
+pub use administrators::{
+    administrators, create_administrator, reset_administrator_password, reset_administrator_totp,
+    set_administrator_active, AdminInfo,
+};
 pub use directory::{directory, Principal};
 pub use groups::{create_group, delete_group, groups, set_group_member, GroupInfo, GroupMember};
 pub use invitations::{
@@ -22,7 +26,10 @@ pub use members::{
     create_member, members, remove_member, reset_member_password, set_role, MemberInfo, RemoveReport,
 };
 pub use settings::{prefs, set_prefs, set_settings};
-pub use tenants::{create_tenant, list_tenants, set_tenant_status, NewTenant, TenantInfo};
+pub use support::{create_tenant_manager, reset_tenant_password, set_tenant_role, tenant_members};
+pub use tenants::{
+    create_tenant, list_tenants, login_tenants, set_tenant_status, LoginTenant, NewTenant, TenantInfo,
+};
 
 use serde_json::Value;
 
@@ -36,12 +43,13 @@ pub fn require_admin(user: &SessionUser) -> Result<()> {
     }
 }
 
-/// Risolve il tenant attivo di una richiesta e verifica la membership.
+/// Risolve il tenant attivo di una richiesta e verifica la membership. Il tenant di
+/// sistema non e' uno spazio di lavoro: non risolve mai.
 pub async fn caller(k: &Kernel, user: &SessionUser, slug: &str) -> Result<Caller> {
     let row = mosaikit_db::query(
         "select t.id, t.slug, t.name, t.settings, m.role from core.tenants t
          join core.memberships m on m.tenant_id = t.id
-         where t.slug = $1 and m.user_id = $2 and t.status = 'active'",
+         where t.slug = $1 and m.user_id = $2 and t.status = 'active' and not t.is_system",
     )
     .bind(slug)
     .bind(user.user_id)
@@ -61,7 +69,7 @@ pub async fn caller(k: &Kernel, user: &SessionUser, slug: &str) -> Result<Caller
     })
 }
 
-fn valid_slug(s: &str) -> bool {
+pub(crate) fn valid_slug(s: &str) -> bool {
     let mut c = s.chars();
     matches!(c.next(), Some('a'..='z' | '0'..='9'))
         && (2..=40).contains(&s.len())

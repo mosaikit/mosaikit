@@ -34,19 +34,27 @@ Architettura completa: **[docs/architettura.md](docs/architettura.md)**.
 ## Cosa offre
 
 - **Tre ruoli**:
-  - **Administrator**: di sistema; gestisce tenant, plugin, KPI globali e gli
-    altri Administrator;
+  - **Administrator**: account di piattaforma del tenant `system`, che non è uno
+    spazio di lavoro; gestisce tenant e loro Tenant Manager, plugin, KPI globali
+    e gli altri Administrator. Accede da una pagina a parte, sempre con utente e
+    password locali e il secondo fattore (TOTP);
   - **Tenant Manager**: gestisce utenti, inviti, gruppi, policy e KPI del
     proprio tenant;
   - **User**: lavora con le proprie risorse e con quelle condivise con lui.
 
   Ogni utente si autentica sempre sul proprio tenant di appartenenza e può
-  essere invitato in altri tenant, con un ruolo diverso in ciascuno.
+  essere invitato in altri tenant, con un ruolo diverso in ciascuno. Chi è sia
+  Administrator sia utente di un tenant ha due account separati: i ruoli non
+  si sovrappongono mai.
+- **Accesso**: gli utenti scelgono il tenant da un menu (nascosto se il tenant
+  è uno solo; `#/login/<tenant>` lo preseleziona); gli Administrator entrano da
+  *Accesso amministratori* (`#/admin`). Al primo accesso l'Administrator
+  registra un'app di autenticazione (QR code) e riceve dieci codici di recupero.
 - **Panoramica**: è la pagina iniziale dopo l'accesso e mostra i dati del ruolo:
   - per tutti: le proprie risorse, le condivisioni fatte e ricevute, i link
     pubblici, l'attività recente;
   - per il Tenant Manager, in più: gli aggregati del tenant;
-  - per l'Administrator, in più: quelli di tutto il sistema.
+  - per l'Administrator: gli aggregati di tutto il sistema.
 - **Risorse con proprietario**:
   - si condividono con utenti e gruppi del tenant a tre livelli (lettura,
     scrittura, gestione), con ereditarietà sulle cartelle;
@@ -145,8 +153,9 @@ cargo xtask --dist ../prodotto dev    # oppure una distribuzione (marchio e plug
    - plugin letti dalle loro cartelle, con `MOSAIKIT_DEV_PLUGINS`.
 4. Avvia **Vite** per la UI host su **http://127.0.0.1:5173**.
 
-Primo accesso: tenant `system`, utente `admin`, password `admin-sviluppo`
-(oppure il valore di `MOSAIKIT_ADMIN_PASSWORD`).
+Primo accesso: *Accesso amministratori* (`#/admin`), utente `admin`, password
+`admin-sviluppo` (oppure il valore di `MOSAIKIT_ADMIN_PASSWORD`). In sviluppo il
+secondo fattore è disattivato (`admin_totp = false`).
 
 | Modifica | Effetto |
 |---|---|
@@ -342,11 +351,11 @@ cargo xtask ci                           # fmt, clippy -D warnings, cargo-deny, 
 | Suite | Cosa verifica |
 |---|---|
 | `crates/db/tests` | **su entrambi i backend**: filtri per livello, ereditarietà, isolamento tra tenant, plugin confinato nel suo spazio, link pubblici in sola lettura, KPI, rifiuto di schemi non conformi, disinstallazione |
-| `crates/kernel/tests` | (anche con `MOSAIKIT_TEST_BACKEND=sqlite`) identità, tre ruoli e più Administrator, tenant e inviti, condivisione, Panoramica per ruolo, riassegnazione, hook e comandi WASM, KPI, file, siti, firma dei pacchetti, migrazioni, catalogo e blocklist, plugin malevoli, modalità sviluppo |
+| `crates/kernel/tests` | (anche con `MOSAIKIT_TEST_BACKEND=sqlite`) identità, tre ruoli, account Administrator e secondo fattore, interventi dell'Administrator sui tenant, tenant e inviti, condivisione, Panoramica per ruolo, riassegnazione, hook e comandi WASM, KPI, file, siti, firma dei pacchetti, migrazioni, catalogo e blocklist, plugin malevoli, modalità sviluppo |
 | `crates/server/tests` | (anche su SQLite) cookie e CSRF, header di sicurezza, separazione delle origini, contenuti in sandbox, link pubblici, percorso base, marchio |
 | unit test dei crate e dei plugin | configurazione, manifest, pacchetti, guard e traduzione SQL, runtime, SDK, logica dei plugin |
 | `ui/*`, `<plugin>/ui` (vitest) | bridge, instradamento delle operazioni, CRUD generico, file manager |
-| `e2e` (Playwright) | sotto il percorso base `/mosaikit`: Administrator, tenant, Tenant Manager, User, Panoramica, plugin in iframe, condivisione, link pubblico, KPI, isolamento dell'iframe |
+| `e2e` (Playwright) | sotto il percorso base `/mosaikit`: Administrator (con registrazione del secondo fattore), tenant, Tenant Manager, User, Panoramica, plugin in iframe, condivisione, link pubblico, KPI, isolamento dell'iframe |
 
 I test PostgreSQL creano database usa e getta (`msk_t_*`) sul cluster di
 sviluppo, oppure dove indica `MOSAIKIT_TEST_DATABASE_URL`; serve un ruolo con
@@ -401,8 +410,11 @@ in `data\pg`, con PostGIS se disponibile.
    una notifica di Windows con l'indirizzo, che si apre con un clic. Con
    `open_browser = false` c'è sempre e solo la notifica. Per riaprire l'app basta
    un clic sull'icona o un nuovo doppio clic.
-4. La password iniziale di `admin` è in `data\initial-admin-password.txt`
-   (menu dell'icona → *Credenziali iniziali*).
+4. Il primo avvio crea anche il tenant di lavoro (`initial_tenant = "locale"`,
+   con il nome del prodotto) e il suo utente `utente`: si lavora subito.
+   L'Administrator `admin` entra da *Accesso amministratori*. Le password
+   iniziali sono in `data\credenziali-iniziali.txt` (menu dell'icona →
+   *Credenziali iniziali*).
 5. Menu dell'icona → *Esci*: ferma tutto. Gli errori di avvio compaiono in una
    finestra di messaggio.
 
@@ -518,21 +530,33 @@ porte interne. Per controllare la configurazione risolta: `mosaikit-server confi
 
 ```powershell
 mosaikit-server migrate                                  # applica le migrazioni ed esce
-$env:MOSAIKIT_NEW_PASSWORD = "..."; mosaikit-server reset-password --tenant system --user admin
+$env:MOSAIKIT_NEW_PASSWORD = "..."; mosaikit-server reset-password --user admin   # un Administrator
+mosaikit-server reset-password --tenant alfa --user anna                   # un utente di un tenant
+mosaikit-server reset-totp --user admin    # telefono perso e nessun codice di recupero
 ```
+
+Sono l'**accesso di emergenza**: richiedono l'accesso alla macchina, non al web.
+`reset-totp` toglie il secondo fattore; al prossimo accesso l'Administrator
+registra di nuovo l'app.
 
 Nella versione desktop c'e' un solo eseguibile: gli stessi comandi si danno a
 `mosaikit.exe` (o `<prodotto>.exe`) da un terminale, ad applicazione chiusa,
-ad esempio `.\mosaikit.exe reset-password --tenant system --user admin`.
+ad esempio `.\mosaikit.exe reset-password --user admin`.
 L'output compare nel terminale.
 
 - **Administrator**: da *Sistema*:
-  - **Tenant**: crea i tenant, ciascuno con il suo Tenant Manager;
-  - **Administrator**: assegna o toglie il ruolo; ne resta sempre almeno uno
-    attivo;
+  - **Tenant**: crea i tenant, ciascuno con il suo Tenant Manager. Da *Utenti e
+    gestori* nomina o sostituisce un Tenant Manager (cambio di ruolo o nuovo
+    account) e reimposta la password di un utente del tenant: utenti e ruoli,
+    mai i contenuti;
+  - **Administrator**: crea gli account Administrator, li disabilita o
+    riattiva (ne resta sempre almeno uno attivo), reimposta password e secondo
+    fattore;
   - **Plugin** e **KPI globali**.
 - **Tenant Manager**: da *Gestione*: utenti, inviti, gruppi, policy, risorse
-  (riassegnazione) e KPI del tenant.
+  (riassegnazione) e KPI del tenant. Non vede né tocca gli account
+  Administrator; non può disabilitare un utente che è l'unico Tenant Manager di
+  un altro tenant.
 - **Accesso BI ai KPI** (PostgreSQL): il ruolo `<prefisso>_reporting` legge
   solo le viste `kpi_*`. È creato `NOLOGIN`; per abilitarlo:
   `ALTER ROLE msk_mosaikit_reporting LOGIN PASSWORD '...'`.

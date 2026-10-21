@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, errText, fmtDate } from '../api.ts'
-import type { Invitation, Session } from '../types.ts'
+import type { Invitation, Membership, Session } from '../types.ts'
 import { useUi } from '../ui-context.ts'
 import { roleLabel } from '../roles.ts'
 
@@ -42,55 +42,22 @@ export default function Account({ session, onChanged }: { session: Session; onCh
   }
 
   const u = session.user
+  const admin = u.is_system_admin
   return (
     <div className="console">
       <h1>Account</h1>
-      <p className="lead">
-        {u.display_name || u.username} · <span className="mono">{u.username}@{u.home_tenant_slug}</span> — ti autentichi sempre sul tenant{' '}
-        <b>{u.home_tenant_slug}</b>.
-      </p>
-      <section className="card">
-        <h3>Inviti ricevuti</h3>
-        {invites.length === 0 ? (
-          <p className="muted">Nessun invito in attesa.</p>
-        ) : (
-          <div className="tbl-wrap">
-            <table className="tbl">
-              <tbody>
-                {invites.map((i) => (
-                  <tr key={i.id}>
-                    <td>
-                      <b>{i.tenant_name}</b> <span className="muted mono">{i.tenant_slug}</span>
-                      <div className="muted" style={{ fontSize: 12 }}>
-                        come {roleLabel(i.role)} · da {i.invited_by ?? '—'} · scade {fmtDate(i.expires_at)}
-                      </div>
-                    </td>
-                    <td className="actions">
-                      <button type="button" className="btn primary small" onClick={() => void answer(i.id, true)}>
-                        Accetta
-                      </button>
-                      <button type="button" className="btn ghost small" onClick={() => void answer(i.id, false)}>
-                        Rifiuta
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-      <section className="card">
-        <h3>I tuoi tenant</h3>
-        <div className="row">
-          {session.memberships.map((m) => (
-            <span key={m.slug} className={'badge' + (m.is_home ? ' acc' : '')}>
-              {m.name} · {roleLabel(m.role)}
-              {m.is_home ? ' · appartenenza' : ' · ospite'}
-            </span>
-          ))}
-        </div>
-      </section>
+      {admin ? (
+        <p className="lead">
+          {u.display_name || u.username} · <span className="mono">{u.username}</span> — account Administrator: accedi da <b>Accesso amministratori</b>, con il
+          secondo fattore.
+        </p>
+      ) : (
+        <p className="lead">
+          {u.display_name || u.username} · <span className="mono">{u.username}@{u.home_tenant_slug}</span> — ti autentichi sempre sul tenant{' '}
+          <b>{u.home_tenant_slug}</b>.
+        </p>
+      )}
+      {!admin && <TenantsAndInvites invites={invites} memberships={session.memberships} onAnswer={(id, accept) => void answer(id, accept)} />}
       <section className="card" style={{ maxWidth: 520 }}>
         <h3>Cambia password</h3>
         <form onSubmit={(e) => void changePassword(e)}>
@@ -113,5 +80,55 @@ export default function Account({ session, onChanged }: { session: Session; onCh
       </section>
       <div className={'msg-line' + (error ? ' err' : '')}>{error}</div>
     </div>
+  )
+}
+
+/** Inviti ricevuti e tenant dell'utente (non per gli Administrator, che non sono membri di nessun tenant). */
+function TenantsAndInvites({ invites, memberships, onAnswer }: { invites: Invitation[]; memberships: Membership[]; onAnswer: (id: string, accept: boolean) => void }) {
+  return (
+    <>
+      <section className="card">
+        <h3>Inviti ricevuti</h3>
+        {invites.length === 0 ? (
+          <p className="muted">Nessun invito in attesa.</p>
+        ) : (
+          <div className="tbl-wrap">
+            <table className="tbl">
+              <tbody>
+                {invites.map((i) => (
+                  <tr key={i.id}>
+                    <td>
+                      <b>{i.tenant_name}</b> <span className="muted mono">{i.tenant_slug}</span>
+                      <div className="muted" style={{ fontSize: 12 }}>
+                        come {roleLabel(i.role)} · da {i.invited_by ?? '—'} · scade {fmtDate(i.expires_at)}
+                      </div>
+                    </td>
+                    <td className="actions">
+                      <button type="button" className="btn primary small" onClick={() => onAnswer(i.id, true)}>
+                        Accetta
+                      </button>
+                      <button type="button" className="btn ghost small" onClick={() => onAnswer(i.id, false)}>
+                        Rifiuta
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+      <section className="card">
+        <h3>I tuoi tenant</h3>
+        <div className="row">
+          {memberships.map((m) => (
+            <span key={m.slug} className={'badge' + (m.is_home ? ' acc' : '')}>
+              {m.name} · {roleLabel(m.role)}
+              {m.is_home ? ' · appartenenza' : ' · ospite'}
+            </span>
+          ))}
+        </div>
+      </section>
+    </>
   )
 }

@@ -17,7 +17,7 @@ use serde::Deserialize;
 use serde_json::{json, Map, Value};
 use uuid::Uuid;
 
-use crate::auth::{session_cookie, Auth, ClientIp, Tenant};
+use crate::auth::{session_cookie, Auth, ClientIp, Pending, Tenant};
 use crate::{bad, ApiResult, AppState};
 
 const UPLOAD_LIMIT: usize = 512 << 20;
@@ -35,6 +35,11 @@ pub fn router() -> Router<AppState> {
         .route("/api/health", get(health))
         .route("/api/brand", get(brand))
         .route("/api/auth/login", post(login))
+        .route("/api/auth/tenants", get(login_tenants))
+        .route("/api/auth/admin/login", post(admin_login))
+        .route("/api/auth/totp/setup", post(totp_setup))
+        .route("/api/auth/totp/enable", post(totp_enable))
+        .route("/api/auth/totp/verify", post(totp_verify))
         .route("/api/auth/logout", post(logout))
         .route("/api/session", get(session))
         .route("/api/me/password", post(change_password))
@@ -81,12 +86,20 @@ pub fn router() -> Router<AppState> {
         // amministratore di sistema
         .route("/api/admin/tenants", get(a_tenants).post(a_create_tenant))
         .route("/api/admin/tenants/{id}/status", put(a_tenant_status))
+        .route("/api/admin/tenants/{id}/members", get(a_tenant_members))
+        .route("/api/admin/tenants/{id}/managers", post(a_tenant_manager))
+        .route("/api/admin/tenants/{id}/members/{uid}/role", put(a_tenant_role))
+        .route("/api/admin/tenants/{id}/members/{uid}/password", post(a_tenant_password))
+        .route("/api/admin/overview", get(a_overview))
         .route("/api/admin/plugins/{id}/{action}", post(a_plugin_action))
         .route("/api/admin/plugins/{id}", delete(a_plugin_uninstall))
         .route("/api/admin/catalog", get(a_catalog))
         .route("/api/admin/catalog/{id}/install", post(a_catalog_install))
         .route("/api/admin/kpi", get(a_kpi))
-        .route("/api/admin/administrators", get(a_admins).put(a_set_admin))
+        .route("/api/admin/administrators", get(a_admins).post(a_create_admin))
+        .route("/api/admin/administrators/{id}/status", put(a_admin_status))
+        .route("/api/admin/administrators/{id}/password", post(a_admin_password))
+        .route("/api/admin/administrators/{id}/totp", delete(a_admin_totp))
         .route("/api/{*rest}", axum::routing::any(api_not_found))
         .merge(uploads)
         .merge(packages)
@@ -141,10 +154,75 @@ async fn login(
     Json(r): Json<LoginReq>,
 ) -> ApiResult<Response> {
     let lr = identity::login(&s.k, &r.tenant, &r.username, &r.password, &ip).await?;
-    let body = session_body(&s, &lr.user).await?;
+    logged_in(&s, lr, json!({})).await
+}
+
+/// Risposta di un accesso completato: sessione + cookie (`extra` aggiunto al corpo).
+async fn logged_in(s: &AppState, lr: identity::LoginResult, extra: Value) -> ApiResult<Response> {
+    let mut body = session_body(s, &lr.user).await?;
+    if let (Some(b), Value::Object(e)) = (body.as_object_mut(), extra) {
+        b.extend(e);
+    }
     let mut res = Json(body).into_response();
-    res.headers_mut().insert(header::SET_COOKIE, session_cookie(&s, Some(&lr.token)));
+    res.headers_mut().insert(header::SET_COOKIE, session_cookie(s, Some(&lr.token)));
     Ok(res)
+}
+
+/// Tenant della pagina di accesso (pubblico).
+async fn login_tenants(State(s): State<AppState>) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(tenancy::login_tenants(&s.k).await?)))
+}
+
+#[derive(Deserialize)]
+struct AdminLoginReq {
+    username: String,
+    password: String,
+}
+
+/// Accesso degli Administrator: sessione completa, oppure `{ pending, csrf }` in attesa
+/// del secondo fattore (`totp` o `totp_setup`).
+async fn admin_login(
+    State(s): State<AppState>,
+    ClientIp(ip): ClientIp,
+    Json(r): Json<AdminLoginReq>,
+) -> ApiResult<Response> {
+    match identity::admin_login(&s.k, &r.username, &r.password, &ip).await? {
+        identity::AdminLogin::Done(lr) => logged_in(&s, lr, json!({})).await,
+        identity::AdminLogin::Pending { token, csrf, step } => {
+            let mut res = Json(json!({ "pending": step, "csrf": csrf })).into_response();
+            res.headers_mut().insert(header::SET_COOKIE, session_cookie(&s, Some(&token)));
+            Ok(res)
+        }
+    }
+}
+
+async fn totp_setup(State(s): State<AppState>, Pending(p): Pending) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(identity::totp_setup(&s.k, &p).await?)))
+}
+
+#[derive(Deserialize)]
+struct CodeReq {
+    code: String,
+}
+
+async fn totp_enable(
+    State(s): State<AppState>,
+    ClientIp(ip): ClientIp,
+    Pending(p): Pending,
+    Json(r): Json<CodeReq>,
+) -> ApiResult<Response> {
+    let (lr, codes) = identity::totp_enable(&s.k, &p, &r.code, &ip).await?;
+    logged_in(&s, lr, json!({ "recovery_codes": codes })).await
+}
+
+async fn totp_verify(
+    State(s): State<AppState>,
+    ClientIp(ip): ClientIp,
+    Pending(p): Pending,
+    Json(r): Json<CodeReq>,
+) -> ApiResult<Response> {
+    let lr = identity::totp_verify(&s.k, &p, &r.code, &ip).await?;
+    logged_in(&s, lr, json!({})).await
 }
 
 async fn logout(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Response> {
@@ -786,19 +864,104 @@ async fn a_admins(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Json<Va
 }
 
 #[derive(Deserialize)]
-struct SetAdminReq {
-    tenant: String,
+struct NewAdminReq {
     username: String,
-    administrator: bool,
+    #[serde(default)]
+    display_name: String,
+    password: String,
 }
 
-async fn a_set_admin(
+async fn a_create_admin(
     State(s): State<AppState>,
     Auth(u): Auth,
-    Json(r): Json<SetAdminReq>,
+    Json(r): Json<NewAdminReq>,
 ) -> ApiResult<Json<Value>> {
-    tenancy::set_administrator(&s.k, &u, r.tenant.trim(), r.username.trim(), r.administrator).await?;
+    tenancy::create_administrator(&s.k, &u, &r.username, &r.display_name, &r.password).await?;
     Ok(Json(json!(tenancy::administrators(&s.k, &u).await?)))
+}
+
+#[derive(Deserialize)]
+struct ActiveReq {
+    active: bool,
+}
+
+async fn a_admin_status(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Path(id): Path<String>,
+    Json(r): Json<ActiveReq>,
+) -> ApiResult<Json<Value>> {
+    tenancy::set_administrator_active(&s.k, &u, uuid(&id)?, r.active).await?;
+    Ok(Json(json!(tenancy::administrators(&s.k, &u).await?)))
+}
+
+async fn a_admin_password(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Path(id): Path<String>,
+    Json(r): Json<ResetReq>,
+) -> ApiResult<Json<Value>> {
+    tenancy::reset_administrator_password(&s.k, &u, uuid(&id)?, &r.password).await?;
+    Ok(ok())
+}
+
+async fn a_admin_totp(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Value>> {
+    tenancy::reset_administrator_totp(&s.k, &u, uuid(&id)?).await?;
+    Ok(Json(json!(tenancy::administrators(&s.k, &u).await?)))
+}
+
+async fn a_overview(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(mosaikit_kernel::overview::system_overview(&s.k, &u).await?)))
+}
+
+#[derive(Deserialize)]
+struct TenantUserPath {
+    id: String,
+    uid: String,
+}
+
+async fn a_tenant_members(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(tenancy::tenant_members(&s.k, &u, uuid(&id)?).await?)))
+}
+
+async fn a_tenant_manager(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Path(id): Path<String>,
+    Json(r): Json<NewAdminReq>,
+) -> ApiResult<Json<Value>> {
+    let tenant = uuid(&id)?;
+    tenancy::create_tenant_manager(&s.k, &u, tenant, &r.username, &r.display_name, &r.password).await?;
+    Ok(Json(json!(tenancy::tenant_members(&s.k, &u, tenant).await?)))
+}
+
+async fn a_tenant_role(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Path(p): Path<TenantUserPath>,
+    Json(r): Json<RoleReq>,
+) -> ApiResult<Json<Value>> {
+    let tenant = uuid(&p.id)?;
+    tenancy::set_tenant_role(&s.k, &u, tenant, uuid(&p.uid)?, Role::parse(&r.role)?).await?;
+    Ok(Json(json!(tenancy::tenant_members(&s.k, &u, tenant).await?)))
+}
+
+async fn a_tenant_password(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Path(p): Path<TenantUserPath>,
+    Json(r): Json<ResetReq>,
+) -> ApiResult<Json<Value>> {
+    tenancy::reset_tenant_password(&s.k, &u, uuid(&p.id)?, uuid(&p.uid)?, &r.password).await?;
+    Ok(ok())
 }
 
 async fn a_tenants(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Json<Value>> {

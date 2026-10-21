@@ -70,6 +70,27 @@ impl FromRequestParts<AppState> for Auth {
     }
 }
 
+/// Sessione in attesa del secondo fattore (accesso degli Administrator). Richiede
+/// sempre `X-CSRF-Token` (ricevuto con la risposta all'accesso).
+pub struct Pending(pub identity::PendingLogin);
+
+impl FromRequestParts<AppState> for Pending {
+    type Rejection = ApiError;
+
+    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
+        let token = cookie(parts, SESSION_COOKIE)
+            .ok_or_else(|| ApiError(Error::unauthorized("accesso richiesto")))?;
+        let p = identity::pending_session(&state.k, &token).await?.ok_or_else(|| {
+            ApiError(Error::unauthorized("accesso scaduto: inserisci di nuovo utente e password"))
+        })?;
+        let sent = parts.headers.get(CSRF_HEADER).and_then(|v| v.to_str().ok()).unwrap_or_default();
+        if sent.is_empty() || sent != p.csrf {
+            return Err(ApiError(Error::forbidden("token CSRF mancante o non valido")));
+        }
+        Ok(Pending(p))
+    }
+}
+
 /// Utente + tenant attivo (`/api/t/{tenant}/...`), membership verificata.
 pub struct Tenant(pub Caller);
 

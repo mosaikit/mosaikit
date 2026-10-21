@@ -51,7 +51,8 @@ export async function api<T = unknown>(method: string, path: string, body?: unkn
     payload = JSON.stringify(body)
   }
   const r = await fetch(appUrl(path), { method, headers, body: payload, credentials: 'same-origin', cache: 'no-store' })
-  if (r.status === 401 && onUnauthorized && !path.endsWith('/auth/login')) onUnauthorized()
+  // 401 delle pagine di accesso (credenziali o codice errati): nessuna sessione da chiudere
+  if (r.status === 401 && onUnauthorized && !path.startsWith('/api/auth/')) onUnauthorized()
   if (!r.ok) {
     let msg = `HTTP ${r.status}`
     try {

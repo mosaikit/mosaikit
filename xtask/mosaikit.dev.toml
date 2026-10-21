@@ -15,6 +15,8 @@ data_dir = "../.dev/data"
 allow_unsigned = true
 # sessioni lunghe per non dover rifare l'accesso
 session_ttl_hours = 72
+# in sviluppo l'Administrator accede senza secondo fattore (in produzione e' obbligatorio)
+admin_totp = false
 
 [database]
 # PostgreSQL di sviluppo avviato da `cargo xtask db up`

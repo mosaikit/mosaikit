@@ -107,6 +107,21 @@ impl App {
         let cookie = set.split(';').next().unwrap().to_string();
         Session { cookie, csrf: r.json()["csrf"].as_str().unwrap().to_string() }
     }
+
+    /// Accesso come Administrator (senza secondo fattore: `admin_totp = false` nei test).
+    async fn admin(&self) -> Session {
+        let r = self
+            .call(
+                None,
+                Method::POST,
+                "/api/auth/admin/login",
+                Some(json!({ "username": "admin", "password": ADMIN_PASSWORD })),
+            )
+            .await;
+        assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+        let cookie = r.header(header::SET_COOKIE).split(';').next().unwrap().to_string();
+        Session { cookie, csrf: r.json()["csrf"].as_str().unwrap().to_string() }
+    }
 }
 
 #[tokio::test]
@@ -116,19 +131,29 @@ async fn sessione_con_cookie_httponly_e_csrf() {
         .call(
             None,
             Method::POST,
-            "/api/auth/login",
-            Some(json!({ "tenant": "system", "username": "admin", "password": "no" })),
+            "/api/auth/admin/login",
+            Some(json!({ "username": "admin", "password": "no" })),
         )
         .await;
     assert_eq!(r.status, StatusCode::UNAUTHORIZED);
     assert!(r.json()["error"].is_string());
-
+    // gli Administrator non accedono dal form dei tenant
     let r = a
         .call(
             None,
             Method::POST,
             "/api/auth/login",
             Some(json!({ "tenant": "system", "username": "admin", "password": ADMIN_PASSWORD })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST);
+
+    let r = a
+        .call(
+            None,
+            Method::POST,
+            "/api/auth/admin/login",
+            Some(json!({ "username": "admin", "password": ADMIN_PASSWORD })),
         )
         .await;
     let cookie = r.header(header::SET_COOKIE);
@@ -140,7 +165,7 @@ async fn sessione_con_cookie_httponly_e_csrf() {
         !r.text().contains(cookie.split(';').next().unwrap().split('=').nth(1).unwrap()),
         "il token non e' nel corpo"
     );
-    let s = a.login("system", "admin", ADMIN_PASSWORD).await;
+    let s = a.admin().await;
 
     // senza cookie: 401
     assert_eq!(a.call(None, Method::GET, "/api/session", None).await.status, StatusCode::UNAUTHORIZED);
@@ -196,7 +221,7 @@ async fn header_di_sicurezza_e_cors_chiuso() {
 async fn flusso_completo_tenant_crud_condivisione() {
     let a = App::new().await;
     a.t.install("notes").await;
-    let admin = a.login("system", "admin", ADMIN_PASSWORD).await;
+    let admin = a.admin().await;
     let r = a
         .call(
             Some(&admin),
@@ -328,7 +353,7 @@ async fn flusso_completo_tenant_crud_condivisione() {
 #[tokio::test]
 async fn installazione_plugin_solo_admin() {
     let a = App::new().await;
-    let admin = a.login("system", "admin", ADMIN_PASSWORD).await;
+    let admin = a.admin().await;
     a.t.tenant("alfa").await;
     let g = a.login("alfa", "alfa-gestore", PASSWORD).await;
     let pkg = pack_plugin("contacts");
@@ -586,8 +611,8 @@ async fn percorso_base_da_un_solo_url() {
         .call(
             None,
             Method::POST,
-            "/mosaikit/api/auth/login",
-            Some(json!({ "tenant": "system", "username": "admin", "password": ADMIN_PASSWORD })),
+            "/mosaikit/api/auth/admin/login",
+            Some(json!({ "username": "admin", "password": ADMIN_PASSWORD })),
         )
         .await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.text());
@@ -626,4 +651,69 @@ async fn marchio_della_distribuzione() {
         assert!(page.contains("<title>Atlante &lt;beta&gt;</title>"), "{page}");
         assert!(page.contains("--acc:#1e88e5;"), "{page}");
     }
+}
+
+#[tokio::test]
+async fn accesso_amministratori_con_secondo_fattore() {
+    use mosaikit_kernel::totp;
+    let a = App::with(start_with(|c| c.admin_totp = true).await);
+    // tenant della pagina di accesso: pubblici, senza il tenant di sistema
+    let r = a.call(None, Method::GET, "/api/auth/tenants", None).await;
+    assert_eq!((r.status, r.json()), (StatusCode::OK, json!([])));
+
+    let r = a
+        .call(
+            None,
+            Method::POST,
+            "/api/auth/admin/login",
+            Some(json!({ "username": "admin", "password": ADMIN_PASSWORD })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    assert_eq!(r.json()["pending"], "totp_setup");
+    assert!(r.json().get("user").is_none());
+    let pending = Session {
+        cookie: r.header(header::SET_COOKIE).split(';').next().unwrap().to_string(),
+        csrf: r.json()["csrf"].as_str().unwrap().to_string(),
+    };
+    // la sessione in attesa non apre le API
+    assert_eq!(
+        a.call(Some(&pending), Method::GET, "/api/session", None).await.status,
+        StatusCode::UNAUTHORIZED
+    );
+    assert_eq!(
+        a.call(Some(&pending), Method::GET, "/api/admin/tenants", None).await.status,
+        StatusCode::UNAUTHORIZED
+    );
+    let no_csrf = Session { cookie: pending.cookie.clone(), csrf: String::new() };
+    assert_eq!(
+        a.call(Some(&no_csrf), Method::POST, "/api/auth/totp/setup", None).await.status,
+        StatusCode::FORBIDDEN
+    );
+    let setup = a.call(Some(&pending), Method::POST, "/api/auth/totp/setup", None).await.json();
+    assert!(setup["qr_svg"].as_str().unwrap().contains("<svg"));
+    let secret = totp::base32_decode(setup["secret"].as_str().unwrap()).unwrap();
+    let code = totp::code(&secret, totp::current_step());
+    let r =
+        a.call(Some(&pending), Method::POST, "/api/auth/totp/enable", Some(json!({ "code": code }))).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    assert_eq!(r.json()["recovery_codes"].as_array().unwrap().len(), 10);
+    assert_eq!(r.json()["user"]["is_system_admin"], true);
+    let s = Session {
+        cookie: r.header(header::SET_COOKIE).split(';').next().unwrap().to_string(),
+        csrf: r.json()["csrf"].as_str().unwrap().to_string(),
+    };
+    assert_ne!(s.cookie, pending.cookie, "nuovo token dopo il secondo fattore");
+    assert_eq!(a.call(Some(&s), Method::GET, "/api/session", None).await.status, StatusCode::OK);
+    assert_eq!(
+        a.call(Some(&pending), Method::POST, "/api/auth/totp/setup", None).await.status,
+        StatusCode::UNAUTHORIZED
+    );
+    // nessuno spazio di lavoro per l'Administrator, ma la sua panoramica
+    assert_eq!(
+        a.call(Some(&s), Method::GET, "/api/t/system/context", None).await.status,
+        StatusCode::FORBIDDEN
+    );
+    let o = a.call(Some(&s), Method::GET, "/api/admin/overview", None).await.json();
+    assert_eq!((o["tenants"].as_i64(), o["administrators"].as_i64()), (Some(0), Some(1)));
 }

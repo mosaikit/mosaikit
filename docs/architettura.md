@@ -75,16 +75,41 @@ iniziale (kernel std-only, persistenza JSON, `ui.js` trusted).
 
 | Ruolo | Ambito | Dove | Può fare |
 |---|---|---|---|
-| **Administrator** | installazione | `core.users.is_system_admin` | creare/sospendere tenant, installare/attivare plugin, KPI cross-tenant, assegnare o togliere il ruolo Administrator (ne resta sempre almeno uno attivo; chi lo perde ha le sessioni chiuse) |
+| **Administrator** | installazione | account del tenant di sistema (`core.users.is_system_admin`) | creare/sospendere tenant, nominare o sostituire i loro Tenant Manager e reimpostare password (utenti e ruoli, mai i contenuti), installare/attivare plugin, KPI cross-tenant, gestire gli account Administrator (ne resta sempre almeno uno attivo; chi viene disabilitato ha le sessioni chiuse) |
 | **Tenant Manager** | un tenant | `core.memberships.role = 'tenant_manager'` | utenti, inviti, gruppi, metadati delle risorse, riassegnazione proprietà, KPI e policy del tenant |
 | **User** | un tenant | `core.memberships.role = 'user'` | creare risorse, condividerle, usare quelle condivise |
 
-Lo stesso utente puo' essere User in un tenant e Tenant Manager in un altro;
-l'Administrator e' un utente di un tenant qualsiasi (di norma `system`).
+Lo stesso utente puo' essere User in un tenant e Tenant Manager in un altro.
+
+- **Administrator: account di piattaforma.** Esiste solo nel tenant di sistema
+  (`system`), che **non e' uno spazio di lavoro**: nessuna membership, nessuna
+  risorsa, nessun ospite (`caller` non lo risolve mai). Essere account di
+  `system` e' essere Administrator: il ruolo non si assegna agli utenti dei
+  tenant, quindi non c'e' mai sovrapposizione con i ruoli nei tenant. Chi e'
+  anche Tenant Manager o User di un tenant ha la' un secondo account, distinto
+  (`system/anna` e `alfa/anna` sono due identita'). Un gestore non puo'
+  invitare, reimpostare o disabilitare un Administrator.
+- **Accesso degli Administrator.** Pagina a parte (`#/admin`,
+  `POST /api/auth/admin/login`), **sempre locale**: non dipende dagli IdP dei
+  tenant (anche quando useranno OIDC, §15). Con `admin_totp` (default) serve il
+  secondo fattore TOTP (RFC 6238): la password apre una sessione *in attesa*
+  (`core.sessions.pending`, 10 minuti, valida solo per `/api/auth/totp/*`); al
+  primo accesso si registra l'app (QR code) e si ricevono 10 codici di recupero
+  monouso (salvati come sha256); un codice gia' usato non vale una seconda volta
+  (`totp_last_step`). Completato il secondo fattore il token viene rinnovato.
+  Accesso di emergenza dalla macchina: `reset-password --user` e `reset-totp`.
+- **Pagina di accesso degli utenti.** Menu a tendina dei tenant attivi
+  (`GET /api/auth/tenants`: solo slug, nome e metodo di accesso), nascosto se il
+  tenant e' uno solo; `#/login/<tenant>` lo preseleziona. Il form dei tenant
+  rifiuta il tenant di sistema.
+- **Nessun tenant senza gestore.** Resta sempre almeno un Tenant Manager attivo
+  per tenant: anche quando un utente viene disabilitato dal suo tenant di
+  appartenenza, se e' l'unico gestore di un altro tenant l'operazione e'
+  rifiutata. L'Administrator puo' comunque nominarne uno nuovo.
 
 - **Tenant di appartenenza.** Ogni utente ha un `home_tenant`. Si autentica
   **sempre** lì (login con `tenant + username + password`; in futuro OIDC per
-  tenant, vedi §14). Il tenant `system` contiene l'amministratore di sistema.
+  tenant, vedi §15). Il tenant `system` contiene solo gli Administrator.
 - **Inviti.** Il gestore del tenant B invita un utente di A con un ruolo. L'utente
   accetta dopo il login su A e ottiene una membership in B. Un utente può
   appartenere a più tenant con ruoli diversi.
@@ -100,7 +125,8 @@ l'Administrator e' un utente di un tenant qualsiasi (di norma `system`).
     ricevute, i link pubblici attivi e le visite, l'attivita' recente (i titoli
     solo delle risorse ancora accessibili);
   - per il Tenant Manager, in piu': gli aggregati del tenant (§6);
-  - per l'Administrator, in piu': gli aggregati del sistema (tenant, utenti,
+  - per l'Administrator, che non ha tenant attivo, una panoramica a parte
+    (`GET /api/admin/overview`): gli aggregati del sistema (tenant, utenti,
     Administrator, risorse, spazio, plugin, utenti attivi).
 
 ## 4. Risorse, proprietà e condivisione
@@ -529,7 +555,7 @@ backend = "sqlite"      # o "postgres"; default: postgres se c'e' url o embedded
 ├── mosaikit.db                SQLite (con -wal e -shm), se il backend e' SQLite
 ├── pg/                        solo desktop con PostgreSQL: cluster embedded e credenziali generate
 ├── logs/mosaikit.log          solo desktop
-└── initial-admin-password.txt solo se la password iniziale e' stata generata
+└── credenziali-iniziali.txt   solo se al primo avvio sono state generate password
 ```
 
 I contenuti di risorse eliminate vengono rimossi subito; all'avvio una pulizia
@@ -538,8 +564,17 @@ Il backup consiste in un dump del database piu' la cartella `blobs/`; nella
 versione desktop basta copiare l'intera data dir a server fermo.
 
 I dati strutturati sono tutti nel database. Al primo avvio viene creato il
-tenant `system` e l'utente `admin`: la password è `MOSAIKIT_ADMIN_PASSWORD`
-oppure viene generata e stampata una sola volta.
+tenant `system` e l'Administrator `admin`: la password è `MOSAIKIT_ADMIN_PASSWORD`
+oppure viene generata e scritta in `credenziali-iniziali.txt`. Con
+`initial_tenant` (release desktop: `"locale"`) il primo avvio crea anche un
+tenant di lavoro, con il nome del prodotto, e il suo Tenant Manager `utente`
+(password generata, nello stesso file): sul desktop si lavora subito, senza
+passare dall'amministrazione. La migrazione `0003_admins`
+porta le installazioni precedenti al modello attuale: un Administrator di un
+altro tenant diventa un account di `system` con la stessa password (con
+suffisso `-<tenant>` se il nome e' gia' preso), l'account originale resta senza
+il ruolo; gli altri account di `system` vengono disabilitati e le membership che
+coinvolgono `system` rimosse; tutte le sessioni vengono chiuse.
 
 ## 11. Struttura del repository
 
@@ -611,7 +646,7 @@ modalità dev esiste solo nelle build debug.
 Le release vanno in `<distribuzione>/dist` (`mosaikit/dist` per Mosaikit).
 La versione desktop ha **un solo eseguibile**: senza argomenti avvia l'app con
 l'icona nell'area di notifica; da un terminale esegue i comandi di
-amministrazione (`migrate`, `reset-password`, `config`) nella sua console.
+amministrazione (`migrate`, `reset-password`, `reset-totp`, `config`) nella sua console.
 
 In CI un tag `v*` produce le release (vedi `.github/workflows/release.yml`).
 Dettagli operativi nel `README.md`.
@@ -648,8 +683,14 @@ Mosaikit non fa riferimento a nessuna distribuzione.
 
 ## 15. Limiti noti e prossimi passi
 
-- **OIDC per tenant** (Keycloak): previsto dal modello (`core.tenants.settings`),
-  non ancora implementato. Oggi l'autenticazione è locale (argon2id).
+- **OIDC per tenant** (Keycloak o IdP del cliente): non ancora implementato;
+  oggi l'autenticazione dei tenant è locale (argon2id). La pagina di accesso
+  riceve gia' il metodo di ogni tenant (`auth`). Da definire: configurazione
+  per tenant (issuer, client, segreto cifrato, claim), identita' esterne
+  (issuer + `sub`, mai collegate per email), creazione al primo accesso, una
+  sola fonte dei ruoli per tenant (Mosaikit oppure gruppi dell'IdP), revoca
+  (back-channel logout) e funzioni locali da disattivare nei tenant OIDC. Gli
+  Administrator restano sempre locali.
 - **Sottodomini per plugin**: tutte le UI dei plugin condividono l'origine
   untrusted; un sottodominio per plugin isolerebbe anche i plugin tra loro.
 - **Storage S3** per i blob: oggi solo filesystem.

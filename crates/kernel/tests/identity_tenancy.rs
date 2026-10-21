@@ -1,13 +1,17 @@
 //! Identita', tenant, membri, inviti, gruppi (richiede PostgreSQL: `cargo xtask db up`).
 
-use mosaikit_kernel::identity::{change_password, login, logout, memberships, session};
-use mosaikit_kernel::tenancy::{
-    administrators, caller, create_group, create_member, directory, invite, list_tenants, members,
-    my_invitations, remove_member, respond_invitation, set_administrator, set_group_member, set_role,
-    set_tenant_status,
+use mosaikit_kernel::identity::{
+    admin_login, change_password, login, logout, memberships, pending_session, session, totp_enable,
+    totp_setup, totp_verify, AdminLogin,
 };
-use mosaikit_kernel::testing::{start, PASSWORD};
-use mosaikit_kernel::{Kind, Role};
+use mosaikit_kernel::tenancy::{
+    administrators, caller, create_administrator, create_group, create_member, create_tenant_manager,
+    directory, invite, list_tenants, login_tenants, members, my_invitations, remove_member,
+    reset_administrator_totp, reset_member_password, reset_tenant_password, respond_invitation,
+    set_administrator_active, set_group_member, set_role, set_tenant_role, set_tenant_status, tenant_members,
+};
+use mosaikit_kernel::testing::{start, start_with, ADMIN_PASSWORD, PASSWORD};
+use mosaikit_kernel::{totp, Kind, Role};
 
 #[tokio::test]
 async fn login_sessione_e_logout() {
@@ -15,17 +19,24 @@ async fn login_sessione_e_logout() {
     let admin = t.admin().await;
     assert!(admin.is_system_admin);
     assert_eq!(admin.home_tenant_slug, "system");
+    let gestore = t.tenant("alfa").await;
 
-    let r = login(&t, "system", "admin", "sbagliata", "1.2.3.4").await.unwrap_err();
+    let r = login(&t, "alfa", "alfa-gestore", "sbagliata", "1.2.3.4").await.unwrap_err();
     assert_eq!(r.kind, Kind::Unauthorized);
-    let r = login(&t, "system", "nessuno", "x", "1.2.3.4").await.unwrap_err();
+    let r = login(&t, "alfa", "nessuno", "x", "1.2.3.4").await.unwrap_err();
     assert_eq!(r.kind, Kind::Unauthorized, "utente inesistente: stesso errore");
+    let r = admin_login(&t, "admin", "sbagliata", "1.2.3.4").await.unwrap_err();
+    assert_eq!(r.kind, Kind::Unauthorized);
+    // gli Administrator non accedono dal form dei tenant
+    let r = login(&t, "system", "admin", ADMIN_PASSWORD, "1.2.3.4").await.unwrap_err();
+    assert_eq!(r.kind, Kind::BadRequest);
+    // e gli utenti dei tenant non accedono come Administrator
+    assert!(admin_login(&t, "alfa-gestore", PASSWORD, "1.2.3.4").await.is_err());
 
-    let lr =
-        login(&t, "System", " ADMIN ", mosaikit_kernel::testing::ADMIN_PASSWORD, "1.2.3.4").await.unwrap();
+    let lr = login(&t, "Alfa", " ALFA-GESTORE ", PASSWORD, "1.2.3.4").await.unwrap();
     assert_eq!(lr.token.len(), 64);
     let s = session(&t, &lr.token).await.unwrap().unwrap();
-    assert_eq!(s.user_id, admin.user_id);
+    assert_eq!(s.user_id, gestore.user_id);
     assert!(session(&t, "token-falso").await.unwrap().is_none());
     logout(&t, &s).await.unwrap();
     assert!(session(&t, &lr.token).await.unwrap().is_none());
@@ -35,10 +46,9 @@ async fn login_sessione_e_logout() {
 async fn troppi_tentativi_bloccano_il_login() {
     let t = start().await;
     for _ in 0..8 {
-        let _ = login(&t, "system", "admin", "sbagliata", "9.9.9.9").await;
+        let _ = admin_login(&t, "admin", "sbagliata", "9.9.9.9").await;
     }
-    let e =
-        login(&t, "system", "admin", mosaikit_kernel::testing::ADMIN_PASSWORD, "9.9.9.9").await.unwrap_err();
+    let e = admin_login(&t, "admin", ADMIN_PASSWORD, "9.9.9.9").await.unwrap_err();
     assert_eq!(e.kind, Kind::TooMany);
 }
 
@@ -76,18 +86,28 @@ async fn tenant_creazione_e_sospensione() {
     let admin = t.admin().await;
     let gestore = t.tenant("alfa").await;
     let tenants = list_tenants(&t, &admin).await.unwrap();
-    assert_eq!(tenants.iter().map(|x| x.slug.as_str()).collect::<Vec<_>>(), vec!["system", "alfa"]);
+    // il tenant di sistema non e' tra i tenant (ne' nella pagina di accesso)
+    assert_eq!(tenants.iter().map(|x| x.slug.as_str()).collect::<Vec<_>>(), vec!["alfa"]);
+    let pubblici = login_tenants(&t).await.unwrap();
+    assert_eq!(
+        pubblici.iter().map(|x| (x.slug.as_str(), x.auth)).collect::<Vec<_>>(),
+        vec![("alfa", "local")]
+    );
     // solo l'amministratore elenca i tenant
     assert_eq!(list_tenants(&t, &gestore).await.unwrap_err().kind, Kind::Forbidden);
 
     let alfa = tenants.iter().find(|x| x.slug == "alfa").unwrap().id;
     set_tenant_status(&t, &admin, alfa, "suspended").await.unwrap();
+    assert!(login_tenants(&t).await.unwrap().is_empty());
     assert!(login(&t, "alfa", "alfa-gestore", PASSWORD, "x").await.is_err());
     assert_eq!(caller(&t, &gestore, "alfa").await.unwrap_err().kind, Kind::Forbidden);
     set_tenant_status(&t, &admin, alfa, "active").await.unwrap();
     assert!(login(&t, "alfa", "alfa-gestore", PASSWORD, "x").await.is_ok());
     // il tenant di sistema non si sospende
-    let system = tenants.iter().find(|x| x.slug == "system").unwrap().id;
+    let system: uuid::Uuid = mosaikit_db::query_scalar("select id from core.tenants where is_system")
+        .fetch_one(&t.k.db)
+        .await
+        .unwrap();
     assert!(set_tenant_status(&t, &admin, system, "suspended").await.is_err());
 }
 
@@ -184,7 +204,7 @@ async fn uscita_dal_tenant_di_appartenenza_disabilita_l_account() {
 }
 
 #[tokio::test]
-async fn tre_ruoli_e_piu_administrator() {
+async fn administrator_account_del_tenant_di_sistema() {
     let t = start().await;
     let admin = t.admin().await;
     let gestore = t.tenant("alfa").await;
@@ -195,32 +215,185 @@ async fn tre_ruoli_e_piu_administrator() {
     assert_eq!(caller(&t, &anna, "alfa").await.unwrap().tenant.role, Role::User);
     assert_eq!(administrators(&t, &gestore).await.unwrap_err().kind, Kind::Forbidden);
     assert_eq!(
-        set_administrator(&t, &gestore, "alfa", "anna", true).await.unwrap_err().kind,
+        create_administrator(&t, &gestore, "anna", "", PASSWORD).await.unwrap_err().kind,
         Kind::Forbidden
     );
     assert_eq!(Role::parse("manager").unwrap_err().kind, Kind::BadRequest);
     assert_eq!(serde_json::to_value(Role::TenantManager).unwrap(), "tenant_manager");
 
-    // l'unico Administrator non puo' togliersi il ruolo
+    // il tenant di sistema non e' uno spazio di lavoro: nessuna membership, nessun caller
+    assert!(memberships(&t, &admin).await.unwrap().is_empty());
+    assert_eq!(caller(&t, &admin, "system").await.unwrap_err().kind, Kind::Forbidden);
+    // un gestore non trova, non invita e non tocca gli account Administrator
+    assert_eq!(invite(&t, &cg, "system", "admin", Role::User).await.unwrap_err().kind, Kind::NotFound);
     assert_eq!(
-        set_administrator(&t, &admin, "system", "admin", false).await.unwrap_err().kind,
+        reset_member_password(&t, &cg, admin.user_id, "password-rubata-1").await.unwrap_err().kind,
+        Kind::Forbidden
+    );
+
+    // l'unico Administrator non puo' disabilitarsi
+    assert_eq!(
+        set_administrator_active(&t, &admin, admin.user_id, false).await.unwrap_err().kind,
         Kind::Conflict
     );
-    // un secondo Administrator, da un altro tenant
-    set_administrator(&t, &admin, "alfa", "anna", true).await.unwrap();
-    let list = administrators(&t, &admin).await.unwrap();
-    assert_eq!(list.iter().map(|a| a.username.as_str()).collect::<Vec<_>>(), vec!["anna", "admin"]);
-    let anna = login(&t, "alfa", "anna", PASSWORD, "t").await.unwrap().user;
-    assert!(anna.is_system_admin);
-    assert_eq!(list_tenants(&t, &anna).await.unwrap().len(), 2);
-    // ora il primo puo' essere tolto; le sessioni di chi perde il ruolo sono chiuse
-    let tok = login(&t, "alfa", "anna", PASSWORD, "t").await.unwrap().token;
-    set_administrator(&t, &admin, "system", "admin", false).await.unwrap();
-    set_administrator(&t, &anna, "system", "admin", true).await.unwrap();
-    set_administrator(&t, &admin, "alfa", "anna", false).await.unwrap();
-    assert!(session(&t, &tok).await.unwrap().is_none());
+    // un secondo Administrator: account nuovo del tenant di sistema, anche con lo stesso
+    // nome di un utente di un tenant (sono account distinti)
+    let id = create_administrator(&t, &admin, "anna", "Anna Admin", PASSWORD).await.unwrap();
+    assert_ne!(id, anna.user_id);
     assert_eq!(
-        set_administrator(&t, &admin, "alfa", "nessuno", true).await.unwrap_err().kind,
+        create_administrator(&t, &admin, "anna", "", PASSWORD).await.unwrap_err().kind,
+        Kind::Conflict
+    );
+    let list = administrators(&t, &admin).await.unwrap();
+    assert_eq!(list.iter().map(|a| a.username.as_str()).collect::<Vec<_>>(), vec!["admin", "anna"]);
+    let AdminLogin::Done(lr) = admin_login(&t, "anna", PASSWORD, "t").await.unwrap() else {
+        panic!("accesso incompleto")
+    };
+    assert!(lr.user.is_system_admin && lr.user.user_id == id);
+    // l'account di anna nel tenant resta un semplice User
+    assert!(!login(&t, "alfa", "anna", PASSWORD, "t").await.unwrap().user.is_system_admin);
+    assert_eq!(caller(&t, &anna, "alfa").await.unwrap().tenant.role, Role::User);
+
+    // disabilitato: perde le sessioni, non accede; riattivato: accede di nuovo
+    set_administrator_active(&t, &admin, id, false).await.unwrap();
+    assert!(session(&t, &lr.token).await.unwrap().is_none());
+    assert!(admin_login(&t, "anna", PASSWORD, "t").await.is_err());
+    set_administrator_active(&t, &admin, id, true).await.unwrap();
+    assert!(admin_login(&t, "anna", PASSWORD, "t").await.is_ok());
+    // un utente dei tenant non e' un Administrator da gestire
+    assert_eq!(
+        set_administrator_active(&t, &admin, anna.user_id, false).await.unwrap_err().kind,
         Kind::NotFound
     );
+}
+
+#[tokio::test]
+async fn administrator_interviene_sui_tenant() {
+    let t = start().await;
+    let admin = t.admin().await;
+    let gestore = t.tenant("alfa").await;
+    let anna = t.member(&gestore, "anna").await;
+    let alfa = list_tenants(&t, &admin).await.unwrap()[0].id;
+    assert_eq!(tenant_members(&t, &gestore, alfa).await.unwrap_err().kind, Kind::Forbidden);
+    let m = tenant_members(&t, &admin, alfa).await.unwrap();
+    assert_eq!(m.iter().map(|x| x.username.as_str()).collect::<Vec<_>>(), vec!["alfa-gestore", "anna"]);
+
+    // nomina un nuovo gestore, promuove anna, sblocca la password del gestore
+    create_tenant_manager(&t, &admin, alfa, "nuovo", "Nuovo", PASSWORD).await.unwrap();
+    assert_eq!(
+        caller(&t, &t.login("alfa", "nuovo").await, "alfa").await.unwrap().tenant.role,
+        Role::TenantManager
+    );
+    set_tenant_role(&t, &admin, alfa, anna.user_id, Role::TenantManager).await.unwrap();
+    assert_eq!(caller(&t, &anna, "alfa").await.unwrap().tenant.role, Role::TenantManager);
+    reset_tenant_password(&t, &admin, alfa, gestore.user_id, "password-nuova-1").await.unwrap();
+    assert!(login(&t, "alfa", "alfa-gestore", "password-nuova-1", "t").await.is_ok());
+
+    // mai sul tenant di sistema
+    let system: uuid::Uuid = mosaikit_db::query_scalar("select id from core.tenants where is_system")
+        .fetch_one(&t.k.db)
+        .await
+        .unwrap();
+    assert_eq!(tenant_members(&t, &admin, system).await.unwrap_err().kind, Kind::BadRequest);
+    assert!(create_tenant_manager(&t, &admin, system, "x1", "", PASSWORD).await.is_err());
+    assert!(reset_tenant_password(&t, &admin, system, admin.user_id, "password-nuova-2").await.is_err());
+}
+
+#[tokio::test]
+async fn nessun_tenant_resta_senza_gestore() {
+    let t = start().await;
+    let ga = t.tenant("alfa").await;
+    let gb = t.tenant("beta").await;
+    let anna = t.member(&ga, "anna").await;
+    // anna (di alfa) diventa l'unica gestore di beta
+    let cb = t.home(&gb).await;
+    let inv = invite(&t, &cb, "alfa", "anna", Role::TenantManager).await.unwrap();
+    respond_invitation(&t, &anna, inv.id, true).await.unwrap();
+    // il gestore originario di beta esce: anna resta l'unica Tenant Manager
+    let cab = caller(&t, &anna, "beta").await.unwrap();
+    remove_member(&t, &cab, gb.user_id, None).await.unwrap();
+    // alfa non puo' disabilitare anna: beta resterebbe senza Tenant Manager
+    let ca = t.home(&ga).await;
+    let e = remove_member(&t, &ca, anna.user_id, None).await.unwrap_err();
+    assert_eq!(e.kind, Kind::Conflict);
+    assert!(e.to_string().contains("beta"));
+}
+
+#[tokio::test]
+async fn secondo_fattore_degli_administrator() {
+    let t = start_with(|c| c.admin_totp = true).await;
+    // primo accesso: registrazione dell'app
+    let AdminLogin::Pending { token, step, .. } =
+        admin_login(&t, "admin", ADMIN_PASSWORD, "t").await.unwrap()
+    else {
+        panic!("atteso il secondo fattore")
+    };
+    assert_eq!(step, "totp_setup");
+    // la sessione in attesa non vale per le API
+    assert!(session(&t, &token).await.unwrap().is_none());
+    let p = pending_session(&t, &token).await.unwrap().unwrap();
+    assert!(totp_verify(&t, &p, "000000", "t").await.is_err(), "prima va registrata l'app");
+    let setup = totp_setup(&t, &p).await.unwrap();
+    assert!(setup.uri.starts_with("otpauth://totp/") && setup.qr_svg.contains("<svg"));
+    let secret = totp::base32_decode(&setup.secret).unwrap();
+    let now = totp::current_step();
+    assert_eq!(totp_enable(&t, &p, "12345", "t").await.unwrap_err().kind, Kind::Unauthorized);
+    let (lr, codes) = totp_enable(&t, &p, &totp::code(&secret, now), "t").await.unwrap();
+    assert!(lr.user.is_system_admin);
+    assert_eq!(codes.len(), 10);
+    assert!(pending_session(&t, &token).await.unwrap().is_none(), "la sessione in attesa e' chiusa");
+    assert!(administrators(&t, &lr.user).await.unwrap()[0].totp);
+
+    // accessi successivi: codice dell'app, mai due volte lo stesso
+    let pending = |t: &mosaikit_kernel::testing::TestKernel| {
+        let k = t.k.clone();
+        async move {
+            match admin_login(&k, "admin", ADMIN_PASSWORD, "t").await.unwrap() {
+                AdminLogin::Pending { token, step, .. } => {
+                    assert_eq!(step, "totp");
+                    pending_session(&k, &token).await.unwrap().unwrap()
+                }
+                AdminLogin::Done(_) => panic!("atteso il codice"),
+            }
+        }
+    };
+    let p = pending(&t).await;
+    assert!(totp_verify(&t, &p, &totp::code(&secret, now), "t").await.is_err(), "codice gia' usato");
+    totp_verify(&t, &p, &totp::code(&secret, now + 1), "t").await.unwrap();
+    // codici di recupero: monouso
+    let p = pending(&t).await;
+    totp_verify(&t, &p, &codes[0].to_uppercase(), "t").await.unwrap();
+    let p = pending(&t).await;
+    assert!(totp_verify(&t, &p, &codes[0], "t").await.is_err());
+
+    // un altro Administrator puo' azzerarlo (telefono perso): si registra di nuovo
+    let admin = lr.user;
+    create_administrator(&t, &admin, "bis", "", PASSWORD).await.unwrap();
+    let AdminLogin::Pending { step, .. } = admin_login(&t, "bis", PASSWORD, "t").await.unwrap() else {
+        panic!("atteso il secondo fattore")
+    };
+    assert_eq!(step, "totp_setup");
+    reset_administrator_totp(&t, &admin, admin.user_id).await.unwrap();
+    let AdminLogin::Pending { step, .. } = admin_login(&t, "admin", ADMIN_PASSWORD, "t").await.unwrap()
+    else {
+        panic!("atteso il secondo fattore")
+    };
+    assert_eq!(step, "totp_setup");
+}
+
+#[tokio::test]
+async fn tenant_di_lavoro_al_primo_avvio() {
+    let t = start_with(|c| c.initial_tenant = Some("locale".into())).await;
+    let pubblici = login_tenants(&t).await.unwrap();
+    assert_eq!(pubblici.iter().map(|x| x.slug.as_str()).collect::<Vec<_>>(), vec!["locale"]);
+    // credenziali generate nel file della cartella dei dati
+    let file =
+        std::fs::read_to_string(t.cfg.data_dir.join(mosaikit_kernel::identity::INITIAL_CREDENTIALS)).unwrap();
+    let section = &file[file.find("utente: utente").expect("credenziali dell'utente")..];
+    let password = section.lines().find_map(|l| l.strip_prefix("password: ")).unwrap();
+    let u = login(&t, "locale", "utente", password, "t").await.unwrap().user;
+    assert_eq!(caller(&t, &u, "locale").await.unwrap().tenant.role, Role::TenantManager);
+    // gia' creato: un nuovo avvio non lo ricrea
+    mosaikit_kernel::identity::bootstrap(&t).await.unwrap();
+    assert_eq!(login_tenants(&t).await.unwrap().len(), 1);
 }

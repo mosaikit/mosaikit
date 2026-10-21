@@ -322,7 +322,7 @@ async fn kpi_per_tenant_e_globali() {
 
     let admin = t.admin().await;
     let g = kpi::global(t, &admin).await.unwrap();
-    assert_eq!(g.tenants.len(), 3);
+    assert_eq!(g.tenants.len(), 2, "il tenant di sistema non e' tra i tenant");
     let notes_kpi = g.plugins.iter().find(|p| p.view == "kpi_notes_by_tag").unwrap();
     let tenants: std::collections::BTreeSet<&str> =
         notes_kpi.rows.iter().map(|r| r["tenant"].as_str().unwrap()).collect();
@@ -367,10 +367,10 @@ async fn panoramica_secondo_il_ruolo() {
 
     // User: solo i propri dati, niente aggregati di tenant o di sistema
     let o = overview(t, &w.anna).await.unwrap();
-    assert_eq!(o.role, "user");
+    assert_eq!(o.role, Role::User);
     assert_eq!(o.me.resources.iter().map(|r| r.count).sum::<i64>(), 2);
     assert_eq!((o.me.shared_by_me, o.me.shared_with_me), (1, 0));
-    assert!(o.tenant.is_none() && o.system.is_none());
+    assert!(o.tenant.is_none());
     let o = overview(t, &w.bruno).await.unwrap();
     assert_eq!(o.me.shared_with_me, 1);
     assert_eq!(o.me.recent_shares[0].title, "piano");
@@ -379,18 +379,15 @@ async fn panoramica_secondo_il_ruolo() {
 
     // Tenant Manager: anche gli aggregati del tenant
     let o = overview(t, &w.gestore).await.unwrap();
-    assert_eq!(o.role, "tenant_manager");
+    assert_eq!(o.role, Role::TenantManager);
     let core = o.tenant.unwrap();
     assert_eq!(core.resources.iter().map(|r| r.count).sum::<i64>(), 3);
     assert_eq!(core.shares, 1);
-    assert!(o.system.is_none());
 
-    // Administrator: anche il sistema
+    // Administrator: gli aggregati del sistema (non e' membro di nessun tenant)
     let admin = t.admin().await;
-    let c = mosaikit_kernel::tenancy::caller(t, &admin, "system").await.unwrap();
-    let o = overview(t, &c).await.unwrap();
-    assert_eq!(o.role, "administrator");
-    let s = o.system.unwrap();
-    assert_eq!((s.tenants, s.administrators, s.resources), (3, 1, 3));
+    let s = mosaikit_kernel::overview::system_overview(t, &admin).await.unwrap();
+    assert_eq!((s.tenants, s.administrators, s.resources), (2, 1, 3));
+    assert!(mosaikit_kernel::overview::system_overview(t, &w.gestore.user).await.is_err());
     assert!(s.plugins_active >= 1);
 }

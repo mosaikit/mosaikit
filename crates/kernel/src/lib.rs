@@ -23,6 +23,7 @@ pub mod overview;
 pub mod plugins;
 pub mod tenancy;
 pub mod testing;
+pub mod totp;
 mod util;
 
 use std::sync::Arc;

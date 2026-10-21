@@ -217,8 +217,7 @@ export interface CatalogItem {
 }
 
 export interface Overview {
-  role: 'administrator' | 'tenant_manager' | 'user'
-  tenant_role: Role
+  role: Role
   me: {
     resources: ResourceStat[]
     shared_by_me: number
@@ -229,23 +228,46 @@ export interface Overview {
     activity: { ts: string; action: string; plugin_id: string | null; plugin: string | null; title: string | null }[]
   }
   tenant?: TenantKpi['core']
-  system?: {
-    tenants: number
-    active_tenants: number
-    users: number
-    administrators: number
-    resources: number
-    bytes: number
-    plugins_installed: number
-    plugins_active: number
-    active_users_30d: number
-  }
+}
+
+/** panoramica dell'Administrator (`/api/admin/overview`) */
+export interface SystemOverview {
+  tenants: number
+  active_tenants: number
+  users: number
+  administrators: number
+  resources: number
+  bytes: number
+  plugins_installed: number
+  plugins_active: number
+  active_users_30d: number
 }
 
 export interface AdminUser {
   user_id: string
-  tenant: string
   username: string
   display_name: string
   status: string
+  /** secondo fattore registrato */
+  totp: boolean
+  created_at: string
+}
+
+/** tenant della pagina di accesso */
+export interface LoginTenant {
+  slug: string
+  name: string
+  auth: 'local'
+}
+
+/** risposta dell'accesso amministratori in attesa del secondo fattore */
+export interface PendingLogin {
+  pending: 'totp' | 'totp_setup'
+  csrf: string
+}
+
+export interface TotpSetup {
+  secret: string
+  uri: string
+  qr_svg: string
 }

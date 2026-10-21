@@ -40,6 +40,10 @@ fn config(flavor: Flavor, trusted: &str, brand: bool) -> String {
             push("data_dir = \"data\"");
             push("# apre il browser all'avvio");
             push("open_browser = true");
+            push("# uso locale: niente secondo fattore per l'Administrator");
+            push("admin_totp = false");
+            push("# al primo avvio crea il tenant di lavoro con il suo utente");
+            push("initial_tenant = \"locale\"");
         }
         Flavor::Server => {
             push(&format!("# {name} server. Tutte le proprieta' sono descritte in mosaikit.example.toml;"));
@@ -159,16 +163,18 @@ fn avvio(postgres: bool) -> String {
          2. Al primo avvio il browser si apre su http://127.0.0.1:{port}; dai successivi\n   \
             compare una notifica di Windows con l'indirizzo (clic per aprirlo).\n   \
             Per riaprire l'app: clic sull'icona.\n\
-         3. Primo accesso: tenant \"system\", utente \"admin\". La password e' in\n   \
-            data\\initial-admin-password.txt (menu dell'icona > Credenziali iniziali):\n   \
-            cambiala (Account) ed elimina il file.\n\
+         3. Primo accesso: utente \"utente\", gia' pronto per lavorare. Per\n   \
+            l'amministrazione (plugin, altri tenant e utenti): link \"Accesso\n   \
+            amministratori\", utente \"admin\". Le password sono in\n   \
+            data\\credenziali-iniziali.txt (menu dell'icona > Credenziali iniziali):\n   \
+            cambiale (Account) ed elimina il file.\n\
          4. Per fermare: menu dell'icona > Esci{stop}.\n\n\
          Log: data\\logs\\mosaikit.log (menu dell'icona > Log).\n\
          Backup: a programma fermo copia l'intera cartella data\\.\n\
          Configurazione: mosaikit.toml (ogni proprieta' e' descritta in mosaikit.example.toml).\n\
          Amministrazione, da un terminale nella cartella del programma (a programma fermo):\n   \
             .\\{exe}.exe --help\n   \
-            .\\{exe}.exe reset-password --tenant system --user admin\n   \
+            .\\{exe}.exe reset-password --user admin\n   \
             .\\{exe}.exe config\n",
         "=".repeat(title.chars().count())
     )
@@ -465,7 +471,7 @@ fn docker_env(image: &str, version: &str, pg: &str) -> String {
          POSTGRES_IMAGE={pg}\n\
          POSTGRES_PASSWORD=cambia-questa-password\n\
          MOSAIKIT_DB_PASSWORD=cambia-anche-questa\n\
-         # password iniziale di admin (tenant system), solo al primo avvio\n\
+         # password iniziale dell'Administrator admin, solo al primo avvio\n\
          MOSAIKIT_ADMIN_PASSWORD=cambiami-subito\n\
          # indirizzi pubblici: app (anche con percorso base) e plugin (origine diversa)\n\
          MOSAIKIT_URL=http://localhost:8080\n\

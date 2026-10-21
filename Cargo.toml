@@ -36,6 +36,10 @@ sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio",
 uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde", "std"] }
 sha2 = "0.10"
+hmac = "0.12"
+sha1 = "0.10"
+# QR code del secondo fattore (SVG, nessuna dipendenza grafica)
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
 hex = "0.4"
 base64 = "0.22"
 rand = "0.8"

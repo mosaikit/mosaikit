@@ -18,20 +18,20 @@ export default function StatusBar({ user, memberships, tenant, onTenant, onLogou
     <footer className="statusbar">
       <span className="st-user">
         ● {user.display_name || user.username}{' '}
-        <span className="muted">
-          {user.username}@{user.home_tenant_slug}
-        </span>
+        <span className="muted">{user.is_system_admin ? user.username : `${user.username}@${user.home_tenant_slug}`}</span>
       </span>
-      <label className="st-tenant">
-        <span className="muted">tenant </span>
-        <select value={tenant} onChange={(e) => onTenant(e.target.value)} aria-label="Tenant attivo">
-          {memberships.map((m) => (
-            <option key={m.slug} value={m.slug}>
-              {m.name} ({m.slug}){m.is_home ? '' : ' · ospite'}
-            </option>
-          ))}
-        </select>
-      </label>
+      {memberships.length > 0 && (
+        <label className="st-tenant">
+          <span className="muted">tenant </span>
+          <select value={tenant} onChange={(e) => onTenant(e.target.value)} aria-label="Tenant attivo">
+            {memberships.map((m) => (
+              <option key={m.slug} value={m.slug}>
+                {m.name} ({m.slug}){m.is_home ? '' : ' · ospite'}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       {current && <span className="st-role">{roleLabel(current.role)}</span>}
       {user.is_system_admin && <span className="badge acc">{ADMINISTRATOR}</span>}
       {dev && <span className="badge acc">sviluppo</span>}

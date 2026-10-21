@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api, enc, errText, fmtBytes, fmtDate } from '../api.ts'
 import { ADMINISTRATOR, roleLabel } from '../roles.ts'
-import type { Overview as Data, Session, TenantContext } from '../types.ts'
+import type { Overview as Data, Session, SystemOverview, TenantContext } from '../types.ts'
 
 interface Props {
   session: Session
@@ -9,7 +9,6 @@ interface Props {
   onOpen: (pluginId: string) => void
   onAccount: () => void
   onManage: () => void
-  onAdmin: () => void
 }
 
 const LEVEL: Record<string, string> = { read: 'lettura', write: 'modifica', manage: 'gestione' }
@@ -36,6 +35,7 @@ const ACTION: Record<string, string> = {
   'invitation.accept': 'hai accettato un invito',
   'invitation.decline': 'hai rifiutato un invito',
   'tenant.settings': 'hai cambiato le impostazioni del tenant',
+  'member.password_reset': 'password reimpostata',
 }
 
 function actionText(a: string): string {
@@ -60,10 +60,10 @@ function Card({ v, l, onClick }: { v: number | string; l: string; onClick?: () =
 
 /**
  * Pagina iniziale dopo l'accesso: i numeri che contano per il ruolo dell'utente.
- * User: le proprie risorse e condivisioni; Tenant Manager: anche il tenant;
- * Administrator: anche tutto il sistema.
+ * User: le proprie risorse e condivisioni; Tenant Manager: anche il tenant.
+ * L'Administrator ha la sua (`SystemOverviewPage`).
  */
-export default function Overview({ session, ctx, onOpen, onAccount, onManage, onAdmin }: Props) {
+export default function Overview({ session, ctx, onOpen, onAccount, onManage }: Props) {
   const [d, setD] = useState<Data | null>(null)
   const [error, setError] = useState('')
   const slug = ctx.tenant.slug
@@ -79,7 +79,7 @@ export default function Overview({ session, ctx, onOpen, onAccount, onManage, on
   }, [slug])
 
   const name = session.user.display_name || session.user.username
-  const role = session.user.is_system_admin ? ADMINISTRATOR : roleLabel(ctx.tenant.role)
+  const role = roleLabel(ctx.tenant.role)
   const mine = d?.me.resources.reduce((s, r) => s + r.count, 0) ?? 0
   const mineBytes = d?.me.resources.reduce((s, r) => s + r.bytes, 0) ?? 0
   const tenantTotal = d?.tenant?.resources.reduce((s, r) => s + r.count, 0) ?? 0
@@ -90,8 +90,7 @@ export default function Overview({ session, ctx, onOpen, onAccount, onManage, on
     <div className="console overview">
       <h1>Panoramica</h1>
       <p className="lead">
-        Ciao {name} · <span className="badge acc">{role}</span>
-        {session.user.is_system_admin && ctx.tenant.role === 'tenant_manager' && <> e {roleLabel(ctx.tenant.role)}</>} in <strong>{ctx.tenant.name}</strong>
+        Ciao {name} · <span className="badge acc">{role}</span> in <strong>{ctx.tenant.name}</strong>
       </p>
 
       {session.invitations > 0 && (
@@ -191,25 +190,6 @@ export default function Overview({ session, ctx, onOpen, onAccount, onManage, on
             </>
           )}
 
-          {d.system && (
-            <>
-              <h2 className="ov-title">
-                Il sistema{' '}
-                <button type="button" className="btn ghost small" onClick={onAdmin}>
-                  Amministrazione
-                </button>
-              </h2>
-              <div className="kpi-cards">
-                <Card v={`${d.system.active_tenants}/${d.system.tenants}`} l="tenant attivi" />
-                <Card v={d.system.users} l="utenti attivi" />
-                <Card v={d.system.active_users_30d} l="utenti attivi (30 gg)" />
-                <Card v={d.system.administrators} l="Administrator" />
-                <Card v={d.system.resources} l="risorse" />
-                <Card v={fmtBytes(d.system.bytes)} l="spazio occupato" />
-                <Card v={`${d.system.plugins_active}/${d.system.plugins_installed}`} l="plugin attivi" />
-              </div>
-            </>
-          )}
         </>
       )}
 
@@ -226,6 +206,53 @@ export default function Overview({ session, ctx, onOpen, onAccount, onManage, on
         ))}
         {ctx.plugins.length === 0 && <p className="muted">Nessun plugin attivo: un Administrator puo' installarli e attivarli.</p>}
       </div>
+    </div>
+  )
+}
+
+/** Pagina iniziale dell'Administrator: aggregati di tutto il sistema. */
+export function SystemOverviewPage({ session, onAdmin }: { session: Session; onAdmin: () => void }) {
+  const [d, setD] = useState<SystemOverview | null>(null)
+  const [error, setError] = useState('')
+  useEffect(() => {
+    api<SystemOverview>('GET', '/api/admin/overview')
+      .then(setD)
+      .catch((e) => setError(errText(e)))
+  }, [])
+  return (
+    <div className="console overview">
+      <h1>Panoramica</h1>
+      <p className="lead">
+        Ciao {session.user.display_name || session.user.username} · <span className="badge acc">{ADMINISTRATOR}</span>
+      </p>
+      {error && <div className="msg-line err">{error}</div>}
+      {!d && !error && <p className="muted">caricamento…</p>}
+      {d && (
+        <>
+          <h2 className="ov-title">
+            Il sistema{' '}
+            <button type="button" className="btn ghost small" onClick={onAdmin}>
+              Amministrazione
+            </button>
+          </h2>
+          <div className="kpi-cards">
+            <Card v={`${d.active_tenants}/${d.tenants}`} l="tenant attivi" onClick={onAdmin} />
+            <Card v={d.users} l="utenti attivi" />
+            <Card v={d.active_users_30d} l="utenti attivi (30 gg)" />
+            <Card v={d.administrators} l="Administrator" />
+            <Card v={d.resources} l="risorse" />
+            <Card v={fmtBytes(d.bytes)} l="spazio occupato" />
+            <Card v={`${d.plugins_active}/${d.plugins_installed}`} l="plugin attivi" />
+          </div>
+          {d.tenants === 0 && (
+            <section className="card">
+              <p>
+                Nessun tenant ancora: creane uno da <b>Amministrazione → Tenant</b>, con il suo Tenant Manager.
+              </p>
+            </section>
+          )}
+        </>
+      )}
     </div>
   )
 }

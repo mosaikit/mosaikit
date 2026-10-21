@@ -63,8 +63,11 @@ il suo database PostgreSQL, con volumi persistenti e un Ingress con due hostname
    ```
 
    Al primo avvio l'app applica le migrazioni del database e installa i plugin
-   inclusi. Accesso: `MOSAIKIT_URL`, tenant `system`, utente `admin`, password
-   `MOSAIKIT_ADMIN_PASSWORD`; cambiala subito dalla pagina Account.
+   inclusi. Accesso: `MOSAIKIT_URL` + `#/admin` (*Accesso amministratori*), utente `admin`, password
+   `MOSAIKIT_ADMIN_PASSWORD`; cambiala subito dalla pagina Account. Al primo
+   accesso registri il secondo fattore (app di autenticazione, QR code) e ricevi
+   i codici di recupero. Telefono perso:
+   `kubectl -n {{id}} exec deploy/{{id}} -- /app/mosaikit-server reset-totp --user admin`.
 
 ## Configurazione
 
@@ -78,7 +81,7 @@ Comandi di amministrazione dentro il pod:
 
 ```sh
 kubectl -n {{id}} exec deploy/{{id}} -- /app/mosaikit-server config
-kubectl -n {{id}} exec -it deploy/{{id}} -- /app/mosaikit-server reset-password --tenant system --user admin
+kubectl -n {{id}} exec -it deploy/{{id}} -- /app/mosaikit-server reset-password --user admin
 ```
 
 ## Database

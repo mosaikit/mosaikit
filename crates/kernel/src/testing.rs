@@ -147,6 +147,8 @@ pub async fn start_with(f: impl FnOnce(&mut Config)) -> TestKernel {
         data_dir: dir.path().join("data"),
         trusted_keys: vec![test_public_key()],
         database,
+        // il secondo fattore ha i suoi test (identity_tenancy)
+        admin_totp: false,
         ..Config::default()
     };
     f(&mut cfg);
@@ -161,7 +163,13 @@ pub async fn start_with(f: impl FnOnce(&mut Config)) -> TestKernel {
 
 impl TestKernel {
     pub async fn admin(&self) -> SessionUser {
-        login(&self.k, "system", "admin", ADMIN_PASSWORD, "test").await.expect("login admin").user
+        match crate::identity::admin_login(&self.k, "admin", ADMIN_PASSWORD, "test")
+            .await
+            .expect("login admin")
+        {
+            crate::identity::AdminLogin::Done(r) => r.user,
+            other => panic!("accesso admin incompleto: {other:?}"),
+        }
     }
 
     /// Installa (firmato) e attiva un plugin del repository.

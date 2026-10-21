@@ -159,13 +159,13 @@ pub fn run(app: &App, stop: tokio::sync::oneshot::Sender<()>, status: Receiver<S
             if ev.id == *open.id() {
                 mosaikit_server::open_browser(&app.app_url);
             } else if ev.id == *creds.id() {
-                let f = app.data_dir.join("initial-admin-password.txt");
+                let f = app.data_dir.join(mosaikit_kernel::identity::INITIAL_CREDENTIALS);
                 if f.is_file() {
                     open_file(&f);
                 } else {
                     message_box(
                         &app.name,
-                        "Il file con la password iniziale non c'e' piu' (eliminato dopo il primo accesso o password impostata con MOSAIKIT_ADMIN_PASSWORD).",
+                        "Il file con le credenziali iniziali non c'e' piu' (eliminato dopo il primo accesso).",
                         false,
                     );
                 }

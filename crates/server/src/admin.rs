@@ -1,5 +1,5 @@
 //! Comandi di amministrazione da riga di comando, comuni a `mosaikit-server` e
-//! all'eseguibile desktop: migrazioni, reset di una password, configurazione.
+//! all'eseguibile desktop: migrazioni, reset di password e secondo fattore, configurazione.
 
 use clap::Subcommand;
 use mosaikit_kernel::{identity, Config, Kernel};
@@ -10,8 +10,14 @@ pub enum AdminCmd {
     Migrate,
     /// Reimposta la password di un utente (la nuova password e' letta da MOSAIKIT_NEW_PASSWORD o da stdin)
     ResetPassword {
-        #[arg(long)]
+        /// tenant dell'utente (default: il tenant di sistema, cioe' un Administrator)
+        #[arg(long, default_value = "system")]
         tenant: String,
+        #[arg(long)]
+        user: String,
+    },
+    /// Toglie il secondo fattore di un Administrator (telefono perso, nessun codice di recupero)
+    ResetTotp {
         #[arg(long)]
         user: String,
     },
@@ -36,6 +42,7 @@ pub async fn run(cfg: Config, cmd: AdminCmd) -> i32 {
             cfg.brand.as_ref().map(|b| b.display().to_string()).unwrap_or_default()
         );
         println!("allow_unsigned = {}", cfg.allow_unsigned);
+        println!("admin_totp     = {}", cfg.admin_totp);
         println!("dev            = {}", cfg.dev.enabled);
         return 0;
     }
@@ -69,6 +76,16 @@ pub async fn run(cfg: Config, cmd: AdminCmd) -> i32 {
                 }
             }
         }
+        AdminCmd::ResetTotp { user } => match identity::reset_admin_totp(&k, &user).await {
+            Ok(()) => {
+                println!("secondo fattore rimosso: al prossimo accesso {user} registra di nuovo l'app");
+                0
+            }
+            Err(e) => {
+                eprintln!("{e}");
+                1
+            }
+        },
         AdminCmd::Config => 0,
     };
     k.shutdown().await;

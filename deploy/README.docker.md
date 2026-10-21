@@ -41,8 +41,11 @@ Docker Engine 24 o successivo con il plugin Compose (`docker compose`).
    ```
 
    Al primo avvio l'app applica le migrazioni del database e installa i plugin
-   inclusi. Accesso: `MOSAIKIT_URL`, tenant `system`, utente `admin`, password
-   `MOSAIKIT_ADMIN_PASSWORD`; cambiala subito dalla pagina Account.
+   inclusi. Accesso: `MOSAIKIT_URL` + `#/admin` (*Accesso amministratori*), utente `admin`, password
+   `MOSAIKIT_ADMIN_PASSWORD`; cambiala subito dalla pagina Account. Al primo
+   accesso registri il secondo fattore (app di autenticazione, QR code) e ricevi
+   i codici di recupero. Telefono perso: `docker compose exec app
+   /app/mosaikit-server reset-totp --user admin`.
 
 ## Produzione
 
@@ -70,7 +73,7 @@ Comandi di amministrazione:
 
 ```sh
 docker compose exec app /app/mosaikit-server config
-docker compose exec -it app /app/mosaikit-server reset-password --tenant system --user admin
+docker compose exec -it app /app/mosaikit-server reset-password --user admin
 ```
 
 ## Dati, backup, aggiornamento

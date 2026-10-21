@@ -1,3 +1,4 @@
+import { createHmac } from 'node:crypto'
 import { expect, test, type Page } from '@playwright/test'
 
 // Scenario completo: amministratore -> tenant -> gestore -> membro -> plugin in
@@ -8,13 +9,46 @@ const PASSWORD = 'password-e2e-123'
 // l'app e' servita sotto un percorso base (url = "http://127.0.0.1:18080/mosaikit")
 const BASE = process.env.E2E_BASE_PATH ?? '/mosaikit'
 
+/** Codice TOTP (RFC 6238, SHA-1, 6 cifre) di un segreto in base32. */
+function totp(secret: string, step = Math.floor(Date.now() / 30000)): string {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+  let bits = ''
+  for (const c of secret.replace(/\s|=/g, '').toUpperCase()) bits += alphabet.indexOf(c).toString(2).padStart(5, '0')
+  const key = Buffer.from((bits.match(/.{8}/g) ?? []).map((b) => parseInt(b, 2)))
+  const msg = Buffer.alloc(8)
+  msg.writeBigUInt64BE(BigInt(step))
+  const h = createHmac('sha1', key).update(msg).digest()
+  const off = h[h.length - 1] & 0x0f
+  return String((h.readUInt32BE(off) & 0x7fffffff) % 1_000_000).padStart(6, '0')
+}
+
 async function login(page: Page, tenant: string, user: string, password: string) {
   await page.goto('./')
-  await page.getByLabel('Tenant').fill(tenant)
+  await expect(page.getByLabel('Utente')).toBeVisible()
+  // il menu dei tenant compare solo se ce n'e' piu' di uno
+  const select = page.getByLabel('Tenant')
+  if (await select.count()) await select.selectOption(tenant)
   await page.getByLabel('Utente').fill(user)
   await page.getByLabel('Password').fill(password)
   await page.getByRole('button', { name: 'Accedi' }).click()
   await expect(page.locator('.statusbar')).toContainText(user)
+}
+
+/** Accesso amministratori; al primo accesso registra il secondo fattore. */
+async function adminLogin(page: Page) {
+  await page.goto('./#/admin')
+  await expect(page.getByText('Accesso amministratori')).toBeVisible()
+  await page.getByLabel('Utente').fill('admin')
+  await page.getByLabel('Password').fill(ADMIN_PASSWORD)
+  await page.getByRole('button', { name: 'Accedi' }).click()
+  const secret = page.locator('.totp-secret')
+  await expect(secret).toBeVisible()
+  await expect(page.getByRole('img', { name: "QR code da inquadrare con l'app" })).toBeVisible()
+  await page.getByLabel("Codice mostrato dall'app").fill(totp((await secret.textContent()) ?? ''))
+  await page.getByRole('button', { name: 'Attiva e accedi' }).click()
+  await expect(page.getByLabel('Codici di recupero').locator('li')).toHaveCount(10)
+  await page.getByRole('button', { name: 'Ho salvato i codici: continua' }).click()
+  await expect(page.locator('.statusbar')).toContainText('admin')
 }
 
 async function logout(page: Page) {
@@ -23,8 +57,12 @@ async function logout(page: Page) {
 }
 
 test.describe.serial('piattaforma', () => {
-  test('amministratore: plugin preinstallati e nuovo tenant', async ({ page }) => {
-    await login(page, 'system', 'admin', ADMIN_PASSWORD)
+  test('amministratore: secondo fattore, plugin preinstallati e nuovo tenant', async ({ page }) => {
+    // prima di ogni tenant la pagina di accesso lo dice e rimanda all'accesso amministratori
+    await page.goto('./')
+    await expect(page.getByText('Nessun tenant disponibile.')).toBeVisible()
+    await adminLogin(page)
+    await expect(page.locator('.overview')).toContainText('Administrator')
     await page.getByTitle('Amministrazione di sistema').click()
     await page.getByRole('tab', { name: 'Plugin' }).click()
     for (const name of ['Note', 'Attività', 'Contatti', 'Mappe', 'Siti statici', 'File']) {
@@ -37,6 +75,9 @@ test.describe.serial('piattaforma', () => {
     await page.getByLabel('Password del Tenant Manager').fill(PASSWORD)
     await page.getByRole('button', { name: 'Crea tenant' }).click()
     await expect(page.locator('tr', { hasText: 'Comune di Alfa' })).toBeVisible()
+    // utenti e gestori del tenant, visti dall'amministratore
+    await page.locator('tr', { hasText: 'Comune di Alfa' }).getByRole('button', { name: 'Utenti e gestori' }).click()
+    await expect(page.locator('.tenant-users tr', { hasText: 'gestore@alfa' })).toContainText('Tenant Manager')
     await logout(page)
   })
 

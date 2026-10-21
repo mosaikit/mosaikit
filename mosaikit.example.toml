@@ -60,6 +60,20 @@ url = "http://127.0.0.1:8080/mosaikit"
 # Durata di una sessione di accesso, in ore.
 # session_ttl_hours = 12
 
+# Secondo fattore (TOTP: Google/Microsoft Authenticator, FreeOTP...) obbligatorio per gli
+# Administrator. Al primo accesso l'app mostra il QR code da registrare e i codici di
+# recupero. Da disattivare solo per l'uso locale (versione desktop). In emergenza:
+# `<eseguibile> reset-totp --user <username>`.
+# Env: MOSAIKIT_ADMIN_TOTP
+# admin_totp = true
+
+# Al primo avvio crea anche un tenant di lavoro con questo slug (nome: quello del prodotto)
+# e il suo Tenant Manager "utente", con password generata. L'Administrator non ha uno
+# spazio di lavoro: serve all'uso locale (versione desktop), dove si lavora subito.
+# Le credenziali sono in <data_dir>/credenziali-iniziali.txt.
+# Env: MOSAIKIT_INITIAL_TENANT
+# initial_tenant = "locale"
+
 # Apre il browser su `url` all'avvio (versione desktop).
 # Env: MOSAIKIT_OPEN_BROWSER
 # open_browser = false

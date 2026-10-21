@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react'
+import { Fragment, useCallback, useEffect, useState, type FormEvent } from 'react'
 import { api, errText, fmtBytes, fmtDate } from '../api.ts'
-import type { AdminPlugin, AdminUser, CatalogItem, GlobalKpi, Session, TenantInfo } from '../types.ts'
+import { ROLE_LABEL } from '../roles.ts'
+import type { AdminPlugin, AdminUser, CatalogItem, GlobalKpi, Member, Role, Session, TenantInfo } from '../types.ts'
 import { useUi } from '../ui-context.ts'
 import { GlobalKpiView } from './Kpi.tsx'
 
@@ -11,7 +12,7 @@ export default function AdminConsole({ session, onPluginsChanged }: { session: S
   return (
     <div className="console">
       <h1>Amministrazione di sistema</h1>
-      <p className="lead">Tenant, Administrator, plugin installati e KPI di tutta l'installazione. Anche qui: metadati e aggregati, mai i contenuti.</p>
+      <p className="lead">Tenant e loro gestori, Administrator, plugin installati e KPI di tutta l'installazione. Anche qui: metadati e aggregati, mai i contenuti.</p>
       <div className="tabs" role="tablist">
         {(
           [
@@ -34,22 +35,25 @@ export default function AdminConsole({ session, onPluginsChanged }: { session: S
   )
 }
 
-/** Utenti con il ruolo di sistema Administrator (di qualsiasi tenant). */
+/** Account Administrator: del tenant di sistema, con accesso a parte e secondo fattore. */
 function Admins({ me }: { me: string }) {
   const ui = useUi()
   const [items, setItems] = useState<AdminUser[]>([])
   const [error, setError] = useState('')
-  const [f, setF] = useState({ tenant: '', username: '' })
+  const [f, setF] = useState({ username: '', display_name: '', password: '' })
+  const [resetFor, setResetFor] = useState<string | null>(null)
+  const [newPw, setNewPw] = useState('')
   const reload = useCallback(() => api<AdminUser[]>('GET', '/api/admin/administrators').then(setItems).catch((e) => setError(errText(e))), [])
   useEffect(() => {
     void reload()
   }, [reload])
 
-  async function set(tenant: string, username: string, administrator: boolean) {
+  async function run(fn: () => Promise<unknown>, ok: string) {
+    setError('')
     try {
-      setItems(await api<AdminUser[]>('PUT', '/api/admin/administrators', { tenant, username, administrator }))
-      setError('')
-      ui.toast(administrator ? `${username}@${tenant} e' ora Administrator` : `${username}@${tenant} non e' piu' Administrator`)
+      const r = await fn()
+      if (Array.isArray(r)) setItems(r as AdminUser[])
+      ui.toast(ok)
       return true
     } catch (e) {
       setError(errText(e))
@@ -59,26 +63,41 @@ function Admins({ me }: { me: string }) {
 
   async function add(e: FormEvent) {
     e.preventDefault()
-    if (await set(f.tenant.trim(), f.username.trim(), true)) setF({ tenant: '', username: '' })
+    if (await run(() => api('POST', '/api/admin/administrators', f), `Administrator ${f.username} creato`)) setF({ username: '', display_name: '', password: '' })
+  }
+
+  async function resetPassword(e: FormEvent, a: AdminUser) {
+    e.preventDefault()
+    if (await run(() => api('POST', `/api/admin/administrators/${a.user_id}/password`, { password: newPw }), `password di ${a.username} reimpostata`)) {
+      setResetFor(null)
+      setNewPw('')
+    }
   }
 
   return (
     <>
       <section className="card">
-        <h3>Assegna il ruolo Administrator</h3>
-        <p className="muted">Un Administrator gestisce tenant, plugin e KPI di tutto il sistema. L'utente continua ad accedere dal proprio tenant.</p>
+        <h3>Nuovo Administrator</h3>
+        <p className="muted">
+          Gli Administrator sono account di piattaforma: accedono da <b>Accesso amministratori</b>, sempre con utente e password locali e il secondo fattore, e non
+          lavorano nei tenant. Chi e' anche Tenant Manager o User di un tenant usa la' un account separato.
+        </p>
         <form className="form-grid" onSubmit={(e) => void add(e)}>
-          <div>
-            <label htmlFor="aa-t">Tenant dell'utente</label>
-            <input id="aa-t" value={f.tenant} onChange={(e) => setF({ ...f, tenant: e.target.value })} required />
-          </div>
           <div>
             <label htmlFor="aa-u">Username</label>
             <input id="aa-u" value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} required />
           </div>
           <div>
+            <label htmlFor="aa-n">Nome</label>
+            <input id="aa-n" value={f.display_name} onChange={(e) => setF({ ...f, display_name: e.target.value })} />
+          </div>
+          <div>
+            <label htmlFor="aa-p">Password iniziale</label>
+            <input id="aa-p" type="password" autoComplete="new-password" minLength={10} value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} required />
+          </div>
+          <div>
             <button type="submit" className="btn primary">
-              Assegna
+              Crea
             </button>
           </div>
         </form>
@@ -90,8 +109,9 @@ function Admins({ me }: { me: string }) {
             <thead>
               <tr>
                 <th>Utente</th>
-                <th>Tenant</th>
                 <th>Stato</th>
+                <th>Secondo fattore</th>
+                <th>Creato</th>
                 <th />
               </tr>
             </thead>
@@ -100,22 +120,63 @@ function Admins({ me }: { me: string }) {
                 <tr key={a.user_id}>
                   <td>
                     {a.display_name || a.username} <span className="muted mono">{a.username}</span>
+                    {a.user_id === me && <span className="badge acc">tu</span>}
                   </td>
-                  <td className="mono">{a.tenant}</td>
                   <td>{a.status === 'active' ? <span className="badge ok">attivo</span> : <span className="badge err">disabilitato</span>}</td>
-                  <td className="num">
-                    <button
-                      type="button"
-                      className="btn ghost small"
-                      onClick={async () => {
-                        const self = a.user_id === me
-                        if (await ui.confirm(self ? 'Togli a te stesso il ruolo Administrator? La sessione verrà chiusa.' : `Togliere il ruolo Administrator a ${a.username}@${a.tenant}?`, true)) {
-                          if ((await set(a.tenant, a.username, false)) && self) window.location.reload()
-                        }
-                      }}
-                    >
-                      Togli il ruolo
-                    </button>
+                  <td>{a.totp ? <span className="badge ok">attivo</span> : <span className="badge">da registrare</span>}</td>
+                  <td>{fmtDate(a.created_at)}</td>
+                  <td className="actions">
+                    {a.user_id !== me && (
+                      <>
+                        {resetFor === a.user_id ? (
+                          <form className="inline-form" onSubmit={(e) => void resetPassword(e, a)}>
+                            <input
+                              type="password"
+                              autoComplete="new-password"
+                              minLength={10}
+                              placeholder="nuova password"
+                              aria-label={`Nuova password di ${a.username}`}
+                              value={newPw}
+                              onChange={(e) => setNewPw(e.target.value)}
+                              required
+                            />
+                            <button type="submit" className="btn primary small">
+                              Salva
+                            </button>
+                            <button type="button" className="btn ghost small" onClick={() => setResetFor(null)}>
+                              Annulla
+                            </button>
+                          </form>
+                        ) : (
+                          <button type="button" className="btn ghost small" onClick={() => (setResetFor(a.user_id), setNewPw(''))}>
+                            Reimposta password
+                          </button>
+                        )}
+                        {a.totp && (
+                          <button
+                            type="button"
+                            className="btn ghost small"
+                            onClick={async () => {
+                              if (await ui.confirm(`Togliere il secondo fattore a ${a.username}? Al prossimo accesso registrera' di nuovo l'app.`, true))
+                                await run(() => api('DELETE', `/api/admin/administrators/${a.user_id}/totp`), `secondo fattore di ${a.username} rimosso`)
+                            }}
+                          >
+                            Reimposta 2FA
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className={'btn small ' + (a.status === 'active' ? 'danger' : 'ghost')}
+                          onClick={async () => {
+                            const active = a.status !== 'active'
+                            if (!active && !(await ui.confirm(`Disabilitare ${a.username}? Le sue sessioni verranno chiuse.`, true))) return
+                            await run(() => api('PUT', `/api/admin/administrators/${a.user_id}/status`, { active }), active ? `${a.username} riattivato` : `${a.username} disabilitato`)
+                          }}
+                        >
+                          {a.status === 'active' ? 'Disabilita' : 'Riattiva'}
+                        </button>
+                      </>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -128,10 +189,153 @@ function Admins({ me }: { me: string }) {
   )
 }
 
+/**
+ * Utenti di un tenant visti dall'Administrator: ruoli e accesso, mai i contenuti. Serve a
+ * nominare o sostituire un Tenant Manager e a sbloccare una password.
+ */
+function TenantUsers({ tenant, onChanged }: { tenant: TenantInfo; onChanged: () => void }) {
+  const ui = useUi()
+  const [items, setItems] = useState<Member[]>([])
+  const [error, setError] = useState('')
+  const [f, setF] = useState({ username: '', display_name: '', password: '' })
+  const [resetFor, setResetFor] = useState<string | null>(null)
+  const [newPw, setNewPw] = useState('')
+  const base = `/api/admin/tenants/${tenant.id}`
+  const reload = useCallback(() => api<Member[]>('GET', `${base}/members`).then(setItems).catch((e) => setError(errText(e))), [base])
+  useEffect(() => {
+    void reload()
+  }, [reload])
+
+  async function run(fn: () => Promise<unknown>, ok: string) {
+    setError('')
+    try {
+      const r = await fn()
+      if (Array.isArray(r)) setItems(r as Member[])
+      ui.toast(ok)
+      onChanged()
+      return true
+    } catch (e) {
+      setError(errText(e))
+      return false
+    }
+  }
+
+  return (
+    <div className="tenant-users">
+      <div className="tbl-wrap">
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th>Utente</th>
+              <th>Ruolo</th>
+              <th>Stato</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {items.map((m) => (
+              <tr key={m.user_id}>
+                <td>
+                  {m.display_name || m.username} <span className="muted mono">{m.username}@{m.home_tenant}</span>
+                  {m.is_guest && <span className="badge">ospite</span>}
+                </td>
+                <td>
+                  <select
+                    value={m.role}
+                    aria-label={`Ruolo di ${m.username}`}
+                    onChange={(e) => void run(() => api('PUT', `${base}/members/${m.user_id}/role`, { role: e.target.value }), `ruolo di ${m.username} aggiornato`)}
+                  >
+                    {(Object.keys(ROLE_LABEL) as Role[]).map((r) => (
+                      <option key={r} value={r}>
+                        {ROLE_LABEL[r]}
+                      </option>
+                    ))}
+                  </select>
+                </td>
+                <td>{m.status === 'active' ? <span className="badge ok">attivo</span> : <span className="badge err">disabilitato</span>}</td>
+                <td className="actions">
+                  {!m.is_guest &&
+                    (resetFor === m.user_id ? (
+                      <form
+                        className="inline-form"
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          void run(() => api('POST', `${base}/members/${m.user_id}/password`, { password: newPw }), `password di ${m.username} reimpostata`).then(
+                            (ok) => ok && setResetFor(null),
+                          )
+                        }}
+                      >
+                        <input
+                          type="password"
+                          autoComplete="new-password"
+                          minLength={10}
+                          placeholder="nuova password"
+                          aria-label={`Nuova password di ${m.username}`}
+                          value={newPw}
+                          onChange={(e) => setNewPw(e.target.value)}
+                          required
+                        />
+                        <button type="submit" className="btn primary small">
+                          Salva
+                        </button>
+                        <button type="button" className="btn ghost small" onClick={() => setResetFor(null)}>
+                          Annulla
+                        </button>
+                      </form>
+                    ) : (
+                      <button type="button" className="btn ghost small" onClick={() => (setResetFor(m.user_id), setNewPw(''))}>
+                        Reimposta password
+                      </button>
+                    ))}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <form
+        className="form-grid"
+        onSubmit={(e) => {
+          e.preventDefault()
+          void run(() => api('POST', `${base}/managers`, f), `Tenant Manager ${f.username} creato`).then((ok) => ok && setF({ username: '', display_name: '', password: '' }))
+        }}
+      >
+        <div>
+          <label htmlFor={`nm-u-${tenant.id}`}>Nuovo Tenant Manager: username</label>
+          <input id={`nm-u-${tenant.id}`} value={f.username} onChange={(e) => setF({ ...f, username: e.target.value })} required />
+        </div>
+        <div>
+          <label htmlFor={`nm-n-${tenant.id}`}>Nome</label>
+          <input id={`nm-n-${tenant.id}`} value={f.display_name} onChange={(e) => setF({ ...f, display_name: e.target.value })} />
+        </div>
+        <div>
+          <label htmlFor={`nm-p-${tenant.id}`}>Password iniziale</label>
+          <input
+            id={`nm-p-${tenant.id}`}
+            type="password"
+            autoComplete="new-password"
+            minLength={10}
+            value={f.password}
+            onChange={(e) => setF({ ...f, password: e.target.value })}
+            required
+          />
+        </div>
+        <div>
+          <button type="submit" className="btn primary">
+            Crea
+          </button>
+        </div>
+      </form>
+      <div className={'msg-line' + (error ? ' err' : '')}>{error}</div>
+    </div>
+  )
+}
+
 function Tenants() {
   const ui = useUi()
   const [items, setItems] = useState<TenantInfo[]>([])
   const [error, setError] = useState('')
+  const [open, setOpen] = useState<string | null>(null)
   const [f, setF] = useState({ slug: '', name: '', manager_username: '', manager_display_name: '', manager_password: '' })
   const reload = useCallback(() => api<TenantInfo[]>('GET', '/api/admin/tenants').then(setItems).catch((e) => setError(errText(e))), [])
   useEffect(() => {
@@ -194,20 +398,29 @@ function Tenants() {
             </tr>
           </thead>
           <tbody>
-            {items.map((t) => (
-              <tr key={t.id}>
-                <td>
-                  {t.name} <span className="muted mono">{t.slug}</span>
-                  {t.is_system && <span className="badge acc">sistema</span>}
-                  {t.status === 'suspended' && <span className="badge err">sospeso</span>}
+            {items.length === 0 && (
+              <tr>
+                <td className="empty" colSpan={7}>
+                  Nessun tenant: creane uno qui sopra.
                 </td>
-                <td className="num">{t.members}</td>
-                <td className="num">{t.guests}</td>
-                <td className="num">{t.resources}</td>
-                <td className="num">{fmtBytes(t.bytes)}</td>
-                <td>{fmtDate(t.created_at)}</td>
-                <td className="actions">
-                  {!t.is_system && (
+              </tr>
+            )}
+            {items.map((t) => (
+              <Fragment key={t.id}>
+                <tr>
+                  <td>
+                    {t.name} <span className="muted mono">{t.slug}</span>
+                    {t.status === 'suspended' && <span className="badge err">sospeso</span>}
+                  </td>
+                  <td className="num">{t.members}</td>
+                  <td className="num">{t.guests}</td>
+                  <td className="num">{t.resources}</td>
+                  <td className="num">{fmtBytes(t.bytes)}</td>
+                  <td>{fmtDate(t.created_at)}</td>
+                  <td className="actions">
+                    <button type="button" className="btn ghost small" aria-expanded={open === t.id} onClick={() => setOpen(open === t.id ? null : t.id)}>
+                      Utenti e gestori
+                    </button>
                     <button
                       type="button"
                       className={'btn small ' + (t.status === 'active' ? 'danger' : 'ghost')}
@@ -224,9 +437,16 @@ function Tenants() {
                     >
                       {t.status === 'active' ? 'Sospendi' : 'Riattiva'}
                     </button>
-                  )}
-                </td>
-              </tr>
+                  </td>
+                </tr>
+                {open === t.id && (
+                  <tr className="row-detail">
+                    <td colSpan={7}>
+                      <TenantUsers tenant={t} onChanged={() => void reload()} />
+                    </td>
+                  </tr>
+                )}
+              </Fragment>
             ))}
           </tbody>
         </table>

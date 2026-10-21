@@ -59,7 +59,7 @@ pub async fn invite(
     c.require_manager()?;
     let user: Option<Uuid> = mosaikit_db::query_scalar(
         "select u.id from core.users u join core.tenants t on t.id = u.home_tenant_id
-         where t.slug = $1 and u.username = $2 and u.status = 'active'",
+         where t.slug = $1 and u.username = $2 and u.status = 'active' and not t.is_system",
     )
     .bind(home_tenant.trim().to_lowercase())
     .bind(username.trim().to_lowercase())

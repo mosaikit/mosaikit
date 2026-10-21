@@ -1,7 +1,8 @@
 //! Panoramica: la pagina iniziale dopo l'accesso, con dati che dipendono dal ruolo.
 //! - User: le proprie risorse, condivisioni fatte e ricevute, link pubblici, attivita' recente;
 //! - Tenant Manager: in piu' gli aggregati del tenant;
-//! - Administrator: in piu' gli aggregati di tutto il sistema.
+//! - Administrator (account del tenant di sistema, senza spazio di lavoro): gli aggregati
+//!   di tutto il sistema, con [`system_overview`].
 //!
 //! Come per i KPI, si vedono solo conteggi e titoli delle risorse accessibili all'utente.
 
@@ -10,18 +11,15 @@ use serde::Serialize;
 use uuid::Uuid;
 
 use crate::kpi::{self, CoreKpi, ResourceStat};
-use crate::{Caller, Kernel, Result, Role};
+use crate::tenancy::require_admin;
+use crate::{Caller, Kernel, Result, Role, SessionUser};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Overview {
-    /// ruolo piu' alto: "administrator", "tenant_manager" o "user"
-    pub role: &'static str,
-    pub tenant_role: Role,
+    pub role: Role,
     pub me: Personal,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tenant: Option<CoreKpi>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub system: Option<SystemOverview>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -186,12 +184,15 @@ async fn personal(k: &Kernel, c: &Caller) -> Result<Personal> {
     })
 }
 
-async fn system(k: &Kernel) -> Result<SystemOverview> {
+/// Panoramica dell'Administrator: aggregati di tutto il sistema (tenant di sistema escluso).
+pub async fn system_overview(k: &Kernel, admin: &SessionUser) -> Result<SystemOverview> {
+    require_admin(admin)?;
     let r = mosaikit_db::query(
         "select
-           (select count(*) from core.tenants),
-           (select count(*) from core.tenants where status = 'active'),
-           (select count(*) from core.users where status = 'active'),
+           (select count(*) from core.tenants where not is_system),
+           (select count(*) from core.tenants where status = 'active' and not is_system),
+           (select count(*) from core.users u join core.tenants t on t.id = u.home_tenant_id
+             where u.status = 'active' and not t.is_system),
            (select count(*) from core.users where is_system_admin and status = 'active'),
            (select count(*) from core.resources),
            (select coalesce(sum(size_bytes), 0)::bigint from core.resources),
@@ -216,19 +217,10 @@ async fn system(k: &Kernel) -> Result<SystemOverview> {
 
 /// Panoramica dell'utente nel tenant attivo, secondo il suo ruolo.
 pub async fn overview(k: &Kernel, c: &Caller) -> Result<Overview> {
-    let admin = c.user.is_system_admin;
     let manager = c.is_manager();
     Ok(Overview {
-        role: if admin {
-            "administrator"
-        } else if manager {
-            "tenant_manager"
-        } else {
-            "user"
-        },
-        tenant_role: c.tenant.role,
+        role: c.tenant.role,
         me: personal(k, c).await?,
         tenant: if manager { Some(kpi::core(k, c.tenant.tenant_id).await?) } else { None },
-        system: if admin { Some(system(k).await?) } else { None },
     })
 }

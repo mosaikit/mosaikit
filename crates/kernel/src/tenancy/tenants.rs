@@ -34,6 +34,26 @@ const TENANT_INFO_SQL: &str = "
            t.created_at
     from core.tenants t";
 
+/// Tenant proposto nella pagina di accesso.
+#[derive(Debug, Clone, Serialize)]
+pub struct LoginTenant {
+    pub slug: String,
+    pub name: String,
+    /// metodo di accesso: "local" (utente e password)
+    pub auth: &'static str,
+}
+
+/// Tenant attivi per la pagina di accesso (pubblico: solo slug e nome). Il tenant di
+/// sistema ha un accesso a parte.
+pub async fn login_tenants(k: &Kernel) -> Result<Vec<LoginTenant>> {
+    let rows = mosaikit_db::query(
+        "select slug, name from core.tenants where status = 'active' and not is_system order by name",
+    )
+    .fetch_all(&k.db)
+    .await?;
+    Ok(rows.iter().map(|r| LoginTenant { slug: r.get(0), name: r.get(1), auth: "local" }).collect())
+}
+
 fn tenant_info(r: &mosaikit_db::Row) -> TenantInfo {
     TenantInfo {
         id: r.get(0),
@@ -51,7 +71,7 @@ fn tenant_info(r: &mosaikit_db::Row) -> TenantInfo {
 
 pub async fn list_tenants(k: &Kernel, admin: &SessionUser) -> Result<Vec<TenantInfo>> {
     require_admin(admin)?;
-    let rows = mosaikit_db::query(format!("{TENANT_INFO_SQL} order by t.is_system desc, t.name"))
+    let rows = mosaikit_db::query(format!("{TENANT_INFO_SQL} where not t.is_system order by t.name"))
         .fetch_all(&k.db)
         .await?;
     Ok(rows.iter().map(tenant_info).collect())

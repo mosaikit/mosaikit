@@ -1213,6 +1213,71 @@ table.tbl {
   text-align: center;
 }
 
+.login-switch {
+  margin-top: 12px;
+  font-size: 12px;
+  text-align: center;
+}
+.login-switch a,
+.login-switch .linklike {
+  color: var(--dim);
+}
+.login-switch a:hover,
+.login-switch .linklike:hover {
+  color: var(--acc);
+}
+
+/* secondo fattore: QR code, chiave, codici */
+.totp-qr {
+  background: #fff;
+  border-radius: var(--r-sm);
+  width: 180px;
+  margin: 4px auto 0;
+  padding: 6px;
+}
+.totp-qr svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.demo-hint code.totp-secret {
+  word-break: break-all;
+  user-select: all;
+}
+.login-card input.code-input {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  letter-spacing: 3px;
+  text-align: center;
+}
+.recovery-codes {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+  font-size: 13px;
+  color: var(--acc);
+}
+
 .st-product {
   font-size: 11px;
+}
+
+/* amministrazione: dettaglio di un tenant (utenti e gestori) e moduli in riga */
+.tbl tr.row-detail > td {
+  background: var(--panel2);
+  padding: 14px 16px;
+}
+.tenant-users .form-grid {
+  margin-top: 12px;
+}
+.inline-form {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.inline-form input {
+  width: 170px;
 }
