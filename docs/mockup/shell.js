@@ -39,7 +39,7 @@ const S = {
       legal: 'https://apps.example.org/legal',
       from: 'Mosaikit <noreply@apps.example.org>',
       footer: 'Automatic message, do not reply.',
-      themes: ['mosaikit', 'civic', 'slate', 'forest', 'terracotta', 'aurora', 'contrast'],
+      themes: ['mosaikit', 'tessera', 'civic', 'slate', 'forest', 'terracotta', 'aurora', 'contrast'],
       // what the top band shows, for everybody: decided by the administrator only
       bar: { logo: true, search: true, lang: true, help: true, mode: true },
       // which of its defaults the tenants may customize
@@ -414,7 +414,8 @@ function themeChecks(p, logo) {
   });
   return out;
 }
-/* The default theme takes the colours of Microsoft Teams: accent #5b5fc7, band #444791, light search field. */
+/* The default theme takes the colours of Microsoft Teams: accent #5b5fc7, band #444791, light search field.
+   Tessera, right after, takes the ones of the logo (docs/logo): burgundy band and accent, warm greys. */
 const PRESETS = [
   (() => {
     const p = Object.assign(
@@ -430,6 +431,22 @@ const PRESETS = [
     );
     p.light.navInput = ['#e8ebfa', '#616161'];
     p.dark.navInput = ['#292929', '#adadad'];
+    return p;
+  })(),
+  (() => {
+    const p = Object.assign(
+      makePreset({
+        id: 'tessera',
+        name: 'Tessera',
+        accent: '#A8293A',
+        bar: 'color',
+        grays: 'warm',
+        adv: { barL: '#6E1522', barD: '#4A0E17', accD: '#E0707C', content: '#FFFDFA' },
+      }),
+      { note: 'the colours of the logo', custom: false },
+    );
+    p.light.navInput = ['#F5F0E6', '#6B6058'];
+    p.dark.navInput = ['#2E2822', '#ADA39A'];
     return p;
   })(),
   {
