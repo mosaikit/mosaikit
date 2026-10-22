@@ -3,7 +3,7 @@
 From the mockup (`docs/mockup`) and the rules of [refactoring-ui.md](refactoring-ui.md) to the product.
 Every phase includes kernel, migrations (PostgreSQL and SQLite), tests of the kernel and of the server,
 API, pages of the shell (`ui/host/src/app`), e2e tests (Playwright, `cargo xtask e2e`) and cites the ids
-of the screens of the mockup. A phase is closed when `cargo xtask test` and the e2e tests pass.
+of the screens of the mockup. A phase is closed when `cargo xtask test` and the e2e tests pass and its section of [manual-tests.md](manual-tests.md) is written.
 
 | Phase | Content | Screens |
 |---|---|---|
