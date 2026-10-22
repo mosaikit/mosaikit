@@ -1,11 +1,11 @@
-//! Test nativi della logica dei plugin con un host simulato.
+//! Native tests of the logic of the plugins with a simulated host.
 //!
 //! ```ignore
 //! use mosaikit_plugin_sdk::testing::MockHost;
 //!
-//! let host = MockHost::new().on("db.query", |_req| Ok(json!([{ "tag": "lavoro", "n": 2 }])));
+//! let host = MockHost::new().on("db.query", |_req| Ok(json!([{ "tag": "work", "n": 2 }])));
 //! let out = host.command(&__msk_registry(), "notes.count_by_tag", json!({}));
-//! assert_eq!(out, Ok(json!([{ "tag": "lavoro", "n": 2 }])));
+//! assert_eq!(out, Ok(json!([{ "tag": "work", "n": 2 }])));
 //! ```
 
 use std::cell::RefCell;
@@ -29,7 +29,7 @@ thread_local! {
     static CURRENT: RefCell<Option<Rc<RefCell<Inner>>>> = const { RefCell::new(None) };
 }
 
-/// Host simulato: risposte programmate per operazione, registro di chiamate e log.
+/// Simulated host: answers programmed per operation, log of calls and log messages.
 #[derive(Clone, Default)]
 pub struct MockHost {
     inner: Rc<RefCell<Inner>>,
@@ -49,7 +49,7 @@ impl MockHost {
         }
     }
 
-    /// Risposta per un'operazione host (`db.query`, `db.exec`, `resource.create`, `http.fetch`...).
+    /// Answer for a host operation (`db.query`, `db.exec`, `resource.create`, `http.fetch`...).
     pub fn on(self, op: &str, f: impl FnMut(&Value) -> Result<Value, String> + 'static) -> MockHost {
         self.inner.borrow_mut().handlers.insert(op.to_string(), Box::new(f));
         self
@@ -77,13 +77,13 @@ impl MockHost {
         }
     }
 
-    /// Esegue un comando come farebbe il kernel.
+    /// Runs a command as the kernel would.
     pub fn command(&self, reg: &Registry, name: &str, args: Value) -> Result<Value, String> {
         let msg = json!({ "abi": 1, "kind": "command", "name": name, "args": args, "ctx": self.ctx });
         Self::unwrap_reply(self.with(|| reg.dispatch(&msg)))
     }
 
-    /// Esegue un hook; ritorna i valori modificati (`None` se invariati).
+    /// Runs a hook; returns the changed values (`None` if unchanged).
     pub fn hook(
         &self,
         reg: &Registry,
@@ -117,7 +117,7 @@ pub(crate) fn mock_call(msg: &[u8]) -> Option<Vec<u8>> {
     let reply = CURRENT.with(|c| {
         let cur = c.borrow();
         let Some(inner) = cur.as_ref() else {
-            return json!({ "err": "nessun MockHost attivo: usa MockHost::command/hook" });
+            return json!({ "err": "no active MockHost: use MockHost::command/hook" });
         };
         let mut inner = inner.borrow_mut();
         inner.calls.push((op.clone(), body.clone()));
@@ -126,7 +126,7 @@ pub(crate) fn mock_call(msg: &[u8]) -> Option<Vec<u8>> {
                 Ok(v) => json!({ "ok": v }),
                 Err(e) => json!({ "err": e }),
             },
-            None => json!({ "err": format!("MockHost: nessuna risposta per {op}") }),
+            None => json!({ "err": format!("MockHost: no answer for {op}") }),
         }
     });
     serde_json::to_vec(&reply).ok()
@@ -150,14 +150,14 @@ mod tests {
         let mut v = hook.values.clone();
         if v.str("tag").is_empty() {
             v.set("tag", "personale");
-            ctx.log("tag di default");
+            ctx.log("default tag");
             return Ok(Some(v));
         }
         Ok(None)
     }
 
     fn reject(_: &Ctx, _: &Hook) -> Result<Option<Values>> {
-        Err(Error::msg("vietato"))
+        Err(Error::msg("forbidden"))
     }
 
     fn count(ctx: &Ctx, _args: Value) -> Result<Value> {
@@ -170,27 +170,30 @@ mod tests {
     }
 
     #[test]
-    fn hook_e_comandi() {
+    fn hooks_and_commands() {
         let host = MockHost::new().on("db.query", |req| {
             assert_eq!(req["sql"], "select count(*) n from notes");
             Ok(json!([{ "n": 3 }]))
         });
         let reg = __msk_registry();
         assert_eq!(host.command(&reg, "notes.count", json!({})), Ok(json!([{ "n": 3 }])));
-        assert!(host.command(&reg, "notes.nope", json!({})).unwrap_err().contains("sconosciuto"));
+        assert!(host.command(&reg, "notes.nope", json!({})).unwrap_err().contains("unknown"));
 
         let v = host.hook(&reg, "before_create", "notes", json!({ "title": "x" })).unwrap().unwrap();
         assert_eq!(v.str("tag"), "personale");
-        assert_eq!(host.logs(), vec!["tag di default"]);
-        assert_eq!(host.hook(&reg, "before_create", "notes", json!({ "tag": "lavoro" })).unwrap(), None);
-        assert_eq!(host.hook(&reg, "before_update", "notes", json!({})), Err("vietato".into()));
-        // hook non registrato: pass-through
+        assert_eq!(host.logs(), vec!["default tag"]);
+        assert_eq!(host.hook(&reg, "before_create", "notes", json!({ "tag": "work" })).unwrap(), None);
+        assert_eq!(host.hook(&reg, "before_update", "notes", json!({})), Err("forbidden".into()));
+        // hook not registered: pass-through
         assert_eq!(host.hook(&reg, "after_delete", "notes", json!({})).unwrap(), None);
     }
 
     #[test]
-    fn errori_dell_host_propagati() {
-        let host = MockHost::new().on("db.query", |_| Err("permesso negato".into()));
-        assert_eq!(host.command(&__msk_registry(), "notes.count", json!({})), Err("permesso negato".into()));
+    fn host_errors_propagated() {
+        let host = MockHost::new().on("db.query", |_| Err("permission denied".into()));
+        assert_eq!(
+            host.command(&__msk_registry(), "notes.count", json!({})),
+            Err("permission denied".into())
+        );
     }
 }

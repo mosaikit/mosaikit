@@ -1,11 +1,11 @@
-// Navigazione con l'hash, come l'app attuale: funziona anche sotto un percorso base.
-//   accesso:        #/  ·  #/login/<tenant>  ·  #/admin
-//   amministratore: #/admin  ·  #/admin/tenants[/<id>[/<scheda>]]  ·  #/admin/plugins[/<filtro>]  ·
-//                   #/admin/system[/<sezione>]  ·  #/admin/account[/<sezione>]  ·  #/admin/notifications
-//   tenant:         #/t/<tenant>  ·  #/t/<tenant>/p/<plugin>  ·  #/t/<tenant>/manage[/<sezione>]  ·
+// Navigation with the hash: it works under a base path too.
+//   sign-in:        #/  ·  #/login/<tenant>  ·  #/admin
+//   administrator:  #/admin  ·  #/admin/tenants[/<id>[/<tab>]]  ·  #/admin/plugins[/<filter>]  ·
+//                   #/admin/system[/<section>]  ·  #/admin/account[/<section>]  ·  #/admin/notifications
+//   tenant:         #/t/<tenant>  ·  #/t/<tenant>/p/<plugin>  ·  #/t/<tenant>/manage[/<section>]  ·
 //                   #/t/<tenant>/plugins  ·  #/t/<tenant>/shares  ·  #/t/<tenant>/usage  ·
-//                   #/t/<tenant>/settings[/<sezione>]  ·  #/t/<tenant>/account[/<sezione>]  ·  #/t/<tenant>/notifications
-// Le rotte di prima (#/admin/settings/…, #/t/<tenant>/settings/appearance|account) portano alla casa nuova.
+//                   #/t/<tenant>/settings[/<section>]  ·  #/t/<tenant>/account[/<section>]  ·  #/t/<tenant>/notifications
+// The old routes (#/admin/settings/…, #/t/<tenant>/settings/appearance|account) lead to the new home.
 
 import { useSyncExternalStore } from 'react'
 
@@ -24,7 +24,7 @@ export function parse(hash: string): Route {
   const p = hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent)
   if (p[0] === 'admin') {
     if (p[1] === 'tenants' && p[2]) return { area: 'admin', page: 'tenant', id: p[2], section: p[3] }
-    // prima: Impostazioni con amministratori, aspetto e account
+    // before: Settings with administrators, appearance and account
     if (p[1] === 'settings') return p[2] === 'appearance' || p[2] === 'account' ? { area: 'admin', page: 'account', section: p[2] === 'account' ? 'security' : 'appearance' } : { area: 'admin', page: 'system', section: 'admins' }
     const page = ADMIN_PAGES.find((x) => x === p[1])
     return page ? { area: 'admin', page, section: p[2] } : { area: 'admin', page: 'overview' }
@@ -50,14 +50,14 @@ export const to = {
   plugin: (slug: string, id: string) => `#/t/${enc(slug)}/p/${enc(id)}`,
 }
 
-/** L'indirizzo di una rotta: per riscrivere quelli di prima. */
+/** The address of a route: to rewrite the old ones. */
 export function href(r: Route): string {
   if (r.area === 'admin') return r.page === 'tenant' ? to.adminTenant(r.id!, r.section) : to.admin(r.page, r.section)
   if (r.area === 'tenant') return r.page === 'plugin' ? to.plugin(r.tenant, r.id!) : to.tenant(r.tenant, r.page, r.section)
   return r.door === 'admin' ? '#/admin' : r.tenant ? `#/login/${enc(r.tenant)}` : '#/'
 }
 
-/** Pagine dell'area personale (Account, Notifiche), con lo stesso indirizzo nei due ambiti. */
+/** Pages of the personal area (Account, Notifications), with the same address in both scopes. */
 export function personal(r: Route, page: 'account' | 'notifications', section?: string): string {
   return r.area === 'tenant' ? to.tenant(r.tenant, page, section) : to.admin(page, section)
 }

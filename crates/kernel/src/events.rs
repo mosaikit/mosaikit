@@ -1,11 +1,11 @@
-//! Registro eventi (audit e KPI di attivita').
+//! Event log (audit and activity KPIs).
 
 use serde_json::Value;
 use uuid::Uuid;
 
 use crate::Kernel;
 
-/// Registra un evento. Un errore qui non deve mai far fallire l'operazione.
+/// Records an event. An error here must never make the operation fail.
 pub async fn record(
     k: &Kernel,
     tenant: Option<Uuid>,
@@ -28,6 +28,6 @@ pub async fn record(
     .execute(&k.db)
     .await;
     if let Err(e) = r {
-        tracing::warn!("evento {action} non registrato: {e}");
+        tracing::warn!("event {action} not recorded: {e}");
     }
 }

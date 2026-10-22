@@ -2,7 +2,7 @@
   "name": "@mosaikit/plugin-api",
   "version": "1.0.0",
   "private": true,
-  "description": "API delle UI dei plugin Mosaikit: bridge postMessage verso l'host, CRUD generico, tema",
+  "description": "API of the UIs of Mosaikit plugins: postMessage bridge to the host, generic CRUD, theme",
   "type": "module",
   "exports": {
     ".": "./src/index.ts",

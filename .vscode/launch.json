@@ -2,8 +2,8 @@
   "version": "0.2.0",
   "configurations": [
     {
-      // richiede il DB di sviluppo (cargo xtask db up) e l'estensione C/C++ (toolchain MSVC)
-      "name": "mosaikit-server (debug, configurazione di sviluppo)",
+      // requires the development DB (cargo xtask db up) and the C/C++ extension (MSVC toolchain)
+      "name": "mosaikit-server (debug, development configuration)",
       "type": "cppvsdbg",
       "request": "launch",
       "program": "${workspaceFolder}/target/debug/mosaikit-server.exe",
@@ -11,7 +11,7 @@
       "cwd": "${workspaceFolder}",
       "environment": [
         { "name": "MOSAIKIT_ADMIN_PASSWORD", "value": "admin-sviluppo" },
-        // plugin di sviluppo (come cargo xtask dev): prima compilali con cargo xtask plugin build
+        // development plugins (like cargo xtask dev): build them first with cargo xtask plugin build
         {
           "name": "MOSAIKIT_DEV_PLUGINS",
           "value": "${workspaceFolder}/../mosaikit-plugins/notes;${workspaceFolder}/../mosaikit-plugins/tasks;${workspaceFolder}/../mosaikit-plugins/contacts;${workspaceFolder}/../mosaikit-plugins/maps;${workspaceFolder}/../mosaikit-plugins/static-site;${workspaceFolder}/../mosaikit-plugins/files"

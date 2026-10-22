@@ -1,9 +1,9 @@
-//! Backend PostgreSQL.
+//! PostgreSQL backend.
 //!
-//! - pool dell'applicazione (ruolo app, proprietario dello schema `core`);
-//! - un pool per plugin, autenticato con il ruolo del plugin (RLS attiva);
-//! - contesto di sicurezza per transazione (`core.set_ctx`);
-//! - provisioning e "congelamento" degli schemi dei plugin dopo le migrazioni.
+//! - pool of the application (app role, owner of the `core` schema);
+//! - one pool per plugin, authenticated with the role of the plugin (RLS on);
+//! - security context per transaction (`core.set_ctx`);
+//! - provisioning and "freezing" of the schemas of the plugins after the migrations.
 
 pub mod plugin_schema;
 
@@ -25,7 +25,7 @@ pub struct PgDb {
     pub app: PgPool,
     base: PgConnectOptions,
     secret: Vec<u8>,
-    /// prefisso dei ruoli creati da questa installazione (dipende dal database)
+    /// prefix of the roles created by this installation (depends on the database)
     pub role_prefix: String,
     plugin_pools: RwLock<HashMap<String, PgPool>>,
 }
@@ -33,7 +33,7 @@ pub struct PgDb {
 const MIN_SERVER_VERSION: i32 = 150000;
 
 impl PgDb {
-    /// Connette, verifica la versione del server, applica le migrazioni core.
+    /// Connects, checks the version of the server, applies the core migrations.
     pub async fn connect(url: &str, max_connections: u32) -> Result<PgDb> {
         let base = PgConnectOptions::from_str(url)?.application_name("mosaikit");
         let app = PgPoolOptions::new()
@@ -45,7 +45,7 @@ impl PgDb {
             sqlx::query_scalar("select current_setting('server_version_num')::int").fetch_one(&app).await?;
         if version < MIN_SERVER_VERSION {
             return Err(DbError::Invalid(format!(
-                "PostgreSQL {version} non supportato: serve la versione 15 o successiva"
+                "PostgreSQL {version} not supported: version 15 or later is required"
             )));
         }
         sqlx::migrate!("./migrations").run(&app).await?;
@@ -53,7 +53,7 @@ impl PgDb {
         let dbname: String = sqlx::query_scalar("select current_database()").fetch_one(&app).await?;
         let role_prefix = role_prefix(&dbname);
 
-        // segreto del contesto: generato una volta per database
+        // secret of the context: generated once per database
         let secret: Vec<u8> = rand::random::<[u8; 32]>().to_vec();
         sqlx::query("insert into core.secrets (name, value) values ('ctx', $1) on conflict do nothing")
             .bind(&secret)
@@ -67,7 +67,7 @@ impl PgDb {
         Ok(db)
     }
 
-    /// Ruolo di sola lettura delle viste KPI (NOLOGIN: per i BI si abilita a mano).
+    /// Read-only role of the KPI views (NOLOGIN: enabled by hand for BI tools).
     pub fn reporting_role(&self) -> String {
         format!("{}_reporting", self.role_prefix)
     }
@@ -91,14 +91,14 @@ impl PgDb {
         Ok(self.app.begin().await?)
     }
 
-    /// Transazione sul pool dell'applicazione con il contesto impostato.
+    /// Transaction on the pool of the application with the context set.
     pub async fn begin(&self, ctx: &Ctx) -> Result<PgTx> {
         let mut tx = self.app.begin().await?;
         self.set_ctx(&mut tx, ctx).await?;
         Ok(tx)
     }
 
-    /// Transazione sul pool del plugin (ruolo del plugin, RLS attiva).
+    /// Transaction on the pool of the plugin (role of the plugin, RLS on).
     pub async fn begin_plugin(&self, plugin_id: &str, ctx: &Ctx) -> Result<PgTx> {
         let pool = self.plugin_pool(plugin_id).await?;
         let mut tx = pool.begin().await?;
@@ -127,7 +127,7 @@ impl PgDb {
             .bind(plugin_id)
             .fetch_optional(&self.app)
             .await?
-            .ok_or_else(|| DbError::Invalid(format!("plugin non installato: {plugin_id}")))?;
+            .ok_or_else(|| DbError::Invalid(format!("plugin not installed: {plugin_id}")))?;
         let role: String = row.get(0);
         let password: String = row.get(1);
         let opts = self.base.clone().username(&role).password(&password).application_name("mosaikit-plugin");
@@ -141,7 +141,7 @@ impl PgDb {
         Ok(pool)
     }
 
-    /// Da chiamare dopo disinstallazione o cambio password del ruolo.
+    /// To call after uninstalling or changing the password of the role.
     pub async fn forget_plugin_pool(&self, plugin_id: &str) {
         let pool = self.plugin_pools.write().expect("lock pool").remove(plugin_id);
         if let Some(p) = pool {
@@ -149,7 +149,7 @@ impl PgDb {
         }
     }
 
-    /// Nome del ruolo PostgreSQL di un plugin.
+    /// Name of the PostgreSQL role of a plugin.
     pub fn plugin_role(&self, plugin_id: &str) -> String {
         plugin_role(&self.role_prefix, plugin_id)
     }
@@ -165,7 +165,7 @@ impl PgDb {
     }
 }
 
-/// Nome del ruolo PostgreSQL di un plugin.
+/// Name of the PostgreSQL role of a plugin.
 pub fn plugin_role(prefix: &str, plugin_id: &str) -> String {
     use sha2::{Digest, Sha256};
     let hash = hex::encode(&Sha256::digest(plugin_id.as_bytes())[..4]);
@@ -182,7 +182,7 @@ pub fn plugin_role(prefix: &str, plugin_id: &str) -> String {
     name
 }
 
-/// `msk_<nome database>` (se il database inizia gia' con `msk_` resta com'e').
+/// `msk_<database name>` (if the database already starts with `msk_` it stays as it is).
 pub fn role_prefix(dbname: &str) -> String {
     let clean: String = dbname
         .chars()
@@ -193,7 +193,7 @@ pub fn role_prefix(dbname: &str) -> String {
     p
 }
 
-// ------------------------------------------------------------------ esecuzione
+// ------------------------------------------------------------------ execution
 
 type PgQuery<'q> = sqlx::query::Query<'q, Postgres, PgArguments>;
 
@@ -259,7 +259,7 @@ fn decode_col(r: &PgRow, i: usize) -> Result<Val> {
         "VOID" => Val::Null,
         _ => match r.try_get::<Option<String>, _>(i) {
             Ok(v) => v.map(Val::Text).unwrap_or(Val::Null),
-            Err(_) => return Err(DbError::Decode(format!("tipo PostgreSQL non gestito: {name}"))),
+            Err(_) => return Err(DbError::Decode(format!("PostgreSQL type not handled: {name}"))),
         },
     })
 }
@@ -274,7 +274,7 @@ pub(crate) fn decode(rows: Vec<PgRow>) -> Result<Vec<Row>> {
         .collect()
 }
 
-/// Esegue su un esecutore sqlx (pool o connessione). `fetch`: righe, altrimenti righe toccate.
+/// Runs on an sqlx executor (pool or connection). `fetch`: rows, otherwise rows affected.
 pub(crate) async fn run<'e, E>(
     e: E,
     sql: &str,

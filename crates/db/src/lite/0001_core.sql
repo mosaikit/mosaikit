@@ -1,9 +1,9 @@
--- Mosaikit su SQLite: schema core (stesse tabelle di PostgreSQL, prefisso core_).
--- uuid e istanti sono testo (istanti: RFC 3339 a millisecondi, UTC, ordinabili),
--- jsonb e array sono JSON, boolean e' 0/1. I nomi dei tipi restano quelli di
--- PostgreSQL per leggibilita' (l'affinita' di SQLite e' quella giusta).
--- I livelli di accesso e il contesto sono calcolati come in PostgreSQL: vedi
--- mosaikit_sql_guard::sqlite (modelli SQL) e le funzioni core_ctx_*().
+-- Mosaikit on SQLite: core schema (the same tables as PostgreSQL, prefix core_).
+-- uuids and instants are text (instants: RFC 3339 with milliseconds, UTC, sortable),
+-- jsonb and arrays are JSON, boolean is 0/1. The type names stay the ones of
+-- PostgreSQL for readability (the SQLite affinity is the right one).
+-- Access levels and context are computed as in PostgreSQL: see
+-- mosaikit_sql_guard::sqlite (SQL templates) and the functions core_ctx_*().
 
 create table core_tenants (
     id          uuid primary key default (gen_random_uuid()),
@@ -108,7 +108,7 @@ create table core_plugin_migrations (
     primary key (plugin_id, version)
 );
 
--- viste dei plugin (non KPI): espanse a ogni uso, con i filtri del contesto
+-- views of the plugins (not KPI): expanded at every use, with the filters of the context
 create table core_plugin_views (
     plugin_id   text not null references core_plugins(id) on delete cascade,
     name        text not null,
@@ -116,7 +116,7 @@ create table core_plugin_views (
     primary key (plugin_id, name)
 );
 
--- ---------------------------------------------------------------- risorse e permessi
+-- ---------------------------------------------------------------- resources and permissions
 
 create table core_resources (
     id          uuid primary key default (gen_random_uuid()),
@@ -124,7 +124,7 @@ create table core_resources (
     plugin_id   text not null references core_plugins(id) on delete cascade,
     kind        text not null,
     parent_id   uuid references core_resources(id) on delete cascade,
-    -- antenati dalla radice al genitore (array JSON)
+    -- ancestors from the root to the parent (JSON array)
     ancestors   uuid[] not null default '[]',
     owner_id    uuid not null references core_users(id),
     title       text not null default '',

@@ -2,7 +2,7 @@
   "name": "@mosaikit/host",
   "version": "1.0.0",
   "private": true,
-  "description": "UI host di Mosaikit (shell, condivisione, console di gestione)",
+  "description": "Host UI of Mosaikit (shell, sharing, management console)",
   "type": "module",
   "scripts": {
     "dev": "vite",

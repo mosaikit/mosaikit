@@ -1,4 +1,4 @@
-//! Permessi sulle risorse: metadati, grant, proprieta'. Elenco metadati per i gestori.
+//! Permissions on resources: metadata, grants, ownership. Metadata listing for managers.
 
 use chrono::{DateTime, Utc};
 use serde::Serialize;
@@ -29,7 +29,7 @@ impl Level {
             "read" => Ok(Level::Read),
             "write" => Ok(Level::Write),
             "manage" => Ok(Level::Manage),
-            _ => Err(Error::bad(format!("livello non valido: {s} (read, write, manage)"))),
+            _ => Err(Error::bad(format!("invalid level: {s} (read, write, manage)"))),
         }
     }
     pub fn name(self) -> &'static str {
@@ -61,7 +61,7 @@ pub struct ResourceMeta {
     pub is_owner: bool,
 }
 
-/// Metadati di una risorsa visibile al chiamante (altrimenti NotFound).
+/// Metadata of a resource visible to the caller (otherwise NotFound).
 pub async fn meta(k: &Kernel, c: &Caller, rid: Uuid) -> Result<ResourceMeta> {
     let mut tx = k.db.begin(&c.ctx()).await?;
     let row = mosaikit_db::query(
@@ -74,10 +74,10 @@ pub async fn meta(k: &Kernel, c: &Caller, rid: Uuid) -> Result<ResourceMeta> {
     .fetch_optional(&mut *tx)
     .await?;
     tx.commit().await?;
-    let r = row.ok_or_else(|| Error::not_found("risorsa non trovata"))?;
+    let r = row.ok_or_else(|| Error::not_found("resource not found"))?;
     let level = Level::from_i32(r.get(11));
     if level == Level::None {
-        return Err(Error::not_found("risorsa non trovata"));
+        return Err(Error::not_found("resource not found"));
     }
     let owner_id: Uuid = r.get(5);
     Ok(ResourceMeta {
@@ -102,9 +102,9 @@ pub async fn require_level(k: &Kernel, c: &Caller, rid: Uuid, need: Level) -> Re
     let m = meta(k, c, rid).await?;
     if m.level < need {
         return Err(Error::forbidden(match need {
-            Level::Manage => "serve il permesso di gestione sulla risorsa",
-            Level::Write => "serve il permesso di scrittura sulla risorsa",
-            _ => "accesso negato",
+            Level::Manage => "the manage permission on the resource is required",
+            Level::Write => "the write permission on the resource is required",
+            _ => "access denied",
         }));
     }
     Ok(m)
@@ -125,7 +125,7 @@ pub async fn grants(k: &Kernel, c: &Caller, rid: Uuid) -> Result<Vec<GrantInfo>>
     let rows = mosaikit_db::query(
         "select g.principal_type, g.principal_id,
                 case when g.principal_type = 'user' then coalesce(nullif(u.display_name, ''), u.username) else gr.name end,
-                case when g.principal_type = 'user' then u.username || '@' || h.slug else 'gruppo' end,
+                case when g.principal_type = 'user' then u.username || '@' || h.slug else 'group' end,
                 g.level, g.granted_at
          from core.grants g
          left join core.users u on g.principal_type = 'user' and u.id = g.principal_id
@@ -149,7 +149,7 @@ pub async fn grants(k: &Kernel, c: &Caller, rid: Uuid) -> Result<Vec<GrantInfo>>
         .collect())
 }
 
-/// Concede, modifica (`Some`) o revoca (`None`) un grant. Serve il livello gestione.
+/// Grants, changes (`Some`) or revokes (`None`) a grant. Requires the manage level.
 pub async fn set_grant(
     k: &Kernel,
     c: &Caller,
@@ -163,7 +163,7 @@ pub async fn set_grant(
     match principal_type {
         "user" => {
             if principal_id == m.owner_id {
-                return Err(Error::bad("il proprietario ha gia' tutti i permessi"));
+                return Err(Error::bad("the owner already has every permission"));
             }
             let member: bool = mosaikit_db::query_scalar("select core.is_member($1, $2)")
                 .bind(principal_id)
@@ -172,7 +172,7 @@ pub async fn set_grant(
                 .await?;
             if !member && level.is_some() {
                 return Err(Error::bad(
-                    "si condivide solo con membri del tenant (gli esterni vanno invitati)",
+                    "sharing is only with members of the tenant (outsiders must be invited)",
                 ));
             }
         }
@@ -185,7 +185,7 @@ pub async fn set_grant(
             .fetch_one(&k.db)
             .await?;
             if !ok {
-                return Err(Error::bad("gruppo non trovato nel tenant"));
+                return Err(Error::bad("group not found in the tenant"));
             }
         }
         _ => return Err(Error::bad("principal_type: user o group")),
@@ -228,7 +228,7 @@ pub async fn set_grant(
     Ok(())
 }
 
-/// Trasferisce la proprieta' di una risorsa: lo puo' fare il proprietario o il gestore del tenant.
+/// Transfers the ownership of a resource: the owner or the manager of the tenant may do it.
 pub async fn transfer_owner(k: &Kernel, c: &Caller, rid: Uuid, new_owner: Uuid) -> Result<()> {
     let row =
         mosaikit_db::query("select owner_id, plugin_id from core.resources where id = $1 and tenant_id = $2")
@@ -236,11 +236,11 @@ pub async fn transfer_owner(k: &Kernel, c: &Caller, rid: Uuid, new_owner: Uuid) 
             .bind(c.tenant.tenant_id)
             .fetch_optional(&k.db)
             .await?
-            .ok_or_else(|| Error::not_found("risorsa non trovata"))?;
+            .ok_or_else(|| Error::not_found("resource not found"))?;
     let owner: Uuid = row.get(0);
     let plugin: String = row.get(1);
     if owner != c.user.user_id && !c.is_manager() {
-        return Err(Error::forbidden("solo il proprietario o il gestore possono trasferire la proprieta'"));
+        return Err(Error::forbidden("only the owner or the manager may transfer the ownership"));
     }
     let member: bool = mosaikit_db::query_scalar("select core.is_member($1, $2)")
         .bind(new_owner)
@@ -248,7 +248,7 @@ pub async fn transfer_owner(k: &Kernel, c: &Caller, rid: Uuid, new_owner: Uuid) 
         .fetch_one(&k.db)
         .await?;
     if !member {
-        return Err(Error::bad("il nuovo proprietario non e' un membro attivo del tenant"));
+        return Err(Error::bad("the new owner is not an active member of the tenant"));
     }
     let mut tx = k.db.begin_app().await?;
     mosaikit_db::query("update core.resources set owner_id = $2, updated_at = now() where id = $1")
@@ -277,13 +277,13 @@ pub async fn transfer_owner(k: &Kernel, c: &Caller, rid: Uuid, new_owner: Uuid) 
     Ok(())
 }
 
-/// Metadati (mai il contenuto) delle risorse di un tenant, per gestore e amministratore.
+/// Metadata (never the content) of the resources of a tenant, for manager and administrator.
 #[derive(Debug, Clone, Serialize)]
 pub struct ResourceRow {
     pub id: Uuid,
     pub plugin_id: String,
     pub kind: String,
-    /// vuoto se la policy `managers_see_titles` e' disattivata
+    /// empty if the policy `managers_see_titles` is off
     pub title: String,
     pub owner_id: Uuid,
     pub owner_name: String,
@@ -356,7 +356,7 @@ pub async fn manager_resources(k: &Kernel, c: &Caller, f: &ResourceFilter) -> Re
     tenant_resources(k, c.tenant.tenant_id, c.tenant.settings.managers_see_titles, f).await
 }
 
-/// Riassegna tutte le risorse di un utente nel tenant (es. utente uscito senza riassegnazione).
+/// Reassigns all the resources of a user in the tenant (e.g. a user who left without reassignment).
 pub async fn reassign_all(k: &Kernel, c: &Caller, from: Uuid, to: Uuid) -> Result<i64> {
     c.require_manager()?;
     let member: bool = mosaikit_db::query_scalar("select core.is_member($1, $2)")
@@ -365,7 +365,7 @@ pub async fn reassign_all(k: &Kernel, c: &Caller, from: Uuid, to: Uuid) -> Resul
         .fetch_one(&k.db)
         .await?;
     if !member || from == to {
-        return Err(Error::bad("il nuovo proprietario deve essere un altro membro attivo del tenant"));
+        return Err(Error::bad("the new owner must be another active member of the tenant"));
     }
     let n = mosaikit_db::query(
         "update core.resources set owner_id = $3, updated_at = now() where tenant_id = $1 and owner_id = $2",

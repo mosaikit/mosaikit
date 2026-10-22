@@ -1,27 +1,27 @@
-# Configurazione di sviluppo (usata da `cargo xtask dev`). Le proprieta' sono
-# descritte in mosaikit.example.toml. I percorsi relativi partono da questa
-# cartella (xtask/).
+# Development configuration (used by `cargo xtask dev`). The properties are
+# described in mosaikit.example.toml. Relative paths start from this
+# folder (xtask/).
 
-# L'app si apre da Vite (HMR della UI host): Vite inoltra le API al server su :47080
+# The app opens from Vite (HMR of the host UI): Vite forwards the API to the server on :47080
 url = "http://127.0.0.1:5173"
-# UI dei plugin, file e link pubblici serviti direttamente dal server
+# plugin UIs, files and public links served directly by the server
 plugin_url = "http://127.0.0.1:47081"
-# porte del server di sviluppo
+# ports of the development server
 listen = "127.0.0.1:47080"
 plugin_listen = "127.0.0.1:47081"
-# dati di sviluppo, separati da quelli reali
+# development data, separate from the real ones
 data_dir = "../.dev/data"
-# i plugin in sviluppo sono letti dalle cartelle: nessun pacchetto da firmare
+# the plugins in development are read from the folders: no package to sign
 allow_unsigned = true
-# sessioni lunghe per non dover rifare l'accesso
+# long sessions so as not to sign in again
 session_ttl_hours = 72
-# in sviluppo l'Administrator accede senza secondo fattore (in produzione e' obbligatorio)
+# in development the Administrator signs in without a second factor (in production it is required)
 admin_totp = false
 
 [database]
-# PostgreSQL di sviluppo avviato da `cargo xtask db up`
+# development PostgreSQL started by `cargo xtask db up`
 url = "postgres://mosaikit_dev:mosaikit_dev@127.0.0.1:55432/mosaikit"
 
 [dev]
-# hot reload; le cartelle dei plugin arrivano da `cargo xtask dev` (MOSAIKIT_DEV_PLUGINS)
+# hot reload; the folders of the plugins come from `cargo xtask dev` (MOSAIKIT_DEV_PLUGINS)
 enabled = true

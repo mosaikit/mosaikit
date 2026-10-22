@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
-/// Valori di un record CRUD (chiave del campo -> valore JSON).
+/// Values of a CRUD record (key of the field -> JSON value).
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Values(pub Map<String, Value>);
@@ -11,7 +11,7 @@ impl Values {
         self.0.get(key).filter(|v| !v.is_null())
     }
 
-    /// Valore come testo ("" se assente o null).
+    /// Value as text ("" if absent or null).
     pub fn str(&self, key: &str) -> String {
         match self.get(key) {
             Some(Value::String(s)) => s.clone(),
@@ -31,7 +31,7 @@ impl Values {
     pub fn bool(&self, key: &str) -> bool {
         match self.get(key) {
             Some(Value::Bool(b)) => *b,
-            Some(Value::String(s)) => matches!(s.as_str(), "true" | "1" | "si" | "sì"),
+            Some(Value::String(s)) => matches!(s.as_str(), "true" | "1" | "yes" | "si" | "sì"),
             _ => false,
         }
     }

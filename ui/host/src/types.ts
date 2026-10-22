@@ -1,4 +1,4 @@
-/** ruolo nel tenant; Administrator e' di sistema (`User.is_system_admin`) */
+/** role in the tenant; Administrator belongs to the system (`User.is_system_admin`) */
 export type Role = 'tenant_manager' | 'user'
 export type Level = 'read' | 'write' | 'manage'
 
@@ -26,25 +26,25 @@ export interface Session {
   memberships: Membership[]
   invitations: number
   plugin_origin: string
-  /** URL di UI dei plugin e contenuti, con il percorso base */
+  /** URL of plugin UIs and contents, with the base path */
   plugin_url?: string
   public_origin: string
   dev: boolean
-  /** barra in alto della shell, decisa dall'Administrator (server recenti) */
+  /** top bar of the shell, decided by the Administrator (recent servers) */
   band?: ShellBand
-  /** tema della piattaforma, scelto dall'Administrator (server recenti) */
+  /** theme of the platform, chosen by the Administrator (recent servers) */
   theme?: string
 }
 
-/** Il tema di un tenant: quello della piattaforma e, se c'e', quello scelto dal Tenant Manager. */
+/** The theme of a tenant: the one of the platform and, if any, the one chosen by the Tenant Manager. */
 export interface ThemeChoice {
   platform: string
   tenant: string | null
-  /** quello in uso */
+  /** the one in use */
   preset: string
 }
 
-/** Elementi della barra in alto: spenti, non compaiono per nessuno. */
+/** Items of the top bar: when off, they show for nobody. */
 export interface ShellBand {
   logo: boolean
   search: boolean
@@ -75,7 +75,7 @@ export interface TenantContext {
   tenant: { id: string; slug: string; name: string; role: Role; settings: TenantSettings }
   plugins: PluginView[]
   prefs: { hidden?: string[] }
-  /** server recenti */
+  /** recent servers */
   theme?: ThemeChoice
 }
 
@@ -253,7 +253,7 @@ export interface Overview {
   tenant?: TenantKpi['core']
 }
 
-/** panoramica dell'Administrator (`/api/admin/overview`) */
+/** overview of the Administrator (`/api/admin/overview`) */
 export interface SystemOverview {
   tenants: number
   active_tenants: number
@@ -271,19 +271,21 @@ export interface AdminUser {
   username: string
   display_name: string
   status: string
-  /** secondo fattore registrato */
+  /** second factor registered */
   totp: boolean
   created_at: string
 }
 
-/** tenant della pagina di accesso */
+/** tenant of the sign-in page */
 export interface LoginTenant {
   slug: string
   name: string
   auth: 'local'
+  /** theme in use for the tenant: its own or the one of the platform (recent servers) */
+  theme?: string
 }
 
-/** risposta dell'accesso amministratori in attesa del secondo fattore */
+/** answer of the administrator sign-in waiting for the second factor */
 export interface PendingLogin {
   pending: 'totp' | 'totp_setup'
   csrf: string

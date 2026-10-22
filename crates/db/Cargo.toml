@@ -1,6 +1,6 @@
 [package]
 name = "mosaikit-db"
-description = "Dati di Mosaikit su PostgreSQL o SQLite: migrazioni core, contesto di sicurezza, schemi dei plugin"
+description = "Data of Mosaikit on PostgreSQL or SQLite: core migrations, security context, plugin schemas"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

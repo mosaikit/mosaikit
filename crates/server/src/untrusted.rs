@@ -1,7 +1,7 @@
-//! Origine untrusted: UI dei plugin, contenuti via ticket, link pubblici.
+//! Untrusted origin: UI of the plugins, contents through tickets, public links.
 //!
-//! Tutto cio' che e' caricato dagli utenti e' servito con CSP `sandbox`
-//! (origine opaca): non puo' leggere storage o DOM di nessun'altra pagina.
+//! Everything uploaded by users is served with CSP `sandbox`
+//! (opaque origin): it cannot read storage or DOM of any other page.
 
 use std::collections::HashMap;
 
@@ -31,7 +31,7 @@ pub fn router() -> Router<AppState> {
         .route("/p/{token}/f/{id}/{name}", get(public_child_file))
         .route("/p/{token}/d/{id}/", get(public_child_folder))
         .route("/p/{token}/{*path}", get(public_path))
-        .fallback(|| async { (StatusCode::NOT_FOUND, "non trovato") })
+        .fallback(|| async { (StatusCode::NOT_FOUND, "not found") })
 }
 
 fn set(res: &mut Response, name: header::HeaderName, value: &str) {
@@ -44,7 +44,7 @@ fn mime(path: &str) -> String {
     mime_guess::from_path(path).first_or_octet_stream().essence_str().to_string()
 }
 
-// ------------------------------------------------------------------ UI dei plugin
+// ------------------------------------------------------------------ UI of the plugins
 
 fn plugin_csp(s: &AppState, p: &mosaikit_kernel::plugins::LoadedPlugin) -> String {
     let net = p.manifest.permissions.network.join(" ");
@@ -65,19 +65,19 @@ async fn plugin_ui_root(s: State<AppState>, Path(plugin): Path<String>) -> Respo
 
 async fn plugin_ui(State(s): State<AppState>, Path((plugin, path)): Path<(String, String)>) -> Response {
     let Ok(p) = s.k.plugins.active(&plugin) else {
-        return (StatusCode::NOT_FOUND, "plugin non attivo").into_response();
+        return (StatusCode::NOT_FOUND, "plugin not active").into_response();
     };
     let (Some(dir), Some(ui)) = (p.ui_dir.clone(), p.manifest.ui.clone()) else {
-        return (StatusCode::NOT_FOUND, "il plugin non ha una UI").into_response();
+        return (StatusCode::NOT_FOUND, "the plugin has no UI").into_response();
     };
     let rel = if path.is_empty() { ui.entry.clone() } else { path };
     if !mosaikit_mskp::is_safe_path(&rel) {
-        return (StatusCode::NOT_FOUND, "non trovato").into_response();
+        return (StatusCode::NOT_FOUND, "not found").into_response();
     }
     let file = dir.join(&rel);
     let Ok(data) = tokio::fs::read(&file).await else {
-        let hint = if p.dev { " (in sviluppo: esegui la build della UI del plugin)" } else { "" };
-        return (StatusCode::NOT_FOUND, format!("file della UI non trovato: {rel}{hint}")).into_response();
+        let hint = if p.dev { " (in development: run the build of the UI of the plugin)" } else { "" };
+        return (StatusCode::NOT_FOUND, format!("file of the UI not found: {rel}{hint}")).into_response();
     };
     let mut res = data.into_response();
     set(&mut res, header::CONTENT_TYPE, &mime(&rel));
@@ -87,9 +87,9 @@ async fn plugin_ui(State(s): State<AppState>, Path((plugin, path)): Path<(String
     res
 }
 
-// ------------------------------------------------------------------ contenuti utente
+// ------------------------------------------------------------------ user contents
 
-/// Contenuto caricato da un utente: origine opaca, niente sniffing, niente referrer.
+/// Content uploaded by a user: opaque origin, no sniffing, no referrer.
 fn user_content(
     data: Vec<u8>,
     name: &str,
@@ -126,16 +126,16 @@ fn ancestors(s: &AppState) -> String {
 async fn serve_site(s: &AppState, tenant: Uuid, rid: Uuid, rel: &str, base: &str, entry: &str) -> Response {
     let rel = if rel.is_empty() { entry } else { rel };
     let site = s.k.blobs.site_dir(tenant, rid);
-    // cartella senza "/" finale: gli URL relativi si risolverebbero male
+    // folder without trailing "/": relative URLs would resolve badly
     if !rel.is_empty() && !rel.ends_with('/') && mosaikit_mskp::is_safe_path(rel) && site.join(rel).is_dir() {
         return Redirect::permanent(&format!("{base}{rel}/")).into_response();
     }
     match s.k.blobs.site_file(tenant, rid, rel) {
         Some(path) => match tokio::fs::read(&path).await {
             Ok(data) => user_content(data, &path.to_string_lossy(), true, false, &ancestors(s)),
-            Err(_) => (StatusCode::NOT_FOUND, "non trovato").into_response(),
+            Err(_) => (StatusCode::NOT_FOUND, "not found").into_response(),
         },
-        None => (StatusCode::NOT_FOUND, "non trovato").into_response(),
+        None => (StatusCode::NOT_FOUND, "not found").into_response(),
     }
 }
 
@@ -158,7 +158,7 @@ async fn ticket_file(
     };
     if t.kind == "file" {
         let Ok(data) = s.k.blobs.read_file(t.tenant, t.resource) else {
-            return (StatusCode::NOT_FOUND, "file mancante").into_response();
+            return (StatusCode::NOT_FOUND, "missing file").into_response();
         };
         let download = t.download || q.contains_key("download");
         return user_content(data, &t.title, false, download, &ancestors(&s));
@@ -179,7 +179,7 @@ async fn site_entry(s: &AppState, rid: Uuid) -> String {
         .unwrap_or_default()
 }
 
-// ------------------------------------------------------------------ link pubblici
+// ------------------------------------------------------------------ public links
 
 fn html(body: String, csp: &str) -> Response {
     let mut res = Html(body).into_response();
@@ -216,7 +216,7 @@ fn unlocked(s: &AppState, headers: &HeaderMap, r: &links::Resolved) -> bool {
         .any(|(k, v)| k == name && v == want)
 }
 
-/// Risolve il link e verifica lo sblocco; altrimenti la risposta da dare.
+/// Resolves the link and checks the unlocking; otherwise the response to give.
 async fn open(s: &AppState, token: &str, headers: &HeaderMap) -> Result<links::Resolved, Box<Response>> {
     let r = links::resolve(&s.k, token).await.map_err(|_| Box::new(not_found_page()))?;
     if !unlocked(s, headers, &r) {
@@ -246,12 +246,12 @@ async fn public_path(
         links::count_view(&s.k, &r).await;
     }
     let base = format!("{}/p/{token}/", s.k.cfg.plugin_base_path);
-    // sito statico
+    // static site
     if let Some(entry) = r.meta.pointer("/content/entry").and_then(Value::as_str) {
         return serve_site(&s, r.tenant, r.resource, &path, &base, entry).await;
     }
     if !path.is_empty() {
-        return (StatusCode::NOT_FOUND, "non trovato").into_response();
+        return (StatusCode::NOT_FOUND, "not found").into_response();
     }
     match r.kind.as_str() {
         "file" => match s.k.blobs.read_file(r.tenant, r.resource) {
@@ -299,7 +299,7 @@ fn urlenc(s: &str) -> String {
         .collect()
 }
 
-/// Campi visibili (non nascosti) di un record CRUD raggiunto tramite link.
+/// Visible (not hidden) fields of a CRUD record reached through a link.
 async fn public_values(s: &AppState, r: &links::Resolved) -> Option<(String, Vec<(String, String)>)> {
     let p = s.k.plugins.active(&r.plugin_id).ok()?;
     let decl = p.manifest.resource(&r.kind)?;
@@ -314,7 +314,7 @@ async fn public_values(s: &AppState, r: &links::Resolved) -> Option<(String, Vec
                 Value::Null => String::new(),
                 Value::Bool(b) => {
                     if *b {
-                        "sì".into()
+                        "yes".into()
                     } else {
                         "no".into()
                     }
@@ -398,12 +398,10 @@ async fn public_child_folder(
 async fn public_api(State(s): State<AppState>, Path(token): Path<String>, headers: HeaderMap) -> Response {
     let r = match open(&s, &token, &headers).await {
         Ok(r) => r,
-        Err(_) => {
-            return (StatusCode::NOT_FOUND, Json(json!({ "error": "link non valido" }))).into_response()
-        }
+        Err(_) => return (StatusCode::NOT_FOUND, Json(json!({ "error": "invalid link" }))).into_response(),
     };
     let Ok(p) = s.k.plugins.active(&r.plugin_id) else {
-        return (StatusCode::NOT_FOUND, Json(json!({ "error": "plugin non attivo" }))).into_response();
+        return (StatusCode::NOT_FOUND, Json(json!({ "error": "plugin not active" }))).into_response();
     };
     let values = if p.manifest.resource(&r.kind).is_some() {
         match crud::get_ctx(&s.k, &r.ctx(), &p, &r.kind, r.resource).await {

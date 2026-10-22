@@ -1,5 +1,5 @@
-//! PostgreSQL di sviluppo: un cluster dedicato in `.dev/pg` (porta 55432),
-//! con i binari locali di PostgreSQL oppure, se mancano, con Docker.
+//! Development PostgreSQL: a dedicated cluster in `.dev/pg` (port 55432),
+//! with the local PostgreSQL binaries or, if they are missing, with Docker.
 
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
@@ -13,12 +13,12 @@ pub const DEV_USER: &str = "mosaikit_dev";
 pub const DEV_PASSWORD: &str = "mosaikit_dev";
 const SUPERUSER_PASSWORD: &str = "postgres";
 
-/// URL del database di sviluppo (usato da `xtask/mosaikit.dev.toml`).
+/// URL of the development database (used by `xtask/mosaikit.dev.toml`).
 pub fn dev_url() -> String {
     format!("postgres://{DEV_USER}:{DEV_PASSWORD}@127.0.0.1:{PORT}/mosaikit")
 }
 
-/// URL per i test: ogni test crea e distrugge il proprio database.
+/// URL for the tests: every test creates and destroys its own database.
 pub fn test_url() -> String {
     format!("postgres://{DEV_USER}:{DEV_PASSWORD}@127.0.0.1:{PORT}/postgres")
 }
@@ -44,8 +44,8 @@ fn backend() -> Result<Backend> {
         return Ok(Backend::Docker);
     }
     bail!(
-        "PostgreSQL non trovato: installa PostgreSQL >= 15 (o imposta MOSAIKIT_PG_BIN sulla cartella bin), \
-         oppure installa Docker"
+        "PostgreSQL not found: install PostgreSQL >= 15 (or set MOSAIKIT_PG_BIN to the bin folder), \
+         or install Docker"
     )
 }
 
@@ -61,7 +61,7 @@ pub fn up() -> Result<()> {
                 .args(["compose", "-f"])
                 .arg(compose_file())
                 .args(["up", "-d", "--wait"]))?;
-            eprintln!("PostgreSQL (Docker) pronto su 127.0.0.1:{PORT}");
+            eprintln!("PostgreSQL (Docker) ready on 127.0.0.1:{PORT}");
             Ok(())
         }
     }
@@ -82,7 +82,7 @@ fn up_local(bin: &std::path::Path) -> Result<()> {
     let data = data_dir();
     std::fs::create_dir_all(dir())?;
     if !data.join("PG_VERSION").is_file() {
-        eprintln!("inizializzazione del cluster di sviluppo in {}", data.display());
+        eprintln!("initializing the development cluster in {}", data.display());
         let pw = dir().join("superuser.pw");
         std::fs::write(&pw, SUPERUSER_PASSWORD)?;
         run(Command::new(bin.join(exe("initdb")))
@@ -96,7 +96,7 @@ fn up_local(bin: &std::path::Path) -> Result<()> {
         start_detached(bin, &data)?;
         wait_ready(bin)?;
     }
-    // ruolo e database di sviluppo (idempotente)
+    // development role and database (idempotent)
     let psql = |sql: &str| -> Result<String> {
         output(
             Command::new(bin.join(exe("psql")))
@@ -111,8 +111,8 @@ fn up_local(bin: &std::path::Path) -> Result<()> {
     if psql("select 1 from pg_database where datname = 'mosaikit'")?.trim() != "1" {
         psql(&format!("create database mosaikit owner {DEV_USER}"))?;
     }
-    // PostGIS (plugin che lo richiedono) se installato: nel template, cosi'
-    // lo ereditano anche i database dei test, e nel database di sviluppo
+    // PostGIS (plugins that require it) if installed: in the template, so that
+    // the test databases inherit it too, and in the development database
     if psql("select 1 from pg_available_extensions where name = 'postgis'")?.trim() == "1" {
         for db in ["template1", "mosaikit"] {
             output(
@@ -123,17 +123,17 @@ fn up_local(bin: &std::path::Path) -> Result<()> {
             )?;
         }
     }
-    eprintln!("PostgreSQL di sviluppo pronto: {}", dev_url());
+    eprintln!("development PostgreSQL ready: {}", dev_url());
     Ok(())
 }
 
-/// Avvia il server staccato dal terminale.
+/// Starts the server detached from the terminal.
 ///
-/// Su Windows `pg_ctl` passa i propri handle al processo `postgres`: se
-/// discendesse da questo terminale ne terrebbe aperta la pipe (chi cattura
-/// l'output resterebbe in attesa per sempre) e alla chiusura della console i
-/// processi figli fallirebbero con 0xC0000142. `Start-Process` usa
-/// ShellExecute: nessun handle ereditato, console propria e nascosta.
+/// On Windows `pg_ctl` passes its own handles to the `postgres` process: if
+/// it descended from this terminal it would keep its pipe open (whoever captures
+/// the output would wait forever) and when the console closes the
+/// child processes would fail with 0xC0000142. `Start-Process` uses
+/// ShellExecute: no inherited handle, a console of its own, hidden.
 fn start_detached(bin: &std::path::Path, data: &std::path::Path) -> Result<()> {
     let pg_ctl = bin.join(exe("pg_ctl"));
     let log = dir().join("server.log");
@@ -175,7 +175,7 @@ fn wait_ready(bin: &std::path::Path) -> Result<()> {
         }
         std::thread::sleep(std::time::Duration::from_millis(250));
     }
-    bail!("PostgreSQL non risponde dopo 30 s: vedi {}", dir().join("server.log").display())
+    bail!("PostgreSQL does not answer after 30 s: see {}", dir().join("server.log").display())
 }
 
 pub fn down() -> Result<()> {
@@ -195,10 +195,10 @@ pub fn down() -> Result<()> {
     }
 }
 
-/// Elimina i database `msk_t_*` lasciati da test interrotti e i loro ruoli.
+/// Deletes the `msk_t_*` databases left by interrupted tests and their roles.
 pub fn clean_tests() -> Result<()> {
     let Backend::Local(bin) = backend()? else {
-        bail!("clean-tests e' disponibile con il cluster locale");
+        bail!("clean-tests is available with the local cluster");
     };
     let psql = |db: &str, sql: &str| -> Result<String> {
         output(
@@ -216,14 +216,14 @@ pub fn clean_tests() -> Result<()> {
     for r in roles.lines().map(str::trim).filter(|l| !l.is_empty()) {
         psql("postgres", &format!("drop role if exists \"{r}\""))?;
     }
-    eprintln!("database di test rimossi");
+    eprintln!("test databases removed");
     Ok(())
 }
 
 pub fn reset() -> Result<()> {
     down()?;
     if data_dir().exists() {
-        std::fs::remove_dir_all(data_dir()).context("rimozione del cluster di sviluppo")?;
+        std::fs::remove_dir_all(data_dir()).context("removing the development cluster")?;
     }
     up()
 }

@@ -1,4 +1,4 @@
-//! Plugin del repository: build (WASM e UI), pacchetti firmati, scaffolding, reset dei dati.
+//! Plugins of the repository: build (WASM and UI), signed packages, scaffolding, data reset.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -9,18 +9,18 @@ use sha2::{Digest, Sha256};
 
 use crate::util::{exe, npm, output, pg_bin, root, run};
 
-/// Un plugin di una delle cartelle della distribuzione.
+/// A plugin of one of the folders of the distribution.
 #[derive(Debug, Clone)]
 pub struct Plugin {
     pub dir: PathBuf,
     pub id: String,
     pub version: String,
-    /// nome del crate, se il plugin ha logica WASM
+    /// name of the crate, if the plugin has WASM logic
     pub crate_name: Option<String>,
     pub has_ui: bool,
-    /// workspace Cargo che contiene il crate (cartella antenata con `[workspace]`)
+    /// Cargo workspace that contains the crate (ancestor folder with `[workspace]`)
     pub cargo_root: Option<PathBuf>,
-    /// workspace npm che contiene la UI (cartella antenata con `workspaces`)
+    /// npm workspace that contains the UI (ancestor folder with `workspaces`)
     pub npm_root: Option<PathBuf>,
 }
 
@@ -31,13 +31,13 @@ fn ancestor_with(dir: &Path, file: &str, marker: &str) -> Option<PathBuf> {
         .map(Path::to_path_buf)
 }
 
-/// Plugin delle cartelle della distribuzione attiva (solo quelli inclusi).
+/// Plugins of the folders of the active distribution (only the included ones).
 pub fn discover() -> Result<Vec<Plugin>> {
     let d = crate::dist::current();
     let mut out = Vec::new();
     for base in &d.plugins.roots {
         let rd = std::fs::read_dir(base).with_context(|| {
-            format!("cartella dei plugin {} (vedi [plugins] roots in distribution.toml)", base.display())
+            format!("plugin folder {} (see [plugins] roots in distribution.toml)", base.display())
         })?;
         let mut dirs: Vec<PathBuf> =
             rd.flatten().map(|e| e.path()).filter(|p| p.join("plugin.toml").is_file()).collect();
@@ -75,13 +75,13 @@ pub fn discover() -> Result<Vec<Plugin>> {
     }
     for want in &d.plugins.include {
         if want != "*" && !out.iter().any(|p| &p.id == want) {
-            bail!("plugin {want} indicato in distribution.toml ma non trovato nelle cartelle dei plugin");
+            bail!("plugin {want} listed in distribution.toml but not found in the plugin folders");
         }
     }
     Ok(out)
 }
 
-/// Workspace Cargo distinti dei plugin.
+/// Distinct Cargo workspaces of the plugins.
 pub fn cargo_roots(plugins: &[Plugin]) -> Vec<PathBuf> {
     let mut v: Vec<PathBuf> = plugins.iter().filter_map(|p| p.cargo_root.clone()).collect();
     v.sort();
@@ -89,7 +89,7 @@ pub fn cargo_roots(plugins: &[Plugin]) -> Vec<PathBuf> {
     v
 }
 
-/// Radici npm distinte delle UI dei plugin.
+/// Distinct npm roots of the UIs of the plugins.
 pub fn npm_roots(plugins: &[Plugin]) -> Vec<PathBuf> {
     let mut v: Vec<PathBuf> = plugins.iter().filter(|p| p.has_ui).map(|p| ui_workspace(p).0).collect();
     v.sort();
@@ -97,7 +97,7 @@ pub fn npm_roots(plugins: &[Plugin]) -> Vec<PathBuf> {
     v
 }
 
-/// `target` di cargo del workspace di mosaikit (server, xtask).
+/// cargo `target` of the mosaikit workspace (server, xtask).
 pub fn target_dir() -> PathBuf {
     std::env::var_os("CARGO_TARGET_DIR").map(PathBuf::from).unwrap_or_else(|| root().join("target"))
 }
@@ -113,14 +113,14 @@ pub fn wasm_path(p: &Plugin, release: bool) -> Option<PathBuf> {
     )
 }
 
-/// Compila la logica WASM, un `cargo build` per workspace dei plugin.
+/// Builds the WASM logic, one `cargo build` per plugin workspace.
 pub fn build_wasm(plugins: &[Plugin], release: bool) -> Result<()> {
     let mut by_ws: BTreeMap<PathBuf, Vec<&String>> = BTreeMap::new();
     for p in plugins {
         if let (Some(c), Some(ws)) = (&p.crate_name, &p.cargo_root) {
             by_ws.entry(ws.clone()).or_default().push(c);
         } else if let Some(c) = &p.crate_name {
-            bail!("{} ({c}) non appartiene a nessun workspace Cargo", p.dir.display());
+            bail!("{} ({c}) does not belong to any Cargo workspace", p.dir.display());
         }
     }
     for (ws, crates) in by_ws {
@@ -141,7 +141,7 @@ pub fn build_wasm(plugins: &[Plugin], release: bool) -> Result<()> {
     Ok(())
 }
 
-/// `npm install` nella radice indicata se manca node_modules.
+/// `npm install` in the given root if node_modules is missing.
 pub fn ensure_npm_in(dir: &Path) -> Result<()> {
     if !dir.join("node_modules").is_dir() {
         run(npm().current_dir(dir).args(["install", "--no-audit", "--no-fund"]))?;
@@ -149,12 +149,12 @@ pub fn ensure_npm_in(dir: &Path) -> Result<()> {
     Ok(())
 }
 
-/// npm di mosaikit (UI host, plugin-api, e2e).
+/// npm of mosaikit (host UI, plugin-api, e2e).
 pub fn ensure_npm() -> Result<()> {
     ensure_npm_in(&root())
 }
 
-/// (radice npm, nome del workspace) della UI di un plugin.
+/// (npm root, workspace name) of the UI of a plugin.
 pub fn ui_workspace(p: &Plugin) -> (PathBuf, String) {
     let npm_root = p.npm_root.clone().unwrap_or_else(|| p.dir.join("ui"));
     let ws = p
@@ -166,7 +166,7 @@ pub fn ui_workspace(p: &Plugin) -> (PathBuf, String) {
     (npm_root, ws)
 }
 
-/// Comando npm per la UI di un plugin (`npm run <script> -w <ui>` nella sua radice npm).
+/// npm command for the UI of a plugin (`npm run <script> -w <ui>` in its npm root).
 pub fn npm_ui(p: &Plugin, script: &str) -> Command {
     let (dir, ws) = ui_workspace(p);
     let mut c = npm();
@@ -184,10 +184,10 @@ pub fn build_ui(plugins: &[Plugin]) -> Result<()> {
     }
     Ok(())
 }
-// ------------------------------------------------------------------ chiavi di firma
+// ------------------------------------------------------------------ signing keys
 
-/// Chiave di firma: `MOSAIKIT_SIGNING_KEY` (base64), `MOSAIKIT_SIGNING_KEY_FILE`,
-/// altrimenti la chiave locale di sviluppo `.dev/signing.key` (creata se manca).
+/// Signing key: `MOSAIKIT_SIGNING_KEY` (base64), `MOSAIKIT_SIGNING_KEY_FILE`,
+/// otherwise the local development key `.dev/signing.key` (created if missing).
 pub fn signing_key() -> Result<(ed25519_dalek::SigningKey, &'static str)> {
     if let Ok(k) = std::env::var("MOSAIKIT_SIGNING_KEY") {
         return Ok((mosaikit_mskp::signing_key_from_b64(&k)?, "MOSAIKIT_SIGNING_KEY"));
@@ -200,14 +200,14 @@ pub fn signing_key() -> Result<(ed25519_dalek::SigningKey, &'static str)> {
     }
     let path = root().join(".dev").join("signing.key");
     if !path.is_file() {
-        std::fs::create_dir_all(path.parent().expect("cartella .dev"))?;
+        std::fs::create_dir_all(path.parent().expect(".dev folder"))?;
         let k = mosaikit_mskp::generate_key();
         std::fs::write(&path, mosaikit_mskp::signing_key_to_b64(&k))?;
-        eprintln!("creata la chiave di sviluppo {} (non va committata)", path.display());
+        eprintln!("created the development key {} (do not commit it)", path.display());
     }
     Ok((
         mosaikit_mskp::signing_key_from_b64(&std::fs::read_to_string(&path)?)?,
-        "chiave di sviluppo .dev/signing.key",
+        "development key .dev/signing.key",
     ))
 }
 
@@ -217,17 +217,17 @@ pub fn keygen(out: Option<PathBuf>) -> Result<()> {
     match out {
         Some(p) => {
             std::fs::write(&p, &private)?;
-            println!("chiave privata salvata in {}", p.display());
+            println!("private key saved in {}", p.display());
         }
-        None => println!("chiave privata (MOSAIKIT_SIGNING_KEY): {private}"),
+        None => println!("private key (MOSAIKIT_SIGNING_KEY): {private}"),
     }
-    println!("chiave pubblica (trusted_keys):       {}", mosaikit_mskp::public_key_b64(&k));
+    println!("public key (trusted_keys):            {}", mosaikit_mskp::public_key_b64(&k));
     Ok(())
 }
 
-// ------------------------------------------------------------------ pacchetti
+// ------------------------------------------------------------------ packages
 
-/// Crea `<out>/<id>-<versione>.mskp` firmato. Ritorna (percorso, sha256).
+/// Creates `<out>/<id>-<version>.mskp`, signed. Returns (path, sha256).
 pub fn pack(
     p: &Plugin,
     release: bool,
@@ -237,11 +237,11 @@ pub fn pack(
     let wasm = wasm_path(p, release);
     if let Some(w) = &wasm {
         if !w.is_file() {
-            bail!("{}: {} non compilato (cargo xtask plugin build)", p.id, w.display());
+            bail!("{}: {} not built (cargo xtask plugin build)", p.id, w.display());
         }
     }
     if p.has_ui && !p.dir.join("ui").join("dist").is_dir() {
-        bail!("{}: UI non compilata (npm run build in {})", p.id, p.dir.join("ui").display());
+        bail!("{}: UI not built (npm run build in {})", p.id, p.dir.join("ui").display());
     }
     let files: BTreeMap<String, Vec<u8>> = mosaikit_mskp::collect_plugin_dir(&p.dir, wasm.as_deref())?;
     let files: BTreeMap<String, Vec<u8>> = files.into_iter().filter(|(k, _)| !k.ends_with(".map")).collect();
@@ -252,10 +252,10 @@ pub fn pack(
     Ok((path, mosaikit_mskp::package_sha256(&bytes)))
 }
 
-/// Pacchetti di tutti i plugin + `index.json` del registry in `out`.
+/// Packages of every plugin + `index.json` of the registry in `out`.
 pub fn pack_all(plugins: &[Plugin], release: bool, out: &Path) -> Result<PathBuf> {
     let (key, source) = signing_key()?;
-    eprintln!("firma dei pacchetti con: {source}");
+    eprintln!("signing the packages with: {source}");
     let pkgs = out.join("plugins");
     let mut entries = Vec::new();
     for p in plugins {
@@ -283,13 +283,13 @@ pub fn pack_all(plugins: &[Plugin], release: bool, out: &Path) -> Result<PathBuf
     Ok(path)
 }
 
-// ------------------------------------------------------------------ nuovo plugin
+// ------------------------------------------------------------------ new plugin
 
 fn replace_all(s: &str, vars: &[(&str, &str)]) -> String {
     vars.iter().fold(s.to_string(), |acc, (k, v)| acc.replace(&format!("{{{{{k}}}}}"), v))
 }
 
-/// Percorso relativo da `from` (cartella) a `to`, con `/`.
+/// Relative path from `from` (folder) to `to`, with `/`.
 pub fn relative(from: &Path, to: &Path) -> String {
     let norm = |p: &Path| -> Vec<String> {
         let abs = std::path::absolute(p).unwrap_or_else(|_| p.to_path_buf());
@@ -326,25 +326,23 @@ pub fn relative(from: &Path, to: &Path) -> String {
     parts.join("/")
 }
 
-/// Nuovo plugin dal template, nella prima cartella dei plugin della distribuzione
-/// (o in `into`), aggiunto ai workspace Cargo e npm di quella cartella.
+/// New plugin from the template, in the first plugin folder of the distribution
+/// (or in `into`), added to the Cargo and npm workspaces of that folder.
 pub fn new_plugin(name: &str, id: Option<String>, no_logic: bool, into: Option<PathBuf>) -> Result<()> {
     if !mosaikit_mskp::is_identifier(&name.replace('-', "_")) || name.contains('_') {
-        bail!("nome non valido: minuscole, cifre e '-' (es. meteo, catasto-strade)");
+        bail!("invalid name: lower case, digits and '-' (e.g. weather, road-registry)");
     }
     let base = match into {
         Some(d) => d,
-        None => {
-            crate::dist::current().plugins.roots.first().cloned().context("nessuna cartella dei plugin")?
-        }
+        None => crate::dist::current().plugins.roots.first().cloned().context("no plugin folder")?,
     };
     let dir = base.join(name);
     if dir.exists() {
-        bail!("{} esiste gia'", dir.display());
+        bail!("{} already exists", dir.display());
     }
     let id = id.unwrap_or_else(|| format!("com.example.{name}"));
     if !mosaikit_mskp::is_plugin_id(&id) {
-        bail!("id non valido: {id} (es. com.azienda.{name})");
+        bail!("invalid id: {id} (e.g. com.company.{name})");
     }
     let label = {
         let mut c = name.chars();
@@ -373,10 +371,10 @@ pub fn new_plugin(name: &str, id: Option<String>, no_logic: bool, into: Option<P
             text = text.replace(&format!("hooks = [\"{table}\"]"), "hooks = []");
         }
         let dest = dir.join(&rel);
-        std::fs::create_dir_all(dest.parent().expect("cartella"))?;
+        std::fs::create_dir_all(dest.parent().expect("folder"))?;
         std::fs::write(dest, text)?;
     }
-    // workspace Cargo della cartella dei plugin
+    // Cargo workspace of the plugin folder
     if !no_logic {
         let cargo = base.join("Cargo.toml");
         let text = std::fs::read_to_string(&cargo).with_context(|| format!("{}", cargo.display()))?;
@@ -386,11 +384,11 @@ pub fn new_plugin(name: &str, id: Option<String>, no_logic: bool, into: Option<P
                     let at = i + "members = [".len();
                     std::fs::write(&cargo, format!("{}\n    \"{name}\",{}", &text[..at], &text[at..]))?;
                 }
-                None => eprintln!("aggiungi a mano \"{name}\" ai members di {}", cargo.display()),
+                None => eprintln!("add \"{name}\" by hand to the members of {}", cargo.display()),
             }
         }
     }
-    // workspace npm della cartella dei plugin
+    // npm workspace of the plugin folder
     let pkg = base.join("package.json");
     let mut v: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(&pkg)?)?;
     if let Some(ws) = v.get_mut("workspaces").and_then(|w| w.as_array_mut()) {
@@ -402,14 +400,14 @@ pub fn new_plugin(name: &str, id: Option<String>, no_logic: bool, into: Option<P
     std::fs::write(&pkg, serde_json::to_string_pretty(&v)? + "\n")?;
     run(npm().current_dir(&base).args(["install", "--no-audit", "--no-fund"]))?;
     println!(
-        "\nplugin creato in {}\n  id: {id}\n  `cargo xtask dev` lo carica in sviluppo (se la distribuzione lo include)",
+        "\nplugin created in {}\n  id: {id}\n  `cargo xtask dev` loads it in development (if the distribution includes it)",
         dir.display()
     );
     Ok(())
 }
-// ------------------------------------------------------------------ reset dei dati di sviluppo
+// ------------------------------------------------------------------ reset of the development data
 
-/// Stesso nome di `mosaikit_db::Db::plugin_role`.
+/// Same name as `mosaikit_db::Db::plugin_role`.
 fn plugin_role(prefix: &str, id: &str) -> String {
     let hash = hex::encode(&Sha256::digest(id.as_bytes())[..4]);
     let last: String = id
@@ -425,9 +423,9 @@ fn plugin_role(prefix: &str, id: &str) -> String {
     name
 }
 
-/// Elimina schema, ruolo e risorse di un plugin dal database di sviluppo.
+/// Deletes schema, role and resources of a plugin from the development database.
 pub fn db_reset(id: &str) -> Result<()> {
-    let bin = pg_bin().context("psql non trovato (MOSAIKIT_PG_BIN)")?;
+    let bin = pg_bin().context("psql not found (MOSAIKIT_PG_BIN)")?;
     let schema = mosaikit_mskp::schema_name(id);
     let role = plugin_role("msk_mosaikit", id);
     let sql = format!(
@@ -440,6 +438,6 @@ pub fn db_reset(id: &str) -> Result<()> {
             .arg(crate::db::dev_url())
             .args(["-c", &sql]),
     )?;
-    println!("dati di {id} azzerati: al prossimo avvio di `cargo xtask dev` lo schema viene ricreato");
+    println!("data of {id} reset: at the next start of `cargo xtask dev` the schema is created again");
     Ok(())
 }

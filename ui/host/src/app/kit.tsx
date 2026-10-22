@@ -1,7 +1,7 @@
-// Mattoni delle pagine (docs/refactoring-ui.md §9): intestazione con breadcrumb, badge di stato, una
-// sola azione primaria e il menu «⋯»; pagina a sezioni (impostazioni) o a schede (dettaglio di un
-// oggetto); barra di salvataggio solo con modifiche; impostazioni gestite dalla piattaforma; dialoghi
-// con un modulo, stati vuoti e di caricamento.
+// Building blocks of the pages (docs/refactoring-ui.md §9): header with breadcrumb, status badge, a
+// single primary action and the «⋯» menu; page with sections (settings) or tabs (detail of an
+// object); save bar only with changes; settings managed by the platform; dialogs
+// with a form, empty and loading states.
 
 import { useState, type FormEvent, type ReactNode } from 'react'
 import { ChevronRight, Loader2, Lock, MoreHorizontal } from 'lucide-react'
@@ -23,14 +23,14 @@ export interface Crumb {
   href?: string
 }
 
-/** Intestazione della pagina: breadcrumb, titolo con il badge di stato, una sola azione primaria e,
- *  nel menu «⋯», le altre azioni e il cambio di stato (voci di DropdownMenu). */
+/** Header of the page: breadcrumb, title with the status badge, a single primary action and,
+ *  in the «⋯» menu, the other actions and the change of state (DropdownMenu items). */
 export function PageHeader({ title, sub, crumbs, badge, actions, more }: { title: string; sub?: ReactNode; crumbs?: Crumb[]; badge?: ReactNode; actions?: ReactNode; more?: ReactNode }) {
   return (
     <div className="flex min-h-[57px] flex-wrap items-center gap-3 border-b px-6 py-2 max-[620px]:px-4">
       <div className="min-w-0 flex-1">
         {crumbs && crumbs.length > 0 && (
-          <nav aria-label={t('Percorso')} className="mb-0.5 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+          <nav aria-label={t('Breadcrumb')} className="mb-0.5 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
             {crumbs.map((c, i) => (
               <span key={i} className="flex min-w-0 items-center gap-1">
                 {c.href ? (
@@ -57,7 +57,7 @@ export function PageHeader({ title, sub, crumbs, badge, actions, more }: { title
           {more && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" aria-label={t('Altre azioni')}>
+                <Button variant="outline" size="icon" aria-label={t('More actions')}>
                   <MoreHorizontal />
                 </Button>
               </DropdownMenuTrigger>
@@ -72,10 +72,10 @@ export function PageHeader({ title, sub, crumbs, badge, actions, more }: { title
   )
 }
 
-/** Schede orizzontali del dettaglio di un oggetto (persona, gruppo, tenant, plugin). */
+/** Horizontal tabs of the detail of an object (person, group, tenant, plugin). */
 export function Tabs({ tabs, current, href }: { tabs: { id: string; label: string; count?: number }[]; current: string; href: (id: string) => string }) {
   return (
-    <nav aria-label={t('Schede')} className="flex gap-1 overflow-x-auto border-b px-6 max-[620px]:px-4">
+    <nav aria-label={t('Tabs')} className="flex gap-1 overflow-x-auto border-b px-6 max-[620px]:px-4">
       {tabs.map((t) => (
         <a
           key={t.id}
@@ -94,8 +94,8 @@ export function Tabs({ tabs, current, href }: { tabs: { id: string; label: strin
   )
 }
 
-/** Filtri a pillole sopra un elenco («Mostra: Tutte · Pubbliche»). */
-export function Pills({ items, value, onChange, label = t('Mostra') }: { items: { id: string; label: string; count?: number }[]; value: string; onChange: (id: string) => void; label?: string }) {
+/** Pill filters above a list («Show: All · Public»). */
+export function Pills({ items, value, onChange, label = t('Show') }: { items: { id: string; label: string; count?: number }[]; value: string; onChange: (id: string) => void; label?: string }) {
   return (
     <div role="radiogroup" aria-label={label} className="flex flex-wrap items-center gap-1.5">
       <span className="mr-1 text-xs text-muted-foreground">{label}</span>
@@ -119,24 +119,24 @@ export function Pills({ items, value, onChange, label = t('Mostra') }: { items: 
   )
 }
 
-/** Barra «Modifiche non salvate»: compare solo quando qualcosa e' cambiato. */
+/** «Unsaved changes» bar: it appears only when something changed. */
 export function SaveBar({ dirty, busy, onSave, onCancel }: { dirty: boolean; busy?: boolean; onSave: () => void; onCancel: () => void }) {
   if (!dirty) return null
   return (
-    <div role="region" aria-label={t('Modifiche non salvate')} className="sticky bottom-0 z-10 -mx-6 mt-6 flex items-center gap-3 border-t bg-background/95 px-6 py-3 backdrop-blur max-[620px]:-mx-4 max-[620px]:px-4">
-      <span className="flex-1 text-sm font-medium">{t('Modifiche non salvate')}</span>
+    <div role="region" aria-label={t('Unsaved changes')} className="sticky bottom-0 z-10 -mx-6 mt-6 flex items-center gap-3 border-t bg-background/95 px-6 py-3 backdrop-blur max-[620px]:-mx-4 max-[620px]:px-4">
+      <span className="flex-1 text-sm font-medium">{t('Unsaved changes')}</span>
       <Button variant="outline" onClick={onCancel} disabled={busy}>
-        {t('Annulla')}
+        {t('Cancel')}
       </Button>
       <Button onClick={onSave} disabled={busy}>
         {busy && <Loader2 className="animate-spin" />}
-        Salva
+        {t('Save')}
       </Button>
     </div>
   )
 }
 
-/** Un'impostazione gestita dalla piattaforma: il valore in sola lettura, con il lucchetto. */
+/** A setting managed by the platform: the value read only, with the padlock. */
 export function Locked({ label, value, hint }: { label: string; value: ReactNode; hint?: ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-4 rounded-lg border bg-muted/40 p-3">
@@ -147,7 +147,7 @@ export function Locked({ label, value, hint }: { label: string; value: ReactNode
       </span>
       <Badge variant="secondary" className="shrink-0 gap-1 font-normal">
         <Lock className="size-3" />
-        {t('Gestita dall’Administrator')}
+        {t('Managed by the Administrator')}
       </Badge>
     </div>
   )
@@ -158,18 +158,18 @@ export interface Section {
   label: string
   icon: ReactNode
   count?: number
-  /** intestazione di gruppo prima della sezione */
+  /** group heading before the section */
   group?: string
 }
 
-/** Una pagina a sezioni: l'elenco a sinistra (un menu a tendina sul telefono), una sezione alla volta. */
+/** A page with sections: the list on the left (a drop-down menu on the phone), one section at a time. */
 export function Sections({ sections, current, href, children }: { sections: Section[]; current: string; href: (id: string) => string; children: ReactNode }) {
   return (
     <div className="flex min-h-0 flex-1 max-[760px]:flex-col">
-      <nav aria-label={t('Sezioni')} className="w-60 shrink-0 border-r bg-pane p-3 max-[760px]:w-auto max-[760px]:border-r-0 max-[760px]:border-b">
+      <nav aria-label={t('Sections')} className="w-60 shrink-0 border-r bg-pane p-3 max-[760px]:w-auto max-[760px]:border-r-0 max-[760px]:border-b">
         <div className="hidden max-[760px]:block">
           <Select value={current} onValueChange={(v) => go(href(v))}>
-            <SelectTrigger className="w-full bg-background" aria-label={t('Sezione')}>
+            <SelectTrigger className="w-full bg-background" aria-label={t('Section')}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -230,12 +230,12 @@ export function ErrorBox({ error }: { error: unknown }) {
 
 export function StatusBadge({ status }: { status: string }) {
   const map: Record<string, [string, string]> = {
-    active: [t('attivo'), 'bg-ok/10 text-ok'],
-    suspended: [t('sospeso'), 'bg-destructive/10 text-destructive'],
-    disabled: [t('disabilitato'), 'bg-destructive/10 text-destructive'],
-    pending: [t('in attesa'), 'bg-warn/10 text-warn'],
-    installed: [t('installato'), 'bg-warn/10 text-warn'],
-    blocked: [t('bloccato'), 'bg-destructive/10 text-destructive'],
+    active: [t('active'), 'bg-ok/10 text-ok'],
+    suspended: [t('suspended'), 'bg-destructive/10 text-destructive'],
+    disabled: [t('disabled'), 'bg-destructive/10 text-destructive'],
+    pending: [t('pending'), 'bg-warn/10 text-warn'],
+    installed: [t('installed'), 'bg-warn/10 text-warn'],
+    blocked: [t('blocked'), 'bg-destructive/10 text-destructive'],
   }
   const [label, cls] = map[status] ?? [status, '']
   return (
@@ -255,7 +255,7 @@ export interface FieldDef {
   initial?: string
 }
 
-/** Un dialogo con un modulo: i campi sono testo, password o una scelta. */
+/** A dialog with a form: the fields are text, password or a choice. */
 export function FormDialog({
   open,
   onOpenChange,
@@ -284,7 +284,7 @@ export function FormDialog({
       onOpenChange(false)
       setV(init())
     } catch {
-      /* il messaggio d'errore lo mostra chi chiama (toast) */
+      /* the caller shows the error message (toast) */
     } finally {
       setBusy(false)
     }
@@ -335,7 +335,7 @@ export function FormDialog({
           ))}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              {t('Annulla')}
+              {t('Cancel')}
             </Button>
             <Button type="submit" disabled={busy}>
               {busy && <Loader2 className="animate-spin" />}
@@ -366,9 +366,9 @@ export function Kpi({ label, value, hint, onClick }: { label: string; value: Rea
   )
 }
 
-/** Una tabella di righe qualsiasi (i KPI dei plugin): le colonne sono le chiavi della prima riga. */
+/** A table of any rows (the KPIs of the plugins): the columns are the keys of the first row. */
 export function DataTable({ rows, label }: { rows: Record<string, unknown>[]; label?: string }) {
-  if (!rows.length) return <p className="text-sm text-muted-foreground">{t('Nessun dato.')}</p>
+  if (!rows.length) return <p className="text-sm text-muted-foreground">{t('No data.')}</p>
   const cols = Object.keys(rows[0])
   return (
     <div className="overflow-x-auto rounded-xl border bg-card">
@@ -398,7 +398,7 @@ export function DataTable({ rows, label }: { rows: Record<string, unknown>[]; la
   )
 }
 
-/** I KPI dichiarati dai plugin, una tabella ciascuno. */
+/** The KPIs declared by the plugins, one table each. */
 export function PluginKpis({ items }: { items: PluginKpi[] }) {
   if (!items.length) return null
   return (

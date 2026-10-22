@@ -1,5 +1,5 @@
-// Le notifiche di chi e' entrato: oggi gli inviti in altri tenant (`/api/me/invitations`), con lo stato
-// «letta» tenuto nel browser finche' il kernel non avra' l'API delle notifiche.
+// Notifications of whoever signed in: today the invitations to other tenants (`/api/me/invitations`), with
+// the «read» state kept in the browser until the kernel has the notifications API.
 
 import { useSyncExternalStore } from 'react'
 import type { Invitation, Session } from '../types.ts'
@@ -15,7 +15,7 @@ export interface Note {
   invitation?: Invitation
 }
 
-// Lette o no: nel browser, finche' il kernel non ha lo stato delle notifiche (fase 2 di docs/piano-ui.md).
+// Read or not: in the browser, until the kernel has the state of the notifications (phase 2 of docs/ui-plan.md).
 const READ = 'msk_read_notes'
 function readSet(): Set<string> {
   try {
@@ -31,7 +31,7 @@ function markRead(ids: string[]) {
   try {
     localStorage.setItem(READ, JSON.stringify([...read].slice(-500)))
   } catch {
-    /* storage non disponibile */
+    /* storage not available */
   }
   listeners.forEach((l) => l())
 }
@@ -50,8 +50,8 @@ export function useNotes(session: Session) {
   const seen = useRead()
   const notes: Note[] = (q.data ?? []).map((i) => ({
     id: `inv:${i.id}`,
-    title: t('Invito in {tenant}', { tenant: i.tenant_name }),
-    body: t('{who} ti invita come {role}', { who: i.invited_by ?? t('Un Tenant Manager'), role: i.role === 'tenant_manager' ? 'Tenant Manager' : 'User' }),
+    title: t('Invitation to {tenant}', { tenant: i.tenant_name }),
+    body: t('{who} invites you as {role}', { who: i.invited_by ?? t('A Tenant Manager'), role: i.role === 'tenant_manager' ? 'Tenant Manager' : 'User' }),
     when: i.created_at,
     read: seen.has(`inv:${i.id}`),
     invitation: i,

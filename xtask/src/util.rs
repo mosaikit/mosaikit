@@ -1,13 +1,13 @@
-//! Utilita' comuni: percorsi, esecuzione di comandi, ricerca dei binari.
+//! Common utilities: paths, running commands, finding binaries.
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
 use anyhow::{bail, Context, Result};
 
-/// Radice del workspace (la cartella che contiene `xtask/`).
+/// Root of the workspace (the folder that contains `xtask/`).
 pub fn root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).parent().expect("xtask dentro il workspace").to_path_buf()
+    Path::new(env!("CARGO_MANIFEST_DIR")).parent().expect("xtask inside the workspace").to_path_buf()
 }
 
 pub fn exe(name: &str) -> String {
@@ -18,7 +18,7 @@ pub fn exe(name: &str) -> String {
     }
 }
 
-/// `npm` su Windows e' `npm.cmd`.
+/// `npm` on Windows is `npm.cmd`.
 pub fn npm() -> Command {
     if cfg!(windows) {
         let mut c = Command::new("cmd");
@@ -32,28 +32,28 @@ pub fn npm() -> Command {
 pub fn run(cmd: &mut Command) -> Result<()> {
     let shown = format!("{cmd:?}");
     eprintln!("  $ {}", shown.replace('"', ""));
-    let status = cmd.status().with_context(|| format!("avvio di {shown}"))?;
+    let status = cmd.status().with_context(|| format!("starting {shown}"))?;
     if !status.success() {
-        bail!("comando fallito ({status}): {shown}");
+        bail!("command failed ({status}): {shown}");
     }
     Ok(())
 }
 
 pub fn output(cmd: &mut Command) -> Result<String> {
-    let out = cmd.stderr(Stdio::inherit()).output().with_context(|| format!("avvio di {cmd:?}"))?;
+    let out = cmd.stderr(Stdio::inherit()).output().with_context(|| format!("starting {cmd:?}"))?;
     if !out.status.success() {
-        bail!("comando fallito ({}): {cmd:?}", out.status);
+        bail!("command failed ({}): {cmd:?}", out.status);
     }
     Ok(String::from_utf8_lossy(&out.stdout).into_owned())
 }
 
-/// Cerca un eseguibile nel PATH.
+/// Looks for an executable in the PATH.
 pub fn which(name: &str) -> Option<PathBuf> {
     let path = std::env::var_os("PATH")?;
     std::env::split_paths(&path).map(|p| p.join(exe(name))).find(|p| p.is_file())
 }
 
-/// Cartella `bin` di PostgreSQL: `MOSAIKIT_PG_BIN`, PATH, poi i percorsi d'installazione tipici.
+/// PostgreSQL `bin` folder: `MOSAIKIT_PG_BIN`, PATH, then the usual installation paths.
 pub fn pg_bin() -> Option<PathBuf> {
     if let Some(p) = std::env::var_os("MOSAIKIT_PG_BIN") {
         let p = PathBuf::from(p);
@@ -92,19 +92,19 @@ pub fn pg_bin() -> Option<PathBuf> {
 
 pub fn copy_dir(from: &Path, to: &Path) -> Result<()> {
     std::fs::create_dir_all(to)?;
-    for e in std::fs::read_dir(from).with_context(|| format!("lettura {}", from.display()))? {
+    for e in std::fs::read_dir(from).with_context(|| format!("reading {}", from.display()))? {
         let e = e?;
         let dest = to.join(e.file_name());
         if e.file_type()?.is_dir() {
             copy_dir(&e.path(), &dest)?;
         } else {
-            std::fs::copy(e.path(), &dest).with_context(|| format!("copia {}", e.path().display()))?;
+            std::fs::copy(e.path(), &dest).with_context(|| format!("the_copy {}", e.path().display()))?;
         }
     }
     Ok(())
 }
 
-/// Tutti i file di una cartella, con percorso relativo in stile `a/b.txt`.
+/// Every file of a folder, with a relative path in the `a/b.txt` style.
 pub fn walk_files(dir: &Path) -> Result<Vec<(String, PathBuf)>> {
     fn go(base: &Path, dir: &Path, out: &mut Vec<(String, PathBuf)>) -> Result<()> {
         for e in std::fs::read_dir(dir)? {

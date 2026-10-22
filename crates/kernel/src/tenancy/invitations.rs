@@ -1,5 +1,5 @@
-//! Inviti: un Tenant Manager invita un utente di un altro tenant, che accetta o rifiuta dopo
-//! l'accesso al proprio tenant di appartenenza.
+//! Invitations: a Tenant Manager invites a user of another tenant, who accepts or declines after
+//! signing in to their own home tenant.
 
 use chrono::{DateTime, Utc};
 use serde::Serialize;
@@ -48,7 +48,7 @@ fn invitation(r: &mosaikit_db::Row) -> Result<InvitationInfo> {
     })
 }
 
-/// Invita nel tenant corrente un utente di un altro tenant (`username` + tenant di appartenenza).
+/// Invites into the current tenant a user of another tenant (`username` + home tenant).
 pub async fn invite(
     k: &Kernel,
     c: &Caller,
@@ -65,9 +65,9 @@ pub async fn invite(
     .bind(username.trim().to_lowercase())
     .fetch_optional(&k.db)
     .await?;
-    let user = user.ok_or_else(|| Error::not_found("utente non trovato nel tenant indicato"))?;
+    let user = user.ok_or_else(|| Error::not_found("user not found in the given tenant"))?;
     if member_role(k, c.tenant.tenant_id, user).await?.is_some() {
-        return Err(Error::conflict("l'utente e' gia' membro del tenant"));
+        return Err(Error::conflict("the user is already a member of the tenant"));
     }
     let pending: bool = mosaikit_db::query_scalar(
         "select exists (select 1 from core.invitations where tenant_id = $1 and user_id = $2 and status = 'pending' and expires_at > now())",
@@ -77,7 +77,7 @@ pub async fn invite(
     .fetch_one(&k.db)
     .await?;
     if pending {
-        return Err(Error::conflict("esiste gia' un invito in attesa per questo utente"));
+        return Err(Error::conflict("a pending invitation for this user already exists"));
     }
     let id: Uuid = mosaikit_db::query_scalar(
         "insert into core.invitations (tenant_id, user_id, role, invited_by) values ($1, $2, $3, $4) returning id",
@@ -120,7 +120,7 @@ pub async fn revoke_invitation(k: &Kernel, c: &Caller, id: Uuid) -> Result<()> {
         .await?
         .rows_affected();
     if n == 0 {
-        return Err(Error::not_found("invito non trovato o gia' chiuso"));
+        return Err(Error::not_found("invitation not found or already closed"));
     }
     Ok(())
 }
@@ -145,7 +145,7 @@ pub async fn respond_invitation(k: &Kernel, user: &SessionUser, id: Uuid, accept
     .bind(user.user_id)
     .fetch_optional(&mut *tx)
     .await?
-    .ok_or_else(|| Error::not_found("invito non trovato o scaduto"))?;
+    .ok_or_else(|| Error::not_found("invitation not found or expired"))?;
     let tenant: Uuid = row.get(0);
     let role: String = row.get(1);
     let invited_by: Option<Uuid> = row.get(2);

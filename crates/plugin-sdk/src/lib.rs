@@ -1,12 +1,12 @@
-//! SDK per la logica dei plugin Mosaikit.
+//! SDK for the logic of Mosaikit plugins.
 //!
 //! ```ignore
 //! use mosaikit_plugin_sdk::prelude::*;
 //!
 //! fn before_create(ctx: &Ctx, hook: &Hook) -> Result<Option<Values>> {
 //!     let mut v = hook.values.clone();
-//!     if v.str("tag").is_empty() { v.set("tag", "personale"); }
-//!     ctx.log("tag di default applicato");
+//!     if v.str("tag").is_empty() { v.set("tag", "personal"); }
+//!     ctx.log("default tag applied");
 //!     Ok(Some(v))
 //! }
 //!
@@ -20,10 +20,10 @@
 //! }
 //! ```
 //!
-//! Sul target `wasm32` la macro genera gli export dell'ABI; sugli altri target
-//! la logica si prova con [`testing`] e un host simulato.
+//! On the `wasm32` target the macro generates the exports of the ABI; on the other targets
+//! the logic is tested with [`testing`] and a simulated host.
 
-#![allow(unsafe_code)] // l'ABI WASM richiede puntatori grezzi: confinato in `abi`
+#![allow(unsafe_code)] // the WASM ABI requires raw pointers: confined to `abi`
 
 pub mod abi;
 mod host;
@@ -37,7 +37,7 @@ pub mod prelude {
     pub use crate::{json, Ctx, Error, Hook, Result, Value, Values};
 }
 
-/// Errore restituito al kernel: annulla la transazione dell'operazione.
+/// Error returned to the kernel: it rolls back the transaction of the operation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Error(pub String);
 
@@ -72,7 +72,7 @@ impl From<serde_json::Error> for Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// Contesto della chiamata: chi la fa, in quale tenant, per quale plugin.
+/// Context of the call: who makes it, in which tenant, for which plugin.
 #[derive(Debug, Clone, Default, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct Ctx {
     #[serde(default)]
@@ -98,57 +98,57 @@ impl Ctx {
     pub fn log(&self, msg: &str) {
         host::log(msg);
     }
-    /// Comando di un altro plugin (dichiarato in `permissions.calls`), con lo
-    /// stesso utente: il plugin chiamato applica le proprie regole di accesso.
+    /// Command of another plugin (declared in `permissions.calls`), with the
+    /// same user: the called plugin applies its own access rules.
     pub fn call_plugin(&self, plugin: &str, name: &str, args: Value) -> Result<Value> {
         host::call("plugin.call", serde_json::json!({ "plugin": plugin, "name": name, "args": args }))
     }
 }
 
-/// Accesso SQL allo schema del plugin. Le query passano dal guard del kernel e
-/// girano con il ruolo del plugin: la Row-Level Security filtra le righe.
+/// SQL access to the schema of the plugin. The queries go through the guard of the kernel and
+/// run with the role of the plugin: Row-Level Security filters the rows.
 pub struct Db(());
 
 impl Db {
-    /// `SELECT` (o DML con `RETURNING`): righe come oggetti JSON.
-    /// I parametri `$1..$n` sono testo/numeri/bool/null: fare il cast in SQL (`$1::uuid`).
+    /// `SELECT` (or DML with `RETURNING`): rows as JSON objects.
+    /// The parameters `$1..$n` are text/numbers/bool/null: cast in SQL (`$1::uuid`).
     pub fn query(&self, sql: &str, params: &[Value]) -> Result<Vec<Value>> {
         match host::call("db.query", json!({ "sql": sql, "params": params }))? {
             Value::Array(rows) => Ok(rows),
-            other => Err(Error(format!("risposta inattesa: {other}"))),
+            other => Err(Error(format!("unexpected answer: {other}"))),
         }
     }
 
-    /// Prima riga, se presente.
+    /// First row, if any.
     pub fn query_one(&self, sql: &str, params: &[Value]) -> Result<Option<Value>> {
         Ok(self.query(sql, params)?.into_iter().next())
     }
 
-    /// `INSERT/UPDATE/DELETE` senza `RETURNING`: numero di righe toccate.
+    /// `INSERT/UPDATE/DELETE` without `RETURNING`: number of rows affected.
     pub fn exec(&self, sql: &str, params: &[Value]) -> Result<u64> {
         let v = host::call("db.exec", json!({ "sql": sql, "params": params }))?;
         Ok(v.get("rows").and_then(Value::as_u64).unwrap_or(0))
     }
 }
 
-/// Risorse del kernel (proprieta', condivisione, gerarchia).
+/// Resources of the kernel (ownership, sharing, hierarchy).
 pub struct Resources(());
 
 impl Resources {
-    /// Crea una risorsa del plugin: proprietario = utente della chiamata.
+    /// Creates a resource of the plugin: owner = user of the call.
     pub fn create(&self, kind: &str, title: &str, parent: Option<&str>) -> Result<String> {
         let v = host::call("resource.create", json!({ "kind": kind, "title": title, "parent": parent }))?;
-        v.as_str().map(str::to_string).ok_or_else(|| Error::msg("id risorsa mancante"))
+        v.as_str().map(str::to_string).ok_or_else(|| Error::msg("missing resource id"))
     }
 
-    /// Elimina una risorsa (serve il livello gestione).
+    /// Deletes a resource (the manage level is required).
     pub fn delete(&self, id: &str) -> Result<()> {
         host::call("resource.delete", json!({ "id": id }))?;
         Ok(())
     }
 }
 
-/// HTTP verso le sole origini dichiarate in `permissions.network`.
+/// HTTP towards the origins declared in `permissions.network` only.
 pub struct Http(());
 
 #[derive(Debug, Clone, PartialEq)]
@@ -177,7 +177,7 @@ impl Http {
     }
 }
 
-/// Hook su una risorsa CRUD.
+/// Hook on a CRUD resource.
 #[derive(Debug, Clone, Default, PartialEq, serde::Deserialize, serde::Serialize)]
 pub struct Hook {
     /// `before_create`, `before_update`, `after_delete`
@@ -187,23 +187,23 @@ pub struct Hook {
     pub id: Option<String>,
     #[serde(default)]
     pub values: Values,
-    /// valori precedenti (solo `before_update`)
+    /// previous values (`before_update` only)
     #[serde(default)]
     pub previous: Option<Values>,
 }
 
 pub type CommandFn = fn(&Ctx, Value) -> Result<Value>;
-/// Ritorna `Some(valori)` per modificarli, `None` per lasciarli invariati, `Err` per rifiutare.
+/// Returns `Some(values)` to change them, `None` to leave them as they are, `Err` to refuse.
 pub type HookFn = fn(&Ctx, &Hook) -> Result<Option<Values>>;
 
-/// Comandi e hook del plugin (generati da [`plugin!`]).
+/// Commands and hooks of the plugin (generated by [`plugin!`]).
 pub struct Registry {
     pub commands: &'static [(&'static str, CommandFn)],
     pub hooks: &'static [(&'static str, HookFn)],
 }
 
 impl Registry {
-    /// Gestisce un messaggio del kernel e produce la risposta `{"ok":..}` / `{"err":..}`.
+    /// Handles a message of the kernel and produces the answer `{"ok":..}` / `{"err":..}`.
     pub fn dispatch(&self, msg: &Value) -> Value {
         match self.dispatch_inner(msg) {
             Ok(v) => json!({ "ok": v }),
@@ -221,7 +221,7 @@ impl Registry {
                     .commands
                     .iter()
                     .find(|(n, _)| *n == name)
-                    .ok_or_else(|| Error(format!("comando sconosciuto: {name}")))?
+                    .ok_or_else(|| Error(format!("unknown command: {name}")))?
                     .1;
                 f(&ctx, msg.get("args").cloned().unwrap_or(Value::Null))
             }
@@ -236,7 +236,7 @@ impl Registry {
                     None => Ok(Value::Null),
                 }
             }
-            other => Err(Error(format!("tipo di messaggio sconosciuto: {other:?}"))),
+            other => Err(Error(format!("unknown message type: {other:?}"))),
         }
     }
 
@@ -245,7 +245,7 @@ impl Registry {
     }
 }
 
-/// Dichiara hook e comandi del plugin e, su wasm32, genera gli export dell'ABI.
+/// Declares hooks and commands of the plugin and, on wasm32, generates the exports of the ABI.
 #[macro_export]
 macro_rules! plugin {
     (

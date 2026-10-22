@@ -1,6 +1,6 @@
-//! `mosaikit-server`: avvia l'applicazione o esegue comandi di amministrazione.
-//! E' l'eseguibile delle installazioni server e di Docker; la versione desktop
-//! ha un solo eseguibile con gli stessi comandi (crates/desktop).
+//! `mosaikit-server`: starts the application or runs administration commands.
+//! It is the executable of the server and Docker installations; the desktop version
+//! has a single executable with the same commands (crates/desktop).
 
 use std::path::PathBuf;
 
@@ -10,9 +10,9 @@ use mosaikit_server::admin::{self, AdminCmd};
 use mosaikit_server::{config_path, open_browser};
 
 #[derive(Parser)]
-#[command(name = "mosaikit-server", version, about = "Mosaikit: piattaforma a plugin multi-tenant")]
+#[command(name = "mosaikit-server", version, about = "Mosaikit: multi-tenant plugin platform")]
 struct Cli {
-    /// file di configurazione (default: MOSAIKIT_CONFIG, poi mosaikit.toml accanto all'eseguibile o nella cartella corrente)
+    /// configuration file (default: MOSAIKIT_CONFIG, then mosaikit.toml next to the executable or in the current folder)
     #[arg(long, short, global = true)]
     config: Option<PathBuf>,
     #[command(subcommand)]
@@ -21,7 +21,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Cmd {
-    /// Avvia il server (default)
+    /// Starts the server (default)
     Serve,
     #[command(flatten)]
     Admin(AdminCmd),
@@ -40,12 +40,12 @@ async fn main() {
     let cfg = match Config::load(path.as_deref(), &base) {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("configurazione: {e}");
+            eprintln!("configuration: {e}");
             std::process::exit(2);
         }
     };
     if let Some(p) = &path {
-        tracing::info!("configurazione: {}", p.display());
+        tracing::info!("configuration: {}", p.display());
     }
     if let Some(Cmd::Admin(cmd)) = cli.cmd {
         std::process::exit(admin::run(cfg, cmd).await);
@@ -53,7 +53,7 @@ async fn main() {
     let k = match Kernel::start(cfg).await {
         Ok(k) => k,
         Err(e) => {
-            eprintln!("avvio non riuscito: {e}");
+            eprintln!("start failed: {e}");
             std::process::exit(1);
         }
     };

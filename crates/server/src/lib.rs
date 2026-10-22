@@ -1,9 +1,9 @@
-//! Server HTTP di Mosaikit.
+//! HTTP server of Mosaikit.
 //!
-//! Due listener, due origini (vedi `docs/architettura.md` §9):
-//! - **app** (`bind`): UI host e API, cookie di sessione `HttpOnly`, CSRF;
-//! - **untrusted** (`untrusted_bind`): UI dei plugin, contenuti caricati dagli
-//!   utenti (sempre con CSP `sandbox`), link pubblici.
+//! Two listeners, two origins (see `docs/architecture.md` §9):
+//! - **app** (`bind`): host UI and API, `HttpOnly` session cookie, CSRF;
+//! - **untrusted** (`untrusted_bind`): UI of the plugins, contents uploaded by the
+//!   users (always with CSP `sandbox`), public links.
 
 pub mod admin;
 mod api;
@@ -26,7 +26,7 @@ pub struct AppState {
     pub k: Arc<Kernel>,
 }
 
-/// Errore HTTP con corpo JSON `{"error": "...", "code": "..."}`: il codice e' stabile, il messaggio no.
+/// HTTP error with a JSON body `{"error": "...", "code": "..."}`: the code is stable, the message is not.
 #[derive(Debug)]
 pub struct ApiError(pub mosaikit_kernel::Error);
 
@@ -58,7 +58,7 @@ pub fn bad(m: impl Into<String>) -> ApiError {
     ApiError(mosaikit_kernel::Error::bad(m))
 }
 
-/// Header comuni a tutte le risposte.
+/// Headers common to every response.
 async fn common_headers(req: axum::extract::Request, next: axum::middleware::Next) -> Response {
     let mut res = next.run(req).await;
     let h = res.headers_mut();
@@ -69,7 +69,7 @@ async fn common_headers(req: axum::extract::Request, next: axum::middleware::Nex
     res
 }
 
-/// Router dell'origine app (API + UI host), sotto il percorso base di `url`.
+/// Router of the app origin (API + host UI), under the base path of `url`.
 pub fn app_router(k: Arc<Kernel>) -> Router {
     let base = k.cfg.base_path.clone();
     let state = AppState { k };
@@ -77,17 +77,17 @@ pub fn app_router(k: Arc<Kernel>) -> Router {
     under_base(&base, r).layer(axum::middleware::from_fn(common_headers))
 }
 
-/// Router dell'origine untrusted (UI dei plugin, contenuti, link pubblici),
-/// sotto il percorso base di `plugin_url`.
+/// Router of the untrusted origin (UI of the plugins, contents, public links),
+/// under the base path of `plugin_url`.
 pub fn untrusted_router(k: Arc<Kernel>) -> Router {
     let base = k.cfg.plugin_base_path.clone();
     let state = AppState { k };
     under_base(&base, untrusted::router().with_state(state)).layer(axum::middleware::from_fn(common_headers))
 }
 
-/// Monta `r` sotto `base` ("" = radice): toglie il prefisso dal percorso prima di
-/// passare la richiesta a `r`. `<base>` senza `/` finale reindirizza a `<base>/`
-/// (la UI usa percorsi relativi), il resto fuori da `base` e' 404.
+/// Mounts `r` under `base` ("" = root): removes the prefix from the path before
+/// passing the request to `r`. `<base>` without trailing `/` redirects to `<base>/`
+/// (the UI uses relative paths), the rest outside `base` is 404.
 fn under_base(base: &str, r: Router) -> Router {
     if base.is_empty() {
         return r;
@@ -101,7 +101,7 @@ fn under_base(base: &str, r: Router) -> Router {
                 return axum::response::Redirect::permanent(&format!("{base}/")).into_response();
             }
             let Some(rest) = path.strip_prefix(base.as_str()).filter(|r| r.starts_with('/')) else {
-                return (StatusCode::NOT_FOUND, "non trovato").into_response();
+                return (StatusCode::NOT_FOUND, "not found").into_response();
             };
             let pq = match req.uri().query() {
                 Some(q) => format!("{rest}?{q}"),
@@ -119,7 +119,7 @@ fn under_base(base: &str, r: Router) -> Router {
     })
 }
 
-/// I due listener (app e untrusted), con un errore chiaro se una porta e' occupata.
+/// The two listeners (app and untrusted), with a clear error if a port is taken.
 pub struct Listeners {
     app: tokio::net::TcpListener,
     untrusted: tokio::net::TcpListener,
@@ -130,18 +130,18 @@ pub async fn bind(k: &Kernel) -> std::io::Result<Listeners> {
         tokio::net::TcpListener::bind(&addr).await.map_err(|e| {
             std::io::Error::new(
                 e.kind(),
-                format!("impossibile ascoltare su {addr} ({e}): porta occupata? cambia la porta di url (o listen/plugin_listen) in mosaikit.toml"),
+                format!("cannot listen on {addr} ({e}): port taken? change the port of url (or listen/plugin_listen) in mosaikit.toml"),
             )
         })
     };
     let app = bind(k.cfg.bind.clone()).await?;
     let untrusted = bind(k.cfg.untrusted_bind.clone()).await?;
-    tracing::info!("app: {} (in ascolto su {})", k.cfg.app_url, k.cfg.bind);
-    tracing::info!("plugin e contenuti: {} (in ascolto su {})", k.cfg.plugin_url, k.cfg.untrusted_bind);
+    tracing::info!("app: {} (listening on {})", k.cfg.app_url, k.cfg.bind);
+    tracing::info!("plugins and contents: {} (listening on {})", k.cfg.plugin_url, k.cfg.untrusted_bind);
     Ok(Listeners { app, untrusted })
 }
 
-/// Avvia i due listener e attende Ctrl+C.
+/// Starts the two listeners and waits for Ctrl+C.
 pub async fn serve(k: Arc<Kernel>) -> std::io::Result<()> {
     let l = bind(&k).await?;
     serve_until(k, l, async {
@@ -150,7 +150,7 @@ pub async fn serve(k: Arc<Kernel>) -> std::io::Result<()> {
     .await
 }
 
-/// Serve finche' `shutdown` non si completa, poi chiude le connessioni in modo ordinato.
+/// Serves until `shutdown` completes, then closes the connections in an orderly way.
 pub async fn serve_until(
     k: Arc<Kernel>,
     l: Listeners,
@@ -174,7 +174,7 @@ pub async fn serve_until(
     });
     let stopper = async move {
         shutdown.await;
-        tracing::info!("arresto in corso...");
+        tracing::info!("shutting down...");
         let _ = tx.send(true);
     };
     let (ra, ru, _) = tokio::join!(a, u, stopper);
@@ -183,9 +183,9 @@ pub async fn serve_until(
     Ok(())
 }
 
-/// File di configurazione: `--config`, `MOSAIKIT_CONFIG`, poi `mosaikit.toml` accanto
-/// all'eseguibile o nella cartella corrente. Ritorna anche la cartella base per i
-/// percorsi relativi quando il file manca (quella dell'eseguibile).
+/// Configuration file: `--config`, `MOSAIKIT_CONFIG`, then `mosaikit.toml` next to
+/// the executable or in the current folder. It also returns the base folder for the
+/// relative paths when the file is missing (the one of the executable).
 pub fn config_path(cli: Option<std::path::PathBuf>) -> (Option<std::path::PathBuf>, std::path::PathBuf) {
     let exe_dir = std::env::current_exe()
         .ok()
@@ -203,10 +203,10 @@ pub fn config_path(cli: Option<std::path::PathBuf>) -> (Option<std::path::PathBu
     (None, exe_dir)
 }
 
-/// Apre un URL (o un file) con il programma predefinito del sistema.
+/// Opens a URL (or a file) with the default program of the system.
 pub fn open_browser(url: &str) {
     let r = if cfg!(windows) {
-        // explorer non apre console: niente finestra di cmd che lampeggia
+        // explorer opens no console: no cmd window flashing
         std::process::Command::new("explorer").arg(url).spawn()
     } else if cfg!(target_os = "macos") {
         std::process::Command::new("open").arg(url).spawn()
@@ -214,6 +214,6 @@ pub fn open_browser(url: &str) {
         std::process::Command::new("xdg-open").arg(url).spawn()
     };
     if let Err(e) = r {
-        tracing::warn!("{url} non aperto: {e}");
+        tracing::warn!("{url} not opened: {e}");
     }
 }

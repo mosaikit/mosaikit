@@ -1,4 +1,4 @@
-# cargo-deny: vulnerabilita' note (RustSec), licenze, sorgenti delle dipendenze.
+# cargo-deny: known vulnerabilities (RustSec), licenses, sources of the dependencies.
 [graph]
 all-features = true
 

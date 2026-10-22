@@ -1,4 +1,4 @@
-//! File e cartelle (permesso `files`): risorse `folder`/`file` con contenuto su disco.
+//! Files and folders (permission `files`): `folder`/`file` resources with content on disk.
 
 use std::io::Write;
 
@@ -42,14 +42,14 @@ pub struct Listing {
     pub parent: Option<Uuid>,
     pub path: Vec<Crumb>,
     pub entries: Vec<Entry>,
-    /// livello sulla cartella corrente (alla radice: "write", si creano risorse proprie)
+    /// level on the current folder (at the root: "write", one creates resources of one's own)
     pub my_level: String,
 }
 
 fn plugin(k: &Kernel, id: &str) -> Result<std::sync::Arc<LoadedPlugin>> {
     let p = k.plugins.active(id)?;
     if !p.manifest.permissions.files {
-        return Err(Error::forbidden("il plugin non dichiara il permesso files"));
+        return Err(Error::forbidden("the plugin does not declare the files permission"));
     }
     Ok(p)
 }
@@ -85,7 +85,7 @@ async fn get_entry(tx: &mut Tx, id: Uuid) -> Result<Entry> {
         .bind(id)
         .fetch_optional(&mut **tx)
         .await?
-        .ok_or_else(|| Error::not_found("file o cartella non trovati"))?;
+        .ok_or_else(|| Error::not_found("file or folder not found"))?;
     Ok(entry(&r))
 }
 
@@ -100,9 +100,9 @@ fn level_rank(l: &str) -> u8 {
 fn need(e: &Entry, lvl: u8) -> Result<()> {
     if level_rank(&e.my_level) < lvl {
         return Err(Error::forbidden(if lvl >= 3 {
-            "serve il permesso di gestione"
+            "the manage permission is required"
         } else {
-            "serve il permesso di scrittura"
+            "the write permission is required"
         }));
     }
     Ok(())
@@ -114,7 +114,7 @@ async fn folder(tx: &mut Tx, parent: Option<Uuid>) -> Result<Option<Entry>> {
         Some(id) => {
             let e = get_entry(tx, id).await?;
             if !e.is_dir {
-                return Err(Error::bad("la destinazione non e' una cartella"));
+                return Err(Error::bad("the destination is not a folder"));
             }
             Ok(Some(e))
         }
@@ -148,7 +148,7 @@ pub async fn list(k: &Kernel, c: &Caller, plugin_id: &str, parent: Option<Uuid>)
             .bind(pid)
             .fetch_all(&mut *tx)
             .await?,
-        // radice: risorse proprie e quelle condivise la cui cartella non e' visibile
+        // root: own resources and the shared ones whose folder is not visible
         None => mosaikit_db::query(format!(
             "{ENTRY_SQL} where kind in ('file', 'folder') and (parent_id is null or core.level_of(parent_id) = 0)
              order by kind desc, lower(title)"
@@ -192,13 +192,13 @@ pub async fn mkdir(
     name: &str,
 ) -> Result<Entry> {
     if !valid_name(name) {
-        return Err(Error::bad("nome non valido"));
+        return Err(Error::bad("invalid name"));
     }
     let p = plugin(k, plugin_id)?;
     let mut tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
     folder(&mut tx, parent).await?;
     if sibling(&mut tx, parent, name, None).await?.is_some() {
-        return Err(Error::conflict(format!("esiste gia' un elemento chiamato '{name}'")));
+        return Err(Error::conflict(format!("an item called '{name}' already exists")));
     }
     let id = tx.create_resource("folder", name, parent, &json!({})).await?;
     let e = get_entry(&mut tx, id).await?;
@@ -206,7 +206,7 @@ pub async fn mkdir(
     Ok(e)
 }
 
-/// Carica un file. Con `replace` sovrascrive il contenuto di un file omonimo.
+/// Uploads a file. With `replace` it overwrites the content of a file with the same name.
 pub async fn upload(
     k: &Kernel,
     c: &Caller,
@@ -217,15 +217,15 @@ pub async fn upload(
     replace: bool,
 ) -> Result<Entry> {
     if !valid_name(name) {
-        return Err(Error::bad("nome non valido"));
+        return Err(Error::bad("invalid name"));
     }
     let p = plugin(k, plugin_id)?;
     let tenant = c.tenant.tenant_id;
     let mut tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
     folder(&mut tx, parent).await?;
     let id = match sibling(&mut tx, parent, name, None).await? {
-        Some(e) if e.is_dir => return Err(Error::conflict(format!("esiste gia' una cartella '{name}'"))),
-        Some(_) if !replace => return Err(Error::conflict(format!("esiste gia' un file '{name}'"))),
+        Some(e) if e.is_dir => return Err(Error::conflict(format!("a folder '{name}' already exists"))),
+        Some(_) if !replace => return Err(Error::conflict(format!("a file '{name}' already exists"))),
         Some(e) => {
             need(&e, 2)?;
             e.id
@@ -254,14 +254,14 @@ pub async fn upload(
     Ok(e)
 }
 
-/// Contenuto di un file (lettura richiesta).
+/// Content of a file (read required).
 pub async fn read(k: &Kernel, c: &Caller, plugin_id: &str, id: Uuid) -> Result<(Entry, Vec<u8>)> {
     let p = plugin(k, plugin_id)?;
     let mut tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
     let e = get_entry(&mut tx, id).await?;
     tx.commit().await?;
     if e.is_dir {
-        return Err(Error::bad("e' una cartella: usa lo zip"));
+        return Err(Error::bad("it is a folder: use the zip"));
     }
     let data = k.blobs.read_file(c.tenant.tenant_id, id)?;
     Ok((e, data))
@@ -269,14 +269,14 @@ pub async fn read(k: &Kernel, c: &Caller, plugin_id: &str, id: Uuid) -> Result<(
 
 pub async fn rename(k: &Kernel, c: &Caller, plugin_id: &str, id: Uuid, name: &str) -> Result<Entry> {
     if !valid_name(name) {
-        return Err(Error::bad("nome non valido"));
+        return Err(Error::bad("invalid name"));
     }
     let p = plugin(k, plugin_id)?;
     let mut tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
     let e = get_entry(&mut tx, id).await?;
     need(&e, 2)?;
     if sibling(&mut tx, e.parent_id, name, Some(id)).await?.is_some() {
-        return Err(Error::conflict(format!("esiste gia' un elemento chiamato '{name}'")));
+        return Err(Error::conflict(format!("an item called '{name}' already exists")));
     }
     let meta = if e.is_dir { Value::Null } else { json!({ "mime": mime_of(name) }) };
     tx.update_resource(id, Some(name), Some(&meta).filter(|m| !m.is_null()), None).await?;
@@ -297,7 +297,7 @@ pub async fn move_to(
     let e = get_entry(&mut tx, id).await?;
     folder(&mut tx, parent).await?;
     if sibling(&mut tx, parent, &e.name, Some(id)).await?.is_some() {
-        return Err(Error::conflict(format!("nella destinazione esiste gia' '{}'", e.name)));
+        return Err(Error::conflict(format!("'{}' already exists in the destination", e.name)));
     }
     tx.move_resource(id, parent).await?;
     let e = get_entry(&mut tx, id).await?;
@@ -305,7 +305,7 @@ pub async fn move_to(
     Ok(e)
 }
 
-/// Copia ricorsiva: la copia appartiene a chi la fa.
+/// Recursive copy: the copy belongs to whoever makes it.
 pub async fn copy_to(
     k: &Kernel,
     c: &Caller,
@@ -325,10 +325,10 @@ pub async fn copy_to(
                 .await?
                 .unwrap_or_default();
         if dest.id == id || anc.contains(&id) {
-            return Err(Error::bad("impossibile copiare una cartella dentro se stessa"));
+            return Err(Error::bad("a folder cannot be copied into itself"));
         }
     }
-    // nome libero nella destinazione: "nome (copia)", "nome (copia 2)"...
+    // free name in the destination: "name (copy)", "name (copy 2)"...
     let mut name = src.name.clone();
     let mut n = 1;
     while sibling(&mut tx, parent, &name, None).await?.is_some() {
@@ -351,7 +351,7 @@ pub async fn copy_to(
 }
 
 fn copy_name(name: &str, n: usize, is_dir: bool) -> String {
-    let suffix = if n == 1 { " (copia)".to_string() } else { format!(" (copia {n})") };
+    let suffix = if n == 1 { " (copy)".to_string() } else { format!(" (copy {n})") };
     match name.rfind('.') {
         Some(i) if i > 0 && !is_dir => format!("{}{suffix}{}", &name[..i], &name[i..]),
         _ => format!("{name}{suffix}"),
@@ -366,7 +366,7 @@ async fn copy_rec(
     copied: &mut Vec<(Uuid, Uuid)>,
 ) -> Result<Uuid> {
     if copied.len() > MAX_COPY_ITEMS {
-        return Err(Error::bad("troppi elementi da copiare"));
+        return Err(Error::bad("too many items to copy"));
     }
     let kind = if src.is_dir { "folder" } else { "file" };
     let meta = if src.is_dir { json!({}) } else { json!({ "mime": src.mime }) };
@@ -413,14 +413,14 @@ pub async fn delete(k: &Kernel, c: &Caller, plugin_id: &str, id: Uuid) -> Result
     Ok(())
 }
 
-/// Zip di una cartella (solo il contenuto leggibile).
+/// Zip of a folder (only the readable content).
 pub async fn zip_folder(k: &Kernel, c: &Caller, plugin_id: &str, id: Uuid) -> Result<(String, Vec<u8>)> {
     let p = plugin(k, plugin_id)?;
     let tenant = c.tenant.tenant_id;
     let mut tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
     let root = get_entry(&mut tx, id).await?;
     if !root.is_dir {
-        return Err(Error::bad("non e' una cartella"));
+        return Err(Error::bad("it is not a folder"));
     }
     let rows = mosaikit_db::query(
         "select id, kind, title, parent_id, size_bytes from core.visible_resources
@@ -432,9 +432,9 @@ pub async fn zip_folder(k: &Kernel, c: &Caller, plugin_id: &str, id: Uuid) -> Re
     tx.commit().await?;
     let total: i64 = rows.iter().map(|r| r.get::<i64, _>(4)).sum();
     if total > MAX_ZIP_BYTES {
-        return Err(Error::bad("cartella oltre 1 GB: scarica i file singolarmente"));
+        return Err(Error::bad("folder over 1 GB: download the files one by one"));
     }
-    // percorsi relativi ricostruiti dai genitori
+    // relative paths rebuilt from the parents
     let mut names: std::collections::HashMap<Uuid, (String, Option<Uuid>, bool)> = rows
         .iter()
         .map(|r| {
@@ -477,9 +477,9 @@ pub async fn zip_folder(k: &Kernel, c: &Caller, plugin_id: &str, id: Uuid) -> Re
 #[cfg(test)]
 mod tests {
     #[test]
-    fn nomi_di_copia() {
-        assert_eq!(super::copy_name("a.txt", 1, false), "a (copia).txt");
-        assert_eq!(super::copy_name("a.txt", 2, false), "a (copia 2).txt");
-        assert_eq!(super::copy_name("cartella", 1, true), "cartella (copia)");
+    fn copy_names() {
+        assert_eq!(super::copy_name("a.txt", 1, false), "a (copy).txt");
+        assert_eq!(super::copy_name("a.txt", 2, false), "a (copy 2).txt");
+        assert_eq!(super::copy_name("folder", 1, true), "folder (copy)");
     }
 }

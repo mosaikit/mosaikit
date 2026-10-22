@@ -1,8 +1,9 @@
-// Lingua dell'interfaccia: italiano e inglese (i18next), scelta da chi usa l'app e ricordata dal browser
-// (al primo accesso quella del browser). I testi sono indicizzati dalla frase italiana: `t('Accedi')`;
-// i segnaposto si scrivono {nome}; con `count` i18next sceglie la forma plurale (`chiave_one`,
-// `chiave_other` nei dizionari). Gli errori del server si traducono dal loro codice (`errors.<codice>`),
-// altrimenti resta il messaggio del server.
+// Language of the interface: English (the default) and Italian (i18next), chosen by whoever uses the app
+// and remembered by the browser (at the first visit the one of the browser: Italian if it asks for it,
+// otherwise English). Texts are keyed by the English phrase: `t('Sign in')`; placeholders are written
+// {name}; with `count` i18next picks the plural form (`key_one`, `key_other` in the dictionaries).
+// Server errors are translated from their code (`errors.<code>`), otherwise the message of the server
+// stays.
 
 import { useSyncExternalStore } from 'react'
 import i18next from 'i18next'
@@ -13,8 +14,8 @@ import { IT } from './locales/it.ts'
 
 export type Lang = 'it' | 'en'
 export const LANGS: { id: Lang; name: string }[] = [
-  { id: 'it', name: 'Italiano' },
   { id: 'en', name: 'English' },
+  { id: 'it', name: 'Italiano' },
 ]
 
 const KEY = 'msk_lang'
@@ -23,14 +24,14 @@ function initial(): Lang {
     const v = localStorage.getItem(KEY)
     if (v === 'it' || v === 'en') return v
   } catch {
-    /* storage non disponibile */
+    /* storage not available */
   }
   return navigator.language.toLowerCase().startsWith('it') ? 'it' : 'en'
 }
 
 void i18next.use(initReactI18next).init({
   lng: initial(),
-  // senza traduzione resta la frase italiana, che e' la chiave
+  // without a translation the English phrase stays, which is the key
   fallbackLng: false,
   resources: { it: { translation: IT }, en: { translation: EN } },
   keySeparator: false,
@@ -52,12 +53,12 @@ export function setLang(l: Lang) {
   try {
     localStorage.setItem(KEY, l)
   } catch {
-    /* storage non disponibile */
+    /* storage not available */
   }
 }
 
 export function lang(): Lang {
-  return i18next.language === 'en' ? 'en' : 'it'
+  return i18next.language === 'it' ? 'it' : 'en'
 }
 
 export function useLang(): Lang {
@@ -70,17 +71,17 @@ export function useLang(): Lang {
   )
 }
 
-/** Il testo nella lingua scelta (la chiave e' la frase italiana). */
-export function t(it: string, vars: Record<string, string | number> = {}): string {
-  return i18next.t(it, vars)
+/** The text in the chosen language (the key is the English phrase). */
+export function t(key: string, vars: Record<string, string | number> = {}): string {
+  return i18next.t(key, vars)
 }
 
-/** Un numero nel formato della lingua scelta. */
+/** A number in the format of the chosen language. */
 export function fmtNumber(n: number, o?: Intl.NumberFormatOptions): string {
   return new Intl.NumberFormat(lang(), o).format(n)
 }
 
-/** Una data (e ora) nel formato della lingua scelta. */
+/** A date (and time) in the format of the chosen language. */
 export function fmtDay(iso: string | null | undefined, o: Intl.DateTimeFormatOptions = { dateStyle: 'medium' }): string {
   if (!iso) return '—'
   const d = new Date(iso)

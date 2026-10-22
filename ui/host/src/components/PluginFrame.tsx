@@ -9,13 +9,13 @@ interface Props {
   plugin: PluginView
   session: Session
   ctx: TenantContext
-  /** cambia per forzare il ricaricamento (hot reload in sviluppo) */
+  /** changes to force the reload (hot reload in development) */
   reloadKey: number
-  /** lingua e tema della shell: all'handshake e, a ogni cambio, con l'evento `context` */
+  /** language and theme of the shell: at the handshake and, at every change, with the `context` event */
   ui?: { lang: string; preset: string; mode: 'light' | 'dark'; preference: 'light' | 'dark' | 'auto' }
 }
 
-/** Lingua, tema e modo da passare al plugin (senza `ui`, quelli della pagina). */
+/** Language, theme and mode to pass to the plugin (without `ui`, the ones of the page). */
 function uiContext(ui: Props['ui']) {
   const root = document.documentElement
   const dark = root.classList.contains('dark') || root.dataset.theme === 'dark'
@@ -29,8 +29,8 @@ function uiContext(ui: Props['ui']) {
 }
 
 /**
- * Iframe della UI del plugin (origine separata, sandbox) e lato host del bridge.
- * Accetta messaggi solo dall'iframe corrente e dall'origine dei plugin.
+ * Iframe of the UI of the plugin (separate origin, sandbox) and host side of the bridge.
+ * It accepts messages only from the current iframe and from the origin of the plugins.
  */
 export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell }: Props) {
   const ref = useRef<HTMLIFrameElement>(null)
@@ -44,8 +44,8 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
     setLoaded(false)
   }, [src])
 
-  // a ogni cambio di lingua, tema o modo il plugin riceve il contesto nuovo (e il solo tema, per i
-  // plugin scritti prima dell'evento `context`)
+  // at every change of language, theme or mode the plugin receives the new context (and the theme only, for
+  // the plugins written before the `context` event)
   const shellRef = useRef(shell)
   useEffect(() => {
     shellRef.current = shell
@@ -105,7 +105,7 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
   if (!plugin.has_ui) {
     return (
       <div className="empty">
-        <p>{t('Il plugin {label} non ha un’interfaccia.', { label: plugin.label })}</p>
+        <p>{t('The plugin {label} has no interface.', { label: plugin.label })}</p>
       </div>
     )
   }
@@ -123,7 +123,7 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
         referrerPolicy="no-referrer"
         onLoad={() => setLoaded(true)}
       />
-      {!loaded && <div className="frame-msg">{t('Caricamento di {label}…', { label: plugin.label })}</div>}
+      {!loaded && <div className="frame-msg">{t('Loading {label}…', { label: plugin.label })}</div>}
     </div>
   )
 }

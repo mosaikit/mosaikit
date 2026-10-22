@@ -1,7 +1,7 @@
-# PostgreSQL di {{name}}: un'istanza con volume persistente. Al primo avvio lo script
-# initdb crea il ruolo applicativo (non superutente, con CREATEROLE per i ruoli dei
-# plugin), il database e, se l'immagine lo include, PostGIS.
-# In alternativa si puo' usare un PostgreSQL gestito: vedi README.md.
+# PostgreSQL of {{name}}: one instance with a persistent volume. At the first start the
+# initdb script creates the application role (not a superuser, with CREATEROLE for the roles of the
+# plugins), the database and, if the image includes it, PostGIS.
+# Alternatively a managed PostgreSQL can be used: see README.md.
 apiVersion: v1
 kind: Service
 metadata:
@@ -50,7 +50,7 @@ spec:
                 secretKeyRef:
                   name: {{id}}-secret
                   key: MOSAIKIT_DB_PASSWORD
-            # sottocartella: la radice di un volume puo' contenere lost+found
+            # subfolder: the root of a volume may contain lost+found
             - name: PGDATA
               value: /var/lib/postgresql/data/pgdata
           volumeMounts:

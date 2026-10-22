@@ -1,6 +1,6 @@
 [package]
 name = "mosaikit-plugin-sdk"
-description = "SDK per scrivere la logica dei plugin Mosaikit (WASM, ABI v1)"
+description = "SDK to write the logic of Mosaikit plugins (WASM, ABI v1)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

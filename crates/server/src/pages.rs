@@ -1,4 +1,4 @@
-//! Pagine HTML minime dell'origine untrusted (link pubblici).
+//! Minimal HTML pages of the untrusted origin (public links).
 
 pub fn esc(s: &str) -> String {
     s.replace('&', "&amp;")
@@ -30,26 +30,26 @@ const STYLE: &str = "
 
 pub fn page(title: &str, body: &str) -> String {
     format!(
-        "<!doctype html><html lang=\"it\"><head><meta charset=\"utf-8\">\
+        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">\
          <meta name=\"robots\" content=\"noindex\"><title>{}</title><style>{STYLE}</style></head>\
-         <body><main>{body}<footer>Condiviso con Mosaikit</footer></main></body></html>",
+         <body><main>{body}<footer>Shared with Mosaikit</footer></main></body></html>",
         esc(title)
     )
 }
 
 pub fn not_found() -> String {
-    page("Link non disponibile", "<h1>Link non disponibile</h1><p class=\"sub\">Il link non esiste, e' scaduto o e' stato revocato.</p>")
+    page("Link not available", "<h1>Link not available</h1><p class=\"sub\">The link does not exist, has expired or has been revoked.</p>")
 }
 
 pub fn password(title: &str, wrong: bool) -> String {
-    let err = if wrong { "<p class=\"err\">Password errata.</p>" } else { "" };
+    let err = if wrong { "<p class=\"err\">Wrong password.</p>" } else { "" };
     page(
         title,
         &format!(
-            "<h1>Contenuto protetto</h1><p class=\"sub\">Inserisci la password ricevuta insieme al link.</p>\
+            "<h1>Protected content</h1><p class=\"sub\">Enter the password you received with the link.</p>\
              <form method=\"post\" action=\"unlock\"><input type=\"password\" name=\"password\" autofocus \
-             required aria-label=\"Password\"><button type=\"submit\">Apri</button></form>{err}"
+             required aria-label=\"Password\"><button type=\"submit\">Open</button></form>{err}"
         ),
     )
 }
@@ -64,7 +64,7 @@ pub fn record(title: &str, plugin: &str, fields: &[(String, String)]) -> String 
 
 pub fn folder(title: &str, items: &[(String, String, String, i64)]) -> String {
     let rows: String = if items.is_empty() {
-        "<tr><td>Cartella vuota</td></tr>".into()
+        "<tr><td>Empty folder</td></tr>".into()
     } else {
         items
             .iter()
@@ -78,7 +78,7 @@ pub fn folder(title: &str, items: &[(String, String, String, i64)]) -> String {
     page(
         title,
         &format!(
-            "<h1>📁 {}</h1><p class=\"sub\">Cartella condivisa (sola lettura)</p><table>{rows}</table>",
+            "<h1>📁 {}</h1><p class=\"sub\">Shared folder (read only)</p><table>{rows}</table>",
             esc(title)
         ),
     )
@@ -95,10 +95,10 @@ fn human(n: i64) -> String {
     }
 }
 
-/// Pagina che incorpora il visualizzatore pubblico del plugin e gli risponde via postMessage.
+/// Page that embeds the public viewer of the plugin and answers it via postMessage.
 pub fn viewer(title: &str, frame_src: &str, plugin_origin: &str, nonce: &str) -> String {
     format!(
-        "<!doctype html><html lang=\"it\"><head><meta charset=\"utf-8\">\
+        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">\
          <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\"><meta name=\"robots\" content=\"noindex\">\
          <title>{t}</title><style>html,body{{margin:0;height:100%;background:#0b0c0f}}iframe{{border:0;width:100%;height:100%;display:block}}</style>\
          </head><body><iframe id=\"v\" title=\"{t}\" src=\"{src}\" \
@@ -110,7 +110,7 @@ pub fn viewer(title: &str, frame_src: &str, plugin_origin: &str, nonce: &str) ->
            function reply(x){{x.msk=1;x.id=m.id;f.contentWindow.postMessage(x,PO);}}\
            if(m.op==='hello'||m.op==='public.get'){{fetch('api',{{cache:'no-store'}}).then(function(r){{return r.json();}})\
              .then(function(j){{reply({{ok:m.op==='hello'?{{public:true,resource:j}}:j}});}},function(e){{reply({{err:String(e)}});}});return;}}\
-           reply({{err:'operazione non disponibile in un link pubblico'}});\
+           reply({{err:'operation not available in a public link'}});\
          }});}})();</script></body></html>",
         t = esc(title),
         src = esc(frame_src),

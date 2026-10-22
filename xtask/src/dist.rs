@@ -1,7 +1,7 @@
-//! Distribuzione: cosa compone un prodotto basato su Mosaikit (nome, versione,
-//! branding, plugin inclusi, cartelle dei plugin). Mosaikit stesso e' la
-//! distribuzione di default (`distribution.toml` nella radice); un prodotto
-//! derivato ha la propria nel suo progetto (`cargo xtask --dist ../<prodotto> ...`).
+//! Distribution: what makes up a product based on Mosaikit (name, version,
+//! branding, included plugins, plugin folders). Mosaikit itself is the
+//! default distribution (`distribution.toml` in the root); a derived
+//! product has its own in its project (`cargo xtask --dist ../<product> ...`).
 
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
@@ -24,7 +24,7 @@ pub struct Distribution {
     pub docker: Docker,
     #[serde(default)]
     pub tests: Tests,
-    /// cartella del file (per risolvere i percorsi relativi)
+    /// folder of the file (to resolve relative paths)
     #[serde(skip)]
     pub dir: PathBuf,
 }
@@ -32,16 +32,16 @@ pub struct Distribution {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Product {
-    /// identificatore tecnico (nomi di file, immagine Docker): minuscole, cifre, '-'
+    /// technical identifier (file names, Docker image): lower case, digits, '-'
     pub id: String,
-    /// nome mostrato agli utenti
+    /// name shown to users
     pub name: String,
-    /// versione del prodotto (puo' differire da quella di Mosaikit)
+    /// version of the product (may differ from the one of Mosaikit)
     pub version: String,
     #[serde(default)]
-    #[allow(dead_code)] // documentazione del prodotto
+    #[allow(dead_code)] // documentation of the product
     pub description: String,
-    /// nome dell'eseguibile desktop (senza .exe)
+    /// name of the desktop executable (without .exe)
     #[serde(default)]
     pub executable: Option<String>,
 }
@@ -49,7 +49,7 @@ pub struct Product {
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Brand {
-    /// cartella con brand.toml, logo, favicon, icone (relativa al file)
+    /// folder with brand.toml, logo, favicon, icons (relative to the file)
     #[serde(default)]
     pub dir: Option<PathBuf>,
 }
@@ -57,9 +57,9 @@ pub struct Brand {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Plugins {
-    /// cartelle che contengono plugin (ognuna con il proprio workspace Cargo e npm)
+    /// folders that contain plugins (each with its own Cargo and npm workspace)
     pub roots: Vec<PathBuf>,
-    /// id dei plugin da includere; "*" = tutti quelli trovati nelle cartelle
+    /// ids of the plugins to include; "*" = every one found in the folders
     #[serde(default = "all")]
     pub include: Vec<String>,
 }
@@ -71,10 +71,10 @@ fn all() -> Vec<String> {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Desktop {
-    /// database della versione desktop: "sqlite" (default) o "postgres" (PostgreSQL embedded)
+    /// database of the desktop version: "sqlite" (default) or "postgres" (embedded PostgreSQL)
     #[serde(default = "sqlite")]
     pub database: String,
-    /// porta dell'app desktop (quella dei plugin e' la successiva)
+    /// port of the desktop app (the plugins use the next one)
     #[serde(default = "desktop_port")]
     pub port: u16,
 }
@@ -92,11 +92,11 @@ impl Default for Desktop {
     }
 }
 
-/// Test propri della distribuzione (oltre a quelli di mosaikit e dei plugin).
+/// Tests of the distribution itself (besides the ones of mosaikit and of the plugins).
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Tests {
-    /// cartelle con un progetto Cargo di test di integrazione (`cargo test` con PostgreSQL)
+    /// folders with a Cargo integration test project (`cargo test` with PostgreSQL)
     #[serde(default)]
     pub cargo: Vec<PathBuf>,
 }
@@ -104,10 +104,10 @@ pub struct Tests {
 #[derive(Debug, Clone, Default, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct Docker {
-    /// nome dell'immagine (default: id del prodotto)
+    /// name of the image (default: id of the product)
     #[serde(default)]
     pub image: Option<String>,
-    /// immagine PostgreSQL del compose (es. postgis/postgis:17-3.5 se servono dati geospaziali)
+    /// PostgreSQL image of the compose (e.g. postgis/postgis:17-3.5 if geospatial data are needed)
     #[serde(default)]
     pub postgres_image: Option<String>,
 }
@@ -115,8 +115,7 @@ pub struct Docker {
 impl Distribution {
     pub fn load(path: &Path) -> Result<Distribution> {
         let file = if path.is_dir() { path.join("distribution.toml") } else { path.to_path_buf() };
-        let text =
-            std::fs::read_to_string(&file).with_context(|| format!("lettura di {}", file.display()))?;
+        let text = std::fs::read_to_string(&file).with_context(|| format!("reading {}", file.display()))?;
         let mut d: Distribution = toml::from_str(&text).with_context(|| format!("{}", file.display()))?;
         d.dir = file.parent().map(Path::to_path_buf).unwrap_or_else(root);
         d.dir = std::path::absolute(&d.dir).unwrap_or(d.dir);
@@ -139,7 +138,7 @@ impl Distribution {
 
 static CURRENT: OnceLock<Distribution> = OnceLock::new();
 
-/// Imposta la distribuzione attiva (opzione globale `--dist`, `MOSAIKIT_DIST` o quella di mosaikit).
+/// Sets the active distribution (global option `--dist`, `MOSAIKIT_DIST` or the one of mosaikit).
 pub fn init(path: Option<PathBuf>) -> Result<()> {
     let path = path.or_else(|| std::env::var_os("MOSAIKIT_DIST").map(PathBuf::from)).unwrap_or_else(root);
     let d = Distribution::load(&path)?;
@@ -148,5 +147,5 @@ pub fn init(path: Option<PathBuf>) -> Result<()> {
 }
 
 pub fn current() -> &'static Distribution {
-    CURRENT.get().expect("distribuzione non inizializzata")
+    CURRENT.get().expect("distribution not initialized")
 }

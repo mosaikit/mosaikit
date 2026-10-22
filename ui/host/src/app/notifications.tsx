@@ -1,7 +1,7 @@
-// Notifiche, come nel mockup: la campanella nella barra apre un pannello con le ultime, «Segna tutte
-// come lette», l'ingranaggio verso Account › Notifiche e «Vedi tutte» verso la pagina. Oggi il kernel
-// produce un solo tipo di notifica, gli inviti in altri tenant (accetta o rifiuta); le altre (menzioni,
-// scadenze, avvisi dei plugin) arriveranno con l'API delle notifiche.
+// Notifications, as in the mockup: the bell in the bar opens a panel with the latest ones, «Mark all
+// as read», the gear towards Account › Notifications and «See all» towards the page. Today the kernel
+// produces a single kind of notification, the invitations to other tenants (accept or decline); the others
+// (mentions, due dates, alerts of the plugins) will come with the notifications API.
 
 import { useState } from 'react'
 import { Bell, BellOff, Check, Mail, Settings } from 'lucide-react'
@@ -18,7 +18,7 @@ import { go, personal, to, type Route } from './router.ts'
 
 function useAnswer() {
   return useAction(({ id, accept }: { id: string; accept: boolean }) => api('POST', `/api/me/invitations/${id}/${accept ? 'accept' : 'decline'}`), {
-    ok: ({ accept }) => (accept ? t('Invito accettato: trovi il tenant nel selettore in alto') : t('Invito rifiutato')),
+    ok: ({ accept }) => (accept ? t('Invitation accepted: the tenant is in the switcher at the top') : t('Invitation declined')),
     invalidate: [['my-invitations'], ['session']],
   })
 }
@@ -34,7 +34,7 @@ function NoteRow({ n, onOpen }: { n: Note; onOpen?: () => void }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-start gap-2">
           <b className="flex-1 text-sm">{n.title}</b>
-          {!n.read && <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" aria-label={t('non letta')} />}
+          {!n.read && <span className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" aria-label={t('unread')} />}
         </div>
         <p className="text-xs text-muted-foreground">
           {n.body} · {fmtDate(n.when)}
@@ -49,10 +49,10 @@ function NoteRow({ n, onOpen }: { n: Note; onOpen?: () => void }) {
               }}
             >
               <Check />
-              {t('Accetta')}
+              {t('Accept')}
             </Button>
             <Button size="sm" variant="outline" onClick={() => answer.mutate({ id: inv.id, accept: false })}>
-              {t('Rifiuta')}
+              {t('Decline')}
             </Button>
           </div>
         )}
@@ -64,11 +64,11 @@ function NoteRow({ n, onOpen }: { n: Note; onOpen?: () => void }) {
 const bandIcon =
   'relative flex size-8 shrink-0 items-center justify-center rounded-md text-band-foreground/90 outline-none hover:bg-band-hover hover:text-band-foreground focus-visible:ring-2 focus-visible:ring-white/60 data-[state=open]:bg-band-hover'
 
-/** La campanella della barra in alto, con il pannello delle ultime notifiche. */
+/** The bell of the top bar, with the panel of the latest notifications. */
 export function NotificationsBell({ session, route }: { session: Session; route: Route }) {
   const [open, setOpen] = useState(false)
   const n = useNotes(session)
-  const label = n.unread ? t('Notifiche, {n} nuove', { n: String(n.unread) }) : t('Notifiche')
+  const label = n.unread ? t('Notifications, {n} new', { n: String(n.unread) }) : t('Notifications')
   const goTo = (h: string) => {
     setOpen(false)
     go(h)
@@ -85,11 +85,11 @@ export function NotificationsBell({ session, route }: { session: Session; route:
       </PopoverTrigger>
       <PopoverContent align="end" className="w-[360px] max-w-[calc(100vw-16px)] p-0">
         <div className="flex items-center gap-1 border-b px-3 py-2">
-          <b className="flex-1 text-sm">{t('Notifiche')}</b>
+          <b className="flex-1 text-sm">{t('Notifications')}</b>
           <Button variant="ghost" size="sm" disabled={!n.unread} onClick={n.markAll}>
-            {t('Segna tutte come lette')}
+            {t('Mark all as read')}
           </Button>
-          <Button variant="ghost" size="icon" aria-label={t('Preferenze delle notifiche')} title={t('Preferenze delle notifiche')} onClick={() => goTo(personal(route, 'account', 'notifications'))}>
+          <Button variant="ghost" size="icon" aria-label={t('Notification preferences')} title={t('Notification preferences')} onClick={() => goTo(personal(route, 'account', 'notifications'))}>
             <Settings />
           </Button>
         </div>
@@ -98,8 +98,8 @@ export function NotificationsBell({ session, route }: { session: Session; route:
         ) : n.notes.length === 0 ? (
           <div className="flex flex-col items-center gap-1.5 p-8 text-center text-sm text-muted-foreground">
             <BellOff className="size-6" />
-            <b className="text-foreground">{t('Nessuna notifica')}</b>
-            {t('Qui arrivano inviti, menzioni e avvisi delle app.')}
+            <b className="text-foreground">{t('No notifications')}</b>
+            {t('Invitations, mentions and alerts of the apps arrive here.')}
           </div>
         ) : (
           <ul className="grid max-h-[60vh] gap-1 overflow-auto p-2">
@@ -110,7 +110,7 @@ export function NotificationsBell({ session, route }: { session: Session; route:
         )}
         <div className="border-t p-1.5">
           <Button variant="ghost" className="w-full" onClick={() => goTo(personal(route, 'notifications'))}>
-            {t('Vedi tutte')}
+            {t('See all')}
           </Button>
         </div>
       </PopoverContent>
@@ -118,7 +118,7 @@ export function NotificationsBell({ session, route }: { session: Session; route:
   )
 }
 
-/** La pagina Notifiche: tutte, con il filtro sulle non lette. */
+/** The Notifications page: all of them, with the filter on the unread ones. */
 export function NotificationsPage({ session, route }: { session: Session; route: Route }) {
   const n = useNotes(session)
   const [show, setShow] = useState('all')
@@ -127,25 +127,25 @@ export function NotificationsPage({ session, route }: { session: Session; route:
   return (
     <>
       <PageHeader
-        title={t('Notifiche')}
+        title={t('Notifications')}
         crumbs={[{ label: t('Account'), href: personal(route, 'account') }]}
-        sub={n.unread ? t('{n} da leggere', { n: String(n.unread) }) : t('Tutte lette')}
+        sub={n.unread ? t('{n} to read', { n: String(n.unread) }) : t('All read')}
         actions={
           <Button variant="outline" disabled={!n.unread} onClick={n.markAll}>
-            {t('Segna tutte come lette')}
+            {t('Mark all as read')}
           </Button>
         }
         more={
           <button type="button" className="w-full rounded-sm px-2 py-1.5 text-left text-sm hover:bg-accent" onClick={() => go(personal(route, 'account', 'notifications'))}>
-            {t('Cosa ricevo')}
+            {t('What I receive')}
           </button>
         }
       />
       <div className="grid max-w-3xl gap-3 p-6 max-[620px]:p-4">
         <Pills
           items={[
-            { id: 'all', label: t('Tutte'), count: n.notes.length },
-            { id: 'unread', label: t('Non lette'), count: n.unread },
+            { id: 'all', label: t('All'), count: n.notes.length },
+            { id: 'unread', label: t('Unread'), count: n.unread },
           ]}
           value={show}
           onChange={setShow}
@@ -153,9 +153,9 @@ export function NotificationsPage({ session, route }: { session: Session; route:
         {n.isLoading ? (
           <Loading />
         ) : rows.length === 0 ? (
-          <Empty icon={<BellOff />} title={show === 'unread' ? t('Nessuna notifica da leggere') : t('Nessuna notifica')}>
+          <Empty icon={<BellOff />} title={show === 'unread' ? t('Nothing to read') : t('No notifications')}>
             <a href={home} className="text-primary hover:underline">
-              {t('Torna alla panoramica')}
+              {t('Back to the overview')}
             </a>
           </Empty>
         ) : (

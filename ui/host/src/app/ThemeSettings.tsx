@@ -1,7 +1,7 @@
-// Il tema di tutti, come nel mockup (docs/refactoring-ui.md §5): l'Administrator sceglie quello della
-// piattaforma (Sistema › Tema), il Tenant Manager quello del tenant (Impostazioni del tenant › Tema), che
-// eredita dalla piattaforma finche' non lo personalizza. Chi lavora sceglie solo il modo, in Account.
-// La scelta vale subito, senza un Salva.
+// Everyone's theme, as in the mockup (docs/refactoring-ui.md §5): the Administrator chooses the one of the
+// platform (System › Theme), the Tenant Manager the one of the tenant (Tenant settings › Theme), which
+// inherits from the platform until it is customized. Whoever works chooses only the mode, in Account.
+// The choice applies at once, without a Save.
 
 import { Check, RotateCcw } from 'lucide-react'
 import { api } from '../api.ts'
@@ -27,7 +27,7 @@ function nameOf(id: string): string {
   return PRESETS.find((p) => p.id === id)?.name ?? id
 }
 
-/** I temi disponibili, ciascuno con una piccola anteprima della cornice. */
+/** The available themes, each with a small preview of the frame. */
 function ThemeCards({ value, busy, onPick }: { value: string; busy?: boolean; onPick: (id: string) => void }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2">
@@ -67,17 +67,17 @@ function ThemeCards({ value, busy, onPick }: { value: string; busy?: boolean; on
   )
 }
 
-/** Sistema › Tema: il tema della piattaforma, dei tenant che non ne scelgono uno e dell'accesso. */
+/** System › Theme: the theme of the platform, of the tenants that do not choose one and of the sign-in. */
 export function PlatformTheme({ session }: { session: Session }) {
   const save = useAction((preset: string) => api('PUT', '/api/admin/theme', { preset }), {
-    ok: (p) => t('Tema della piattaforma: {name}', { name: nameOf(p) }),
+    ok: (p) => t('Theme of the platform: {name}', { name: nameOf(p) }),
     invalidate: [['session']],
   })
   return (
     <Card className="max-w-3xl">
       <CardHeader>
-        <CardTitle>{t('Tema predefinito')}</CardTitle>
-        <CardDescription>{t('Per la piattaforma, la pagina di accesso e i tenant che non ne scelgono uno. Il modo (chiaro, scuro) resta di ciascuno.')}</CardDescription>
+        <CardTitle>{t('Default theme')}</CardTitle>
+        <CardDescription>{t('For the platform, the sign-in page and the tenants that do not choose one. The mode (light, dark) stays with each person.')}</CardDescription>
       </CardHeader>
       <CardContent>
         <ThemeCards value={session.theme ?? 'mosaikit'} busy={save.isPending} onPick={(p) => save.mutate(p)} />
@@ -86,11 +86,11 @@ export function PlatformTheme({ session }: { session: Session }) {
   )
 }
 
-/** Impostazioni del tenant › Tema: ereditato dalla piattaforma, o personalizzato dal Tenant Manager. */
+/** Tenant settings › Theme: inherited from the platform, or customized by the Tenant Manager. */
 export function TenantTheme({ slug }: { slug: string }) {
   const ctx = useTenantCtx(slug)
   const save = useAction((preset: string | null) => api('PUT', `/api/t/${enc(slug)}/manage/theme`, { preset }), {
-    ok: (p) => (p ? t('Tema del tenant: {name}', { name: nameOf(p) }) : t('Di nuovo il tema della piattaforma')),
+    ok: (p) => (p ? t('Theme of the tenant: {name}', { name: nameOf(p) }) : t('Back to the theme of the platform')),
     invalidate: [['ctx', slug]],
   })
   if (ctx.isLoading) return <Loading />
@@ -100,14 +100,14 @@ export function TenantTheme({ slug }: { slug: string }) {
     <Card className="max-w-3xl">
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2">
-          {t('Tema del tenant')}
-          <Badge variant={own ? 'default' : 'secondary'}>{own ? 'Personalizzato' : 'Ereditato'}</Badge>
+          {t('Theme of the tenant')}
+          <Badge variant={own ? 'default' : 'secondary'}>{own ? t('Customized') : t('Inherited')}</Badge>
         </CardTitle>
         <CardDescription>
           {own
-            ? t('Al posto di quello della piattaforma ({platform}), per tutte le persone del tenant.', { platform: nameOf(th.platform) })
-            : t('Quello della piattaforma, scelto dall\'Administrator. Scegline un altro per personalizzarlo.')}{' '}
-          Il modo (chiaro, scuro) resta di ciascuno.
+            ? t('Instead of the one of the platform ({platform}), for everybody in the tenant.', { platform: nameOf(th.platform) })
+            : t('The one of the platform, chosen by the Administrator. Pick another one to customize it.')}{' '}
+          {t('The mode (light, dark) stays with each person.')}
         </CardDescription>
       </CardHeader>
       <CardContent className="grid gap-4">
@@ -116,7 +116,7 @@ export function TenantTheme({ slug }: { slug: string }) {
           <div>
             <Button variant="outline" size="sm" disabled={save.isPending} onClick={() => save.mutate(null)}>
               <RotateCcw />
-              {t('Ripristina il tema della piattaforma')}
+              {t('Restore the theme of the platform')}
             </Button>
           </div>
         )}

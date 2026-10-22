@@ -1,8 +1,8 @@
-// Lato host del bridge con le UI dei plugin.
+// Host side of the bridge with the UIs of the plugins.
 //
-// Ogni richiesta del plugin viene tradotta in una chiamata REST **limitata al
-// plugin dell'iframe** (il plugin non puo' indicarne un altro) e al tenant
-// attivo. Le operazioni sconosciute o con argomenti non validi sono rifiutate.
+// Every request of the plugin is translated into a REST call **limited to the
+// plugin of the iframe** (the plugin cannot name another one) and to the active
+// tenant. Unknown operations or invalid arguments are refused.
 
 import { api, enc } from './api.ts'
 
@@ -24,12 +24,12 @@ type Args = Record<string, unknown>
 
 function obj(a: unknown): Args {
   if (a === undefined || a === null) return {}
-  if (typeof a !== 'object' || Array.isArray(a)) throw new OpError('argomenti non validi')
+  if (typeof a !== 'object' || Array.isArray(a)) throw new OpError('invalid arguments')
   return a as Args
 }
 
 export function uuid(v: unknown, what = 'id'): string {
-  if (typeof v !== 'string' || !UUID.test(v)) throw new OpError(`${what} non valido`)
+  if (typeof v !== 'string' || !UUID.test(v)) throw new OpError(`invalid ${what}`)
   return v
 }
 
@@ -38,32 +38,32 @@ function optUuid(v: unknown, what = 'parent'): string | null {
 }
 
 function ident(v: unknown, what: string): string {
-  if (typeof v !== 'string' || !IDENT.test(v)) throw new OpError(`${what} non valido`)
+  if (typeof v !== 'string' || !IDENT.test(v)) throw new OpError(`invalid ${what}`)
   return v
 }
 
 function str(v: unknown, what: string, max = 255): string {
-  if (typeof v !== 'string' || !v.length || v.length > max) throw new OpError(`${what} non valido`)
+  if (typeof v !== 'string' || !v.length || v.length > max) throw new OpError(`invalid ${what}`)
   return v
 }
 
 function blob(v: unknown): Blob {
-  if (!(v instanceof Blob)) throw new OpError('file non valido')
+  if (!(v instanceof Blob)) throw new OpError('invalid file')
   return v
 }
 
 function values(v: unknown): Args {
   const o = obj(v)
   for (const val of Object.values(o)) {
-    if (val !== null && !['string', 'number', 'boolean'].includes(typeof val)) throw new OpError('valori non validi')
+    if (val !== null && !['string', 'number', 'boolean'].includes(typeof val)) throw new OpError('invalid values')
   }
   return o
 }
 
-/** Operazioni gestite localmente dall'host (non diventano chiamate REST). */
+/** Operations handled locally by the host (they do not become REST calls). */
 export const LOCAL_OPS = new Set(['hello', 'share', 'toast', 'confirm'])
 
-/** Traduce un'operazione del plugin in una chiamata REST. */
+/** Translates an operation of the plugin into a REST call. */
 export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unknown): RestCall {
   const base = `/api/t/${enc(tenant)}/p/${enc(plugin)}`
   const a = obj(rawArgs)
@@ -74,19 +74,19 @@ export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unk
       const parent = optUuid(a.parent)
       if (parent) q.set('parent', parent)
       const qs = q.toString()
-      return { method: 'GET', url: `${base}/r/${ident(a.resource, 'risorsa')}${qs ? '?' + qs : ''}` }
+      return { method: 'GET', url: `${base}/r/${ident(a.resource, 'resource')}${qs ? '?' + qs : ''}` }
     }
     case 'crud.get':
-      return { method: 'GET', url: `${base}/r/${ident(a.resource, 'risorsa')}/${uuid(a.id)}` }
+      return { method: 'GET', url: `${base}/r/${ident(a.resource, 'resource')}/${uuid(a.id)}` }
     case 'crud.create':
-      return { method: 'POST', url: `${base}/r/${ident(a.resource, 'risorsa')}`, json: { values: values(a.values), parent: optUuid(a.parent) } }
+      return { method: 'POST', url: `${base}/r/${ident(a.resource, 'resource')}`, json: { values: values(a.values), parent: optUuid(a.parent) } }
     case 'crud.update':
-      return { method: 'PUT', url: `${base}/r/${ident(a.resource, 'risorsa')}/${uuid(a.id)}`, json: { values: values(a.values) } }
+      return { method: 'PUT', url: `${base}/r/${ident(a.resource, 'resource')}/${uuid(a.id)}`, json: { values: values(a.values) } }
     case 'crud.delete':
-      return { method: 'DELETE', url: `${base}/r/${ident(a.resource, 'risorsa')}/${uuid(a.id)}` }
+      return { method: 'DELETE', url: `${base}/r/${ident(a.resource, 'resource')}/${uuid(a.id)}` }
     case 'call': {
       const name = a.name
-      if (typeof name !== 'string' || !COMMAND.test(name)) throw new OpError('nome del comando non valido')
+      if (typeof name !== 'string' || !COMMAND.test(name)) throw new OpError('invalid command name')
       return { method: 'POST', url: `${base}/call/${enc(name)}`, json: { args: a.args ?? null } }
     }
     case 'files.list': {
@@ -121,7 +121,7 @@ export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unk
     case 'resource.meta':
       return { method: 'GET', url: `/api/t/${enc(tenant)}/resources/${uuid(a.id)}` }
     default:
-      throw new OpError(`operazione non disponibile: ${op}`)
+      throw new OpError(`operation not available: ${op}`)
   }
 }
 
@@ -129,7 +129,7 @@ export async function execute(call: RestCall): Promise<unknown> {
   return api(call.method, call.url, call.json, { raw: call.raw, blob: call.blob })
 }
 
-/** Variabili del tema dell'host passate alle UI dei plugin. */
+/** Variables of the theme of the host passed to the UIs of the plugins. */
 export const THEME_VARS = [
   '--bg', '--panel', '--panel2', '--line', '--fg', '--dim', '--acc', '--acc-soft', '--acc-line', '--ok', '--err',
 ]

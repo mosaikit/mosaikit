@@ -1,11 +1,11 @@
-//! Notifica di Windows ("toast") quando l'app e' pronta: un clic apre l'indirizzo
-//! dell'app nel browser (attivazione di tipo protocollo, senza callback).
+//! Windows notification ("toast") when the app is ready: a click opens the address
+//! of the app in the browser (protocol activation, no callback).
 //!
-//! Un programma non installato da Microsoft Store deve registrare un AppUserModelID
-//! con nome e icona: lo si fa in HKCU (nessun privilegio amministrativo), cosi' la
-//! notifica mostra il nome del prodotto.
+//! A program not installed from the Microsoft Store must register an AppUserModelID
+//! with name and icon: it is done in HKCU (no administrative privilege), so the
+//! notification shows the name of the product.
 
-#![allow(unsafe_code)] // API Win32 del registro
+#![allow(unsafe_code)] // Win32 registry API
 
 use windows::core::{HSTRING, PCWSTR};
 use windows::Data::Xml::Dom::XmlDocument;
@@ -22,7 +22,7 @@ fn esc(s: &str) -> String {
     s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
 }
 
-/// Identificativo dell'app per le notifiche (es. `Mosaikit.Desktop.Geoportal`).
+/// Identifier of the app for the notifications (e.g. `Mosaikit.Desktop.Atlas`).
 fn aumid(name: &str) -> String {
     let clean: String = name.chars().filter(|c| c.is_ascii_alphanumeric()).collect();
     format!("Mosaikit.Desktop.{}", if clean.is_empty() { "App" } else { &clean })
@@ -32,12 +32,12 @@ fn wide(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
 }
 
-/// Nome e icona mostrati nelle notifiche.
+/// Name and icon shown in the notifications.
 fn register(id: &str, app: &App) -> windows::core::Result<()> {
     let key = wide(&format!("Software\\Classes\\AppUserModelId\\{id}"));
     let mut h = HKEY::default();
-    // SAFETY: chiave e valori UTF-16 terminati da zero che vivono fino al ritorno; la chiave
-    // aperta viene chiusa.
+    // SAFETY: zero-terminated UTF-16 key and values that live until the return; the opened
+    // key is closed.
     unsafe {
         RegCreateKeyExW(
             HKEY_CURRENT_USER,
@@ -64,9 +64,9 @@ fn register(id: &str, app: &App) -> windows::core::Result<()> {
     Ok(())
 }
 
-/// Mostra "<nome> e' pronto" con l'indirizzo; il clic apre il browser.
+/// Shows "<name> is ready" with the address; a click opens the browser.
 pub fn ready(app: &App) -> windows::core::Result<()> {
-    // SAFETY: inizializzazione WinRT del thread (gia' inizializzato: risultato ignorato).
+    // SAFETY: WinRT initialization of the thread (already initialized: result ignored).
     unsafe {
         let _ = RoInitialize(RO_INIT_SINGLETHREADED);
     }
@@ -75,9 +75,9 @@ pub fn ready(app: &App) -> windows::core::Result<()> {
     let xml = format!(
         "<toast activationType=\"protocol\" launch=\"{url}\">\
            <visual><binding template=\"ToastGeneric\">\
-             <text>{name} e' pronto</text>\
+             <text>{name} is ready</text>
              <text>{url}</text>\
-             <text>Clic per aprire nel browser</text>\
+             <text>Click to open in the browser</text>
            </binding></visual>\
          </toast>",
         url = esc(&app.app_url),
@@ -92,8 +92,8 @@ pub fn ready(app: &App) -> windows::core::Result<()> {
 #[cfg(test)]
 mod tests {
     #[test]
-    fn id_e_testo_sicuri() {
-        assert_eq!(super::aumid("Geoportal 2.0!"), "Mosaikit.Desktop.Geoportal20");
+    fn safe_ids_and_text() {
+        assert_eq!(super::aumid("Atlas 2.0!"), "Mosaikit.Desktop.Atlas20");
         assert_eq!(super::aumid("***"), "Mosaikit.Desktop.App");
         assert_eq!(super::esc("a<b>&\"c\""), "a&lt;b&gt;&amp;&quot;c&quot;");
     }

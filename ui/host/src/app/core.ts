@@ -1,12 +1,13 @@
-// Hook comuni della shell: sessione e dati (TanStack Query), modifiche con il loro messaggio.
+// Common hooks of the shell: session and data (TanStack Query), changes with their message.
 
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { api, ApiError, errText, setCsrf } from '../api.ts'
+import { api, ApiError, errText, isUnavailable, setCsrf } from '../api.ts'
+import { retryDelay } from '../brand.ts'
 import type { Session, TenantContext } from '../types.ts'
 export { useConfirm } from './confirm.ts'
 
-/** La sessione: `null` se non si e' entrati. */
+/** The session: `null` if nobody signed in. */
 export function useSession() {
   return useQuery({
     queryKey: ['session'],
@@ -20,7 +21,9 @@ export function useSession() {
         throw e
       }
     },
-    retry: false,
+    // while the server does not answer (restarting, unreachable) the session is asked again
+    retry: (_n, e) => isUnavailable(e),
+    retryDelay,
     staleTime: 60_000,
   })
 }
@@ -31,7 +34,7 @@ export function useSessionValue(): Session {
   return data
 }
 
-/** Contesto del tenant attivo: ruolo, plugin attivi, preferenze. */
+/** Context of the active tenant: role, active plugins, preferences. */
 export function useTenantCtx(slug: string) {
   return useQuery({
     queryKey: ['ctx', slug],
@@ -44,7 +47,7 @@ export function useApi<T>(key: QueryKey, path: string | null) {
   return useQuery({ queryKey: key, queryFn: () => api<T>('GET', path!), enabled: !!path })
 }
 
-/** Una modifica: in caso di successo un messaggio e l'aggiornamento delle query indicate. */
+/** A change: on success a message and the refresh of the given queries. */
 export function useAction<A>(fn: (a: A) => Promise<unknown>, o: { ok?: string | ((a: A) => string); invalidate?: QueryKey[] } = {}) {
   const qc = useQueryClient()
   return useMutation({

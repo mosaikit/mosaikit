@@ -1,4 +1,4 @@
-//! Contenuti su disco: `<data_dir>/blobs/<tenant>/<risorsa>/{file | site/...}`.
+//! Contents on disk: `<data_dir>/blobs/<tenant>/<resource>/{file | site/...}`.
 
 use std::io::Read;
 use std::path::{Path, PathBuf};
@@ -20,7 +20,7 @@ pub struct Blobs {
 pub struct SiteInfo {
     pub files: usize,
     pub size: u64,
-    /// pagina iniziale (index.html meno annidato), vuota se assente
+    /// start page (least nested index.html), empty if absent
     pub entry: String,
 }
 
@@ -52,7 +52,7 @@ impl Blobs {
 
     pub fn read_file(&self, tenant: Uuid, rid: Uuid) -> Result<Vec<u8>> {
         std::fs::read(self.file_path(tenant, rid)).map_err(|e| match e.kind() {
-            std::io::ErrorKind::NotFound => Error::not_found("contenuto del file mancante"),
+            std::io::ErrorKind::NotFound => Error::not_found("content of the file missing"),
             _ => e.into(),
         })
     }
@@ -73,12 +73,12 @@ impl Blobs {
         }
     }
 
-    /// Estrae uno zip come contenuto a cartella della risorsa, sostituendo il precedente.
+    /// Extracts a zip as the folder content of the resource, replacing the previous one.
     pub fn extract_site(&self, tenant: Uuid, rid: Uuid, zip_bytes: &[u8]) -> Result<SiteInfo> {
         let mut zip = zip::ZipArchive::new(std::io::Cursor::new(zip_bytes))
-            .map_err(|e| Error::bad(format!("zip non valido: {e}")))?;
+            .map_err(|e| Error::bad(format!("invalid zip: {e}")))?;
         if zip.len() > SITE_MAX_FILES {
-            return Err(Error::bad(format!("lo zip contiene oltre {SITE_MAX_FILES} file")));
+            return Err(Error::bad(format!("the zip contains more than {SITE_MAX_FILES} files")));
         }
         let dir = self.dir(tenant, rid);
         std::fs::create_dir_all(&dir)?;
@@ -94,11 +94,11 @@ impl Blobs {
                 }
                 let name = f.name().replace('\\', "/");
                 if !mosaikit_mskp::is_safe_path(&name) || f.enclosed_name().is_none() {
-                    return Err(Error::bad(format!("percorso non sicuro nello zip: {name}")));
+                    return Err(Error::bad(format!("unsafe path in the zip: {name}")));
                 }
                 size += f.size();
                 if size > SITE_MAX_BYTES {
-                    return Err(Error::bad("contenuto dello zip oltre 512 MB"));
+                    return Err(Error::bad("content of the zip over 512 MB"));
                 }
                 let out = tmp.join(&name);
                 if let Some(parent) = out.parent() {
@@ -136,7 +136,7 @@ impl Blobs {
         }
     }
 
-    /// File di un sito (percorso relativo sicuro). Una cartella diventa la sua index.html.
+    /// File of a site (safe relative path). A folder becomes its index.html.
     pub fn site_file(&self, tenant: Uuid, rid: Uuid, rel: &str) -> Option<PathBuf> {
         let base = self.site_dir(tenant, rid);
         let rel = rel.trim_matches('/');
@@ -160,7 +160,7 @@ impl Blobs {
     }
 }
 
-/// Rimuove i contenuti di risorse non piu' esistenti (piu' vecchi di un'ora).
+/// Removes the contents of resources that no longer exist (older than one hour).
 pub async fn gc(k: &Kernel) {
     let Ok(tenants) = std::fs::read_dir(k.blobs.root()) else { return };
     for t in tenants.flatten() {

@@ -1,8 +1,8 @@
-//! Plugin in sviluppo: letti dalla cartella sorgente, ricaricati a ogni modifica.
+//! Plugins in development: read from the source folder, reloaded at every change.
 //!
-//! - `plugin.toml`, `migrations/`: manifest e schema riapplicati (migrazioni nuove);
-//! - `<target>/wasm32-unknown-unknown/debug/<crate>.wasm`: modulo ricompilato;
-//! - `ui/dist/`: la UI host ricarica l'iframe del plugin.
+//! - `plugin.toml`, `migrations/`: manifest and schema applied again (new migrations);
+//! - `<target>/wasm32-unknown-unknown/debug/<crate>.wasm`: recompiled module;
+//! - `ui/dist/`: the host UI reloads the iframe of the plugin.
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -14,8 +14,8 @@ use notify::{RecursiveMode, Watcher};
 use super::{install::upsert_row, LoadedPlugin, Status};
 use crate::{DevEvent, Error, Kernel, Result};
 
-/// Nome del crate (da Cargo.toml) -> file .wasm prodotto da cargo, nel `target`
-/// del workspace del plugin (cartella antenata con `[workspace]`), altrimenti in `dev.target_dir`.
+/// Name of the crate (from Cargo.toml) -> .wasm file produced by cargo, in the `target`
+/// of the workspace of the plugin (ancestor folder with `[workspace]`), otherwise in `dev.target_dir`.
 fn wasm_path(k: &Kernel, dir: &Path) -> Option<PathBuf> {
     let cargo = std::fs::read_to_string(dir.join("Cargo.toml")).ok()?;
     let value: toml::Value = toml::from_str(&cargo).ok()?;
@@ -44,7 +44,7 @@ fn migrations(dir: &Path) -> Result<Vec<(u32, String, String)>> {
     Ok(out)
 }
 
-/// Carica (o ricarica) un plugin dalla sua cartella sorgente.
+/// Loads (or reloads) a plugin from its source folder.
 pub async fn load_one(k: &Kernel, dir: &Path) -> Result<String> {
     let manifest = Manifest::from_toml(&std::fs::read_to_string(dir.join("plugin.toml"))?)?;
     let installed_as_package: bool =
@@ -54,14 +54,14 @@ pub async fn load_one(k: &Kernel, dir: &Path) -> Result<String> {
             .await?;
     if installed_as_package {
         return Err(Error::conflict(format!(
-            "{} e' installato come pacchetto: disinstallalo per svilupparlo dalla cartella",
+            "{} is installed as a package: uninstall it to develop it from the folder",
             manifest.id
         )));
     }
     let module = match wasm_path(k, dir) {
         Some(w) if w.is_file() => Some(k.engine.compile(&std::fs::read(&w)?)?),
         Some(w) => {
-            tracing::warn!("{}: {} non ancora compilato", manifest.id, w.display());
+            tracing::warn!("{}: {} not compiled yet", manifest.id, w.display());
             None
         }
         None => None,
@@ -93,13 +93,13 @@ pub async fn load_one(k: &Kernel, dir: &Path) -> Result<String> {
 pub async fn load_all(k: &Kernel) {
     for dir in k.cfg.dev.plugins.clone() {
         match load_one(k, &dir).await {
-            Ok(id) => tracing::info!("plugin di sviluppo {id} caricato da {}", dir.display()),
-            Err(e) => tracing::error!("plugin di sviluppo {}: {e}", dir.display()),
+            Ok(id) => tracing::info!("development plugin {id} loaded from {}", dir.display()),
+            Err(e) => tracing::error!("development plugin {}: {e}", dir.display()),
         }
     }
 }
 
-/// Osserva le cartelle dei plugin e i .wasm compilati; ricarica e notifica la UI.
+/// Watches the folders of the plugins and the compiled .wasm files; reloads and notifies the UI.
 pub fn watch(k: Arc<Kernel>) {
     let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<PathBuf>();
     let dirs = k.cfg.dev.plugins.clone();
@@ -114,7 +114,7 @@ pub fn watch(k: Arc<Kernel>) {
     let mut watcher = match watcher {
         Ok(w) => w,
         Err(e) => {
-            tracing::error!("hot reload non disponibile: {e}");
+            tracing::error!("hot reload not available: {e}");
             return;
         }
     };
@@ -123,7 +123,7 @@ pub fn watch(k: Arc<Kernel>) {
             tracing::warn!("watch {}: {e}", d.display());
         }
     }
-    // cartelle dei .wasm: una per workspace dei plugin (es. mosaikit-plugins e quelli di una distribuzione)
+    // folders of the .wasm files: one per workspace of plugins (e.g. mosaikit-plugins and the ones of a distribution)
     let mut wasm_dirs: Vec<PathBuf> =
         dirs.iter().filter_map(|d| wasm_path(&k, d)?.parent().map(Path::to_path_buf)).collect();
     wasm_dirs.push(wasm_dir);
@@ -135,13 +135,13 @@ pub fn watch(k: Arc<Kernel>) {
             tracing::warn!("watch {}: {e}", w.display());
         }
     }
-    // thread dedicato: le ricariche usano il runtime con block_on, una alla volta
+    // dedicated thread: reloads use the runtime with block_on, one at a time
     let rt = tokio::runtime::Handle::current();
     std::thread::spawn(move || {
         let _keep = watcher;
         while let Some(first) = rx.blocking_recv() {
             let mut paths = vec![first];
-            // accorpa le modifiche ravvicinate (build, salvataggi multipli)
+            // merges close changes (builds, several saves)
             std::thread::sleep(Duration::from_millis(400));
             while let Ok(p) = rx.try_recv() {
                 paths.push(p);

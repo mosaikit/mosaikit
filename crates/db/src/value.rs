@@ -1,8 +1,8 @@
-//! Valori indipendenti dal backend: parametri delle query e colonne dei risultati.
+//! Backend-independent values: query parameters and result columns.
 //!
-//! PostgreSQL ha tipi nativi (uuid, timestamptz, jsonb, array); SQLite li salva
-//! come testo (uuid, istanti in formato RFC 3339 a millisecondi, JSON, array
-//! come JSON) o interi (bool). Le conversioni `FromVal` accettano entrambe le forme.
+//! PostgreSQL has native types (uuid, timestamptz, jsonb, arrays); SQLite stores them
+//! as text (uuid, instants in RFC 3339 format with milliseconds, JSON, arrays
+//! as JSON) or integers (bool). The `FromVal` conversions accept both forms.
 
 use std::sync::Arc;
 
@@ -12,14 +12,14 @@ use uuid::Uuid;
 
 use crate::DbError;
 
-/// Formato degli istanti salvati come testo (SQLite): ordinabile come stringa.
+/// Format of the instants stored as text (SQLite): sortable as a string.
 pub const TS_FORMAT: &str = "%Y-%m-%dT%H:%M:%S%.3fZ";
 
 pub fn ts_text(t: &DateTime<Utc>) -> String {
     t.format(TS_FORMAT).to_string()
 }
 
-/// Tipo di un parametro (serve per i NULL tipizzati di PostgreSQL).
+/// Type of a parameter (needed for the typed NULLs of PostgreSQL).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Ty {
     Bool,
@@ -37,7 +37,7 @@ pub enum Ty {
     Texts,
 }
 
-/// Parametro di una query.
+/// Parameter of a query.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Param {
     Null(Ty),
@@ -60,7 +60,7 @@ pub trait IntoParam {
     fn into_param(self) -> Param;
 }
 
-/// Tipo statico, per `Option<T>` (NULL tipizzato).
+/// Static type, for `Option<T>` (typed NULL).
 pub trait ParamTy {
     const TY: Ty;
 }
@@ -132,7 +132,7 @@ impl IntoParam for Param {
 }
 
 impl Param {
-    /// Parametro da un valore JSON (parametri delle query dei plugin).
+    /// Parameter from a JSON value (query parameters of the plugins).
     pub fn from_json(v: &Value) -> Param {
         match v {
             Value::Null => Param::Null(Ty::Text),
@@ -145,7 +145,7 @@ impl Param {
     }
 }
 
-/// Valore di una colonna del risultato.
+/// Value of a column of the result.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Val {
     Null,
@@ -163,7 +163,7 @@ pub enum Val {
 }
 
 impl Val {
-    /// Come JSON (risultati delle query dei plugin).
+    /// As JSON (results of the queries of the plugins).
     pub fn to_json(&self) -> Value {
         match self {
             Val::Null => Value::Null,
@@ -183,14 +183,14 @@ impl Val {
 }
 
 fn bad(want: &str, got: &Val) -> DbError {
-    DbError::Decode(format!("atteso {want}, trovato {got:?}"))
+    DbError::Decode(format!("expected {want}, found {got:?}"))
 }
 
 pub fn parse_ts(s: &str) -> Option<DateTime<Utc>> {
     if let Ok(t) = DateTime::parse_from_rfc3339(s) {
         return Some(t.with_timezone(&Utc));
     }
-    // formati di SQLite (datetime(), CURRENT_TIMESTAMP)
+    // SQLite formats (datetime(), CURRENT_TIMESTAMP)
     for f in ["%Y-%m-%d %H:%M:%S%.f", "%Y-%m-%dT%H:%M:%S%.f", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"] {
         if let Ok(t) = chrono::NaiveDateTime::parse_from_str(s, f) {
             return Some(t.and_utc());
@@ -199,7 +199,7 @@ pub fn parse_ts(s: &str) -> Option<DateTime<Utc>> {
     NaiveDate::parse_from_str(s, "%Y-%m-%d").ok().and_then(|d| d.and_hms_opt(0, 0, 0)).map(|t| t.and_utc())
 }
 
-/// Conversione da una colonna.
+/// Conversion from a column.
 pub trait FromVal<'r>: Sized {
     fn from_val(v: &'r Val) -> Result<Self, DbError>;
 }
@@ -258,7 +258,7 @@ impl<'r> FromVal<'r> for String {
             Val::Text(s) => Ok(s.clone()),
             Val::Uuid(u) => Ok(u.to_string()),
             Val::Date(d) => Ok(d.to_string()),
-            other => Err(bad("testo", other)),
+            other => Err(bad("text", other)),
         }
     }
 }
@@ -267,7 +267,7 @@ impl<'r> FromVal<'r> for &'r str {
     fn from_val(v: &'r Val) -> Result<Self, DbError> {
         match v {
             Val::Text(s) => Ok(s.as_str()),
-            other => Err(bad("testo", other)),
+            other => Err(bad("text", other)),
         }
     }
 }
@@ -287,8 +287,8 @@ impl<'r> FromVal<'r> for DateTime<Utc> {
     fn from_val(v: &'r Val) -> Result<Self, DbError> {
         match v {
             Val::Ts(t) => Ok(*t),
-            Val::Text(s) => parse_ts(s).ok_or_else(|| bad("istante", v)),
-            other => Err(bad("istante", other)),
+            Val::Text(s) => parse_ts(s).ok_or_else(|| bad("instant", v)),
+            other => Err(bad("instant", other)),
         }
     }
 }
@@ -298,9 +298,9 @@ impl<'r> FromVal<'r> for NaiveDate {
         match v {
             Val::Date(d) => Ok(*d),
             Val::Text(s) => {
-                NaiveDate::parse_from_str(&s[..s.len().min(10)], "%Y-%m-%d").map_err(|_| bad("data", v))
+                NaiveDate::parse_from_str(&s[..s.len().min(10)], "%Y-%m-%d").map_err(|_| bad("date", v))
             }
-            other => Err(bad("data", other)),
+            other => Err(bad("date", other)),
         }
     }
 }
@@ -345,7 +345,7 @@ impl<'r> FromVal<'r> for Vec<String> {
     }
 }
 
-/// Riga di un risultato.
+/// Row of a result.
 #[derive(Debug, Clone)]
 pub struct Row {
     pub(crate) cols: Arc<Vec<String>>,
@@ -374,15 +374,15 @@ impl Row {
     }
 
     pub fn try_get<'r, T: FromVal<'r>, I: ColIndex>(&'r self, i: I) -> Result<T, DbError> {
-        let idx = i.index(self).ok_or_else(|| DbError::Decode("colonna inesistente".into()))?;
+        let idx = i.index(self).ok_or_else(|| DbError::Decode("column does not exist".into()))?;
         T::from_val(&self.vals[idx])
     }
 
-    /// Come `try_get`, ma un tipo sbagliato e' un errore di programmazione (panic).
+    /// Like `try_get`, but a wrong type is a programming error (panic).
     pub fn get<'r, T: FromVal<'r>, I: ColIndex>(&'r self, i: I) -> T {
         match self.try_get(i) {
             Ok(v) => v,
-            Err(e) => panic!("colonna non decodificabile: {e}"),
+            Err(e) => panic!("column cannot be decoded: {e}"),
         }
     }
 
@@ -402,7 +402,7 @@ impl Row {
         self.vals.is_empty()
     }
 
-    /// La riga come oggetto JSON.
+    /// The row as a JSON object.
     pub fn to_json(&self) -> Value {
         Value::Object(self.cols.iter().cloned().zip(self.vals.iter().map(Val::to_json)).collect())
     }

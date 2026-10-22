@@ -1,7 +1,7 @@
 {
   "name": "mosaikit-workspace",
   "private": true,
-  "description": "UI di Mosaikit: host e plugin-api (i plugin sono in ../mosaikit-plugins)",
+  "description": "UI of Mosaikit: host and plugin-api (the plugins are in ../mosaikit-plugins)",
   "workspaces": [
     "ui/plugin-api",
     "ui/host",

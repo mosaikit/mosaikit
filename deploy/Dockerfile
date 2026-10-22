@@ -1,17 +1,17 @@
 # syntax=docker/dockerfile:1.7
-# Immagine del server di una distribuzione Mosaikit (multi-stage).
+# Image of the server of a Mosaikit distribution (multi-stage).
 #
-# Il contesto contiene mosaikit, le cartelle dei plugin (es. mosaikit-plugins) e la
-# cartella della distribuzione, affiancati come in locale: `cargo xtask release docker`
-# lo prepara in una cartella temporanea leggendo distribution.toml e passa la chiave
-# di firma come secret:
+# The context contains mosaikit, the plugin folders (e.g. mosaikit-plugins) and the
+# folder of the distribution, side by side as locally: `cargo xtask release docker`
+# prepares it in a temporary folder reading distribution.toml and passes the signing
+# key as a secret:
 #   cargo xtask release docker                       # Mosaikit
-#   cargo xtask --dist ../prodotto release docker    # una distribuzione
-# oppure a mano, dalla cartella superiore:
+#   cargo xtask --dist ../product release docker     # a distribution
+# or by hand, from the parent folder:
 #   docker build -f mosaikit/deploy/Dockerfile --build-arg DIST=mosaikit \
 #     --secret id=signing_key,src=<file> -t mosaikit:1.0.0 .
-# Senza secret i plugin vengono firmati con una chiave usa e getta generata nella build.
-# I file esclusi dal contesto sono in Dockerfile.dockerignore.
+# Without the secret the plugins are signed with a throwaway key generated in the build.
+# The files excluded from the context are in Dockerfile.dockerignore.
 
 ARG DIST=mosaikit
 
@@ -27,7 +27,7 @@ RUN ln -s /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
     && ln -s /usr/local/lib/node_modules/npm/bin/npx-cli.js /usr/local/bin/npx
 WORKDIR /src
 COPY . .
-# UI host, plugin (WASM e UI) firmati, registry e configurazione in /out
+# host UI, signed plugins (WASM and UI), registry and configuration in /out
 RUN --mount=type=secret,id=signing_key,required=false \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/src/mosaikit/target \
@@ -49,7 +49,7 @@ ENV MOSAIKIT_CONFIG=/app/mosaikit.toml \
 VOLUME ["/data"]
 EXPOSE 8080 8081
 USER mosaikit
-# il percorso base dell'app viene da MOSAIKIT_URL (es. https://gis.esempio.it/mosaikit)
+# the base path of the app comes from MOSAIKIT_URL (e.g. https://gis.example.com/mosaikit)
 HEALTHCHECK --interval=15s --timeout=3s --start-period=20s CMD \
     p=$(printf '%s' "${MOSAIKIT_URL:-}" | sed -E 's#^[a-z]+://[^/]*##; s#/$##'); \
     curl -fsS "http://127.0.0.1:8080${p}/api/health" || exit 1

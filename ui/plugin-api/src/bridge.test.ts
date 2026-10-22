@@ -4,7 +4,7 @@ import { Bridge, BridgeError } from './bridge.ts'
 import { applyContext, applyTheme, Msk } from './client.ts'
 import type { UiContext } from './protocol.ts'
 
-/** Finestra finta: registra i postMessage e permette di simulare risposte. */
+/** Fake window: it records the postMessage calls and lets the test simulate answers. */
 function fakeHost() {
   const sent: { msg: any; origin: string }[] = []
   const host = { postMessage: (msg: any, origin: string) => sent.push({ msg, origin }) } as unknown as Window
@@ -16,7 +16,7 @@ function reply(self: Window, source: unknown, origin: string, data: unknown) {
 }
 
 describe('Bridge', () => {
-  it('invia solo all\'origine dell\'host e risolve con la risposta', async () => {
+  it('sends only to the origin of the host and resolves with the answer', async () => {
     const { host, sent } = fakeHost()
     const b = new Bridge(host, 'https://app.example', window)
     const p = b.call('crud.list', { resource: 'notes' })
@@ -27,32 +27,32 @@ describe('Bridge', () => {
     b.dispose()
   })
 
-  it('ignora risposte da altre origini o finestre', async () => {
+  it('ignores answers from other origins or windows', async () => {
     const { host, sent } = fakeHost()
     const b = new Bridge(host, 'https://app.example', window, 50)
     const p = b.call('x')
     const id = sent[0].msg.id
-    reply(window, host, 'https://evil.example', { msk: 1, id, ok: 'falso' })
-    reply(window, {}, 'https://app.example', { msk: 1, id, ok: 'falso' })
+    reply(window, host, 'https://evil.example', { msk: 1, id, ok: 'fake' })
+    reply(window, {}, 'https://app.example', { msk: 1, id, ok: 'fake' })
     await expect(p).rejects.toBeInstanceOf(BridgeError)
     b.dispose()
   })
 
-  it('propaga gli errori dell\'host', async () => {
+  it('propagates the errors of the host', async () => {
     const { host, sent } = fakeHost()
     const b = new Bridge(host, 'https://app.example', window)
     const p = b.call('crud.get')
-    reply(window, host, 'https://app.example', { msk: 1, id: sent[0].msg.id, err: 'record non trovato' })
-    await expect(p).rejects.toThrow('record non trovato')
+    reply(window, host, 'https://app.example', { msk: 1, id: sent[0].msg.id, err: 'record not found' })
+    await expect(p).rejects.toThrow('record not found')
     b.dispose()
   })
 
-  it('rifiuta un\'origine jolly', () => {
+  it('refuses a wildcard origin', () => {
     const { host } = fakeHost()
     expect(() => new Bridge(host, '*', window)).toThrow(BridgeError)
   })
 
-  it('consegna gli eventi dell\'host', () => {
+  it('delivers the events of the host', () => {
     const { host } = fakeHost()
     const b = new Bridge(host, 'https://app.example', window)
     const fn = vi.fn()
@@ -64,7 +64,7 @@ describe('Bridge', () => {
 })
 
 describe('applyTheme', () => {
-  it('applica solo variabili CSS valide', () => {
+  it('applies only valid CSS variables', () => {
     const el = document.createElement('div')
     applyTheme({ '--acc': '#f00', 'color': 'red', '--x': 'a;b' }, el)
     expect(el.style.getPropertyValue('--acc')).toBe('#f00')
@@ -76,7 +76,7 @@ describe('applyTheme', () => {
 const CTX: UiContext = { lang: 'en', preset: 'italia', mode: 'dark', preference: 'auto', theme: { '--acc': '#06c' } }
 
 describe('applyContext', () => {
-  it('applica lingua, modo, preset e tema', () => {
+  it('applies language, mode, preset and theme', () => {
     const el = document.createElement('div')
     applyContext(CTX, el)
     expect(el.lang).toBe('en')
@@ -86,9 +86,9 @@ describe('applyContext', () => {
     expect(el.style.getPropertyValue('--acc')).toBe('#06c')
   })
 
-  it('ignora valori non validi', () => {
+  it('ignores invalid values', () => {
     const el = document.createElement('div')
-    applyContext({ ...CTX, lang: 'en"><script>', mode: 'nero' as 'dark', preset: 'a b' }, el)
+    applyContext({ ...CTX, lang: 'en"><script>', mode: 'black' as 'dark', preset: 'a b' }, el)
     expect(el.lang).toBe('')
     expect(el.dataset.mode).toBeUndefined()
     expect(el.dataset.preset).toBeUndefined()
@@ -96,7 +96,7 @@ describe('applyContext', () => {
 })
 
 describe('Msk.onContext', () => {
-  it("riceve il contesto dell'handshake e i suoi cambi", () => {
+  it("receives the context of the handshake and its changes", () => {
     const { host } = fakeHost()
     const b = new Bridge(host, 'https://app.example', window)
     const msk = new Msk(b, { public: false, context: CTX })

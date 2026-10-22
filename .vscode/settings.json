@@ -1,4 +1,4 @@
 {
-  // alleggerisce l'Explorer nascondendo le directory di build
+  // lightens the Explorer by hiding the build directories
   "files.exclude": { "**/target": true }
 }

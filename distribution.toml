@@ -1,36 +1,36 @@
-# Distribuzione di default: Mosaikit "puro", con i plugin ufficiali.
-# Un prodotto derivato ha il proprio distribution.toml nel suo progetto e si
-# compila con `cargo xtask --dist ../<prodotto> <comando>`.
+# Default distribution: "plain" Mosaikit, with the official plugins.
+# A derived product has its own distribution.toml in its project and is
+# built with `cargo xtask --dist ../<product> <command>`.
 
 [product]
-# identificatore tecnico: nomi dei file di release e dell'immagine Docker
+# technical identifier: names of the release files and of the Docker image
 id = "mosaikit"
-# nome mostrato agli utenti (titolo, login, icona nell'area di notifica)
+# name shown to users (title, sign-in, icon in the notification area)
 name = "Mosaikit"
-# versione del prodotto
+# version of the product
 version = "1.0.0"
-description = "Piattaforma web multi-tenant a plugin"
-# nome dell'eseguibile desktop (senza .exe)
+description = "Multi-tenant web platform built out of plugins"
+# name of the desktop executable (without .exe)
 executable = "mosaikit"
 
 [brand]
-# cartella con brand.toml (colori, testi) e le immagini (logo, favicon, icona)
+# folder with brand.toml (colours, texts) and the images (logo, favicon, icon)
 dir = "branding"
 
 [plugins]
-# cartelle che contengono i plugin (ognuna con il proprio workspace Cargo e npm)
+# folders that contain plugins (each with its own Cargo and npm workspace)
 roots = ["../mosaikit-plugins"]
-# plugin da includere nelle release: "*" = tutti quelli trovati
+# plugins to include in the releases: "*" = every one found
 include = ["*"]
 
 [desktop]
-# database della versione desktop: "sqlite" (nessun server da avviare) o "postgres" (PostgreSQL embedded)
+# database of the desktop version: "sqlite" (no server to start) or "postgres" (embedded PostgreSQL)
 database = "sqlite"
-# porta dell'app desktop; quella di plugin e contenuti e' la successiva
+# port of the desktop app; plugins and contents use the next one
 port = 48080
 
 [docker]
-# nome dell'immagine Docker
+# name of the Docker image
 image = "mosaikit"
-# immagine PostgreSQL usata dal compose
+# PostgreSQL image used by the compose
 postgres_image = "postgres:17-alpine"

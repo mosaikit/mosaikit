@@ -1,10 +1,10 @@
-//! Spazio di un plugin su SQLite: tabelle `plg_<id>__<nome>`, viste KPI vere,
-//! viste normali salvate in `core_plugin_views` ed espanse a ogni uso.
+//! Space of a plugin on SQLite: tables `plg_<id>__<name>`, real KPI views,
+//! normal views stored in `core_plugin_views` and expanded at every use.
 //!
-//! `freeze` verifica le stesse regole di PostgreSQL (resource_id e tenant_id
-//! obbligatori, indice su resource_id, viste KPI con tenant_id) e crea i trigger
-//! che, nelle transazioni dei plugin, rifiutano righe non consentite (come le
-//! clausole `WITH CHECK` delle policy RLS).
+//! `freeze` checks the same rules as PostgreSQL (resource_id and tenant_id
+//! required, index on resource_id, KPI views with tenant_id) and creates the triggers
+//! that, in the transactions of the plugins, refuse rows that are not allowed (like the
+//! `WITH CHECK` clauses of the RLS policies).
 
 use std::sync::Arc;
 
@@ -24,7 +24,7 @@ fn q(s: &str) -> String {
     format!("\"{}\"", s.replace('"', "\"\""))
 }
 
-const DENY: &str = "SELECT RAISE(ABORT, 'mosaikit[42501]: riga non consentita dalle regole di accesso')";
+const DENY: &str = "SELECT RAISE(ABORT, 'mosaikit[42501]: row not allowed by the access rules')";
 
 impl LitePluginSchema {
     fn prefix(&self) -> String {
@@ -49,7 +49,7 @@ impl LitePluginSchema {
         rows.iter().map(|r| Ok((r.try_get(0)?, r.try_get(1)?))).collect()
     }
 
-    /// Istruzioni gia' verificate da sql-guard, tradotte nello spazio del plugin.
+    /// Statements already checked by sql-guard, translated into the space of the plugin.
     pub async fn run_as_plugin(&self, tx: &mut LiteTx, statements: &[String]) -> Result<()> {
         for stmt in statements {
             let scope = tx.reload_scope(&self.plugin_id).await?;
@@ -67,11 +67,11 @@ impl LitePluginSchema {
                         })?;
                     }
                     Translated::StoreView { name, sql } => {
-                        // la vista deve essere valida come query del plugin
+                        // the view must be valid as a query of the plugin
                         let mut probe = scope.clone();
                         probe.views.insert(name.clone(), sql.clone());
                         tr::translate_one(&format!("select * from {}", q(&name)), Mode::Plugin(&probe))
-                            .map_err(|e| DbError::Invalid(format!("vista {name}: {e}")))?;
+                            .map_err(|e| DbError::Invalid(format!("view {name}: {e}")))?;
                         tx.raw(
                             "insert into core_plugin_views (plugin_id, name, sql) values (?1, ?2, ?3) \
                              on conflict (plugin_id, name) do update set sql = excluded.sql"
@@ -97,7 +97,7 @@ impl LitePluginSchema {
         Ok(())
     }
 
-    /// Colonne: (nome, tipo dichiarato in minuscolo: gli stessi nomi di PostgreSQL).
+    /// Columns: (name, declared type in lower case: the same names as PostgreSQL).
     pub async fn columns(&self, tx: &mut LiteTx, table: &str) -> Result<Vec<(String, String)>> {
         let (rows, _) = tx
             .raw(
@@ -130,12 +130,12 @@ impl LitePluginSchema {
                 });
                 if !ok {
                     return Err(DbError::Invalid(format!(
-                        "la tabella {name} deve avere la colonna {col} uuid not null"
+                        "the table {name} must have the column {col} uuid not null"
                     )));
                 }
             }
             let _ = (cols, protected);
-            // indice su resource_id (la chiave primaria conta)
+            // index on resource_id (the primary key counts)
             let (idx, _) = tx
                 .raw(
                     "select 1 from pragma_index_list(?1) l join pragma_index_info(l.name) i \
@@ -158,7 +158,7 @@ impl LitePluginSchema {
                 )
                 .await?;
             }
-            // trigger di controllo (attivi solo nelle transazioni dei plugin)
+            // check triggers (active only in the transactions of the plugins)
             let lv = |r: &str| tr::level_of(r);
             let triggers = [
                 (
@@ -176,7 +176,7 @@ impl LitePluginSchema {
                     ),
                 ),
                 (
-                    // a cascata dalla risorsa (gia' eliminata) non si controlla
+                    // in cascade from the resource (already deleted) there is nothing to check
                     "msk_del",
                     "before delete",
                     format!(
@@ -209,7 +209,7 @@ impl LitePluginSchema {
                 )
                 .await?;
             if rows.is_empty() {
-                return Err(DbError::Invalid(format!("la vista KPI {v} deve avere la colonna tenant_id")));
+                return Err(DbError::Invalid(format!("the KPI view {v} must have the column tenant_id")));
             }
             report.kpi_views.push(v.clone());
         }
@@ -218,14 +218,14 @@ impl LitePluginSchema {
         Ok(report)
     }
 
-    /// Rimuove tabelle, viste, indici e trigger del plugin.
+    /// Removes tables, views, indexes and triggers of the plugin.
     pub async fn drop(&self, tx: &mut LiteTx) -> Result<()> {
         for (name, kind) in self.objects(tx, "'trigger', 'view', 'index', 'table'").await? {
             if kind == "index" && name.starts_with("sqlite_") {
                 continue;
             }
             let res = tx.raw(format!("drop {kind} if exists {}", q(&name)), Vec::new(), false).await;
-            // gli indici automatici spariscono con la tabella
+            // automatic indexes go away with the table
             if let Err(e) = res {
                 if kind != "index" {
                     return Err(e);

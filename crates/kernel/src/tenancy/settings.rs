@@ -1,5 +1,5 @@
-//! Policy del tenant (Tenant Manager), preferenze dell'utente nel tenant, tema (della piattaforma e
-//! del tenant) e barra in alto della shell (Administrator, per tutta la piattaforma).
+//! Policy of the tenant (Tenant Manager), preferences of the user in the tenant, theme (of the platform
+//! and of the tenant) and top bar of the shell (Administrator, for the whole platform).
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -10,9 +10,9 @@ use crate::{events, Caller, Error, Kernel, Result, SessionUser, TenantSettings};
 pub async fn set_settings(k: &Kernel, c: &Caller, s: &TenantSettings) -> Result<()> {
     c.require_manager()?;
     if s.public_link_max_days > 3650 {
-        return Err(Error::bad("durata massima dei link: al massimo 3650 giorni"));
+        return Err(Error::bad("maximum lifetime of links: at most 3650 days"));
     }
-    // le policy si fondono con il resto delle impostazioni (il tema, per esempio)
+    // the policies merge with the rest of the settings (the theme, for instance)
     let mut all = settings_of(k, c.tenant.tenant_id).await?;
     if let (Some(o), Value::Object(n)) = (all.as_object_mut(), serde_json::to_value(s)?) {
         o.extend(n);
@@ -43,7 +43,7 @@ pub async fn prefs(k: &Kernel, c: &Caller) -> Result<Value> {
 
 pub async fn set_prefs(k: &Kernel, c: &Caller, prefs: &Value) -> Result<()> {
     if !prefs.is_object() || prefs.to_string().len() > 16 * 1024 {
-        return Err(Error::bad("preferenze non valide"));
+        return Err(Error::bad("invalid preferences"));
     }
     mosaikit_db::query(
         "insert into core.user_prefs (user_id, tenant_id, prefs) values ($1, $2, $3)
@@ -57,23 +57,23 @@ pub async fn set_prefs(k: &Kernel, c: &Caller, prefs: &Value) -> Result<()> {
     Ok(())
 }
 
-/// Elementi della barra in alto della shell, decisi dall'Administrator e uguali per tutti i tenant.
-/// Stanno nelle impostazioni del tenant di sistema, sotto `band`; un elemento assente vale acceso.
+/// Items of the top bar of the shell, decided by the Administrator and the same for every tenant.
+/// They live in the settings of the system tenant, under `band`; a missing item counts as on.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ShellBand {
-    /// logo e nome dell'applicazione (spento: il pulsante della sidebar ne prende il posto)
+    /// logo and name of the application (off: the sidebar button takes its place)
     #[serde(default = "on")]
     pub logo: bool,
-    /// casella di ricerca e Ctrl K
+    /// search box and Ctrl K
     #[serde(default = "on")]
     pub search: bool,
-    /// menu della lingua
+    /// language menu
     #[serde(default = "on")]
     pub lang: bool,
-    /// menu dell'aiuto (tour, guida, novita')
+    /// help menu (tour, guide, what's new)
     #[serde(default = "on")]
     pub help: bool,
-    /// menu della tonalita' (chiaro, scuro, automatico)
+    /// mode menu (light, dark, automatic)
     #[serde(default = "on")]
     pub mode: bool,
 }
@@ -84,7 +84,7 @@ fn on() -> bool {
 
 impl Default for ShellBand {
     fn default() -> ShellBand {
-        serde_json::from_str("{}").expect("barra di default")
+        serde_json::from_str("{}").expect("default bar")
     }
 }
 
@@ -95,7 +95,7 @@ async fn system_settings(k: &Kernel) -> Result<Value> {
     Ok(v.filter(Value::is_object).unwrap_or_else(|| json!({})))
 }
 
-/// La barra in alto della piattaforma (la legge chiunque abbia una sessione).
+/// The top bar of the platform (anyone with a session reads it).
 pub async fn shell_band(k: &Kernel) -> Result<ShellBand> {
     let s = system_settings(k).await?;
     Ok(s.get("band").cloned().and_then(|b| serde_json::from_value(b).ok()).unwrap_or_default())
@@ -131,21 +131,21 @@ async fn write_settings(k: &Kernel, tenant: uuid::Uuid, s: Value) -> Result<()> 
     Ok(())
 }
 
-/// Il tema predefinito quando nessuno ne ha scelto uno.
+/// The default theme when nobody chose one.
 pub const DEFAULT_THEME: &str = "mosaikit";
 
-/// Il tema: quello della piattaforma (Administrator) e, per un tenant, quello che il Tenant Manager ha
-/// scelto al suo posto. Il modo (chiaro, scuro) resta una scelta di ciascuno.
+/// The theme: the one of the platform (Administrator) and, for a tenant, the one the Tenant Manager
+/// chose instead. The mode (light, dark) stays everyone's own choice.
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
 pub struct ThemeChoice {
     pub platform: String,
-    /// il tema del tenant; assente: eredita quello della piattaforma
+    /// the theme of the tenant; absent: it inherits the one of the platform
     pub tenant: Option<String>,
-    /// quello in uso
+    /// the one in use
     pub preset: String,
 }
 
-fn theme_in(s: &Value) -> Option<String> {
+pub(super) fn theme_in(s: &Value) -> Option<String> {
     s.get("theme").and_then(Value::as_str).map(str::to_owned)
 }
 
@@ -156,16 +156,16 @@ fn check_theme(preset: &str) -> Result<()> {
     if ok {
         Ok(())
     } else {
-        Err(Error::bad("tema non valido"))
+        Err(Error::bad("invalid theme"))
     }
 }
 
-/// Il tema della piattaforma, per l'accesso e per le pagine dell'Administrator.
+/// The theme of the platform, for the sign-in and for the pages of the Administrator.
 pub async fn platform_theme(k: &Kernel) -> Result<String> {
     Ok(theme_in(&system_settings(k).await?).unwrap_or_else(|| DEFAULT_THEME.into()))
 }
 
-/// Il tema di un tenant, con quello della piattaforma da cui eredita.
+/// The theme of a tenant, with the one of the platform it inherits from.
 pub async fn tenant_theme(k: &Kernel, tenant: uuid::Uuid) -> Result<ThemeChoice> {
     let platform = platform_theme(k).await?;
     let own = theme_in(&settings_of(k, tenant).await?);
@@ -186,7 +186,7 @@ pub async fn set_platform_theme(k: &Kernel, admin: &SessionUser, preset: &str) -
     Ok(())
 }
 
-/// Il Tenant Manager sceglie il tema del tenant; `None` torna a quello della piattaforma.
+/// The Tenant Manager chooses the theme of the tenant; `None` goes back to the one of the platform.
 pub async fn set_tenant_theme(k: &Kernel, c: &Caller, preset: Option<&str>) -> Result<()> {
     c.require_manager()?;
     let mut s = settings_of(k, c.tenant.tenant_id).await?;

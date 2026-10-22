@@ -1,14 +1,15 @@
-// Vista CRUD generica guidata dai metadati della risorsa (campi del manifest).
-// Rispetta il livello dell'utente su ogni riga: lettura, scrittura, gestione.
+// Generic CRUD view driven by the metadata of the resource (fields of the manifest).
+// It respects the level of the user on every row: read, write, manage.
+// Its texts are in English, or in Italian when the host is in Italian (the `context` of the bridge).
 
 import type { Msk } from './client.ts'
 import type { FieldDecl, Row, Values } from './protocol.ts'
 
 export interface CrudOptions {
   title?: string
-  /** campi da mostrare in tabella (default: i campi non nascosti, al massimo 5) */
+  /** fields to show in the table (default: the fields that are not hidden, at most 5) */
   columns?: string[]
-  /** etichetta per "nuovo" (default "Nuovo") */
+  /** label for "new" (default "New") */
   newLabel?: string
 }
 
@@ -30,16 +31,72 @@ function display(f: FieldDecl, v: unknown): string {
   return String(v)
 }
 
-const LEVEL_LABEL: Record<string, string> = { read: 'sola lettura', write: 'modifica', manage: 'gestione' }
+const TEXTS = {
+  en: {
+    filter: 'Filter…',
+    filterLabel: 'Filter',
+    new: '＋ New',
+    save: 'Save',
+    cancel: 'Cancel',
+    close: 'Close',
+    share: 'Share…',
+    del: 'Delete',
+    owner: 'Owner',
+    item: '1 item',
+    items: '{n} items',
+    noResult: 'no result',
+    noItem: 'no item',
+    shared: 'shared',
+    detail: 'Detail',
+    newItem: 'New item',
+    sharedReadOnly: 'Shared with you, read only.',
+    ownerIs: 'Owner: {name}',
+    saved: 'saved',
+    deleted: 'deleted',
+    confirmDelete: 'Delete this item?',
+    read: 'read only',
+    write: 'edit',
+    manage: 'manage',
+  },
+  it: {
+    filter: 'Filtra…',
+    filterLabel: 'Filtra',
+    new: '＋ Nuovo',
+    save: 'Salva',
+    cancel: 'Annulla',
+    close: 'Chiudi',
+    share: 'Condividi…',
+    del: 'Elimina',
+    owner: 'Proprietario',
+    item: '1 elemento',
+    items: '{n} elementi',
+    noResult: 'nessun risultato',
+    noItem: 'nessun elemento',
+    shared: 'condivisa',
+    detail: 'Dettaglio',
+    newItem: 'Nuovo elemento',
+    sharedReadOnly: 'Condiviso con te in sola lettura.',
+    ownerIs: 'Proprietario: {name}',
+    saved: 'salvato',
+    deleted: 'eliminato',
+    confirmDelete: 'Eliminare questo elemento?',
+    read: 'sola lettura',
+    write: 'modifica',
+    manage: 'gestione',
+  },
+}
+type Text = keyof (typeof TEXTS)['en']
 
 export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: CrudOptions = {}): () => void {
   const api = msk.crud(resource)
   const st: State = { fields: [], rows: [], selected: null, filter: '', busy: false }
   let disposed = false
+  const tr = (k: Text, vars: Record<string, string | number> = {}) =>
+    TEXTS[msk.context?.lang === 'it' ? 'it' : 'en'][k].replace(/\{(\w+)\}/g, (_, v: string) => String(vars[v] ?? ''))
 
   const title = h('h2', { class: 'msk-h2' }, opts.title ?? resource)
-  const filter = h('input', { type: 'search', class: 'msk-filter', placeholder: 'Filtra…', 'aria-label': 'Filtra' })
-  const btnNew = h('button', { type: 'button', class: 'msk-btn ghost' }, opts.newLabel ?? '＋ Nuovo')
+  const filter = h('input', { type: 'search', class: 'msk-filter' })
+  const btnNew = h('button', { type: 'button', class: 'msk-btn ghost' })
   const count = h('span', { class: 'msk-count' })
   const thead = h('thead')
   const tbody = h('tbody')
@@ -47,10 +104,19 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   const formTitle = h('h3')
   const readonly = h('div', { class: 'msk-readonly' })
   const fieldsBox = h('div')
-  const btnSave = h('button', { type: 'button', class: 'msk-btn' }, 'Salva')
-  const btnCancel = h('button', { type: 'button', class: 'msk-btn ghost' }, 'Annulla')
-  const btnShare = h('button', { type: 'button', class: 'msk-btn ghost' }, 'Condividi…')
-  const btnDel = h('button', { type: 'button', class: 'msk-btn danger' }, 'Elimina')
+  const btnSave = h('button', { type: 'button', class: 'msk-btn' })
+  const btnCancel = h('button', { type: 'button', class: 'msk-btn ghost' })
+  const btnShare = h('button', { type: 'button', class: 'msk-btn ghost' })
+  const btnDel = h('button', { type: 'button', class: 'msk-btn danger' })
+  /** The fixed texts, in the language of the host. */
+  function renderTexts() {
+    filter.placeholder = tr('filter')
+    filter.setAttribute('aria-label', tr('filterLabel'))
+    btnNew.textContent = opts.newLabel ?? tr('new')
+    btnSave.textContent = tr('save')
+    btnShare.textContent = tr('share')
+    btnDel.textContent = tr('del')
+  }
   const msg = h('div', { class: 'msk-msg', role: 'status' })
   const form = h('section', { class: 'msk-form' }, formTitle, readonly, fieldsBox, h('div', { class: 'msk-actions' }, btnSave, btnCancel, btnShare, btnDel), msg)
 
@@ -74,36 +140,39 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
 
   function renderTable() {
     const cols = columns()
-    thead.replaceChildren(h('tr', {}, ...cols.map((f) => h('th', {}, f.label || f.key)), h('th', {}, 'Proprietario')))
+    thead.replaceChildren(h('tr', {}, ...cols.map((f) => h('th', {}, f.label || f.key)), h('th', {}, tr('owner'))))
     const q = st.filter.trim().toLowerCase()
     const shown = st.rows.filter((r) => !q || Object.values(r.values).some((v) => String(v ?? '').toLowerCase().includes(q)))
-    count.textContent = shown.length === 1 ? '1 elemento' : `${shown.length} elementi`
+    count.textContent = shown.length === 1 ? tr('item') : tr('items', { n: shown.length })
     if (!shown.length) {
-      tbody.replaceChildren(h('tr', {}, h('td', { class: 'empty', colspan: String(cols.length + 1) }, st.rows.length ? 'nessun risultato' : 'nessun elemento')))
+      tbody.replaceChildren(h('tr', {}, h('td', { class: 'empty', colspan: String(cols.length + 1) }, st.rows.length ? tr('noResult') : tr('noItem'))))
       return
     }
     tbody.replaceChildren(
       ...shown.map((r) => {
-        const tr = h('tr', { class: 'row' + (r.id === st.selected ? ' sel' : ''), tabindex: '0' })
+        const line = h('tr', { class: 'row' + (r.id === st.selected ? ' sel' : ''), tabindex: '0' })
         cols.forEach((f, i) => {
           const td = h('td', {}, display(f, r.values[f.key]))
           if (i === 0) {
-            if (r.shared) td.append(h('span', { class: 'msk-badge acc' }, 'condivisa'))
-            if (r.my_level !== 'manage') td.append(h('span', { class: 'msk-badge' }, LEVEL_LABEL[r.my_level] ?? r.my_level))
+            if (r.shared) td.append(h('span', { class: 'msk-badge acc' }, tr('shared')))
+            if (r.my_level !== 'manage') {
+              const level = r.my_level === 'read' || r.my_level === 'write' ? tr(r.my_level) : r.my_level
+              td.append(h('span', { class: 'msk-badge' }, level))
+            }
           }
-          tr.append(td)
+          line.append(td)
         })
-        tr.append(h('td', { class: 'msk-owner' }, r.owner_name))
+        line.append(h('td', { class: 'msk-owner' }, r.owner_name))
         const pick = () => {
           st.selected = st.selected === r.id ? null : r.id
           renderTable()
           renderForm()
         }
-        tr.addEventListener('click', pick)
-        tr.addEventListener('keydown', (e) => {
+        line.addEventListener('click', pick)
+        line.addEventListener('keydown', (e) => {
           if (e.key === 'Enter') pick()
         })
-        return tr
+        return line
       }),
     )
   }
@@ -135,13 +204,13 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     const row = selectedRow()
     const canWrite = !row || row.my_level === 'write' || row.my_level === 'manage'
     const canManage = !row || row.my_level === 'manage'
-    formTitle.textContent = row ? 'Dettaglio' : 'Nuovo elemento'
-    readonly.textContent = row && !canWrite ? 'Condiviso con te in sola lettura.' : row ? `Proprietario: ${row.owner_name}` : ''
+    formTitle.textContent = row ? tr('detail') : tr('newItem')
+    readonly.textContent = row && !canWrite ? tr('sharedReadOnly') : row ? tr('ownerIs', { name: row.owner_name }) : ''
     fieldsBox.replaceChildren(...visibleFields().map((f) => input(f, row?.values[f.key], !canWrite)))
     btnSave.hidden = !canWrite
     btnDel.hidden = !row || !canManage
     btnShare.hidden = !row || !canManage
-    btnCancel.textContent = row ? 'Chiudi' : 'Annulla'
+    btnCancel.textContent = row ? tr('close') : tr('cancel')
   }
 
   function collect(): Values {
@@ -207,7 +276,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
       const row = selectedRow()
       const saved = row ? await api.update(row.id, values) : await api.create(values)
       st.selected = saved.id
-      setMsg('salvato')
+      setMsg(tr('saved'))
       await load()
     }),
   )
@@ -215,10 +284,10 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     busy(async () => {
       const row = selectedRow()
       if (!row) return
-      if (!(await msk.confirm('Eliminare questo elemento?'))) return
+      if (!(await msk.confirm(tr('confirmDelete')))) return
       await api.remove(row.id)
       st.selected = null
-      setMsg('eliminato')
+      setMsg(tr('deleted'))
       await load()
     }),
   )
@@ -230,9 +299,18 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     }
   })
 
+  renderTexts()
+  renderForm()
+  // a new language of the host: the texts again, in the new language
+  const off = msk.onContext(() => {
+    renderTexts()
+    renderTable()
+    renderForm()
+  })
   void load()
   return () => {
     disposed = true
+    off()
     root.replaceChildren()
   }
 }

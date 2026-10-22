@@ -1,15 +1,15 @@
-// Tema della shell: preset (insieme di variabili CSS in index.css) e modo (chiaro, scuro, automatico).
-// Il preset non e' una scelta personale: lo decide il Tenant Manager per il tenant, o l'Administrator
-// per la piattaforma (e per i tenant che non ne scelgono uno), e arriva dal server. Il browser ricorda
-// l'ultimo usato solo per la pagina di accesso. Il modo e' di ciascuno.
+// Theme of the shell: preset (set of CSS variables in index.css) and mode (light, dark, automatic).
+// The preset is not a personal choice: the Tenant Manager decides it for the tenant, or the Administrator
+// for the platform (and for the tenants that do not choose one), and it comes from the server. The browser
+// remembers the last one used only for the sign-in page. The mode is everyone's own.
 
 import { useSyncExternalStore } from 'react'
 
 export type Mode = 'light' | 'dark' | 'auto'
 export const PRESETS = [
-  { id: 'mosaikit', name: 'Mosaikit', note: 'i colori di Microsoft Teams' },
-  { id: 'italia', name: 'Italia', note: 'Designers Italia, per i tenant della PA' },
-  { id: 'tessera', name: 'Tessera', note: 'i colori del logo' },
+  { id: 'mosaikit', name: 'Mosaikit', note: 'the colours of Microsoft Teams' },
+  { id: 'italia', name: 'Italia', note: 'Designers Italia, for public administration tenants' },
+  { id: 'tessera', name: 'Tessera', note: 'the colours of the logo' },
 ] as const
 export type PresetId = (typeof PRESETS)[number]['id']
 
@@ -35,7 +35,7 @@ let current = read()
 const listeners = new Set<() => void>()
 const media = window.matchMedia('(prefers-color-scheme: dark)')
 
-/** Applica il tema a <html>: `data-preset` e classe `dark`. */
+/** Applies the theme to <html>: `data-preset` and class `dark`. */
 export function applyTheme() {
   const dark = effectiveMode() === 'dark'
   document.documentElement.dataset.preset = current.preset
@@ -43,17 +43,17 @@ export function applyTheme() {
   document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
 }
 
-/** Il modo in uso: con `auto` quello del sistema. */
+/** The mode in use: with `auto` the one of the system. */
 export function effectiveMode(t: Theme = current): 'light' | 'dark' {
   return t.mode === 'dark' || (t.mode === 'auto' && media.matches) ? 'dark' : 'light'
 }
 
-/** Il modo scelto dalla persona. */
+/** The mode chosen by the person. */
 export function setTheme(t: Partial<Pick<Theme, 'mode'>>) {
   update(t)
 }
 
-/** Il preset in uso, da quello che dice il server (tenant o piattaforma); sconosciuto: quello di base. */
+/** The preset in use, from what the server says (tenant or platform); unknown: the base one. */
 export function setPreset(id: string | undefined) {
   if (!id) return
   const preset: PresetId = PRESETS.some((p) => p.id === id) ? (id as PresetId) : 'mosaikit'
@@ -65,7 +65,7 @@ function update(t: Partial<Theme>) {
   try {
     localStorage.setItem(KEY, JSON.stringify(current))
   } catch {
-    /* storage non disponibile */
+    /* storage not available */
   }
   applyTheme()
   listeners.forEach((l) => l())

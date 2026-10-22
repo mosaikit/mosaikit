@@ -1,13 +1,13 @@
-# Server di una distribuzione Mosaikit + PostgreSQL.
-#   cargo xtask release docker                 # costruisce l'immagine mosaikit:<versione>
+# Server of a Mosaikit distribution + PostgreSQL.
+#   cargo xtask release docker                 # builds the image mosaikit:<version>
 #   MOSAIKIT_VERSION=1.0.0 docker compose -f deploy/compose.yml up -d
-# Una distribuzione (eventualmente con PostGIS):
-#   MOSAIKIT_IMAGE=prodotto POSTGRES_IMAGE=postgis/postgis:17-3.5-alpine docker compose ... up -d
-# App:   http://localhost:8080   (tenant system, utente admin, password MOSAIKIT_ADMIN_PASSWORD)
-# Plugin e contenuti: http://localhost:8081
-# In produzione metti un reverse proxy HTTPS davanti con DUE hostname
-# (es. gis.esempio.it -> 8080, plugins.esempio.it -> 8081) e imposta MOSAIKIT_URL
-# (anche con un percorso base, es. https://gis.esempio.it/mosaikit) e MOSAIKIT_PLUGIN_URL.
+# A distribution (possibly with PostGIS):
+#   MOSAIKIT_IMAGE=product POSTGRES_IMAGE=postgis/postgis:17-3.5-alpine docker compose ... up -d
+# App:   http://localhost:8080   (tenant system, user admin, password MOSAIKIT_ADMIN_PASSWORD)
+# Plugins and contents: http://localhost:8081
+# In production put an HTTPS reverse proxy in front with TWO hostnames
+# (e.g. gis.example.com -> 8080, plugins.example.com -> 8081) and set MOSAIKIT_URL
+# (with a base path too, e.g. https://gis.example.com/mosaikit) and MOSAIKIT_PLUGIN_URL.
 
 services:
   db:
@@ -34,11 +34,11 @@ services:
     environment:
       MOSAIKIT_DATABASE_URL: postgres://mosaikit_app:${MOSAIKIT_DB_PASSWORD:-cambia-anche-questa}@db:5432/mosaikit
       MOSAIKIT_ADMIN_PASSWORD: ${MOSAIKIT_ADMIN_PASSWORD:-cambiami-subito}
-      # indirizzo pubblico dell'app, con l'eventuale percorso base
+      # public address of the app, with an optional base path
       MOSAIKIT_URL: ${MOSAIKIT_URL:-http://localhost:8080}
-      # UI dei plugin, file e link pubblici: un'origine diversa (altro host o porta)
+      # plugin UIs, files and public links: a different origin (another host or port)
       MOSAIKIT_PLUGIN_URL: ${MOSAIKIT_PLUGIN_URL:-http://localhost:8081}
-      # dietro un reverse proxy: usa X-Forwarded-For per il limite ai tentativi di login
+      # behind a reverse proxy: use X-Forwarded-For for the limit on sign-in attempts
       MOSAIKIT_TRUST_PROXY: ${MOSAIKIT_TRUST_PROXY:-false}
     ports:
       - "${MOSAIKIT_HTTP_PORT:-8080}:8080"

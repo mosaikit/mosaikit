@@ -4,10 +4,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::{is_identifier, is_safe_path, Error, Result, Version};
 
-/// Versione dell'ABI WASM supportata dal kernel.
+/// Version of the WASM ABI supported by the kernel.
 pub const ABI_VERSION: u32 = 1;
 
-/// Colonne che l'host aggiunge a ogni tabella di un plugin.
+/// Columns the host adds to every table of a plugin.
 const RESERVED_FIELDS: &[&str] = &["resource_id", "tenant_id", "id", "owner", "my_level"];
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -35,14 +35,14 @@ pub struct Manifest {
     pub requires: Requires,
 }
 
-/// Requisiti del plugin verso l'installazione.
+/// Requirements of the plugin towards the installation.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Requires {
-    /// "postgres" se il plugin usa funzioni di PostgreSQL (es. PostGIS); vuoto = qualsiasi
+    /// "postgres" if the plugin uses PostgreSQL functions (e.g. PostGIS); empty = any
     #[serde(default)]
     pub database: Option<String>,
-    /// estensioni di PostgreSQL che devono essere installate nel database (es. postgis)
+    /// PostgreSQL extensions that must be installed in the database (e.g. postgis)
     #[serde(default)]
     pub extensions: Vec<String>,
 }
@@ -67,7 +67,7 @@ pub struct ResourceDecl {
     pub name: String,
     #[serde(default)]
     pub label: String,
-    /// Campo usato come titolo della risorsa (default: il primo campo text).
+    /// Field used as the title of the resource (default: the first text field).
     #[serde(default)]
     pub title_field: Option<String>,
     pub fields: Vec<FieldDecl>,
@@ -94,7 +94,7 @@ pub struct FieldDecl {
     pub multiline: bool,
     #[serde(default)]
     pub options: Vec<String>,
-    /// Campo calcolato (es. da un hook): non mostrato nei form.
+    /// Computed field (e.g. by a hook): not shown in forms.
     #[serde(default)]
     pub hidden: bool,
 }
@@ -123,10 +123,10 @@ impl FieldKind {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(deny_unknown_fields)]
 pub struct UiDecl {
-    /// Pagina della UI, relativa a `ui/` (default `index.html`).
+    /// Page of the UI, relative to `ui/` (default `index.html`).
     #[serde(default = "default_entry")]
     pub entry: String,
-    /// Visualizzatore per i link pubblici, relativo a `ui/`.
+    /// Viewer for the public links, relative to `ui/`.
     #[serde(default)]
     pub public_view: Option<String>,
 }
@@ -138,23 +138,23 @@ fn default_entry() -> String {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Permissions {
-    /// Risorse su cui il plugin riceve gli hook WASM.
+    /// Resources on which the plugin receives the WASM hooks.
     #[serde(default)]
     pub hooks: Vec<String>,
-    /// API file e cartelle con contenuto su disco.
+    /// File and folder API with content on disk.
     #[serde(default)]
     pub files: bool,
-    /// Contenuto a cartella caricato da zip (es. siti statici).
+    /// Folder content uploaded from a zip (e.g. static sites).
     #[serde(default)]
     pub content: bool,
-    /// Origini raggiungibili da `http.fetch` e dalla UI (`connect-src`).
+    /// Origins reachable by `http.fetch` and by the UI (`connect-src`).
     #[serde(default)]
     pub network: Vec<String>,
-    /// Origini che la UI puo' incorporare in un iframe.
+    /// Origins the UI may embed in an iframe.
     #[serde(default)]
     pub frame_src: Vec<String>,
-    /// Plugin di cui la logica puo' chiamare i comandi (`plugin.call`), con l'utente
-    /// corrente: il plugin chiamato applica le proprie regole.
+    /// Plugins whose commands the logic may call (`plugin.call`), with the current
+    /// user: the called plugin applies its own rules.
     #[serde(default)]
     pub calls: Vec<String>,
 }
@@ -177,7 +177,7 @@ impl Manifest {
         Version::parse(&self.version).unwrap_or(Version(0, 0, 0))
     }
 
-    /// Nome dello schema PostgreSQL del plugin.
+    /// Name of the PostgreSQL schema of the plugin.
     pub fn schema_name(&self) -> String {
         schema_name(&self.id)
     }
@@ -189,75 +189,75 @@ impl Manifest {
     pub fn validate(&self) -> Result<()> {
         let bad = |m: String| Err(Error::Manifest(m));
         if !is_plugin_id(&self.id) {
-            return bad(format!("id '{}' non valido (es. com.azienda.nome)", self.id));
+            return bad(format!("invalid id '{}' (e.g. com.company.name)", self.id));
         }
         if self.name.trim().is_empty() {
-            return bad("name obbligatorio".into());
+            return bad("name required".into());
         }
         if Version::parse(&self.version).is_none() {
-            return bad(format!("version '{}' non e' MAJOR.MINOR.PATCH", self.version));
+            return bad(format!("version '{}' is not MAJOR.MINOR.PATCH", self.version));
         }
         if Version::parse(&self.min_kernel).is_none() {
-            return bad(format!("min_kernel '{}' non e' MAJOR.MINOR.PATCH", self.min_kernel));
+            return bad(format!("min_kernel '{}' is not MAJOR.MINOR.PATCH", self.min_kernel));
         }
         if self.abi != ABI_VERSION {
-            return bad(format!("abi {} non supportata (il kernel supporta {ABI_VERSION})", self.abi));
+            return bad(format!("abi {} not supported (the kernel supports {ABI_VERSION})", self.abi));
         }
         if self.contribution.label.trim().is_empty() || self.contribution.icon.trim().is_empty() {
-            return bad("contribution.icon e contribution.label obbligatori".into());
+            return bad("contribution.icon and contribution.label required".into());
         }
         let mut names = std::collections::HashSet::new();
         for r in &self.resources {
             if !is_identifier(&r.name) || r.name.starts_with("kpi_") {
-                return bad(format!("nome risorsa '{}' non valido", r.name));
+                return bad(format!("invalid resource name '{}'", r.name));
             }
             if !names.insert(r.name.as_str()) {
-                return bad(format!("risorsa '{}' duplicata", r.name));
+                return bad(format!("duplicate resource '{}'", r.name));
             }
             if r.fields.is_empty() {
-                return bad(format!("la risorsa '{}' non ha campi", r.name));
+                return bad(format!("the resource '{}' has no fields", r.name));
             }
             let mut keys = std::collections::HashSet::new();
             for f in &r.fields {
                 if !is_identifier(&f.key) || RESERVED_FIELDS.contains(&f.key.as_str()) {
-                    return bad(format!("campo '{}.{}' non valido o riservato", r.name, f.key));
+                    return bad(format!("field '{}.{}' invalid or reserved", r.name, f.key));
                 }
                 if !keys.insert(f.key.as_str()) {
-                    return bad(format!("campo '{}.{}' duplicato", r.name, f.key));
+                    return bad(format!("duplicate field '{}.{}'", r.name, f.key));
                 }
                 if f.kind == FieldKind::Choice && f.options.is_empty() {
-                    return bad(format!("il campo choice '{}.{}' non ha options", r.name, f.key));
+                    return bad(format!("the choice field '{}.{}' has no options", r.name, f.key));
                 }
             }
             if let Some(t) = &r.title_field {
                 if !r.fields.iter().any(|f| &f.key == t) {
-                    return bad(format!("title_field '{t}' non esiste in '{}'", r.name));
+                    return bad(format!("title_field '{t}' does not exist in '{}'", r.name));
                 }
             }
         }
         for h in &self.permissions.hooks {
             if self.resource(h).is_none() {
-                return bad(format!("hook su risorsa inesistente '{h}'"));
+                return bad(format!("hook on a resource that does not exist '{h}'"));
             }
         }
         for o in self.permissions.network.iter().chain(&self.permissions.frame_src) {
             if !is_origin(o) {
-                return bad(format!("origine '{o}' non valida (es. https://esempio.it)"));
+                return bad(format!("invalid origin '{o}' (e.g. https://example.com)"));
             }
         }
         for c in &self.permissions.calls {
             if !is_plugin_id(c) || c == &self.id {
-                return bad(format!("permissions.calls: id '{c}' non valido"));
+                return bad(format!("permissions.calls: invalid id '{c}'"));
             }
         }
         if let Some(db) = &self.requires.database {
             if db != "postgres" {
-                return bad(format!("requires.database '{db}' non valido (solo \"postgres\")"));
+                return bad(format!("requires.database '{db}' invalid (only \"postgres\")"));
             }
         }
         for e in &self.requires.extensions {
             if !is_identifier(e) {
-                return bad(format!("requires.extensions: nome '{e}' non valido"));
+                return bad(format!("requires.extensions: invalid name '{e}'"));
             }
             if self.requires.database.is_none() {
                 return bad("requires.extensions richiede requires.database = \"postgres\"".into());
@@ -265,19 +265,19 @@ impl Manifest {
         }
         if let Some(ui) = &self.ui {
             if !is_safe_path(&ui.entry) || ui.public_view.as_deref().is_some_and(|p| !is_safe_path(p)) {
-                return bad("percorsi ui non validi".into());
+                return bad("invalid ui paths".into());
             }
         }
         for k in &self.kpi {
             if !k.view.starts_with("kpi_") || !is_identifier(&k.view) {
-                return bad(format!("vista KPI '{}' deve chiamarsi kpi_*", k.view));
+                return bad(format!("KPI view '{}' must be called kpi_*", k.view));
             }
         }
         Ok(())
     }
 }
 
-/// `com.azienda.nome`: almeno due segmenti, minuscole, cifre e `-`.
+/// `com.company.name`: at least two segments, lower case, digits and `-`.
 pub fn is_plugin_id(id: &str) -> bool {
     let parts: Vec<&str> = id.split('.').collect();
     id.len() <= 64
@@ -289,7 +289,7 @@ pub fn is_plugin_id(id: &str) -> bool {
         })
 }
 
-/// Schema PostgreSQL di un plugin: `plg_` + id sanificato (max 63 caratteri).
+/// PostgreSQL schema of a plugin: `plg_` + sanitized id (max 63 characters).
 pub fn schema_name(id: &str) -> String {
     let s: String = id.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect();
     let mut name = format!("plg_{s}");
@@ -323,7 +323,7 @@ mod tests {
         [[resources]]
         name = "notes"
         fields = [
-          { key = "title", label = "Titolo", kind = "text", required = true },
+          { key = "title", label = "Title", kind = "text", required = true },
           { key = "tag", label = "Tag", kind = "choice", options = ["a", "b"] },
         ]
         [permissions]
@@ -331,7 +331,7 @@ mod tests {
         frame_src = ["https://web.geolibre.app"]
         [[kpi]]
         view = "kpi_notes_by_tag"
-        label = "Note per tag"
+        label = "Notes by tag"
     "#;
 
     #[test]
@@ -343,7 +343,7 @@ mod tests {
     }
 
     #[test]
-    fn errori_di_validazione() {
+    fn validation_errors() {
         let bad_id = NOTES.replace(r#"id = "com.mosaikit.notes""#, r#"id = "notes""#);
         assert!(Manifest::from_toml(&bad_id).is_err());
         let bad_version = NOTES.replace(r#"version = "0.3.0""#, r#"version = "1.0""#);
@@ -356,7 +356,7 @@ mod tests {
         assert!(Manifest::from_toml(&bad_origin).is_err());
         let bad_kpi = NOTES.replace("kpi_notes_by_tag", "notes_by_tag");
         assert!(Manifest::from_toml(&bad_kpi).is_err());
-        let unknown = format!("{NOTES}\nsconosciuto = 1");
+        let unknown = format!("{NOTES}\nunknown = 1");
         assert!(Manifest::from_toml(&unknown).is_err());
     }
 
@@ -364,7 +364,7 @@ mod tests {
     fn plugin_id() {
         assert!(is_plugin_id("com.mosaikit.static-site"));
         assert!(!is_plugin_id("Com.X"));
-        assert!(!is_plugin_id("solo"));
+        assert!(!is_plugin_id("single"));
         assert!(!is_plugin_id("a..b"));
     }
 }

@@ -1,15 +1,15 @@
-// Il simbolo di Mosaikit (docs/logo): nove tessere, quella in alto a destra sollevata in giallo fuori dal
-// suo posto tratteggiato, un plugin che entra. Positivo (tessere bordeaux) sulle superfici chiare,
-// negativo (tessere crema) su quelle scure: la barra in alto e il pannello dell'accesso, sempre scuri,
-// usano il negativo. I colori sono quelli del marchio, non del tema. Un logo del marchio (brand.toml)
-// prende il posto del simbolo, anche nella favicon.
+// The symbol of Mosaikit (docs/logo): nine tiles, the one at the top right lifted in yellow out of its
+// dashed place, a plugin going in. Positive (burgundy tiles) on light surfaces, negative (cream tiles)
+// on dark ones: the top bar and the sign-in panel, always dark, use the negative. The colours are the
+// ones of the brand, not of the theme. A brand logo (brand.toml) takes the place of the symbol, in the
+// favicon too.
 
 import { useEffect } from 'react'
 import { useBrand } from '../brand.ts'
 
 export type MarkVariant = 'positive' | 'negative'
 
-/** La parte dei disegni da 512 di docs/logo che contiene il simbolo. */
+/** The part of the 512 drawings of docs/logo that holds the symbol. */
 const VIEW = '70 44 398 398'
 const TILES: Record<MarkVariant, string[]> = {
   positive: ['#8A1C2B', '#A8293A', '#6E1522', '#8A1C2B', '#A8293A', '#6E1522', '#8A1C2B', '#A8293A'],
@@ -26,14 +26,14 @@ const AT = [
   [326, 326],
 ]
 
-/** Il simbolo in SVG; `slot` false toglie il posto tratteggiato (a 16 px diventa una macchia). */
+/** The symbol in SVG; `slot` false removes the dashed place (at 16 px it becomes a blot). */
 export function markSvg(variant: MarkVariant, slot = true): string {
   const tiles = AT.map(([x, y], i) => `<rect x="${x}" y="${y}" width="104" height="104" rx="14" fill="${TILES[variant][i]}"/>`).join('')
   const dashed = slot ? '<rect x="326" y="82" width="104" height="104" rx="14" fill="none" stroke="#C9707C" stroke-width="5" stroke-dasharray="14 10"/>' : ''
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${VIEW}">${tiles}${dashed}<rect x="352" y="56" width="104" height="104" rx="14" fill="#F0B23A"/></svg>`
 }
 
-/** La favicon: il simbolo positivo, o il logo del marchio. */
+/** The favicon: the positive symbol, or the brand logo. */
 export function useFavicon() {
   const brand = useBrand()
   useEffect(() => {

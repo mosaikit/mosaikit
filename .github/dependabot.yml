@@ -5,7 +5,7 @@ updates:
     schedule:
       interval: weekly
     groups:
-      # aggiornamenti minori e patch insieme; le major (es. sqlx, wasmi, zip) una alla volta
+      # minor updates and patches together; the major ones (e.g. sqlx, wasmi, zip) one at a time
       minor-e-patch:
         update-types: [minor, patch]
   - package-ecosystem: npm

@@ -1,7 +1,7 @@
 use std::cmp::Ordering;
 use std::fmt;
 
-/// Versione semantica `MAJOR.MINOR.PATCH` (senza pre-release).
+/// Semantic version `MAJOR.MINOR.PATCH` (without pre-release).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Version(pub u64, pub u64, pub u64);
 
@@ -38,7 +38,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn parse_e_confronto() {
+    fn parse_and_compare() {
         assert_eq!(Version::parse("1.2.3"), Some(Version(1, 2, 3)));
         assert!(Version::parse("1.2").is_none());
         assert!(Version::parse("1.2.3.4").is_none());

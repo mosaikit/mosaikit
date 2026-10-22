@@ -1,5 +1,5 @@
-// UI del plugin {{label}}: gira in un iframe su un'origine separata e parla con
-// l'host solo tramite @mosaikit/plugin-api (niente fetch diretti, niente token).
+// UI of the plugin {{label}}: it runs in an iframe on a separate origin and talks to
+// the host only through @mosaikit/plugin-api (no direct fetch, no tokens).
 
 import '@mosaikit/plugin-api/style.css'
 import { connect, errText, mountCrud } from '@mosaikit/plugin-api'
@@ -8,11 +8,11 @@ const app = document.getElementById('app')!
 
 async function main() {
   const msk = await connect()
-  // CRUD generico guidato dal manifest; per una UI su misura usa msk.crud('{{table}}'),
-  // msk.call('{{table}}.riepilogo') e msk.share(id) (finestra di condivisione dell'host).
+  // generic CRUD driven by the manifest; for a custom UI use msk.crud('{{table}}'),
+  // msk.call('{{table}}.summary') and msk.share(id) (share dialog of the host).
   mountCrud(app, msk, '{{table}}', { title: '{{label}}' })
 }
 
 main().catch((e) => {
-  app.textContent = 'Impossibile avviare la UI del plugin: ' + errText(e)
+  app.textContent = 'Cannot start the UI of the plugin: ' + errText(e)
 })

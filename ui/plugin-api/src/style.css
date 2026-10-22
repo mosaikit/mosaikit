@@ -1,7 +1,7 @@
 @import '@fontsource-variable/bricolage-grotesque';
 @import '@fontsource-variable/jetbrains-mono';
 
-/* Stile di base delle UI dei plugin. I valori arrivano dall'host (tema). */
+/* Base style of the plugin UIs. The values come from the host (theme). */
 :root {
   --bg: #0b0c0f;
   --panel: #14161b;

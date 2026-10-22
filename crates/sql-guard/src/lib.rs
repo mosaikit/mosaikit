@@ -1,11 +1,11 @@
-//! Whitelist SQL per i plugin.
+//! SQL whitelist for the plugins.
 //!
-//! E' la **seconda** difesa: la prima sono il ruolo PostgreSQL del plugin
-//! (nessun privilegio fuori dal suo schema) e la Row-Level Security. Il guard
-//! impedisce in anticipo istruzioni che non hanno motivo di esistere in un
-//! plugin (`SET`, `COPY`, funzioni di sistema, altri schemi...) e restituisce
-//! l'SQL ri-serializzato dall'AST: viene eseguito esattamente cio' che e' stato
-//! analizzato.
+//! It is the **second** defence: the first are the PostgreSQL role of the plugin
+//! (no privilege outside its schema) and Row-Level Security. The guard
+//! stops in advance statements that have no reason to exist in a
+//! plugin (`SET`, `COPY`, system functions, other schemas...) and returns
+//! the SQL serialized again from the AST: exactly what was analysed
+//! is run.
 
 use std::ops::ControlFlow;
 
@@ -20,21 +20,21 @@ use sqlparser::parser::Parser;
 
 #[derive(Debug, thiserror::Error, PartialEq)]
 pub enum GuardError {
-    #[error("SQL non valido: {0}")]
+    #[error("invalid SQL: {0}")]
     Parse(String),
-    #[error("una sola istruzione per chiamata")]
+    #[error("one statement per call only")]
     MultipleStatements,
-    #[error("istruzione non ammessa nei plugin: {0}")]
+    #[error("statement not allowed in plugins: {0}")]
     Statement(String),
-    #[error("oggetto non accessibile ai plugin: {0}")]
+    #[error("object not accessible to plugins: {0}")]
     Relation(String),
-    #[error("funzione non ammessa nei plugin: {0}")]
+    #[error("function not allowed in plugins: {0}")]
     Function(String),
 }
 
 pub type Result<T> = std::result::Result<T, GuardError>;
 
-/// Tipo di istruzione ammessa a runtime.
+/// Kind of statement allowed at runtime.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Kind {
     Select,
@@ -46,9 +46,9 @@ pub enum Kind {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Checked {
     pub kind: Kind,
-    /// `INSERT/UPDATE/DELETE ... RETURNING`: produce righe
+    /// `INSERT/UPDATE/DELETE ... RETURNING`: produces rows
     pub returning: bool,
-    /// SQL ri-serializzato dall'AST
+    /// SQL serialized again from the AST
     pub sql: String,
 }
 
@@ -58,11 +58,11 @@ impl Checked {
     }
 }
 
-/// Oggetti dello schema `core` che i plugin possono leggere.
+/// Objects of the `core` schema the plugins may read.
 const CORE_RELATIONS: &[&str] = &["visible_resources"];
-/// Funzioni dello schema `core` che i plugin possono chiamare.
+/// Functions of the `core` schema the plugins may call.
 const CORE_FUNCTIONS: &[&str] = &["can_access", "level_of", "ctx_user", "ctx_tenant"];
-/// Funzioni vietate (oltre a tutte quelle `pg_*`).
+/// Forbidden functions (besides all the `pg_*` ones).
 const DENIED_FUNCTIONS: &[&str] = &[
     "set_config",
     "current_setting",
@@ -90,7 +90,7 @@ fn ident(s: &str) -> String {
     s.to_ascii_lowercase()
 }
 
-/// Verifica un nome di relazione (tabella, vista, CTE, funzione di tabella).
+/// Checks a relation name (table, view, CTE, table function).
 fn check_relation(name: &ObjectName, schema: &str) -> Result<()> {
     let parts: Vec<String> = name.0.iter().map(|i| ident(&i.value)).collect();
     let ok = match parts.as_slice() {
@@ -106,7 +106,7 @@ fn check_relation(name: &ObjectName, schema: &str) -> Result<()> {
     }
 }
 
-/// Verifica un nome di oggetto creato/modificato da una migrazione: solo nel proprio schema.
+/// Checks the name of an object created/changed by a migration: only in its own schema.
 fn check_own_object(name: &ObjectName, schema: &str) -> Result<()> {
     let parts: Vec<String> = name.0.iter().map(|i| ident(&i.value)).collect();
     let ok = match parts.as_slice() {
@@ -136,7 +136,7 @@ fn check_function(name: &ObjectName, schema: &str) -> Result<()> {
     }
 }
 
-/// Controlla tutte le relazioni e le funzioni referenziate da un'istruzione.
+/// Checks every relation and function referenced by a statement.
 fn check_references(stmt: &Statement, schema: &str) -> Result<()> {
     let mut err = None;
     let _ = visit_relations(stmt, |rel| match check_relation(rel, schema) {
@@ -191,18 +191,18 @@ fn check_dml(stmt: &Statement, schema: &str) -> Result<Checked> {
     Ok(Checked { kind, returning, sql: stmt.to_string() })
 }
 
-/// Istruzione inviata da un plugin a runtime: una sola, solo DML.
+/// Statement sent by a plugin at runtime: one only, DML only.
 pub fn check_query(sql: &str, schema: &str) -> Result<Checked> {
     let stmts = parse(sql)?;
     match stmts.as_slice() {
         [one] => check_dml(one, schema),
-        [] => Err(GuardError::Parse("istruzione vuota".into())),
+        [] => Err(GuardError::Parse("empty statement".into())),
         _ => Err(GuardError::MultipleStatements),
     }
 }
 
-/// File di migrazione di un plugin: DDL limitato al proprio schema + DML.
-/// Ritorna le istruzioni ri-serializzate, da eseguire una alla volta.
+/// Migration file of a plugin: DDL limited to its own schema + DML.
+/// Returns the statements serialized again, to run one at a time.
 pub fn check_migration(sql: &str, schema: &str) -> Result<Vec<String>> {
     let stmts = parse(sql)?;
     let mut out = Vec::with_capacity(stmts.len());
@@ -299,7 +299,7 @@ mod tests {
     const S: &str = "plg_com_test_notes";
 
     #[test]
-    fn dml_ammesso() {
+    fn allowed_dml() {
         let c = check_query("select tag, count(*) n from notes where tag = $1 group by tag", S).unwrap();
         assert_eq!(c.kind, Kind::Select);
         assert!(c.produces_rows());
@@ -320,7 +320,7 @@ mod tests {
     }
 
     #[test]
-    fn istruzioni_vietate() {
+    fn forbidden_statements() {
         for sql in [
             "set role postgres",
             "reset role",
@@ -331,18 +331,18 @@ mod tests {
             "grant select on notes to public",
             "listen x",
             "select 1; select 2",
-            "select * into nuova from notes",
+            "select * into new_table from notes",
         ] {
-            assert!(check_query(sql, S).is_err(), "doveva essere rifiutato: {sql}");
+            assert!(check_query(sql, S).is_err(), "should have been refused: {sql}");
         }
     }
 
     #[test]
-    fn oggetti_e_funzioni_vietati() {
+    fn forbidden_objects_and_functions() {
         for sql in [
             "select * from core.users",
             "select * from core.session_ctx",
-            "select * from plg_altro.notes",
+            "select * from plg_other.notes",
             "select * from pg_catalog.pg_authid",
             "select * from pg_stat_activity",
             "select * from information_schema.tables",
@@ -358,12 +358,12 @@ mod tests {
             "select * from (select * from core.users) x",
             "select (select password_hash from core.users limit 1)",
         ] {
-            assert!(check_query(sql, S).is_err(), "doveva essere rifiutato: {sql}");
+            assert!(check_query(sql, S).is_err(), "should have been refused: {sql}");
         }
     }
 
     #[test]
-    fn migrazioni() {
+    fn migrations() {
         let ok = check_migration(
             "create table readings (resource_id uuid not null, tenant_id uuid not null, temp double precision);
              create index on readings (resource_id);
@@ -394,7 +394,7 @@ mod tests {
             "create table t (a text default current_setting('x'))",
             "create temporary table t (a int)",
         ] {
-            assert!(check_migration(sql, S).is_err(), "doveva essere rifiutato: {sql}");
+            assert!(check_migration(sql, S).is_err(), "should have been refused: {sql}");
         }
     }
 }

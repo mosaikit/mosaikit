@@ -1,6 +1,6 @@
-//! Icona nell'area di notifica di Windows e ciclo dei messaggi.
+//! Icon in the Windows notification area and message loop.
 
-#![allow(unsafe_code)] // API Win32: ciclo dei messaggi e MessageBox
+#![allow(unsafe_code)] // Win32 API: message loop and MessageBox
 
 use std::sync::mpsc::{Receiver, TryRecvError};
 use std::time::Duration;
@@ -21,16 +21,16 @@ fn wide(s: &str) -> Vec<u16> {
 pub fn message_box(title: &str, text: &str, error: bool) {
     let (t, x) = (wide(title), wide(text));
     let flags = MB_OK | if error { MB_ICONERROR } else { MB_ICONINFORMATION };
-    // SAFETY: stringhe UTF-16 terminate da zero, vive fino al ritorno della chiamata.
+    // SAFETY: zero-terminated UTF-16 strings, alive until the call returns.
     unsafe {
         MessageBoxW(std::ptr::null_mut(), x.as_ptr(), t.as_ptr(), flags);
     }
 }
 
-/// Usa la console del terminale da cui e' stato lanciato l'eseguibile (che non ha
-/// una console propria): l'output dei comandi di amministrazione appare li'.
+/// Uses the console of the terminal the executable was started from (it has no
+/// console of its own): the output of the administration commands appears there.
 pub fn attach_parent_console() {
-    // SAFETY: chiamata Win32 senza puntatori; se non c'e' un terminale non fa nulla.
+    // SAFETY: Win32 call without pointers; if there is no terminal it does nothing.
     unsafe {
         windows_sys::Win32::System::Console::AttachConsole(
             windows_sys::Win32::System::Console::ATTACH_PARENT_PROCESS,
@@ -38,8 +38,8 @@ pub fn attach_parent_console() {
     }
 }
 
-/// App pronta: al primo avvio si apre il browser, poi una notifica con l'indirizzo
-/// (un clic la apre). Con `open_browser = false` sempre e solo la notifica.
+/// App ready: at the first start the browser opens, then a notification with the address
+/// (a click opens it). With `open_browser = false` always and only the notification.
 fn announce(app: &App) {
     if app.first_run && app.open_browser {
         mosaikit_server::open_browser(&app.app_url);
@@ -47,17 +47,17 @@ fn announce(app: &App) {
         return;
     }
     if let Err(e) = crate::notify::ready(app) {
-        // senza notifiche (es. disattivate): si ripiega sul browser
-        tracing::warn!("notifica non mostrata: {e}");
+        // without notifications (e.g. turned off): fall back to the browser
+        tracing::warn!("notification not shown: {e}");
         if app.open_browser {
             mosaikit_server::open_browser(&app.app_url);
         }
     }
 }
 
-/// Smista i messaggi Windows in attesa (necessario per icona e menu).
+/// Dispatches the pending Windows messages (needed for icon and menu).
 fn pump(timeout: Duration) {
-    // SAFETY: chiamate Win32 standard sul thread che possiede l'icona; MSG e' POD.
+    // SAFETY: standard Win32 calls on the thread that owns the icon; MSG is POD.
     unsafe {
         MsgWaitForMultipleObjects(0, std::ptr::null(), 0, timeout.as_millis() as u32, QS_ALLINPUT);
         let mut msg: MSG = std::mem::zeroed();
@@ -73,11 +73,11 @@ fn open_file(p: &std::path::Path) {
 }
 
 pub fn run(app: &App, stop: tokio::sync::oneshot::Sender<()>, status: Receiver<Status>) {
-    let open = MenuItem::new(format!("Apri {}", app.name), true, None);
-    let creds = MenuItem::new("Credenziali iniziali", true, None);
-    let data = MenuItem::new("Cartella dei dati", true, None);
+    let open = MenuItem::new(format!("Open {}", app.name), true, None);
+    let creds = MenuItem::new("Initial credentials", true, None);
+    let data = MenuItem::new("Data folder", true, None);
     let log = MenuItem::new("Log", true, None);
-    let quit = MenuItem::new("Esci", true, None);
+    let quit = MenuItem::new("Quit", true, None);
     let menu = Menu::new();
     let sep = PredefinedMenuItem::separator();
     let sep2 = PredefinedMenuItem::separator();
@@ -94,33 +94,33 @@ pub fn run(app: &App, stop: tokio::sync::oneshot::Sender<()>, status: Receiver<S
             crate::fatal(&format!("menu: {e}"));
         }
     }
-    // icona del marchio (.ico) o quella di Mosaikit disegnata dal codice
+    // icon of the brand (.ico) or the Mosaikit one drawn in code
     let icon = app
         .icon
         .as_ref()
         .and_then(|p| Icon::from_path(p, Some((32, 32))).ok())
         .map(Ok)
         .unwrap_or_else(|| Icon::from_rgba(crate::icon::render(32), 32, 32))
-        .unwrap_or_else(|e| crate::fatal(&format!("icona: {e}")));
+        .unwrap_or_else(|e| crate::fatal(&format!("icon: {e}")));
     let tray = TrayIconBuilder::new()
         .with_menu(Box::new(menu))
-        .with_tooltip(format!("{} — avvio in corso…", app.name))
+        .with_tooltip(format!("{} — starting…", app.name))
         .with_icon(icon)
         .build()
-        .unwrap_or_else(|e| crate::fatal(&format!("icona nell'area di notifica: {e}")));
+        .unwrap_or_else(|e| crate::fatal(&format!("icon in the notification area: {e}")));
 
     let mut stop = Some(stop);
     let mut ready = false;
     let started = std::time::Instant::now();
     loop {
         pump(Duration::from_millis(100));
-        // avvio lento (primo avvio, PostgreSQL embedded): finestra con fase e spinner
+        // slow start (first start, embedded PostgreSQL): window with phase and spinner
         if !ready && stop.is_some() && started.elapsed() > Duration::from_millis(500) {
             crate::splash::show(app);
         }
         match status.try_recv() {
             Ok(Status::Progress(p)) => {
-                tracing::info!("avvio: {p}");
+                tracing::info!("start: {p}");
                 crate::splash::set_phase(&p);
             }
             Ok(Status::Ready) => {
@@ -132,11 +132,11 @@ pub fn run(app: &App, stop: tokio::sync::oneshot::Sender<()>, status: Receiver<S
             Ok(Status::Failed(e)) => {
                 crate::splash::close();
                 drop(tray);
-                crate::fatal(&format!("{e}\n\nDettagli nel log: {}", app.log_file.display()));
+                crate::fatal(&format!("{e}\n\nDetails in the log: {}", app.log_file.display()));
             }
             Ok(Status::Stopped(err)) => {
                 if let Some(e) = err {
-                    message_box(&app.name, &format!("Il server si e' fermato: {e}"), true);
+                    message_box(&app.name, &format!("The server stopped: {e}"), true);
                 }
                 break;
             }
@@ -165,7 +165,7 @@ pub fn run(app: &App, stop: tokio::sync::oneshot::Sender<()>, status: Receiver<S
                 } else {
                     message_box(
                         &app.name,
-                        "Il file con le credenziali iniziali non c'e' piu' (eliminato dopo il primo accesso).",
+                        "The file with the initial credentials is no longer there (deleted after the first sign-in).",
                         false,
                     );
                 }
@@ -174,13 +174,13 @@ pub fn run(app: &App, stop: tokio::sync::oneshot::Sender<()>, status: Receiver<S
             } else if ev.id == *log.id() {
                 open_file(&app.log_file);
             } else if ev.id == *quit.id() {
-                let _ = tray.set_tooltip(Some(format!("{} — arresto in corso…", app.name)));
+                let _ = tray.set_tooltip(Some(format!("{} — shutting down…", app.name)));
                 if let Some(tx) = stop.take() {
                     let _ = tx.send(());
                 }
                 if !ready {
-                    // ancora in avvio: si attende la fine dell'avvio, poi l'arresto
-                    tracing::info!("uscita richiesta durante l'avvio");
+                    // still starting: wait for the start to end, then shut down
+                    tracing::info!("quit requested during the start");
                 }
             }
         }

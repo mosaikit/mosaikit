@@ -1,4 +1,4 @@
-//! Link pubblici: sola lettura, scadenza, password facoltativa, token salvato come hash.
+//! Public links: read only, expiry, optional password, token stored as a hash.
 
 use chrono::{DateTime, Utc};
 use serde::Serialize;
@@ -25,7 +25,7 @@ pub struct LinkInfo {
 pub struct CreatedLink {
     #[serde(flatten)]
     pub info: LinkInfo,
-    /// mostrato solo alla creazione: il server conserva solo l'hash del token
+    /// shown only at creation: the server keeps only the hash of the token
     pub url: String,
 }
 
@@ -39,19 +39,21 @@ pub async fn create(
     let m = require_level(k, c, rid, Level::Manage).await?;
     let s = &c.tenant.settings;
     if !s.public_links_enabled {
-        return Err(Error::forbidden("i link pubblici sono disattivati per questo tenant"));
+        return Err(Error::forbidden("public links are turned off for this tenant"));
     }
-    // 0 o assente = la durata massima del tenant (o nessuna scadenza se il tenant non la limita)
+    // 0 or absent = the maximum lifetime of the tenant (or no expiry if the tenant does not limit it)
     let max = s.public_link_max_days;
     let days = match days {
         Some(0) | None => (max > 0).then_some(max),
         Some(d) if max > 0 && d > max => {
-            return Err(Error::bad(format!("durata massima consentita: {max} giorni")));
+            return Err(Error::bad(format!("maximum lifetime allowed: {max} days")));
         }
         Some(d) => Some(d),
     };
     let pw_hash = match password.map(str::trim).filter(|p| !p.is_empty()) {
-        Some(p) if p.chars().count() < 6 => return Err(Error::bad("password del link: almeno 6 caratteri")),
+        Some(p) if p.chars().count() < 6 => {
+            return Err(Error::bad("password of the link: at least 6 characters"))
+        }
         Some(p) => Some(hash_password(k, p).await?),
         None => None,
     };
@@ -122,7 +124,7 @@ pub async fn revoke(k: &Kernel, c: &Caller, link: Uuid) -> Result<()> {
         .bind(link)
         .fetch_optional(&k.db)
         .await?
-        .ok_or_else(|| Error::not_found("link non trovato"))?;
+        .ok_or_else(|| Error::not_found("link not found"))?;
     let m = require_level(k, c, rid, Level::Manage).await?;
     mosaikit_db::query("update core.public_links set revoked_at = now() where id = $1")
         .bind(link)
@@ -141,7 +143,7 @@ pub async fn revoke(k: &Kernel, c: &Caller, link: Uuid) -> Result<()> {
     Ok(())
 }
 
-/// Link pubblico risolto.
+/// Resolved public link.
 #[derive(Debug, Clone)]
 pub struct Resolved {
     pub link_id: Uuid,
@@ -161,7 +163,7 @@ impl Resolved {
 }
 
 pub async fn resolve(k: &Kernel, token: &str) -> Result<Resolved> {
-    let not_found = || Error::not_found("link non valido, scaduto o revocato");
+    let not_found = || Error::not_found("invalid, expired or revoked link");
     if token.len() != 48 || !token.chars().all(|c| c.is_ascii_hexdigit()) {
         return Err(not_found());
     }
@@ -200,7 +202,7 @@ pub async fn check_password(k: &Kernel, r: &Resolved, password: &str) -> Result<
     }
 }
 
-/// Valore del cookie che ricorda lo sblocco di un link con password.
+/// Value of the cookie that remembers the unlocking of a password-protected link.
 pub fn unlock_cookie_value(k: &Kernel, r: &Resolved) -> String {
     let mut data = k.cookie_secret.clone();
     data.extend_from_slice(format!(":{}:{}", r.link_id, r.password_hash.as_deref().unwrap_or("")).as_bytes());
@@ -216,7 +218,7 @@ pub async fn count_view(k: &Kernel, r: &Resolved) {
         .await;
 }
 
-/// Figli visibili tramite link (cartelle condivise pubblicamente).
+/// Children visible through a link (publicly shared folders).
 pub async fn children(k: &Kernel, r: &Resolved, parent: Uuid) -> Result<Vec<(Uuid, String, String, i64)>> {
     let mut tx = k.db.begin_plugin(&r.plugin_id, &r.ctx()).await?;
     let rows = mosaikit_db::query(
@@ -229,7 +231,7 @@ pub async fn children(k: &Kernel, r: &Resolved, parent: Uuid) -> Result<Vec<(Uui
     Ok(rows.iter().map(|r| (r.get(0), r.get(1), r.get(2), r.get(3))).collect())
 }
 
-/// Livello del link su una risorsa (1 se e' la risorsa del link o un suo discendente).
+/// Level of the link on a resource (1 if it is the resource of the link or one of its descendants).
 pub async fn covers(k: &Kernel, r: &Resolved, rid: Uuid) -> Result<bool> {
     let mut tx = k.db.begin(&r.ctx()).await?;
     let lvl: i32 =

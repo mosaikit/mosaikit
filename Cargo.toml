@@ -38,7 +38,7 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "serd
 sha2 = "0.10"
 hmac = "0.12"
 sha1 = "0.10"
-# QR code del secondo fattore (SVG, nessuna dipendenza grafica)
+# QR code of the second factor (SVG, no graphic dependency)
 qrcode = { version = "0.14", default-features = false, features = ["svg"] }
 hex = "0.4"
 base64 = "0.22"
@@ -47,7 +47,7 @@ ed25519-dalek = { version = "2", features = ["rand_core"] }
 argon2 = "0.5"
 zip = { version = "2", default-features = false, features = ["deflate"] }
 sqlparser = { version = "=0.52.0", features = ["visitor"] }
-# SQLite incluso nell'eseguibile (versione desktop): nessuna dipendenza esterna
+# SQLite included in the executable (desktop version): no external dependency
 rusqlite = { version = "0.32", features = ["bundled", "hooks", "functions", "column_decltype"] }
 wasmi = "0.40"
 axum = { version = "0.8", features = ["macros"] }
@@ -71,8 +71,8 @@ mosaikit-runtime = { path = "crates/runtime" }
 mosaikit-plugin-sdk = { path = "crates/plugin-sdk" }
 mosaikit-kernel = { path = "crates/kernel" }
 
-# in debug le dipendenze crittografiche e l'interprete WASM sono lentissimi:
-# ottimizzate anche nei build di sviluppo e di test
+# in debug the cryptographic dependencies and the WASM interpreter are very slow:
+# optimized in development and test builds too
 [profile.dev.package.argon2]
 opt-level = 3
 [profile.dev.package.blake2]

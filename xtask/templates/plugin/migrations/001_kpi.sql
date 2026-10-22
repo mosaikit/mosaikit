@@ -1,9 +1,9 @@
--- Migrazioni del plugin: girano con il ruolo del plugin, solo nel suo schema.
--- Ogni tabella deve avere `resource_id uuid not null` e `tenant_id uuid not null`
--- (default core.ctx_tenant()): l'host aggiunge FK e policy RLS.
--- Le viste kpi_* (con tenant_id) sono lette dai gestori e dall'amministratore.
+-- Migrations of the plugin: they run with the role of the plugin, only in its schema.
+-- Every table must have `resource_id uuid not null` and `tenant_id uuid not null`
+-- (default core.ctx_tenant()): the host adds FKs and RLS policies.
+-- The kpi_* views (with tenant_id) are read by the managers and by the administrator.
 
 create view kpi_{{table}}_by_status as
-  select tenant_id, coalesce(status, '(nessuno)') as stato, count(*) as elementi
+  select tenant_id, coalesce(status, '(none)') as status, count(*) as items
   from {{table}}
-  group by tenant_id, coalesce(status, '(nessuno)');
+  group by tenant_id, coalesce(status, '(none)');

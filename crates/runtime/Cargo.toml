@@ -1,6 +1,6 @@
 [package]
 name = "mosaikit-runtime"
-description = "Runtime WASM dei plugin Mosaikit (wasmi): fuel, limiti di memoria, ABI v1"
+description = "WASM runtime of Mosaikit plugins (wasmi): fuel, memory limits, ABI v1"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

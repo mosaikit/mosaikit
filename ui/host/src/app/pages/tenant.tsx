@@ -1,5 +1,5 @@
-// Pagine di un tenant: Home o panoramica, app (nell'iframe) e, per il Tenant Manager, la gestione del
-// tenant: Persone, Plugin, Condivisioni, Consumi e Impostazioni del tenant (docs/refactoring-ui.md §2).
+// Pages of a tenant: Home or overview, apps (in the iframe) and, for the Tenant Manager, the management of
+// the tenant: People, Plugins, Shares, Usage and Tenant settings (docs/refactoring-ui.md §2).
 
 import { useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -32,7 +32,7 @@ import { TenantTheme } from '../ThemeSettings.tsx'
 const enc = encodeURIComponent
 const ROLE: Record<string, string> = { tenant_manager: 'Tenant Manager', user: 'User' }
 
-/* ── Panoramica ──────────────────────────────────────────────────────── */
+/* ── Overview ────────────────────────────────────────────────────────── */
 
 export function TenantHome({ session, slug }: { session: Session; slug: string }) {
   const ctx = useTenantCtx(slug)
@@ -45,37 +45,37 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
   return (
     <>
       <PageHeader
-        title={c.tenant.role === 'tenant_manager' ? t('Panoramica del tenant') : t('Home')}
-        sub={`${t('Ciao')} ${session.user.display_name || session.user.username} · ${ROLE[c.tenant.role]} in ${c.tenant.name}`}
+        title={c.tenant.role === 'tenant_manager' ? t('Tenant overview') : t('Home')}
+        sub={`${t('Hello')} ${session.user.display_name || session.user.username} · ${ROLE[c.tenant.role]} in ${c.tenant.name}`}
       />
       <div className="grid gap-6 p-6 max-[620px]:p-4">
         {d && (
           <section className="grid gap-3">
-            <h2 className="text-sm font-semibold">{t('Il tuo spazio')}</h2>
+            <h2 className="text-sm font-semibold">{t('Your space')}</h2>
             <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3">
-              <Kpi label={t('Risorse tue')} value={mine} hint={fmtBytes(d.me.resources.reduce((s, r) => s + r.bytes, 0))} />
-              <Kpi label={t('Condivisi da me')} value={d.me.shared_by_me} />
-              <Kpi label={t('Condivisi con me')} value={d.me.shared_with_me} />
-              <Kpi label={t('Miei link pubblici attivi')} value={d.me.public_links} hint={t('{n} visite', { n: d.me.link_views })} />
+              <Kpi label={t('Your items')} value={mine} hint={fmtBytes(d.me.resources.reduce((s, r) => s + r.bytes, 0))} />
+              <Kpi label={t('Shared by me')} value={d.me.shared_by_me} />
+              <Kpi label={t('Shared with me')} value={d.me.shared_with_me} />
+              <Kpi label={t('My active public links')} value={d.me.public_links} hint={t('{n} views', { n: d.me.link_views })} />
             </div>
           </section>
         )}
         {d?.tenant && (
           <section className="grid gap-3">
-            <h2 className="text-sm font-semibold">Il tenant {c.tenant.name}</h2>
+            <h2 className="text-sm font-semibold">{t('The tenant {name}', { name: c.tenant.name })}</h2>
             <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3">
-              <Kpi label={t('Membri')} value={d.tenant.members} hint={`${d.tenant.guests} ospiti`} onClick={() => go(to.tenant(slug, 'manage'))} />
-              <Kpi label={t('Utenti attivi (30 gg)')} value={d.tenant.active_users_30d} />
-              <Kpi label={t('Risorse')} value={d.tenant.resources.reduce((s, r) => s + r.count, 0)} />
-              <Kpi label={t('Condivisioni')} value={d.tenant.shares} hint={`${d.tenant.public_links} link pubblici`} onClick={() => go(to.tenant(slug, 'shares'))} />
+              <Kpi label={t('Members')} value={d.tenant.members} hint={t('{count} guests', { count: d.tenant.guests })} onClick={() => go(to.tenant(slug, 'manage'))} />
+              <Kpi label={t('Active users (30 days)')} value={d.tenant.active_users_30d} />
+              <Kpi label={t('Items')} value={d.tenant.resources.reduce((s, r) => s + r.count, 0)} />
+              <Kpi label={t('Shares')} value={d.tenant.shares} hint={t('{count} public links', { count: d.tenant.public_links })} onClick={() => go(to.tenant(slug, 'shares'))} />
             </div>
           </section>
         )}
         <section className="grid gap-3">
-          <h2 className="text-sm font-semibold">{t('App')}</h2>
+          <h2 className="text-sm font-semibold">{t('Apps')}</h2>
           {c.plugins.length === 0 ? (
-            <Empty icon={<Grid2x2 />} title={t('Nessuna app attiva')}>
-              {t('Un Administrator le installa e le attiva.')}
+            <Empty icon={<Grid2x2 />} title={t('No active apps')}>
+              {t('An Administrator installs and turns them on.')}
             </Empty>
           ) : (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
@@ -99,9 +99,9 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
   )
 }
 
-/* ── Plugin ──────────────────────────────────────────────────────────── */
+/* ── Plugins ─────────────────────────────────────────────────────────── */
 
-/** In sviluppo il server avvisa quando un plugin cambia: l'iframe si ricarica (hot reload). */
+/** In development the server says when a plugin changes: the iframe reloads (hot reload). */
 function useDevReload(session: Session, slug: string): Record<string, number> {
   const qc = useQueryClient()
   const [reloads, setReloads] = useState<Record<string, number>>({})
@@ -114,10 +114,10 @@ function useDevReload(session: Session, slug: string): Record<string, number> {
         if (ev.type === 'plugin_changed') {
           setReloads((r) => ({ ...r, [ev.id]: (r[ev.id] ?? 0) + 1 }))
           if (ev.what === 'schema') void qc.invalidateQueries({ queryKey: ['ctx', slug] })
-          toast(`${ev.id}: ${ev.what === 'ui' ? t('interfaccia aggiornata') : ev.what === 'logic' ? t('logica aggiornata') : t('schema aggiornato')}`)
+          toast(`${ev.id}: ${ev.what === 'ui' ? t('interface updated') : ev.what === 'logic' ? t('logic updated') : t('schema updated')}`)
         } else if (ev.type === 'plugin_error') toast.error(`${ev.id}: ${ev.error}`)
       } catch {
-        /* evento non valido */
+        /* invalid event */
       }
     }
     return () => es.close()
@@ -127,20 +127,20 @@ function useDevReload(session: Session, slug: string): Record<string, number> {
 
 export function PluginPage({ session, slug, id }: { session: Session; slug: string; id: string }) {
   const ctx = useTenantCtx(slug)
-  // lingua, tema e modo della shell: arrivano al plugin all'avvio e a ogni cambio
+  // language, theme and mode of the shell: they reach the plugin at start and at every change
   const lang = useLang()
   const th = useTheme()
   const ui = { lang, preset: th.preset, mode: effectiveMode(th), preference: th.mode }
   const base = useUi()
   const reloads = useDevReload(session, slug)
   const [share, setShare] = useState<{ id: string; done: () => void } | null>(null)
-  // la condivisione chiesta dal plugin apre la finestra dell'host, che conosce il tenant
+  // the sharing asked by the plugin opens the dialog of the host, which knows the tenant
   const services = useMemo<Ui>(() => ({ ...base, share: (rid) => new Promise<void>((done) => setShare({ id: rid, done })) }), [base])
   if (ctx.isLoading) return <Loading />
   if (ctx.error) return <ErrorBox error={ctx.error} />
   const c: TenantContext = ctx.data!
   const p = c.plugins.find((x) => x.id === id)
-  if (!p) return <Empty title={t('App non attiva in questo tenant')} />
+  if (!p) return <Empty title={t('App not active in this tenant')} />
   return (
     <UiContext.Provider value={services}>
       <div className="relative flex-1 [&_.frame-msg]:absolute [&_.frame-msg]:inset-0 [&_.frame-msg]:flex [&_.frame-msg]:items-center [&_.frame-msg]:justify-center [&_.frame-msg]:text-sm [&_.frame-msg]:text-muted-foreground [&_.frame-wrap]:absolute [&_.frame-wrap]:inset-0 [&_iframe]:size-full [&_iframe]:border-0">
@@ -158,49 +158,49 @@ export function PluginPage({ session, slug, id }: { session: Session; slug: stri
   )
 }
 
-/* ── Persone ─────────────────────────────────────────────────────────── */
+/* ── People ──────────────────────────────────────────────────────────── */
 
 export function Manage({ slug, section }: { slug: string; section?: string }) {
   const base = `/api/t/${enc(slug)}/manage`
   const members = useApi<Member[]>(['members', slug], `${base}/members`)
   const groups = useApi<Group[]>(['groups', slug], `${base}/groups`)
   const invites = useApi<Invitation[]>(['invites', slug], `${base}/invitations`)
-  // In attesa: gli inviti (le richieste di accesso arriveranno con il kernel); i profili di permesso non
-  // ci sono ancora
+  // Pending: the invitations (access requests will come with the kernel); permission profiles are not
+  // there yet
   const cur = ['people', 'groups', 'pending'].includes(section ?? '') ? section! : 'people'
   const sections = [
-    { id: 'people', label: t('Persone'), icon: <Users />, count: members.data?.length },
-    { id: 'groups', label: t('Gruppi'), icon: <Grid2x2 />, count: groups.data?.length },
-    { id: 'pending', label: t('In attesa'), icon: <Mail />, count: invites.data?.filter((i) => i.status === 'pending').length },
+    { id: 'people', label: t('People'), icon: <Users />, count: members.data?.length },
+    { id: 'groups', label: t('Groups'), icon: <Grid2x2 />, count: groups.data?.length },
+    { id: 'pending', label: t('Pending'), icon: <Mail />, count: invites.data?.filter((i) => i.status === 'pending').length },
   ]
   const [dlg, setDlg] = useState<null | 'member' | 'group' | 'invite'>(null)
   const inval = [['members', slug], ['groups', slug], ['invites', slug], ['overview', slug]]
-  const create = useAction((v: Record<string, string>) => api('POST', `${base}/members`, v), { ok: (v) => t('Utente {username} creato', { username: v.username }), invalidate: inval })
-  const newGroup = useAction((v: Record<string, string>) => api('POST', `${base}/groups`, v), { ok: (v) => t('Gruppo {name} creato', { name: v.name }), invalidate: inval })
-  const invite = useAction((v: Record<string, string>) => api('POST', `${base}/invitations`, v), { ok: t('Invito inviato'), invalidate: inval })
+  const create = useAction((v: Record<string, string>) => api('POST', `${base}/members`, v), { ok: (v) => t('User {username} created', { username: v.username }), invalidate: inval })
+  const newGroup = useAction((v: Record<string, string>) => api('POST', `${base}/groups`, v), { ok: (v) => t('Group {name} created', { name: v.name }), invalidate: inval })
+  const invite = useAction((v: Record<string, string>) => api('POST', `${base}/invitations`, v), { ok: t('Invitation sent'), invalidate: inval })
   const action =
     cur === 'people' ? (
       <Button onClick={() => setDlg('member')}>
         <Plus />
-        {t('Nuovo utente')}
+        {t('New user')}
       </Button>
     ) : cur === 'groups' ? (
       <Button onClick={() => setDlg('group')}>
         <Plus />
-        {t('Nuovo gruppo')}
+        {t('New group')}
       </Button>
     ) : (
       <Button onClick={() => setDlg('invite')}>
         <Plus />
-        {t('Invita')}
+        {t('Invite')}
       </Button>
     )
   return (
     <>
       <PageHeader
-        title={t('Gestisci')}
-        crumbs={[{ label: t('Gestione del tenant') }]}
-        sub={{ people: `${members.data?.length ?? '…'} persone`, groups: `${groups.data?.length ?? '…'} gruppi`, pending: `${sections[2].count ?? '…'} inviti in attesa` }[cur]}
+        title={t('Manage')}
+        crumbs={[{ label: t('Tenant management') }]}
+        sub={{ people: t('{count} people', { count: members.data?.length ?? 0 }), groups: t('{count} groups', { count: groups.data?.length ?? 0 }), pending: t('{count} pending invitations', { count: sections[2].count ?? 0 }) }[cur]}
         actions={action}
       />
       <Sections sections={sections} current={cur} href={(id) => to.tenant(slug, 'manage', id)}>
@@ -211,36 +211,36 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
       <FormDialog
         open={dlg === 'member'}
         onOpenChange={(o) => !o && setDlg(null)}
-        title={t('Nuovo utente')}
-        description={t('Un account locale di questo tenant.')}
+        title={t('New user')}
+        description={t('A local account of this tenant.')}
         fields={[
           { name: 'username', label: t('Username'), required: true },
-          { name: 'display_name', label: t('Nome visualizzato') },
-          { name: 'password', label: t('Password iniziale'), type: 'password', required: true, hint: t('Almeno 10 caratteri') },
-          { name: 'role', label: t('Ruolo'), options: [['user', 'User'], ['tenant_manager', 'Tenant Manager']] },
+          { name: 'display_name', label: t('Display name') },
+          { name: 'password', label: t('Initial password'), type: 'password', required: true, hint: t('At least 10 characters') },
+          { name: 'role', label: t('Role'), options: [['user', 'User'], ['tenant_manager', 'Tenant Manager']] },
         ]}
-        submit={t('Crea utente')}
+        submit={t('Create user')}
         onSubmit={(v) => create.mutateAsync(v)}
       />
       <FormDialog
         open={dlg === 'group'}
         onOpenChange={(o) => !o && setDlg(null)}
-        title={t('Nuovo gruppo')}
-        fields={[{ name: 'name', label: t('Nome'), required: true }]}
-        submit={t('Crea gruppo')}
+        title={t('New group')}
+        fields={[{ name: 'name', label: t('Name'), required: true }]}
+        submit={t('Create group')}
         onSubmit={(v) => newGroup.mutateAsync(v)}
       />
       <FormDialog
         open={dlg === 'invite'}
         onOpenChange={(o) => !o && setDlg(null)}
-        title={t('Invita una persona di un altro tenant')}
-        description={t('Entra come ospite: accede dal suo tenant e qui riceve ruolo e gruppi.')}
+        title={t('Invite a person of another tenant')}
+        description={t('They join as a guest: they sign in from their tenant and get a role and groups here.')}
         fields={[
-          { name: 'tenant', label: t('Tenant di appartenenza'), required: true },
+          { name: 'tenant', label: t('Home tenant'), required: true },
           { name: 'username', label: t('Username'), required: true },
-          { name: 'role', label: t('Ruolo'), options: [['user', 'User'], ['tenant_manager', 'Tenant Manager']] },
+          { name: 'role', label: t('Role'), options: [['user', 'User'], ['tenant_manager', 'Tenant Manager']] },
         ]}
-        submit={t('Invia l’invito')}
+        submit={t('Send the invitation')}
         onSubmit={(v) => invite.mutateAsync(v)}
       />
     </>
@@ -256,15 +256,15 @@ function People({ slug, q }: { slug: string; q: Q<Member[]> }) {
   const [pwFor, setPwFor] = useState<Member | null>(null)
   const inval = [['members', slug], ['overview', slug]]
   const setRole = useAction(({ ids, role }: { ids: string[]; role: string }) => Promise.all(ids.map((id) => api('PUT', `${base}/${id}/role`, { role }))), {
-    ok: ({ ids }) => (ids.length === 1 ? t('Ruolo aggiornato') : t('Ruolo aggiornato per {n} persone', { n: ids.length })),
+    ok: ({ ids }) => (ids.length === 1 ? t('Role updated') : t('Role updated for {n} people', { n: ids.length })),
     invalidate: inval,
   })
   const [removing, setRemoving] = useState<Member | null>(null)
   const remove = useAction(({ id, newOwner }: { id: string; newOwner?: string }) => api('DELETE', `${base}/${id}${newOwner ? `?new_owner=${newOwner}` : ''}`), {
-    ok: t('Persona rimossa dal tenant'),
+    ok: t('Person removed from the tenant'),
     invalidate: [...inval, ['m-resources', slug]],
   })
-  const resetPw = useAction(({ id, password }: { id: string; password: string }) => api('POST', `${base}/${id}/password`, { password }), { ok: t('Password reimpostata') })
+  const resetPw = useAction(({ id, password }: { id: string; password: string }) => api('POST', `${base}/${id}/password`, { password }), { ok: t('Password reset') })
   const rows = useMemo(() => {
     const s = search.trim().toLowerCase()
     return (q.data ?? []).filter((m) => !s || `${m.username} ${m.display_name} ${m.home_tenant}`.toLowerCase().includes(s))
@@ -276,21 +276,21 @@ function People({ slug, q }: { slug: string; q: Q<Member[]> }) {
   return (
     <div className="grid gap-3">
       <div className="flex flex-wrap items-center gap-3">
-        <Input type="search" placeholder={t('Cerca per nome o username')} aria-label={t('Cerca per nome o username')} className="w-72 max-w-full" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <Input type="search" placeholder={t('Search by name or username')} aria-label={t('Search by name or username')} className="w-72 max-w-full" value={search} onChange={(e) => setSearch(e.target.value)} />
         {ids.length > 0 && (
-          // la barra delle azioni compare solo con una selezione
-          <div className="flex flex-wrap items-center gap-2 rounded-lg bg-primary/10 py-1 pr-1 pl-3" role="group" aria-label={t('Azioni sulla selezione')}>
-            <span className="text-sm font-medium tabular-nums">{ids.length === 1 ? '1 selezionata' : `${ids.length} selezionate`}</span>
+          // the action bar appears only with a selection
+          <div className="flex flex-wrap items-center gap-2 rounded-lg bg-primary/10 py-1 pr-1 pl-3" role="group" aria-label={t('Actions on the selection')}>
+            <span className="text-sm font-medium tabular-nums">{t('{count} selected', { count: ids.length })}</span>
             <Button variant="outline" size="sm" onClick={() => setRole.mutate({ ids, role: 'tenant_manager' })}>
               <ShieldCheck />
-              {t('Rendi Tenant Manager')}
+              {t('Make Tenant Manager')}
             </Button>
             <Button variant="outline" size="sm" onClick={() => setRole.mutate({ ids, role: 'user' })}>
               <UserRound />
-              {t('Rendi User')}
+              {t('Make User')}
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setSel(new Set())}>
-              {t('Deseleziona')}
+              {t('Deselect')}
             </Button>
           </div>
         )}
@@ -301,16 +301,16 @@ function People({ slug, q }: { slug: string; q: Q<Member[]> }) {
             <TableRow>
               <TableHead className="w-10">
                 <Checkbox
-                  aria-label={t('Seleziona tutto')}
+                  aria-label={t('Select all')}
                   checked={all ? true : ids.length ? 'indeterminate' : false}
                   onCheckedChange={(v) => setSel(v ? new Set(rows.map((r) => r.user_id)) : new Set())}
                 />
               </TableHead>
-              <TableHead>{t('Nome')}</TableHead>
-              <TableHead>{t('Ruolo')}</TableHead>
-              <TableHead>{t('Stato')}</TableHead>
-              <TableHead className="text-right">{t('Risorse')}</TableHead>
-              <TableHead>{t('Nel tenant dal')}</TableHead>
+              <TableHead>{t('Name')}</TableHead>
+              <TableHead>{t('Role')}</TableHead>
+              <TableHead>{t('Status')}</TableHead>
+              <TableHead className="text-right">{t('Items')}</TableHead>
+              <TableHead>{t('In the tenant since')}</TableHead>
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
@@ -319,7 +319,7 @@ function People({ slug, q }: { slug: string; q: Q<Member[]> }) {
               <TableRow key={m.user_id} data-state={sel.has(m.user_id) ? 'selected' : undefined}>
                 <TableCell>
                   <Checkbox
-                    aria-label={`Seleziona ${m.username}`}
+                    aria-label={t('Select {name}', { name: m.username })}
                     checked={sel.has(m.user_id)}
                     onCheckedChange={(v) => {
                       const n = new Set(sel)
@@ -360,19 +360,19 @@ function People({ slug, q }: { slug: string; q: Q<Member[]> }) {
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" aria-label={t('Azioni per {username}', { username: m.username })}>
+                      <Button variant="ghost" size="icon" aria-label={t('Actions for {username}', { username: m.username })}>
                         <MoreHorizontal />
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onSelect={() => setRole.mutate({ ids: [m.user_id], role: m.role === 'user' ? 'tenant_manager' : 'user' })}>
                         <ShieldCheck />
-                        {m.role === 'user' ? t('Rendi Tenant Manager') : t('Rendi User')}
+                        {m.role === 'user' ? t('Make Tenant Manager') : t('Make User')}
                       </DropdownMenuItem>
                       {!m.is_guest && (
                         <DropdownMenuItem onSelect={() => setPwFor(m)}>
                           <KeyRound />
-                          {t('Reimposta la password')}
+                          {t('Reset the password')}
                         </DropdownMenuItem>
                       )}
                       <DropdownMenuSeparator />
@@ -381,7 +381,7 @@ function People({ slug, q }: { slug: string; q: Q<Member[]> }) {
                         onSelect={() => setRemoving(m)}
                       >
                         <Trash2 />
-                        {t('Rimuovi dal tenant')}
+                        {t('Remove from the tenant')}
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -390,15 +390,15 @@ function People({ slug, q }: { slug: string; q: Q<Member[]> }) {
             ))}
           </TableBody>
         </Table>
-        {rows.length === 0 && <p className="p-6 text-center text-sm text-muted-foreground">{t('Nessuna persona trovata.')}</p>}
+        {rows.length === 0 && <p className="p-6 text-center text-sm text-muted-foreground">{t('No person found.')}</p>}
       </div>
       <FormDialog
         open={!!pwFor}
         onOpenChange={(o) => !o && setPwFor(null)}
-        title={t('Nuova password per {username}', { username: pwFor?.username ?? '' })}
-        description={t('Le sue sessioni aperte vengono chiuse.')}
-        fields={[{ name: 'password', label: t('Nuova password'), type: 'password', required: true, hint: t('Almeno 10 caratteri') }]}
-        submit={t('Reimposta')}
+        title={t('New password for {username}', { username: pwFor?.username ?? '' })}
+        description={t('Their open sessions are closed.')}
+        fields={[{ name: 'password', label: t('New password'), type: 'password', required: true, hint: t('At least 10 characters') }]}
+        submit={t('Reset')}
         onSubmit={(v) => resetPw.mutateAsync({ id: pwFor!.user_id, password: v.password })}
       />
       <RemoveDialog
@@ -412,8 +412,8 @@ function People({ slug, q }: { slug: string; q: Q<Member[]> }) {
   )
 }
 
-/** Rimozione dal tenant (mockup: dlg-remove-person): chi riceve gli elementi della persona e cosa
- *  succede al suo account. */
+/** Removal from the tenant (mockup: dlg-remove-person): who receives the items of the person and what
+ *  happens to their account. */
 function RemoveDialog({ member, members, busy, onConfirm, onClose }: { member: Member | null; members: Member[]; busy: boolean; onConfirm: (newOwner?: string) => void; onClose: () => void }) {
   const [owner, setOwner] = useState('')
   useEffect(() => setOwner(''), [member])
@@ -422,17 +422,17 @@ function RemoveDialog({ member, members, busy, onConfirm, onClose }: { member: M
     <Dialog open={!!member} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t('Rimuovi dal tenant')}</DialogTitle>
+          <DialogTitle>{t('Remove from the tenant')}</DialogTitle>
           <DialogDescription>{member && (member.display_name || member.username)}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 text-sm">
-          <p>{member?.is_guest ? t('È ospite: perde l’accesso a questo tenant, il suo account resta nel tenant di appartenenza.') : t('È il suo tenant di appartenenza: l’account viene disabilitato.')}</p>
+          <p>{member?.is_guest ? t('They are a guest: they lose access to this tenant, their account stays in their home tenant.') : t('It is their home tenant: the account is disabled.')}</p>
           {owns && (
             <div className="grid gap-1.5">
-              <Label htmlFor="rm-owner">{t('Chi riceve i suoi {count} elementi', { count: member!.owned_resources })}</Label>
+              <Label htmlFor="rm-owner">{t('Who gets their {count} items', { count: member!.owned_resources })}</Label>
               <Select value={owner} onValueChange={setOwner}>
                 <SelectTrigger id="rm-owner" className="w-full">
-                  <SelectValue placeholder={t('Scegli la persona…')} />
+                  <SelectValue placeholder={t('Choose the person…')} />
                 </SelectTrigger>
                 <SelectContent>
                   {members
@@ -448,10 +448,10 @@ function RemoveDialog({ member, members, busy, onConfirm, onClose }: { member: M
           )}
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={onClose}>
-              {t('Annulla')}
+              {t('Cancel')}
             </Button>
             <Button variant="destructive" disabled={busy || (owns && !owner)} onClick={() => onConfirm(owner || undefined)}>
-              {t('Rimuovi')}
+              {t('Remove')}
             </Button>
           </div>
         </div>
@@ -464,15 +464,15 @@ function Groups({ slug, q, members }: { slug: string; q: Q<Group[]>; members: Me
   const base = `/api/t/${enc(slug)}/manage/groups`
   const confirm = useConfirm()
   const inval = [['groups', slug]]
-  const del = useAction((id: string) => api('DELETE', `${base}/${id}`), { ok: t('Gruppo eliminato'), invalidate: inval })
-  const addMember = useAction(({ g, u }: { g: string; u: string }) => api('PUT', `${base}/${g}/members/${u}`), { ok: t('Aggiunto al gruppo'), invalidate: inval })
+  const del = useAction((id: string) => api('DELETE', `${base}/${id}`), { ok: t('Group deleted'), invalidate: inval })
+  const addMember = useAction(({ g, u }: { g: string; u: string }) => api('PUT', `${base}/${g}/members/${u}`), { ok: t('Added to the group'), invalidate: inval })
   const rmMember = useAction(({ g, u }: { g: string; u: string }) => api('DELETE', `${base}/${g}/members/${u}`), { invalidate: inval })
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
   if (!q.data?.length)
     return (
-      <Empty icon={<Grid2x2 />} title={t('Nessun gruppo')}>
-        {t('I gruppi servono a condividere con più persone insieme.')}
+      <Empty icon={<Grid2x2 />} title={t('No groups')}>
+        {t('Groups are for sharing with several people at once.')}
       </Empty>
     )
   return (
@@ -484,14 +484,14 @@ function Groups({ slug, q, members }: { slug: string; q: Q<Group[]>; members: Me
             <CardHeader className="flex-row items-center justify-between">
               <div>
                 <CardTitle className="text-base">{g.name}</CardTitle>
-                <CardDescription>{g.members.length} membri</CardDescription>
+                <CardDescription>{t('{count} members', { count: g.members.length })}</CardDescription>
               </div>
               <div className="flex gap-1">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" disabled={!others.length}>
                       <Plus />
-                      {t('Aggiungi')}
+                      {t('Add')}
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" className="max-h-72 overflow-auto">
@@ -505,19 +505,19 @@ function Groups({ slug, q, members }: { slug: string; q: Q<Group[]>; members: Me
                 <Button
                   variant="ghost"
                   size="icon"
-                  aria-label={t('Elimina il gruppo {name}', { name: g.name })}
-                  onClick={async () => (await confirm(t('Eliminare il gruppo {name}? Le condivisioni con il gruppo vengono revocate.', { name: g.name }), true)) && del.mutate(g.id)}
+                  aria-label={t('Delete the group {name}', { name: g.name })}
+                  onClick={async () => (await confirm(t('Delete the group {name}? The shares with the group are revoked.', { name: g.name }), true)) && del.mutate(g.id)}
                 >
                   <Trash2 />
                 </Button>
               </div>
             </CardHeader>
             <CardContent className="flex flex-wrap gap-1.5">
-              {g.members.length === 0 && <span className="text-sm text-muted-foreground">{t('Nessun membro.')}</span>}
+              {g.members.length === 0 && <span className="text-sm text-muted-foreground">{t('No members.')}</span>}
               {g.members.map((m) => (
                 <Badge key={m.user_id} variant="secondary" className="gap-1 font-normal">
                   {m.display_name || m.username}
-                  <button type="button" aria-label={t('Togli {username} dal gruppo', { username: m.username })} className="ml-0.5 opacity-60 hover:opacity-100" onClick={() => rmMember.mutate({ g: g.id, u: m.user_id })}>
+                  <button type="button" aria-label={t('Remove {username} from the group', { username: m.username })} className="ml-0.5 opacity-60 hover:opacity-100" onClick={() => rmMember.mutate({ g: g.id, u: m.user_id })}>
                     ×
                   </button>
                 </Badge>
@@ -531,13 +531,13 @@ function Groups({ slug, q, members }: { slug: string; q: Q<Group[]>; members: Me
 }
 
 function Invites({ slug, q }: { slug: string; q: Q<Invitation[]> }) {
-  const revoke = useAction((id: string) => api('DELETE', `/api/t/${enc(slug)}/manage/invitations/${id}`), { ok: t('Invito revocato'), invalidate: [['invites', slug]] })
+  const revoke = useAction((id: string) => api('DELETE', `/api/t/${enc(slug)}/manage/invitations/${id}`), { ok: t('Invitation revoked'), invalidate: [['invites', slug]] })
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
   if (!q.data?.length)
     return (
-      <Empty icon={<Mail />} title={t('Niente in attesa')}>
-        {t('Gli inviti alle persone di altri tenant restano qui finché non rispondono.')}
+      <Empty icon={<Mail />} title={t('Nothing pending')}>
+        {t('Invitations to people of other tenants stay here until they answer.')}
       </Empty>
     )
   return (
@@ -545,10 +545,10 @@ function Invites({ slug, q }: { slug: string; q: Q<Invitation[]> }) {
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>{t('Persona')}</TableHead>
-            <TableHead>{t('Ruolo')}</TableHead>
-            <TableHead>{t('Stato')}</TableHead>
-            <TableHead>{t('Scade')}</TableHead>
+            <TableHead>{t('Person')}</TableHead>
+            <TableHead>{t('Role')}</TableHead>
+            <TableHead>{t('Status')}</TableHead>
+            <TableHead>{t('Expires')}</TableHead>
             <TableHead />
           </TableRow>
         </TableHeader>
@@ -564,7 +564,7 @@ function Invites({ slug, q }: { slug: string; q: Q<Invitation[]> }) {
               <TableCell className="text-right">
                 {i.status === 'pending' && (
                   <Button variant="ghost" size="sm" onClick={() => revoke.mutate(i.id)}>
-                    {t('Revoca')}
+                    {t('Revoke')}
                   </Button>
                 )}
               </TableCell>
@@ -576,10 +576,10 @@ function Invites({ slug, q }: { slug: string; q: Q<Invitation[]> }) {
   )
 }
 
-/* ── Plugin del tenant ───────────────────────────────────────────────── */
+/* ── Plugins of the tenant ───────────────────────────────────────────── */
 
-/** I plugin del tenant: li rende disponibili l'Administrator, il Tenant Manager li vede con il loro tipo.
- *  Attivarli per il tenant e deciderne i permessi arrivera' con il kernel (docs/refactoring-ui.md §3). */
+/** The plugins of the tenant: the Administrator makes them available, the Tenant Manager sees them with their kind.
+ *  Turning them on for the tenant and deciding their permissions will come with the kernel (docs/refactoring-ui.md §3). */
 export function TenantPlugins({ slug }: { slug: string }) {
   const ctx = useTenantCtx(slug)
   if (ctx.isLoading) return <Loading />
@@ -587,22 +587,22 @@ export function TenantPlugins({ slug }: { slug: string }) {
   const plugins = ctx.data!.plugins
   return (
     <>
-      <PageHeader title={t('Plugin')} crumbs={[{ label: t('Gestione del tenant') }]} sub={t('{n} disponibili in {name}', { n: plugins.length, name: ctx.data!.tenant.name })} />
+      <PageHeader title={t('Plugins')} crumbs={[{ label: t('Tenant management') }]} sub={t('{n} available in {name}', { n: plugins.length, name: ctx.data!.tenant.name })} />
       <div className="grid gap-3 p-6 max-[620px]:p-4">
         <p className="max-w-2xl text-sm text-muted-foreground">
-          Li installa e li rende disponibili l’Administrator. Le <b>app</b> hanno pagine proprie e compaiono nella sidebar; i <b>servizi</b> lavorano dietro le quinte.
+          {t('The Administrator installs them and makes them available. Apps have pages of their own and appear in the sidebar; services work behind the scenes.')}
         </p>
         {plugins.length === 0 ? (
-          <Empty icon={<Puzzle />} title={t('Nessun plugin disponibile')} />
+          <Empty icon={<Puzzle />} title={t('No plugins available')} />
         ) : (
           <div className="overflow-hidden rounded-xl border bg-card">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t('Plugin')}</TableHead>
-                  <TableHead>{t('Tipo')}</TableHead>
-                  <TableHead>{t('Versione')}</TableHead>
-                  <TableHead>{t('Stato')}</TableHead>
+                  <TableHead>{t('Plugins')}</TableHead>
+                  <TableHead>{t('Kind')}</TableHead>
+                  <TableHead>{t('Version')}</TableHead>
+                  <TableHead>{t('Status')}</TableHead>
                   <TableHead />
                 </TableRow>
               </TableHeader>
@@ -620,7 +620,7 @@ export function TenantPlugins({ slug }: { slug: string }) {
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary" className="font-normal">
-                        {p.has_ui ? 'App' : 'Servizio'}
+                        {p.has_ui ? t('App') : t('Service')}
                       </Badge>
                     </TableCell>
                     <TableCell className="font-mono text-xs">{p.version}</TableCell>
@@ -630,7 +630,7 @@ export function TenantPlugins({ slug }: { slug: string }) {
                     <TableCell className="text-right">
                       {p.has_ui && (
                         <Button variant="ghost" size="sm" onClick={() => go(to.plugin(slug, p.id))}>
-                          {t('Apri')}
+                          {t('Open')}
                         </Button>
                       )}
                     </TableCell>
@@ -645,9 +645,9 @@ export function TenantPlugins({ slug }: { slug: string }) {
   )
 }
 
-/* ── Condivisioni ────────────────────────────────────────────────────── */
+/* ── Shares ──────────────────────────────────────────────────────────── */
 
-/** Gli elementi del tenant condivisi con altri o con un link pubblico; i link si revocano da qui. */
+/** The items of the tenant shared with others or with a public link; links are revoked from here. */
 export function Shares({ slug }: { slug: string }) {
   const ctx = useTenantCtx(slug)
   const members = useApi<Member[]>(['members', slug], `/api/t/${enc(slug)}/manage/members`)
@@ -667,13 +667,13 @@ export function Shares({ slug }: { slug: string }) {
   return (
     <>
       <PageHeader
-        title={t('Condivisioni')}
-        crumbs={[{ label: t('Gestione del tenant') }]}
-        sub={t('Elementi condivisi con altre persone, con gruppi o con un link pubblico')}
+        title={t('Shares')}
+        crumbs={[{ label: t('Tenant management') }]}
+        sub={t('Items shared with other people, with groups or with a public link')}
         more={
           <DropdownMenuItem onSelect={() => setReassign(true)}>
             <Users />
-            {t('Riassegna gli elementi di una persona')}
+            {t("Reassign a person's items")}
           </DropdownMenuItem>
         }
       />
@@ -681,19 +681,19 @@ export function Shares({ slug }: { slug: string }) {
         <div className="flex flex-wrap items-center gap-3">
           <Pills
             items={[
-              { id: 'all', label: t('Condivisi'), count: shared.length },
-              { id: 'public', label: t('Pubblici'), count: shared.filter((r) => r.public_links > 0).length },
-              { id: 'items', label: t('Tutti gli elementi'), count: all.length },
+              { id: 'all', label: t('Shared'), count: shared.length },
+              { id: 'public', label: t('Public'), count: shared.filter((r) => r.public_links > 0).length },
+              { id: 'items', label: t('All items'), count: all.length },
             ]}
             value={show}
             onChange={setShow}
           />
           <Select value={filter.owner || 'all'} onValueChange={(v) => setFilter({ ...filter, owner: v === 'all' ? '' : v })}>
-            <SelectTrigger size="sm" className="w-48" aria-label={t('Proprietario')}>
+            <SelectTrigger size="sm" className="w-48" aria-label={t('Owner')}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">{t('Tutti i proprietari')}</SelectItem>
+              <SelectItem value="all">{t('All owners')}</SelectItem>
               {(members.data ?? []).map((m) => (
                 <SelectItem key={m.user_id} value={m.user_id}>
                   {m.display_name || m.username}
@@ -702,11 +702,11 @@ export function Shares({ slug }: { slug: string }) {
             </SelectContent>
           </Select>
           <Select value={filter.plugin || 'all'} onValueChange={(v) => setFilter({ ...filter, plugin: v === 'all' ? '' : v })}>
-            <SelectTrigger size="sm" className="w-40" aria-label={t('App')}>
+            <SelectTrigger size="sm" className="w-40" aria-label={t('Apps')}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">{t('Tutte le app')}</SelectItem>
+              <SelectItem value="all">{t('All apps')}</SelectItem>
               {plugins.map((p) => (
                 <SelectItem key={p.id} value={p.id}>
                   {p.label}
@@ -715,7 +715,7 @@ export function Shares({ slug }: { slug: string }) {
             </SelectContent>
           </Select>
           {seeTitles && (
-            <Input type="search" className="h-8 w-56" placeholder={t('Cerca nel titolo')} aria-label={t('Cerca nel titolo')} value={filter.q} onChange={(e) => setFilter({ ...filter, q: e.target.value })} />
+            <Input type="search" className="h-8 w-56" placeholder={t('Search in the title')} aria-label={t('Search in the title')} value={filter.q} onChange={(e) => setFilter({ ...filter, q: e.target.value })} />
           )}
         </div>
         {q.isLoading ? (
@@ -723,18 +723,18 @@ export function Shares({ slug }: { slug: string }) {
         ) : q.error ? (
           <ErrorBox error={q.error} />
         ) : rows.length === 0 ? (
-          <Empty icon={<Share2 />} title={show === 'public' ? t('Nessun link pubblico attivo') : show === 'items' ? t('Nessun elemento') : t('Nessuna condivisione')} />
+          <Empty icon={<Share2 />} title={show === 'public' ? t('No active public link') : show === 'items' ? t('No items') : t('No shares')} />
         ) : (
           <div className="overflow-x-auto rounded-xl border bg-card">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>{t('Elemento')}</TableHead>
-                  <TableHead>{t('Proprietario')}</TableHead>
-                  <TableHead className="text-right">{t('Dimensione')}</TableHead>
-                  <TableHead className="text-right">{t('Condivisioni')}</TableHead>
-                  <TableHead className="text-right">{t('Link pubblici')}</TableHead>
-                  <TableHead>{t('Modificato')}</TableHead>
+                  <TableHead>{t('Item')}</TableHead>
+                  <TableHead>{t('Owner')}</TableHead>
+                  <TableHead className="text-right">{t('Size')}</TableHead>
+                  <TableHead className="text-right">{t('Shares')}</TableHead>
+                  <TableHead className="text-right">{t('Public links')}</TableHead>
+                  <TableHead>{t('Modified')}</TableHead>
                   <TableHead />
                 </TableRow>
               </TableHeader>
@@ -742,7 +742,7 @@ export function Shares({ slug }: { slug: string }) {
                 {rows.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell>
-                      <b className="block font-medium">{r.title || <span className="font-normal text-muted-foreground italic">{t('titolo nascosto')}</span>}</b>
+                      <b className="block font-medium">{r.title || <span className="font-normal text-muted-foreground italic">{t('title hidden')}</span>}</b>
                       <span className="text-xs text-muted-foreground">
                         {label(r.plugin_id)} · {r.kind}
                       </span>
@@ -751,7 +751,7 @@ export function Shares({ slug }: { slug: string }) {
                       {r.owner_name}
                       {!r.owner_active && (
                         <Badge variant="secondary" className="ml-2 font-normal">
-                          {t('uscito')}
+                          {t('left')}
                         </Badge>
                       )}
                     </TableCell>
@@ -770,11 +770,11 @@ export function Shares({ slug }: { slug: string }) {
                     <TableCell className="text-right whitespace-nowrap">
                       {r.public_links > 0 && (
                         <Button variant="ghost" size="sm" onClick={() => setLinks(r)}>
-                          {t('Link pubblici')}
+                          {t('Public links')}
                         </Button>
                       )}
                       <Button variant="ghost" size="sm" onClick={() => setSharing(r.id)}>
-                        {t('Condividi')}
+                        {t('Share')}
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -783,7 +783,7 @@ export function Shares({ slug }: { slug: string }) {
             </Table>
           </div>
         )}
-        {all.length > 0 && !all.some((r) => r.title) && <p className="text-xs text-muted-foreground">{t('I titoli sono nascosti dalle regole del tenant (Impostazioni del tenant › Condivisione).')}</p>}
+        {all.length > 0 && !all.some((r) => r.title) && <p className="text-xs text-muted-foreground">{t('Titles are hidden by the rules of the tenant (Tenant settings › Sharing).')}</p>}
       </div>
       <LinksDialog slug={slug} row={links} onClose={() => setLinks(null)} />
       {ctx.data && <ShareDialog ctx={ctx.data} resourceId={sharing} onClose={() => setSharing(null)} />}
@@ -792,7 +792,7 @@ export function Shares({ slug }: { slug: string }) {
   )
 }
 
-/** Tutti gli elementi di una persona passano a un'altra (per esempio prima che esca dal tenant). */
+/** All the items of a person go to another one (for example before they leave the tenant). */
 function ReassignDialog({ slug, open, members, onClose }: { slug: string; open: boolean; members: Member[]; onClose: () => void }) {
   const [from, setFrom] = useState('')
   const [dest, setDest] = useState('')
@@ -804,30 +804,30 @@ function ReassignDialog({ slug, open, members, onClose }: { slug: string; open: 
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t('Riassegna gli elementi di una persona')}</DialogTitle>
-          <DialogDescription>{t('Tutti i suoi elementi passano alla persona scelta, con le condivisioni.')}</DialogDescription>
+          <DialogTitle>{t("Reassign a person's items")}</DialogTitle>
+          <DialogDescription>{t('All their items go to the chosen person, with their shares.')}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4">
           <div className="grid gap-1.5">
-            <Label htmlFor="ra-from">{t('Da')}</Label>
+            <Label htmlFor="ra-from">{t('From')}</Label>
             <Select value={from} onValueChange={setFrom}>
               <SelectTrigger id="ra-from" className="w-full">
-                <SelectValue placeholder={t('Scegli la persona…')} />
+                <SelectValue placeholder={t('Choose the person…')} />
               </SelectTrigger>
               <SelectContent>
                 {owners.map((m) => (
                   <SelectItem key={m.user_id} value={m.user_id}>
-                    {m.display_name || m.username} · {t('{count} elementi', { count: m.owned_resources })}
+                    {m.display_name || m.username} · {t('{count} items', { count: m.owned_resources })}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
           <div className="grid gap-1.5">
-            <Label htmlFor="ra-to">{t('A')}</Label>
+            <Label htmlFor="ra-to">{t('To')}</Label>
             <Select value={dest} onValueChange={setDest}>
               <SelectTrigger id="ra-to" className="w-full">
-                <SelectValue placeholder={t('Scegli la persona…')} />
+                <SelectValue placeholder={t('Choose the person…')} />
               </SelectTrigger>
               <SelectContent>
                 {members
@@ -842,14 +842,14 @@ function ReassignDialog({ slug, open, members, onClose }: { slug: string; open: 
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={onClose}>
-              {t('Annulla')}
+              {t('Cancel')}
             </Button>
             <Button
               disabled={!from || !dest || from === dest || run.isPending}
               onClick={() =>
                 run.mutate(undefined, {
                   onSuccess: (r) => {
-                    toast.success(t('{count} elementi riassegnati', { count: (r as { reassigned: number }).reassigned }))
+                    toast.success(t('{count} items reassigned', { count: (r as { reassigned: number }).reassigned }))
                     setFrom('')
                     setDest('')
                     onClose()
@@ -857,7 +857,7 @@ function ReassignDialog({ slug, open, members, onClose }: { slug: string; open: 
                 })
               }
             >
-              {t('Riassegna')}
+              {t('Reassign')}
             </Button>
           </div>
         </div>
@@ -869,7 +869,7 @@ function ReassignDialog({ slug, open, members, onClose }: { slug: string; open: 
 function LinksDialog({ slug, row, onClose }: { slug: string; row: ResourceRow | null; onClose: () => void }) {
   const q = useApi<LinkInfo[]>(['links', row?.id], row ? `/api/t/${enc(slug)}/resources/${row.id}/links` : null)
   const revoke = useAction((id: string) => api('DELETE', `/api/t/${enc(slug)}/links/${id}`), {
-    ok: t('Link revocato'),
+    ok: t('Link revoked'),
     invalidate: [['links', row?.id], ['m-resources', slug], ['overview', slug]],
   })
   const active = (q.data ?? []).filter((l) => l.active)
@@ -877,7 +877,7 @@ function LinksDialog({ slug, row, onClose }: { slug: string; row: ResourceRow | 
     <Dialog open={!!row} onOpenChange={(o) => !o && onClose()}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t('Link pubblici')}</DialogTitle>
+          <DialogTitle>{t('Public links')}</DialogTitle>
           <DialogDescription>{row?.title || row?.kind}</DialogDescription>
         </DialogHeader>
         {q.isLoading ? (
@@ -890,20 +890,20 @@ function LinksDialog({ slug, row, onClose }: { slug: string; row: ResourceRow | 
               <li key={l.id} className="flex items-center gap-3 rounded-lg border p-3 text-sm">
                 <span className="min-w-0 flex-1">
                   <span className="block">
-                    {t('Creato il {date}', { date: fmtDate(l.created_at) })}
-                    {l.created_by ? ` ${t('da {name}', { name: l.created_by })}` : ''}
+                    {t('Created on {date}', { date: fmtDate(l.created_at) })}
+                    {l.created_by ? ` ${t('by {name}', { name: l.created_by })}` : ''}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {l.expires_at ? t('Scade il {date}', { date: fmtDate(l.expires_at) }) : t('Senza scadenza')} · {t('{n} visite', { n: l.view_count })}
-                    {l.has_password ? ` · ${t('con password')}` : ''}
+                    {l.expires_at ? t('Expires on {date}', { date: fmtDate(l.expires_at) }) : t('No expiry')} · {t('{n} views', { n: l.view_count })}
+                    {l.has_password ? ` · ${t('with password')}` : ''}
                   </span>
                 </span>
                 <Button variant="outline" size="sm" onClick={() => revoke.mutate(l.id)}>
-                  {t('Revoca')}
+                  {t('Revoke')}
                 </Button>
               </li>
             ))}
-            {active.length === 0 && <li className="text-sm text-muted-foreground">{t('Nessun link attivo.')}</li>}
+            {active.length === 0 && <li className="text-sm text-muted-foreground">{t('No active link.')}</li>}
           </ul>
         )}
       </DialogContent>
@@ -911,10 +911,10 @@ function LinksDialog({ slug, row, onClose }: { slug: string; row: ResourceRow | 
   )
 }
 
-/* ── Consumi ─────────────────────────────────────────────────────────── */
+/* ── Usage ───────────────────────────────────────────────────────────── */
 
-/** I consumi del tenant. Le quote le decide l'Administrator: quando il kernel le avra', qui si vedranno
- *  in sola lettura accanto ai consumi (docs/refactoring-ui.md §6). */
+/** The usage of the tenant. Quotas are decided by the Administrator: when the kernel has them, they will
+ *  show here read only next to the usage (docs/refactoring-ui.md §6). */
 export function Usage({ slug }: { slug: string }) {
   const q = useApi<TenantKpi>(['m-kpi', slug], `/api/t/${enc(slug)}/manage/kpi`)
   if (q.isLoading) return <Loading />
@@ -924,40 +924,40 @@ export function Usage({ slug }: { slug: string }) {
   const max = Math.max(1, ...k.activity.map((d) => d.events))
   return (
     <>
-      <PageHeader title={t('Consumi')} crumbs={[{ label: t('Gestione del tenant') }]} sub={t('Spazio, elementi e attività del tenant')} />
+      <PageHeader title={t('Usage')} crumbs={[{ label: t('Tenant management') }]} sub={t('Storage, items and activity of the tenant')} />
       <div className="grid gap-6 p-6 max-[620px]:p-4">
         <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3">
-          <Kpi label={t('Spazio usato')} value={fmtBytes(bytes)} hint={t('Quota: non ancora nel kernel')} />
-          <Kpi label={t('Elementi')} value={k.resources.reduce((s, r) => s + r.count, 0)} />
-          <Kpi label={t('Persone')} value={k.members} hint={t('{guests} ospiti · {groups} gruppi', { guests: k.guests, groups: k.groups })} />
-          <Kpi label={t('Attive negli ultimi 30 giorni')} value={k.active_users_30d} />
-          <Kpi label={t('Condivisioni')} value={k.shares} hint={t('{n} link pubblici attivi · {v} visite', { n: k.public_links, v: k.link_views })} onClick={() => go(to.tenant(slug, 'shares'))} />
+          <Kpi label={t('Storage used')} value={fmtBytes(bytes)} hint={t('Quota: not in the kernel yet')} />
+          <Kpi label={t('Items')} value={k.resources.reduce((s, r) => s + r.count, 0)} />
+          <Kpi label={t('People')} value={k.members} hint={t('{guests} guests · {groups} groups', { guests: k.guests, groups: k.groups })} />
+          <Kpi label={t('Active in the last 30 days')} value={k.active_users_30d} />
+          <Kpi label={t('Shares')} value={k.shares} hint={t('{n} active public links · {v} views', { n: k.public_links, v: k.link_views })} onClick={() => go(to.tenant(slug, 'shares'))} />
         </div>
         <section className="grid gap-3">
-          <h2 className="text-sm font-semibold">{t('Attività degli ultimi giorni')}</h2>
+          <h2 className="text-sm font-semibold">{t('Activity of the last days')}</h2>
           {k.activity.length === 0 ? (
-            <Empty icon={<Gauge />} title={t('Nessuna attività')} />
+            <Empty icon={<Gauge />} title={t('No activity')} />
           ) : (
-            <div className="flex h-36 items-end gap-1 rounded-xl border bg-card p-4" role="img" aria-label={t('Eventi al giorno')}>
+            <div className="flex h-36 items-end gap-1 rounded-xl border bg-card p-4" role="img" aria-label={t('Events per day')}>
               {k.activity.map((d) => (
-                <span key={d.day} title={t('{day}: {events} eventi, {users} persone', { day: d.day, events: d.events, users: d.users })} className="min-w-1 flex-1 rounded-t bg-primary/70" style={{ height: `${Math.max(4, (d.events / max) * 100)}%` }} />
+                <span key={d.day} title={t('{day}: {events} events, {users} people', { day: d.day, events: d.events, users: d.users })} className="min-w-1 flex-1 rounded-t bg-primary/70" style={{ height: `${Math.max(4, (d.events / max) * 100)}%` }} />
               ))}
             </div>
           )}
         </section>
         <section className="grid gap-3">
-          <h2 className="text-sm font-semibold">{t('Per app')}</h2>
+          <h2 className="text-sm font-semibold">{t('By app')}</h2>
           {k.resources.length === 0 ? (
-            <Empty icon={<Gauge />} title={t('Nessun elemento')} />
+            <Empty icon={<Gauge />} title={t('No items')} />
           ) : (
             <div className="overflow-hidden rounded-xl border bg-card">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>{t('App')}</TableHead>
-                    <TableHead>{t('Tipo')}</TableHead>
-                    <TableHead className="text-right">{t('Elementi')}</TableHead>
-                    <TableHead className="text-right">{t('Spazio')}</TableHead>
+                    <TableHead>{t('Apps')}</TableHead>
+                    <TableHead>{t('Kind')}</TableHead>
+                    <TableHead className="text-right">{t('Items')}</TableHead>
+                    <TableHead className="text-right">{t('Space')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -980,33 +980,33 @@ export function Usage({ slug }: { slug: string }) {
   )
 }
 
-/* ── Impostazioni del tenant ─────────────────────────────────────────── */
+/* ── Tenant settings ─────────────────────────────────────────────────── */
 
 export function TenantSettingsPage({ slug, section }: { slug: string; section?: string }) {
   const ctx = useTenantCtx(slug)
   if (ctx.isLoading) return <Loading />
-  if (ctx.data?.tenant.role !== 'tenant_manager') return <Empty title={t('Riservate ai Tenant Manager')} />
+  if (ctx.data?.tenant.role !== 'tenant_manager') return <Empty title={t('Reserved to Tenant Managers')} />
   const sections = [
-    { id: 'sharing', label: t('Condivisione'), icon: <Share2 />, group: t('Tenant') },
-    { id: 'sign-in', label: t('Accesso'), icon: <KeyRound /> },
-    { id: 'theme', label: t('Tema'), icon: <Palette />, group: t('Identità e aspetto') },
+    { id: 'sharing', label: t('Sharing'), icon: <Share2 />, group: t('Tenant') },
+    { id: 'sign-in', label: t('Sign-in'), icon: <KeyRound /> },
+    { id: 'theme', label: t('Theme'), icon: <Palette />, group: t('Identity and appearance') },
   ]
   const cur = sections.some((s) => s.id === section) ? section! : 'sharing'
   return (
     <>
-      <PageHeader title={t('Impostazioni del tenant')} sub={t('Valgono per tutte le persone di {name}', { name: ctx.data.tenant.name })} />
+      <PageHeader title={t('Tenant settings')} sub={t('They apply to everybody in {name}', { name: ctx.data.tenant.name })} />
       <Sections sections={sections} current={cur} href={(id) => to.tenant(slug, 'settings', id)}>
         {cur === 'sharing' && <Policy slug={slug} />}
         {cur === 'theme' && <TenantTheme slug={slug} />}
         {cur === 'sign-in' && (
           <Card className="max-w-2xl">
             <CardHeader>
-              <CardTitle>{t('Accesso')}</CardTitle>
-              <CardDescription>{t('Lo decide l’Administrator per il tenant.')}</CardDescription>
+              <CardTitle>{t('Sign-in')}</CardTitle>
+              <CardDescription>{t('The Administrator decides it for the tenant.')}</CardDescription>
             </CardHeader>
             <CardContent className="grid gap-3">
-              <Locked label={t('Modo di autenticazione')} value="Account locali del tenant" hint={t('Oppure un provider di identità (OIDC), mai entrambi.')} />
-              <Locked label={t('Regole della password')} value="Almeno 10 caratteri, non tutti uguali" hint={t('Il tenant potrà renderle più severe, non più deboli.')} />
+              <Locked label={t('Sign-in method')} value={t('Local accounts of the tenant')} hint={t('Or an identity provider (OIDC), never both.')} />
+              <Locked label={t('Password rules')} value={t('At least 10 characters, not all the same')} hint={t('The tenant will be able to make them stricter, not weaker.')} />
             </CardContent>
           </Card>
         )}
@@ -1019,7 +1019,7 @@ function Policy({ slug }: { slug: string }) {
   const path = `/api/t/${enc(slug)}/manage/settings`
   const q = useApi<TenantSettings>(['settings', slug], path)
   const [v, setV] = useState<TenantSettings | null>(null)
-  const save = useAction((s: TenantSettings) => api('PUT', path, s), { ok: t('Impostazioni salvate'), invalidate: [['settings', slug], ['ctx', slug]] })
+  const save = useAction((s: TenantSettings) => api('PUT', path, s), { ok: t('Settings saved'), invalidate: [['settings', slug], ['ctx', slug]] })
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
   const s = v ?? q.data!
@@ -1028,25 +1028,25 @@ function Policy({ slug }: { slug: string }) {
     <div className="max-w-2xl">
       <Card>
         <CardHeader>
-          <CardTitle>{t('Condivisione')}</CardTitle>
-          <CardDescription>{t('Link pubblici e cosa vedono i Tenant Manager.')}</CardDescription>
+          <CardTitle>{t('Sharing')}</CardTitle>
+          <CardDescription>{t('Public links and what Tenant Managers see.')}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-5">
           <label className="flex items-center justify-between gap-4">
             <span>
-              <b className="block text-sm">{t('Link pubblici')}</b>
-              <span className="text-xs text-muted-foreground">{t('Chi ha il permesso di gestione può creare link in sola lettura')}</span>
+              <b className="block text-sm">{t('Public links')}</b>
+              <span className="text-xs text-muted-foreground">{t('Whoever has the manage permission can create read-only links')}</span>
             </span>
             <Switch checked={s.public_links_enabled} onCheckedChange={(x) => setV({ ...s, public_links_enabled: x })} />
           </label>
           <div className="grid gap-1.5">
-            <Label htmlFor="maxd">{t('Durata massima dei link, in giorni (0 = nessun limite)')}</Label>
+            <Label htmlFor="maxd">{t('Maximum length of links, in days (0 = no limit)')}</Label>
             <Input id="maxd" type="number" min={0} className="w-32" value={s.public_link_max_days} onChange={(e) => setV({ ...s, public_link_max_days: Math.max(0, +e.target.value) })} />
           </div>
           <label className="flex items-center justify-between gap-4">
             <span>
-              <b className="block text-sm">{t('I Tenant Manager vedono i titoli degli elementi')}</b>
-              <span className="text-xs text-muted-foreground">{t('Altrimenti solo conteggi e dimensioni')}</span>
+              <b className="block text-sm">{t('Tenant Managers see the titles of the items')}</b>
+              <span className="text-xs text-muted-foreground">{t('Otherwise only counts and sizes')}</span>
             </span>
             <Switch checked={s.managers_see_titles} onCheckedChange={(x) => setV({ ...s, managers_see_titles: x })} />
           </label>

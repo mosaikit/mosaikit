@@ -43,7 +43,7 @@
       "problemMatcher": ["$rustc"]
     },
     {
-      "label": "mosaikit: nuovo plugin",
+      "label": "mosaikit: new plugin",
       "type": "shell",
       "command": "cargo xtask plugin new ${input:pluginName}",
       "problemMatcher": []
@@ -62,6 +62,6 @@
     }
   ],
   "inputs": [
-    { "id": "pluginName", "type": "promptString", "description": "Nome del plugin (minuscole e '-')" }
+    { "id": "pluginName", "type": "promptString", "description": "Name of the plugin (lower case and '-')" }
   ]
 }

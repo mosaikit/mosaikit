@@ -1,10 +1,10 @@
 use super::*;
 
-/// Guest minimale in WAT che implementa l'ABI a mano.
-/// - msk_call: chiama host_call con la richiesta fissa {"op":"echo","req":1},
-///   copia la risposta in memoria e la restituisce;
-/// - loop: se il messaggio in ingresso inizia con `"l` entra in un ciclo infinito;
-/// - grow: se inizia con `"g` prova a crescere di 2000 pagine (128 MB).
+/// Minimal guest in WAT that implements the ABI by hand.
+/// - msk_call: calls host_call with the fixed request {"op":"echo","req":1},
+///   copies the answer into memory and returns it;
+/// - loop: if the incoming message starts with `"l` it enters an endless loop;
+/// - grow: if it starts with `"g` it tries to grow by 2000 pages (128 MB).
 const GUEST: &str = r#"
 (module
   (import "msk" "host_call" (func $host_call (param i32 i32) (result i32)))
@@ -12,7 +12,7 @@ const GUEST: &str = r#"
   (import "msk" "log" (func $log (param i32 i32)))
   (memory (export "memory") 1)
   (data (i32.const 16) "{\"op\":\"echo\",\"req\":1}")
-  (data (i32.const 64) "ciao")
+  (data (i32.const 64) "test")
   (global $bump (mut i32) (i32.const 1024))
   (func (export "msk_alloc") (param $len i32) (result i32)
     (local $p i32)
@@ -48,7 +48,7 @@ impl Host for TestHost {
         if op == "echo" {
             Ok(json!({ "echo": req }))
         } else {
-            Err("sconosciuta".into())
+            Err("unknown".into())
         }
     }
     fn log(&mut self, msg: &str) {
@@ -61,20 +61,20 @@ fn engine() -> Engine {
 }
 
 #[test]
-fn chiamata_con_host_call_e_log() {
+fn call_with_host_call_and_log() {
     let e = engine();
     let m = e.compile(&wat::parse_str(GUEST).unwrap()).unwrap();
     let (res, host) = e.call(&m, &json!("x"), TestHost::default());
     assert_eq!(res.unwrap(), json!({ "ok": { "echo": 1 } }));
     assert_eq!(host.calls, vec!["echo"]);
-    assert_eq!(host.logs, vec!["ciao"]);
-    // istanza nuova a ogni chiamata: lo stato del guest non sopravvive
+    assert_eq!(host.logs, vec!["test"]);
+    // new instance at every call: the state of the guest does not survive
     let (res2, _) = e.call(&m, &json!("x"), TestHost::default());
     assert!(res2.is_ok());
 }
 
 #[test]
-fn ciclo_infinito_fermato_dal_fuel() {
+fn endless_loop_stopped_by_fuel() {
     let e = engine();
     let m = e.compile(&wat::parse_str(GUEST).unwrap()).unwrap();
     let (res, _) = e.call(&m, &json!("loop"), TestHost::default());
@@ -82,18 +82,18 @@ fn ciclo_infinito_fermato_dal_fuel() {
 }
 
 #[test]
-fn memoria_oltre_il_limite_negata() {
+fn memory_beyond_the_limit_denied() {
     let e = engine();
     let m = e.compile(&wat::parse_str(GUEST).unwrap()).unwrap();
-    // memory.grow oltre il limite fallisce (ritorna -1): il guest prosegue normalmente
+    // memory.grow beyond the limit fails (returns -1): the guest goes on normally
     let (res, _) = e.call(&m, &json!("grow"), TestHost::default());
     assert!(res.is_ok(), "{res:?}");
 }
 
 #[test]
-fn moduli_non_conformi_rifiutati() {
+fn non_conforming_modules_refused() {
     let e = engine();
-    assert!(matches!(e.compile(b"non wasm"), Err(RuntimeError::Invalid(_))));
+    assert!(matches!(e.compile(b"not wasm"), Err(RuntimeError::Invalid(_))));
     let no_exports = wat::parse_str("(module (memory (export \"memory\") 1))").unwrap();
     assert!(matches!(e.compile(&no_exports), Err(RuntimeError::Invalid(_))));
     let wasi = wat::parse_str(
@@ -104,5 +104,5 @@ fn moduli_non_conformi_rifiutati() {
     )
     .unwrap();
     let err = e.compile(&wasi).err().unwrap().to_string();
-    assert!(err.contains("import non consentito"), "{err}");
+    assert!(err.contains("import not allowed"), "{err}");
 }

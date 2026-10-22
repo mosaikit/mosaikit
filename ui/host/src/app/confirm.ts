@@ -1,4 +1,4 @@
-// La richiesta di conferma (il dialogo lo mostra UiServices).
+// The request for confirmation (UiServices shows the dialog).
 
 import { createContext, useContext } from 'react'
 

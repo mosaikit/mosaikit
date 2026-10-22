@@ -1,12 +1,12 @@
-//! Catalogo dei plugin fidati (`registry/index.json`) e blocklist.
+//! Catalog of the trusted plugins (`registry/index.json`) and blocklist.
 //!
 //! ```json
-//! { "plugins": [ { "id": "com.mosaikit.notes", "name": "Note", "description": "...",
+//! { "plugins": [ { "id": "com.mosaikit.notes", "name": "Notes", "description": "...",
 //!                  "versions": [ { "version": "0.3.0", "file": "plugins/com.mosaikit.notes-0.3.0.mskp",
-//!                                  "sha256": "...", "publisher": "<chiave base64>" } ] } ],
+//!                                  "sha256": "...", "publisher": "<base64 key>" } ] } ],
 //!   "blocklist": [ { "id": "com.x.y", "version": "1.0.0", "sha256": null, "reason": "..." } ] }
 //! ```
-//! `file` e' relativo alla cartella di `index.json`.
+//! `file` is relative to the folder of `index.json`.
 
 use std::path::PathBuf;
 
@@ -47,7 +47,7 @@ pub struct EntryVersion {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Blocked {
     pub id: String,
-    /// versione bloccata (assente = tutte)
+    /// blocked version (absent = all)
     #[serde(default)]
     pub version: Option<String>,
     #[serde(default)]
@@ -129,37 +129,37 @@ fn latest(e: &Entry) -> Option<&EntryVersion> {
         .max_by_key(|v| Version::parse(&v.version))
 }
 
-/// Legge il pacchetto di una voce del catalogo e ne verifica lo sha256.
+/// Reads the package of an entry of the catalog and checks its sha256.
 fn read_package(k: &Kernel, v: &EntryVersion) -> Result<Vec<u8>> {
     let base = index_path(k)
         .and_then(|p| p.parent().map(|d| d.to_path_buf()))
-        .ok_or_else(|| Error::not_found("registry non configurato"))?;
+        .ok_or_else(|| Error::not_found("registry not configured"))?;
     if !mosaikit_mskp::is_safe_path(&v.file) {
-        return Err(Error::bad("percorso del pacchetto non valido nel registry"));
+        return Err(Error::bad("invalid path of the package in the registry"));
     }
     let bytes =
         std::fs::read(base.join(&v.file)).map_err(|e| Error::not_found(format!("{}: {e}", v.file)))?;
     if mosaikit_mskp::package_sha256(&bytes) != v.sha256 {
-        return Err(Error::forbidden(format!("{}: sha256 diverso da quello del registry", v.file)));
+        return Err(Error::forbidden(format!("{}: sha256 different from the one of the registry", v.file)));
     }
     Ok(bytes)
 }
 
 pub async fn install_from_catalog(k: &Kernel, admin: &SessionUser, id: &str) -> Result<()> {
     crate::tenancy::require_admin(admin)?;
-    let index = load(k).ok_or_else(|| Error::not_found("registry non configurato"))?;
+    let index = load(k).ok_or_else(|| Error::not_found("registry not configured"))?;
     let entry = index
         .plugins
         .iter()
         .find(|e| e.id == id)
-        .ok_or_else(|| Error::not_found("plugin non presente nel catalogo"))?;
-    let v = latest(entry).ok_or_else(|| Error::not_found("nessuna versione valida"))?;
+        .ok_or_else(|| Error::not_found("plugin not in the catalog"))?;
+    let v = latest(entry).ok_or_else(|| Error::not_found("no valid version"))?;
     let bytes = read_package(k, v)?;
     install_package(k, Some(admin), &bytes, InstallSource::Registry).await?;
     Ok(())
 }
 
-/// Installa e attiva i plugin del catalogo assenti o con versione piu' vecchia.
+/// Installs and turns on the plugins of the catalog that are missing or have an older version.
 pub async fn preinstall(k: &Kernel) -> Result<()> {
     let Some(index) = load(k) else { return Ok(()) };
     for e in &index.plugins {
@@ -180,11 +180,11 @@ pub async fn preinstall(k: &Kernel) -> Result<()> {
                     if !was_installed {
                         set_active(k, None, &e.id, true).await?;
                     }
-                    tracing::info!("plugin {} {} preinstallato", e.id, v.version);
+                    tracing::info!("plugin {} {} preinstalled", e.id, v.version);
                 }
-                Err(err) => tracing::error!("preinstallazione {}: {err}", e.id),
+                Err(err) => tracing::error!("preinstall {}: {err}", e.id),
             },
-            Err(err) => tracing::error!("preinstallazione {}: {err}", e.id),
+            Err(err) => tracing::error!("preinstall {}: {err}", e.id),
         }
     }
     Ok(())

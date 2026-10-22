@@ -9,7 +9,7 @@ permissions:
   contents: write
   packages: write
 
-# mosaikit e mosaikit-plugins affiancati, come in locale
+# mosaikit and mosaikit-plugins side by side, as locally
 jobs:
   desktop-windows:
     runs-on: windows-latest
@@ -33,7 +33,7 @@ jobs:
         with:
           node-version: 24
       - run: npm ci --no-audit --no-fund
-      # Mosaikit desktop usa SQLite: nessun PostgreSQL da includere
+      # Mosaikit desktop uses SQLite: no PostgreSQL to include
       - name: release desktop
         shell: pwsh
         run: cargo xtask release desktop
@@ -59,9 +59,9 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: chiave di firma dei plugin
+      - name: signing key of the plugins
         run: printf '%s' "${{ secrets.MOSAIKIT_SIGNING_KEY }}" > signing.key
-      # contesto: la cartella con mosaikit e mosaikit-plugins (vedi Dockerfile.dockerignore)
+      # context: the folder with mosaikit and mosaikit-plugins (see Dockerfile.dockerignore)
       - uses: docker/build-push-action@v6
         with:
           context: .

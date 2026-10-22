@@ -1,4 +1,4 @@
-//! Tenant: elenco, creazione con il primo Tenant Manager, sospensione (Administrator).
+//! Tenants: list, creation with the first Tenant Manager, suspension (Administrator).
 
 use chrono::{DateTime, Utc};
 use serde::Serialize;
@@ -34,24 +34,36 @@ const TENANT_INFO_SQL: &str = "
            t.created_at
     from core.tenants t";
 
-/// Tenant proposto nella pagina di accesso.
+/// Tenant offered on the sign-in page.
 #[derive(Debug, Clone, Serialize)]
 pub struct LoginTenant {
     pub slug: String,
     pub name: String,
-    /// metodo di accesso: "local" (utente e password)
+    /// sign-in method: "local" (username and password)
     pub auth: &'static str,
+    /// theme in use: the one the Tenant Manager chose, otherwise the one of the platform (the
+    /// sign-in page switches to it as soon as the tenant is known)
+    pub theme: String,
 }
 
-/// Tenant attivi per la pagina di accesso (pubblico: solo slug e nome). Il tenant di
-/// sistema ha un accesso a parte.
+/// Active tenants for the sign-in page (public: only slug, name and theme). The system
+/// tenant has a sign-in of its own.
 pub async fn login_tenants(k: &Kernel) -> Result<Vec<LoginTenant>> {
     let rows = mosaikit_db::query(
-        "select slug, name from core.tenants where status = 'active' and not is_system order by name",
+        "select slug, name, settings from core.tenants where status = 'active' and not is_system order by name",
     )
     .fetch_all(&k.db)
     .await?;
-    Ok(rows.iter().map(|r| LoginTenant { slug: r.get(0), name: r.get(1), auth: "local" }).collect())
+    let platform = super::settings::platform_theme(k).await?;
+    Ok(rows
+        .iter()
+        .map(|r| {
+            let settings: Option<serde_json::Value> = r.get(2);
+            let theme =
+                settings.as_ref().and_then(super::settings::theme_in).unwrap_or_else(|| platform.clone());
+            LoginTenant { slug: r.get(0), name: r.get(1), auth: "local", theme }
+        })
+        .collect())
 }
 
 fn tenant_info(r: &mosaikit_db::Row) -> TenantInfo {
@@ -89,14 +101,14 @@ pub async fn create_tenant(k: &Kernel, admin: &SessionUser, t: NewTenant<'_>) ->
     require_admin(admin)?;
     let slug = t.slug.trim().to_lowercase();
     if !valid_slug(&slug) {
-        return Err(Error::bad("slug non valido: 2-40 caratteri, minuscole, cifre e '-'"));
+        return Err(Error::bad("invalid slug: 2-40 characters, lower case, digits and '-'"));
     }
     if t.name.trim().is_empty() {
-        return Err(Error::bad("nome del tenant obbligatorio"));
+        return Err(Error::bad("the name of the tenant is required"));
     }
     let username = t.manager_username.trim().to_lowercase();
     if !valid_username(&username) {
-        return Err(Error::bad("username del gestore non valido"));
+        return Err(Error::bad("invalid username of the manager"));
     }
     check_password_policy(t.manager_password)?;
     let hash = hash_password(k, t.manager_password).await?;
@@ -109,7 +121,7 @@ pub async fn create_tenant(k: &Kernel, admin: &SessionUser, t: NewTenant<'_>) ->
             .await
             .map_err(|e| match Error::from(e) {
                 err if err.kind == crate::Kind::Conflict => {
-                    Error::conflict(format!("esiste gia' un tenant '{slug}'"))
+                    Error::conflict(format!("a tenant '{slug}' already exists"))
                 }
                 err => err,
             })?;
@@ -140,7 +152,7 @@ pub async fn create_tenant(k: &Kernel, admin: &SessionUser, t: NewTenant<'_>) ->
 pub async fn set_tenant_status(k: &Kernel, admin: &SessionUser, id: Uuid, status: &str) -> Result<()> {
     require_admin(admin)?;
     if !["active", "suspended"].contains(&status) {
-        return Err(Error::bad("stato non valido"));
+        return Err(Error::bad("invalid state"));
     }
     let n = mosaikit_db::query("update core.tenants set status = $2 where id = $1 and not is_system")
         .bind(id)
@@ -149,7 +161,7 @@ pub async fn set_tenant_status(k: &Kernel, admin: &SessionUser, id: Uuid, status
         .await?
         .rows_affected();
     if n == 0 {
-        return Err(Error::bad("tenant inesistente o di sistema"));
+        return Err(Error::bad("tenant does not exist or is the system one"));
     }
     events::record(
         k,

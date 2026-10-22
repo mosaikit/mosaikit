@@ -1,87 +1,87 @@
-# {{name}} {{version}} con Docker
+# {{name}} {{version}} with Docker
 
-Installazione di {{name}} su un server con **Docker Compose**: l'app e il suo
-database PostgreSQL, con volumi persistenti.
+Installation of {{name}} on a server with **Docker Compose**: the app and its
+PostgreSQL database, with persistent volumes.
 
 ```
 {{id}}-{{version}}-docker/
-├── {{id}}-{{version}}-image.tar   immagine dell'app
+├── {{id}}-{{version}}-image.tar   image of the app
 ├── compose.yml                    PostgreSQL + app
-├── .env                           immagine, password, indirizzi e porte
-├── initdb/                        prima inizializzazione del database
+├── .env                           image, passwords, addresses and ports
+├── initdb/                        first initialization of the database
 └── README.md
 ```
 
-## Requisiti
+## Requirements
 
-Docker Engine 24 o successivo con il plugin Compose (`docker compose`).
+Docker Engine 24 or later with the Compose plugin (`docker compose`).
 
-## Installazione
+## Installation
 
-1. **Immagine:**
+1. **Image:**
 
    ```sh
    docker load -i {{id}}-{{version}}-image.tar
    ```
 
-2. **Configurazione:** modifica `.env`:
-   - password (`POSTGRES_PASSWORD`, `MOSAIKIT_DB_PASSWORD`,
+2. **Configuration:** edit `.env`:
+   - passwords (`POSTGRES_PASSWORD`, `MOSAIKIT_DB_PASSWORD`,
      `MOSAIKIT_ADMIN_PASSWORD`);
-   - indirizzi pubblici (`MOSAIKIT_URL`, `MOSAIKIT_PLUGIN_URL`);
-   - porte pubblicate sull'host (`MOSAIKIT_HTTP_PORT`, `MOSAIKIT_PLUGIN_PORT`).
+   - public addresses (`MOSAIKIT_URL`, `MOSAIKIT_PLUGIN_URL`);
+   - ports published on the host (`MOSAIKIT_HTTP_PORT`, `MOSAIKIT_PLUGIN_PORT`).
 
-   Il database usa l'immagine `{{postgres_image}}`, scaricata da Docker Hub al
-   primo avvio.
+   The database uses the image `{{postgres_image}}`, downloaded from Docker Hub at
+   the first start.
 
-3. **Avvio:**
+3. **Start:**
 
    ```sh
    docker compose up -d
-   docker compose ps                 # attendi che "app" sia healthy
+   docker compose ps                 # wait until "app" is healthy
    ```
 
-   Al primo avvio l'app applica le migrazioni del database e installa i plugin
-   inclusi. Accesso: `MOSAIKIT_URL` + `#/admin` (*Accesso amministratori*), utente `admin`, password
-   `MOSAIKIT_ADMIN_PASSWORD`; cambiala subito dalla pagina Account. Al primo
-   accesso registri il secondo fattore (app di autenticazione, QR code) e ricevi
-   i codici di recupero. Telefono perso: `docker compose exec app
+   At the first start the app applies the database migrations and installs the included
+   plugins. Sign-in: `MOSAIKIT_URL` + `#/admin` (*Administrator access*), user `admin`, password
+   `MOSAIKIT_ADMIN_PASSWORD`; change it at once from the Account page. At the first
+   sign-in you register the second factor (authenticator app, QR code) and receive
+   the recovery codes. Lost phone: `docker compose exec app
    /app/mosaikit-server reset-totp --user admin`.
 
-## Produzione
+## Production
 
-Metti un reverse proxy HTTPS davanti, con **due hostname**: uno per l'app (porta
-`MOSAIKIT_HTTP_PORT`) e uno per plugin, file caricati e link pubblici (porta
-`MOSAIKIT_PLUGIN_PORT`). Le due origini devono essere diverse: il codice dei
-plugin non deve poter leggere i cookie dell'app. Poi in `.env`:
+Put an HTTPS reverse proxy in front, with **two hostnames**: one for the app (port
+`MOSAIKIT_HTTP_PORT`) and one for plugins, uploaded files and public links (port
+`MOSAIKIT_PLUGIN_PORT`). The two origins must be different: the code of the
+plugins must not be able to read the cookies of the app. Then in `.env`:
 
 ```sh
-MOSAIKIT_URL=https://{{id}}.esempio.it            # anche con percorso base: .../{{id}}
-MOSAIKIT_PLUGIN_URL=https://plugins.{{id}}.esempio.it
-MOSAIKIT_TRUST_PROXY=true                          # il proxy imposta X-Forwarded-For
+MOSAIKIT_URL=https://{{id}}.example.com             # with a base path too: .../{{id}}
+MOSAIKIT_PLUGIN_URL=https://plugins.{{id}}.example.com
+MOSAIKIT_TRUST_PROXY=true                           # the proxy sets X-Forwarded-For
 ```
 
-Con `https://` il cookie di sessione diventa `Secure`.
+With `https://` the session cookie becomes `Secure`.
 
-## Configurazione
+## Configuration
 
-Ogni proprieta' di `mosaikit.toml` si imposta con la variabile `MOSAIKIT_*`
-corrispondente nella sezione `environment` dell'app in `compose.yml`; l'elenco
-completo, con le descrizioni, e' in `mosaikit.example.toml` nell'immagine
+Every property of `mosaikit.toml` is set with the matching `MOSAIKIT_*` variable
+in the `environment` section of the app in `compose.yml`; the full list,
+with descriptions, is in `mosaikit.example.toml` in the image
 (`/app/mosaikit.example.toml`).
 
-Comandi di amministrazione:
+Administration commands:
 
 ```sh
 docker compose exec app /app/mosaikit-server config
 docker compose exec -it app /app/mosaikit-server reset-password --user admin
 ```
 
-## Dati, backup, aggiornamento
+## Data, backup, update
 
-- Volumi: `pgdata` (database) e `appdata` (file caricati, pacchetti dei plugin).
-- Backup: `docker compose exec db pg_dump -U postgres mosaikit > backup.sql` e
-  una copia del volume `appdata`.
-- Aggiornamento: `docker load` della nuova immagine, `MOSAIKIT_VERSION` in
-  `.env`, poi `docker compose up -d` (le migrazioni si applicano all'avvio).
+- Volumes: `pgdata` (database) and `appdata` (uploaded files, plugin packages).
+- Backup: `docker compose exec db pg_dump -U postgres mosaikit > backup.sql` and
+  a copy of the `appdata` volume.
+- Update: `docker load` of the new image, `MOSAIKIT_VERSION` in
+  `.env`, then `docker compose up -d` (the migrations apply at start).
 
-Per Kubernetes vedi la cartella `{{id}}-{{version}}-k8s` della stessa release.
+For Kubernetes see the folder `{{id}}-{{version}}-k8s` of the same release.

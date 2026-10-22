@@ -1,10 +1,10 @@
-//! Finestra di avvio: icona, nome e versione del prodotto, spinner e fase in corso.
+//! Splash window: icon, name and version of the product, spinner and current phase.
 //!
-//! Compare solo se l'avvio dura piu' di mezzo secondo (tipicamente il primo avvio,
-//! o con PostgreSQL embedded) e si chiude quando l'app e' pronta. Disegnata con
-//! GDI su un buffer in memoria; vive sul thread dell'icona, che ne smista i messaggi.
+//! It appears only if the start takes more than half a second (typically the first start,
+//! or with embedded PostgreSQL) and closes when the app is ready. Drawn with
+//! GDI on an in-memory buffer; it lives on the thread of the icon, which dispatches its messages.
 
-#![allow(unsafe_code)] // API Win32: finestra, timer e disegno GDI
+#![allow(unsafe_code)] // Win32 API: window, timer and GDI drawing
 
 use std::cell::RefCell;
 use std::ptr::null_mut;
@@ -55,8 +55,8 @@ struct Colors {
 
 thread_local! {
     static SPLASH: RefCell<Option<Splash>> = const { RefCell::new(None) };
-    /// ultima fase ricevuta (anche prima che la finestra compaia)
-    static PHASE: RefCell<String> = RefCell::new(String::from("Avvio in corso"));
+    /// last phase received (even before the window appears)
+    static PHASE: RefCell<String> = RefCell::new(String::from("Starting"));
 }
 
 fn wide(s: &str) -> Vec<u16> {
@@ -84,7 +84,7 @@ fn mix(a: COLORREF, b: COLORREF, t: f32) -> COLORREF {
 
 fn font(height: i32, weight: u32) -> HFONT {
     let face = wide("Segoe UI");
-    // SAFETY: parametri numerici e nome del font terminato da zero.
+    // SAFETY: numeric parameters and zero-terminated font name.
     unsafe {
         CreateFontW(
             height,
@@ -107,7 +107,7 @@ fn font(height: i32, weight: u32) -> HFONT {
 
 fn text(hdc: HDC, f: HFONT, color: COLORREF, s: &str, mut r: RECT) {
     let w: Vec<u16> = s.encode_utf16().collect();
-    // SAFETY: hdc valido durante il disegno; testo e rettangolo vivono fino al ritorno.
+    // SAFETY: hdc valid while drawing; text and rectangle live until the return.
     unsafe {
         SelectObject(hdc, f);
         SetTextColor(hdc, color);
@@ -123,7 +123,7 @@ fn text(hdc: HDC, f: HFONT, color: COLORREF, s: &str, mut r: RECT) {
 
 fn paint(s: &Splash, hdc: HDC) {
     let c = s.colors;
-    // SAFETY: GDI su un DC in memoria creato e distrutto qui; gli oggetti creati vengono eliminati.
+    // SAFETY: GDI on an in-memory DC created and destroyed here; the objects created are deleted.
     unsafe {
         let mem = CreateCompatibleDC(hdc);
         let bmp = CreateCompatibleBitmap(hdc, W, H);
@@ -135,7 +135,7 @@ fn paint(s: &Splash, hdc: HDC) {
         let line = CreateSolidBrush(c.line);
         FrameRect(mem, &all, line);
         DeleteObject(line);
-        // barra d'accento in alto
+        // accent bar at the top
         let acc = CreateSolidBrush(c.acc);
         FillRect(mem, &RECT { left: 0, top: 0, right: W, bottom: 3 }, acc);
         DeleteObject(acc);
@@ -151,7 +151,7 @@ fn paint(s: &Splash, hdc: HDC) {
             &format!("versione {}", s.version),
             RECT { left: 93, top: 64, right: W - 24, bottom: 84 },
         );
-        // spinner: otto punti, la coda sfuma verso lo sfondo
+        // spinner: eight dots, the tail fades into the background
         let (cx, cy, rad) = (52.0f32, 130.0f32, 13.0f32);
         SelectObject(mem, GetStockObject(NULL_PEN));
         for i in 0..8u32 {
@@ -177,7 +177,7 @@ fn paint(s: &Splash, hdc: HDC) {
             mem,
             s.small_font,
             c.dim,
-            "Il primo avvio puo' richiedere qualche secondo",
+            "The first start may take a few seconds",
             RECT { left: 92, top: 146, right: W - 24, bottom: 166 },
         );
         BitBlt(hdc, 0, 0, W, H, mem, 0, 0, SRCCOPY);
@@ -214,7 +214,7 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wp: WPARAM, lp: LPARAM) 
     }
 }
 
-/// Mostra la finestra (se non e' gia' aperta).
+/// Shows the window (if it is not open yet).
 pub fn show(app: &App) {
     if SPLASH.with(|s| s.borrow().is_some()) {
         return;
@@ -229,8 +229,8 @@ pub fn show(app: &App) {
     };
     let class = wide("MosaikitSplash");
     let title = wide(&app.name);
-    // SAFETY: registrazione della classe e creazione della finestra sul thread corrente;
-    // le stringhe vivono fino al ritorno; l'icona si carica da file e si libera in `close`.
+    // SAFETY: registration of the class and creation of the window on the current thread;
+    // the strings live until the return; the icon is loaded from a file and freed in `close`.
     unsafe {
         let hinst = GetModuleHandleW(null_mut());
         let wc = WNDCLASSW {
@@ -245,7 +245,7 @@ pub fn show(app: &App) {
             lpszMenuName: null_mut(),
             lpszClassName: class.as_ptr(),
         };
-        RegisterClassW(&wc); // gia' registrata: errore innocuo
+        RegisterClassW(&wc); // already registered: harmless error
         let x = (GetSystemMetrics(SM_CXSCREEN) - W) / 2;
         let y = (GetSystemMetrics(SM_CYSCREEN) - H) / 2;
         let hwnd = CreateWindowExW(
@@ -263,10 +263,10 @@ pub fn show(app: &App) {
             null_mut(),
         );
         if hwnd.is_null() {
-            tracing::warn!("finestra di avvio non creata: {}", std::io::Error::last_os_error());
+            tracing::warn!("splash window not created: {}", std::io::Error::last_os_error());
             return;
         }
-        tracing::info!("finestra di avvio mostrata");
+        tracing::info!("splash window shown");
         let path = wide(&app.icon_file.to_string_lossy());
         let icon = LoadImageW(null_mut(), path.as_ptr(), IMAGE_ICON, 48, 48, LR_LOADFROMFILE) as HICON;
         let phase = PHASE.with(|p| p.borrow().clone());
@@ -285,19 +285,19 @@ pub fn show(app: &App) {
             })
         });
         SetTimer(hwnd, TIMER, 90, None);
-        // SetWindowPos e non ShowWindow: la prima ShowWindow del processo usa lo stato
-        // di avvio (es. collegamento "ridotto a icona") al posto di quello richiesto
+        // SetWindowPos and not ShowWindow: the first ShowWindow of the process uses the start
+        // state (e.g. a "minimized" shortcut) instead of the requested one
         SetWindowPos(hwnd, HWND_TOPMOST, x, y, W, H, SWP_SHOWWINDOW | SWP_NOACTIVATE);
     }
 }
 
-/// Aggiorna la fase mostrata (memorizzata anche se la finestra non c'e' ancora).
+/// Updates the phase shown (stored even if the window is not there yet).
 pub fn set_phase(phase: &str) {
     PHASE.with(|p| *p.borrow_mut() = phase.to_string());
     SPLASH.with(|s| {
         if let Some(s) = s.borrow_mut().as_mut() {
             s.phase = phase.to_string();
-            // SAFETY: finestra creata da `show` sul thread corrente.
+            // SAFETY: window created by `show` on the current thread.
             unsafe {
                 InvalidateRect(s.hwnd, null_mut(), 0);
             }
@@ -305,11 +305,11 @@ pub fn set_phase(phase: &str) {
     });
 }
 
-/// Chiude la finestra e libera le risorse.
+/// Closes the window and frees the resources.
 pub fn close() {
-    // si estrae lo stato prima di distruggere la finestra (DestroyWindow invia messaggi)
+    // the state is taken out before destroying the window (DestroyWindow sends messages)
     let Some(s) = SPLASH.with(|s| s.borrow_mut().take()) else { return };
-    // SAFETY: handle creati da `show` e non ancora liberati.
+    // SAFETY: handles created by `show` and not freed yet.
     unsafe {
         KillTimer(s.hwnd, TIMER);
         DestroyWindow(s.hwnd);

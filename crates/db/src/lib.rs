@@ -1,13 +1,13 @@
-//! Accesso ai dati di Mosaikit: PostgreSQL o SQLite, con le stesse regole.
+//! Data access of Mosaikit: PostgreSQL or SQLite, with the same rules.
 //!
-//! - `query`/`query_scalar`: SQL scritto per PostgreSQL; su SQLite viene tradotto
-//!   (vedi `mosaikit_sql_guard::sqlite`) o sostituito con `.sqlite(...)`;
-//! - transazioni con contesto di sicurezza (utente, tenant, plugin, link pubblico);
-//! - transazioni dei plugin: su PostgreSQL ruolo del plugin + RLS, su SQLite
-//!   righe filtrate dalla riscrittura delle query e trigger di controllo;
-//! - schemi dei plugin: migrazioni, verifiche, congelamento.
+//! - `query`/`query_scalar`: SQL written for PostgreSQL; on SQLite it is translated
+//!   (see `mosaikit_sql_guard::sqlite`) or replaced with `.sqlite(...)`;
+//! - transactions with a security context (user, tenant, plugin, public link);
+//! - transactions of the plugins: on PostgreSQL role of the plugin + RLS, on SQLite
+//!   rows filtered by rewriting the queries and check triggers;
+//! - schemas of the plugins: migrations, checks, freezing.
 //!
-//! Vedi `docs/architettura.md` §7.
+//! See `docs/architecture.md` §7.
 
 mod lite;
 mod pg;
@@ -29,10 +29,10 @@ pub enum DbError {
     Sqlx(#[from] sqlx::Error),
     #[error(transparent)]
     Migrate(#[from] sqlx::migrate::MigrateError),
-    /// errore SQL con codice SQLSTATE (anche da SQLite, tradotto)
+    /// SQL error with an SQLSTATE code (SQLite too, translated)
     #[error("{message}")]
     Sql { code: Option<String>, message: String },
-    #[error("nessuna riga")]
+    #[error("no row")]
     RowNotFound,
     #[error("{0}")]
     Decode(String),
@@ -42,7 +42,7 @@ pub enum DbError {
 
 pub type Result<T> = std::result::Result<T, DbError>;
 
-/// Codice SQLSTATE di un errore, se presente.
+/// SQLSTATE code of an error, if any.
 pub fn sqlstate(e: &DbError) -> Option<String> {
     match e {
         DbError::Sqlx(sqlx::Error::Database(d)) => d.code().map(|c| c.to_string()),
@@ -51,13 +51,13 @@ pub fn sqlstate(e: &DbError) -> Option<String> {
     }
 }
 
-/// Contesto di sicurezza di una transazione.
+/// Security context of a transaction.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Ctx {
     pub user: Option<Uuid>,
     pub tenant: Option<Uuid>,
     pub plugin: Option<String>,
-    /// risorsa raggiunta tramite link pubblico (sola lettura)
+    /// resource reached through a public link (read only)
     pub link: Option<Uuid>,
 }
 
@@ -87,12 +87,12 @@ enum Inner {
 }
 
 impl Db {
-    /// PostgreSQL: connette, verifica la versione, applica le migrazioni core.
+    /// PostgreSQL: connects, checks the version, applies the core migrations.
     pub async fn connect(url: &str, max_connections: u32) -> Result<Db> {
         Ok(Db { inner: Inner::Pg(Box::new(pg::PgDb::connect(url, max_connections).await?)) })
     }
 
-    /// SQLite: apre (o crea) il file e applica le migrazioni core.
+    /// SQLite: opens (or creates) the file and applies the core migrations.
     pub async fn open_sqlite(path: &Path, max_connections: u32) -> Result<Db> {
         Ok(Db { inner: Inner::Lite(lite::LiteDb::open(path, max_connections).await?) })
     }
@@ -108,7 +108,7 @@ impl Db {
         self.backend() == Backend::Sqlite
     }
 
-    /// Pool PostgreSQL dell'applicazione (strumenti e test specifici di PostgreSQL).
+    /// PostgreSQL pool of the application (PostgreSQL-specific tools and tests).
     pub fn pg_pool(&self) -> Option<&sqlx::PgPool> {
         match &self.inner {
             Inner::Pg(p) => Some(&p.app),
@@ -116,7 +116,7 @@ impl Db {
         }
     }
 
-    /// Prefisso dei ruoli PostgreSQL (vuoto su SQLite).
+    /// Prefix of the PostgreSQL roles (empty on SQLite).
     pub fn role_prefix(&self) -> &str {
         match &self.inner {
             Inner::Pg(p) => &p.role_prefix,
@@ -124,7 +124,7 @@ impl Db {
         }
     }
 
-    /// Transazione dell'applicazione senza contesto (operazioni amministrative).
+    /// Transaction of the application without context (administrative operations).
     pub async fn begin_app(&self) -> Result<Tx> {
         Ok(Tx(match &self.inner {
             Inner::Pg(p) => TxConn::Pg(p.begin_app().await?),
@@ -132,7 +132,7 @@ impl Db {
         }))
     }
 
-    /// Transazione dell'applicazione con il contesto impostato.
+    /// Transaction of the application with the context set.
     pub async fn begin(&self, ctx: &Ctx) -> Result<Tx> {
         Ok(Tx(match &self.inner {
             Inner::Pg(p) => TxConn::Pg(p.begin(ctx).await?),
@@ -140,7 +140,7 @@ impl Db {
         }))
     }
 
-    /// Transazione del plugin: vede solo le righe consentite dal contesto.
+    /// Transaction of the plugin: it sees only the rows the context allows.
     pub async fn begin_plugin(&self, plugin_id: &str, ctx: &Ctx) -> Result<Tx> {
         let ctx = Ctx { plugin: Some(plugin_id.to_string()), ..ctx.clone() };
         Ok(Tx(match &self.inner {
@@ -149,7 +149,7 @@ impl Db {
         }))
     }
 
-    /// Da chiamare dopo installazione, aggiornamento o disinstallazione di un plugin.
+    /// To call after installing, updating or uninstalling a plugin.
     pub async fn forget_plugin_pool(&self, plugin_id: &str) {
         match &self.inner {
             Inner::Pg(p) => p.forget_plugin_pool(plugin_id).await,
@@ -157,7 +157,7 @@ impl Db {
         }
     }
 
-    /// Nome del ruolo PostgreSQL di un plugin (su SQLite non ci sono ruoli: informativo).
+    /// Name of the PostgreSQL role of a plugin (SQLite has no roles: informative).
     pub fn plugin_role(&self, plugin_id: &str) -> String {
         match &self.inner {
             Inner::Pg(p) => p.plugin_role(plugin_id),
@@ -165,7 +165,7 @@ impl Db {
         }
     }
 
-    /// Schema del plugin per migrazioni e verifiche.
+    /// Schema of the plugin for migrations and checks.
     pub fn plugin_schema(&self, plugin_id: &str, schema: &str) -> PluginSchema {
         PluginSchema(match &self.inner {
             Inner::Pg(p) => SchemaInner::Pg(p.plugin_schema(plugin_id, schema)),
@@ -181,7 +181,7 @@ impl Db {
     }
 }
 
-// ------------------------------------------------------------------ transazioni
+// ------------------------------------------------------------------ transactions
 
 pub struct Tx(TxConn);
 
@@ -236,7 +236,7 @@ impl TxConn {
         self.sql("rollback to savepoint msk_sp").await
     }
 
-    /// Nuova risorsa del contesto (utente, tenant e plugin della transazione).
+    /// New resource of the context (user, tenant and plugin of the transaction).
     pub async fn create_resource(
         &mut self,
         kind: &str,
@@ -258,7 +258,7 @@ impl TxConn {
         }
     }
 
-    /// Aggiorna titolo, meta (unione) e dimensione; richiede scrittura.
+    /// Updates title, meta (merge) and size; requires write.
     pub async fn update_resource(
         &mut self,
         id: Uuid,
@@ -279,7 +279,7 @@ impl TxConn {
         }
     }
 
-    /// Sposta una risorsa (gestione sulla risorsa, scrittura sulla destinazione).
+    /// Moves a resource (manage on the resource, write on the destination).
     pub async fn move_resource(&mut self, id: Uuid, parent: Option<Uuid>) -> Result<()> {
         match self {
             TxConn::Pg(_) => query("select core.move_resource($1, $2)")
@@ -292,7 +292,7 @@ impl TxConn {
         }
     }
 
-    /// Elimina una risorsa e i discendenti (gestione richiesta). Ritorna gli id eliminati.
+    /// Deletes a resource and its descendants (manage required). Returns the deleted ids.
     pub async fn delete_resource(&mut self, id: Uuid) -> Result<Vec<Uuid>> {
         match self {
             TxConn::Pg(_) => {
@@ -302,9 +302,9 @@ impl TxConn {
         }
     }
 
-    /// SQL di un plugin, gia' verificato da sql-guard, in un savepoint (un errore non
-    /// invalida la transazione). `rows`: ritorna le righe come array JSON, altrimenti
-    /// `{"rows": <righe toccate>}`.
+    /// SQL of a plugin, already checked by sql-guard, in a savepoint (an error does not
+    /// invalidate the transaction). `rows`: returns the rows as a JSON array, otherwise
+    /// `{"rows": <rows affected>}`.
     pub async fn plugin_sql(
         &mut self,
         sql: &str,
@@ -347,9 +347,9 @@ impl TxConn {
     }
 }
 
-// ------------------------------------------------------------------ query
+// ------------------------------------------------------------------ queries
 
-/// Dove eseguire una query: il pool dell'applicazione o una transazione.
+/// Where to run a query: the pool of the application or a transaction.
 pub enum Target<'a> {
     Db(&'a Db),
     Conn(&'a mut TxConn),
@@ -373,13 +373,13 @@ impl<'a> From<&'a mut Tx> for Target<'a> {
     }
 }
 
-/// Query con parametri `$1, $2, ...` (sintassi PostgreSQL).
+/// Query with parameters `$1, $2, ...` (PostgreSQL syntax).
 #[derive(Debug, Clone)]
 pub struct Query {
     pub(crate) sql: String,
     pub(crate) lite: Option<String>,
     pub(crate) params: Vec<Param>,
-    /// DDL o SQL dinamico: niente prepared statement in cache (PostgreSQL)
+    /// DDL or dynamic SQL: no cached prepared statement (PostgreSQL)
     pub(crate) raw: bool,
 }
 
@@ -387,7 +387,7 @@ pub fn query(sql: impl Into<String>) -> Query {
     Query { sql: sql.into(), lite: None, params: Vec::new(), raw: false }
 }
 
-/// Risultato di `execute`.
+/// Result of `execute`.
 #[derive(Debug, Clone, Copy)]
 pub struct Done(u64);
 
@@ -403,7 +403,7 @@ impl Query {
         self
     }
 
-    /// Variante per SQLite, quando la traduzione automatica non basta.
+    /// Variant for SQLite, when the automatic translation is not enough.
     pub fn sqlite(mut self, sql: impl Into<String>) -> Query {
         self.lite = Some(sql.into());
         self
@@ -444,7 +444,7 @@ impl Query {
     }
 }
 
-/// Query che ritorna una sola colonna.
+/// Query that returns a single column.
 pub struct QueryScalar<O> {
     q: Query,
     _o: std::marker::PhantomData<fn() -> O>,
@@ -481,7 +481,7 @@ where
     }
 }
 
-// ------------------------------------------------------------------ schemi dei plugin
+// ------------------------------------------------------------------ schemas of the plugins
 
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct FinalizeReport {
@@ -500,19 +500,19 @@ enum SchemaInner {
 fn pg_tx(tx: &mut TxConn) -> Result<&mut pg::PgTx> {
     match tx {
         TxConn::Pg(t) => Ok(t),
-        TxConn::Lite(_) => Err(DbError::Invalid("transazione SQLite su uno schema PostgreSQL".into())),
+        TxConn::Lite(_) => Err(DbError::Invalid("SQLite transaction on a PostgreSQL schema".into())),
     }
 }
 
 fn lite_tx(tx: &mut TxConn) -> Result<&mut lite::LiteTx> {
     match tx {
         TxConn::Lite(t) => Ok(t),
-        TxConn::Pg(_) => Err(DbError::Invalid("transazione PostgreSQL su uno schema SQLite".into())),
+        TxConn::Pg(_) => Err(DbError::Invalid("PostgreSQL transaction on an SQLite schema".into())),
     }
 }
 
 impl PluginSchema {
-    /// Schemi aggiunti al search_path del plugin dopo il suo (estensioni come PostGIS).
+    /// Schemas added to the search_path of the plugin after its own (extensions such as PostGIS).
     pub fn with_search_path(mut self, extra: Vec<String>) -> PluginSchema {
         if let SchemaInner::Pg(s) = &mut self.0 {
             s.extra_path = extra;
@@ -520,7 +520,7 @@ impl PluginSchema {
         self
     }
 
-    /// Crea (o aggiorna) lo spazio del plugin. Idempotente.
+    /// Creates (or updates) the space of the plugin. Idempotent.
     pub async fn provision(&self, tx: &mut TxConn, password: &str) -> Result<()> {
         match &self.0 {
             SchemaInner::Pg(s) => s.provision(pg_tx(tx)?, password).await,
@@ -528,7 +528,7 @@ impl PluginSchema {
         }
     }
 
-    /// Prepara lo schema per una migrazione.
+    /// Prepares the schema for a migration.
     pub async fn thaw(&self, tx: &mut TxConn) -> Result<()> {
         match &self.0 {
             SchemaInner::Pg(s) => s.thaw(pg_tx(tx)?).await,
@@ -536,7 +536,7 @@ impl PluginSchema {
         }
     }
 
-    /// Esegue istruzioni gia' verificate da sql-guard nello spazio del plugin.
+    /// Runs statements already checked by sql-guard in the space of the plugin.
     pub async fn run_as_plugin(&self, tx: &mut TxConn, statements: &[String]) -> Result<()> {
         match &self.0 {
             SchemaInner::Pg(s) => s.run_as_plugin(pg_tx(tx)?, statements).await,
@@ -544,7 +544,7 @@ impl PluginSchema {
         }
     }
 
-    /// Verifica le regole e applica la sicurezza (RLS o trigger).
+    /// Checks the rules and applies the security (RLS or triggers).
     pub async fn freeze(&self, tx: &mut TxConn) -> Result<FinalizeReport> {
         match &self.0 {
             SchemaInner::Pg(s) => s.freeze(pg_tx(tx)?).await,
@@ -552,7 +552,7 @@ impl PluginSchema {
         }
     }
 
-    /// Colonne di una tabella del plugin: nome -> tipo (nomi dei tipi di PostgreSQL).
+    /// Columns of a table of the plugin: name -> type (names of the PostgreSQL types).
     pub async fn columns(&self, tx: &mut TxConn, table: &str) -> Result<Vec<(String, String)>> {
         match &self.0 {
             SchemaInner::Pg(s) => s.columns(pg_tx(tx)?, table).await,
@@ -560,7 +560,7 @@ impl PluginSchema {
         }
     }
 
-    /// Rimuove tutto lo spazio del plugin (disinstallazione).
+    /// Removes the whole space of the plugin (uninstall).
     pub async fn drop(&self, tx: &mut TxConn) -> Result<()> {
         match &self.0 {
             SchemaInner::Pg(s) => s.drop(pg_tx(tx)?).await,
@@ -569,14 +569,14 @@ impl PluginSchema {
     }
 }
 
-// ------------------------------------------------------------------ utilita'
+// ------------------------------------------------------------------ utilities
 
-/// Identificatore SQL tra virgolette.
+/// Quoted SQL identifier.
 pub fn qi(s: &str) -> String {
     format!("\"{}\"", s.replace('"', "\"\""))
 }
 
-/// Letterale SQL tra apici.
+/// Quoted SQL literal.
 pub fn ql(s: &str) -> String {
     format!("'{}'", s.replace('\'', "''"))
 }
@@ -586,7 +586,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn nomi_ruoli() {
+    fn role_names() {
         assert_eq!(role_prefix("mosaikit"), "msk_mosaikit");
         assert_eq!(role_prefix("msk_t_abc"), "msk_t_abc");
         assert!(role_prefix(&"x".repeat(80)).len() <= 28);

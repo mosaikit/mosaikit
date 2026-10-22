@@ -1,4 +1,4 @@
-//! Risorse dei plugin: proprieta', condivisione, isolamento, gestore, hook, comandi, KPI.
+//! Resources of the plugins: ownership, sharing, isolation, manager, hooks, commands, KPIs.
 
 use mosaikit_kernel::acl::{grants, manager_resources, set_grant, transfer_owner, Level, ResourceFilter};
 use mosaikit_kernel::tenancy::{
@@ -20,7 +20,7 @@ fn id(row: &Value) -> Uuid {
 }
 
 async fn note(t: &TestKernel, c: &Caller, title: &str) -> Value {
-    crud::create(t, c, NOTES, "notes", &vals(json!({ "title": title, "body": "riservato" })), None)
+    crud::create(t, c, NOTES, "notes", &vals(json!({ "title": title, "body": "confidential" })), None)
         .await
         .unwrap()
 }
@@ -39,10 +39,10 @@ async fn titles(t: &TestKernel, c: &Caller) -> Vec<String> {
 
 struct World {
     t: TestKernel,
-    gestore: Caller,
+    mgr: Caller,
     anna: Caller,
     bruno: Caller,
-    altro_tenant: Caller,
+    other_tenant: Caller,
 }
 
 async fn world() -> World {
@@ -53,46 +53,46 @@ async fn world() -> World {
     let bruno = t.member(&g, "bruno").await;
     let gb = t.tenant("beta").await;
     World {
-        gestore: t.home(&g).await,
+        mgr: t.home(&g).await,
         anna: t.home(&anna).await,
         bruno: t.home(&bruno).await,
-        altro_tenant: t.home(&gb).await,
+        other_tenant: t.home(&gb).await,
         t,
     }
 }
 
 #[tokio::test]
-async fn proprieta_e_livelli_di_condivisione() {
+async fn ownership_and_sharing_levels() {
     let w = world().await;
     let t = &w.t;
     let row = note(t, &w.anna, "piano").await;
     let rid = id(&row);
     assert_eq!(row["my_level"], "manage");
-    assert_eq!(row["values"]["tag"], "personale", "hook before_create del plugin notes");
+    assert_eq!(row["values"]["tag"], "personale", "before_create hook of the notes plugin");
 
     assert_eq!(titles(t, &w.anna).await, vec!["piano"]);
-    assert!(titles(t, &w.bruno).await.is_empty(), "non condivisa");
+    assert!(titles(t, &w.bruno).await.is_empty(), "not shared");
     assert_eq!(crud::get(t, &w.bruno, NOTES, "notes", rid).await.unwrap_err().kind, Kind::NotFound);
 
-    // lettura
+    // read
     set_grant(t, &w.anna, rid, "user", w.bruno.user.user_id, Some(Level::Read)).await.unwrap();
     assert_eq!(titles(t, &w.bruno).await, vec!["piano"]);
     let e = crud::update(t, &w.bruno, NOTES, "notes", rid, &vals(json!({ "title": "x" }))).await.unwrap_err();
     assert_eq!(e.kind, Kind::Forbidden);
-    // scrittura: modifica ma non elimina ne' condivide
+    // write: changes but neither deletes nor shares
     set_grant(t, &w.anna, rid, "user", w.bruno.user.user_id, Some(Level::Write)).await.unwrap();
-    let upd = crud::update(t, &w.bruno, NOTES, "notes", rid, &vals(json!({ "body": "rivisto da bruno" })))
+    let upd = crud::update(t, &w.bruno, NOTES, "notes", rid, &vals(json!({ "body": "reviewed by bruno" })))
         .await
         .unwrap();
-    assert_eq!(upd["values"]["title"], "piano", "aggiornamento parziale");
-    assert_eq!(upd["values"]["body"], "rivisto da bruno");
+    assert_eq!(upd["values"]["title"], "piano", "partial update");
+    assert_eq!(upd["values"]["body"], "reviewed by bruno");
     assert_eq!(crud::delete(t, &w.bruno, NOTES, "notes", rid).await.unwrap_err().kind, Kind::Forbidden);
-    let e = set_grant(t, &w.bruno, rid, "user", w.gestore.user.user_id, Some(Level::Read)).await.unwrap_err();
+    let e = set_grant(t, &w.bruno, rid, "user", w.mgr.user.user_id, Some(Level::Read)).await.unwrap_err();
     assert_eq!(e.kind, Kind::Forbidden);
-    // gestione: condivide ed elimina
+    // manage: shares and deletes
     set_grant(t, &w.anna, rid, "user", w.bruno.user.user_id, Some(Level::Manage)).await.unwrap();
     assert_eq!(grants(t, &w.bruno, rid).await.unwrap().len(), 1);
-    // revoca
+    // revocation
     set_grant(t, &w.anna, rid, "user", w.bruno.user.user_id, None).await.unwrap();
     assert!(titles(t, &w.bruno).await.is_empty());
     crud::delete(t, &w.anna, NOTES, "notes", rid).await.unwrap();
@@ -100,61 +100,61 @@ async fn proprieta_e_livelli_di_condivisione() {
 }
 
 #[tokio::test]
-async fn condivisione_con_gruppo() {
+async fn sharing_with_a_group() {
     let w = world().await;
     let t = &w.t;
-    let rid = id(&note(t, &w.anna, "di gruppo").await);
-    let gid = create_group(t, &w.gestore, "Redazione").await.unwrap();
+    let rid = id(&note(t, &w.anna, "group note").await);
+    let gid = create_group(t, &w.mgr, "Editorial").await.unwrap();
     set_grant(t, &w.anna, rid, "group", gid, Some(Level::Read)).await.unwrap();
     assert!(titles(t, &w.bruno).await.is_empty());
-    set_group_member(t, &w.gestore, gid, w.bruno.user.user_id, true).await.unwrap();
-    assert_eq!(titles(t, &w.bruno).await, vec!["di gruppo"]);
-    set_group_member(t, &w.gestore, gid, w.bruno.user.user_id, false).await.unwrap();
+    set_group_member(t, &w.mgr, gid, w.bruno.user.user_id, true).await.unwrap();
+    assert_eq!(titles(t, &w.bruno).await, vec!["group note"]);
+    set_group_member(t, &w.mgr, gid, w.bruno.user.user_id, false).await.unwrap();
     assert!(titles(t, &w.bruno).await.is_empty());
 }
 
 #[tokio::test]
-async fn isolamento_tra_tenant() {
+async fn isolation_between_tenants() {
     let w = world().await;
     let t = &w.t;
-    let rid = id(&note(t, &w.anna, "solo alfa").await);
-    assert!(titles(t, &w.altro_tenant).await.is_empty());
-    assert_eq!(crud::get(t, &w.altro_tenant, NOTES, "notes", rid).await.unwrap_err().kind, Kind::NotFound);
-    // non si condivide con chi non e' membro del tenant
+    let rid = id(&note(t, &w.anna, "alfa only").await);
+    assert!(titles(t, &w.other_tenant).await.is_empty());
+    assert_eq!(crud::get(t, &w.other_tenant, NOTES, "notes", rid).await.unwrap_err().kind, Kind::NotFound);
+    // no sharing with whoever is not a member of the tenant
     let e =
-        set_grant(t, &w.anna, rid, "user", w.altro_tenant.user.user_id, Some(Level::Read)).await.unwrap_err();
+        set_grant(t, &w.anna, rid, "user", w.other_tenant.user.user_id, Some(Level::Read)).await.unwrap_err();
     assert_eq!(e.kind, Kind::BadRequest);
-    // un ospite invitato invece si'
-    let inv = invite(t, &w.gestore, "beta", "beta-gestore", Role::User).await.unwrap();
-    let ospite = w.altro_tenant.user.clone();
-    respond_invitation(t, &ospite, my_invitations(t, &ospite).await.unwrap()[0].id, true).await.unwrap();
+    // an invited guest instead yes
+    let inv = invite(t, &w.mgr, "beta", "beta-manager", Role::User).await.unwrap();
+    let guest = w.other_tenant.user.clone();
+    respond_invitation(t, &guest, my_invitations(t, &guest).await.unwrap()[0].id, true).await.unwrap();
     let _ = inv;
-    set_grant(t, &w.anna, rid, "user", ospite.user_id, Some(Level::Read)).await.unwrap();
-    let ospite_in_alfa = t.caller(&ospite, "alfa").await;
-    assert_eq!(titles(t, &ospite_in_alfa).await, vec!["solo alfa"]);
-    assert!(titles(t, &w.altro_tenant).await.is_empty(), "nel suo tenant la nota non c'e'");
+    set_grant(t, &w.anna, rid, "user", guest.user_id, Some(Level::Read)).await.unwrap();
+    let guest_in_alfa = t.caller(&guest, "alfa").await;
+    assert_eq!(titles(t, &guest_in_alfa).await, vec!["alfa only"]);
+    assert!(titles(t, &w.other_tenant).await.is_empty(), "the note is not in their tenant");
 }
 
 #[tokio::test]
-async fn il_gestore_vede_metadati_non_contenuti() {
+async fn the_manager_sees_metadata_not_contents() {
     let w = world().await;
     let t = &w.t;
-    let rid = id(&note(t, &w.anna, "verbale riservato").await);
-    assert!(titles(t, &w.gestore).await.is_empty(), "il gestore non legge il contenuto");
-    assert_eq!(crud::get(t, &w.gestore, NOTES, "notes", rid).await.unwrap_err().kind, Kind::NotFound);
-    let meta = manager_resources(t, &w.gestore, &ResourceFilter::default()).await.unwrap();
+    let rid = id(&note(t, &w.anna, "confidential minutes").await);
+    assert!(titles(t, &w.mgr).await.is_empty(), "the manager does not read the content");
+    assert_eq!(crud::get(t, &w.mgr, NOTES, "notes", rid).await.unwrap_err().kind, Kind::NotFound);
+    let meta = manager_resources(t, &w.mgr, &ResourceFilter::default()).await.unwrap();
     assert_eq!(meta.len(), 1);
-    assert_eq!(meta[0].title, "verbale riservato");
+    assert_eq!(meta[0].title, "confidential minutes");
     assert_eq!(meta[0].owner_name, "anna");
     let json = serde_json::to_string(&meta).unwrap();
-    assert!(!json.contains("riservato\"") || !json.contains("body"), "nessun campo di contenuto");
-    // policy: titoli nascosti
-    let mut s = w.gestore.tenant.settings.clone();
+    assert!(!json.contains("confidential\"") || !json.contains("body"), "no content field");
+    // policy: hidden titles
+    let mut s = w.mgr.tenant.settings.clone();
     s.managers_see_titles = false;
-    set_settings(t, &w.gestore, &s).await.unwrap();
-    let g2 = t.caller(&w.gestore.user, "alfa").await;
+    set_settings(t, &w.mgr, &s).await.unwrap();
+    let g2 = t.caller(&w.mgr.user, "alfa").await;
     assert_eq!(manager_resources(t, &g2, &ResourceFilter::default()).await.unwrap()[0].title, "");
-    // un membro non vede l'elenco
+    // a member does not see the list
     assert_eq!(
         manager_resources(t, &w.anna, &ResourceFilter::default()).await.unwrap_err().kind,
         Kind::Forbidden
@@ -162,82 +162,83 @@ async fn il_gestore_vede_metadati_non_contenuti() {
 }
 
 #[tokio::test]
-async fn riassegnazione_quando_un_utente_esce() {
+async fn reassignment_when_a_user_leaves() {
     let w = world().await;
     let t = &w.t;
     let r1 = id(&note(t, &w.anna, "uno").await);
     note(t, &w.anna, "due").await;
-    set_grant(t, &w.anna, r1, "user", w.gestore.user.user_id, Some(Level::Read)).await.unwrap();
-    let e = remove_member(t, &w.gestore, w.anna.user.user_id, None).await.unwrap_err();
-    assert!(e.message.contains("riassegnarle"), "{e}");
-    let rep = remove_member(t, &w.gestore, w.anna.user.user_id, Some(w.bruno.user.user_id)).await.unwrap();
+    set_grant(t, &w.anna, r1, "user", w.mgr.user.user_id, Some(Level::Read)).await.unwrap();
+    let e = remove_member(t, &w.mgr, w.anna.user.user_id, None).await.unwrap_err();
+    assert!(e.message.contains("reassign"), "{e}");
+    let rep = remove_member(t, &w.mgr, w.anna.user.user_id, Some(w.bruno.user.user_id)).await.unwrap();
     assert_eq!(rep.reassigned, 2);
     assert!(rep.disabled);
-    assert_eq!(titles(t, &w.bruno).await, vec!["due", "uno"], "bruno e' il nuovo proprietario");
+    assert_eq!(titles(t, &w.bruno).await, vec!["due", "uno"], "bruno is the new owner");
     let row = crud::get(t, &w.bruno, NOTES, "notes", r1).await.unwrap();
     assert_eq!(row["my_level"], "manage");
-    // i grant esistenti restano
-    assert_eq!(titles(t, &w.gestore).await, vec!["uno"]);
+    // the existing grants stay
+    assert_eq!(titles(t, &w.mgr).await, vec!["uno"]);
 }
 
 #[tokio::test]
-async fn trasferimento_di_proprieta() {
+async fn ownership_transfer() {
     let w = world().await;
     let t = &w.t;
-    let rid = id(&note(t, &w.anna, "passa a bruno").await);
+    let rid = id(&note(t, &w.anna, "goes to bruno").await);
     assert_eq!(
         transfer_owner(t, &w.bruno, rid, w.bruno.user.user_id).await.unwrap_err().kind,
         Kind::Forbidden
     );
     transfer_owner(t, &w.anna, rid, w.bruno.user.user_id).await.unwrap();
     assert!(titles(t, &w.anna).await.is_empty());
-    assert_eq!(titles(t, &w.bruno).await, vec!["passa a bruno"]);
-    // anche il gestore puo' trasferire
-    transfer_owner(t, &w.gestore, rid, w.anna.user.user_id).await.unwrap();
-    assert_eq!(titles(t, &w.anna).await, vec!["passa a bruno"]);
+    assert_eq!(titles(t, &w.bruno).await, vec!["goes to bruno"]);
+    // the manager can transfer too
+    transfer_owner(t, &w.mgr, rid, w.anna.user.user_id).await.unwrap();
+    assert_eq!(titles(t, &w.anna).await, vec!["goes to bruno"]);
 }
 
 #[tokio::test]
-async fn validazione_e_hook_che_rifiutano() {
+async fn validation_and_refusing_hooks() {
     let w = world().await;
     let t = &w.t;
     t.install("contacts").await;
     let c = &w.anna;
-    let e =
-        crud::create(t, c, NOTES, "notes", &vals(json!({ "body": "senza titolo" })), None).await.unwrap_err();
-    assert!(e.message.contains("obbligatorio"), "{e}");
+    let e = crud::create(t, c, NOTES, "notes", &vals(json!({ "body": "without title" })), None)
+        .await
+        .unwrap_err();
+    assert!(e.message.contains("required"), "{e}");
     let e = crud::create(t, c, NOTES, "notes", &vals(json!({ "title": "x", "tag": "inesistente" })), None)
         .await
         .unwrap_err();
-    assert!(e.message.contains("opzioni"), "{e}");
+    assert!(e.message.contains("options"), "{e}");
     let e = crud::create(t, c, NOTES, "notes", &vals(json!({ "title": "x", "nope": 1 })), None)
         .await
         .unwrap_err();
-    assert!(e.message.contains("sconosciuto"), "{e}");
+    assert!(e.message.contains("unknown"), "{e}");
 
     let ok = crud::create(
         t,
         c,
         "com.mosaikit.contacts",
         "contacts",
-        &vals(json!({ "name": "Mario", "email": "Mario@Esempio.IT" })),
+        &vals(json!({ "name": "Mario", "email": "Mario@Example.COM" })),
         None,
     )
     .await
     .unwrap();
-    assert_eq!(ok["values"]["email"], "mario@esempio.it");
+    assert_eq!(ok["values"]["email"], "mario@example.com");
     let e = crud::create(
         t,
         c,
         "com.mosaikit.contacts",
         "contacts",
-        &vals(json!({ "name": "Luigi", "email": "non-valida" })),
+        &vals(json!({ "name": "Luigi", "email": "not-valid" })),
         None,
     )
     .await
     .unwrap_err();
     assert!(e.message.contains("email non valida"), "{e}");
-    // l'hook ha rifiutato: nessuna risorsa orfana
+    // the hook refused: no orphan resource
     let n: i64 = mosaikit_db::query_scalar(
         "select count(*) from core.resources where plugin_id = 'com.mosaikit.contacts'",
     )
@@ -248,7 +249,7 @@ async fn validazione_e_hook_che_rifiutano() {
 }
 
 #[tokio::test]
-async fn hook_con_valori_precedenti_e_campi_calcolati() {
+async fn hook_with_previous_values_and_computed_fields() {
     let w = world().await;
     let t = &w.t;
     t.install("tasks").await;
@@ -259,7 +260,7 @@ async fn hook_con_valori_precedenti_e_campi_calcolati() {
         c,
         "com.mosaikit.tasks",
         "tasks",
-        &vals(json!({ "title": "relazione", "done": false })),
+        &vals(json!({ "title": "report", "done": false })),
         None,
     )
     .await
@@ -269,7 +270,7 @@ async fn hook_con_valori_precedenti_e_campi_calcolati() {
     let done = crud::update(t, c, "com.mosaikit.tasks", "tasks", id(&task), &vals(json!({ "done": true })))
         .await
         .unwrap();
-    assert!(done["values"]["completed_on"].as_str().unwrap().len() == 10, "data di completamento dal DB");
+    assert!(done["values"]["completed_on"].as_str().unwrap().len() == 10, "completion date from the DB");
 
     let cfg = json!({ "layers": [{ "id": "a" }, { "id": "b" }, { "id": "c" }] }).to_string();
     let map = crud::create(
@@ -277,7 +278,7 @@ async fn hook_con_valori_precedenti_e_campi_calcolati() {
         c,
         "com.mosaikit.maps",
         "maps",
-        &vals(json!({ "name": "Rete idrica", "config": cfg })),
+        &vals(json!({ "name": "Water network", "config": cfg })),
         None,
     )
     .await
@@ -286,7 +287,7 @@ async fn hook_con_valori_precedenti_e_campi_calcolati() {
 }
 
 #[tokio::test]
-async fn comandi_wasm_rispettano_la_rls() {
+async fn wasm_commands_respect_rls() {
     let w = world().await;
     let t = &w.t;
     note(t, &w.anna, "a1").await;
@@ -296,43 +297,43 @@ async fn comandi_wasm_rispettano_la_rls() {
     note(t, &w.bruno, "b1").await;
     let mine = crud::call(t, &w.anna, NOTES, "notes.count_by_tag", json!({})).await.unwrap();
     let total: i64 = mine.as_array().unwrap().iter().map(|r| r["n"].as_i64().unwrap()).sum();
-    assert_eq!(total, 2, "il comando vede solo le note di anna: {mine}");
+    assert_eq!(total, 2, "the command sees only anna's notes: {mine}");
     let e = crud::call(t, &w.anna, NOTES, "notes.inesistente", json!({})).await.unwrap_err();
-    assert!(e.message.contains("sconosciuto"));
+    assert!(e.message.contains("unknown"));
 }
 
 #[tokio::test]
-async fn kpi_per_tenant_e_globali() {
+async fn kpis_per_tenant_and_global() {
     let w = world().await;
     let t = &w.t;
     note(t, &w.anna, "1").await;
     crud::create(t, &w.bruno, NOTES, "notes", &vals(json!({ "title": "2", "tag": "lavoro" })), None)
         .await
         .unwrap();
-    note(t, &w.altro_tenant, "beta").await;
+    note(t, &w.other_tenant, "beta").await;
 
-    let k = kpi::tenant(t, &w.gestore).await.unwrap();
+    let k = kpi::tenant(t, &w.mgr).await.unwrap();
     assert_eq!(k.core.members, 3);
     assert_eq!(k.core.resources.iter().map(|r| r.count).sum::<i64>(), 2);
     let notes_kpi = k.plugins.iter().find(|p| p.view == "kpi_notes_by_tag").unwrap();
     let total: i64 = notes_kpi.rows.iter().map(|r| r["note"].as_i64().unwrap()).sum();
-    assert_eq!(total, 2, "solo il tenant alfa");
+    assert_eq!(total, 2, "only the alfa tenant");
     assert!(notes_kpi.rows.iter().all(|r| r.get("tenant_id").is_none()));
     assert_eq!(kpi::tenant(t, &w.anna).await.unwrap_err().kind, Kind::Forbidden);
 
     let admin = t.admin().await;
     let g = kpi::global(t, &admin).await.unwrap();
-    assert_eq!(g.tenants.len(), 2, "il tenant di sistema non e' tra i tenant");
+    assert_eq!(g.tenants.len(), 2, "the system tenant is not among the tenants");
     let notes_kpi = g.plugins.iter().find(|p| p.view == "kpi_notes_by_tag").unwrap();
     let tenants: std::collections::BTreeSet<&str> =
         notes_kpi.rows.iter().map(|r| r["tenant"].as_str().unwrap()).collect();
     assert_eq!(tenants.into_iter().collect::<Vec<_>>(), vec!["alfa", "beta"]);
-    assert_eq!(kpi::global(t, &w.gestore.user).await.unwrap_err().kind, Kind::Forbidden);
+    assert_eq!(kpi::global(t, &w.mgr.user).await.unwrap_err().kind, Kind::Forbidden);
 }
 
-/// Le API del kernel devono essere utilizzabili dai gestori HTTP (future `Send`).
+/// The APIs of the kernel must be usable by HTTP handlers (`Send` futures).
 #[allow(dead_code)]
-fn le_future_sono_send(k: std::sync::Arc<mosaikit_kernel::Kernel>, c: Caller) {
+fn the_futures_are_send(k: std::sync::Arc<mosaikit_kernel::Kernel>, c: Caller) {
     fn send<F: std::future::Future + Send + 'static>(_: F) {}
     let (k1, c1) = (k.clone(), c.clone());
     send(async move { crud::create(&k1, &c1, "p", "r", &Map::new(), None).await });
@@ -356,16 +357,16 @@ fn le_future_sono_send(k: std::sync::Arc<mosaikit_kernel::Kernel>, c: Caller) {
 }
 
 #[tokio::test]
-async fn panoramica_secondo_il_ruolo() {
+async fn overview_by_role() {
     use mosaikit_kernel::overview::overview;
     let w = world().await;
     let t = &w.t;
     let a = id(&note(t, &w.anna, "piano").await);
-    note(t, &w.anna, "bozza").await;
-    note(t, &w.bruno, "di bruno").await;
+    note(t, &w.anna, "draft").await;
+    note(t, &w.bruno, "bruno's").await;
     set_grant(t, &w.anna, a, "user", w.bruno.user.user_id, Some(Level::Write)).await.unwrap();
 
-    // User: solo i propri dati, niente aggregati di tenant o di sistema
+    // User: only their own data, no aggregates of tenant or system
     let o = overview(t, &w.anna).await.unwrap();
     assert_eq!(o.role, Role::User);
     assert_eq!(o.me.resources.iter().map(|r| r.count).sum::<i64>(), 2);
@@ -377,17 +378,17 @@ async fn panoramica_secondo_il_ruolo() {
     assert_eq!(o.me.recent_shares[0].owner, "anna");
     assert_eq!(o.me.recent_shares[0].level, "write");
 
-    // Tenant Manager: anche gli aggregati del tenant
-    let o = overview(t, &w.gestore).await.unwrap();
+    // Tenant Manager: the aggregates of the tenant too
+    let o = overview(t, &w.mgr).await.unwrap();
     assert_eq!(o.role, Role::TenantManager);
     let core = o.tenant.unwrap();
     assert_eq!(core.resources.iter().map(|r| r.count).sum::<i64>(), 3);
     assert_eq!(core.shares, 1);
 
-    // Administrator: gli aggregati del sistema (non e' membro di nessun tenant)
+    // Administrator: the aggregates of the system (not a member of any tenant)
     let admin = t.admin().await;
     let s = mosaikit_kernel::overview::system_overview(t, &admin).await.unwrap();
     assert_eq!((s.tenants, s.administrators, s.resources), (2, 1, 3));
-    assert!(mosaikit_kernel::overview::system_overview(t, &w.gestore.user).await.is_err());
+    assert!(mosaikit_kernel::overview::system_overview(t, &w.mgr.user).await.is_err());
     assert!(s.plugins_active >= 1);
 }

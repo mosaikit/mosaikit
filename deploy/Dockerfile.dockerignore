@@ -1,6 +1,6 @@
-# Contesto: mosaikit, le cartelle dei plugin e la distribuzione (vedi Dockerfile).
-# `cargo xtask release docker` li copia gia' senza build e dipendenze; queste
-# regole valgono anche per una build fatta a mano o in CI.
+# Context: mosaikit, the plugin folders and the distribution (see Dockerfile).
+# `cargo xtask release docker` already copies them without builds and dependencies; these
+# rules also hold for a build made by hand or in CI.
 **/target
 **/node_modules
 **/dist

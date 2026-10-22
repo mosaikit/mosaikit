@@ -1,11 +1,11 @@
-//! `cargo xtask dev`: ambiente di sviluppo con hot reload.
+//! `cargo xtask dev`: development environment with hot reload.
 //!
-//! - PostgreSQL di sviluppo (`db up`);
-//! - plugin delle cartelle della distribuzione (`../mosaikit-plugins`, ...): WASM ricompilato
-//!   a ogni modifica di `src`, UI con `vite build --watch`;
-//!   il server (modalita' dev) ricarica moduli, manifest e migrazioni da solo;
-//! - server ricompilato e riavviato a ogni modifica di `crates/`;
-//! - UI host con Vite (HMR) su http://127.0.0.1:5173.
+//! - development PostgreSQL (`db up`);
+//! - plugins of the folders of the distribution (`../mosaikit-plugins`, ...): WASM rebuilt
+//!   at every change of `src`, UI with `vite build --watch`;
+//!   the server (dev mode) reloads modules, manifests and migrations by itself;
+//! - server rebuilt and restarted at every change of `crates/`;
+//! - host UI with Vite (HMR) on http://127.0.0.1:5173.
 
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command};
@@ -22,7 +22,7 @@ use crate::util::{npm, root, run};
 
 pub const DEV_ADMIN_PASSWORD: &str = "admin-sviluppo";
 
-/// Termina un processo con tutti i suoi figli (npm/vite su Windows sono catene di processi).
+/// Ends a process with all its children (npm/vite on Windows are chains of processes).
 pub fn kill_tree(child: &mut Child) {
     if cfg!(windows) {
         let _ = Command::new("taskkill").args(["/T", "/F", "/PID", &child.id().to_string()]).output();
@@ -63,7 +63,7 @@ pub fn dev(no_ui: bool) -> Result<()> {
     for r in plugins.iter().filter_map(|p| p.npm_root.as_ref()) {
         plugins::ensure_npm_in(r)?;
     }
-    eprintln!("== build iniziale dei plugin");
+    eprintln!("== initial build of the plugins");
     plugins::build_wasm(&plugins, false)?;
     plugins::build_ui(&plugins)?;
 
@@ -84,7 +84,7 @@ pub fn dev(no_ui: bool) -> Result<()> {
     }
     let mut server = server_cmd(&plugins)?.spawn()?;
 
-    // osserva sorgenti del server e logica dei plugin
+    // watches sources of the server and logic of the plugins
     let (tx, rx) = mpsc::channel::<PathBuf>();
     let mut watcher = notify::recommended_watcher(move |res: notify::Result<notify::Event>| {
         if let Ok(ev) = res {
@@ -104,15 +104,15 @@ pub fn dev(no_ui: bool) -> Result<()> {
     }
 
     println!(
-        "\n  Mosaikit in sviluppo\n  app:            http://127.0.0.1:5173  (UI host con HMR)\n  \
+        "\n  Mosaikit in development\n  app:            http://127.0.0.1:5173  (host UI with HMR)\n  \
          server:         http://127.0.0.1:47080 (API)  ·  plugin: http://127.0.0.1:47081\n  \
-         amministratore: tenant system, utente admin, password {}\n  \
-         (la password vale per un database nuovo; Ctrl+C per uscire)\n",
+         administrator:  tenant system, user admin, password {}\n  \
+         (the password holds for a new database; Ctrl+C to quit)\n",
         std::env::var("MOSAIKIT_ADMIN_PASSWORD").unwrap_or_else(|_| DEV_ADMIN_PASSWORD.into())
     );
 
     let crates_dir = root().join("crates");
-    // il server e' fermo perche' l'ultima compilazione e' fallita: riparte con la prossima che riesce
+    // the server is down because the last build failed: it restarts with the next one that succeeds
     let mut down = false;
     while !stop.load(Ordering::SeqCst) {
         let first = match rx.recv_timeout(Duration::from_millis(300)) {
@@ -122,7 +122,7 @@ pub fn dev(no_ui: bool) -> Result<()> {
                     continue;
                 }
                 if let Ok(Some(status)) = server.try_wait() {
-                    eprintln!("server terminato ({status}): riparte alla prossima modifica di crates/");
+                    eprintln!("server ended ({status}): it restarts at the next change of crates/");
                     server = server_cmd(&plugins)?.spawn()?;
                     std::thread::sleep(Duration::from_secs(2));
                 }
@@ -147,17 +147,17 @@ pub fn dev(no_ui: bool) -> Result<()> {
         }
         if !wasm.is_empty() {
             eprintln!(
-                "== ricompilo la logica: {}",
+                "== rebuilding the logic: {}",
                 wasm.iter().map(|p| p.id.as_str()).collect::<Vec<_>>().join(", ")
             );
             if let Err(e) = plugins::build_wasm(&wasm, false) {
-                eprintln!("build WASM fallita: {e}");
+                eprintln!("WASM build failed: {e}");
             }
         }
         if server_changed {
-            eprintln!("== crates/ modificato: ricompilo e riavvio il server");
-            // su Windows l'eseguibile in uso non si puo' sostituire ("Accesso negato"): il server si
-            // ferma prima della compilazione; altrove resta acceso finche' quella nuova non e' pronta
+            eprintln!("== crates/ changed: rebuilding and restarting the server");
+            // on Windows the running executable cannot be replaced ("Access denied"): the server
+            // stops before the build; elsewhere it stays up until the new one is ready
             if cfg!(windows) {
                 kill_tree(&mut server);
             }
@@ -169,12 +169,12 @@ pub fn dev(no_ui: bool) -> Result<()> {
                 server = server_cmd(&plugins)?.spawn()?;
                 down = false;
             } else if cfg!(windows) {
-                eprintln!("compilazione fallita: il server riparte alla prossima modifica che compila");
+                eprintln!("build failed: the server restarts at the next change that compiles");
                 down = true;
             }
         }
     }
-    eprintln!("\narresto...");
+    eprintln!("\nshutting down...");
     kill_tree(&mut server);
     for (_, mut c) in children {
         kill_tree(&mut c);

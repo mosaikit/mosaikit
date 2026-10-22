@@ -1,7 +1,7 @@
-// Su Windows incorpora nell'eseguibile icona e descrizione: sono quelle che
-// mostrano Esplora file e Task Manager. Una distribuzione con un proprio marchio
-// le passa con MOSAIKIT_PRODUCT_NAME, MOSAIKIT_PRODUCT_VERSION e MOSAIKIT_BRAND_ICON
-// (file .ico), impostate da `cargo xtask --dist ... release desktop`.
+// On Windows it embeds icon and description in the executable: they are the ones
+// File Explorer and Task Manager show. A distribution with a brand of its own
+// passes them with MOSAIKIT_PRODUCT_NAME, MOSAIKIT_PRODUCT_VERSION and MOSAIKIT_BRAND_ICON
+// (.ico file), set by `cargo xtask --dist ... release desktop`.
 
 #[allow(dead_code)]
 mod icon {
@@ -24,7 +24,7 @@ fn main() {
         }
         None => {
             let p = out.join("mosaikit.ico");
-            std::fs::write(&p, icon::ico()).expect("scrittura dell'icona");
+            std::fs::write(&p, icon::ico()).expect("writing the icon");
             p
         }
     };
@@ -33,7 +33,7 @@ fn main() {
     #[cfg(windows)]
     {
         let mut res = winresource::WindowsResource::new();
-        res.set_icon(path.to_str().expect("percorso icona"));
+        res.set_icon(path.to_str().expect("icon path"));
         res.set("FileDescription", &name);
         res.set("ProductName", &name);
         res.set("CompanyName", &name);
@@ -41,7 +41,7 @@ fn main() {
             res.set("ProductVersion", v);
         }
         if let Err(e) = res.compile() {
-            println!("cargo:warning=icona e descrizione dell'eseguibile non incorporate: {e}");
+            println!("cargo:warning=icon and description of the executable not embedded: {e}");
         }
     }
 }

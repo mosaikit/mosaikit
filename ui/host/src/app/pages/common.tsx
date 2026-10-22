@@ -1,6 +1,6 @@
-// Account: la pagina personale, uguale per tutti i ruoli (docs/refactoring-ui.md §2). Sezioni: Profilo,
-// Accesso e sicurezza, Notifiche, Aspetto e lingua e, per chi lavora in un tenant, I miei tenant e
-// Consumi. Ci si arriva dal menu della persona.
+// Account: the personal page, the same for every role (docs/refactoring-ui.md §2). Sections: Profile,
+// Sign-in and security, Notifications, Appearance and language and, for whoever works in a tenant, My
+// tenants and Usage. It is reached from the menu of the person.
 
 import { useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -31,15 +31,15 @@ export function AccountPage({ session, route }: { session: Session; route: Route
   const admin = session.user.is_system_admin
   const section = route.area === 'login' ? undefined : route.section
   const sections: Section[] = [
-    { id: 'profile', label: t('Profilo'), icon: <UserRound /> },
-    { id: 'security', label: t('Accesso e sicurezza'), icon: <KeyRound /> },
-    { id: 'notifications', label: t('Notifiche'), icon: <Bell /> },
-    { id: 'appearance', label: t('Aspetto e lingua'), icon: <Palette /> },
+    { id: 'profile', label: t('Profile'), icon: <UserRound /> },
+    { id: 'security', label: t('Sign-in and security'), icon: <KeyRound /> },
+    { id: 'notifications', label: t('Notifications'), icon: <Bell /> },
+    { id: 'appearance', label: t('Appearance and language'), icon: <Palette /> },
     ...(admin
       ? []
       : [
-          { id: 'tenants', label: t('I miei tenant'), icon: <Building2 />, count: session.memberships.length },
-          { id: 'usage', label: t('Consumi'), icon: <Gauge /> },
+          { id: 'tenants', label: t('My tenants'), icon: <Building2 />, count: session.memberships.length },
+          { id: 'usage', label: t('Usage'), icon: <Gauge /> },
         ]),
   ]
   const cur = sections.some((s) => s.id === section) ? section! : 'profile'
@@ -76,17 +76,17 @@ function Profile({ session }: { session: Session }) {
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>{t('Dati')}</CardTitle>
-          <CardDescription>{u.is_system_admin ? t('Li cambia un altro Administrator.') : t('Li cambia il Tenant Manager del tuo tenant di appartenenza.')}</CardDescription>
+          <CardTitle>{t('Details')}</CardTitle>
+          <CardDescription>{u.is_system_admin ? t('Another Administrator changes them.') : t('The Tenant Manager of your home tenant changes them.')}</CardDescription>
         </CardHeader>
         <CardContent>
           <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
-            <dt className="text-muted-foreground">{t('Nome')}</dt>
+            <dt className="text-muted-foreground">{t('Name')}</dt>
             <dd>{u.display_name || '—'}</dd>
             <dt className="text-muted-foreground">{t('Username')}</dt>
             <dd className="font-mono">{u.username}</dd>
-            <dt className="text-muted-foreground">{u.is_system_admin ? t('Ruolo') : t('Tenant di appartenenza')}</dt>
-            <dd>{u.is_system_admin ? t('Administrator della piattaforma') : (home?.name ?? u.home_tenant_slug)}</dd>
+            <dt className="text-muted-foreground">{u.is_system_admin ? t('Role') : t('Home tenant')}</dt>
+            <dd>{u.is_system_admin ? t('Administrator of the platform') : (home?.name ?? u.home_tenant_slug)}</dd>
           </dl>
         </CardContent>
       </Card>
@@ -100,11 +100,11 @@ function Security({ session }: { session: Session }) {
   const admin = session.user.is_system_admin
   async function save(e: FormEvent) {
     e.preventDefault()
-    if (pw.new !== pw.again) return void toast.error(t('Le due password non coincidono'))
+    if (pw.new !== pw.again) return void toast.error(t('The two passwords do not match'))
     setBusy(true)
     try {
       await api('POST', '/api/me/password', { old: pw.old, new: pw.new })
-      toast.success(t('Password aggiornata: le altre sessioni sono state chiuse'))
+      toast.success(t('Password updated: the other sessions were closed'))
       setPw({ old: '', new: '', again: '' })
     } catch (err) {
       toast.error(errText(err))
@@ -118,44 +118,44 @@ function Security({ session }: { session: Session }) {
     <div className="grid max-w-2xl gap-6">
       <Card>
         <CardHeader>
-          <CardTitle>{t('Cambia password')}</CardTitle>
-          <CardDescription>{admin ? t('La password locale della piattaforma.') : t('La password del tuo tenant di appartenenza: vale anche nei tenant in cui sei ospite.')}</CardDescription>
+          <CardTitle>{t('Change password')}</CardTitle>
+          <CardDescription>{admin ? t('The local password of the platform.') : t('The password of your home tenant: it also works in the tenants where you are a guest.')}</CardDescription>
         </CardHeader>
         <CardContent>
           <form className="grid gap-4" onSubmit={(e) => void save(e)}>
             <div className="grid gap-1.5">
-              <Label htmlFor="pw-old">{t('Password attuale')}</Label>
+              <Label htmlFor="pw-old">{t('Current password')}</Label>
               <Input id="pw-old" type="password" autoComplete="current-password" required value={pw.old} onChange={(e) => setPw({ ...pw, old: e.target.value })} />
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="pw-new">{t('Nuova password')}</Label>
+              <Label htmlFor="pw-new">{t('New password')}</Label>
               <Input id="pw-new" type="password" autoComplete="new-password" minLength={10} required aria-describedby="pw-rule" value={pw.new} onChange={(e) => setPw({ ...pw, new: e.target.value })} />
-              {/* la regola accanto al campo, non dopo l'invio */}
+              {/* the rule next to the field, not after sending */}
               <p id="pw-rule" className={cn('text-xs', short ? 'text-destructive' : 'text-muted-foreground')}>
-                {t('Almeno 10 caratteri, non tutti uguali.')}
+                {t('At least 10 characters, not all the same.')}
               </p>
             </div>
             <div className="grid gap-1.5">
-              <Label htmlFor="pw-again">{t('Ripeti la nuova password')}</Label>
+              <Label htmlFor="pw-again">{t('Repeat the new password')}</Label>
               <Input id="pw-again" type="password" autoComplete="new-password" minLength={10} required aria-invalid={differ} value={pw.again} onChange={(e) => setPw({ ...pw, again: e.target.value })} />
-              {differ && <p className="text-xs text-destructive">{t('Le due password non coincidono')}</p>}
+              {differ && <p className="text-xs text-destructive">{t('The two passwords do not match')}</p>}
             </div>
             <Button type="submit" disabled={busy || short || differ} className="justify-self-start">
               {busy && <Loader2 className="animate-spin" />}
-              {t('Aggiorna password')}
+              {t('Update password')}
             </Button>
           </form>
         </CardContent>
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>{t('Come accedi')}</CardTitle>
+          <CardTitle>{t('How you sign in')}</CardTitle>
         </CardHeader>
         <CardContent className="grid gap-3">
           {admin ? (
-            <Locked label={t('Accesso amministratori')} value={t('Password locale e secondo fattore (app di autenticazione)')} hint={t('Per registrare di nuovo l’app, chiedi a un altro Administrator di reimpostare il secondo fattore.')} />
+            <Locked label={t('Administrator access')} value={t('Local password and second factor (authenticator app)')} hint={t('To register the app again, ask another Administrator to reset the second factor.')} />
           ) : (
-            <Locked label={t('Modo di autenticazione')} value={t('Account locale del tenant')} hint={t('Se il tenant passa a un provider di identità (OIDC), accedi da lì.')} />
+            <Locked label={t('Sign-in method')} value={t('Local account of the tenant')} hint={t('If the tenant moves to an identity provider (OIDC), you sign in there.')} />
           )}
         </CardContent>
       </Card>
@@ -167,15 +167,15 @@ function NotificationPrefs({ admin }: { admin: boolean }) {
   return (
     <Card className="max-w-2xl">
       <CardHeader>
-        <CardTitle>{t('Cosa ricevo')}</CardTitle>
-        <CardDescription>{t('Le notifiche arrivano nella campanella in alto. L’invio per email arriverà con il server di posta della piattaforma.')}</CardDescription>
+        <CardTitle>{t('What I receive')}</CardTitle>
+        <CardDescription>{t('Notifications arrive in the bell at the top. Email delivery will come with the mail server of the platform.')}</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-1">
         {(admin
-          ? [[t('Avvisi della piattaforma'), t('Aggiornamenti dei plugin, errori dei servizi')]]
+          ? [[t('Platform alerts'), t('Plugin updates, service errors')]]
           : [
-              [t('Inviti in altri tenant'), t('Un Tenant Manager ti invita come ospite')],
-              [t('Menzioni e scadenze delle app'), t('Quando le app le pubblicano')],
+              [t('Invitations to other tenants'), t('A Tenant Manager invites you as a guest')],
+              [t('Mentions and due dates of the apps'), t('When the apps publish them')],
             ]
         ).map(([l, d]) => (
           <div key={l} className="flex items-center justify-between gap-4 border-b py-3 last:border-0">
@@ -185,12 +185,12 @@ function NotificationPrefs({ admin }: { admin: boolean }) {
             </span>
             <span className="flex items-center gap-4 text-xs text-muted-foreground">
               <label className="flex items-center gap-2">
-                {t('Nell’app')}
-                <Switch checked disabled aria-label={t('{what}: nell’app', { what: l })} />
+                {t('In the app')}
+                <Switch checked disabled aria-label={t('{what}: in the app', { what: l })} />
               </label>
               <label className="flex items-center gap-2">
                 {t('Email')}
-                <Switch checked={false} disabled aria-label={t('{what}: per email', { what: l })} />
+                <Switch checked={false} disabled aria-label={t('{what}: by email', { what: l })} />
               </label>
             </span>
           </div>
@@ -214,15 +214,15 @@ function Appearance({ route }: { route: Route }) {
     <div className="grid max-w-3xl gap-6">
       <Card>
         <CardHeader>
-          <CardTitle>{t('Tonalità')}</CardTitle>
-          <CardDescription>{t('Vale solo per te, subito. Il tema lo sceglie chi gestisce il tenant.')}</CardDescription>
+          <CardTitle>{t('Mode')}</CardTitle>
+          <CardDescription>{t('It applies only to you, at once. The theme is chosen by whoever manages the tenant.')}</CardDescription>
         </CardHeader>
         <CardContent className="flex flex-wrap gap-2">
           {(
             [
-              ['light', t('Chiaro')],
-              ['dark', t('Scuro')],
-              ['auto', t('Automatico (come il sistema)')],
+              ['light', t('Light')],
+              ['dark', t('Dark')],
+              ['auto', t('Automatic (like the system)')],
             ] as [Mode, string][]
           ).map(([m, l]) => (
             <Button key={m} variant={th.mode === m ? 'default' : 'outline'} aria-pressed={th.mode === m} onClick={() => setTheme({ mode: m })}>
@@ -233,12 +233,12 @@ function Appearance({ route }: { route: Route }) {
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>{t('Lingua')}</CardTitle>
-          <CardDescription>{t('La lingua dell’interfaccia e delle app.')}</CardDescription>
+          <CardTitle>{t('Language')}</CardTitle>
+          <CardDescription>{t('The language of the interface and of the apps.')}</CardDescription>
         </CardHeader>
         <CardContent>
           <Select value={lang} onValueChange={(v) => setLang(v as Lang)}>
-            <SelectTrigger className="w-60" aria-label={t('Lingua')}>
+            <SelectTrigger className="w-60" aria-label={t('Language')}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -258,8 +258,8 @@ function Appearance({ route }: { route: Route }) {
         <CardContent className="grid gap-4">
           <label className="flex items-center justify-between gap-4">
             <span>
-              <b className="block text-sm">{t('Aperta all’avvio')}</b>
-              <span className="text-xs text-muted-foreground">{t('Altrimenti solo le icone, con il nome sotto')}</span>
+              <b className="block text-sm">{t('Open at start')}</b>
+              <span className="text-xs text-muted-foreground">{t('Otherwise only the icons, with the name below')}</span>
             </span>
             <Switch
               checked={side}
@@ -268,7 +268,7 @@ function Appearance({ route }: { route: Route }) {
                 try {
                   localStorage.setItem(SIDEBAR_PREF, v ? '1' : '0')
                 } catch {
-                  /* storage non disponibile */
+                  /* storage not available */
                 }
               }}
             />
@@ -280,7 +280,7 @@ function Appearance({ route }: { route: Route }) {
   )
 }
 
-/** Le app che compaiono nella sidebar (preferenza della persona nel tenant). */
+/** The apps shown in the sidebar (preference of the person in the tenant). */
 function AppsInSidebar({ slug }: { slug: string }) {
   const qc = useQueryClient()
   const ctx = useTenantCtx(slug)
@@ -300,12 +300,12 @@ function AppsInSidebar({ slug }: { slug: string }) {
   }
   return (
     <div className="grid gap-1 border-t pt-4">
-      <b className="text-sm">{t('App nella sidebar')}</b>
-      <span className="mb-1 text-xs text-muted-foreground">{t('Quelle spente restano nella Home e nella ricerca.')}</span>
+      <b className="text-sm">{t('Apps in the sidebar')}</b>
+      <span className="mb-1 text-xs text-muted-foreground">{t('The ones turned off stay in Home and in the search.')}</span>
       {apps.map((p) => (
         <label key={p.id} className="flex items-center justify-between gap-4 py-1.5 text-sm">
           {p.label}
-          <Switch checked={!hidden.has(p.id)} onCheckedChange={(v) => void toggle(p.id, v)} aria-label={t('{app} nella sidebar', { app: p.label })} />
+          <Switch checked={!hidden.has(p.id)} onCheckedChange={(v) => void toggle(p.id, v)} aria-label={t('{app} in the sidebar', { app: p.label })} />
         </label>
       ))}
     </div>
@@ -315,14 +315,14 @@ function AppsInSidebar({ slug }: { slug: string }) {
 function MyTenants({ session }: { session: Session }) {
   return (
     <div className="grid max-w-3xl gap-3">
-      <p className="text-sm text-muted-foreground">{t('Accedi sempre dal tenant di appartenenza; in quelli in cui sei ospite entri dal selettore in alto.')}</p>
+      <p className="text-sm text-muted-foreground">{t('You always sign in to your home tenant; you enter the ones where you are a guest from the switcher at the top.')}</p>
       <div className="overflow-hidden rounded-xl border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>{t('Tenant')}</TableHead>
-              <TableHead>{t('Come')}</TableHead>
-              <TableHead>{t('Ruolo')}</TableHead>
+              <TableHead>{t('As')}</TableHead>
+              <TableHead>{t('Role')}</TableHead>
               <TableHead />
             </TableRow>
           </TableHeader>
@@ -337,13 +337,13 @@ function MyTenants({ session }: { session: Session }) {
                 </TableCell>
                 <TableCell>
                   <Badge variant={m.is_home ? 'default' : 'secondary'} className="font-normal">
-                    {m.is_home ? t('appartenenza') : t('ospite')}
+                    {m.is_home ? t('home') : t('guest')}
                   </Badge>
                 </TableCell>
                 <TableCell>{m.role === 'tenant_manager' ? 'Tenant Manager' : 'User'}</TableCell>
                 <TableCell className="text-right">
                   <Button variant="ghost" size="sm" onClick={() => go(to.tenant(m.slug))}>
-                    {t('Apri')}
+                    {t('Open')}
                   </Button>
                 </TableCell>
               </TableRow>
@@ -355,8 +355,8 @@ function MyTenants({ session }: { session: Session }) {
   )
 }
 
-/** I propri consumi nel tenant attivo. Le quote per tenant non sono ancora nel kernel: quando ci
- *  saranno, qui si vedra' anche quanto resta. */
+/** One's own usage in the active tenant. Quotas per tenant are not in the kernel yet: when they
+ *  are, this will also show how much is left. */
 function MyUsage({ slug }: { slug: string }) {
   const q = useApi<Overview>(['overview', slug], `/api/t/${enc(slug)}/overview`)
   if (q.isLoading) return <Loading />
@@ -367,25 +367,25 @@ function MyUsage({ slug }: { slug: string }) {
     <div className="grid max-w-3xl gap-4">
       <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3">
         <div className="rounded-xl border bg-card p-4">
-          <span className="text-xs text-muted-foreground">{t('Spazio usato da te')}</span>
+          <span className="text-xs text-muted-foreground">{t('Space you use')}</span>
           <b className="block text-2xl font-semibold tabular-nums">{fmtBytes(bytes)}</b>
         </div>
         <div className="rounded-xl border bg-card p-4">
-          <span className="text-xs text-muted-foreground">{t('Elementi tuoi')}</span>
+          <span className="text-xs text-muted-foreground">{t('Your items')}</span>
           <b className="block text-2xl font-semibold tabular-nums">{res.reduce((s, r) => s + r.count, 0)}</b>
         </div>
       </div>
       {res.length === 0 ? (
-        <Empty icon={<Gauge />} title={t('Nessun consumo')} />
+        <Empty icon={<Gauge />} title={t('No usage')} />
       ) : (
         <div className="overflow-hidden rounded-xl border bg-card">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>{t('App')}</TableHead>
-                <TableHead>{t('Tipo')}</TableHead>
-                <TableHead className="text-right">{t('Elementi')}</TableHead>
-                <TableHead className="text-right">{t('Spazio')}</TableHead>
+                <TableHead>{t('Apps')}</TableHead>
+                <TableHead>{t('Kind')}</TableHead>
+                <TableHead className="text-right">{t('Items')}</TableHead>
+                <TableHead className="text-right">{t('Space')}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -401,7 +401,7 @@ function MyUsage({ slug }: { slug: string }) {
           </Table>
         </div>
       )}
-      <p className="text-xs text-muted-foreground">{t('Le quote del tenant le decide l’Administrator: quando ci saranno, qui vedrai anche quanto resta.')}</p>
+      <p className="text-xs text-muted-foreground">{t('The Administrator decides the quotas of the tenant: once they exist, you will also see here what is left.')}</p>
     </div>
   )
 }

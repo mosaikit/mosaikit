@@ -197,8 +197,8 @@ function Sidebar({
           side={side}
         >
           <SheetHeader className="sr-only">
-            <SheetTitle>{t('Navigazione')}</SheetTitle>
-            <SheetDescription>{t('Pagine e app del tenant')}</SheetDescription>
+            <SheetTitle>{t('Navigation')}</SheetTitle>
+            <SheetDescription>{t('Pages and apps of the tenant')}</SheetDescription>
           </SheetHeader>
           <div className="flex h-full w-full flex-col">{children}</div>
         </SheetContent>
@@ -275,7 +275,7 @@ function SidebarTrigger({
       {...props}
     >
       <PanelLeftIcon />
-      <span className="sr-only">{t('Apri o chiudi la sidebar')}</span>
+      <span className="sr-only">{t('Open or close the sidebar')}</span>
     </Button>
   )
 }
@@ -287,10 +287,10 @@ function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
     <button
       data-sidebar="rail"
       data-slot="sidebar-rail"
-      aria-label={t('Apri o chiudi la sidebar')}
+      aria-label={t('Open or close the sidebar')}
       tabIndex={-1}
       onClick={toggleSidebar}
-      title={t('Apri o chiudi la sidebar')}
+      title={t('Open or close the sidebar')}
       className={cn(
         "absolute inset-y-0 z-20 hidden w-4 -translate-x-1/2 transition-all ease-linear group-data-[side=left]:-right-4 group-data-[side=right]:left-0 after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] hover:after:bg-sidebar-border sm:flex",
         "in-data-[side=left]:cursor-w-resize in-data-[side=right]:cursor-e-resize",

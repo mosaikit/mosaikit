@@ -1,4 +1,4 @@
-//! Lettura, verifica e scrittura dei pacchetti `.mskp`.
+//! Reading, checking and writing `.mskp` packages.
 
 use std::collections::BTreeMap;
 use std::io::{Cursor, Read, Write};
@@ -20,16 +20,16 @@ const HASHES_FILE: &str = "MANIFEST.sha256";
 const SIGNATURE_FILE: &str = "SIGNATURE";
 pub const WASM_FILE: &str = "logic.wasm";
 
-/// Pacchetto letto e controllato nell'integrita' (hash di ogni file).
+/// Package read and checked for integrity (hash of every file).
 #[derive(Debug, Clone)]
 pub struct Package {
     pub manifest: Manifest,
     pub manifest_toml: String,
-    /// file del pacchetto (esclusi `MANIFEST.sha256` e `SIGNATURE`)
+    /// files of the package (excluding `MANIFEST.sha256` and `SIGNATURE`)
     pub files: BTreeMap<String, Vec<u8>>,
     pub signature: Option<Signature>,
     hashes: Vec<u8>,
-    /// sha256 dell'intero file `.mskp` (per il registry)
+    /// sha256 of the whole `.mskp` file (for the registry)
     pub sha256: String,
 }
 
@@ -37,11 +37,11 @@ impl Package {
     pub fn read(bytes: &[u8]) -> Result<Package> {
         let bad = |m: String| Error::Package(m);
         if bytes.len() > MAX_PACKAGE_BYTES {
-            return Err(bad(format!("pacchetto oltre {} MB", MAX_PACKAGE_BYTES >> 20)));
+            return Err(bad(format!("package over {} MB", MAX_PACKAGE_BYTES >> 20)));
         }
         let mut zip = zip::ZipArchive::new(Cursor::new(bytes)).map_err(|e| bad(format!("zip: {e}")))?;
         if zip.len() > MAX_FILES {
-            return Err(bad("troppi file".into()));
+            return Err(bad("too many files".into()));
         }
         let mut files = BTreeMap::new();
         let mut total = 0u64;
@@ -52,23 +52,23 @@ impl Package {
             }
             let name = f.name().to_string();
             if !is_safe_path(&name) {
-                return Err(bad(format!("percorso non sicuro: {name}")));
+                return Err(bad(format!("unsafe path: {name}")));
             }
             total += f.size();
             if f.size() > MAX_FILE_BYTES as u64 || total > MAX_TOTAL_BYTES {
-                return Err(bad("contenuto oltre i limiti".into()));
+                return Err(bad("content beyond the limits".into()));
             }
             let mut buf = Vec::with_capacity(f.size() as usize);
             (&mut f).take(MAX_FILE_BYTES as u64 + 1).read_to_end(&mut buf).map_err(|e| bad(e.to_string()))?;
             if buf.len() > MAX_FILE_BYTES {
-                return Err(bad("file oltre i limiti".into()));
+                return Err(bad("file beyond the limits".into()));
             }
             if files.insert(name.clone(), buf).is_some() {
-                return Err(bad(format!("file duplicato: {name}")));
+                return Err(bad(format!("duplicate file: {name}")));
             }
         }
 
-        let hashes = files.remove(HASHES_FILE).ok_or_else(|| bad(format!("manca {HASHES_FILE}")))?;
+        let hashes = files.remove(HASHES_FILE).ok_or_else(|| bad(format!("missing {HASHES_FILE}")))?;
         let signature = match files.remove(SIGNATURE_FILE) {
             Some(raw) => Some(serde_json::from_slice(&raw).map_err(|e| Error::Signature(e.to_string()))?),
             None => None,
@@ -76,22 +76,22 @@ impl Package {
         check_hashes(&hashes, &files)?;
 
         let manifest_toml = String::from_utf8(
-            files.get(MANIFEST_FILE).ok_or_else(|| bad(format!("manca {MANIFEST_FILE}")))?.clone(),
+            files.get(MANIFEST_FILE).ok_or_else(|| bad(format!("missing {MANIFEST_FILE}")))?.clone(),
         )
-        .map_err(|_| bad("plugin.toml non e' UTF-8".into()))?;
+        .map_err(|_| bad("plugin.toml is not UTF-8".into()))?;
         let manifest = Manifest::from_toml(&manifest_toml)?;
         for name in files.keys() {
             if let Some(m) = name.strip_prefix("migrations/") {
                 if parse_migration_name(m).is_none() {
-                    return Err(bad(format!("nome migrazione non valido: {name} (atteso NNN_nome.sql)")));
+                    return Err(bad(format!("invalid migration name: {name} (expected NNN_name.sql)")));
                 }
             }
         }
         Ok(Package { manifest, manifest_toml, files, signature, hashes, sha256: package_sha256(bytes) })
     }
 
-    /// Verifica la firma. Ritorna la chiave dell'editore (base64) se firmato.
-    /// Senza firma e' accettato solo con `allow_unsigned`.
+    /// Checks the signature. Returns the key of the publisher (base64) if signed.
+    /// Without a signature it is accepted only with `allow_unsigned`.
     pub fn verify(&self, trusted: &TrustedKeys, allow_unsigned: bool) -> Result<Option<String>> {
         match &self.signature {
             None if allow_unsigned => Ok(None),
@@ -111,26 +111,25 @@ impl Package {
         self.files.get(WASM_FILE).map(Vec::as_slice)
     }
 
-    /// Migrazioni ordinate per numero: (numero, nome file, SQL).
+    /// Migrations sorted by number: (number, file name, SQL).
     pub fn migrations(&self) -> Result<Vec<(u32, String, String)>> {
         let mut out = Vec::new();
         for (name, data) in &self.files {
             if let Some(m) = name.strip_prefix("migrations/") {
-                let n =
-                    parse_migration_name(m).ok_or_else(|| Error::Package(format!("migrazione {name}")))?;
+                let n = parse_migration_name(m).ok_or_else(|| Error::Package(format!("migration {name}")))?;
                 let sql = String::from_utf8(data.clone())
-                    .map_err(|_| Error::Package(format!("{name} non e' UTF-8")))?;
+                    .map_err(|_| Error::Package(format!("{name} is not UTF-8")))?;
                 out.push((n, m.to_string(), sql));
             }
         }
         out.sort_by_key(|m| m.0);
         if out.windows(2).any(|w| w[0].0 == w[1].0) {
-            return Err(Error::Package("numeri di migrazione duplicati".into()));
+            return Err(Error::Package("duplicate migration numbers".into()));
         }
         Ok(out)
     }
 
-    /// File della UI (percorsi relativi a `ui/`).
+    /// Files of the UI (paths relative to `ui/`).
     pub fn ui_files(&self) -> impl Iterator<Item = (&str, &[u8])> {
         self.files.iter().filter_map(|(k, v)| k.strip_prefix("ui/").map(|p| (p, v.as_slice())))
     }
@@ -160,7 +159,7 @@ fn hashes_text(files: &BTreeMap<String, Vec<u8>>) -> Vec<u8> {
 fn check_hashes(hashes: &[u8], files: &BTreeMap<String, Vec<u8>>) -> Result<()> {
     if hashes != hashes_text(files).as_slice() {
         return Err(Error::Package(
-            "MANIFEST.sha256 non corrisponde ai file (pacchetto alterato o incompleto)".into(),
+            "MANIFEST.sha256 does not match the files (package altered or incomplete)".into(),
         ));
     }
     Ok(())
@@ -170,19 +169,19 @@ pub fn package_sha256(bytes: &[u8]) -> String {
     hex::encode(Sha256::digest(bytes))
 }
 
-/// Crea un pacchetto dai file (percorsi relativi). Con `key` aggiunge la firma.
-/// Lo zip e' deterministico: stessi file, stessi byte.
+/// Creates a package from the files (relative paths). With `key` it adds the signature.
+/// The zip is deterministic: same files, same bytes.
 pub fn pack(files: &BTreeMap<String, Vec<u8>>, key: Option<&SigningKey>) -> Result<Vec<u8>> {
     if !files.contains_key(MANIFEST_FILE) {
-        return Err(Error::Package("manca plugin.toml".into()));
+        return Err(Error::Package("missing plugin.toml".into()));
     }
     for name in files.keys() {
         if !is_safe_path(name) || name == HASHES_FILE || name == SIGNATURE_FILE {
-            return Err(Error::Package(format!("nome file non ammesso: {name}")));
+            return Err(Error::Package(format!("file name not allowed: {name}")));
         }
     }
     let manifest = std::str::from_utf8(&files[MANIFEST_FILE])
-        .map_err(|_| Error::Package("plugin.toml non e' UTF-8".into()))?;
+        .map_err(|_| Error::Package("plugin.toml is not UTF-8".into()))?;
     Manifest::from_toml(manifest)?;
 
     let hashes = hashes_text(files);
@@ -230,7 +229,7 @@ label = "Demo"
         let mut f = BTreeMap::new();
         f.insert("plugin.toml".to_string(), TOML.as_bytes().to_vec());
         f.insert("logic.wasm".to_string(), b"\0asm\x01\0\0\0".to_vec());
-        f.insert("ui/index.html".to_string(), b"<h1>ciao</h1>".to_vec());
+        f.insert("ui/index.html".to_string(), b"<h1>hello</h1>".to_vec());
         f.insert(
             "migrations/001_init.sql".to_string(),
             b"create table t (resource_id uuid not null, tenant_id uuid not null);".to_vec(),
@@ -239,7 +238,7 @@ label = "Demo"
     }
 
     #[test]
-    fn firmato_e_verificato() {
+    fn signed_and_verified() {
         let key = generate_key();
         let bytes = pack(&files(), Some(&key)).unwrap();
         let pkg = Package::read(&bytes).unwrap();
@@ -249,12 +248,12 @@ label = "Demo"
         assert_eq!(pkg.ui_files().count(), 1);
         let trusted = TrustedKeys::from_b64(&[public_key_b64(&key)]).unwrap();
         assert_eq!(pkg.verify(&trusted, false).unwrap(), Some(public_key_b64(&key)));
-        // deterministico
+        // deterministic
         assert_eq!(bytes, pack(&files(), Some(&key)).unwrap());
     }
 
     #[test]
-    fn chiave_non_fidata_e_pacchetto_non_firmato() {
+    fn untrusted_key_and_unsigned_package() {
         let key = generate_key();
         let other = generate_key();
         let trusted = TrustedKeys::from_b64(&[public_key_b64(&other)]).unwrap();
@@ -265,7 +264,7 @@ label = "Demo"
         assert_eq!(unsigned.verify(&trusted, true).unwrap(), None);
     }
 
-    /// Riscrive lo zip sostituendo/aggiungendo file senza aggiornare gli hash.
+    /// Rewrites the zip replacing/adding files without updating the hashes.
     fn tamper(bytes: &[u8], name: &str, data: Option<&[u8]>) -> Vec<u8> {
         let mut zip = zip::ZipArchive::new(Cursor::new(bytes)).unwrap();
         let mut w = zip::ZipWriter::new(Cursor::new(Vec::new()));
@@ -295,16 +294,16 @@ label = "Demo"
     }
 
     #[test]
-    fn manomissioni_rifiutate() {
+    fn tampering_refused() {
         let key = generate_key();
         let bytes = pack(&files(), Some(&key)).unwrap();
-        // file modificato
+        // changed file
         assert!(Package::read(&tamper(&bytes, "ui/index.html", Some(b"<script>evil()</script>"))).is_err());
-        // file aggiunto
+        // added file
         assert!(Package::read(&tamper(&bytes, "ui/extra.js", Some(b"x"))).is_err());
-        // file rimosso
+        // removed file
         assert!(Package::read(&tamper(&bytes, "logic.wasm", None)).is_err());
-        // hash rigenerati ma firma vecchia: la firma non corrisponde
+        // hashes regenerated but old signature: the signature does not match
         let mut f = files();
         f.insert("ui/index.html".into(), b"evil".to_vec());
         let resigned_hashes = pack(&f, None).unwrap();
@@ -325,7 +324,7 @@ label = "Demo"
     }
 
     #[test]
-    fn percorsi_non_sicuri_rifiutati() {
+    fn unsafe_paths_refused() {
         let mut f = files();
         f.insert("../evil".into(), b"x".to_vec());
         assert!(pack(&f, None).is_err());
@@ -334,7 +333,7 @@ label = "Demo"
     }
 
     #[test]
-    fn nomi_migrazioni() {
+    fn migration_names() {
         assert_eq!(parse_migration_name("001_init.sql"), Some(1));
         assert_eq!(parse_migration_name("12_init.sql"), None);
         assert_eq!(parse_migration_name("001_.sql"), None);

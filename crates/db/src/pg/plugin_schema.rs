@@ -1,10 +1,10 @@
-//! Schema e ruolo di un plugin: provisioning, migrazioni, congelamento.
+//! Schema and role of a plugin: provisioning, migrations, freezing.
 //!
-//! Durante una migrazione gli oggetti dello schema appartengono al ruolo del
-//! plugin e le istruzioni girano con quel ruolo (`SET LOCAL ROLE`): non possono
-//! toccare `core` ne' altri plugin. Dopo, `freeze` riporta tutto al ruolo app,
-//! verifica le regole (resource_id/tenant_id, niente policy proprie...), aggiunge
-//! FK e policy RLS e concede al plugin solo il DML.
+//! During a migration the objects of the schema belong to the role of the
+//! plugin and the statements run with that role (`SET LOCAL ROLE`): they cannot
+//! touch `core` nor other plugins. Afterwards, `freeze` gives everything back to the app role,
+//! checks the rules (resource_id/tenant_id, no policies of its own...), adds
+//! FKs and RLS policies and grants the plugin only DML.
 
 use sqlx::Row;
 
@@ -18,11 +18,11 @@ pub struct PgPluginSchema {
     pub schema: String,
     pub role: String,
     pub reporting_role: String,
-    /// schemi delle estensioni richieste (es. `public` per PostGIS), dopo quello del plugin
+    /// schemas of the required extensions (e.g. `public` for PostGIS), after the one of the plugin
     pub extra_path: Vec<String>,
 }
 
-/// Funzioni `core` che i ruoli dei plugin possono eseguire.
+/// `core` functions the roles of the plugins may run.
 const CORE_GRANTS: &[&str] = &[
     "core.set_ctx(bytea, uuid, uuid, text, uuid)",
     "core.ctx_user()",
@@ -47,8 +47,8 @@ impl PgPluginSchema {
         std::iter::once(self.s()).chain(self.extra_path.iter().map(|e| qi(e))).collect::<Vec<_>>().join(", ")
     }
 
-    /// Una istruzione alla volta, senza cache dei prepared statement (DDL).
-    /// Non si usa `raw_sql`: la sua future non e' `Send` per ogni lifetime.
+    /// One statement at a time, without a cache of prepared statements (DDL).
+    /// `raw_sql` is not used: its future is not `Send` for every lifetime.
     async fn exec(tx: &mut Tx, sql: &str) -> Result<()> {
         sqlx::query(sql).persistent(false).execute(&mut **tx).await.map_err(|e| {
             DbError::Invalid(format!("{e} (in: {})", sql.chars().take(160).collect::<String>()))
@@ -56,7 +56,7 @@ impl PgPluginSchema {
         Ok(())
     }
 
-    /// Crea (o aggiorna) ruolo e schema del plugin. Idempotente.
+    /// Creates (or updates) role and schema of the plugin. Idempotent.
     pub async fn provision(&self, tx: &mut Tx, password: &str) -> Result<()> {
         let exists: bool = sqlx::query_scalar("select exists (select 1 from pg_roles where rolname = $1)")
             .bind(&self.role)
@@ -74,7 +74,7 @@ impl PgPluginSchema {
         Self::exec(tx, &format!("alter role {r} set search_path = {}", self.search_path())).await?;
         Self::exec(tx, &format!("alter role {r} set statement_timeout = '15s'")).await?;
         Self::exec(tx, &format!("alter role {r} set idle_in_transaction_session_timeout = '60s'")).await?;
-        // il ruolo app deve poter assumere il ruolo del plugin (migrazioni, cambio proprietario)
+        // the app role must be able to take the role of the plugin (migrations, change of owner)
         Self::exec(tx, &format!("grant {r} to current_user")).await?;
         Self::exec(tx, &format!("create schema if not exists {s}")).await?;
         Self::exec(tx, &format!("grant usage on schema core to {r}")).await?;
@@ -86,7 +86,7 @@ impl PgPluginSchema {
         Ok(())
     }
 
-    /// Relazioni dello schema: (nome, relkind). Esclude le sequenze legate a colonne.
+    /// Relations of the schema: (name, relkind). It excludes the sequences tied to columns.
     async fn relations(&self, tx: &mut Tx) -> Result<Vec<(String, String)>> {
         let rows = sqlx::query(
             "select c.relname::text, c.relkind::text from pg_class c
@@ -117,14 +117,14 @@ impl PgPluginSchema {
         Ok(())
     }
 
-    /// Prepara lo schema per una migrazione: oggetti al ruolo del plugin, CREATE concesso.
+    /// Prepares the schema for a migration: objects to the role of the plugin, CREATE granted.
     pub async fn thaw(&self, tx: &mut Tx) -> Result<()> {
-        // il nuovo proprietario deve avere CREATE sullo schema
+        // the new owner must have CREATE on the schema
         Self::exec(tx, &format!("grant create on schema {} to {}", self.s(), self.r())).await?;
         self.set_owner(tx, &self.r()).await
     }
 
-    /// Esegue istruzioni gia' verificate da sql-guard con il ruolo del plugin.
+    /// Runs statements already checked by sql-guard with the role of the plugin.
     pub async fn run_as_plugin(&self, tx: &mut Tx, statements: &[String]) -> Result<()> {
         Self::exec(tx, &format!("set local search_path = {}", self.search_path())).await?;
         Self::exec(tx, &format!("set local role {}", self.r())).await?;
@@ -135,7 +135,7 @@ impl PgPluginSchema {
         Self::exec(tx, "set local search_path = core, public").await
     }
 
-    /// Riporta lo schema al ruolo app e applica le regole di sicurezza.
+    /// Gives the schema back to the app role and applies the security rules.
     pub async fn freeze(&self, tx: &mut Tx) -> Result<FinalizeReport> {
         let s = self.s();
         let r = self.r();
@@ -149,11 +149,11 @@ impl PgPluginSchema {
         .fetch_one(&mut **tx)
         .await?;
         if funcs > 0 {
-            return Err(DbError::Invalid("lo schema del plugin non puo' contenere funzioni".into()));
+            return Err(DbError::Invalid("the schema of the plugin cannot contain functions".into()));
         }
 
-        // PostgreSQL verifica i privilegi delle viste solo all'uso: una vista su
-        // core.users creata dal plugin, passata al ruolo app, li esporrebbe.
+        // PostgreSQL checks the privileges of views only when used: a view on
+        // core.users created by the plugin, handed to the app role, would expose them.
         let outside: Vec<String> = sqlx::query_scalar(
             "select distinct v.relname::text || ' -> ' || dn.nspname::text || '.' || d.relname::text
              from pg_rewrite rw
@@ -170,7 +170,7 @@ impl PgPluginSchema {
         .await?;
         if let Some(o) = outside.first() {
             return Err(DbError::Invalid(format!(
-                "una vista del plugin usa oggetti fuori dal suo schema: {o}"
+                "a view of the plugin uses objects outside its schema: {o}"
             )));
         }
 
@@ -178,7 +178,7 @@ impl PgPluginSchema {
         for (name, kind) in &rels {
             if kind == "m" || kind == "f" {
                 return Err(DbError::Invalid(format!(
-                    "oggetto non ammesso: {name} (vista materializzata o tabella esterna)"
+                    "object not allowed: {name} (materialized view or foreign table)"
                 )));
             }
         }
@@ -200,7 +200,7 @@ impl PgPluginSchema {
                     .await?;
                     if foreign > 0 {
                         return Err(DbError::Invalid(format!(
-                            "la tabella {name} ha policy non gestite dall'host"
+                            "the table {name} has policies not managed by the host"
                         )));
                     }
                     let has_fk: bool = sqlx::query_scalar(
@@ -284,17 +284,17 @@ impl PgPluginSchema {
                     .await?;
                     if !has_tenant {
                         return Err(DbError::Invalid(format!(
-                            "la vista KPI {name} deve avere la colonna tenant_id"
+                            "the KPI view {name} must have the column tenant_id"
                         )));
                     }
-                    // definer (proprietario app): aggrega su tutti i tenant; il plugin non la legge
+                    // definer (app owner): it aggregates over every tenant; the plugin does not read it
                     Self::exec(tx, &format!("alter view {t} set (security_invoker = false)")).await?;
                     Self::exec(tx, &format!("revoke all on {t} from {r}")).await?;
                     Self::exec(tx, &format!("grant select on {t} to {}", qi(&self.reporting_role))).await?;
                     report.kpi_views.push(name.clone());
                 }
                 "v" => {
-                    // invoker: la vista non scavalca la RLS delle tabelle
+                    // invoker: the view does not bypass the RLS of the tables
                     Self::exec(tx, &format!("alter view {t} set (security_invoker = true)")).await?;
                     Self::exec(tx, &format!("revoke all on {t} from {r}")).await?;
                     Self::exec(tx, &format!("grant select on {t} to {r}")).await?;
@@ -322,14 +322,14 @@ impl PgPluginSchema {
             .await?;
             if !ok {
                 return Err(DbError::Invalid(format!(
-                    "la tabella {table} deve avere la colonna {col} uuid not null"
+                    "the table {table} must have the column {col} uuid not null"
                 )));
             }
         }
         Ok(())
     }
 
-    /// Colonne di una tabella dello schema: (nome, tipo di information_schema).
+    /// Columns of a table of the schema: (name, type from information_schema).
     pub async fn columns(&self, tx: &mut Tx, table: &str) -> Result<Vec<(String, String)>> {
         let rows = sqlx::query(
             "select column_name::text, data_type::text from information_schema.columns
@@ -342,7 +342,7 @@ impl PgPluginSchema {
         Ok(rows.iter().map(|r| (r.get(0), r.get(1))).collect())
     }
 
-    /// Rimuove schema e ruolo (disinstallazione).
+    /// Removes schema and role (uninstall).
     pub async fn drop(&self, tx: &mut Tx) -> Result<()> {
         Self::exec(tx, &format!("drop schema if exists {} cascade", self.s())).await?;
         let exists: bool = sqlx::query_scalar("select exists (select 1 from pg_roles where rolname = $1)")

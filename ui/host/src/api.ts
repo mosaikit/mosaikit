@@ -1,13 +1,13 @@
-// Client REST dell'host: cookie di sessione HttpOnly (gestito dal browser)
-// + header X-CSRF-Token sulle richieste che modificano dati.
+// REST client of the host: HttpOnly session cookie (handled by the browser)
+// + X-CSRF-Token header on the requests that change data.
 
 /**
- * Percorso base dell'app (es. "/mosaikit", "" alla radice), ricavato dalla pagina:
- * la UI e' servita da `<base>/` e naviga solo con l'hash.
+ * Base path of the app (e.g. "/mosaikit", "" at the root), taken from the page:
+ * the UI is served from `<base>/` and navigates with the hash only.
  */
 export const BASE = window.location.pathname.replace(/\/[^/]*$/, '')
 
-/** URL di un percorso assoluto dell'app (`/api/...`) sotto il percorso base. */
+/** URL of an absolute path of the app (`/api/...`) under the base path. */
 export function appUrl(path: string): string {
   return path.startsWith('/') ? BASE + path : path
 }
@@ -23,18 +23,28 @@ export function setUnauthorizedHandler(fn: () => void) {
   onUnauthorized = fn
 }
 
+/** Code of the errors raised when the server does not answer (restarting, unreachable, proxy error). */
+export const UNAVAILABLE = 'server_unavailable'
+/** Code of an error without a message of the server: never show a bare HTTP status. */
+export const UNEXPECTED = 'unexpected'
+
 export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
-    /** codice stabile del server (`wrong_credentials`, `forbidden`…), se c'e' */
+    /** stable code of the server (`wrong_credentials`, `forbidden`…), or one of the client */
     readonly code?: string,
   ) {
     super(message)
   }
 }
 
-/** Traduce un errore dal suo codice (lo imposta la shell con la lingua scelta); senza, il messaggio. */
+/** The server is not answering: whoever shows the error retries instead of giving up. */
+export function isUnavailable(e: unknown): boolean {
+  return e instanceof ApiError && e.code === UNAVAILABLE
+}
+
+/** Translates an error from its code (the shell sets it with the chosen language); otherwise the message. */
 let translate: (code: string | undefined, message: string) => string = (_c, m) => m
 
 export function setErrorTranslator(fn: (code: string | undefined, message: string) => string) {
@@ -42,10 +52,14 @@ export function setErrorTranslator(fn: (code: string | undefined, message: strin
 }
 
 export interface CallOptions {
-  /** corpo binario (upload) */
+  /** binary body (upload) */
   raw?: Blob
-  /** risposta come Blob invece che JSON */
+  /** response as a Blob instead of JSON */
   blob?: boolean
+}
+
+function unavailable(): ApiError {
+  return new ApiError('The server is not responding. Trying again…', 0, UNAVAILABLE)
 }
 
 export async function api<T = unknown>(method: string, path: string, body?: unknown, opts: CallOptions = {}): Promise<T> {
@@ -59,19 +73,27 @@ export async function api<T = unknown>(method: string, path: string, body?: unkn
     headers['Content-Type'] = 'application/json'
     payload = JSON.stringify(body)
   }
-  const r = await fetch(appUrl(path), { method, headers, body: payload, credentials: 'same-origin', cache: 'no-store' })
-  // 401 delle pagine di accesso (credenziali o codice errati): nessuna sessione da chiudere
+  let r: Response
+  try {
+    r = await fetch(appUrl(path), { method, headers, body: payload, credentials: 'same-origin', cache: 'no-store' })
+  } catch {
+    // network error: the server is down or restarting
+    throw unavailable()
+  }
+  // 401 of the sign-in pages (wrong credentials or code): no session to close
   if (r.status === 401 && onUnauthorized && !path.startsWith('/api/auth/')) onUnauthorized()
   if (!r.ok) {
-    let msg = `HTTP ${r.status}`
-    let code: string | undefined
+    // a gateway between browser and server (Vite, a reverse proxy) answers for a server that is not there
+    if (r.status === 502 || r.status === 503 || r.status === 504) throw unavailable()
+    let j: { error?: unknown; code?: unknown } | null = null
     try {
-      const j = await r.json()
-      if (j && typeof j.error === 'string') msg = j.error
-      if (j && typeof j.code === 'string') code = j.code
+      j = await r.json()
     } catch {
-      /* corpo non JSON */
+      // not the JSON of Mosaikit: whoever answered is not the server
+      throw unavailable()
     }
+    const msg = j && typeof j.error === 'string' ? j.error : 'Something went wrong. Try again.'
+    const code = j && typeof j.code === 'string' ? j.code : j && typeof j.error === 'string' ? undefined : UNEXPECTED
     throw new ApiError(msg, r.status, code)
   }
   if (opts.blob) return (await r.blob()) as T
@@ -101,5 +123,5 @@ export function fmtBytes(n: number): string {
 export function fmtDate(iso: string | null | undefined): string {
   if (!iso) return '—'
   const d = new Date(iso)
-  return isNaN(d.getTime()) ? '—' : d.toLocaleString(document.documentElement.lang || 'it', { dateStyle: 'short', timeStyle: 'short' })
+  return isNaN(d.getTime()) ? '—' : d.toLocaleString(document.documentElement.lang || 'en', { dateStyle: 'short', timeStyle: 'short' })
 }

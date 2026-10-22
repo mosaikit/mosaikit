@@ -1,4 +1,4 @@
-//! UI host (React) incorporata nell'eseguibile, con fallback SPA e CSP.
+//! Host UI (React) embedded in the executable, with SPA fallback and CSP.
 
 use axum::extract::State;
 use axum::http::{header, HeaderValue, Method, StatusCode, Uri};
@@ -7,7 +7,7 @@ use axum::Router;
 
 use crate::AppState;
 
-/// `ui/host/dist`: in debug letta da disco a ogni richiesta, in release incorporata.
+/// `ui/host/dist`: in debug read from disk at every request, in release embedded.
 #[derive(rust_embed::Embed)]
 #[folder = "../../ui/host/dist/"]
 #[allow_missing = true]
@@ -29,16 +29,26 @@ pub fn host_csp(s: &AppState) -> String {
 
 const MISSING: &str = "<!doctype html><meta charset=utf-8><title>Mosaikit</title>\
     <body style=\"font:15px system-ui;padding:40px;background:#0b0c0f;color:#ece7db\">\
-    <h1>UI non compilata</h1><p>Esegui <code>npm run build -w ui/host</code> \
-    oppure, in sviluppo, apri l'app da Vite: <code>cargo xtask dev</code> (http://127.0.0.1:5173).</p>";
+    <h1>UI not built</h1><p>Run <code>npm run build -w ui/host</code> \
+    or, in development, open the app from Vite: <code>cargo xtask dev</code> (http://127.0.0.1:5173).</p>";
 
 fn esc(s: &str) -> String {
     s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
 }
 
-/// Titolo e colori del marchio nella pagina (niente lampeggio del marchio di default).
-fn branded(b: &mosaikit_kernel::brand::Brand, html: String) -> String {
+/// Title and colours of the brand in the page (no flash of the default brand), and the social preview
+/// with absolute URLs built from the public address of the app (crawlers do not resolve relative ones).
+fn branded(b: &mosaikit_kernel::brand::Brand, app_url: &str, html: String) -> String {
     let html = html.replace("<title>Mosaikit</title>", &format!("<title>{}</title>", esc(&b.name)));
+    let html =
+        html.replace("content=\"social.png\"", &format!("content=\"{}/social.png\"", esc(app_url))).replacen(
+            "<meta property=\"og:type\"",
+            &format!(
+                "<meta property=\"og:url\" content=\"{}/\" />\n    <meta property=\"og:type\"",
+                esc(app_url)
+            ),
+            1,
+        );
     let css = b.css();
     if css.is_empty() {
         html
@@ -47,8 +57,8 @@ fn branded(b: &mosaikit_kernel::brand::Brand, html: String) -> String {
     }
 }
 
-/// Logo, favicon e icona del marchio (default: il simbolo di Mosaikit).
-/// Simbolo di Mosaikit, incorporato dal sorgente: non dipende dalla UI compilata.
+/// Logo, favicon and icon of the brand (default: the Mosaikit symbol).
+/// Mosaikit symbol, embedded from the source: it does not depend on the compiled UI.
 const DEFAULT_ICON: &str = include_str!("../../../ui/host/public/favicon.svg");
 
 fn brand_file(s: &AppState, which: &str) -> Response {
@@ -66,7 +76,7 @@ fn brand_file(s: &AppState, which: &str) -> Response {
         h.insert(header::CONTENT_TYPE, v);
     }
     h.insert(header::CACHE_CONTROL, HeaderValue::from_static("public, max-age=3600"));
-    // un SVG del marchio non esegue script
+    // an SVG of the brand runs no scripts
     h.insert(
         header::CONTENT_SECURITY_POLICY,
         HeaderValue::from_static("default-src 'none'; style-src 'unsafe-inline'; sandbox"),
@@ -100,7 +110,7 @@ async fn serve(State(s): State<AppState>, method: Method, uri: Uri) -> Response 
             }
             return res;
         }
-        // file statico con estensione inesistente: 404, non la SPA
+        // static file with a missing extension: 404, not the SPA
         if path.rsplit('/').next().is_some_and(|last| last.contains('.')) {
             return StatusCode::NOT_FOUND.into_response();
         }
@@ -108,7 +118,7 @@ async fn serve(State(s): State<AppState>, method: Method, uri: Uri) -> Response 
     let body = HostUi::get("index.html")
         .map(|f| String::from_utf8_lossy(&f.data).into_owned())
         .unwrap_or_else(|| MISSING.to_string());
-    let body = branded(&s.k.brand, body);
+    let body = branded(&s.k.brand, &s.k.cfg.app_url, body);
     let mut res = Html(body).into_response();
     let h = res.headers_mut();
     h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
@@ -117,4 +127,23 @@ async fn serve(State(s): State<AppState>, method: Method, uri: Uri) -> Response 
         h.insert(header::CONTENT_SECURITY_POLICY, v);
     }
     res
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn social_preview_with_absolute_urls() {
+        let html = "<head><title>Mosaikit</title><meta property=\"og:type\" content=\"website\" />\
+                    <meta property=\"og:image\" content=\"social.png\" />\
+                    <meta name=\"twitter:image\" content=\"social.png\" /></head>"
+            .to_string();
+        let out = super::branded(&Default::default(), "https://apps.example.com/mosaikit", html);
+        assert!(out.contains("og:image\" content=\"https://apps.example.com/mosaikit/social.png\""), "{out}");
+        assert!(
+            out.contains("twitter:image\" content=\"https://apps.example.com/mosaikit/social.png\""),
+            "{out}"
+        );
+        assert!(out.contains("og:url\" content=\"https://apps.example.com/mosaikit/\""), "{out}");
+        assert!(!out.contains("\"social.png\""), "{out}");
+    }
 }

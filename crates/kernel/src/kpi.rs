@@ -1,5 +1,5 @@
-//! KPI: del kernel (sempre disponibili) e dei plugin (viste `kpi_*`).
-//! Sono aggregati: chi li consulta non vede mai il contenuto delle risorse.
+//! KPIs: of the kernel (always available) and of the plugins (views `kpi_*`).
+//! They are aggregates: whoever looks at them never sees the content of the resources.
 
 use mosaikit_db::qi;
 use serde::Serialize;
@@ -141,7 +141,7 @@ pub(crate) async fn core(k: &Kernel, tenant: Uuid) -> Result<CoreKpi> {
     })
 }
 
-/// Viste KPI dei plugin attivi; con `tenant` filtrate, altrimenti con lo slug del tenant.
+/// KPI views of the active plugins; with `tenant` filtered, otherwise with the slug of the tenant.
 async fn plugin_kpis(k: &Kernel, tenant: Option<Uuid>) -> Result<Vec<PluginKpi>> {
     let mut out = Vec::new();
     for p in k.plugins.list().iter().filter(|p| p.is_active()) {
@@ -154,7 +154,7 @@ async fn plugin_kpis(k: &Kernel, tenant: Option<Uuid>) -> Result<Vec<PluginKpi>>
                 qi(&decl.view)
             );
             let rows = if k.db.is_sqlite() {
-                // SQLite: niente json_agg di righe intere, il JSON si costruisce qui
+                // SQLite: no json_agg of whole rows, the JSON is built here
                 let sql = format!(
                     "select t.slug as tenant, v.* from {}.{} v join core.tenants t on t.id = v.tenant_id
                      where $1::uuid is null or v.tenant_id = $1 order by t.slug",
@@ -199,7 +199,7 @@ async fn plugin_kpis(k: &Kernel, tenant: Option<Uuid>) -> Result<Vec<PluginKpi>>
     Ok(out)
 }
 
-/// KPI del tenant attivo (gestore).
+/// KPIs of the active tenant (manager).
 pub async fn tenant(k: &Kernel, c: &Caller) -> Result<TenantKpi> {
     c.require_manager()?;
     Ok(TenantKpi {
@@ -209,7 +209,7 @@ pub async fn tenant(k: &Kernel, c: &Caller) -> Result<TenantKpi> {
     })
 }
 
-/// KPI di tutti i tenant (amministratore di sistema).
+/// KPIs of every tenant (system administrator).
 pub async fn global(k: &Kernel, admin: &SessionUser) -> Result<GlobalKpi> {
     require_admin(admin)?;
     let mut tenants = Vec::new();

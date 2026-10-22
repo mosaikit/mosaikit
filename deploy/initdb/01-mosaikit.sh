@@ -1,8 +1,8 @@
 #!/bin/sh
-# Primo avvio del container PostgreSQL: ruolo applicativo (non superutente,
-# con CREATEROLE per i ruoli dei plugin) e database di Mosaikit.
-# Con un'immagine PostGIS (POSTGRES_IMAGE=postgis/postgis:...) l'estensione viene
-# creata qui: il ruolo applicativo non puo' farlo da solo.
+# First start of the PostgreSQL container: application role (not a superuser,
+# with CREATEROLE for the roles of the plugins) and the database of Mosaikit.
+# With a PostGIS image (POSTGRES_IMAGE=postgis/postgis:...) the extension is
+# created here: the application role cannot do it by itself.
 set -eu
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname postgres <<SQL
 CREATE ROLE mosaikit_app LOGIN CREATEROLE PASSWORD '${MOSAIKIT_DB_PASSWORD}';

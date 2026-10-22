@@ -1,4 +1,4 @@
-//! Gruppi del tenant (destinatari delle condivisioni).
+//! Groups of the tenant (recipients of shares).
 
 use serde::Serialize;
 use serde_json::Value;
@@ -61,7 +61,7 @@ pub async fn create_group(k: &Kernel, c: &Caller, name: &str) -> Result<Uuid> {
     c.require_manager()?;
     let name = name.trim();
     if name.is_empty() || name.len() > 80 {
-        return Err(Error::bad("nome del gruppo non valido"));
+        return Err(Error::bad("invalid group name"));
     }
     let id: Uuid =
         mosaikit_db::query_scalar("insert into core.groups (tenant_id, name) values ($1, $2) returning id")
@@ -71,7 +71,7 @@ pub async fn create_group(k: &Kernel, c: &Caller, name: &str) -> Result<Uuid> {
             .await
             .map_err(|e| match Error::from(e) {
                 err if err.kind == crate::Kind::Conflict => {
-                    Error::conflict(format!("esiste gia' il gruppo '{name}'"))
+                    Error::conflict(format!("the group '{name}' already exists"))
                 }
                 err => err,
             })?;
@@ -88,7 +88,7 @@ pub async fn delete_group(k: &Kernel, c: &Caller, id: Uuid) -> Result<()> {
         .await?
         .rows_affected();
     if n == 0 {
-        return Err(Error::not_found("gruppo non trovato"));
+        return Err(Error::not_found("group not found"));
     }
     mosaikit_db::query("delete from core.grants where principal_type = 'group' and principal_id = $1")
         .bind(id)
@@ -108,11 +108,11 @@ pub async fn set_group_member(k: &Kernel, c: &Caller, group: Uuid, user: Uuid, m
     .fetch_one(&k.db)
     .await?;
     if !ok {
-        return Err(Error::not_found("gruppo non trovato"));
+        return Err(Error::not_found("group not found"));
     }
     if member {
         if member_role(k, c.tenant.tenant_id, user).await?.is_none() {
-            return Err(Error::bad("l'utente non e' membro del tenant"));
+            return Err(Error::bad("the user is not a member of the tenant"));
         }
         mosaikit_db::query(
             "insert into core.group_members (group_id, user_id) values ($1, $2) on conflict do nothing",

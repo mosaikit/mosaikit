@@ -1,4 +1,4 @@
-//! Plugin: registro in memoria, installazione, attivazione, sviluppo, catalogo.
+//! Plugins: in-memory registry, installation, activation, development, catalog.
 
 pub mod dev;
 mod install;
@@ -48,7 +48,7 @@ pub struct LoadedPlugin {
     pub manifest: Manifest,
     pub status: Status,
     pub dev: bool,
-    /// cartella della UI (`ui/` installata o `ui/dist` in sviluppo)
+    /// folder of the UI (installed `ui/` or `ui/dist` in development)
     pub ui_dir: Option<PathBuf>,
     pub module: Option<mosaikit_runtime::Module>,
     pub sha256: String,
@@ -73,11 +73,11 @@ impl Plugins {
         self.0.read().expect("lock plugin").get(id).cloned()
     }
 
-    /// Plugin attivo, altrimenti NotFound.
+    /// Active plugin, otherwise NotFound.
     pub fn active(&self, id: &str) -> Result<Arc<LoadedPlugin>> {
         self.get(id)
             .filter(|p| p.is_active())
-            .ok_or_else(|| Error::not_found(format!("plugin non attivo: {id}")))
+            .ok_or_else(|| Error::not_found(format!("plugin not active: {id}")))
     }
 
     pub fn list(&self) -> Vec<Arc<LoadedPlugin>> {
@@ -115,12 +115,12 @@ impl Plugins {
     }
 }
 
-/// Cartella di installazione di una versione.
+/// Installation folder of a version.
 pub fn install_dir(k: &Kernel, id: &str, version: &str) -> PathBuf {
     k.cfg.data_dir.join("plugins").join(id).join(version)
 }
 
-/// Carica in memoria i plugin installati (non di sviluppo) registrati nel database.
+/// Loads into memory the installed plugins (not the development ones) recorded in the database.
 pub async fn load_installed(k: &Kernel) -> Result<()> {
     let rows = mosaikit_db::query(
         "select id, version, status, sha256, signed_by, installed_at from core.plugins where not dev",
@@ -141,7 +141,7 @@ pub async fn load_installed(k: &Kernel) -> Result<()> {
                         .bind(&id)
                         .execute(&k.db)
                         .await;
-                    tracing::warn!("plugin {id} {version} nella blocklist: bloccato");
+                    tracing::warn!("plugin {id} {version} in the blocklist: blocked");
                 }
                 let ui = dir.join("ui");
                 k.plugins.put(LoadedPlugin {
@@ -156,7 +156,7 @@ pub async fn load_installed(k: &Kernel) -> Result<()> {
                     installed_at: r.get(5),
                 });
             }
-            Err(e) => tracing::error!("plugin {id} {version} non caricabile da {}: {e}", dir.display()),
+            Err(e) => tracing::error!("plugin {id} {version} cannot be loaded from {}: {e}", dir.display()),
         }
     }
     Ok(())
@@ -170,9 +170,9 @@ pub(crate) fn load_from_dir(k: &Kernel, dir: &Path) -> Result<(Manifest, Option<
     Ok((manifest, module))
 }
 
-// ------------------------------------------------------------------ informazioni per le API
+// ------------------------------------------------------------------ information for the APIs
 
-/// Plugin come lo vede la UI host (rail).
+/// Plugin as the host UI sees it (rail).
 #[derive(Debug, Clone, Serialize)]
 pub struct PluginView {
     pub id: String,
@@ -204,7 +204,7 @@ impl PluginView {
     }
 }
 
-/// Plugin come lo vede l'amministratore.
+/// Plugin as the administrator sees it.
 #[derive(Debug, Clone, Serialize)]
 pub struct PluginAdminView {
     #[serde(flatten)]
@@ -238,15 +238,15 @@ pub fn admin_views(k: &Kernel, admin: &SessionUser) -> Result<Vec<PluginAdminVie
         .collect())
 }
 
-// ------------------------------------------------------------------ attivazione e rimozione
+// ------------------------------------------------------------------ activation and removal
 
 pub async fn set_active(k: &Kernel, admin: Option<&SessionUser>, id: &str, active: bool) -> Result<()> {
     if let Some(a) = admin {
         crate::tenancy::require_admin(a)?;
     }
-    let p = k.plugins.get(id).ok_or_else(|| Error::not_found(format!("plugin non installato: {id}")))?;
+    let p = k.plugins.get(id).ok_or_else(|| Error::not_found(format!("plugin not installed: {id}")))?;
     if p.status == Status::Blocked && active {
-        return Err(Error::forbidden("plugin bloccato dalla blocklist del registry"));
+        return Err(Error::forbidden("plugin blocked by the blocklist of the registry"));
     }
     let status = if active { Status::Active } else { Status::Installed };
     mosaikit_db::query("update core.plugins set status = $2, updated_at = now() where id = $1")
@@ -268,10 +268,10 @@ pub async fn set_active(k: &Kernel, admin: Option<&SessionUser>, id: &str, activ
     Ok(())
 }
 
-/// Disinstalla: schema, ruolo, risorse (a cascata), contenuti su disco, file del pacchetto.
+/// Uninstalls: schema, role, resources (in cascade), contents on disk, files of the package.
 pub async fn uninstall(k: &Kernel, admin: &SessionUser, id: &str) -> Result<()> {
     crate::tenancy::require_admin(admin)?;
-    let p = k.plugins.get(id).ok_or_else(|| Error::not_found(format!("plugin non installato: {id}")))?;
+    let p = k.plugins.get(id).ok_or_else(|| Error::not_found(format!("plugin not installed: {id}")))?;
     let resources: Vec<(Uuid, Uuid)> =
         mosaikit_db::query("select tenant_id, id from core.resources where plugin_id = $1")
             .bind(id)

@@ -1,9 +1,9 @@
-// La shell di Mosaikit: accesso, poi la cornice con la pagina della rotta.
+// The shell of Mosaikit: sign-in, then the frame with the page of the route.
 
 import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
-import { setUnauthorizedHandler } from '../api.ts'
+import { errText, isUnavailable, setUnauthorizedHandler } from '../api.ts'
 import type { Session } from '../types.ts'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -23,8 +23,8 @@ import { setPreset } from './theme.ts'
 
 const LAST_TENANT = 'msk_tenant'
 
-/** Dove deve stare chi e' entrato: l'amministratore nella piattaforma, gli altri in un loro tenant; gli
- *  indirizzi di prima portano alla casa nuova. */
+/** Where whoever signed in must be: the administrator in the platform, the others in one of their tenants;
+ *  the old addresses lead to the new home. */
 function landing(s: Session, r: Route, hash: string): string | null {
   const canonical = r.area === 'login' ? null : href(r)
   if (s.user.is_system_admin) return r.area === 'admin' ? (canonical !== hash ? canonical : null) : to.admin()
@@ -33,7 +33,7 @@ function landing(s: Session, r: Route, hash: string): string | null {
   try {
     last = localStorage.getItem(LAST_TENANT) ?? ''
   } catch {
-    /* storage non disponibile */
+    /* storage not available */
   }
   const slug = [last, s.user.home_tenant_slug].find((x) => s.memberships.some((m) => m.slug === x)) ?? s.memberships[0]?.slug
   return slug ? to.tenant(slug) : null
@@ -54,7 +54,7 @@ function Page({ session, route }: { session: Session; route: Route }) {
     if (route.page === 'plugin') return <PluginPage session={session} slug={route.tenant} id={route.id!} />
     if (route.page === 'account') return <AccountPage session={session} route={route} />
     if (route.page === 'notifications') return <NotificationsPage session={session} route={route} />
-    if (route.page !== 'home' && !manager) return <Empty title={t('Riservato ai Tenant Manager')} />
+    if (route.page !== 'home' && !manager) return <Empty title={t('Reserved to Tenant Managers')} />
     if (route.page === 'manage') return <Manage slug={route.tenant} section={route.section} />
     if (route.page === 'plugins') return <TenantPlugins slug={route.tenant} />
     if (route.page === 'shares') return <Shares slug={route.tenant} />
@@ -69,13 +69,13 @@ export default function App() {
   const qc = useQueryClient()
   const session = useSession()
   const hash = useHash()
-  useLang() // con la lingua nuova si ridisegna tutto
+  useLang() // with the new language everything is drawn again
   const route = parse(hash)
   useFavicon()
   useEffect(() => setUnauthorizedHandler(() => qc.setQueryData(['session'], null)), [qc])
   const s = session.data
   const target = s ? landing(s, route, hash) : null
-  // il tema del tenant in cui si lavora, altrimenti quello della piattaforma
+  // the theme of the tenant one works in, otherwise the one of the platform
   const ctx = useTenantCtx(s && route.area === 'tenant' ? route.tenant : '')
   const preset = route.area === 'tenant' ? ctx.data?.theme?.preset : s?.theme
   useEffect(() => setPreset(preset), [preset])
@@ -87,14 +87,15 @@ export default function App() {
       try {
         localStorage.setItem(LAST_TENANT, route.tenant)
       } catch {
-        /* storage non disponibile */
+        /* storage not available */
       }
   }, [route])
 
   if (session.isLoading)
     return (
-      <div className="flex h-full items-center justify-center text-muted-foreground">
+      <div className="flex h-full flex-col items-center justify-center gap-3 text-muted-foreground">
         <Loader2 className="size-6 animate-spin" />
+        {isUnavailable(session.failureReason) && <p role="status">{errText(session.failureReason)}</p>}
       </div>
     )
   return (

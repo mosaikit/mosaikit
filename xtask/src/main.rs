@@ -1,4 +1,4 @@
-//! `cargo xtask <comando>`: sviluppo, test e release di Mosaikit senza script bash.
+//! `cargo xtask <command>`: development, tests and release of Mosaikit without bash scripts.
 
 mod ci;
 mod db;
@@ -15,9 +15,9 @@ use anyhow::Result;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
-#[command(name = "cargo xtask", about = "Automazione del progetto Mosaikit")]
+#[command(name = "cargo xtask", about = "Automation of the Mosaikit project")]
 struct Cli {
-    /// distribuzione da usare (cartella o file distribution.toml; default: quella di mosaikit)
+    /// distribution to use (folder or distribution.toml file; default: the one of mosaikit)
     #[arg(long, global = true, env = "MOSAIKIT_DIST")]
     dist: Option<PathBuf>,
     #[command(subcommand)]
@@ -26,33 +26,33 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Cmd {
-    /// PostgreSQL di sviluppo (.dev/pg, porta 55432)
+    /// Development PostgreSQL (.dev/pg, port 55432)
     Db {
         #[command(subcommand)]
         cmd: DbCmd,
     },
-    /// Ambiente di sviluppo con hot reload (DB, server, Vite, plugin)
+    /// Development environment with hot reload (DB, server, Vite, plugins)
     Dev {
-        /// non avviare Vite per la UI host
+        /// do not start Vite for the host UI
         #[arg(long)]
         no_ui: bool,
     },
-    /// Plugin: build, pacchetti, scaffolding
+    /// Plugins: build, packages, scaffolding
     Plugin {
         #[command(subcommand)]
         cmd: PluginCmd,
     },
-    /// Test Rust (con PostgreSQL) e test delle UI
+    /// Rust tests (with PostgreSQL) and UI tests
     Test {
-        /// non avviare il cluster di sviluppo (usa MOSAIKIT_TEST_DATABASE_URL)
+        /// do not start the development cluster (use MOSAIKIT_TEST_DATABASE_URL)
         #[arg(long)]
         skip_db: bool,
     },
-    /// Controlli della CI: fmt, clippy, deny, typecheck, lint, build, test
+    /// CI checks: fmt, clippy, deny, typecheck, lint, build, test
     Ci,
-    /// Test end-to-end nel browser (Playwright) su un'installazione completa
+    /// End-to-end tests in the browser (Playwright) on a full installation
     E2e {
-        /// mostra il browser
+        /// show the browser
         #[arg(long)]
         headed: bool,
     },
@@ -65,48 +65,48 @@ enum Cmd {
 
 #[derive(Subcommand)]
 enum DbCmd {
-    /// Avvia (e se serve inizializza) il cluster di sviluppo
+    /// Starts (and if needed initializes) the development cluster
     Up,
-    /// Ferma il cluster di sviluppo
+    /// Stops the development cluster
     Down,
-    /// Ricrea da zero il cluster di sviluppo
+    /// Recreates the development cluster from scratch
     Reset,
-    /// Elimina i database lasciati da test interrotti
+    /// Deletes the databases left by interrupted tests
     CleanTests,
-    /// Stampa gli URL di connessione
+    /// Prints the connection URLs
     Url,
 }
 
 #[derive(Subcommand)]
 enum PluginCmd {
-    /// Compila logica (WASM) e UI di tutti i plugin
+    /// Builds logic (WASM) and UI of every plugin
     Build {
         #[arg(long)]
         release: bool,
     },
-    /// Crea i pacchetti .mskp firmati e l'index.json del registry
+    /// Creates the signed .mskp packages and the index.json of the registry
     Pack {
         #[arg(long)]
         release: bool,
         #[arg(long, default_value = "dist/registry")]
         out: PathBuf,
     },
-    /// Nuovo plugin dal template (xtask/templates/plugin)
+    /// New plugin from the template (xtask/templates/plugin)
     New {
         name: String,
-        /// id del plugin (default com.example.<nome>)
+        /// id of the plugin (default com.example.<name>)
         #[arg(long)]
         id: Option<String>,
-        /// senza logica WASM (solo manifest, migrazioni e UI)
+        /// without WASM logic (manifest, migrations and UI only)
         #[arg(long)]
         no_logic: bool,
-        /// cartella in cui crearlo (default: la prima di [plugins] roots della distribuzione)
+        /// folder to create it in (default: the first of [plugins] roots of the distribution)
         #[arg(long)]
         into: Option<PathBuf>,
     },
-    /// Azzera schema e dati di un plugin nel database di sviluppo
+    /// Resets schema and data of a plugin in the development database
     DbReset { id: String },
-    /// Genera una coppia di chiavi ed25519 per firmare i pacchetti
+    /// Generates an ed25519 key pair to sign the packages
     Keygen {
         #[arg(long)]
         out: Option<PathBuf>,
@@ -115,37 +115,37 @@ enum PluginCmd {
 
 #[derive(Subcommand)]
 enum ReleaseCmd {
-    /// Server release + plugin firmati + registry in una cartella
+    /// Release server + signed plugins + registry in a folder
     Bundle {
         #[arg(long)]
         out: PathBuf,
-        /// la UI e' gia' compilata (es. nel Dockerfile)
+        /// the UI is already built (e.g. in the Dockerfile)
         #[arg(long)]
         skip_ui: bool,
         #[arg(long, value_enum, default_value = "server")]
         flavor: release::Flavor,
     },
-    /// Zip desktop in dist/ (SQLite; PostgreSQL embedded se la distribuzione lo chiede)
+    /// Desktop zip in dist/ (SQLite; embedded PostgreSQL if the distribution asks for it)
     Desktop {
-        /// distribuzione con database postgres: cartella di PostgreSQL da includere (bin/, lib/, share/)
+        /// distribution with a postgres database: PostgreSQL folder to include (bin/, lib/, share/)
         #[arg(long)]
         pg_dir: Option<PathBuf>,
-        /// distribuzione con database postgres: non includerlo (usera' quello installato)
+        /// distribution with a postgres database: do not include it (the installed one will be used)
         #[arg(long)]
         no_pg: bool,
     },
-    /// Immagine Docker del server + cartelle Docker (compose) e Kubernetes in dist/
+    /// Docker image of the server + Docker (compose) and Kubernetes folders in dist/
     Docker {
         #[arg(long)]
         tag: Option<String>,
     },
-    /// Solo i manifest Kubernetes (kustomize) in dist/, senza costruire l'immagine
+    /// Kubernetes manifests only (kustomize) in dist/, without building the image
     K8s {
-        /// immagine (default <immagine della distribuzione>:<versione>)
+        /// image (default <image of the distribution>:<version>)
         #[arg(long)]
         tag: Option<String>,
     },
-    /// Tutte le release in dist/: desktop, Docker e Kubernetes
+    /// Every release in dist/: desktop, Docker and Kubernetes
     All {
         #[arg(long)]
         pg_dir: Option<PathBuf>,
@@ -164,7 +164,7 @@ fn main() -> Result<()> {
             DbCmd::Reset => db::reset(),
             DbCmd::CleanTests => db::clean_tests(),
             DbCmd::Url => {
-                println!("sviluppo: {}", db::dev_url());
+                println!("development: {}", db::dev_url());
                 println!("test:     {}", db::test_url());
                 Ok(())
             }

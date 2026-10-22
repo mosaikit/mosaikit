@@ -2,18 +2,19 @@ import { createHmac } from 'node:crypto'
 import AxeBuilder from '@axe-core/playwright'
 import { expect, test, type Page } from '@playwright/test'
 
-// Scenario completo nella shell: amministratore (secondo fattore, plugin, tenant, barra in alto, tema)
-// -> Tenant Manager (persone, tema del tenant, invito) -> membro (Account, plugin in iframe,
-// condivisione, link pubblico, notifica di un invito) -> Tenant Manager (condivisioni, consumi).
-// Poi isolamento dell'iframe, lingua, telefono, accessibilita' (axe) e contrasto dei temi.
+// Full scenario in the shell: administrator (second factor, plugins, tenants, top bar, theme)
+// -> Tenant Manager (people, theme of the tenant, invitation) -> member (Account, plugin in the iframe,
+// sharing, public link, notification of an invitation) -> Tenant Manager (shares, usage).
+// Then isolation of the iframe, language, phone, the theme of the sign-in page, a server that does not
+// answer, accessibility (axe) and contrast of the themes. The interface is in English (the default).
 
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? 'e2e-admin-password'
 const PASSWORD = 'password-e2e-123'
 const NEW_PASSWORD = 'password-e2e-456'
-// l'app e' servita sotto un percorso base (url = "http://127.0.0.1:18080/mosaikit")
+// the app is served under a base path (url = "http://127.0.0.1:18080/mosaikit")
 const BASE = process.env.E2E_BASE_PATH ?? '/mosaikit'
 
-/** Codice TOTP (RFC 6238, SHA-1, 6 cifre) di un segreto in base32. */
+/** TOTP code (RFC 6238, SHA-1, 6 digits) of a base32 secret. */
 function totp(secret: string, step = Math.floor(Date.now() / 30000)): string {
   const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
   let bits = ''
@@ -28,69 +29,69 @@ function totp(secret: string, step = Math.floor(Date.now() / 30000)): string {
 
 let adminSecret = ''
 
-/** Lingua italiana e niente stato di prove precedenti. */
+/** English and no state of previous tests. */
 async function fresh(page: Page, hash = '') {
   await page.goto('./' + hash)
   await page.evaluate(() => {
     localStorage.clear()
-    localStorage.setItem('msk_lang', 'it')
+    localStorage.setItem('msk_lang', 'en')
   })
   await page.goto('./' + hash)
 }
 
 async function login(page: Page, tenant: string, user: string, password: string) {
   await fresh(page)
-  await expect(page.getByLabel('Utente')).toBeVisible()
-  // il menu dei tenant compare solo se ce n'e' piu' di uno
+  await expect(page.getByLabel('Username')).toBeVisible()
+  // the menu of the tenants appears only if there is more than one
   const select = page.getByRole('combobox', { name: 'Tenant' })
   if (await select.count()) {
     await select.click()
     await page.getByRole('option', { name: tenant }).click()
   }
-  await page.getByLabel('Utente').fill(user)
+  await page.getByLabel('Username').fill(user)
   await page.getByLabel('Password').fill(password)
-  await page.getByRole('button', { name: 'Accedi' }).click()
-  await expect(page.getByRole('button', { name: /menu della persona/ })).toBeVisible()
+  await page.getByRole('button', { name: 'Sign in' }).click()
+  await expect(page.getByRole('button', { name: /person menu/ })).toBeVisible()
 }
 
-/** Accesso amministratori: la prima volta registra il secondo fattore, poi chiede il codice. */
+/** Administrator access: the first time it registers the second factor, then it asks for the code. */
 async function adminLogin(page: Page) {
   await fresh(page, '#/admin')
-  await expect(page.getByRole('heading', { name: 'Accesso amministratori' })).toBeVisible()
-  await page.getByLabel('Utente').fill('admin')
+  await expect(page.getByRole('heading', { name: 'Administrator access' })).toBeVisible()
+  await page.getByLabel('Username').fill('admin')
   await page.getByLabel('Password').fill(ADMIN_PASSWORD)
-  await page.getByRole('button', { name: 'Accedi' }).click()
+  await page.getByRole('button', { name: 'Sign in' }).click()
   if (!adminSecret) {
-    await expect(page.getByRole('img', { name: "QR code da inquadrare con l'app" })).toBeVisible()
+    await expect(page.getByRole('img', { name: 'QR code to scan with the app' })).toBeVisible()
     adminSecret = ((await page.locator('code').first().textContent()) ?? '').replace(/\s/g, '')
-    await page.getByLabel('Codice mostrato dall’app').fill(totp(adminSecret))
-    await page.getByRole('button', { name: 'Attiva e accedi' }).click()
-    await expect(page.getByLabel('Codici di recupero').locator('li')).toHaveCount(10)
-    await page.getByRole('button', { name: 'Ho salvato i codici: continua' }).click()
+    await page.getByLabel('Code shown by the app').fill(totp(adminSecret))
+    await page.getByRole('button', { name: 'Turn on and sign in' }).click()
+    await expect(page.getByLabel('Recovery codes').locator('li')).toHaveCount(10)
+    await page.getByRole('button', { name: 'I saved the codes: continue' }).click()
   } else {
-    await page.getByLabel('Codice', { exact: true }).fill(totp(adminSecret))
-    await page.getByRole('button', { name: 'Conferma' }).click()
+    await page.getByLabel('Code', { exact: true }).fill(totp(adminSecret))
+    await page.getByRole('button', { name: 'Confirm' }).click()
   }
-  await expect(page.getByRole('heading', { name: 'Panoramica della piattaforma' })).toBeVisible()
+  await expect(page.getByRole('heading', { name: 'Platform overview' })).toBeVisible()
 }
 
 async function logout(page: Page) {
-  await page.getByRole('button', { name: /menu della persona/ }).click()
-  await page.getByRole('menuitem', { name: 'Esci' }).click()
-  await expect(page.getByRole('button', { name: 'Accedi' })).toBeVisible()
+  await page.getByRole('button', { name: /person menu/ }).click()
+  await page.getByRole('menuitem', { name: 'Sign out' }).click()
+  await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible()
 }
 
-/** Una voce della sidebar (barra a icone o pannello aperto). */
+/** An item of the sidebar (icon bar or open panel). */
 const nav = (page: Page, name: string) => page.locator('[data-sidebar="sidebar"]').getByRole('link', { name, exact: true })
 
 async function createTenant(page: Page, slug: string, name: string) {
-  await page.getByRole('button', { name: 'Nuovo tenant' }).click()
-  const d = page.getByRole('dialog', { name: 'Nuovo tenant' })
-  await d.getByLabel('Identificativo').fill(slug)
-  await d.getByLabel('Nome', { exact: true }).fill(name)
-  await d.getByLabel('Username del Tenant Manager').fill('gestore')
-  await d.getByLabel('Password iniziale').fill(PASSWORD)
-  await d.getByRole('button', { name: 'Crea il tenant' }).click()
+  await page.getByRole('button', { name: 'New tenant' }).click()
+  const d = page.getByRole('dialog', { name: 'New tenant' })
+  await d.getByLabel('Identifier').fill(slug)
+  await d.getByLabel('Name', { exact: true }).fill(name)
+  await d.getByLabel('Username of the Tenant Manager').fill('manager')
+  await d.getByLabel('Initial password').fill(PASSWORD)
+  await d.getByRole('button', { name: 'Create the tenant' }).click()
   await expect(page.getByRole('row', { name: new RegExp(name) })).toBeVisible()
 }
 
@@ -102,261 +103,310 @@ async function accessible(page: Page, where: string) {
   expect(bad.map((v) => `${where}: ${v.id} ${v.nodes.map((n) => n.target.join(' ') + ' ' + n.html.slice(0, 300) + ' => ' + n.failureSummary).join(' | ')}`)).toEqual([])
 }
 
-test.describe.serial('piattaforma', () => {
-  test('amministratore: secondo fattore, plugin, tenant, barra in alto e tema', async ({ page }) => {
-    // prima di ogni tenant la pagina di accesso lo dice e rimanda all'accesso amministratori
+test.describe.serial('platform', () => {
+  test('administrator: second factor, plugins, tenants, top bar and theme', async ({ page }) => {
+    // before any tenant the sign-in page says so and points to the administrator access
     await fresh(page)
-    await expect(page.getByText('Nessun tenant disponibile.')).toBeVisible()
-    await accessible(page, 'accesso')
+    await expect(page.getByText('No tenant available.', { exact: false })).toBeVisible()
+    await accessible(page, 'sign-in')
     await adminLogin(page)
-    await expect(page.getByText('Piattaforma', { exact: true }).first()).toBeVisible()
-    await accessible(page, 'panoramica della piattaforma')
+    await expect(page.getByText('Platform', { exact: true }).first()).toBeVisible()
+    await accessible(page, 'platform overview')
 
-    // plugin preinstallati dal registry
-    await nav(page, 'Plugin').click()
+    // plugins preinstalled from the registry
+    await nav(page, 'Plugins').click()
     for (const name of ['Note', 'Attività', 'Contatti', 'Mappe', 'Siti statici', 'File']) {
-      await expect(page.getByRole('row', { name: new RegExp(name) }).first()).toContainText('attivo')
+      await expect(page.getByRole('row', { name: new RegExp(name) }).first()).toContainText('active')
     }
-    await accessible(page, 'plugin della piattaforma')
+    await accessible(page, 'plugins of the platform')
 
-    // due tenant, ciascuno con il suo Tenant Manager
+    // two tenants, each with its Tenant Manager
     await nav(page, 'Tenant').click()
-    await createTenant(page, 'alfa', 'Comune di Alfa')
-    await createTenant(page, 'beta', 'Comune di Beta')
-    await page.getByRole('link', { name: 'Comune di Alfa' }).click()
-    await page.getByRole('link', { name: 'Utenti e gestori' }).click()
-    await expect(page.getByRole('row', { name: /gestore/ })).toContainText('Tenant Manager')
-    await accessible(page, 'dettaglio del tenant')
+    await createTenant(page, 'alfa', 'City of Alfa')
+    await createTenant(page, 'beta', 'City of Beta')
+    await page.getByRole('link', { name: 'City of Alfa' }).click()
+    await page.getByRole('link', { name: 'Users and managers' }).click()
+    await expect(page.getByRole('row', { name: /manager/ })).toContainText('Tenant Manager')
+    await accessible(page, 'detail of the tenant')
 
-    // la barra in alto, decisa dall'Administrator: senza guida, l'aiuto passa nel menu della persona
-    await nav(page, 'Sistema').click()
-    await page.getByRole('link', { name: 'Barra in alto' }).click()
-    await page.getByRole('switch', { name: 'Guida' }).click()
-    await accessible(page, 'barra in alto, con modifiche')
-    await page.getByRole('button', { name: 'Salva' }).click()
-    await expect(page.getByRole('button', { name: 'Aiuto', exact: true })).toBeHidden()
-    await page.getByRole('button', { name: /menu della persona/ }).click()
-    await expect(page.getByRole('menuitem', { name: 'Tour guidato di questa pagina' })).toBeVisible()
+    // the top bar, decided by the Administrator: without help, the help moves to the person menu
+    await nav(page, 'System').click()
+    await page.getByRole('link', { name: 'Top bar' }).click()
+    await page.getByRole('switch', { name: 'Help' }).click()
+    await accessible(page, 'top bar, with changes')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByRole('button', { name: 'Help', exact: true })).toBeHidden()
+    await page.getByRole('button', { name: /person menu/ }).click()
+    await expect(page.getByRole('menuitem', { name: 'Guided tour of this page' })).toBeVisible()
     await page.keyboard.press('Escape')
-    await page.getByRole('switch', { name: 'Guida' }).click()
-    await page.getByRole('button', { name: 'Salva' }).click()
-    await expect(page.getByRole('button', { name: 'Aiuto', exact: true })).toBeVisible()
+    await page.getByRole('switch', { name: 'Help' }).click()
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByRole('button', { name: 'Help', exact: true })).toBeVisible()
 
-    // il tema della piattaforma: Tessera, i colori del logo
-    await page.getByRole('link', { name: 'Tema', exact: true }).click()
+    // the theme of the platform: Tessera, the colours of the logo
+    await page.getByRole('link', { name: 'Theme', exact: true }).click()
     await page.getByRole('button', { name: /Tessera/ }).click()
     await expect(page.locator('html')).toHaveAttribute('data-preset', 'tessera')
-    await accessible(page, 'sistema, tema Tessera')
+    await accessible(page, 'system, Tessera theme')
     await logout(page)
   })
 
-  test('Tenant Manager: navigazione, persone, tema del tenant, invito', async ({ page }) => {
-    await login(page, 'Comune di Alfa', 'gestore', PASSWORD)
-    // il tenant eredita il tema della piattaforma
+  test('Tenant Manager: navigation, people, theme of the tenant, invitation', async ({ page }) => {
+    await login(page, 'City of Alfa', 'manager', PASSWORD)
+    // the tenant inherits the theme of the platform
     await expect(page.locator('html')).toHaveAttribute('data-preset', 'tessera')
-    for (const name of ['Panoramica del tenant', 'Gestisci', 'Plugin', 'Condivisioni', 'Consumi', 'Impostazioni del tenant']) {
+    for (const name of ['Tenant overview', 'Manage', 'Plugins', 'Shares', 'Usage', 'Tenant settings']) {
       await expect(nav(page, name)).toBeVisible()
     }
-    await nav(page, 'Gestisci').click()
-    await page.getByRole('button', { name: 'Nuovo utente' }).click()
-    const d = page.getByRole('dialog', { name: 'Nuovo utente' })
+    await nav(page, 'Manage').click()
+    await page.getByRole('button', { name: 'New user' }).click()
+    const d = page.getByRole('dialog', { name: 'New user' })
     await d.getByLabel('Username').fill('anna')
-    await d.getByLabel('Nome visualizzato').fill('Anna Rossi')
-    await d.getByLabel('Password iniziale').fill(PASSWORD)
-    await d.getByRole('button', { name: 'Crea utente' }).click()
+    await d.getByLabel('Display name').fill('Anna Rossi')
+    await d.getByLabel('Initial password').fill(PASSWORD)
+    await d.getByRole('button', { name: 'Create user' }).click()
     await expect(page.getByRole('row', { name: /Anna Rossi/ })).toBeVisible()
-    // la barra delle azioni compare solo con una selezione
-    await expect(page.getByRole('group', { name: 'Azioni sulla selezione' })).toBeHidden()
+    // the action bar appears only with a selection
+    await expect(page.getByRole('group', { name: 'Actions on the selection' })).toBeHidden()
     await page.getByRole('row', { name: /Anna Rossi/ }).getByRole('checkbox').click()
-    await expect(page.getByRole('group', { name: 'Azioni sulla selezione' })).toBeVisible()
-    await accessible(page, 'gestisci')
+    await expect(page.getByRole('group', { name: 'Actions on the selection' })).toBeVisible()
+    await accessible(page, 'manage')
 
-    // tema del tenant: personalizzato, poi di nuovo quello della piattaforma
-    await nav(page, 'Impostazioni del tenant').click()
-    await page.getByRole('link', { name: 'Tema', exact: true }).click()
-    await expect(page.getByText('Ereditato', { exact: true })).toBeVisible()
+    // theme of the tenant: customized, then the one of the platform again
+    await nav(page, 'Tenant settings').click()
+    await page.getByRole('link', { name: 'Theme', exact: true }).click()
+    await expect(page.getByText('Inherited', { exact: true })).toBeVisible()
     await page.getByRole('button', { name: /Designers Italia/ }).click()
-    await expect(page.getByText('Personalizzato', { exact: true })).toBeVisible()
+    await expect(page.getByText('Customized', { exact: true })).toBeVisible()
     await expect(page.locator('html')).toHaveAttribute('data-preset', 'italia')
-    await page.getByRole('button', { name: 'Ripristina il tema della piattaforma' }).click()
+    await page.getByRole('button', { name: 'Restore the theme of the platform' }).click()
     await expect(page.locator('html')).toHaveAttribute('data-preset', 'tessera')
     await logout(page)
 
-    // il Tenant Manager di Beta invita Anna, che sta in Alfa
-    await login(page, 'Comune di Beta', 'gestore', PASSWORD)
-    await nav(page, 'Gestisci').click()
-    await page.getByRole('link', { name: /In attesa/ }).click()
-    await page.getByRole('button', { name: 'Invita' }).click()
-    const inv = page.getByRole('dialog', { name: 'Invita una persona di un altro tenant' })
-    await inv.getByLabel('Tenant di appartenenza').fill('alfa')
+    // the Tenant Manager of Beta invites Anna, who is in Alfa
+    await login(page, 'City of Beta', 'manager', PASSWORD)
+    await nav(page, 'Manage').click()
+    await page.getByRole('link', { name: /Pending/ }).click()
+    await page.getByRole('button', { name: 'Invite' }).click()
+    const inv = page.getByRole('dialog', { name: 'Invite a person of another tenant' })
+    await inv.getByLabel('Home tenant').fill('alfa')
     await inv.getByLabel('Username').fill('anna')
-    await inv.getByRole('button', { name: 'Invia l’invito' }).click()
+    await inv.getByRole('button', { name: 'Send the invitation' }).click()
     await expect(page.getByRole('row', { name: /anna/ })).toBeVisible()
     await logout(page)
   })
 
-  test('membro: Account, notifica, plugin, condivisione e link pubblico', async ({ page, context }) => {
-    await login(page, 'Comune di Alfa', 'anna', PASSWORD)
-    await expect(nav(page, 'Gestisci')).toBeHidden()
+  test('member: Account, notification, plugin, sharing and public link', async ({ page, context }) => {
+    await login(page, 'City of Alfa', 'anna', PASSWORD)
+    await expect(nav(page, 'Manage')).toBeHidden()
     await accessible(page, 'home')
 
-    // cambio della propria password: la regola accanto al campo
-    await page.getByRole('button', { name: /menu della persona/ }).click()
+    // change of one's own password: the rule next to the field
+    await page.getByRole('button', { name: /person menu/ }).click()
     await page.getByRole('menuitem', { name: 'Account' }).click()
-    await page.getByRole('link', { name: 'Accesso e sicurezza' }).click()
-    await page.getByLabel('Password attuale').fill(PASSWORD)
-    await page.getByLabel('Nuova password', { exact: true }).fill(NEW_PASSWORD)
-    await page.getByLabel('Ripeti la nuova password').fill(NEW_PASSWORD)
-    await page.getByRole('button', { name: 'Aggiorna password' }).click()
-    await expect(page.getByText('Password aggiornata: le altre sessioni sono state chiuse')).toBeVisible()
+    await page.getByRole('link', { name: 'Sign-in and security' }).click()
+    await page.getByLabel('Current password').fill(PASSWORD)
+    await page.getByLabel('New password', { exact: true }).fill(NEW_PASSWORD)
+    await page.getByLabel('Repeat the new password').fill(NEW_PASSWORD)
+    await page.getByRole('button', { name: 'Update password' }).click()
+    await expect(page.getByText('Password updated: the other sessions were closed')).toBeVisible()
     await accessible(page, 'account')
 
-    // la campanella: l'invito di Beta, accettato dal pannello
-    await page.getByRole('button', { name: /^Notifiche/ }).click()
+    // the bell: the invitation of Beta, accepted from the panel
+    await page.getByRole('button', { name: /^Notifications/ }).click()
     const panel = page.getByRole('dialog')
-    await expect(panel).toContainText('Comune di Beta')
-    await panel.getByRole('button', { name: 'Accetta' }).click()
+    await expect(panel).toContainText('City of Beta')
+    await panel.getByRole('button', { name: 'Accept' }).click()
     await page.keyboard.press('Escape')
     await expect(page.getByRole('button', { name: /^Tenant: / })).toBeVisible()
 
-    // una nota nel plugin, nell'iframe
+    // a note in the plugin, in the iframe (the plugin labels come from its manifest)
     await nav(page, 'Note').click()
     const frame = page.frameLocator('iframe.plugin-frame')
     await expect(frame.getByRole('heading', { name: 'Note' })).toBeVisible()
-    await frame.locator('[data-key="title"]').fill('Verbale riunione')
-    await frame.locator('[data-key="body"]').fill('<b>contenuto riservato</b>')
-    await frame.getByRole('button', { name: 'Salva' }).click()
-    const row = frame.locator('tbody tr.row', { hasText: 'Verbale riunione' })
+    await frame.locator('[data-key="title"]').fill('Meeting minutes')
+    await frame.locator('[data-key="body"]').fill('<b>confidential content</b>')
+    await frame.getByRole('button', { name: 'Save' }).click()
+    const row = frame.locator('tbody tr.row', { hasText: 'Meeting minutes' })
     await expect(row).toBeVisible()
-    // hook WASM del plugin: tag di default
+    // WASM hook of the plugin: default tag
     await expect(row).toContainText('personale')
 
-    // condivisione in lettura con il gestore, nella finestra dell'host
-    await frame.getByRole('button', { name: 'Condividi…' }).click()
-    const dialog = page.getByRole('dialog', { name: 'Condivisione' })
+    // read sharing with the manager, in the dialog of the host
+    await frame.getByRole('button', { name: 'Share…' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Sharing' })
     await expect(dialog).toBeVisible()
-    await dialog.getByLabel('Cerca persone o gruppi').fill('gestore')
-    await dialog.getByRole('option', { name: /gestore/ }).click()
-    await dialog.getByRole('button', { name: 'Condividi', exact: true }).click()
-    await expect(dialog.getByRole('list', { name: 'Con chi è condiviso' })).toContainText('gestore')
-    await accessible(page, 'condivisione')
+    await dialog.getByLabel('Search people or groups').fill('manager')
+    await dialog.getByRole('option', { name: /manager/ }).click()
+    await dialog.getByRole('button', { name: 'Share', exact: true }).click()
+    await expect(dialog.getByRole('list', { name: 'Shared with' })).toContainText('manager')
+    await accessible(page, 'sharing')
 
-    // link pubblico
-    await dialog.getByRole('button', { name: 'Crea link' }).click()
-    const url = await dialog.getByLabel('Link pubblico', { exact: true }).inputValue()
+    // public link
+    await dialog.getByRole('button', { name: 'Create link' }).click()
+    const url = await dialog.getByLabel('Public link', { exact: true }).inputValue()
     expect(url).toMatch(/\/p\/[0-9a-f]{48}\/$/)
-    await dialog.getByRole('button', { name: 'Chiudi' }).click()
+    await dialog.getByRole('button', { name: 'Close' }).click()
 
     const pub = await context.newPage()
     await pub.goto(url)
-    await expect(pub.getByRole('heading', { name: 'Verbale riunione' })).toBeVisible()
-    // il contenuto e' mostrato come testo, non come HTML
-    await expect(pub.locator('body')).toContainText('<b>contenuto riservato</b>')
+    await expect(pub.getByRole('heading', { name: 'Meeting minutes' })).toBeVisible()
+    // the content is shown as text, not as HTML
+    await expect(pub.locator('body')).toContainText('<b>confidential content</b>')
     await pub.close()
     await logout(page)
   })
 
-  test('Tenant Manager: la nota condivisa in sola lettura, condivisioni e consumi', async ({ page }) => {
-    await login(page, 'Comune di Alfa', 'gestore', PASSWORD)
-    await expect(page.getByRole('heading', { name: 'Panoramica del tenant' })).toBeVisible()
-    // modo scuro, con il tema del tenant
-    await page.getByRole('button', { name: 'Tonalità' }).click()
-    await page.getByRole('menuitemradio', { name: 'Scuro' }).click()
+  test('Tenant Manager: the note shared read only, shares and usage', async ({ page }) => {
+    await login(page, 'City of Alfa', 'manager', PASSWORD)
+    await expect(page.getByRole('heading', { name: 'Tenant overview' })).toBeVisible()
+    // dark mode, with the theme of the tenant
+    await page.getByRole('button', { name: 'Mode' }).click()
+    await page.getByRole('menuitemradio', { name: 'Dark' }).click()
     await expect(page.locator('html')).toHaveClass(/dark/)
-    await accessible(page, 'panoramica del tenant, scuro')
-    await page.getByRole('button', { name: 'Tonalità' }).click()
-    await page.getByRole('menuitemradio', { name: 'Chiaro' }).click()
+    await accessible(page, 'tenant overview, dark')
+    await page.getByRole('button', { name: 'Mode' }).click()
+    await page.getByRole('menuitemradio', { name: 'Light' }).click()
     await nav(page, 'Note').click()
     const frame = page.frameLocator('iframe.plugin-frame')
-    const row = frame.locator('tbody tr.row', { hasText: 'Verbale riunione' })
-    await expect(row).toContainText('sola lettura')
+    const row = frame.locator('tbody tr.row', { hasText: 'Meeting minutes' })
+    await expect(row).toContainText('read only')
     await row.click()
     await expect(frame.locator('[data-key="title"]')).toBeDisabled()
-    await expect(frame.getByRole('button', { name: 'Salva' })).toBeHidden()
+    await expect(frame.getByRole('button', { name: 'Save' })).toBeHidden()
 
-    await nav(page, 'Condivisioni').click()
-    await expect(page.getByRole('row', { name: /Verbale riunione/ })).toContainText('Anna Rossi')
-    await page.getByRole('radio', { name: /Pubblici/ }).click()
-    await expect(page.getByRole('row', { name: /Verbale riunione/ })).toBeVisible()
-    await accessible(page, 'condivisioni')
+    await nav(page, 'Shares').click()
+    await expect(page.getByRole('row', { name: /Meeting minutes/ })).toContainText('Anna Rossi')
+    await page.getByRole('radio', { name: /Public/ }).click()
+    await expect(page.getByRole('row', { name: /Meeting minutes/ })).toBeVisible()
+    await accessible(page, 'shares')
 
-    await nav(page, 'Consumi').click()
+    await nav(page, 'Usage').click()
     await expect(page.getByText('Note per tag')).toBeVisible()
     await expect(page.getByRole('table', { name: /Note per tag/ })).toContainText('personale')
-    await accessible(page, 'consumi')
+    await accessible(page, 'usage')
     await logout(page)
   })
 
-  test("l'iframe del plugin non accede all'app", async ({ page }) => {
-    await login(page, 'Comune di Alfa', 'anna', NEW_PASSWORD)
+  test('the iframe of the plugin does not reach the app', async ({ page }) => {
+    await login(page, 'City of Alfa', 'anna', NEW_PASSWORD)
     await nav(page, 'Note').click()
     const frameEl = page.locator('iframe.plugin-frame')
     await expect(frameEl).toHaveAttribute('src', new RegExp(`^http://127\\.0\\.0\\.1:18081${BASE}/ui/`))
     const frame = page.frames().find((f) => f.url().includes(`:18081${BASE}/ui/`))!
-    // origine diversa: niente cookie di sessione, niente DOM del padre
+    // a different origin: no session cookie, no DOM of the parent
     expect(await frame.evaluate(() => document.cookie)).not.toContain('msk_session')
     const parentAccess = await frame.evaluate(() => {
       try {
         return String(window.parent.document.title)
       } catch {
-        return 'bloccato'
+        return 'blocked'
       }
     })
-    expect(parentAccess).toBe('bloccato')
-    // una chiamata diretta alle API dell'app dall'iframe fallisce (CORS e CSRF)
+    expect(parentAccess).toBe('blocked')
+    // a direct call to the API of the app from the iframe fails (CORS and CSRF)
     const direct = await frame.evaluate(async (base) => {
       try {
         const r = await fetch(`http://127.0.0.1:18080${base}/api/session`, { credentials: 'include' })
         return String(r.status)
       } catch {
-        return 'bloccato'
+        return 'blocked'
       }
     }, BASE)
-    expect(direct).toBe('bloccato')
+    expect(direct).toBe('blocked')
     await logout(page)
   })
 
-  test('lingua: inglese in tutta la cornice, errori del server tradotti', async ({ page }) => {
+  test('language: English by default, Italian in the whole frame, translated server errors', async ({ page }) => {
     await fresh(page)
-    await page.getByRole('combobox', { name: 'Lingua' }).click()
-    await page.getByRole('option', { name: 'English' }).click()
+    await page.evaluate(() => localStorage.removeItem('msk_lang'))
+    await page.reload()
+    // a browser that does not ask for Italian gets English
     await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
     await expect(page.locator('html')).toHaveAttribute('lang', 'en')
-    // l'errore arriva con il suo codice e si legge nella lingua scelta
+    await page.getByRole('combobox', { name: 'Language' }).click()
+    await page.getByRole('option', { name: 'Italiano' }).click()
+    await expect(page.getByRole('heading', { name: 'Accedi' })).toBeVisible()
+    await expect(page.locator('html')).toHaveAttribute('lang', 'it')
+    // the error arrives with its code and reads in the chosen language
     await page.getByRole('combobox', { name: 'Tenant' }).click()
-    await page.getByRole('option', { name: 'Comune di Alfa' }).click()
-    await page.getByLabel('Username').fill('anna')
-    await page.getByLabel('Password').fill('sbagliata-123')
-    await page.getByRole('button', { name: 'Sign in' }).click()
-    await expect(page.getByRole('alert')).toHaveText('Wrong username or password')
+    await page.getByRole('option', { name: 'City of Alfa' }).click()
+    await page.getByLabel('Utente').fill('anna')
+    await page.getByLabel('Password').fill('wrong-pass-123')
+    await page.getByRole('button', { name: 'Accedi' }).click()
+    await expect(page.getByRole('alert')).toHaveText('Utente o password non corretti')
     await page.getByLabel('Password').fill(NEW_PASSWORD)
-    await page.getByRole('button', { name: 'Sign in' }).click()
-    await expect(page.getByRole('heading', { name: 'Home' })).toBeVisible()
-    await expect(page.getByText('Your space')).toBeVisible()
-    await expect(page.getByRole('button', { name: /person menu/ })).toBeVisible()
-    // nessuna frase italiana rimasta nella cornice e nella pagina
+    await page.getByRole('button', { name: 'Accedi' }).click()
+    await expect(page.getByText('Il tuo spazio')).toBeVisible()
+    await expect(page.getByRole('button', { name: /menu della persona/ })).toBeVisible()
+    // no English phrase of the frame left in the page
     const text = await page.locator('body').innerText()
-    expect(text).not.toMatch(/\b(Il tuo spazio|Condivisi da me|Gestione del tenant|Impostazioni|Esci|Notifiche)\b/)
-    // il plugin riceve la lingua nuova
-    await page.getByRole('link', { name: 'Notes', exact: true }).or(nav(page, 'Note')).first().click()
-    await expect(page.locator('iframe.plugin-frame')).toBeVisible()
+    expect(text).not.toMatch(/\b(Your space|Shared by me|Tenant management|Sign out|Notifications)\b/)
+    // the plugin receives the language of the shell
+    await nav(page, 'Note').click()
+    const frame = page.frameLocator('iframe.plugin-frame')
+    await expect(frame.getByPlaceholder('Filtra…')).toBeVisible()
   })
 
-  test('telefono: la sidebar diventa un pannello', async ({ browser }) => {
+  test('phone: the sidebar becomes a drawer', async ({ browser }) => {
     const ctx = await browser.newContext({ viewport: { width: 400, height: 820 } })
     const page = await ctx.newPage()
-    await login(page, 'Comune di Alfa', 'gestore', PASSWORD)
+    await login(page, 'City of Alfa', 'manager', PASSWORD)
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true)
-    await page.getByRole('button', { name: 'Apri o chiudi la sidebar' }).first().click()
-    const drawer = page.getByRole('dialog', { name: 'Navigazione' })
+    await page.getByRole('button', { name: 'Open or close the sidebar' }).first().click()
+    const drawer = page.getByRole('dialog', { name: 'Navigation' })
     await expect(drawer).toBeVisible()
-    await drawer.getByRole('link', { name: 'Gestisci', exact: true }).click()
-    await expect(page.getByRole('heading', { name: 'Gestisci' })).toBeVisible()
-    await accessible(page, 'telefono')
+    await drawer.getByRole('link', { name: 'Manage', exact: true }).click()
+    await expect(page.getByRole('heading', { name: 'Manage' })).toBeVisible()
+    await accessible(page, 'phone')
     await ctx.close()
   })
 
-  test('temi: contrasto della barra e dei pulsanti (WCAG AA), chiaro e scuro', async ({ page }) => {
+  test('sign-in: the theme of the tenant as soon as the tenant is known', async ({ page }) => {
+    // the platform goes back to the default theme, Beta chooses Tessera for itself
+    await adminLogin(page)
+    await nav(page, 'System').click()
+    await page.getByRole('link', { name: 'Theme', exact: true }).click()
+    await page.getByRole('button', { name: /^Mosaikit/ }).click()
+    await expect(page.locator('html')).toHaveAttribute('data-preset', 'mosaikit')
+    await logout(page)
+    await login(page, 'City of Beta', 'manager', PASSWORD)
+    await nav(page, 'Tenant settings').click()
+    await page.getByRole('link', { name: 'Theme', exact: true }).click()
+    await page.getByRole('button', { name: /^Tessera/ }).click()
+    await expect(page.getByText('Customized', { exact: true })).toBeVisible()
+    await logout(page)
+    // a first visit: the theme of the platform, then the one of the chosen tenant
+    await fresh(page)
+    await expect(page.getByRole('combobox', { name: 'Tenant' })).toBeVisible()
+    await expect(page.locator('html')).toHaveAttribute('data-preset', 'mosaikit')
+    await page.getByRole('combobox', { name: 'Tenant' }).click()
+    await page.getByRole('option', { name: 'City of Beta' }).click()
+    await expect(page.locator('html')).toHaveAttribute('data-preset', 'tessera')
+    await page.getByRole('combobox', { name: 'Tenant' }).click()
+    await page.getByRole('option', { name: 'City of Alfa' }).click()
+    await expect(page.locator('html')).toHaveAttribute('data-preset', 'mosaikit')
+    // the address names the tenant
+    await fresh(page, '#/login/beta')
+    await expect(page.locator('html')).toHaveAttribute('data-preset', 'tessera')
+  })
+
+  test('sign-in: a server that does not answer is never "no tenant" nor a bare HTTP status', async ({ page }) => {
+    await fresh(page)
+    await page.route('**/api/auth/tenants', (r) => r.fulfill({ status: 502, contentType: 'text/plain', body: 'Bad Gateway' }))
+    await page.reload()
+    await expect(page.getByRole('status').filter({ hasText: 'The server is not responding. Trying again…' })).toBeVisible()
+    const text = await page.locator('body').innerText()
+    expect(text).not.toContain('502')
+    expect(text).not.toContain('HTTP')
+    expect(text).not.toContain('No tenant available')
+    // the server answers again: the form appears by itself
+    await page.unroute('**/api/auth/tenants')
+    await expect(page.getByRole('combobox', { name: 'Tenant' })).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByText('The server is not responding')).toBeHidden()
+  })
+
+  test('themes: contrast of the bar and of the buttons (WCAG AA), light and dark', async ({ page }) => {
     await fresh(page)
     const ratios = await page.evaluate(() => {
       const rgb = (c: string) => {
@@ -385,11 +435,11 @@ test.describe.serial('piattaforma', () => {
           root.dataset.preset = preset
           root.classList.toggle('dark', dark)
           const v = (n: string) => getComputedStyle(root).getPropertyValue(n).trim()
-          const k = `${preset}${dark ? ' scuro' : ''}`
-          out[`${k}: barra`] = ratio(v('--band-foreground'), v('--band'))
-          out[`${k}: pulsante`] = ratio(v('--primary-foreground'), v('--primary'))
-          out[`${k}: testo`] = ratio(v('--foreground'), v('--background'))
-          out[`${k}: testo secondario`] = ratio(v('--muted-foreground'), v('--background'))
+          const k = `${preset}${dark ? ' dark' : ''}`
+          out[`${k}: bar`] = ratio(v('--band-foreground'), v('--band'))
+          out[`${k}: button`] = ratio(v('--primary-foreground'), v('--primary'))
+          out[`${k}: text`] = ratio(v('--foreground'), v('--background'))
+          out[`${k}: secondary text`] = ratio(v('--muted-foreground'), v('--background'))
         }
       return out
     })

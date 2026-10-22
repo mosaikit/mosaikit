@@ -1,8 +1,8 @@
-//! Marchio del prodotto: nome, versione, testi, logo, favicon, colori.
+//! Brand of the product: name, version, texts, logo, favicon, colours.
 //!
-//! Una distribuzione basata su Mosaikit fornisce una cartella con
-//! `brand.toml` e i file indicati; senza cartella si usa il marchio Mosaikit.
-//! Vedi `branding/brand.toml` per l'elenco delle proprieta'.
+//! A distribution based on Mosaikit provides a folder with
+//! `brand.toml` and the files it names; without a folder the Mosaikit brand is used.
+//! See `branding/brand.toml` for the list of properties.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -14,34 +14,34 @@ use crate::{Error, Result};
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Brand {
-    /// nome del prodotto (titolo della pagina, login, area di notifica)
+    /// name of the product (page title, sign-in, notification area)
     #[serde(default = "d_name")]
     pub name: String,
-    /// versione del prodotto (default: quella di Mosaikit)
+    /// version of the product (default: the one of Mosaikit)
     #[serde(default)]
     pub version: Option<String>,
-    /// frase sotto il nome nella pagina di accesso
+    /// phrase under the name on the sign-in page
     #[serde(default = "d_tagline")]
     pub tagline: String,
-    /// messaggio nella pagina di accesso (es. a chi rivolgersi per un account)
+    /// message on the sign-in page (e.g. whom to ask for an account)
     #[serde(default)]
     pub login_message: String,
-    /// testo a pie' di pagina (es. copyright)
+    /// footer text (e.g. copyright)
     #[serde(default)]
     pub footer: String,
-    /// indirizzo di supporto o documentazione
+    /// support or documentation address
     #[serde(default)]
     pub support_url: Option<String>,
-    /// file del logo nella cartella del marchio (svg, png, webp)
+    /// file of the logo in the brand folder (svg, png, webp)
     #[serde(default)]
     pub logo: Option<String>,
-    /// file della favicon (svg, png, ico)
+    /// file of the favicon (svg, png, ico)
     #[serde(default)]
     pub favicon: Option<String>,
-    /// icona per l'area di notifica e l'eseguibile desktop (ico)
+    /// icon for the notification area and the desktop executable (ico)
     #[serde(default)]
     pub icon: Option<String>,
-    /// colori del tema: accent, bg, panel, panel2, line, fg, dim, ok, err
+    /// colours of the theme: accent, bg, panel, panel2, line, fg, dim, ok, err
     #[serde(default)]
     pub colors: BTreeMap<String, String>,
     #[serde(skip)]
@@ -52,16 +52,16 @@ fn d_name() -> String {
     "Mosaikit".into()
 }
 fn d_tagline() -> String {
-    "applicazioni, dati e condivisione per ogni tenant".into()
+    "apps, data and sharing for every tenant".into()
 }
 
 impl Default for Brand {
     fn default() -> Brand {
-        toml::from_str("").expect("marchio di default")
+        toml::from_str("").expect("default brand")
     }
 }
 
-/// Colori ammessi e variabile CSS corrispondente.
+/// Allowed colours and the matching CSS variable.
 const COLORS: &[(&str, &str)] = &[
     ("accent", "--acc"),
     ("bg", "--bg"),
@@ -74,7 +74,7 @@ const COLORS: &[(&str, &str)] = &[
     ("err", "--err"),
 ];
 
-/// Solo `#rgb`, `#rrggbb`, `#rrggbbaa`: niente CSS arbitrario nella pagina.
+/// Only `#rgb`, `#rrggbb`, `#rrggbbaa`: no arbitrary CSS in the page.
 fn hex_color(v: &str) -> Option<(u8, u8, u8)> {
     let h = v.strip_prefix('#')?;
     if !h.chars().all(|c| c.is_ascii_hexdigit()) {
@@ -91,13 +91,13 @@ fn hex_color(v: &str) -> Option<(u8, u8, u8)> {
     }
 }
 
-/// File della cartella del marchio: solo nomi semplici, niente percorsi.
+/// File of the brand folder: plain names only, no paths.
 fn safe_file(name: &str) -> bool {
     !name.is_empty() && !name.contains(['/', '\\']) && !name.starts_with('.') && name.len() < 128
 }
 
 impl Brand {
-    /// Legge `<dir>/brand.toml` e verifica colori e file.
+    /// Reads `<dir>/brand.toml` and checks colours and files.
     pub fn load(dir: &Path) -> Result<Brand> {
         let file = dir.join("brand.toml");
         let text =
@@ -106,15 +106,15 @@ impl Brand {
             toml::from_str(&text).map_err(|e| Error::bad(format!("{}: {e}", file.display())))?;
         for (k, v) in &b.colors {
             if !COLORS.iter().any(|(n, _)| n == k) {
-                return Err(Error::bad(format!("brand.toml: colore sconosciuto {k}")));
+                return Err(Error::bad(format!("brand.toml: unknown colour {k}")));
             }
             if hex_color(v).is_none() {
-                return Err(Error::bad(format!("brand.toml: colore {k} non valido: {v} (atteso #rrggbb)")));
+                return Err(Error::bad(format!("brand.toml: invalid colour {k}: {v} (expected #rrggbb)")));
             }
         }
         for f in [&b.logo, &b.favicon, &b.icon].into_iter().flatten() {
             if !safe_file(f) || !dir.join(f).is_file() {
-                return Err(Error::bad(format!("brand.toml: file {f} non trovato in {}", dir.display())));
+                return Err(Error::bad(format!("brand.toml: file {f} not found in {}", dir.display())));
             }
         }
         b.dir = Some(dir.to_path_buf());
@@ -125,7 +125,7 @@ impl Brand {
         self.version.as_deref().unwrap_or(crate::KERNEL_VERSION)
     }
 
-    /// Regole CSS con i colori del marchio (anche le varianti trasparenti dell'accento).
+    /// CSS rules with the colours of the brand (the transparent variants of the accent too).
     pub fn css(&self) -> String {
         let mut out = String::new();
         for (k, var) in COLORS {
@@ -147,7 +147,7 @@ impl Brand {
         }
     }
 
-    /// Percorso di un file del marchio (logo, favicon, icona), se configurato.
+    /// Path of a brand file (logo, favicon, icon), if configured.
     pub fn file(&self, which: &str) -> Option<PathBuf> {
         let name = match which {
             "logo" => self.logo.as_ref(),
@@ -158,7 +158,7 @@ impl Brand {
         Some(self.dir.as_ref()?.join(name))
     }
 
-    /// Dati pubblici per la UI (pagina di accesso compresa).
+    /// Public data for the UI (sign-in page included).
     pub fn public(&self) -> serde_json::Value {
         serde_json::json!({
             "name": self.name,
@@ -178,7 +178,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn colori_validati_e_css() {
+    fn validated_colours_and_css() {
         let dir = tempfile::tempdir().unwrap();
         std::fs::write(dir.path().join("logo.svg"), "<svg/>").unwrap();
         std::fs::write(
@@ -194,9 +194,9 @@ mod tests {
 
         for bad in [
             "[colors]\naccent = \"red;}body{display:none\"",
-            "[colors]\nsfondo = \"#000\"",
-            "logo = \"../segreto.svg\"",
-            "logo = \"manca.svg\"",
+            "[colors]\nbackground = \"#000\"",
+            "logo = \"../secret.svg\"",
+            "logo = \"missing.svg\"",
         ] {
             std::fs::write(dir.path().join("brand.toml"), bad).unwrap();
             assert!(Brand::load(dir.path()).is_err(), "{bad}");

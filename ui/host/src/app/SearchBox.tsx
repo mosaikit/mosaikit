@@ -1,6 +1,6 @@
-// La ricerca nella barra in alto. Chiusa e' un campo da cliccare (o Ctrl K); aperta si scrive e sotto
-// si apre una tendina con i filtri a pillole e i risultati. Esc, un clic fuori o un risultato la chiudono.
-// La navigazione da tastiera (frecce, Invio) e' di cmdk, come nel componente Command di shadcn.
+// The search in the top bar. Closed it is a field to click (or Ctrl K); open one types and below
+// a drop-down opens with the pill filters and the results. Esc, a click outside or a result close it.
+// Keyboard navigation (arrows, Enter) comes from cmdk, as in the Command component of shadcn.
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Command as CommandPrimitive } from 'cmdk'
@@ -16,7 +16,7 @@ export interface SearchItem {
   label: string
   icon: ReactNode
   href: string
-  /** testo in piu' su cui cercare (es. lo slug del tenant) */
+  /** extra text to search on (e.g. the slug of the tenant) */
   extra?: string
   sub?: string
 }
@@ -50,7 +50,7 @@ export default function SearchBox({ session, groups }: { session: Session; route
           },
         ]
       : session.memberships.length > 1
-        ? [{ id: 'tenants', label: t('Tenant'), items: session.memberships.map((m) => ({ label: m.name, sub: m.is_home ? 'appartenenza' : 'ospite', icon: <Building2 />, href: to.tenant(m.slug) })) }]
+        ? [{ id: 'tenants', label: t('Tenant'), items: session.memberships.map((m) => ({ label: m.name, sub: m.is_home ? 'home' : 'guest', icon: <Building2 />, href: to.tenant(m.slug) })) }]
         : []
     return [...groups, ...extra].filter((g) => g.items.length)
   }, [groups, admin, tenants.data, session.memberships])
@@ -91,7 +91,7 @@ export default function SearchBox({ session, groups }: { session: Session; route
     return () => document.removeEventListener('mousedown', onDown)
   }, [open])
 
-  const placeholder = admin ? t('Cerca tenant e pagine') : t('Cerca pagine, app e tenant')
+  const placeholder = admin ? t('Search tenants and pages') : t('Search pages, apps and tenants')
   return (
     <div
       ref={box}
@@ -110,13 +110,13 @@ export default function SearchBox({ session, groups }: { session: Session; route
         >
           <Search className="size-4 shrink-0" />
           {/* on a narrow bar only the icon shows: the text becomes sr-only and still names the button */}
-          <span className="flex-1 truncate text-left @max-[600px]:sr-only max-[620px]:sr-only">{t('Cerca ovunque')}</span>
+          <span className="flex-1 truncate text-left @max-[600px]:sr-only max-[620px]:sr-only">{t('Search everywhere')}</span>
           <kbd className="rounded border border-current/30 px-1.5 font-mono text-[11px] @max-[860px]:hidden max-[620px]:hidden">{t('Ctrl K')}</kbd>
         </button>
       ) : (
         <CommandPrimitive
           shouldFilter={false}
-          label={t('Cerca')}
+          label={t('Search')}
           className="w-full"
           onKeyDown={(e) => {
             if (e.key === 'Escape') {
@@ -138,11 +138,11 @@ export default function SearchBox({ session, groups }: { session: Session; route
           </div>
           <div
             role="dialog"
-            aria-label={t('Risultati della ricerca')}
+            aria-label={t('Search results')}
             className="absolute top-[calc(100%+6px)] left-1/2 z-50 flex w-[max(100%,520px)] max-w-[calc(100vw-16px)] -translate-x-1/2 flex-col overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-lg max-[900px]:right-2 max-[900px]:left-2 max-[900px]:w-auto max-[900px]:translate-x-0"
           >
-            <div role="tablist" aria-label={t('Mostra')} className="flex flex-wrap gap-1.5 border-b px-3.5 py-3">
-              {[{ id: 'all', label: t('Tutto'), n: counts.reduce((s, c) => s + c, 0) }, ...all.map((g, i) => ({ id: g.id, label: g.label, n: counts[i] }))].map((p) => (
+            <div role="tablist" aria-label={t('Show')} className="flex flex-wrap gap-1.5 border-b px-3.5 py-3">
+              {[{ id: 'all', label: t('All'), n: counts.reduce((s, c) => s + c, 0) }, ...all.map((g, i) => ({ id: g.id, label: g.label, n: counts[i] }))].map((p) => (
                 <button
                   key={p.id}
                   type="button"
@@ -161,7 +161,7 @@ export default function SearchBox({ session, groups }: { session: Session; route
               ))}
             </div>
             <CommandList className="max-h-[min(55vh,460px)]">
-              <CommandEmpty>{q ? t('Nessun risultato per «{q}».', { q }) : t('Nessun risultato.')}</CommandEmpty>
+              <CommandEmpty>{q ? t('No results for «{q}».', { q }) : t('No results.')}</CommandEmpty>
               {shown.map((g) => (
                 <CommandGroup key={g.id} heading={`${g.label} · ${g.items.length}`}>
                   {g.items.map((it) => (
@@ -176,13 +176,13 @@ export default function SearchBox({ session, groups }: { session: Session; route
             </CommandList>
             <div className="flex gap-4 border-t px-4 py-2 text-xs text-muted-foreground">
               <span>
-                <kbd className="font-mono">↑ ↓</kbd> per scegliere
+                <kbd className="font-mono">↑ ↓</kbd> {t('to choose')}
               </span>
               <span>
-                <kbd className="font-mono">{t('Invio')}</kbd> per aprire
+                <kbd className="font-mono">{t('Enter')}</kbd> {t('to open')}
               </span>
               <span>
-                <kbd className="font-mono">{t('Esc')}</kbd> per chiudere
+                <kbd className="font-mono">{t('Esc')}</kbd> {t('to close')}
               </span>
             </div>
           </div>

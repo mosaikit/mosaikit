@@ -1,6 +1,6 @@
 [package]
 name = "mosaikit-kernel"
-description = "Kernel Mosaikit: tenant, identita', risorse e permessi, link pubblici, KPI, plugin"
+description = "Mosaikit kernel: tenants, identity, resources and permissions, public links, KPIs, plugins"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -1,5 +1,5 @@
-//! Test e controlli di qualita' (gli stessi della CI), su mosaikit e sulle
-//! cartelle dei plugin della distribuzione (es. ../mosaikit-plugins).
+//! Tests and quality checks (the same as the CI), on mosaikit and on the
+//! plugin folders of the distribution (e.g. ../mosaikit-plugins).
 
 use std::process::Command;
 
@@ -8,7 +8,7 @@ use anyhow::Result;
 use crate::plugins;
 use crate::util::{npm, root, run, which};
 
-/// Test Rust (con PostgreSQL) e test delle UI.
+/// Rust tests (with PostgreSQL) and UI tests.
 pub fn test(skip_db: bool) -> Result<()> {
     if !skip_db && std::env::var_os("MOSAIKIT_TEST_DATABASE_URL").is_none() {
         crate::db::up()?;
@@ -20,7 +20,7 @@ pub fn test(skip_db: bool) -> Result<()> {
         .current_dir(root())
         .args(["test", "--workspace"])
         .env("MOSAIKIT_TEST_DATABASE_URL", &url))?;
-    // stessi test di kernel e server sul backend SQLite (default della versione desktop)
+    // the same kernel and server tests on the SQLite backend (default of the desktop version)
     eprintln!("== test su SQLite");
     run(Command::new("cargo")
         .current_dir(root())
@@ -32,9 +32,9 @@ pub fn test(skip_db: bool) -> Result<()> {
             .env_remove("CARGO_TARGET_DIR")
             .args(["test", "--workspace"]))?;
     }
-    // test di integrazione della distribuzione (`[tests] cargo` in distribution.toml)
+    // integration tests of the distribution (`[tests] cargo` in distribution.toml)
     for dir in &crate::dist::current().tests.cargo {
-        eprintln!("== test della distribuzione in {}", dir.display());
+        eprintln!("== tests of the distribution in {}", dir.display());
         run(Command::new("cargo").current_dir(dir).args(["test"]).env("MOSAIKIT_TEST_DATABASE_URL", &url))?;
     }
     plugins::ensure_npm()?;
@@ -46,7 +46,7 @@ pub fn test(skip_db: bool) -> Result<()> {
     Ok(())
 }
 
-/// fmt, clippy, test, typecheck, lint e build delle UI, cargo-deny se installato.
+/// fmt, clippy, tests, typecheck, lint and build of the UIs, cargo-deny if installed.
 pub fn ci() -> Result<()> {
     let all = plugins::discover()?;
     let cargo_roots = plugins::cargo_roots(&all);
@@ -76,9 +76,7 @@ pub fn ci() -> Result<()> {
     if which("cargo-deny").is_some() {
         run(Command::new("cargo").current_dir(root()).args(["deny", "check"]))?;
     } else {
-        eprintln!(
-            "cargo-deny non installato: controllo licenze/vulnerabilita' saltato (cargo install cargo-deny)"
-        );
+        eprintln!("cargo-deny not installed: license/vulnerability check skipped (cargo install cargo-deny)");
     }
     plugins::ensure_npm()?;
     let npm_roots = plugins::npm_roots(&all);
@@ -89,6 +87,6 @@ pub fn ci() -> Result<()> {
         }
     }
     test(false)?;
-    eprintln!("\nCI locale: tutto verde");
+    eprintln!("\nlocal CI: all green");
     Ok(())
 }

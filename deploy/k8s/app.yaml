@@ -1,7 +1,7 @@
-# {{name}}: un'istanza dell'app con volume persistente per file caricati e pacchetti
-# dei plugin (/data). Una sola replica: i contenuti stanno sul volume (ReadWriteOnce);
-# sessioni e dati sono nel database. Aggiornamento "Recreate": la vecchia istanza si
-# ferma prima che parta la nuova (le migrazioni girano all'avvio).
+# {{name}}: one instance of the app with a persistent volume for uploaded files and plugin
+# packages (/data). A single replica: the contents are on the volume (ReadWriteOnce);
+# sessions and data are in the database. "Recreate" update: the old instance
+# stops before the new one starts (the migrations run at start).
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
@@ -22,11 +22,11 @@ spec:
   selector:
     app.kubernetes.io/name: {{id}}
   ports:
-    # app: UI e API
+    # app: UI and API
     - name: app
       port: 8080
       targetPort: app
-    # UI dei plugin, file caricati e link pubblici (origine separata)
+    # plugin UIs, uploaded files and public links (separate origin)
     - name: plugins
       port: 8081
       targetPort: plugins
@@ -73,7 +73,7 @@ spec:
                   key: MOSAIKIT_DB_PASSWORD
             - name: MOSAIKIT_DATABASE_URL
               value: postgres://mosaikit_app:$(MOSAIKIT_DB_PASSWORD)@{{id}}-postgres:5432/mosaikit
-            # password iniziale di admin (tenant system): usata solo al primo avvio
+            # initial password of admin (tenant system): used only at the first start
             - name: MOSAIKIT_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
@@ -82,7 +82,7 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
-          # salute: /api/health sotto il percorso base di MOSAIKIT_URL (come nel Dockerfile)
+          # health: /api/health under the base path of MOSAIKIT_URL (as in the Dockerfile)
           startupProbe:
             exec:
               command:

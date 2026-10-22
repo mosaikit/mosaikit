@@ -1,5 +1,5 @@
-//! Secondo fattore TOTP (RFC 6238: HMAC-SHA1, 6 cifre, passo di 30 secondi),
-//! compatibile con Google/Microsoft Authenticator, FreeOTP e simili.
+//! TOTP second factor (RFC 6238: HMAC-SHA1, 6 digits, 30-second step),
+//! compatible with Google/Microsoft Authenticator, FreeOTP and similar apps.
 
 use hmac::{Hmac, Mac};
 use rand::RngCore;
@@ -7,11 +7,11 @@ use sha1::Sha1;
 
 pub const PERIOD: u64 = 30;
 const DIGITS: u32 = 6;
-/// passi accettati prima e dopo quello corrente (orologi non allineati)
+/// steps accepted before and after the current one (clocks out of sync)
 const SKEW: u64 = 1;
 const ALPHABET: &[u8; 32] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
 
-/// Nuovo segreto (160 bit) in base32, come lo mostrano le app di autenticazione.
+/// New secret (160 bits) in base32, as authenticator apps show it.
 pub fn new_secret() -> String {
     let mut b = [0u8; 20];
     rand::thread_rng().fill_bytes(&mut b);
@@ -50,9 +50,9 @@ pub fn base32_decode(s: &str) -> Option<Vec<u8>> {
     Some(out)
 }
 
-/// Codice del passo `step` (`unix_time / 30`).
+/// Code of step `step` (`unix_time / 30`).
 pub fn code(secret: &[u8], step: u64) -> String {
-    let mut mac = Hmac::<Sha1>::new_from_slice(secret).expect("HMAC accetta chiavi di ogni lunghezza");
+    let mut mac = Hmac::<Sha1>::new_from_slice(secret).expect("HMAC accepts keys of any length");
     mac.update(&step.to_be_bytes());
     let h = mac.finalize().into_bytes();
     let off = (h[h.len() - 1] & 0x0f) as usize;
@@ -67,8 +67,8 @@ pub fn current_step() -> u64 {
         .unwrap_or(0)
 }
 
-/// Verifica `input` attorno al passo `now`; ritorna il passo riconosciuto, se e' successivo
-/// a `last_step` (un codice gia' usato non vale una seconda volta).
+/// Checks `input` around step `now`; returns the recognised step, if it comes after
+/// `last_step` (a code already used does not work a second time).
 pub fn verify(secret_b32: &str, input: &str, now: u64, last_step: u64) -> Option<u64> {
     let input: String = input.chars().filter(|c| !c.is_whitespace()).collect();
     if input.len() != DIGITS as usize || !input.chars().all(|c| c.is_ascii_digit()) {
@@ -84,7 +84,7 @@ fn constant_eq(a: &[u8], b: &[u8]) -> bool {
     a.len() == b.len() && a.iter().zip(b).fold(0u8, |acc, (x, y)| acc | (x ^ y)) == 0
 }
 
-/// URI `otpauth://` da registrare nell'app (anche come QR code).
+/// `otpauth://` URI to register in the app (also as a QR code).
 pub fn uri(issuer: &str, account: &str, secret_b32: &str) -> String {
     let (i, a) = (pct(issuer), pct(account));
     format!("otpauth://totp/{i}:{a}?secret={secret_b32}&issuer={i}&algorithm=SHA1&digits={DIGITS}&period={PERIOD}")
@@ -99,7 +99,7 @@ fn pct(s: &str) -> String {
         .collect()
 }
 
-/// QR code SVG dell'URI.
+/// SVG QR code of the URI.
 pub fn qr_svg(data: &str) -> String {
     match qrcode::QrCode::new(data.as_bytes()) {
         Ok(q) => q.render::<qrcode::render::svg::Color>().min_dimensions(200, 200).quiet_zone(true).build(),
@@ -107,7 +107,7 @@ pub fn qr_svg(data: &str) -> String {
     }
 }
 
-/// Codici di recupero monouso, nel formato `xxxx-xxxx`.
+/// Single-use recovery codes, in the format `xxxx-xxxx`.
 pub fn recovery_codes(n: usize) -> Vec<String> {
     const CH: &[u8] = b"abcdefghjkmnpqrstuvwxyz23456789";
     let mut rng = rand::thread_rng();
@@ -120,7 +120,7 @@ pub fn recovery_codes(n: usize) -> Vec<String> {
         .collect()
 }
 
-/// Forma canonica di un codice di recupero (minuscole, senza spazi; il trattino e' facoltativo).
+/// Canonical form of a recovery code (lower case, no spaces; the dash is optional).
 pub fn normalize_recovery(s: &str) -> String {
     let c: String = s.chars().filter(|c| c.is_ascii_alphanumeric()).map(|c| c.to_ascii_lowercase()).collect();
     if c.len() == 8 {
@@ -136,7 +136,7 @@ mod tests {
 
     #[test]
     fn rfc6238_sha1() {
-        // RFC 6238, appendice B (8 cifre: 94287082 / 07081804 / 14050471 / 89005924): le ultime 6
+        // RFC 6238, appendix B (8 digits: 94287082 / 07081804 / 14050471 / 89005924): the last 6
         let key = b"12345678901234567890";
         assert_eq!(code(key, 59 / PERIOD), "287082");
         assert_eq!(code(key, 1111111109 / PERIOD), "081804");
@@ -145,7 +145,7 @@ mod tests {
     }
 
     #[test]
-    fn base32_andata_e_ritorno() {
+    fn base32_round_trip() {
         let s = new_secret();
         assert_eq!(s.len(), 32);
         assert_eq!(base32_encode(&base32_decode(&s).unwrap()), s);
@@ -153,7 +153,7 @@ mod tests {
     }
 
     #[test]
-    fn verifica_con_tolleranza_e_senza_riuso() {
+    fn check_with_tolerance_and_no_reuse() {
         let s = base32_encode(b"12345678901234567890");
         let now = 1234567890 / PERIOD;
         assert_eq!(verify(&s, "005924", now, 0), Some(now));
@@ -164,7 +164,7 @@ mod tests {
     }
 
     #[test]
-    fn uri_e_codici_di_recupero() {
+    fn uri_and_recovery_codes() {
         let u = uri("Mosaikit Test", "admin", "ABC");
         assert!(u.starts_with("otpauth://totp/Mosaikit%20Test:admin?secret=ABC&issuer=Mosaikit%20Test"));
         assert!(qr_svg(&u).contains("<svg"));

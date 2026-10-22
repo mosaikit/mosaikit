@@ -1,4 +1,4 @@
--- Administrator come account di piattaforma (vedi migrations/0003_admins.sql per PostgreSQL).
+-- Administrators as platform accounts (see migrations/0003_admins.sql for PostgreSQL).
 
 alter table core_users add column totp_secret text;
 alter table core_users add column totp_enabled boolean not null default false;

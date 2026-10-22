@@ -1,4 +1,4 @@
-//! Chiamate verso l'host: import WASM su wasm32, host simulato altrove.
+//! Calls to the host: WASM imports on wasm32, simulated host elsewhere.
 
 use serde_json::{json, Value};
 
@@ -15,7 +15,7 @@ mod imp {
     }
 
     pub fn call(msg: &[u8]) -> Option<Vec<u8>> {
-        // SAFETY: il buffer vive per tutta la chiamata; l'host scrive al massimo `n` byte.
+        // SAFETY: the buffer lives for the whole call; the host writes at most `n` bytes.
         unsafe {
             let n = host_call(msg.as_ptr(), msg.len());
             if n < 0 {
@@ -28,7 +28,7 @@ mod imp {
     }
 
     pub fn log(msg: &str) {
-        // SAFETY: puntatore e lunghezza di una stringa valida.
+        // SAFETY: pointer and length of a valid string.
         unsafe { host_log(msg.as_ptr(), msg.len()) }
     }
 }
@@ -45,7 +45,7 @@ mod imp {
 
 pub fn call(op: &str, req: Value) -> Result<Value> {
     let msg = serde_json::to_vec(&json!({ "op": op, "req": req }))?;
-    let raw = imp::call(&msg).ok_or_else(|| Error::msg("chiamata all'host fallita"))?;
+    let raw = imp::call(&msg).ok_or_else(|| Error::msg("call to the host failed"))?;
     let reply: Value = serde_json::from_slice(&raw)?;
     if let Some(e) = reply.get("err") {
         return Err(Error(e.as_str().map(str::to_string).unwrap_or_else(|| e.to_string())));

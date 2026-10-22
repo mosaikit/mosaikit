@@ -1,4 +1,4 @@
-//! Installazione e aggiornamento: verifica del pacchetto, schema, migrazioni.
+//! Installation and update: check of the package, schema, migrations.
 
 use std::collections::BTreeMap;
 
@@ -10,7 +10,7 @@ use super::{install_dir, registry, LoadedPlugin, Status};
 use crate::util::random_token;
 use crate::{events, Error, Kernel, Result, SessionUser};
 
-/// Da dove arriva il pacchetto (per il registro eventi).
+/// Where the package comes from (for the event log).
 #[derive(Debug, Clone, Copy)]
 pub enum InstallSource {
     Upload,
@@ -18,8 +18,8 @@ pub enum InstallSource {
     Preinstall,
 }
 
-/// Installa o aggiorna un plugin da un pacchetto `.mskp`. Lo stato (attivo o no)
-/// di un plugin gia' installato viene conservato.
+/// Installs or updates a plugin from a `.mskp` package. The state (on or off)
+/// of a plugin already installed is kept.
 pub async fn install_package(
     k: &Kernel,
     admin: Option<&SessionUser>,
@@ -33,12 +33,12 @@ pub async fn install_package(
     let signed_by = pkg.verify(&k.trusted, k.cfg.allow_unsigned)?;
     let m = &pkg.manifest;
     if registry::is_blocked(k, &m.id, &m.version, &pkg.sha256) {
-        return Err(Error::forbidden(format!("{} {} e' nella blocklist del registry", m.id, m.version)));
+        return Err(Error::forbidden(format!("{} {} is in the blocklist of the registry", m.id, m.version)));
     }
     let min = Version::parse(&m.min_kernel).unwrap_or(Version(0, 0, 0));
     let kernel = Version::parse(crate::KERNEL_VERSION).unwrap_or(Version(0, 0, 0));
     if min > kernel {
-        return Err(Error::bad(format!("il plugin richiede il kernel {min} (questo e' {kernel})")));
+        return Err(Error::bad(format!("the plugin requires kernel {min} (this one is {kernel})")));
     }
     let module = match pkg.wasm() {
         Some(w) => Some(k.engine.compile(w)?),
@@ -56,27 +56,27 @@ pub async fn install_package(
         let dev: bool = r.get(2);
         status = Status::parse(r.get::<&str, _>(3));
         if dev {
-            return Err(Error::conflict(format!("{} e' caricato in modalita' sviluppo", m.id)));
+            return Err(Error::conflict(format!("{} is loaded in development mode", m.id)));
         }
         let old = Version::parse(&version).unwrap_or(Version(0, 0, 0));
         if m.version() < old {
-            return Err(Error::bad(format!("downgrade non consentito ({old} -> {})", m.version)));
+            return Err(Error::bad(format!("downgrade not allowed ({old} -> {})", m.version)));
         }
         if m.version() == old && sha == pkg.sha256 {
-            return k.plugins.get(&m.id).ok_or_else(|| Error::internal("plugin installato ma non caricato"));
+            return k.plugins.get(&m.id).ok_or_else(|| Error::internal("plugin installed but not loaded"));
         }
         if m.version() == old {
             return Err(Error::conflict(format!(
-                "{} {} e' gia' installato con un contenuto diverso: aumenta la versione",
+                "{} {} is already installed with a different content: raise the version",
                 m.id, m.version
             )));
         }
     }
 
-    // file del pacchetto: prima in una cartella temporanea, poi al loro posto
+    // files of the package: first in a temporary folder, then in their place
     let dir = install_dir(k, &m.id, &m.version);
     let tmp =
-        dir.parent().expect("cartella del plugin").join(format!(".tmp-{}-{}", m.version, random_token(4)));
+        dir.parent().expect("folder of the plugin").join(format!(".tmp-{}-{}", m.version, random_token(4)));
     for (name, data) in &pkg.files {
         let path = tmp.join(name);
         if let Some(parent) = path.parent() {
@@ -101,8 +101,8 @@ pub async fn install_package(
         let _ = std::fs::remove_dir_all(&dir);
     }
     std::fs::rename(&tmp, &dir)?;
-    // versioni precedenti
-    if let Ok(rd) = std::fs::read_dir(dir.parent().expect("cartella del plugin")) {
+    // previous versions
+    if let Ok(rd) = std::fs::read_dir(dir.parent().expect("folder of the plugin")) {
         for e in rd.flatten() {
             if e.path() != dir {
                 let _ = std::fs::remove_dir_all(e.path());
@@ -170,7 +170,7 @@ fn checksum(sql: &str) -> String {
     hex::encode(Sha256::digest(sql.replace("\r\n", "\n").as_bytes()))
 }
 
-/// Schema del plugin: ruolo, tabelle delle `[[resources]]`, migrazioni, congelamento.
+/// Schema of the plugin: role, tables of the `[[resources]]`, migrations, freezing.
 pub async fn apply_schema(
     k: &Kernel,
     tx: &mut mosaikit_db::Tx,
@@ -188,7 +188,7 @@ pub async fn apply_schema(
     ps.provision(tx, &password).await?;
     ps.thaw(tx).await?;
 
-    // tabelle generate dal manifest (CRUD generico)
+    // tables generated from the manifest (generic CRUD)
     let mut auto = Vec::new();
     for r in &m.resources {
         let cols: BTreeMap<String, String> = ps.columns(tx, &r.name).await?.into_iter().collect();
@@ -211,7 +211,7 @@ pub async fn apply_schema(
                     )),
                     Some(t) if !same_type(t, f.kind) => {
                         return Err(Error::bad(format!(
-                            "il campo {}.{} e' gia' di tipo {t}: non si puo' cambiare in {:?}",
+                            "field {}.{} is already of type {t}: it cannot change to {:?}",
                             r.name, f.key, f.kind
                         )))
                     }
@@ -225,7 +225,7 @@ pub async fn apply_schema(
         ps.run_as_plugin(tx, &stmts).await?;
     }
 
-    // migrazioni del plugin
+    // migrations of the plugin
     let applied: BTreeMap<i32, String> =
         mosaikit_db::query("select version, checksum from core.plugin_migrations where plugin_id = $1")
             .bind(&m.id)
@@ -241,19 +241,19 @@ pub async fn apply_schema(
             Some(_) => {
                 return Err(Error::bad(if dev {
                     format!(
-                        "la migrazione {name} e' gia' stata applicata e poi modificata: crea una nuova migrazione \
-                         oppure azzera i dati del plugin con `cargo xtask plugin db-reset {}`",
+                        "migration {name} was already applied and then changed: create a new migration \
+                         or reset the data of the plugin with `cargo xtask plugin db-reset {}`",
                         m.id
                     )
                 } else {
-                    format!("la migrazione {name} differisce da quella gia' applicata")
+                    format!("migration {name} differs from the one already applied")
                 }))
             }
             None => {}
         }
         let stmts = mosaikit_sql_guard::check_migration(sql, &schema)
-            .map_err(|e| Error::bad(format!("migrazione {name}: {e}")))?;
-        ps.run_as_plugin(tx, &stmts).await.map_err(|e| Error::bad(format!("migrazione {name}: {e}")))?;
+            .map_err(|e| Error::bad(format!("migration {name}: {e}")))?;
+        ps.run_as_plugin(tx, &stmts).await.map_err(|e| Error::bad(format!("migration {name}: {e}")))?;
         mosaikit_db::query(
             "insert into core.plugin_migrations (plugin_id, version, name, checksum) values ($1, $2, $3, $4)",
         )
@@ -268,19 +268,22 @@ pub async fn apply_schema(
     let report = ps.freeze(tx).await?;
     for kpi in &m.kpi {
         if !report.kpi_views.contains(&kpi.view) {
-            return Err(Error::bad(format!("la vista KPI {} dichiarata nel manifest non esiste", kpi.view)));
+            return Err(Error::bad(format!(
+                "the KPI view {} declared in the manifest does not exist",
+                kpi.view
+            )));
         }
     }
     Ok(())
 }
 
-/// Requisiti del manifest (`[requires]`): database ed estensioni. Ritorna gli schemi
-/// delle estensioni da aggiungere al search_path del plugin (es. `public` per PostGIS).
+/// Requirements of the manifest (`[requires]`): database and extensions. Returns the schemas
+/// of the extensions to add to the search_path of the plugin (e.g. `public` for PostGIS).
 async fn check_requirements(k: &Kernel, tx: &mut mosaikit_db::Tx, m: &Manifest) -> Result<Vec<String>> {
     let r = &m.requires;
     if r.database.as_deref() == Some("postgres") && k.db.is_sqlite() {
         return Err(Error::bad(format!(
-            "{} richiede PostgreSQL: questa installazione usa SQLite (database.backend)",
+            "{} requires PostgreSQL: this installation uses SQLite (database.backend)",
             m.name
         )));
     }
@@ -295,7 +298,7 @@ async fn check_requirements(k: &Kernel, tx: &mut mosaikit_db::Tx, m: &Manifest) 
         let schema = match installed {
             Some(s) => s,
             None => {
-                // se il ruolo app puo' (estensione "trusted" o superutente) la crea, altrimenti errore chiaro
+                // if the app role can (a "trusted" extension or superuser) it creates it, otherwise a clear error
                 tx.savepoint().await?;
                 let created =
                     mosaikit_db::query(format!("create extension if not exists {}", mosaikit_db::qi(ext)))
@@ -305,8 +308,8 @@ async fn check_requirements(k: &Kernel, tx: &mut mosaikit_db::Tx, m: &Manifest) 
                 if created.is_err() {
                     tx.rollback_savepoint().await?;
                     return Err(Error::bad(format!(
-                        "{} richiede l'estensione PostgreSQL {ext}: installala nel database con \
-                         CREATE EXTENSION {ext}; (serve un superutente)",
+                        "{} requires the PostgreSQL extension {ext}: install it in the database with \
+                         CREATE EXTENSION {ext}; (a superuser is required)",
                         m.name
                     )));
                 }

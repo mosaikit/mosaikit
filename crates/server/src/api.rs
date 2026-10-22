@@ -1,4 +1,4 @@
-//! API REST dell'origine app.
+//! REST API of the app origin.
 
 use std::collections::HashMap;
 
@@ -56,7 +56,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/t/{t}/resources/{rid}/owner", post(resource_owner))
         .route("/api/t/{t}/resources/{rid}/links", get(resource_links).post(resource_link_create))
         .route("/api/t/{t}/links/{id}", delete(link_revoke))
-        // operazioni dei plugin (sempre limitate al plugin del percorso)
+        // operations of the plugins (always limited to the plugin of the path)
         .route("/api/t/{t}/p/{plugin}/r/{res}", get(crud_list).post(crud_create))
         .route("/api/t/{t}/p/{plugin}/r/{res}/{id}", get(crud_get).put(crud_update).delete(crud_delete))
         .route("/api/t/{t}/p/{plugin}/call/{name}", post(plugin_call))
@@ -69,7 +69,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/t/{t}/p/{plugin}/files/{id}/copy", post(files_copy))
         .route("/api/t/{t}/p/{plugin}/files/{id}", delete(files_delete))
         .route("/api/t/{t}/p/{plugin}/ticket/{id}", post(ticket))
-        // gestore del tenant
+        // manager of the tenant
         .route("/api/t/{t}/manage/members", get(m_members).post(m_create_member))
         .route("/api/t/{t}/manage/members/{uid}", delete(m_remove_member))
         .route("/api/t/{t}/manage/members/{uid}/role", put(m_set_role))
@@ -84,7 +84,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/t/{t}/manage/settings", get(m_settings).put(m_set_settings))
         .route("/api/t/{t}/manage/theme", put(m_set_theme))
         .route("/api/t/{t}/manage/kpi", get(m_kpi))
-        // amministratore di sistema
+        // system administrator
         .route("/api/admin/tenants", get(a_tenants).post(a_create_tenant))
         .route("/api/admin/tenants/{id}/status", put(a_tenant_status))
         .route("/api/admin/tenants/{id}/members", get(a_tenant_members))
@@ -114,21 +114,28 @@ async fn api_not_found() -> ApiResult<()> {
 }
 
 fn uuid(s: &str) -> ApiResult<Uuid> {
-    s.parse().map_err(|_| bad(format!("id non valido: {s}")))
+    s.parse().map_err(|_| bad(format!("invalid id: {s}")))
 }
 
 fn ok() -> Json<Value> {
     Json(json!({ "ok": true }))
 }
 
-// ------------------------------------------------------------------ autenticazione
+// ------------------------------------------------------------------ authentication
 
 async fn health(State(s): State<AppState>) -> Json<Value> {
     Json(json!({ "ok": true, "version": mosaikit_kernel::KERNEL_VERSION, "dev": s.k.cfg.dev.enabled }))
 }
 
-async fn brand(State(s): State<AppState>) -> Json<Value> {
-    Json(s.k.brand.public())
+/// Brand of the product, with the theme and the top bar of the platform: public, so the sign-in page
+/// has them before a session exists.
+async fn brand(State(s): State<AppState>) -> ApiResult<Json<Value>> {
+    let mut b = s.k.brand.public();
+    if let Some(o) = b.as_object_mut() {
+        o.insert("theme".into(), json!(tenancy::platform_theme(&s.k).await?));
+        o.insert("band".into(), json!(tenancy::shell_band(&s.k).await?));
+    }
+    Ok(Json(b))
 }
 
 #[derive(Deserialize)]
@@ -162,7 +169,7 @@ async fn login(
     logged_in(&s, lr, json!({})).await
 }
 
-/// Risposta di un accesso completato: sessione + cookie (`extra` aggiunto al corpo).
+/// Response of a completed sign-in: session + cookie (`extra` added to the body).
 async fn logged_in(s: &AppState, lr: identity::LoginResult, extra: Value) -> ApiResult<Response> {
     let mut body = session_body(s, &lr.user).await?;
     if let (Some(b), Value::Object(e)) = (body.as_object_mut(), extra) {
@@ -173,7 +180,7 @@ async fn logged_in(s: &AppState, lr: identity::LoginResult, extra: Value) -> Api
     Ok(res)
 }
 
-/// Tenant della pagina di accesso (pubblico).
+/// Tenants of the sign-in page (public).
 async fn login_tenants(State(s): State<AppState>) -> ApiResult<Json<Value>> {
     Ok(Json(json!(tenancy::login_tenants(&s.k).await?)))
 }
@@ -184,8 +191,8 @@ struct AdminLoginReq {
     password: String,
 }
 
-/// Accesso degli Administrator: sessione completa, oppure `{ pending, csrf }` in attesa
-/// del secondo fattore (`totp` o `totp_setup`).
+/// Sign-in of the Administrators: full session, or `{ pending, csrf }` waiting
+/// for the second factor (`totp` or `totp_setup`).
 async fn admin_login(
     State(s): State<AppState>,
     ClientIp(ip): ClientIp,
@@ -268,16 +275,16 @@ async fn answer_invitation(
     let accept = match answer.as_str() {
         "accept" => true,
         "decline" => false,
-        _ => return Err(bad("risposta: accept o decline")),
+        _ => return Err(bad("answer: accept or decline")),
     };
     tenancy::respond_invitation(&s.k, &u, uuid(&id)?, accept).await?;
     Ok(ok())
 }
 
-/// Eventi di sviluppo (hot reload), solo in modalita' dev.
+/// Development events (hot reload), only in dev mode.
 async fn dev_events(State(s): State<AppState>, Auth(_u): Auth) -> ApiResult<Response> {
     if !s.k.cfg.dev.enabled {
-        return Err(Error::not_found("modalita' sviluppo non attiva").into());
+        return Err(Error::not_found("development mode not active").into());
     }
     let rx = s.k.dev_events.subscribe();
     let stream = tokio_stream::wrappers::BroadcastStream::new(rx).filter_map(|e| async move {
@@ -348,7 +355,7 @@ async fn resource_grants(
 struct GrantReq {
     principal_type: String,
     principal_id: Uuid,
-    /// read | write | manage; assente o null = revoca
+    /// read | write | manage; absent or null = revoke
     level: Option<String>,
 }
 
@@ -410,7 +417,7 @@ async fn link_revoke(
     Ok(ok())
 }
 
-// ------------------------------------------------------------------ CRUD e comandi
+// ------------------------------------------------------------------ CRUD and commands
 
 #[derive(Deserialize)]
 struct ResPath {
@@ -499,7 +506,7 @@ async fn plugin_call(
     Ok(Json(json!({ "result": crud::call(&s.k, &c, &p.plugin, &p.name, args).await? })))
 }
 
-// ------------------------------------------------------------------ file e contenuti
+// ------------------------------------------------------------------ files and contents
 
 #[derive(Deserialize)]
 struct PluginPath {
@@ -551,14 +558,14 @@ async fn files_upload(
     Query(q): Query<HashMap<String, String>>,
     body: Bytes,
 ) -> ApiResult<Json<Value>> {
-    let name = q.get("name").ok_or_else(|| bad("manca name"))?;
+    let name = q.get("name").ok_or_else(|| bad("missing name"))?;
     let replace = q.get("replace").is_some_and(|v| v == "1" || v == "true");
     Ok(Json(json!(
         files::upload(&s.k, &c, &p.plugin, opt_uuid(q.get("parent"))?, name, &body, replace).await?
     )))
 }
 
-/// Contenuto come download: `application/octet-stream` + attachment, mai interpretato dal browser.
+/// Content as a download: `application/octet-stream` + attachment, never interpreted by the browser.
 fn attachment(name: &str, data: Vec<u8>) -> Response {
     let safe: String = name.chars().map(|c| if c == '"' || c.is_control() { '_' } else { c }).collect();
     let ascii: String = safe.chars().map(|c| if c.is_ascii() { c } else { '_' }).collect();
@@ -673,7 +680,7 @@ async fn ticket(
     Ok(Json(json!(content::ticket(&s.k, &c, &p.plugin, p.id()?, download).await?)))
 }
 
-// ------------------------------------------------------------------ gestore del tenant
+// ------------------------------------------------------------------ manager of the tenant
 
 #[derive(Deserialize)]
 struct UidPath {
@@ -859,7 +866,7 @@ async fn m_kpi(State(s): State<AppState>, Tenant(c): Tenant) -> ApiResult<Json<V
     Ok(Json(json!(kpi::tenant(&s.k, &c).await?)))
 }
 
-// ------------------------------------------------------------------ amministratore di sistema
+// ------------------------------------------------------------------ system administrator
 
 async fn overview(State(s): State<AppState>, Tenant(c): Tenant) -> ApiResult<Json<Value>> {
     Ok(Json(json!(mosaikit_kernel::overview::overview(&s.k, &c).await?)))
@@ -1043,7 +1050,7 @@ async fn a_plugin_action(
     match action.as_str() {
         "activate" => plugins::set_active(&s.k, Some(&u), &id, true).await?,
         "deactivate" => plugins::set_active(&s.k, Some(&u), &id, false).await?,
-        _ => return Err(bad("azione: activate o deactivate")),
+        _ => return Err(bad("action: activate or deactivate")),
     }
     Ok(ok())
 }
@@ -1081,7 +1088,7 @@ async fn a_set_band(
 
 #[derive(serde::Deserialize)]
 struct ThemeReq {
-    /// assente o null: il tenant torna al tema della piattaforma
+    /// absent or null: the tenant goes back to the theme of the platform
     preset: Option<String>,
 }
 
@@ -1090,7 +1097,7 @@ async fn a_set_theme(
     Auth(u): Auth,
     Json(r): Json<ThemeReq>,
 ) -> ApiResult<Json<Value>> {
-    let preset = r.preset.ok_or_else(|| Error::bad("tema mancante"))?;
+    let preset = r.preset.ok_or_else(|| Error::bad("missing theme"))?;
     tenancy::set_platform_theme(&s.k, &u, &preset).await?;
     Ok(ok())
 }

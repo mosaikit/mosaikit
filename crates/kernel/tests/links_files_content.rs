@@ -1,4 +1,4 @@
-//! Link pubblici, file e cartelle, siti statici (contenuti su disco e ticket).
+//! Public links, files and folders, static sites (contents on disk and tickets).
 
 use std::io::Write;
 
@@ -37,12 +37,12 @@ async fn note(t: &TestKernel, c: &Caller, title: &str) -> Uuid {
 }
 
 #[tokio::test]
-async fn link_pubblici() {
-    let (t, gestore, anna, bruno) = setup().await;
-    let rid = note(&t, &anna, "pubblica").await;
-    let altra = note(&t, &anna, "privata").await;
+async fn public_links() {
+    let (t, mgr, anna, bruno) = setup().await;
+    let rid = note(&t, &anna, "public").await;
+    let other_session = note(&t, &anna, "private").await;
 
-    // serve il livello gestione
+    // the manage level is required
     set_grant(&t, &anna, rid, "user", bruno.user.user_id, Some(Level::Write)).await.unwrap();
     assert_eq!(links::create(&t, &bruno, rid, None, None).await.unwrap_err().kind, Kind::Forbidden);
 
@@ -51,116 +51,115 @@ async fn link_pubblici() {
     assert!(l.info.expires_at.is_some());
     let r = links::resolve(&t, &token_of(&l.url)).await.unwrap();
     assert_eq!(r.resource, rid);
-    // il link legge solo la sua risorsa, in sola lettura
+    // the link reads only its resource, read only
     let p = t.plugins.active(NOTES).unwrap();
     let row = crud::get_ctx(&t, &r.ctx(), &p, "notes", rid).await.unwrap();
-    assert_eq!(row["values"]["title"], "pubblica");
+    assert_eq!(row["values"]["title"], "public");
     assert_eq!(row["my_level"], "read");
-    assert_eq!(crud::get_ctx(&t, &r.ctx(), &p, "notes", altra).await.unwrap_err().kind, Kind::NotFound);
+    assert_eq!(
+        crud::get_ctx(&t, &r.ctx(), &p, "notes", other_session).await.unwrap_err().kind,
+        Kind::NotFound
+    );
     assert_eq!(crud::list_ctx(&t, &r.ctx(), &p, "notes", None, None).await.unwrap().rows.len(), 1);
 
-    // durata oltre il massimo del tenant (30 giorni di default)
+    // lifetime beyond the maximum of the tenant (30 days by default)
     assert_eq!(links::create(&t, &anna, rid, Some(365), None).await.unwrap_err().kind, Kind::BadRequest);
 
     // password
-    let lp = links::create(&t, &anna, rid, None, Some("segreta1")).await.unwrap();
+    let lp = links::create(&t, &anna, rid, None, Some("secret1")).await.unwrap();
     let rp = links::resolve(&t, &token_of(&lp.url)).await.unwrap();
-    assert!(!links::check_password(&t, &rp, "sbagliata").await.unwrap());
-    assert!(links::check_password(&t, &rp, "segreta1").await.unwrap());
+    assert!(!links::check_password(&t, &rp, "wrong").await.unwrap());
+    assert!(links::check_password(&t, &rp, "secret1").await.unwrap());
 
-    // revoca
+    // revocation
     links::revoke(&t, &anna, l.info.id).await.unwrap();
     assert_eq!(links::resolve(&t, &token_of(&l.url)).await.unwrap_err().kind, Kind::NotFound);
-    // scadenza
+    // expiry
     mosaikit_db::query("update core.public_links set expires_at = now() - interval '1 minute' where id = $1")
         .bind(lp.info.id)
         .execute(&t.db)
         .await
         .unwrap();
     assert!(links::resolve(&t, &token_of(&lp.url)).await.is_err());
-    // token inesistente o malformato
+    // token that does not exist or is malformed
     assert!(links::resolve(&t, "abc").await.is_err());
     assert!(links::resolve(&t, &"0".repeat(48)).await.is_err());
 
-    // policy del tenant: link disattivati
+    // policy of the tenant: links turned off
     let l2 = links::create(&t, &anna, rid, None, None).await.unwrap();
-    let mut s = gestore.tenant.settings.clone();
+    let mut s = mgr.tenant.settings.clone();
     s.public_links_enabled = false;
-    set_settings(&t, &gestore, &s).await.unwrap();
+    set_settings(&t, &mgr, &s).await.unwrap();
     let anna2 = t.caller(&anna.user, "alfa").await;
     assert_eq!(links::create(&t, &anna2, rid, None, None).await.unwrap_err().kind, Kind::Forbidden);
-    assert!(links::resolve(&t, &token_of(&l2.url)).await.is_err(), "i link esistenti smettono di funzionare");
+    assert!(links::resolve(&t, &token_of(&l2.url)).await.is_err(), "the existing links stop working");
 }
 
 #[tokio::test]
-async fn file_e_cartelle_con_ereditarieta() {
+async fn files_and_folders_with_inheritance() {
     let (t, _g, anna, bruno) = setup().await;
-    let progetto = files::mkdir(&t, &anna, FILES, None, "Progetto").await.unwrap();
-    assert!(progetto.is_dir);
+    let project = files::mkdir(&t, &anna, FILES, None, "Project").await.unwrap();
+    assert!(project.is_dir);
     assert_eq!(
-        files::mkdir(&t, &anna, FILES, None, "progetto").await.unwrap_err().kind,
+        files::mkdir(&t, &anna, FILES, None, "project").await.unwrap_err().kind,
         Kind::Conflict,
-        "nomi senza distinzione di maiuscole"
+        "case-insensitive names"
     );
     assert_eq!(files::mkdir(&t, &anna, FILES, None, "a/b").await.unwrap_err().kind, Kind::BadRequest);
-    let doc =
-        files::upload(&t, &anna, FILES, Some(progetto.id), "relazione.txt", b"ciao", false).await.unwrap();
-    assert_eq!(doc.size, 4);
+    let doc = files::upload(&t, &anna, FILES, Some(project.id), "report.txt", b"hello", false).await.unwrap();
+    assert_eq!(doc.size, 5);
     assert_eq!(doc.mime, "text/plain");
     assert_eq!(
-        files::upload(&t, &anna, FILES, Some(progetto.id), "relazione.txt", b"x", false)
-            .await
-            .unwrap_err()
-            .kind,
+        files::upload(&t, &anna, FILES, Some(project.id), "report.txt", b"x", false).await.unwrap_err().kind,
         Kind::Conflict
     );
-    files::upload(&t, &anna, FILES, Some(progetto.id), "relazione.txt", b"ciao mondo", true).await.unwrap();
+    files::upload(&t, &anna, FILES, Some(project.id), "report.txt", b"hello world", true).await.unwrap();
     let (_, data) = files::read(&t, &anna, FILES, doc.id).await.unwrap();
-    assert_eq!(data, b"ciao mondo");
+    assert_eq!(data, b"hello world");
 
-    // bruno non vede nulla; con scrittura sulla cartella vede e aggiunge file
+    // bruno sees nothing; with write on the folder he sees and adds files
     assert!(files::list(&t, &bruno, FILES, None).await.unwrap().entries.is_empty());
     assert_eq!(files::read(&t, &bruno, FILES, doc.id).await.unwrap_err().kind, Kind::NotFound);
-    set_grant(&t, &anna, progetto.id, "user", bruno.user.user_id, Some(Level::Write)).await.unwrap();
+    set_grant(&t, &anna, project.id, "user", bruno.user.user_id, Some(Level::Write)).await.unwrap();
     let root_b = files::list(&t, &bruno, FILES, None).await.unwrap();
-    assert_eq!(root_b.entries.len(), 1, "la cartella condivisa appare nella radice di bruno");
-    let inside = files::list(&t, &bruno, FILES, Some(progetto.id)).await.unwrap();
+    assert_eq!(root_b.entries.len(), 1, "the shared folder appears in bruno's root");
+    let inside = files::list(&t, &bruno, FILES, Some(project.id)).await.unwrap();
     assert_eq!(inside.entries.len(), 1);
     assert_eq!(inside.path.len(), 1);
     assert_eq!(inside.my_level, "write");
-    let di_bruno =
-        files::upload(&t, &bruno, FILES, Some(progetto.id), "note.md", b"# note", false).await.unwrap();
+    let brunos_file =
+        files::upload(&t, &bruno, FILES, Some(project.id), "note.md", b"# note", false).await.unwrap();
     assert_eq!(
         files::delete(&t, &bruno, FILES, doc.id).await.unwrap_err().kind,
         Kind::Forbidden,
-        "scrittura non basta per eliminare"
+        "write is not enough to delete"
     );
-    // anna, proprietaria della cartella, gestisce anche il file di bruno
-    let listed = files::list(&t, &anna, FILES, Some(progetto.id)).await.unwrap();
-    assert_eq!(listed.entries.iter().find(|e| e.id == di_bruno.id).unwrap().my_level, "manage");
+    // anna, owner of the folder, also manages bruno's file
+    let listed = files::list(&t, &anna, FILES, Some(project.id)).await.unwrap();
+    assert_eq!(listed.entries.iter().find(|e| e.id == brunos_file.id).unwrap().my_level, "manage");
 
-    // sottocartella, spostamento, copia, zip
-    let sub = files::mkdir(&t, &anna, FILES, Some(progetto.id), "Allegati").await.unwrap();
+    // subfolder, move, copy, zip
+    let sub = files::mkdir(&t, &anna, FILES, Some(project.id), "Attachments").await.unwrap();
     files::move_to(&t, &anna, FILES, doc.id, Some(sub.id)).await.unwrap();
     let deep = files::list(&t, &bruno, FILES, Some(sub.id)).await.unwrap();
-    assert_eq!(deep.path.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(), vec!["Progetto", "Allegati"]);
-    assert!(files::move_to(&t, &anna, FILES, progetto.id, Some(sub.id)).await.is_err(), "niente cicli");
-    let copia = files::copy_to(&t, &bruno, FILES, sub.id, None).await.unwrap();
-    assert_eq!(copia.owner_id, bruno.user.user_id, "la copia appartiene a chi la fa");
-    let copia_dentro = files::list(&t, &bruno, FILES, Some(copia.id)).await.unwrap();
-    let (_, copied) = files::read(&t, &bruno, FILES, copia_dentro.entries[0].id).await.unwrap();
-    assert_eq!(copied, b"ciao mondo");
-    let (name, zip) = files::zip_folder(&t, &anna, FILES, progetto.id).await.unwrap();
-    assert_eq!(name, "Progetto.zip");
+    assert_eq!(deep.path.iter().map(|c| c.name.as_str()).collect::<Vec<_>>(), vec!["Project", "Attachments"]);
+    assert!(files::move_to(&t, &anna, FILES, project.id, Some(sub.id)).await.is_err(), "no cycles");
+    let the_copy = files::copy_to(&t, &bruno, FILES, sub.id, None).await.unwrap();
+    assert_eq!(the_copy.owner_id, bruno.user.user_id, "the copy belongs to whoever makes it");
+    let inside_the_copy = files::list(&t, &bruno, FILES, Some(the_copy.id)).await.unwrap();
+    let (_, copied) = files::read(&t, &bruno, FILES, inside_the_copy.entries[0].id).await.unwrap();
+    assert_eq!(copied, b"hello world");
+    let (name, zip) = files::zip_folder(&t, &anna, FILES, project.id).await.unwrap();
+    assert_eq!(name, "Project.zip");
     let mut z = zip::ZipArchive::new(std::io::Cursor::new(zip)).unwrap();
     let mut names: Vec<String> = (0..z.len()).map(|i| z.by_index(i).unwrap().name().to_string()).collect();
     names.sort();
-    assert_eq!(names, vec!["Allegati/relazione.txt", "note.md"]);
+    assert_eq!(names, vec!["Attachments/report.txt", "note.md"]);
 
-    // eliminazione: i contenuti spariscono anche dal disco
+    // deletion: the contents go away from the disk too
     let blob = t.blobs.file_path(anna.tenant.tenant_id, doc.id);
     assert!(blob.is_file());
-    files::delete(&t, &anna, FILES, progetto.id).await.unwrap();
+    files::delete(&t, &anna, FILES, project.id).await.unwrap();
     assert!(!blob.exists());
     assert!(files::list(&t, &anna, FILES, None).await.unwrap().entries.is_empty());
 }
@@ -175,14 +174,14 @@ fn zip_of(entries: &[(&str, &[u8])]) -> Vec<u8> {
 }
 
 #[tokio::test]
-async fn siti_statici_con_ticket() {
+async fn static_sites_with_tickets() {
     let (t, _g, anna, bruno) = setup().await;
     let site = crud::create(
         &t,
         &anna,
         SITES,
         "sites",
-        json!({ "name": "Documentazione" }).as_object().unwrap(),
+        json!({ "name": "Documentation" }).as_object().unwrap(),
         None,
     )
     .await
@@ -195,11 +194,11 @@ async fn siti_statici_con_ticket() {
     ]);
     let info = content::upload_site(&t, &anna, SITES, rid, &zip).await.unwrap();
     assert_eq!(info.files, 3);
-    assert_eq!(info.entry, "doc/index.html", "index.html meno annidato");
-    // percorso malevolo
-    let evil = zip_of(&[("../fuori.html", b"x")]);
+    assert_eq!(info.entry, "doc/index.html", "least nested index.html");
+    // malicious path
+    let evil = zip_of(&[("../outside.html", b"x")]);
     assert_eq!(content::upload_site(&t, &anna, SITES, rid, &evil).await.unwrap_err().kind, Kind::BadRequest);
-    // bruno non puo' caricare ne' aprire
+    // bruno can neither upload nor open
     assert_eq!(content::upload_site(&t, &bruno, SITES, rid, &zip).await.unwrap_err().kind, Kind::NotFound);
     assert_eq!(content::ticket(&t, &bruno, SITES, rid, false).await.unwrap_err().kind, Kind::NotFound);
 
@@ -210,12 +209,12 @@ async fn siti_statici_con_ticket() {
     let target = content::resolve_ticket(&t, &token).await.unwrap();
     assert_eq!(target.resource, rid);
     assert!(t.blobs.site_file(target.tenant, rid, "doc/css/s.css").is_some());
-    assert!(t.blobs.site_file(target.tenant, rid, "doc/a").is_some(), "cartella -> index.html");
+    assert!(t.blobs.site_file(target.tenant, rid, "doc/a").is_some(), "folder -> index.html");
     assert!(t.blobs.site_file(target.tenant, rid, "../../etc/passwd").is_none());
-    // revoca del permesso: il ticket smette di funzionare
+    // revocation of the permission: the ticket stops working
     set_grant(&t, &anna, rid, "user", bruno.user.user_id, None).await.unwrap();
     assert_eq!(content::resolve_ticket(&t, &token).await.unwrap_err().kind, Kind::Forbidden);
-    // logout: i ticket della sessione scadono
+    // logout: the tickets of the session expire
     let tk2 = content::ticket(&t, &anna, SITES, rid, false).await.unwrap();
     let token2 = tk2.url.split("/c/").nth(1).unwrap().split('/').next().unwrap().to_string();
     mosaikit_kernel::identity::logout(&t, &anna.user).await.unwrap();
@@ -224,7 +223,7 @@ async fn siti_statici_con_ticket() {
 }
 
 #[tokio::test]
-async fn permesso_files_e_content_obbligatorio() {
+async fn files_and_content_permission_required() {
     let (t, _g, anna, _b) = setup().await;
     assert_eq!(files::list(&t, &anna, NOTES, None).await.unwrap_err().kind, Kind::Forbidden);
     let rid = note(&t, &anna, "x").await;

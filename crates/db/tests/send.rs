@@ -1,4 +1,4 @@
-//! Le future del crate devono essere `Send` (usate dai gestori HTTP).
+//! The futures of the crate must be `Send` (used by the HTTP handlers).
 
 use std::sync::Arc;
 

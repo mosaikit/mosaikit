@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react'
-import { api } from './api.ts'
+import { useSyncExternalStore } from 'react'
+import { api, isUnavailable } from './api.ts'
+import type { ShellBand } from './types.ts'
 
-/** Marchio del prodotto (`brand.toml` della distribuzione). */
+/** Brand of the product (`brand.toml` of the distribution), with the theme and the top bar of the
+ *  platform: public, so the sign-in page has them before a session exists. */
 export interface Brand {
   name: string
   version: string
@@ -10,8 +12,12 @@ export interface Brand {
   login_message: string
   footer: string
   support_url: string | null
-  /** c'e' un logo del marchio (altrimenti il simbolo di Mosaikit) */
+  /** there is a brand logo (otherwise the Mosaikit symbol) */
   logo: boolean
+  /** theme of the platform (recent servers) */
+  theme?: string
+  /** top bar of the platform (recent servers) */
+  band?: ShellBand
 }
 
 export const DEFAULT_BRAND: Brand = {
@@ -25,26 +31,51 @@ export const DEFAULT_BRAND: Brand = {
   logo: false,
 }
 
-let pending: Promise<Brand> | null = null
+/** Wait before the next attempt when the server does not answer: 3 s, growing up to 15 s. */
+export function retryDelay(attempt: number): number {
+  return Math.min(3000 * 1.5 ** attempt, 15000)
+}
 
-export function loadBrand(): Promise<Brand> {
-  pending ??= api<Brand>('GET', '/api/brand').catch(() => DEFAULT_BRAND)
-  return pending
+/** `loading` until the first answer; `unavailable` while the server does not answer (and retrying). */
+export type BrandStatus = 'loading' | 'ok' | 'unavailable'
+
+let current: { brand: Brand; status: BrandStatus } = { brand: DEFAULT_BRAND, status: 'loading' }
+const listeners = new Set<() => void>()
+let started = false
+
+function set(next: typeof current) {
+  current = next
+  if (next.status === 'ok') document.title = next.brand.name
+  listeners.forEach((l) => l())
+}
+
+/** Loads the brand once; while the server does not answer it keeps trying. */
+function start() {
+  if (started) return
+  started = true
+  const attempt = (n: number) => {
+    api<Brand>('GET', '/api/brand')
+      .then((b) => set({ brand: { ...DEFAULT_BRAND, ...b }, status: 'ok' }))
+      .catch((e) => {
+        if (!isUnavailable(e)) return set({ brand: DEFAULT_BRAND, status: 'ok' })
+        set({ brand: current.brand, status: 'unavailable' })
+        setTimeout(() => attempt(n + 1), retryDelay(n))
+      })
+  }
+  attempt(0)
+}
+
+export function useBrandState(): { brand: Brand; status: BrandStatus } {
+  start()
+  return useSyncExternalStore(
+    (l) => {
+      listeners.add(l)
+      return () => listeners.delete(l)
+    },
+    () => current,
+  )
 }
 
 export function useBrand(): Brand {
-  const [b, setB] = useState<Brand>(DEFAULT_BRAND)
-  useEffect(() => {
-    let live = true
-    void loadBrand().then((x) => {
-      if (live) {
-        setB(x)
-        document.title = x.name
-      }
-    })
-    return () => {
-      live = false
-    }
-  }, [])
-  return b
+  return useBrandState().brand
 }

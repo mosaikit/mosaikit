@@ -1,5 +1,5 @@
-//! Membri del tenant: creazione, ruolo (Tenant Manager o User), reset della password, uscita con
-//! riassegnazione delle risorse.
+//! Members of the tenant: creation, role (Tenant Manager or User), password reset, leaving with
+//! reassignment of the resources.
 
 use chrono::{DateTime, Utc};
 use serde::Serialize;
@@ -54,7 +54,7 @@ pub(super) async fn members_of(k: &Kernel, tenant: Uuid) -> Result<Vec<MemberInf
         .collect()
 }
 
-/// Crea un utente locale con questo tenant come tenant di appartenenza.
+/// Creates a local user with this tenant as home tenant.
 pub async fn create_member(
     k: &Kernel,
     c: &Caller,
@@ -67,7 +67,7 @@ pub async fn create_member(
     create_member_in(k, c.tenant.tenant_id, c.user.user_id, username, display_name, password, role).await
 }
 
-/// Crea un utente locale di `tenant` (anche per l'Administrator, che nomina un gestore).
+/// Creates a local user of `tenant` (for the Administrator too, who appoints a manager).
 pub(super) async fn create_member_in(
     k: &Kernel,
     tenant: Uuid,
@@ -79,7 +79,7 @@ pub(super) async fn create_member_in(
 ) -> Result<Uuid> {
     let username = username.trim().to_lowercase();
     if !valid_username(&username) {
-        return Err(Error::bad("username non valido: minuscole, cifre, '.', '-', '_' (2-64)"));
+        return Err(Error::bad("invalid username: lower case, digits, '.', '-', '_' (2-64)"));
     }
     check_password_policy(password)?;
     let hash = hash_password(k, password).await?;
@@ -94,7 +94,7 @@ pub(super) async fn create_member_in(
     .fetch_one(&mut *tx)
     .await
     .map_err(|e| match Error::from(e) {
-        err if err.kind == crate::Kind::Conflict => Error::conflict(format!("l'utente '{username}' esiste gia'")),
+        err if err.kind == crate::Kind::Conflict => Error::conflict(format!("the user '{username}' already exists")),
         err => err,
     })?;
     mosaikit_db::query(
@@ -120,14 +120,14 @@ pub(super) async fn create_member_in(
     Ok(id)
 }
 
-/// Reimposta la password di un membro che ha questo tenant come tenant di appartenenza.
+/// Resets the password of a member whose home tenant is this tenant.
 pub async fn reset_member_password(k: &Kernel, c: &Caller, user_id: Uuid, password: &str) -> Result<()> {
     c.require_manager()?;
     reset_password_in(k, c.tenant.tenant_id, user_id, password).await
 }
 
 pub(super) async fn reset_password_in(k: &Kernel, tenant: Uuid, user_id: Uuid, password: &str) -> Result<()> {
-    // mai un Administrator: e' un account del tenant di sistema, gestito solo dagli Administrator
+    // never an Administrator: it is an account of the system tenant, managed only by Administrators
     let home: Option<Uuid> = mosaikit_db::query_scalar(
         "select home_tenant_id from core.users where id = $1 and not is_system_admin",
     )
@@ -135,7 +135,7 @@ pub(super) async fn reset_password_in(k: &Kernel, tenant: Uuid, user_id: Uuid, p
     .fetch_optional(&k.db)
     .await?;
     if home != Some(tenant) {
-        return Err(Error::forbidden("puoi reimpostare solo le password degli utenti del tuo tenant"));
+        return Err(Error::forbidden("you can only reset the passwords of the users of your tenant"));
     }
     crate::identity::set_password(k, user_id, password).await?;
     mosaikit_db::query("delete from core.sessions where user_id = $1").bind(user_id).execute(&k.db).await?;
@@ -175,9 +175,9 @@ pub(super) async fn set_role_in(
     role: Role,
 ) -> Result<()> {
     let current =
-        member_role(k, tenant, user_id).await?.ok_or_else(|| Error::not_found("membro non trovato"))?;
+        member_role(k, tenant, user_id).await?.ok_or_else(|| Error::not_found("member not found"))?;
     if current == Role::TenantManager && role == Role::User && managers_count(k, tenant).await? <= 1 {
-        return Err(Error::bad("il tenant deve avere almeno un gestore"));
+        return Err(Error::bad("the tenant must have at least one manager"));
     }
     mosaikit_db::query("update core.memberships set role = $3 where tenant_id = $1 and user_id = $2")
         .bind(tenant)
@@ -204,9 +204,9 @@ pub struct RemoveReport {
     pub disabled: bool,
 }
 
-/// Rimuove un membro dal tenant. Le sue risorse passano a `new_owner`
-/// (obbligatorio se ne possiede). Se il tenant e' il suo tenant di
-/// appartenenza l'account viene disabilitato.
+/// Removes a member from the tenant. Their resources go to `new_owner`
+/// (required if they own any). If the tenant is their home
+/// tenant the account is disabled.
 pub async fn remove_member(
     k: &Kernel,
     c: &Caller,
@@ -215,10 +215,9 @@ pub async fn remove_member(
 ) -> Result<RemoveReport> {
     c.require_manager()?;
     let tenant = c.tenant.tenant_id;
-    let role =
-        member_role(k, tenant, user_id).await?.ok_or_else(|| Error::not_found("membro non trovato"))?;
+    let role = member_role(k, tenant, user_id).await?.ok_or_else(|| Error::not_found("member not found"))?;
     if role == Role::TenantManager && managers_count(k, tenant).await? <= 1 {
-        return Err(Error::bad("non puoi rimuovere l'unico gestore del tenant"));
+        return Err(Error::bad("you cannot remove the only manager of the tenant"));
     }
     let owned: i64 = mosaikit_db::query_scalar(
         "select count(*) from core.resources where tenant_id = $1 and owner_id = $2",
@@ -229,10 +228,10 @@ pub async fn remove_member(
     .await?;
     if owned > 0 {
         let to = new_owner.ok_or_else(|| {
-            Error::bad(format!("l'utente possiede {owned} risorse: indica a chi riassegnarle"))
+            Error::bad(format!("the user owns {owned} resources: say to whom to reassign them"))
         })?;
         if to == user_id {
-            return Err(Error::bad("il nuovo proprietario deve essere un altro membro"));
+            return Err(Error::bad("the new owner must be another member"));
         }
         let active: bool = mosaikit_db::query_scalar("select core.is_member($1, $2)")
             .bind(to)
@@ -240,7 +239,7 @@ pub async fn remove_member(
             .fetch_one(&k.db)
             .await?;
         if !active {
-            return Err(Error::bad("il nuovo proprietario non e' un membro attivo del tenant"));
+            return Err(Error::bad("the new owner is not an active member of the tenant"));
         }
     }
     let home: Uuid = mosaikit_db::query_scalar("select home_tenant_id from core.users where id = $1")
@@ -249,7 +248,7 @@ pub async fn remove_member(
         .await?;
     let disabled = home == tenant;
     if disabled {
-        // l'account viene disabilitato: nessun altro tenant deve restare senza gestore
+        // the account is disabled: no other tenant must stay without a manager
         let orphan: Option<String> = mosaikit_db::query_scalar(
             "select t.slug from core.memberships m join core.tenants t on t.id = m.tenant_id
              where m.user_id = $1 and m.tenant_id <> $2 and m.role = 'tenant_manager'
@@ -264,7 +263,7 @@ pub async fn remove_member(
         .await?;
         if let Some(slug) = orphan {
             return Err(Error::conflict(format!(
-                "l'utente e' l'unico Tenant Manager del tenant '{slug}': prima nominane un altro"
+                "the user is the only Tenant Manager of the tenant '{slug}': appoint another one first"
             )));
         }
     }

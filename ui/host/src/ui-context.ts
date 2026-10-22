@@ -1,4 +1,4 @@
-// Servizi di interfaccia condivisi: toast, conferme, condivisione.
+// Shared interface services: toasts, confirmations, sharing.
 
 import { createContext, useContext } from 'react'
 

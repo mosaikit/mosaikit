@@ -1,8 +1,8 @@
-//! Tenant, Administrator, membri, inviti, gruppi, policy, rubrica per la condivisione.
+//! Tenants, Administrators, members, invitations, groups, policies, directory for sharing.
 //!
-//! Un sotto-modulo per area; qui le funzioni comuni (verifica dell'Administrator,
-//! risoluzione del tenant attivo) e le riesportazioni: dall'esterno si usa
-//! `tenancy::<funzione>` senza conoscere i sotto-moduli.
+//! One sub-module per area; here the common functions (check of the Administrator,
+//! resolution of the active tenant) and the re-exports: from outside one uses
+//! `tenancy::<function>` without knowing the sub-modules.
 
 mod administrators;
 mod directory;
@@ -42,12 +42,12 @@ pub fn require_admin(user: &SessionUser) -> Result<()> {
     if user.is_system_admin {
         Ok(())
     } else {
-        Err(Error::forbidden("operazione riservata all'Administrator"))
+        Err(Error::forbidden("operation reserved to the Administrator"))
     }
 }
 
-/// Risolve il tenant attivo di una richiesta e verifica la membership. Il tenant di
-/// sistema non e' uno spazio di lavoro: non risolve mai.
+/// Resolves the active tenant of a request and checks the membership. The system
+/// tenant is not a workspace: it never resolves.
 pub async fn caller(k: &Kernel, user: &SessionUser, slug: &str) -> Result<Caller> {
     let row = mosaikit_db::query(
         "select t.id, t.slug, t.name, t.settings, m.role from core.tenants t
@@ -58,7 +58,7 @@ pub async fn caller(k: &Kernel, user: &SessionUser, slug: &str) -> Result<Caller
     .bind(user.user_id)
     .fetch_optional(&k.db)
     .await?
-    .ok_or_else(|| Error::forbidden(format!("non sei membro del tenant '{slug}'")))?;
+    .ok_or_else(|| Error::forbidden(format!("you are not a member of the tenant '{slug}'")))?;
     let settings: Value = row.get(3);
     Ok(Caller {
         user: user.clone(),

@@ -1,4 +1,4 @@
-//! Raccolta dei file di un plugin dalla sua cartella sorgente.
+//! Collection of the files of a plugin from its source folder.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -29,8 +29,8 @@ fn walk(base: &Path, dir: &Path, prefix: &str, out: &mut BTreeMap<String, Vec<u8
     Ok(())
 }
 
-/// File di un plugin pronti per [`crate::pack`]:
-/// `plugin.toml`, `migrations/*.sql`, `ui/dist/**` (come `ui/**`) e, se indicato, il WASM.
+/// Files of a plugin ready for [`crate::pack`]:
+/// `plugin.toml`, `migrations/*.sql`, `ui/dist/**` (as `ui/**`) and, if given, the WASM.
 pub fn collect_plugin_dir(dir: &Path, wasm: Option<&Path>) -> Result<BTreeMap<String, Vec<u8>>> {
     let mut files = BTreeMap::new();
     files.insert("plugin.toml".to_string(), read(&dir.join("plugin.toml"))?);

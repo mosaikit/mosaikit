@@ -1,4 +1,4 @@
-// Toast (sonner), conferme (AlertDialog) e i servizi che il bridge dei plugin usa.
+// Toasts (sonner), confirmations (AlertDialog) and the services the bridge of the plugins uses.
 
 import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
@@ -22,7 +22,7 @@ interface Ask {
   resolve: (v: boolean) => void
 }
 
-/** Toast (sonner), conferme (AlertDialog) e i servizi che il bridge dei plugin usa. */
+/** Toasts (sonner), confirmations (AlertDialog) and the services the bridge of the plugins uses. */
 export function UiServices({ children }: { children: ReactNode }) {
   const [ask, setAsk] = useState<Ask | null>(null)
   const confirm = useCallback(
@@ -33,7 +33,7 @@ export function UiServices({ children }: { children: ReactNode }) {
     () => ({
       toast: (text, error = false) => (error ? toast.error(text) : toast(text)),
       confirm,
-      // la finestra di condivisione la apre la pagina del plugin, che conosce il tenant (PluginPage)
+      // the share dialog is opened by the page of the plugin, which knows the tenant (PluginPage)
       share: async () => {},
     }),
     [confirm],
@@ -49,16 +49,16 @@ export function UiServices({ children }: { children: ReactNode }) {
         <AlertDialog open={!!ask} onOpenChange={(o) => !o && close(false)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>{t('Conferma')}</AlertDialogTitle>
+              <AlertDialogTitle>{t('Confirm')}</AlertDialogTitle>
               <AlertDialogDescription>{ask?.message}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => close(false)}>{t('Annulla')}</AlertDialogCancel>
+              <AlertDialogCancel onClick={() => close(false)}>{t('Cancel')}</AlertDialogCancel>
               <AlertDialogAction
                 className={ask?.danger ? 'bg-destructive text-white hover:bg-destructive/90' : undefined}
                 onClick={() => close(true)}
               >
-                {t('Conferma')}
+                {t('Confirm')}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

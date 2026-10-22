@@ -1,9 +1,9 @@
-//! Database usa e getta per i test.
+//! Throwaway databases for the tests.
 //!
-//! Serve `MOSAIKIT_TEST_DATABASE_URL`: un ruolo con CREATEDB e CREATEROLE
-//! (con `cargo xtask db up` e' `mosaikit_dev` sul cluster di sviluppo).
-//! Ogni test crea il proprio database `msk_t_<casuale>`; alla fine database e
-//! ruoli con quel prefisso vengono rimossi.
+//! It needs `MOSAIKIT_TEST_DATABASE_URL`: a role with CREATEDB and CREATEROLE
+//! (with `cargo xtask db up` it is `mosaikit_dev` on the development cluster).
+//! Every test creates its own database `msk_t_<random>`; at the end databases and
+//! roles with that prefix are removed.
 
 use std::str::FromStr;
 
@@ -12,7 +12,7 @@ use sqlx::{ConnectOptions, Connection};
 
 pub const ENV: &str = "MOSAIKIT_TEST_DATABASE_URL";
 
-/// URL di default: il cluster di `cargo xtask db up`.
+/// Default URL: the cluster of `cargo xtask db up`.
 pub const DEFAULT_URL: &str = "postgres://mosaikit_dev:mosaikit_dev@127.0.0.1:55432/postgres";
 
 pub struct TestDb {
@@ -24,10 +24,10 @@ pub struct TestDb {
 impl TestDb {
     pub async fn create() -> TestDb {
         let admin_url = std::env::var(ENV).unwrap_or_else(|_| DEFAULT_URL.to_string());
-        let admin = PgConnectOptions::from_str(&admin_url).expect("MOSAIKIT_TEST_DATABASE_URL non valido");
+        let admin = PgConnectOptions::from_str(&admin_url).expect("invalid MOSAIKIT_TEST_DATABASE_URL");
         let name = format!("msk_t_{}", &uuid::Uuid::new_v4().simple().to_string()[..12]);
         let mut conn = admin.connect().await.unwrap_or_else(|e| {
-            panic!("PostgreSQL di test non raggiungibile ({e}): avvia `cargo xtask db up` o imposta {ENV}")
+            panic!("test PostgreSQL not reachable ({e}): run `cargo xtask db up` or set {ENV}")
         });
         sqlx::raw_sql(&format!("create database {name}")).execute(&mut conn).await.expect("create database");
         conn.close().await.ok();
@@ -56,7 +56,7 @@ impl Drop for TestDb {
     fn drop(&mut self) {
         let admin = self.admin.clone();
         let name = self.name.clone();
-        // runtime dedicato: Drop puo' avvenire dentro o fuori da tokio
+        // dedicated runtime: Drop may happen inside or outside tokio
         let _ = std::thread::spawn(move || {
             if let Ok(rt) = tokio::runtime::Builder::new_current_thread().enable_all().build() {
                 rt.block_on(Self::cleanup(admin, name));

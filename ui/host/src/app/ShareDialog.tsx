@@ -1,6 +1,6 @@
-// La finestra di condivisione dell'host, la stessa per tutti i plugin (mockup: dlg-share). Persone e
-// gruppi del tenant con il loro livello, il link pubblico in sola lettura (se il tenant li permette) e,
-// per il proprietario o il Tenant Manager, il passaggio di proprieta'.
+// The share dialog of the host, the same for every plugin (mockup: dlg-share). People and
+// groups of the tenant with their level, the read-only public link (if the tenant allows them) and,
+// for the owner or the Tenant Manager, the transfer of ownership.
 
 import { useEffect, useState } from 'react'
 import { Copy, Link2, Loader2, UserRound, Users, X } from 'lucide-react'
@@ -21,9 +21,9 @@ const enc = encodeURIComponent
 
 function levels(): { v: Level; label: string; hint: string }[] {
   return [
-    { v: 'read', label: t('Lettura'), hint: t('vede il contenuto') },
-    { v: 'write', label: t('Scrittura'), hint: t('modifica il contenuto') },
-    { v: 'manage', label: t('Gestione'), hint: t('condivide, sposta, elimina') },
+    { v: 'read', label: t('Read'), hint: t('sees the content') },
+    { v: 'write', label: t('Write'), hint: t('edits the content') },
+    { v: 'manage', label: t('Manage'), hint: t('shares, moves, deletes') },
   ]
 }
 
@@ -44,7 +44,7 @@ function LevelSelect({ value, onChange, label }: { value: Level; onChange: (l: L
   )
 }
 
-/** Persone e gruppi del tenant che corrispondono alla ricerca. */
+/** People and groups of the tenant matching the search. */
 function useDirectory(slug: string, q: string) {
   const [found, setFound] = useState<Principal[]>([])
   useEffect(() => {
@@ -108,7 +108,7 @@ export default function ShareDialog({ ctx, resourceId, onClose }: { ctx: TenantC
     }
   }
   const setGrant = (p: { principal_type: string; principal_id: string }, l: Level | null) =>
-    run(() => api('PUT', `${base}/grants`, { ...p, level: l }), l ? t('Condivisione aggiornata') : t('Accesso revocato'))
+    run(() => api('PUT', `${base}/grants`, { ...p, level: l }), l ? t('Sharing updated') : t('Access revoked'))
   const candidates = found.filter((p) => p.id !== res?.owner_id && !grants.some((x) => x.principal_id === p.id))
   const canOwn = !!res && (res.is_owner || ctx.tenant.role === 'tenant_manager')
   const icon = (kind: string) => (kind === 'group' ? <Users className="size-4 text-muted-foreground" /> : <UserRound className="size-4 text-muted-foreground" />)
@@ -117,14 +117,14 @@ export default function ShareDialog({ ctx, resourceId, onClose }: { ctx: TenantC
     <Dialog open={!!resourceId} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
-          <DialogTitle>{t('Condivisione')}</DialogTitle>
+          <DialogTitle>{t('Sharing')}</DialogTitle>
           <DialogDescription>
             {res ? (
               <>
-                <b className="text-foreground">{res.title || t('(senza titolo)')}</b> · {t('proprietario {name}', { name: res.owner_name })}
+                <b className="text-foreground">{res.title || t('(untitled)')}</b> · {t('owner {name}', { name: res.owner_name })}
               </>
             ) : (
-              t('Caricamento…')
+              t('Loading…')
             )}
           </DialogDescription>
         </DialogHeader>
@@ -135,13 +135,13 @@ export default function ShareDialog({ ctx, resourceId, onClose }: { ctx: TenantC
         ) : (
           <div className="grid gap-6">
             <section className="grid gap-3">
-              <h3 className="text-sm font-semibold">{t('Persone e gruppi del tenant')}</h3>
+              <h3 className="text-sm font-semibold">{t('People and groups of the tenant')}</h3>
               <div className="flex flex-wrap items-start gap-2">
                 <div className="relative min-w-56 flex-1">
                   <Input
                     type="search"
-                    placeholder={t('Cerca persone o gruppi…')}
-                    aria-label={t('Cerca persone o gruppi')}
+                    placeholder={t('Search people or groups…')}
+                    aria-label={t('Search people or groups')}
                     value={pick ? `${pick.name} (${pick.detail})` : q}
                     onChange={(e) => {
                       setPick(null)
@@ -149,7 +149,7 @@ export default function ShareDialog({ ctx, resourceId, onClose }: { ctx: TenantC
                     }}
                   />
                   {!pick && candidates.length > 0 && (
-                    <ul role="listbox" aria-label={t('Risultati')} className="absolute inset-x-0 top-full z-10 mt-1 max-h-56 overflow-auto rounded-md border bg-popover p-1 shadow-md">
+                    <ul role="listbox" aria-label={t('Results')} className="absolute inset-x-0 top-full z-10 mt-1 max-h-56 overflow-auto rounded-md border bg-popover p-1 shadow-md">
                       {candidates.map((p) => (
                         <li key={p.kind + p.id}>
                           <button
@@ -168,7 +168,7 @@ export default function ShareDialog({ ctx, resourceId, onClose }: { ctx: TenantC
                     </ul>
                   )}
                 </div>
-                <LevelSelect value={level} onChange={setLevel} label={t('Livello')} />
+                <LevelSelect value={level} onChange={setLevel} label={t('Level')} />
                 <Button
                   disabled={!pick || busy}
                   onClick={() =>
@@ -179,25 +179,25 @@ export default function ShareDialog({ ctx, resourceId, onClose }: { ctx: TenantC
                     })
                   }
                 >
-                  {t('Condividi')}
+                  {t('Share')}
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
                 {levels()
                   .map((l) => `${l.label}: ${l.hint}`)
                   .join(' · ')}
-                . {t('Chi non è nel tenant va prima invitato dal Tenant Manager.')}
+                . {t('Whoever is not in the tenant must first be invited by the Tenant Manager.')}
               </p>
-              <ul className="grid divide-y rounded-lg border" aria-label={t('Con chi è condiviso')}>
-                {grants.length === 0 && <li className="p-3 text-sm text-muted-foreground">{t('Non condiviso con nessuno.')}</li>}
+              <ul className="grid divide-y rounded-lg border" aria-label={t('Shared with')}>
+                {grants.length === 0 && <li className="p-3 text-sm text-muted-foreground">{t('Not shared with anybody.')}</li>}
                 {grants.map((x) => (
                   <li key={x.principal_type + x.principal_id} className="flex flex-wrap items-center gap-2 p-2 pl-3 text-sm">
                     {icon(x.principal_type)}
                     <span className="min-w-0 flex-1">
                       {x.name} <span className="font-mono text-xs text-muted-foreground">{x.detail}</span>
                     </span>
-                    <LevelSelect value={x.level} onChange={(l) => void setGrant(x, l)} label={t('Livello di {name}', { name: x.name })} />
-                    <Button variant="ghost" size="sm" aria-label={t('Revoca a {name}', { name: x.name })} onClick={() => void setGrant(x, null)}>
+                    <LevelSelect value={x.level} onChange={(l) => void setGrant(x, l)} label={t('Level of {name}', { name: x.name })} />
+                    <Button variant="ghost" size="sm" aria-label={t('Revoke from {name}', { name: x.name })} onClick={() => void setGrant(x, null)}>
                       <X />
                     </Button>
                   </li>
@@ -208,15 +208,15 @@ export default function ShareDialog({ ctx, resourceId, onClose }: { ctx: TenantC
             <section className="grid gap-3">
               <h3 className="flex items-center gap-2 text-sm font-semibold">
                 <Link2 className="size-4" />
-                {t('Link pubblico (sola lettura)')}
+                {t('Public link (read only)')}
               </h3>
               {!linksOn ? (
-                <p className="text-sm text-muted-foreground">{t('I link pubblici sono disattivati per questo tenant.')}</p>
+                <p className="text-sm text-muted-foreground">{t('Public links are turned off for this tenant.')}</p>
               ) : (
                 <>
                   <div className="flex flex-wrap items-end gap-3">
                     <div className="grid gap-1.5">
-                      <Label htmlFor="sh-days">{t('Scadenza (giorni)')}</Label>
+                      <Label htmlFor="sh-days">{t('Expiry (days)')}</Label>
                       <Input
                         id="sh-days"
                         type="number"
@@ -228,7 +228,7 @@ export default function ShareDialog({ ctx, resourceId, onClose }: { ctx: TenantC
                       />
                     </div>
                     <div className="grid gap-1.5">
-                      <Label htmlFor="sh-pw">{t('Password (facoltativa)')}</Label>
+                      <Label htmlFor="sh-pw">{t('Password (optional)')}</Label>
                       <Input id="sh-pw" type="password" className="w-52" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} />
                     </div>
                     <Button
@@ -239,38 +239,38 @@ export default function ShareDialog({ ctx, resourceId, onClose }: { ctx: TenantC
                           const l = await api<LinkInfo>('POST', `${base}/links`, { days, password: pw || null })
                           setCreated(l.url ?? null)
                           setPw('')
-                        }, t('Link creato'))
+                        }, t('Link created'))
                       }
                     >
-                      {t('Crea link')}
+                      {t('Create link')}
                     </Button>
                   </div>
                   {created && (
                     <div className="grid gap-1.5">
                       <div className="flex gap-2">
-                        <Input readOnly value={created} aria-label={t('Link pubblico')} onFocus={(e) => e.currentTarget.select()} className="font-mono text-xs" />
-                        <Button variant="outline" onClick={() => void navigator.clipboard?.writeText(created).then(() => toast.success(t('Link copiato')))}>
+                        <Input readOnly value={created} aria-label={t('Public link')} onFocus={(e) => e.currentTarget.select()} className="font-mono text-xs" />
+                        <Button variant="outline" onClick={() => void navigator.clipboard?.writeText(created).then(() => toast.success(t('Link copied')))}>
                           <Copy />
-                          {t('Copia')}
+                          {t('Copy')}
                         </Button>
                       </div>
-                      <p className="text-xs text-muted-foreground">{t('Il link è mostrato solo ora: il server ne conserva solo un’impronta.')}</p>
+                      <p className="text-xs text-muted-foreground">{t('The link is shown only now: the server keeps only a fingerprint of it.')}</p>
                     </div>
                   )}
                   {(links.data ?? []).length > 0 && (
-                    <ul className="grid divide-y rounded-lg border" aria-label={t('Link pubblici')}>
+                    <ul className="grid divide-y rounded-lg border" aria-label={t('Public links')}>
                       {(links.data ?? []).map((l) => (
                         <li key={l.id} className="flex flex-wrap items-center gap-2 p-2 pl-3 text-sm">
                           <span className="min-w-0 flex-1">
-                            {t('Creato il {date}', { date: fmtDate(l.created_at) })}
+                            {t('Created on {date}', { date: fmtDate(l.created_at) })}
                             <span className="block text-xs text-muted-foreground">
-                              {l.expires_at ? t('Scade il {date}', { date: fmtDate(l.expires_at) }) : t('Senza scadenza')} · {t('{n} visite', { n: l.view_count })}
-                              {l.has_password ? ` · ${t('con password')}` : ''}
+                              {l.expires_at ? t('Expires on {date}', { date: fmtDate(l.expires_at) }) : t('No expiry')} · {t('{n} views', { n: l.view_count })}
+                              {l.has_password ? ` · ${t('with password')}` : ''}
                             </span>
                           </span>
-                          {!l.active && <Badge variant="secondary">{t('Scaduto')}</Badge>}
-                          <Button variant="outline" size="sm" onClick={() => void run(() => api('DELETE', `/api/t/${enc(slug)}/links/${l.id}`), t('Link revocato'))}>
-                            {t('Revoca')}
+                          {!l.active && <Badge variant="secondary">{t('Expired')}</Badge>}
+                          <Button variant="outline" size="sm" onClick={() => void run(() => api('DELETE', `/api/t/${enc(slug)}/links/${l.id}`), t('Link revoked'))}>
+                            {t('Revoke')}
                           </Button>
                         </li>
                       ))}
@@ -282,8 +282,8 @@ export default function ShareDialog({ ctx, resourceId, onClose }: { ctx: TenantC
 
             {canOwn && (
               <section className="grid gap-3">
-                <h3 className="text-sm font-semibold">{t('Proprietà')}</h3>
-                <Input type="search" placeholder={t('Cerca il nuovo proprietario…')} aria-label={t('Nuovo proprietario')} value={ownerQ} onChange={(e) => setOwnerQ(e.target.value)} />
+                <h3 className="text-sm font-semibold">{t('Ownership')}</h3>
+                <Input type="search" placeholder={t('Search the new owner…')} aria-label={t('New owner')} value={ownerQ} onChange={(e) => setOwnerQ(e.target.value)} />
                 {owners.filter((p) => p.kind === 'user' && p.id !== res!.owner_id).length > 0 && (
                   <ul className="grid divide-y rounded-lg border">
                     {owners
@@ -298,12 +298,12 @@ export default function ShareDialog({ ctx, resourceId, onClose }: { ctx: TenantC
                             size="sm"
                             disabled={busy}
                             onClick={async () => {
-                              if (!(await confirm(t('Trasferire la proprietà a {name}?', { name: p.name }), true))) return
-                              await run(() => api('POST', `${base}/owner`, { user_id: p.id }), t('Proprietà trasferita'))
+                              if (!(await confirm(t('Transfer the ownership to {name}?', { name: p.name }), true))) return
+                              await run(() => api('POST', `${base}/owner`, { user_id: p.id }), t('Ownership transferred'))
                               setOwnerQ('')
                             }}
                           >
-                            {t('Trasferisci')}
+                            {t('Transfer')}
                           </Button>
                         </li>
                       ))}

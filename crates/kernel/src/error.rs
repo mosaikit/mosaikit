@@ -1,5 +1,5 @@
-//! Errori del kernel, con la categoria che il server traduce in codice HTTP e un codice stabile che
-//! l'interfaccia traduce nella lingua di chi la usa (il messaggio resta per i log e come riserva).
+//! Errors of the kernel, with the category the server turns into an HTTP status and a stable code the
+//! interface translates into the language of whoever uses it (the message stays for logs and as a fallback).
 
 use std::fmt;
 
@@ -15,7 +15,7 @@ pub enum Kind {
 }
 
 impl Kind {
-    /// Il codice di una categoria, quando l'errore non ne ha uno suo.
+    /// The code of a category, when the error has no code of its own.
     pub fn code(self) -> &'static str {
         match self {
             Kind::BadRequest => "bad_request",
@@ -33,7 +33,7 @@ impl Kind {
 pub struct Error {
     pub kind: Kind,
     pub message: String,
-    /// codice specifico (`password_too_short`, `wrong_credentials`…); assente: quello della categoria
+    /// specific code (`password_too_short`, `wrong_credentials`, ...); absent: the one of the category
     pub code: Option<&'static str>,
 }
 
@@ -43,12 +43,12 @@ impl Error {
     pub fn new(kind: Kind, m: impl Into<String>) -> Error {
         Error { kind, message: m.into(), code: None }
     }
-    /// Lo stesso errore con un codice specifico, stabile tra le versioni.
+    /// The same error with a specific code, stable across versions.
     pub fn with_code(mut self, code: &'static str) -> Error {
         self.code = Some(code);
         self
     }
-    /// Il codice da mandare all'interfaccia.
+    /// The code to send to the interface.
     pub fn code(&self) -> &'static str {
         self.code.unwrap_or(self.kind.code())
     }
@@ -80,7 +80,7 @@ impl fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
-/// Categoria di un errore SQL dal codice SQLSTATE (anche SQLite, tradotto da mosaikit-db).
+/// Category of an SQL error from the SQLSTATE code (SQLite too, translated by mosaikit-db).
 fn sql_kind(code: Option<&str>) -> Option<Kind> {
     Some(match code? {
         "42501" => Kind::Forbidden,
@@ -94,14 +94,14 @@ fn sql_kind(code: Option<&str>) -> Option<Kind> {
 }
 
 fn internal(e: &dyn fmt::Display) -> Error {
-    tracing::error!("errore database: {e}");
-    Error::new(Kind::Internal, "errore interno del database")
+    tracing::error!("database error: {e}");
+    Error::new(Kind::Internal, "internal database error")
 }
 
 impl From<sqlx::Error> for Error {
     fn from(e: sqlx::Error) -> Error {
         if matches!(e, sqlx::Error::RowNotFound) {
-            return Error::not_found("non trovato");
+            return Error::not_found("not found");
         }
         let code = match &e {
             sqlx::Error::Database(d) => d.code().map(|c| c.to_string()),
@@ -127,7 +127,7 @@ impl From<mosaikit_db::DbError> for Error {
             D::Sqlx(s) => s.into(),
             D::Invalid(m) => Error::bad(m),
             D::Migrate(m) => Error::internal(m.to_string()),
-            D::RowNotFound => Error::not_found("non trovato"),
+            D::RowNotFound => Error::not_found("not found"),
             D::Decode(m) => internal(&m),
             D::Sql { code, message } => match sql_kind(code.as_deref()) {
                 Some(kind) => Error::new(kind, message.trim_start_matches("mosaikit: ").to_string()),
@@ -157,14 +157,14 @@ impl From<mosaikit_runtime::RuntimeError> for Error {
 
 impl From<std::io::Error> for Error {
     fn from(e: std::io::Error) -> Error {
-        tracing::error!("errore I/O: {e}");
-        Error::internal(format!("errore di I/O: {e}"))
+        tracing::error!("I/O error: {e}");
+        Error::internal(format!("I/O error: {e}"))
     }
 }
 
 impl From<serde_json::Error> for Error {
     fn from(e: serde_json::Error) -> Error {
-        Error::bad(format!("JSON non valido: {e}"))
+        Error::bad(format!("invalid JSON: {e}"))
     }
 }
 

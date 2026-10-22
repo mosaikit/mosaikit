@@ -1,4 +1,4 @@
-// `sqlx::migrate!` incorpora le migrazioni a compile time: ricompila quando cambiano.
+// `sqlx::migrate!` embeds the migrations at compile time: recompile when they change.
 fn main() {
     println!("cargo:rerun-if-changed=migrations");
 }

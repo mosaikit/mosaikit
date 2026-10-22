@@ -1,6 +1,6 @@
 [package]
 name = "mosaikit-desktop"
-description = "Mosaikit desktop: applicazione senza console con icona nell'area di notifica"
+description = "Mosaikit desktop: application without a console, with an icon in the notification area"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -27,7 +27,7 @@ windows-sys = { version = "0.59", features = [
   "Win32_UI_WindowsAndMessaging",
 ] }
 
-# notifiche di Windows (toast) e registrazione del nome dell'app
+# Windows notifications (toast) and registration of the name of the app
 windows = { version = "0.61", features = [
   "Data_Xml_Dom",
   "UI_Notifications",

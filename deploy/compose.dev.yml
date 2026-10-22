@@ -1,5 +1,5 @@
-# PostgreSQL di sviluppo via Docker (usato da `cargo xtask db up` se PostgreSQL non e'
-# installato localmente). Stessa porta e credenziali del cluster locale.
+# Development PostgreSQL via Docker (used by `cargo xtask db up` if PostgreSQL is not
+# installed locally). The same port and credentials as the local cluster.
 services:
   db:
     image: postgres:17-alpine

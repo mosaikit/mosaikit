@@ -1,20 +1,20 @@
-//! `mosaikit.exe`: Mosaikit desktop senza finestra di console.
+//! `mosaikit.exe`: Mosaikit desktop without a console window.
 //!
-//! Il server gira in un thread con il suo runtime tokio; il thread principale
-//! gestisce l'icona nell'area di notifica (menu: Apri, Credenziali iniziali,
-//! Cartella dati, Log, Esci). "Esci" ferma il server in modo ordinato e con lui
-//! il PostgreSQL embedded. Log in `<data_dir>/logs/mosaikit.log`.
-//! Una seconda esecuzione, con Mosaikit gia' attivo, apre solo il browser.
+//! The server runs in a thread with its own tokio runtime; the main thread
+//! handles the icon in the notification area (menu: Open, Initial credentials,
+//! Data folder, Log, Quit). "Quit" stops the server in an orderly way and with it
+//! the embedded PostgreSQL. Log in `<data_dir>/logs/mosaikit.log`.
+//! A second run, with Mosaikit already active, only opens the browser.
 //!
-//! Durante l'avvio, se dura piu' di mezzo secondo, una finestrella mostra nome,
-//! versione e fase in corso. Quando l'app e' pronta: al primo avvio si apre il
-//! browser, ai successivi compare una notifica di Windows con l'indirizzo.
+//! During the start, if it takes more than half a second, a small window shows name,
+//! version and current phase. When the app is ready: at the first start the browser
+//! opens, at the following ones a Windows notification with the address appears.
 //!
-//! E' l'unico eseguibile della versione desktop: da un terminale accetta anche
-//! i comandi di amministrazione (`migrate`, `reset-password`, `config`, `--help`),
-//! scrivendo nella console da cui e' stato lanciato.
+//! It is the only executable of the desktop version: from a terminal it also accepts
+//! the administration commands (`migrate`, `reset-password`, `config`, `--help`),
+//! writing into the console it was started from.
 
-// in release nessuna console; in debug resta, per vedere i log
+// no console in release; in debug it stays, to see the logs
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 
 mod icon;
@@ -32,18 +32,21 @@ use clap::Parser;
 use mosaikit_kernel::{Config, Kernel};
 use mosaikit_server::admin::{self, AdminCmd};
 
-/// Senza comandi avvia l'app con l'icona nell'area di notifica.
+/// Without commands it starts the app with the icon in the notification area.
 #[derive(Parser)]
-#[command(version, about = "Versione desktop: senza comandi avvia l'app con l'icona nell'area di notifica")]
+#[command(
+    version,
+    about = "Desktop version: without commands it starts the app with the icon in the notification area"
+)]
 struct Cli {
-    /// file di configurazione (default: MOSAIKIT_CONFIG, poi mosaikit.toml accanto all'eseguibile)
+    /// configuration file (default: MOSAIKIT_CONFIG, then mosaikit.toml next to the executable)
     #[arg(long, short, global = true)]
     config: Option<PathBuf>,
     #[command(subcommand)]
     cmd: Option<AdminCmd>,
 }
 
-/// Comando di amministrazione nella console del terminale; ritorna il codice di uscita.
+/// Administration command in the console of the terminal; returns the exit code.
 fn run_admin(path: Option<PathBuf>, base: PathBuf, cmd: AdminCmd) -> i32 {
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -54,12 +57,12 @@ fn run_admin(path: Option<PathBuf>, base: PathBuf, cmd: AdminCmd) -> i32 {
     let cfg = match Config::load(path.as_deref(), &base) {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("configurazione: {e}");
+            eprintln!("configuration: {e}");
             return 2;
         }
     };
     if !matches!(cmd, AdminCmd::Config) && already_running(&cfg.bind) {
-        eprintln!("l'applicazione e' in esecuzione: chiudila (menu dell'icona > Esci) e riprova");
+        eprintln!("the application is running: close it (icon menu > Quit) and try again");
         return 1;
     }
     match tokio::runtime::Runtime::new() {
@@ -71,9 +74,9 @@ fn run_admin(path: Option<PathBuf>, base: PathBuf, cmd: AdminCmd) -> i32 {
     }
 }
 
-/// Notifiche dal thread del server al thread dell'interfaccia.
+/// Notifications from the server thread to the interface thread.
 pub enum Status {
-    /// fase dell'avvio (finestra di avvio)
+    /// phase of the start (splash window)
     Progress(String),
     Ready,
     Failed(String),
@@ -81,17 +84,17 @@ pub enum Status {
 }
 
 pub struct App {
-    /// nome del prodotto (marchio)
+    /// name of the product (brand)
     pub name: String,
-    /// versione del prodotto (marchio)
+    /// version of the product (brand)
     pub version: String,
-    /// colori del marchio (finestra di avvio)
+    /// colours of the brand (splash window)
     pub colors: std::collections::BTreeMap<String, String>,
-    /// icona del marchio per l'area di notifica (.ico), se presente
+    /// icon of the brand for the notification area (.ico), if any
     pub icon: Option<PathBuf>,
-    /// icona in un file .ico (finestra di avvio, notifiche): del marchio o quella di Mosaikit
+    /// icon in an .ico file (splash window, notifications): the brand's or the Mosaikit one
     pub icon_file: PathBuf,
-    /// primo avvio: si apre il browser; poi solo la notifica
+    /// first start: the browser opens; afterwards only the notification
     pub first_run: bool,
     pub app_url: String,
     pub data_dir: PathBuf,
@@ -116,12 +119,12 @@ fn init_log(dir: &Path) -> PathBuf {
     file
 }
 
-/// File che segna che l'app e' gia' stata avviata (e il browser gia' aperto una volta).
+/// File that marks that the app has already been started (and the browser already opened once).
 pub fn first_run_marker(data_dir: &Path) -> PathBuf {
     data_dir.join(".avviato")
 }
 
-/// Mosaikit risponde gia' su questo indirizzo?
+/// Does Mosaikit already answer on this address?
 fn already_running(bind: &str) -> bool {
     use std::net::ToSocketAddrs;
     bind.to_socket_addrs().ok().and_then(|mut a| a.next()).is_some_and(|addr| {
@@ -129,7 +132,7 @@ fn already_running(bind: &str) -> bool {
     })
 }
 
-/// Avvia il server in un thread. `stop` ferma il server; lo stato arriva su `status`.
+/// Starts the server in a thread. `stop` stops the server; the state arrives on `status`.
 fn spawn_server(
     cfg: Config,
     stop: tokio::sync::oneshot::Receiver<()>,
@@ -151,8 +154,8 @@ fn spawn_server(
             let k = match Kernel::start_with_progress(cfg, &report).await {
                 Ok(k) => k,
                 Err(e) => {
-                    tracing::error!("avvio non riuscito: {e}");
-                    let _ = status.send(Status::Failed(format!("avvio non riuscito: {e}")));
+                    tracing::error!("start failed: {e}");
+                    let _ = status.send(Status::Failed(format!("start failed: {e}")));
                     return;
                 }
             };
@@ -170,7 +173,7 @@ fn spawn_server(
                 let _ = stop.await;
             })
             .await;
-            tracing::info!("arresto: chiusura del database");
+            tracing::info!("shutdown: closing the database");
             k.shutdown().await;
             let _ = status.send(Status::Stopped(r.err().map(|e| e.to_string())));
         });
@@ -187,7 +190,7 @@ pub fn fatal(msg: &str) -> ! {
 }
 
 fn main() {
-    // con argomenti si usa da un terminale: l'output va nella sua console
+    // with arguments it is used from a terminal: the output goes to its console
     #[cfg(windows)]
     if std::env::args_os().len() > 1 {
         tray::attach_parent_console();
@@ -199,12 +202,12 @@ fn main() {
     }
     let cfg = match Config::load(path.as_deref(), &base) {
         Ok(c) => c,
-        Err(e) => fatal(&format!("Configurazione non valida: {e}")),
+        Err(e) => fatal(&format!("Invalid configuration: {e}")),
     };
     let log_file = init_log(&cfg.data_dir);
-    tracing::info!("Mosaikit desktop {} — configurazione {:?}", mosaikit_kernel::KERNEL_VERSION, path);
+    tracing::info!("Mosaikit desktop {} — configuration {:?}", mosaikit_kernel::KERNEL_VERSION, path);
     if already_running(&cfg.bind) {
-        // seconda esecuzione: basta aprire l'app gia' attiva
+        // second run: opening the app already active is enough
         mosaikit_server::open_browser(&cfg.app_url);
         return;
     }
@@ -213,7 +216,7 @@ fn main() {
         None => mosaikit_kernel::brand::Brand::default(),
     };
     let icon_file = brand.file("icon").unwrap_or_else(|| {
-        // icona di Mosaikit in un .ico temporaneo (la finestra e le notifiche leggono un file)
+        // Mosaikit icon in a temporary .ico (the window and the notifications read a file)
         let f = std::env::temp_dir().join("mosaikit-icon.ico");
         let _ = std::fs::write(&f, icon::ico());
         f
@@ -239,7 +242,7 @@ fn main() {
 
     #[cfg(not(windows))]
     {
-        // fuori da Windows: niente icona, si ferma con Ctrl+C
+        // outside Windows: no icon, it stops with Ctrl+C
         let _ = &app;
         let stop = std::sync::Mutex::new(Some(stop_tx));
         let _ = std::thread::spawn(move || {
@@ -254,7 +257,7 @@ fn main() {
         });
         for s in status_rx {
             match s {
-                Status::Progress(p) => tracing::info!("avvio: {p}"),
+                Status::Progress(p) => tracing::info!("start: {p}"),
                 Status::Ready => {
                     if app.open_browser {
                         mosaikit_server::open_browser(&app.app_url);

@@ -1,6 +1,6 @@
-// L'icona di un'app nella shell: lo stesso set (Lucide) delle voci della shell, al posto dell'emoji
-// del manifest, cosi' la barra ha un solo stile. Le app sconosciute hanno il pezzo di puzzle.
-// Nella shell definitiva il plugin potra' dichiarare il nome dell'icona nel manifest.
+// The icon of an app in the shell: the same set (Lucide) as the items of the shell, instead of the emoji
+// of the manifest, so the bar has a single style. Unknown apps get the puzzle piece.
+// In the final shell the plugin will be able to declare the name of its icon in the manifest.
 
 import { BookUser, Folder, Globe, Map, NotebookPen, Puzzle, SquareCheckBig, type LucideIcon } from 'lucide-react'
 

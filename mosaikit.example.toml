@@ -1,129 +1,129 @@
 # =============================================================================
-#  mosaikit.toml - configurazione di Mosaikit
+#  mosaikit.toml - configuration of Mosaikit
 # =============================================================================
-#  Ogni proprieta' e' facoltativa: quelle commentate mostrano il valore di default.
-#  Ogni proprieta' si puo' anche impostare con una variabile d'ambiente (indicata
-#  accanto), che ha la precedenza sul file.
-#  I percorsi relativi sono relativi alla cartella di questo file.
+#  Every property is optional: the commented ones show the default value.
+#  Every property can also be set with an environment variable (shown next to
+#  it), which takes precedence over the file.
+#  Relative paths are relative to the folder of this file.
 # =============================================================================
 
-# Indirizzo con cui gli utenti aprono Mosaikit, con l'eventuale percorso base.
-# E' l'unico indirizzo da impostare: gli altri si ricavano da questo.
-# Esempi: "http://127.0.0.1:8080"  "http://127.0.0.1:8080/mosaikit"  "https://gis.esempio.it/mosaikit"
+# Address users open Mosaikit with, with an optional base path.
+# It is the only address to set: the others are derived from it.
+# Examples: "http://127.0.0.1:8080"  "http://127.0.0.1:8080/mosaikit"  "https://gis.example.com/mosaikit"
 # Env: MOSAIKIT_URL
 url = "http://127.0.0.1:8080/mosaikit"
 
-# Indirizzo delle UI dei plugin, dei file caricati e dei link pubblici.
-# Per sicurezza deve essere un'ORIGINE DIVERSA da `url` (altro host o altra porta):
-# il codice dei plugin cosi' non puo' leggere i cookie ne' chiamare le API dell'app.
-# Default: stesso indirizzo di `url` sulla porta successiva (es. :8081).
-# Dietro un reverse proxy si usa di norma un secondo hostname.
+# Address of the plugin UIs, of the uploaded files and of the public links.
+# For security it must be a DIFFERENT ORIGIN from `url` (another host or another port):
+# so the code of the plugins cannot read the cookies nor call the API of the app.
+# Default: the same address as `url` on the next port (e.g. :8081).
+# Behind a reverse proxy a second hostname is normally used.
 # Env: MOSAIKIT_PLUGIN_URL
-# plugin_url = "https://plugins.esempio.it/mosaikit"
+# plugin_url = "https://plugins.example.com/mosaikit"
 
-# Indirizzo e porta su cui il server ascolta per l'app.
-# Default: la porta di `url`; solo locale (127.0.0.1) se l'host di `url` e' locale,
-# altrimenti tutte le interfacce (0.0.0.0). Serve impostarlo dietro un reverse proxy.
+# Address and port the server listens on for the app.
+# Default: the port of `url`; local only (127.0.0.1) if the host of `url` is local,
+# otherwise every interface (0.0.0.0). It must be set behind a reverse proxy.
 # Env: MOSAIKIT_LISTEN
 # listen = "0.0.0.0:8080"
 
-# Come `listen`, per plugin, file e link pubblici. Default: la porta di `plugin_url`.
+# Like `listen`, for plugins, files and public links. Default: the port of `plugin_url`.
 # Env: MOSAIKIT_PLUGIN_LISTEN
 # plugin_listen = "0.0.0.0:8081"
 
-# Cartella dei dati: file caricati, pacchetti dei plugin, log, database SQLite.
+# Data folder: uploaded files, plugin packages, logs, SQLite database.
 # Env: MOSAIKIT_DATA_DIR
 # data_dir = "data"
 
-# Cartella del branding (brand.toml con nome, colori e testi, piu' logo e favicon).
-# Se assente si usa il marchio Mosaikit incluso nell'eseguibile.
+# Branding folder (brand.toml with name, colours and texts, plus logo and favicon).
+# If absent, the Mosaikit brand included in the executable is used.
 # Env: MOSAIKIT_BRAND
 # brand = "branding"
 
-# Accetta pacchetti di plugin non firmati. Solo per lo sviluppo: in produzione false.
+# Accepts unsigned plugin packages. For development only: false in production.
 # Env: MOSAIKIT_ALLOW_UNSIGNED
 # allow_unsigned = false
 
-# Chiavi pubbliche ed25519 (base64) degli editori di plugin fidati: si installano
-# solo pacchetti firmati da una di queste chiavi.
-# Env: MOSAIKIT_TRUSTED_KEYS (separate da virgola, si aggiungono a quelle del file)
+# ed25519 public keys (base64) of the trusted plugin publishers: only packages
+# signed by one of these keys are installed.
+# Env: MOSAIKIT_TRUSTED_KEYS (comma separated, added to the ones of the file)
 # trusted_keys = ["MCowBQYDK2VwAyEA..."]
 
-# Catalogo dei plugin installabili (file index.json con nome, versione e sha256 dei pacchetti).
+# Catalog of the installable plugins (index.json file with name, version and sha256 of the packages).
 # Env: MOSAIKIT_REGISTRY
 # registry = "registry/index.json"
 
-# All'avvio installa e attiva i plugin del catalogo non ancora installati.
+# At start installs and turns on the plugins of the catalog not installed yet.
 # Env: MOSAIKIT_PREINSTALL
 # preinstall = false
 
-# Durata di una sessione di accesso, in ore.
+# Lifetime of a sign-in session, in hours.
 # session_ttl_hours = 12
 
-# Secondo fattore (TOTP: Google/Microsoft Authenticator, FreeOTP...) obbligatorio per gli
-# Administrator. Al primo accesso l'app mostra il QR code da registrare e i codici di
-# recupero. Da disattivare solo per l'uso locale (versione desktop). In emergenza:
-# `<eseguibile> reset-totp --user <username>`.
+# Second factor (TOTP: Google/Microsoft Authenticator, FreeOTP...) required for the
+# Administrators. At the first sign-in the app shows the QR code to register and the recovery
+# codes. Turn it off only for local use (desktop version). In an emergency:
+# `<executable> reset-totp --user <username>`.
 # Env: MOSAIKIT_ADMIN_TOTP
 # admin_totp = true
 
-# Al primo avvio crea anche un tenant di lavoro con questo slug (nome: quello del prodotto)
-# e il suo Tenant Manager "utente", con password generata. L'Administrator non ha uno
-# spazio di lavoro: serve all'uso locale (versione desktop), dove si lavora subito.
-# Le credenziali sono in <data_dir>/credenziali-iniziali.txt.
+# At the first start also creates a work tenant with this slug (name: the one of the product)
+# and its Tenant Manager "utente", with a generated password. The Administrator has no
+# workspace: it is meant for local use (desktop version), where one works at once.
+# The credentials are in <data_dir>/credenziali-iniziali.txt.
 # Env: MOSAIKIT_INITIAL_TENANT
 # initial_tenant = "locale"
 
-# Password degli account creati al primo avvio (admin e, con initial_tenant, utente) al posto
-# di quelle generate. Vale anche se piu' corta della policy (10 caratteri): da cambiare al
-# primo accesso. Solo per l'uso locale (desktop); MOSAIKIT_ADMIN_PASSWORD ha la precedenza per admin.
+# Password of the accounts created at the first start (admin and, with initial_tenant, utente)
+# instead of the generated ones. It holds even if shorter than the policy (10 characters): to change
+# at the first sign-in. For local use only (desktop); MOSAIKIT_ADMIN_PASSWORD takes precedence for admin.
 # Env: MOSAIKIT_INITIAL_PASSWORD
 # initial_password = "mosaikit"
 
-# Apre il browser su `url` all'avvio (versione desktop).
+# Opens the browser on `url` at start (desktop version).
 # Env: MOSAIKIT_OPEN_BROWSER
 # open_browser = false
 
-# Usa l'header X-Forwarded-For per l'indirizzo del client (limiti sui tentativi di accesso).
-# Attivalo SOLO dietro un reverse proxy che lo imposta: altrimenti e' falsificabile.
+# Uses the X-Forwarded-For header for the address of the client (limits on sign-in attempts).
+# Turn it on ONLY behind a reverse proxy that sets it: otherwise it can be forged.
 # Env: MOSAIKIT_TRUST_PROXY
 # trust_proxy = false
 
 [database]
-# Database: "sqlite" oppure "postgres".
-# Default: "postgres" se e' impostato `url` o `embedded`, altrimenti "sqlite".
+# Database: "sqlite" or "postgres".
+# Default: "postgres" if `url` or `embedded` is set, otherwise "sqlite".
 # Env: MOSAIKIT_DATABASE
 # backend = "sqlite"
 
-# SQLite: file del database. Default: <data_dir>/mosaikit.db
+# SQLite: database file. Default: <data_dir>/mosaikit.db
 # file = "data/mosaikit.db"
 
-# PostgreSQL: stringa di connessione. L'utente deve poter creare ruoli e schemi
-# (CREATEROLE, CREATE sul database): ogni plugin ha il proprio schema e il proprio ruolo.
-# Env: MOSAIKIT_DATABASE_URL (oppure DATABASE_URL)
+# PostgreSQL: connection string. The user must be able to create roles and schemas
+# (CREATEROLE, CREATE on the database): every plugin has its own schema and its own role.
+# Env: MOSAIKIT_DATABASE_URL (or DATABASE_URL)
 # url = "postgres://mosaikit:password@127.0.0.1:5432/mosaikit"
 
-# PostgreSQL embedded: avvia un PostgreSQL privato in <data_dir>/pg (desktop).
+# Embedded PostgreSQL: starts a private PostgreSQL in <data_dir>/pg (desktop).
 # embedded = false
 
-# Cartella `bin` di PostgreSQL per la modalita' embedded.
-# Default: `pgsql/bin` accanto all'eseguibile.
+# PostgreSQL `bin` folder for the embedded mode.
+# Default: `pgsql/bin` next to the executable.
 # pg_bin = "pgsql/bin"
 
-# Porta del PostgreSQL embedded (se occupata se ne cerca una libera). Default 55433.
+# Port of the embedded PostgreSQL (if taken, a free one is looked for). Default 55433.
 # embedded_port = 55433
 
-# Numero massimo di connessioni al database dell'app.
+# Maximum number of connections to the database of the app.
 # max_connections = 20
 
 [dev]
-# Modalita' sviluppo: i plugin si leggono dalle cartelle sorgente con hot reload
-# di logica e UI. Mai in produzione. La attiva `cargo xtask dev`.
+# Development mode: the plugins are read from the source folders with hot reload
+# of logic and UI. Never in production. `cargo xtask dev` turns it on.
 # enabled = false
 
-# Cartelle dei plugin in sviluppo.
-# Env: MOSAIKIT_DEV_PLUGINS (separate come nel PATH: ';' su Windows, ':' altrove)
+# Folders of the plugins in development.
+# Env: MOSAIKIT_DEV_PLUGINS (separated as in PATH: ';' on Windows, ':' elsewhere)
 # plugins = ["../mosaikit-plugins/notes"]
 
-# Cartella `target` di cargo usata se il plugin non e' in un workspace cargo.
+# cargo `target` folder used if the plugin is not in a cargo workspace.
 # target_dir = "target"

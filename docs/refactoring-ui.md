@@ -1,145 +1,151 @@
-# Mosaikit — Refactoring dell'interfaccia
+# Mosaikit — Refactoring of the interface
 
-Decisioni approvate per riorganizzare la shell, valide per il mockup (`docs/mockup`, in inglese) e per
-la nuova shell (`ui/host/src/next`, in italiano). Obiettivo: che chi usa Mosaikit sappia sempre dove si
-trova e dove trovare ogni cosa.
+Approved decisions to reorganize the shell, valid for the mockup (`docs/mockup`) and for the shell
+(`ui/host/src/app`). Both are in English by default; the shell is also available in Italian. Goal:
+whoever uses Mosaikit always knows where they are and where to find everything.
 
-## 1. Regola: ogni cosa ha una sola casa
+## 1. Rule: everything has a single home
 
-- **Lavoro**, nella sidebar: panoramica e app.
-- **Gestione dell'ambito**, nella sidebar, solo per Tenant Manager (il tenant) e Administrator (la
-  piattaforma).
-- **Personale**, nel menu della persona: Account, Notifiche, Cestino, Esci.
+- **Work**, in the sidebar: overview and apps.
+- **Management of the scope**, in the sidebar, only for the Tenant Manager (the tenant) and the
+  Administrator (the platform).
+- **Personal**, in the person menu: Account, Notifications, Trash, Sign out.
 
-Altrove compaiono solo scorciatoie che portano alla casa, mai un secondo punto in cui modificare la
-stessa cosa.
+Elsewhere only shortcuts appear that lead to the home, never a second place to change the
+same thing.
 
-## 2. Navigazione
+## 2. Navigation
 
-| Ruolo | Sidebar |
+| Role | Sidebar |
 |---|---|
-| Utente | Home · le app |
-| Tenant Manager | Panoramica del tenant · le app · gruppo «Gestione del tenant»: Gestisci (persone e gruppi), Plugin, Condivisioni, Consumi, Registro · in fondo: Impostazioni del tenant |
-| Administrator | Panoramica della piattaforma · Tenant · Persone · Plugin · Monitoraggio · Registro · in fondo: Sistema |
+| User | Home · the apps |
+| Tenant Manager | Tenant overview · the apps · group «Tenant management»: Manage (people and groups), Plugins, Shares, Usage, Log · at the bottom: Tenant settings |
+| Administrator | Platform overview · Tenants · People · Plugins · Monitoring · Log · at the bottom: System |
 
-- **Menu della persona**: Account, Notifiche, Cestino (non per l'Administrator), Esci. Impostazioni e
-  Sistema stanno solo nella sidebar; la pagina Account non ha un secondo «Esci».
-- **Campanella**: apre un pannello con le ultime notifiche, «Segna tutte come lette», un ingranaggio verso
-  Account › Notifiche e «Vedi tutte» verso la pagina Notifiche. Le notifiche sono nella prima versione.
-- **Account** (una pagina sola, sezioni a sinistra): Profilo · Accesso e sicurezza (cambio della propria
-  password, secondo fattore, sessioni, token personali) · Notifiche (cosa ricevo, su quale canale) ·
-  Aspetto e lingua (modo, contrasto, lingua, sidebar) · I miei tenant (casa, ospite, «Lascia») ·
-  Consumi (Utente e Tenant Manager: il proprio consumo e quanto resta nel tenant) · Chiavi (le chiavi
-  personali dei servizi esterni; non per l'Administrator).
-- **Aiuto** (?) nella barra: tour guidato della pagina, guida, novità della versione, scorciatoie, versione.
+- **Person menu**: Account, Notifications, Trash (not for the Administrator), Sign out. Settings and
+  System are only in the sidebar; the Account page has no second «Sign out».
+- **Bell**: opens a panel with the latest notifications, «Mark all as read», a gear towards
+  Account › Notifications and «See all» towards the Notifications page. Notifications are in the first
+  version.
+- **Account** (a single page, sections on the left): Profile · Sign-in and security (change of one's own
+  password, second factor, sessions, personal tokens) · Notifications (what I receive, on which channel) ·
+  Appearance and language (mode, contrast, language, sidebar) · My tenants (home, guest, «Leave») ·
+  Usage (User and Tenant Manager: one's own usage and what is left in the tenant) · Keys (personal
+  keys of outside services; not for the Administrator).
+- **Help** (?) in the bar: guided tour of the page, guide, what is new in the version, shortcuts, version.
 
-## 3. Accorpamenti
+## 3. Merges
 
-- **Gestisci › Persone**: Persone · Gruppi · Profili di permesso · In attesa (inviti e richieste di
-  accesso, con il contatore). Un solo «Nuovo profilo».
-- **Permessi dei plugin**: si modificano solo nella pagina del plugin del tenant. Gruppo › Plugin e
-  Persona › Permessi sono riepiloghi in sola lettura con «Modifica nei permessi del plugin». Niente
-  eccezioni nell'invito.
-- **Plugin e tenant**: l'Administrator rende un plugin *disponibile* a un tenant (Plugin › Tenant); il
-  Tenant Manager lo *attiva* e ne decide i permessi. Il dettaglio del tenant mostra l'elenco con il link.
-- **Registro**: stesso nome e stesso componente per tutti; l'Administrator ha in più il filtro per tenant.
-- **Aspetto del tenant o della piattaforma**: solo in Impostazioni o Sistema › Identità e aspetto, con le
-  schede Identità e testi · Tema e modo · Lingue e formati (e, nel Sistema, Barra in alto). La tavolozza
-  in alto contiene solo le preferenze personali.
+- **Manage › People**: People · Groups · Permission profiles · Pending (invitations and access
+  requests, with the counter). A single «New profile».
+- **Permissions of the plugins**: they are changed only on the page of the plugin of the tenant. Group ›
+  Plugins and Person › Permissions are read-only summaries with «Change in the permissions of the
+  plugin». No exceptions in the invitation.
+- **Plugins and tenants**: the Administrator makes a plugin *available* to a tenant (Plugins › Tenants);
+  the Tenant Manager turns it *on* and decides its permissions. The detail of the tenant shows the list
+  with the link.
+- **Log**: the same name and the same component for everybody; the Administrator also has the filter by
+  tenant.
+- **Appearance of the tenant or of the platform**: only in Settings or System › Identity and appearance,
+  with the tabs Identity and texts · Theme and mode · Languages and formats (and, in System, Top bar). The
+  palette at the top holds only the personal preferences.
 
-## 4. Plugin: un solo nome
+## 4. Plugins: a single name
 
-Il termine è **Plugin** per tutti i ruoli, come nel codice e nel pacchetto per gli sviluppatori («modulo»
-in italiano vuol dire anche *form*). Il tipo è un'etichetta del plugin:
+The term is **Plugin** for every role, as in the code and in the package for developers. The kind is a
+label of the plugin:
 
-| Tipo | Cosa fa | Dove si vede |
+| Kind | What it does | Where it shows |
 |---|---|---|
-| App | ha pagine proprie | nella sidebar e nella Home |
-| Servizio | lavora dietro le quinte | solo nell'elenco dei plugin |
-| Estensione | estende un altro plugin (campi, azioni, schede) | dentro il plugin che estende, «Estende: Note» |
+| App | has pages of its own | in the sidebar and on the Home |
+| Service | works behind the scenes | only in the list of the plugins |
+| Extension | extends another plugin (fields, actions, tabs) | inside the plugin it extends, «Extends: Notes» |
 
-Il dettaglio di un plugin ha la scheda **Estensioni** (quelle installate e quelle disponibili). Chi lavora
-ogni giorno vede le **App**.
+The detail of a plugin has the **Extensions** tab (the installed ones and the available ones). Whoever
+works every day sees the **Apps**.
 
-I plugin ricevono **lingua, tema e modo** all'avvio (handshake del bridge) e a ogni cambio (evento), anche
-quando il pulsante corrispondente della barra è nascosto.
+The plugins receive **language, theme and mode** at start (handshake of the bridge) and at every change
+(event), even when the matching button of the bar is hidden.
 
-## 5. Impostazioni ereditate: tre tipi
+## 5. Inherited settings: three kinds
 
-| Tipo | Esempi | Aspetto al livello sotto |
+| Kind | Examples | Look at the level below |
 |---|---|---|
-| Gestita dalla piattaforma | modo di autenticazione e provider, quote, plugin disponibili, barra in alto | sola lettura con lucchetto e «Gestita dall'Administrator» |
-| Con un limite | regole della password, durata delle sessioni, lingue (sottoinsieme), conservazione | modificabile, «Minimo della piattaforma: 10»; i valori oltre il limite sono rifiutati |
-| Personalizzabile | identità e testi, tema e modo predefinito, formati, chiavi dei servizi esterni | «Ereditato» con «Personalizza»; poi «Personalizzato» con «Ripristina» |
+| Managed by the platform | sign-in method and provider, quotas, available plugins, top bar | read only with a padlock and «Managed by the Administrator» |
+| With a limit | password rules, session length, languages (a subset), retention | editable, «Minimum of the platform: 10»; values beyond the limit are refused |
+| Customizable | identity and texts, default theme and mode, formats, keys of outside services | «Inherited» with «Customize»; then «Customized» with «Restore» |
 
-Nel Sistema un'impostazione personalizzabile può avere l'interruttore «I tenant possono personalizzarla».
+In System a customizable setting can have the switch «Tenants may customize it».
 
-## 6. Quote
+## 6. Quotas
 
-- **Administrator**: Sistema › Quote (quote predefinite dei nuovi tenant e capacità totale, con avviso se
-  la somma delle quote assegnate la supera); nel dettaglio del tenant le quote del tenant (Ereditato o
-  Personalizzato). Unico punto in cui si modificano.
-- **Tenant Manager**: Consumi, con le quote del tenant in sola lettura, andamento, chi consuma di più,
-  avvisi (configurabili).
-- **Utente**: Account › Consumi, il proprio consumo e quanto resta nel tenant. Non ci sono quote per
-  persona. In sidebar solo un avviso vicino al limite, non un riquadro fisso.
+- **Administrator**: System › Quotas (default quotas of the new tenants and total capacity, with a warning
+  if the sum of the given quotas exceeds it); in the detail of the tenant the quotas of the tenant
+  (Inherited or Customized). The only place where they are changed.
+- **Tenant Manager**: Usage, with the quotas of the tenant read only, trend, who uses the most,
+  alerts (configurable).
+- **User**: Account › Usage, one's own usage and what is left in the tenant. There are no quotas per
+  person. In the sidebar only an alert near the limit, not a fixed box.
 
-## 7. Barra in alto
+## 7. Top bar
 
-Sistema › Identità e aspetto › **Barra in alto**, decisa solo dall'Administrator e valida per tutti i
-tenant, con l'anteprima. Interruttori:
+System › Identity and appearance › **Top bar**, decided only by the Administrator and valid for every
+tenant, with a preview. Switches:
 
-| Elemento | Se è spento |
+| Item | When off |
 |---|---|
-| Logo e nome dell'applicazione | il pulsante della sidebar prende il posto del logo, anche sul telefono |
-| Ricerca | spariscono la casella e Ctrl K; resta la ricerca nelle pagine |
-| Lingua | si sceglie in Account › Aspetto e lingua (il pulsante sparisce comunque con una sola lingua) |
-| Guida | tour, guida e novità passano nel menu della persona |
-| Tonalità (chiaro, scuro, automatico) | vale il modo predefinito; la persona lo cambia in Account |
+| Logo and name of the application | the sidebar button takes the place of the logo, on the phone too |
+| Search | the box and Ctrl K go away; the search inside the pages stays |
+| Language | it is chosen in Account › Appearance and language (the button goes away anyway with a single language) |
+| Help | tour, guide and what is new move to the person menu |
+| Mode (light, dark, automatic) | the default mode applies; the person changes it in Account |
 
-Campanella, menu della persona e selettore del tenant restano sempre (il selettore sparisce da solo con un
-solo tenant).
+Bell, person menu and tenant switcher always stay (the switcher goes away by itself with a single
+tenant).
 
-## 8. Glossario
+## 8. Glossary
 
-| Usare | Al posto di |
+| Use | Instead of |
 |---|---|
-| Tenant | Organizzazione (Organization) |
+| Tenant | Organization |
 | Tenant Manager | Manager |
-| Plugin (tipi: App, Servizio, Estensione) | Moduli, Marketplace |
-| Account (pagina personale) · Profilo di permesso | Profilo, con tre significati |
-| Impostazioni del tenant · Sistema | Config, Configurazione |
-| Home (Utente) · Panoramica del tenant · Panoramica della piattaforma | tre «Overview» |
-| Registro | Activity log, Audit log |
-| Accesso · Provider di identità (OIDC) | SSO, single sign-on, Keycloak |
+| Plugin (kinds: App, Service, Extension) | Modules, Marketplace |
+| Account (personal page) · Permission profile | Profile, with three meanings |
+| Tenant settings · System | Config, Configuration |
+| Home (User) · Tenant overview · Platform overview | three «Overview» |
+| Log | Activity log, Audit log |
+| Sign-in · Identity provider (OIDC) | SSO, single sign-on, Keycloak |
 
-Gli id delle schermate del mockup restano stabili anche quando cambiano le etichette (README del mockup):
-le schermate nuove hanno id nuovi, quelle tolte restano come ritirate.
+The screen ids of the mockup stay stable even when the labels change (README of the mockup): new
+screens get new ids, removed ones stay as retired.
 
-## 9. Pagine
+## 9. Pages
 
-- Struttura fissa: breadcrumb, titolo con il badge di stato, una sola azione primaria a destra, le altre e
-  il cambio di stato nel menu «⋯».
-- Elenco delle sezioni a sinistra per le pagine di impostazioni (Account, Impostazioni, Sistema,
-  Gestisci); schede orizzontali per il dettaglio di un oggetto (persona, gruppo, tenant, plugin).
-- Barra «Modifiche non salvate · Annulla · Salva» solo quando qualcosa è cambiato.
-- Pannello laterale per un'occhiata (riga del registro, servizio), pagina per modificare.
-- Barra delle azioni sulla selezione solo con una selezione.
-- L'Administrator ha un segnale stabile di trovarsi nella piattaforma (badge «Piattaforma» nella barra).
-- Le azioni delle panoramiche portano alla casa giusta (Condivisioni, Plugin), non a un avviso.
+- Fixed structure: breadcrumb, title with the status badge, a single primary action on the right, the
+  others and the change of state in the «⋯» menu.
+- List of the sections on the left for the settings pages (Account, Settings, System,
+  Manage); horizontal tabs for the detail of an object (person, group, tenant, plugin).
+- «Unsaved changes · Cancel · Save» bar only when something changed.
+- Side panel for a quick look (row of the log, service), page to change.
+- Action bar on the selection only with a selection.
+- The Administrator has a stable sign of being in the platform («Platform» badge in the bar).
+- The actions of the overviews lead to the right home (Shares, Plugins), not to a notice.
+- When the server does not answer the interface says so and tries again: never a bare HTTP status,
+  never a misleading message (for example «no tenant» on the sign-in page).
 
-## 10. Da aggiungere
+## 10. To add
 
-- Cambio della propria password (Account › Accesso e sicurezza).
-- Condivisioni: per il Tenant Manager la pagina con il filtro «Pubblici» e «Revoca»; per l'Utente
-  «Condivisi da me» nella Home.
-- Dettaglio del tenant per l'Administrator: logo in sola lettura, «Archivia» ed «Elimina» in un'area
-  separata in fondo.
+- Change of one's own password (Account › Sign-in and security).
+- Shares: for the Tenant Manager the page with the «Public» filter and «Revoke»; for the User
+  «Shared by me» on the Home.
+- Detail of the tenant for the Administrator: read-only logo, «Archive» and «Delete» in a separate
+  area at the bottom.
 
-## 11. Testi da allineare
+## 11. Texts to align
 
-- Password: minimo 10 caratteri (piattaforma, come nel kernel); blocco dopo 8 tentativi falliti in 15 minuti (come nel kernel).
-- Account locali in Mosaikit (argon2id); OIDC per i tenant che lo scelgono; mai entrambi.
-- Administrator: password locale e secondo fattore (TOTP), mai tramite un tenant.
-- Nessun riferimento ai piani.
-- Profili di permesso in Gestisci, non in Impostazioni.
+- Password: at least 10 characters (platform, as in the kernel); lock after 8 failed attempts in 15
+  minutes (as in the kernel).
+- Local accounts in Mosaikit (argon2id); OIDC for the tenants that choose it; never both.
+- Administrator: local password and second factor (TOTP), never through a tenant.
+- No reference to plans.
+- Permission profiles in Manage, not in Settings.

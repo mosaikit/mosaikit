@@ -1,6 +1,6 @@
 [package]
 name = "mosaikit-server"
-description = "Server HTTP di Mosaikit: API, UI host, UI dei plugin, contenuti e link pubblici"
+description = "HTTP server of Mosaikit: API, host UI, plugin UIs, contents and public links"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

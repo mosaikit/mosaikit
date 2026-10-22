@@ -1,9 +1,9 @@
-//! Esecuzione sandboxata della logica dei plugin.
+//! Sandboxed execution of the logic of the plugins.
 //!
-//! - interprete **wasmi** (puro Rust), nessuna WASI: il guest non ha file,
-//!   rete o orologio se non tramite l'host;
-//! - istanza nuova per ogni chiamata, limite di istruzioni (fuel) e di memoria;
-//! - ABI v1 (vedi `docs/architettura.md` §8.3):
+//! - **wasmi** interpreter (pure Rust), no WASI: the guest has no files,
+//!   network or clock except through the host;
+//! - a new instance for every call, limits on instructions (fuel) and memory;
+//! - ABI v1 (see `docs/architecture.md` §8.3):
 //!   export `msk_alloc(len) -> ptr`, `msk_call(ptr, len) -> (ptr << 32) | len`;
 //!   import `msk.host_call(ptr, len) -> len`, `msk.host_read(ptr)`, `msk.log(ptr, len)`.
 
@@ -14,13 +14,13 @@ pub const ABI_EXPORTS: &[&str] = &["memory", "msk_alloc", "msk_call"];
 
 #[derive(Debug, thiserror::Error)]
 pub enum RuntimeError {
-    #[error("modulo WASM non valido: {0}")]
+    #[error("invalid WASM module: {0}")]
     Invalid(String),
-    #[error("limite di istruzioni superato")]
+    #[error("instruction limit exceeded")]
     OutOfFuel,
-    #[error("il plugin e' terminato con un errore: {0}")]
+    #[error("the plugin ended with an error: {0}")]
     Trap(String),
-    #[error("messaggio non valido dal plugin: {0}")]
+    #[error("invalid message from the plugin: {0}")]
     Protocol(String),
 }
 
@@ -28,11 +28,11 @@ pub type Result<T> = std::result::Result<T, RuntimeError>;
 
 #[derive(Debug, Clone, Copy)]
 pub struct Limits {
-    /// istruzioni WASM (circa) per chiamata
+    /// WASM instructions (roughly) per call
     pub fuel: u64,
-    /// memoria lineare massima del guest
+    /// maximum linear memory of the guest
     pub memory_bytes: usize,
-    /// dimensione massima di un messaggio in ingresso o uscita
+    /// maximum size of an incoming or outgoing message
     pub max_message: usize,
 }
 
@@ -42,9 +42,9 @@ impl Default for Limits {
     }
 }
 
-/// Servizi che l'host offre al guest durante una chiamata.
+/// Services the host offers the guest during a call.
 pub trait Host {
-    /// Operazione richiesta dal guest (es. `db.query`). L'errore diventa `{"err": ...}`.
+    /// Operation requested by the guest (e.g. `db.query`). The error becomes `{"err": ...}`.
     fn call(&mut self, op: &str, req: &Value) -> std::result::Result<Value, String>;
     fn log(&mut self, msg: &str);
 }
@@ -54,7 +54,7 @@ pub struct Engine {
     pub limits: Limits,
 }
 
-/// Modulo compilato, riusabile per molte chiamate.
+/// Compiled module, reusable for many calls.
 #[derive(Clone)]
 pub struct Module {
     inner: wasmi::Module,
@@ -74,20 +74,20 @@ impl Engine {
         Engine { engine: wasmi::Engine::new(&config), limits }
     }
 
-    /// Compila e verifica gli export dell'ABI, senza eseguire nulla.
+    /// Compiles and checks the exports of the ABI, without running anything.
     pub fn compile(&self, wasm: &[u8]) -> Result<Module> {
         let inner =
             wasmi::Module::new(&self.engine, wasm).map_err(|e| RuntimeError::Invalid(e.to_string()))?;
         let exports: Vec<String> = inner.exports().map(|e| e.name().to_string()).collect();
         for need in ABI_EXPORTS {
             if !exports.iter().any(|e| e == need) {
-                return Err(RuntimeError::Invalid(format!("export mancante: {need}")));
+                return Err(RuntimeError::Invalid(format!("missing export: {need}")));
             }
         }
         for imp in inner.imports() {
             if imp.module() != "msk" || !["host_call", "host_read", "log"].contains(&imp.name()) {
                 return Err(RuntimeError::Invalid(format!(
-                    "import non consentito: {}.{} (solo msk.host_call, msk.host_read, msk.log)",
+                    "import not allowed: {}.{} (only msk.host_call, msk.host_read, msk.log)",
                     imp.module(),
                     imp.name()
                 )));
@@ -96,7 +96,7 @@ impl Engine {
         Ok(Module { inner })
     }
 
-    /// Esegue una chiamata in un'istanza nuova. Ritorna sempre l'host, anche in caso di errore.
+    /// Runs a call in a new instance. It always returns the host, even on error.
     pub fn call<H: Host + 'static>(&self, module: &Module, input: &Value, host: H) -> (Result<Value>, H) {
         self.call_with_fuel(module, input, host, self.limits.fuel)
     }
@@ -136,7 +136,7 @@ impl Engine {
             .map_err(|e| RuntimeError::Invalid(e.to_string()))?;
         let memory = instance
             .get_memory(&*store, "memory")
-            .ok_or_else(|| RuntimeError::Invalid("memory non esportata".into()))?;
+            .ok_or_else(|| RuntimeError::Invalid("memory not exported".into()))?;
         let alloc: TypedFunc<i32, i32> = instance
             .get_typed_func(&*store, "msk_alloc")
             .map_err(|e| RuntimeError::Invalid(e.to_string()))?;
@@ -145,7 +145,7 @@ impl Engine {
 
         let msg = serde_json::to_vec(input).map_err(|e| RuntimeError::Protocol(e.to_string()))?;
         if msg.len() > self.limits.max_message {
-            return Err(RuntimeError::Protocol("messaggio in ingresso troppo grande".into()));
+            return Err(RuntimeError::Protocol("incoming message too large".into()));
         }
         let len = msg.len() as i32;
         let ptr = alloc.call(&mut *store, len).map_err(trap)?;
@@ -153,7 +153,7 @@ impl Engine {
         let packed = call.call(&mut *store, (ptr, len)).map_err(trap)?;
         let (out_ptr, out_len) = ((packed as u64 >> 32) as usize, (packed as u64 & 0xffff_ffff) as usize);
         if out_len > self.limits.max_message {
-            return Err(RuntimeError::Protocol("risposta troppo grande".into()));
+            return Err(RuntimeError::Protocol("answer too large".into()));
         }
         let mut out = vec![0u8; out_len];
         memory.read(&*store, out_ptr, &mut out).map_err(|e| RuntimeError::Protocol(e.to_string()))?;
@@ -178,7 +178,7 @@ fn trap(e: wasmi::Error) -> RuntimeError {
 fn memory_of<H>(caller: &Caller<'_, State<H>>) -> std::result::Result<Memory, wasmi::Error> {
     match caller.get_export("memory") {
         Some(Extern::Memory(m)) => Ok(m),
-        _ => Err(wasmi::Error::new("memory non esportata")),
+        _ => Err(wasmi::Error::new("memory not exported")),
     }
 }
 
@@ -188,7 +188,7 @@ fn read_bytes<H>(
     len: i32,
 ) -> std::result::Result<Vec<u8>, wasmi::Error> {
     if len < 0 || len as usize > caller.data().max_message {
-        return Err(wasmi::Error::new("messaggio troppo grande"));
+        return Err(wasmi::Error::new("message too large"));
     }
     let mut buf = vec![0u8; len as usize];
     memory_of(caller)?
@@ -212,11 +212,11 @@ fn link<H: Host + 'static>(linker: &mut Linker<State<H>>) -> std::result::Result
                         Err(e) => json!({ "err": e }),
                     }
                 }
-                Err(e) => json!({ "err": format!("richiesta non valida: {e}") }),
+                Err(e) => json!({ "err": format!("invalid request: {e}") }),
             };
             let bytes = serde_json::to_vec(&reply).map_err(|e| wasmi::Error::new(e.to_string()))?;
             if bytes.len() > caller.data().max_message {
-                return Err(wasmi::Error::new("risposta dell'host troppo grande"));
+                return Err(wasmi::Error::new("answer of the host too large"));
             }
             let n = bytes.len() as i32;
             caller.data_mut().pending = Some(bytes);

@@ -9,14 +9,14 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
-# mosaikit e mosaikit-plugins stanno affiancati come in locale:
+# mosaikit and mosaikit-plugins stay side by side as locally:
 #   $GITHUB_WORKSPACE/mosaikit, $GITHUB_WORKSPACE/mosaikit-plugins
 jobs:
   ci:
     runs-on: ubuntu-latest
     services:
       postgres:
-        # PostGIS: i test delle distribuzioni geografiche lo usano
+        # PostGIS: the tests of the geographic distributions use it
         image: postgis/postgis:17-3.5
         env:
           POSTGRES_PASSWORD: postgres
@@ -49,7 +49,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: ruolo di test (CREATEDB, CREATEROLE) e PostGIS nel template
+      - name: test role (CREATEDB, CREATEROLE) and PostGIS in the template
         run: |
           PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -c "create role mosaikit_dev login createdb createrole password 'mosaikit_dev'"
           PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d template1 -c "create extension if not exists postgis"
@@ -58,7 +58,7 @@ jobs:
         with:
           manifest-path: mosaikit/Cargo.toml
       - run: npm ci --no-audit --no-fund
-      - name: fmt, clippy, typecheck, lint, build, test (PostgreSQL e SQLite)
+      - name: fmt, clippy, typecheck, lint, build, test (PostgreSQL and SQLite)
         run: cargo xtask ci
       - name: test end-to-end (Playwright)
         run: |

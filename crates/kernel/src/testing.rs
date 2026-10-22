@@ -1,5 +1,5 @@
-//! Supporto ai test del kernel e del server: database usa e getta, plugin
-//! compilati e firmati con una chiave di test, tenant e utenti pronti.
+//! Support for the tests of the kernel and of the server: throwaway database, plugins
+//! compiled and signed with a test key, tenants and users ready.
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Once};
@@ -18,14 +18,14 @@ mod ed25519_dalek_key {
     pub type SigningKey = ed25519_dalek::SigningKey;
 }
 
-pub const PASSWORD: &str = "password-di-test";
-pub const ADMIN_PASSWORD: &str = "admin-password-di-test";
+pub const PASSWORD: &str = "test-password";
+pub const ADMIN_PASSWORD: &str = "admin-test-password";
 
 pub fn workspace_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("..")
 }
 
-/// Chiave dell'editore usata nei test (deterministica).
+/// Publisher key used in the tests (deterministic).
 pub fn test_key() -> SigningKey {
     SigningKey::from_bytes(&[7u8; 32])
 }
@@ -34,21 +34,21 @@ pub fn test_public_key() -> String {
     mosaikit_mskp::public_key_b64(&test_key())
 }
 
-/// Cartella dei plugin ufficiali: `MOSAIKIT_PLUGINS_DIR` o `../mosaikit-plugins`.
+/// Folder of the official plugins: `MOSAIKIT_PLUGINS_DIR` or `../mosaikit-plugins`.
 pub fn plugins_root() -> PathBuf {
     std::env::var_os("MOSAIKIT_PLUGINS_DIR")
         .map(PathBuf::from)
         .unwrap_or_else(|| workspace_root().join("..").join("mosaikit-plugins"))
 }
 
-/// Compila (una volta per processo) i plugin con logica in WASM.
+/// Compiles (once per process) the plugins with WASM logic.
 pub fn build_wasm_plugins() -> PathBuf {
     static BUILD: Once = Once::new();
     let root = plugins_root();
     BUILD.call_once(|| {
         assert!(
             root.join("Cargo.toml").is_file(),
-            "plugin non trovati in {}: clona mosaikit-plugins accanto a mosaikit o imposta MOSAIKIT_PLUGINS_DIR",
+            "plugins not found in {}: clone mosaikit-plugins next to mosaikit or set MOSAIKIT_PLUGINS_DIR",
             root.display()
         );
         let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".into());
@@ -58,13 +58,13 @@ pub fn build_wasm_plugins() -> PathBuf {
             .args(["build", "--quiet", "--target", "wasm32-unknown-unknown"])
             .args(["-p", "notes", "-p", "tasks", "-p", "contacts", "-p", "maps"])
             .status()
-            .expect("cargo build dei plugin");
-        assert!(status.success(), "build WASM dei plugin fallita");
+            .expect("cargo build of the plugins");
+        assert!(status.success(), "WASM build of the plugins failed");
     });
     root.join("target").join("wasm32-unknown-unknown").join("debug")
 }
 
-/// Pacchetto firmato di un plugin ufficiale (`mosaikit-plugins/<nome>`).
+/// Signed package of an official plugin (`mosaikit-plugins/<name>`).
 pub fn pack_plugin(name: &str) -> Vec<u8> {
     let dir = plugins_root().join(name);
     let wasm = if dir.join("Cargo.toml").is_file() {
@@ -72,12 +72,12 @@ pub fn pack_plugin(name: &str) -> Vec<u8> {
     } else {
         None
     };
-    let files = mosaikit_mskp::collect_plugin_dir(&dir, wasm.as_deref()).expect("file del plugin");
+    let files = mosaikit_mskp::collect_plugin_dir(&dir, wasm.as_deref()).expect("files of the plugin");
     mosaikit_mskp::pack(&files, Some(&test_key())).expect("pack")
 }
 
-/// Compila in WASM i crate indicati di un workspace di plugin (es. quelli di una
-/// distribuzione); ritorna la cartella con i `.wasm`.
+/// Compiles to WASM the given crates of a plugin workspace (e.g. the ones of a
+/// distribution); returns the folder with the `.wasm` files.
 pub fn build_wasm_in(workspace: &Path, crates: &[&str]) -> PathBuf {
     let cargo = std::env::var("CARGO").unwrap_or_else(|_| "cargo".into());
     let mut cmd = std::process::Command::new(cargo);
@@ -91,16 +91,16 @@ pub fn build_wasm_in(workspace: &Path, crates: &[&str]) -> PathBuf {
         cmd.args(["-p", c]);
     }
     assert!(
-        cmd.status().expect("cargo build dei plugin").success(),
-        "build WASM fallita in {}",
+        cmd.status().expect("cargo build of the plugins").success(),
+        "WASM build failed in {}",
         workspace.display()
     );
     workspace.join("target").join("wasm32-unknown-unknown").join("debug")
 }
 
-/// Pacchetto firmato con la chiave di test di un plugin in una cartella qualsiasi.
+/// Package signed with the test key of a plugin in any folder.
 pub fn pack_dir(dir: &Path, wasm: Option<&Path>) -> Vec<u8> {
-    let files = mosaikit_mskp::collect_plugin_dir(dir, wasm).expect("file del plugin");
+    let files = mosaikit_mskp::collect_plugin_dir(dir, wasm).expect("files of the plugin");
     mosaikit_mskp::pack(&files, Some(&test_key())).expect("pack")
 }
 
@@ -110,7 +110,7 @@ pub struct TestKernel {
     _db: Option<TestDb>,
 }
 
-/// Backend dei test: `MOSAIKIT_TEST_BACKEND=sqlite` (default PostgreSQL).
+/// Backend of the tests: `MOSAIKIT_TEST_BACKEND=sqlite` (default PostgreSQL).
 pub fn test_backend_sqlite() -> bool {
     std::env::var("MOSAIKIT_TEST_BACKEND").is_ok_and(|b| b.eq_ignore_ascii_case("sqlite"))
 }
@@ -147,12 +147,12 @@ pub async fn start_with(f: impl FnOnce(&mut Config)) -> TestKernel {
         data_dir: dir.path().join("data"),
         trusted_keys: vec![test_public_key()],
         database,
-        // il secondo fattore ha i suoi test (identity_tenancy)
+        // the second factor has its own tests (identity_tenancy)
         admin_totp: false,
         ..Config::default()
     };
     f(&mut cfg);
-    let k = Kernel::start(cfg).await.expect("avvio del kernel");
+    let k = Kernel::start(cfg).await.expect("start of the kernel");
     let admin: Uuid = mosaikit_db::query_scalar("select id from core.users where is_system_admin limit 1")
         .fetch_one(&k.db)
         .await
@@ -168,29 +168,29 @@ impl TestKernel {
             .expect("login admin")
         {
             crate::identity::AdminLogin::Done(r) => r.user,
-            other => panic!("accesso admin incompleto: {other:?}"),
+            other => panic!("incomplete admin sign-in: {other:?}"),
         }
     }
 
-    /// Installa (firmato) e attiva un plugin del repository.
+    /// Installs (signed) and turns on a plugin of the repository.
     pub async fn install(&self, name: &str) {
         let p = install_package(&self.k, None, &pack_plugin(name), InstallSource::Upload)
             .await
-            .expect("installazione");
-        set_active(&self.k, None, &p.id, true).await.expect("attivazione");
+            .expect("installation");
+        set_active(&self.k, None, &p.id, true).await.expect("activation");
     }
 
-    /// Installa e attiva un pacchetto (es. da `pack_dir`); ritorna l'id del plugin.
+    /// Installs and turns on a package (e.g. from `pack_dir`); returns the id of the plugin.
     pub async fn install_package(&self, pkg: &[u8]) -> crate::Result<String> {
         let p = install_package(&self.k, None, pkg, InstallSource::Upload).await?;
         set_active(&self.k, None, &p.id, true).await?;
         Ok(p.id.clone())
     }
 
-    /// Crea un tenant con il gestore `<slug>-gestore`; ritorna il gestore autenticato.
+    /// Creates a tenant with the manager `<slug>-manager`; returns the authenticated manager.
     pub async fn tenant(&self, slug: &str) -> SessionUser {
         let admin = self.admin().await;
-        let manager = format!("{slug}-gestore");
+        let manager = format!("{slug}-manager");
         create_tenant(
             &self.k,
             &admin,
@@ -198,7 +198,7 @@ impl TestKernel {
                 slug,
                 name: &slug.to_uppercase(),
                 manager_username: &manager,
-                manager_display_name: "Gestore",
+                manager_display_name: "Manager",
                 manager_password: PASSWORD,
             },
         )
@@ -207,10 +207,10 @@ impl TestKernel {
         self.login(slug, &manager).await
     }
 
-    /// Crea un membro del tenant del gestore e lo autentica.
+    /// Creates a member of the tenant of the manager and signs them in.
     pub async fn member(&self, manager: &SessionUser, username: &str) -> SessionUser {
         let c = self.caller(manager, &manager.home_tenant_slug).await;
-        create_member(&self.k, &c, username, username, PASSWORD, Role::User).await.expect("membro");
+        create_member(&self.k, &c, username, username, PASSWORD, Role::User).await.expect("member");
         self.login(&manager.home_tenant_slug, username).await
     }
 
@@ -222,7 +222,7 @@ impl TestKernel {
         caller(&self.k, user, tenant).await.expect("caller")
     }
 
-    /// Caller nel tenant di appartenenza.
+    /// Caller in the home tenant.
     pub async fn home(&self, user: &SessionUser) -> Caller {
         self.caller(user, &user.home_tenant_slug.clone()).await
     }

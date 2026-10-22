@@ -1,8 +1,8 @@
-// Protocollo del bridge host <-> UI dei plugin (postMessage).
+// Protocol of the bridge host <-> plugin UIs (postMessage).
 //
 // plugin -> host: { msk: 1, id, op, args }
 // host -> plugin: { msk: 1, id, ok } | { msk: 1, id, err }
-// host -> plugin (eventi): { msk: 1, event, data }
+// host -> plugin (events): { msk: 1, event, data }
 
 export interface BridgeRequest {
   msk: 1
@@ -86,17 +86,17 @@ export interface SiteInfo {
   entry: string
 }
 
-/** Lingua, tema e modo dell'host: arrivano con l'handshake e, a ogni cambio, con l'evento `context`. */
+/** Language, theme and mode of the host: they arrive with the handshake and, at every change, with the `context` event. */
 export interface UiContext {
-  /** lingua dell'interfaccia (`it`, `en`…) */
+  /** language of the interface (`it`, `en`…) */
   lang: string
-  /** preset del tema dell'host (`mosaikit`, `italia`…) */
+  /** preset of the theme of the host (`mosaikit`, `italia`…) */
   preset: string
-  /** modo effettivo */
+  /** actual mode */
   mode: 'light' | 'dark'
-  /** la scelta della persona: con `auto` il modo segue il sistema */
+  /** the choice of the person: with `auto` the mode follows the system */
   preference: 'light' | 'dark' | 'auto'
-  /** variabili CSS del tema */
+  /** CSS variables of the theme */
   theme: Record<string, string>
 }
 
@@ -106,9 +106,9 @@ export interface Hello {
   tenant?: { slug: string; name: string; role: 'manager' | 'member' }
   plugin?: { id: string; version: string }
   theme?: Record<string, string>
-  /** host recenti: lingua, tema e modo (gli host precedenti mandano solo `theme`) */
+  /** recent hosts: language, theme and mode (older hosts send only `theme`) */
   context?: UiContext
-  /** solo nei link pubblici: la risorsa condivisa */
+  /** only in public links: the shared resource */
   resource?: PublicResource
 }
 

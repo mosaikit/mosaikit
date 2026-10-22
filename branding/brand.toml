@@ -1,49 +1,49 @@
 # =============================================================================
-#  brand.toml - marchio del prodotto
+#  brand.toml - brand of the product
 # =============================================================================
-#  Mosaikit usa questi valori per titolo della pagina, accesso, barra di stato,
-#  area di notifica (desktop) e colori del tema. Una distribuzione basata su
-#  Mosaikit ha la propria cartella `branding/` con questo file
-#  e le immagini indicate. Ogni proprieta' e' facoltativa.
-#  I file (logo, favicon, icon) sono nomi di file in questa cartella.
+#  Mosaikit uses these values for the page title, the sign-in, the status bar,
+#  the notification area (desktop) and the colours of the theme. A distribution
+#  based on Mosaikit has its own `branding/` folder with this file and the
+#  images it names. Every property is optional.
+#  The files (logo, favicon, icon) are file names in this folder.
 # =============================================================================
 
-# Nome del prodotto.
+# Name of the product.
 name = "Mosaikit"
 
-# Versione mostrata agli utenti (default: la versione di Mosaikit).
+# Version shown to users (default: the version of Mosaikit).
 # version = "1.0.0"
 
-# Frase sotto il nome nella pagina di accesso.
-tagline = "applicazioni, dati e condivisione per ogni tenant"
+# Phrase under the name on the sign-in page.
+tagline = "apps, data and sharing for every tenant"
 
-# Messaggio nella pagina di accesso (es. a chi chiedere un account).
-# login_message = "Per un account scrivi a supporto@esempio.it"
+# Message on the sign-in page (e.g. whom to ask for an account).
+# login_message = "For an account write to support@example.com"
 
-# Testo a pie' della pagina di accesso (default: il nome).
-# footer = "© 2026 Esempio S.p.A."
+# Text at the foot of the sign-in page (default: the name).
+# footer = "© 2026 Example Inc."
 
-# Indirizzo di supporto o documentazione.
-# support_url = "https://esempio.it/supporto"
+# Support or documentation address.
+# support_url = "https://example.com/support"
 
-# Logo (svg, png o webp; altezza consigliata 64 px). Default: il simbolo di Mosaikit.
+# Logo (svg, png or webp; recommended height 64 px). Default: the Mosaikit symbol.
 # logo = "logo.svg"
 
-# Favicon del browser (svg, png o ico).
+# Favicon of the browser (svg, png or ico).
 # favicon = "favicon.svg"
 
-# Icona per l'area di notifica e l'eseguibile desktop (.ico con 16-256 px).
+# Icon for the notification area and the desktop executable (.ico with 16-256 px).
 # icon = "icon.ico"
 
-# Colori del tema (solo #rrggbb). Le varianti trasparenti dell'accento si
-# calcolano da `accent`. Le UI dei plugin ricevono gli stessi colori.
+# Colours of the theme (#rrggbb only). The transparent variants of the accent are
+# computed from `accent`. The plugin UIs receive the same colours.
 [colors]
-# accent = "#f0b23e"  # accento: pulsanti, selezione, grafici
-# bg     = "#0b0c0f"  # sfondo della pagina
-# panel  = "#14161b"  # pannelli e schede
-# panel2 = "#1b1e24"  # pannelli secondari
-# line   = "#2a2e37"  # bordi
-# fg     = "#ece7db"  # testo
-# dim    = "#8f887a"  # testo secondario
-# ok     = "#5cb887"  # esito positivo
-# err    = "#e0615c"  # errori
+# accent = "#f0b23e"  # accent: buttons, selection, charts
+# bg     = "#0b0c0f"  # background of the page
+# panel  = "#14161b"  # panels and cards
+# panel2 = "#1b1e24"  # secondary panels
+# line   = "#2a2e37"  # borders
+# fg     = "#ece7db"  # text
+# dim    = "#8f887a"  # secondary text
+# ok     = "#5cb887"  # positive outcome
+# err    = "#e0615c"  # errors

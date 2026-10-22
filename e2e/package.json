@@ -2,7 +2,7 @@
   "name": "@mosaikit/e2e",
   "version": "1.0.0",
   "private": true,
-  "description": "Test end-to-end nel browser (avviati da cargo xtask e2e)",
+  "description": "End-to-end tests in the browser (started by cargo xtask e2e)",
   "type": "module",
   "scripts": {
     "e2e": "playwright test -c playwright.config.ts"

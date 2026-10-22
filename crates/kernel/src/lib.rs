@@ -1,9 +1,9 @@
 //! Kernel Mosaikit: domain-agnostic.
 //!
-//! Conosce tenant, utenti, risorse, permessi, link pubblici, KPI e plugin; ogni
-//! dominio vive nei plugin. L'accesso ai dati dei plugin passa sempre da una
-//! transazione con il ruolo del plugin e il contesto dell'utente (RLS).
-//! Vedi `docs/architettura.md`.
+//! It knows tenants, users, resources, permissions, public links, KPIs and plugins; every
+//! domain lives in the plugins. Access to the data of the plugins always goes through a
+//! transaction with the role of the plugin and the context of the user (RLS).
+//! See `docs/architecture.md`.
 
 pub mod acl;
 pub mod blobs;
@@ -38,7 +38,7 @@ pub use error::{Error, Kind, Result};
 
 pub const KERNEL_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Utente autenticato (dalla sessione).
+/// Authenticated user (from the session).
 #[derive(Debug, Clone, Serialize)]
 pub struct SessionUser {
     pub user_id: Uuid,
@@ -53,14 +53,14 @@ pub struct SessionUser {
     pub token_hash: Vec<u8>,
 }
 
-/// Ruolo in un tenant. Il terzo ruolo, Administrator, e' di sistema
-/// (`SessionUser::is_system_admin`) e non dipende dal tenant.
+/// Role in a tenant. The third role, Administrator, belongs to the system
+/// (`SessionUser::is_system_admin`) and does not depend on the tenant.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Role {
-    /// Tenant Manager: membri, gruppi, impostazioni, KPI e riassegnazione delle risorse del tenant
+    /// Tenant Manager: members, groups, settings, KPIs and reassignment of the resources of the tenant
     TenantManager,
-    /// User: le proprie risorse e quelle condivise con lui
+    /// User: their own resources and the ones shared with them
     User,
 }
 
@@ -75,7 +75,7 @@ impl Role {
         match s {
             "tenant_manager" => Ok(Role::TenantManager),
             "user" => Ok(Role::User),
-            _ => Err(Error::bad(format!("ruolo non valido: {s} (tenant_manager o user)"))),
+            _ => Err(Error::bad(format!("invalid role: {s} (tenant_manager or user)"))),
         }
     }
     pub fn label(self) -> &'static str {
@@ -86,12 +86,12 @@ impl Role {
     }
 }
 
-/// Policy di un tenant.
+/// Policy of a tenant.
 #[derive(Debug, Clone, Serialize, serde::Deserialize, PartialEq)]
 pub struct TenantSettings {
     #[serde(default = "yes")]
     pub public_links_enabled: bool,
-    /// durata massima dei link pubblici in giorni (0 = nessun limite)
+    /// maximum lifetime of public links in days (0 = no limit)
     #[serde(default = "d_link_days")]
     pub public_link_max_days: u32,
     #[serde(default = "yes")]
@@ -107,11 +107,11 @@ fn d_link_days() -> u32 {
 
 impl Default for TenantSettings {
     fn default() -> TenantSettings {
-        serde_json::from_str("{}").expect("settings di default")
+        serde_json::from_str("{}").expect("default settings")
     }
 }
 
-/// Tenant attivo della richiesta, con il ruolo dell'utente.
+/// Active tenant of the request, with the role of the user.
 #[derive(Debug, Clone, Serialize)]
 pub struct TenantCtx {
     pub tenant_id: Uuid,
@@ -121,7 +121,7 @@ pub struct TenantCtx {
     pub settings: TenantSettings,
 }
 
-/// Chi esegue un'operazione nel tenant attivo.
+/// Who runs an operation in the active tenant.
 #[derive(Debug, Clone)]
 pub struct Caller {
     pub user: SessionUser,
@@ -139,12 +139,12 @@ impl Caller {
         if self.is_manager() {
             Ok(())
         } else {
-            Err(Error::forbidden("operazione riservata al Tenant Manager"))
+            Err(Error::forbidden("operation reserved to the Tenant Manager"))
         }
     }
 }
 
-/// Notifiche per la UI in modalita' sviluppo (hot reload).
+/// Notifications for the UI in development mode (hot reload).
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum DevEvent {
@@ -158,27 +158,27 @@ pub struct Kernel {
     pub plugins: plugins::Plugins,
     pub engine: Arc<mosaikit_runtime::Engine>,
     pub blobs: blobs::Blobs,
-    /// marchio del prodotto (nome, logo, colori)
+    /// brand of the product (name, logo, colours)
     pub brand: brand::Brand,
     pub(crate) trusted: mosaikit_mskp::TrustedKeys,
     pub(crate) limiter: identity::LoginLimiter,
     pub(crate) argon: Arc<Semaphore>,
     pub http: reqwest::Client,
     pub dev_events: broadcast::Sender<DevEvent>,
-    /// segreto per i cookie firmati (sblocco dei link con password)
+    /// secret for signed cookies (unlocking password-protected links)
     pub(crate) cookie_secret: Vec<u8>,
     embedded: tokio::sync::Mutex<Option<embedded::EmbeddedPg>>,
-    /// riferimento a se stesso (chiamate tra plugin dalla logica WASM)
+    /// reference to itself (calls between plugins from the WASM logic)
     me: std::sync::OnceLock<std::sync::Weak<Kernel>>,
 }
 
 impl Kernel {
-    /// Avvio completo: database (o PostgreSQL embedded), bootstrap, plugin.
+    /// Full start: database (or embedded PostgreSQL), bootstrap, plugins.
     pub async fn start(cfg: Config) -> Result<Arc<Kernel>> {
         Kernel::start_with_progress(cfg, &|_| {}).await
     }
 
-    /// Come `start`, comunicando le fasi dell'avvio (es. alla finestra di avvio desktop).
+    /// Like `start`, reporting the phases of the start (e.g. to the desktop splash window).
     pub async fn start_with_progress(
         mut cfg: Config,
         progress: &(dyn Fn(&str) + Send + Sync),
@@ -187,16 +187,16 @@ impl Kernel {
         std::fs::create_dir_all(&cfg.data_dir)?;
         let mut embedded = None;
         let max = cfg.database.max_connections.max(2);
-        progress("Preparazione del database");
+        progress("Preparing the database");
         let db = if cfg.backend() == config::Backend::Sqlite {
             let file = cfg.sqlite_file();
             tracing::info!("database SQLite: {}", file.display());
             Db::open_sqlite(&file, max).await?
         } else {
             let url = if cfg.database.embedded {
-                progress("Avvio di PostgreSQL");
+                progress("Starting PostgreSQL");
                 let pg = embedded::EmbeddedPg::start(&cfg).await?;
-                progress("Preparazione del database");
+                progress("Preparing the database");
                 let url = pg.url.clone();
                 embedded = Some(pg);
                 url
@@ -243,14 +243,14 @@ impl Kernel {
         });
         let _ = kernel.me.set(Arc::downgrade(&kernel));
         identity::bootstrap(&kernel).await?;
-        progress("Caricamento dei plugin");
+        progress("Loading the plugins");
         plugins::load_installed(&kernel).await?;
         if kernel.cfg.dev.enabled {
             plugins::dev::load_all(&kernel).await;
             plugins::dev::watch(kernel.clone());
         }
         if kernel.cfg.preinstall {
-            progress("Installazione dei plugin");
+            progress("Installing the plugins");
             plugins::registry::preinstall(&kernel).await?;
         }
         blobs::gc(&kernel).await;
@@ -261,7 +261,7 @@ impl Kernel {
         self.me.get().and_then(std::sync::Weak::upgrade)
     }
 
-    /// Ferma il PostgreSQL embedded (se presente).
+    /// Stops the embedded PostgreSQL (if any).
     pub async fn shutdown(&self) {
         self.db.close().await;
         if let Some(pg) = self.embedded.lock().await.take() {

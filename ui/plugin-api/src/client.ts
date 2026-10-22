@@ -9,14 +9,14 @@ export interface CrudClient {
   remove(id: string): Promise<void>
 }
 
-/** API di una UI di plugin. Tutte le chiamate passano dall'host, che le limita al plugin. */
+/** API of a plugin UI. Every call goes through the host, which limits it to the plugin. */
 export class Msk {
   readonly isPublic: boolean
   readonly user: Hello['user']
   readonly tenant: Hello['tenant']
   readonly plugin: Hello['plugin']
   readonly publicResource: PublicResource | undefined
-  /** lingua, tema e modo correnti dell'host (aggiornati a ogni evento `context`) */
+  /** current language, theme and mode of the host (updated at every `context` event) */
   context: UiContext | undefined
 
   constructor(
@@ -31,7 +31,7 @@ export class Msk {
     this.context = hello.context
   }
 
-  /** Avvisa quando l'host cambia lingua, tema o modo (gia' applicati a `<html>`). */
+  /** Tells when the host changes language, theme or mode (already applied to `<html>`). */
   onContext(fn: (ctx: UiContext) => void) {
     return this.bridge.onEvent((event, data) => {
       if (event === 'context') fn(data as UiContext)
@@ -51,7 +51,7 @@ export class Msk {
     }
   }
 
-  /** Comando della logica WASM del plugin. */
+  /** Command of the WASM logic of the plugin. */
   async call<T = unknown>(name: string, args?: unknown): Promise<T> {
     const r = await this.bridge.call<{ result: T }>('call', { name, args })
     return r.result
@@ -68,11 +68,11 @@ export class Msk {
     remove: async (id: string) => {
       await this.bridge.call('files.delete', { id })
     },
-    /** contenuto del file (anteprime, download dal plugin) */
+    /** content of the file (previews, downloads from the plugin) */
     blob: (id: string) => this.bridge.call<Blob>('files.blob', { id }),
-    /** zip di una cartella */
+    /** zip of a folder */
     zip: (id: string) => this.bridge.call<Blob>('files.zip', { id }),
-    /** URL temporaneo sull'origine dei contenuti (iframe, nuova scheda, download) */
+    /** temporary URL on the origin of the contents (iframe, new tab, download) */
     url: async (id: string, download = false) => (await this.bridge.call<{ url: string }>('ticket', { id, download })).url,
   }
 
@@ -81,12 +81,12 @@ export class Msk {
     url: async (id: string) => (await this.bridge.call<{ url: string }>('ticket', { id })).url,
   }
 
-  /** Metadati di una risorsa (proprietario, livello, dimensione...). */
+  /** Metadata of a resource (owner, level, size...). */
   resource(id: string) {
     return this.bridge.call<Record<string, unknown>>('resource.meta', { id })
   }
 
-  /** Apre la finestra di condivisione dell'host (utenti, gruppi, link pubblici). */
+  /** Opens the share dialog of the host (users, groups, public links). */
   async share(id: string): Promise<void> {
     await this.bridge.call('share', { id })
   }
@@ -95,12 +95,12 @@ export class Msk {
     void this.bridge.call('toast', { text, error }).catch(() => {})
   }
 
-  /** Conferma con il dialogo dell'host. */
+  /** Confirmation with the dialog of the host. */
   confirm(text: string): Promise<boolean> {
     return this.bridge.call<boolean>('confirm', { text })
   }
 
-  /** Nei link pubblici: la risorsa condivisa con i suoi valori. */
+  /** In public links: the shared resource with its values. */
   publicGet(): Promise<PublicResource> {
     return this.bridge.call<PublicResource>('public.get')
   }
@@ -110,7 +110,7 @@ export class Msk {
   }
 }
 
-/** Applica lingua, modo e tema dell'host a `<html>`: `lang`, `data-mode`, `data-preset`, `color-scheme`. */
+/** Applies language, mode and theme of the host to `<html>`: `lang`, `data-mode`, `data-preset`, `color-scheme`. */
 export function applyContext(ctx: UiContext | undefined, root: HTMLElement = document.documentElement) {
   if (!ctx) return
   if (/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(ctx.lang)) root.lang = ctx.lang
@@ -130,14 +130,14 @@ export function applyTheme(vars: Record<string, string> | undefined, root: HTMLE
 }
 
 /**
- * Connessione all'host. L'host passa la propria origine nel parametro `host`
- * dell'URL dell'iframe: ogni messaggio viene inviato solo a quell'origine.
+ * Connection to the host. The host passes its own origin in the `host` parameter
+ * of the URL of the iframe: every message is sent only to that origin.
  */
 export async function connect(win: Window = window): Promise<Msk> {
   const params = new URLSearchParams(win.location.search)
   const host = params.get('host')
   if (!host || win.parent === win) {
-    throw new BridgeError("questa pagina va aperta dentro Mosaikit (manca l'host)")
+    throw new BridgeError('this page must be opened inside Mosaikit (the host is missing)')
   }
   const bridge = new Bridge(win.parent, host, win)
   const hello = await bridge.call<Hello>('hello')

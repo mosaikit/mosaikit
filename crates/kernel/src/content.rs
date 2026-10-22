@@ -1,5 +1,5 @@
-//! Contenuti serviti in iframe dall'origine untrusted: siti da zip (permesso
-//! `content`) e file (permesso `files`), tramite ticket legati alla sessione.
+//! Contents served in an iframe from the untrusted origin: sites from a zip (permission
+//! `content`) and files (permission `files`), through tickets bound to the session.
 
 use serde::Serialize;
 use serde_json::json;
@@ -11,20 +11,20 @@ use crate::{events, Caller, Error, Kernel, Result};
 
 const TICKET_HOURS: i32 = 8;
 
-/// Carica uno zip come contenuto della risorsa `rid` (scrittura richiesta).
+/// Uploads a zip as the content of resource `rid` (write required).
 pub async fn upload_site(k: &Kernel, c: &Caller, plugin_id: &str, rid: Uuid, zip: &[u8]) -> Result<SiteInfo> {
     let p = k.plugins.active(plugin_id)?;
     if !p.manifest.permissions.content {
-        return Err(Error::forbidden("il plugin non dichiara il permesso content"));
+        return Err(Error::forbidden("the plugin does not declare the content permission"));
     }
     let mut tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
     let lvl: i32 =
         mosaikit_db::query_scalar("select core.level_of($1)").bind(rid).fetch_one(&mut *tx).await?;
     if lvl == 0 {
-        return Err(Error::not_found("risorsa non trovata"));
+        return Err(Error::not_found("resource not found"));
     }
     if lvl < 2 {
-        return Err(Error::forbidden("serve il permesso di scrittura"));
+        return Err(Error::forbidden("the write permission is required"));
     }
     let info = k.blobs.extract_site(c.tenant.tenant_id, rid, zip)?;
     tx.update_resource(rid, None, Some(&json!({ "content": info })), Some(info.size as i64)).await?;
@@ -48,7 +48,7 @@ pub struct TicketUrl {
     pub expires_in: i64,
 }
 
-/// URL temporaneo (legato alla sessione) per mostrare un contenuto in iframe o scaricarlo.
+/// Temporary URL (bound to the session) to show a content in an iframe or download it.
 pub async fn ticket(k: &Kernel, c: &Caller, plugin_id: &str, rid: Uuid, download: bool) -> Result<TicketUrl> {
     let p = k.plugins.active(plugin_id)?;
     let mut tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
@@ -56,7 +56,7 @@ pub async fn ticket(k: &Kernel, c: &Caller, plugin_id: &str, rid: Uuid, download
         .bind(rid)
         .fetch_optional(&mut *tx)
         .await?
-        .ok_or_else(|| Error::not_found("risorsa non trovata"))?;
+        .ok_or_else(|| Error::not_found("resource not found"))?;
     tx.commit().await?;
     let kind: String = row.get(0);
     let title: String = row.get(1);
@@ -103,7 +103,7 @@ fn urlencode_path(p: &str) -> String {
         .join("/")
 }
 
-/// Cosa serve un ticket valido.
+/// What a valid ticket serves.
 #[derive(Debug, Clone)]
 pub struct Target {
     pub tenant: Uuid,
@@ -113,7 +113,7 @@ pub struct Target {
     pub download: bool,
 }
 
-/// Verifica un ticket: non scaduto, sessione ancora valida, permesso di lettura ancora presente.
+/// Checks a ticket: not expired, session still valid, read permission still there.
 pub async fn resolve_ticket(k: &Kernel, token: &str) -> Result<Target> {
     let row = mosaikit_db::query(
         "select t.resource_id, t.user_id, t.tenant_id, t.download from core.tickets t
@@ -123,7 +123,7 @@ pub async fn resolve_ticket(k: &Kernel, token: &str) -> Result<Target> {
     .bind(sha256(token.as_bytes()))
     .fetch_optional(&k.db)
     .await?
-    .ok_or_else(|| Error::forbidden("ticket non valido o scaduto: riapri il contenuto"))?;
+    .ok_or_else(|| Error::forbidden("invalid or expired ticket: open the content again"))?;
     let rid: Uuid = row.get(0);
     let user: Uuid = row.get(1);
     let tenant: Uuid = row.get(2);
@@ -133,9 +133,9 @@ pub async fn resolve_ticket(k: &Kernel, token: &str) -> Result<Target> {
         .fetch_optional(&mut *tx)
         .await?;
     tx.commit().await?;
-    let r = r.ok_or_else(|| Error::not_found("risorsa non trovata"))?;
+    let r = r.ok_or_else(|| Error::not_found("resource not found"))?;
     if r.get::<i32, _>(2) < 1 {
-        return Err(Error::forbidden("accesso revocato"));
+        return Err(Error::forbidden("access revoked"));
     }
     Ok(Target { tenant, resource: rid, kind: r.get(0), title: r.get(1), download: row.get(3) })
 }

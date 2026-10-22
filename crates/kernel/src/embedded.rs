@@ -1,8 +1,8 @@
-//! PostgreSQL embedded per la release desktop.
+//! Embedded PostgreSQL for the desktop release.
 //!
-//! Il cluster vive in `<data_dir>/pg`, ascolta solo su 127.0.0.1 con
-//! autenticazione scram-sha-256. Le credenziali del superutente e del ruolo
-//! applicativo sono generate al primo avvio e salvate in `<data_dir>/pg/`.
+//! The cluster lives in `<data_dir>/pg`, listens on 127.0.0.1 only with
+//! scram-sha-256 authentication. The credentials of the superuser and of the
+//! application role are generated at the first start and saved in `<data_dir>/pg/`.
 
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
@@ -25,7 +25,7 @@ fn exe(name: &str) -> String {
     }
 }
 
-/// Cartella `bin` di PostgreSQL: configurata, accanto all'eseguibile (`pgsql/bin`), oppure nel PATH.
+/// PostgreSQL `bin` folder: configured, next to the executable (`pgsql/bin`), or in the PATH.
 fn find_bin(cfg: &Config) -> Result<PathBuf> {
     let mut candidates: Vec<PathBuf> = Vec::new();
     if let Some(b) = &cfg.database.pg_bin {
@@ -43,7 +43,7 @@ fn find_bin(cfg: &Config) -> Result<PathBuf> {
         .into_iter()
         .find(|d| d.join(exe("pg_ctl")).is_file() && d.join(exe("initdb")).is_file())
         .ok_or_else(|| {
-            Error::bad("PostgreSQL embedded: binari non trovati (pgsql/bin accanto all'eseguibile o database.pg_bin)")
+            Error::bad("embedded PostgreSQL: binaries not found (pgsql/bin next to the executable or database.pg_bin)")
         })
 }
 
@@ -65,7 +65,7 @@ fn free_port(preferred: u16) -> u16 {
         .unwrap_or(preferred)
 }
 
-/// Avvia `pg_ctl` senza legarlo alla console del chiamante (vedi xtask/db.rs).
+/// Starts `pg_ctl` without tying it to the console of the caller (see xtask/db.rs).
 fn start_server(bin: &Path, data: &Path, log: &Path, port: u16) -> Result<()> {
     let mut cmd = Command::new(bin.join(exe("pg_ctl")));
     cmd.arg("-D")
@@ -81,13 +81,13 @@ fn start_server(bin: &Path, data: &Path, log: &Path, port: u16) -> Result<()> {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
-        // console propria e nascosta: i processi di postgres non dipendono dalla finestra del server
+        // a console of its own, hidden: the postgres processes do not depend on the window of the server
         const CREATE_NO_WINDOW: u32 = 0x0800_0000;
         cmd.creation_flags(CREATE_NO_WINDOW);
     }
     let status = cmd.status().map_err(|e| Error::internal(format!("pg_ctl: {e}")))?;
     if !status.success() {
-        return Err(Error::internal(format!("pg_ctl start fallito: vedi {}", log.display())));
+        return Err(Error::internal(format!("pg_ctl start failed: see {}", log.display())));
     }
     Ok(())
 }
@@ -121,7 +121,7 @@ impl EmbeddedPg {
             start_server(&bin, &data, &dir.join("server.log"), port)?;
             port
         };
-        // attesa: pronto ad accettare connessioni
+        // wait: ready to accept connections
         let su_url = format!("postgres://postgres:{su}@127.0.0.1:{port}/postgres");
         let mut admin = None;
         for _ in 0..120 {
@@ -131,8 +131,8 @@ impl EmbeddedPg {
             }
             tokio::time::sleep(Duration::from_millis(250)).await;
         }
-        let admin = admin.ok_or_else(|| Error::internal("PostgreSQL embedded non risponde"))?;
-        // ruolo applicativo (non superutente) e database
+        let admin = admin.ok_or_else(|| Error::internal("embedded PostgreSQL does not answer"))?;
+        // application role (not a superuser) and database
         if !app_file.is_file() {
             std::fs::write(&app_file, random_token(16))?;
         }
@@ -154,8 +154,8 @@ impl EmbeddedPg {
             sqlx::raw_sql("create database mosaikit owner mosaikit_app").execute(&admin).await?;
         }
         admin.close().await;
-        // PostGIS (plugin geospaziali) se incluso nella distribuzione di PostgreSQL:
-        // il ruolo applicativo non puo' creare estensioni non "trusted"
+        // PostGIS (geospatial plugins) if included in the PostgreSQL distribution:
+        // the application role cannot create extensions that are not "trusted"
         let su_db = format!("postgres://postgres:{su}@127.0.0.1:{port}/mosaikit");
         if let Ok(pool) = sqlx::postgres::PgPoolOptions::new().max_connections(1).connect(&su_db).await {
             let available: bool = sqlx::query_scalar(
@@ -166,7 +166,7 @@ impl EmbeddedPg {
             .unwrap_or(false);
             if available {
                 if let Err(e) = sqlx::raw_sql("create extension if not exists postgis").execute(&pool).await {
-                    tracing::warn!("PostGIS non attivato: {e}");
+                    tracing::warn!("PostGIS not enabled: {e}");
                 }
             }
             pool.close().await;

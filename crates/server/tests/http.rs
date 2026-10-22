@@ -1,4 +1,4 @@
-//! Test HTTP del server (router reali, PostgreSQL reale: `cargo xtask db up`).
+//! HTTP tests of the server (real routers, real PostgreSQL: `cargo xtask db up`).
 
 use std::io::Write;
 
@@ -108,7 +108,7 @@ impl App {
         Session { cookie, csrf: r.json()["csrf"].as_str().unwrap().to_string() }
     }
 
-    /// Accesso come Administrator (senza secondo fattore: `admin_totp = false` nei test).
+    /// Sign-in as Administrator (without second factor: `admin_totp = false` in the tests).
     async fn admin(&self) -> Session {
         let r = self
             .call(
@@ -125,7 +125,7 @@ impl App {
 }
 
 #[tokio::test]
-async fn sessione_con_cookie_httponly_e_csrf() {
+async fn session_with_httponly_cookie_and_csrf() {
     let a = App::new().await;
     let r = a
         .call(
@@ -137,7 +137,7 @@ async fn sessione_con_cookie_httponly_e_csrf() {
         .await;
     assert_eq!(r.status, StatusCode::UNAUTHORIZED);
     assert!(r.json()["error"].is_string());
-    // gli Administrator non accedono dal form dei tenant
+    // Administrators do not sign in from the form of the tenants
     let r = a
         .call(
             None,
@@ -163,17 +163,17 @@ async fn sessione_con_cookie_httponly_e_csrf() {
     );
     assert!(
         !r.text().contains(cookie.split(';').next().unwrap().split('=').nth(1).unwrap()),
-        "il token non e' nel corpo"
+        "the token is not in the body"
     );
     let s = a.admin().await;
 
-    // senza cookie: 401
+    // without cookie: 401
     assert_eq!(a.call(None, Method::GET, "/api/session", None).await.status, StatusCode::UNAUTHORIZED);
     let me = a.call(Some(&s), Method::GET, "/api/session", None).await;
     assert_eq!(me.json()["user"]["username"], "admin");
     assert!(me.json()["user"].get("token_hash").is_none());
 
-    // modifica senza CSRF: 403
+    // change without CSRF: 403
     let no_csrf = Session { cookie: s.cookie.clone(), csrf: String::new() };
     let r = a
         .call(Some(&no_csrf), Method::POST, "/api/me/password", Some(json!({ "old": "a", "new": "b" })))
@@ -185,40 +185,40 @@ async fn sessione_con_cookie_httponly_e_csrf() {
         StatusCode::FORBIDDEN
     );
 
-    // logout: cookie cancellato e sessione invalidata
+    // logout: cookie cleared and session invalidated
     let r = a.call(Some(&s), Method::POST, "/api/auth/logout", None).await;
     assert!(r.header(header::SET_COOKIE).contains("Max-Age=0"));
     assert_eq!(a.call(Some(&s), Method::GET, "/api/session", None).await.status, StatusCode::UNAUTHORIZED);
 }
 
 #[tokio::test]
-async fn header_di_sicurezza_e_cors_chiuso() {
+async fn security_headers_and_closed_cors() {
     let a = App::new().await;
     let r = a.call(None, Method::GET, "/", None).await;
     assert_eq!(r.status, StatusCode::OK);
     let csp = r.header(header::CONTENT_SECURITY_POLICY);
     assert!(csp.contains("frame-ancestors 'none'") && csp.contains("default-src 'self'"), "{csp}");
-    assert!(csp.contains(&a.t.cfg.plugin_origin()), "frame-src verso l'origine dei plugin");
+    assert!(csp.contains(&a.t.cfg.plugin_origin()), "frame-src towards the origin of the plugins");
     assert_eq!(r.header(header::X_FRAME_OPTIONS), "DENY");
     assert_eq!(r.header(header::X_CONTENT_TYPE_OPTIONS), "nosniff");
-    // preflight da un'altra origine: nessun Access-Control-Allow-Origin
+    // preflight from another origin: no Access-Control-Allow-Origin
     let req = Request::builder()
         .method(Method::OPTIONS)
         .uri("/api/session")
-        .header(header::ORIGIN, "https://malevolo.example")
+        .header(header::ORIGIN, "https://malicious.example")
         .header(header::ACCESS_CONTROL_REQUEST_METHOD, "POST")
         .body(Body::empty())
         .unwrap();
     let r = send(&a.app, req).await;
     assert!(r.headers.get(header::ACCESS_CONTROL_ALLOW_ORIGIN).is_none());
-    // API inesistente: JSON, non la SPA
+    // API that does not exist: JSON, not the SPA
     let r = a.call(None, Method::GET, "/api/nope", None).await;
     assert_eq!(r.status, StatusCode::NOT_FOUND);
     assert!(r.json()["error"].is_string());
 }
 
 #[tokio::test]
-async fn flusso_completo_tenant_crud_condivisione() {
+async fn full_flow_tenant_crud_sharing() {
     let a = App::new().await;
     a.t.install("notes").await;
     let admin = a.admin().await;
@@ -234,7 +234,7 @@ async fn flusso_completo_tenant_crud_condivisione() {
         .await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.text());
     let g = a.login("alfa", "gestore", PASSWORD).await;
-    // un gestore non e' amministratore di sistema
+    // a manager is not a system administrator
     assert_eq!(a.call(Some(&g), Method::GET, "/api/admin/tenants", None).await.status, StatusCode::FORBIDDEN);
     let r = a
         .call(
@@ -251,7 +251,7 @@ async fn flusso_completo_tenant_crud_condivisione() {
     let ctx = a.call(Some(&anna), Method::GET, "/api/t/alfa/context", None).await.json();
     assert_eq!(ctx["tenant"]["role"], "user");
     assert_eq!(ctx["plugins"][0]["id"], "com.mosaikit.notes");
-    // tenant non proprio
+    // tenant not one's own
     assert_eq!(
         a.call(Some(&anna), Method::GET, "/api/t/system/context", None).await.status,
         StatusCode::FORBIDDEN
@@ -262,7 +262,7 @@ async fn flusso_completo_tenant_crud_condivisione() {
             Some(&anna),
             Method::POST,
             "/api/t/alfa/p/com.mosaikit.notes/r/notes",
-            Some(json!({ "values": { "title": "Nota di Anna" } })),
+            Some(json!({ "values": { "title": "Anna's note" } })),
         )
         .await;
     assert_eq!(r.status, StatusCode::CREATED, "{}", r.text());
@@ -277,17 +277,17 @@ async fn flusso_completo_tenant_crud_condivisione() {
         .await;
     assert_eq!(r.status, StatusCode::BAD_REQUEST);
 
-    // il gestore non vede il contenuto ma vede i metadati
+    // the manager does not see the content but sees the metadata
     let list = a.call(Some(&g), Method::GET, "/api/t/alfa/p/com.mosaikit.notes/r/notes", None).await.json();
     assert_eq!(list["rows"].as_array().unwrap().len(), 0);
     let r =
         a.call(Some(&g), Method::GET, &format!("/api/t/alfa/p/com.mosaikit.notes/r/notes/{rid}"), None).await;
     assert_eq!(r.status, StatusCode::NOT_FOUND);
     let meta = a.call(Some(&g), Method::GET, "/api/t/alfa/manage/resources", None).await.json();
-    assert_eq!(meta[0]["title"], "Nota di Anna");
+    assert_eq!(meta[0]["title"], "Anna's note");
     assert_eq!(meta[0]["owner_name"], "anna");
 
-    // condivisione in lettura al gestore
+    // read sharing with the manager
     let gid = a.call(Some(&g), Method::GET, "/api/session", None).await.json()["user"]["user_id"]
         .as_str()
         .unwrap()
@@ -315,7 +315,7 @@ async fn flusso_completo_tenant_crud_condivisione() {
         .await;
     assert_eq!(r.status, StatusCode::FORBIDDEN);
 
-    // comando WASM
+    // WASM command
     let r = a
         .call(
             Some(&anna),
@@ -327,14 +327,14 @@ async fn flusso_completo_tenant_crud_condivisione() {
     assert_eq!(r.status, StatusCode::OK, "{}", r.text());
     assert_eq!(r.json()["result"][0]["n"], 1);
 
-    // KPI: gestore si', membro no
+    // KPIs: manager yes, member no
     assert_eq!(a.call(Some(&g), Method::GET, "/api/t/alfa/manage/kpi", None).await.status, StatusCode::OK);
     assert_eq!(
         a.call(Some(&anna), Method::GET, "/api/t/alfa/manage/kpi", None).await.status,
         StatusCode::FORBIDDEN
     );
 
-    // uscita con riassegnazione
+    // leaving with reassignment
     let r = a
         .call(
             Some(&g),
@@ -351,11 +351,11 @@ async fn flusso_completo_tenant_crud_condivisione() {
 }
 
 #[tokio::test]
-async fn installazione_plugin_solo_admin() {
+async fn plugin_installation_admin_only() {
     let a = App::new().await;
     let admin = a.admin().await;
     a.t.tenant("alfa").await;
-    let g = a.login("alfa", "alfa-gestore", PASSWORD).await;
+    let g = a.login("alfa", "alfa-manager", PASSWORD).await;
     let pkg = pack_plugin("contacts");
     assert_eq!(a.raw(&g, "/api/admin/plugins", pkg.clone()).await.status, StatusCode::FORBIDDEN);
     let r = a.raw(&admin, "/api/admin/plugins", pkg).await;
@@ -367,21 +367,21 @@ async fn installazione_plugin_solo_admin() {
     let list = a.call(Some(&admin), Method::GET, "/api/admin/plugins", None).await.json();
     assert_eq!(list[0]["status"], "active");
     assert!(list[0]["signed_by"].is_string());
-    let r = a.raw(&admin, "/api/admin/plugins", b"non e' uno zip".to_vec()).await;
+    let r = a.raw(&admin, "/api/admin/plugins", b"not a zip".to_vec()).await;
     assert_eq!(r.status, StatusCode::BAD_REQUEST);
 }
 
 #[tokio::test]
-async fn ui_dei_plugin_solo_sull_origine_untrusted() {
+async fn plugin_uis_only_on_the_untrusted_origin() {
     let a = App::new().await;
-    // UI minima nella cartella del plugin installato
+    // minimal UI in the folder of the installed plugin
     a.t.install("maps").await;
     let p = a.t.plugins.get("com.mosaikit.maps").unwrap();
     let ui_dir = a.t.cfg.data_dir.join("plugins/com.mosaikit.maps/0.4.0/ui");
     std::fs::create_dir_all(&ui_dir).unwrap();
     std::fs::write(ui_dir.join("index.html"), "<h1>mappe</h1>").unwrap();
     drop(p);
-    // ricarica: la cartella ui ora esiste
+    // reload: the ui folder now exists
     mosaikit_kernel::plugins::load_installed(&a.t).await.unwrap();
 
     let r = a.get_untrusted("/ui/com.mosaikit.maps/", None).await;
@@ -394,7 +394,7 @@ async fn ui_dei_plugin_solo_sull_origine_untrusted() {
         StatusCode::NOT_FOUND
     );
     assert_eq!(a.get_untrusted("/ui/com.inesistente.x/", None).await.status, StatusCode::NOT_FOUND);
-    // l'origine app non serve le UI dei plugin (fallback SPA dell'host, non il file del plugin)
+    // the app origin does not serve the UIs of the plugins (SPA fallback of the host, not the file of the plugin)
     let r = a.call(None, Method::GET, "/ui/com.mosaikit.maps/index.html", None).await;
     assert!(!r.text().contains("<h1>mappe</h1>"));
 }
@@ -409,18 +409,18 @@ fn zip_of(entries: &[(&str, &[u8])]) -> Vec<u8> {
 }
 
 #[tokio::test]
-async fn contenuti_utente_sempre_in_sandbox() {
+async fn user_contents_always_sandboxed() {
     let a = App::new().await;
     a.t.install("static-site").await;
     a.t.install("files").await;
     a.t.tenant("alfa").await;
-    let g = a.login("alfa", "alfa-gestore", PASSWORD).await;
+    let g = a.login("alfa", "alfa-manager", PASSWORD).await;
     let site = a
         .call(
             Some(&g),
             Method::POST,
             "/api/t/alfa/p/com.mosaikit.static-site/r/sites",
-            Some(json!({ "values": { "name": "Sito" } })),
+            Some(json!({ "values": { "name": "Site" } })),
         )
         .await;
     let sid = site.json()["id"].as_str().unwrap().to_string();
@@ -451,13 +451,13 @@ async fn contenuti_utente_sempre_in_sandbox() {
     );
     assert_eq!(a.get_untrusted(&format!("{base}docs"), None).await.status, StatusCode::PERMANENT_REDIRECT);
     assert_eq!(a.get_untrusted(&format!("{base}../../x"), None).await.status, StatusCode::NOT_FOUND);
-    assert_eq!(a.get_untrusted("/c/ticket-falso/index.html", None).await.status, StatusCode::FORBIDDEN);
+    assert_eq!(a.get_untrusted("/c/fake-ticket/index.html", None).await.status, StatusCode::FORBIDDEN);
 
-    // file HTML caricato nel file manager: mai eseguito (sandbox senza script)
+    // HTML file uploaded in the file manager: never run (sandbox without scripts)
     let r = a
         .raw(
             &g,
-            "/api/t/alfa/p/com.mosaikit.files/files/upload?name=pagina.html",
+            "/api/t/alfa/p/com.mosaikit.files/files/upload?name=page.html",
             b"<script>alert(1)</script>".to_vec(),
         )
         .await;
@@ -472,7 +472,7 @@ async fn contenuti_utente_sempre_in_sandbox() {
     let r = a.get_untrusted(url.trim_start_matches(&a.t.cfg.public_url), None).await;
     let csp = r.header(header::CONTENT_SECURITY_POLICY);
     assert!(csp.starts_with("sandbox allow-downloads") && !csp.contains("allow-scripts"), "{csp}");
-    // download dall'app: sempre attachment octet-stream
+    // download from the app: always attachment octet-stream
     let r = a
         .call(Some(&g), Method::GET, &format!("/api/t/alfa/p/com.mosaikit.files/files/{fid}/content"), None)
         .await;
@@ -481,18 +481,18 @@ async fn contenuti_utente_sempre_in_sandbox() {
 }
 
 #[tokio::test]
-async fn link_pubblici_via_http() {
+async fn public_links_over_http() {
     let a = App::new().await;
     a.t.install("notes").await;
     a.t.install("files").await;
     a.t.tenant("alfa").await;
-    let g = a.login("alfa", "alfa-gestore", PASSWORD).await;
+    let g = a.login("alfa", "alfa-manager", PASSWORD).await;
     let n = a
         .call(
             Some(&g),
             Method::POST,
             "/api/t/alfa/p/com.mosaikit.notes/r/notes",
-            Some(json!({ "values": { "title": "Avviso", "body": "<b>testo</b>" } })),
+            Some(json!({ "values": { "title": "Notice", "body": "<b>text</b>" } })),
         )
         .await;
     let rid = n.json()["id"].as_str().unwrap().to_string();
@@ -502,85 +502,82 @@ async fn link_pubblici_via_http() {
     let path = l.json()["url"].as_str().unwrap().trim_start_matches(&a.t.cfg.public_url).to_string();
     let r = a.get_untrusted(&path, None).await;
     assert_eq!(r.status, StatusCode::OK);
-    assert!(
-        r.text().contains("Avviso") && r.text().contains("&lt;b&gt;testo&lt;/b&gt;"),
-        "contenuto escapato"
-    );
+    assert!(r.text().contains("Notice") && r.text().contains("&lt;b&gt;text&lt;/b&gt;"), "content escaped");
     assert!(r.header(header::CONTENT_SECURITY_POLICY).contains("default-src 'none'"));
     let api = a.get_untrusted(&format!("{path}api"), None).await.json();
-    assert_eq!(api["values"]["title"], "Avviso");
+    assert_eq!(api["values"]["title"], "Notice");
     let views: i64 = mosaikit_db::query_scalar("select view_count from core.public_links")
         .fetch_one(&a.t.db)
         .await
         .unwrap();
     assert_eq!(views, 1);
 
-    // con password
+    // with password
     let l = a
         .call(
             Some(&g),
             Method::POST,
             &format!("/api/t/alfa/resources/{rid}/links"),
-            Some(json!({ "password": "aperto123" })),
+            Some(json!({ "password": "open123" })),
         )
         .await;
     let ppath = l.json()["url"].as_str().unwrap().trim_start_matches(&a.t.cfg.public_url).to_string();
     let r = a.get_untrusted(&ppath, None).await;
-    assert!(r.text().contains("Contenuto protetto"));
+    assert!(r.text().contains("Protected content"));
     assert_eq!(a.get_untrusted(&format!("{ppath}api"), None).await.status, StatusCode::NOT_FOUND);
     let wrong = Request::builder()
         .method(Method::POST)
         .uri(format!("{ppath}unlock"))
         .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
-        .body(Body::from("password=sbagliata"))
+        .body(Body::from("password=wrong-pass"))
         .unwrap();
     assert_eq!(send(&a.untrusted, wrong).await.status, StatusCode::UNAUTHORIZED);
     let right = Request::builder()
         .method(Method::POST)
         .uri(format!("{ppath}unlock"))
         .header(header::CONTENT_TYPE, "application/x-www-form-urlencoded")
-        .body(Body::from("password=aperto123"))
+        .body(Body::from("password=open123"))
         .unwrap();
     let r = send(&a.untrusted, right).await;
     let cookie = r.header(header::SET_COOKIE);
     assert!(cookie.contains("HttpOnly"), "{cookie}");
     let r = a.get_untrusted(&ppath, Some(cookie.split(';').next().unwrap())).await;
-    assert!(r.text().contains("Avviso"));
+    assert!(r.text().contains("Notice"));
 
-    // cartella condivisa pubblicamente
+    // publicly shared folder
     let f = a
         .call(
             Some(&g),
             Method::POST,
             "/api/t/alfa/p/com.mosaikit.files/files/folder",
-            Some(json!({ "name": "Pubblica" })),
+            Some(json!({ "name": "Public" })),
         )
         .await
         .json();
     let fid = f["id"].as_str().unwrap().to_string();
     a.raw(
         &g,
-        &format!("/api/t/alfa/p/com.mosaikit.files/files/upload?parent={fid}&name=leggimi.txt"),
-        b"ciao".to_vec(),
+        &format!("/api/t/alfa/p/com.mosaikit.files/files/upload?parent={fid}&name=readme.txt"),
+        b"hello".to_vec(),
     )
     .await;
     let l =
         a.call(Some(&g), Method::POST, &format!("/api/t/alfa/resources/{fid}/links"), Some(json!({}))).await;
     let fpath = l.json()["url"].as_str().unwrap().trim_start_matches(&a.t.cfg.public_url).to_string();
     let page = a.get_untrusted(&fpath, None).await.text();
-    assert!(page.contains("leggimi.txt"));
+    assert!(page.contains("readme.txt"));
     let href = page.split("href=\"").nth(1).unwrap().split('"').next().unwrap().to_string();
     let file = a.get_untrusted(&href, None).await;
-    assert_eq!(file.body, b"ciao");
-    // un file non coperto dal link
+    assert_eq!(file.body, b"hello");
+    // a file not covered by the link
     let other = a
-        .raw(&g, "/api/t/alfa/p/com.mosaikit.files/files/upload?name=privato.txt", b"x".to_vec())
+        .raw(&g, "/api/t/alfa/p/com.mosaikit.files/files/upload?name=private.txt", b"x".to_vec())
         .await
         .json();
     let forged = href.replace(href.split('/').nth(4).unwrap(), other["id"].as_str().unwrap());
     assert_eq!(a.get_untrusted(&forged, None).await.status, StatusCode::NOT_FOUND);
 
-    // revoca
+    // revocation
     let links =
         a.call(Some(&g), Method::GET, &format!("/api/t/alfa/resources/{rid}/links"), None).await.json();
     for l in links.as_array().unwrap() {
@@ -591,7 +588,7 @@ async fn link_pubblici_via_http() {
 }
 
 #[tokio::test]
-async fn percorso_base_da_un_solo_url() {
+async fn base_path_from_a_single_url() {
     let a = App::with(
         start_with(|c| {
             c.url = "http://127.0.0.1:9100/mosaikit".into();
@@ -599,14 +596,14 @@ async fn percorso_base_da_un_solo_url() {
         .await,
     );
     assert_eq!(a.t.cfg.plugin_url, "http://127.0.0.1:9101/mosaikit");
-    // API e UI solo sotto il percorso base
+    // API and UI only under the base path
     assert_eq!(a.call(None, Method::GET, "/mosaikit/api/health", None).await.status, StatusCode::OK);
     assert_eq!(a.call(None, Method::GET, "/api/health", None).await.status, StatusCode::NOT_FOUND);
     let r = a.call(None, Method::GET, "/mosaikit", None).await;
     assert_eq!(r.status, StatusCode::PERMANENT_REDIRECT);
     assert_eq!(r.header(header::LOCATION), "/mosaikit/");
     assert_eq!(a.call(None, Method::GET, "/mosaikit/", None).await.status, StatusCode::OK);
-    // cookie di sessione limitato al percorso base
+    // session cookie limited to the base path
     let r = a
         .call(
             None,
@@ -618,46 +615,46 @@ async fn percorso_base_da_un_solo_url() {
     assert_eq!(r.status, StatusCode::OK, "{}", r.text());
     assert!(r.header(header::SET_COOKIE).contains("Path=/mosaikit/"));
     assert_eq!(r.json()["plugin_url"], "http://127.0.0.1:9101/mosaikit");
-    // origine dei plugin: stessa base
+    // origin of the plugins: same base
     assert_eq!(a.get_untrusted("/ui/x/", None).await.status, StatusCode::NOT_FOUND);
     let r = a.get_untrusted("/mosaikit/ui/inesistente/", None).await;
-    assert_eq!(r.text(), "plugin non attivo");
+    assert_eq!(r.text(), "plugin not active");
 }
 
 #[tokio::test]
-async fn marchio_della_distribuzione() {
+async fn brand_of_the_distribution() {
     let brand = tempfile::tempdir().unwrap();
     std::fs::write(brand.path().join("logo.svg"), "<svg xmlns=\"http://www.w3.org/2000/svg\"/>").unwrap();
     std::fs::write(
         brand.path().join("brand.toml"),
-        "name = \"Atlante <beta>\"\nversion = \"2.0.0\"\nlogo = \"logo.svg\"\ntagline = \"dati territoriali\"\n[colors]\naccent = \"#1e88e5\"\n",
+        "name = \"Atlas <beta>\"\nversion = \"2.0.0\"\nlogo = \"logo.svg\"\ntagline = \"territorial data\"\n[colors]\naccent = \"#1e88e5\"\n",
     )
     .unwrap();
     let dir = brand.path().to_path_buf();
     let a = App::with(start_with(move |c| c.brand = Some(dir)).await);
     let b = a.call(None, Method::GET, "/api/brand", None).await.json();
-    assert_eq!(b["name"], "Atlante <beta>");
+    assert_eq!(b["name"], "Atlas <beta>");
     assert_eq!(b["version"], "2.0.0");
     assert_eq!(b["logo"], true);
     let logo = a.call(None, Method::GET, "/brand/logo", None).await;
     assert_eq!(logo.status, StatusCode::OK);
     assert!(logo.header(header::CONTENT_TYPE).starts_with("image/svg"));
     assert!(logo.header(header::CONTENT_SECURITY_POLICY).contains("sandbox"));
-    // senza favicon propria: quella di default
+    // without a favicon of its own: the default one
     assert_eq!(a.call(None, Method::GET, "/brand/favicon", None).await.status, StatusCode::OK);
-    assert_eq!(a.call(None, Method::GET, "/brand/altro", None).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(a.call(None, Method::GET, "/brand/other", None).await.status, StatusCode::NOT_FOUND);
     let page = a.call(None, Method::GET, "/", None).await.text();
-    if page.contains("<title>") && !page.contains("UI non compilata") {
-        assert!(page.contains("<title>Atlante &lt;beta&gt;</title>"), "{page}");
+    if page.contains("<title>") && !page.contains("UI not built") {
+        assert!(page.contains("<title>Atlas &lt;beta&gt;</title>"), "{page}");
         assert!(page.contains("--acc:#1e88e5;"), "{page}");
     }
 }
 
 #[tokio::test]
-async fn accesso_amministratori_con_secondo_fattore() {
+async fn administrator_sign_in_with_second_factor() {
     use mosaikit_kernel::totp;
     let a = App::with(start_with(|c| c.admin_totp = true).await);
-    // tenant della pagina di accesso: pubblici, senza il tenant di sistema
+    // tenants of the sign-in page: public, without the system tenant
     let r = a.call(None, Method::GET, "/api/auth/tenants", None).await;
     assert_eq!((r.status, r.json()), (StatusCode::OK, json!([])));
 
@@ -676,7 +673,7 @@ async fn accesso_amministratori_con_secondo_fattore() {
         cookie: r.header(header::SET_COOKIE).split(';').next().unwrap().to_string(),
         csrf: r.json()["csrf"].as_str().unwrap().to_string(),
     };
-    // la sessione in attesa non apre le API
+    // the pending session does not open the APIs
     assert_eq!(
         a.call(Some(&pending), Method::GET, "/api/session", None).await.status,
         StatusCode::UNAUTHORIZED
@@ -703,13 +700,13 @@ async fn accesso_amministratori_con_secondo_fattore() {
         cookie: r.header(header::SET_COOKIE).split(';').next().unwrap().to_string(),
         csrf: r.json()["csrf"].as_str().unwrap().to_string(),
     };
-    assert_ne!(s.cookie, pending.cookie, "nuovo token dopo il secondo fattore");
+    assert_ne!(s.cookie, pending.cookie, "new token after the second factor");
     assert_eq!(a.call(Some(&s), Method::GET, "/api/session", None).await.status, StatusCode::OK);
     assert_eq!(
         a.call(Some(&pending), Method::POST, "/api/auth/totp/setup", None).await.status,
         StatusCode::UNAUTHORIZED
     );
-    // nessuno spazio di lavoro per l'Administrator, ma la sua panoramica
+    // no workspace for the Administrator, but their overview
     assert_eq!(
         a.call(Some(&s), Method::GET, "/api/t/system/context", None).await.status,
         StatusCode::FORBIDDEN
@@ -719,7 +716,7 @@ async fn accesso_amministratori_con_secondo_fattore() {
 }
 
 #[tokio::test]
-async fn errori_con_codice_stabile() {
+async fn errors_with_a_stable_code() {
     let a = App::new().await;
     a.t.tenant("alfa").await;
     let r = a
@@ -727,15 +724,15 @@ async fn errori_con_codice_stabile() {
             None,
             Method::POST,
             "/api/auth/login",
-            Some(json!({ "tenant": "alfa", "username": "alfa-gestore", "password": "sbagliata-123" })),
+            Some(json!({ "tenant": "alfa", "username": "alfa-manager", "password": "wrong-pass-123" })),
         )
         .await;
     assert_eq!((r.status, r.json()["code"].as_str()), (StatusCode::UNAUTHORIZED, Some("wrong_credentials")));
-    assert!(r.json()["error"].is_string(), "il messaggio resta, come riserva");
+    assert!(r.json()["error"].is_string(), "the message stays, as a fallback");
 
-    let s = a.login("alfa", "alfa-gestore", PASSWORD).await;
+    let s = a.login("alfa", "alfa-manager", PASSWORD).await;
     let r = a
-        .call(Some(&s), Method::POST, "/api/me/password", Some(json!({ "old": PASSWORD, "new": "corta" })))
+        .call(Some(&s), Method::POST, "/api/me/password", Some(json!({ "old": PASSWORD, "new": "short" })))
         .await;
     assert_eq!((r.status, r.json()["code"].as_str()), (StatusCode::BAD_REQUEST, Some("password_too_short")));
     let r = a
@@ -743,15 +740,15 @@ async fn errori_con_codice_stabile() {
             Some(&s),
             Method::POST,
             "/api/me/password",
-            Some(json!({ "old": "non-e-questa", "new": "lunga-abbastanza-1" })),
+            Some(json!({ "old": "not-this-one", "new": "long-enough-1" })),
         )
         .await;
     assert_eq!(r.json()["code"], "wrong_password");
-    // senza un codice specifico: quello della categoria
+    // without a specific code: the one of the category
     let r = a.call(Some(&s), Method::GET, "/api/admin/tenants", None).await;
     assert_eq!((r.status, r.json()["code"].as_str()), (StatusCode::FORBIDDEN, Some("forbidden")));
 
-    // troppi tentativi
+    // too many attempts
     let mut last = None;
     for _ in 0..10 {
         last = Some(
@@ -759,7 +756,7 @@ async fn errori_con_codice_stabile() {
                 None,
                 Method::POST,
                 "/api/auth/login",
-                Some(json!({ "tenant": "alfa", "username": "alfa-gestore", "password": "sbagliata-123" })),
+                Some(json!({ "tenant": "alfa", "username": "alfa-manager", "password": "wrong-pass-123" })),
             )
             .await,
         );
@@ -769,4 +766,35 @@ async fn errori_con_codice_stabile() {
         (r.status, r.json()["code"].as_str()),
         (StatusCode::TOO_MANY_REQUESTS, Some("too_many_attempts"))
     );
+}
+
+#[tokio::test]
+async fn sign_in_page_knows_the_themes() {
+    let a = App::new().await;
+    a.t.tenant("alfa").await;
+    a.t.tenant("beta").await;
+    // public, before any session: theme and top bar of the platform, theme of every tenant
+    let brand = a.call(None, Method::GET, "/api/brand", None).await.json();
+    assert_eq!(brand["theme"], "mosaikit");
+    assert_eq!(brand["band"]["search"], true);
+    let themes = |v: Value| {
+        v.as_array()
+            .unwrap()
+            .iter()
+            .map(|t| (t["slug"].as_str().unwrap().to_string(), t["theme"].as_str().unwrap().to_string()))
+            .collect::<Vec<_>>()
+    };
+    let r = a.call(None, Method::GET, "/api/auth/tenants", None).await;
+    assert_eq!(themes(r.json()), [("alfa".into(), "mosaikit".into()), ("beta".into(), "mosaikit".into())]);
+    // a tenant with a theme of its own; the others follow the platform
+    let m = a.login("alfa", "alfa-manager", PASSWORD).await;
+    let r =
+        a.call(Some(&m), Method::PUT, "/api/t/alfa/manage/theme", Some(json!({ "preset": "tessera" }))).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let admin = a.admin().await;
+    let r = a.call(Some(&admin), Method::PUT, "/api/admin/theme", Some(json!({ "preset": "italia" }))).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let r = a.call(None, Method::GET, "/api/auth/tenants", None).await;
+    assert_eq!(themes(r.json()), [("alfa".into(), "tessera".into()), ("beta".into(), "italia".into())]);
+    assert_eq!(a.call(None, Method::GET, "/api/brand", None).await.json()["theme"], "italia");
 }

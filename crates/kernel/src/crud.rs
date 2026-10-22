@@ -1,7 +1,7 @@
-//! CRUD generico sulle `[[resources]]` dei manifest.
+//! Generic CRUD on the `[[resources]]` of the manifests.
 //!
-//! Ogni riga e' una risorsa del kernel (proprietario, permessi, link). Tutte le
-//! operazioni girano con il ruolo del plugin: la RLS decide cosa si vede.
+//! Every row is a kernel resource (owner, permissions, links). Every
+//! operation runs with the role of the plugin: RLS decides what is visible.
 
 use std::sync::Arc;
 
@@ -28,10 +28,10 @@ pub struct ListResult {
 }
 
 fn decl<'a>(p: &'a LoadedPlugin, resource: &str) -> Result<&'a ResourceDecl> {
-    p.manifest.resource(resource).ok_or_else(|| Error::not_found(format!("risorsa sconosciuta: {resource}")))
+    p.manifest.resource(resource).ok_or_else(|| Error::not_found(format!("unknown resource: {resource}")))
 }
 
-/// SELECT delle righe visibili con metadati, come JSON.
+/// SELECT of the visible rows with metadata, as JSON.
 fn select_sql(k: &Kernel, p: &LoadedPlugin, d: &ResourceDecl, cond: &str) -> String {
     if k.db.is_sqlite() {
         return select_sql_lite(p, d, cond);
@@ -51,8 +51,8 @@ fn select_sql(k: &Kernel, p: &LoadedPlugin, d: &ResourceDecl, cond: &str) -> Str
     )
 }
 
-/// Come `select_sql` per SQLite: oggetti JSON costruiti riga per riga (`json_agg(x)`
-/// non esiste) e booleani convertiti (SQLite li salva come 0/1).
+/// Like `select_sql` for SQLite: JSON objects built row by row (`json_agg(x)`
+/// does not exist) and booleans converted (SQLite stores them as 0/1).
 fn select_sql_lite(p: &LoadedPlugin, d: &ResourceDecl, cond: &str) -> String {
     let obj: Vec<String> = d
         .fields
@@ -131,7 +131,7 @@ pub async fn get_ctx(k: &Kernel, ctx: &Ctx, p: &LoadedPlugin, resource: &str, id
     let mut tx = k.db.begin_plugin(&p.id, ctx).await?;
     let row = get_in(k, &mut tx, p, d, id).await?;
     tx.commit().await?;
-    row.ok_or_else(|| Error::not_found("record non trovato"))
+    row.ok_or_else(|| Error::not_found("record not found"))
 }
 
 pub async fn list(
@@ -151,12 +151,12 @@ pub async fn get(k: &Kernel, c: &Caller, plugin: &str, resource: &str, id: Uuid)
     get_ctx(k, &c.ctx(), &p, resource, id).await
 }
 
-/// Converte e valida i valori secondo il manifest. `base` fornisce i valori
-/// dei campi non presenti in `input` (aggiornamenti parziali, output degli hook).
+/// Converts and validates the values according to the manifest. `base` gives the values
+/// of the fields not present in `input` (partial updates, output of the hooks).
 pub fn coerce(d: &ResourceDecl, input: &Values, base: Option<&Values>) -> Result<Values> {
     for k in input.keys() {
         if !d.fields.iter().any(|f| &f.key == k) {
-            return Err(Error::bad(format!("campo sconosciuto: {k}")));
+            return Err(Error::bad(format!("unknown field: {k}")));
         }
     }
     let mut out = Map::new();
@@ -164,12 +164,12 @@ pub fn coerce(d: &ResourceDecl, input: &Values, base: Option<&Values>) -> Result
         let raw =
             input.get(&f.key).or_else(|| base.and_then(|b| b.get(&f.key))).cloned().unwrap_or(Value::Null);
         let label = if f.label.is_empty() { &f.key } else { &f.label };
-        let bad = |what: &str| Error::bad(format!("campo '{label}': {what}"));
+        let bad = |what: &str| Error::bad(format!("field '{label}': {what}"));
         let v = match (f.kind, raw) {
             (_, Value::Null) => Value::Null,
             (FieldKind::Text, Value::String(s)) => {
                 if s.len() > MAX_TEXT {
-                    return Err(bad("testo troppo lungo"));
+                    return Err(bad("text too long"));
                 }
                 if s.is_empty() {
                     Value::Null
@@ -184,13 +184,13 @@ pub fn coerce(d: &ResourceDecl, input: &Values, base: Option<&Values>) -> Result
             (FieldKind::Number, Value::String(s)) if s.trim().is_empty() => Value::Null,
             (FieldKind::Number, Value::String(s)) => match s.trim().replace(',', ".").parse::<f64>() {
                 Ok(x) if x.is_finite() => json!(x),
-                _ => return Err(bad("numero non valido")),
+                _ => return Err(bad("invalid number")),
             },
             (FieldKind::Bool, Value::Bool(b)) => Value::Bool(b),
             (FieldKind::Bool, Value::String(s)) => match s.trim().to_lowercase().as_str() {
-                "true" | "1" | "si" | "sì" | "on" | "✓" => Value::Bool(true),
+                "true" | "1" | "yes" | "si" | "sì" | "on" | "✓" => Value::Bool(true),
                 "false" | "0" | "no" | "off" | "" => Value::Bool(false),
-                _ => return Err(bad("valore booleano non valido")),
+                _ => return Err(bad("invalid boolean value")),
             },
             (FieldKind::Bool, Value::Number(n)) => Value::Bool(n.as_f64() != Some(0.0)),
             (FieldKind::Date, Value::String(s)) if s.trim().is_empty() => Value::Null,
@@ -198,17 +198,17 @@ pub fn coerce(d: &ResourceDecl, input: &Values, base: Option<&Values>) -> Result
                 let s = s.trim();
                 let d = s.get(..10).unwrap_or(s);
                 chrono::NaiveDate::parse_from_str(d, "%Y-%m-%d")
-                    .map_err(|_| bad("data non valida (AAAA-MM-GG)"))?;
+                    .map_err(|_| bad("invalid date (YYYY-MM-DD)"))?;
                 Value::String(d.to_string())
             }
             (FieldKind::Choice, Value::String(s)) if s.is_empty() => Value::Null,
             (FieldKind::Choice, Value::String(s)) => {
                 if !f.options.contains(&s) {
-                    return Err(bad(&format!("valore '{s}' non tra le opzioni")));
+                    return Err(bad(&format!("value '{s}' is not among the options")));
                 }
                 Value::String(s)
             }
-            _ => return Err(bad("tipo non valido")),
+            _ => return Err(bad("invalid type")),
         };
         out.insert(f.key.clone(), v);
     }
@@ -224,13 +224,13 @@ fn check_required(d: &ResourceDecl, v: &Values) -> Result<()> {
         };
         if empty {
             let label = if f.label.is_empty() { &f.key } else { &f.label };
-            return Err(Error::bad(format!("campo obbligatorio: {label}")));
+            return Err(Error::bad(format!("required field: {label}")));
         }
     }
     Ok(())
 }
 
-/// Parametro tipizzato di un campo (numeri e booleani nativi: SQLite non converte il testo).
+/// Typed parameter of a field (native numbers and booleans: SQLite does not convert text).
 fn bind_value(kind: FieldKind, v: &Value) -> mosaikit_db::Param {
     use mosaikit_db::{Param, Ty};
     match (kind, v) {
@@ -253,7 +253,7 @@ fn title_of(d: &ResourceDecl, v: &Values) -> String {
     t.unwrap_or_default().chars().take(500).collect()
 }
 
-/// Esegue un hook, se il plugin lo dichiara; ritorna i valori (eventualmente modificati).
+/// Runs a hook, if the plugin declares it; returns the values (possibly changed).
 #[allow(clippy::too_many_arguments)]
 async fn run_hook(
     k: &Kernel,
@@ -316,7 +316,7 @@ pub async fn create(
     }
     q.execute(&mut *tx).await?;
     let row =
-        get_in(k, &mut tx, &p, d, id).await?.ok_or_else(|| Error::internal("record creato non visibile"))?;
+        get_in(k, &mut tx, &p, d, id).await?.ok_or_else(|| Error::internal("created record not visible"))?;
     tx.commit().await?;
     events::record(
         k,
@@ -343,9 +343,9 @@ pub async fn update(
     let d = decl(&p, resource)?;
     let mut tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
     let prev_row =
-        get_in(k, &mut tx, &p, d, id).await?.ok_or_else(|| Error::not_found("record non trovato"))?;
+        get_in(k, &mut tx, &p, d, id).await?.ok_or_else(|| Error::not_found("record not found"))?;
     if level(&mut tx, id).await? < 2 {
-        return Err(Error::forbidden("serve il permesso di scrittura"));
+        return Err(Error::forbidden("the write permission is required"));
     }
     let previous: Values = prev_row.get("values").and_then(Value::as_object).cloned().unwrap_or_default();
     let values = coerce(d, input, Some(&previous))?;
@@ -370,10 +370,10 @@ pub async fn update(
     }
     let n = q.execute(&mut *tx).await?.rows_affected();
     if n != 1 {
-        return Err(Error::forbidden("aggiornamento non consentito"));
+        return Err(Error::forbidden("update not allowed"));
     }
     tx.update_resource(id, Some(&title_of(d, &values)), None, None).await?;
-    let row = get_in(k, &mut tx, &p, d, id).await?.ok_or_else(|| Error::internal("record non visibile"))?;
+    let row = get_in(k, &mut tx, &p, d, id).await?.ok_or_else(|| Error::internal("record not visible"))?;
     tx.commit().await?;
     events::record(
         k,
@@ -393,9 +393,9 @@ pub async fn delete(k: &Kernel, c: &Caller, plugin: &str, resource: &str, id: Uu
     let d = decl(&p, resource)?;
     let mut tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
     let prev_row =
-        get_in(k, &mut tx, &p, d, id).await?.ok_or_else(|| Error::not_found("record non trovato"))?;
+        get_in(k, &mut tx, &p, d, id).await?.ok_or_else(|| Error::not_found("record not found"))?;
     if level(&mut tx, id).await? < 3 {
-        return Err(Error::forbidden("serve il permesso di gestione per eliminare"));
+        return Err(Error::forbidden("the manage permission is required to delete"));
     }
     let previous: Values = prev_row.get("values").and_then(Value::as_object).cloned().unwrap_or_default();
     let gone = tx.delete_resource(id).await?;
@@ -418,12 +418,12 @@ pub async fn delete(k: &Kernel, c: &Caller, plugin: &str, resource: &str, id: Uu
     Ok(())
 }
 
-/// Comando della logica del plugin (`msk.call` dalla UI).
+/// Command of the logic of the plugin (`msk.call` from the UI).
 pub async fn call(k: &Kernel, c: &Caller, plugin: &str, name: &str, args: Value) -> Result<Value> {
     call_depth(k, c, plugin, name, args, 0).await
 }
 
-/// Come `call`, da un altro plugin (`plugin.call`) a profondita' `depth`.
+/// Like `call`, from another plugin (`plugin.call`) at depth `depth`.
 pub(crate) async fn call_depth(
     k: &Kernel,
     c: &Caller,

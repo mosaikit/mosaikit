@@ -1,17 +1,17 @@
-//! Traduzione da SQL PostgreSQL a SQLite, con le regole di sicurezza di Mosaikit.
+//! Translation from PostgreSQL SQL to SQLite, with the security rules of Mosaikit.
 //!
-//! Su SQLite non ci sono schemi, ruoli ne' Row-Level Security. La traduzione:
-//! - rinomina gli oggetti: `core.users` -> `core_users`, `plg_x.notes` -> `plg_x__notes`;
-//! - nelle transazioni dei plugin sostituisce ogni lettura di una tabella protetta
-//!   (con `resource_id`) con una sottoquery filtrata per livello di accesso del
-//!   contesto (equivalente di `msk_select`), e aggiunge il filtro a UPDATE/DELETE
-//!   (`msk_update`/`msk_delete`); INSERT e nuovi valori li controllano i trigger;
-//! - espande le funzioni `core.*` (livelli, contesto) in SQL sulle tabelle core;
-//! - converte cast, funzioni, intervalli, `= ANY(...)`, `ILIKE`, placeholder `$n`;
-//! - per l'SQL scritto dai plugin accetta solo le loro tabelle e viste.
+//! SQLite has no schemas, roles or Row-Level Security. The translation:
+//! - renames the objects: `core.users` -> `core_users`, `plg_x.notes` -> `plg_x__notes`;
+//! - in the transactions of the plugins replaces every read of a protected table
+//!   (with `resource_id`) with a subquery filtered by the access level of the
+//!   context (the equivalent of `msk_select`), and adds the filter to UPDATE/DELETE
+//!   (`msk_update`/`msk_delete`); triggers check INSERT and new values;
+//! - expands the `core.*` functions (levels, context) into SQL on the core tables;
+//! - converts casts, functions, intervals, `= ANY(...)`, `ILIKE`, `$n` placeholders;
+//! - for the SQL written by the plugins it accepts only their tables and views.
 //!
-//! Le funzioni `core_ctx_*()` sono registrate da Mosaikit su ogni connessione e
-//! leggono il contesto della transazione dal lato Rust: il plugin non puo' cambiarlo.
+//! The `core_ctx_*()` functions are registered by Mosaikit on every connection and
+//! read the context of the transaction from the Rust side: the plugin cannot change it.
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::ops::ControlFlow;
@@ -26,19 +26,19 @@ use sqlparser::parser::Parser;
 
 use crate::{GuardError, Result};
 
-/// Formato degli istanti salvati come testo (come `TS_FORMAT` di mosaikit-db).
+/// Format of the instants stored as text (like `TS_FORMAT` of mosaikit-db).
 pub const NOW: &str = "strftime('%Y-%m-%dT%H:%M:%fZ', 'now')";
 
-/// Oggetti di un plugin, per risolvere i nomi delle sue query.
+/// Objects of a plugin, to resolve the names of its queries.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Scope {
-    /// schema logico (`plg_notes`)
+    /// logical schema (`plg_notes`)
     pub schema: String,
-    /// tabelle: nome -> protetta (ha `resource_id`: righe filtrate per livello)
+    /// tables: name -> protected (has `resource_id`: rows filtered by level)
     pub tables: BTreeMap<String, bool>,
-    /// viste del plugin (non KPI): nome -> SQL PostgreSQL, espanse a ogni uso
+    /// views of the plugin (not KPI): name -> PostgreSQL SQL, expanded at every use
     pub views: BTreeMap<String, String>,
-    /// viste KPI (vere viste SQLite, aggregate su tutti i tenant: solo per il kernel)
+    /// KPI views (real SQLite views, aggregated over every tenant: for the kernel only)
     pub kpi_views: BTreeSet<String>,
 }
 
@@ -53,19 +53,19 @@ impl Scope {
 
 #[derive(Debug, Clone, Copy)]
 pub enum Mode<'a> {
-    /// SQL del kernel; con `Some` gira in una transazione del plugin (righe filtrate)
+    /// SQL of the kernel; with `Some` it runs in a transaction of the plugin (filtered rows)
     Kernel(Option<&'a Scope>),
-    /// SQL scritto dal plugin, gia' verificato da `check_query`
+    /// SQL written by the plugin, already checked by `check_query`
     Plugin(&'a Scope),
-    /// migrazione del plugin, gia' verificata da `check_migration`
+    /// migration of the plugin, already checked by `check_migration`
     Migration(&'a Scope),
 }
 
-/// Risultato della traduzione di un'istruzione.
+/// Result of the translation of a statement.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Translated {
     Sql(String),
-    /// vista del plugin (non KPI): si salva la definizione e si espande a ogni uso
+    /// view of the plugin (not KPI): the definition is stored and expanded at every use
     StoreView {
         name: String,
         sql: String,
@@ -73,13 +73,13 @@ pub enum Translated {
     DropView {
         name: String,
     },
-    /// istruzione senza effetto su SQLite (es. COMMENT ON)
+    /// statement with no effect on SQLite (e.g. COMMENT ON)
     Skip,
 }
 
-// ------------------------------------------------------------------ modelli SQL
+// ------------------------------------------------------------------ SQL templates
 
-/// Livello (0-3) del contesto sulla riga di `core_resources` con alias `r`.
+/// Level (0-3) of the context on the row of `core_resources` with alias `r`.
 pub fn level_row(r: &str) -> String {
     format!(
         "(CASE \
@@ -97,12 +97,12 @@ pub fn level_row(r: &str) -> String {
     )
 }
 
-// Gli argomenti dei modelli (`rid`, `u`, ...) arrivano dall'SQL del chiamante e
-// possono contenere colonne non qualificate (es. `parent_id`): si valutano in una
-// sottoquery senza tabelle nella FROM, cosi' si risolvono nella query esterna e
-// non nelle tabelle core interne al modello.
+// The arguments of the templates (`rid`, `u`, ...) come from the SQL of the caller and
+// may contain unqualified columns (e.g. `parent_id`): they are evaluated in a
+// subquery without tables in the FROM, so they resolve in the outer query and
+// not in the core tables inside the template.
 
-/// Livello del contesto su una risorsa qualsiasi (0 se non esiste).
+/// Level of the context on any resource (0 if it does not exist).
 pub fn level_of(rid: &str) -> String {
     format!(
         "coalesce((SELECT {} FROM (SELECT ({rid}) AS v) msk_lx JOIN core_resources msk_lr ON msk_lr.id = msk_lx.v), 0)",
@@ -110,8 +110,8 @@ pub fn level_of(rid: &str) -> String {
     )
 }
 
-/// Livello di un utente: proprietario della risorsa o di un antenato 3, altrimenti
-/// il massimo dei grant diretti o tramite gruppo del tenant.
+/// Level of a user: owner of the resource or of an ancestor 3, otherwise
+/// the highest of the grants, direct or through a group of the tenant.
 pub fn level_for(u: &str, t: &str, rid: &str, anc: &str) -> String {
     format!(
         "(SELECT CASE \
@@ -130,7 +130,7 @@ pub fn level_for(u: &str, t: &str, rid: &str, anc: &str) -> String {
     )
 }
 
-/// L'utente e' membro attivo di un tenant attivo.
+/// The user is an active member of an active tenant.
 pub fn is_member(u: &str, t: &str) -> String {
     format!("(SELECT {} FROM (SELECT ({u}) AS u, ({t}) AS t) msk_im)", member_sql("msk_im.u", "msk_im.t"))
 }
@@ -144,7 +144,7 @@ fn member_sql(u: &str, t: &str) -> String {
     )
 }
 
-/// `core.visible_resources`: metadati delle risorse del plugin visibili nel contesto.
+/// `core.visible_resources`: metadata of the resources of the plugin visible in the context.
 pub fn visible_resources() -> String {
     format!(
         "SELECT msk_r.id, msk_r.tenant_id, msk_r.plugin_id, msk_r.kind, msk_r.parent_id, msk_r.ancestors, \
@@ -159,12 +159,12 @@ pub fn visible_resources() -> String {
     )
 }
 
-/// Righe di una tabella protetta visibili nel contesto (lettura).
+/// Rows of a protected table visible in the context (read).
 fn filtered_table(physical: &str) -> String {
     format!("SELECT * FROM \"{physical}\" WHERE {} >= 1", level_of("resource_id"))
 }
 
-// ------------------------------------------------------------------ utilita'
+// ------------------------------------------------------------------ utilities
 
 fn err(m: impl Into<String>) -> GuardError {
     GuardError::Statement(m.into())
@@ -174,13 +174,13 @@ fn parse_expr(sql: &str) -> Result<Expr> {
     Parser::new(&GenericDialect {})
         .try_with_sql(sql)
         .and_then(|mut p| p.parse_expr())
-        .map_err(|e| GuardError::Parse(format!("{e} (modello interno)")))
+        .map_err(|e| GuardError::Parse(format!("{e} (internal template)")))
 }
 
 fn parse_query(sql: &str) -> Result<Query> {
     match Parser::parse_sql(&GenericDialect {}, sql).map_err(|e| GuardError::Parse(e.to_string()))?.pop() {
         Some(Statement::Query(q)) => Ok(*q),
-        _ => Err(GuardError::Parse("query attesa (modello interno)".into())),
+        _ => Err(GuardError::Parse("query expected (internal template)".into())),
     }
 }
 
@@ -237,18 +237,18 @@ fn type_class(dt: &DataType) -> &'static str {
     } else if s.contains("char") || s == "text" || s == "name" || s == "citext" {
         "text"
     } else {
-        // uuid, json, jsonb, timestamp...: su SQLite sono gia' testo
+        // uuid, json, jsonb, timestamp...: on SQLite they are already text
         "same"
     }
 }
 
 const SENTINEL: &str = "__msk_target__";
 
-/// Nomi di funzione che i plugin non possono usare su SQLite (oltre a quelle di sistema).
+/// Function names the plugins cannot use on SQLite (besides the system ones).
 const DENIED_LITE: &[&str] =
     &["load_extension", "readfile", "writefile", "edit", "fts3_tokenizer", "zipfile"];
 
-/// Tabelle-funzione PostgreSQL con equivalente SQLite (stessa colonna `value`).
+/// PostgreSQL table functions with a SQLite equivalent (same `value` column).
 fn table_function(name: &str) -> Option<&'static str> {
     match name {
         "json_each" | "jsonb_each" | "json_each_text" | "jsonb_each_text" => Some("json_each"),
@@ -261,7 +261,7 @@ fn table_function(name: &str) -> Option<&'static str> {
     }
 }
 
-// ------------------------------------------------------------------ visitatore
+// ------------------------------------------------------------------ visitor
 
 struct Tr<'a> {
     mode: Mode<'a>,
@@ -278,7 +278,7 @@ impl<'a> Tr<'a> {
         }
     }
 
-    /// Le righe delle tabelle protette vanno filtrate (transazioni dei plugin).
+    /// The rows of the protected tables must be filtered (transactions of the plugins).
     fn filtering(&self) -> bool {
         matches!(self.mode, Mode::Plugin(_) | Mode::Kernel(Some(_)))
     }
@@ -290,7 +290,7 @@ impl<'a> Tr<'a> {
         ControlFlow::Continue(())
     }
 
-    /// Nome logico di un oggetto del plugin -> nome fisico (o None se resta com'e').
+    /// Logical name of an object of the plugin -> physical name (or None if it stays as it is).
     fn resolve_local(&self, name: &str) -> Result<Option<String>> {
         let Some(s) = self.scope() else {
             return Err(GuardError::Relation(name.to_string()));
@@ -301,9 +301,9 @@ impl<'a> Tr<'a> {
         if s.views.contains_key(name) {
             return match self.mode {
                 Mode::Migration(_) => {
-                    Err(err(format!("la vista {name} non si usa nelle migrazioni su SQLite")))
+                    Err(err(format!("the view {name} is not used in migrations on SQLite")))
                 }
-                _ => Ok(None), // espansa in post_visit_table_factor
+                _ => Ok(None), // expanded in post_visit_table_factor
             };
         }
         if s.kpi_views.contains(name) {
@@ -329,7 +329,7 @@ impl<'a> Tr<'a> {
                 }
             }
             [s, t] if s == "core" => {
-                // migrazioni: nessun oggetto core (la chiave verso core.resources e' a parte)
+                // migrations: no core object (the key to core.resources is separate)
                 if matches!(self.mode, Mode::Migration(_))
                     || (matches!(self.mode, Mode::Plugin(_)) && t != "visible_resources")
                 {
@@ -354,14 +354,14 @@ impl<'a> Tr<'a> {
         Ok(())
     }
 
-    /// Nome fisico -> (nome logico, protetta), se e' una tabella del plugin.
+    /// Physical name -> (logical name, protected), if it is a table of the plugin.
     fn plugin_table(&self, n: &ObjectName) -> Option<(String, bool)> {
         let s = self.scope()?;
         let [one] = n.0.as_slice() else { return None };
         let logical = one.value.strip_prefix(&s.prefix())?;
         match s.tables.get(logical) {
             Some(p) => Some((logical.to_string(), *p)),
-            // tabelle create nella stessa migrazione
+            // tables created in the same migration
             None if matches!(self.mode, Mode::Migration(_)) => Some((logical.to_string(), false)),
             None => None,
         }
@@ -376,7 +376,7 @@ impl<'a> Tr<'a> {
                 let inner = expr.to_string();
                 let literal = matches!(**expr, Expr::Value(_));
                 Some(match type_class(data_type) {
-                    "interval" => return Ok(()), // gestito dall'operazione che lo usa
+                    "interval" => return Ok(()), // handled by the operation that uses it
                     "int" => parse_expr(&format!("CAST({inner} AS INTEGER)"))?,
                     "real" => parse_expr(&format!("CAST({inner} AS REAL)"))?,
                     "date" => parse_expr(&format!("date({inner})"))?,
@@ -399,13 +399,13 @@ impl<'a> Tr<'a> {
             Expr::AnyOp { left, compare_op, right, .. } => {
                 let neg = match compare_op {
                     BinaryOperator::Eq => "",
-                    _ => return Err(err("solo `= ANY(...)` e' supportato su SQLite")),
+                    _ => return Err(err("only `= ANY(...)` is supported on SQLite")),
                 };
                 Some(parse_expr(&format!("({left} {neg}IN (SELECT value FROM json_each({right})))"))?)
             }
             Expr::AllOp { left, compare_op, right } => {
                 if !matches!(compare_op, BinaryOperator::NotEq) {
-                    return Err(err("solo `<> ALL(...)` e' supportato su SQLite"));
+                    return Err(err("only `<> ALL(...)` is supported on SQLite"));
                 }
                 Some(parse_expr(&format!("({left} NOT IN (SELECT value FROM json_each({right})))"))?)
             }
@@ -423,7 +423,7 @@ impl<'a> Tr<'a> {
                     "day" => format!("CAST(strftime('%d', {expr}) AS INTEGER)"),
                     "hour" => format!("CAST(strftime('%H', {expr}) AS INTEGER)"),
                     "dow" => format!("CAST(strftime('%w', {expr}) AS INTEGER)"),
-                    other => return Err(err(format!("EXTRACT({other}) non supportato su SQLite"))),
+                    other => return Err(err(format!("EXTRACT({other}) not supported on SQLite"))),
                 })?)
             }
             Expr::BinaryOp { left, op: op @ (BinaryOperator::Plus | BinaryOperator::Minus), right } => {
@@ -444,8 +444,8 @@ impl<'a> Tr<'a> {
                         Some(vec![format!("('{sign}' || ({expr}))")])
                     }
                     Expr::Function(f) if lower_parts(&f.name) == ["make_interval"] => {
-                        let (unit, v) = named_arg(f)
-                            .ok_or_else(|| err("make_interval richiede un argomento con nome"))?;
+                        let (unit, v) =
+                            named_arg(f).ok_or_else(|| err("make_interval requires a named argument"))?;
                         let (unit, mul) = match unit.as_str() {
                             "secs" => ("seconds", ""),
                             "mins" => ("minutes", ""),
@@ -454,7 +454,7 @@ impl<'a> Tr<'a> {
                             "weeks" => ("days", " * 7"),
                             "months" => ("months", ""),
                             "years" => ("years", ""),
-                            other => return Err(err(format!("make_interval({other}) non supportato"))),
+                            other => return Err(err(format!("make_interval({other}) not supported"))),
                         };
                         Some(vec![format!("('{sign}' || (({v}){mul}) || ' {unit}')")])
                     }
@@ -476,7 +476,7 @@ impl<'a> Tr<'a> {
                     | BinaryOperator::PGRegexNotIMatch,
                 ..
             } => {
-                return Err(err("espressioni regolari (~) non supportate su SQLite"));
+                return Err(err("regular expressions (~) not supported on SQLite"));
             }
             Expr::Function(f) => self.function(f)?,
             _ => None,
@@ -491,7 +491,7 @@ impl<'a> Tr<'a> {
         let parts = lower_parts(&f.name);
         let a = args_of(f);
         let arg =
-            |i: usize| a.get(i).cloned().ok_or_else(|| err(format!("argomenti mancanti per {}", f.name)));
+            |i: usize| a.get(i).cloned().ok_or_else(|| err(format!("missing arguments for {}", f.name)));
         if let [s, name] = parts.as_slice() {
             if s == "core" {
                 return Ok(Some(parse_expr(&match name.as_str() {
@@ -528,9 +528,11 @@ impl<'a> Tr<'a> {
                     if x.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
                         && !x.chars().all(|c| c.is_ascii_digit())
                     {
-                        // json_agg(alias) aggrega righe intere: su SQLite serve l'elenco delle colonne
+                        // json_agg(alias) aggregates whole rows: on SQLite the list of columns is needed
                         if !matches!(x.as_str(), "true" | "false" | "null") {
-                            return Err(err("json_agg di una riga intera non e' supportato su SQLite: usa json_build_object"));
+                            return Err(err(
+                                "json_agg of a whole row is not supported on SQLite: use json_build_object",
+                            ));
                         }
                     }
                 }
@@ -555,9 +557,7 @@ impl<'a> Tr<'a> {
                     "'YYYY-MM'" => "'%Y-%m'",
                     "'YYYY'" => "'%Y'",
                     "'HH24:MI'" => "'%H:%M'",
-                    other => {
-                        return Err(err(format!("to_char con formato {other} non supportato su SQLite")))
-                    }
+                    other => return Err(err(format!("to_char with format {other} not supported on SQLite"))),
                 };
                 return Ok(Some(parse_expr(&format!("strftime({f2}, {})", arg(0)?))?));
             }
@@ -568,10 +568,10 @@ impl<'a> Tr<'a> {
                     "'day'" => format!("(date({x}) || 'T00:00:00.000Z')"),
                     "'month'" => format!("(strftime('%Y-%m', {x}) || '-01T00:00:00.000Z')"),
                     "'year'" => format!("(strftime('%Y', {x}) || '-01-01T00:00:00.000Z')"),
-                    other => return Err(err(format!("date_trunc({other}) non supportato su SQLite"))),
+                    other => return Err(err(format!("date_trunc({other}) not supported on SQLite"))),
                 })?));
             }
-            "make_interval" => {} // gestito dall'operazione + / -
+            "make_interval" => {} // handled by the + / - operation
             _ => {}
         }
         Ok(None)
@@ -587,11 +587,11 @@ impl VisitorMut for Tr<'_> {
                 self.ctes.insert(c.alias.name.value.to_ascii_lowercase());
             }
         }
-        // FOR UPDATE / FOR SHARE: SQLite serializza gia' le scritture
+        // FOR UPDATE / FOR SHARE: SQLite already serializes writes
         q.locks.clear();
         if let SetExpr::Select(s) = q.body.as_ref() {
             if matches!(s.distinct, Some(sqlparser::ast::Distinct::On(_))) {
-                return self.fail(err("DISTINCT ON non supportato su SQLite"));
+                return self.fail(err("DISTINCT ON not supported on SQLite"));
             }
         }
         ControlFlow::Continue(())
@@ -607,7 +607,7 @@ impl VisitorMut for Tr<'_> {
                         self.funcs.insert(to.to_string());
                     }
                     None => {
-                        return self.fail(GuardError::Function(format!("{one} (tabella-funzione su SQLite)")))
+                        return self.fail(GuardError::Function(format!("{one} (table function on SQLite)")))
                     }
                 },
                 _ => return self.fail(GuardError::Function(name.to_string())),
@@ -632,7 +632,8 @@ impl VisitorMut for Tr<'_> {
         // core.visible_resources
         if parts == ["core", "visible_resources"] {
             if !self.filtering() {
-                return self.fail(err("core.visible_resources si usa solo nelle transazioni dei plugin"));
+                return self
+                    .fail(err("core.visible_resources is used only in the transactions of the plugins"));
             }
             let alias =
                 alias.unwrap_or(TableAlias { name: Ident::new("visible_resources"), columns: vec![] });
@@ -644,7 +645,7 @@ impl VisitorMut for Tr<'_> {
             }
             return ControlFlow::Continue(());
         }
-        // vista del plugin: espansa
+        // view of the plugin: expanded
         if let (Some(s), [one]) = (self.scope(), parts.as_slice()) {
             if let Some(body) = s.views.get(one) {
                 let alias = alias.unwrap_or(TableAlias { name: ident(one), columns: vec![] });
@@ -662,7 +663,7 @@ impl VisitorMut for Tr<'_> {
                 return ControlFlow::Continue(());
             }
         }
-        // tabella del plugin: righe filtrate nelle transazioni dei plugin
+        // table of the plugin: rows filtered in the transactions of the plugins
         if let Some((logical, protected)) = self.plugin_table(&name) {
             let alias = alias.unwrap_or(TableAlias { name: ident(&logical), columns: vec![] });
             if protected && self.filtering() {
@@ -688,9 +689,9 @@ impl VisitorMut for Tr<'_> {
     }
 }
 
-// ------------------------------------------------------------------ istruzioni
+// ------------------------------------------------------------------ statements
 
-/// Bersaglio di INSERT/UPDATE/DELETE: (nome fisico, nome logico, protetta).
+/// Target of INSERT/UPDATE/DELETE: (physical name, logical name, protected).
 fn target(tr: &Tr, n: &ObjectName) -> Result<(String, String, bool)> {
     let parts = lower_parts(n);
     let scope = tr.scope();
@@ -726,12 +727,12 @@ fn and_level(sel: &mut Option<Expr>, alias: &str, min: u8) -> Result<()> {
     Ok(())
 }
 
-/// Controlli preliminari sull'SQL scritto da un plugin: niente nomi interni di Mosaikit.
+/// Preliminary checks on the SQL written by a plugin: no internal names of Mosaikit.
 fn plugin_prescan(sql: &str) -> Result<()> {
     let l = sql.to_ascii_lowercase();
     for bad in ["core_", "plg_", "msk_", "sqlite_", "__", "pragma", "attach", "main.", "temp."] {
         if l.contains(bad) {
-            return Err(GuardError::Relation(format!("nome riservato: {bad}")));
+            return Err(GuardError::Relation(format!("reserved name: {bad}")));
         }
     }
     Ok(())
@@ -739,7 +740,7 @@ fn plugin_prescan(sql: &str) -> Result<()> {
 
 fn translate_stmt(mut st: Statement, mode: Mode) -> Result<Translated> {
     let mut tr = Tr { mode, ctes: HashSet::new(), funcs: HashSet::new(), err: None };
-    // bersagli DML: rinominati a parte (non vanno sostituiti da sottoquery)
+    // DML targets: renamed separately (they must not be replaced by subqueries)
     let mut dml: Option<(String, String, bool)> = None;
     match &mut st {
         Statement::Insert(i) => {
@@ -748,7 +749,7 @@ fn translate_stmt(mut st: Statement, mode: Mode) -> Result<Translated> {
         }
         Statement::Update { table, .. } => {
             if !table.joins.is_empty() {
-                return Err(err("UPDATE con JOIN non supportato su SQLite"));
+                return Err(err("UPDATE with JOIN not supported on SQLite"));
             }
             if let TableFactor::Table { name, .. } = &mut table.relation {
                 dml = Some(target(&tr, name)?);
@@ -760,7 +761,7 @@ fn translate_stmt(mut st: Statement, mode: Mode) -> Result<Translated> {
                 FromTable::WithFromKeyword(t) | FromTable::WithoutKeyword(t) => t,
             };
             if tables.len() != 1 || d.using.is_some() {
-                return Err(err("DELETE su piu' tabelle o con USING non supportato su SQLite"));
+                return Err(err("DELETE on several tables or with USING not supported on SQLite"));
             }
             if let TableFactor::Table { name, .. } = &mut tables[0].relation {
                 dml = Some(target(&tr, name)?);
@@ -772,20 +773,20 @@ fn translate_stmt(mut st: Statement, mode: Mode) -> Result<Translated> {
 
     let out: Option<()> = match &mut st {
         Statement::CreateView { name, query, materialized, .. } => {
-            let Mode::Migration(scope) = mode else { return Err(err("CREATE VIEW solo nelle migrazioni")) };
+            let Mode::Migration(scope) = mode else { return Err(err("CREATE VIEW only in migrations")) };
             if *materialized {
-                return Err(err("viste materializzate non supportate"));
+                return Err(err("materialized views not supported"));
             }
             let n = lower_parts(name).pop().unwrap_or_default();
             if !n.starts_with("kpi_") {
-                // vista normale: si espande a ogni uso con i filtri del contesto
+                // normal view: expanded at every use with the filters of the context
                 return Ok(Translated::StoreView { name: n, sql: query.to_string() });
             }
             *name = ObjectName(vec![ident(&scope.physical(&n))]);
             None
         }
         Statement::Drop { object_type, names, cascade, .. } => {
-            let Mode::Migration(scope) = mode else { return Err(err("DROP solo nelle migrazioni")) };
+            let Mode::Migration(scope) = mode else { return Err(err("DROP only in migrations")) };
             if let (sqlparser::ast::ObjectType::View, [one]) = (&*object_type, names.as_slice()) {
                 let n = lower_parts(one).pop().unwrap_or_default();
                 if scope.views.contains_key(&n) {
@@ -801,7 +802,7 @@ fn translate_stmt(mut st: Statement, mode: Mode) -> Result<Translated> {
         }
         Statement::Comment { .. } => return Ok(Translated::Skip),
         Statement::CreateIndex(ci) => {
-            let Mode::Migration(scope) = mode else { return Err(err("CREATE INDEX solo nelle migrazioni")) };
+            let Mode::Migration(scope) = mode else { return Err(err("CREATE INDEX only in migrations")) };
             let table = lower_parts(&ci.table_name).pop().unwrap_or_default();
             let n = match &ci.name {
                 Some(n) => lower_parts(n).pop().unwrap_or_default(),
@@ -826,7 +827,7 @@ fn translate_stmt(mut st: Statement, mode: Mode) -> Result<Translated> {
             None
         }
         Statement::CreateTable(ct) => {
-            let Mode::Migration(scope) = mode else { return Err(err("CREATE TABLE solo nelle migrazioni")) };
+            let Mode::Migration(scope) = mode else { return Err(err("CREATE TABLE only in migrations")) };
             let fk = |n: &mut ObjectName| {
                 let p = lower_parts(n);
                 *n = match p.as_slice() {
@@ -848,13 +849,13 @@ fn translate_stmt(mut st: Statement, mode: Mode) -> Result<Translated> {
                 }
                 for o in &mut c.options {
                     if let ColumnOption::Default(d) = &mut o.option {
-                        // su SQLite un DEFAULT non letterale va tra parentesi
+                        // on SQLite a non-literal DEFAULT goes between parentheses
                         if !matches!(d, Expr::Value(_)) {
                             *d = Expr::Nested(Box::new(d.clone()));
                         }
                     }
                 }
-                // resource_id: chiave verso core_resources con cancellazione a cascata
+                // resource_id: key to core_resources with cascading delete
                 if c.name.value.eq_ignore_ascii_case("resource_id")
                     && !c.options.iter().any(|o| matches!(o.option, ColumnOption::ForeignKey { .. }))
                 {
@@ -885,7 +886,7 @@ fn translate_stmt(mut st: Statement, mode: Mode) -> Result<Translated> {
                     | A::RenameColumn { .. }
                     | A::RenameTable { .. }
                     | A::DropColumn { .. } => {}
-                    other => return Err(err(format!("ALTER TABLE non supportato su SQLite: {other}"))),
+                    other => return Err(err(format!("ALTER TABLE not supported on SQLite: {other}"))),
                 }
             }
             None
@@ -898,7 +899,7 @@ fn translate_stmt(mut st: Statement, mode: Mode) -> Result<Translated> {
         | Statement::ReleaseSavepoint { .. }
         | Statement::Rollback { .. } => None,
         other => {
-            return Err(err(format!("istruzione non supportata su SQLite: {}", crate::statement_name(other))))
+            return Err(err(format!("statement not supported on SQLite: {}", crate::statement_name(other))))
         }
     };
     let _ = out;
@@ -908,7 +909,7 @@ fn translate_stmt(mut st: Statement, mode: Mode) -> Result<Translated> {
         return Err(e);
     }
 
-    // rinomina dei vincoli, indici e nomi di DDL non coperti dal visitatore
+    // renaming of constraints, indexes and DDL names not covered by the visitor
     if let Statement::AlterTable { operations, .. } = &mut st {
         for op in operations.iter_mut() {
             if let sqlparser::ast::AlterTableOperation::RenameTable { table_name } = op {
@@ -965,7 +966,7 @@ fn translate_stmt(mut st: Statement, mode: Mode) -> Result<Translated> {
     Ok(Translated::Sql(st.to_string()))
 }
 
-/// Traduce una o piu' istruzioni PostgreSQL per SQLite.
+/// Translates one or more PostgreSQL statements for SQLite.
 pub fn translate(sql: &str, mode: Mode) -> Result<Vec<Translated>> {
     if let Mode::Plugin(_) = mode {
         plugin_prescan(sql)?;
@@ -975,12 +976,12 @@ pub fn translate(sql: &str, mode: Mode) -> Result<Vec<Translated>> {
     stmts.into_iter().map(|s| translate_stmt(s, mode)).collect()
 }
 
-/// Traduce una sola istruzione SQL (DML o query).
+/// Translates a single SQL statement (DML or query).
 pub fn translate_one(sql: &str, mode: Mode) -> Result<String> {
     let mut v = translate(sql, mode)?;
     match (v.len(), v.pop()) {
         (1, Some(Translated::Sql(s))) => Ok(s),
-        (1, Some(other)) => Err(err(format!("istruzione inattesa: {other:?}"))),
+        (1, Some(other)) => Err(err(format!("unexpected statement: {other:?}"))),
         _ => Err(GuardError::MultipleStatements),
     }
 }
@@ -1008,7 +1009,7 @@ mod tests {
     }
 
     #[test]
-    fn nomi_cast_parametri() {
+    fn names_casts_parameters() {
         assert_eq!(
             k("select id from core.users where id = $1::uuid"),
             "SELECT id FROM \"core_users\" WHERE id = (?1)"
@@ -1022,7 +1023,7 @@ mod tests {
     }
 
     #[test]
-    fn tempo_e_array() {
+    fn time_and_arrays() {
         let s = k("select 1 from core.sessions where expires_at > now() and created_at > now() - interval '30 days'");
         assert!(s.contains("expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')"), "{s}");
         assert!(
@@ -1038,7 +1039,7 @@ mod tests {
     }
 
     #[test]
-    fn funzioni_core_espanse() {
+    fn core_functions_expanded() {
         let s = k("select core.level_of($1)");
         assert!(s.contains("core_ctx_tenant()") && s.contains("core_grants"), "{s}");
         let s = k("select core.ctx_user()");
@@ -1046,15 +1047,15 @@ mod tests {
     }
 
     #[test]
-    fn righe_filtrate_nelle_transazioni_dei_plugin() {
+    fn rows_filtered_in_plugin_transactions() {
         let sc = scope();
         let s = translate_one("select title from notes where tag = $1", Mode::Plugin(&sc)).unwrap();
         assert!(s.contains("FROM (SELECT * FROM \"plg_notes__notes\" WHERE coalesce("), "{s}");
         assert!(s.contains(") AS \"notes\" WHERE tag = ?1"), "{s}");
-        // tabella senza resource_id: non filtrata ma rinominata
+        // table without resource_id: not filtered but renamed
         let s = translate_one("select * from tags", Mode::Plugin(&sc)).unwrap();
         assert_eq!(s, "SELECT * FROM \"plg_notes__tags\" AS \"tags\"");
-        // UPDATE / DELETE: filtro sul bersaglio
+        // UPDATE / DELETE: filter on the target
         let s = translate_one("update notes set title = $1 where tag = 'x'", Mode::Plugin(&sc)).unwrap();
         assert!(
             s.starts_with(
@@ -1064,13 +1065,13 @@ mod tests {
         );
         let s = translate_one("delete from notes", Mode::Plugin(&sc)).unwrap();
         assert!(s.contains("WHERE coalesce((SELECT"), "{s}");
-        // vista del plugin espansa con i filtri
+        // view of the plugin expanded with the filters
         let s = translate_one("select title from recent", Mode::Plugin(&sc)).unwrap();
         assert!(
             s.contains("FROM (SELECT resource_id, title FROM (SELECT * FROM \"plg_notes__notes\""),
             "{s}"
         );
-        // kernel nella transazione del plugin: core.visible_resources
+        // kernel in the transaction of the plugin: core.visible_resources
         let s = translate_one(
             "select t.title from \"plg_notes\".\"notes\" t join core.visible_resources v on v.id = t.resource_id",
             Mode::Kernel(Some(&sc)),
@@ -1080,7 +1081,7 @@ mod tests {
     }
 
     #[test]
-    fn il_plugin_non_esce_dal_suo_spazio() {
+    fn the_plugin_does_not_leave_its_space() {
         let sc = scope();
         for bad in [
             "select * from core_users",
@@ -1097,7 +1098,7 @@ mod tests {
     }
 
     #[test]
-    fn migrazioni() {
+    fn migrations() {
         let sc = Scope { schema: "plg_x".into(), ..Scope::default() };
         let v = translate(
             "create table items (resource_id uuid primary key, tenant_id uuid not null default core.ctx_tenant(), n serial, at timestamptz default now());

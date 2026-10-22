@@ -1,7 +1,7 @@
-//! `cargo xtask e2e`: test nel browser su un'installazione completa.
+//! `cargo xtask e2e`: tests in the browser on a full installation.
 //!
-//! Database nuovo, plugin compilati, firmati e preinstallati dal registry
-//! (come in produzione), server su 18080/18081 sotto il percorso base `/mosaikit`, Playwright.
+//! New database, plugins built, signed and preinstalled from the registry
+//! (as in production), server on 18080/18081 under the base path `/mosaikit`, Playwright.
 
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
@@ -15,7 +15,7 @@ use crate::util::{exe, npm, output, pg_bin, root, run, which};
 const DB: &str = "mosaikit_e2e";
 const ADMIN_PASSWORD: &str = "e2e-admin-password";
 
-/// Ruolo amministrativo dei test: `MOSAIKIT_TEST_DATABASE_URL` (CI) o il cluster di sviluppo.
+/// Administrative role of the tests: `MOSAIKIT_TEST_DATABASE_URL` (CI) or the development cluster.
 fn admin_url() -> String {
     std::env::var("MOSAIKIT_TEST_DATABASE_URL").unwrap_or_else(|_| crate::db::test_url())
 }
@@ -24,7 +24,7 @@ fn psql(sql: &str) -> Result<String> {
     let psql = pg_bin()
         .map(|b| b.join(exe("psql")))
         .or_else(|| which("psql"))
-        .context("psql non trovato (MOSAIKIT_PG_BIN o PATH)")?;
+        .context("psql not found (MOSAIKIT_PG_BIN or PATH)")?;
     output(Command::new(psql).args(["-v", "ON_ERROR_STOP=1", "-d"]).arg(admin_url()).args(["-tAc", sql]))
 }
 
@@ -54,7 +54,7 @@ fn wait_health(url: &str) -> Result<()> {
         }
         std::thread::sleep(Duration::from_millis(500));
     }
-    bail!("il server non risponde su {url}")
+    bail!("the server does not answer on {url}")
 }
 
 pub fn e2e(headed: bool) -> Result<()> {
@@ -79,7 +79,7 @@ pub fn e2e(headed: bool) -> Result<()> {
     std::fs::write(
         dir.join("mosaikit.toml"),
         format!(
-            "# installazione dei test e2e (proprieta' descritte in mosaikit.example.toml)\n\
+            "# installation of the e2e tests (properties described in mosaikit.example.toml)\n\
              url = \"http://127.0.0.1:18080/mosaikit\"\ndata_dir = \"data\"\n\
              registry = \"registry/index.json\"\npreinstall = true\ntrusted_keys = [\"{}\"]\n\n[database]\nurl = \"{url}\"\n",
             trusted.trim()
@@ -104,7 +104,7 @@ pub fn e2e(headed: bool) -> Result<()> {
     })();
     kill_tree(&mut server);
     if result.is_err() {
-        eprintln!("log del server: {}", dir.join("server.err.log").display());
+        eprintln!("server log: {}", dir.join("server.err.log").display());
     }
     result
 }

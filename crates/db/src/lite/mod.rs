@@ -1,16 +1,16 @@
-//! Backend SQLite (default della versione desktop).
+//! SQLite backend (default of the desktop version).
 //!
-//! Stesse regole di PostgreSQL, applicate in modo diverso:
-//! - contesto (utente, tenant, plugin, link) per connessione, letto dalle funzioni
-//!   `core_ctx_*()` registrate da Rust: l'SQL non puo' modificarlo;
-//! - nelle transazioni dei plugin le query sono riscritte (`mosaikit_sql_guard::sqlite`):
-//!   le righe delle tabelle protette passano dal filtro sul livello di accesso;
-//! - trigger sulle tabelle dei plugin per INSERT/UPDATE/DELETE (come `WITH CHECK`);
-//! - authorizer di SQLite sull'SQL scritto dai plugin: niente scritture fuori dalle
-//!   sue tabelle, niente segreti, PRAGMA o ATTACH.
+//! The same rules as PostgreSQL, applied differently:
+//! - context (user, tenant, plugin, link) per connection, read by the functions
+//!   `core_ctx_*()` registered from Rust: SQL cannot change it;
+//! - in the transactions of the plugins the queries are rewritten (`mosaikit_sql_guard::sqlite`):
+//!   the rows of the protected tables go through the filter on the access level;
+//! - triggers on the tables of the plugins for INSERT/UPDATE/DELETE (like `WITH CHECK`);
+//! - SQLite authorizer on the SQL written by the plugins: no writes outside its
+//!   own tables, no secrets, PRAGMA or ATTACH.
 //!
-//! rusqlite e' sincrono: ogni operazione gira in `spawn_blocking` con una
-//! connessione del pool (WAL, `busy_timeout`, chiavi esterne attive).
+//! rusqlite is synchronous: every operation runs in `spawn_blocking` with a
+//! connection of the pool (WAL, `busy_timeout`, foreign keys on).
 
 pub mod plugin_schema;
 
@@ -34,14 +34,14 @@ use crate::{Ctx, DbError, Query, Result};
 const MIGRATIONS: &[(i64, &str, &str)] =
     &[(1, "core", include_str!("0001_core.sql")), (2, "admins", include_str!("0002_admins.sql"))];
 
-/// Contesto della transazione sulla connessione (letto da `core_ctx_*()`).
+/// Context of the transaction on the connection (read by `core_ctx_*()`).
 #[derive(Debug, Clone, Default)]
 struct CtxState {
     user: Option<String>,
     tenant: Option<String>,
     plugin: Option<String>,
     link: Option<String>,
-    /// transazione di un plugin: i trigger di controllo sono attivi
+    /// transaction of a plugin: the check triggers are active
     active: bool,
 }
 
@@ -52,7 +52,7 @@ pub(crate) struct PConn {
 
 impl PConn {
     fn set_ctx(&self, c: CtxState) {
-        *self.ctx.lock().expect("contesto") = c;
+        *self.ctx.lock().expect("context") = c;
     }
 }
 
@@ -74,7 +74,7 @@ pub(crate) fn map_err(e: rusqlite::Error) -> DbError {
         rusqlite::Error::QueryReturnedNoRows => DbError::RowNotFound,
         rusqlite::Error::SqliteFailure(f, msg) => {
             let message = msg.unwrap_or_else(|| f.to_string());
-            // errori di Mosaikit (trigger, controlli): "mosaikit[SQLSTATE]: messaggio"
+            // errors of Mosaikit (triggers, checks): "mosaikit[SQLSTATE]: message"
             if let Some(rest) = message.strip_prefix("mosaikit[") {
                 if let Some((code, m)) = rest.split_once("]: ") {
                     return DbError::Sql { code: Some(code.to_string()), message: m.to_string() };
@@ -95,7 +95,7 @@ pub(crate) fn map_err(e: rusqlite::Error) -> DbError {
     }
 }
 
-/// Errore con codice SQLSTATE (stessi codici delle funzioni core di PostgreSQL).
+/// Error with an SQLSTATE code (the same codes as the core functions of PostgreSQL).
 pub(crate) fn sql_err(code: &str, m: &str) -> DbError {
     DbError::Sql { code: Some(code.to_string()), message: m.to_string() }
 }
@@ -121,7 +121,7 @@ fn to_sql(p: &Param) -> SqlValue {
     }
 }
 
-/// Esegue una istruzione. `json`: colonne json/bool tipizzate (risultati per i plugin).
+/// Runs a statement. `json`: typed json/bool columns (results for the plugins).
 fn exec(
     c: &PConn,
     sql: &str,
@@ -213,12 +213,12 @@ fn open_conn(path: &Path) -> Result<PConn> {
     ];
     for (name, get) in getters {
         let state = ctx.clone();
-        conn.create_scalar_function(name, 0, flags, move |_| Ok(get(&state.lock().expect("contesto"))))
+        conn.create_scalar_function(name, 0, flags, move |_| Ok(get(&state.lock().expect("context"))))
             .map_err(map_err)?;
     }
     let state = ctx.clone();
     conn.create_scalar_function("core_ctx_active", 0, flags, move |_| {
-        Ok(state.lock().expect("contesto").active)
+        Ok(state.lock().expect("context").active)
     })
     .map_err(map_err)?;
     Ok(PConn { conn, ctx })
@@ -258,7 +258,7 @@ fn migrate(c: &PConn) -> Result<()> {
     Ok(())
 }
 
-/// Oggetti di un plugin, letti dalla connessione (vede anche le modifiche non confermate).
+/// Objects of a plugin, read from the connection (it also sees uncommitted changes).
 pub(crate) fn load_scope(c: &PConn, plugin_id: &str) -> Result<Scope> {
     let schema: Option<String> = c
         .conn
@@ -267,7 +267,7 @@ pub(crate) fn load_scope(c: &PConn, plugin_id: &str) -> Result<Scope> {
         .or_else(|e| if matches!(e, rusqlite::Error::QueryReturnedNoRows) { Ok(None) } else { Err(e) })
         .map_err(map_err)?;
     let Some(schema) = schema else {
-        return Err(DbError::Invalid(format!("plugin non installato: {plugin_id}")));
+        return Err(DbError::Invalid(format!("plugin not installed: {plugin_id}")));
     };
     load_scope_schema(c, &schema, Some(plugin_id))
 }
@@ -318,7 +318,7 @@ pub(crate) fn load_scope_schema(c: &PConn, schema: &str, plugin_id: Option<&str>
 impl Inner {
     async fn acquire(self: &Arc<Self>) -> Result<(PConn, OwnedSemaphorePermit)> {
         let permit =
-            self.sem.clone().acquire_owned().await.map_err(|_| DbError::Invalid("database chiuso".into()))?;
+            self.sem.clone().acquire_owned().await.map_err(|_| DbError::Invalid("database closed".into()))?;
         let pooled = self.pool.lock().expect("pool").pop();
         let c = match pooled {
             Some(c) => c,
@@ -337,7 +337,7 @@ impl Inner {
         self.pool.lock().expect("pool").push(c);
     }
 
-    /// SQL per SQLite: variante esplicita o traduzione (in cache).
+    /// SQL for SQLite: explicit variant or translation (cached).
     fn sql_for(&self, q: &Query, scope: Option<&Scope>) -> Result<Arc<str>> {
         if let Some(l) = &q.lite {
             return Ok(Arc::from(l.as_str()));
@@ -351,10 +351,9 @@ impl Inner {
         if let Some(s) = self.cache.lock().expect("cache").get(&key) {
             return Ok(s.clone());
         }
-        let s: Arc<str> =
-            Arc::from(tr::translate_one(&q.sql, Mode::Kernel(scope)).map_err(|e| {
-                DbError::Invalid(format!("SQL non traducibile per SQLite: {e} (in: {})", q.sql))
-            })?);
+        let s: Arc<str> = Arc::from(tr::translate_one(&q.sql, Mode::Kernel(scope)).map_err(|e| {
+            DbError::Invalid(format!("SQL cannot be translated for SQLite: {e} (in: {})", q.sql))
+        })?);
         let mut cache = self.cache.lock().expect("cache");
         if cache.len() > 4096 {
             cache.clear();
@@ -425,7 +424,7 @@ impl LiteDb {
         }
     }
 
-    /// Query sul pool (autocommit, senza contesto).
+    /// Query on the pool (autocommit, no context).
     pub(crate) async fn run(&self, q: Query, fetch: bool) -> Result<(Vec<Row>, u64)> {
         let sql = self.inner.sql_for(&q, None)?;
         let (c, permit) = self.inner.acquire().await?;
@@ -435,8 +434,8 @@ impl LiteDb {
         r
     }
 
-    /// Transazione (BEGIN IMMEDIATE: le scritture sono serializzate, niente stalli
-    /// da promozione del lock).
+    /// Transaction (BEGIN IMMEDIATE: writes are serialized, no deadlocks
+    /// from lock promotion).
     pub(crate) async fn begin(&self, ctx: Option<Ctx>, plugin: bool) -> Result<LiteTx> {
         let (c, permit) = self.inner.acquire().await?;
         let state = match &ctx {
@@ -471,7 +470,7 @@ pub struct LiteTx {
 impl Drop for LiteTx {
     fn drop(&mut self) {
         if let Some(c) = self.conn.take() {
-            // transazione non confermata: annullata
+            // transaction not committed: rolled back
             let _ = c.conn.execute_batch("rollback");
             self.db.release(c);
         }
@@ -483,7 +482,7 @@ impl LiteTx {
         &mut self,
         f: impl FnOnce(&mut PConn) -> Result<R> + Send + 'static,
     ) -> Result<R> {
-        let c = self.conn.take().ok_or_else(|| DbError::Invalid("transazione chiusa".into()))?;
+        let c = self.conn.take().ok_or_else(|| DbError::Invalid("transaction closed".into()))?;
         let (c, r) = blocking(c, f).await;
         self.conn = Some(c);
         r
@@ -523,7 +522,7 @@ impl LiteTx {
         self.with(move |c| exec(c, &sql, &q.params, fetch, true, false)).await
     }
 
-    /// Esegue SQL gia' tradotto (DDL delle migrazioni, controlli interni).
+    /// Runs SQL already translated (DDL of the migrations, internal checks).
     pub(crate) async fn raw(
         &mut self,
         sql: String,
@@ -545,7 +544,7 @@ impl LiteTx {
     }
 
     async fn ctx(&mut self) -> Result<CtxState> {
-        self.with(|c| Ok(c.ctx.lock().expect("contesto").clone())).await
+        self.with(|c| Ok(c.ctx.lock().expect("context").clone())).await
     }
 
     async fn resource(&mut self, id: Uuid) -> Result<Option<(String, String, Vec<Uuid>)>> {
@@ -572,35 +571,35 @@ impl LiteTx {
         let c = self.ctx().await?;
         let (Some(user), Some(tenant), Some(plugin)) = (c.user.clone(), c.tenant.clone(), c.plugin.clone())
         else {
-            return Err(sql_err("42501", "contesto non valido per creare risorse"));
+            return Err(sql_err("42501", "invalid context to create resources"));
         };
         if c.link.is_some() {
-            return Err(sql_err("42501", "contesto non valido per creare risorse"));
+            return Err(sql_err("42501", "invalid context to create resources"));
         }
         let member_sql = format!("select {}", tr::is_member("?1", "?2"));
         let (rows, _) =
             self.raw(member_sql, vec![Param::Text(user.clone()), Param::Text(tenant.clone())], true).await?;
         if !rows.first().map(|r| r.try_get::<bool, _>(0)).transpose()?.unwrap_or(false) {
-            return Err(sql_err("42501", "contesto non valido per creare risorse"));
+            return Err(sql_err("42501", "invalid context to create resources"));
         }
         let valid = !kind.is_empty()
             && kind.len() <= 48
             && kind.starts_with(|c: char| c.is_ascii_lowercase())
             && kind.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_');
         if !valid {
-            return Err(sql_err("22023", "tipo di risorsa non valido"));
+            return Err(sql_err("22023", "invalid resource kind"));
         }
         let mut anc: Vec<Uuid> = Vec::new();
         if let Some(p) = parent {
             match self.resource(p).await? {
                 Some((t, pl, a)) if t == tenant && pl == plugin => {
                     if self.level(p).await? < 2 {
-                        return Err(sql_err("42501", "permesso di scrittura sul genitore richiesto"));
+                        return Err(sql_err("42501", "write permission on the parent required"));
                     }
                     anc = a;
                     anc.push(p);
                 }
-                _ => return Err(sql_err("22023", "genitore non valido")),
+                _ => return Err(sql_err("22023", "invalid parent")),
             }
         }
         let id = Uuid::new_v4();
@@ -633,7 +632,7 @@ impl LiteTx {
         size: Option<i64>,
     ) -> Result<()> {
         if self.level(id).await? < 2 {
-            return Err(sql_err("42501", "permesso di scrittura richiesto"));
+            return Err(sql_err("42501", "write permission required"));
         }
         let merged = match meta {
             None => None,
@@ -643,7 +642,7 @@ impl LiteTx {
                     .await?;
                 let mut cur: Value =
                     rows.first().map(|r| r.try_get(0)).transpose()?.unwrap_or_else(|| serde_json::json!({}));
-                // come `meta || p_meta` di PostgreSQL: unione delle chiavi di primo livello
+                // like `meta || p_meta` of PostgreSQL: union of the first-level keys
                 if let (Some(o), Some(p)) = (cur.as_object_mut(), patch.as_object()) {
                     for (k, v) in p {
                         o.insert(k.clone(), v.clone());
@@ -672,24 +671,24 @@ impl LiteTx {
 
     pub(crate) async fn move_resource(&mut self, id: Uuid, parent: Option<Uuid>) -> Result<()> {
         if self.level(id).await? < 3 {
-            return Err(sql_err("42501", "permesso di gestione richiesto"));
+            return Err(sql_err("42501", "manage permission required"));
         }
         let Some((tenant, plugin, _)) = self.resource(id).await? else {
-            return Err(sql_err("42501", "permesso di gestione richiesto"));
+            return Err(sql_err("42501", "manage permission required"));
         };
         let mut anc: Vec<Uuid> = Vec::new();
         if let Some(p) = parent {
             let Some((pt, pp, pa)) = self.resource(p).await? else {
-                return Err(sql_err("22023", "destinazione non valida"));
+                return Err(sql_err("22023", "invalid destination"));
             };
             if pt != tenant || pp != plugin {
-                return Err(sql_err("22023", "destinazione non valida"));
+                return Err(sql_err("22023", "invalid destination"));
             }
             if p == id || pa.contains(&id) {
-                return Err(sql_err("22023", "impossibile spostare una cartella dentro se stessa"));
+                return Err(sql_err("22023", "a folder cannot be moved into itself"));
             }
             if self.level(p).await? < 2 {
-                return Err(sql_err("42501", "permesso di scrittura sulla destinazione richiesto"));
+                return Err(sql_err("42501", "write permission on the destination required"));
             }
             anc = pa;
             anc.push(p);
@@ -707,7 +706,7 @@ impl LiteTx {
             false,
         )
         .await?;
-        // discendenti: nuovo prefisso + parte dopo la risorsa spostata
+        // descendants: new prefix + the part after the moved resource
         let (rows, _) = self
             .raw(
                 "select id, ancestors from core_resources where ?1 in (select value from json_each(ancestors))".into(),
@@ -734,7 +733,7 @@ impl LiteTx {
 
     pub(crate) async fn delete_resource(&mut self, id: Uuid) -> Result<Vec<Uuid>> {
         if self.level(id).await? < 3 {
-            return Err(sql_err("42501", "permesso di gestione richiesto"));
+            return Err(sql_err("42501", "manage permission required"));
         }
         let (rows, _) = self
             .raw(
@@ -748,13 +747,13 @@ impl LiteTx {
         Ok(ids)
     }
 
-    /// SQL scritto dal plugin (gia' passato da `check_query`): tradotto, filtrato,
-    /// eseguito con l'authorizer di SQLite.
+    /// SQL written by the plugin (already through `check_query`): translated, filtered,
+    /// run with the SQLite authorizer.
     pub(crate) async fn plugin_sql(&mut self, sql: &str, rows: bool, params: Vec<Param>) -> Result<Value> {
         let scope = self
             .scope
             .clone()
-            .ok_or_else(|| DbError::Invalid("SQL del plugin fuori da una sua transazione".into()))?;
+            .ok_or_else(|| DbError::Invalid("SQL of the plugin outside one of its transactions".into()))?;
         let lite = tr::translate_one(sql, Mode::Plugin(&scope))
             .map_err(|e| DbError::Sql { code: Some("42501".into()), message: e.to_string() })?;
         let prefix = scope.prefix();
@@ -773,7 +772,7 @@ impl LiteTx {
     }
 }
 
-/// Difesa in profondita' sull'SQL dei plugin (dopo la traduzione che gia' lo limita).
+/// Defence in depth on the SQL of the plugins (after the translation that already limits it).
 fn authorize(prefix: &str, a: &AuthContext<'_>) -> Authorization {
     match a.action {
         AuthAction::Read { table_name, column_name } => {

@@ -1,10 +1,10 @@
-//! Panoramica: la pagina iniziale dopo l'accesso, con dati che dipendono dal ruolo.
-//! - User: le proprie risorse, condivisioni fatte e ricevute, link pubblici, attivita' recente;
-//! - Tenant Manager: in piu' gli aggregati del tenant;
-//! - Administrator (account del tenant di sistema, senza spazio di lavoro): gli aggregati
-//!   di tutto il sistema, con [`system_overview`].
+//! Overview: the start page after sign-in, with data that depend on the role.
+//! - User: their own resources, shares made and received, public links, recent activity;
+//! - Tenant Manager: in addition the aggregates of the tenant;
+//! - Administrator (account of the system tenant, without a workspace): the aggregates
+//!   of the whole system, with [`system_overview`].
 //!
-//! Come per i KPI, si vedono solo conteggi e titoli delle risorse accessibili all'utente.
+//! As for the KPIs, only counts and titles of the resources accessible to the user are visible.
 
 use chrono::{DateTime, Utc};
 use serde::Serialize;
@@ -24,7 +24,7 @@ pub struct Overview {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Personal {
-    /// risorse di cui l'utente e' proprietario nel tenant, per plugin e tipo
+    /// resources owned by the user in the tenant, per plugin and kind
     pub resources: Vec<ResourceStat>,
     pub shared_by_me: i64,
     pub shared_with_me: i64,
@@ -102,7 +102,7 @@ async fn personal(k: &Kernel, c: &Caller) -> Result<Personal> {
             }
         })
         .collect();
-    // concessioni dirette all'utente o ai suoi gruppi del tenant
+    // grants given directly to the user or to their groups of the tenant
     const TO_ME: &str = "((g.principal_type = 'user' and g.principal_id = $2)
           or (g.principal_type = 'group' and g.principal_id in (
                 select gm.group_id from core.group_members gm join core.groups gr on gr.id = gm.group_id
@@ -149,7 +149,7 @@ async fn personal(k: &Kernel, c: &Caller) -> Result<Personal> {
             }
         })
         .collect();
-    // titoli solo delle risorse ancora proprie o accessibili (le altre restano anonime)
+    // titles only of the resources still owned or accessible (the others stay anonymous)
     let events = mosaikit_db::query(
         "select e.ts, e.action, e.plugin_id,
                 case when r.owner_id = $2 or core.level_for($2, r.tenant_id, r.id, r.ancestors) > 0 then r.title end
@@ -184,7 +184,7 @@ async fn personal(k: &Kernel, c: &Caller) -> Result<Personal> {
     })
 }
 
-/// Panoramica dell'Administrator: aggregati di tutto il sistema (tenant di sistema escluso).
+/// Overview of the Administrator: aggregates of the whole system (system tenant excluded).
 pub async fn system_overview(k: &Kernel, admin: &SessionUser) -> Result<SystemOverview> {
     require_admin(admin)?;
     let r = mosaikit_db::query(
@@ -215,7 +215,7 @@ pub async fn system_overview(k: &Kernel, admin: &SessionUser) -> Result<SystemOv
     })
 }
 
-/// Panoramica dell'utente nel tenant attivo, secondo il suo ruolo.
+/// Overview of the user in the active tenant, according to their role.
 pub async fn overview(k: &Kernel, c: &Caller) -> Result<Overview> {
     let manager = c.is_manager();
     Ok(Overview {
