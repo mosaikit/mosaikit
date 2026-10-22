@@ -20,7 +20,8 @@ separate project that refers to Mosaikit; Mosaikit knows none of them.
 Full architecture: **[docs/architecture.md](docs/architecture.md)**. The interface follows the
 mockup in [docs/mockup](docs/mockup) and the rules of [docs/refactoring-ui.md](docs/refactoring-ui.md);
 the plan to complete it is in [docs/ui-plan.md](docs/ui-plan.md). The interface is in English by
-default, with Italian available.
+default, with Italian available. Guides for the people who use it, one per role:
+[docs/guide](docs/guide/README.md).
 
 ## Contents
 
