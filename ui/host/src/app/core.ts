@@ -17,7 +17,8 @@ export function useSession() {
         setCsrf(s.csrf)
         return s
       } catch (e) {
-        if (e instanceof ApiError && e.status === 401) return null
+        // signed out, or only the Administrators work (maintenance): the sign-in page with the notice
+        if (e instanceof ApiError && (e.status === 401 || e.code === 'maintenance')) return null
         throw e
       }
     },

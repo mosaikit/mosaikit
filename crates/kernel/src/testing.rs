@@ -201,6 +201,7 @@ impl TestKernel {
                 manager_username: &manager,
                 manager_display_name: "Manager",
                 manager_password: PASSWORD,
+                trial_until: None,
             },
         )
         .await

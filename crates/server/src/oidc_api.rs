@@ -65,6 +65,9 @@ struct StartReq {
 /// Sends the browser to the provider of the tenant.
 async fn start(State(s): State<AppState>, Path(slug): Path<String>, Query(q): Query<StartReq>) -> Response {
     let remember = matches!(q.remember.as_deref(), Some("1" | "true"));
+    if let Err(e) = mosaikit_kernel::ops::maintenance::check(&s.k, None).await {
+        return back_to_login(&s, &slug, e.code());
+    }
     match oidc::begin(&s.k, &slug, remember).await {
         Ok(b) => {
             let mut res = redirect(&b.url);

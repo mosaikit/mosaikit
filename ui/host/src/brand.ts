@@ -30,6 +30,8 @@ export interface Brand {
   locale?: string
   /** default mode (light, dark, auto) for whoever did not choose one */
   mode?: string
+  /** maintenance mode and the planned one (recent servers) */
+  maintenance?: { on: boolean; message: string; planned_at: string | null; planned_message: string }
 }
 
 export const DEFAULT_BRAND: Brand = {

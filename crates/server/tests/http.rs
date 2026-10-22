@@ -108,6 +108,20 @@ impl App {
         Session { cookie, csrf: r.json()["csrf"].as_str().unwrap().to_string() }
     }
 
+    /// A refused sign-in: the code of the error.
+    async fn login_err(&self, tenant: &str, user: &str) -> String {
+        let r = self
+            .call(
+                None,
+                Method::POST,
+                "/api/auth/login",
+                Some(json!({ "tenant": tenant, "username": user, "password": PASSWORD })),
+            )
+            .await;
+        assert_ne!(r.status, StatusCode::OK);
+        r.json()["code"].as_str().unwrap_or_default().to_string()
+    }
+
     /// Sign-in as Administrator (without second factor: `admin_totp = false` in the tests).
     async fn admin(&self) -> Session {
         let r = self
@@ -1653,4 +1667,131 @@ async fn quotas_over_http() {
     assert_eq!(mine["items"], 1);
     let near = a.call(Some(&anna), Method::GET, "/api/t/alfa/usage/near", None).await.json();
     assert_eq!(near.as_array().unwrap().len(), 1);
+}
+
+#[tokio::test]
+async fn lifecycle_and_operations_over_http() {
+    let a = App::new().await;
+    a.t.install("notes").await;
+    let admin = a.admin().await;
+    // new tenant with a trial period
+    let until = (chrono::Utc::now() + chrono::Duration::days(30)).to_rfc3339();
+    let r = a
+        .call(
+            Some(&admin),
+            Method::POST,
+            "/api/admin/tenants",
+            Some(json!({ "slug": "gamma", "name": "Gamma", "manager_username": "boss", "manager_password": PASSWORD,
+                         "trial_until": until })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let id = r.json()["id"].as_str().unwrap().to_string();
+    assert!(r.json()["trial_until"].is_string());
+    let boss = a.login("gamma", "boss", PASSWORD).await;
+    let r = a.call(Some(&admin), Method::GET, &format!("/api/admin/tenants/{id}/impact"), None).await;
+    assert_eq!(r.json()["people"], 1);
+    // export, download, import refused while it exists, then with replace
+    let r = a.call(Some(&admin), Method::POST, &format!("/api/admin/tenants/{id}/export"), None).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let file = r.json()["file"].as_str().unwrap().to_string();
+    let r = a.call(Some(&admin), Method::GET, &format!("/api/admin/exports/{file}"), None).await;
+    assert_eq!(r.status, StatusCode::OK);
+    assert_eq!(r.header(header::CONTENT_TYPE), "application/zip");
+    let zip = r.body.clone();
+    assert_eq!(
+        a.call(Some(&boss), Method::GET, &format!("/api/admin/exports/{file}"), None).await.status,
+        StatusCode::FORBIDDEN
+    );
+    let r = a.raw(&admin, "/api/admin/tenants/import", zip.clone()).await;
+    assert_eq!((r.status, r.json()["code"].as_str()), (StatusCode::CONFLICT, Some("tenant_exists")));
+    let r = a.raw(&admin, "/api/admin/tenants/import?replace=true", zip).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    assert_eq!(r.json()["replaced"], true);
+    // maintenance: the notice for everybody, only the Administrators work
+    let r = a
+        .call(
+            Some(&admin),
+            Method::PUT,
+            "/api/admin/maintenance",
+            Some(json!({ "on": true, "message": "Back at 10" })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let r = a.call(None, Method::GET, "/api/brand", None).await;
+    assert_eq!(
+        (r.json()["maintenance"]["on"].as_bool(), r.json()["maintenance"]["message"].as_str()),
+        (Some(true), Some("Back at 10"))
+    );
+    let boss = a.login_err("gamma", "boss").await;
+    assert_eq!(boss, "maintenance");
+    assert_eq!(a.call(Some(&admin), Method::GET, "/api/session", None).await.status, StatusCode::OK);
+    a.call(Some(&admin), Method::PUT, "/api/admin/maintenance", Some(json!({ "on": false }))).await;
+    let boss = a.login("gamma", "boss", PASSWORD).await;
+    // monitoring
+    for p in ["status", "performance?period=12h", "errors", "tenants", "capacity", "alerts"] {
+        let r = a.call(Some(&admin), Method::GET, &format!("/api/admin/monitoring/{p}"), None).await;
+        assert_eq!(r.status, StatusCode::OK, "{p}: {}", r.text());
+        assert_eq!(
+            a.call(Some(&boss), Method::GET, &format!("/api/admin/monitoring/{p}"), None).await.status,
+            StatusCode::FORBIDDEN
+        );
+    }
+    let r = a.call(Some(&admin), Method::GET, "/api/admin/monitoring/status", None).await;
+    assert!(r.json()["services"].as_array().unwrap().iter().any(|s| s["key"] == "database"));
+    let r = a.call(Some(&admin), Method::GET, "/api/admin/metrics", None).await;
+    assert!(r.text().contains("mosaikit_requests_total"));
+    assert_eq!(a.call(None, Method::GET, "/metrics", None).await.status, StatusCode::NOT_FOUND);
+    // a backup in the background, then listed
+    let r = a.call(Some(&admin), Method::POST, "/api/admin/backups", None).await;
+    assert_eq!(r.status, StatusCode::ACCEPTED);
+    let mut done = Value::Null;
+    for _ in 0..100 {
+        let r = a.call(Some(&admin), Method::GET, "/api/admin/backups", None).await;
+        if let Some(b) = r.json()["backups"].as_array().and_then(|l| l.first().cloned()) {
+            if b["status"] != "running" {
+                done = b;
+                break;
+            }
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+    }
+    assert_eq!(done["status"], "ok", "{done}");
+    let bid = done["id"].as_str().unwrap();
+    let r = a.call(Some(&admin), Method::GET, &format!("/api/admin/backups/{bid}/tenants"), None).await;
+    assert!(r.json().as_array().unwrap().iter().any(|m| m["tenant"]["slug"] == "gamma"));
+    // archive, then delete with the address typed
+    assert_eq!(
+        a.call(Some(&admin), Method::POST, &format!("/api/admin/tenants/{id}/archive"), None).await.status,
+        StatusCode::OK
+    );
+    let r = a
+        .call(
+            Some(&admin),
+            Method::POST,
+            &format!("/api/admin/tenants/{id}/delete"),
+            Some(json!({ "confirm": "gam" })),
+        )
+        .await;
+    assert_eq!(r.json()["code"], "confirm_mismatch");
+    let r = a
+        .call(
+            Some(&admin),
+            Method::POST,
+            &format!("/api/admin/tenants/{id}/delete"),
+            Some(json!({ "confirm": "gamma" })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    // and back from the backup
+    let r = a
+        .call(
+            Some(&admin),
+            Method::POST,
+            &format!("/api/admin/backups/{bid}/restore"),
+            Some(json!({ "slug": "gamma" })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    a.login("gamma", "boss", PASSWORD).await;
 }

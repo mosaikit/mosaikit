@@ -2,7 +2,7 @@
 //   sign-in:        #/  ·  #/login/<tenant>  ·  #/admin  ·  #/reset/<token> (a new password, from a link)
 //   administrator:  #/admin  ·  #/admin/tenants[/<id>[/<tab>]]  ·  #/admin/people  ·  #/admin/person/<id>[/<tab>]  ·
 //                   #/admin/plugins[/<filter>]  ·  #/admin/plugin/<id>[/<tab>]  ·  #/admin/system[/<section>]  ·  #/admin/account[/<section>]  ·
-//                   #/admin/notifications  ·  #/admin/log
+//                   #/admin/monitoring[/<section>]  ·  #/admin/notifications  ·  #/admin/log
 //   tenant:         #/t/<tenant>  ·  #/t/<tenant>/p/<plugin>[/<place>]  ·  #/t/<tenant>/manage[/<section>]  ·
 //                   #/t/<tenant>/person/<id>[/<tab>]  ·  #/t/<tenant>/group/<id>[/<tab>]  ·
 //                   #/t/<tenant>/plugins[/<plugin>]  ·  #/t/<tenant>/shares  ·  #/t/<tenant>/usage  ·
@@ -13,7 +13,7 @@
 
 import { useSyncExternalStore } from 'react'
 
-export type AdminPage = 'overview' | 'tenants' | 'people' | 'plugins' | 'system' | 'account' | 'notifications' | 'log'
+export type AdminPage = 'overview' | 'tenants' | 'people' | 'plugins' | 'monitoring' | 'system' | 'account' | 'notifications' | 'log'
 export type TenantPage = 'home' | 'manage' | 'plugins' | 'shares' | 'usage' | 'settings' | 'account' | 'notifications' | 'requests' | 'trash' | 'log'
 
 export type Route =
@@ -22,7 +22,7 @@ export type Route =
   | { area: 'login'; door: 'tenant' | 'admin'; tenant?: string }
   | { area: 'reset'; token: string }
 
-const ADMIN_PAGES: AdminPage[] = ['tenants', 'people', 'plugins', 'system', 'account', 'notifications', 'log']
+const ADMIN_PAGES: AdminPage[] = ['tenants', 'people', 'plugins', 'monitoring', 'system', 'account', 'notifications', 'log']
 const TENANT_PAGES: TenantPage[] = ['manage', 'plugins', 'shares', 'usage', 'settings', 'account', 'notifications', 'requests', 'trash', 'log']
 
 export function parse(hash: string): Route {

@@ -10,6 +10,7 @@ mod groups;
 mod invitations;
 pub mod keys;
 pub mod levels;
+pub mod lifecycle;
 mod members;
 mod people;
 mod requests;

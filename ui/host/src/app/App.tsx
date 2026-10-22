@@ -18,6 +18,7 @@ import { AdminOverview, AdminSystem, AdminTenant, AdminTenants } from './pages/a
 import { AdminPluginPage, AdminPlugins, TenantPlugins } from './pages/plugins.tsx'
 import { AccountPage } from './pages/common.tsx'
 import { LogPage, TrashPage } from './pages/history.tsx'
+import { MonitoringPage } from './pages/operations.tsx'
 import { AdminPeople, AdminPersonPage, GroupPage, ItemPage, PersonPage, PluginAccessPage, RequestsPage, ResetPage } from './pages/people.tsx'
 import { Manage, PluginPage, Shares, TenantHome, TenantSettingsPage, Usage } from './pages/tenant.tsx'
 import { go, href, parse, to, useHash, type Route } from './router.ts'
@@ -58,6 +59,7 @@ function Page({ session, route }: { session: Session; route: Route }) {
     if (route.page === 'account') return <AccountPage session={session} route={route} />
     if (route.page === 'notifications') return <NotificationsPage session={session} route={route} />
     if (route.page === 'log') return <LogPage />
+    if (route.page === 'monitoring') return <MonitoringPage section={route.section} />
     return <AdminOverview session={session} />
   }
   if (route.area === 'tenant') {

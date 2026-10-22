@@ -251,6 +251,41 @@ or empty fields in System › Quotas). Storage is in GB (1 GB = 1024 MB).
 | P6-18 | Italian, dark mode | Everything translated («Quote», «Consumi», «Andamento», «Chi consuma di più», «Avvisi»); bars and alerts readable in dark mode |
 | P6-19 | As Administrator: Restore every quota of the tenants and empty System › Quotas | No limit again; the sidebar alert disappears |
 
+## Phase 7 — Lifecycle of the tenants and operations
+
+As Administrator (`#/admin`) unless said otherwise. The checks create and delete a test tenant (*Test
+Town*, address `test-town`): Comune di Roma and Regione Lazio are only read.
+
+| Id | Check | Expected |
+|---|---|---|
+| P7-01 | Tenants › New tenant | A dialog in four steps (Tenant, Sign-in, Tenant Manager, Summary) with the bar of the steps; Next is disabled until the step is complete |
+| P7-02 | Step 1: Name *Test Town* | The identifier fills in by itself (`test-town`); Trial period on with a date 10 days ahead |
+| P7-03 | Step 2 | Local accounts chosen; Identity provider (OIDC) asks issuer and client id and says that roles and the check are on the Sign-in tab |
+| P7-04 | Step 3 and 4: Tenant Manager `boss` with a password, Summary, Create the tenant | The summary lists what the platform prepares by itself; the page of the tenant opens with «on trial until …» |
+| P7-05 | Details of Test Town | Below the details and the quotas: Trial period (date, Update the trial, Remove the trial), Logo of the tenant (read only, or «No logo»), Export, the red area Archive or delete |
+| P7-06 | Export the tenant | A link `test-town-<date>.zip` with its size; it downloads a zip with `manifest.json`, `core/…`, `plugins/…` |
+| P7-07 | Archive the tenant (confirm) | The confirmation lists what it holds; the badge becomes «archived»; signing in as `boss` is refused |
+| P7-08 | ⋯ › Reactivate the tenant | Back to «on trial until …»; `boss` signs in again |
+| P7-09 | Tenants › ⋯ › Import a tenant, choose the zip of P7-06 | «The tenant of this export exists. Replace it?»; confirming, the tenant comes back as it was at the export |
+| P7-10 | Delete the tenant | A dialog with what goes away and «Type test-town to confirm»; Delete for good stays disabled until the address is typed; then the tenant disappears from the list |
+| P7-11 | Import the zip of P7-06 again | Test Town comes back with `boss` (the same people, items and files); delete it again at the end |
+| P7-12 | System › Maintenance: Maintenance mode on, notice «Upgrade, back at 10», Save, confirm | A yellow band «Maintenance mode is on · only the Administrators can work» on every page of the Administrator |
+| P7-13 | In a private window: the sign-in page | The notice «The platform is under maintenance» with the text; signing in as `s.greco` is refused with «The platform is under maintenance: only the Administrators sign in»; a public link answers with the maintenance page |
+| P7-14 | A session of `e.ricci` opened before | At the next action it goes back to the sign-in page with the notice |
+| P7-15 | Maintenance off, Save | The band disappears; `s.greco` signs in again |
+| P7-16 | Planned maintenance: a start 5 minutes ahead and a notice, Save | Everybody (also `s.greco`, in the shell) sees «Maintenance planned on …» within a minute; at the time the mode turns on by itself (wait, then turn it off) |
+| P7-17 | System › Backup and restore › Run now | A row «running», then «complete» (PostgreSQL with a `pg_dump` of the same version in the PATH, or SQLite) or «tenants only» with the reason (no usable `pg_dump`); size and number of tenants; Download gives the zip with `README.txt` |
+| P7-18 | Restore a tenant on a backup | The tenants inside; restoring one that exists asks to replace it |
+| P7-19 | Schedule: hour and backups kept, Save | Saved; with «Backups kept» 1 and another Run now only the last backup stays |
+| P7-20 | Monitoring › Status | Database, Storage of the contents, Emails (off without a mail server), Background work, Plugin runtime, Backups, and the identity providers of OIDC tenants, each with its state; a row opens its detail |
+| P7-21 | Performance, period 1 hour / 12 hours / 7 days | Charts of requests and errors, response time (p50, p95, p99), sessions and emails waiting; «Show as a table» gives the same numbers; a new installation says «No data yet» for the first minute |
+| P7-22 | Errors | Server errors and error rate; the latest refused operations (e.g. a wrong password) with «See in the log» |
+| P7-23 | Tenants | Requests in the last hour and day, people, items, space and the nearest quota of each tenant |
+| P7-24 | Capacity | Disk of the data and memory as bars with what is free; database, contents, backups, memory of Mosaikit |
+| P7-25 | Alerts: Free disk under 99 %, Save, wait a minute | «Alerts now» shows «Disk almost full»; the bell gets «Alert: …» once (not every minute); put the threshold back to 10 |
+| P7-26 | Platform overview | The panels Services and To do (alerts, a failed backup, trials ending within a week, plugin updates) with links |
+| P7-27 | Italian, dark mode, phone width | Every new page translated («Monitoraggio», «Backup e ripristino», «Manutenzione», «Archivia o elimina»); charts and badges readable in dark mode; the wizard usable on a phone |
+
 ## Phase 8 — Sign-in through the identity provider of a tenant (OIDC)
 
 **Test identity provider.** In a second terminal, from the `mosaikit` folder:

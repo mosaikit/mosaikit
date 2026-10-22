@@ -22,6 +22,7 @@ import { setLanguageContext, setLang, t, useLang, useLanguages, type Lang } from
 import { go, to } from './router.ts'
 import { AppMark } from './Shell.tsx'
 import { setDefaultMode, setPreset, setTheme, useTheme, type Mode } from './theme.ts'
+import { MaintenanceNotice } from './pages/operations.tsx'
 
 const LAST = 'msk_last_login_tenant'
 
@@ -110,6 +111,7 @@ export default function Login({ door, tenant }: { door: 'tenant' | 'admin'; tena
               <AppMark className="size-9" />
               <b className="text-lg">{brand.name}</b>
             </div>
+            <MaintenanceNotice />
             {admin ? (
               status === 'ok' ? (
                 <AdminDoor platformTheme={brand.theme} onEnter={enter} />

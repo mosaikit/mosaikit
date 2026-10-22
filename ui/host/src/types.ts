@@ -435,6 +435,138 @@ export interface TenantInfo {
   active_users_30d?: number
   shares?: number
   public_links?: number
+  /** end of the trial period (recent servers) */
+  trial_until?: string | null
+  /** archived: suspended and kept as it is (recent servers) */
+  archived_at?: string | null
+}
+
+/** What a tenant holds: for the confirmations of archive and deletion. */
+export interface TenantImpact {
+  slug: string
+  name: string
+  people: number
+  guests: number
+  groups: number
+  items: number
+  bytes: number
+  public_links: number
+  items_elsewhere: number
+}
+
+export interface ExportManifest {
+  format: string
+  version: number
+  backend: string
+  kernel: string
+  exported_at: string
+  tenant: { id: string; slug: string; name: string }
+  plugins: Record<string, string>
+  blobs: string
+  counts: Record<string, number>
+}
+
+export interface ImportReport {
+  tenant_id: string
+  slug: string
+  name: string
+  rows: number
+  files: number
+  people_missing: number
+  replaced: boolean
+}
+
+export interface BackupInfo {
+  id: string
+  started_at: string
+  finished_at: string | null
+  status: 'running' | 'ok' | 'failed'
+  manual: boolean
+  file: string
+  size_bytes: number
+  /** the dump of the whole database is inside */
+  whole: boolean
+  tenants: number
+  /** the error of a failed backup, or the note of one without the database dump */
+  error: string
+  by: string | null
+}
+
+export interface BackupSettings {
+  enabled: boolean
+  hour: number
+  keep: number
+}
+
+export interface Maintenance {
+  on: boolean
+  message: string
+  planned_at: string | null
+  planned_message: string
+}
+
+export interface ServiceState {
+  key: string
+  name: string
+  state: 'ok' | 'degraded' | 'down' | 'off'
+  version: string
+  ms: number | null
+  detail: string
+}
+
+export interface MetricPoint {
+  ts: string
+  requests: number
+  errors: number
+  p50_ms: number
+  p95_ms: number
+  p99_ms: number
+  sessions: number
+  mail_pending: number
+  db_ms: number
+}
+
+export interface TenantLoad {
+  id: string
+  slug: string
+  name: string
+  status: string
+  archived: boolean
+  requests_24h: number
+  requests_1h: number
+  people: number
+  items: number
+  bytes: number
+  /** the quota nearest to its limit (none without limits) */
+  nearest_quota: { metric: 'storage' | 'people' | 'items'; limit: number | null; used: number; percent: number | null } | null
+}
+
+export interface Capacity {
+  disk_total: number
+  disk_free: number
+  database_bytes: number
+  contents_bytes: number
+  backups_bytes: number
+  memory_total: number
+  memory_available: number
+  process_memory: number
+}
+
+export interface AlertSettings {
+  disk_free_pct: number
+  error_rate_pct: number
+  mail_failed: number
+  backup_failed: boolean
+  service_down: boolean
+  recipients: string[]
+}
+
+export interface AlertState {
+  key: string
+  active: boolean
+  since: string | null
+  detail: string
+  notified_at: string | null
 }
 
 export interface ResourceStat {

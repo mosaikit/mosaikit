@@ -112,6 +112,11 @@ fn configured(s: &EmailSettings) -> bool {
     !s.host.is_empty() && !s.sender.is_empty()
 }
 
+/// A server and a sender are set: the platform can send emails (Monitoring).
+pub(crate) async fn is_configured(k: &Kernel) -> Result<bool> {
+    Ok(configured(&stored(k).await?))
+}
+
 pub async fn settings(k: &Kernel, admin: &SessionUser) -> Result<EmailView> {
     require_admin(admin)?;
     let settings = stored(k).await?;
@@ -409,6 +414,7 @@ pub(crate) fn spawn_worker(k: &Arc<Kernel>) {
         loop {
             tokio::time::sleep(StdDuration::from_secs(15)).await;
             let Some(k) = weak.upgrade() else { break };
+            k.ops.tick("mail");
             if let Err(e) = drain(&k).await {
                 tracing::warn!("queue of the emails: {e}");
             }

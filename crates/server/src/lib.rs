@@ -11,6 +11,7 @@ mod auth;
 pub mod fake_idp;
 mod history_api;
 mod oidc_api;
+mod ops_api;
 mod pages;
 mod people_api;
 mod plugins_api;
@@ -98,6 +99,48 @@ async fn request_info(
         .await
 }
 
+/// Counts the requests for the Monitoring pages (time, outcome and tenant of `/api/t/<slug>/...`); the
+/// live streams, which stay open, are left out.
+async fn measure(
+    axum::extract::State(s): axum::extract::State<AppState>,
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Response {
+    let path = req.uri().path();
+    if path.ends_with("/stream") {
+        return next.run(req).await;
+    }
+    let tenant = path.split_once("/api/t/").and_then(|(_, r)| r.split('/').next()).map(str::to_owned);
+    let start = std::time::Instant::now();
+    let res = next.run(req).await;
+    s.k.ops.metrics.record(start.elapsed().as_secs_f64() * 1000.0, res.status().as_u16(), tenant.as_deref());
+    res
+}
+
+/// Public links and contents are closed during maintenance.
+async fn maintenance_gate(
+    axum::extract::State(s): axum::extract::State<AppState>,
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Response {
+    let path = req.uri().path();
+    if path.starts_with("/p/") || path.starts_with("/c/") {
+        if let Err(e) = mosaikit_kernel::ops::maintenance::check(&s.k, None).await {
+            let page = format!(
+                "<!doctype html><meta charset=\"utf-8\"><title>Maintenance</title><p>{}</p>",
+                e.message.replace('<', "&lt;")
+            );
+            return (
+                StatusCode::SERVICE_UNAVAILABLE,
+                [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
+                page,
+            )
+                .into_response();
+        }
+    }
+    next.run(req).await
+}
+
 /// Router of the app origin (API + host UI), under the base path of `url`.
 pub fn app_router(k: Arc<Kernel>) -> Router {
     let base = k.cfg.base_path.clone();
@@ -106,6 +149,7 @@ pub fn app_router(k: Arc<Kernel>) -> Router {
         .merge(oidc_api::router())
         .merge(ui::router())
         .layer(axum::middleware::from_fn_with_state(state.clone(), request_info))
+        .layer(axum::middleware::from_fn_with_state(state.clone(), measure))
         .with_state(state);
     under_base(&base, r).layer(axum::middleware::from_fn(common_headers))
 }
@@ -115,7 +159,10 @@ pub fn app_router(k: Arc<Kernel>) -> Router {
 pub fn untrusted_router(k: Arc<Kernel>) -> Router {
     let base = k.cfg.plugin_base_path.clone();
     let state = AppState { k };
-    let r = untrusted::router().layer(axum::middleware::from_fn_with_state(state.clone(), request_info));
+    let r = untrusted::router()
+        .layer(axum::middleware::from_fn_with_state(state.clone(), request_info))
+        .layer(axum::middleware::from_fn_with_state(state.clone(), maintenance_gate))
+        .layer(axum::middleware::from_fn_with_state(state.clone(), measure));
     under_base(&base, r.with_state(state)).layer(axum::middleware::from_fn(common_headers))
 }
 

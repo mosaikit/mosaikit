@@ -21,6 +21,10 @@ pub struct TenantInfo {
     pub resources: i64,
     pub bytes: i64,
     pub created_at: DateTime<Utc>,
+    /// end of the trial period, if any
+    pub trial_until: Option<DateTime<Utc>>,
+    /// archived (suspended and kept as it is)
+    pub archived_at: Option<DateTime<Utc>>,
 }
 
 const TENANT_INFO_SQL: &str = "
@@ -31,7 +35,7 @@ const TENANT_INFO_SQL: &str = "
              where m.tenant_id = t.id and u.home_tenant_id <> t.id) as guests,
            (select count(*) from core.resources r where r.tenant_id = t.id) as resources,
            (select coalesce(sum(size_bytes), 0)::bigint from core.resources r where r.tenant_id = t.id) as bytes,
-           t.created_at
+           t.created_at, t.trial_until, t.archived_at
     from core.tenants t";
 
 /// Tenant offered on the sign-in page.
@@ -119,6 +123,8 @@ fn tenant_info(r: &mosaikit_db::Row) -> TenantInfo {
         resources: r.get(7),
         bytes: r.get(8),
         created_at: r.get(9),
+        trial_until: r.get(10),
+        archived_at: r.get(11),
     }
 }
 
@@ -136,6 +142,8 @@ pub struct NewTenant<'a> {
     pub manager_username: &'a str,
     pub manager_display_name: &'a str,
     pub manager_password: &'a str,
+    /// end of the trial period (none: no trial)
+    pub trial_until: Option<DateTime<Utc>>,
 }
 
 pub async fn create_tenant(k: &Kernel, admin: &SessionUser, t: NewTenant<'_>) -> Result<TenantInfo> {
@@ -153,20 +161,25 @@ pub async fn create_tenant(k: &Kernel, admin: &SessionUser, t: NewTenant<'_>) ->
     }
     // a new tenant has the rules of the platform
     check_password_len(t.manager_password, password_min(k, None).await?)?;
+    if t.trial_until.is_some_and(|u| u <= chrono::Utc::now()) {
+        return Err(Error::bad("the end of the trial must be in the future").with_code("trial_past"));
+    }
     let hash = hash_password(k, t.manager_password).await?;
     let mut tx = k.db.begin_app().await?;
-    let id: Uuid =
-        mosaikit_db::query_scalar("insert into core.tenants (slug, name) values ($1, $2) returning id")
-            .bind(&slug)
-            .bind(t.name.trim())
-            .fetch_one(&mut *tx)
-            .await
-            .map_err(|e| match Error::from(e) {
-                err if err.kind == crate::Kind::Conflict => {
-                    Error::conflict(format!("a tenant '{slug}' already exists"))
-                }
-                err => err,
-            })?;
+    let id: Uuid = mosaikit_db::query_scalar(
+        "insert into core.tenants (slug, name, trial_until) values ($1, $2, $3) returning id",
+    )
+    .bind(&slug)
+    .bind(t.name.trim())
+    .bind(t.trial_until)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(|e| match Error::from(e) {
+        err if err.kind == crate::Kind::Conflict => {
+            Error::conflict(format!("a tenant '{slug}' already exists"))
+        }
+        err => err,
+    })?;
     let manager: Uuid = mosaikit_db::query_scalar(
         "insert into core.users (home_tenant_id, username, display_name, password_hash) values ($1, $2, $3, $4) returning id",
     )
@@ -197,12 +210,19 @@ pub async fn set_tenant_status(k: &Kernel, admin: &SessionUser, id: Uuid, status
     if !["active", "suspended"].contains(&status) {
         return Err(Error::bad("invalid state"));
     }
-    let n = mosaikit_db::query("update core.tenants set status = $2 where id = $1 and not is_system")
-        .bind(id)
-        .bind(status)
-        .execute(&k.db)
-        .await?
-        .rows_affected();
+    // reactivating brings an archived tenant back and forgets a trial already over
+    let n = mosaikit_db::query(
+        "update core.tenants set status = $2,
+                archived_at = case when $2 = 'active' then null else archived_at end,
+                trial_until = case when $2 = 'active' and trial_until <= $3 then null else trial_until end
+         where id = $1 and not is_system",
+    )
+    .bind(id)
+    .bind(status)
+    .bind(chrono::Utc::now())
+    .execute(&k.db)
+    .await?
+    .rows_affected();
     if n == 0 {
         return Err(Error::bad("tenant does not exist or is the system one"));
     }

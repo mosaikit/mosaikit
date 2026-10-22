@@ -65,6 +65,10 @@ impl FromRequestParts<AppState> for Auth {
                 return Err(ApiError(Error::forbidden("missing or invalid CSRF token")));
             }
         }
+        // during maintenance only the Administrators work; signing out stays possible
+        if !parts.uri.path().contains("/api/auth/") {
+            mosaikit_kernel::ops::maintenance::check(&state.k, Some(&user)).await?;
+        }
         Ok(Auth(user))
     }
 }

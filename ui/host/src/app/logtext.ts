@@ -85,6 +85,23 @@ export const ACTIONS: Record<string, string> = {
   'admin.totp_reset': 'Removed the second factor of an administrator',
   'admin.recovery_code': 'Signed in with a recovery code',
   'user.create.oidc': 'Account created at the first sign-in through the identity provider',
+  'tenant.trial': 'Set the trial period of a tenant',
+  'tenant.archive': 'Archived a tenant',
+  'tenant.delete': 'Deleted a tenant',
+  'tenant.export': 'Exported a tenant',
+  'tenant.import': 'Imported a tenant',
+  'tenant.trial_end': 'The trial of a tenant ended',
+  'maintenance.on': 'Turned the maintenance on',
+  'maintenance.off': 'Turned the maintenance off',
+  'maintenance.planned': 'Planned a maintenance',
+  'backup.done': 'Made a backup',
+  'backup.failed': 'The backup failed',
+  'backup.delete': 'Deleted a backup',
+  'backup.settings': 'Changed the schedule of the backups',
+  'backup.restore_tenant': 'Restored a tenant from a backup',
+  'alerts.settings': 'Changed the alerts',
+  'alert.raised': 'An alert was raised',
+  'alert.cleared': 'An alert cleared',
 }
 
 export function describe(e: Pick<LogEvent, 'action'>): string {

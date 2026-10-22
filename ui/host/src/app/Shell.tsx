@@ -9,6 +9,7 @@ import type { ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import {
+  Activity,
   Bell,
   Building2,
   Check,
@@ -33,6 +34,7 @@ import {
   Users,
 } from 'lucide-react'
 import { api } from '../api.ts'
+import { MaintenanceBanner } from './pages/operations.tsx'
 import { useBrand } from '../brand.ts'
 import type { Session, ShellBand } from '../types.ts'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -116,6 +118,7 @@ function useNav(session: Session, route: Route): { groups: NavGroup[]; bottom: N
             { label: t('Tenant'), icon: <Building2 />, href: to.admin('tenants'), active: page === 'tenants' || page === 'tenant' },
             { label: t('People'), icon: <Users />, href: to.admin('people'), active: page === 'people' || page === 'person' },
             { label: t('Plugins'), icon: <Puzzle />, href: to.admin('plugins'), active: page === 'plugins' },
+            { label: t('Monitoring'), icon: <Activity />, href: to.admin('monitoring'), active: page === 'monitoring' },
             { label: t('Log'), icon: <History />, href: to.admin('log'), active: page === 'log' },
           ],
         },
@@ -545,6 +548,7 @@ export default function Shell({ session, route, children }: { session: Session; 
       <AppSidebar session={session} route={route} band={band} />
       <SidebarInset className="min-w-0">
         <TopBar session={session} route={route} band={band} />
+        <MaintenanceBanner admin={session.user.is_system_admin} />
         <div className="flex min-h-0 flex-1 flex-col">{children}</div>
       </SidebarInset>
     </SidebarProvider>

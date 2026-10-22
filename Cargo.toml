@@ -35,6 +35,7 @@ tokio = { version = "1", features = ["full"] }
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "uuid", "chrono", "json", "migrate", "macros"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde", "std"] }
+sysinfo = { version = "0.33", default-features = false, features = ["disk", "system"] }
 sha2 = "0.10"
 hmac = "0.12"
 sha1 = "0.10"
@@ -71,6 +72,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tempfile = "3"
 futures-util = "0.3"
 tokio-stream = { version = "0.1", features = ["sync"] }
+tokio-util = { version = "0.7", features = ["io"] }
 
 mosaikit-mskp = { path = "crates/mskp" }
 mosaikit-sql-guard = { path = "crates/sql-guard" }

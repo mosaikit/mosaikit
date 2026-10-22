@@ -14,6 +14,7 @@ development and release. The choices described here replace the initial PoC
    - [3.2 People and permissions](#32-people-and-permissions)
    - [3.3 Sign-in through an identity provider (OIDC)](#33-sign-in-through-an-identity-provider-oidc)
    - [3.4 Quotas and usage](#34-quotas-and-usage)
+   - [3.5 Lifecycle of the tenants](#35-lifecycle-of-the-tenants)
 4. [Resources, ownership and sharing](#4-resources-ownership-and-sharing)
    - [4.1 Trash](#41-trash)
    - [4.2 Log](#42-log)
@@ -27,6 +28,9 @@ development and release. The choices described here replace the initial PoC
    - [8.10 Settings, updates, uninstall](#810-settings-updates-uninstall)
 9. [Web security: origins, cookies, CSP](#9-web-security-origins-cookies-csp)
 10. [Configuration and data dir](#10-configuration-and-data-dir)
+   - [10.1 Backup and restore](#101-backup-and-restore)
+   - [10.2 Maintenance mode](#102-maintenance-mode)
+   - [10.3 Monitoring](#103-monitoring)
 11. [Repository layout](#11-repository-layout)
 12. [Development](#12-development)
 13. [Release](#13-release)
@@ -380,6 +384,49 @@ API: `GET|PUT /api/admin/quotas`, `GET|PUT /api/admin/tenants/{id}/quotas` (Admi
 `GET /api/t/{t}/manage/quotas`, `GET /api/t/{t}/manage/usage/{trend,consumers}`,
 `GET|PUT /api/t/{t}/manage/usage/alerts` (Tenant Manager); `GET /api/t/{t}/usage/{mine,near}` (every
 member).
+
+### 3.5 Lifecycle of the tenants
+
+Kernel modules `tenancy::lifecycle` and `transfer`; the Administrator only. The system tenant is never
+archived, exported or deleted.
+
+| State | What it is | How it ends |
+|---|---|---|
+| Trial | `trial_until` on the tenant. A week and a day before, its Tenant Managers and the Administrators get a notification (`tenant.trial_ending`, once each); at the end the tenant is **suspended** (`tenant.trial_ended`), nothing is deleted | the Administrator extends or removes the trial; reactivating forgets a trial already over |
+| Suspended | nobody of the tenant signs in (also guests); data and public links stay but links do not open | Reactivate |
+| Archived | suspended and marked `archived_at`: kept as it is, it can still be exported | Reactivate (clears the mark) |
+| Deleted | everything, for good, with the address of the tenant typed as confirmation | — |
+
+**Deletion** (`purge_tenant`): the items of the tenant go (the rows of the plugins follow through their
+foreign keys, the contents and the logos from `<data_dir>/blobs`), then the people whose home is the
+tenant, then the tenant (memberships, groups, settings, log, quotas… by cascade). Items its people own
+as guests in other tenants pass to the first active Tenant Manager of each of those tenants; if a tenant
+has none the deletion is refused (`tenant_delete_blocked`). The event `tenant.delete` stays in the log of
+the platform.
+
+**Export and import.** An export is a zip (`<data_dir>/exports`, kept 7 days):
+
+```text
+manifest.json                   format "mosaikit-tenant-export", version, backend, tenant, plugins
+core/<table>.json               the rows of the tenant in the tables of the kernel
+plugins/<plugin>/<table>.json   the rows of the tenant in the tables of each plugin
+blobs/…  identity/…             its contents and its logos
+```
+
+Rows are JSON objects with the columns of the table (on PostgreSQL the types of extensions, e.g. PostGIS
+geometries, travel as their text form). The import recreates the tenant with the **same ids** (contents,
+links and bookmarks keep working), only the columns the table still has (an export of an older version
+gets the defaults of the new columns), in the order of the foreign keys; the tables of a plugin that
+refer to each other are tried again until they go in. The tenant must not exist (`tenant_exists`) unless
+it is replaced; the plugins with rows must be installed (`export_plugins_missing`); the export must come
+from the same kind of database (`export_backend`). Guests of other tenants come back only if they still
+exist; an item of a missing owner goes to the first Tenant Manager; the authors of past events are
+forgotten. Secrets travel encrypted (the OIDC client secret of the tenant, its keys): they work only
+with the same key (`secret.key`).
+
+API: `GET /api/admin/tenants/{id}/impact`, `PUT …/trial`, `POST …/archive`, `POST …/delete`
+(`{"confirm": "<slug>"}`), `POST …/export` then `GET /api/admin/exports/{file}`,
+`POST /api/admin/tenants/import[?replace=true]` (the zip as the body, up to 4 GB).
 
 ## 4. Resources, ownership and sharing
 
@@ -1073,6 +1120,86 @@ tenant becomes an account of `system` with the same password (with the
 suffix `-<tenant>` if the name is already taken), the original account stays without
 the role; the other accounts of `system` are disabled and the memberships that
 involve `system` removed; every session is closed.
+
+### 10.1 Backup and restore
+
+Kernel module `ops::backup` (System › Backup and restore). A backup is a zip in `<data_dir>/backups`:
+
+```text
+manifest.json        format "mosaikit-backup", backend, kernel version, tenants, `whole`
+README.txt           how to restore it
+database/            the whole database: mosaikit.pgdump (pg_dump, custom format) or mosaikit.db (SQLite, VACUUM INTO)
+blobs/               the contents and logos of every tenant
+plugins/             the installed packages
+tenants/<slug>/      the export of each tenant (§3.5) without contents (they are in blobs/)
+```
+
+- **Schedule**: once a day at the hour chosen (UTC), default 02:00, `backup.enabled`, `backup.hour`,
+  `backup.keep` (default 7: the older ones are deleted) in the settings of the system tenant. Run now
+  starts one in the background; one at a time; a backup interrupted by a stop is marked failed at the
+  next start.
+- **pg_dump**: looked for in `database.pg_bin`, `pgsql/bin` next to the executable, `MOSAIKIT_PG_BIN`,
+  `PGBIN` and the PATH. It must be of the same major version as the server or newer: otherwise (or
+  without it) the backup is made without the dump — `whole: false`, "tenants only" with the reason —
+  and every tenant can still be restored. The Docker image does not include `pg_dump`: for complete
+  backups install `postgresql-client-<major>` in an image of your own, or dump the database container.
+- **Never inside**: the key of the secrets (`<data_dir>/secret.key` or `secret_key`). Keep it apart:
+  without it the encrypted values (keys of outside services, OIDC secrets, the password of the mail
+  server) cannot be read after a restore.
+- **Restore everything** is an offline step (README.txt): stop the server, `pg_restore --clean
+  --if-exists --no-owner` (or replace the SQLite file), put back `blobs/` and `plugins/`, keep the same
+  key, start.
+- **Restore one tenant**, in the running installation: Restore a tenant on a backup imports its
+  `tenants/<slug>/` with the contents of `blobs/` (replacing the tenant if it exists). Restoring a single
+  item from a backup is not offered: the trash keeps deleted items for `trash.retention_days`.
+- A failed backup notifies every Administrator (`backup.failed`) and raises the alert «Backup failed».
+
+API: `GET|POST /api/admin/backups`, `GET|PUT /api/admin/backups/settings`,
+`GET /api/admin/backups/{id}/file`, `GET …/tenants`, `POST …/restore` (`{"slug", "replace"}`),
+`DELETE /api/admin/backups/{id}`.
+
+### 10.2 Maintenance mode
+
+Kernel module `ops::maintenance` (System › Maintenance; settings of the system tenant, `maintenance`).
+While it is on, only the Administrators work: the requests of everybody else (shell and plugins) are
+refused with `403` and the code `maintenance` — the shell goes back to the sign-in page, which shows the
+notice — and so are the sign-in of the tenants (also through OIDC) and the public links and contents of
+the plugin origin (a page that says so). Signing out stays possible. A **planned** maintenance shows its
+notice to everybody in advance (`/api/brand` carries `maintenance` for the sign-in page and the band of
+the shell, read again every minute) and turns the mode on by itself at the planned time. The state is
+read at every request and kept 5 seconds.
+
+### 10.3 Monitoring
+
+Kernel modules `ops::metrics` and `ops::monitor`; pages Monitoring › Status, Performance, Errors,
+Tenants, Capacity, Alerts (Administrator).
+
+- **Metrics**: the server counts every request (time, outcome, tenant of `/api/t/<slug>/…`; the live
+  streams are left out); every minute a snapshot goes into `core.metrics` (requests, server errors,
+  p50/p95/p99 of the latency on a sample of 2000, open sessions, emails waiting and failed, time of a
+  trivial query, requests per tenant), kept 8 days. The charts aggregate them in buckets (1 hour: per
+  minute; 12 hours: 10 minutes; 7 days: 2 hours).
+- **Status** of the services: database (version, time), storage of the contents (write and read of a
+  probe), emails (queue, failures, configured or not), background work (last run of the workers),
+  plugin runtime (active, blocked), backups (last result), the identity providers of the OIDC tenants
+  (discovery document, checked at most every 5 minutes).
+- **Capacity**: disk of the data folder, memory of the server and of the process (`sysinfo`), size of the
+  database, of the contents and of the backups.
+- **Tenants**: requests of the last hour and day, people, items, space and the quota nearest to its
+  limit (§3.4).
+- **Alerts** (settings of the system tenant, `alerts`): free disk under a percentage (10), server errors
+  over a percentage of the last 15 minutes with at least 20 requests (5), emails failed in an hour (3),
+  a failed backup, a service not answering; recipients chosen among the Administrators (none: all of
+  them). Checked every minute; `core.alerts` keeps the state, so a crossing is notified **once**
+  (`alert.raised`) until the condition clears (`alert.cleared` in the log).
+- **Prometheus**: `GET /metrics` exists only with `MOSAIKIT_METRICS_TOKEN` (at least 16 characters) and
+  `Authorization: Bearer <token>`; `GET /api/admin/metrics` gives the same text to an Administrator.
+- **Background work**: a worker of the operations runs every minute (snapshot, alerts, planned
+  maintenance, scheduled backup) and every 10 minutes the trial periods, next to the worker of the
+  emails, the retention and the quotas; both stop with the kernel and are off with `no_background`.
+
+API: `GET /api/admin/monitoring/{status,performance,errors,tenants,capacity,alerts}`
+(`?period=1h|12h|7d`), `PUT /api/admin/monitoring/alerts`, `GET|PUT /api/admin/maintenance`.
 
 ## 11. Repository layout
 

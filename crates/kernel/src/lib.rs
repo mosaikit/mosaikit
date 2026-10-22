@@ -24,6 +24,7 @@ pub mod log;
 pub mod mail;
 pub mod notify;
 pub mod oidc;
+pub mod ops;
 pub mod overview;
 pub mod plugins;
 pub mod quotas;
@@ -31,6 +32,7 @@ pub mod secret;
 pub mod tenancy;
 pub mod testing;
 pub mod totp;
+pub mod transfer;
 pub mod trash;
 mod util;
 
@@ -184,6 +186,8 @@ pub struct Kernel {
     pub(crate) secrets: secret::SecretBox,
     /// discovery documents and keys of the identity providers (OIDC)
     pub(crate) oidc: oidc::Cache,
+    /// metrics, maintenance mode, backups and the state of the background work
+    pub ops: ops::Ops,
     embedded: tokio::sync::Mutex<Option<embedded::EmbeddedPg>>,
     /// reference to itself (calls between plugins from the WASM logic)
     me: std::sync::OnceLock<std::sync::Weak<Kernel>>,
@@ -259,6 +263,7 @@ impl Kernel {
             cookie_secret,
             secrets,
             oidc: oidc::Cache::default(),
+            ops: ops::Ops::default(),
             embedded: tokio::sync::Mutex::new(embedded),
             me: std::sync::OnceLock::new(),
             cfg,
@@ -279,12 +284,21 @@ impl Kernel {
         blobs::gc(&kernel).await;
         if !kernel.cfg.no_background {
             mail::spawn_worker(&kernel);
+            ops::spawn_worker(&kernel);
         }
         Ok(kernel)
     }
 
     pub(crate) fn arc(&self) -> Option<Arc<Kernel>> {
         self.me.get().and_then(std::sync::Weak::upgrade)
+    }
+
+    /// Address of the PostgreSQL database (configured or embedded), for pg_dump.
+    pub(crate) async fn database_url(&self) -> Option<String> {
+        if let Some(pg) = self.embedded.lock().await.as_ref() {
+            return Some(pg.url.clone());
+        }
+        self.cfg.database.url.clone()
     }
 
     /// Stops the embedded PostgreSQL (if any).

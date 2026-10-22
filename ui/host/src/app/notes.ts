@@ -145,6 +145,14 @@ export function noteTitle(n: Note): string {
       if (d.level === 'forecast') return t('{quota} of {tenant}: at this pace the quota is used up in about {n} days', { quota: q, tenant: d.tenant, n: String(d.days ?? '') })
       return t('{quota} of {tenant}: {p}% of the quota', { quota: q, tenant: d.tenant, p: String(d.percent) })
     }
+    case 'tenant.trial_ending':
+      return t('The trial of {tenant} ends on {date}', { tenant: d.tenant, date: d.until })
+    case 'tenant.trial_ended':
+      return t('The trial of {tenant} ended: the tenant is suspended', { tenant: d.tenant })
+    case 'backup.failed':
+      return t('The backup failed')
+    case 'alert.raised':
+      return t('Alert: {detail}', { detail: d.detail })
     default:
       return n.title
   }
@@ -170,6 +178,12 @@ export function noteBody(n: Note): string {
       return t('Turn it on in Plugins to give it to the people of the tenant.')
     case 'plugin.unavailable':
       return t('The Administrator took it back: the people of the tenant no longer see it.')
+    case 'tenant.trial_ending':
+      return t('At the end the tenant is suspended; the data stay')
+    case 'tenant.trial_ended':
+      return t('Reactivate it or extend the trial from its page.')
+    case 'alert.raised':
+      return t('See Monitoring for the state of the platform.')
     default:
       return n.body
   }

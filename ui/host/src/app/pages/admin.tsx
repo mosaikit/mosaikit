@@ -3,7 +3,7 @@
 
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Bell, Building2, CircleHelp, Contrast, Frame, Gauge, History, KeyRound, KeySquare, Mail, MoreHorizontal, Palette, PanelLeft, Plus, Power, Search, ShieldCheck, Users } from 'lucide-react'
+import { Bell, Building2, CircleHelp, Contrast, Frame, Gauge, HardDrive, History, KeyRound, KeySquare, Mail, MoreHorizontal, Palette, PanelLeft, Plus, Power, Search, ShieldCheck, Upload, Users, Wrench } from 'lucide-react'
 import { api, fmtBytes, fmtDate } from '../../api.ts'
 import { useBrand } from '../../brand.ts'
 import type { AdminUser, GlobalKpi, Member, Session, ShellBand, SystemOverview, TenantInfo } from '../../types.ts'
@@ -27,6 +27,7 @@ import { SignInSettings } from '../SignInSettings.tsx'
 import { EmailPanel } from '../EmailPanel.tsx'
 import { TenantPluginsOfAdmin } from './plugins.tsx'
 import { PlatformQuotasPanel, TenantQuotasPanel } from '../Quotas.tsx'
+import { BackupPanel, ImportTenantDialog, MaintenancePanel, NewTenantWizard, OverviewOps, TenantLifecycle, TenantState } from './operations.tsx'
 import { t } from '../i18n.ts'
 
 
@@ -52,6 +53,7 @@ export function AdminOverview({ session }: { session: Session }) {
             <Kpi label={t('Active plugins')} value={`${q.data!.plugins_active}/${q.data!.plugins_installed}`} onClick={() => go(to.admin('plugins'))} />
           </div>
         )}
+        <OverviewOps />
         {q.data?.tenants === 0 && (
           <Empty icon={<Building2 />} title={t('No tenants')}>
             <Button className="mt-2" onClick={() => go(to.admin('tenants'))}>
@@ -77,14 +79,10 @@ export function AdminOverview({ session }: { session: Session }) {
 /* ── Tenant ──────────────────────────────────────────────────────────── */
 
 export function AdminTenants() {
-  const pwMin = passwordMin(useConfig())
   const q = useApi<TenantInfo[]>(['admin-tenants'], '/api/admin/tenants')
   const [open, setOpen] = useState(false)
+  const [importing, setImporting] = useState(false)
   const [search, setSearch] = useState('')
-  const create = useAction((v: Record<string, string>) => api('POST', '/api/admin/tenants', v), {
-    ok: (v) => t('Tenant {name} created with its Tenant Manager', { name: v.name }),
-    invalidate: [['admin-tenants'], ['admin-overview']],
-  })
   const rows = (q.data ?? []).filter((tn) => !search || `${tn.name} ${tn.slug}`.toLowerCase().includes(search.toLowerCase()))
   return (
     <>
@@ -96,6 +94,12 @@ export function AdminTenants() {
             <Plus />
             {t('New tenant')}
           </Button>
+        }
+        more={
+          <DropdownMenuItem onSelect={() => setImporting(true)}>
+            <Upload />
+            {t('Import a tenant')}
+          </DropdownMenuItem>
         }
       />
       <div className="grid gap-3 p-6 max-[620px]:p-4">
@@ -134,7 +138,7 @@ export function AdminTenants() {
                     <TableCell className="text-right tabular-nums">{tn.resources}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBytes(tn.bytes)}</TableCell>
                     <TableCell>
-                      <StatusBadge status={tn.status} />
+                      <TenantState tn={tn} />
                     </TableCell>
                     <TableCell className="text-muted-foreground">{fmtDate(tn.created_at)}</TableCell>
                   </TableRow>
@@ -144,21 +148,8 @@ export function AdminTenants() {
           </div>
         )}
       </div>
-      <FormDialog
-        open={open}
-        onOpenChange={setOpen}
-        title={t('New tenant')}
-        description={t('With its first Tenant Manager, a local account of the tenant.')}
-        fields={[
-          { name: 'slug', label: t('Identifier'), required: true, hint: t('Lowercase letters, digits and hyphens: it goes in the address and does not change') },
-          { name: 'name', label: t('Name'), required: true },
-          { name: 'manager_username', label: t('Username of the Tenant Manager'), required: true },
-          { name: 'manager_display_name', label: t('Name of the Tenant Manager') },
-          { name: 'manager_password', label: t('Initial password'), type: 'password', required: true, hint: t('At least {n} characters', { n: pwMin }) },
-        ]}
-        submit={t('Create the tenant')}
-        onSubmit={(v) => create.mutateAsync(v)}
-      />
+      <NewTenantWizard open={open} onOpenChange={setOpen} />
+      <ImportTenantDialog open={importing} onOpenChange={setImporting} />
     </>
   )
 }
@@ -171,7 +162,7 @@ export function AdminTenant({ id, section }: { id: string; section?: string }) {
   const cur = section === 'users' || section === 'sign-in' || section === 'plugins' ? section : 'details'
   const signIn = useApi<{ enabled: boolean }>(['admin-sign-in', id], `/api/admin/tenants/${id}/sign-in`)
   const toggle = async () => {
-    const next = tn!.status === 'active' ? 'suspended' : 'active'
+    const next = tn!.status === 'active' && !tn!.archived_at ? 'suspended' : 'active'
     if (next === 'active' || (await confirm(t('Suspend {name}? Its people will no longer be able to sign in.', { name: tn!.name }), true))) status.mutate(next)
   }
   const status = useAction((s: string) => api('PUT', `/api/admin/tenants/${id}/status`, { status: s }), {
@@ -185,7 +176,7 @@ export function AdminTenant({ id, section }: { id: string; section?: string }) {
       <PageHeader
         crumbs={[{ label: t('Tenant'), href: to.admin('tenants') }]}
         title={tn.name}
-        badge={<StatusBadge status={tn.status} />}
+        badge={<TenantState tn={tn} />}
         sub={t('{slug} · {members} members · {guests} guests', { slug: tn.slug, members: tn.members, guests: tn.guests })}
         more={
           <DropdownMenuItem variant={tn.status === 'active' ? 'destructive' : 'default'} onSelect={() => void toggle()}>
@@ -235,6 +226,7 @@ export function AdminTenant({ id, section }: { id: string; section?: string }) {
             </CardContent>
           </Card>
           <TenantQuotasPanel id={id} />
+          <TenantLifecycle tn={tn} />
           </div>
         ) : cur === 'sign-in' ? (
           <SignInSettings id={id} />
@@ -350,6 +342,8 @@ export function AdminSystem({ session, section }: { session: Session; section?: 
     { id: 'quotas', label: t('Quotas'), icon: <Gauge /> },
     { id: 'keys', label: t('Keys of outside services'), icon: <KeySquare /> },
     { id: 'embedding', label: t('Embedding'), icon: <Frame /> },
+    { id: 'backup', label: t('Backup and restore'), icon: <HardDrive />, group: t('Operation') },
+    { id: 'maintenance', label: t('Maintenance'), icon: <Wrench /> },
     { id: 'appearance', label: t('Identity and appearance'), icon: <Palette />, group: t('Appearance') },
   ]
   // Identity and appearance has tabs: identity and texts, theme and mode, languages and formats, top bar
@@ -373,6 +367,8 @@ export function AdminSystem({ session, section }: { session: Session; section?: 
         {cur === 'quotas' && <PlatformQuotasPanel />}
         {cur === 'keys' && <KeysPanel level={PLATFORM} />}
         {cur === 'embedding' && <EmbeddingPanel level={PLATFORM} />}
+        {cur === 'backup' && <BackupPanel />}
+        {cur === 'maintenance' && <MaintenancePanel />}
         {cur === 'appearance' && tab && (
           <div className="grid gap-6">
             <Tabs tabs={tabs} current={tab} href={(id) => to.admin('system', id)} />

@@ -132,6 +132,7 @@ pub fn router() -> Router<AppState> {
         .merge(crate::quotas_api::router())
         .merge(crate::plugins_api::router())
         .merge(crate::history_api::router())
+        .merge(crate::ops_api::router())
         .merge(uploads)
         .merge(packages)
         .layer(DefaultBodyLimit::max(16 << 20))
@@ -174,6 +175,12 @@ async fn brand(State(s): State<AppState>) -> ApiResult<Json<Value>> {
             o.insert("footer".into(), text("identity.footer"));
         }
         o.insert("privacy_url".into(), text("identity.privacy_url"));
+        // the notice of the maintenance, for everybody (also before signing in)
+        let m = mosaikit_kernel::ops::maintenance::get(&s.k).await?;
+        o.insert(
+            "maintenance".into(),
+            json!({ "on": m.on, "message": m.message, "planned_at": m.planned_at, "planned_message": m.planned_message }),
+        );
         o.insert("legal_url".into(), text("identity.legal_url"));
         o.insert("languages".into(), text("lang.enabled"));
         o.insert("language".into(), text("lang.default"));
@@ -251,6 +258,8 @@ async fn login(
     ClientIp(ip): ClientIp,
     Json(r): Json<LoginReq>,
 ) -> ApiResult<Response> {
+    // during maintenance only the Administrators sign in (through their own door)
+    mosaikit_kernel::ops::maintenance::check(&s.k, None).await?;
     let lr = identity::login_remembered(&s.k, &r.tenant, &r.username, &r.password, &ip, r.remember).await?;
     logged_in(&s, lr, json!({})).await
 }
@@ -1395,6 +1404,9 @@ struct NewTenantReq {
     #[serde(default)]
     manager_display_name: String,
     manager_password: String,
+    /// end of the trial period (none: no trial)
+    #[serde(default)]
+    trial_until: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 async fn a_create_tenant(
@@ -1411,6 +1423,7 @@ async fn a_create_tenant(
             manager_username: &r.manager_username,
             manager_display_name: &r.manager_display_name,
             manager_password: &r.manager_password,
+            trial_until: r.trial_until,
         },
     )
     .await?;

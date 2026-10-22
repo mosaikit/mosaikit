@@ -25,6 +25,8 @@ export function setUnauthorizedHandler(fn: () => void) {
 
 /** Code of the errors raised when the server does not answer (restarting, unreachable, proxy error). */
 export const UNAVAILABLE = 'server_unavailable'
+/** Code of the refusals during the maintenance of the platform. */
+export const MAINTENANCE = 'maintenance'
 /** Code of an error without a message of the server: never show a bare HTTP status. */
 export const UNEXPECTED = 'unexpected'
 
@@ -103,6 +105,8 @@ export async function api<T = unknown>(method: string, path: string, body?: unkn
     }
     const msg = j && typeof j.error === 'string' ? j.error : 'Something went wrong. Try again.'
     const code = j && typeof j.code === 'string' ? j.code : j && typeof j.error === 'string' ? undefined : UNEXPECTED
+    // maintenance: only the Administrators work, the others go back to the sign-in page with the notice
+    if (code === MAINTENANCE && onUnauthorized && !path.startsWith('/api/auth/')) onUnauthorized()
     throw new ApiError(msg, r.status, code)
   }
   if (opts.blob) return (await r.blob()) as T
