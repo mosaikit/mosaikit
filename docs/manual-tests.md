@@ -161,6 +161,34 @@ As `e.ricci` (Tenant Manager of *Comune di Roma*) unless said otherwise.
 | P3-27 | Italian | Every new page and message in Italian |
 | P3-28 | Dark mode on the new pages | Readable, check boxes and badges visible |
 
+## Phase 4 — Plugins
+
+The dev environment loads the plugins of `mosaikit-plugins` from their folders (development mode), among them the sample extension *Note review*. Plugins in development mode cannot be uninstalled and there is no catalog: P4-03 and P4-20 need an installation (Docker or desktop release) or `cargo xtask e2e`, which installs them from a registry.
+
+| Id | Check | Expected |
+|---|---|---|
+| P4-01 | As Administrator: Plugins | Every plugin with its icon, kind (App, Service, Extension) and version; *Note review* is an Extension; the filter Apps / Services / Extensions narrows the list |
+| P4-02 | Tick two plugins | The selection bar appears only now: Update (when an update exists), Turn off, Uninstall, Deselect |
+| P4-03 | Updates and Catalog | Updates lists only newer versions with what they bring (release notes); Catalog what is not installed yet |
+| P4-04 | Click *Notes* | Its page: breadcrumb to Plugins, status badge, tabs Overview, What it asks, Tenants, Extensions; the "⋯" menu has Turn off and Uninstall |
+| P4-05 | What it asks | Logic on the server, hooks, files, network, other plugins, database; the permissions it brings |
+| P4-06 | Extensions tab | *Note review* (installed); a link opens its page, whose What it asks lists the field «Reviewed» and the action «Mark as reviewed» |
+| P4-07 | Tenants tab | One row per tenant: Available switch, whether the tenant turned it on, Restore when the tenant has its own choice; the switch «Available to every tenant» on top |
+| P4-08 | Turn off «Available to Regione Lazio» | «Availability updated»; Tenants › Regione Lazio › Plugins tab: Notes «not available» |
+| P4-09 | As `l.verdi` (Tenant Manager of Regione Lazio) | Notes is gone from the sidebar and from Plugins; the bell says «Notes is no longer available to the tenant»; *Note review* says «Turn on Notes first» |
+| P4-10 | As Administrator: Restore for Regione Lazio | Available again; `l.verdi` gets «Notes is available to the tenant» |
+| P4-11 | As `e.ricci`: Tenant management › Plugins | The plugins available to Comune di Roma with kind, version, an On switch, Access and permissions, Open for the apps |
+| P4-12 | Turn Tasks off | «Turned off for the tenant»; Tasks leaves the sidebar of everybody in the tenant (as `s.greco`, after a reload: no Tasks) |
+| P4-13 | Turn Notes off | A confirmation names the extensions that go off with it (*Note review*); after it, *Note review* says «Turn on Notes first»; turn Notes and Tasks on again |
+| P4-14 | As `s.greco`: Notes, open a note | A column «Reviewed», and in the detail a box *Note review* with Reviewed, Reviewed by and the button «Mark as reviewed» |
+| P4-15 | Mark as reviewed | The box ticks, «Reviewed by» shows Sara Greco, the column shows ✓ |
+| P4-16 | A note shared with `s.greco` read only | Fields of the extension read only, no button |
+| P4-17 | Switch to Italiano | «Revisionata», «Segna come revisionata»; kinds App / Servizio / Estensione in the pages of the plugins |
+| P4-18 | A public link to a note, then turn Notes off in the tenant | The link stops working; on again, it works again |
+| P4-19 | As Administrator: a plugin with settings (`[[config]]`), Configuration tab | A field per setting; secrets show «Saved: type to replace» and never their value; the save bar appears only after a change (none of the official plugins has settings yet: try with a package of your own) |
+| P4-20 | Uninstall *Note review* (⋯ › Uninstall) | The confirmation says how many items and tenants are touched; the extension disappears, Notes keeps working; reinstall it from Catalog |
+| P4-21 | Dark mode on the new pages | Readable; switches and badges visible |
+
 ## Phase 8 — Sign-in through the identity provider of a tenant (OIDC)
 
 **Test identity provider.** In a second terminal, from the `mosaikit` folder:
@@ -198,4 +226,4 @@ cannot sign in. At the end put it back to local accounts (P8-14).
 
 ---
 
-Phases 4 to 7 and 9 add their sections here when they are committed.
+Phases 5 to 7 and 9 add their sections here when they are committed.

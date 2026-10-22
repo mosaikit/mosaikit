@@ -185,6 +185,11 @@ pub async fn resolve(k: &Kernel, token: &str) -> Result<Resolved> {
     if !settings.public_links_enabled {
         return Err(not_found());
     }
+    // a plugin turned off in the tenant (or no longer available to it) takes its links with it
+    let plugin: String = row.get(3);
+    if !crate::plugins::tenants::is_on(k, row.get(2), &plugin).await? {
+        return Err(not_found());
+    }
     Ok(Resolved {
         link_id: row.get(0),
         resource: row.get(1),

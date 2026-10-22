@@ -377,7 +377,7 @@ async fn plugin_uis_only_on_the_untrusted_origin() {
     // minimal UI in the folder of the installed plugin
     a.t.install("maps").await;
     let p = a.t.plugins.get("com.mosaikit.maps").unwrap();
-    let ui_dir = a.t.cfg.data_dir.join("plugins/com.mosaikit.maps/0.5.0/ui");
+    let ui_dir = a.t.cfg.data_dir.join("plugins/com.mosaikit.maps/0.5.1/ui");
     std::fs::create_dir_all(&ui_dir).unwrap();
     std::fs::write(ui_dir.join("index.html"), "<h1>mappe</h1>").unwrap();
     drop(p);
@@ -1278,4 +1278,167 @@ async fn people_and_permissions_over_http() {
         a.call(Some(&anna), Method::GET, "/api/admin/people", None).await.status,
         StatusCode::FORBIDDEN
     );
+}
+
+#[tokio::test]
+async fn plugins_in_the_tenants_over_http() {
+    let a = App::new().await;
+    a.t.install("notes").await;
+    let g = a.t.tenant("alfa").await;
+    a.t.member(&g, "anna").await;
+    let admin = a.admin().await;
+    let mgr = a.login("alfa", "alfa-manager", PASSWORD).await;
+    let anna = a.login("alfa", "anna", PASSWORD).await;
+    const NOTES_ID: &str = "com.mosaikit.notes";
+
+    // an extension of Notes, uploaded and turned on by the Administrator
+    let manifest = r#"
+id = "com.example.review"
+name = "Review"
+version = "0.1.0"
+icon = "badge-check"
+[contribution]
+icon = "✔"
+label = "Review"
+[extends]
+plugin = "com.mosaikit.notes"
+[[extension.fields]]
+resource = "notes"
+key = "reviewed"
+label = "Reviewed"
+kind = "bool"
+[[extension.actions]]
+resource = "notes"
+key = "approve"
+label = "Approve"
+set = { reviewed = true }
+[[config]]
+key = "token"
+label = "Token"
+kind = "secret"
+"#;
+    let files = std::collections::BTreeMap::from([("plugin.toml".to_string(), manifest.as_bytes().to_vec())]);
+    let pkg = mosaikit_mskp::pack(&files, Some(&mosaikit_kernel::testing::test_key())).unwrap();
+    let r = a.raw(&admin, "/api/admin/plugins", pkg).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let r = a.call(Some(&admin), Method::POST, "/api/admin/plugins/com.example.review/activate", None).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let list = a.call(Some(&admin), Method::GET, "/api/admin/plugins", None).await.json();
+    let review = list.as_array().unwrap().iter().find(|p| p["id"] == "com.example.review").unwrap().clone();
+    assert_eq!(
+        (review["kind"].clone(), review["icon_name"].clone()),
+        (json!("extension"), json!("badge-check"))
+    );
+    assert_eq!(review["extends"], NOTES_ID);
+
+    // the Tenant Manager sees the plugins available to the tenant, the others do not
+    let mine = a.call(Some(&mgr), Method::GET, "/api/t/alfa/manage/plugins", None).await.json();
+    assert_eq!(mine.as_array().unwrap().len(), 2);
+    assert_eq!(
+        a.call(Some(&anna), Method::GET, "/api/t/alfa/manage/plugins", None).await.status,
+        StatusCode::FORBIDDEN
+    );
+
+    // fields and actions of the extension, through the plugin it extends
+    let note = a
+        .call(
+            Some(&anna),
+            Method::POST,
+            "/api/t/alfa/p/com.mosaikit.notes/r/notes",
+            Some(json!({ "values": { "title": "x" } })),
+        )
+        .await
+        .json();
+    let id = note["id"].as_str().unwrap().to_string();
+    let ext =
+        a.call(Some(&anna), Method::GET, "/api/t/alfa/p/com.mosaikit.notes/ext/notes", None).await.json();
+    assert_eq!(ext[0]["fields"][0]["key"], "reviewed");
+    let r = a
+        .call(
+            Some(&anna),
+            Method::POST,
+            &format!("/api/t/alfa/p/com.mosaikit.notes/ext/notes/{id}/com.example.review/approve"),
+            None,
+        )
+        .await;
+    assert_eq!(r.json()["values"]["reviewed"], true, "{}", r.text());
+    let v = a
+        .call(
+            Some(&anna),
+            Method::POST,
+            "/api/t/alfa/p/com.mosaikit.notes/ext/notes/values",
+            Some(json!({ "ids": [id] })),
+        )
+        .await
+        .json();
+    assert_eq!(v[&id]["com.example.review"]["reviewed"], true);
+
+    // the Tenant Manager turns Notes off: its extension goes with it, the context forgets both
+    let r = a
+        .call(
+            Some(&mgr),
+            Method::PUT,
+            "/api/t/alfa/manage/plugins/com.mosaikit.notes/on",
+            Some(json!({ "on": false })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let ctx = a.call(Some(&anna), Method::GET, "/api/t/alfa/context", None).await.json();
+    assert!(ctx["plugins"].as_array().unwrap().is_empty());
+    let r = a.call(Some(&anna), Method::GET, "/api/t/alfa/p/com.mosaikit.notes/r/notes", None).await;
+    assert_eq!((r.status, r.json()["code"].clone()), (StatusCode::NOT_FOUND, json!("plugin_off")));
+    let r = a
+        .call(
+            Some(&mgr),
+            Method::PUT,
+            "/api/t/alfa/manage/plugins/com.example.review/on",
+            Some(json!({ "on": true })),
+        )
+        .await;
+    assert_eq!(r.json()["code"], "base_off");
+    a.call(
+        Some(&mgr),
+        Method::PUT,
+        "/api/t/alfa/manage/plugins/com.mosaikit.notes/on",
+        Some(json!({ "on": true })),
+    )
+    .await;
+
+    // the Administrator: tenants of a plugin, availability, settings, what uninstalling takes away
+    let ten =
+        a.call(Some(&admin), Method::GET, "/api/admin/plugins/com.mosaikit.notes/tenants", None).await.json();
+    let tid = ten["tenants"][0]["tenant_id"].as_str().unwrap().to_string();
+    assert_eq!(ten["tenants"][0]["on"], true);
+    let r = a
+        .call(
+            Some(&admin),
+            Method::PUT,
+            &format!("/api/admin/plugins/com.mosaikit.notes/tenants/{tid}"),
+            Some(json!({ "available": false })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let mine = a.call(Some(&mgr), Method::GET, "/api/t/alfa/manage/plugins", None).await.json();
+    assert!(mine.as_array().unwrap().iter().all(|p| p["id"] != NOTES_ID));
+    assert_eq!(
+        a.call(Some(&mgr), Method::GET, "/api/admin/plugins/com.mosaikit.notes/tenants", None).await.status,
+        StatusCode::FORBIDDEN
+    );
+    let c = a
+        .call(
+            Some(&admin),
+            Method::PUT,
+            "/api/admin/plugins/com.example.review/config",
+            Some(json!({ "secrets": { "token": "abc123" } })),
+        )
+        .await;
+    assert_eq!(c.json()["secrets"], json!(["token"]), "{}", c.text());
+    assert!(!c.text().contains("abc123"));
+    let of_tenant =
+        a.call(Some(&admin), Method::GET, &format!("/api/admin/tenants/{tid}/plugins"), None).await.json();
+    let notes = of_tenant.as_array().unwrap().iter().find(|p| p["id"] == NOTES_ID).unwrap().clone();
+    assert_eq!((notes["available"].clone(), notes["on"].clone()), (json!(false), json!(false)));
+    let impact =
+        a.call(Some(&admin), Method::GET, "/api/admin/plugins/com.mosaikit.notes/impact", None).await.json();
+    assert_eq!((impact["items"].clone(), impact["extensions"].clone()), (json!(1), json!(["Review"])));
 }

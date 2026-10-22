@@ -125,7 +125,7 @@ function useNav(session: Session, route: Route): { groups: NavGroup[]; bottom: N
   const page = route.page
   const apps: NavItem[] = (ctx.data?.plugins ?? [])
     .filter((p) => p.has_ui && !hidden.has(p.id))
-    .map((p) => ({ label: p.label, icon: <AppIcon id={p.id} />, href: to.plugin(slug, p.id), active: page === 'plugin' && route.id === p.id }))
+    .map((p) => ({ label: p.label, icon: <AppIcon id={p.id} name={p.icon_name} />, href: to.plugin(slug, p.id), active: page === 'plugin' && route.id === p.id }))
   const groups: NavGroup[] = [
     {
       items: [

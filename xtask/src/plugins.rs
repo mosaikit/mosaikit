@@ -263,6 +263,10 @@ pub fn pack_all(plugins: &[Plugin], release: bool, out: &Path) -> Result<PathBuf
         let manifest =
             mosaikit_mskp::Manifest::from_toml(&std::fs::read_to_string(p.dir.join("plugin.toml"))?)?;
         eprintln!("  {} {} -> {}", p.id, p.version, path.display());
+        // what changes in this version: RELEASE.md of the plugin, if it has one
+        let notes = std::fs::read_to_string(p.dir.join("RELEASE.md"))
+            .map(|s| s.trim().chars().take(4000).collect::<String>())
+            .unwrap_or_default();
         entries.push(serde_json::json!({
             "id": p.id,
             "name": manifest.name,
@@ -273,6 +277,9 @@ pub fn pack_all(plugins: &[Plugin], release: bool, out: &Path) -> Result<PathBuf
                 "file": format!("plugins/{}", path.file_name().expect("nome file").to_string_lossy()),
                 "sha256": sha,
                 "publisher": mosaikit_mskp::public_key_b64(&key),
+                "notes": notes,
+                "kind": manifest.effective_kind().as_str(),
+                "extends": manifest.extends.as_ref().map(|e| e.plugin.clone()),
             }],
         }));
     }

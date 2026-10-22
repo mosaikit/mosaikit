@@ -129,6 +129,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/admin/theme", put(a_set_theme))
         .route("/api/{*rest}", axum::routing::any(api_not_found))
         .merge(crate::people_api::router())
+        .merge(crate::plugins_api::router())
         .merge(uploads)
         .merge(packages)
         .layer(DefaultBodyLimit::max(16 << 20))

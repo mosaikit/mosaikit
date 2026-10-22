@@ -1,12 +1,12 @@
 // Pages of the Administrator: platform overview, tenants and their tabbed detail, plugins, System
 // (administrators, identity and top bar). Account and Notifications are in common.tsx and notifications.tsx.
 
-import { useRef, useState } from 'react'
+import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Bell, Building2, CircleHelp, Contrast, Frame, KeyRound, KeySquare, Mail, MoreHorizontal, Palette, PanelLeft, Plus, Power, Puzzle, Search, ShieldCheck, Trash2, Upload, Users } from 'lucide-react'
+import { Bell, Building2, CircleHelp, Contrast, Frame, KeyRound, KeySquare, Mail, MoreHorizontal, Palette, PanelLeft, Plus, Power, Search, ShieldCheck, Users } from 'lucide-react'
 import { api, fmtBytes, fmtDate } from '../../api.ts'
 import { useBrand } from '../../brand.ts'
-import type { AdminPlugin, AdminUser, CatalogItem, GlobalKpi, Member, Session, ShellBand, SystemOverview, TenantInfo } from '../../types.ts'
+import type { AdminUser, GlobalKpi, Member, Session, ShellBand, SystemOverview, TenantInfo } from '../../types.ts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -17,8 +17,7 @@ import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { initials, passwordMin, useAction, useApi, useConfig, useConfirm } from '../core.ts'
-import AppIcon from '../AppIcon.tsx'
-import { DataTable, Empty, ErrorBox, FormDialog, Kpi, Loading, PageHeader, Pills, PluginKpis, SaveBar, Sections, StatusBadge, Tabs } from '../kit.tsx'
+import { DataTable, Empty, ErrorBox, FormDialog, Kpi, Loading, PageHeader, PluginKpis, SaveBar, Sections, StatusBadge, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import { bandOf } from '../prefs.ts'
 import { AppMark } from '../Shell.tsx'
@@ -26,9 +25,9 @@ import { PlatformTheme } from '../ThemeSettings.tsx'
 import { EmbeddingPanel, IdentityPanel, KeysPanel, LanguagesPanel, ModePanel, NotificationsPanel, SecurityPanel, ThemeSwitch } from '../SettingsPanels.tsx'
 import { SignInSettings } from '../SignInSettings.tsx'
 import { EmailPanel } from '../EmailPanel.tsx'
+import { TenantPluginsOfAdmin } from './plugins.tsx'
 import { t } from '../i18n.ts'
 
-const enc = encodeURIComponent
 
 /* ── Overview ────────────────────────────────────────────────────────── */
 
@@ -168,7 +167,7 @@ export function AdminTenant({ id, section }: { id: string; section?: string }) {
   const members = useApi<Member[]>(['admin-members', id], `/api/admin/tenants/${id}/members`)
   const confirm = useConfirm()
   const tn = tenants.data?.find((x) => x.id === id)
-  const cur = section === 'users' || section === 'sign-in' ? section : 'details'
+  const cur = section === 'users' || section === 'sign-in' || section === 'plugins' ? section : 'details'
   const signIn = useApi<{ enabled: boolean }>(['admin-sign-in', id], `/api/admin/tenants/${id}/sign-in`)
   const toggle = async () => {
     const next = tn!.status === 'active' ? 'suspended' : 'active'
@@ -199,6 +198,7 @@ export function AdminTenant({ id, section }: { id: string; section?: string }) {
           { id: 'details', label: t('Details') },
           { id: 'users', label: t('Users and managers'), count: members.data?.length },
           { id: 'sign-in', label: t('Sign-in') },
+          { id: 'plugins', label: t('Plugins') },
         ]}
         current={cur}
         href={(s) => to.adminTenant(id, s === 'details' ? undefined : s)}
@@ -234,6 +234,8 @@ export function AdminTenant({ id, section }: { id: string; section?: string }) {
           </Card>
         ) : cur === 'sign-in' ? (
           <SignInSettings id={id} />
+        ) : cur === 'plugins' ? (
+          <TenantPluginsOfAdmin id={id} />
         ) : (
           <TenantUsers id={id} q={members} />
         )}
@@ -329,185 +331,6 @@ function TenantUsers({ id, q }: { id: string; q: { data?: Member[]; isLoading: b
         onSubmit={(v) => resetPw.mutateAsync({ uid: (dlg as Member).user_id, password: v.password })}
       />
     </div>
-  )
-}
-
-/* ── Plugins ─────────────────────────────────────────────────────────── */
-
-/** The plugins of the platform: installed (on or not) and the catalog of the trusted registries. A plugin
- *  with pages of its own is an App, without them a Service (docs/refactoring-ui.md §4). */
-export function AdminPlugins({ section }: { section?: string }) {
-  const installed = useApi<AdminPlugin[]>(['admin-plugins'], '/api/admin/plugins')
-  const catalog = useApi<CatalogItem[]>(['admin-catalog'], '/api/admin/catalog')
-  const confirm = useConfirm()
-  const file = useRef<HTMLInputElement>(null)
-  const cur = section === 'updates' || section === 'catalog' ? section : 'installed'
-  const inval = [['admin-plugins'], ['admin-catalog'], ['admin-overview']]
-  const act = useAction(({ id, action }: { id: string; action: 'activate' | 'deactivate' }) => api('POST', `/api/admin/plugins/${enc(id)}/${action}`), {
-    ok: ({ action }) => (action === 'activate' ? t('Plugin turned on') : t('Plugin turned off')),
-    invalidate: inval,
-  })
-  const uninstall = useAction((id: string) => api('DELETE', `/api/admin/plugins/${enc(id)}`), { ok: t('Plugin uninstalled'), invalidate: inval })
-  const install = useAction((id: string) => api('POST', `/api/admin/catalog/${enc(id)}/install`), { ok: t('Plugin installed'), invalidate: inval })
-  const upload = useAction((f: File) => api('POST', '/api/admin/plugins', undefined, { raw: f }), { ok: t('Package installed'), invalidate: inval })
-  const updates = (catalog.data ?? []).filter((c) => c.update_available)
-  const available = (catalog.data ?? []).filter((c) => !c.installed)
-  return (
-    <>
-      <PageHeader
-        title={t('Plugins')}
-        sub={t('Installed on the platform and available in the trusted registries')}
-        actions={
-          <>
-            <input
-              ref={file}
-              type="file"
-              accept=".mskp"
-              hidden
-              onChange={(e) => {
-                const f = e.target.files?.[0]
-                if (f) upload.mutate(f)
-                e.target.value = ''
-              }}
-            />
-            <Button onClick={() => file.current?.click()}>
-              <Upload />
-              {t('Install from file')}
-            </Button>
-          </>
-        }
-      />
-      <div className="grid gap-3 p-6 max-[620px]:p-4">
-        <Pills
-          items={[
-            { id: 'installed', label: t('Installed'), count: installed.data?.length },
-            { id: 'updates', label: t('Updates'), count: updates.length },
-            { id: 'catalog', label: t('Catalog'), count: available.length },
-          ]}
-          value={cur}
-          onChange={(id) => go(to.admin('plugins', id === 'installed' ? undefined : id))}
-        />
-        {cur === 'installed' ? (
-          installed.isLoading ? (
-            <Loading />
-          ) : installed.error ? (
-            <ErrorBox error={installed.error} />
-          ) : !installed.data?.length ? (
-            <Empty icon={<Puzzle />} title={t('No plugin installed')} />
-          ) : (
-            <div className="overflow-hidden rounded-xl border bg-card">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('Plugins')}</TableHead>
-                    <TableHead>{t('Kind')}</TableHead>
-                    <TableHead>{t('Version')}</TableHead>
-                    <TableHead>{t('Signature')}</TableHead>
-                    <TableHead>{t('Status')}</TableHead>
-                    <TableHead className="w-10" />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {installed.data.map((p) => (
-                    <TableRow key={p.id}>
-                      <TableCell>
-                        <span className="flex items-center gap-2.5">
-                          <AppIcon id={p.id} className="size-5 text-primary" />
-                          <span>
-                            <b className="block font-medium">{p.label}</b>
-                            <span className="font-mono text-xs text-muted-foreground">{p.id}</span>
-                          </span>
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="font-normal">
-                          {p.has_ui ? t('App') : t('Service')}
-                        </Badge>
-                        {p.dev && (
-                          <Badge variant="outline" className="ml-1.5 font-normal">
-                            {t('development')}
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="font-mono text-xs">{p.version}</TableCell>
-                      <TableCell className="text-sm">{p.signed_by ?? <span className="text-warn">{t('unsigned')}</span>}</TableCell>
-                      <TableCell>
-                        <StatusBadge status={p.status} />
-                      </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" aria-label={t('Actions for {label}', { label: p.label })}>
-                              <MoreHorizontal />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {p.status === 'active' ? (
-                              <DropdownMenuItem onSelect={async () => (await confirm(t('Turn off {label}? It goes off in every tenant.', { label: p.label }), true)) && act.mutate({ id: p.id, action: 'deactivate' })}>
-                                <Power />
-                                {t('Turn off')}
-                              </DropdownMenuItem>
-                            ) : (
-                              <DropdownMenuItem onSelect={() => act.mutate({ id: p.id, action: 'activate' })}>
-                                <Power />
-                                {t('Turn on')}
-                              </DropdownMenuItem>
-                            )}
-                            {!p.dev && (
-                              <DropdownMenuItem
-                                variant="destructive"
-                                onSelect={async () => (await confirm(t('Uninstall {label}? Its data stay in the database.', { label: p.label }), true)) && uninstall.mutate(p.id)}
-                              >
-                                <Trash2 />
-                                {t('Uninstall')}
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )
-        ) : catalog.isLoading ? (
-          <Loading />
-        ) : catalog.error ? (
-          <ErrorBox error={catalog.error} />
-        ) : (cur === 'updates' ? updates : available).length === 0 ? (
-          <Empty icon={<Puzzle />} title={cur === 'updates' ? t('No updates') : t('Nothing to install in the catalog')} />
-        ) : (
-          <div className="overflow-hidden rounded-xl border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('Plugins')}</TableHead>
-                  <TableHead>{t('Version')}</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {(cur === 'updates' ? updates : available).map((c) => (
-                  <TableRow key={c.id}>
-                    <TableCell>
-                      <b className="block font-medium">{c.name}</b>
-                      <span className="line-clamp-1 text-xs text-muted-foreground">{c.description}</span>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">{c.installed ? `${c.installed} → ${c.latest}` : c.latest}</TableCell>
-                    <TableCell className="text-right">
-                      <Button size="sm" variant="outline" disabled={install.isPending} onClick={() => install.mutate(c.id)}>
-                        {c.installed ? t('Update') : t('Install')}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </div>
-    </>
   )
 }
 

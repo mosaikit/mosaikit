@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Bell, Frame, Gauge, Grid2x2, KeyRound, KeySquare, Link2, Lock, Mail, MoreHorizontal, Palette, Plus, Puzzle, Share2, ShieldCheck, ShieldOff, Trash2, UserRound, Users } from 'lucide-react'
+import { Bell, Frame, Gauge, Grid2x2, KeyRound, KeySquare, Link2, Lock, Mail, MoreHorizontal, Palette, Plus, Share2, ShieldCheck, ShieldOff, Trash2, UserRound, Users } from 'lucide-react'
 import { api, appUrl, fmtBytes, fmtDate } from '../../api.ts'
 import PluginFrame from '../../components/PluginFrame.tsx'
 import { UiContext, useUi, type Ui } from '../../ui-context.ts'
@@ -89,7 +89,7 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
                   onClick={() => go(to.plugin(slug, p.id))}
                   className="flex flex-col gap-1.5 rounded-xl border bg-card p-4 text-left hover:border-primary/50 hover:bg-accent/40"
                 >
-                  <AppIcon id={p.id} className="size-[22px] fill-current text-primary [fill-opacity:0.12]" />
+                  <AppIcon id={p.id} name={p.icon_name} className="size-[22px] fill-current text-primary [fill-opacity:0.12]" />
                   <b className="text-base font-semibold">{p.label}</b>
                   <span className="line-clamp-2 text-xs text-muted-foreground">{p.description}</span>
                 </button>
@@ -702,77 +702,6 @@ function Invites({ slug, q }: { slug: string; q: Q<Invitation[]> }) {
 }
 
 /* ── Plugins of the tenant ───────────────────────────────────────────── */
-
-/** The plugins of the tenant: the Administrator makes them available, the Tenant Manager sees them with their kind
- *  and decides who may do what in each one (Access and permissions). Turning them on per tenant comes with phase 4. */
-export function TenantPlugins({ slug }: { slug: string }) {
-  const ctx = useTenantCtx(slug)
-  if (ctx.isLoading) return <Loading />
-  if (ctx.error) return <ErrorBox error={ctx.error} />
-  const plugins = ctx.data!.plugins
-  return (
-    <>
-      <PageHeader title={t('Plugins')} crumbs={[{ label: t('Tenant management') }]} sub={t('{n} available in {name}', { n: plugins.length, name: ctx.data!.tenant.name })} />
-      <div className="grid gap-3 p-6 max-[620px]:p-4">
-        <p className="max-w-2xl text-sm text-muted-foreground">
-          {t('The Administrator installs them and makes them available. Apps have pages of their own and appear in the sidebar; services work behind the scenes.')}
-        </p>
-        {plugins.length === 0 ? (
-          <Empty icon={<Puzzle />} title={t('No plugins available')} />
-        ) : (
-          <div className="overflow-hidden rounded-xl border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('Plugins')}</TableHead>
-                  <TableHead>{t('Kind')}</TableHead>
-                  <TableHead>{t('Version')}</TableHead>
-                  <TableHead>{t('Status')}</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {plugins.map((p) => (
-                  <TableRow key={p.id}>
-                    <TableCell>
-                      <span className="flex items-center gap-2.5">
-                        <AppIcon id={p.id} className="size-5 text-primary" />
-                        <span>
-                          <b className="block font-medium">{p.label}</b>
-                          <span className="line-clamp-1 text-xs text-muted-foreground">{p.description}</span>
-                        </span>
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary" className="font-normal">
-                        {p.has_ui ? t('App') : t('Service')}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">{p.version}</TableCell>
-                    <TableCell>
-                      <StatusBadge status="active" />
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="outline" size="sm" onClick={() => go(to.tenant(slug, 'plugins', p.id))}>
-                        <KeySquare />
-                        {t('Access and permissions')}
-                      </Button>
-                      {p.has_ui && (
-                        <Button variant="ghost" size="sm" onClick={() => go(to.plugin(slug, p.id))}>
-                          {t('Open')}
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </div>
-    </>
-  )
-}
 
 /* ── Shares ──────────────────────────────────────────────────────────── */
 

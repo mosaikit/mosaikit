@@ -24,6 +24,14 @@ pub struct Manifest {
     pub min_kernel: String,
     #[serde(default)]
     pub description: String,
+    /// `app` (pages of its own, in the sidebar), `service` (works behind the scenes) or `extension`
+    /// (extends another plugin). Absent: `extension` with `[extends]`, `app` with `[ui]`, else `service`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<PluginKind>,
+    /// Name of the icon in the set of the shell (Lucide, e.g. `notebook-pen`); the shell shows a
+    /// default icon for names it does not know. `contribution.icon` stays for older hosts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
     pub contribution: Contribution,
     #[serde(default)]
     pub resources: Vec<ResourceDecl>,
@@ -41,9 +49,166 @@ pub struct Manifest {
     /// enforces its own ones.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub user_permissions: Vec<UserPermission>,
+    /// The plugin an extension extends (`kind = "extension"`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extends: Option<Extends>,
+    /// What an extension adds to the plugin it extends: fields and actions on its resources.
+    #[serde(default, skip_serializing_if = "ExtensionDecl::is_empty")]
+    pub extension: ExtensionDecl,
+    /// Settings of the plugin at platform level, chosen by the Administrator (`[[config]]`); the
+    /// logic reads them in `ctx.config`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub config: Vec<ConfigDecl>,
     /// Texts in other languages (`[i18n.it]`, ...); the texts above are the English ones.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub i18n: BTreeMap<String, Translation>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum PluginKind {
+    App,
+    Service,
+    Extension,
+}
+
+impl PluginKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            PluginKind::App => "app",
+            PluginKind::Service => "service",
+            PluginKind::Extension => "extension",
+        }
+    }
+}
+
+/// `[extends]`: the plugin an extension extends, from a minimum version.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct Extends {
+    pub plugin: String,
+    #[serde(default = "zero_version")]
+    pub min_version: String,
+}
+
+fn zero_version() -> String {
+    "0.0.0".into()
+}
+
+/// What an extension adds to the resources of the plugin it extends. The kernel keeps the values
+/// of the fields (one set per item and extension) and checks them with the permissions of the item.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(deny_unknown_fields)]
+pub struct ExtensionDecl {
+    #[serde(default)]
+    pub fields: Vec<ExtFieldDecl>,
+    #[serde(default)]
+    pub actions: Vec<ExtActionDecl>,
+}
+
+impl ExtensionDecl {
+    pub fn is_empty(&self) -> bool {
+        self.fields.is_empty() && self.actions.is_empty()
+    }
+
+    /// The fields of the extension on a resource of the extended plugin.
+    pub fn fields_of(&self, resource: &str) -> Vec<FieldDecl> {
+        self.fields.iter().filter(|f| f.resource == resource).map(ExtFieldDecl::field).collect()
+    }
+}
+
+/// A field an extension adds to a resource (`[[extension.fields]]`).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ExtFieldDecl {
+    /// resource of the extended plugin
+    pub resource: String,
+    pub key: String,
+    #[serde(default)]
+    pub label: String,
+    pub kind: FieldKind,
+    #[serde(default)]
+    pub multiline: bool,
+    #[serde(default)]
+    pub options: Vec<String>,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub option_labels: BTreeMap<String, String>,
+}
+
+impl ExtFieldDecl {
+    pub fn field(&self) -> FieldDecl {
+        FieldDecl {
+            key: self.key.clone(),
+            label: self.label.clone(),
+            kind: self.kind,
+            required: false,
+            multiline: self.multiline,
+            options: self.options.clone(),
+            hidden: false,
+            option_labels: self.option_labels.clone(),
+        }
+    }
+}
+
+/// An action an extension adds to the items of a resource (`[[extension.actions]]`): it sets some
+/// of its fields (`set`, where `$user` is the name of the person and `$today` the date) or runs a
+/// command of its logic (`command`), which answers `{ "set": { ... } }`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ExtActionDecl {
+    pub resource: String,
+    pub key: String,
+    pub label: String,
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub set: BTreeMap<String, serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command: Option<String>,
+}
+
+/// A setting of the plugin (`[[config]]`).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ConfigDecl {
+    pub key: String,
+    pub label: String,
+    #[serde(default)]
+    pub description: String,
+    pub kind: ConfigKind,
+    /// value when the Administrator has not chosen one (not for `secret`)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default: Option<serde_json::Value>,
+    /// values of a `choice`
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub options: Vec<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ConfigKind {
+    Text,
+    Number,
+    Bool,
+    Choice,
+    /// encrypted, never shown again after saving
+    Secret,
+}
+
+impl ConfigDecl {
+    /// The value checked against the kind (`None`: not valid).
+    pub fn check(&self, v: &serde_json::Value) -> Option<serde_json::Value> {
+        use serde_json::Value;
+        match (self.kind, v) {
+            (_, Value::Null) => Some(Value::Null),
+            (ConfigKind::Text | ConfigKind::Secret, Value::String(s)) if s.len() <= 4000 => Some(v.clone()),
+            (ConfigKind::Number, Value::Number(_)) => Some(v.clone()),
+            (ConfigKind::Number, Value::String(s)) => {
+                s.trim().parse::<f64>().ok().filter(|x| x.is_finite()).map(|x| serde_json::json!(x))
+            }
+            (ConfigKind::Bool, Value::Bool(_)) => Some(v.clone()),
+            (ConfigKind::Choice, Value::String(s)) if self.options.contains(s) => Some(v.clone()),
+            _ => None,
+        }
+    }
 }
 
 /// A permission of the people in the plugin (`[[user_permissions]]`).
@@ -88,6 +253,21 @@ pub struct Translation {
     /// by key of the user permission
     #[serde(default)]
     pub permissions: BTreeMap<String, PermissionTranslation>,
+    /// labels of the fields and actions of an extension, by key
+    #[serde(default)]
+    pub extension: ExtensionTranslation,
+    /// by key of the setting
+    #[serde(default)]
+    pub config: BTreeMap<String, PermissionTranslation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(deny_unknown_fields)]
+pub struct ExtensionTranslation {
+    #[serde(default)]
+    pub fields: BTreeMap<String, String>,
+    #[serde(default)]
+    pub actions: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -279,6 +459,17 @@ impl Manifest {
         self.resources.iter().find(|r| r.name == name)
     }
 
+    /// The kind declared, or the one that follows from `[extends]` and `[ui]`.
+    pub fn effective_kind(&self) -> PluginKind {
+        self.kind.unwrap_or(if self.extends.is_some() {
+            PluginKind::Extension
+        } else if self.ui.is_some() {
+            PluginKind::App
+        } else {
+            PluginKind::Service
+        })
+    }
+
     pub fn validate(&self) -> Result<()> {
         let bad = |m: String| Err(Error::Manifest(m));
         if !is_plugin_id(&self.id) {
@@ -388,8 +579,127 @@ impl Manifest {
                 return bad(format!("the user permission '{}' has no label", p.key));
             }
         }
+        self.validate_kind().map_err(Error::Manifest)?;
+        self.validate_config().map_err(Error::Manifest)?;
         for (lang, tr) in &self.i18n {
             self.validate_translation(lang, tr).map_err(|m| Error::Manifest(format!("i18n.{lang}: {m}")))?;
+        }
+        Ok(())
+    }
+
+    fn validate_kind(&self) -> std::result::Result<(), String> {
+        if let Some(icon) = &self.icon {
+            let ok = !icon.is_empty()
+                && icon.len() <= 48
+                && icon.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
+            if !ok {
+                return Err(format!("icon '{icon}': the name of an icon (lower case, digits and -)"));
+            }
+        }
+        let extension = self.effective_kind() == PluginKind::Extension;
+        match (&self.extends, extension) {
+            (Some(_), false) => return Err("[extends] is only for kind = \"extension\"".into()),
+            (None, true) => return Err("an extension needs [extends] with the plugin it extends".into()),
+            (Some(e), true) => {
+                if !is_plugin_id(&e.plugin) || e.plugin == self.id {
+                    return Err(format!("extends.plugin: invalid id '{}'", e.plugin));
+                }
+                if Version::parse(&e.min_version).is_none() {
+                    return Err(format!("extends.min_version '{}' is not MAJOR.MINOR.PATCH", e.min_version));
+                }
+            }
+            (None, false) => {}
+        }
+        if !extension && !self.extension.is_empty() {
+            return Err("[extension] is only for kind = \"extension\"".into());
+        }
+        let mut keys = std::collections::HashSet::new();
+        for f in &self.extension.fields {
+            if !is_identifier(&f.resource)
+                || !is_identifier(&f.key)
+                || RESERVED_FIELDS.contains(&f.key.as_str())
+            {
+                return Err(format!("extension field '{}.{}' invalid or reserved", f.resource, f.key));
+            }
+            if !keys.insert(f.key.as_str()) {
+                return Err(format!("duplicate extension field '{}'", f.key));
+            }
+            if f.kind == FieldKind::Choice && f.options.is_empty() {
+                return Err(format!("the choice field '{}' has no options", f.key));
+            }
+            if f.option_labels.keys().any(|v| !f.options.contains(v)) {
+                return Err(format!("option_labels of '{}' name a value that is not an option", f.key));
+            }
+        }
+        let mut actions = std::collections::HashSet::new();
+        for a in &self.extension.actions {
+            if !is_identifier(&a.resource) || !is_identifier(&a.key) {
+                return Err(format!("extension action '{}.{}' invalid", a.resource, a.key));
+            }
+            if !actions.insert(a.key.as_str()) {
+                return Err(format!("duplicate extension action '{}'", a.key));
+            }
+            if a.label.trim().is_empty() {
+                return Err(format!("the extension action '{}' has no label", a.key));
+            }
+            match (&a.command, a.set.is_empty()) {
+                (Some(_), false) | (None, true) => {
+                    return Err(format!("the extension action '{}' needs either set or command", a.key))
+                }
+                (Some(c), true) => {
+                    let ok = !c.is_empty()
+                        && c.len() <= 64
+                        && c.bytes().all(|b| b.is_ascii_alphanumeric() || b"_.-".contains(&b));
+                    if !ok {
+                        return Err(format!("the extension action '{}': invalid command '{c}'", a.key));
+                    }
+                }
+                (None, false) => {
+                    for (k, v) in &a.set {
+                        let Some(f) =
+                            self.extension.fields.iter().find(|f| &f.key == k && f.resource == a.resource)
+                        else {
+                            return Err(format!(
+                                "the extension action '{}' sets '{k}', not a field of {}",
+                                a.key, a.resource
+                            ));
+                        };
+                        let ok = match v {
+                            serde_json::Value::String(_) | serde_json::Value::Null => true,
+                            serde_json::Value::Bool(_) => f.kind == FieldKind::Bool,
+                            serde_json::Value::Number(_) => f.kind == FieldKind::Number,
+                            _ => false,
+                        };
+                        if !ok {
+                            return Err(format!(
+                                "the extension action '{}': value of '{k}' of the wrong type",
+                                a.key
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_config(&self) -> std::result::Result<(), String> {
+        let mut keys = std::collections::HashSet::new();
+        for c in &self.config {
+            if !is_identifier(&c.key) || !keys.insert(c.key.as_str()) {
+                return Err(format!("config '{}' invalid or duplicate", c.key));
+            }
+            if c.label.trim().is_empty() {
+                return Err(format!("the config '{}' has no label", c.key));
+            }
+            if c.kind == ConfigKind::Choice && c.options.is_empty() {
+                return Err(format!("the choice config '{}' has no options", c.key));
+            }
+            if let Some(d) = &c.default {
+                if c.kind == ConfigKind::Secret || c.check(d).is_none() {
+                    return Err(format!("the default of the config '{}' does not fit its kind", c.key));
+                }
+            }
         }
         Ok(())
     }
@@ -434,6 +744,25 @@ impl Manifest {
             }
             all.extend(pt.label.iter());
             all.extend(pt.description.iter());
+        }
+        for (key, label) in &tr.extension.fields {
+            if !self.extension.fields.iter().any(|f| &f.key == key) {
+                return Err(format!("extension field '{key}' is not declared"));
+            }
+            all.push(label);
+        }
+        for (key, label) in &tr.extension.actions {
+            if !self.extension.actions.iter().any(|a| &a.key == key) {
+                return Err(format!("extension action '{key}' is not declared"));
+            }
+            all.push(label);
+        }
+        for (key, ct) in &tr.config {
+            if !self.config.iter().any(|c| &c.key == key) {
+                return Err(format!("config '{key}' is not declared"));
+            }
+            all.extend(ct.label.iter());
+            all.extend(ct.description.iter());
         }
         if all.iter().any(|t| t.chars().count() > 300) {
             return Err("text longer than 300 characters".into());
@@ -484,6 +813,23 @@ impl Manifest {
             };
             set(&mut p.label, &pt.label);
             set(&mut p.description, &pt.description);
+        }
+        for f in &mut m.extension.fields {
+            if let Some(label) = tr.extension.fields.get(&f.key) {
+                f.label = label.clone();
+            }
+        }
+        for a in &mut m.extension.actions {
+            if let Some(label) = tr.extension.actions.get(&a.key) {
+                a.label = label.clone();
+            }
+        }
+        for c in &mut m.config {
+            let Some(ct) = tr.config.get(&c.key) else {
+                continue;
+            };
+            set(&mut c.label, &ct.label);
+            set(&mut c.description, &ct.description);
         }
         m
     }
@@ -657,6 +1003,111 @@ mod tests {
         ] {
             assert!(Manifest::from_toml(&format!("{NOTES}{bad}")).is_err(), "{bad}");
         }
+    }
+
+    const REVIEW: &str = r#"
+        id = "com.mosaikit.note-review"
+        name = "Note review"
+        version = "0.1.0"
+        icon = "badge-check"
+        [contribution]
+        icon = "✔"
+        label = "Note review"
+        [extends]
+        plugin = "com.mosaikit.notes"
+        min_version = "0.4.0"
+        [[extension.fields]]
+        resource = "notes"
+        key = "reviewed"
+        label = "Reviewed"
+        kind = "bool"
+        [[extension.fields]]
+        resource = "notes"
+        key = "reviewer"
+        label = "Reviewed by"
+        kind = "text"
+        [[extension.actions]]
+        resource = "notes"
+        key = "mark_reviewed"
+        label = "Mark as reviewed"
+        set = { reviewed = true, reviewer = "$user" }
+        [[config]]
+        key = "endpoint"
+        label = "Address"
+        kind = "text"
+        default = "https://example.com"
+        [[config]]
+        key = "token"
+        label = "Token"
+        kind = "secret"
+        [i18n.it]
+        name = "Revisione delle note"
+        extension = { fields = { reviewed = "Revisionata" }, actions = { mark_reviewed = "Segna come revisionata" } }
+        config = { token = { label = "Chiave" } }
+    "#;
+
+    #[test]
+    fn kinds_and_extensions() {
+        let notes = Manifest::from_toml(NOTES).unwrap();
+        assert_eq!(notes.effective_kind(), PluginKind::Service, "no [ui]: a service");
+        let app = Manifest::from_toml(&format!("kind = \"app\"\n{NOTES}")).unwrap();
+        assert_eq!(app.effective_kind(), PluginKind::App);
+        let r = Manifest::from_toml(REVIEW).unwrap();
+        assert_eq!(r.effective_kind(), PluginKind::Extension, "[extends] makes it an extension");
+        assert_eq!(r.icon.as_deref(), Some("badge-check"));
+        assert_eq!(r.extension.fields_of("notes").len(), 2);
+        assert!(r.extension.fields_of("other").is_empty());
+        let it = r.localized("it");
+        assert_eq!(it.extension.fields[0].label, "Revisionata");
+        assert_eq!(it.extension.fields[1].label, "Reviewed by");
+        assert_eq!(it.extension.actions[0].label, "Segna come revisionata");
+        assert_eq!(it.config[1].label, "Chiave");
+        let json = serde_json::to_string(&r).unwrap();
+        assert_eq!(serde_json::from_str::<Manifest>(&json).unwrap(), r);
+        let plain = serde_json::to_string(&notes).unwrap();
+        assert!(
+            !plain.contains("\"extension\"") && !plain.contains("\"extends\""),
+            "nothing new when absent"
+        );
+        for bad in [
+            REVIEW.replace("icon = \"badge-check\"", "icon = \"Badge Check\""),
+            REVIEW.replace("plugin = \"com.mosaikit.notes\"", "plugin = \"com.mosaikit.note-review\""),
+            REVIEW.replace("min_version = \"0.4.0\"", "min_version = \"4\""),
+            REVIEW.replace(
+                "[extends]\n        plugin = \"com.mosaikit.notes\"\n        min_version = \"0.4.0\"",
+                "",
+            ),
+            REVIEW.replace("set = { reviewed = true, reviewer = \"$user\" }", "set = { missing = true }"),
+            REVIEW.replace("set = { reviewed = true, reviewer = \"$user\" }", "set = { reviewed = 3 }"),
+            REVIEW.replace(
+                "set = { reviewed = true, reviewer = \"$user\" }",
+                "set = { reviewed = true }\n        command = \"x\"",
+            ),
+            REVIEW.replace("key = \"reviewer\"", "key = \"reviewed\""),
+            REVIEW.replace("key = \"reviewer\"", "key = \"owner\""),
+            REVIEW.replace("kind = \"secret\"", "kind = \"secret\"\n        default = \"x\""),
+            REVIEW.replace("default = \"https://example.com\"", "default = 3"),
+            REVIEW.replace("actions = { mark_reviewed", "actions = { other"),
+            format!("kind = \"app\"\n{REVIEW}"),
+        ] {
+            assert!(Manifest::from_toml(&bad).is_err(), "{bad}");
+        }
+        // [extension] without being an extension
+        let stray =
+            format!("{NOTES}\n[[extension.fields]]\nresource = \"notes\"\nkey = \"x\"\nkind = \"text\"\n");
+        assert!(Manifest::from_toml(&stray).is_err());
+    }
+
+    #[test]
+    fn config_values() {
+        let r = Manifest::from_toml(REVIEW).unwrap();
+        let text = &r.config[0];
+        assert_eq!(text.check(&serde_json::json!("x")), Some(serde_json::json!("x")));
+        assert_eq!(text.check(&serde_json::json!(3)), None);
+        let num = ConfigDecl { kind: ConfigKind::Number, ..text.clone() };
+        assert_eq!(num.check(&serde_json::json!("2.5")), Some(serde_json::json!(2.5)));
+        let choice = ConfigDecl { kind: ConfigKind::Choice, options: vec!["a".into()], ..text.clone() };
+        assert_eq!(choice.check(&serde_json::json!("b")), None);
     }
 
     #[test]

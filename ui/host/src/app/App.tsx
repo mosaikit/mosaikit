@@ -14,10 +14,11 @@ import { UiServices } from './services.tsx'
 import { Empty } from './kit.tsx'
 import Login from './Login.tsx'
 import { NotificationsPage } from './notifications.tsx'
-import { AdminOverview, AdminPlugins, AdminSystem, AdminTenant, AdminTenants } from './pages/admin.tsx'
+import { AdminOverview, AdminSystem, AdminTenant, AdminTenants } from './pages/admin.tsx'
+import { AdminPluginPage, AdminPlugins, TenantPlugins } from './pages/plugins.tsx'
 import { AccountPage } from './pages/common.tsx'
 import { AdminPeople, AdminPersonPage, GroupPage, ItemPage, PersonPage, PluginAccessPage, RequestsPage, ResetPage } from './pages/people.tsx'
-import { Manage, PluginPage, Shares, TenantHome, TenantPlugins, TenantSettingsPage, Usage } from './pages/tenant.tsx'
+import { Manage, PluginPage, Shares, TenantHome, TenantSettingsPage, Usage } from './pages/tenant.tsx'
 import { go, href, parse, to, useHash, type Route } from './router.ts'
 import Shell from './Shell.tsx'
 import { setDefaultMode, setPreset } from './theme.ts'
@@ -51,6 +52,7 @@ function Page({ session, route }: { session: Session; route: Route }) {
     if (route.page === 'people') return <AdminPeople />
     if (route.page === 'person') return <AdminPersonPage id={route.id!} tab={route.section} />
     if (route.page === 'plugins') return <AdminPlugins section={route.section} />
+    if (route.page === 'plugin') return <AdminPluginPage id={route.id!} tab={route.section} />
     if (route.page === 'system') return <AdminSystem session={session} section={route.section} />
     if (route.page === 'account') return <AccountPage session={session} route={route} />
     if (route.page === 'notifications') return <NotificationsPage session={session} route={route} />

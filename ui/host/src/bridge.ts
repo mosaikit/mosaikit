@@ -19,6 +19,7 @@ export class OpError extends Error {}
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const IDENT = /^[a-z][a-z0-9_]{0,47}$/
 const COMMAND = /^[A-Za-z0-9_.-]{1,64}$/
+const PLUGIN_ID = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/
 
 type Args = Record<string, unknown>
 
@@ -39,6 +40,11 @@ function optUuid(v: unknown, what = 'parent'): string | null {
 
 function ident(v: unknown, what: string): string {
   if (typeof v !== 'string' || !IDENT.test(v)) throw new OpError(`invalid ${what}`)
+  return v
+}
+
+function pluginId(v: unknown): string {
+  if (typeof v !== 'string' || v.length > 64 || !PLUGIN_ID.test(v)) throw new OpError('invalid extension')
   return v
 }
 
@@ -128,6 +134,22 @@ export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unk
       if (rid) n.resource = rid
       return { method: 'POST', url: `${base}/notify`, json: n }
     }
+    // the extensions of the plugin of the iframe: fields and actions on its own items (the kernel
+    // checks the permissions of each item)
+    case 'ext.list':
+      return { method: 'GET', url: `${base}/ext/${ident(a.resource, 'resource')}` }
+    case 'ext.values': {
+      if (!Array.isArray(a.ids) || a.ids.length > 1000) throw new OpError('invalid ids')
+      return { method: 'POST', url: `${base}/ext/${ident(a.resource, 'resource')}/values`, json: { ids: a.ids.map((x) => uuid(x)) } }
+    }
+    case 'ext.set':
+      return {
+        method: 'PUT',
+        url: `${base}/ext/${ident(a.resource, 'resource')}/${uuid(a.id)}/${pluginId(a.extension)}`,
+        json: { values: values(a.values) },
+      }
+    case 'ext.action':
+      return { method: 'POST', url: `${base}/ext/${ident(a.resource, 'resource')}/${uuid(a.id)}/${pluginId(a.extension)}/${ident(a.action, 'action')}` }
     default:
       throw new OpError(`operation not available: ${op}`)
   }

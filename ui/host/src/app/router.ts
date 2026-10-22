@@ -1,7 +1,7 @@
 // Navigation with the hash: it works under a base path too.
 //   sign-in:        #/  ·  #/login/<tenant>  ·  #/admin  ·  #/reset/<token> (a new password, from a link)
 //   administrator:  #/admin  ·  #/admin/tenants[/<id>[/<tab>]]  ·  #/admin/people  ·  #/admin/person/<id>[/<tab>]  ·
-//                   #/admin/plugins[/<filter>]  ·  #/admin/system[/<section>]  ·  #/admin/account[/<section>]  ·
+//                   #/admin/plugins[/<filter>]  ·  #/admin/plugin/<id>[/<tab>]  ·  #/admin/system[/<section>]  ·  #/admin/account[/<section>]  ·
 //                   #/admin/notifications
 //   tenant:         #/t/<tenant>  ·  #/t/<tenant>/p/<plugin>[/<place>]  ·  #/t/<tenant>/manage[/<section>]  ·
 //                   #/t/<tenant>/person/<id>[/<tab>]  ·  #/t/<tenant>/group/<id>[/<tab>]  ·
@@ -16,7 +16,7 @@ export type AdminPage = 'overview' | 'tenants' | 'people' | 'plugins' | 'system'
 export type TenantPage = 'home' | 'manage' | 'plugins' | 'shares' | 'usage' | 'settings' | 'account' | 'notifications' | 'requests'
 
 export type Route =
-  | { area: 'admin'; page: AdminPage | 'tenant' | 'person'; id?: string; section?: string }
+  | { area: 'admin'; page: AdminPage | 'tenant' | 'person' | 'plugin'; id?: string; section?: string }
   | { area: 'tenant'; tenant: string; page: TenantPage | 'plugin' | 'person' | 'group' | 'item'; id?: string; section?: string }
   | { area: 'login'; door: 'tenant' | 'admin'; tenant?: string }
   | { area: 'reset'; token: string }
@@ -29,6 +29,7 @@ export function parse(hash: string): Route {
   if (p[0] === 'admin') {
     if (p[1] === 'tenants' && p[2]) return { area: 'admin', page: 'tenant', id: p[2], section: p[3] }
     if (p[1] === 'person' && p[2]) return { area: 'admin', page: 'person', id: p[2], section: p[3] }
+    if (p[1] === 'plugin' && p[2]) return { area: 'admin', page: 'plugin', id: p[2], section: p[3] }
     // before: Settings with administrators, appearance and account
     if (p[1] === 'settings') return p[2] === 'appearance' || p[2] === 'account' ? { area: 'admin', page: 'account', section: p[2] === 'account' ? 'security' : 'appearance' } : { area: 'admin', page: 'system', section: 'admins' }
     const page = ADMIN_PAGES.find((x) => x === p[1])
@@ -60,11 +61,17 @@ export const to = {
   group: (slug: string, id: string, tab?: string) => `#/t/${enc(slug)}/group/${enc(id)}${sub(tab)}`,
   item: (slug: string, id: string) => `#/t/${enc(slug)}/item/${enc(id)}`,
   adminPerson: (id: string, tab?: string) => `#/admin/person/${enc(id)}${sub(tab)}`,
+  adminPlugin: (id: string, tab?: string) => `#/admin/plugin/${enc(id)}${sub(tab)}`,
 }
 
 /** The address of a route: to rewrite the old ones. */
 export function href(r: Route): string {
-  if (r.area === 'admin') return r.page === 'tenant' ? to.adminTenant(r.id!, r.section) : r.page === 'person' ? to.adminPerson(r.id!, r.section) : to.admin(r.page, r.section)
+  if (r.area === 'admin') {
+    if (r.page === 'tenant') return to.adminTenant(r.id!, r.section)
+    if (r.page === 'person') return to.adminPerson(r.id!, r.section)
+    if (r.page === 'plugin') return to.adminPlugin(r.id!, r.section)
+    return to.admin(r.page, r.section)
+  }
   if (r.area === 'tenant') {
     if (r.page === 'plugin') return to.plugin(r.tenant, r.id!, r.section)
     if (r.page === 'person') return to.person(r.tenant, r.id!, r.section)

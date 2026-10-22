@@ -104,4 +104,43 @@ describe('mountCrud', () => {
     expect(el.textContent).toContain('read only')
     expect(el.querySelector('.msk-count')!.textContent).toBe('1 item')
   })
+  it('shows the fields and actions of the extensions of the plugin', async () => {
+    const el = document.createElement('div')
+    const calls: { op: string; args: any }[] = []
+    const ext = [{ id: 'com.x.review', label: 'Review', fields: [{ key: 'reviewed', label: 'Reviewed', kind: 'bool' }], actions: [{ key: 'approve', label: 'Approve' }] }]
+    const bridge = {
+      call: async (op: string, args: any) => {
+        calls.push({ op, args })
+        if (op === 'crud.list') return { resource: 'notes', fields, rows: [row('1', 'mine', 'manage')] }
+        if (op === 'crud.update') return row('1', args.values.title, 'manage')
+        if (op === 'ext.list') return ext
+        if (op === 'ext.values') return { '1': { 'com.x.review': { reviewed: true } } }
+        if (op === 'ext.action' || op === 'ext.set') return { values: { reviewed: false } }
+        return {}
+      },
+      onEvent: () => () => {},
+    } as unknown as Bridge
+    mountCrud(el, new Msk(bridge, { public: false }), 'notes')
+    await tick()
+    // a column, with the value of the item
+    expect([...el.querySelectorAll('th')].map((x) => x.textContent)).toContain('Reviewed')
+    expect(el.querySelector('tbody tr.row')!.textContent).toContain('✓')
+    expect(calls.find((c) => c.op === 'ext.values')!.args).toEqual({ resource: 'notes', ids: ['1'] })
+    // in the detail: the field and the action
+    ;(el.querySelector('tbody tr.row') as HTMLElement).click()
+    expect(el.querySelector('fieldset legend')!.textContent).toBe('Review')
+    const box = el.querySelector<HTMLInputElement>('[data-ext="com.x.review"][data-key="reviewed"]')!
+    expect(box.checked).toBe(true)
+    const approve = [...el.querySelectorAll<HTMLButtonElement>('fieldset button')].find((b) => b.textContent === 'Approve')!
+    approve.click()
+    await tick()
+    expect(calls.find((c) => c.op === 'ext.action')!.args).toEqual({ resource: 'notes', id: '1', extension: 'com.x.review', action: 'approve' })
+    // a changed field is saved with the item
+    const box2 = el.querySelector<HTMLInputElement>('[data-ext="com.x.review"][data-key="reviewed"]')!
+    box2.checked = true
+    ;[...el.querySelectorAll<HTMLButtonElement>('.msk-form > .msk-actions button')].find((b) => b.textContent === 'Save')!.click()
+    await tick()
+    await tick()
+    expect(calls.find((c) => c.op === 'ext.set')!.args).toEqual({ resource: 'notes', id: '1', extension: 'com.x.review', values: { reviewed: true } })
+  })
 })

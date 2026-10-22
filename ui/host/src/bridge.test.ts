@@ -42,4 +42,18 @@ describe('routeOp', () => {
     expect(() => routeOp('alfa', 'p.x', 'notify', { title: 'x'.repeat(161) })).toThrow(OpError)
     expect(() => routeOp('alfa', 'p.x', 'notify', { title: 'Hi', resource: 'not-an-id' })).toThrow(OpError)
   })
+  it('builds the operations of the extensions, on the items of the plugin of the iframe', () => {
+    const N = '/api/t/alfa/p/com.mosaikit.notes'
+    expect(routeOp('alfa', 'com.mosaikit.notes', 'ext.list', { resource: 'notes' })).toEqual({ method: 'GET', url: `${N}/ext/notes` })
+    expect(routeOp('alfa', 'com.mosaikit.notes', 'ext.values', { resource: 'notes', ids: [ID] })).toEqual({ method: 'POST', url: `${N}/ext/notes/values`, json: { ids: [ID] } })
+    expect(routeOp('alfa', 'com.mosaikit.notes', 'ext.set', { resource: 'notes', id: ID, extension: 'com.x.review', values: { ok: true } })).toEqual({
+      method: 'PUT',
+      url: `${N}/ext/notes/${ID}/com.x.review`,
+      json: { values: { ok: true } },
+    })
+    expect(routeOp('alfa', 'com.mosaikit.notes', 'ext.action', { resource: 'notes', id: ID, extension: 'com.x.review', action: 'approve' }).url).toBe(`${N}/ext/notes/${ID}/com.x.review/approve`)
+    expect(() => routeOp('alfa', 'p.x', 'ext.set', { resource: 'notes', id: ID, extension: '../admin', values: {} })).toThrow(OpError)
+    expect(() => routeOp('alfa', 'p.x', 'ext.values', { resource: 'notes', ids: ['x'] })).toThrow(OpError)
+    expect(() => routeOp('alfa', 'p.x', 'ext.action', { resource: 'notes', id: ID, extension: 'com.x.y', action: 'a/b' })).toThrow(OpError)
+  })
 })

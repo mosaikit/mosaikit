@@ -1,5 +1,17 @@
 import { Bridge, BridgeError } from './bridge.ts'
-import type { FileEntry, Hello, ListResult, Listing, Notify, PublicResource, Row, SiteInfo, UiContext, Values } from './protocol.ts'
+import type { ExtensionView, FileEntry, Hello, ListResult, Listing, Notify, PublicResource, Row, SiteInfo, UiContext, Values } from './protocol.ts'
+
+/** The extensions of the plugin on a resource (fields and actions other plugins add to its items). */
+export interface ExtensionsClient {
+  /** the extensions on in the tenant that the person may use (empty with an older host) */
+  list(): Promise<ExtensionView[]>
+  /** item id -> extension id -> values, for the items the person can see */
+  values(ids: string[]): Promise<Record<string, Record<string, Values>>>
+  /** changes the values of an extension on an item (the person must be able to edit it) */
+  set(id: string, extension: string, values: Values): Promise<Values>
+  /** runs an action of an extension on an item; returns the new values of the extension */
+  action(id: string, extension: string, action: string): Promise<Values>
+}
 
 export interface CrudClient {
   list(opts?: { filter?: string; parent?: string }): Promise<ListResult>
@@ -60,6 +72,21 @@ export class Msk {
       remove: async (id) => {
         await b.call('crud.delete', { resource, id })
       },
+    }
+  }
+
+  /** Fields and actions that the extensions of the plugin add to the items of `resource`. */
+  extensions(resource: string): ExtensionsClient {
+    const b = this.bridge
+    return {
+      list: () =>
+        b
+          .call<ExtensionView[]>('ext.list', { resource })
+          .then((r) => (Array.isArray(r) ? r : []))
+          .catch(() => []),
+      values: async (ids) => (ids.length ? b.call('ext.values', { resource, ids }) : {}),
+      set: async (id, extension, values) => (await b.call<{ values: Values }>('ext.set', { resource, id, extension, values })).values,
+      action: async (id, extension, action) => (await b.call<{ values: Values }>('ext.action', { resource, id, extension, action })).values,
     }
   }
 

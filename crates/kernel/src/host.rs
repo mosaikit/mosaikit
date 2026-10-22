@@ -180,8 +180,11 @@ pub(crate) async fn run(
 ) -> Result<(Value, Tx)> {
     // what the caller may do in the plugin: the logic enforces the permissions it declares
     let perms = crate::access::effective(k, c, &p.id).await?;
+    let config = crate::plugins::config::for_logic(k, &p.id).await?;
     if let Some(ctx) = msg.get_mut("ctx").filter(|v| v.is_object()) {
         ctx["perms"] = json!(perms);
+        // the settings of the plugin chosen by the Administrator (`[[config]]`)
+        ctx["config"] = config;
     }
     let module = p.module.clone().ok_or_else(|| Error::bad(format!("{} has no WASM logic", p.id)))?;
     let host = KernelHost {

@@ -60,6 +60,15 @@ export interface ListResult {
   rows: Row[]
 }
 
+/** An extension of the plugin: the fields and actions it adds to the items of a resource. */
+export interface ExtensionView {
+  /** id of the extension (another plugin) */
+  id: string
+  label: string
+  fields: FieldDecl[]
+  actions: { key: string; label: string }[]
+}
+
 export interface FileEntry {
   id: string
   name: string

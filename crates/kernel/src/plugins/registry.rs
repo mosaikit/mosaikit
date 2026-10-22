@@ -42,6 +42,15 @@ pub struct EntryVersion {
     pub sha256: String,
     #[serde(default)]
     pub publisher: Option<String>,
+    /// what changes in this version (release notes, plain text)
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub notes: String,
+    /// `app`, `service` or `extension` (for the catalog, before installing)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kind: Option<String>,
+    /// for an extension: the plugin it extends
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extends: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -93,6 +102,16 @@ pub struct CatalogItem {
     pub latest: String,
     pub installed: Option<String>,
     pub update_available: bool,
+    pub kind: Option<String>,
+    pub extends: Option<String>,
+    /// the notes of the versions newer than the installed one (or of the latest), newest first
+    pub notes: Vec<VersionNotes>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct VersionNotes {
+    pub version: String,
+    pub notes: String,
 }
 
 pub fn catalog(k: &Kernel, admin: &SessionUser) -> Result<Vec<CatalogItem>> {
@@ -109,6 +128,18 @@ pub fn catalog(k: &Kernel, admin: &SessionUser) -> Result<Vec<CatalogItem>> {
                 .and_then(Version::parse)
                 .zip(Version::parse(&latest.version))
                 .is_some_and(|(i, l)| l > i);
+            let from = installed.as_deref().and_then(Version::parse);
+            let mut notes: Vec<&EntryVersion> = e
+                .versions
+                .iter()
+                .filter(|v| match (Version::parse(&v.version), from) {
+                    (Some(x), Some(f)) => x > f,
+                    (Some(_), None) => v.version == latest.version,
+                    _ => false,
+                })
+                .filter(|v| !v.notes.is_empty())
+                .collect();
+            notes.sort_by_key(|v| std::cmp::Reverse(Version::parse(&v.version)));
             Some(CatalogItem {
                 id: e.id.clone(),
                 name: e.name.clone(),
@@ -117,6 +148,12 @@ pub fn catalog(k: &Kernel, admin: &SessionUser) -> Result<Vec<CatalogItem>> {
                 latest: latest.version.clone(),
                 installed,
                 update_available,
+                kind: latest.kind.clone(),
+                extends: latest.extends.clone(),
+                notes: notes
+                    .into_iter()
+                    .map(|v| VersionNotes { version: v.version.clone(), notes: v.notes.clone() })
+                    .collect(),
             })
         })
         .collect())

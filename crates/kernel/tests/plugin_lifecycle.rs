@@ -202,9 +202,9 @@ async fn catalog_and_blocklist() {
     let index = |blocked: bool, sha: &str| {
         json!({
             "plugins": [{ "id": "com.mosaikit.notes", "name": "Notes", "versions": [
-                { "version": "0.4.0", "file": "plugins/notes.mskp", "sha256": sha }
+                { "version": "0.4.1", "file": "plugins/notes.mskp", "sha256": sha }
             ]}],
-            "blocklist": if blocked { json!([{ "id": "com.mosaikit.notes", "version": "0.4.0", "reason": "test" }]) } else { json!([]) }
+            "blocklist": if blocked { json!([{ "id": "com.mosaikit.notes", "version": "0.4.1", "reason": "test" }]) } else { json!([]) }
         })
     };
     std::fs::write(dir.join("index.json"), index(false, "0000").to_string()).unwrap();
@@ -218,7 +218,7 @@ async fn catalog_and_blocklist() {
     assert_eq!(e.kind, Kind::Forbidden);
     std::fs::write(t.cfg.registry.as_ref().unwrap(), index(false, &sha).to_string()).unwrap();
     plugins::registry::install_from_catalog(&t, &admin, "com.mosaikit.notes").await.unwrap();
-    assert_eq!(plugins::registry::catalog(&t, &admin).unwrap()[0].installed.as_deref(), Some("0.4.0"));
+    assert_eq!(plugins::registry::catalog(&t, &admin).unwrap()[0].installed.as_deref(), Some("0.4.1"));
     // blocklist: it is not turned on and not reinstalled
     std::fs::write(t.cfg.registry.as_ref().unwrap(), index(true, &sha).to_string()).unwrap();
     plugins::uninstall(&t, &admin, "com.mosaikit.notes").await.unwrap();
@@ -238,7 +238,7 @@ async fn preinstall_from_the_catalog() {
     let pkg = pack_plugin("tasks");
     std::fs::write(dir.path().join("plugins/tasks.mskp"), &pkg).unwrap();
     let index = json!({ "plugins": [{ "id": "com.mosaikit.tasks", "name": "Tasks", "versions": [
-        { "version": "0.4.0", "file": "plugins/tasks.mskp", "sha256": mosaikit_mskp::package_sha256(&pkg) } ]}] });
+        { "version": "0.4.1", "file": "plugins/tasks.mskp", "sha256": mosaikit_mskp::package_sha256(&pkg) } ]}] });
     std::fs::write(dir.path().join("index.json"), index.to_string()).unwrap();
     let path = dir.path().join("index.json");
     let t = start_with(|c| {

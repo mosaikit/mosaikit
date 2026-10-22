@@ -12,6 +12,9 @@
 //! - plus the **grants** of the plugin to the person and to their groups (they only add).
 //!
 //! Permissions never widen what a person sees: the access to the items stays the one of the ACL.
+//!
+//! Only the plugins **on in the tenant** count (available to it and turned on, see
+//! [`crate::plugins::tenants`]): the others have no permissions at all.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::sync::Arc;
@@ -141,14 +144,16 @@ async fn reaching(k: &Kernel, tenant: Uuid, user: Uuid) -> Result<Vec<Reach>> {
         .collect())
 }
 
-/// What a person may do in every active plugin of a tenant: plugin id -> keys.
+/// What a person may do in every plugin on in a tenant: plugin id -> keys.
 pub async fn effective_all(
     k: &Kernel,
     tenant: Uuid,
     user: Uuid,
     role: Role,
 ) -> Result<HashMap<String, BTreeSet<String>>> {
-    let plugins: Vec<Arc<LoadedPlugin>> = k.plugins.list().into_iter().filter(|p| p.is_active()).collect();
+    let on = crate::plugins::tenants::on_in(k, tenant).await?;
+    let plugins: Vec<Arc<LoadedPlugin>> =
+        k.plugins.list().into_iter().filter(|p| p.is_active() && on.contains(&p.id)).collect();
     if role == Role::TenantManager {
         return Ok(plugins.iter().map(|p| (p.id.clone(), all_keys(p))).collect());
     }
@@ -183,6 +188,9 @@ pub async fn require(
     perm: &str,
 ) -> Result<(Arc<LoadedPlugin>, BTreeSet<String>)> {
     let p = k.plugins.active(plugin)?;
+    if !crate::plugins::tenants::is_on(k, c.tenant.tenant_id, plugin).await? {
+        return Err(crate::plugins::tenants::off_error(&p));
+    }
     let keys = effective(k, c, plugin).await?;
     for need in [USE, perm] {
         if !keys.contains(need) {

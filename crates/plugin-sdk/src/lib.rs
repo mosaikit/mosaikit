@@ -87,12 +87,21 @@ pub struct Ctx {
     /// `delete`, `share`) and the `[[user_permissions]]` of the manifest that the caller has.
     #[serde(default)]
     pub perms: Vec<String>,
+    /// Settings of the plugin chosen by the Administrator (`[[config]]` of the manifest), secrets
+    /// included: key -> value (`null` when not set).
+    #[serde(default)]
+    pub config: serde_json::Value,
 }
 
 impl Ctx {
     /// The caller has the permission `key` (a `[[user_permissions]]` of the manifest, or a standard one).
     pub fn can(&self, key: &str) -> bool {
         self.perms.iter().any(|p| p == key)
+    }
+
+    /// A setting of the plugin (`[[config]]`), if it has a value.
+    pub fn setting(&self, key: &str) -> Option<&serde_json::Value> {
+        self.config.get(key).filter(|v| !v.is_null())
     }
     pub fn db(&self) -> Db {
         Db(())

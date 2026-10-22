@@ -75,6 +75,10 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .msk-form { margin-top: 22px; max-width: 680px; background: var(--panel); border: 1px solid var(--line); border-radius: 16px; padding: 20px 22px; }
 .msk-form h3 { font-size: 12px; color: var(--dim); text-transform: uppercase; letter-spacing: 0.9px; margin: 0 0 14px; font-weight: 600; }
 .msk-field { margin-bottom: 12px; }
+/* fields and actions of the extensions of the plugin */
+.msk-extset { margin: 6px 0 14px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px 4px; }
+.msk-extset legend { font-size: 12px; color: var(--dim); padding: 0 6px; }
+.msk-extset .msk-actions { margin: 4px 0 8px; }
 .msk-field label { display: block; font-size: 12px; color: var(--dim); margin-bottom: 5px; }
 .msk-field.req label { color: var(--fg); font-weight: 600; }
 .msk-field .star { color: var(--err); }

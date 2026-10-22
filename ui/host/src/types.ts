@@ -102,16 +102,77 @@ export interface TenantSettings {
   managers_see_titles: boolean
 }
 
+export type PluginKind = 'app' | 'service' | 'extension'
+
 export interface PluginView {
   id: string
   name: string
   version: string
+  /** emoji of the manifest, for older hosts */
   icon: string
+  /** name of the icon of the shell (Lucide) declared by the manifest (recent servers) */
+  icon_name?: string | null
+  /** recent servers */
+  kind?: PluginKind
+  /** for an extension: the plugin it extends (recent servers) */
+  extends?: string | null
   label: string
   description: string
   has_ui: boolean
   dev: boolean
-  permissions: { hooks: string[]; files: boolean; content: boolean; network: string[]; frame_src: string[] }
+  permissions: { hooks: string[]; files: boolean; content: boolean; network: string[]; frame_src: string[]; calls?: string[] }
+}
+
+/** A plugin available to a tenant, as its Tenant Manager sees it (or every plugin, for the Administrator). */
+export interface TenantPlugin {
+  id: string
+  label: string
+  description: string
+  version: string
+  kind: PluginKind
+  icon: string | null
+  has_ui: boolean
+  available: boolean
+  enabled: boolean
+  on: boolean
+  off: 'platform' | 'unavailable' | 'turned_off' | 'base' | null
+  extends: string | null
+  /** recent servers: the name of the plugin it extends */
+  extends_label?: string | null
+  extensions: string[]
+}
+
+/** A tenant in the Tenants tab of a plugin. */
+export interface PluginTenant {
+  tenant_id: string
+  slug: string
+  name: string
+  status: string
+  available: boolean
+  own_choice: boolean | null
+  enabled: boolean
+  on: boolean
+}
+
+export interface ConfigDecl {
+  key: string
+  label: string
+  description: string
+  kind: 'text' | 'number' | 'bool' | 'choice' | 'secret'
+  default?: unknown
+  options?: string[]
+}
+
+export interface PluginConfig {
+  decls: ConfigDecl[]
+  values: Record<string, unknown>
+  secrets: string[]
+}
+
+export interface UninstallImpact {
+  items: number
+  tenants: number
+  extensions: string[]
 }
 
 export interface TenantContext {
@@ -423,6 +484,13 @@ export interface AdminPlugin extends PluginView {
   installed_at: string
   has_logic: boolean
   kpi: { view: string; label: string }[]
+  /** recent servers */
+  requires?: { database: string | null; extensions: string[] }
+  user_permissions?: { key: string; label: string; description: string; default: boolean }[]
+  min_kernel?: string
+  extends_min?: string | null
+  extension?: { fields: { resource: string; key: string; label: string; kind: string }[]; actions: { resource: string; key: string; label: string }[] }
+  has_config?: boolean
 }
 
 export interface CatalogItem {
@@ -433,6 +501,10 @@ export interface CatalogItem {
   latest: string
   installed: string | null
   update_available: boolean
+  /** recent servers */
+  kind?: PluginKind | null
+  extends?: string | null
+  notes?: { version: string; notes: string }[]
 }
 
 export interface Overview {

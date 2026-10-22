@@ -135,6 +135,10 @@ export function noteTitle(n: Note): string {
       return t('{by} gave you access to «{item}»', { by: d.by, item: d.item })
     case 'access.refused':
       return t('{by} refused your request for «{item}»', { by: d.by, item: d.item })
+    case 'plugin.available':
+      return t('{plugin} is available to the tenant', { plugin: d.plugin })
+    case 'plugin.unavailable':
+      return t('{plugin} is no longer available to the tenant', { plugin: d.plugin })
     default:
       return n.title
   }
@@ -156,6 +160,10 @@ export function noteBody(n: Note): string {
       return ''
     case 'access.forwarded':
       return t('Approve or refuse in Access requests.')
+    case 'plugin.available':
+      return t('Turn it on in Plugins to give it to the people of the tenant.')
+    case 'plugin.unavailable':
+      return t('The Administrator took it back: the people of the tenant no longer see it.')
     default:
       return n.body
   }

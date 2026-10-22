@@ -1,8 +1,11 @@
 //! Plugins: in-memory registry, installation, activation, development, catalog.
 
+pub mod config;
 pub mod dev;
+pub mod extensions;
 mod install;
 pub mod registry;
+pub mod tenants;
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -178,7 +181,14 @@ pub struct PluginView {
     pub id: String,
     pub name: String,
     pub version: String,
+    /// emoji of the manifest (`contribution.icon`), for older hosts
     pub icon: String,
+    /// name of the icon in the set of the shell (Lucide), if the manifest declares it
+    pub icon_name: Option<String>,
+    /// `app`, `service` or `extension`
+    pub kind: &'static str,
+    /// for an extension: the plugin it extends
+    pub extends: Option<String>,
     pub label: String,
     pub description: String,
     pub has_ui: bool,
@@ -203,6 +213,9 @@ impl PluginView {
             name: m.name.clone(),
             version: m.version.clone(),
             icon: m.contribution.icon.clone(),
+            icon_name: m.icon.clone(),
+            kind: m.effective_kind().as_str(),
+            extends: m.extends.as_ref().map(|e| e.plugin.clone()),
             label: m.contribution.label.clone(),
             description: m.description.clone(),
             has_ui: p.ui_dir.is_some() && m.ui.is_some(),
@@ -224,6 +237,16 @@ pub struct PluginAdminView {
     pub installed_at: DateTime<Utc>,
     pub has_logic: bool,
     pub kpi: Vec<mosaikit_mskp::KpiDecl>,
+    /// what it asks of the platform (besides `permissions`)
+    pub requires: mosaikit_mskp::Requires,
+    pub user_permissions: Vec<mosaikit_mskp::UserPermission>,
+    pub min_kernel: String,
+    /// for an extension: the version of the plugin it extends it needs
+    pub extends_min: Option<String>,
+    /// what an extension adds (fields and actions)
+    pub extension: mosaikit_mskp::ExtensionDecl,
+    /// it has settings (`[[config]]`)
+    pub has_config: bool,
 }
 
 pub fn active_views(k: &Kernel) -> Vec<PluginView> {
@@ -253,8 +276,47 @@ pub fn admin_views_in(k: &Kernel, admin: &SessionUser, lang: &str) -> Result<Vec
             installed_at: p.installed_at,
             has_logic: p.module.is_some(),
             kpi: p.manifest.localized(lang).kpi,
+            requires: p.manifest.requires.clone(),
+            user_permissions: p.manifest.localized(lang).user_permissions,
+            min_kernel: p.manifest.min_kernel.clone(),
+            extends_min: p.manifest.extends.as_ref().map(|e| e.min_version.clone()),
+            extension: p.manifest.localized(lang).extension,
+            has_config: !p.manifest.config.is_empty(),
         })
         .collect())
+}
+
+/// What uninstalling a plugin takes away, to say it before.
+#[derive(Debug, Clone, Serialize)]
+pub struct UninstallImpact {
+    /// items of the plugin, in every tenant
+    pub items: i64,
+    /// tenants with items of the plugin
+    pub tenants: i64,
+    /// installed extensions of the plugin (they stop working)
+    pub extensions: Vec<String>,
+}
+
+pub async fn uninstall_impact(k: &Kernel, admin: &SessionUser, id: &str) -> Result<UninstallImpact> {
+    crate::tenancy::require_admin(admin)?;
+    k.plugins.get(id).ok_or_else(|| Error::not_found(format!("plugin not installed: {id}")))?;
+    let r = mosaikit_db::query(
+        "select count(*), count(distinct tenant_id) from core.resources where plugin_id = $1",
+    )
+    .bind(id)
+    .fetch_one(&k.db)
+    .await?;
+    Ok(UninstallImpact {
+        items: r.get(0),
+        tenants: r.get(1),
+        extensions: k
+            .plugins
+            .list()
+            .iter()
+            .filter(|p| p.manifest.extends.as_ref().is_some_and(|e| e.plugin == id))
+            .map(|p| p.manifest.contribution.label.clone())
+            .collect(),
+    })
 }
 
 /// The fields of a resource of a plugin with their labels in `lang` (for the CRUD of the UIs).
@@ -318,6 +380,7 @@ pub async fn uninstall(k: &Kernel, admin: &SessionUser, id: &str) -> Result<()> 
     mosaikit_db::query("delete from core.plugins where id = $1").bind(id).execute(&mut *tx).await?;
     tx.commit().await?;
     k.plugins.remove(id);
+    config::forget(k, id).await?;
     for (tenant, rid) in resources {
         k.blobs.remove(tenant, rid);
     }
