@@ -1,0 +1,7 @@
+# cargo-nextest settings (cargo xtask test uses nextest when it is installed).
+
+[profile.default]
+# a test still running after 60 s is reported as slow; after 5 minutes it is stopped
+slow-timeout = { period = "60s", terminate-after = 5 }
+# the run stops at the first failure only on request (--fail-fast); xtask passes --no-fail-fast
+fail-fast = false

@@ -798,6 +798,18 @@ set by `cargo xtask dev` with the plugins of the distribution):
 The plugins in development are read from the folder, there is no need to pack them; the
 dev mode exists only in debug builds.
 
+**Build speed.** The repository configures what is the same for everybody; the rest is per machine:
+
+| What | Where | Effect |
+|---|---|---|
+| `rust-lld` as linker on Windows | `.cargo/config.toml` | links the many test binaries in about half the time of `link.exe` |
+| line tables only for our crates, no debug info for dependencies | `[profile.dev]` in `Cargo.toml` | faster builds, `target/` about a tenth of the size; backtraces keep file and line |
+| `cargo-nextest` | installed by the developer; `.config/nextest.toml` | `cargo xtask test` runs the tests through it when present (doctests apart); slow tests are reported after 60 s |
+| `sccache` | the developer's `~/.cargo/config.toml` (`rustc-wrapper`), `SCCACHE_DIR`, `SCCACHE_CACHE_SIZE` | dependencies compiled once are reused by every checkout and worktree |
+
+On Windows, excluding the source folders, `~/.cargo` and `~/.rustup` from the antivirus real-time
+scan speeds up Cargo and npm noticeably (a choice of whoever owns the machine).
+
 ## 13. Release
 
 | Release | Command | Content |

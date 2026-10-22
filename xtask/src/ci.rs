@@ -8,6 +8,19 @@ use anyhow::Result;
 use crate::plugins;
 use crate::util::{npm, root, run, which};
 
+/// `cargo test` arguments run through cargo-nextest when it is installed (tests in parallel processes,
+/// much faster on many integration test binaries); nextest skips doctests, so those run on their own.
+fn rust_tests(args: &[&str]) -> Command {
+    let mut c = Command::new("cargo");
+    c.current_dir(root());
+    if which("cargo-nextest").is_some() {
+        c.args(["nextest", "run", "--no-fail-fast"]).args(args);
+    } else {
+        c.arg("test").args(args);
+    }
+    c
+}
+
 /// Rust tests (with PostgreSQL) and UI tests.
 pub fn test(skip_db: bool) -> Result<()> {
     if !skip_db && std::env::var_os("MOSAIKIT_TEST_DATABASE_URL").is_none() {
@@ -16,15 +29,13 @@ pub fn test(skip_db: bool) -> Result<()> {
     let url = std::env::var("MOSAIKIT_TEST_DATABASE_URL").unwrap_or_else(|_| crate::db::test_url());
     let all = plugins::discover()?;
     plugins::build_wasm(&all, false)?;
-    run(Command::new("cargo")
-        .current_dir(root())
-        .args(["test", "--workspace"])
-        .env("MOSAIKIT_TEST_DATABASE_URL", &url))?;
-    // the same kernel and server tests on the SQLite backend (default of the desktop version)
-    eprintln!("== test su SQLite");
-    run(Command::new("cargo")
-        .current_dir(root())
-        .args(["test", "-p", "mosaikit-kernel", "-p", "mosaikit-server"])
+    run(rust_tests(&["--workspace"]).env("MOSAIKIT_TEST_DATABASE_URL", &url))?;
+    if which("cargo-nextest").is_some() {
+        run(Command::new("cargo").current_dir(root()).args(["test", "--workspace", "--doc"]))?;
+    }
+    // the same kernel, server and db tests on the SQLite backend (default of the desktop version)
+    eprintln!("== tests on SQLite");
+    run(rust_tests(&["-p", "mosaikit-kernel", "-p", "mosaikit-server", "-p", "mosaikit-db"])
         .env("MOSAIKIT_TEST_BACKEND", "sqlite"))?;
     for ws in plugins::cargo_roots(&all) {
         run(Command::new("cargo")

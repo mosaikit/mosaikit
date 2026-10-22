@@ -1,2 +1,7 @@
 [alias]
 xtask = "run --quiet --package xtask --"
+
+# Windows: link with rust-lld (it ships with rustup) instead of link.exe; much faster for the many test
+# binaries. Machine-wide choices like sccache belong to the user's own ~/.cargo/config.toml.
+[target.x86_64-pc-windows-msvc]
+linker = "rust-lld.exe"

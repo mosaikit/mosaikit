@@ -79,6 +79,13 @@ mosaikit-kernel = { path = "crates/kernel" }
 
 # in debug the cryptographic dependencies and the WASM interpreter are very slow:
 # optimized in development and test builds too
+# Development and test builds: line tables only for our crates (backtraces keep file and line), no debug
+# info for dependencies. Builds and links faster and target/ stays a fraction of the size.
+[profile.dev]
+debug = "line-tables-only"
+[profile.dev.package."*"]
+debug = false
+
 [profile.dev.package.argon2]
 opt-level = 3
 [profile.dev.package.blake2]
