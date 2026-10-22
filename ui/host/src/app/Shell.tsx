@@ -414,14 +414,17 @@ function UserMenu({ session, route, band }: { session: Session; route: Route; ba
   const u = session.user
   const name = u.display_name || u.username
   async function logout() {
+    let endSession: string | null = null
     try {
-      await api('POST', '/api/auth/logout')
+      // a person of a tenant with an identity provider also signs out of the provider
+      endSession = (await api<{ end_session?: string | null }>('POST', '/api/auth/logout')).end_session ?? null
     } catch {
       /* session already closed */
     }
     qc.setQueryData(['session'], null)
     qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'session' })
-    go(u.is_system_admin ? '#/admin' : '#/')
+    if (endSession) window.location.assign(endSession)
+    else go(u.is_system_admin ? '#/admin' : '#/')
   }
   const role = u.is_system_admin ? 'Administrator' : roleOf(session, route)
   const tenant = route.area === 'tenant' ? session.memberships.find((m) => m.slug === route.tenant)?.name : t('Platform')

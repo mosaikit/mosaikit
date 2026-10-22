@@ -106,6 +106,8 @@ pub(super) async fn create_member_in(
     password: &str,
     role: Role,
 ) -> Result<Uuid> {
+    // in a tenant that signs in through its provider the people come from the provider
+    crate::oidc::refuse_local_password(k, tenant).await?;
     let username = username.trim().to_lowercase();
     if !valid_username(&username) {
         return Err(Error::bad("invalid username: lower case, digits, '.', '-', '_' (2-64)"));

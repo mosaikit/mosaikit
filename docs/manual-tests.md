@@ -161,6 +161,41 @@ As `e.ricci` (Tenant Manager of *Comune di Roma*) unless said otherwise.
 | P3-27 | Italian | Every new page and message in Italian |
 | P3-28 | Dark mode on the new pages | Readable, check boxes and badges visible |
 
+## Phase 8 — Sign-in through the identity provider of a tenant (OIDC)
+
+**Test identity provider.** In a second terminal, from the `mosaikit` folder:
+`cargo run -p mosaikit-server --bin mosaikit-fake-idp` (it prints `test identity provider:
+http://127.0.0.1:5556`). Client id `mosaikit`, client secret `fake-secret`. Its people, without
+passwords (a button each):
+
+| Person | Username | Groups |
+|---|---|---|
+| Anna Rossi | `anna.rossi` | `mosaikit-managers`, `staff` |
+| Bruno Neri | `bruno.neri` | `mosaikit-users`, `staff` |
+| Carla Bassi | `carla.bassi` | none |
+
+Use a tenant made for the test (P8-01), not *Comune di Roma*: with the provider on, its local accounts
+cannot sign in. At the end put it back to local accounts (P8-14).
+
+| Id | Check | Expected |
+|---|---|---|
+| P8-01 | As Administrator: Tenants › New tenant `prova-oidc` «Prova OIDC», then its page › tab **Sign-in** | Two choices, Local accounts (chosen) and Identity provider (OIDC); Accounts: 1 local account |
+| P8-02 | Choose Identity provider (OIDC); issuer `http://127.0.0.1:5556`, client id `mosaikit`, client secret `fake-secret`, text of the button «Test provider» | The addresses to register appear (return, back-channel logout, after the sign-out) with a copy button |
+| P8-03 | **Check the configuration** | Every line green: discovery document, PKCE (S256), signing keys, sign-out at the provider, back-channel logout |
+| P8-04 | Same check with issuer `http://127.0.0.1:1` | A red line with the reason, no raw code |
+| P8-05 | Where roles come from: Groups of the identity provider; Tenant Managers `mosaikit-managers`, Users `mosaikit-users`; Save | A confirmation says the local account can no longer sign in; then «Sign-in saved»; the secret shows only its last four characters |
+| P8-06 | Sign out; open `#/login/prova-oidc` | A button «Sign in with Test provider», no username and password |
+| P8-07 | Click it, then «Sign in as Anna Rossi» on the page of the provider | Back in Mosaikit, in *Prova OIDC*, as Tenant Manager (Manage in the sidebar) |
+| P8-08 | Account › Sign-in and security | «Identity provider of the tenant (OIDC)», no Change password |
+| P8-09 | Manage › People | No «New user»; in the menu of a person no password link nor password reset |
+| P8-10 | Sign out | The browser passes through the provider and comes back to the sign-in page |
+| P8-11 | Sign in as Bruno Neri | User (no Manage) |
+| P8-12 | Sign in as Carla Bassi | Back on the sign-in page: «Your account of the provider is not in a group allowed in this tenant» |
+| P8-13 | Back-channel logout: with Anna signed in, run in a terminal `curl -X POST http://127.0.0.1:5556/_admin/backchannel -H "content-type: application/json" -d "{\"url\": \"<back-channel logout address of P8-02>\", \"sub\": \"anna.rossi\"}"` | The answer says 1 session or more; Anna's next action in Mosaikit asks to sign in again |
+| P8-14 | As Administrator: tab Sign-in › Local accounts › Save | `#/login/prova-oidc` shows username and password again |
+| P8-15 | As the Tenant Manager of a tenant with the provider: Tenant settings › Managed by the platform | Sign-in method «Identity provider of the tenant (OIDC)» with the padlock |
+| P8-16 | Italian, and dark mode, on the Sign-in tab and on the sign-in page | Everything translated and readable |
+
 ---
 
-Phases 4 to 9 add their sections here when they are committed.
+Phases 4 to 7 and 9 add their sections here when they are committed.

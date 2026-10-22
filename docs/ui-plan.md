@@ -16,7 +16,7 @@ of the screens of the mockup. A phase is closed when `cargo xtask test` and the 
 | 5. Shares, Trash, Log | All the shares and «Shared by me»; trash with 30 days and restore; Log with filters, CSV and detail | `shares`, `trash`, `activity`, `audit` |
 | 6. Quotas and usage | Default quotas and capacity, quotas per tenant, behaviour at the limit, usage, alerts, Account › Usage | `system/quotas`, `usage/*`, `account/usage` |
 | 7. Life cycle and operations | Archiving and deleting a tenant, logo, trial; backup and restore, retention, maintenance; Monitoring | `tenant/*`, `system/*`, `monitoring/*` |
-| 8. OIDC sign-in per tenant | Configuration per tenant, external identities, source of the roles, revocation (architecture §15) | `tenant/sign-in`, `login` |
+| 8. OIDC sign-in per tenant | Configuration per tenant, external identities, source of the roles, revocation (architecture §3.3) | `tenant/sign-in`, `login` |
 | 9. Search, help, themes | Search in the contents with the plugins; tour, guide, what is new, shortcuts; high contrast; theme editor with WCAG check | `dlg-search`, `themeedit` |
 
 Order: 0 → 0b → 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9. Phase 8 can come earlier if a customer needs it.
@@ -35,5 +35,5 @@ Order: 0 → 0b → 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9. Phase 8 c
 | 5 | to do |
 | 6 | to do |
 | 7 | to do |
-| 8 | to do |
+| 8 | done: sign-in through the identity provider of a tenant (authorization code with PKCE, ID token RS256/ES256 checked in the kernel, key rotation), configuration and «Check the configuration» for the Administrator, people by issuer + `sub` created at the first sign-in, roles from Mosaikit or from the groups of the provider, local passwords turned off in OIDC tenants, end session and back-channel logout; test provider `mosaikit-fake-idp` for the tests and the development environment |
 | 9 | to do |

@@ -274,6 +274,16 @@ pub async fn login_remembered(
         return Err(Error::bad("Administrators sign in from the \"Administrator access\" page")
             .with_code("admin_door"));
     }
+    let tenant: Option<Uuid> = mosaikit_db::query_scalar("select id from core.tenants where slug = $1")
+        .bind(&tenant_slug)
+        .fetch_optional(&k.db)
+        .await?;
+    if let Some(t) = tenant {
+        if crate::oidc::tenant_uses_oidc(k, t).await? {
+            return Err(Error::bad("this tenant signs in with its identity provider: use its button")
+                .with_code("oidc_tenant"));
+        }
+    }
     let user_id = check_credentials(k, &tenant_slug, username, password, ip).await?;
     finish_session(k, user_id, ip, remember).await
 }
@@ -409,6 +419,26 @@ async fn finish_session(k: &Kernel, user_id: Uuid, ip: &str, remember: bool) -> 
     events::record(k, Some(user.home_tenant_id), Some(user_id), None, None, "login", json!({ "ip": ip }))
         .await;
     Ok(LoginResult { token, user, max_age: minutes * 60 })
+}
+
+/// The session of a person who signed in through the identity provider of their tenant (`sid`: the
+/// session of the provider, for its back-channel logout).
+pub(crate) async fn external_session(
+    k: &Kernel,
+    user_id: Uuid,
+    ip: &str,
+    remember: bool,
+    sid: Option<&str>,
+) -> Result<LoginResult> {
+    let lr = finish_session(k, user_id, ip, remember).await?;
+    if let Some(sid) = sid.filter(|s| !s.is_empty() && s.len() <= 255) {
+        mosaikit_db::query("update core.sessions set oidc_sid = $2 where token_hash = $1")
+            .bind(sha256(lr.token.as_bytes()))
+            .bind(sid)
+            .execute(&k.db)
+            .await?;
+    }
+    Ok(lr)
 }
 
 /// The minimum length of passwords in use for the accounts of a tenant (`None`: the platform's).
@@ -688,6 +718,9 @@ pub async fn memberships(k: &Kernel, user: &SessionUser) -> Result<Vec<Membershi
 }
 
 pub async fn change_password(k: &Kernel, user: &SessionUser, old: &str, new: &str) -> Result<()> {
+    if crate::oidc::is_external(k, user.user_id).await? {
+        return Err(crate::oidc::local_refused());
+    }
     let hash: Option<String> =
         mosaikit_db::query_scalar("select password_hash from core.users where id = $1")
             .bind(user.user_id)
@@ -711,6 +744,9 @@ pub async fn set_password(k: &Kernel, user_id: Uuid, new: &str) -> Result<()> {
         .bind(user_id)
         .fetch_optional(&k.db)
         .await?;
+    if let Some(home) = home {
+        crate::oidc::refuse_local_password(k, home).await?;
+    }
     check_password_len(new, password_min(k, home).await?)?;
     let hash = hash_password(k, new).await?;
     mosaikit_db::query("update core.users set password_hash = $2 where id = $1")

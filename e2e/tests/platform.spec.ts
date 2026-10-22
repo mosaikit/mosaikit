@@ -837,4 +837,60 @@ test.describe.serial('platform', () => {
     await page.goto(`./#/t/alfa/item/${budget.id}`)
     await expect(page).toHaveURL(/#\/t\/alfa\/p\/com\.mosaikit\.notes\//)
   })
+
+  test('sign-in through the identity provider of a tenant (OIDC)', async ({ page }) => {
+    // the test identity provider started by `cargo xtask e2e` (mosaikit-fake-idp)
+    const idp = process.env.E2E_IDP_URL ?? 'http://127.0.0.1:18082'
+    test.setTimeout(240_000)
+    await adminLogin(page)
+    await nav(page, 'Tenant').click()
+    await createTenant(page, 'omega', 'City of Omega')
+    await page.getByRole('link', { name: 'City of Omega' }).click()
+    await page.getByRole('link', { name: 'Sign-in', exact: true }).click()
+    await page.getByRole('radio', { name: /Identity provider \(OIDC\)/ }).check()
+    await page.getByLabel('Address of the provider (issuer)').fill(idp)
+    await page.getByLabel('Client id').fill('mosaikit')
+    await page.getByLabel('Client secret').fill('fake-secret')
+    await page.getByLabel('Text of the button').fill('Test provider')
+    await page.getByRole('radio', { name: /Groups of the identity provider/ }).check()
+    await page.getByLabel('Groups of the Tenant Managers').fill('mosaikit-managers')
+    await page.getByLabel('Groups of the Users').fill('mosaikit-users')
+    await page.getByRole('button', { name: 'Check the configuration' }).click()
+    await expect(page.getByRole('list', { name: 'Result of the check' })).toContainText('Discovery document')
+    await expect(page.getByRole('list', { name: 'Result of the check' }).getByLabel('Error')).toHaveCount(0)
+    await accessible(page, 'sign-in of the tenant')
+    await page.getByRole('button', { name: 'Save' }).click()
+    // the first Tenant Manager is a local account: it can no longer sign in
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Confirm' }).click()
+    await expect(page.getByText('Sign-in saved').last()).toBeVisible()
+    await logout(page)
+
+    // the sign-in page of the tenant shows the button of the provider, not the password
+    await fresh(page, '#/login/omega')
+    const button = page.getByRole('link', { name: 'Sign in with Test provider' })
+    await expect(button).toBeVisible()
+    await expect(page.getByLabel('Password')).toBeHidden()
+    await accessible(page, 'sign-in through the provider')
+
+    // Anna is in the group of the managers: Tenant Manager, account created at the first sign-in
+    await button.click()
+    await page.getByRole('button', { name: 'Sign in as Anna Rossi' }).click()
+    await expect(page.getByRole('button', { name: /person menu/ })).toBeVisible()
+    await expect(nav(page, 'Manage')).toBeVisible()
+    await page.goto('./#/t/omega/account/security')
+    await expect(page.getByText('Identity provider of the tenant (OIDC)')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Change password' })).toBeHidden()
+    await accessible(page, 'account of a person of the provider')
+    // signing out goes through the end-session endpoint of the provider and back to the sign-in
+    await page.getByRole('button', { name: /person menu/ }).click()
+    await page.getByRole('menuitem', { name: 'Sign out' }).click()
+    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
+
+    // Carla is in no allowed group: back on the sign-in page with the reason, never a code
+    await fresh(page, '#/login/omega')
+    await page.getByRole('link', { name: 'Sign in with Test provider' }).click()
+    await page.getByRole('button', { name: 'Sign in as Carla Bassi' }).click()
+    await expect(page.getByText('Your account of the provider is not in a group allowed in this tenant')).toBeVisible()
+    await expect(page.getByText('oidc_no_role')).toBeHidden()
+  })
 })

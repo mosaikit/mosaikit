@@ -22,6 +22,7 @@ import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { useApi, useTenantCtx } from './core.ts'
+import { useTenantSignIn } from './signin.ts'
 import { LANGS, t } from './i18n.ts'
 import { ErrorBox, Loading, Locked, SaveBar } from './kit.tsx'
 
@@ -579,6 +580,8 @@ export function EmbeddingPanel({ level }: { level: Level }) {
 /** What the platform decides for the tenant: shown with the padlock. */
 export function ManagedPanel({ slug }: { slug: string }) {
   const q = useLevelSettings({ kind: 'tenant', slug })
+  // the sign-in method as the sign-in page shows it (public)
+  const method = useTenantSignIn(slug)
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
   const L = labels()
@@ -592,7 +595,11 @@ export function ManagedPanel({ slug }: { slug: string }) {
         <CardDescription>{t('The Administrator decides these for the tenant.')}</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3">
-        <Locked label={t('Sign-in method')} value={t('Local accounts of the tenant')} hint={t('Or an identity provider (OIDC), never both.')} />
+        <Locked
+          label={t('Sign-in method')}
+          value={method === 'oidc' ? t('Identity provider of the tenant (OIDC)') : t('Local accounts of the tenant')}
+          hint={method === 'oidc' ? t('People and passwords come from the provider: the Tenant Manager does not create local accounts.') : t('Or an identity provider (OIDC), never both.')}
+        />
         <Locked label={t('Top bar')} value={t('{n} of 5 items shown', { n: bandOn })} hint={t('The same for every tenant.')} />
         {locked.map((s) => (
           <Locked key={s.key} label={L[s.key]?.[0] ?? s.key} value={show(s.value)} hint={t('Tenants may not customize it.')} />

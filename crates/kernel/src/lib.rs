@@ -22,6 +22,7 @@ pub mod kpi;
 pub mod links;
 pub mod mail;
 pub mod notify;
+pub mod oidc;
 pub mod overview;
 pub mod plugins;
 pub mod secret;
@@ -178,6 +179,8 @@ pub struct Kernel {
     pub(crate) cookie_secret: Vec<u8>,
     /// encryption of the keys of outside services
     pub(crate) secrets: secret::SecretBox,
+    /// discovery documents and keys of the identity providers (OIDC)
+    pub(crate) oidc: oidc::Cache,
     embedded: tokio::sync::Mutex<Option<embedded::EmbeddedPg>>,
     /// reference to itself (calls between plugins from the WASM logic)
     me: std::sync::OnceLock<std::sync::Weak<Kernel>>,
@@ -252,6 +255,7 @@ impl Kernel {
             notify_rate: std::sync::Mutex::new(std::collections::HashMap::new()),
             cookie_secret,
             secrets,
+            oidc: oidc::Cache::default(),
             embedded: tokio::sync::Mutex::new(embedded),
             me: std::sync::OnceLock::new(),
             cfg,

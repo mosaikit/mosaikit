@@ -24,6 +24,7 @@ import { bandOf } from '../prefs.ts'
 import { AppMark } from '../Shell.tsx'
 import { PlatformTheme } from '../ThemeSettings.tsx'
 import { EmbeddingPanel, IdentityPanel, KeysPanel, LanguagesPanel, ModePanel, NotificationsPanel, SecurityPanel, ThemeSwitch } from '../SettingsPanels.tsx'
+import { SignInSettings } from '../SignInSettings.tsx'
 import { EmailPanel } from '../EmailPanel.tsx'
 import { t } from '../i18n.ts'
 
@@ -167,7 +168,8 @@ export function AdminTenant({ id, section }: { id: string; section?: string }) {
   const members = useApi<Member[]>(['admin-members', id], `/api/admin/tenants/${id}/members`)
   const confirm = useConfirm()
   const tn = tenants.data?.find((x) => x.id === id)
-  const cur = section === 'users' ? 'users' : 'details'
+  const cur = section === 'users' || section === 'sign-in' ? section : 'details'
+  const signIn = useApi<{ enabled: boolean }>(['admin-sign-in', id], `/api/admin/tenants/${id}/sign-in`)
   const toggle = async () => {
     const next = tn!.status === 'active' ? 'suspended' : 'active'
     if (next === 'active' || (await confirm(t('Suspend {name}? Its people will no longer be able to sign in.', { name: tn!.name }), true))) status.mutate(next)
@@ -196,6 +198,7 @@ export function AdminTenant({ id, section }: { id: string; section?: string }) {
         tabs={[
           { id: 'details', label: t('Details') },
           { id: 'users', label: t('Users and managers'), count: members.data?.length },
+          { id: 'sign-in', label: t('Sign-in') },
         ]}
         current={cur}
         href={(s) => to.adminTenant(id, s === 'details' ? undefined : s)}
@@ -206,7 +209,7 @@ export function AdminTenant({ id, section }: { id: string; section?: string }) {
           <Card className="max-w-2xl">
             <CardHeader>
               <CardTitle>{t('Tenant')}</CardTitle>
-              <CardDescription>{t('Sign-in with local accounts. Sign-in with an identity provider (OIDC) comes later.')}</CardDescription>
+              <CardDescription>{t('Name, identifier and contents of the tenant.')}</CardDescription>
             </CardHeader>
             <CardContent>
               <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
@@ -215,7 +218,11 @@ export function AdminTenant({ id, section }: { id: string; section?: string }) {
                 <dt className="text-muted-foreground">{t('Identifier')}</dt>
                 <dd className="font-mono">{tn.slug}</dd>
                 <dt className="text-muted-foreground">{t('Sign-in')}</dt>
-                <dd>{t('Local accounts')}</dd>
+                <dd>
+                  <a className="underline-offset-4 hover:underline" href={to.adminTenant(id, 'sign-in')}>
+                    {signIn.data?.enabled ? t('Identity provider (OIDC)') : t('Local accounts')}
+                  </a>
+                </dd>
                 <dt className="text-muted-foreground">{t('Items')}</dt>
                 <dd>
                   {tn.resources} · {fmtBytes(tn.bytes)}
@@ -225,6 +232,8 @@ export function AdminTenant({ id, section }: { id: string; section?: string }) {
               </dl>
             </CardContent>
           </Card>
+        ) : cur === 'sign-in' ? (
+          <SignInSettings id={id} />
         ) : (
           <TenantUsers id={id} q={members} />
         )}

@@ -123,37 +123,39 @@ function Security({ session }: { session: Session }) {
   const differ = pw.again.length > 0 && pw.again !== pw.new
   return (
     <div className="grid max-w-2xl gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('Change password')}</CardTitle>
-          <CardDescription>{admin ? t('The local password of the platform.') : t('The password of your home tenant: it also works in the tenants where you are a guest.')}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form className="grid gap-4" onSubmit={(e) => void save(e)}>
-            <div className="grid gap-1.5">
-              <Label htmlFor="pw-old">{t('Current password')}</Label>
-              <Input id="pw-old" type="password" autoComplete="current-password" required value={pw.old} onChange={(e) => setPw({ ...pw, old: e.target.value })} />
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="pw-new">{t('New password')}</Label>
-              <Input id="pw-new" type="password" autoComplete="new-password" minLength={min} required aria-describedby="pw-rule" value={pw.new} onChange={(e) => setPw({ ...pw, new: e.target.value })} />
-              {/* the rule next to the field, not after sending */}
-              <p id="pw-rule" className={cn('text-xs', short ? 'text-destructive' : 'text-muted-foreground')}>
-                {t('At least {n} characters, not all the same.', { n: min })}
-              </p>
-            </div>
-            <div className="grid gap-1.5">
-              <Label htmlFor="pw-again">{t('Repeat the new password')}</Label>
-              <Input id="pw-again" type="password" autoComplete="new-password" minLength={min} required aria-invalid={differ} value={pw.again} onChange={(e) => setPw({ ...pw, again: e.target.value })} />
-              {differ && <p className="text-xs text-destructive">{t('The two passwords do not match')}</p>}
-            </div>
-            <Button type="submit" disabled={busy || short || differ} className="justify-self-start">
-              {busy && <Loader2 className="animate-spin" />}
-              {t('Update password')}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+      {!session.external && (
+        <Card>
+          <CardHeader>
+            <CardTitle>{t('Change password')}</CardTitle>
+            <CardDescription>{admin ? t('The local password of the platform.') : t('The password of your home tenant: it also works in the tenants where you are a guest.')}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form className="grid gap-4" onSubmit={(e) => void save(e)}>
+              <div className="grid gap-1.5">
+                <Label htmlFor="pw-old">{t('Current password')}</Label>
+                <Input id="pw-old" type="password" autoComplete="current-password" required value={pw.old} onChange={(e) => setPw({ ...pw, old: e.target.value })} />
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="pw-new">{t('New password')}</Label>
+                <Input id="pw-new" type="password" autoComplete="new-password" minLength={min} required aria-describedby="pw-rule" value={pw.new} onChange={(e) => setPw({ ...pw, new: e.target.value })} />
+                {/* the rule next to the field, not after sending */}
+                <p id="pw-rule" className={cn('text-xs', short ? 'text-destructive' : 'text-muted-foreground')}>
+                  {t('At least {n} characters, not all the same.', { n: min })}
+                </p>
+              </div>
+              <div className="grid gap-1.5">
+                <Label htmlFor="pw-again">{t('Repeat the new password')}</Label>
+                <Input id="pw-again" type="password" autoComplete="new-password" minLength={min} required aria-invalid={differ} value={pw.again} onChange={(e) => setPw({ ...pw, again: e.target.value })} />
+                {differ && <p className="text-xs text-destructive">{t('The two passwords do not match')}</p>}
+              </div>
+              <Button type="submit" disabled={busy || short || differ} className="justify-self-start">
+                {busy && <Loader2 className="animate-spin" />}
+                {t('Update password')}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      )}
       <Card>
         <CardHeader>
           <CardTitle>{t('How you sign in')}</CardTitle>
@@ -161,6 +163,8 @@ function Security({ session }: { session: Session }) {
         <CardContent className="grid gap-3">
           {admin ? (
             <Locked label={t('Administrator access')} value={t('Local password and second factor (authenticator app)')} hint={t('To register the app again, ask another Administrator to reset the second factor.')} />
+          ) : session.external ? (
+            <Locked label={t('Sign-in method')} value={t('Identity provider of the tenant (OIDC)')} hint={t('Password and second factor are managed by the provider, not by Mosaikit.')} />
           ) : (
             <Locked label={t('Sign-in method')} value={t('Local account of the tenant')} hint={t('If the tenant moves to an identity provider (OIDC), you sign in there.')} />
           )}

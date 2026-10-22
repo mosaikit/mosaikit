@@ -335,7 +335,9 @@ pub struct ResetLink {
 /// A one-time link to choose a new password, valid 48 hours. It replaces the previous ones; the
 /// actor gives it to the person, and it is also sent by email when the account has an address.
 pub async fn reset_link(k: &Kernel, by: By<'_>, user: Uuid) -> Result<ResetLink> {
-    let (_, email, username) = check_account(k, by, user).await?;
+    let (home, email, username) = check_account(k, by, user).await?;
+    // the people of a tenant with an identity provider have no local password
+    crate::oidc::refuse_local_password(k, home).await?;
     let token = random_token(32);
     let expires_at = Utc::now() + Duration::hours(RESET_HOURS);
     let mut tx = k.db.begin_app().await?;
@@ -736,6 +738,12 @@ pub async fn move_home(k: &Kernel, admin: &SessionUser, user: Uuid, tenant: Uuid
     client_tenant(k, tenant).await?;
     if home == tenant {
         return Err(Error::bad("it is already the home tenant"));
+    }
+    // an account of an identity provider belongs to its tenant, and a tenant with a provider has no
+    // local accounts: neither can move
+    if crate::oidc::is_external(k, user).await? || crate::oidc::tenant_uses_oidc(k, tenant).await? {
+        return Err(Error::bad("the home tenant cannot change for the accounts of an identity provider")
+            .with_code("oidc_tenant"));
     }
     member_role(k, tenant, user)
         .await?

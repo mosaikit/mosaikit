@@ -29,6 +29,7 @@ base64.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 reqwest.workspace = true
+url.workspace = true
 rustls.workspace = true
 tokio-rustls.workspace = true
 webpki-roots.workspace = true

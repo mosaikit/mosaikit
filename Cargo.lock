@@ -1921,6 +1921,7 @@ dependencies = [
  "tokio-rustls",
  "toml 0.8.2",
  "tracing",
+ "url",
  "uuid",
  "wat",
  "webpki-roots",
@@ -1966,6 +1967,7 @@ name = "mosaikit-server"
 version = "1.0.0"
 dependencies = [
  "axum",
+ "base64 0.22.1",
  "clap",
  "futures-util",
  "hex",
@@ -1975,9 +1977,11 @@ dependencies = [
  "mosaikit-kernel",
  "mosaikit-mskp",
  "rand 0.8.8",
+ "reqwest",
  "rust-embed",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "sqlx",
  "tempfile",
  "tokio",
@@ -1985,6 +1989,7 @@ dependencies = [
  "tower",
  "tracing",
  "tracing-subscriber",
+ "url",
  "uuid",
  "zip",
 ]

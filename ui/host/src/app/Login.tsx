@@ -9,8 +9,8 @@
 
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Check, Contrast, Globe, KeyRound, LifeBuoy, Loader2, Moon, Sun } from 'lucide-react'
-import { api, errText, isUnavailable, setCsrf } from '../api.ts'
+import { Check, Contrast, Globe, KeyRound, LifeBuoy, Loader2, LogIn, Moon, Sun } from 'lucide-react'
+import { api, ApiError, errText, isUnavailable, setCsrf } from '../api.ts'
 import { retryDelay, useBrandState } from '../brand.ts'
 import type { LoginTenant, PendingLogin, Session, TotpSetup } from '../types.ts'
 import { Button } from '@/components/ui/button'
@@ -292,9 +292,18 @@ function TenantDoor({ initial, platformTheme, onEnter, onPick }: { initial: stri
   const [tenant, setTenant] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
+  // back from the identity provider with an error: `?oidc_error=<code>` before the hash
+  const [error, setError] = useState(() => {
+    const code = new URLSearchParams(window.location.search).get('oidc_error')
+    return code ? errText(new ApiError('', 0, code)) : ''
+  })
   const [busy, setBusy] = useState(false)
   const [remember, setRemember] = useState(false)
+
+  useEffect(() => {
+    // the code of the error is read once: a reload shows the clean page
+    if (window.location.search.includes('oidc_error=')) window.history.replaceState(null, '', window.location.pathname + window.location.hash)
+  }, [])
 
   useEffect(() => {
     let live = true
@@ -391,39 +400,47 @@ function TenantDoor({ initial, platformTheme, onEnter, onPick }: { initial: stri
               </Select>
             </Field>
           )}
-          <Field id="lu" label={t('Username')}>
-            <Input
-              id="lu"
-              autoComplete="username"
-              list="test-users"
-              value={username}
-              onChange={(e) => {
-                const v = e.target.value
-                setUsername(v)
-                const u = TEST_USERS.find((x) => x.username === v && (only || !tenant || x.tenant === tenant)) ?? TEST_USERS.find((x) => x.username === v)
-                if (u && tenants.some((x) => x.slug === u.tenant)) {
-                  setTenant(u.tenant)
-                  setPassword(u.password)
-                }
-              }}
-              required
-            />
-            <TestUsers id="test-users" users={TEST_USERS.filter((u) => tenants.some((x) => x.slug === u.tenant) && (only || !tenant || u.tenant === tenant))} />
-          </Field>
-          {TEST_USERS.length > 0 && <p className="-mt-2 text-xs text-muted-foreground">{t('Development: pick a test user in the Username field, the password fills in by itself.')}</p>}
-          <Field id="lp" label={t('Password')}>
-            <Input id="lp" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-          </Field>
+          {picked?.auth === 'oidc' ? (
+            <OidcButton tenant={picked} remember={remember && !!picked.remember} />
+          ) : (
+            <>
+              <Field id="lu" label={t('Username')}>
+                <Input
+                  id="lu"
+                  autoComplete="username"
+                  list="test-users"
+                  value={username}
+                  onChange={(e) => {
+                    const v = e.target.value
+                    setUsername(v)
+                    const u = TEST_USERS.find((x) => x.username === v && (only || !tenant || x.tenant === tenant)) ?? TEST_USERS.find((x) => x.username === v)
+                    if (u && tenants.some((x) => x.slug === u.tenant)) {
+                      setTenant(u.tenant)
+                      setPassword(u.password)
+                    }
+                  }}
+                  required
+                />
+                <TestUsers id="test-users" users={TEST_USERS.filter((u) => tenants.some((x) => x.slug === u.tenant) && (only || !tenant || u.tenant === tenant))} />
+              </Field>
+              {TEST_USERS.length > 0 && <p className="-mt-2 text-xs text-muted-foreground">{t('Development: pick a test user in the Username field, the password fills in by itself.')}</p>}
+              <Field id="lp" label={t('Password')}>
+                <Input id="lp" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
+              </Field>
+            </>
+          )}
           {picked?.remember && (
             <label className="-mt-1 flex items-center gap-2 text-sm">
               <Checkbox checked={remember} onCheckedChange={(on) => setRemember(on === true)} />
               {t('Remember me on this device')}
             </label>
           )}
-          <Button type="submit" size="lg" disabled={busy}>
-            {busy && <Loader2 className="animate-spin" />}
-            {t('Sign in')}
-          </Button>
+          {picked?.auth !== 'oidc' && (
+            <Button type="submit" size="lg" disabled={busy}>
+              {busy && <Loader2 className="animate-spin" />}
+              {t('Sign in')}
+            </Button>
+          )}
           <ErrorLine text={error} />
           <p className="-mt-2 text-xs text-muted-foreground">{t('Invited to other tenants? Sign in to your own, then switch from the top bar.')}</p>
         </form>
@@ -435,6 +452,22 @@ function TenantDoor({ initial, platformTheme, onEnter, onPick }: { initial: stri
         </a>
       </div>
     </>
+  )
+}
+
+/** The tenant signs in through its identity provider: the browser goes there and comes back signed in. */
+function OidcButton({ tenant, remember }: { tenant: LoginTenant; remember: boolean }) {
+  const name = tenant.button || t('your identity provider')
+  return (
+    <div className="grid gap-2">
+      <Button asChild size="lg">
+        <a href={`api/auth/oidc/${encodeURIComponent(tenant.slug)}/start${remember ? '?remember=1' : ''}`}>
+          <LogIn />
+          {t('Sign in with {name}', { name })}
+        </a>
+      </Button>
+      <p className="text-xs text-muted-foreground">{t('{tenant} signs in through its identity provider: the password is asked there, never by Mosaikit.', { tenant: tenant.name })}</p>
+    </div>
   )
 }
 

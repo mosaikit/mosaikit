@@ -8,6 +8,8 @@
 pub mod admin;
 pub(crate) mod api;
 mod auth;
+pub mod fake_idp;
+mod oidc_api;
 mod pages;
 mod people_api;
 mod ui;
@@ -74,7 +76,7 @@ async fn common_headers(req: axum::extract::Request, next: axum::middleware::Nex
 pub fn app_router(k: Arc<Kernel>) -> Router {
     let base = k.cfg.base_path.clone();
     let state = AppState { k };
-    let r = api::router().merge(ui::router()).with_state(state);
+    let r = api::router().merge(oidc_api::router()).merge(ui::router()).with_state(state);
     under_base(&base, r).layer(axum::middleware::from_fn(common_headers))
 }
 

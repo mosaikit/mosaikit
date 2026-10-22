@@ -9,6 +9,11 @@ license.workspace = true
 name = "mosaikit-server"
 path = "src/main.rs"
 
+# test identity provider (OIDC) for the e2e and the manual tests in the development environment
+[[bin]]
+name = "mosaikit-fake-idp"
+path = "src/bin/fake_idp.rs"
+
 [dependencies]
 mosaikit-kernel.workspace = true
 mosaikit-db.workspace = true
@@ -29,6 +34,10 @@ futures-util.workspace = true
 tokio-stream.workspace = true
 rand.workspace = true
 hex.workspace = true
+base64.workspace = true
+sha2.workspace = true
+url.workspace = true
+reqwest.workspace = true
 
 [dev-dependencies]
 http-body-util = "0.1"

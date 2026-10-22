@@ -228,6 +228,8 @@ async fn session_body(s: &AppState, user: &mosaikit_kernel::SessionUser) -> ApiR
     Ok(json!({
         "user": user,
         "csrf": user.csrf,
+        // signs in through the identity provider of the home tenant (no local password)
+        "external": mosaikit_kernel::oidc::is_external(&s.k, user.user_id).await?,
         "memberships": identity::memberships(&s.k, user).await?,
         "invitations": tenancy::my_invitations(&s.k, user).await?.len(),
         "plugin_origin": s.k.cfg.plugin_origin(),
@@ -319,9 +321,12 @@ async fn totp_verify(
     logged_in(&s, lr, json!({})).await
 }
 
+/// Sign-out. For a person of a tenant that signs in through its provider, `end_session` is where to
+/// send the browser to sign out of the provider too (if it has an end-session endpoint).
 async fn logout(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Response> {
+    let end_session = mosaikit_kernel::oidc::end_session_url(&s.k, &u).await;
     identity::logout(&s.k, &u).await?;
-    let mut res = ok().into_response();
+    let mut res = Json(json!({ "ok": true, "end_session": end_session })).into_response();
     res.headers_mut().insert(header::SET_COOKIE, session_cookie(&s, None));
     Ok(res)
 }

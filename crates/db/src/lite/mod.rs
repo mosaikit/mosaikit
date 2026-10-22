@@ -37,6 +37,7 @@ const MIGRATIONS: &[(i64, &str, &str)] = &[
     (3, "service_keys", include_str!("0003_service_keys.sql")),
     (4, "notifications", include_str!("0004_notifications.sql")),
     (5, "people", include_str!("0005_people.sql")),
+    (6, "oidc", include_str!("0006_oidc.sql")),
 ];
 
 /// Context of the transaction on the connection (read by `core_ctx_*()`).
@@ -783,7 +784,13 @@ fn authorize(prefix: &str, a: &AuthContext<'_>) -> Authorization {
         AuthAction::Read { table_name, column_name } => {
             let secret_table = matches!(
                 table_name,
-                "core_secrets" | "core_sessions" | "core_tickets" | "core_migrations" | "core_service_keys"
+                "core_secrets"
+                    | "core_sessions"
+                    | "core_tickets"
+                    | "core_migrations"
+                    | "core_service_keys"
+                    | "core_tenant_oidc"
+                    | "core_user_identities"
             );
             let secret_col = matches!(
                 column_name,

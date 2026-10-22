@@ -4,8 +4,9 @@
 //! (as in production), server under the base path `/mosaikit`, Playwright.
 //!
 //! Several checkouts (worktrees) can run their suites at the same time: each one has its own
-//! database (`mosaikit_e2e` plus the folder name of the checkout) and takes the first free pair of
-//! ports from 18080/18081 (in steps of 10), or `MOSAIKIT_E2E_PORT` and the next one.
+//! database (`mosaikit_e2e` plus the folder name of the checkout) and takes the first free ports
+//! from 18080 (in steps of 10), or `MOSAIKIT_E2E_PORT`: the app, the plugins on the next one and
+//! the test identity provider (`mosaikit-fake-idp`, OIDC) on the one after.
 
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
@@ -49,8 +50,8 @@ fn db_name() -> String {
     }
 }
 
-/// The app port of this run (the plugins use the next one): `MOSAIKIT_E2E_PORT`, or the first pair
-/// free on 127.0.0.1 among 18080, 18090, 18100…
+/// The app port of this run (the plugins use the next one, the test identity provider the one after):
+/// `MOSAIKIT_E2E_PORT`, or the first three free on 127.0.0.1 among 18080, 18090, 18100…
 fn ports() -> Result<u16> {
     if let Some(p) = std::env::var("MOSAIKIT_E2E_PORT").ok().and_then(|p| p.parse().ok()) {
         return Ok(p);
@@ -58,8 +59,8 @@ fn ports() -> Result<u16> {
     let free = |p: u16| std::net::TcpListener::bind(("127.0.0.1", p)).is_ok();
     (0..20)
         .map(|i| 18080 + i * 10)
-        .find(|&p| free(p) && free(p + 1))
-        .context("no free pair of ports from 18080 to 18271")
+        .find(|&p| free(p) && free(p + 1) && free(p + 2))
+        .context("no three free ports from 18080 to 18272")
 }
 
 fn reset_db(db: &str) -> Result<()> {
@@ -130,20 +131,29 @@ pub fn e2e(headed: bool) -> Result<()> {
         .stdout(Stdio::from(std::fs::File::create(dir.join("server.log"))?))
         .stderr(Stdio::from(std::fs::File::create(dir.join("server.err.log"))?))
         .spawn()?;
+    let idp_port = port + 2;
+    let mut idp = Command::new(plugins::target_dir().join("debug").join(exe("mosaikit-fake-idp")))
+        .args(["--port", &idp_port.to_string()])
+        .stdout(Stdio::from(std::fs::File::create(dir.join("idp.log"))?))
+        .stderr(Stdio::from(std::fs::File::create(dir.join("idp.err.log"))?))
+        .spawn()?;
     let result = (|| -> Result<()> {
         wait_health(&format!("http://127.0.0.1:{port}/mosaikit/api/health"))?;
+        wait_health(&format!("http://127.0.0.1:{idp_port}/.well-known/openid-configuration"))?;
         let mut cmd = npm();
         cmd.current_dir(root())
             .args(["run", "e2e", "-w", "e2e"])
             .env("E2E_ADMIN_PASSWORD", ADMIN_PASSWORD)
             .env("E2E_BASE_URL", format!("http://127.0.0.1:{port}/mosaikit/"))
-            .env("E2E_PLUGIN_ORIGIN", format!("http://127.0.0.1:{}", port + 1));
+            .env("E2E_PLUGIN_ORIGIN", format!("http://127.0.0.1:{}", port + 1))
+            .env("E2E_IDP_URL", format!("http://127.0.0.1:{idp_port}"));
         if headed {
             cmd.env("E2E_HEADED", "1");
         }
         run(&mut cmd)
     })();
     kill_tree(&mut server);
+    kill_tree(&mut idp);
     if result.is_err() {
         eprintln!("server log: {}", dir.join("server.err.log").display());
     }

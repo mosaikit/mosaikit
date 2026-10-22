@@ -28,6 +28,7 @@ import { go, to } from '../router.ts'
 import { effectiveMode, useTheme } from '../theme.ts'
 import AppIcon from '../AppIcon.tsx'
 import { TenantTheme } from '../ThemeSettings.tsx'
+import { useTenantSignIn } from '../signin.ts'
 import { LinkDialog, ProfilesSection, RequestsTable } from './people.tsx'
 import { EmbeddingPanel, IdentityPanel, KeysPanel, LanguagesPanel, ManagedPanel, ModePanel, NotificationsPanel, SecurityPanel } from '../SettingsPanels.tsx'
 
@@ -165,6 +166,7 @@ export function PluginPage({ session, slug, id, at }: { session: Session; slug: 
 
 export function Manage({ slug, section }: { slug: string; section?: string }) {
   const pwMin = passwordMin(useConfig(slug))
+  const oidc = useTenantSignIn(slug) === 'oidc'
   const base = `/api/t/${enc(slug)}/manage`
   const members = useApi<Member[]>(['members', slug], `${base}/members`)
   const groups = useApi<Group[]>(['groups', slug], `${base}/groups`)
@@ -195,7 +197,8 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
         <Plus />
         {t('New profile')}
       </Button>
-    ) : cur === 'people' ? (
+    ) : cur === 'people' && !oidc ? (
+      // with an identity provider the people come from the provider, at their first sign-in
       <Button onClick={() => setDlg('member')}>
         <Plus />
         {t('New user')}
@@ -299,6 +302,7 @@ type Q<T> = { data?: T; isLoading: boolean; error: unknown }
 
 function People({ slug, q, profiles, groups }: { slug: string; q: Q<Member[]>; profiles: Profile[]; groups: Group[] }) {
   const pwMin = passwordMin(useConfig(slug))
+  const oidc = useTenantSignIn(slug) === 'oidc'
   const base = `/api/t/${enc(slug)}/manage/members`
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState('')
@@ -475,13 +479,13 @@ function People({ slug, q, profiles, groups }: { slug: string; q: Q<Member[]>; p
                         <ShieldCheck />
                         {m.role === 'user' ? t('Make Tenant Manager') : t('Make User')}
                       </DropdownMenuItem>
-                      {!m.is_guest && (
+                      {!m.is_guest && !oidc && (
                         <DropdownMenuItem onSelect={() => sendLink.mutate(m, { onSuccess: (l) => setLink({ name: m.display_name || m.username, link: l as ResetLink }) })}>
                           <Link2 />
                           {t('Send the password link')}
                         </DropdownMenuItem>
                       )}
-                      {!m.is_guest && (
+                      {!m.is_guest && !oidc && (
                         <DropdownMenuItem onSelect={() => setPwFor(m)}>
                           <KeyRound />
                           {t('Reset the password')}

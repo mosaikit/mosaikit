@@ -39,8 +39,10 @@ const TENANT_INFO_SQL: &str = "
 pub struct LoginTenant {
     pub slug: String,
     pub name: String,
-    /// sign-in method: "local" (username and password)
+    /// sign-in method: "local" (username and password) or "oidc" (the identity provider of the tenant)
     pub auth: &'static str,
+    /// text of the button of the identity provider ("" for the default one)
+    pub button: String,
     /// theme in use: the one the Tenant Manager chose, otherwise the one of the platform (the
     /// sign-in page switches to it as soon as the tenant is known)
     pub theme: String,
@@ -63,10 +65,11 @@ pub struct LoginTenant {
 /// system tenant has a sign-in of its own.
 pub async fn login_tenants(k: &Kernel) -> Result<Vec<LoginTenant>> {
     let rows = mosaikit_db::query(
-        "select slug, name, settings from core.tenants where status = 'active' and not is_system order by name",
+        "select slug, name, settings, id from core.tenants where status = 'active' and not is_system order by name",
     )
     .fetch_all(&k.db)
     .await?;
+    let oidc = crate::oidc::login_methods(k).await?;
     let platform = super::levels::system_settings(k).await?;
     let defaults = super::levels::Defaults::of(k);
     Ok(rows
@@ -75,13 +78,15 @@ pub async fn login_tenants(k: &Kernel) -> Result<Vec<LoginTenant>> {
             let own: Option<serde_json::Value> = r.get(2);
             let own = own.filter(serde_json::Value::is_object).unwrap_or_else(|| serde_json::json!({}));
             let name: String = r.get(1);
+            let button = oidc.get(&r.get::<Uuid, _>(3));
             let v = super::levels::values(&super::levels::tenant_view(&platform, &own, &name, &defaults));
             let text =
                 |key: &str| v.get(key).and_then(serde_json::Value::as_str).unwrap_or_default().to_string();
             LoginTenant {
                 slug: r.get(0),
                 name: text("identity.name"),
-                auth: "local",
+                auth: if button.is_some() { "oidc" } else { "local" },
+                button: button.cloned().unwrap_or_default(),
                 theme: text("theme"),
                 logo_light: v.get("identity.logo_light").is_some_and(|x| !x.is_null()),
                 logo_dark: v.get("identity.logo_dark").is_some_and(|x| !x.is_null()),

@@ -23,6 +23,8 @@ export interface Membership {
 export interface Session {
   user: User
   csrf: string
+  /** signs in through the identity provider of the home tenant: no local password (recent servers) */
+  external?: boolean
   memberships: Membership[]
   invitations: number
   plugin_origin: string
@@ -474,7 +476,10 @@ export interface AdminUser {
 export interface LoginTenant {
   slug: string
   name: string
-  auth: 'local'
+  /** sign-in method: username and password, or the identity provider of the tenant (OIDC) */
+  auth: 'local' | 'oidc'
+  /** text of the button of the identity provider ("" = the default one) */
+  button?: string
   /** theme in use for the tenant: its own or the one of the platform (recent servers) */
   theme?: string
   /** identity of the tenant on its sign-in page (recent servers) */

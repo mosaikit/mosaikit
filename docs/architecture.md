@@ -12,6 +12,7 @@ development and release. The choices described here replace the initial PoC
 3. [Tenants, users and roles](#3-tenants-users-and-roles)
    - [3.1 Settings on three levels](#31-settings-on-three-levels)
    - [3.2 People and permissions](#32-people-and-permissions)
+   - [3.3 Sign-in through an identity provider (OIDC)](#33-sign-in-through-an-identity-provider-oidc)
 4. [Resources, ownership and sharing](#4-resources-ownership-and-sharing)
 5. [Public links](#5-public-links)
    - [5.1 Notifications](#51-notifications)
@@ -257,6 +258,73 @@ Administrator (`/api/admin/people/{id}…`): profile, sessions (closed one by on
 only for the accounts whose home is their tenant), the latest events, and for the manager the
 permissions in every plugin with their sources and the explanation of why the person does or does not
 see an item (`…/why?resource=<id>`: account, membership, `use` of the plugin, owner, shares).
+
+### 3.3 Sign-in through an identity provider (OIDC)
+
+A tenant signs in **either** with local accounts **or** with its identity provider (OpenID Connect:
+Keycloak, Entra ID, the IdP of the customer), never both. The Administrator decides it on the page of
+the tenant (Tenants › a tenant › Sign-in); the Tenant Manager sees it read-only in Managed by the
+platform. Administrators always sign in with their local password and second factor.
+
+**Configuration** (`core.tenant_oidc`, one row per tenant, `/api/admin/tenants/{id}/sign-in`): issuer,
+client id, client secret (encrypted with the secret key of the installation, §10; only the last four
+characters go back to the browser), scopes (with `openid`), text of the button, where the roles come
+from, the groups of the Tenant Managers and of the Users, the names of the claims (username, name,
+email, groups). The page shows the addresses to register in the provider: return address
+`<url>/api/auth/oidc/<tenant>/callback`, back-channel logout `<url>/api/auth/oidc/<tenant>/backchannel-logout`,
+address after the sign-out `<url>/`. **Check the configuration** (`POST /api/admin/oidc/check`) reads the
+discovery document and the keys as a sign-in would and says what is missing (PKCE S256, keys RS256 or
+ES256, end-session endpoint, back-channel logout). Addresses of a provider must be `https`, plain
+`http` only on this computer (development and tests).
+
+**Flow** (authorization code with PKCE):
+
+1. `GET /api/auth/oidc/<tenant>/start` reads the discovery document (cached one hour), creates
+   `state`, `nonce` and the PKCE verifier and keeps them in an encrypted cookie `msk_oidc`
+   (`HttpOnly; SameSite=Lax`, 10 minutes, path `/api/auth/oidc/`): the flow is bound to the browser
+   that started it, nothing is stored on the server. `Lax` because the return from the provider is a
+   top-level navigation from another site, which a `Strict` cookie would not survive.
+2. The provider authenticates the person and sends the browser back with `code` and `state`
+   (and `iss`, RFC 9207, checked when present).
+3. `GET …/callback` checks `state` against the cookie, exchanges the code at the token endpoint
+   (client secret with HTTP Basic, or in the body if the provider asks so, plus the PKCE verifier) and
+   checks the ID token: signature RS256 or ES256 with the keys of `jwks_uri` (an unknown `kid` fetches
+   the keys again: rotation; not again for 30 s after that, so the provider is not hammered), `iss`,
+   `aud` (and `azp` with several audiences), `exp` and `iat` (one minute of tolerance), `nonce`, `sub`.
+   `alg: none`, HMAC and other curves are refused.
+4. The person is found by **tenant, issuer and `sub`** (`core.user_identities`), never by the email.
+   At the first sign-in the account is created in the tenant (username from the claim, made unique;
+   no local password). Name and email follow the provider at every sign-in.
+5. The session is the same as a local sign-in (`msk_session`, length and "remember me" of the tenant);
+   the browser lands on `#/t/<tenant>`. On any error it goes back to `#/login/<tenant>` with
+   `?oidc_error=<code>` (`oidc_state`, `oidc_token`, `oidc_provider`, `oidc_denied`, `oidc_no_role`,
+   `oidc_disabled`), which the sign-in page translates.
+
+**Roles, one source per tenant.** *Mosaikit*: the provider only says who the person is; everybody
+starts as User and the Tenant Manager gives roles. *Groups of the provider*: at every sign-in the
+groups claim decides — a group of the Tenant Managers gives Tenant Manager, otherwise a group of the
+Users (or any group, if that list is empty) gives User, otherwise the sign-in is refused
+(`oidc_no_role`). When a tenant moves to its provider, its local accounts (the first Tenant Manager
+too) can no longer sign in: with roles in Mosaikit the Administrator gives the Tenant Manager role to a
+person of the provider after their first sign-in.
+
+**Local features turned off** in an OIDC tenant: local sign-in (`oidc_tenant`), creation of people
+with a password, change and reset of passwords, password links, moving the home tenant of an account
+of the provider. Guests from other tenants sign in with their own tenant, as before.
+
+**Sign-out and revocation.** `POST /api/auth/logout` answers `end_session` for a person of the provider:
+the shell sends the browser to the end-session endpoint (`client_id`, `post_logout_redirect_uri`).
+The provider closes sessions with the **back-channel logout** (`POST …/backchannel-logout`,
+`logout_token`): signature, `iss`, `aud`, `iat` within 10 minutes, the back-channel event, no `nonce`,
+`jti` used once; with `sid` it closes that session of the provider (kept in `core.sessions.oidc_sid`),
+with `sub` every session of the person.
+
+**Implementation.** A small client on `ring` and `reqwest`, already in the tree (`crates/kernel/src/oidc`),
+rather than a general OIDC library: Mosaikit needs one flow and two signature algorithms, and every check
+is in one module next to its tests. **Test provider**: `mosaikit-fake-idp`
+(`crates/server/src/fake_idp.rs`), started by the tests in-process and by `cargo xtask e2e`; for manual
+tests `cargo run -p mosaikit-server --bin mosaikit-fake-idp` (port 5556, client `mosaikit`, secret
+`fake-secret`). It has no passwords: never in production.
 
 ## 4. Resources, ownership and sharing
 
@@ -934,14 +1002,9 @@ Mosaikit refers to no distribution.
 
 ## 15. Known limits and next steps
 
-- **OIDC per tenant** (Keycloak or the IdP of the customer): not implemented yet;
-  today the sign-in of the tenants is local (argon2id). The sign-in page
-  already receives the method of every tenant (`auth`). To define: configuration
-  per tenant (issuer, client, encrypted secret, claims), external identities
-  (issuer + `sub`, never linked by email), creation at the first sign-in, a
-  single source of the roles per tenant (Mosaikit or groups of the IdP), revocation
-  (back-channel logout) and local functions to turn off in the OIDC tenants. The
-  Administrators always stay local.
+- **OIDC**: the groups of the provider give roles, not the groups of Mosaikit (no sync of groups);
+  no front-channel logout; the ID token is not kept, so the end-session request carries `client_id`
+  instead of `id_token_hint`.
 - **Subdomains per plugin**: all the plugin UIs share the untrusted
   origin; a subdomain per plugin would also isolate the plugins from each other.
 - **S3 storage** for the blobs: today the filesystem only.
