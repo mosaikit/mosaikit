@@ -13,7 +13,7 @@ cargo-audit 0.22.2 (advisory database of 2026-10-23) and `npm audit`.
 | zip 2.6.1: RUSTSEC-2026-0367, -0368, -0369 | **not applicable**: they concern `ZipArchive::extract`, never called; exception documented, upgrade to zip ≥ 9 recommended |
 | `npm audit`: root workspace (ui/host, ui/plugin-api, e2e) | **0 vulnerabilities** |
 | `npm audit`: ../mosaikit-plugins (read only) | **0 vulnerabilities** |
-| Desktop release build | see [Release](#release) |
+| Desktop release build | **built**, starts headless and serves `/api/health` (see [Release](#release)) |
 
 ## Rust advisories
 
@@ -61,5 +61,15 @@ npm: everything at the latest major; only patch releases of `i18next` (26.5.6) a
 
 ## Release
 
-Desktop release built with `cargo xtask release desktop` in the worktree (release profile, thin LTO).
-The result and the start-up check are recorded below.
+`cargo xtask release desktop` in the worktree (release profile, thin LTO): **built**.
+
+| Check | Result |
+|---|---|
+| Bundle | `mosaikit-1.0.0-desktop-windows-x86_64`: 34 MB folder, 13 MB zip, `SHA256SUMS`; executable, commented configuration, branding, signed plugins and registry, `START.txt` |
+| Start without the browser (`MOSAIKIT_OPEN_BROWSER=false`, no tray interaction) | listening on 48080/48081 within 2 s |
+| `GET /api/health` | `200 {"ok":true,"dev":false,"version":"1.0.0"}` |
+| Host page | `200`, CSP without inline scripts |
+| Plugin UI (Notes) | `200`, `script-src` limited to `/ui/com.mosaikit.notes/` (fix M3 of the security review) |
+| Sign-in of the first-start account (`locale` / `utente`) | `200` |
+
+The process was stopped and the release output deleted afterwards (`dist/` is not tracked).
