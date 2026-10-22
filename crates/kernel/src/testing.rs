@@ -149,6 +149,7 @@ pub async fn start_with(f: impl FnOnce(&mut Config)) -> TestKernel {
         database,
         // the second factor has its own tests (identity_tenancy)
         admin_totp: false,
+        no_background: true,
         ..Config::default()
     };
     f(&mut cfg);
@@ -225,5 +226,78 @@ impl TestKernel {
     /// Caller in the home tenant.
     pub async fn home(&self, user: &SessionUser) -> Caller {
         self.caller(user, &user.home_tenant_slug.clone()).await
+    }
+}
+
+/// A mail server for the tests: accepts every message (EHLO, AUTH, MAIL, RCPT, DATA) and keeps it.
+pub struct FakeSmtp {
+    pub port: u16,
+    /// the messages received: (recipient, whole message with the headers)
+    pub mails: Arc<std::sync::Mutex<Vec<(String, String)>>>,
+}
+
+impl FakeSmtp {
+    pub async fn start() -> FakeSmtp {
+        use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.expect("fake smtp");
+        let port = listener.local_addr().expect("address").port();
+        let mails: Arc<std::sync::Mutex<Vec<(String, String)>>> = Arc::default();
+        let store = mails.clone();
+        tokio::spawn(async move {
+            while let Ok((sock, _)) = listener.accept().await {
+                let store = store.clone();
+                tokio::spawn(async move {
+                    let (r, mut w) = sock.into_split();
+                    let mut r = BufReader::new(r);
+                    let _ = w.write_all(b"220 fake ESMTP\r\n").await;
+                    let mut to = String::new();
+                    let mut line = String::new();
+                    loop {
+                        line.clear();
+                        if r.read_line(&mut line).await.unwrap_or(0) == 0 {
+                            break;
+                        }
+                        let cmd = line.trim_end().to_ascii_uppercase();
+                        let answer: &[u8] = if cmd.starts_with("EHLO") {
+                            b"250-fake\r\n250 AUTH PLAIN\r\n"
+                        } else if cmd.starts_with("AUTH") {
+                            b"235 ok\r\n"
+                        } else if cmd.starts_with("RCPT TO:") {
+                            to = line.trim_end()[8..]
+                                .trim_matches(|c| c == '<' || c == '>' || c == ' ')
+                                .to_string();
+                            b"250 ok\r\n"
+                        } else if cmd == "DATA" {
+                            let _ = w.write_all(b"354 go\r\n").await;
+                            let mut msg = String::new();
+                            loop {
+                                line.clear();
+                                if r.read_line(&mut line).await.unwrap_or(0) == 0 || line.trim_end() == "." {
+                                    break;
+                                }
+                                msg.push_str(&line);
+                            }
+                            store.lock().expect("mails").push((to.clone(), msg));
+                            b"250 queued\r\n"
+                        } else if cmd == "QUIT" {
+                            let _ = w.write_all(b"221 bye\r\n").await;
+                            break;
+                        } else {
+                            b"250 ok\r\n"
+                        };
+                        let _ = w.write_all(answer).await;
+                    }
+                });
+            }
+        });
+        FakeSmtp { port, mails }
+    }
+
+    /// The text of a message received (the body is base64).
+    pub fn text(message: &str) -> String {
+        use base64::Engine;
+        let body = message.split("\r\n\r\n").nth(1).unwrap_or_default().replace("\r\n", "");
+        String::from_utf8(base64::engine::general_purpose::STANDARD.decode(body).unwrap_or_default())
+            .unwrap_or_default()
     }
 }

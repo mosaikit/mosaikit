@@ -192,6 +192,15 @@ pub async fn set_grant(
     }
     match level {
         Some(l) if l > Level::None => {
+            let new: bool = mosaikit_db::query_scalar(
+                "select not exists (select 1 from core.grants
+                                    where resource_id = $1 and principal_type = $2 and principal_id = $3)",
+            )
+            .bind(rid)
+            .bind(principal_type)
+            .bind(principal_id)
+            .fetch_one(&k.db)
+            .await?;
             mosaikit_db::query(
                 "insert into core.grants (resource_id, principal_type, principal_id, level, granted_by)
                  values ($1, $2, $3, $4, $5)
@@ -205,6 +214,9 @@ pub async fn set_grant(
             .bind(c.user.user_id)
             .execute(&k.db)
             .await?;
+            if new {
+                crate::notify::shared(k, c, rid, &m.plugin_id, &m.title, principal_type, principal_id).await;
+            }
         }
         _ => {
             mosaikit_db::query("delete from core.grants where resource_id = $1 and principal_type = $2 and principal_id = $3")

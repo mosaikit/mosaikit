@@ -1909,6 +1909,7 @@ dependencies = [
  "rand 0.8.8",
  "reqwest",
  "ring",
+ "rustls",
  "serde",
  "serde_json",
  "sha1",
@@ -1917,10 +1918,12 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "tokio",
+ "tokio-rustls",
  "toml 0.8.2",
  "tracing",
  "uuid",
  "wat",
+ "webpki-roots",
  "zip",
 ]
 

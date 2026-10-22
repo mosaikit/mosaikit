@@ -19,6 +19,8 @@ mod host;
 pub mod identity;
 pub mod kpi;
 pub mod links;
+pub mod mail;
+pub mod notify;
 pub mod overview;
 pub mod plugins;
 pub mod secret;
@@ -166,6 +168,11 @@ pub struct Kernel {
     pub(crate) argon: Arc<Semaphore>,
     pub http: reqwest::Client,
     pub dev_events: broadcast::Sender<DevEvent>,
+    /// live events of the notifications, for the open sessions (`/api/me/stream`)
+    pub live: broadcast::Sender<notify::Live>,
+    /// notifications sent by the plugins in the last minute, per person and plugin
+    pub(crate) notify_rate:
+        std::sync::Mutex<std::collections::HashMap<(Uuid, String), Vec<std::time::Instant>>>,
     /// secret for signed cookies (unlocking password-protected links)
     pub(crate) cookie_secret: Vec<u8>,
     /// encryption of the keys of outside services
@@ -225,6 +232,7 @@ impl Kernel {
         };
         let trusted = mosaikit_mskp::TrustedKeys::from_b64(&cfg.trusted_keys)?;
         let (dev_events, _) = broadcast::channel(64);
+        let (live, _) = broadcast::channel(256);
         let kernel = Arc::new(Kernel {
             blobs: blobs::Blobs::new(cfg.data_dir.join("blobs")),
             brand,
@@ -239,6 +247,8 @@ impl Kernel {
                 .build()
                 .map_err(|e| Error::internal(e.to_string()))?,
             dev_events,
+            live,
+            notify_rate: std::sync::Mutex::new(std::collections::HashMap::new()),
             cookie_secret,
             secrets,
             embedded: tokio::sync::Mutex::new(embedded),
@@ -259,6 +269,9 @@ impl Kernel {
             plugins::registry::preinstall(&kernel).await?;
         }
         blobs::gc(&kernel).await;
+        if !kernel.cfg.no_background {
+            mail::spawn_worker(&kernel);
+        }
         Ok(kernel)
     }
 

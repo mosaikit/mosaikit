@@ -73,6 +73,10 @@ pub struct Config {
     #[serde(default)]
     pub dev: DevConfig,
 
+    /// no background work (queue of the emails, digest, retention): the tests run it by hand
+    #[serde(skip)]
+    pub no_background: bool,
+
     // ---- derived values (not in the file)
     /// URL of the app without trailing `/`
     #[serde(skip)]

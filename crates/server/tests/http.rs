@@ -947,3 +947,175 @@ async fn remember_me_and_embedding_of_public_pages() {
     let r = a.call(Some(&m), Method::PUT, "/api/t/alfa/manage/config", Some(evil)).await;
     assert_eq!(r.status, StatusCode::BAD_REQUEST);
 }
+
+#[tokio::test]
+async fn notifications_over_http() {
+    let a = App::new().await;
+    a.t.install("notes").await;
+    let g = a.t.tenant("alfa").await;
+    a.t.member(&g, "anna").await;
+    let bruno_user = a.t.member(&g, "bruno").await;
+    let anna = a.login("alfa", "anna", PASSWORD).await;
+    let bruno = a.login("alfa", "bruno", PASSWORD).await;
+
+    // the live stream starts with the number of unread notifications
+    let req = Request::builder()
+        .uri("/api/me/stream")
+        .header(header::COOKIE, &bruno.cookie)
+        .body(Body::empty())
+        .unwrap();
+    let res = a.app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    assert!(res.headers()[header::CONTENT_TYPE].to_str().unwrap().starts_with("text/event-stream"));
+    let mut body = res.into_body();
+    let first = tokio::time::timeout(std::time::Duration::from_secs(5), body.frame())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    let text = String::from_utf8_lossy(first.data_ref().unwrap()).into_owned();
+    assert!(text.contains("\"event\":\"count\"") && text.contains("\"unread\":0"), "{text}");
+
+    // Anna shares a note with Bruno: a notification, also on the stream
+    let r = a
+        .call(
+            Some(&anna),
+            Method::POST,
+            "/api/t/alfa/p/com.mosaikit.notes/r/notes",
+            Some(json!({ "values": { "title": "Plan" } })),
+        )
+        .await;
+    let rid = r.json()["id"].as_str().unwrap().to_string();
+    let r = a
+        .call(
+            Some(&anna),
+            Method::PUT,
+            &format!("/api/t/alfa/resources/{rid}/grants"),
+            Some(json!({ "principal_type": "user", "principal_id": bruno_user.user_id, "level": "read" })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let next = tokio::time::timeout(std::time::Duration::from_secs(5), body.frame())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+    let text = String::from_utf8_lossy(next.data_ref().unwrap()).into_owned();
+    assert!(text.contains("\"event\":\"notification\"") && text.contains("\"unread\":1"), "{text}");
+
+    let list = a.call(Some(&bruno), Method::GET, "/api/me/notifications?unread=true&kind=share", None).await;
+    assert_eq!(list.status, StatusCode::OK, "{}", list.text());
+    let list = list.json();
+    assert_eq!(list["unread"], 1);
+    let id = list["items"][0]["id"].as_str().unwrap().to_string();
+    assert_eq!(list["items"][0]["data"]["code"], "share.received");
+    assert_eq!(
+        a.call(Some(&anna), Method::GET, "/api/me/notifications", None).await.json()["items"],
+        json!([])
+    );
+    // Anna cannot touch the notification of Bruno
+    let r =
+        a.call(Some(&anna), Method::POST, "/api/me/notifications/read", Some(json!({ "ids": [id] }))).await;
+    assert_eq!(r.json()["changed"], 0);
+    let r =
+        a.call(Some(&bruno), Method::POST, "/api/me/notifications/read", Some(json!({ "ids": [id] }))).await;
+    assert_eq!((r.json()["changed"].clone(), r.json()["unread"].clone()), (json!(1), json!(0)));
+    assert_eq!(
+        a.call(Some(&bruno), Method::GET, "/api/me/notifications/count", None).await.json()["unread"],
+        0
+    );
+
+    // preferences, with the email address
+    let r = a
+        .call(
+            Some(&bruno),
+            Method::PUT,
+            "/api/me/notifications/prefs",
+            Some(json!({ "address": "nope", "mode": "immediate" })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST);
+    assert_eq!(r.json()["code"], "email_invalid");
+    let r = a
+        .call(
+            Some(&bruno),
+            Method::PUT,
+            "/api/me/notifications/prefs",
+            Some(json!({ "address": "bruno@example.org", "mode": "off", "kinds": { "share": false } })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let p = a.call(Some(&bruno), Method::GET, "/api/me/notifications/prefs", None).await.json();
+    assert_eq!((p["mode"].clone(), p["address"].clone()), (json!("off"), json!("bruno@example.org")));
+
+    // a plugin notifies the person using it; an invalid place is refused
+    let r = a
+        .call(
+            Some(&anna),
+            Method::POST,
+            "/api/t/alfa/p/com.mosaikit.notes/notify",
+            Some(json!({ "title": "Saved", "at": "notes/1" })),
+        )
+        .await;
+    assert_eq!((r.status, r.json()["sent"].clone()), (StatusCode::OK, json!(1)));
+    let r = a
+        .call(
+            Some(&anna),
+            Method::POST,
+            "/api/t/alfa/p/com.mosaikit.notes/notify",
+            Some(json!({ "title": "x", "at": "<b>" })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST);
+    let r = a
+        .call(
+            Some(&anna),
+            Method::POST,
+            "/api/t/alfa/p/com.mosaikit.notes/notify",
+            Some(json!({ "title": "To all", "resource": rid })),
+        )
+        .await;
+    assert_eq!(r.json()["sent"], 1, "Bruno can see the note");
+    let mine = a.call(Some(&anna), Method::GET, "/api/me/notifications", None).await.json();
+    let ids: Vec<Value> = mine["items"].as_array().unwrap().iter().map(|x| x["id"].clone()).collect();
+    let r =
+        a.call(Some(&anna), Method::POST, "/api/me/notifications/delete", Some(json!({ "ids": ids }))).await;
+    assert_eq!(r.json()["deleted"], 1);
+    let r = a.call(Some(&bruno), Method::POST, "/api/me/notifications/read-all", None).await;
+    assert_eq!(r.status, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn email_of_the_platform_over_http() {
+    let a = App::new().await;
+    let fake = mosaikit_kernel::testing::FakeSmtp::start().await;
+    let admin = a.admin().await;
+    a.t.tenant("alfa").await;
+    let g = a.login("alfa", "alfa-manager", PASSWORD).await;
+    assert_eq!(a.call(Some(&g), Method::GET, "/api/admin/email", None).await.status, StatusCode::FORBIDDEN);
+    let r = a
+        .call(Some(&admin), Method::POST, "/api/admin/email/test", Some(json!({ "to": "p@example.org" })))
+        .await;
+    assert_eq!(r.json()["code"], "email_not_configured");
+    let r = a
+        .call(
+            Some(&admin),
+            Method::PUT,
+            "/api/admin/email",
+            Some(json!({ "host": "127.0.0.1", "port": fake.port, "security": "none", "username": "robot",
+                         "sender": "Mosaikit <noreply@example.org>", "footer": "Bye", "password": "very-secret" })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let v = a.call(Some(&admin), Method::GET, "/api/admin/email", None).await;
+    assert!(!v.text().contains("very-secret"));
+    assert_eq!(
+        (v.json()["has_password"].clone(), v.json()["configured"].clone()),
+        (json!(true), json!(true))
+    );
+    let r = a
+        .call(Some(&admin), Method::POST, "/api/admin/email/test", Some(json!({ "to": "p@example.org" })))
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    assert_eq!(fake.mails.lock().unwrap().len(), 1);
+}

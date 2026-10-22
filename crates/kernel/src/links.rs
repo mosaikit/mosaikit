@@ -80,6 +80,7 @@ pub async fn create(
         json!({ "days": days, "password": pw_hash.is_some() }),
     )
     .await;
+    crate::notify::link_created(k, c, rid, m.owner_id, &m.title).await;
     Ok(CreatedLink {
         url: format!("{}/p/{token}/", k.cfg.public_url),
         info: LinkInfo {

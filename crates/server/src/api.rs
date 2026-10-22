@@ -13,7 +13,9 @@ use futures_util::StreamExt;
 use mosaikit_kernel::acl::{self, Level, ResourceFilter};
 use mosaikit_kernel::tenancy::keys::{self, Level as KeyLevel};
 use mosaikit_kernel::tenancy::{self, levels, NewTenant};
-use mosaikit_kernel::{content, crud, files, identity, kpi, links, plugins, Error, Role, TenantSettings};
+use mosaikit_kernel::{
+    content, crud, files, identity, kpi, links, mail, notify, plugins, Error, Role, TenantSettings,
+};
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
 use uuid::Uuid;
@@ -48,6 +50,16 @@ pub fn router() -> Router<AppState> {
         .route("/api/me/invitations", get(my_invitations))
         .route("/api/me/invitations/{id}/{answer}", post(answer_invitation))
         .route("/api/dev/events", get(dev_events))
+        .route("/api/me/stream", get(my_stream))
+        .route("/api/me/notifications", get(my_notifications))
+        .route("/api/me/notifications/count", get(my_unread))
+        .route("/api/me/notifications/read", post(my_mark_read))
+        .route("/api/me/notifications/read-all", post(my_mark_all_read))
+        .route("/api/me/notifications/delete", post(my_delete_notifications))
+        .route("/api/me/notifications/prefs", get(my_note_prefs).put(my_set_note_prefs))
+        .route("/api/t/{t}/p/{plugin}/notify", post(plugin_notify))
+        .route("/api/admin/email", get(a_email).put(a_set_email))
+        .route("/api/admin/email/test", post(a_email_test))
         // tenant
         .route("/api/t/{t}/context", get(context))
         .route("/api/t/{t}/overview", get(overview))
@@ -347,6 +359,121 @@ async fn answer_invitation(
         _ => return Err(bad("answer: accept or decline")),
     };
     tenancy::respond_invitation(&s.k, &u, uuid(&id)?, accept).await?;
+    Ok(ok())
+}
+
+// ------------------------------------------------------------------ notifications
+
+async fn my_notifications(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Query(f): Query<notify::Filter>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(notify::list(&s.k, &u, &f).await?)))
+}
+
+async fn my_unread(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Json<Value>> {
+    Ok(Json(json!({ "unread": notify::unread_count(&s.k, &u).await? })))
+}
+
+#[derive(Deserialize)]
+struct NoteIds {
+    ids: Vec<Uuid>,
+    #[serde(default = "yes")]
+    read: bool,
+}
+
+fn yes() -> bool {
+    true
+}
+
+async fn my_mark_read(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Json(r): Json<NoteIds>,
+) -> ApiResult<Json<Value>> {
+    let n = notify::mark(&s.k, &u, &r.ids, r.read).await?;
+    Ok(Json(json!({ "changed": n, "unread": notify::unread_count(&s.k, &u).await? })))
+}
+
+async fn my_mark_all_read(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Json<Value>> {
+    let n = notify::mark_all_read(&s.k, &u).await?;
+    Ok(Json(json!({ "changed": n, "unread": 0 })))
+}
+
+async fn my_delete_notifications(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Json(r): Json<NoteIds>,
+) -> ApiResult<Json<Value>> {
+    let n = notify::delete(&s.k, &u, &r.ids).await?;
+    Ok(Json(json!({ "deleted": n, "unread": notify::unread_count(&s.k, &u).await? })))
+}
+
+async fn my_note_prefs(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(notify::prefs(&s.k, &u).await?)))
+}
+
+async fn my_set_note_prefs(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Json(r): Json<notify::PrefsChange>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(notify::set_prefs(&s.k, &u, &r).await?)))
+}
+
+/// Live events of the person: the number of unread notifications at once, then every change.
+async fn my_stream(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Response> {
+    let me = u.user_id;
+    let first =
+        notify::Live { user: me, event: "count", unread: notify::unread_count(&s.k, &u).await?, id: None };
+    let rx = s.k.live.subscribe();
+    let live = tokio_stream::wrappers::BroadcastStream::new(rx).filter_map(move |e| async move {
+        match e {
+            Ok(ev) if ev.user == me => Some(ev),
+            _ => None,
+        }
+    });
+    let stream = futures_util::stream::once(async move { first }).chain(live).map(|ev| {
+        Ok::<_, std::convert::Infallible>(
+            Event::default().data(serde_json::to_string(&ev).unwrap_or_default()),
+        )
+    });
+    Ok(Sse::new(stream).keep_alive(KeepAlive::default()).into_response())
+}
+
+async fn plugin_notify(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<PluginPath>,
+    Json(r): Json<notify::PluginNote>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!({ "sent": notify::from_plugin(&s.k, &c, &p.plugin, &r).await? })))
+}
+
+async fn a_email(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(mail::settings(&s.k, &u).await?)))
+}
+
+async fn a_set_email(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Json(r): Json<mail::EmailChange>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(mail::set_settings(&s.k, &u, &r).await?)))
+}
+
+#[derive(Deserialize)]
+struct TestMail {
+    to: String,
+}
+
+async fn a_email_test(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Json(r): Json<TestMail>,
+) -> ApiResult<Json<Value>> {
+    mail::send_test(&s.k, &u, r.to.trim()).await?;
     Ok(ok())
 }
 

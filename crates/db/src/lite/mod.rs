@@ -35,6 +35,7 @@ const MIGRATIONS: &[(i64, &str, &str)] = &[
     (1, "core", include_str!("0001_core.sql")),
     (2, "admins", include_str!("0002_admins.sql")),
     (3, "service_keys", include_str!("0003_service_keys.sql")),
+    (4, "notifications", include_str!("0004_notifications.sql")),
 ];
 
 /// Context of the transaction on the connection (read by `core_ctx_*()`).

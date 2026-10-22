@@ -98,6 +98,7 @@ pub async fn invite(
         json!({ "user": user, "role": role }),
     )
     .await;
+    crate::notify::invited(k, c, id, user, role.as_str()).await;
     let row = mosaikit_db::query(format!("{INVITE_SQL} where i.id = $1")).bind(id).fetch_one(&k.db).await?;
     invitation(&row)
 }
@@ -177,5 +178,6 @@ pub async fn respond_invitation(k: &Kernel, user: &SessionUser, id: Uuid, accept
         json!({}),
     )
     .await;
+    crate::notify::answered(k, user, id, tenant, invited_by, accept).await;
     Ok(())
 }

@@ -106,6 +106,10 @@ const DEFS: &[Def] = &[
     limit("security.remember_days", Rule::Max, remember_days),
     // embedding
     limit("embed.sites", Rule::Subset, origins),
+    // notifications: emails at once, in a daily digest or never (each person may choose)
+    def("notify.email_mode", Kind::Custom, Scope::Both, email_mode),
+    def("notify.digest_hour", Kind::Managed, Scope::Platform, digest_hour),
+    def("notify.retention_days", Kind::Managed, Scope::Platform, retention_days),
 ];
 
 fn find(key: &str) -> Result<&'static Def> {
@@ -239,6 +243,18 @@ fn remember_days(v: &Value) -> Result<()> {
     int(v, 0, 365)
 }
 
+fn email_mode(v: &Value) -> Result<()> {
+    one_of(v, &["off", "immediate", "digest"], "off, immediate or digest")
+}
+
+fn digest_hour(v: &Value) -> Result<()> {
+    int(v, 0, 23)
+}
+
+fn retention_days(v: &Value) -> Result<()> {
+    int(v, 7, 3650)
+}
+
 /// An origin that may embed public pages: `https://host[:port]`, without a path.
 pub fn valid_origin(s: &str) -> bool {
     let Some(rest) = s.strip_prefix("https://").or_else(|| s.strip_prefix("http://")) else {
@@ -303,6 +319,9 @@ impl Defaults {
             "security.session_hours" => json!(self.session_hours),
             "security.remember_days" => json!(30),
             "embed.sites" => json!([]),
+            "notify.email_mode" => json!("digest"),
+            "notify.digest_hour" => json!(7),
+            "notify.retention_days" => json!(90),
             _ => Value::Null,
         }
     }
