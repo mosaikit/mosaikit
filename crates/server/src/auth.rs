@@ -117,13 +117,10 @@ impl FromRequestParts<AppState> for ClientIp {
 
     async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
         if state.k.cfg.trust_proxy {
-            if let Some(ip) = parts
-                .headers
-                .get("x-forwarded-for")
-                .and_then(|v| v.to_str().ok())
-                .and_then(|v| v.split(',').next())
+            if let Some(ip) =
+                parts.headers.get("x-forwarded-for").and_then(|v| v.to_str().ok()).and_then(forwarded_client)
             {
-                return Ok(ClientIp(ip.trim().to_string()));
+                return Ok(ClientIp(ip));
             }
         }
         let ip = parts
@@ -132,5 +129,22 @@ impl FromRequestParts<AppState> for ClientIp {
             .map(|c| c.0.ip().to_string())
             .unwrap_or_else(|| "unknown".into());
         Ok(ClientIp(ip))
+    }
+}
+
+/// The address of the client in `X-Forwarded-For`: the LAST entry, the one the trusted reverse proxy
+/// added. The entries before it come from the request as the client sent it and can be anything (a
+/// client choosing its own address would get around the limit on sign-in attempts per address).
+pub fn forwarded_client(header: &str) -> Option<String> {
+    header.rsplit(',').map(str::trim).find(|s| !s.is_empty()).map(str::to_string)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn the_address_added_by_the_proxy_counts() {
+        assert_eq!(super::forwarded_client("6.6.6.6, 10.0.0.7").as_deref(), Some("10.0.0.7"));
+        assert_eq!(super::forwarded_client("10.0.0.7").as_deref(), Some("10.0.0.7"));
+        assert_eq!(super::forwarded_client(" , ").as_deref(), None);
     }
 }

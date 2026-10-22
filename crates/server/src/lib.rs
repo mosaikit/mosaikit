@@ -87,9 +87,8 @@ async fn request_info(
     let forwarded =
         s.k.cfg
             .trust_proxy
-            .then(|| h.get("x-forwarded-for").and_then(|v| v.to_str().ok()).and_then(|v| v.split(',').next()))
-            .flatten()
-            .map(|v| v.trim().to_string());
+            .then(|| h.get("x-forwarded-for").and_then(|v| v.to_str().ok()).and_then(auth::forwarded_client))
+            .flatten();
     let ip = forwarded.or_else(|| {
         req.extensions()
             .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()

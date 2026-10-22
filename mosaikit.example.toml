@@ -93,7 +93,8 @@ url = "http://127.0.0.1:8080/mosaikit"
 # open_browser = false
 
 # Uses the X-Forwarded-For header for the address of the client (limits on sign-in attempts).
-# Turn it on ONLY behind a reverse proxy that sets it: otherwise it can be forged.
+# Turn it on ONLY behind a reverse proxy that sets it: otherwise it can be forged. The last address of
+# the header counts (the one the proxy added), so exactly one proxy must sit in front of Mosaikit.
 # Env: MOSAIKIT_TRUST_PROXY
 # trust_proxy = false
 

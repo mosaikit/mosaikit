@@ -223,8 +223,8 @@ pub async fn page(k: &Kernel, scope: Scope<'_>, f: &LogFilter) -> Result<LogPage
 }
 
 fn csv_cell(s: &str) -> String {
-    // a leading = + - @ would be a formula in a spreadsheet
-    let s = if s.starts_with(['=', '+', '-', '@']) { format!("'{s}") } else { s.to_string() };
+    // a leading = + - @ (or tab, carriage return) would be a formula in a spreadsheet
+    let s = if s.starts_with(['=', '+', '-', '@', '\t', '\r']) { format!("'{s}") } else { s.to_string() };
     if s.contains([',', '"', '\n', '\r']) {
         format!("\"{}\"", s.replace('"', "\"\""))
     } else {

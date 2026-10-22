@@ -612,6 +612,7 @@ pub async fn import_tenant(
         .filter_map(|m| m.get("user_id").and_then(Value::as_str))
         .find(|u| known.contains(*u))
         .map(str::to_owned);
+    check_scope(t, &core)?;
     let mut people_missing: HashSet<String> = HashSet::new();
     let mut tx = k.db.begin_app().await?;
     if k.db.is_sqlite() {
@@ -634,6 +635,9 @@ pub async fn import_tenant(
             let v =
                 read_json(&mut zip, &format!("{prefix}plugins/{id}/{logical}.json"))?.unwrap_or(json!([]));
             let rows = v.as_array().cloned().unwrap_or_default();
+            if rows.iter().any(|r| r.get("tenant_id").is_some_and(|v| !same_id(v, t))) {
+                return Err(foreign_rows(&format!("{id}/{logical}")));
+            }
             if !rows.is_empty() {
                 pending.push((physical, rows));
             }
@@ -668,6 +672,59 @@ pub async fn import_tenant(
         people_missing: people_missing.len(),
         replaced,
     })
+}
+
+fn same_id(v: &Value, id: Uuid) -> bool {
+    v.as_str().and_then(|s| s.parse::<Uuid>().ok()) == Some(id)
+}
+
+/// A boolean of a row: `true`, or a non-zero number (SQLite), or a string such as "t".
+fn truthy(v: Option<&Value>) -> bool {
+    match v {
+        Some(Value::Bool(b)) => *b,
+        Some(Value::Number(n)) => n.as_f64() != Some(0.0),
+        Some(Value::String(s)) => matches!(s.as_str(), "t" | "true" | "1"),
+        _ => false,
+    }
+}
+
+fn foreign_rows(table: &str) -> Error {
+    Error::bad(format!("the export holds rows that do not belong to its tenant ({table})"))
+        .with_code("export_invalid")
+}
+
+/// An export is a file from outside: its rows may only describe its own tenant. Without this check a
+/// crafted file could add Administrators, members to other tenants, or grants on their items.
+fn check_scope(t: Uuid, core: &HashMap<&str, Vec<Value>>) -> Result<()> {
+    let ids = |table: &str| -> HashSet<String> {
+        core.get(table)
+            .into_iter()
+            .flatten()
+            .filter_map(|r| r.get("id").and_then(Value::as_str).map(str::to_owned))
+            .collect()
+    };
+    let (users, groups, resources) = (ids("users"), ids("groups"), ids("resources"));
+    let within =
+        |v: Option<&Value>, set: &HashSet<String>| v.and_then(Value::as_str).is_some_and(|s| set.contains(s));
+    for (table, rows) in core {
+        for r in rows {
+            let ok = match *table {
+                "tenants" => r.get("id").is_some_and(|v| same_id(v, t)) && !truthy(r.get("is_system")),
+                "users" => {
+                    r.get("home_tenant_id").is_some_and(|v| same_id(v, t))
+                        && !truthy(r.get("is_system_admin"))
+                }
+                "notification_prefs" | "person_prefs" => within(r.get("user_id"), &users),
+                "group_members" => within(r.get("group_id"), &groups),
+                "grants" | "public_links" => within(r.get("resource_id"), &resources),
+                _ => r.get("tenant_id").is_none_or(|v| same_id(v, t)),
+            };
+            if !ok {
+                return Err(foreign_rows(table));
+            }
+        }
+    }
+    Ok(())
 }
 
 fn depth(v: &Value) -> usize {

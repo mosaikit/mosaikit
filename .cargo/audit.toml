@@ -1,0 +1,10 @@
+# cargo audit: the same exceptions as deny.toml, with the reasons in docs/reports/dependencies.md.
+[advisories]
+ignore = [
+  "RUSTSEC-2026-0367", # zip: ZipArchive::extract not used (entries read one by one, paths checked)
+  "RUSTSEC-2026-0368", # zip: idem
+  "RUSTSEC-2026-0369", # zip: idem
+  "RUSTSEC-2024-0370", # proc-macro-error: build time only, Linux tray (gtk)
+  "RUSTSEC-2024-0429", # glib VariantStrIter: Linux tray only, the API is not used
+  "RUSTSEC-2023-0071", # rsa (Marvin): only in Cargo.lock through sqlx-mysql, never compiled
+]

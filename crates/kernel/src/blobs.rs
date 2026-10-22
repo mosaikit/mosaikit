@@ -10,7 +10,7 @@ use crate::util::random_token;
 use crate::{Error, Kernel, Result};
 
 const SITE_MAX_FILES: usize = 20_000;
-const SITE_MAX_BYTES: u64 = 512 << 20;
+pub(crate) const SITE_MAX_BYTES: u64 = 512 << 20;
 
 pub struct Blobs {
     root: PathBuf,
@@ -75,6 +75,17 @@ impl Blobs {
 
     /// Extracts a zip as the folder content of the resource, replacing the previous one.
     pub fn extract_site(&self, tenant: Uuid, rid: Uuid, zip_bytes: &[u8]) -> Result<SiteInfo> {
+        self.extract_site_within(tenant, rid, zip_bytes, SITE_MAX_BYTES)
+    }
+
+    /// [`Self::extract_site`] with the limit on the unpacked size as a parameter (tests).
+    pub(crate) fn extract_site_within(
+        &self,
+        tenant: Uuid,
+        rid: Uuid,
+        zip_bytes: &[u8],
+        max: u64,
+    ) -> Result<SiteInfo> {
         let mut zip = zip::ZipArchive::new(std::io::Cursor::new(zip_bytes))
             .map_err(|e| Error::bad(format!("invalid zip: {e}")))?;
         if zip.len() > SITE_MAX_FILES {
@@ -96,19 +107,24 @@ impl Blobs {
                 if !mosaikit_mskp::is_safe_path(&name) || f.enclosed_name().is_none() {
                     return Err(Error::bad(format!("unsafe path in the zip: {name}")));
                 }
-                size += f.size();
-                if size > SITE_MAX_BYTES {
-                    return Err(Error::bad("content of the zip over 512 MB"));
+                if size.saturating_add(f.size()) > max {
+                    return Err(Error::bad(format!("content of the zip over {} MB", max >> 20))
+                        .with_code("content_too_large"));
                 }
                 let out = tmp.join(&name);
                 if let Some(parent) = out.parent() {
                     std::fs::create_dir_all(parent)?;
                 }
-                let mut buf = Vec::with_capacity(f.size() as usize);
-                (&mut f)
-                    .take(SITE_MAX_BYTES + 1)
-                    .read_to_end(&mut buf)
-                    .map_err(|e| Error::bad(format!("zip: {e}")))?;
+                // the sizes in the headers of a zip are written by whoever made it: what counts is what
+                // the entry really inflates to, read at most up to what is left of the limit
+                let left = max - size;
+                let mut buf = Vec::with_capacity(f.size().min(left).min(16 << 20) as usize);
+                (&mut f).take(left + 1).read_to_end(&mut buf).map_err(|e| Error::bad(format!("zip: {e}")))?;
+                size += buf.len() as u64;
+                if size > max {
+                    return Err(Error::bad(format!("content of the zip over {} MB", max >> 20))
+                        .with_code("content_too_large"));
+                }
                 std::fs::write(&out, &buf)?;
                 files += 1;
                 entries.push(name);
@@ -186,5 +202,40 @@ pub async fn gc(k: &Kernel) {
                 k.blobs.remove(tenant, rid);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Write;
+
+    use super::*;
+
+    /// A zip with one deflated entry of `size` zero bytes whose headers declare 10 bytes.
+    fn lying_zip(size: usize) -> Vec<u8> {
+        let mut w = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        w.start_file("index.html", zip::write::SimpleFileOptions::default()).unwrap();
+        w.write_all(&vec![0u8; size]).unwrap();
+        let mut b = w.finish().unwrap().into_inner();
+        assert_eq!(&b[0..4], b"PK");
+        b[22..26].copy_from_slice(&10u32.to_le_bytes());
+        let cd = b.windows(4).position(|x| x == b"PK").unwrap();
+        b[cd + 24..cd + 28].copy_from_slice(&10u32.to_le_bytes());
+        b
+    }
+
+    #[test]
+    fn the_sizes_declared_in_a_zip_are_not_trusted() {
+        let dir = tempfile::tempdir().unwrap();
+        let blobs = Blobs::new(dir.path().to_path_buf());
+        let (t, r) = (Uuid::new_v4(), Uuid::new_v4());
+        // what is counted (quotas) is what the entry really inflates to
+        let info = blobs.extract_site_within(t, r, &lying_zip(3 << 20), 8 << 20).unwrap();
+        assert_eq!(info.size, 3 << 20);
+        // and the limit applies to it: nothing is left on disk
+        let err = blobs.extract_site_within(t, r, &lying_zip(9 << 20), 8 << 20).unwrap_err();
+        assert!(err.message.contains("over 8 MB"), "{}", err.message);
+        let site = blobs.dir(t, r).join("site");
+        assert_eq!(std::fs::read(site.join("index.html")).unwrap().len(), 3 << 20, "the previous site stays");
     }
 }
