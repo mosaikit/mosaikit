@@ -43,6 +43,8 @@ const CORE: &[(&str, &str)] = &[
     ("tenants", "id = $1"),
     ("users", "home_tenant_id = $1"),
     ("notification_prefs", "user_id in (select id from core.users where home_tenant_id = $1)"),
+    // high contrast and guided tours seen (the themes made for the tenant are in `tenants.settings`)
+    ("person_prefs", "user_id in (select id from core.users where home_tenant_id = $1)"),
     ("permission_profiles", "tenant_id = $1"),
     ("memberships", "tenant_id = $1"),
     ("user_identities", "tenant_id = $1"),
@@ -64,9 +66,10 @@ const CORE: &[(&str, &str)] = &[
     ("events", "tenant_id = $1"),
 ];
 
-/// Columns not carried over (generated again by the database).
+/// Columns not carried over (generated again by the database): the ids of the events and the words of
+/// the search (`search_vec`, computed from title and searchable text, which do travel).
 fn skipped(table: &str, col: &str) -> bool {
-    table == "events" && col == "id"
+    (table == "events" && col == "id") || (table == "resources" && col == "search_vec")
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

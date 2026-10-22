@@ -321,6 +321,38 @@ cannot sign in. At the end put it back to local accounts (P8-14).
 | P8-15 | As the Tenant Manager of a tenant with the provider: Tenant settings › Managed by the platform | Sign-in method «Identity provider of the tenant (OIDC)» with the padlock |
 | P8-16 | Italian, and dark mode, on the Sign-in tab and on the sign-in page | Everything translated and readable |
 
+## Phase 9 — Search, help and themes
+
+| Id | Check | Expected |
+|---|---|---|
+| P9-01 | As `e.ricci`: Notes › a new note «Quarterly inspection» with the text «The pump of the north well needs a new seal» | Saved |
+| P9-02 | Home, press `/` (not in a field) and type `north well` | The search opens; a pill **Notes 1** next to All, Pages, Apps; the note with a piece of its text around «north well» |
+| P9-03 | Type `insp` | The note is found by the beginning of a word of its title |
+| P9-04 | Arrows down to the note, Enter | The note opens in Notes |
+| P9-05 | Ctrl K again, with the field empty | «Recent searches» lists `north well`; choosing it searches again |
+| P9-06 | As `s.greco` (same tenant): search `north well` | «No results»: the note of Elena is not shared with Sara |
+| P9-07 | As `e.ricci`: share the note with Sara (read); as `s.greco` search again | Now found |
+| P9-08 | As `e.ricci`: delete the note, search it | Not found (it is in the trash); restore it from the Trash: found again |
+| P9-09 | As Administrator: search `roma` | Pills Tenant and People: *Comune di Roma* and its people; a result opens the tenant or the person |
+| P9-10 | As Administrator: System › Identity and appearance › Top bar: search off | No search box, `/` and Ctrl K do nothing; put it back on |
+| P9-11 | As `s.greco`, on the Home: the help button (?) | A small dot: a guided tour of this page is waiting |
+| P9-12 | Help › Guided tour of this page | The page darkens around the sidebar, a card «Step 1 of 5»; Next, Back, Skip the tour; arrows and Esc work |
+| P9-13 | Go to the end (Done), reload the page, sign in again from another browser | The dot is gone everywhere (the tour is remembered with the person) |
+| P9-14 | As `e.ricci`: Manage, Plugins, Tenant settings; as Administrator: System | Manage and Plugins have their tour; System too (Administrator); Tenant settings has none (the item is greyed) |
+| P9-15 | Help › Guide of Mosaikit | A dialog with the short guide; as Administrator, Identity and texts › Guide = an address: the item opens that address in a new tab (put it back empty) |
+| P9-16 | Help › What is new in version 1.0.0 | The notes of version 1.0.0 (from `CHANGELOG.md`), in groups |
+| P9-17 | Press `?` | Keyboard shortcuts: Ctrl K, `/`, `?`, `G H`, `G N`, `G A`, `G T` |
+| P9-18 | Press `g` then `n`; `g` then `h`; `g` then `t` | Notifications, Home, Trash |
+| P9-19 | Account › Appearance and language › High contrast on | Darker secondary texts and borders, thick focus ring, links underlined; the same from the mode menu (sun/moon) of the top bar |
+| P9-20 | Reload, sign in from another browser | High contrast stays on; open an app: the plugin follows it; put it off |
+| P9-21 | As Administrator: System › Identity and appearance › Theme and mode › **New theme**: name «Lagoon», main colour `#8fd8c8` | Two previews (light, dark); «Does it read?» lists the checks with their ratios, some in red; **Save the theme** is off |
+| P9-22 | Fix it for me | «Everything reads»; Save the theme; the card «Lagoon» appears |
+| P9-23 | Choose Lagoon as theme of the platform | The whole platform in the new colours, also the sign-in page in a private window |
+| P9-24 | Put Mosaikit back; «Themes tenants may use»: Every theme off, Lagoon unticked | — |
+| P9-25 | As `e.ricci`: Tenant settings › Identity and appearance › Theme and mode | Lagoon is not offered; **New theme** makes a theme of the tenant («made for this tenant»), editable and deletable |
+| P9-26 | Choose the theme of the tenant, then delete it | The tenant uses it; after the delete it goes back to the theme of the platform |
+| P9-27 | Italian and dark mode on the search, the help dialogs, the tour and the theme editor | Everything translated and readable |
+
 ---
 
-Phases 6, 7 and 9 add their sections here when they are committed.
+Every phase of the plan has its section. New work adds its checks here when it is committed.

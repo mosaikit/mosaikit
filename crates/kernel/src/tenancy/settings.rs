@@ -88,7 +88,7 @@ impl Default for ShellBand {
     }
 }
 
-async fn system_settings(k: &Kernel) -> Result<Value> {
+pub(super) async fn system_settings(k: &Kernel) -> Result<Value> {
     let v: Option<Value> = mosaikit_db::query_scalar("select settings from core.tenants where is_system")
         .fetch_optional(&k.db)
         .await?;
@@ -114,7 +114,7 @@ pub async fn set_shell_band(k: &Kernel, admin: &SessionUser, band: &ShellBand) -
     Ok(())
 }
 
-async fn settings_of(k: &Kernel, tenant: uuid::Uuid) -> Result<Value> {
+pub(super) async fn settings_of(k: &Kernel, tenant: uuid::Uuid) -> Result<Value> {
     let v: Option<Value> = mosaikit_db::query_scalar("select settings from core.tenants where id = $1")
         .bind(tenant)
         .fetch_optional(&k.db)
@@ -122,7 +122,7 @@ async fn settings_of(k: &Kernel, tenant: uuid::Uuid) -> Result<Value> {
     Ok(v.filter(Value::is_object).unwrap_or_else(|| json!({})))
 }
 
-async fn write_settings(k: &Kernel, tenant: uuid::Uuid, s: Value) -> Result<()> {
+pub(super) async fn write_settings(k: &Kernel, tenant: uuid::Uuid, s: Value) -> Result<()> {
     mosaikit_db::query("update core.tenants set settings = $2 where id = $1")
         .bind(tenant)
         .bind(s)
@@ -172,11 +172,12 @@ pub async fn platform_theme(k: &Kernel) -> Result<String> {
 pub async fn tenant_theme(k: &Kernel, tenant: uuid::Uuid) -> Result<ThemeChoice> {
     let system = system_settings(k).await?;
     let platform = theme_in(&system).unwrap_or_else(|| DEFAULT_THEME.into());
-    let own = theme_in(&settings_of(k, tenant).await?);
-    let preset = if theme_locked(&system) {
-        platform.clone()
-    } else {
-        own.clone().unwrap_or_else(|| platform.clone())
+    let settings = settings_of(k, tenant).await?;
+    let own = theme_in(&settings);
+    // a theme no longer allowed (or deleted) falls back to the one of the platform
+    let preset = match &own {
+        Some(o) if !theme_locked(&system) && super::themes::usable(&system, &settings, o) => o.clone(),
+        _ => platform.clone(),
     };
     Ok(ThemeChoice { preset, platform, tenant: own, locked: theme_locked(&system) })
 }
@@ -190,6 +191,9 @@ pub async fn set_platform_theme(k: &Kernel, admin: &SessionUser, preset: &str) -
     require_admin(admin)?;
     check_theme(preset)?;
     let mut s = system_settings(k).await?;
+    if !super::themes::exists_for_platform(&s, preset) {
+        return Err(Error::bad("unknown theme").with_code("theme_unknown"));
+    }
     s["theme"] = json!(preset);
     mosaikit_db::query("update core.tenants set settings = $1 where is_system")
         .bind(s)
@@ -210,6 +214,10 @@ pub async fn set_tenant_theme(k: &Kernel, c: &Caller, preset: Option<&str>) -> R
     match preset {
         Some(p) => {
             check_theme(p)?;
+            if !super::themes::usable(&system_settings(k).await?, &s, p) {
+                return Err(Error::forbidden("the Administrator does not offer this theme to the tenants")
+                    .with_code("theme_not_allowed"));
+            }
             s["theme"] = json!(p);
         }
         None => {

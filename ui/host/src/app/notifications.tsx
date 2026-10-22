@@ -99,7 +99,7 @@ export function NotificationsBell({ route }: { session: Session; route: Route })
   }
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger className={bandIcon} aria-label={label} title={label}>
+      <PopoverTrigger className={bandIcon} aria-label={label} title={label} data-tour="bell">
         <Bell className="size-[18px]" />
         {unread > 0 && (
           <em data-testid="bell-badge" className="absolute -top-0.5 -right-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-white not-italic tabular-nums">

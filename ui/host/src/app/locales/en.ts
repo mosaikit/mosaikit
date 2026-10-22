@@ -96,4 +96,8 @@ export const EN: Record<string, string> = {
   'errors.backup_running': 'A backup is already running',
   'errors.maintenance': 'The platform is under maintenance: only the Administrators sign in',
   'errors.planned_past': 'The planned time must be in the future',
+  'errors.theme_contrast': 'Some colours of the theme do not read (WCAG AA contrast): fix them before saving',
+  'errors.theme_not_allowed': 'The Administrator does not offer this theme to the tenants',
+  'errors.theme_unknown': 'Unknown theme',
+  'errors.theme_in_use': 'It is the theme of the platform: choose another one before deleting it',
 }

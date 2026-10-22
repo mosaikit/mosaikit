@@ -133,6 +133,7 @@ pub fn router() -> Router<AppState> {
         .merge(crate::plugins_api::router())
         .merge(crate::history_api::router())
         .merge(crate::ops_api::router())
+        .merge(crate::shell_api::router())
         .merge(uploads)
         .merge(packages)
         .layer(DefaultBodyLimit::max(16 << 20))
@@ -248,6 +249,11 @@ async fn session_body(s: &AppState, user: &mosaikit_kernel::SessionUser) -> ApiR
         "dev": s.k.cfg.dev.enabled,
         "band": tenancy::shell_band(&s.k).await?,
         "theme": tenancy::platform_theme(&s.k).await?,
+        // themes made with the theme editor (platform) and the ones tenants may use
+        "themes": tenancy::themes::platform_themes(&s.k).await?,
+        "themes_allowed": tenancy::themes::allowed(&s.k).await?,
+        // preferences that follow the person everywhere (high contrast, guided tours seen)
+        "me": mosaikit_kernel::personal::get(&s.k, user.user_id).await?,
         // settings in use for the home tenant of the person (the platform's for the Administrator)
         "config": levels::effective(&s.k, (!user.is_system_admin).then_some(user.home_tenant_id)).await?,
     }))
@@ -539,6 +545,8 @@ async fn context(State(s): State<AppState>, Tenant(c): Tenant, h: HeaderMap) -> 
         "perms": perms,
         "prefs": tenancy::prefs(&s.k, &c).await?,
         "theme": tenancy::tenant_theme(&s.k, c.tenant.tenant_id).await?,
+        // themes of the theme editor the tenant can see: its own and the allowed ones of the platform
+        "themes": tenancy::themes::for_tenant(&s.k, c.tenant.tenant_id).await?,
         "config": levels::effective(&s.k, Some(c.tenant.tenant_id)).await?,
     })))
 }

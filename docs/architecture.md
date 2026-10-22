@@ -20,6 +20,7 @@ development and release. The choices described here replace the initial PoC
    - [4.2 Log](#42-log)
 5. [Public links](#5-public-links)
    - [5.1 Notifications](#51-notifications)
+   - [5.2 Search, help and themes of the shell](#52-search-help-and-themes-of-the-shell)
 6. [KPIs](#6-kpis)
 7. [Database: PostgreSQL and SQLite](#7-database-postgresql-and-sqlite)
 8. [Plugins](#8-plugins)
@@ -414,7 +415,9 @@ blobs/…  identity/…             its contents and its logos
 ```
 
 Rows are JSON objects with the columns of the table (on PostgreSQL the types of extensions, e.g. PostGIS
-geometries, travel as their text form). The import recreates the tenant with the **same ids** (contents,
+geometries, travel as their text form). With the people go their preferences (`notification_prefs`,
+`person_prefs`: high contrast, guided tours seen); the themes made for the tenant are in its settings;
+the searchable text of the items travels with them, the search words (`search_vec`) are computed again. The import recreates the tenant with the **same ids** (contents,
 links and bookmarks keep working), only the columns the table still has (an export of an older version
 gets the defaults of the new columns), in the order of the foreign keys; the tables of a plugin that
 refer to each other are tried again until they go in. The tenant must not exist (`tenant_exists`) unless
@@ -551,6 +554,70 @@ What the kernel and the plugins tell a person (`core.notifications`, kernel modu
   unread notifications not emailed yet.
 - **Retention**: notifications older than `notify.retention_days` (default 90) are deleted; sent and
   failed emails after 30 days.
+
+### 5.2 Search, help and themes of the shell
+
+**Search** (kernel module `search`, `GET /api/t/{t}/search?q=`, the box of the top bar). It finds the
+items of the plugins the caller can see, with the rules of every other list of the kernel: the tenant of
+the caller, never the trash, only plugins on in the tenant where the caller has `use` (§3.2, §8.8), and
+the level of the caller on the item (owner, grants, groups, parent items: `core.level_for`); a Tenant
+Manager does not see private items through it either. It looks into the title and the **searchable
+fields** of each `[[resources]]` declaration: `search = true | false` on a field; without it the visible
+`text` fields are searchable. The kernel keeps their text in `core.resources.search_text`, written after
+every create and update of the CRUD (outside the transaction of the plugin: the index follows the data a
+moment later); items without it (created by the logic, or before the search existed) are indexed by the
+background worker of the kernel, a batch every 15 seconds, read with the rights of their owner.
+
+- PostgreSQL: full text on `search_vec` (a generated `tsvector`, configuration `simple`: no stemming, the
+  same rules for every language, accents kept), every word of the query as the beginning of a word
+  (`insp` finds `inspection`), plus the title anywhere (`ilike`); ranked by `ts_rank`, then by date.
+- SQLite: every word (anywhere) in the title or in the searchable text, with `like` (case-insensitive
+  for ASCII letters only), by date.
+- At most five words of at least two characters; up to 300 items read, 20 per plugin in the answer,
+  with the count, a piece of the text around the first word when it is not in the title, the owner.
+- A plugin may add results with a command of its logic (`[search] command = "find"`): the kernel calls
+  it with `{ "q": "..." }` as the person searching; it answers `{ "results": [{ "id", "snippet" }] }` and
+  the kernel keeps only the items of that plugin the person can see.
+- The Administrator finds tenants (name, identifier) and people (name, username, email):
+  `GET /api/admin/search?q=`.
+- The shell groups the results by app with a pill each (All, Pages, Apps, one per app, Tenants), opens an
+  item at `#/t/<tenant>/item/<id>`, and remembers the last six searches in the browser, per person. It
+  opens with Ctrl K or `/`, unless the Administrator turned the search off in the top bar.
+
+**Help** (shell, `help.ts` and `HelpLayer.tsx`): a guided tour of Home, Manage, Plugins and System,
+whose steps point at elements marked `data-tour` (a step whose element is not on the page is skipped);
+a tour seen to the end or skipped is remembered with the person, so the dot on the help button goes
+away on every device. The guide is the address of `identity.guide_url` (Identity and texts) or, empty,
+a short guide built into the shell. What is new shows the section of the current version of
+`CHANGELOG.md`, shipped with the build. Keyboard shortcuts, outside the fields where one types: Ctrl K
+and `/` (search), `?` (the list), `g h` (Home), `g n` (notifications), `g a` (account), `g t` (trash).
+
+**Preferences of a person** (`core.person_prefs`, `GET/PUT /api/me/prefs`, also in `/api/session` as
+`me`): high contrast and the tours seen; they follow the person on every tenant and device (the mode and
+the language stay with the browser). **High contrast** (Account › Appearance and language, and the mode
+menu of the top bar) puts `data-contrast="more"` on `<html>`: on top of every theme, built-in or made with
+the editor, secondary texts as strong as the main text, visible borders and fields, a thick focus ring,
+underlined links. Plugins receive it in the context (`contrast`, below).
+
+**Theme editor** (System › Identity and appearance › Theme and mode for the platform; Tenant settings ›
+Identity and appearance › Theme and mode for a tenant, when the theme is not locked by the Administrator):
+from a main colour, the style of the top band (in the main colour, dark, light) and the greys (neutral,
+warm, cool) the shell generates the CSS variables of the theme, light and dark, as the mockup does; the
+previews follow at once; the contrast of the pairs that must read is checked (WCAG 2.1 AA, 4.5: text,
+secondary text, links on the page, main button, top band, search field, sidebar, active item, icon bar)
+and «Fix it for me» darkens or lightens the colours until they read; Save stays off while a check fails.
+The main button is checked also under the pointer (12 % darker in light mode, 12 % lighter in dark mode,
+as the buttons of the shell do).
+The kernel (`tenancy::themes`) checks again what it stores: only the variables of the themes, colours only
+(`#rgb[a]`, `#rrggbb[aa]`, `rgb()`/`rgba()`), the same contrast checks with the hover of the main button
+(code `theme_contrast`), at most 20
+themes per scope. The themes of the platform live in the settings of the system tenant (`themes`), the
+ones of a tenant in its settings; ids `c-<hex>`. `themes_allowed` (System › Theme and mode, «Themes
+tenants may use») limits what tenants choose (absent: every theme; the theme of the platform always); a
+tenant using a theme no longer offered, or deleted, goes back to the one of the platform. The shell gets
+the custom themes from the session, the context of the tenant and, for the sign-in page,
+`GET /api/auth/themes` (the themes of the platform and the ones in use by active tenants: colours only),
+and puts their CSS in a `<style>` of the page.
 
 ## 6. KPIs
 
@@ -811,7 +878,8 @@ the set of the shell; the shell draws only the names it knows (a manifest cannot
 
 Field kinds: `text` (`multiline` too), `number`, `bool`, `date`, `choice`. A choice
 field may give display labels to its values (`option_labels = { work = "Work" }`); the
-stored value stays the option.
+stored value stays the option. `search = false` keeps a text field out of the search of the shell
+(`search = true` puts another kind in); `[search] command = "<name>"` adds results from the logic (§5.2).
 
 **Languages.** The texts of the manifest are English. `[i18n.<lang>]` (two or three
 lower-case letters, not `en`) translates the name, the description, the label of the
@@ -905,10 +973,11 @@ msk.at                                       // the place, when the page opens f
 
 **Language, theme and mode.** The handshake carries `context`: `lang` (`it`, `en`…),
 `preset` (theme of the host), `mode` (`light` or `dark`, the one in use),
-`preference` (`light`, `dark` or `auto`) and `theme` (CSS variables). At every
+`preference` (`light`, `dark` or `auto`), `contrast` (high contrast chosen by the person; absent with
+older hosts) and `theme` (CSS variables, high contrast included). At every
 change the host sends the `context` event with the new values (and, for the plugins
 written before, the `theme` event with the variables only). `connect()` applies them
-to `<html>` (`lang`, `data-mode`, `data-preset`, `color-scheme`, variables);
+to `<html>` (`lang`, `data-mode`, `data-preset`, `data-contrast`, `color-scheme`, variables);
 to react, for example changing the labels:
 
 ```ts

@@ -89,6 +89,8 @@ const DEFS: &[Def] = &[
     def("identity.footer", Kind::Custom, Scope::Both, text_200),
     def("identity.privacy_url", Kind::Custom, Scope::Both, url_or_empty),
     def("identity.legal_url", Kind::Custom, Scope::Both, url_or_empty),
+    // the Guide of the help menu; empty: the short guide built into the shell
+    def("identity.guide_url", Kind::Custom, Scope::Both, url_or_empty),
     def("identity.landing", Kind::Custom, Scope::Tenant, landing),
     // appearance
     def("theme", Kind::Custom, Scope::Both, theme),
@@ -318,7 +320,9 @@ impl Defaults {
         match key {
             "identity.name" => json!(self.name),
             "identity.footer" => json!(self.footer),
-            "identity.welcome" | "identity.privacy_url" | "identity.legal_url" => json!(""),
+            "identity.welcome" | "identity.privacy_url" | "identity.legal_url" | "identity.guide_url" => {
+                json!("")
+            }
             "identity.landing" => json!("home"),
             "theme" => json!(super::settings::DEFAULT_THEME),
             "appearance.mode" | "lang.default" | "format.locale" => json!("auto"),

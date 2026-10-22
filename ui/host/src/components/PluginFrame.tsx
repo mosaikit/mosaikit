@@ -12,7 +12,7 @@ interface Props {
   /** changes to force the reload (hot reload in development) */
   reloadKey: number
   /** language and theme of the shell: at the handshake and, at every change, with the `context` event */
-  ui?: { lang: string; preset: string; mode: 'light' | 'dark'; preference: 'light' | 'dark' | 'auto' }
+  ui?: { lang: string; preset: string; mode: 'light' | 'dark'; preference: 'light' | 'dark' | 'auto'; contrast?: boolean }
   /** the place inside the plugin to open (from a notification), given at the handshake */
   at?: string
 }
@@ -26,6 +26,7 @@ function uiContext(ui: Props['ui']) {
     preset: ui?.preset ?? (root.dataset.preset || 'mosaikit'),
     mode: ui?.mode ?? (dark ? 'dark' : 'light'),
     preference: ui?.preference ?? (dark ? 'dark' : 'light'),
+    contrast: ui?.contrast ?? root.dataset.contrast === 'more',
     theme: themeVars(),
   }
 }
@@ -52,7 +53,7 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
   useEffect(() => {
     shellRef.current = shell
   })
-  const uiKey = shell ? `${shell.lang}|${shell.preset}|${shell.mode}|${shell.preference}` : ''
+  const uiKey = shell ? `${shell.lang}|${shell.preset}|${shell.mode}|${shell.preference}|${shell.contrast ? 1 : 0}` : ''
   useEffect(() => {
     const win = ref.current?.contentWindow
     if (!win || !loaded) return

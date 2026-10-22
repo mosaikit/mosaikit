@@ -107,6 +107,8 @@ export interface UiContext {
   mode: 'light' | 'dark'
   /** the choice of the person: with `auto` the mode follows the system */
   preference: 'light' | 'dark' | 'auto'
+  /** high contrast chosen by the person (older hosts: absent); the theme variables already have it */
+  contrast?: boolean
   /** CSS variables of the theme */
   theme: Record<string, string>
 }

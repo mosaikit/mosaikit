@@ -404,7 +404,7 @@ pub async fn digest(k: &Kernel, force: bool) -> Result<usize> {
 
 // ------------------------------------------------------------------ worker
 
-/// The background work: the queue of the emails every 15 seconds; every 10 minutes the digest, the
+/// The background work: the queue of the emails and the search index every 15 seconds; every 10 minutes the digest, the
 /// retention of notifications and log, the purge of the trash, the cleaning of the queue and the quotas
 /// (usage of the day, alerts). Stops with the kernel.
 pub(crate) fn spawn_worker(k: &Arc<Kernel>) {
@@ -417,6 +417,10 @@ pub(crate) fn spawn_worker(k: &Arc<Kernel>) {
             k.ops.tick("mail");
             if let Err(e) = drain(&k).await {
                 tracing::warn!("queue of the emails: {e}");
+            }
+            // search: the items still without their searchable text, a batch at a time
+            if let Err(e) = crate::search::reindex_pending(&k).await {
+                tracing::warn!("search index: {e}");
             }
             if tick.is_multiple_of(40) {
                 if let Err(e) = digest(&k, false).await {

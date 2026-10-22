@@ -86,6 +86,14 @@ describe('applyContext', () => {
     expect(el.style.getPropertyValue('--acc')).toBe('#06c')
   })
 
+  it('follows high contrast (absent with older hosts)', () => {
+    const el = document.createElement('div')
+    applyContext({ ...CTX, contrast: true }, el)
+    expect(el.dataset.contrast).toBe('more')
+    applyContext(CTX, el)
+    expect(el.dataset.contrast).toBeUndefined()
+  })
+
   it('ignores invalid values', () => {
     const el = document.createElement('div')
     applyContext({ ...CTX, lang: 'en"><script>', mode: 'black' as 'dark', preset: 'a b' }, el)

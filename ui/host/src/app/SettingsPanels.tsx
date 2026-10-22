@@ -43,6 +43,7 @@ function labels(): Record<string, [string, string]> {
     'identity.footer': [t('Footer'), t('At the foot of the sign-in page and of the messages')],
     'identity.privacy_url': [t('Privacy notice'), t('Address of the page, starting with https://')],
     'identity.legal_url': [t('Legal notes'), t('Address of the page, starting with https://')],
+    'identity.guide_url': [t('Guide'), t('Address of the guide in the help menu, starting with https://; empty: the short guide of the shell')],
     'identity.landing': [t('Landing page'), t('What people see after signing in')],
     'appearance.mode': [t('Default mode'), t('For whoever did not choose one; everyone can change it in Account')],
     'lang.enabled': [t('Languages offered'), t('The ones people can choose')],
@@ -269,7 +270,7 @@ export function IdentityPanel({ level }: { level: Level }) {
       <Images level={level} />
       <Panel
         level={level}
-        keys={['identity.name', 'identity.welcome', 'identity.footer', 'identity.privacy_url', 'identity.legal_url', 'identity.landing']}
+        keys={['identity.name', 'identity.welcome', 'identity.footer', 'identity.privacy_url', 'identity.legal_url', 'identity.guide_url', 'identity.landing']}
         title={t('Identity and texts')}
         description={level.kind === 'platform' ? t('Of the platform: the sign-in page and the pages of the Administrator; tenants inherit the texts.') : t('Of the tenant: its sign-in page and the top bar of its people.')}
       >
@@ -280,6 +281,7 @@ export function IdentityPanel({ level }: { level: Level }) {
             {s('identity.footer') && <TextRow level={level} d={d} s={s('identity.footer')!} />}
             {s('identity.privacy_url') && <TextRow level={level} d={d} s={s('identity.privacy_url')!} placeholder="https://" />}
             {s('identity.legal_url') && <TextRow level={level} d={d} s={s('identity.legal_url')!} placeholder="https://" />}
+            {s('identity.guide_url') && <TextRow level={level} d={d} s={s('identity.guide_url')!} placeholder="https://" />}
             {s('identity.landing') && (
               <ChoiceRow level={level} d={d} s={s('identity.landing')!} options={[['home', t('Home')], ...apps.map((p): [string, string] => [p.id, p.label])]} />
             )}

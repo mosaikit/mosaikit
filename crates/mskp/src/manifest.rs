@@ -62,6 +62,18 @@ pub struct Manifest {
     /// Texts in other languages (`[i18n.it]`, ...); the texts above are the English ones.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub i18n: BTreeMap<String, Translation>,
+    /// `[search]`: a command of the logic the kernel calls with `{ "q": ... }` to add results to the
+    /// search of the shell (titles and searchable fields are found without it).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub search: Option<SearchDecl>,
+}
+
+/// `[search]` of a manifest.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct SearchDecl {
+    /// name of the command; it returns `{ "results": [{ "id": "<resource id>", "snippet": "..." }] }`
+    pub command: String,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -146,6 +158,8 @@ impl ExtFieldDecl {
             options: self.options.clone(),
             hidden: false,
             option_labels: self.option_labels.clone(),
+            // values of an extension live in the kernel, not in the search text of the base plugin
+            search: Some(false),
         }
     }
 }
@@ -367,6 +381,17 @@ pub struct FieldDecl {
     /// Labels of the values of a choice field (value -> label), shown instead of the value.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub option_labels: BTreeMap<String, String>,
+    /// Found by the search of the shell. Absent: yes for the visible text fields, no otherwise
+    /// (`search = false` keeps a text field out, e.g. codes or private notes).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub search: Option<bool>,
+}
+
+impl FieldDecl {
+    /// Whether the search of the shell looks into this field.
+    pub fn searchable(&self) -> bool {
+        self.search.unwrap_or(self.kind == FieldKind::Text && !self.hidden)
+    }
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -577,6 +602,11 @@ impl Manifest {
             }
             if p.label.trim().is_empty() {
                 return bad(format!("the user permission '{}' has no label", p.key));
+            }
+        }
+        if let Some(sd) = &self.search {
+            if !is_identifier(&sd.command) {
+                return bad(format!("search.command: invalid name '{}'", sd.command));
             }
         }
         self.validate_kind().map_err(Error::Manifest)?;

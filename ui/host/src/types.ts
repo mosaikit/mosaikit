@@ -1,3 +1,5 @@
+import type { CustomTheme } from './app/theme.ts'
+
 /** role in the tenant; Administrator belongs to the system (`User.is_system_admin`) */
 export type Role = 'tenant_manager' | 'user'
 export type Level = 'read' | 'write' | 'manage'
@@ -36,6 +38,11 @@ export interface Session {
   band?: ShellBand
   /** theme of the platform, chosen by the Administrator (recent servers) */
   theme?: string
+  /** themes made with the theme editor (platform) and the themes tenants may use (null: every one) */
+  themes?: CustomTheme[]
+  themes_allowed?: string[] | null
+  /** preferences that follow the person everywhere */
+  me?: PersonPrefs
   /** settings in use for the home tenant of the person (the platform's for the Administrator) */
   config?: Config
 }
@@ -183,6 +190,8 @@ export interface TenantContext {
   perms?: Record<string, string[]>
   /** recent servers */
   theme?: ThemeChoice
+  /** custom themes the tenant can see: its own and the allowed ones of the platform */
+  themes?: CustomTheme[]
   /** settings in use in the tenant (recent servers) */
   config?: Config
 }
@@ -867,4 +876,21 @@ export interface MyUsage {
   storage: number
   items: number
   tenant: QuotaRow[]
+}
+
+/** Preferences of a person that follow them everywhere. */
+export interface PersonPrefs {
+  contrast: boolean
+  tours_done: string[]
+}
+
+export type { CustomTheme }
+
+/** Search of the shell: the items of one app. */
+export interface SearchGroupResult {
+  plugin_id: string
+  label: string
+  icon?: string | null
+  count: number
+  items: { id: string; kind: string; title: string; snippet: string; owner_name: string; updated_at: string }[]
 }

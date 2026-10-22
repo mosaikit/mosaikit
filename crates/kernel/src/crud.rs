@@ -319,6 +319,7 @@ pub async fn create(
     let row =
         get_in(k, &mut tx, &p, d, id).await?.ok_or_else(|| Error::internal("created record not visible"))?;
     tx.commit().await?;
+    crate::search::index(k, id, &crate::search::text_of(d, &values)).await;
     crate::quotas::touched(k, c.tenant.tenant_id);
     events::record(
         k,
@@ -377,6 +378,7 @@ pub async fn update(
     tx.update_resource(id, Some(&title_of(d, &values)), None, None).await?;
     let row = get_in(k, &mut tx, &p, d, id).await?.ok_or_else(|| Error::internal("record not visible"))?;
     tx.commit().await?;
+    crate::search::index(k, id, &crate::search::text_of(d, &values)).await;
     events::record(
         k,
         Some(c.tenant.tenant_id),

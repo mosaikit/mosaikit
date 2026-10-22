@@ -5,6 +5,7 @@
 // the default of the platform or of the tenant applies (Theme and mode).
 
 import { useSyncExternalStore } from 'react'
+import { themeCss } from './themegen.ts'
 
 export type Mode = 'light' | 'dark' | 'auto'
 export const PRESETS = [
@@ -12,7 +13,17 @@ export const PRESETS = [
   { id: 'italia', name: 'Italia', note: 'Designers Italia, for public administration tenants' },
   { id: 'tessera', name: 'Tessera', note: 'the colours of the logo' },
 ] as const
-export type PresetId = (typeof PRESETS)[number]['id']
+export type PresetId = string
+
+/** A theme made with the theme editor (System › Theme, Tenant settings › Theme). */
+export interface CustomTheme {
+  id: string
+  name: string
+  scope: 'platform' | 'tenant'
+  input: unknown
+  light: Record<string, string>
+  dark: Record<string, string>
+}
 
 const KEY = 'msk_theme'
 /** the mode chosen by the person (absent: the default of the place) */
@@ -20,7 +31,15 @@ const MODE_KEY = 'msk_mode'
 interface Theme {
   preset: PresetId
   mode: Mode
+  /** high contrast, for oneself (Account › Appearance and language, the palette of the top bar) */
+  contrast: boolean
 }
+
+/** The custom themes known to this page, by id (their CSS is in a <style> of the head). */
+const custom = new Map<string, CustomTheme>()
+const known = (id: string) => PRESETS.some((p) => p.id === id) || custom.has(id)
+/** the theme the server asked for, applied as soon as it is known */
+let wanted: string | undefined
 
 function chosenMode(): Mode | null {
   try {
@@ -40,13 +59,29 @@ function read(): Theme {
     return {
       preset: PRESETS.some((p) => p.id === t.preset) ? (t.preset as PresetId) : 'mosaikit',
       mode: chosenMode() ?? 'auto',
+      contrast: t.contrast === true,
     }
   } catch {
-    return { preset: 'mosaikit', mode: 'auto' }
+    return { preset: 'mosaikit', mode: 'auto', contrast: false }
   }
 }
 
+const DEF_KEY = 'msk_theme_def'
 let current = read()
+try {
+  const def = JSON.parse(localStorage.getItem(DEF_KEY) ?? 'null') as CustomTheme | null
+  const last = (JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Theme>).preset
+  if (def?.id && def.id === last) {
+    custom.set(def.id, def)
+    current = { ...current, preset: def.id }
+    const el = document.createElement('style')
+    el.id = 'msk-custom-themes'
+    el.textContent = themeCss(def.id, def)
+    document.head.appendChild(el)
+  }
+} catch {
+  /* storage not available */
+}
 const listeners = new Set<() => void>()
 const media = window.matchMedia('(prefers-color-scheme: dark)')
 
@@ -54,6 +89,8 @@ const media = window.matchMedia('(prefers-color-scheme: dark)')
 export function applyTheme() {
   const dark = effectiveMode() === 'dark'
   document.documentElement.dataset.preset = current.preset
+  if (current.contrast) document.documentElement.dataset.contrast = 'more'
+  else delete document.documentElement.dataset.contrast
   document.documentElement.classList.toggle('dark', dark)
   document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
 }
@@ -83,14 +120,53 @@ export function setDefaultMode(m: string | undefined) {
 /** The preset in use, from what the server says (tenant or platform); unknown: the base one. */
 export function setPreset(id: string | undefined) {
   if (!id) return
-  const preset: PresetId = PRESETS.some((p) => p.id === id) ? (id as PresetId) : 'mosaikit'
-  if (preset !== current.preset) update({ preset })
+  wanted = id
+  // a custom theme not registered yet: applied by registerThemes
+  if (!known(id)) return
+  if (id !== current.preset) update({ preset: id })
+}
+
+/** The custom themes (from the session, the tenant or the sign-in page): their CSS goes into the page
+ *  and they can be applied like the built-in ones. */
+export function registerThemes(list: CustomTheme[] | undefined) {
+  if (!list?.length) return
+  let changed = false
+  for (const t of list) {
+    const old = custom.get(t.id)
+    if (!old || JSON.stringify(old) !== JSON.stringify(t)) {
+      custom.set(t.id, t)
+      changed = true
+    }
+  }
+  if (!changed) return
+  let el = document.getElementById('msk-custom-themes')
+  if (!el) {
+    el = document.createElement('style')
+    el.id = 'msk-custom-themes'
+    document.head.appendChild(el)
+  }
+  el.textContent = [...custom.values()].map((t) => themeCss(t.id, t)).join('\n')
+  if (wanted && known(wanted) && wanted !== current.preset) update({ preset: wanted })
+  else listeners.forEach((l) => l())
+}
+
+/** A custom theme known to the page. */
+export function customTheme(id: string): CustomTheme | undefined {
+  return custom.get(id)
+}
+
+/** High contrast, for oneself (saved with the person by the caller). */
+export function setContrast(on: boolean) {
+  if (on !== current.contrast) update({ contrast: on })
 }
 
 function update(t: Partial<Theme>) {
   current = { ...current, ...t }
   try {
     localStorage.setItem(KEY, JSON.stringify(current))
+    // the colours of a custom theme too, so the next visit starts with them (no flash of another theme)
+    const def = custom.get(current.preset)
+    if (def) localStorage.setItem(DEF_KEY, JSON.stringify(def))
   } catch {
     /* storage not available */
   }

@@ -21,7 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { setLanguageContext, setLang, t, useLang, useLanguages, type Lang } from './i18n.ts'
 import { go, to } from './router.ts'
 import { AppMark } from './Shell.tsx'
-import { setDefaultMode, setPreset, setTheme, useTheme, type Mode } from './theme.ts'
+import { registerThemes, setDefaultMode, setPreset, setTheme, useTheme, type CustomTheme, type Mode } from './theme.ts'
 import { MaintenanceNotice } from './pages/operations.tsx'
 
 const LAST = 'msk_last_login_tenant'
@@ -73,6 +73,14 @@ export default function Login({ door, tenant }: { door: 'tenant' | 'admin'; tena
   const qc = useQueryClient()
   useLang() // the texts follow the chosen language
   const admin = door === 'admin'
+  // the themes made with the theme editor, before the theme of the platform or of the tenant is applied
+  useEffect(() => {
+    api<CustomTheme[]>('GET', '/api/auth/themes')
+      .then(registerThemes)
+      .catch(() => {
+        /* older server, or not reachable: the built-in themes */
+      })
+  }, [])
   // the tenant chosen on the page: its identity and languages, otherwise the platform's
   const [picked, setPicked] = useState<LoginTenant | null>(null)
   const tn = admin ? null : picked

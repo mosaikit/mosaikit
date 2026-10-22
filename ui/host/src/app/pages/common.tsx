@@ -29,6 +29,7 @@ import { TenantLeft } from '../Quotas.tsx'
 import { totals, trashHint } from '../usage.ts'
 import { kindLabel, type NoteKind } from '../notes.ts'
 import { setTheme, useTheme, type Mode } from '../theme.ts'
+import { useSetContrast } from '../personal.ts'
 
 const enc = encodeURIComponent
 
@@ -280,6 +281,7 @@ function NotificationPrefs() {
 
 function Appearance({ route }: { route: Route }) {
   const th = useTheme()
+  const setContrast = useSetContrast()
   const lang = useLang()
   const langs = useLanguages()
   const [side, setSide] = useState(() => {
@@ -308,6 +310,15 @@ function Appearance({ route }: { route: Route }) {
               {l}
             </Button>
           ))}
+        </CardContent>
+        <CardContent>
+          <label className="flex items-center justify-between gap-4 border-t pt-4">
+            <span>
+              <b className="block text-sm">{t('High contrast')}</b>
+              <span className="text-xs text-muted-foreground">{t('Sharper colours, for whoever reads with effort. With every theme, on every device you use.')}</span>
+            </span>
+            <Switch checked={th.contrast} onCheckedChange={(v) => void setContrast(v)} aria-label={t('High contrast')} />
+          </label>
         </CardContent>
       </Card>
       <Card>

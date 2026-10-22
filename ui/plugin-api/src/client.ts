@@ -166,6 +166,8 @@ export function applyContext(ctx: UiContext | undefined, root: HTMLElement = doc
     root.style.colorScheme = ctx.mode
   }
   if (/^[a-z0-9-]{1,32}$/.test(ctx.preset)) root.dataset.preset = ctx.preset
+  if (ctx.contrast) root.dataset.contrast = 'more'
+  else delete root.dataset.contrast
   applyTheme(ctx.theme, root)
 }
 

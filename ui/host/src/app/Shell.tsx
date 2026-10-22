@@ -7,7 +7,6 @@
 
 import type { ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { toast } from 'sonner'
 import {
   Activity,
   Bell,
@@ -15,20 +14,17 @@ import {
   Check,
   ChevronDown,
   CircleHelp,
-  CirclePlay,
   Contrast,
   Gauge,
   History,
   House,
   KeyRound,
-  Keyboard,
   LayoutDashboard,
   LogOut,
   Puzzle,
   Settings,
   Share2,
   ShieldCheck,
-  Sparkles,
   Trash2,
   UserRound,
   Users,
@@ -40,6 +36,7 @@ import type { Session, ShellBand } from '../types.ts'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
@@ -75,6 +72,9 @@ import { bandOf, sidebarOpen } from './prefs.ts'
 import { go, personal, to, type Route } from './router.ts'
 import { markSvg, type MarkVariant } from './mark.ts'
 import { QuotaAlert } from './Quotas.tsx'
+import { useFreshTour, useHelpItems } from './help.ts'
+import { HelpLayer } from './HelpLayer.tsx'
+import { useSetContrast } from './personal.ts'
 import { effectiveMode, setTheme, useTheme, type Mode } from './theme.ts'
 
 /** The symbol of the application (or the brand logo), as in the favicon (mark.ts): `negative` on the
@@ -204,7 +204,7 @@ function AppSidebar({ session, route, band }: { session: Session; route: Route; 
   const manager = route.area === 'tenant' && session.memberships.find((m) => m.slug === route.tenant)?.role === 'tenant_manager'
   return (
     // the right border is drawn by the parts: light on the top bar, grey below
-    <Sidebar collapsible="icon" className="border-r-0!">
+    <Sidebar collapsible="icon" className="border-r-0!" data-tour="sidebar">
       {isMobile && !admin ? (
         // on the phone the drawer starts with the tenant switcher (manager and user)
         <SidebarHeader className="border-b p-2">
@@ -336,6 +336,7 @@ export function TenantBadge({ name }: { name: string }) {
 /** The mode for oneself: light, dark or automatic; theme and other preferences are in Account. */
 function ModeMenu({ route }: { route: Route }) {
   const th = useTheme()
+  const setContrast = useSetContrast()
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className={bandIcon} aria-label={t('Mode')} title={t('Mode: light, dark or automatic')}>
@@ -348,6 +349,10 @@ function ModeMenu({ route }: { route: Route }) {
           <DropdownMenuRadioItem value="dark">{t('Dark')}</DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="auto">{t('Automatic')}</DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
+        <DropdownMenuSeparator />
+        <DropdownMenuCheckboxItem checked={th.contrast} onCheckedChange={(v) => void setContrast(v === true)}>
+          {t('High contrast')}
+        </DropdownMenuCheckboxItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={() => go(personal(route, 'account', 'appearance'))}>
           <Settings />
@@ -384,29 +389,22 @@ function LanguageMenu() {
 }
 
 /** The items of the help, as in the mockup: in the bar (? menu) or, if the help is off, in the menu of the person. */
-function useHelpItems() {
+function HelpMenu({ session, route }: { session: Session; route: Route }) {
   const brand = useBrand()
-  return [
-    { icon: CirclePlay, label: t('Guided tour of this page') },
-    { icon: CircleHelp, label: t('Guide of Mosaikit') },
-    { icon: Sparkles, label: t('What is new in version {v}', { v: brand.version || '1.0' }) },
-    { icon: Keyboard, label: t('Keyboard shortcuts') },
-  ].map((x) => ({ ...x, run: () => toast.info(t('In the product: {what}.', { what: x.label.toLowerCase() })) }))
-}
-
-function HelpMenu() {
-  const brand = useBrand()
-  const items = useHelpItems()
+  const items = useHelpItems(session, route)
+  const fresh = useFreshTour(session, route)
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className={bandIcon} aria-label={t('Help')} title={t('Help and version')}>
+      <DropdownMenuTrigger className={cn(bandIcon, 'relative')} aria-label={t('Help')} aria-description={fresh ? t('A guided tour of this page is available') : undefined} data-fresh={fresh ? 'true' : undefined} title={t('Help and version')} data-tour="help">
         <CircleHelp className="size-[18px]" />
+        {fresh && <span aria-hidden="true" className="absolute top-1 right-1 size-2 rounded-full bg-band-foreground ring-2 ring-band" />}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
         {items.map((x) => (
-          <DropdownMenuItem key={x.label} onSelect={x.run}>
+          <DropdownMenuItem key={x.label} onSelect={x.run} disabled={x.disabled}>
             <x.icon />
-            {x.label}
+            <span className="flex-1">{x.label}</span>
+            {x.fresh && <span className="rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">{t('new')}</span>}
           </DropdownMenuItem>
         ))}
         <DropdownMenuSeparator />
@@ -425,7 +423,7 @@ function HelpMenu() {
 function UserMenu({ session, route, band }: { session: Session; route: Route; band: ShellBand }) {
   const qc = useQueryClient()
   const unread = useUnread().data ?? 0
-  const help = useHelpItems()
+  const help = useHelpItems(session, route)
   const u = session.user
   const name = u.display_name || u.username
   async function logout() {
@@ -446,6 +444,7 @@ function UserMenu({ session, route, band }: { session: Session; route: Route; ba
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
+        data-tour="person"
         className="flex items-center gap-2 rounded-md py-0.5 pr-0.5 pl-2 text-band-foreground outline-none hover:bg-band-hover focus-visible:ring-2 focus-visible:ring-white/60"
       >
         {/* the name comes from the content, so it always holds the visible text (WCAG 2.5.3); on a
@@ -532,7 +531,7 @@ function TopBar({ session, route, band }: { session: Session; route: Route; band
       <div className="flex items-center gap-1 justify-self-end">
         {band.lang && <LanguageMenu />}
         {band.mode && <ModeMenu route={route} />}
-        {band.help && <HelpMenu />}
+        {band.help && <HelpMenu session={session} route={route} />}
         <NotificationsBell session={session} route={route} />
         <UserMenu session={session} route={route} band={band} />
       </div>
@@ -549,7 +548,10 @@ export default function Shell({ session, route, children }: { session: Session; 
       <SidebarInset className="min-w-0">
         <TopBar session={session} route={route} band={band} />
         <MaintenanceBanner admin={session.user.is_system_admin} />
-        <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+        <div data-tour="content" className="flex min-h-0 flex-1 flex-col">
+          {children}
+        </div>
+        <HelpLayer route={route} search={band.search} />
       </SidebarInset>
     </SidebarProvider>
   )

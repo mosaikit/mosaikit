@@ -364,3 +364,29 @@
   --warning-text: #8a4b00 !important;
   --error-text: #b4232a !important;
 }
+
+/* ── High contrast, for oneself (Account › Appearance and language) ─────────────────────────────
+   On top of every theme, built-in or made with the editor: secondary texts as strong as the main
+   text, visible borders and fields, a thick focus ring, underlined links. The selector is more specific
+   than the ones of the themes (.dark[data-preset=…]), so it wins in light and dark mode. */
+:root[data-contrast='more'][data-preset],
+:root[data-contrast='more'] {
+  --muted-foreground: var(--foreground);
+  --border: color-mix(in srgb, var(--foreground) 55%, var(--background));
+  --input: color-mix(in srgb, var(--foreground) 70%, var(--background));
+  --sidebar-foreground: var(--foreground);
+  --sidebar-border: color-mix(in srgb, var(--foreground) 55%, var(--background));
+  --rail-foreground: var(--foreground);
+  --band-muted: var(--band-foreground);
+  --band-line: var(--band-foreground);
+}
+:root[data-contrast='more'] :focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 2px;
+}
+:root[data-contrast='more'] main a:not([role]),
+:root[data-contrast='more'] [role='dialog'] a:not([role]) {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+

@@ -27,7 +27,7 @@ export interface Crumb {
  *  in the «⋯» menu, the other actions and the change of state (DropdownMenu items). */
 export function PageHeader({ title, sub, crumbs, badge, actions, more }: { title: string; sub?: ReactNode; crumbs?: Crumb[]; badge?: ReactNode; actions?: ReactNode; more?: ReactNode }) {
   return (
-    <div className="flex min-h-[57px] flex-wrap items-center gap-3 border-b px-6 py-2 max-[620px]:px-4">
+    <div data-tour="page-header" className="flex min-h-[57px] flex-wrap items-center gap-3 border-b px-6 py-2 max-[620px]:px-4">
       <div className="min-w-0 flex-1">
         {crumbs && crumbs.length > 0 && (
           <nav aria-label={t('Breadcrumb')} className="mb-0.5 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
@@ -52,7 +52,7 @@ export function PageHeader({ title, sub, crumbs, badge, actions, more }: { title
         {sub && <p className="truncate text-xs text-muted-foreground">{sub}</p>}
       </div>
       {(actions || more) && (
-        <div className="flex flex-wrap items-center gap-2">
+        <div data-tour="page-actions" className="flex flex-wrap items-center gap-2">
           {actions}
           {more && (
             <DropdownMenu>
@@ -166,7 +166,7 @@ export interface Section {
 export function Sections({ sections, current, href, children }: { sections: Section[]; current: string; href: (id: string) => string; children: ReactNode }) {
   return (
     <div className="flex min-h-0 flex-1 max-[760px]:flex-col">
-      <nav aria-label={t('Sections')} className="w-60 shrink-0 border-r bg-pane p-3 max-[760px]:w-auto max-[760px]:border-r-0 max-[760px]:border-b">
+      <nav data-tour="sections" aria-label={t('Sections')} className="w-60 shrink-0 border-r bg-pane p-3 max-[760px]:w-auto max-[760px]:border-r-0 max-[760px]:border-b">
         <div className="hidden max-[760px]:block">
           <Select value={current} onValueChange={(v) => go(href(v))}>
             <SelectTrigger className="w-full bg-background" aria-label={t('Section')}>

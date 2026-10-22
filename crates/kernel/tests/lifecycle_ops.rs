@@ -78,6 +78,39 @@ async fn export_delete_and_import_a_tenant() {
 
     let imp = lifecycle::impact(&t, &admin, alfa).await.unwrap();
     assert_eq!((imp.people, imp.items, imp.items_elsewhere), (2, 3, 1));
+    // what follows the people and the tenant: high contrast, a theme made for the tenant, the search
+    mosaikit_kernel::personal::change(
+        &t,
+        anna.user_id,
+        &mosaikit_kernel::personal::PrefsChange { contrast: Some(true), ..Default::default() },
+    )
+    .await
+    .unwrap();
+    let vars: std::collections::BTreeMap<String, String> = [
+        ("--background", "#ffffff"),
+        ("--foreground", "#242424"),
+        ("--primary", "#1f6f5c"),
+        ("--primary-foreground", "#ffffff"),
+        ("--band", "#174f42"),
+        ("--band-foreground", "#ffffff"),
+    ]
+    .into_iter()
+    .map(|(a, b)| (a.to_string(), b.to_string()))
+    .collect();
+    let theme = mosaikit_kernel::tenancy::themes::save_tenant(
+        &t,
+        &mgr,
+        &mosaikit_kernel::tenancy::themes::ThemeInput {
+            id: None,
+            name: "Ours".into(),
+            input: serde_json::Value::Null,
+            light: vars.clone(),
+            dark: vars,
+        },
+    )
+    .await
+    .unwrap();
+    mosaikit_kernel::tenancy::set_tenant_theme(&t, &mgr, Some(&theme.id)).await.unwrap();
 
     let (path, m) = transfer::export_tenant(&t, &admin, alfa).await.unwrap();
     assert!(path.is_file());
@@ -119,6 +152,10 @@ async fn export_delete_and_import_a_tenant() {
     assert_eq!(titles(&t, &anna_c).await, vec!["Minutes".to_string()]);
     let (_, data) = files::read(&t, &anna_c, FILES, doc.id).await.unwrap();
     assert_eq!(data, b"hello");
+    assert!(mosaikit_kernel::personal::get(&t, anna.user_id).await.unwrap().contrast);
+    assert_eq!(mosaikit_kernel::tenancy::tenant_theme(&t, alfa).await.unwrap().preset, theme.id);
+    let found = mosaikit_kernel::search::search(&t, &anna_c, "minutes", "en").await.unwrap();
+    assert_eq!(found.iter().map(|g| g.items.len()).sum::<usize>(), 1, "found after the import");
     // a second import needs `replace`
     let again = transfer::import_tenant(&t, &admin, &path, "", &ImportOptions::default()).await.unwrap_err();
     assert_eq!(again.code(), "tenant_exists");

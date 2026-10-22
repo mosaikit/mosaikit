@@ -139,7 +139,7 @@ export function PluginPage({ session, slug, id, at }: { session: Session; slug: 
   // language, theme and mode of the shell: they reach the plugin at start and at every change
   const lang = useLang()
   const th = useTheme()
-  const ui = { lang, preset: th.preset, mode: effectiveMode(th), preference: th.mode }
+  const ui = { lang, preset: th.preset, mode: effectiveMode(th), preference: th.mode, contrast: th.contrast }
   const base = useUi()
   const reloads = useDevReload(session, slug)
   const [share, setShare] = useState<{ id: string; done: () => void } | null>(null)

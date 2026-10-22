@@ -17,6 +17,7 @@ mod requests;
 mod settings;
 mod support;
 mod tenants;
+pub mod themes;
 
 pub use administrators::{
     administrators, create_administrator, reset_administrator_password, reset_administrator_totp,

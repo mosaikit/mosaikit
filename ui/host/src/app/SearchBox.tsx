@@ -1,16 +1,52 @@
-// The search in the top bar. Closed it is a field to click (or Ctrl K); open one types and below
+// The search in the top bar. Closed it is a field to click (or Ctrl K, or /); open one types and below
 // a drop-down opens with the pill filters and the results. Esc, a click outside or a result close it.
 // Keyboard navigation (arrows, Enter) comes from cmdk, as in the Command component of shadcn.
+// Pages, apps and tenants are filtered here; the items of the apps come from the server
+// (`/api/t/<tenant>/search`: only what the person can see), one pill per app with its count; the
+// Administrator finds tenants and people (`/api/admin/search`). The last searches are remembered in this
+// browser, for this person.
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Command as CommandPrimitive } from 'cmdk'
-import { Building2, Search } from 'lucide-react'
-import type { Session, TenantInfo } from '../types.ts'
+import { Building2, History, Search, UserRound } from 'lucide-react'
+import { api } from '../api.ts'
+import type { SearchGroupResult, Session } from '../types.ts'
 import { CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/components/ui/command'
 import { cn } from '@/lib/utils'
-import { useApi } from './core.ts'
+import AppIcon from './AppIcon.tsx'
 import { go, to, type Route } from './router.ts'
 import { t } from './i18n.ts'
+import { searchable } from './searchwords.ts'
+
+const enc = encodeURIComponent
+const RECENT_MAX = 6
+
+function recentKey(user: string) {
+  return `msk_recent_search:${user}`
+}
+function readRecent(user: string): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(recentKey(user)) ?? '[]') as unknown
+    return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string').slice(0, RECENT_MAX) : []
+  } catch {
+    return []
+  }
+}
+function remember(user: string, q: string) {
+  const v = q.trim()
+  if (!searchable(v)) return
+  try {
+    localStorage.setItem(recentKey(user), JSON.stringify([v, ...readRecent(user).filter((x) => x !== v)].slice(0, RECENT_MAX)))
+  } catch {
+    /* storage not available */
+  }
+}
+
+interface AdminResults {
+  tenants: { id: string; name: string; sub: string }[]
+  people: { id: string; name: string; sub: string }[]
+}
 
 export interface SearchItem {
   label: string
@@ -24,6 +60,9 @@ export interface SearchGroup {
   id: string
   label: string
   items: SearchItem[]
+  /** found by the server: shown as they come, with the total count */
+  remote?: boolean
+  count?: number
 }
 
 const norm = (s: string) =>
@@ -32,41 +71,76 @@ const norm = (s: string) =>
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
 
-export default function SearchBox({ session, groups }: { session: Session; route: Route; groups: SearchGroup[] }) {
+export default function SearchBox({ session, route, groups }: { session: Session; route: Route; groups: SearchGroup[] }) {
   const [open, setOpen] = useState(false)
   const [q, setQ] = useState('')
+  const [dq, setDq] = useState('')
   const [pill, setPill] = useState('all')
   const box = useRef<HTMLDivElement>(null)
   const admin = session.user.is_system_admin
-  const tenants = useApi<TenantInfo[]>(['admin-tenants'], admin && open ? '/api/admin/tenants' : null)
+  const me = session.user.user_id
+  const slug = route.area === 'tenant' ? route.tenant : ''
+  // the server is asked once the person stops typing for a moment
+  useEffect(() => {
+    const h = setTimeout(() => setDq(q.trim()), 180)
+    return () => clearTimeout(h)
+  }, [q])
+  const ask = open && searchable(dq)
+  const items = useQuery({
+    queryKey: ['search', slug, dq],
+    queryFn: () => api<SearchGroupResult[]>('GET', `/api/t/${enc(slug)}/search?q=${enc(dq)}`),
+    enabled: ask && !admin && !!slug,
+    staleTime: 15_000,
+  })
+  const found = useQuery({
+    queryKey: ['admin-search', dq],
+    queryFn: () => api<AdminResults>('GET', `/api/admin/search?q=${enc(dq)}`),
+    enabled: ask && admin,
+    staleTime: 15_000,
+  })
+  const [recent, setRecent] = useState<string[]>([])
 
   const all: SearchGroup[] = useMemo(() => {
     const extra: SearchGroup[] = admin
       ? [
-          {
-            id: 'tenants',
-            label: t('Tenant'),
-            items: (tenants.data ?? []).map((t) => ({ label: t.name, sub: t.slug, extra: t.slug, icon: <Building2 />, href: to.adminTenant(t.id) })),
-          },
+          { id: 'tenants', label: t('Tenant'), remote: true, items: (found.data?.tenants ?? []).map((x) => ({ label: x.name, sub: x.sub, icon: <Building2 />, href: to.adminTenant(x.id) })) },
+          { id: 'people', label: t('People'), remote: true, items: (found.data?.people ?? []).map((x) => ({ label: x.name, sub: x.sub, icon: <UserRound />, href: to.adminPerson(x.id) })) },
         ]
       : session.memberships.length > 1
         ? [{ id: 'tenants', label: t('Tenant'), items: session.memberships.map((m) => ({ label: m.name, sub: m.is_home ? 'home' : 'guest', icon: <Building2 />, href: to.tenant(m.slug) })) }]
         : []
-    return [...groups, ...extra].filter((g) => g.items.length)
-  }, [groups, admin, tenants.data, session.memberships])
+    const apps: SearchGroup[] = (items.data ?? []).map((g) => ({
+      id: `app:${g.plugin_id}`,
+      label: g.label,
+      remote: true,
+      count: g.count,
+      items: g.items.map((h) => ({
+        label: h.title || t('(untitled)'),
+        sub: h.snippet || h.owner_name,
+        icon: <AppIcon id={g.plugin_id} name={g.icon} />,
+        href: to.item(slug, h.id),
+      })),
+    }))
+    return [...groups, ...apps, ...extra].filter((g) => g.items.length)
+  }, [groups, admin, found.data, items.data, session.memberships, slug])
 
   const nq = norm(q.trim())
-  const match = (it: SearchItem) => !nq || norm(`${it.label} ${it.extra ?? ''} ${it.sub ?? ''}`).includes(nq)
-  const counts = all.map((g) => g.items.filter(match).length)
-  const shown = all.map((g) => ({ ...g, items: g.items.filter(match) })).filter((g) => (pill === 'all' || g.id === pill) && g.items.length)
+  const match = (g: SearchGroup, it: SearchItem) => g.remote || !nq || norm(`${it.label} ${it.extra ?? ''} ${it.sub ?? ''}`).includes(nq)
+  const counts = all.map((g) => (g.remote ? (g.count ?? g.items.length) : g.items.filter((it) => match(g, it)).length))
+  const shown = all.map((g) => ({ ...g, items: g.items.filter((it) => match(g, it)) })).filter((g) => (pill === 'all' || g.id === pill) && g.items.length)
+  const loading = (items.isFetching || found.isFetching) && ask
+  const recents = !q.trim() && pill === 'all' ? recent : []
 
-  const openBox = () => {
+  const openBox = useCallback(() => {
     setQ('')
+    setDq('')
     setPill('all')
+    setRecent(readRecent(me))
     setOpen(true)
-  }
+  }, [me])
   const close = () => setOpen(false)
   const pick = (href: string) => {
+    remember(me, q)
     close()
     go(href)
   }
@@ -79,9 +153,17 @@ export default function SearchBox({ session, groups }: { session: Session; route
         else openBox()
       }
     }
+    // the "/" shortcut and the help ask for the search with this event
+    const onAsk = () => {
+      if (!open) openBox()
+    }
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [open])
+    window.addEventListener('msk:search', onAsk)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      window.removeEventListener('msk:search', onAsk)
+    }
+  }, [open, openBox])
   useEffect(() => {
     if (!open) return
     const onDown = (e: MouseEvent) => {
@@ -91,10 +173,11 @@ export default function SearchBox({ session, groups }: { session: Session; route
     return () => document.removeEventListener('mousedown', onDown)
   }, [open])
 
-  const placeholder = admin ? t('Search tenants and pages') : t('Search pages, apps and tenants')
+  const placeholder = admin ? t('Search tenants, people and pages') : t('Search pages, apps and their items')
   return (
     <div
       ref={box}
+      data-tour="search"
       className={cn(
         'relative flex min-w-0 justify-center @max-[600px]:justify-end max-[900px]:static max-[900px]:ml-auto max-[900px]:basis-80 max-[620px]:basis-auto',
         open && 'max-[900px]:flex-1 max-[620px]:basis-auto',
@@ -161,14 +244,30 @@ export default function SearchBox({ session, groups }: { session: Session; route
               ))}
             </div>
             <CommandList className="max-h-[min(55vh,460px)]">
-              <CommandEmpty>{q ? t('No results for «{q}».', { q }) : t('No results.')}</CommandEmpty>
+              {loading && !shown.some((g) => g.remote) ? (
+                <div className="py-6 text-center text-sm text-muted-foreground" role="status">
+                  {t('Searching…')}
+                </div>
+              ) : (
+                <CommandEmpty>{q ? t('No results for «{q}».', { q }) : t('No results.')}</CommandEmpty>
+              )}
+              {recents.length > 0 && (
+                <CommandGroup heading={t('Recent searches')}>
+                  {recents.map((r) => (
+                    <CommandItem key={`recent:${r}`} value={`recent:${r}`} onSelect={() => setQ(r)}>
+                      <History />
+                      <span className="flex-1 truncate">{r}</span>
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
               {shown.map((g) => (
-                <CommandGroup key={g.id} heading={`${g.label} · ${g.items.length}`}>
+                <CommandGroup key={g.id} heading={`${g.label} · ${g.remote ? (g.count ?? g.items.length) : g.items.length}`}>
                   {g.items.map((it) => (
                     <CommandItem key={it.href} value={`${g.id}:${it.href}`} onSelect={() => pick(it.href)}>
                       {it.icon}
-                      <span className="flex-1 truncate">{it.label}</span>
-                      {it.sub && <span className="text-xs text-muted-foreground">{it.sub}</span>}
+                      <span className="min-w-0 flex-1 truncate">{it.label}</span>
+                      {it.sub && <span className="max-w-[55%] truncate text-xs text-muted-foreground">{it.sub}</span>}
                     </CommandItem>
                   ))}
                 </CommandGroup>

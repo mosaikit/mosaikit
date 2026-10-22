@@ -1795,3 +1795,112 @@ async fn lifecycle_and_operations_over_http() {
     assert_eq!(r.status, StatusCode::OK, "{}", r.text());
     a.login("gamma", "boss", PASSWORD).await;
 }
+
+#[tokio::test]
+async fn search_prefs_and_themes_over_http() {
+    let a = App::new().await;
+    a.t.install("notes").await;
+    let g = a.t.tenant("alfa").await;
+    a.t.member(&g, "anna").await;
+    let admin = a.admin().await;
+    let m = a.login("alfa", "alfa-manager", PASSWORD).await;
+    let anna = a.login("alfa", "anna", PASSWORD).await;
+
+    // search: Anna finds her note by a word of the text, the Tenant Manager does not see it
+    let r = a
+        .call(
+            Some(&anna),
+            Method::POST,
+            "/api/t/alfa/p/com.mosaikit.notes/r/notes",
+            Some(json!({ "values": { "title": "Site visit", "body": "north depot" } })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::CREATED, "{}", r.text());
+    let r = a.call(Some(&anna), Method::GET, "/api/t/alfa/search?q=depot", None).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    assert_eq!(r.json()[0]["plugin_id"], "com.mosaikit.notes");
+    assert_eq!(r.json()[0]["items"][0]["title"], "Site visit");
+    assert_eq!(a.call(Some(&m), Method::GET, "/api/t/alfa/search?q=depot", None).await.json(), json!([]));
+    let r = a.call(Some(&admin), Method::GET, "/api/admin/search?q=alf", None).await;
+    assert_eq!(r.json()["tenants"][0]["sub"], "alfa");
+    assert_eq!(
+        a.call(Some(&anna), Method::GET, "/api/admin/search?q=alf", None).await.status,
+        StatusCode::FORBIDDEN
+    );
+
+    // preferences that follow the person: in the session too
+    let r = a
+        .call(
+            Some(&anna),
+            Method::PUT,
+            "/api/me/prefs",
+            Some(json!({ "contrast": true, "tour_done": "home" })),
+        )
+        .await;
+    assert_eq!(r.json(), json!({ "contrast": true, "tours_done": ["home"] }));
+    assert_eq!(
+        a.call(Some(&anna), Method::GET, "/api/session", None).await.json()["me"]["contrast"],
+        json!(true)
+    );
+
+    // a theme of the platform: contrast checked, offered to tenants, public for the sign-in page
+    let vars = json!({ "--background": "#ffffff", "--foreground": "#242424", "--primary": "#1f6f5c",
+                       "--primary-foreground": "#ffffff", "--band": "#174f42", "--band-foreground": "#ffffff" });
+    let bad = json!({ "name": "Low", "light": { "--background": "#ffffff", "--foreground": "#bbbbbb",
+        "--primary": "#1f6f5c", "--primary-foreground": "#ffffff", "--band": "#174f42", "--band-foreground": "#ffffff" },
+        "dark": vars });
+    let r = a.call(Some(&admin), Method::POST, "/api/admin/themes", Some(bad)).await;
+    assert_eq!((r.status, r.json()["code"].clone()), (StatusCode::BAD_REQUEST, json!("theme_contrast")));
+    let r = a
+        .call(
+            Some(&admin),
+            Method::POST,
+            "/api/admin/themes",
+            Some(json!({ "name": "Green", "light": vars, "dark": vars })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let id = r.json()["id"].as_str().unwrap().to_string();
+    let r = a
+        .call(
+            Some(&m),
+            Method::POST,
+            "/api/admin/themes",
+            Some(json!({ "name": "X", "light": vars, "dark": vars })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN);
+    assert_eq!(a.call(None, Method::GET, "/api/auth/themes", None).await.json()[0]["id"], json!(id));
+    let r = a.call(Some(&m), Method::PUT, "/api/t/alfa/manage/theme", Some(json!({ "preset": id }))).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let ctx = a.call(Some(&anna), Method::GET, "/api/t/alfa/context", None).await.json();
+    assert_eq!((ctx["theme"]["preset"].clone(), ctx["themes"][0]["id"].clone()), (json!(id), json!(id)));
+    // no longer offered: the tenant goes back to the theme of the platform
+    let r = a
+        .call(Some(&admin), Method::PUT, "/api/admin/themes-allowed", Some(json!({ "allowed": ["tessera"] })))
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let ctx = a.call(Some(&anna), Method::GET, "/api/t/alfa/context", None).await.json();
+    assert_eq!(ctx["theme"]["preset"], "mosaikit");
+    // a theme of the tenant
+    let r = a
+        .call(
+            Some(&m),
+            Method::POST,
+            "/api/t/alfa/manage/themes",
+            Some(json!({ "name": "Ours", "light": vars, "dark": vars })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    assert_eq!(
+        a.call(
+            Some(&anna),
+            Method::POST,
+            "/api/t/alfa/manage/themes",
+            Some(json!({ "name": "No", "light": vars, "dark": vars }))
+        )
+        .await
+        .status,
+        StatusCode::FORBIDDEN
+    );
+}

@@ -23,7 +23,7 @@ import { AdminPeople, AdminPersonPage, GroupPage, ItemPage, PersonPage, PluginAc
 import { Manage, PluginPage, Shares, TenantHome, TenantSettingsPage, Usage } from './pages/tenant.tsx'
 import { go, href, parse, to, useHash, type Route } from './router.ts'
 import Shell from './Shell.tsx'
-import { setDefaultMode, setPreset } from './theme.ts'
+import { registerThemes, setContrast, setDefaultMode, setPreset } from './theme.ts'
 
 const LAST_TENANT = 'msk_tenant'
 
@@ -105,7 +105,15 @@ export default function App() {
   // the theme of the tenant one works in, otherwise the one of the platform
   const ctx = useTenantCtx(s && route.area === 'tenant' ? route.tenant : '')
   const preset = route.area === 'tenant' ? ctx.data?.theme?.preset : s?.theme
+  // the themes of the theme editor known to the session and to the tenant, before choosing one
+  useEffect(() => registerThemes(s?.themes), [s?.themes])
+  useEffect(() => registerThemes(ctx.data?.themes), [ctx.data?.themes])
   useEffect(() => setPreset(preset), [preset])
+  // high contrast follows the person (saved with them)
+  const contrast = s?.me?.contrast
+  useEffect(() => {
+    if (contrast !== undefined) setContrast(contrast)
+  }, [contrast])
   // languages, formats and default mode of the tenant one works in, otherwise of the home tenant (the
   // platform's for the Administrator)
   const config = route.area === 'tenant' ? ctx.data?.config : s?.config
