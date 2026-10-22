@@ -11,6 +11,8 @@ mod invitations;
 pub mod keys;
 pub mod levels;
 mod members;
+mod people;
+mod requests;
 mod settings;
 mod support;
 mod tenants;
@@ -22,11 +24,21 @@ pub use administrators::{
 pub use directory::{directory, Principal};
 pub use groups::{create_group, delete_group, groups, set_group_member, GroupInfo, GroupMember};
 pub use invitations::{
-    invite, my_invitations, respond_invitation, revoke_invitation, tenant_invitations, InvitationInfo,
+    invite, invite_with, my_invitations, respond_invitation, revoke_invitation, tenant_invitations,
+    InvitationInfo,
 };
 pub use members::{
-    create_member, members, remove_member, reset_member_password, set_role, MemberInfo, RemoveReport,
+    create_member, members, remove_member, reset_member_password, set_member_suspended, set_role, MemberInfo,
+    RemoveReport,
 };
+pub use people::{
+    add_to_tenant, close_session, close_sessions, create_person, directory_of_people, group_detail,
+    member_detail, move_home, person, person_activity, person_sessions, remove_from_tenant, reset_info,
+    reset_link, reset_with_link, set_person_status, update_membership, update_person, why_not, By, EventInfo,
+    GroupDetail, MemberDetail, MembershipChange, NewMembership, NewPerson, PersonRow, PersonTenant,
+    ResetInfo, ResetLink, SessionInfo, SharedItem, Step, WhyNot,
+};
+pub use requests::{decide_request, request_access, requests, AccessRequest};
 pub use settings::{
     platform_theme, prefs, set_platform_theme, set_prefs, set_settings, set_shell_band, set_tenant_theme,
     shell_band, tenant_theme, ShellBand, ThemeChoice, DEFAULT_THEME,
@@ -54,7 +66,8 @@ pub async fn caller(k: &Kernel, user: &SessionUser, slug: &str) -> Result<Caller
     let row = mosaikit_db::query(
         "select t.id, t.slug, t.name, t.settings, m.role from core.tenants t
          join core.memberships m on m.tenant_id = t.id
-         where t.slug = $1 and m.user_id = $2 and t.status = 'active' and not t.is_system",
+         where t.slug = $1 and m.user_id = $2 and t.status = 'active' and not t.is_system
+           and m.status = 'active'",
     )
     .bind(slug)
     .bind(user.user_id)

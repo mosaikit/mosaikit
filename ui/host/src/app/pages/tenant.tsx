@@ -4,12 +4,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Bell, Frame, Gauge, Grid2x2, KeyRound, KeySquare, Lock, Mail, MoreHorizontal, Palette, Plus, Puzzle, Share2, ShieldCheck, Trash2, UserRound, Users } from 'lucide-react'
+import { Bell, Frame, Gauge, Grid2x2, KeyRound, KeySquare, Link2, Lock, Mail, MoreHorizontal, Palette, Plus, Puzzle, Share2, ShieldCheck, ShieldOff, Trash2, UserRound, Users } from 'lucide-react'
 import { api, appUrl, fmtBytes, fmtDate } from '../../api.ts'
 import PluginFrame from '../../components/PluginFrame.tsx'
 import { UiContext, useUi, type Ui } from '../../ui-context.ts'
 import ShareDialog from '../ShareDialog.tsx'
-import type { Group, Invitation, LinkInfo, Member, Overview, ResourceRow, Session, TenantContext, TenantKpi, TenantSettings } from '../../types.ts'
+import type { AccessRequest, Group, Invitation, LinkInfo, Member, Overview, Profile, ResetLink, ResourceRow, Session, TenantContext, TenantKpi, TenantSettings } from '../../types.ts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -28,6 +28,7 @@ import { go, to } from '../router.ts'
 import { effectiveMode, useTheme } from '../theme.ts'
 import AppIcon from '../AppIcon.tsx'
 import { TenantTheme } from '../ThemeSettings.tsx'
+import { LinkDialog, ProfilesSection, RequestsTable } from './people.tsx'
 import { EmbeddingPanel, IdentityPanel, KeysPanel, LanguagesPanel, ManagedPanel, ModePanel, NotificationsPanel, SecurityPanel } from '../SettingsPanels.tsx'
 
 const enc = encodeURIComponent
@@ -168,21 +169,33 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
   const members = useApi<Member[]>(['members', slug], `${base}/members`)
   const groups = useApi<Group[]>(['groups', slug], `${base}/groups`)
   const invites = useApi<Invitation[]>(['invites', slug], `${base}/invitations`)
-  // Pending: the invitations (access requests will come with the kernel); permission profiles are not
-  // there yet
-  const cur = ['people', 'groups', 'pending'].includes(section ?? '') ? section! : 'people'
+  const profiles = useApi<Profile[]>(['profiles', slug], `${base}/profiles`)
+  const requests = useApi<AccessRequest[]>(['requests', slug], `/api/t/${enc(slug)}/requests`)
+  const cur = ['people', 'groups', 'profiles', 'pending'].includes(section ?? '') ? section! : 'people'
+  const pending = (invites.data?.filter((i) => i.status === 'pending').length ?? 0) + (requests.data?.length ?? 0)
   const sections = [
     { id: 'people', label: t('People'), icon: <Users />, count: members.data?.length },
     { id: 'groups', label: t('Groups'), icon: <Grid2x2 />, count: groups.data?.length },
-    { id: 'pending', label: t('Pending'), icon: <Mail />, count: invites.data?.filter((i) => i.status === 'pending').length },
+    { id: 'profiles', label: t('Permission profiles'), icon: <KeySquare />, count: profiles.data?.length },
+    { id: 'pending', label: t('Pending'), icon: <Mail />, count: pending },
   ]
-  const [dlg, setDlg] = useState<null | 'member' | 'group' | 'invite'>(null)
-  const inval = [['members', slug], ['groups', slug], ['invites', slug], ['overview', slug]]
+  const [dlg, setDlg] = useState<null | 'member' | 'group' | 'invite' | 'profile'>(null)
+  const inval = [['members', slug], ['groups', slug], ['invites', slug], ['overview', slug], ['profiles', slug]]
   const create = useAction((v: Record<string, string>) => api('POST', `${base}/members`, v), { ok: (v) => t('User {username} created', { username: v.username }), invalidate: inval })
   const newGroup = useAction((v: Record<string, string>) => api('POST', `${base}/groups`, v), { ok: (v) => t('Group {name} created', { name: v.name }), invalidate: inval })
-  const invite = useAction((v: Record<string, string>) => api('POST', `${base}/invitations`, v), { ok: t('Invitation sent'), invalidate: inval })
+  const invite = useAction((v: Record<string, string>) => api('POST', `${base}/invitations`, { ...v, profile: v.profile === 'default' ? null : v.profile }), { ok: t('Invitation sent'), invalidate: inval })
+  const newProfile = useAction((v: Record<string, string>) => api('POST', `${base}/profiles`, v), { ok: (v) => t('Profile {name} created', { name: v.name }), invalidate: inval })
+  const profileChoices: [string, string][] = [
+    ['default', t('Default profile')],
+    ...(profiles.data ?? []).filter((p) => !p.is_default).map((p): [string, string] => [p.id, p.name]),
+  ]
   const action =
-    cur === 'people' ? (
+    cur === 'profiles' ? (
+      <Button onClick={() => setDlg('profile')}>
+        <Plus />
+        {t('New profile')}
+      </Button>
+    ) : cur === 'people' ? (
       <Button onClick={() => setDlg('member')}>
         <Plus />
         {t('New user')}
@@ -203,13 +216,32 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
       <PageHeader
         title={t('Manage')}
         crumbs={[{ label: t('Tenant management') }]}
-        sub={{ people: t('{count} people', { count: members.data?.length ?? 0 }), groups: t('{count} groups', { count: groups.data?.length ?? 0 }), pending: t('{count} pending invitations', { count: sections[2].count ?? 0 }) }[cur]}
+        sub={
+          {
+            people: t('{count} people', { count: members.data?.length ?? 0 }),
+            groups: t('{count} groups', { count: groups.data?.length ?? 0 }),
+            profiles: t('{count} profiles', { count: profiles.data?.length ?? 0 }),
+            pending: t('{count} pending', { count: pending }),
+          }[cur]
+        }
         actions={action}
       />
       <Sections sections={sections} current={cur} href={(id) => to.tenant(slug, 'manage', id)}>
-        {cur === 'people' && <People slug={slug} q={members} />}
+        {cur === 'people' && <People slug={slug} q={members} profiles={profiles.data ?? []} groups={groups.data ?? []} />}
         {cur === 'groups' && <Groups slug={slug} q={groups} members={members.data ?? []} />}
-        {cur === 'pending' && <Invites slug={slug} q={invites} />}
+        {cur === 'profiles' && <ProfilesSection slug={slug} />}
+        {cur === 'pending' && (
+          <div className="grid gap-6">
+            <section className="grid gap-2" aria-label={t('Access requests')}>
+              <h2 className="text-sm font-semibold">{t('Access requests')}</h2>
+              <RequestsTable slug={slug} manager />
+            </section>
+            <section className="grid gap-2" aria-label={t('Invitations')}>
+              <h2 className="text-sm font-semibold">{t('Invitations')}</h2>
+              <Invites slug={slug} q={invites} />
+            </section>
+          </div>
+        )}
       </Sections>
       <FormDialog
         open={dlg === 'member'}
@@ -242,9 +274,22 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
           { name: 'tenant', label: t('Home tenant'), required: true },
           { name: 'username', label: t('Username'), required: true },
           { name: 'role', label: t('Role'), options: [['user', 'User'], ['tenant_manager', 'Tenant Manager']] },
+          { name: 'profile', label: t('Permission profile'), options: profileChoices },
         ]}
         submit={t('Send the invitation')}
         onSubmit={(v) => invite.mutateAsync(v)}
+      />
+      <FormDialog
+        open={dlg === 'profile'}
+        onOpenChange={(o) => !o && setDlg(null)}
+        title={t('New profile')}
+        description={t('It starts with the default permissions of every plugin: change them afterwards.')}
+        fields={[
+          { name: 'name', label: t('Name'), required: true },
+          { name: 'description', label: t('Description') },
+        ]}
+        submit={t('Create profile')}
+        onSubmit={(v) => newProfile.mutateAsync(v)}
       />
     </>
   )
@@ -252,7 +297,7 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
 
 type Q<T> = { data?: T; isLoading: boolean; error: unknown }
 
-function People({ slug, q }: { slug: string; q: Q<Member[]> }) {
+function People({ slug, q, profiles, groups }: { slug: string; q: Q<Member[]>; profiles: Profile[]; groups: Group[] }) {
   const pwMin = passwordMin(useConfig(slug))
   const base = `/api/t/${enc(slug)}/manage/members`
   const [sel, setSel] = useState<Set<string>>(new Set())
@@ -269,6 +314,20 @@ function People({ slug, q }: { slug: string; q: Q<Member[]> }) {
     invalidate: [...inval, ['m-resources', slug]],
   })
   const resetPw = useAction(({ id, password }: { id: string; password: string }) => api('POST', `${base}/${id}/password`, { password }), { ok: t('Password reset') })
+  const setProfile = useAction(({ ids, profile }: { ids: string[]; profile: string | null }) => Promise.all(ids.map((id) => api('PUT', `${base}/${id}/profile`, { profile }))), {
+    ok: t('Profile updated'),
+    invalidate: [...inval, ['profiles', slug]],
+  })
+  const toGroup = useAction(({ ids, group }: { ids: string[]; group: string }) => Promise.all(ids.map((id) => api('PUT', `/api/t/${enc(slug)}/manage/groups/${group}/members/${id}`))), {
+    ok: t('Added to the group'),
+    invalidate: [...inval, ['groups', slug]],
+  })
+  const suspend = useAction(({ ids, suspended }: { ids: string[]; suspended: boolean }) => Promise.all(ids.map((id) => api('PUT', `${base}/${id}/status`, { suspended }))), {
+    ok: ({ suspended }) => (suspended ? t('Suspended in the tenant') : t('Active again')),
+    invalidate: inval,
+  })
+  const [link, setLink] = useState<{ name: string; link: ResetLink } | null>(null)
+  const sendLink = useAction((m: Member) => api<ResetLink>('POST', `${base}/${m.user_id}/reset-link`), {})
   const rows = useMemo(() => {
     const s = search.trim().toLowerCase()
     return (q.data ?? []).filter((m) => !s || `${m.username} ${m.display_name} ${m.home_tenant}`.toLowerCase().includes(s))
@@ -293,6 +352,40 @@ function People({ slug, q }: { slug: string; q: Q<Member[]> }) {
               <UserRound />
               {t('Make User')}
             </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm">
+                  {t('Change profile')}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onSelect={() => setProfile.mutate({ ids, profile: null })}>{t('Default profile')}</DropdownMenuItem>
+                {profiles
+                  .filter((p) => !p.is_default)
+                  .map((p) => (
+                    <DropdownMenuItem key={p.id} onSelect={() => setProfile.mutate({ ids, profile: p.id })}>
+                      {p.name}
+                    </DropdownMenuItem>
+                  ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" disabled={!groups.length}>
+                  {t('Add to a group')}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="max-h-72 overflow-auto">
+                {groups.map((g) => (
+                  <DropdownMenuItem key={g.id} onSelect={() => toGroup.mutate({ ids, group: g.id })}>
+                    {g.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Button variant="outline" size="sm" onClick={() => suspend.mutate({ ids, suspended: true })}>
+              {t('Suspend')}
+            </Button>
             <Button variant="ghost" size="sm" onClick={() => setSel(new Set())}>
               {t('Deselect')}
             </Button>
@@ -311,10 +404,11 @@ function People({ slug, q }: { slug: string; q: Q<Member[]> }) {
                 />
               </TableHead>
               <TableHead>{t('Name')}</TableHead>
-              <TableHead>{t('Role')}</TableHead>
+              <TableHead>{t('Role and profile')}</TableHead>
+              <TableHead>{t('Groups')}</TableHead>
               <TableHead>{t('Status')}</TableHead>
               <TableHead className="text-right">{t('Items')}</TableHead>
-              <TableHead>{t('In the tenant since')}</TableHead>
+              <TableHead>{t('Last sign-in')}</TableHead>
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
@@ -335,13 +429,15 @@ function People({ slug, q }: { slug: string; q: Q<Member[]> }) {
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2.5">
-                    <span className="flex size-8 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">{initials(m.display_name || m.username)}</span>
+                    <span className="flex size-8 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary-strong">{initials(m.display_name || m.username)}</span>
                     <div>
-                      <div className="font-medium">
+                      <a className="font-medium hover:underline" href={to.person(slug, m.user_id)}>
                         {m.display_name || m.username}
+                      </a>
+                      <div className="contents">
                         {m.is_guest && (
                           <Badge variant="secondary" className="ml-2 font-normal">
-                            ospite · {m.home_tenant}
+                            {t('guest')} · {m.home_tenant}
                           </Badge>
                         )}
                       </div>
@@ -355,12 +451,14 @@ function People({ slug, q }: { slug: string; q: Q<Member[]> }) {
                   <Badge variant={m.role === 'tenant_manager' ? 'default' : 'secondary'} className="font-normal">
                     {ROLE[m.role]}
                   </Badge>
+                  <div className="mt-1 text-xs text-muted-foreground">{m.role === 'tenant_manager' ? t('every permission') : m.profile}</div>
                 </TableCell>
+                <TableCell className="max-w-48 text-sm text-muted-foreground">{m.groups.join(', ') || '—'}</TableCell>
                 <TableCell>
-                  <StatusBadge status={m.status} />
+                  <StatusBadge status={m.status !== 'active' ? m.status : m.membership} />
                 </TableCell>
                 <TableCell className="text-right tabular-nums">{m.owned_resources}</TableCell>
-                <TableCell className="text-muted-foreground">{fmtDate(m.joined_at)}</TableCell>
+                <TableCell className="text-muted-foreground">{m.last_sign_in_at ? fmtDate(m.last_sign_in_at) : t('Never')}</TableCell>
                 <TableCell>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -369,16 +467,30 @@ function People({ slug, q }: { slug: string; q: Q<Member[]> }) {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem onSelect={() => go(to.person(slug, m.user_id))}>
+                        <UserRound />
+                        {t('Open')}
+                      </DropdownMenuItem>
                       <DropdownMenuItem onSelect={() => setRole.mutate({ ids: [m.user_id], role: m.role === 'user' ? 'tenant_manager' : 'user' })}>
                         <ShieldCheck />
                         {m.role === 'user' ? t('Make Tenant Manager') : t('Make User')}
                       </DropdownMenuItem>
+                      {!m.is_guest && (
+                        <DropdownMenuItem onSelect={() => sendLink.mutate(m, { onSuccess: (l) => setLink({ name: m.display_name || m.username, link: l as ResetLink }) })}>
+                          <Link2 />
+                          {t('Send the password link')}
+                        </DropdownMenuItem>
+                      )}
                       {!m.is_guest && (
                         <DropdownMenuItem onSelect={() => setPwFor(m)}>
                           <KeyRound />
                           {t('Reset the password')}
                         </DropdownMenuItem>
                       )}
+                      <DropdownMenuItem onSelect={() => suspend.mutate({ ids: [m.user_id], suspended: m.membership !== 'suspended' })}>
+                        <ShieldOff />
+                        {m.membership === 'suspended' ? t('Reactivate in the tenant') : t('Suspend in the tenant')}
+                      </DropdownMenuItem>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem
                         variant="destructive"
@@ -405,6 +517,7 @@ function People({ slug, q }: { slug: string; q: Q<Member[]> }) {
         submit={t('Reset')}
         onSubmit={(v) => resetPw.mutateAsync({ id: pwFor!.user_id, password: v.password })}
       />
+      <LinkDialog link={link?.link ?? null} name={link?.name ?? ''} onClose={() => setLink(null)} />
       <RemoveDialog
         member={removing}
         members={q.data ?? []}
@@ -418,7 +531,7 @@ function People({ slug, q }: { slug: string; q: Q<Member[]> }) {
 
 /** Removal from the tenant (mockup: dlg-remove-person): who receives the items of the person and what
  *  happens to their account. */
-function RemoveDialog({ member, members, busy, onConfirm, onClose }: { member: Member | null; members: Member[]; busy: boolean; onConfirm: (newOwner?: string) => void; onClose: () => void }) {
+export function RemoveDialog({ member, members, busy, onConfirm, onClose }: { member: Member | null; members: Member[]; busy: boolean; onConfirm: (newOwner?: string) => void; onClose: () => void }) {
   const [owner, setOwner] = useState('')
   useEffect(() => setOwner(''), [member])
   const owns = (member?.owned_resources ?? 0) > 0
@@ -487,7 +600,11 @@ function Groups({ slug, q, members }: { slug: string; q: Q<Group[]>; members: Me
           <Card key={g.id}>
             <CardHeader className="flex-row items-center justify-between">
               <div>
-                <CardTitle className="text-base">{g.name}</CardTitle>
+                <CardTitle className="text-base">
+                  <a className="hover:underline" href={to.group(slug, g.id)}>
+                    {g.name}
+                  </a>
+                </CardTitle>
                 <CardDescription>{t('{count} members', { count: g.members.length })}</CardDescription>
               </div>
               <div className="flex gap-1">
@@ -582,8 +699,8 @@ function Invites({ slug, q }: { slug: string; q: Q<Invitation[]> }) {
 
 /* ── Plugins of the tenant ───────────────────────────────────────────── */
 
-/** The plugins of the tenant: the Administrator makes them available, the Tenant Manager sees them with their kind.
- *  Turning them on for the tenant and deciding their permissions will come with the kernel (docs/refactoring-ui.md §3). */
+/** The plugins of the tenant: the Administrator makes them available, the Tenant Manager sees them with their kind
+ *  and decides who may do what in each one (Access and permissions). Turning them on per tenant comes with phase 4. */
 export function TenantPlugins({ slug }: { slug: string }) {
   const ctx = useTenantCtx(slug)
   if (ctx.isLoading) return <Loading />
@@ -632,6 +749,10 @@ export function TenantPlugins({ slug }: { slug: string }) {
                       <StatusBadge status="active" />
                     </TableCell>
                     <TableCell className="text-right">
+                      <Button variant="outline" size="sm" onClick={() => go(to.tenant(slug, 'plugins', p.id))}>
+                        <KeySquare />
+                        {t('Access and permissions')}
+                      </Button>
                       {p.has_ui && (
                         <Button variant="ghost" size="sm" onClick={() => go(to.plugin(slug, p.id))}>
                           {t('Open')}

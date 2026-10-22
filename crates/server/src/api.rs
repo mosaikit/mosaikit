@@ -85,13 +85,13 @@ pub fn router() -> Router<AppState> {
         .route("/api/t/{t}/p/{plugin}/ticket/{id}", post(ticket))
         // manager of the tenant
         .route("/api/t/{t}/manage/members", get(m_members).post(m_create_member))
-        .route("/api/t/{t}/manage/members/{uid}", delete(m_remove_member))
+        .route("/api/t/{t}/manage/members/{uid}", get(crate::people_api::m_member).delete(m_remove_member))
         .route("/api/t/{t}/manage/members/{uid}/role", put(m_set_role))
         .route("/api/t/{t}/manage/members/{uid}/password", post(m_reset_password))
         .route("/api/t/{t}/manage/invitations", get(m_invitations).post(m_invite))
         .route("/api/t/{t}/manage/invitations/{id}", delete(m_revoke_invitation))
         .route("/api/t/{t}/manage/groups", get(m_groups).post(m_create_group))
-        .route("/api/t/{t}/manage/groups/{gid}", delete(m_delete_group))
+        .route("/api/t/{t}/manage/groups/{gid}", get(crate::people_api::m_group).delete(m_delete_group))
         .route("/api/t/{t}/manage/groups/{gid}/members/{uid}", put(m_group_add).delete(m_group_remove))
         .route("/api/t/{t}/manage/resources", get(m_resources))
         .route("/api/t/{t}/manage/resources/reassign", post(m_reassign))
@@ -128,20 +128,21 @@ pub fn router() -> Router<AppState> {
         .route("/api/admin/keys/{service}", put(a_set_key).delete(a_remove_key))
         .route("/api/admin/theme", put(a_set_theme))
         .route("/api/{*rest}", axum::routing::any(api_not_found))
+        .merge(crate::people_api::router())
         .merge(uploads)
         .merge(packages)
         .layer(DefaultBodyLimit::max(16 << 20))
 }
 
 async fn api_not_found() -> ApiResult<()> {
-    Err(Error::not_found("API inesistente").into())
+    Err(Error::not_found("unknown API").into())
 }
 
-fn uuid(s: &str) -> ApiResult<Uuid> {
+pub(crate) fn uuid(s: &str) -> ApiResult<Uuid> {
     s.parse().map_err(|_| bad(format!("invalid id: {s}")))
 }
 
-fn ok() -> Json<Value> {
+pub(crate) fn ok() -> Json<Value> {
     Json(json!({ "ok": true }))
 }
 
@@ -507,10 +508,18 @@ pub(crate) fn request_lang(h: &HeaderMap) -> String {
 // ------------------------------------------------------------------ tenant
 
 async fn context(State(s): State<AppState>, Tenant(c): Tenant, h: HeaderMap) -> ApiResult<Json<Value>> {
+    // the plugins the person may use, with what they may do in each
+    let perms =
+        mosaikit_kernel::access::effective_all(&s.k, c.tenant.tenant_id, c.user.user_id, c.tenant.role)
+            .await?;
+    let usable = |id: &str| perms.get(id).is_some_and(|p| p.contains(mosaikit_kernel::access::USE));
+    let views: Vec<_> =
+        plugins::active_views_in(&s.k, &request_lang(&h)).into_iter().filter(|v| usable(&v.id)).collect();
     Ok(Json(json!({
         "tenant": { "id": c.tenant.tenant_id, "slug": c.tenant.slug, "name": c.tenant.name,
                     "role": c.tenant.role, "settings": c.tenant.settings },
-        "plugins": plugins::active_views_in(&s.k, &request_lang(&h)),
+        "plugins": views,
+        "perms": perms,
         "prefs": tenancy::prefs(&s.k, &c).await?,
         "theme": tenancy::tenant_theme(&s.k, c.tenant.tenant_id).await?,
         "config": levels::effective(&s.k, Some(c.tenant.tenant_id)).await?,
@@ -736,7 +745,7 @@ impl PluginPath {
     }
 }
 
-fn opt_uuid(v: Option<&String>) -> ApiResult<Option<Uuid>> {
+pub(crate) fn opt_uuid(v: Option<&String>) -> ApiResult<Option<Uuid>> {
     v.filter(|s| !s.is_empty() && *s != "null").map(|s| uuid(s)).transpose()
 }
 
@@ -981,6 +990,8 @@ struct InviteReq {
     username: String,
     #[serde(default = "member_role")]
     role: String,
+    #[serde(default)]
+    profile: Option<Uuid>,
 }
 
 async fn m_invite(
@@ -988,7 +999,9 @@ async fn m_invite(
     Tenant(c): Tenant,
     Json(r): Json<InviteReq>,
 ) -> ApiResult<Json<Value>> {
-    Ok(Json(json!(tenancy::invite(&s.k, &c, &r.tenant, &r.username, Role::parse(&r.role)?).await?)))
+    Ok(Json(json!(
+        tenancy::invite_with(&s.k, &c, &r.tenant, &r.username, Role::parse(&r.role)?, r.profile).await?
+    )))
 }
 
 async fn m_revoke_invitation(

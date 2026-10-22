@@ -53,4 +53,13 @@ export const EN: Record<string, string> = {
   'errors.email_not_configured': 'The mail server of the platform is not set',
   'errors.email_failed': 'The mail server refused the message',
   'errors.too_many_notifications': 'Too many notifications: try again in a minute',
+  // people and permissions (phase 3)
+  '{count} profiles_one': '1 profile',
+  '{count} profiles_other': '{count} profiles',
+  '{count} pending_one': '1 pending',
+  '{count} pending_other': '{count} pending',
+  'errors.missing_permission': 'Your permission profile does not allow it',
+  'errors.reset_expired': 'The link is not valid any more: ask for a new one',
+  'errors.access_already': 'You already have this access to the item',
+  'errors.access_pending': 'You already asked for access: wait for the answer',
 }

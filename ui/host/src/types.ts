@@ -116,6 +116,8 @@ export interface TenantContext {
   tenant: { id: string; slug: string; name: string; role: Role; settings: TenantSettings }
   plugins: PluginView[]
   prefs: { hidden?: string[] }
+  /** what the person may do in each plugin: plugin id -> permission keys (recent servers) */
+  perms?: Record<string, string[]>
   /** recent servers */
   theme?: ThemeChoice
   /** settings in use in the tenant (recent servers) */
@@ -170,9 +172,156 @@ export interface Member {
   home_tenant: string
   is_guest: boolean
   role: Role
+  /** status of the account (active, disabled) */
   status: string
+  /** status of the membership (active, suspended) */
+  membership: string
+  /** permission profile (null: the default one of the tenant) */
+  profile_id: string | null
+  profile: string
+  groups: string[]
+  email: string | null
+  last_sign_in_at: string | null
   joined_at: string
   owned_resources: number
+}
+
+/** A permission of a plugin: standard (enforced by the kernel) or declared by the manifest. */
+export interface PermDecl {
+  key: string
+  label: string
+  description: string
+  default: boolean
+  standard: boolean
+}
+
+export interface Profile {
+  id: string
+  name: string
+  description: string
+  is_default: boolean
+  /** plugin id -> permission keys */
+  perms: Record<string, string[]>
+  members: number
+  created_at: string
+}
+
+export interface PluginGrant {
+  principal_type: 'user' | 'group'
+  principal_id: string
+  name: string
+  detail: string
+  perms: string[]
+}
+
+export interface PluginAccess {
+  plugin_id: string
+  label: string
+  icon: string
+  permissions: PermDecl[]
+  profiles: Profile[]
+  grants: PluginGrant[]
+}
+
+export interface PermSource {
+  key: string
+  label: string
+  standard: boolean
+  granted: boolean
+  sources: { kind: 'manager' | 'profile' | 'group' | 'personal'; name: string }[]
+}
+
+export interface PluginPerms {
+  plugin_id: string
+  label: string
+  icon: string
+  perms: PermSource[]
+}
+
+export interface MemberDetail {
+  member: Member
+  permissions: PluginPerms[]
+  home_here: boolean
+}
+
+export interface SessionInfo {
+  id: string
+  created_at: string
+  last_seen: string
+  expires_at: string
+}
+
+export interface EventInfo {
+  ts: string
+  action: string
+  tenant: string | null
+  plugin_id: string | null
+  resource_id: string | null
+  detail: Record<string, unknown>
+}
+
+export interface ResetLink {
+  url: string
+  expires_at: string
+  emailed: boolean
+}
+
+export interface WhyNot {
+  level: string
+  title: string
+  plugin_id: string
+  steps: { code: string; ok: boolean; detail: string }[]
+}
+
+export interface GroupDetail {
+  id: string
+  name: string
+  members: { user_id: string; username: string; display_name: string }[]
+  shared: { resource_id: string; title: string; plugin_id: string; level: string }[]
+  plugins: [string, string[]][]
+}
+
+export interface AccessRequest {
+  id: string
+  resource_id: string
+  title: string
+  plugin_id: string
+  owner_id: string
+  owner_name: string
+  requester_id: string
+  requester_name: string
+  requester_username: string
+  level: 'read' | 'write'
+  message: string
+  status: string
+  created_at: string
+  mine: boolean
+}
+
+export interface PersonTenant {
+  tenant_id: string
+  slug: string
+  name: string
+  role: Role
+  status: string
+  profile_id: string | null
+  profile: string
+  is_home: boolean
+}
+
+export interface PersonRow {
+  user_id: string
+  username: string
+  display_name: string
+  email: string | null
+  home_tenant_id: string
+  home_tenant: string
+  is_admin: boolean
+  status: string
+  totp: boolean
+  last_sign_in_at: string | null
+  created_at: string
+  tenants: PersonTenant[]
 }
 
 export interface Invitation {

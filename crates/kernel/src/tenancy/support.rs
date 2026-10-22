@@ -10,7 +10,7 @@ use super::{require_admin, MemberInfo};
 use crate::{events, Error, Kernel, Result, Role, SessionUser};
 
 /// The tenant exists and is not the system one.
-async fn client_tenant(k: &Kernel, tenant: Uuid) -> Result<()> {
+pub(super) async fn client_tenant(k: &Kernel, tenant: Uuid) -> Result<()> {
     let ok: Option<bool> = mosaikit_db::query_scalar("select not is_system from core.tenants where id = $1")
         .bind(tenant)
         .fetch_optional(&k.db)
@@ -18,7 +18,7 @@ async fn client_tenant(k: &Kernel, tenant: Uuid) -> Result<()> {
     match ok {
         Some(true) => Ok(()),
         Some(false) => Err(Error::bad("the system tenant holds only Administrators")),
-        None => Err(Error::not_found("tenant inesistente")),
+        None => Err(Error::not_found("tenant not found")),
     }
 }
 

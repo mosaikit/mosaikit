@@ -174,10 +174,15 @@ pub(crate) async fn run(
     c: &crate::Caller,
     p: &Arc<LoadedPlugin>,
     tx: Tx,
-    msg: Value,
+    mut msg: Value,
     fuel: u64,
     depth: u8,
 ) -> Result<(Value, Tx)> {
+    // what the caller may do in the plugin: the logic enforces the permissions it declares
+    let perms = crate::access::effective(k, c, &p.id).await?;
+    if let Some(ctx) = msg.get_mut("ctx").filter(|v| v.is_object()) {
+        ctx["perms"] = json!(perms);
+    }
     let module = p.module.clone().ok_or_else(|| Error::bad(format!("{} has no WASM logic", p.id)))?;
     let host = KernelHost {
         rt: tokio::runtime::Handle::current(),

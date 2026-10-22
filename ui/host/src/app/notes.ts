@@ -127,6 +127,14 @@ export function noteTitle(n: Note): string {
       return d.item ? t('{by} shared «{item}» with you', { by: d.by, item: d.item }) : t('{by} shared an item with you', { by: d.by })
     case 'link.created':
       return t('{by} created a public link to «{item}»', { by: d.by, item: d.item })
+    case 'access.requested':
+      return d.level === 'write' ? t('{by} asks to edit «{item}»', { by: d.by, item: d.item }) : t('{by} asks to see «{item}»', { by: d.by, item: d.item })
+    case 'access.forwarded':
+      return t('{by} leaves to you the request of {who}', { by: d.by, who: d.who })
+    case 'access.approved':
+      return t('{by} gave you access to «{item}»', { by: d.by, item: d.item })
+    case 'access.refused':
+      return t('{by} refused your request for «{item}»', { by: d.by, item: d.item })
     default:
       return n.title
   }
@@ -143,7 +151,11 @@ export function noteBody(n: Note): string {
       return t('Whoever has the link can open the item without signing in.')
     case 'invitation.accepted':
     case 'invitation.declined':
+    case 'access.approved':
+    case 'access.refused':
       return ''
+    case 'access.forwarded':
+      return t('Approve or refuse in Access requests.')
     default:
       return n.body
   }

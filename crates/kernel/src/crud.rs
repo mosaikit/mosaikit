@@ -142,12 +142,12 @@ pub async fn list(
     filter: Option<&str>,
     parent: Option<Uuid>,
 ) -> Result<ListResult> {
-    let p = k.plugins.active(plugin)?;
+    let (p, _) = crate::access::require(k, c, plugin, crate::access::USE).await?;
     list_ctx(k, &c.ctx(), &p, resource, filter, parent).await
 }
 
 pub async fn get(k: &Kernel, c: &Caller, plugin: &str, resource: &str, id: Uuid) -> Result<Value> {
-    let p = k.plugins.active(plugin)?;
+    let (p, _) = crate::access::require(k, c, plugin, crate::access::USE).await?;
     get_ctx(k, &c.ctx(), &p, resource, id).await
 }
 
@@ -293,7 +293,7 @@ pub async fn create(
     input: &Values,
     parent: Option<Uuid>,
 ) -> Result<Value> {
-    let p = k.plugins.active(plugin)?;
+    let (p, _) = crate::access::require(k, c, plugin, crate::access::CREATE).await?;
     let d = decl(&p, resource)?;
     let values = coerce(d, input, None)?;
     let tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
@@ -339,7 +339,7 @@ pub async fn update(
     id: Uuid,
     input: &Values,
 ) -> Result<Value> {
-    let p = k.plugins.active(plugin)?;
+    let (p, _) = crate::access::require(k, c, plugin, crate::access::USE).await?;
     let d = decl(&p, resource)?;
     let mut tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
     let prev_row =
@@ -389,7 +389,7 @@ pub async fn update(
 }
 
 pub async fn delete(k: &Kernel, c: &Caller, plugin: &str, resource: &str, id: Uuid) -> Result<()> {
-    let p = k.plugins.active(plugin)?;
+    let (p, _) = crate::access::require(k, c, plugin, crate::access::DELETE).await?;
     let d = decl(&p, resource)?;
     let mut tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
     let prev_row =
@@ -432,7 +432,7 @@ pub(crate) async fn call_depth(
     args: Value,
     depth: u8,
 ) -> Result<Value> {
-    let p = k.plugins.active(plugin)?;
+    let (p, _) = crate::access::require(k, c, plugin, crate::access::USE).await?;
     let tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
     let msg = json!({ "abi": 1, "kind": "command", "name": name, "args": args, "ctx": ctx_json(c, &p.id) });
     let (out, tx) = host::run(k, c, &p, tx, msg, FUEL_COMMAND, depth).await?;

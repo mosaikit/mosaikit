@@ -111,6 +111,7 @@ function useNav(session: Session, route: Route): { groups: NavGroup[]; bottom: N
           items: [
             { label: t('Platform overview'), short: t('Overview'), icon: <LayoutDashboard />, href: to.admin(), active: page === 'overview' },
             { label: t('Tenant'), icon: <Building2 />, href: to.admin('tenants'), active: page === 'tenants' || page === 'tenant' },
+            { label: t('People'), icon: <Users />, href: to.admin('people'), active: page === 'people' || page === 'person' },
             { label: t('Plugins'), icon: <Puzzle />, href: to.admin('plugins'), active: page === 'plugins' },
           ],
         },
@@ -139,7 +140,7 @@ function useNav(session: Session, route: Route): { groups: NavGroup[]; bottom: N
     groups.push({
       label: t('Tenant management'),
       items: [
-        { label: t('Manage'), icon: <Users />, href: to.tenant(slug, 'manage'), active: page === 'manage' },
+        { label: t('Manage'), icon: <Users />, href: to.tenant(slug, 'manage'), active: page === 'manage' || page === 'person' || page === 'group' },
         { label: t('Plugins'), icon: <Puzzle />, href: to.tenant(slug, 'plugins'), active: page === 'plugins' },
         { label: t('Shares'), icon: <Share2 />, href: to.tenant(slug, 'shares'), active: page === 'shares' },
         { label: t('Usage'), icon: <Gauge />, href: to.tenant(slug, 'usage'), active: page === 'usage' },

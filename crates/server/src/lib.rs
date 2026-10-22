@@ -9,6 +9,7 @@ pub mod admin;
 pub(crate) mod api;
 mod auth;
 mod pages;
+mod people_api;
 mod ui;
 mod untrusted;
 

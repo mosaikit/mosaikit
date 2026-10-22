@@ -20,6 +20,8 @@ export class Msk {
   context: UiContext | undefined
   /** the place the page was opened at, from a notification of the plugin (see `notify`) */
   readonly at: string | undefined
+  /** permissions of the person in the plugin (older hosts: undefined, everything allowed) */
+  readonly perms: string[] | undefined
 
   constructor(
     readonly bridge: Bridge,
@@ -32,6 +34,13 @@ export class Msk {
     this.publicResource = hello.resource
     this.context = hello.context
     this.at = hello.at
+    this.perms = hello.perms
+  }
+
+  /** The person has the permission `key` in the plugin (to hide what they may not do; the kernel and the
+   *  logic of the plugin enforce it anyway). With an older host, true. */
+  can(key: string): boolean {
+    return this.perms ? this.perms.includes(key) : true
   }
 
   /** Tells when the host changes language, theme or mode (already applied to `<html>`). */

@@ -56,7 +56,20 @@ pub async fn invite(
     username: &str,
     role: Role,
 ) -> Result<InvitationInfo> {
+    invite_with(k, c, home_tenant, username, role, None).await
+}
+
+/// Like `invite`, with the permission profile the person gets on accepting (`None`: the default one).
+pub async fn invite_with(
+    k: &Kernel,
+    c: &Caller,
+    home_tenant: &str,
+    username: &str,
+    role: Role,
+    profile: Option<Uuid>,
+) -> Result<InvitationInfo> {
     c.require_manager()?;
+    crate::access::check_profile(k, c.tenant.tenant_id, profile).await?;
     let user: Option<Uuid> = mosaikit_db::query_scalar(
         "select u.id from core.users u join core.tenants t on t.id = u.home_tenant_id
          where t.slug = $1 and u.username = $2 and u.status = 'active' and not t.is_system",
@@ -80,12 +93,13 @@ pub async fn invite(
         return Err(Error::conflict("a pending invitation for this user already exists"));
     }
     let id: Uuid = mosaikit_db::query_scalar(
-        "insert into core.invitations (tenant_id, user_id, role, invited_by) values ($1, $2, $3, $4) returning id",
+        "insert into core.invitations (tenant_id, user_id, role, invited_by, profile_id) values ($1, $2, $3, $4, $5) returning id",
     )
     .bind(c.tenant.tenant_id)
     .bind(user)
     .bind(role.as_str())
     .bind(c.user.user_id)
+    .bind(profile)
     .fetch_one(&k.db)
     .await?;
     events::record(
@@ -139,7 +153,7 @@ pub async fn my_invitations(k: &Kernel, user: &SessionUser) -> Result<Vec<Invita
 pub async fn respond_invitation(k: &Kernel, user: &SessionUser, id: Uuid, accept: bool) -> Result<()> {
     let mut tx = k.db.begin_app().await?;
     let row = mosaikit_db::query(
-        "select tenant_id, role, invited_by from core.invitations
+        "select tenant_id, role, invited_by, profile_id from core.invitations
          where id = $1 and user_id = $2 and status = 'pending' and expires_at > now() for update",
     )
     .bind(id)
@@ -150,6 +164,7 @@ pub async fn respond_invitation(k: &Kernel, user: &SessionUser, id: Uuid, accept
     let tenant: Uuid = row.get(0);
     let role: String = row.get(1);
     let invited_by: Option<Uuid> = row.get(2);
+    let profile: Option<Uuid> = row.get(3);
     mosaikit_db::query("update core.invitations set status = $2 where id = $1")
         .bind(id)
         .bind(if accept { "accepted" } else { "declined" })
@@ -157,13 +172,14 @@ pub async fn respond_invitation(k: &Kernel, user: &SessionUser, id: Uuid, accept
         .await?;
     if accept {
         mosaikit_db::query(
-            "insert into core.memberships (tenant_id, user_id, role, invited_by) values ($1, $2, $3, $4)
+            "insert into core.memberships (tenant_id, user_id, role, invited_by, profile_id) values ($1, $2, $3, $4, $5)
              on conflict do nothing",
         )
         .bind(tenant)
         .bind(user.user_id)
         .bind(role)
         .bind(invited_by)
+        .bind(profile)
         .execute(&mut *tx)
         .await?;
     }

@@ -220,6 +220,7 @@ async fn initial_tenant(k: &Kernel, slug: &str) -> Result<Option<String>> {
     .bind(user)
     .execute(&mut *tx)
     .await?;
+    crate::access::create_default_profile(&mut tx, tenant).await?;
     tx.commit().await?;
     Ok(Some(format!(
         "Work (sign-in page, tenant {})\nusername: utente\npassword: {password}\n",
@@ -400,6 +401,10 @@ async fn finish_session(k: &Kernel, user_id: Uuid, ip: &str, remember: bool) -> 
     let minutes =
         if remember && sec.remember_days > 0 { sec.remember_days * 24 * 60 } else { sec.session_hours * 60 };
     let (token, _) = open_session(k, user_id, None, minutes as i32).await?;
+    mosaikit_db::query("update core.users set last_sign_in_at = now() where id = $1")
+        .bind(user_id)
+        .execute(&k.db)
+        .await?;
     let user = session(k, &token).await?.ok_or_else(|| Error::internal("session just created not found"))?;
     events::record(k, Some(user.home_tenant_id), Some(user_id), None, None, "login", json!({ "ip": ip }))
         .await;
@@ -662,7 +667,7 @@ pub async fn memberships(k: &Kernel, user: &SessionUser) -> Result<Vec<Membershi
     let rows = mosaikit_db::query(
         "select t.id, t.slug, t.name, m.role, t.id = u.home_tenant_id, t.is_system
          from core.memberships m join core.tenants t on t.id = m.tenant_id join core.users u on u.id = m.user_id
-         where m.user_id = $1 and t.status = 'active'
+         where m.user_id = $1 and t.status = 'active' and m.status = 'active'
          order by (t.id = u.home_tenant_id) desc, t.name",
     )
     .bind(user.user_id)

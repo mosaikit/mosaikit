@@ -5,6 +5,7 @@
 //! transaction with the role of the plugin and the context of the user (RLS).
 //! See `docs/architecture.md`.
 
+pub mod access;
 pub mod acl;
 pub mod blobs;
 pub mod brand;

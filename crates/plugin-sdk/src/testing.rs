@@ -44,6 +44,7 @@ impl MockHost {
                 username: Some("test".into()),
                 tenant: Some("00000000-0000-0000-0000-0000000000aa".into()),
                 plugin: "com.test.plugin".into(),
+                perms: ["use", "create", "delete", "share"].map(String::from).to_vec(),
             },
             ..MockHost::default()
         }

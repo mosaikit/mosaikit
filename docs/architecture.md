@@ -10,6 +10,8 @@ development and release. The choices described here replace the initial PoC
 1. [Principles](#1-principles)
 2. [Overview](#2-overview)
 3. [Tenants, users and roles](#3-tenants-users-and-roles)
+   - [3.1 Settings on three levels](#31-settings-on-three-levels)
+   - [3.2 People and permissions](#32-people-and-permissions)
 4. [Resources, ownership and sharing](#4-resources-ownership-and-sharing)
 5. [Public links](#5-public-links)
    - [5.1 Notifications](#51-notifications)
@@ -92,8 +94,8 @@ the units, Playwright with axe (`cargo xtask e2e`) for the flows and accessibili
 
 | Role | Scope | Where | Can do |
 |---|---|---|---|
-| **Administrator** | installation | account of the system tenant (`core.users.is_system_admin`) | create/suspend tenants, appoint or replace their Tenant Managers and reset passwords (users and roles, never the contents), install/turn on plugins, cross-tenant KPIs, theme and top bar of the platform, manage the Administrator accounts (at least one always stays active; whoever is disabled has their sessions closed) |
-| **Tenant Manager** | a tenant | `core.memberships.role = 'tenant_manager'` | users, invitations, groups, metadata of the resources, reassignment of ownership, KPIs, policies and theme of the tenant |
+| **Administrator** | installation | account of the system tenant (`core.users.is_system_admin`) | create/suspend tenants, appoint or replace their Tenant Managers and reset passwords (users and roles, never the contents), every person of the installation (add to a tenant, role and profile, suspension, move of the home tenant, links to choose a new password; §3.2), install/turn on plugins, cross-tenant KPIs, theme and top bar of the platform, manage the Administrator accounts (at least one always stays active; whoever is disabled has their sessions closed) |
+| **Tenant Manager** | a tenant | `core.memberships.role = 'tenant_manager'` | users, invitations, groups, permission profiles and permissions of the plugins, access requests, suspension of a membership, metadata of the resources, reassignment of ownership, KPIs, policies and theme of the tenant |
 | **User** | a tenant | `core.memberships.role = 'user'` | create resources, share them, use the shared ones |
 
 The same user can be User in a tenant and Tenant Manager in another one.
@@ -190,6 +192,71 @@ database alone does not reveal it. It never goes back to the browser: the pages 
 characters (the address of a self-hosted model shows whole). APIs: `/api/admin/keys`,
 `/api/t/<t>/manage/keys`, `/api/t/<t>/me/keys` (`PUT` with `value` and/or `shared`, `DELETE`);
 the kernel reads the key in use with `keys::key_in_use`.
+
+### 3.2 People and permissions
+
+**Permissions in the plugins** (kernel module `access`). Every plugin has the standard permissions
+of the kernel, enforced by the kernel itself, and the ones its manifest declares
+(`[[user_permissions]]`, §8.2), enforced by the plugin:
+
+| Permission | Enforced on |
+|---|---|
+| `use` | every operation of the plugin (CRUD, commands, files, contents, notifications); without it the plugin is not in the context of the tenant, so not in the sidebar |
+| `create` | CRUD create, new folders, uploads and copies of files |
+| `delete` | CRUD delete, deletion of files and folders |
+| `share` | grants on an item (`PUT …/resources/{id}/grants`) and public links |
+
+A refusal is `403` with code `missing_permission`. The permissions never widen what a person sees:
+the access to the items stays the one of the ACL (§4). The logic of the plugin receives the
+permissions of the caller in `ctx.perms` (`Ctx::can` in the SDK); the UI in the handshake of the
+bridge (`perms`, `msk.can(key)`), to hide what the person may not do. Items created by the WASM logic
+itself (`resource.create`) are the plugin's choice and are not gated by `create`.
+
+What a person may do in a plugin of a tenant:
+
+- a Tenant Manager: everything;
+- otherwise the **permission profile** of the membership (`core.memberships.profile_id`) or, without
+  one, the default profile of the tenant (`core.permission_profiles.is_default`): for every plugin the
+  keys it lists, or the defaults of the plugin (the standard ones and the declared ones with
+  `default = true`) when it does not list it, so a plugin installed later works at once;
+- plus the **grants** of the plugin to the person and to their groups (`core.plugin_grants`): they
+  only add.
+
+Every tenant has the profile *Standard* (default) from its creation; the migration gave it to the
+existing ones. An invitation may name the profile the person gets on accepting.
+
+**Memberships.** A membership may be **suspended** (`core.memberships.status`): the person keeps
+account, items and groups but cannot work in the tenant (`caller` refuses it, `core.is_member` on
+PostgreSQL and its SQLite expansion do not count it, so the database shows them nothing). The only
+active Tenant Manager of a tenant cannot be suspended. The last sign-in of every account is kept
+(`core.users.last_sign_in_at`).
+
+**Access requests** (`core.access_requests`). A member who cannot see an item (or only read it)
+asks to see or to edit it (`POST /api/t/{t}/resources/{id}/request`, from `#/t/<t>/item/<id>`).
+The owner of the item, or a Tenant Manager, approves (a grant to the person, never lowering one
+they already have), refuses, or (the manager) forwards the decision to the owner; the people
+involved get a notification (kind `share`). A Tenant Manager sees the titles of the items of others
+only if the tenant allows it (`managers_see_titles`).
+
+**Links to choose a new password** (`core.password_resets`). The Administrator (any account that is
+not an Administrator) or the Tenant Manager of the home tenant creates a one-time link valid 48
+hours (`#/reset/<token>`; only its hash is stored). It replaces the previous one; it is shown once to
+whoever created it and queued by email when the account has an address. Using it sets the password
+(with the rules of the home tenant) and closes the sessions of the person. A new person created by the
+Administrator without an initial password gets one at once.
+
+**The Administrator and the people.** `GET /api/admin/people` lists every account with its tenants
+(role, profile, status); the Administrator adds a person to a tenant at once (no invitation), changes
+role, profile and suspension there, removes them from a tenant that is not their home (their items go
+to a new owner), moves the home tenant to another tenant they are a member of (the old one stays as a
+tenant where they are a guest; sessions closed), disables or reactivates the account. Administrators
+are handled in System › Administrators.
+
+**Detail of a person.** For the Tenant Manager (`/api/t/{t}/manage/members/{id}…`) and the
+Administrator (`/api/admin/people/{id}…`): profile, sessions (closed one by one or all; the manager
+only for the accounts whose home is their tenant), the latest events, and for the manager the
+permissions in every plugin with their sources and the explanation of why the person does or does not
+see an item (`…/why?resource=<id>`: account, membership, `use` of the plugin, owner, shares).
 
 ## 4. Resources, ownership and sharing
 
@@ -492,6 +559,12 @@ view = "kpi_notes_by_tag"
 label = "Notes by tag"
 columns = { notes = "Notes" }   # optional labels of the columns of the view
 
+[[user_permissions]]     # optional: permissions of the people beyond the standard ones (§3.2)
+key = "export"
+label = "Export"
+description = "PDF of what they can see"
+default = true           # given by the profiles that do not say otherwise
+
 [i18n.it]                # optional: the texts in another language
 name = "Note"
 label = "Note"
@@ -502,6 +575,8 @@ options.tag = { personal = "personale", work = "lavoro" }
 [i18n.it.kpi.kpi_notes_by_tag]
 label = "Note per tag"
 columns = { notes = "note" }
+[i18n.it.permissions.export]
+label = "Esportare"
 ```
 
 Field kinds: `text` (`multiline` too), `number`, `bool`, `date`, `choice`. A choice
@@ -511,7 +586,7 @@ stored value stays the option.
 **Languages.** The texts of the manifest are English. `[i18n.<lang>]` (two or three
 lower-case letters, not `en`) translates the name, the description, the label of the
 contribution, the labels of resources and fields, the labels of the choice values, and
-label and columns of the KPIs; every key is optional and falls back to English, and the
+label and columns of the KPIs, label and description of the user permissions; every key is optional and falls back to English, and the
 installation refuses a translation that names a resource, field, value or view the
 manifest does not have. The shell sends its language with every request
 (`Accept-Language`): the context of the tenant, the lists of the CRUD (fields and

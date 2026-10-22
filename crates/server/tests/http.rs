@@ -1119,3 +1119,163 @@ async fn email_of_the_platform_over_http() {
     assert_eq!(r.status, StatusCode::OK, "{}", r.text());
     assert_eq!(fake.mails.lock().unwrap().len(), 1);
 }
+
+#[tokio::test]
+async fn people_and_permissions_over_http() {
+    let a = App::new().await;
+    a.t.install("notes").await;
+    let g = a.t.tenant("alfa").await;
+    let anna_user = a.t.member(&g, "anna").await;
+    let bruno_user = a.t.member(&g, "bruno").await;
+    let mgr = a.login("alfa", "alfa-manager", PASSWORD).await;
+    let anna = a.login("alfa", "anna", PASSWORD).await;
+    let bruno = a.login("alfa", "bruno", PASSWORD).await;
+    const NOTES: &str = "/api/t/alfa/p/com.mosaikit.notes/r/notes";
+
+    // the context says what each person may do in each plugin
+    let ctx = a.call(Some(&anna), Method::GET, "/api/t/alfa/context", None).await.json();
+    assert!(ctx["perms"]["com.mosaikit.notes"].as_array().unwrap().iter().any(|p| p == "create"));
+    assert_eq!(ctx["plugins"].as_array().unwrap().len(), 1);
+
+    // a profile that may only use the app, given to Anna: creating is refused with a code
+    let p = a
+        .call(Some(&mgr), Method::POST, "/api/t/alfa/manage/profiles", Some(json!({ "name": "Reader" })))
+        .await
+        .json();
+    let pid = p["id"].as_str().unwrap().to_string();
+    let r = a
+        .call(
+            Some(&mgr),
+            Method::PUT,
+            &format!("/api/t/alfa/manage/profiles/{pid}"),
+            Some(json!({ "plugins": { "com.mosaikit.notes": ["use"] } })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let r = a
+        .call(
+            Some(&mgr),
+            Method::PUT,
+            &format!("/api/t/alfa/manage/members/{}/profile", anna_user.user_id),
+            Some(json!({ "profile": pid })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let r = a.call(Some(&anna), Method::POST, NOTES, Some(json!({ "values": { "title": "x" } }))).await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN);
+    assert_eq!(r.json()["code"], "missing_permission");
+    // a personal grant gives it back
+    let r = a
+        .call(
+            Some(&mgr),
+            Method::PUT,
+            "/api/t/alfa/manage/plugins/com.mosaikit.notes/grants",
+            Some(json!({ "principal_type": "user", "principal_id": anna_user.user_id, "perms": ["create"] })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let r = a.call(Some(&anna), Method::POST, NOTES, Some(json!({ "values": { "title": "Plan" } }))).await;
+    assert_eq!(r.status, StatusCode::CREATED, "{}", r.text());
+    let rid = r.json()["id"].as_str().unwrap().to_string();
+    let access = a
+        .call(Some(&mgr), Method::GET, "/api/t/alfa/manage/plugins/com.mosaikit.notes/access", None)
+        .await
+        .json();
+    assert_eq!(access["grants"].as_array().unwrap().len(), 1);
+    // a User cannot manage
+    let r = a.call(Some(&anna), Method::GET, "/api/t/alfa/manage/profiles", None).await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN);
+
+    // the detail of a person, with permissions, sessions and activity
+    let d = a
+        .call(Some(&mgr), Method::GET, &format!("/api/t/alfa/manage/members/{}", anna_user.user_id), None)
+        .await;
+    assert_eq!(d.status, StatusCode::OK, "{}", d.text());
+    assert_eq!(d.json()["member"]["profile"], "Reader");
+    let s = a
+        .call(
+            Some(&mgr),
+            Method::GET,
+            &format!("/api/t/alfa/manage/members/{}/sessions", anna_user.user_id),
+            None,
+        )
+        .await
+        .json();
+    assert!(!s.as_array().unwrap().is_empty());
+
+    // Bruno asks to see the note; Anna approves
+    let r = a
+        .call(
+            Some(&bruno),
+            Method::POST,
+            &format!("/api/t/alfa/resources/{rid}/request"),
+            Some(json!({ "level": "read", "message": "please" })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let rq = r.json()["id"].as_str().unwrap().to_string();
+    let list = a.call(Some(&anna), Method::GET, "/api/t/alfa/requests", None).await.json();
+    assert_eq!(list.as_array().unwrap().len(), 1);
+    let r = a.call(Some(&anna), Method::POST, &format!("/api/t/alfa/requests/{rq}/approve"), None).await;
+    assert_eq!(r.json()["status"], "approved");
+    let r = a.call(Some(&bruno), Method::GET, &format!("/api/t/alfa/resources/{rid}"), None).await;
+    assert_eq!(r.status, StatusCode::OK);
+
+    // suspension: Bruno is out of the tenant until reactivated
+    let r = a
+        .call(
+            Some(&mgr),
+            Method::PUT,
+            &format!("/api/t/alfa/manage/members/{}/status", bruno_user.user_id),
+            Some(json!({ "suspended": true })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    assert_eq!(
+        a.call(Some(&bruno), Method::GET, "/api/t/alfa/context", None).await.status,
+        StatusCode::FORBIDDEN
+    );
+
+    // the Administrator: directory, a link to choose a new password, used from the public page
+    let admin = a.admin().await;
+    let people = a.call(Some(&admin), Method::GET, "/api/admin/people", None).await.json();
+    assert!(people.as_array().unwrap().iter().any(|p| p["username"] == "anna"));
+    let link = a
+        .call(
+            Some(&admin),
+            Method::POST,
+            &format!("/api/admin/people/{}/reset-link", anna_user.user_id),
+            None,
+        )
+        .await
+        .json();
+    let token = link["url"].as_str().unwrap().rsplit('/').next().unwrap().to_string();
+    let info = a.call(None, Method::GET, &format!("/api/auth/reset/{token}"), None).await.json();
+    assert_eq!(info["username"], "anna");
+    let r = a
+        .call(
+            None,
+            Method::POST,
+            "/api/auth/reset",
+            Some(json!({ "token": token, "password": "brand-new-pass-1" })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    // the link closed the old sessions
+    assert_eq!(a.call(Some(&anna), Method::GET, "/api/session", None).await.status, StatusCode::UNAUTHORIZED);
+    let anna = a.login("alfa", "anna", "brand-new-pass-1").await;
+    let r = a
+        .call(
+            None,
+            Method::POST,
+            "/api/auth/reset",
+            Some(json!({ "token": token, "password": "again-pass-2222" })),
+        )
+        .await;
+    assert_eq!(r.json()["code"], "reset_expired");
+    // not for Users
+    assert_eq!(
+        a.call(Some(&anna), Method::GET, "/api/admin/people", None).await.status,
+        StatusCode::FORBIDDEN
+    );
+}

@@ -37,6 +37,7 @@ pub async fn create(
     password: Option<&str>,
 ) -> Result<CreatedLink> {
     let m = require_level(k, c, rid, Level::Manage).await?;
+    crate::access::require(k, c, &m.plugin_id, crate::access::SHARE).await?;
     let s = &c.tenant.settings;
     if !s.public_links_enabled {
         return Err(Error::forbidden("public links are turned off for this tenant"));

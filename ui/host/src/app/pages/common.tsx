@@ -32,7 +32,7 @@ const enc = encodeURIComponent
 
 export function AccountPage({ session, route }: { session: Session; route: Route }) {
   const admin = session.user.is_system_admin
-  const section = route.area === 'login' ? undefined : route.section
+  const section = route.area === 'login' || route.area === 'reset' ? undefined : route.section
   const sections: Section[] = [
     { id: 'profile', label: t('Profile'), icon: <UserRound /> },
     { id: 'security', label: t('Sign-in and security'), icon: <KeyRound /> },

@@ -35,10 +35,37 @@ pub struct Manifest {
     pub kpi: Vec<KpiDecl>,
     #[serde(default)]
     pub requires: Requires,
+    /// Permissions of the people in the plugin beyond the standard ones of the kernel (`use`,
+    /// `create`, `delete`, `share`), given by the permission profiles of the tenant. The kernel
+    /// sends the permissions of the caller to the logic (`ctx.perms`) and to the UI: the plugin
+    /// enforces its own ones.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub user_permissions: Vec<UserPermission>,
     /// Texts in other languages (`[i18n.it]`, ...); the texts above are the English ones.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub i18n: BTreeMap<String, Translation>,
 }
+
+/// A permission of the people in the plugin (`[[user_permissions]]`).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct UserPermission {
+    /// identifier (`export`, `approve`...): lower case, digits and `_`
+    pub key: String,
+    pub label: String,
+    #[serde(default)]
+    pub description: String,
+    /// given by the profiles that do not say otherwise (the "Standard" profile, for example)
+    #[serde(default = "yes")]
+    pub default: bool,
+}
+
+fn yes() -> bool {
+    true
+}
+
+/// The permissions the kernel gives to every plugin and enforces itself.
+pub const STANDARD_PERMISSIONS: &[&str] = &["use", "create", "delete", "share"];
 
 /// Texts of the manifest in another language. Every key is optional: what is missing stays in
 /// English.
@@ -58,6 +85,18 @@ pub struct Translation {
     /// by name of the KPI view
     #[serde(default)]
     pub kpi: BTreeMap<String, KpiTranslation>,
+    /// by key of the user permission
+    #[serde(default)]
+    pub permissions: BTreeMap<String, PermissionTranslation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(deny_unknown_fields)]
+pub struct PermissionTranslation {
+    #[serde(default)]
+    pub label: Option<String>,
+    #[serde(default)]
+    pub description: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -337,6 +376,18 @@ impl Manifest {
                 }
             }
         }
+        let mut perms = std::collections::HashSet::new();
+        for p in &self.user_permissions {
+            if !is_identifier(&p.key) || STANDARD_PERMISSIONS.contains(&p.key.as_str()) {
+                return bad(format!("user permission '{}' invalid or standard", p.key));
+            }
+            if !perms.insert(p.key.as_str()) {
+                return bad(format!("duplicate user permission '{}'", p.key));
+            }
+            if p.label.trim().is_empty() {
+                return bad(format!("the user permission '{}' has no label", p.key));
+            }
+        }
         for (lang, tr) in &self.i18n {
             self.validate_translation(lang, tr).map_err(|m| Error::Manifest(format!("i18n.{lang}: {m}")))?;
         }
@@ -376,6 +427,13 @@ impl Manifest {
             }
             all.extend(kt.label.iter());
             all.extend(kt.columns.values());
+        }
+        for (key, pt) in &tr.permissions {
+            if !self.user_permissions.iter().any(|p| &p.key == key) {
+                return Err(format!("user permission '{key}' is not declared"));
+            }
+            all.extend(pt.label.iter());
+            all.extend(pt.description.iter());
         }
         if all.iter().any(|t| t.chars().count() > 300) {
             return Err("text longer than 300 characters".into());
@@ -419,6 +477,13 @@ impl Manifest {
             };
             set(&mut k.label, &kt.label);
             k.columns.extend(kt.columns.iter().map(|(c, v)| (c.clone(), v.clone())));
+        }
+        for p in &mut m.user_permissions {
+            let Some(pt) = tr.permissions.get(&p.key) else {
+                continue;
+            };
+            set(&mut p.label, &pt.label);
+            set(&mut p.description, &pt.description);
         }
         m
     }
@@ -562,6 +627,36 @@ mod tests {
         let labels = NOTES
             .replace(r#"options = ["a", "b"] }"#, r#"options = ["a", "b"], option_labels = { c = "C" } }"#);
         assert!(Manifest::from_toml(&labels).is_err());
+    }
+
+    #[test]
+    fn user_permissions() {
+        let perms = r#"
+            [[user_permissions]]
+            key = "export"
+            label = "Export"
+            description = "PDF of what they can see"
+            [[user_permissions]]
+            key = "approve"
+            label = "Approve"
+            default = false
+            [i18n.it.permissions.export]
+            label = "Esportare"
+        "#;
+        let m = Manifest::from_toml(&format!("{NOTES}{perms}")).unwrap();
+        assert_eq!(m.user_permissions.len(), 2);
+        assert!(m.user_permissions[0].default && !m.user_permissions[1].default);
+        let it = m.localized("it");
+        assert_eq!(it.user_permissions[0].label, "Esportare");
+        assert_eq!(it.user_permissions[0].description, "PDF of what they can see");
+        for bad in [
+            perms.replace("key = \"export\"", "key = \"use\""),
+            perms.replace("key = \"approve\"", "key = \"export\""),
+            perms.replace("key = \"export\"", "key = \"Export!\""),
+            perms.replace("permissions.export]", "permissions.other]"),
+        ] {
+            assert!(Manifest::from_toml(&format!("{NOTES}{bad}")).is_err(), "{bad}");
+        }
     }
 
     #[test]

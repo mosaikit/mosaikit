@@ -701,7 +701,7 @@ fn valid_at(s: &str) -> bool {
 /// write, it reaches the people who can see the item. The text is plain, the link stays inside the page of
 /// the plugin.
 pub async fn from_plugin(k: &Kernel, c: &Caller, plugin: &str, n: &PluginNote) -> Result<i64> {
-    let p = k.plugins.active(plugin)?;
+    let (p, _) = crate::access::plugin_for(k, c, plugin).await?;
     if n.title.trim().is_empty() {
         return Err(Error::bad("the title of the notification is missing"));
     }

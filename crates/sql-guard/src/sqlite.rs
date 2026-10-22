@@ -130,7 +130,7 @@ pub fn level_for(u: &str, t: &str, rid: &str, anc: &str) -> String {
     )
 }
 
-/// The user is an active member of an active tenant.
+/// The user is an active member of an active tenant (membership not suspended).
 pub fn is_member(u: &str, t: &str) -> String {
     format!("(SELECT {} FROM (SELECT ({u}) AS u, ({t}) AS t) msk_im)", member_sql("msk_im.u", "msk_im.t"))
 }
@@ -140,7 +140,7 @@ fn member_sql(u: &str, t: &str) -> String {
         "EXISTS (SELECT 1 FROM core_memberships msk_m \
            JOIN core_users msk_mu ON msk_mu.id = msk_m.user_id AND msk_mu.status = 'active' \
            JOIN core_tenants msk_mt ON msk_mt.id = msk_m.tenant_id AND msk_mt.status = 'active' \
-           WHERE msk_m.tenant_id = {t} AND msk_m.user_id = {u})"
+           WHERE msk_m.tenant_id = {t} AND msk_m.user_id = {u} AND msk_m.status = 'active')"
     )
 }
 

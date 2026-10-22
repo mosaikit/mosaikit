@@ -1,5 +1,5 @@
-//! Members of the tenant: creation, role (Tenant Manager or User), password reset, leaving with
-//! reassignment of the resources.
+//! Members of the tenant: creation, role (Tenant Manager or User), permission profile, suspension,
+//! password reset, leaving with reassignment of the resources.
 
 use chrono::{DateTime, Utc};
 use serde::Serialize;
@@ -17,7 +17,16 @@ pub struct MemberInfo {
     pub home_tenant: String,
     pub is_guest: bool,
     pub role: Role,
+    /// status of the account (`active`, `disabled`)
     pub status: String,
+    /// status of the membership in this tenant (`active`, `suspended`)
+    pub membership: String,
+    /// permission profile (`None`: the default profile of the tenant)
+    pub profile_id: Option<Uuid>,
+    pub profile: String,
+    pub groups: Vec<String>,
+    pub email: Option<String>,
+    pub last_sign_in_at: Option<DateTime<Utc>>,
     pub joined_at: DateTime<Utc>,
     pub owned_resources: i64,
 }
@@ -30,13 +39,27 @@ pub async fn members(k: &Kernel, c: &Caller) -> Result<Vec<MemberInfo>> {
 pub(super) async fn members_of(k: &Kernel, tenant: Uuid) -> Result<Vec<MemberInfo>> {
     let rows = mosaikit_db::query(
         "select u.id, u.username, u.display_name, h.slug, u.home_tenant_id <> m.tenant_id, m.role, u.status, m.joined_at,
-                (select count(*) from core.resources r where r.tenant_id = m.tenant_id and r.owner_id = u.id)
+                (select count(*) from core.resources r where r.tenant_id = m.tenant_id and r.owner_id = u.id),
+                m.status, m.profile_id,
+                coalesce(p.name, (select d.name from core.permission_profiles d where d.tenant_id = m.tenant_id and d.is_default), ''),
+                u.email, u.last_sign_in_at
          from core.memberships m join core.users u on u.id = m.user_id join core.tenants h on h.id = u.home_tenant_id
+         left join core.permission_profiles p on p.id = m.profile_id
          where m.tenant_id = $1 order by u.username",
     )
     .bind(tenant)
     .fetch_all(&k.db)
     .await?;
+    let groups = mosaikit_db::query(
+        "select gm.user_id, g.name from core.group_members gm join core.groups g on g.id = gm.group_id
+         where g.tenant_id = $1 order by g.name",
+    )
+    .bind(tenant)
+    .fetch_all(&k.db)
+    .await?;
+    let groups_of = |u: Uuid| -> Vec<String> {
+        groups.iter().filter(|g| g.get::<Uuid, _>(0) == u).map(|g| g.get::<String, _>(1)).collect()
+    };
     rows.iter()
         .map(|r| {
             Ok(MemberInfo {
@@ -47,6 +70,12 @@ pub(super) async fn members_of(k: &Kernel, tenant: Uuid) -> Result<Vec<MemberInf
                 is_guest: r.get(4),
                 role: Role::parse(r.get::<&str, _>(5))?,
                 status: r.get(6),
+                membership: r.get(9),
+                profile_id: r.get(10),
+                profile: r.get(11),
+                groups: groups_of(r.get(0)),
+                email: r.get(12),
+                last_sign_in_at: r.get(13),
                 joined_at: r.get(7),
                 owned_resources: r.get(8),
             })
@@ -142,10 +171,10 @@ pub(super) async fn reset_password_in(k: &Kernel, tenant: Uuid, user_id: Uuid, p
     Ok(())
 }
 
-async fn managers_count(k: &Kernel, tenant: Uuid) -> Result<i64> {
+pub(super) async fn managers_count(k: &Kernel, tenant: Uuid) -> Result<i64> {
     Ok(mosaikit_db::query_scalar(
         "select count(*) from core.memberships m join core.users u on u.id = m.user_id
-         where m.tenant_id = $1 and m.role = 'tenant_manager' and u.status = 'active'",
+         where m.tenant_id = $1 and m.role = 'tenant_manager' and u.status = 'active' and m.status = 'active'",
     )
     .bind(tenant)
     .fetch_one(&k.db)
@@ -214,7 +243,18 @@ pub async fn remove_member(
     new_owner: Option<Uuid>,
 ) -> Result<RemoveReport> {
     c.require_manager()?;
-    let tenant = c.tenant.tenant_id;
+    remove_member_in(k, c.tenant.tenant_id, c.user.user_id, user_id, new_owner).await
+}
+
+/// Like `remove_member`, by an actor with the authority on the tenant (its manager, or the
+/// Administrator).
+pub(super) async fn remove_member_in(
+    k: &Kernel,
+    tenant: Uuid,
+    actor: Uuid,
+    user_id: Uuid,
+    new_owner: Option<Uuid>,
+) -> Result<RemoveReport> {
     let role = member_role(k, tenant, user_id).await?.ok_or_else(|| Error::not_found("member not found"))?;
     if role == Role::TenantManager && managers_count(k, tenant).await? <= 1 {
         return Err(Error::bad("you cannot remove the only manager of the tenant"));
@@ -315,7 +355,7 @@ pub async fn remove_member(
     events::record(
         k,
         Some(tenant),
-        Some(c.user.user_id),
+        Some(actor),
         None,
         None,
         "member.remove",
@@ -323,4 +363,44 @@ pub async fn remove_member(
     )
     .await;
     Ok(RemoveReport { reassigned, disabled })
+}
+
+/// Suspends (or reactivates) the membership of a member: a suspended member keeps account, items and
+/// groups but cannot work in the tenant until reactivated.
+pub async fn set_member_suspended(k: &Kernel, c: &Caller, user_id: Uuid, suspended: bool) -> Result<()> {
+    c.require_manager()?;
+    if user_id == c.user.user_id && suspended {
+        return Err(Error::bad("you cannot suspend yourself"));
+    }
+    set_suspended_in(k, c.tenant.tenant_id, c.user.user_id, user_id, suspended).await
+}
+
+pub(super) async fn set_suspended_in(
+    k: &Kernel,
+    tenant: Uuid,
+    actor: Uuid,
+    user_id: Uuid,
+    suspended: bool,
+) -> Result<()> {
+    let role = member_role(k, tenant, user_id).await?.ok_or_else(|| Error::not_found("member not found"))?;
+    if suspended && role == Role::TenantManager && managers_count(k, tenant).await? <= 1 {
+        return Err(Error::bad("the tenant must have at least one active manager"));
+    }
+    mosaikit_db::query("update core.memberships set status = $3 where tenant_id = $1 and user_id = $2")
+        .bind(tenant)
+        .bind(user_id)
+        .bind(if suspended { "suspended" } else { "active" })
+        .execute(&k.db)
+        .await?;
+    events::record(
+        k,
+        Some(tenant),
+        Some(actor),
+        None,
+        None,
+        if suspended { "member.suspend" } else { "member.reactivate" },
+        json!({ "user": user_id }),
+    )
+    .await;
+    Ok(())
 }

@@ -126,6 +126,41 @@ As Administrator (`#/admin`) unless said otherwise.
 | P2-10 | As Administrator: System › Email | SMTP server, port, TLS, user, password (masked after saving), sender, footer, test message. Without a mail server in the development environment the test message fails with a readable message; with a local catcher (e.g. Mailpit on port 1025) the message arrives |
 | P2-11 | Dark mode on the panel and the page | Readable, unread dot visible |
 
+## Phase 3 — People and permissions
+
+As `e.ricci` (Tenant Manager of *Comune di Roma*) unless said otherwise.
+
+| Id | Check | Expected |
+|---|---|---|
+| P3-01 | Manage | Sections People, Groups, Permission profiles, Pending; the people table shows role and profile, groups, status, last sign-in |
+| P3-02 | Permission profiles | The profile *Standard* (Default) with its people and, for each plugin, what it gives |
+| P3-03 | New profile «Reader» | It appears; in its menu: Edit the permissions, Duplicate, Use for new invitations, Delete |
+| P3-04 | Plugins › Notes › Access and permissions | What each permission means (Use the app, Create items, Delete items, Share items); a row per profile with check boxes; Groups and people empty |
+| P3-05 | Untick Create, Delete and Share for «Reader», Save | The save bar appears only after a change; «Permissions saved» |
+| P3-06 | Manage › People › Sara Greco (click the name) | Her page: tabs Profile, Sign-in, Permissions, Activity; breadcrumb back to Manage |
+| P3-07 | Profile tab: Permission profile → Reader | «Profile updated»; in People her profile reads Reader |
+| P3-08 | Permissions tab | Notes: Use the app ✓ (Profile Reader), Create items — ; the other plugins still from her profile |
+| P3-09 | As `s.greco`, open Notes and try to create a note | Refused: «your permission profile does not allow «Create items» in Notes» (inside the apps the messages of the server are in English for now) |
+| P3-10 | As `e.ricci`, Plugins › Notes › Access and permissions › Add a group or person › Sara Greco, tick Create items, Save | As `s.greco` creating a note works again; her Permissions tab shows Create items from «Personal» |
+| P3-11 | People: tick two people, «Change profile», «Add to a group», «Suspend» | The action bar appears only with a selection; each action applies to all of them |
+| P3-12 | A suspended person (e.g. `l.bianchi`) signs in | The tenant is not offered to them any more; reactivate from their page («⋯» › Reactivate in the tenant) |
+| P3-13 | Groups: click a group | Group page: Members (add, remove), Shared items, Plugins (what the group adds) |
+| P3-14 | As `e.ricci`, create a note in Notes and copy its address; take the identifier after the last `/` | — |
+| P3-15 | As `s.greco` open `#/t/comune-roma/item/<identifier>` | «You cannot see this item» with Access (See, Edit) and a message; Send the request; «Request sent» |
+| P3-16 | As `e.ricci`: the bell | «Sara Greco asks to see «…»»; Manage › Pending lists it under Access requests with Approve, Refuse, Forward to the owner |
+| P3-17 | Approve | `s.greco` gets «… gave you access to …»; the same address now opens the note in Notes |
+| P3-18 | Sara's page › Permissions › «Why can't they see an item?» with an identifier | The steps (account, membership, use of the app, owner, shared) with ✓ or — |
+| P3-19 | Sara's page › Sign-in | Send the password link: a dialog with the link to copy (valid until …); her open sessions, Close and Close every session |
+| P3-20 | Open the link in a private window | «Choose a new password» with the rule of the tenant; after saving, «Done: sign in with the new password.»; the link does not work a second time |
+| P3-21 | A guest (`d.conti` seen from *Regione Lazio* as `l.verdi`) › Sign-in tab | It says that the home tenant handles password and sessions |
+| P3-22 | As Administrator: the sidebar | A new item People |
+| P3-23 | People | Every person (Administrators too), pills All / In several tenants / Administrators, filters by tenant, role, status, search; the Administrators link to System › Administrators |
+| P3-24 | New person (home tenant, role, profile; no password) | Created; a dialog with the link to choose the password |
+| P3-25 | A person › Tenants | Role and profile per tenant, suspend or remove (not the home), Add to a tenant, Move the home tenant (the person then signs in from the new one) |
+| P3-26 | Select people › Send the password link | One link per person, Copy all |
+| P3-27 | Italian | Every new page and message in Italian |
+| P3-28 | Dark mode on the new pages | Readable, check boxes and badges visible |
+
 ---
 
-Phases 3 to 9 add their sections here when they are committed.
+Phases 4 to 9 add their sections here when they are committed.

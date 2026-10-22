@@ -83,9 +83,17 @@ pub struct Ctx {
     pub tenant: Option<String>,
     #[serde(default)]
     pub plugin: String,
+    /// Permissions of the caller in the plugin: the standard ones of the kernel (`use`, `create`,
+    /// `delete`, `share`) and the `[[user_permissions]]` of the manifest that the caller has.
+    #[serde(default)]
+    pub perms: Vec<String>,
 }
 
 impl Ctx {
+    /// The caller has the permission `key` (a `[[user_permissions]]` of the manifest, or a standard one).
+    pub fn can(&self, key: &str) -> bool {
+        self.perms.iter().any(|p| p == key)
+    }
     pub fn db(&self) -> Db {
         Db(())
     }

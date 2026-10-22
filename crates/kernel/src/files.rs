@@ -46,8 +46,9 @@ pub struct Listing {
     pub my_level: String,
 }
 
-fn plugin(k: &Kernel, id: &str) -> Result<std::sync::Arc<LoadedPlugin>> {
-    let p = k.plugins.active(id)?;
+/// The plugin, with the files permission of its manifest and the permission `perm` of the caller.
+async fn plugin(k: &Kernel, c: &Caller, id: &str, perm: &str) -> Result<std::sync::Arc<LoadedPlugin>> {
+    let (p, _) = crate::access::require(k, c, id, perm).await?;
     if !p.manifest.permissions.files {
         return Err(Error::forbidden("the plugin does not declare the files permission"));
     }
@@ -140,7 +141,7 @@ async fn sibling(
 }
 
 pub async fn list(k: &Kernel, c: &Caller, plugin_id: &str, parent: Option<Uuid>) -> Result<Listing> {
-    let p = plugin(k, plugin_id)?;
+    let p = plugin(k, c, plugin_id, crate::access::USE).await?;
     let mut tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
     let current = folder(&mut tx, parent).await?;
     let rows = match parent {
@@ -194,7 +195,7 @@ pub async fn mkdir(
     if !valid_name(name) {
         return Err(Error::bad("invalid name"));
     }
-    let p = plugin(k, plugin_id)?;
+    let p = plugin(k, c, plugin_id, crate::access::CREATE).await?;
     let mut tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
     folder(&mut tx, parent).await?;
     if sibling(&mut tx, parent, name, None).await?.is_some() {
@@ -219,7 +220,7 @@ pub async fn upload(
     if !valid_name(name) {
         return Err(Error::bad("invalid name"));
     }
-    let p = plugin(k, plugin_id)?;
+    let p = plugin(k, c, plugin_id, crate::access::CREATE).await?;
     let tenant = c.tenant.tenant_id;
     let mut tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
     folder(&mut tx, parent).await?;
@@ -256,7 +257,7 @@ pub async fn upload(
 
 /// Content of a file (read required).
 pub async fn read(k: &Kernel, c: &Caller, plugin_id: &str, id: Uuid) -> Result<(Entry, Vec<u8>)> {
-    let p = plugin(k, plugin_id)?;
+    let p = plugin(k, c, plugin_id, crate::access::USE).await?;
     let mut tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
     let e = get_entry(&mut tx, id).await?;
     tx.commit().await?;
@@ -271,7 +272,7 @@ pub async fn rename(k: &Kernel, c: &Caller, plugin_id: &str, id: Uuid, name: &st
     if !valid_name(name) {
         return Err(Error::bad("invalid name"));
     }
-    let p = plugin(k, plugin_id)?;
+    let p = plugin(k, c, plugin_id, crate::access::USE).await?;
     let mut tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
     let e = get_entry(&mut tx, id).await?;
     need(&e, 2)?;
@@ -292,7 +293,7 @@ pub async fn move_to(
     id: Uuid,
     parent: Option<Uuid>,
 ) -> Result<Entry> {
-    let p = plugin(k, plugin_id)?;
+    let p = plugin(k, c, plugin_id, crate::access::USE).await?;
     let mut tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
     let e = get_entry(&mut tx, id).await?;
     folder(&mut tx, parent).await?;
@@ -313,7 +314,7 @@ pub async fn copy_to(
     id: Uuid,
     parent: Option<Uuid>,
 ) -> Result<Entry> {
-    let p = plugin(k, plugin_id)?;
+    let p = plugin(k, c, plugin_id, crate::access::CREATE).await?;
     let tenant = c.tenant.tenant_id;
     let mut tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
     let src = get_entry(&mut tx, id).await?;
@@ -391,7 +392,7 @@ async fn copy_rec(
 }
 
 pub async fn delete(k: &Kernel, c: &Caller, plugin_id: &str, id: Uuid) -> Result<()> {
-    let p = plugin(k, plugin_id)?;
+    let p = plugin(k, c, plugin_id, crate::access::DELETE).await?;
     let mut tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
     let e = get_entry(&mut tx, id).await?;
     need(&e, 3)?;
@@ -415,7 +416,7 @@ pub async fn delete(k: &Kernel, c: &Caller, plugin_id: &str, id: Uuid) -> Result
 
 /// Zip of a folder (only the readable content).
 pub async fn zip_folder(k: &Kernel, c: &Caller, plugin_id: &str, id: Uuid) -> Result<(String, Vec<u8>)> {
-    let p = plugin(k, plugin_id)?;
+    let p = plugin(k, c, plugin_id, crate::access::USE).await?;
     let tenant = c.tenant.tenant_id;
     let mut tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
     let root = get_entry(&mut tx, id).await?;

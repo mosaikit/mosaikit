@@ -16,6 +16,7 @@ import Login from './Login.tsx'
 import { NotificationsPage } from './notifications.tsx'
 import { AdminOverview, AdminPlugins, AdminSystem, AdminTenant, AdminTenants } from './pages/admin.tsx'
 import { AccountPage } from './pages/common.tsx'
+import { AdminPeople, AdminPersonPage, GroupPage, ItemPage, PersonPage, PluginAccessPage, RequestsPage, ResetPage } from './pages/people.tsx'
 import { Manage, PluginPage, Shares, TenantHome, TenantPlugins, TenantSettingsPage, Usage } from './pages/tenant.tsx'
 import { go, href, parse, to, useHash, type Route } from './router.ts'
 import Shell from './Shell.tsx'
@@ -26,6 +27,7 @@ const LAST_TENANT = 'msk_tenant'
 /** Where whoever signed in must be: the administrator in the platform, the others in one of their tenants;
  *  the old addresses lead to the new home. */
 function landing(s: Session, r: Route, hash: string): string | null {
+  if (r.area === 'reset') return null
   const canonical = r.area === 'login' ? null : href(r)
   if (s.user.is_system_admin) return r.area === 'admin' ? (canonical !== hash ? canonical : null) : to.admin()
   if (r.area === 'tenant' && s.memberships.some((m) => m.slug === r.tenant)) return canonical !== hash ? canonical : null
@@ -46,6 +48,8 @@ function Page({ session, route }: { session: Session; route: Route }) {
   if (route.area === 'admin') {
     if (route.page === 'tenants') return <AdminTenants />
     if (route.page === 'tenant') return <AdminTenant id={route.id!} section={route.section} />
+    if (route.page === 'people') return <AdminPeople />
+    if (route.page === 'person') return <AdminPersonPage id={route.id!} tab={route.section} />
     if (route.page === 'plugins') return <AdminPlugins section={route.section} />
     if (route.page === 'system') return <AdminSystem session={session} section={route.section} />
     if (route.page === 'account') return <AccountPage session={session} route={route} />
@@ -57,7 +61,12 @@ function Page({ session, route }: { session: Session; route: Route }) {
     if (route.page === 'plugin') return <PluginPage session={session} slug={route.tenant} id={route.id!} at={route.section} />
     if (route.page === 'account') return <AccountPage session={session} route={route} />
     if (route.page === 'notifications') return <NotificationsPage session={session} route={route} />
+    if (route.page === 'requests') return <RequestsPage slug={route.tenant} />
+    if (route.page === 'item') return <ItemPage slug={route.tenant} id={route.id!} />
     if (route.page !== 'home' && !manager) return <Empty title={t('Reserved to Tenant Managers')} />
+    if (route.page === 'person') return <PersonPage slug={route.tenant} id={route.id!} tab={route.section} />
+    if (route.page === 'group') return <GroupPage slug={route.tenant} id={route.id!} tab={route.section} />
+    if (route.page === 'plugins' && route.section) return <PluginAccessPage slug={route.tenant} plugin={route.section} />
     if (route.page === 'manage') return <Manage slug={route.tenant} section={route.section} />
     if (route.page === 'plugins') return <TenantPlugins slug={route.tenant} />
     if (route.page === 'shares') return <Shares slug={route.tenant} />
@@ -124,7 +133,10 @@ export default function App() {
   return (
     <UiServices>
       <TooltipProvider delayDuration={300}>
-        {!s ? (
+        {route.area === 'reset' ? (
+          // the page of a link to choose a new password works with or without a session
+          <ResetPage token={route.token} />
+        ) : !s ? (
           <Login door={route.area === 'login' ? route.door : route.area === 'admin' ? 'admin' : 'tenant'} tenant={route.area === 'login' ? route.tenant : undefined} />
         ) : target ? null : (
           <Shell session={s} route={route}>

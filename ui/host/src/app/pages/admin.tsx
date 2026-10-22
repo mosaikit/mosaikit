@@ -697,7 +697,7 @@ function Admins({ me }: { me: string }) {
               <TableRow key={a.user_id}>
                 <TableCell>
                   <div className="flex items-center gap-2.5">
-                    <span className="flex size-8 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">{initials(a.display_name || a.username)}</span>
+                    <span className="flex size-8 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary-strong">{initials(a.display_name || a.username)}</span>
                     <div>
                       <div className="font-medium">
                         {a.display_name || a.username}

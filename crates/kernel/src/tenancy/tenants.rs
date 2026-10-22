@@ -178,6 +178,7 @@ pub async fn create_tenant(k: &Kernel, admin: &SessionUser, t: NewTenant<'_>) ->
     .bind(manager)
     .execute(&mut *tx)
     .await?;
+    crate::access::create_default_profile(&mut tx, id).await?;
     tx.commit().await?;
     events::record(k, Some(id), Some(admin.user_id), None, None, "tenant.create", json!({ "slug": slug }))
         .await;

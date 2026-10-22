@@ -11,8 +11,11 @@ import { expect, test, type Page } from '@playwright/test'
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? 'e2e-admin-password'
 const PASSWORD = 'password-e2e-123'
 const NEW_PASSWORD = 'password-e2e-456'
-// the app is served under a base path (url = "http://127.0.0.1:18080/mosaikit")
+// the app is served under a base path (url = "http://127.0.0.1:18080/mosaikit"); `cargo xtask e2e` picks the
+// first free pair of ports and passes them in E2E_BASE_URL and E2E_PLUGIN_ORIGIN
 const BASE = process.env.E2E_BASE_PATH ?? '/mosaikit'
+const APP_ORIGIN = new URL(process.env.E2E_BASE_URL ?? 'http://127.0.0.1:18080/mosaikit/').origin
+const PLUGIN_ORIGIN = new URL(process.env.E2E_PLUGIN_ORIGIN ?? 'http://127.0.0.1:18081').origin
 
 /** TOTP code (RFC 6238, SHA-1, 6 digits) of a base32 secret. */
 function totp(secret: string, step = Math.floor(Date.now() / 30000)): string {
@@ -412,8 +415,9 @@ test.describe.serial('platform', () => {
     await login(page, 'City of Alfa', 'anna', NEW_PASSWORD)
     await nav(page, 'Notes').click()
     const frameEl = page.locator('iframe.plugin-frame')
-    await expect(frameEl).toHaveAttribute('src', new RegExp(`^http://127\\.0\\.0\\.1:18081${BASE}/ui/`))
-    const frame = page.frames().find((f) => f.url().includes(`:18081${BASE}/ui/`))!
+    const uiPrefix = `${PLUGIN_ORIGIN}${BASE}/ui/`
+    await expect(frameEl).toHaveAttribute('src', new RegExp(`^${uiPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`))
+    const frame = page.frames().find((f) => f.url().startsWith(uiPrefix))!
     // a different origin: no session cookie, no DOM of the parent
     expect(await frame.evaluate(() => document.cookie)).not.toContain('msk_session')
     const parentAccess = await frame.evaluate(() => {
@@ -427,12 +431,12 @@ test.describe.serial('platform', () => {
     // a direct call to the API of the app from the iframe fails (CORS and CSRF)
     const direct = await frame.evaluate(async (base) => {
       try {
-        const r = await fetch(`http://127.0.0.1:18080${base}/api/session`, { credentials: 'include' })
+        const r = await fetch(`${base}/api/session`, { credentials: 'include' })
         return String(r.status)
       } catch {
         return 'blocked'
       }
-    }, BASE)
+    }, APP_ORIGIN + BASE)
     expect(direct).toBe('blocked')
     await logout(page)
   })
@@ -730,5 +734,107 @@ test.describe.serial('platform', () => {
     await expect(page.getByText('Settings saved').last()).toBeVisible()
     await expect(page.getByRole('button', { name: /Language:/ })).toBeVisible()
     await logout(page)
+  })
+
+  test('people and permissions: profiles, permissions of a plugin, access requests, every person', async ({ page }) => {
+    // two sign-ins of the Administrator may wait for a new code of the second factor
+    test.setTimeout(240_000)
+    const note = async (title: string) =>
+      page.evaluate(
+        async ([base, title]) => {
+          const s = await (await fetch(`${base}/api/session`)).json()
+          const r = await fetch(`${base}/api/t/alfa/p/com.mosaikit.notes/r/notes`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', 'x-csrf-token': s.csrf },
+            body: JSON.stringify({ values: { title } }),
+          })
+          const j = await r.json()
+          return { status: r.status, id: j.id as string, code: j.code as string }
+        },
+        [BASE, title],
+      )
+    // the Tenant Manager: a profile that may only open Notes, given to Anna
+    await login(page, 'Alfa Municipality', 'manager', PASSWORD)
+    await nav(page, 'Manage').click()
+    await page.getByRole('link', { name: /Permission profiles/ }).click()
+    await expect(page.getByText('The permissions every plugin gives by default.', { exact: false })).toBeVisible()
+    await page.getByRole('button', { name: 'New profile' }).click()
+    const d = page.getByRole('dialog', { name: 'New profile' })
+    await d.getByLabel('Name').fill('Reader')
+    await d.getByRole('button', { name: 'Create profile' }).click()
+    await expect(page.getByText('Reader', { exact: true })).toBeVisible()
+    await accessible(page, 'permission profiles')
+    await nav(page, 'Plugins').click()
+    await page.getByRole('row', { name: /Notes/ }).getByRole('button', { name: 'Access and permissions' }).click()
+    await expect(page.getByRole('heading', { name: 'Access and permissions · Notes' })).toBeVisible()
+    for (const perm of ['Create items', 'Delete items', 'Share items']) await page.getByRole('checkbox', { name: `Reader: ${perm}` }).click()
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByText('Permissions saved').last()).toBeVisible()
+    await accessible(page, 'permissions of a plugin')
+    await nav(page, 'Manage').click()
+    await page.getByRole('link', { name: 'Anna Rossi' }).click()
+    await expect(page.getByRole('heading', { name: 'Anna Rossi' })).toBeVisible()
+    await page.getByRole('combobox', { name: 'Permission profile' }).click()
+    await page.getByRole('option', { name: 'Reader' }).click()
+    await expect(page.getByText('Profile updated').last()).toBeVisible()
+    await page.getByRole('navigation', { name: 'Tabs' }).getByRole('link', { name: 'Permissions' }).click()
+    const notes = page.getByRole('list', { name: 'Permissions in Notes' })
+    await expect(notes.getByRole('listitem').filter({ hasText: 'Create items' })).toHaveAttribute('data-granted', 'false')
+    await expect(notes.getByRole('listitem').filter({ hasText: 'Use the app' })).toContainText('Profile Reader')
+    await accessible(page, 'person, permissions')
+    // a note of the manager, which Anna cannot see
+    const budget = await note('Budget plan')
+    expect(budget.status).toBe(201)
+    await logout(page)
+
+    // Anna: no new notes any more; she asks to see the note of the manager
+    await login(page, 'Alfa Municipality', 'anna', NEW_PASSWORD)
+    const denied = await note('Not allowed')
+    expect(`${denied.status} ${denied.code}`).toBe('403 missing_permission')
+    await page.goto(`./#/t/alfa/item/${budget.id}`)
+    await expect(page.getByRole('heading', { name: 'You cannot see this item' })).toBeVisible()
+    await page.getByLabel('Message (optional)').fill('For the meeting')
+    await page.getByRole('button', { name: 'Send the request' }).click()
+    await expect(page.getByText('Request sent: you will get a notification with the answer.')).toBeVisible()
+    await accessible(page, 'request of access')
+    await logout(page)
+
+    // the Tenant Manager approves it from Pending
+    await login(page, 'Alfa Municipality', 'manager', PASSWORD)
+    await nav(page, 'Manage').click()
+    await page.getByRole('link', { name: /Pending/ }).click()
+    const req = page.getByRole('table', { name: 'Access requests' }).getByRole('row', { name: /Budget plan/ })
+    await expect(req).toContainText('Anna Rossi')
+    await accessible(page, 'pending')
+    await req.getByRole('button', { name: 'Approve' }).click()
+    await expect(page.getByText('Access given').last()).toBeVisible()
+    await logout(page)
+
+    // the Administrator: every person, the tenants of Anna, a link to choose a new password
+    await adminLogin(page)
+    await nav(page, 'People').click()
+    await expect(page.getByRole('heading', { name: 'People' })).toBeVisible()
+    await accessible(page, 'people of the platform')
+    await page.getByRole('link', { name: /Anna Rossi/ }).click()
+    const tabs = page.getByRole('navigation', { name: 'Tabs' })
+    await tabs.getByRole('link', { name: /Tenants/ }).click()
+    await expect(page.getByRole('row', { name: /Alfa/ })).toContainText('home')
+    await accessible(page, 'person, tenants')
+    await tabs.getByRole('link', { name: 'Sign-in' }).click()
+    await page.getByRole('button', { name: 'Send the password link' }).click()
+    const link = await page.getByLabel('Link', { exact: true }).inputValue()
+    await page.getByRole('button', { name: 'Done' }).click()
+    await logout(page)
+    await page.goto(link)
+    await expect(page.getByRole('heading', { name: 'Choose a new password' })).toBeVisible()
+    await page.getByLabel('New password', { exact: true }).fill('password-e2e-789')
+    await page.getByLabel('Repeat the new password').fill('password-e2e-789')
+    await page.getByRole('button', { name: 'Save the new password' }).click()
+    await expect(page.getByText('Done: sign in with the new password.')).toBeVisible()
+    await accessible(page, 'new password')
+    // Anna signs in with it and now opens the note in its app
+    await login(page, 'Alfa Municipality', 'anna', 'password-e2e-789')
+    await page.goto(`./#/t/alfa/item/${budget.id}`)
+    await expect(page).toHaveURL(/#\/t\/alfa\/p\/com\.mosaikit\.notes\//)
   })
 })

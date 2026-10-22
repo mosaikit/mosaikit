@@ -112,6 +112,9 @@ export interface Hello {
   context?: UiContext
   /** the place inside the plugin the page was opened at (from a notification: `Notify.at`) */
   at?: string
+  /** recent hosts: the permissions of the person in the plugin (`use`, `create`, `delete`, `share` and the
+   *  `[[user_permissions]]` of the manifest); the kernel enforces the standard ones, the plugin its own */
+  perms?: string[]
   /** only in public links: the shared resource */
   resource?: PublicResource
 }

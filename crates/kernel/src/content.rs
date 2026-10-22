@@ -13,7 +13,7 @@ const TICKET_HOURS: i32 = 8;
 
 /// Uploads a zip as the content of resource `rid` (write required).
 pub async fn upload_site(k: &Kernel, c: &Caller, plugin_id: &str, rid: Uuid, zip: &[u8]) -> Result<SiteInfo> {
-    let p = k.plugins.active(plugin_id)?;
+    let (p, _) = crate::access::plugin_for(k, c, plugin_id).await?;
     if !p.manifest.permissions.content {
         return Err(Error::forbidden("the plugin does not declare the content permission"));
     }
@@ -50,7 +50,7 @@ pub struct TicketUrl {
 
 /// Temporary URL (bound to the session) to show a content in an iframe or download it.
 pub async fn ticket(k: &Kernel, c: &Caller, plugin_id: &str, rid: Uuid, download: bool) -> Result<TicketUrl> {
-    let p = k.plugins.active(plugin_id)?;
+    let (p, _) = crate::access::plugin_for(k, c, plugin_id).await?;
     let mut tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
     let row = mosaikit_db::query("select kind, title, meta from core.visible_resources where id = $1")
         .bind(rid)

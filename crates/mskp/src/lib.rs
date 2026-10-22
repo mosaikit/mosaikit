@@ -13,7 +13,8 @@ mod version;
 pub use collect::collect_plugin_dir;
 pub use manifest::{
     is_plugin_id, schema_name, Contribution, FieldDecl, FieldKind, KpiDecl, KpiTranslation, Manifest,
-    Permissions, Requires, ResourceDecl, ResourceTranslation, Translation, UiDecl, ABI_VERSION,
+    PermissionTranslation, Permissions, Requires, ResourceDecl, ResourceTranslation, Translation, UiDecl,
+    UserPermission, ABI_VERSION, STANDARD_PERMISSIONS,
 };
 pub use package::{
     pack, package_sha256, parse_migration_name, Package, MAX_FILE_BYTES, MAX_PACKAGE_BYTES, WASM_FILE,

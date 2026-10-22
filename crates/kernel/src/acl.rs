@@ -159,6 +159,9 @@ pub async fn set_grant(
     level: Option<Level>,
 ) -> Result<()> {
     let m = require_level(k, c, rid, Level::Manage).await?;
+    if level.is_some() {
+        crate::access::require(k, c, &m.plugin_id, crate::access::SHARE).await?;
+    }
     let tenant = c.tenant.tenant_id;
     match principal_type {
         "user" => {

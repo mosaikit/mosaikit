@@ -125,3 +125,14 @@ describe('Msk.notify', () => {
     b.dispose()
   })
 })
+
+describe('permissions of the person', () => {
+  it('msk.can follows the permissions of the host, everything with an older host', () => {
+    const { host } = fakeHost()
+    const b = new Bridge(host, 'https://app.example', window)
+    const msk = new Msk(b, { public: false, perms: ['use', 'export'] })
+    expect(msk.can('export')).toBe(true)
+    expect(msk.can('delete')).toBe(false)
+    expect(new Msk(b, { public: false }).can('delete')).toBe(true)
+  })
+})

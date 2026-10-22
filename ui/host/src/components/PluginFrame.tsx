@@ -79,6 +79,7 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
                 plugin: { id: plugin.id, version: plugin.version },
                 theme: themeVars(),
                 context: uiContext(shellRef.current),
+                ...(ctx.perms ? { perms: ctx.perms[plugin.id] ?? [] } : {}),
                 ...(at ? { at: at.slice(0, 200) } : {}),
               },
             })
