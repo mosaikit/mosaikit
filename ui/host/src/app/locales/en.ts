@@ -48,4 +48,9 @@ export const EN: Record<string, string> = {
   'errors.image_type': 'Only SVG, PNG or WebP images',
   'errors.image_too_large': 'Image too large: at most 512 KB',
   'errors.key_invalid': 'Invalid key',
+  // notifications and email
+  'errors.email_invalid': 'Invalid email address',
+  'errors.email_not_configured': 'The mail server of the platform is not set',
+  'errors.email_failed': 'The mail server refused the message',
+  'errors.too_many_notifications': 'Too many notifications: try again in a minute',
 }

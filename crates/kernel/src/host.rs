@@ -113,7 +113,7 @@ impl KernelHost {
         let k = self.kernel.clone().ok_or("kernel not available")?;
         if k.db.is_sqlite() {
             // SQLite has one write transaction at a time: the one of the caller is open
-            return Err("plugin.call richiede PostgreSQL".into());
+            return Err("plugin.call requires PostgreSQL".into());
         }
         let (caller, depth) = (self.caller.clone(), self.depth + 1);
         self.rt.block_on(async move {

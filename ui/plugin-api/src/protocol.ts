@@ -110,8 +110,24 @@ export interface Hello {
   theme?: Record<string, string>
   /** recent hosts: language, theme and mode (older hosts send only `theme`) */
   context?: UiContext
+  /** the place inside the plugin the page was opened at (from a notification: `Notify.at`) */
+  at?: string
   /** only in public links: the shared resource */
   resource?: PublicResource
+}
+
+/** A notification of the plugin (`msk.notify`). */
+export interface Notify {
+  /** plain text, at most 160 characters */
+  title: string
+  /** plain text, at most 600 characters */
+  body?: string
+  /** a place inside the plugin, given back as `msk.at` when the notification is opened (letters, digits
+   *  and `/ _ - . = & ? % :`, at most 200 characters) */
+  at?: string
+  /** an item of the plugin, on which the person can write: the notification goes to the people who can
+   *  see it (not to the sender). Without it, only to the person using the plugin. */
+  resource?: string
 }
 
 export interface PublicResource {

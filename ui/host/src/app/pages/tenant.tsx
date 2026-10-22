@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Frame, Gauge, Grid2x2, KeyRound, KeySquare, Lock, Mail, MoreHorizontal, Palette, Plus, Puzzle, Share2, ShieldCheck, Trash2, UserRound, Users } from 'lucide-react'
+import { Bell, Frame, Gauge, Grid2x2, KeyRound, KeySquare, Lock, Mail, MoreHorizontal, Palette, Plus, Puzzle, Share2, ShieldCheck, Trash2, UserRound, Users } from 'lucide-react'
 import { api, appUrl, fmtBytes, fmtDate } from '../../api.ts'
 import PluginFrame from '../../components/PluginFrame.tsx'
 import { UiContext, useUi, type Ui } from '../../ui-context.ts'
@@ -28,7 +28,7 @@ import { go, to } from '../router.ts'
 import { effectiveMode, useTheme } from '../theme.ts'
 import AppIcon from '../AppIcon.tsx'
 import { TenantTheme } from '../ThemeSettings.tsx'
-import { EmbeddingPanel, IdentityPanel, KeysPanel, LanguagesPanel, ManagedPanel, ModePanel, SecurityPanel } from '../SettingsPanels.tsx'
+import { EmbeddingPanel, IdentityPanel, KeysPanel, LanguagesPanel, ManagedPanel, ModePanel, NotificationsPanel, SecurityPanel } from '../SettingsPanels.tsx'
 
 const enc = encodeURIComponent
 const ROLE: Record<string, string> = { tenant_manager: 'Tenant Manager', user: 'User' }
@@ -126,7 +126,7 @@ function useDevReload(session: Session, slug: string): Record<string, number> {
   return reloads
 }
 
-export function PluginPage({ session, slug, id }: { session: Session; slug: string; id: string }) {
+export function PluginPage({ session, slug, id, at }: { session: Session; slug: string; id: string; at?: string }) {
   const ctx = useTenantCtx(slug)
   // language, theme and mode of the shell: they reach the plugin at start and at every change
   const lang = useLang()
@@ -145,7 +145,8 @@ export function PluginPage({ session, slug, id }: { session: Session; slug: stri
   return (
     <UiContext.Provider value={services}>
       <div className="relative flex-1 [&_.frame-msg]:absolute [&_.frame-msg]:inset-0 [&_.frame-msg]:flex [&_.frame-msg]:items-center [&_.frame-msg]:justify-center [&_.frame-msg]:text-sm [&_.frame-msg]:text-muted-foreground [&_.frame-wrap]:absolute [&_.frame-wrap]:inset-0 [&_iframe]:size-full [&_iframe]:border-0">
-        <PluginFrame key={p.id + slug} plugin={p} session={session} ctx={c} reloadKey={reloads[p.id] ?? 0} ui={ui} />
+        {/* another place (a notification) opens the page again at that place */}
+        <PluginFrame key={`${p.id}|${slug}|${at ?? ''}`} plugin={p} session={session} ctx={c} reloadKey={reloads[p.id] ?? 0} ui={ui} at={at} />
       </div>
       <ShareDialog
         ctx={c}
@@ -995,6 +996,7 @@ export function TenantSettingsPage({ slug, section }: { slug: string; section?: 
     { id: 'security', label: t('Passwords and sessions'), icon: <KeyRound /> },
     { id: 'keys', label: t('Keys of outside services'), icon: <KeySquare /> },
     { id: 'embedding', label: t('Embedding'), icon: <Frame /> },
+    { id: 'notifications', label: t('Notifications'), icon: <Bell /> },
     { id: 'appearance', label: t('Identity and appearance'), icon: <Palette />, group: t('Appearance') },
     { id: 'platform', label: t('Managed by the platform'), icon: <Lock />, group: t('Platform') },
   ]
@@ -1015,6 +1017,7 @@ export function TenantSettingsPage({ slug, section }: { slug: string; section?: 
         {cur === 'security' && <SecurityPanel level={level} />}
         {cur === 'keys' && <KeysPanel level={level} />}
         {cur === 'embedding' && <EmbeddingPanel level={level} />}
+        {cur === 'notifications' && <NotificationsPanel level={level} />}
         {cur === 'platform' && <ManagedPanel slug={slug} />}
         {cur === 'appearance' && tab && (
           <div className="grid gap-6">

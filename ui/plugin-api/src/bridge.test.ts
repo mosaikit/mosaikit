@@ -111,3 +111,17 @@ describe('Msk.onContext', () => {
     b.dispose()
   })
 })
+
+describe('Msk.notify', () => {
+  it('sends the notification through the host and returns how many received it', async () => {
+    const { host, sent } = fakeHost()
+    const b = new Bridge(host, 'https://app.example', window)
+    const msk = new Msk(b, { public: false, at: 'notes/7' })
+    expect(msk.at).toBe('notes/7')
+    const p = msk.notify({ title: 'Due today', at: 'notes/7' })
+    expect(sent[0].msg).toMatchObject({ msk: 1, op: 'notify', args: { title: 'Due today', at: 'notes/7' } })
+    reply(window, host, 'https://app.example', { msk: 1, id: sent[0].msg.id, ok: { sent: 2 } })
+    await expect(p).resolves.toBe(2)
+    b.dispose()
+  })
+})

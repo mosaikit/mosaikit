@@ -411,7 +411,7 @@ pub(crate) fn spawn_worker(k: &Arc<Kernel>) {
             if let Err(e) = drain(&k).await {
                 tracing::warn!("queue of the emails: {e}");
             }
-            if tick % 40 == 0 {
+            if tick.is_multiple_of(40) {
                 if let Err(e) = digest(&k, false).await {
                     tracing::warn!("digest of the notifications: {e}");
                 }
@@ -437,7 +437,7 @@ struct Smtp {
 }
 
 fn smtp_err(m: impl std::fmt::Display) -> Error {
-    Error::new(crate::Kind::Internal, format!("mail server: {m}")).with_code("email_failed")
+    Error::new(crate::Kind::BadRequest, format!("mail server: {m}")).with_code("email_failed")
 }
 
 const TIMEOUT: StdDuration = StdDuration::from_secs(20);

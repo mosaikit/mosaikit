@@ -66,7 +66,7 @@ import SearchBox, { type SearchGroup } from './SearchBox.tsx'
 import { initials, useTenantCtx } from './core.ts'
 import { setLang, t, useLang, useLanguages, type Lang } from './i18n.ts'
 import { NotificationsBell } from './notifications.tsx'
-import { useNotes } from './notes.ts'
+import { useLiveNotes, useUnread } from './notes.ts'
 import { bandOf, sidebarOpen } from './prefs.ts'
 import { go, personal, to, type Route } from './router.ts'
 import { markSvg, type MarkVariant } from './mark.ts'
@@ -278,10 +278,15 @@ function TenantSwitcher({ session, route, variant = 'band' }: { session: Session
           'flex h-9 min-w-0 items-center gap-2 rounded-md px-2 text-sm font-semibold outline-none focus-visible:ring-2',
           band ? 'text-band-foreground hover:bg-band-hover focus-visible:ring-white/60' : 'w-full hover:bg-sidebar-accent',
         )}
-        aria-label={t('Tenant: {name}. Switch tenant', { name: cur?.name ?? '' })}
       >
-        {badge(cur?.name ?? '?')}
+        {/* the name comes from the content (an aria-label would differ from the visible text): the initials
+            repeat the name and are hidden, the words around the name are only for screen readers */}
+        <span aria-hidden="true" className="contents">
+          {badge(cur?.name ?? '?')}
+        </span>
+        <span className="sr-only">{t('Tenant:')} </span>
         <span className={cn('truncate', band ? 'max-w-44' : 'flex-1 text-left')}>{cur?.name ?? 'Tenant'}</span>
+        <span className="sr-only">. {t('Switch tenant')}</span>
         <ChevronDown className="size-4 opacity-70" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-72">
@@ -403,7 +408,7 @@ function HelpMenu() {
 /** The menu of the person: Account, Notifications, Sign out (and the help, if the bar does not show it). */
 function UserMenu({ session, route, band }: { session: Session; route: Route; band: ShellBand }) {
   const qc = useQueryClient()
-  const notes = useNotes(session)
+  const unread = useUnread().data ?? 0
   const help = useHelpItems()
   const u = session.user
   const name = u.display_name || u.username
@@ -451,7 +456,7 @@ function UserMenu({ session, route, band }: { session: Session; route: Route; ba
         <DropdownMenuItem onSelect={() => go(personal(route, 'notifications'))}>
           <Bell />
           <span className="flex-1">{t('Notifications')}</span>
-          {notes.unread > 0 && <span className="text-xs text-muted-foreground">{t('{n} new', { n: String(notes.unread) })}</span>}
+          {unread > 0 && <span className="text-xs text-muted-foreground">{t('{n} new', { n: String(unread) })}</span>}
         </DropdownMenuItem>
         {!band.help && (
           <>
@@ -512,6 +517,7 @@ function TopBar({ session, route, band }: { session: Session; route: Route; band
 
 export default function Shell({ session, route, children }: { session: Session; route: Route; children: ReactNode }) {
   const band = bandOf(session)
+  useLiveNotes(session)
   return (
     <SidebarProvider defaultOpen={sidebarOpen()} className="min-h-svh">
       <AppSidebar session={session} route={route} band={band} />

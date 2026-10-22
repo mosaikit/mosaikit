@@ -33,4 +33,13 @@ describe('routeOp', () => {
     const t = routeOp('alfa', 'com.mosaikit.files', 'ticket', { id: ID, download: true })
     expect(t).toMatchObject({ method: 'POST', json: { download: true } })
   })
+
+  it('builds the notifications of the plugin, limited to the plugin and without recipients', () => {
+    const n = routeOp('alfa', 'com.mosaikit.notes', 'notify', { title: 'Due today', body: 'Plan', at: 'notes/1', resource: ID, to: 'everybody' })
+    expect(n).toEqual({ method: 'POST', url: '/api/t/alfa/p/com.mosaikit.notes/notify', json: { title: 'Due today', body: 'Plan', at: 'notes/1', resource: ID } })
+    expect(routeOp('alfa', 'p.x', 'notify', { title: 'Hi' }).json).toEqual({ title: 'Hi' })
+    expect(() => routeOp('alfa', 'p.x', 'notify', {})).toThrow(OpError)
+    expect(() => routeOp('alfa', 'p.x', 'notify', { title: 'x'.repeat(161) })).toThrow(OpError)
+    expect(() => routeOp('alfa', 'p.x', 'notify', { title: 'Hi', resource: 'not-an-id' })).toThrow(OpError)
+  })
 })

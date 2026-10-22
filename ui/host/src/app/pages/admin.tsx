@@ -3,7 +3,7 @@
 
 import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Bell, Building2, CircleHelp, Contrast, Frame, KeyRound, KeySquare, MoreHorizontal, Palette, PanelLeft, Plus, Power, Puzzle, Search, ShieldCheck, Trash2, Upload, Users } from 'lucide-react'
+import { Bell, Building2, CircleHelp, Contrast, Frame, KeyRound, KeySquare, Mail, MoreHorizontal, Palette, PanelLeft, Plus, Power, Puzzle, Search, ShieldCheck, Trash2, Upload, Users } from 'lucide-react'
 import { api, fmtBytes, fmtDate } from '../../api.ts'
 import { useBrand } from '../../brand.ts'
 import type { AdminPlugin, AdminUser, CatalogItem, GlobalKpi, Member, Session, ShellBand, SystemOverview, TenantInfo } from '../../types.ts'
@@ -23,7 +23,8 @@ import { go, to } from '../router.ts'
 import { bandOf } from '../prefs.ts'
 import { AppMark } from '../Shell.tsx'
 import { PlatformTheme } from '../ThemeSettings.tsx'
-import { EmbeddingPanel, IdentityPanel, KeysPanel, LanguagesPanel, ModePanel, SecurityPanel, ThemeSwitch } from '../SettingsPanels.tsx'
+import { EmbeddingPanel, IdentityPanel, KeysPanel, LanguagesPanel, ModePanel, NotificationsPanel, SecurityPanel, ThemeSwitch } from '../SettingsPanels.tsx'
+import { EmailPanel } from '../EmailPanel.tsx'
 import { t } from '../i18n.ts'
 
 const enc = encodeURIComponent
@@ -506,6 +507,8 @@ export function AdminPlugins({ section }: { section?: string }) {
 export function AdminSystem({ session, section }: { session: Session; section?: string }) {
   const sections = [
     { id: 'admins', label: t('Administrators'), icon: <ShieldCheck />, group: t('Platform') },
+    { id: 'email', label: t('Email'), icon: <Mail /> },
+    { id: 'notifications', label: t('Notifications'), icon: <Bell /> },
     { id: 'security', label: t('Passwords and sessions'), icon: <KeyRound /> },
     { id: 'keys', label: t('Keys of outside services'), icon: <KeySquare /> },
     { id: 'embedding', label: t('Embedding'), icon: <Frame /> },
@@ -525,6 +528,8 @@ export function AdminSystem({ session, section }: { session: Session; section?: 
       <PageHeader title={t('System')} sub={t('Settings of the platform, for every tenant')} />
       <Sections sections={sections} current={cur} href={(id) => to.admin('system', id === 'appearance' ? 'identity' : id)}>
         {cur === 'admins' && <Admins me={session.user.user_id} />}
+        {cur === 'email' && <EmailPanel session={session} />}
+        {cur === 'notifications' && <NotificationsPanel level={PLATFORM} />}
         {cur === 'security' && <SecurityPanel level={PLATFORM} />}
         {cur === 'keys' && <KeysPanel level={PLATFORM} />}
         {cur === 'embedding' && <EmbeddingPanel level={PLATFORM} />}

@@ -52,6 +52,9 @@ function labels(): Record<string, [string, string]> {
     'security.session_hours': [t('Length of the session, in hours'), t('Then the person signs in again')],
     'security.remember_days': [t('«Remember me», in days'), t('0: the option does not show on the sign-in page')],
     'embed.sites': [t('Sites that may embed public pages'), t('For instance the website of the tenant: https://www.example.com')],
+    'notify.email_mode': [t('Emails of the notifications'), t('For whoever did not choose; everyone can change it in Account › Notifications')],
+    'notify.digest_hour': [t('Hour of the daily summary'), t('0-23, UTC time of the server')],
+    'notify.retention_days': [t('Notifications kept, in days'), t('Older ones are deleted, read or not')],
     theme: [t('Theme'), ''],
     band: [t('Top bar'), ''],
   }
@@ -476,6 +479,26 @@ export function SecurityPanel({ level }: { level: Level }) {
       description={level.kind === 'platform' ? t('The minimum rules of the platform: tenants may only make them stricter.') : t('Rules of the tenant: only stricter than the ones of the platform.')}
     >
       {(d, s) => keys.map((k) => s(k) && <NumberRow key={k} level={level} d={d} s={s(k)!} />)}
+    </Panel>
+  )
+}
+
+/** How the notifications arrive by email: the default of the people (customizable by the tenants) and, for
+ *  the platform, the hour of the daily summary and how long the notifications are kept. */
+export function NotificationsPanel({ level }: { level: Level }) {
+  const keys = level.kind === 'platform' ? ['notify.email_mode', 'notify.digest_hour', 'notify.retention_days'] : ['notify.email_mode']
+  const modes: [string, string][] = [
+    ['digest', t('One summary a day')],
+    ['immediate', t('At once')],
+    ['off', t('Never')],
+  ]
+  return (
+    <Panel level={level} keys={keys} title={t('Notifications')} description={t('In the app every notification arrives in the bell; these are the defaults for the emails.')}>
+      {(d, s) =>
+        keys.map((k) =>
+          !s(k) ? null : k === 'notify.email_mode' ? <ChoiceRow key={k} level={level} d={d} s={s(k)!} options={modes} /> : <NumberRow key={k} level={level} d={d} s={s(k)!} />,
+        )
+      }
     </Panel>
   )
 }

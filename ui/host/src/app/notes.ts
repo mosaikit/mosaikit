@@ -1,60 +1,156 @@
-// Notifications of whoever signed in: today the invitations to other tenants (`/api/me/invitations`), with
-// the «read» state kept in the browser until the kernel has the notifications API.
+// Notifications of whoever signed in, from the kernel (`/api/me/notifications`), with the number of the
+// unread ones kept live by the stream of the person (`/api/me/stream`, server-sent events): the bell and
+// the menu of the person update as soon as something arrives, in every open tab.
 
-import { useSyncExternalStore } from 'react'
-import type { Invitation, Session } from '../types.ts'
-import { useApi } from './core.ts'
+import { useEffect } from 'react'
+import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
+import { api, appUrl } from '../api.ts'
+import type { Session } from '../types.ts'
+import { useAction } from './core.ts'
 import { t } from './i18n.ts'
+
+export type NoteKind = 'invitation' | 'share' | 'link' | 'plugin' | 'system'
 
 export interface Note {
   id: string
+  kind: NoteKind
   title: string
   body: string
-  when: string
+  link: string
+  source: string
+  tenant_slug: string | null
+  tenant_name: string | null
+  resource_id: string | null
+  data: Record<string, unknown>
   read: boolean
-  invitation?: Invitation
+  created_at: string
 }
 
-// Read or not: in the browser, until the kernel has the state of the notifications (phase 2 of docs/ui-plan.md).
-const READ = 'msk_read_notes'
-function readSet(): Set<string> {
-  try {
-    return new Set(JSON.parse(localStorage.getItem(READ) ?? '[]') as string[])
-  } catch {
-    return new Set()
-  }
-}
-let read = readSet()
-const listeners = new Set<() => void>()
-function markRead(ids: string[]) {
-  read = new Set([...read, ...ids])
-  try {
-    localStorage.setItem(READ, JSON.stringify([...read].slice(-500)))
-  } catch {
-    /* storage not available */
-  }
-  listeners.forEach((l) => l())
-}
-function useRead(): Set<string> {
-  return useSyncExternalStore(
-    (l) => {
-      listeners.add(l)
-      return () => listeners.delete(l)
-    },
-    () => read,
-  )
+export interface NotePage {
+  items: Note[]
+  unread: number
+  next: string | null
 }
 
-export function useNotes(session: Session) {
-  const q = useApi<Invitation[]>(['my-invitations'], session.user.is_system_admin ? null : '/api/me/invitations')
-  const seen = useRead()
-  const notes: Note[] = (q.data ?? []).map((i) => ({
-    id: `inv:${i.id}`,
-    title: t('Invitation to {tenant}', { tenant: i.tenant_name }),
-    body: t('{who} invites you as {role}', { who: i.invited_by ?? t('A Tenant Manager'), role: i.role === 'tenant_manager' ? 'Tenant Manager' : 'User' }),
-    when: i.created_at,
-    read: seen.has(`inv:${i.id}`),
-    invitation: i,
-  }))
-  return { notes, unread: notes.filter((n) => !n.read).length, isLoading: q.isLoading, markAll: () => markRead(notes.map((n) => n.id)), mark: (id: string) => markRead([id]) }
+export interface NoteFilter {
+  unread?: boolean
+  kind?: string
+  days?: number
+  q?: string
+  before?: string
+  limit?: number
+}
+
+export const KINDS: NoteKind[] = ['invitation', 'share', 'link', 'plugin', 'system']
+
+export function kindLabel(k: NoteKind): string {
+  return {
+    invitation: t('Invitations'),
+    share: t('Shared with you'),
+    link: t('Public links'),
+    plugin: t('From the apps'),
+    system: t('Platform'),
+  }[k]
+}
+
+function query(f: NoteFilter): string {
+  const q = new URLSearchParams()
+  if (f.unread) q.set('unread', 'true')
+  if (f.kind) q.set('kind', f.kind)
+  if (f.days) q.set('days', String(f.days))
+  if (f.q?.trim()) q.set('q', f.q.trim())
+  if (f.before) q.set('before', f.before)
+  if (f.limit) q.set('limit', String(f.limit))
+  const s = q.toString()
+  return `/api/me/notifications${s ? '?' + s : ''}`
+}
+
+export function useNoteList(f: NoteFilter) {
+  return useQuery({ queryKey: ['notes', 'list', f], queryFn: () => api<NotePage>('GET', query(f)) })
+}
+
+export function useUnread() {
+  return useQuery({ queryKey: ['notes', 'count'], queryFn: () => api<{ unread: number }>('GET', '/api/me/notifications/count').then((r) => r.unread) })
+}
+
+function refresh(qc: QueryClient, unread?: number) {
+  if (unread !== undefined) qc.setQueryData(['notes', 'count'], unread)
+  void qc.invalidateQueries({ queryKey: ['notes', 'list'] })
+}
+
+/** The live stream of the person: mounted once by the shell. */
+export function useLiveNotes(session: Session) {
+  const qc = useQueryClient()
+  const user = session.user.user_id
+  useEffect(() => {
+    if (typeof EventSource === 'undefined') return
+    const es = new EventSource(appUrl('/api/me/stream'))
+    es.onmessage = (ev) => {
+      try {
+        const m = JSON.parse(ev.data as string) as { event: string; unread: number }
+        refresh(qc, m.unread)
+        // an invitation arrives with its buttons: the list of the open ones changes too
+        if (m.event === 'notification') void qc.invalidateQueries({ queryKey: ['my-invitations'] })
+      } catch {
+        /* not an event of ours */
+      }
+    }
+    // the browser reconnects by itself; on the way back the first event brings the count again
+    return () => es.close()
+  }, [qc, user])
+}
+
+export function useNoteActions() {
+  const qc = useQueryClient()
+  const after = (r: unknown) => refresh(qc, (r as { unread?: number } | null)?.unread)
+  const mark = useAction(({ ids, read }: { ids: string[]; read: boolean }) => api('POST', '/api/me/notifications/read', { ids, read }).then(after))
+  const markAll = useAction(() => api('POST', '/api/me/notifications/read-all').then(after))
+  const remove = useAction((ids: string[]) => api('POST', '/api/me/notifications/delete', { ids }).then(after), { ok: (ids) => t('{n} deleted', { n: String(ids.length) }) })
+  const answer = useAction(({ id, accept }: { id: string; accept: boolean }) => api('POST', `/api/me/invitations/${id}/${accept ? 'accept' : 'decline'}`).then(() => refresh(qc)), {
+    ok: ({ accept }) => (accept ? t('Invitation accepted: the tenant is in the switcher at the top') : t('Invitation declined')),
+    invalidate: [['my-invitations'], ['session']],
+  })
+  return { mark, markAll, remove, answer }
+}
+
+/** The title in the language of the person, from the code of the kernel; otherwise the text as sent. */
+export function noteTitle(n: Note): string {
+  const d = n.data as Record<string, string>
+  switch (d.code) {
+    case 'invitation.received':
+      return t('{by} invited you to {tenant}', { by: d.by, tenant: d.tenant })
+    case 'invitation.accepted':
+      return t('{person} accepted the invitation to {tenant}', { person: d.person, tenant: d.tenant })
+    case 'invitation.declined':
+      return t('{person} declined the invitation to {tenant}', { person: d.person, tenant: d.tenant })
+    case 'share.received':
+      return d.item ? t('{by} shared «{item}» with you', { by: d.by, item: d.item }) : t('{by} shared an item with you', { by: d.by })
+    case 'link.created':
+      return t('{by} created a public link to «{item}»', { by: d.by, item: d.item })
+    default:
+      return n.title
+  }
+}
+
+export function noteBody(n: Note): string {
+  const d = n.data as Record<string, string>
+  switch (d.code) {
+    case 'invitation.received':
+      return t('You can work in {tenant} as {role}: accept or decline.', { tenant: d.tenant, role: d.role === 'tenant_manager' ? 'Tenant Manager' : t('User') })
+    case 'share.received':
+      return t('In {tenant}.', { tenant: d.tenant })
+    case 'link.created':
+      return t('Whoever has the link can open the item without signing in.')
+    case 'invitation.accepted':
+    case 'invitation.declined':
+      return ''
+    default:
+      return n.body
+  }
+}
+
+/** The invitation to answer, if the notification is about one still open. */
+export function pendingInvitation(n: Note): string | null {
+  const d = n.data as Record<string, string>
+  return d.code === 'invitation.received' && !n.read && typeof d.invitation_id === 'string' ? d.invitation_id : null
 }

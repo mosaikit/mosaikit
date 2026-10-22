@@ -2,7 +2,7 @@
 //   sign-in:        #/  ·  #/login/<tenant>  ·  #/admin
 //   administrator:  #/admin  ·  #/admin/tenants[/<id>[/<tab>]]  ·  #/admin/plugins[/<filter>]  ·
 //                   #/admin/system[/<section>]  ·  #/admin/account[/<section>]  ·  #/admin/notifications
-//   tenant:         #/t/<tenant>  ·  #/t/<tenant>/p/<plugin>  ·  #/t/<tenant>/manage[/<section>]  ·
+//   tenant:         #/t/<tenant>  ·  #/t/<tenant>/p/<plugin>[/<place>]  ·  #/t/<tenant>/manage[/<section>]  ·
 //                   #/t/<tenant>/plugins  ·  #/t/<tenant>/shares  ·  #/t/<tenant>/usage  ·
 //                   #/t/<tenant>/settings[/<section>]  ·  #/t/<tenant>/account[/<section>]  ·  #/t/<tenant>/notifications
 // The old routes (#/admin/settings/…, #/t/<tenant>/settings/appearance|account) lead to the new home.
@@ -31,7 +31,8 @@ export function parse(hash: string): Route {
   }
   if (p[0] === 't' && p[1]) {
     const tenant = p[1]
-    if (p[2] === 'p' && p[3]) return { area: 'tenant', tenant, page: 'plugin', id: p[3] }
+    // the place inside the plugin (from a notification) is given to its page
+    if (p[2] === 'p' && p[3]) return { area: 'tenant', tenant, page: 'plugin', id: p[3], section: p[4] }
     if (p[2] === 'settings' && (p[3] === 'appearance' || p[3] === 'account')) return { area: 'tenant', tenant, page: 'account', section: p[3] === 'account' ? 'security' : 'appearance' }
     if (p[2] === 'manage' && p[3] === 'invitations') return { area: 'tenant', tenant, page: 'manage', section: 'pending' }
     const page = TENANT_PAGES.find((x) => x === p[2])
@@ -47,13 +48,13 @@ export const to = {
   admin: (page: AdminPage = 'overview', section?: string) => (page === 'overview' ? '#/admin' : `#/admin/${page}${sub(section)}`),
   adminTenant: (id: string, section?: string) => `#/admin/tenants/${enc(id)}${sub(section)}`,
   tenant: (slug: string, page: TenantPage = 'home', section?: string) => `#/t/${enc(slug)}${page === 'home' ? '' : '/' + page}${sub(section)}`,
-  plugin: (slug: string, id: string) => `#/t/${enc(slug)}/p/${enc(id)}`,
+  plugin: (slug: string, id: string, at?: string) => `#/t/${enc(slug)}/p/${enc(id)}${sub(at)}`,
 }
 
 /** The address of a route: to rewrite the old ones. */
 export function href(r: Route): string {
   if (r.area === 'admin') return r.page === 'tenant' ? to.adminTenant(r.id!, r.section) : to.admin(r.page, r.section)
-  if (r.area === 'tenant') return r.page === 'plugin' ? to.plugin(r.tenant, r.id!) : to.tenant(r.tenant, r.page, r.section)
+  if (r.area === 'tenant') return r.page === 'plugin' ? to.plugin(r.tenant, r.id!, r.section) : to.tenant(r.tenant, r.page, r.section)
   return r.door === 'admin' ? '#/admin' : r.tenant ? `#/login/${enc(r.tenant)}` : '#/'
 }
 

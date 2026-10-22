@@ -54,7 +54,7 @@ function Page({ session, route }: { session: Session; route: Route }) {
   }
   if (route.area === 'tenant') {
     const manager = session.memberships.find((m) => m.slug === route.tenant)?.role === 'tenant_manager'
-    if (route.page === 'plugin') return <PluginPage session={session} slug={route.tenant} id={route.id!} />
+    if (route.page === 'plugin') return <PluginPage session={session} slug={route.tenant} id={route.id!} at={route.section} />
     if (route.page === 'account') return <AccountPage session={session} route={route} />
     if (route.page === 'notifications') return <NotificationsPage session={session} route={route} />
     if (route.page !== 'home' && !manager) return <Empty title={t('Reserved to Tenant Managers')} />

@@ -120,6 +120,14 @@ export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unk
       return { method: 'POST', url: `${base}/content/${uuid(a.id)}`, raw: blob(a.file) }
     case 'resource.meta':
       return { method: 'GET', url: `/api/t/${enc(tenant)}/resources/${uuid(a.id)}` }
+    case 'notify': {
+      const n: Args = { title: str(a.title, 'title', 160) }
+      if (a.body !== undefined && a.body !== null && a.body !== '') n.body = str(a.body, 'body', 600)
+      if (a.at !== undefined && a.at !== null && a.at !== '') n.at = str(a.at, 'place', 200)
+      const rid = optUuid(a.resource, 'resource')
+      if (rid) n.resource = rid
+      return { method: 'POST', url: `${base}/notify`, json: n }
+    }
     default:
       throw new OpError(`operation not available: ${op}`)
   }

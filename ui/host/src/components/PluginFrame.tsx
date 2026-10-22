@@ -13,6 +13,8 @@ interface Props {
   reloadKey: number
   /** language and theme of the shell: at the handshake and, at every change, with the `context` event */
   ui?: { lang: string; preset: string; mode: 'light' | 'dark'; preference: 'light' | 'dark' | 'auto' }
+  /** the place inside the plugin to open (from a notification), given at the handshake */
+  at?: string
 }
 
 /** Language, theme and mode to pass to the plugin (without `ui`, the ones of the page). */
@@ -32,7 +34,7 @@ function uiContext(ui: Props['ui']) {
  * Iframe of the UI of the plugin (separate origin, sandbox) and host side of the bridge.
  * It accepts messages only from the current iframe and from the origin of the plugins.
  */
-export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell }: Props) {
+export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell, at }: Props) {
   const ref = useRef<HTMLIFrameElement>(null)
   const ui = useUi()
   const [loaded, setLoaded] = useState(false)
@@ -77,6 +79,7 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
                 plugin: { id: plugin.id, version: plugin.version },
                 theme: themeVars(),
                 context: uiContext(shellRef.current),
+                ...(at ? { at: at.slice(0, 200) } : {}),
               },
             })
             return
@@ -100,7 +103,7 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
-  }, [origin, tenant, plugin.id, plugin.version, session, ctx, ui])
+  }, [origin, tenant, plugin.id, plugin.version, session, ctx, ui, at])
 
   if (!plugin.has_ui) {
     return (

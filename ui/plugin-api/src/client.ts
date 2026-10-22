@@ -1,5 +1,5 @@
 import { Bridge, BridgeError } from './bridge.ts'
-import type { FileEntry, Hello, ListResult, Listing, PublicResource, Row, SiteInfo, UiContext, Values } from './protocol.ts'
+import type { FileEntry, Hello, ListResult, Listing, Notify, PublicResource, Row, SiteInfo, UiContext, Values } from './protocol.ts'
 
 export interface CrudClient {
   list(opts?: { filter?: string; parent?: string }): Promise<ListResult>
@@ -18,6 +18,8 @@ export class Msk {
   readonly publicResource: PublicResource | undefined
   /** current language, theme and mode of the host (updated at every `context` event) */
   context: UiContext | undefined
+  /** the place the page was opened at, from a notification of the plugin (see `notify`) */
+  readonly at: string | undefined
 
   constructor(
     readonly bridge: Bridge,
@@ -29,6 +31,7 @@ export class Msk {
     this.plugin = hello.plugin
     this.publicResource = hello.resource
     this.context = hello.context
+    this.at = hello.at
   }
 
   /** Tells when the host changes language, theme or mode (already applied to `<html>`). */
@@ -84,6 +87,14 @@ export class Msk {
   /** Metadata of a resource (owner, level, size...). */
   resource(id: string) {
     return this.bridge.call<Record<string, unknown>>('resource.meta', { id })
+  }
+
+  /** Sends a notification: to the person using the plugin or, with `resource`, to the people who can see
+   *  that item. It arrives in the bell of the host and, if they chose so, by email. Returns how many
+   *  people received it. */
+  async notify(n: Notify): Promise<number> {
+    const r = await this.bridge.call<{ sent: number }>('notify', { ...n })
+    return r.sent
   }
 
   /** Opens the share dialog of the host (users, groups, public links). */

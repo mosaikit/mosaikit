@@ -11,19 +11,21 @@ import type { Overview, Session } from '../../types.ts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
-import { initials, passwordMin, useApi, useTenantCtx } from '../core.ts'
+import { initials, passwordMin, useAction, useApi, useTenantCtx } from '../core.ts'
 import { setLang, t, useLang, useLanguages, type Lang } from '../i18n.ts'
-import { Empty, ErrorBox, Loading, Locked, PageHeader, Sections, type Section } from '../kit.tsx'
+import { Empty, ErrorBox, Loading, Locked, PageHeader, SaveBar, Sections, type Section } from '../kit.tsx'
 import { go, personal, to, type Route } from '../router.ts'
 import { SIDEBAR_PREF } from '../prefs.ts'
 import { TenantBadge } from '../Shell.tsx'
 import { KeysPanel } from '../SettingsPanels.tsx'
+import { kindLabel, type NoteKind } from '../notes.ts'
 import { setTheme, useTheme, type Mode } from '../theme.ts'
 
 const enc = encodeURIComponent
@@ -52,7 +54,7 @@ export function AccountPage({ session, route }: { session: Session; route: Route
       <Sections sections={sections} current={cur} href={(id) => personal(route, 'account', id)}>
         {cur === 'profile' && <Profile session={session} />}
         {cur === 'security' && <Security session={session} />}
-        {cur === 'notifications' && <NotificationPrefs admin={admin} />}
+        {cur === 'notifications' && <NotificationPrefs />}
         {cur === 'appearance' && <Appearance route={route} />}
         {cur === 'tenants' && <MyTenants session={session} />}
         {cur === 'usage' && route.area === 'tenant' && <MyUsage slug={route.tenant} />}
@@ -168,40 +170,105 @@ function Security({ session }: { session: Session }) {
   )
 }
 
-function NotificationPrefs({ admin }: { admin: boolean }) {
+interface NotePrefs {
+  address: string | null
+  mode: string
+  own_mode: string | null
+  default_mode: string
+  digest_hour: number
+  kinds: { kind: NoteKind; email: boolean }[]
+}
+
+interface PrefsDraft {
+  address: string
+  mode: string
+  kinds: Record<string, boolean>
+}
+
+function draftOf(p: NotePrefs): PrefsDraft {
+  return { address: p.address ?? '', mode: p.own_mode ?? 'default', kinds: Object.fromEntries(p.kinds.map((k) => [k.kind, k.email])) }
+}
+
+/** What arrives by email: the address, at once or in a daily digest, and the kinds. In the app everything
+ *  arrives in the bell. */
+function NotificationPrefs() {
+  const q = useApi<NotePrefs>(['note-prefs'], '/api/me/notifications/prefs')
+  const [v, setV] = useState<PrefsDraft | null>(null)
+  const save = useAction(
+    (d: PrefsDraft) => api('PUT', '/api/me/notifications/prefs', { address: d.address.trim() || null, mode: d.mode === 'default' ? null : d.mode, kinds: d.kinds }),
+    { ok: t('Preferences saved'), invalidate: [['note-prefs']] },
+  )
+  if (q.isLoading) return <Loading />
+  if (q.error) return <ErrorBox error={q.error} />
+  const p = q.data!
+  const saved = draftOf(p)
+  const d = v ?? saved
+  const dirty = !!v && JSON.stringify(v) !== JSON.stringify(saved)
+  const modeName = (m: string) => ({ off: t('Never'), immediate: t('At once'), digest: t('One summary a day, at {h}:00 (UTC)', { h: String(p.digest_hour) }) })[m] ?? m
   return (
-    <Card className="max-w-2xl">
-      <CardHeader>
-        <CardTitle>{t('What I receive')}</CardTitle>
-        <CardDescription>{t('Notifications arrive in the bell at the top. Email delivery will come with the mail server of the platform.')}</CardDescription>
-      </CardHeader>
-      <CardContent className="grid gap-1">
-        {(admin
-          ? [[t('Platform alerts'), t('Plugin updates, service errors')]]
-          : [
-              [t('Invitations to other tenants'), t('A Tenant Manager invites you as a guest')],
-              [t('Mentions and due dates of the apps'), t('When the apps publish them')],
-            ]
-        ).map(([l, d]) => (
-          <div key={l} className="flex items-center justify-between gap-4 border-b py-3 last:border-0">
-            <span>
-              <b className="block text-sm">{l}</b>
-              <span className="text-xs text-muted-foreground">{d}</span>
-            </span>
-            <span className="flex items-center gap-4 text-xs text-muted-foreground">
-              <label className="flex items-center gap-2">
-                {t('In the app')}
-                <Switch checked disabled aria-label={t('{what}: in the app', { what: l })} />
-              </label>
-              <label className="flex items-center gap-2">
-                {t('Email')}
-                <Switch checked={false} disabled aria-label={t('{what}: by email', { what: l })} />
-              </label>
-            </span>
+    <div className="grid max-w-2xl gap-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('What I receive')}</CardTitle>
+          <CardDescription>{t('In the app every notification arrives in the bell; by email only what you choose.')}</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid gap-1.5">
+              <Label htmlFor="np-address">{t('Email address')}</Label>
+              <Input id="np-address" type="email" autoComplete="email" placeholder="name@example.org" value={d.address} onChange={(e) => setV({ ...d, address: e.target.value })} />
+              {!d.address.trim() && <span className="text-xs text-muted-foreground">{t('Without an address nothing arrives by email.')}</span>}
+            </div>
+            <div className="grid gap-1.5">
+              <Label htmlFor="np-mode">{t('Emails')}</Label>
+              <Select value={d.mode} onValueChange={(m) => setV({ ...d, mode: m })}>
+                <SelectTrigger id="np-mode" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="default">{t('Default: {mode}', { mode: modeName(p.default_mode) })}</SelectItem>
+                  {['immediate', 'digest', 'off'].map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {modeName(m)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-        ))}
-      </CardContent>
-    </Card>
+          <div className="overflow-hidden rounded-lg border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('Kind')}</TableHead>
+                  <TableHead className="w-28 text-center">{t('In the app')}</TableHead>
+                  <TableHead className="w-28 text-center">{t('Email')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {p.kinds.map(({ kind }) => (
+                  <TableRow key={kind}>
+                    <TableCell className="font-medium">{kindLabel(kind)}</TableCell>
+                    <TableCell className="text-center">
+                      <Checkbox checked disabled aria-label={t('{what}: in the app', { what: kindLabel(kind) })} />
+                    </TableCell>
+                    <TableCell className="text-center">
+                      <Checkbox
+                        checked={d.kinds[kind] ?? false}
+                        disabled={d.mode === 'off' || (d.mode === 'default' && p.default_mode === 'off')}
+                        onCheckedChange={(on) => setV({ ...d, kinds: { ...d.kinds, [kind]: !!on } })}
+                        aria-label={t('{what}: by email', { what: kindLabel(kind) })}
+                      />
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
+      <SaveBar dirty={dirty} busy={save.isPending} onSave={() => save.mutate(d, { onSuccess: () => setV(null) })} onCancel={() => setV(null)} />
+    </div>
   )
 }
 

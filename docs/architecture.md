@@ -12,6 +12,7 @@ development and release. The choices described here replace the initial PoC
 3. [Tenants, users and roles](#3-tenants-users-and-roles)
 4. [Resources, ownership and sharing](#4-resources-ownership-and-sharing)
 5. [Public links](#5-public-links)
+   - [5.1 Notifications](#51-notifications)
 6. [KPIs](#6-kpis)
 7. [Database: PostgreSQL and SQLite](#7-database-postgresql-and-sqlite)
 8. [Plugins](#8-plugins)
@@ -232,6 +233,41 @@ The share dialog belongs to **the host**: plugins open it with
   public viewer of the plugin opens (`public_view` in the manifest), which receives
   only the data of that resource (and of its children).
 - Every visit increments `view_count` and is an event (KPI).
+
+### 5.1 Notifications
+
+What the kernel and the plugins tell a person (`core.notifications`, kernel module `notify`).
+
+- **Producers of the kernel**: an invitation to another tenant (to the person invited, with the buttons
+  to accept or decline; the answer closes it and tells who invited), an item shared with a person or a
+  group (to the people who now see it, only when the grant is new), a public link created on an item by
+  somebody else (to its owner). A failure to notify never makes the operation fail.
+- **Plugins** send their own with `msk.notify({ title, body, at, resource })`
+  (`POST /api/t/{t}/p/{plugin}/notify`). The plugin names no recipient: without `resource` the
+  notification reaches only the person using the plugin; with an item of the same plugin and tenant, on
+  which that person can **write**, it reaches the people who can **see** the item (owner and grants, also
+  through groups and parent items: `core.level_for`), never the sender. Plain text (title ≤ 160, body ≤
+  600 characters); `at` (≤ 200 characters, letters, digits and `/ _ - . = & ? % :`) is a place inside the
+  plugin: opening the notification opens `#/t/<tenant>/p/<plugin>/<at>` and the plugin finds it in
+  `msk.at`. At most 30 notifications a minute per person and plugin.
+- Every notification has the English `title` and `body` (also the text of the emails) and in `data` the
+  `code` and parameters of the text, which the shell shows in the language of the person.
+- **Reading** (only one's own): `GET /api/me/notifications` (filters `unread`, `kind`, `days`, `q`,
+  pages with `before`), `/count`, `POST /read` (`ids`, `read`), `/read-all`, `/delete`.
+- **Live**: `GET /api/me/stream` (server-sent events) sends at once the number of unread notifications,
+  then every new notification and every change of the number; the bell updates without reloading.
+- **Preferences** (`/api/me/notifications/prefs`, Account › Notifications): the email address, the mode of
+  the emails (`immediate`, `digest` or `off`; without a choice the default of the setting
+  `notify.email_mode`, customizable by the tenants) and the kinds sent by email. In the app everything
+  arrives.
+- **Email** (kernel module `mail`): the mail server of the platform (System › Email: host, port, STARTTLS,
+  TLS or none, user, password encrypted with the secret key of the installation in `core.secrets`, sender,
+  footer, a test message sent at once). Messages wait in `core.mail_outbox`; a worker of the kernel sends
+  them every 15 seconds and retries a failure after 1, 5, 30 minutes, 2 and 12 hours, then marks it
+  failed. The **daily digest** goes out once a day from the hour `notify.digest_hour` (UTC) with the
+  unread notifications not emailed yet.
+- **Retention**: notifications older than `notify.retention_days` (default 90) are deleted; sent and
+  failed emails after 30 days.
 
 ## 6. KPIs
 
@@ -552,7 +588,12 @@ await msk.share(rows[0].id)                  // share dialog of the host
 
 API of the bridge: `crud(name).list/get/create/update/delete`, `call`,
 `files.*` (if `files`), `content.upload/ticket` (if `content`),
-`resource.meta`, `share`, `toast`, `theme`.
+`resource.meta`, `share`, `toast`, `notify` (§5.1), `theme`.
+
+```ts
+await msk.notify({ title: 'Due today', body: 'Site visit', at: `notes/${id}`, resource: id })
+msk.at                                       // the place, when the page opens from a notification
+```
 
 **Language, theme and mode.** The handshake carries `context`: `lang` (`it`, `en`…),
 `preset` (theme of the host), `mode` (`light` or `dark`, the one in use),
