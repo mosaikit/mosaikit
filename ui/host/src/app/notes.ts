@@ -15,7 +15,7 @@ export interface Note {
   invitation?: Invitation
 }
 
-// Lette o no: per ora nel browser (prototipo), finche' il kernel non ha lo stato delle notifiche.
+// Lette o no: nel browser, finche' il kernel non ha lo stato delle notifiche (fase 2 di docs/piano-ui.md).
 const READ = 'msk_read_notes'
 function readSet(): Set<string> {
   try {

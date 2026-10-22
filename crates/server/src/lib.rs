@@ -26,7 +26,7 @@ pub struct AppState {
     pub k: Arc<Kernel>,
 }
 
-/// Errore HTTP con corpo JSON `{"error": "..."}`.
+/// Errore HTTP con corpo JSON `{"error": "...", "code": "..."}`: il codice e' stabile, il messaggio no.
 #[derive(Debug)]
 pub struct ApiError(pub mosaikit_kernel::Error);
 
@@ -47,7 +47,8 @@ impl IntoResponse for ApiError {
             Kind::TooMany => StatusCode::TOO_MANY_REQUESTS,
             Kind::Internal => StatusCode::INTERNAL_SERVER_ERROR,
         };
-        (status, axum::Json(serde_json::json!({ "error": self.0.message }))).into_response()
+        let body = serde_json::json!({ "error": self.0.message, "code": self.0.code() });
+        (status, axum::Json(body)).into_response()
     }
 }
 

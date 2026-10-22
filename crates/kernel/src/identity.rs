@@ -51,11 +51,12 @@ impl LoginLimiter {
 
 pub fn check_password_policy(pw: &str) -> Result<()> {
     if pw.chars().count() < MIN_PASSWORD_LEN {
-        return Err(Error::bad(format!("la password deve avere almeno {MIN_PASSWORD_LEN} caratteri")));
+        return Err(Error::bad(format!("la password deve avere almeno {MIN_PASSWORD_LEN} caratteri"))
+            .with_code("password_too_short"));
     }
     let first = pw.chars().next();
     if pw.chars().all(|c| Some(c) == first) {
-        return Err(Error::bad("password troppo semplice"));
+        return Err(Error::bad("password troppo semplice").with_code("password_too_simple"));
     }
     Ok(())
 }
@@ -238,7 +239,8 @@ pub async fn login(
             .fetch_optional(&k.db)
             .await?;
     if system == Some(true) {
-        return Err(Error::bad("gli Administrator accedono dalla pagina \"Accesso amministratori\""));
+        return Err(Error::bad("gli Administrator accedono dalla pagina \"Accesso amministratori\"")
+            .with_code("admin_door"));
     }
     let user_id = check_credentials(k, &tenant_slug, username, password, ip).await?;
     finish_login(k, user_id, ip).await
@@ -306,7 +308,7 @@ async fn check_credentials(
     let Some(user_id) = user_id.filter(|_| ok) else {
         k.limiter.fail(&user_key);
         k.limiter.fail(&ip_key);
-        return Err(Error::unauthorized("credenziali non valide"));
+        return Err(Error::unauthorized("credenziali non valide").with_code("wrong_credentials"));
     };
     k.limiter.clear(&user_key);
     Ok(user_id)
@@ -314,6 +316,7 @@ async fn check_credentials(
 
 fn too_many() -> Error {
     Error::new(crate::Kind::TooMany, "troppi tentativi falliti: riprova tra qualche minuto")
+        .with_code("too_many_attempts")
 }
 
 /// Nuova sessione (completa, o in attesa del secondo fattore); ritorna token e CSRF.
@@ -426,7 +429,7 @@ pub async fn totp_enable(
     let secret = secret.ok_or_else(|| Error::bad("registra prima l'app di autenticazione"))?;
     let Some(step) = totp::verify(&secret, code, totp::current_step(), 0) else {
         k.limiter.fail(&key);
-        return Err(Error::unauthorized("codice non valido"));
+        return Err(Error::unauthorized("codice non valido").with_code("wrong_code"));
     };
     k.limiter.clear(&key);
     let codes = totp::recovery_codes(RECOVERY_CODES);
@@ -496,7 +499,7 @@ pub async fn totp_verify(k: &Kernel, p: &PendingLogin, code: &str, ip: &str) -> 
     };
     if !ok {
         k.limiter.fail(&key);
-        return Err(Error::unauthorized("codice non valido"));
+        return Err(Error::unauthorized("codice non valido").with_code("wrong_code"));
     }
     k.limiter.clear(&key);
     close_pending(k, p).await?;
@@ -627,7 +630,7 @@ pub async fn change_password(k: &Kernel, user: &SessionUser, old: &str, new: &st
             .fetch_one(&k.db)
             .await?;
     if !verify_password(k, hash, old).await? {
-        return Err(Error::forbidden("password attuale errata"));
+        return Err(Error::forbidden("password attuale errata").with_code("wrong_password"));
     }
     set_password(k, user.user_id, new).await?;
     // le altre sessioni dell'utente vengono chiuse

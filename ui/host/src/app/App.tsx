@@ -1,4 +1,4 @@
-// Il prototipo della nuova shell: accesso, poi la cornice con la pagina della rotta.
+// La shell di Mosaikit: accesso, poi la cornice con la pagina della rotta.
 
 import { useEffect } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
@@ -8,7 +8,7 @@ import type { Session } from '../types.ts'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { useSession, useTenantCtx } from './core.ts'
-import { useLang } from './i18n.ts'
+import { useLang, t } from './i18n.ts'
 import { useFavicon } from './mark.ts'
 import { UiServices } from './services.tsx'
 import { Empty } from './kit.tsx'
@@ -54,7 +54,7 @@ function Page({ session, route }: { session: Session; route: Route }) {
     if (route.page === 'plugin') return <PluginPage session={session} slug={route.tenant} id={route.id!} />
     if (route.page === 'account') return <AccountPage session={session} route={route} />
     if (route.page === 'notifications') return <NotificationsPage session={session} route={route} />
-    if (route.page !== 'home' && !manager) return <Empty title="Riservato ai Tenant Manager" />
+    if (route.page !== 'home' && !manager) return <Empty title={t('Riservato ai Tenant Manager')} />
     if (route.page === 'manage') return <Manage slug={route.tenant} section={route.section} />
     if (route.page === 'plugins') return <TenantPlugins slug={route.tenant} />
     if (route.page === 'shares') return <Shares slug={route.tenant} />

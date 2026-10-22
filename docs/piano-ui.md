@@ -24,7 +24,7 @@ Ordine: 0 → 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9. La fase 8 si pu
 
 | Fase | Stato |
 |---|---|
-| 0 | da fare |
+| 0 | done: the shell is the UI (old UI removed), real Share dialog, i18next (it/en) with server error codes, official logo and Tessera theme, Playwright e2e with axe, Windows dev watcher fixed |
 | 1 | da fare |
 | 2 | da fare |
 | 3 | da fare |

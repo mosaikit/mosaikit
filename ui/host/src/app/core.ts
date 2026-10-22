@@ -1,4 +1,4 @@
-// Hook comuni del prototipo: sessione e dati (TanStack Query), modifiche con il loro messaggio.
+// Hook comuni della shell: sessione e dati (TanStack Query), modifiche con il loro messaggio.
 
 import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query'
 import { toast } from 'sonner'

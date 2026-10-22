@@ -717,3 +717,56 @@ async fn accesso_amministratori_con_secondo_fattore() {
     let o = a.call(Some(&s), Method::GET, "/api/admin/overview", None).await.json();
     assert_eq!((o["tenants"].as_i64(), o["administrators"].as_i64()), (Some(0), Some(1)));
 }
+
+#[tokio::test]
+async fn errori_con_codice_stabile() {
+    let a = App::new().await;
+    a.t.tenant("alfa").await;
+    let r = a
+        .call(
+            None,
+            Method::POST,
+            "/api/auth/login",
+            Some(json!({ "tenant": "alfa", "username": "alfa-gestore", "password": "sbagliata-123" })),
+        )
+        .await;
+    assert_eq!((r.status, r.json()["code"].as_str()), (StatusCode::UNAUTHORIZED, Some("wrong_credentials")));
+    assert!(r.json()["error"].is_string(), "il messaggio resta, come riserva");
+
+    let s = a.login("alfa", "alfa-gestore", PASSWORD).await;
+    let r = a
+        .call(Some(&s), Method::POST, "/api/me/password", Some(json!({ "old": PASSWORD, "new": "corta" })))
+        .await;
+    assert_eq!((r.status, r.json()["code"].as_str()), (StatusCode::BAD_REQUEST, Some("password_too_short")));
+    let r = a
+        .call(
+            Some(&s),
+            Method::POST,
+            "/api/me/password",
+            Some(json!({ "old": "non-e-questa", "new": "lunga-abbastanza-1" })),
+        )
+        .await;
+    assert_eq!(r.json()["code"], "wrong_password");
+    // senza un codice specifico: quello della categoria
+    let r = a.call(Some(&s), Method::GET, "/api/admin/tenants", None).await;
+    assert_eq!((r.status, r.json()["code"].as_str()), (StatusCode::FORBIDDEN, Some("forbidden")));
+
+    // troppi tentativi
+    let mut last = None;
+    for _ in 0..10 {
+        last = Some(
+            a.call(
+                None,
+                Method::POST,
+                "/api/auth/login",
+                Some(json!({ "tenant": "alfa", "username": "alfa-gestore", "password": "sbagliata-123" })),
+            )
+            .await,
+        );
+    }
+    let r = last.unwrap();
+    assert_eq!(
+        (r.status, r.json()["code"].as_str()),
+        (StatusCode::TOO_MANY_REQUESTS, Some("too_many_attempts"))
+    );
+}

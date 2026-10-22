@@ -13,12 +13,14 @@ import { cn } from '@/lib/utils'
 import { useAction, useTenantCtx } from './core.ts'
 import { Loading } from './kit.tsx'
 import { PRESETS } from './theme.ts'
+import { t } from './i18n.ts'
 
 const enc = encodeURIComponent
 
 const SWATCH: Record<string, { band: string; side: string; acc: string; page: string }> = {
   mosaikit: { band: '#444791', side: '#ebebeb', acc: '#5b5fc7', page: '#ffffff' },
   italia: { band: '#0066cc', side: '#ffffff', acc: '#0066cc', page: '#f5f7fa' },
+  tessera: { band: '#6e1522', side: '#efebe6', acc: '#a8293a', page: '#fffdfa' },
 }
 
 function nameOf(id: string): string {
@@ -54,7 +56,7 @@ function ThemeCards({ value, busy, onPick }: { value: string; busy?: boolean; on
             <div className="flex items-center gap-2 border-t p-3">
               <span className="flex-1">
                 <b className="block text-sm">{p.name}</b>
-                <span className="text-xs text-muted-foreground">{p.note}</span>
+                <span className="text-xs text-muted-foreground">{t(p.note)}</span>
               </span>
               {on && <Check className="size-4 text-primary" />}
             </div>
@@ -68,14 +70,14 @@ function ThemeCards({ value, busy, onPick }: { value: string; busy?: boolean; on
 /** Sistema › Tema: il tema della piattaforma, dei tenant che non ne scelgono uno e dell'accesso. */
 export function PlatformTheme({ session }: { session: Session }) {
   const save = useAction((preset: string) => api('PUT', '/api/admin/theme', { preset }), {
-    ok: (p) => `Tema della piattaforma: ${nameOf(p)}`,
+    ok: (p) => t('Tema della piattaforma: {name}', { name: nameOf(p) }),
     invalidate: [['session']],
   })
   return (
     <Card className="max-w-3xl">
       <CardHeader>
-        <CardTitle>Tema predefinito</CardTitle>
-        <CardDescription>Per la piattaforma, la pagina di accesso e i tenant che non ne scelgono uno. Il modo (chiaro, scuro) resta di ciascuno.</CardDescription>
+        <CardTitle>{t('Tema predefinito')}</CardTitle>
+        <CardDescription>{t('Per la piattaforma, la pagina di accesso e i tenant che non ne scelgono uno. Il modo (chiaro, scuro) resta di ciascuno.')}</CardDescription>
       </CardHeader>
       <CardContent>
         <ThemeCards value={session.theme ?? 'mosaikit'} busy={save.isPending} onPick={(p) => save.mutate(p)} />
@@ -88,7 +90,7 @@ export function PlatformTheme({ session }: { session: Session }) {
 export function TenantTheme({ slug }: { slug: string }) {
   const ctx = useTenantCtx(slug)
   const save = useAction((preset: string | null) => api('PUT', `/api/t/${enc(slug)}/manage/theme`, { preset }), {
-    ok: (p) => (p ? `Tema del tenant: ${nameOf(p)}` : 'Di nuovo il tema della piattaforma'),
+    ok: (p) => (p ? t('Tema del tenant: {name}', { name: nameOf(p) }) : t('Di nuovo il tema della piattaforma')),
     invalidate: [['ctx', slug]],
   })
   if (ctx.isLoading) return <Loading />
@@ -98,13 +100,13 @@ export function TenantTheme({ slug }: { slug: string }) {
     <Card className="max-w-3xl">
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2">
-          Tema del tenant
+          {t('Tema del tenant')}
           <Badge variant={own ? 'default' : 'secondary'}>{own ? 'Personalizzato' : 'Ereditato'}</Badge>
         </CardTitle>
         <CardDescription>
           {own
-            ? `Al posto di quello della piattaforma (${nameOf(th.platform)}), per tutte le persone del tenant.`
-            : `Quello della piattaforma, scelto dall'Administrator. Scegline un altro per personalizzarlo.`}{' '}
+            ? t('Al posto di quello della piattaforma ({platform}), per tutte le persone del tenant.', { platform: nameOf(th.platform) })
+            : t('Quello della piattaforma, scelto dall\'Administrator. Scegline un altro per personalizzarlo.')}{' '}
           Il modo (chiaro, scuro) resta di ciascuno.
         </CardDescription>
       </CardHeader>
@@ -114,7 +116,7 @@ export function TenantTheme({ slug }: { slug: string }) {
           <div>
             <Button variant="outline" size="sm" disabled={save.isPending} onClick={() => save.mutate(null)}>
               <RotateCcw />
-              Ripristina il tema della piattaforma
+              {t('Ripristina il tema della piattaforma')}
             </Button>
           </div>
         )}

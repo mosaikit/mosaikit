@@ -10,6 +10,7 @@ import { CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/componen
 import { cn } from '@/lib/utils'
 import { useApi } from './core.ts'
 import { go, to, type Route } from './router.ts'
+import { t } from './i18n.ts'
 
 export interface SearchItem {
   label: string
@@ -44,12 +45,12 @@ export default function SearchBox({ session, groups }: { session: Session; route
       ? [
           {
             id: 'tenants',
-            label: 'Tenant',
+            label: t('Tenant'),
             items: (tenants.data ?? []).map((t) => ({ label: t.name, sub: t.slug, extra: t.slug, icon: <Building2 />, href: to.adminTenant(t.id) })),
           },
         ]
       : session.memberships.length > 1
-        ? [{ id: 'tenants', label: 'Tenant', items: session.memberships.map((m) => ({ label: m.name, sub: m.is_home ? 'appartenenza' : 'ospite', icon: <Building2 />, href: to.tenant(m.slug) })) }]
+        ? [{ id: 'tenants', label: t('Tenant'), items: session.memberships.map((m) => ({ label: m.name, sub: m.is_home ? 'appartenenza' : 'ospite', icon: <Building2 />, href: to.tenant(m.slug) })) }]
         : []
     return [...groups, ...extra].filter((g) => g.items.length)
   }, [groups, admin, tenants.data, session.memberships])
@@ -90,7 +91,7 @@ export default function SearchBox({ session, groups }: { session: Session; route
     return () => document.removeEventListener('mousedown', onDown)
   }, [open])
 
-  const placeholder = admin ? 'Cerca tenant e pagine' : 'Cerca pagine, app e tenant'
+  const placeholder = admin ? t('Cerca tenant e pagine') : t('Cerca pagine, app e tenant')
   return (
     <div
       ref={box}
@@ -103,18 +104,19 @@ export default function SearchBox({ session, groups }: { session: Session; route
         <button
           type="button"
           onClick={openBox}
-          aria-label="Cerca"
+          aria-keyshortcuts="Control+K"
           aria-haspopup="dialog"
           className="flex h-8 w-full items-center gap-2.5 rounded-md bg-search px-3 text-sm text-search-foreground outline-none hover:brightness-[1.04] focus-visible:ring-2 focus-visible:ring-white/70 @max-[600px]:w-8 @max-[600px]:justify-center @max-[600px]:bg-transparent @max-[600px]:px-0 @max-[600px]:text-band-foreground/90 @max-[600px]:hover:bg-band-hover max-[620px]:w-8! max-[620px]:justify-center max-[620px]:bg-transparent max-[620px]:px-0 max-[620px]:text-band-foreground/90"
         >
           <Search className="size-4 shrink-0" />
-          <span className="flex-1 truncate text-left @max-[600px]:hidden max-[620px]:hidden">Cerca ovunque</span>
-          <kbd className="rounded border border-current/30 px-1.5 font-mono text-[11px] @max-[860px]:hidden max-[620px]:hidden">Ctrl K</kbd>
+          {/* on a narrow bar only the icon shows: the text becomes sr-only and still names the button */}
+          <span className="flex-1 truncate text-left @max-[600px]:sr-only max-[620px]:sr-only">{t('Cerca ovunque')}</span>
+          <kbd className="rounded border border-current/30 px-1.5 font-mono text-[11px] @max-[860px]:hidden max-[620px]:hidden">{t('Ctrl K')}</kbd>
         </button>
       ) : (
         <CommandPrimitive
           shouldFilter={false}
-          label="Cerca"
+          label={t('Cerca')}
           className="w-full"
           onKeyDown={(e) => {
             if (e.key === 'Escape') {
@@ -132,15 +134,15 @@ export default function SearchBox({ session, groups }: { session: Session; route
               placeholder={placeholder}
               className="min-w-0 flex-1 bg-transparent text-foreground outline-none placeholder:text-search-foreground"
             />
-            <kbd className="rounded border border-current/30 px-1.5 font-mono text-[11px] max-[620px]:hidden">Esc</kbd>
+            <kbd className="rounded border border-current/30 px-1.5 font-mono text-[11px] max-[620px]:hidden">{t('Esc')}</kbd>
           </div>
           <div
             role="dialog"
-            aria-label="Risultati della ricerca"
+            aria-label={t('Risultati della ricerca')}
             className="absolute top-[calc(100%+6px)] left-1/2 z-50 flex w-[max(100%,520px)] max-w-[calc(100vw-16px)] -translate-x-1/2 flex-col overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-lg max-[900px]:right-2 max-[900px]:left-2 max-[900px]:w-auto max-[900px]:translate-x-0"
           >
-            <div role="tablist" aria-label="Mostra" className="flex flex-wrap gap-1.5 border-b px-3.5 py-3">
-              {[{ id: 'all', label: 'Tutto', n: counts.reduce((s, c) => s + c, 0) }, ...all.map((g, i) => ({ id: g.id, label: g.label, n: counts[i] }))].map((p) => (
+            <div role="tablist" aria-label={t('Mostra')} className="flex flex-wrap gap-1.5 border-b px-3.5 py-3">
+              {[{ id: 'all', label: t('Tutto'), n: counts.reduce((s, c) => s + c, 0) }, ...all.map((g, i) => ({ id: g.id, label: g.label, n: counts[i] }))].map((p) => (
                 <button
                   key={p.id}
                   type="button"
@@ -159,7 +161,7 @@ export default function SearchBox({ session, groups }: { session: Session; route
               ))}
             </div>
             <CommandList className="max-h-[min(55vh,460px)]">
-              <CommandEmpty>Nessun risultato{q ? ` per «${q}»` : ''}.</CommandEmpty>
+              <CommandEmpty>{q ? t('Nessun risultato per «{q}».', { q }) : t('Nessun risultato.')}</CommandEmpty>
               {shown.map((g) => (
                 <CommandGroup key={g.id} heading={`${g.label} · ${g.items.length}`}>
                   {g.items.map((it) => (
@@ -177,10 +179,10 @@ export default function SearchBox({ session, groups }: { session: Session; route
                 <kbd className="font-mono">↑ ↓</kbd> per scegliere
               </span>
               <span>
-                <kbd className="font-mono">Invio</kbd> per aprire
+                <kbd className="font-mono">{t('Invio')}</kbd> per aprire
               </span>
               <span>
-                <kbd className="font-mono">Esc</kbd> per chiudere
+                <kbd className="font-mono">{t('Esc')}</kbd> per chiudere
               </span>
             </div>
           </div>

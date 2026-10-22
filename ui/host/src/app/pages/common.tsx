@@ -67,7 +67,7 @@ function Profile({ session }: { session: Session }) {
     <div className="grid max-w-2xl gap-6">
       <Card>
         <CardContent className="flex items-center gap-4 pt-6">
-          <span className="flex size-16 items-center justify-center rounded-full bg-teal-500 text-xl font-semibold text-white">{initials(name)}</span>
+          <span className="flex size-16 items-center justify-center rounded-full bg-teal-700 text-xl font-semibold text-white">{initials(name)}</span>
           <div>
             <b className="block text-lg">{name}</b>
             <span className="text-sm text-muted-foreground">{u.is_system_admin ? `${u.username} · Administrator` : `${u.username}@${u.home_tenant_slug}`}</span>
@@ -83,7 +83,7 @@ function Profile({ session }: { session: Session }) {
           <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
             <dt className="text-muted-foreground">{t('Nome')}</dt>
             <dd>{u.display_name || '—'}</dd>
-            <dt className="text-muted-foreground">Username</dt>
+            <dt className="text-muted-foreground">{t('Username')}</dt>
             <dd className="font-mono">{u.username}</dd>
             <dt className="text-muted-foreground">{u.is_system_admin ? t('Ruolo') : t('Tenant di appartenenza')}</dt>
             <dd>{u.is_system_admin ? t('Administrator della piattaforma') : (home?.name ?? u.home_tenant_slug)}</dd>
@@ -189,7 +189,7 @@ function NotificationPrefs({ admin }: { admin: boolean }) {
                 <Switch checked disabled aria-label={t('{what}: nell’app', { what: l })} />
               </label>
               <label className="flex items-center gap-2">
-                Email
+                {t('Email')}
                 <Switch checked={false} disabled aria-label={t('{what}: per email', { what: l })} />
               </label>
             </span>
@@ -320,7 +320,7 @@ function MyTenants({ session }: { session: Session }) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Tenant</TableHead>
+              <TableHead>{t('Tenant')}</TableHead>
               <TableHead>{t('Come')}</TableHead>
               <TableHead>{t('Ruolo')}</TableHead>
               <TableHead />

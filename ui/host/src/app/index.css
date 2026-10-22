@@ -1,4 +1,4 @@
-/* Prototipo della nuova shell (next.html): Tailwind v4 + componenti shadcn/ui.
+/* La shell di Mosaikit: Tailwind v4 + componenti shadcn/ui.
    I temi sono insiemi di variabili CSS, scelti da `data-preset` e dalla classe `dark` su <html>
    (vedi theme.ts). Oltre alle variabili di shadcn ci sono quelle della barra in alto (band) e quelle
    che i plugin leggono dal bridge (--bg, --fg, --acc...). */
@@ -23,6 +23,8 @@
   --popover-foreground: #242424;
   --primary: #5b5fc7;
   --primary-foreground: #ffffff;
+  /* the accent as text on its own light tints (selected items), at 4.5:1 */
+  --primary-strong: #4f52b2;
   --secondary: #f5f5f5;
   --secondary-foreground: #242424;
   --muted: #f5f5f5;
@@ -34,7 +36,7 @@
   --input: #d1d1d1;
   --ring: #5b5fc7;
   --ok: #107c10;
-  --warn: #a96a05;
+  --warn: #8a5600;
   --pane: #f5f5f5;
   --band: #444791;
   --band-foreground: #ffffff;
@@ -64,6 +66,7 @@
   --popover-foreground: #f0f0f0;
   --primary: #7f85f5;
   --primary-foreground: #141414;
+  --primary-strong: var(--primary);
   --secondary: #2b2b2b;
   --secondary-foreground: #f0f0f0;
   --muted: #2b2b2b;
@@ -104,6 +107,8 @@
   --popover-foreground: #17324d;
   --primary: #0066cc;
   --primary-foreground: #ffffff;
+  /* the accent as text on its own light tints (selected items), at 4.5:1 */
+  --primary-strong: #004d99;
   --secondary: #f5f7fa;
   --secondary-foreground: #17324d;
   --muted: #f5f7fa;
@@ -115,7 +120,7 @@
   --input: #c5d0dc;
   --ring: #0066cc;
   --ok: #008758;
-  --warn: #a66300;
+  --warn: #8a5200;
   --pane: #f5f7fa;
   --band: #0066cc;
   --band-foreground: #ffffff;
@@ -144,6 +149,7 @@
   --popover-foreground: #e6edf5;
   --primary: #4da3ff;
   --primary-foreground: #04121f;
+  --primary-strong: var(--primary);
   --secondary: #1a2a3d;
   --secondary-foreground: #e6edf5;
   --muted: #1a2a3d;
@@ -170,6 +176,89 @@
   --rail-foreground: #8195ab;
 }
 
+/* ── Tessera: i colori del logo (bordeaux, giallo della tessera, grigi caldi) ── */
+[data-preset='tessera'] {
+  --font-sans: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --radius: 0.375rem;
+  --background: #fffdfa;
+  --foreground: #2a2420;
+  --card: #fffdfa;
+  --card-foreground: #2a2420;
+  --popover: #fffdfa;
+  --popover-foreground: #2a2420;
+  --primary: #a8293a;
+  --primary-foreground: #ffffff;
+  /* the accent as text on its own light tints (selected items), at 4.5:1 */
+  --primary-strong: #8a1c2b;
+  --secondary: #f7f4f0;
+  --secondary-foreground: #2a2420;
+  --muted: #f7f4f0;
+  --muted-foreground: #6b6058;
+  --accent: #f1ece6;
+  --accent-foreground: #2a2420;
+  --destructive: #b3261e;
+  --border: #e5dfd8;
+  --input: #d6cdc4;
+  --ring: #a8293a;
+  --ok: #1e6b24;
+  --warn: #8a4f00;
+  --pane: #f7f4f0;
+  --band: #6e1522;
+  --band-foreground: #ffffff;
+  --band-muted: rgba(255, 255, 255, 0.82);
+  --band-hover: rgba(255, 255, 255, 0.14);
+  --band-line: rgba(255, 255, 255, 0.18);
+  --search: #f5f0e6;
+  --search-foreground: #6b6058;
+  --sidebar: #efebe6;
+  --sidebar-foreground: #4a413a;
+  --sidebar-primary: #a8293a;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #fffdfa;
+  --sidebar-accent-foreground: #a8293a;
+  --sidebar-border: #e5dfd8;
+  --sidebar-ring: #a8293a;
+  --sidebar-hover: #e5dfd8;
+  --rail-foreground: #6b6058;
+}
+.dark[data-preset='tessera'] {
+  --background: #1f1a16;
+  --foreground: #f2ece6;
+  --card: #26211c;
+  --card-foreground: #f2ece6;
+  --popover: #26211c;
+  --popover-foreground: #f2ece6;
+  --primary: #e0707c;
+  --primary-foreground: #1f1a16;
+  --primary-strong: var(--primary);
+  --secondary: #2e2822;
+  --secondary-foreground: #f2ece6;
+  --muted: #2e2822;
+  --muted-foreground: #ada39a;
+  --accent: #2e2822;
+  --accent-foreground: #f2ece6;
+  --destructive: #f2b8b5;
+  --border: #2e2822;
+  --input: #3d352e;
+  --ring: #e0707c;
+  --ok: #81c784;
+  --warn: #f0b23a;
+  --pane: #26211c;
+  --band: #4a0e17;
+  --search: #2e2822;
+  --search-foreground: #ada39a;
+  --sidebar: #17130f;
+  --sidebar-foreground: #d6cdc4;
+  --sidebar-primary: #e0707c;
+  --sidebar-primary-foreground: #1f1a16;
+  --sidebar-accent: #2e2822;
+  --sidebar-accent-foreground: #e0707c;
+  --sidebar-border: #2e2822;
+  --sidebar-ring: #e0707c;
+  --sidebar-hover: #2e2822;
+  --rail-foreground: #ada39a;
+}
+
 /* Le variabili che il bridge passa alle UI dei plugin (bridge.ts, THEME_VARS). */
 :root {
   --bg: var(--background);
@@ -185,6 +274,7 @@
 }
 
 @theme inline {
+  --color-primary-strong: var(--primary-strong);
   --font-sans: var(--font-sans);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -264,4 +354,13 @@
   .login-tile {
     animation: none;
   }
+}
+
+/* Rich toasts (sonner): darker text in light mode, so that it reaches 4.5:1 on its tinted background */
+[data-sonner-toaster][data-sonner-theme='light'],
+[data-sonner-toaster][data-theme='light'] {
+  --success-text: #0a6b2c !important;
+  --info-text: #1d4ed8 !important;
+  --warning-text: #8a4b00 !important;
+  --error-text: #b4232a !important;
 }

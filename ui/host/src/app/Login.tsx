@@ -140,14 +140,14 @@ function Hero({ admin, name, tagline, version }: { admin: boolean; name: string;
         {tiles.map((x) => (
           <span
             key={x.i}
-            className={x.accent ? 'login-tile rounded-xl bg-primary' : 'login-tile rounded-xl bg-white'}
+            className={x.accent ? 'login-tile rounded-xl bg-[#F0B23A]' : 'login-tile rounded-xl bg-white'}
             style={{ opacity: x.accent ? 0.55 : 0.04 + x.o * 0.14, animationDelay: `${x.delay}s` }}
           />
         ))}
       </div>
       <div className="relative flex h-full min-h-[640px] flex-col justify-between p-12">
         <div className="flex items-center gap-3">
-          <AppMark className="size-12 ring-2 ring-white/20 rounded-[10px]" />
+          <AppMark variant="negative" className="size-12" />
           <div>
             <b className="block text-xl">{name}</b>
             <span className="text-sm text-band-muted">{admin ? t('Piattaforma') : tagline || t('Spazio di lavoro')}</span>

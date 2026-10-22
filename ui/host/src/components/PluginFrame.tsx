@@ -3,6 +3,7 @@ import { errText } from '../api.ts'
 import { execute, routeOp, themeVars, uuid } from '../bridge.ts'
 import type { PluginView, Session, TenantContext } from '../types.ts'
 import { useUi } from '../ui-context.ts'
+import { t } from '../app/i18n.ts'
 
 interface Props {
   plugin: PluginView
@@ -104,7 +105,7 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
   if (!plugin.has_ui) {
     return (
       <div className="empty">
-        <p>Il plugin {plugin.label} non ha un'interfaccia.</p>
+        <p>{t('Il plugin {label} non ha un’interfaccia.', { label: plugin.label })}</p>
       </div>
     )
   }
@@ -122,7 +123,7 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
         referrerPolicy="no-referrer"
         onLoad={() => setLoaded(true)}
       />
-      {!loaded && <div className="frame-msg">caricamento di {plugin.label}…</div>}
+      {!loaded && <div className="frame-msg">{t('Caricamento di {label}…', { label: plugin.label })}</div>}
     </div>
   )
 }

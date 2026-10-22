@@ -112,10 +112,15 @@ pub fn dev(no_ui: bool) -> Result<()> {
     );
 
     let crates_dir = root().join("crates");
+    // il server e' fermo perche' l'ultima compilazione e' fallita: riparte con la prossima che riesce
+    let mut down = false;
     while !stop.load(Ordering::SeqCst) {
         let first = match rx.recv_timeout(Duration::from_millis(300)) {
             Ok(p) => p,
             Err(mpsc::RecvTimeoutError::Timeout) => {
+                if down {
+                    continue;
+                }
                 if let Ok(Some(status)) = server.try_wait() {
                     eprintln!("server terminato ({status}): riparte alla prossima modifica di crates/");
                     server = server_cmd(&plugins)?.spawn()?;
@@ -151,10 +156,21 @@ pub fn dev(no_ui: bool) -> Result<()> {
         }
         if server_changed {
             eprintln!("== crates/ modificato: ricompilo e riavvio il server");
+            // su Windows l'eseguibile in uso non si puo' sostituire ("Accesso negato"): il server si
+            // ferma prima della compilazione; altrove resta acceso finche' quella nuova non e' pronta
+            if cfg!(windows) {
+                kill_tree(&mut server);
+            }
             if run(Command::new("cargo").current_dir(root()).args(["build", "-p", "mosaikit-server"])).is_ok()
             {
-                kill_tree(&mut server);
+                if !cfg!(windows) {
+                    kill_tree(&mut server);
+                }
                 server = server_cmd(&plugins)?.spawn()?;
+                down = false;
+            } else if cfg!(windows) {
+                eprintln!("compilazione fallita: il server riparte alla prossima modifica che compila");
+                down = true;
             }
         }
     }

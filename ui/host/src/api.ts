@@ -27,9 +27,18 @@ export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    /** codice stabile del server (`wrong_credentials`, `forbidden`…), se c'e' */
+    readonly code?: string,
   ) {
     super(message)
   }
+}
+
+/** Traduce un errore dal suo codice (lo imposta la shell con la lingua scelta); senza, il messaggio. */
+let translate: (code: string | undefined, message: string) => string = (_c, m) => m
+
+export function setErrorTranslator(fn: (code: string | undefined, message: string) => string) {
+  translate = fn
 }
 
 export interface CallOptions {
@@ -55,13 +64,15 @@ export async function api<T = unknown>(method: string, path: string, body?: unkn
   if (r.status === 401 && onUnauthorized && !path.startsWith('/api/auth/')) onUnauthorized()
   if (!r.ok) {
     let msg = `HTTP ${r.status}`
+    let code: string | undefined
     try {
       const j = await r.json()
       if (j && typeof j.error === 'string') msg = j.error
+      if (j && typeof j.code === 'string') code = j.code
     } catch {
       /* corpo non JSON */
     }
-    throw new ApiError(msg, r.status)
+    throw new ApiError(msg, r.status, code)
   }
   if (opts.blob) return (await r.blob()) as T
   const text = await r.text()
@@ -69,6 +80,7 @@ export async function api<T = unknown>(method: string, path: string, body?: unkn
 }
 
 export function errText(e: unknown): string {
+  if (e instanceof ApiError) return translate(e.code, e.message)
   return e instanceof Error ? e.message : String(e)
 }
 
@@ -89,5 +101,5 @@ export function fmtBytes(n: number): string {
 export function fmtDate(iso: string | null | undefined): string {
   if (!iso) return '—'
   const d = new Date(iso)
-  return isNaN(d.getTime()) ? '—' : d.toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' })
+  return isNaN(d.getTime()) ? '—' : d.toLocaleString(document.documentElement.lang || 'it', { dateStyle: 'short', timeStyle: 'short' })
 }

@@ -11,7 +11,7 @@ export default defineConfig({
   // percorsi relativi: l'app puo' essere servita sotto un percorso base (url = ".../mosaikit")
   base: './',
   plugins: [react(), tailwindcss()],
-  // «@/» per i componenti shadcn/ui del prototipo della nuova shell (next.html)
+  // «@/» per i componenti shadcn/ui della shell
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   server: {
     host: '127.0.0.1',
@@ -26,13 +26,6 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
     sourcemap: true,
-    // due pagine: l'app attuale e il prototipo della nuova shell
-    rollupOptions: {
-      input: {
-        main: fileURLToPath(new URL('./index.html', import.meta.url)),
-        next: fileURLToPath(new URL('./next.html', import.meta.url)),
-      },
-    },
   },
   test: { environment: 'happy-dom' },
 })

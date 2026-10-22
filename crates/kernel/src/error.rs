@@ -1,4 +1,5 @@
-//! Errori del kernel, con la categoria che il server traduce in codice HTTP.
+//! Errori del kernel, con la categoria che il server traduce in codice HTTP e un codice stabile che
+//! l'interfaccia traduce nella lingua di chi la usa (il messaggio resta per i log e come riserva).
 
 use std::fmt;
 
@@ -13,17 +14,43 @@ pub enum Kind {
     Internal,
 }
 
+impl Kind {
+    /// Il codice di una categoria, quando l'errore non ne ha uno suo.
+    pub fn code(self) -> &'static str {
+        match self {
+            Kind::BadRequest => "bad_request",
+            Kind::Unauthorized => "unauthorized",
+            Kind::Forbidden => "forbidden",
+            Kind::NotFound => "not_found",
+            Kind::Conflict => "conflict",
+            Kind::TooMany => "too_many",
+            Kind::Internal => "internal",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct Error {
     pub kind: Kind,
     pub message: String,
+    /// codice specifico (`password_too_short`, `wrong_credentials`…); assente: quello della categoria
+    pub code: Option<&'static str>,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
 
 impl Error {
     pub fn new(kind: Kind, m: impl Into<String>) -> Error {
-        Error { kind, message: m.into() }
+        Error { kind, message: m.into(), code: None }
+    }
+    /// Lo stesso errore con un codice specifico, stabile tra le versioni.
+    pub fn with_code(mut self, code: &'static str) -> Error {
+        self.code = Some(code);
+        self
+    }
+    /// Il codice da mandare all'interfaccia.
+    pub fn code(&self) -> &'static str {
+        self.code.unwrap_or(self.kind.code())
     }
     pub fn bad(m: impl Into<String>) -> Error {
         Error::new(Kind::BadRequest, m)

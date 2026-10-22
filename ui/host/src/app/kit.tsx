@@ -12,7 +12,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
+import type { PluginKpi } from '../types.ts'
+import { t } from './i18n.ts'
 import { go } from './router.ts'
 
 export interface Crumb {
@@ -27,7 +30,7 @@ export function PageHeader({ title, sub, crumbs, badge, actions, more }: { title
     <div className="flex min-h-[57px] flex-wrap items-center gap-3 border-b px-6 py-2 max-[620px]:px-4">
       <div className="min-w-0 flex-1">
         {crumbs && crumbs.length > 0 && (
-          <nav aria-label="Percorso" className="mb-0.5 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
+          <nav aria-label={t('Percorso')} className="mb-0.5 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
             {crumbs.map((c, i) => (
               <span key={i} className="flex min-w-0 items-center gap-1">
                 {c.href ? (
@@ -54,7 +57,7 @@ export function PageHeader({ title, sub, crumbs, badge, actions, more }: { title
           {more && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="icon" aria-label="Altre azioni">
+                <Button variant="outline" size="icon" aria-label={t('Altre azioni')}>
                   <MoreHorizontal />
                 </Button>
               </DropdownMenuTrigger>
@@ -72,7 +75,7 @@ export function PageHeader({ title, sub, crumbs, badge, actions, more }: { title
 /** Schede orizzontali del dettaglio di un oggetto (persona, gruppo, tenant, plugin). */
 export function Tabs({ tabs, current, href }: { tabs: { id: string; label: string; count?: number }[]; current: string; href: (id: string) => string }) {
   return (
-    <nav aria-label="Schede" className="flex gap-1 overflow-x-auto border-b px-6 max-[620px]:px-4">
+    <nav aria-label={t('Schede')} className="flex gap-1 overflow-x-auto border-b px-6 max-[620px]:px-4">
       {tabs.map((t) => (
         <a
           key={t.id}
@@ -92,7 +95,7 @@ export function Tabs({ tabs, current, href }: { tabs: { id: string; label: strin
 }
 
 /** Filtri a pillole sopra un elenco («Mostra: Tutte · Pubbliche»). */
-export function Pills({ items, value, onChange, label = 'Mostra' }: { items: { id: string; label: string; count?: number }[]; value: string; onChange: (id: string) => void; label?: string }) {
+export function Pills({ items, value, onChange, label = t('Mostra') }: { items: { id: string; label: string; count?: number }[]; value: string; onChange: (id: string) => void; label?: string }) {
   return (
     <div role="radiogroup" aria-label={label} className="flex flex-wrap items-center gap-1.5">
       <span className="mr-1 text-xs text-muted-foreground">{label}</span>
@@ -120,10 +123,10 @@ export function Pills({ items, value, onChange, label = 'Mostra' }: { items: { i
 export function SaveBar({ dirty, busy, onSave, onCancel }: { dirty: boolean; busy?: boolean; onSave: () => void; onCancel: () => void }) {
   if (!dirty) return null
   return (
-    <div role="region" aria-label="Modifiche non salvate" className="sticky bottom-0 z-10 -mx-6 mt-6 flex items-center gap-3 border-t bg-background/95 px-6 py-3 backdrop-blur max-[620px]:-mx-4 max-[620px]:px-4">
-      <span className="flex-1 text-sm font-medium">Modifiche non salvate</span>
+    <div role="region" aria-label={t('Modifiche non salvate')} className="sticky bottom-0 z-10 -mx-6 mt-6 flex items-center gap-3 border-t bg-background/95 px-6 py-3 backdrop-blur max-[620px]:-mx-4 max-[620px]:px-4">
+      <span className="flex-1 text-sm font-medium">{t('Modifiche non salvate')}</span>
       <Button variant="outline" onClick={onCancel} disabled={busy}>
-        Annulla
+        {t('Annulla')}
       </Button>
       <Button onClick={onSave} disabled={busy}>
         {busy && <Loader2 className="animate-spin" />}
@@ -144,7 +147,7 @@ export function Locked({ label, value, hint }: { label: string; value: ReactNode
       </span>
       <Badge variant="secondary" className="shrink-0 gap-1 font-normal">
         <Lock className="size-3" />
-        Gestita dall’Administrator
+        {t('Gestita dall’Administrator')}
       </Badge>
     </div>
   )
@@ -163,10 +166,10 @@ export interface Section {
 export function Sections({ sections, current, href, children }: { sections: Section[]; current: string; href: (id: string) => string; children: ReactNode }) {
   return (
     <div className="flex min-h-0 flex-1 max-[760px]:flex-col">
-      <nav aria-label="Sezioni" className="w-60 shrink-0 border-r bg-pane p-3 max-[760px]:w-auto max-[760px]:border-r-0 max-[760px]:border-b">
+      <nav aria-label={t('Sezioni')} className="w-60 shrink-0 border-r bg-pane p-3 max-[760px]:w-auto max-[760px]:border-r-0 max-[760px]:border-b">
         <div className="hidden max-[760px]:block">
           <Select value={current} onValueChange={(v) => go(href(v))}>
-            <SelectTrigger className="w-full bg-background" aria-label="Sezione">
+            <SelectTrigger className="w-full bg-background" aria-label={t('Sezione')}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -187,7 +190,7 @@ export function Sections({ sections, current, href, children }: { sections: Sect
                 aria-current={s.id === current ? 'page' : undefined}
                 className={cn(
                   'flex h-9 items-center gap-2.5 rounded-md px-3 text-sm text-foreground/85 hover:bg-accent [&>svg]:size-4 [&>svg]:shrink-0',
-                  s.id === current && 'bg-primary/10 font-medium text-primary hover:bg-primary/10',
+                  s.id === current && 'bg-primary/10 font-medium text-primary-strong hover:bg-primary/10',
                 )}
               >
                 {s.icon}
@@ -227,12 +230,12 @@ export function ErrorBox({ error }: { error: unknown }) {
 
 export function StatusBadge({ status }: { status: string }) {
   const map: Record<string, [string, string]> = {
-    active: ['attivo', 'bg-ok/10 text-ok'],
-    suspended: ['sospeso', 'bg-destructive/10 text-destructive'],
-    disabled: ['disabilitato', 'bg-destructive/10 text-destructive'],
-    pending: ['in attesa', 'bg-warn/10 text-warn'],
-    installed: ['installato', 'bg-warn/10 text-warn'],
-    blocked: ['bloccato', 'bg-destructive/10 text-destructive'],
+    active: [t('attivo'), 'bg-ok/10 text-ok'],
+    suspended: [t('sospeso'), 'bg-destructive/10 text-destructive'],
+    disabled: [t('disabilitato'), 'bg-destructive/10 text-destructive'],
+    pending: [t('in attesa'), 'bg-warn/10 text-warn'],
+    installed: [t('installato'), 'bg-warn/10 text-warn'],
+    blocked: [t('bloccato'), 'bg-destructive/10 text-destructive'],
   }
   const [label, cls] = map[status] ?? [status, '']
   return (
@@ -332,7 +335,7 @@ export function FormDialog({
           ))}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-              Annulla
+              {t('Annulla')}
             </Button>
             <Button type="submit" disabled={busy}>
               {busy && <Loader2 className="animate-spin" />}
@@ -360,5 +363,54 @@ export function Kpi({ label, value, hint, onClick }: { label: string; value: Rea
     </button>
   ) : (
     <div className={cls}>{body}</div>
+  )
+}
+
+/** Una tabella di righe qualsiasi (i KPI dei plugin): le colonne sono le chiavi della prima riga. */
+export function DataTable({ rows, label }: { rows: Record<string, unknown>[]; label?: string }) {
+  if (!rows.length) return <p className="text-sm text-muted-foreground">{t('Nessun dato.')}</p>
+  const cols = Object.keys(rows[0])
+  return (
+    <div className="overflow-x-auto rounded-xl border bg-card">
+      <Table aria-label={label}>
+        <TableHeader>
+          <TableRow>
+            {cols.map((c) => (
+              <TableHead key={c} className="capitalize">
+                {c.replace(/_/g, ' ')}
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((r, i) => (
+            <TableRow key={i}>
+              {cols.map((c) => (
+                <TableCell key={c} className={typeof r[c] === 'number' ? 'text-right tabular-nums' : undefined}>
+                  {r[c] === null || r[c] === undefined ? '—' : String(r[c])}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
+  )
+}
+
+/** I KPI dichiarati dai plugin, una tabella ciascuno. */
+export function PluginKpis({ items }: { items: PluginKpi[] }) {
+  if (!items.length) return null
+  return (
+    <>
+      {items.map((p) => (
+        <section key={p.plugin_id + p.view} className="grid gap-3">
+          <h2 className="text-sm font-semibold">
+            {p.plugin} · {p.label}
+          </h2>
+          <DataTable rows={p.rows} label={`${p.plugin} · ${p.label}`} />
+        </section>
+      ))}
+    </>
   )
 }

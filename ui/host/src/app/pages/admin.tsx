@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Bell, Building2, CircleHelp, Contrast, Info, KeyRound, MoreHorizontal, Palette, PanelLeft, PanelTop, Plus, Power, Puzzle, Search, ShieldCheck, Trash2, Upload, Users } from 'lucide-react'
 import { api, fmtBytes, fmtDate } from '../../api.ts'
 import { useBrand } from '../../brand.ts'
-import type { AdminPlugin, AdminUser, CatalogItem, Member, Session, ShellBand, SystemOverview, TenantInfo } from '../../types.ts'
+import type { AdminPlugin, AdminUser, CatalogItem, GlobalKpi, Member, Session, ShellBand, SystemOverview, TenantInfo } from '../../types.ts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -18,11 +18,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils'
 import { initials, useAction, useApi, useConfirm } from '../core.ts'
 import AppIcon from '../AppIcon.tsx'
-import { Empty, ErrorBox, FormDialog, Kpi, Loading, PageHeader, Pills, SaveBar, Sections, StatusBadge, Tabs } from '../kit.tsx'
+import { DataTable, Empty, ErrorBox, FormDialog, Kpi, Loading, PageHeader, Pills, PluginKpis, SaveBar, Sections, StatusBadge, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import { bandOf } from '../prefs.ts'
 import { AppMark } from '../Shell.tsx'
 import { PlatformTheme } from '../ThemeSettings.tsx'
+import { t } from '../i18n.ts'
 
 const enc = encodeURIComponent
 
@@ -30,9 +31,10 @@ const enc = encodeURIComponent
 
 export function AdminOverview({ session }: { session: Session }) {
   const q = useApi<SystemOverview>(['admin-overview'], '/api/admin/overview')
+  const kpi = useApi<GlobalKpi>(['admin-kpi'], '/api/admin/kpi')
   return (
     <>
-      <PageHeader title="Panoramica della piattaforma" sub={`Ciao ${session.user.display_name || session.user.username} · Administrator`} />
+      <PageHeader title={t('Panoramica della piattaforma')} sub={t('Ciao {name} · Administrator', { name: session.user.display_name || session.user.username })} />
       <div className="grid gap-6 p-6 max-[620px]:p-4">
         {q.isLoading ? (
           <Loading />
@@ -40,20 +42,30 @@ export function AdminOverview({ session }: { session: Session }) {
           <ErrorBox error={q.error} />
         ) : (
           <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
-            <Kpi label="Tenant attivi" value={`${q.data!.active_tenants}/${q.data!.tenants}`} onClick={() => go(to.admin('tenants'))} />
-            <Kpi label="Utenti attivi" value={q.data!.users} hint={`${q.data!.active_users_30d} negli ultimi 30 giorni`} />
-            <Kpi label="Administrator" value={q.data!.administrators} onClick={() => go(to.admin('system', 'admins'))} />
-            <Kpi label="Risorse" value={q.data!.resources} hint={fmtBytes(q.data!.bytes)} />
-            <Kpi label="Plugin attivi" value={`${q.data!.plugins_active}/${q.data!.plugins_installed}`} onClick={() => go(to.admin('plugins'))} />
+            <Kpi label={t('Tenant attivi')} value={`${q.data!.active_tenants}/${q.data!.tenants}`} onClick={() => go(to.admin('tenants'))} />
+            <Kpi label={t('Utenti attivi')} value={q.data!.users} hint={t('{n} negli ultimi 30 giorni', { n: q.data!.active_users_30d })} />
+            <Kpi label={t('Administrator')} value={q.data!.administrators} onClick={() => go(to.admin('system', 'admins'))} />
+            <Kpi label={t('Risorse')} value={q.data!.resources} hint={fmtBytes(q.data!.bytes)} />
+            <Kpi label={t('Plugin attivi')} value={`${q.data!.plugins_active}/${q.data!.plugins_installed}`} onClick={() => go(to.admin('plugins'))} />
           </div>
         )}
         {q.data?.tenants === 0 && (
-          <Empty icon={<Building2 />} title="Nessun tenant">
+          <Empty icon={<Building2 />} title={t('Nessun tenant')}>
             <Button className="mt-2" onClick={() => go(to.admin('tenants'))}>
-              Crea il primo tenant
+              {t('Crea il primo tenant')}
             </Button>
           </Empty>
         )}
+        {kpi.data && kpi.data.resources.length > 0 && (
+          <section className="grid gap-3">
+            <h2 className="text-sm font-semibold">{t('Elementi per plugin, in tutti i tenant')}</h2>
+            <DataTable
+              label={t('Elementi per plugin, in tutti i tenant')}
+              rows={kpi.data.resources.map((r) => ({ [t('Plugin')]: r.plugin, [t('Tipo')]: r.kind, [t('Elementi')]: r.count, [t('Spazio')]: fmtBytes(r.bytes) }))}
+            />
+          </section>
+        )}
+        {kpi.data && <PluginKpis items={kpi.data.plugins} />}
       </div>
     </>
   )
@@ -66,61 +78,61 @@ export function AdminTenants() {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const create = useAction((v: Record<string, string>) => api('POST', '/api/admin/tenants', v), {
-    ok: (v) => `Tenant ${v.name} creato con il suo Tenant Manager`,
+    ok: (v) => t('Tenant {name} creato con il suo Tenant Manager', { name: v.name }),
     invalidate: [['admin-tenants'], ['admin-overview']],
   })
-  const rows = (q.data ?? []).filter((t) => !search || `${t.name} ${t.slug}`.toLowerCase().includes(search.toLowerCase()))
+  const rows = (q.data ?? []).filter((tn) => !search || `${tn.name} ${tn.slug}`.toLowerCase().includes(search.toLowerCase()))
   return (
     <>
       <PageHeader
-        title="Tenant"
+        title={t('Tenant')}
         sub={q.data ? `${q.data.length} tenant` : undefined}
         actions={
           <Button onClick={() => setOpen(true)}>
             <Plus />
-            Nuovo tenant
+            {t('Nuovo tenant')}
           </Button>
         }
       />
       <div className="grid gap-3 p-6 max-[620px]:p-4">
-        <Input type="search" placeholder="Cerca un tenant" aria-label="Cerca un tenant" className="w-72 max-w-full" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <Input type="search" placeholder={t('Cerca un tenant')} aria-label={t('Cerca un tenant')} className="w-72 max-w-full" value={search} onChange={(e) => setSearch(e.target.value)} />
         {q.isLoading ? (
           <Loading />
         ) : q.error ? (
           <ErrorBox error={q.error} />
         ) : rows.length === 0 ? (
-          <Empty icon={<Building2 />} title={q.data?.length ? 'Nessun tenant trovato' : 'Nessun tenant'} />
+          <Empty icon={<Building2 />} title={q.data?.length ? t('Nessun tenant trovato') : t('Nessun tenant')} />
         ) : (
           <div className="overflow-hidden rounded-xl border bg-card">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Tenant</TableHead>
-                  <TableHead className="text-right">Membri</TableHead>
-                  <TableHead className="text-right">Ospiti</TableHead>
-                  <TableHead className="text-right">Risorse</TableHead>
-                  <TableHead className="text-right">Spazio</TableHead>
-                  <TableHead>Stato</TableHead>
-                  <TableHead>Creato</TableHead>
+                  <TableHead>{t('Tenant')}</TableHead>
+                  <TableHead className="text-right">{t('Membri')}</TableHead>
+                  <TableHead className="text-right">{t('Ospiti')}</TableHead>
+                  <TableHead className="text-right">{t('Risorse')}</TableHead>
+                  <TableHead className="text-right">{t('Spazio')}</TableHead>
+                  <TableHead>{t('Stato')}</TableHead>
+                  <TableHead>{t('Creato')}</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((t) => (
-                  <TableRow key={t.id} className="cursor-pointer" onClick={() => go(to.adminTenant(t.id))}>
+                {rows.map((tn) => (
+                  <TableRow key={tn.id} className="cursor-pointer" onClick={() => go(to.adminTenant(tn.id))}>
                     <TableCell>
-                      <a href={to.adminTenant(t.id)} className="font-medium hover:underline" onClick={(e) => e.stopPropagation()}>
-                        {t.name}
+                      <a href={to.adminTenant(tn.id)} className="font-medium hover:underline" onClick={(e) => e.stopPropagation()}>
+                        {tn.name}
                       </a>
-                      <span className="ml-2 font-mono text-xs text-muted-foreground">{t.slug}</span>
+                      <span className="ml-2 font-mono text-xs text-muted-foreground">{tn.slug}</span>
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">{t.members}</TableCell>
-                    <TableCell className="text-right tabular-nums">{t.guests}</TableCell>
-                    <TableCell className="text-right tabular-nums">{t.resources}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtBytes(t.bytes)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{tn.members}</TableCell>
+                    <TableCell className="text-right tabular-nums">{tn.guests}</TableCell>
+                    <TableCell className="text-right tabular-nums">{tn.resources}</TableCell>
+                    <TableCell className="text-right tabular-nums">{fmtBytes(tn.bytes)}</TableCell>
                     <TableCell>
-                      <StatusBadge status={t.status} />
+                      <StatusBadge status={tn.status} />
                     </TableCell>
-                    <TableCell className="text-muted-foreground">{fmtDate(t.created_at)}</TableCell>
+                    <TableCell className="text-muted-foreground">{fmtDate(tn.created_at)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -131,16 +143,16 @@ export function AdminTenants() {
       <FormDialog
         open={open}
         onOpenChange={setOpen}
-        title="Nuovo tenant"
-        description="Con il suo primo Tenant Manager, un account locale del tenant."
+        title={t('Nuovo tenant')}
+        description={t('Con il suo primo Tenant Manager, un account locale del tenant.')}
         fields={[
-          { name: 'slug', label: 'Identificativo', required: true, hint: 'Minuscole, cifre e trattini: va nell’indirizzo e non cambia' },
-          { name: 'name', label: 'Nome', required: true },
-          { name: 'manager_username', label: 'Username del Tenant Manager', required: true },
-          { name: 'manager_display_name', label: 'Nome del Tenant Manager' },
-          { name: 'manager_password', label: 'Password iniziale', type: 'password', required: true, hint: 'Almeno 10 caratteri' },
+          { name: 'slug', label: t('Identificativo'), required: true, hint: t('Minuscole, cifre e trattini: va nell’indirizzo e non cambia') },
+          { name: 'name', label: t('Nome'), required: true },
+          { name: 'manager_username', label: t('Username del Tenant Manager'), required: true },
+          { name: 'manager_display_name', label: t('Nome del Tenant Manager') },
+          { name: 'manager_password', label: t('Password iniziale'), type: 'password', required: true, hint: t('Almeno 10 caratteri') },
         ]}
-        submit="Crea il tenant"
+        submit={t('Crea il tenant')}
         onSubmit={(v) => create.mutateAsync(v)}
       />
     </>
@@ -151,36 +163,36 @@ export function AdminTenant({ id, section }: { id: string; section?: string }) {
   const tenants = useApi<TenantInfo[]>(['admin-tenants'], '/api/admin/tenants')
   const members = useApi<Member[]>(['admin-members', id], `/api/admin/tenants/${id}/members`)
   const confirm = useConfirm()
-  const t = tenants.data?.find((x) => x.id === id)
+  const tn = tenants.data?.find((x) => x.id === id)
   const cur = section === 'users' ? 'users' : 'details'
   const toggle = async () => {
-    const next = t!.status === 'active' ? 'suspended' : 'active'
-    if (next === 'active' || (await confirm(`Sospendere ${t!.name}? Le sue persone non potranno più accedere.`, true))) status.mutate(next)
+    const next = tn!.status === 'active' ? 'suspended' : 'active'
+    if (next === 'active' || (await confirm(t('Sospendere {name}? Le sue persone non potranno più accedere.', { name: tn!.name }), true))) status.mutate(next)
   }
   const status = useAction((s: string) => api('PUT', `/api/admin/tenants/${id}/status`, { status: s }), {
-    ok: (s) => (s === 'active' ? 'Tenant riattivato' : 'Tenant sospeso'),
+    ok: (s) => (s === 'active' ? t('Tenant riattivato') : t('Tenant sospeso')),
     invalidate: [['admin-tenants'], ['admin-overview']],
   })
   if (tenants.isLoading) return <Loading />
-  if (!t) return <Empty title="Tenant inesistente" />
+  if (!tn) return <Empty title={t('Tenant inesistente')} />
   return (
     <>
       <PageHeader
-        crumbs={[{ label: 'Tenant', href: to.admin('tenants') }]}
-        title={t.name}
-        badge={<StatusBadge status={t.status} />}
-        sub={`${t.slug} · ${t.members} membri · ${t.guests} ospiti`}
+        crumbs={[{ label: t('Tenant'), href: to.admin('tenants') }]}
+        title={tn.name}
+        badge={<StatusBadge status={tn.status} />}
+        sub={t('{slug} · {members} membri · {guests} ospiti', { slug: tn.slug, members: tn.members, guests: tn.guests })}
         more={
-          <DropdownMenuItem variant={t.status === 'active' ? 'destructive' : 'default'} onSelect={() => void toggle()}>
+          <DropdownMenuItem variant={tn.status === 'active' ? 'destructive' : 'default'} onSelect={() => void toggle()}>
             <Power />
-            {t.status === 'active' ? 'Sospendi il tenant' : 'Riattiva il tenant'}
+            {tn.status === 'active' ? t('Sospendi il tenant') : t('Riattiva il tenant')}
           </DropdownMenuItem>
         }
       />
       <Tabs
         tabs={[
-          { id: 'details', label: 'Dettagli' },
-          { id: 'users', label: 'Utenti e gestori', count: members.data?.length },
+          { id: 'details', label: t('Dettagli') },
+          { id: 'users', label: t('Utenti e gestori'), count: members.data?.length },
         ]}
         current={cur}
         href={(s) => to.adminTenant(id, s === 'details' ? undefined : s)}
@@ -190,23 +202,23 @@ export function AdminTenant({ id, section }: { id: string; section?: string }) {
         {cur === 'details' ? (
           <Card className="max-w-2xl">
             <CardHeader>
-              <CardTitle>Tenant</CardTitle>
-              <CardDescription>Accesso con account locali. L’accesso con un provider di identità (OIDC) arriva nella fase 2.</CardDescription>
+              <CardTitle>{t('Tenant')}</CardTitle>
+              <CardDescription>{t('Accesso con account locali. L’accesso con un provider di identità (OIDC) arriva nella fase 2.')}</CardDescription>
             </CardHeader>
             <CardContent>
               <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
-                <dt className="text-muted-foreground">Nome</dt>
-                <dd>{t.name}</dd>
-                <dt className="text-muted-foreground">Identificativo</dt>
-                <dd className="font-mono">{t.slug}</dd>
-                <dt className="text-muted-foreground">Accesso</dt>
-                <dd>Account locali</dd>
-                <dt className="text-muted-foreground">Risorse</dt>
+                <dt className="text-muted-foreground">{t('Nome')}</dt>
+                <dd>{tn.name}</dd>
+                <dt className="text-muted-foreground">{t('Identificativo')}</dt>
+                <dd className="font-mono">{tn.slug}</dd>
+                <dt className="text-muted-foreground">{t('Accesso')}</dt>
+                <dd>{t('Account locali')}</dd>
+                <dt className="text-muted-foreground">{t('Risorse')}</dt>
                 <dd>
-                  {t.resources} · {fmtBytes(t.bytes)}
+                  {tn.resources} · {fmtBytes(tn.bytes)}
                 </dd>
-                <dt className="text-muted-foreground">Creato</dt>
-                <dd>{fmtDate(t.created_at)}</dd>
+                <dt className="text-muted-foreground">{t('Creato')}</dt>
+                <dd>{fmtDate(tn.created_at)}</dd>
               </dl>
             </CardContent>
           </Card>
@@ -222,27 +234,27 @@ function TenantUsers({ id, q }: { id: string; q: { data?: Member[]; isLoading: b
   const base = `/api/admin/tenants/${id}`
   const [dlg, setDlg] = useState<null | 'manager' | Member>(null)
   const inval = [['admin-members', id], ['admin-tenants']]
-  const setRole = useAction(({ uid, role }: { uid: string; role: string }) => api('PUT', `${base}/members/${uid}/role`, { role }), { ok: 'Ruolo aggiornato', invalidate: inval })
-  const newManager = useAction((v: Record<string, string>) => api('POST', `${base}/managers`, v), { ok: (v) => `${v.username} è Tenant Manager`, invalidate: inval })
-  const resetPw = useAction(({ uid, password }: { uid: string; password: string }) => api('POST', `${base}/members/${uid}/password`, { password }), { ok: 'Password reimpostata' })
+  const setRole = useAction(({ uid, role }: { uid: string; role: string }) => api('PUT', `${base}/members/${uid}/role`, { role }), { ok: t('Ruolo aggiornato'), invalidate: inval })
+  const newManager = useAction((v: Record<string, string>) => api('POST', `${base}/managers`, v), { ok: (v) => t('{username} è Tenant Manager', { username: v.username }), invalidate: inval })
+  const resetPw = useAction(({ uid, password }: { uid: string; password: string }) => api('POST', `${base}/members/${uid}/password`, { password }), { ok: t('Password reimpostata') })
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
   return (
     <div className="grid gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="max-w-xl text-sm text-muted-foreground">Utenti e ruoli, mai i contenuti: per nominare o sostituire un Tenant Manager e sbloccare un accesso.</p>
+        <p className="max-w-xl text-sm text-muted-foreground">{t('Utenti e ruoli, mai i contenuti: per nominare o sostituire un Tenant Manager e sbloccare un accesso.')}</p>
         <Button variant="outline" onClick={() => setDlg('manager')}>
           <Plus />
-          Nuovo Tenant Manager
+          {t('Nuovo Tenant Manager')}
         </Button>
       </div>
       <div className="overflow-hidden rounded-xl border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Utente</TableHead>
-              <TableHead className="w-48">Ruolo</TableHead>
-              <TableHead>Stato</TableHead>
+              <TableHead>{t('Utente')}</TableHead>
+              <TableHead className="w-48">{t('Ruolo')}</TableHead>
+              <TableHead>{t('Stato')}</TableHead>
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
@@ -258,12 +270,12 @@ function TenantUsers({ id, q }: { id: string; q: { data?: Member[]; isLoading: b
                 </TableCell>
                 <TableCell>
                   <Select value={m.role} onValueChange={(role) => setRole.mutate({ uid: m.user_id, role })}>
-                    <SelectTrigger size="sm" aria-label={`Ruolo di ${m.username}`}>
+                    <SelectTrigger size="sm" aria-label={t('Ruolo di {username}', { username: m.username })}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="tenant_manager">Tenant Manager</SelectItem>
-                      <SelectItem value="user">User</SelectItem>
+                      <SelectItem value="tenant_manager">{t('Tenant Manager')}</SelectItem>
+                      <SelectItem value="user">{t('User')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </TableCell>
@@ -272,7 +284,7 @@ function TenantUsers({ id, q }: { id: string; q: { data?: Member[]; isLoading: b
                 </TableCell>
                 <TableCell>
                   {!m.is_guest && (
-                    <Button variant="ghost" size="icon" aria-label={`Reimposta la password di ${m.username}`} onClick={() => setDlg(m)}>
+                    <Button variant="ghost" size="icon" aria-label={t('Reimposta la password di {username}', { username: m.username })} onClick={() => setDlg(m)}>
                       <KeyRound />
                     </Button>
                   )}
@@ -285,22 +297,22 @@ function TenantUsers({ id, q }: { id: string; q: { data?: Member[]; isLoading: b
       <FormDialog
         open={dlg === 'manager'}
         onOpenChange={(o) => !o && setDlg(null)}
-        title="Nuovo Tenant Manager"
-        description="Un account locale del tenant, con il ruolo di Tenant Manager."
+        title={t('Nuovo Tenant Manager')}
+        description={t('Un account locale del tenant, con il ruolo di Tenant Manager.')}
         fields={[
-          { name: 'username', label: 'Username', required: true },
-          { name: 'display_name', label: 'Nome' },
-          { name: 'password', label: 'Password iniziale', type: 'password', required: true, hint: 'Almeno 10 caratteri' },
+          { name: 'username', label: t('Username'), required: true },
+          { name: 'display_name', label: t('Nome') },
+          { name: 'password', label: t('Password iniziale'), type: 'password', required: true, hint: t('Almeno 10 caratteri') },
         ]}
-        submit="Crea"
+        submit={t('Crea')}
         onSubmit={(v) => newManager.mutateAsync(v)}
       />
       <FormDialog
         open={!!dlg && dlg !== 'manager'}
         onOpenChange={(o) => !o && setDlg(null)}
-        title={`Nuova password per ${dlg && dlg !== 'manager' ? dlg.username : ''}`}
-        fields={[{ name: 'password', label: 'Nuova password', type: 'password', required: true, hint: 'Almeno 10 caratteri' }]}
-        submit="Reimposta"
+        title={t('Nuova password per {v}', { v: dlg && dlg !== 'manager' ? dlg.username : '' })}
+        fields={[{ name: 'password', label: t('Nuova password'), type: 'password', required: true, hint: t('Almeno 10 caratteri') }]}
+        submit={t('Reimposta')}
         onSubmit={(v) => resetPw.mutateAsync({ uid: (dlg as Member).user_id, password: v.password })}
       />
     </div>
@@ -319,19 +331,19 @@ export function AdminPlugins({ section }: { section?: string }) {
   const cur = section === 'updates' || section === 'catalog' ? section : 'installed'
   const inval = [['admin-plugins'], ['admin-catalog'], ['admin-overview']]
   const act = useAction(({ id, action }: { id: string; action: 'activate' | 'deactivate' }) => api('POST', `/api/admin/plugins/${enc(id)}/${action}`), {
-    ok: ({ action }) => (action === 'activate' ? 'Plugin attivato' : 'Plugin disattivato'),
+    ok: ({ action }) => (action === 'activate' ? t('Plugin attivato') : t('Plugin disattivato')),
     invalidate: inval,
   })
-  const uninstall = useAction((id: string) => api('DELETE', `/api/admin/plugins/${enc(id)}`), { ok: 'Plugin disinstallato', invalidate: inval })
-  const install = useAction((id: string) => api('POST', `/api/admin/catalog/${enc(id)}/install`), { ok: 'Plugin installato', invalidate: inval })
-  const upload = useAction((f: File) => api('POST', '/api/admin/plugins', undefined, { raw: f }), { ok: 'Pacchetto installato', invalidate: inval })
+  const uninstall = useAction((id: string) => api('DELETE', `/api/admin/plugins/${enc(id)}`), { ok: t('Plugin disinstallato'), invalidate: inval })
+  const install = useAction((id: string) => api('POST', `/api/admin/catalog/${enc(id)}/install`), { ok: t('Plugin installato'), invalidate: inval })
+  const upload = useAction((f: File) => api('POST', '/api/admin/plugins', undefined, { raw: f }), { ok: t('Pacchetto installato'), invalidate: inval })
   const updates = (catalog.data ?? []).filter((c) => c.update_available)
   const available = (catalog.data ?? []).filter((c) => !c.installed)
   return (
     <>
       <PageHeader
-        title="Plugin"
-        sub="Installati sulla piattaforma e disponibili nei registri fidati"
+        title={t('Plugin')}
+        sub={t('Installati sulla piattaforma e disponibili nei registri fidati')}
         actions={
           <>
             <input
@@ -347,7 +359,7 @@ export function AdminPlugins({ section }: { section?: string }) {
             />
             <Button onClick={() => file.current?.click()}>
               <Upload />
-              Installa da file
+              {t('Installa da file')}
             </Button>
           </>
         }
@@ -355,9 +367,9 @@ export function AdminPlugins({ section }: { section?: string }) {
       <div className="grid gap-3 p-6 max-[620px]:p-4">
         <Pills
           items={[
-            { id: 'installed', label: 'Installati', count: installed.data?.length },
-            { id: 'updates', label: 'Aggiornamenti', count: updates.length },
-            { id: 'catalog', label: 'Catalogo', count: available.length },
+            { id: 'installed', label: t('Installati'), count: installed.data?.length },
+            { id: 'updates', label: t('Aggiornamenti'), count: updates.length },
+            { id: 'catalog', label: t('Catalogo'), count: available.length },
           ]}
           value={cur}
           onChange={(id) => go(to.admin('plugins', id === 'installed' ? undefined : id))}
@@ -368,17 +380,17 @@ export function AdminPlugins({ section }: { section?: string }) {
           ) : installed.error ? (
             <ErrorBox error={installed.error} />
           ) : !installed.data?.length ? (
-            <Empty icon={<Puzzle />} title="Nessun plugin installato" />
+            <Empty icon={<Puzzle />} title={t('Nessun plugin installato')} />
           ) : (
             <div className="overflow-hidden rounded-xl border bg-card">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Plugin</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Versione</TableHead>
-                    <TableHead>Firma</TableHead>
-                    <TableHead>Stato</TableHead>
+                    <TableHead>{t('Plugin')}</TableHead>
+                    <TableHead>{t('Tipo')}</TableHead>
+                    <TableHead>{t('Versione')}</TableHead>
+                    <TableHead>{t('Firma')}</TableHead>
+                    <TableHead>{t('Stato')}</TableHead>
                     <TableHead className="w-10" />
                   </TableRow>
                 </TableHeader>
@@ -405,36 +417,36 @@ export function AdminPlugins({ section }: { section?: string }) {
                         )}
                       </TableCell>
                       <TableCell className="font-mono text-xs">{p.version}</TableCell>
-                      <TableCell className="text-sm">{p.signed_by ?? <span className="text-warn">non firmato</span>}</TableCell>
+                      <TableCell className="text-sm">{p.signed_by ?? <span className="text-warn">{t('non firmato')}</span>}</TableCell>
                       <TableCell>
                         <StatusBadge status={p.status} />
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" aria-label={`Azioni per ${p.label}`}>
+                            <Button variant="ghost" size="icon" aria-label={t('Azioni per {label}', { label: p.label })}>
                               <MoreHorizontal />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
                             {p.status === 'active' ? (
-                              <DropdownMenuItem onSelect={async () => (await confirm(`Disattivare ${p.label}? Si spegne in tutti i tenant.`, true)) && act.mutate({ id: p.id, action: 'deactivate' })}>
+                              <DropdownMenuItem onSelect={async () => (await confirm(t('Disattivare {label}? Si spegne in tutti i tenant.', { label: p.label }), true)) && act.mutate({ id: p.id, action: 'deactivate' })}>
                                 <Power />
-                                Disattiva
+                                {t('Disattiva')}
                               </DropdownMenuItem>
                             ) : (
                               <DropdownMenuItem onSelect={() => act.mutate({ id: p.id, action: 'activate' })}>
                                 <Power />
-                                Attiva
+                                {t('Attiva')}
                               </DropdownMenuItem>
                             )}
                             {!p.dev && (
                               <DropdownMenuItem
                                 variant="destructive"
-                                onSelect={async () => (await confirm(`Disinstallare ${p.label}? I suoi dati restano nel database.`, true)) && uninstall.mutate(p.id)}
+                                onSelect={async () => (await confirm(t('Disinstallare {label}? I suoi dati restano nel database.', { label: p.label }), true)) && uninstall.mutate(p.id)}
                               >
                                 <Trash2 />
-                                Disinstalla
+                                {t('Disinstalla')}
                               </DropdownMenuItem>
                             )}
                           </DropdownMenuContent>
@@ -451,14 +463,14 @@ export function AdminPlugins({ section }: { section?: string }) {
         ) : catalog.error ? (
           <ErrorBox error={catalog.error} />
         ) : (cur === 'updates' ? updates : available).length === 0 ? (
-          <Empty icon={<Puzzle />} title={cur === 'updates' ? 'Nessun aggiornamento' : 'Niente da installare nel catalogo'} />
+          <Empty icon={<Puzzle />} title={cur === 'updates' ? t('Nessun aggiornamento') : t('Niente da installare nel catalogo')} />
         ) : (
           <div className="overflow-hidden rounded-xl border bg-card">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Plugin</TableHead>
-                  <TableHead>Versione</TableHead>
+                  <TableHead>{t('Plugin')}</TableHead>
+                  <TableHead>{t('Versione')}</TableHead>
                   <TableHead />
                 </TableRow>
               </TableHeader>
@@ -490,15 +502,15 @@ export function AdminPlugins({ section }: { section?: string }) {
 
 export function AdminSystem({ session, section }: { session: Session; section?: string }) {
   const sections = [
-    { id: 'admins', label: 'Amministratori', icon: <ShieldCheck />, group: 'Piattaforma' },
-    { id: 'identity', label: 'Identità e testi', icon: <Info />, group: 'Identità e aspetto' },
-    { id: 'theme', label: 'Tema', icon: <Palette /> },
-    { id: 'topbar', label: 'Barra in alto', icon: <PanelTop /> },
+    { id: 'admins', label: t('Amministratori'), icon: <ShieldCheck />, group: t('Piattaforma') },
+    { id: 'identity', label: t('Identità e testi'), icon: <Info />, group: t('Identità e aspetto') },
+    { id: 'theme', label: t('Tema'), icon: <Palette /> },
+    { id: 'topbar', label: t('Barra in alto'), icon: <PanelTop /> },
   ]
   const cur = sections.some((s) => s.id === section) ? section! : 'admins'
   return (
     <>
-      <PageHeader title="Sistema" sub="Impostazioni della piattaforma, per tutti i tenant" />
+      <PageHeader title={t('Sistema')} sub={t('Impostazioni della piattaforma, per tutti i tenant')} />
       <Sections sections={sections} current={cur} href={(id) => to.admin('system', id)}>
         {cur === 'admins' && <Admins me={session.user.user_id} />}
         {cur === 'identity' && <Identity />}
@@ -514,18 +526,18 @@ function Identity() {
   return (
     <Card className="max-w-2xl">
       <CardHeader>
-        <CardTitle>Identità e testi</CardTitle>
-        <CardDescription>Dal marchio della distribuzione (brand.toml). Modificarli da qui arriverà con il kernel.</CardDescription>
+        <CardTitle>{t('Identità e testi')}</CardTitle>
+        <CardDescription>{t('Dal marchio della distribuzione (brand.toml). Modificarli da qui arriverà con il kernel.')}</CardDescription>
       </CardHeader>
       <CardContent>
         <dl className="grid grid-cols-[max-content_1fr] items-center gap-x-6 gap-y-3 text-sm">
-          <dt className="text-muted-foreground">Logo</dt>
+          <dt className="text-muted-foreground">{t('Logo')}</dt>
           <dd>
             <AppMark />
           </dd>
-          <dt className="text-muted-foreground">Nome</dt>
+          <dt className="text-muted-foreground">{t('Nome')}</dt>
           <dd>{brand.name}</dd>
-          <dt className="text-muted-foreground">Versione</dt>
+          <dt className="text-muted-foreground">{t('Versione')}</dt>
           <dd className="font-mono">{brand.version}</dd>
         </dl>
       </CardContent>
@@ -533,12 +545,12 @@ function Identity() {
   )
 }
 
-const BAND_ITEMS: { key: keyof ShellBand; label: string; off: string }[] = [
-  { key: 'logo', label: 'Logo e nome dell’applicazione', off: 'il pulsante della sidebar prende il posto del logo.' },
-  { key: 'search', label: 'Ricerca', off: 'spariscono la casella e Ctrl K; resta la ricerca nelle pagine.' },
-  { key: 'lang', label: 'Lingua', off: 'la lingua si sceglie in Account › Aspetto e lingua.' },
-  { key: 'help', label: 'Guida', off: 'tour, guida e novità passano nel menu della persona.' },
-  { key: 'mode', label: 'Tonalità (chiaro, scuro, automatico)', off: 'vale il modo predefinito; la persona lo cambia in Account.' },
+const bandItems = (): { key: keyof ShellBand; label: string; off: string }[] => [
+  { key: 'logo', label: t('Logo e nome dell’applicazione'), off: t('il pulsante della sidebar prende il posto del logo.') },
+  { key: 'search', label: t('Ricerca'), off: t('spariscono la casella e Ctrl K; resta la ricerca nelle pagine.') },
+  { key: 'lang', label: t('Lingua'), off: t('la lingua si sceglie in Account › Aspetto e lingua.') },
+  { key: 'help', label: t('Guida'), off: t('tour, guida e novità passano nel menu della persona.') },
+  { key: 'mode', label: t('Tonalità (chiaro, scuro, automatico)'), off: t('vale il modo predefinito; la persona lo cambia in Account.') },
 ]
 
 /** La barra in alto, decisa dall'Administrator per tutti i tenant, con l'anteprima. Campanella, menu
@@ -548,14 +560,14 @@ function BandSettings({ session }: { session: Session }) {
   const saved = bandOf(session)
   const [v, setV] = useState<ShellBand | null>(null)
   const b = v ?? saved
-  const save = useAction((x: ShellBand) => api('PUT', '/api/admin/band', x), { ok: 'Barra in alto aggiornata per tutti', invalidate: [['session']] })
+  const save = useAction((x: ShellBand) => api('PUT', '/api/admin/band', x), { ok: t('Barra in alto aggiornata per tutti'), invalidate: [['session']] })
   const dirty = !!v && JSON.stringify(v) !== JSON.stringify(saved)
   return (
     <div className="grid max-w-3xl gap-6">
       <Card>
         <CardHeader>
-          <CardTitle>Anteprima</CardTitle>
-          <CardDescription>Uguale per tutti i tenant.</CardDescription>
+          <CardTitle>{t('Anteprima')}</CardTitle>
+          <CardDescription>{t('Uguale per tutti i tenant.')}</CardDescription>
         </CardHeader>
         <CardContent>
           <BandPreview band={b} />
@@ -563,11 +575,11 @@ function BandSettings({ session }: { session: Session }) {
       </Card>
       <Card>
         <CardHeader>
-          <CardTitle>Elementi</CardTitle>
-          <CardDescription>Campanella, menu della persona e selettore del tenant restano sempre.</CardDescription>
+          <CardTitle>{t('Elementi')}</CardTitle>
+          <CardDescription>{t('Campanella, menu della persona e selettore del tenant restano sempre.')}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-1">
-          {BAND_ITEMS.map((it) => (
+          {bandItems().map((it) => (
             <label key={it.key} className="flex items-center justify-between gap-4 border-b py-3 last:border-0">
               <span>
                 <b className="block text-sm">{it.label}</b>
@@ -611,9 +623,9 @@ function BandPreview({ band }: { band: ShellBand }) {
             <PanelLeft />
           </span>
         )}
-        <span className="truncate rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-semibold">Comune di Esempio</span>
-        <span className="flex flex-1 justify-center">{band.search && <span className="flex h-6 w-full max-w-48 items-center gap-1.5 rounded bg-search px-2 text-[11px] text-search-foreground"><Search className="size-3" />Cerca ovunque</span>}</span>
-        {band.lang && <span className={cn(icon, 'font-mono text-[10px] font-semibold')}>IT</span>}
+        <span className="truncate rounded-full bg-white/15 px-2 py-0.5 text-[11px] font-semibold">{t('Comune di Esempio')}</span>
+        <span className="flex flex-1 justify-center">{band.search && <span className="flex h-6 w-full max-w-48 items-center gap-1.5 rounded bg-search px-2 text-[11px] text-search-foreground"><Search className="size-3" />{t('Cerca ovunque')}</span>}</span>
+        {band.lang && <span className={cn(icon, 'font-mono text-[10px] font-semibold')}>{t('IT')}</span>}
         {band.mode && (
           <span className={icon}>
             <Contrast />
@@ -627,7 +639,7 @@ function BandPreview({ band }: { band: ShellBand }) {
         <span className={icon}>
           <Bell />
         </span>
-        <span className="flex size-6 items-center justify-center rounded-full bg-teal-500 text-[9px] font-semibold text-white">ER</span>
+        <span className="flex size-6 items-center justify-center rounded-full bg-teal-700 text-[9px] font-semibold text-white">{t('ER')}</span>
       </div>
     </div>
   )
@@ -638,34 +650,34 @@ function Admins({ me }: { me: string }) {
   const confirm = useConfirm()
   const [dlg, setDlg] = useState<null | 'new' | AdminUser>(null)
   const inval = [['admins'], ['admin-overview']]
-  const create = useAction((v: Record<string, string>) => api('POST', '/api/admin/administrators', v), { ok: (v) => `Administrator ${v.username} creato`, invalidate: inval })
+  const create = useAction((v: Record<string, string>) => api('POST', '/api/admin/administrators', v), { ok: (v) => t('Administrator {username} creato', { username: v.username }), invalidate: inval })
   const status = useAction(({ id, active }: { id: string; active: boolean }) => api('PUT', `/api/admin/administrators/${id}/status`, { active }), {
-    ok: ({ active }) => (active ? 'Riattivato' : 'Disabilitato: le sue sessioni sono chiuse'),
+    ok: ({ active }) => (active ? t('Riattivato') : t('Disabilitato: le sue sessioni sono chiuse')),
     invalidate: inval,
   })
-  const totp = useAction((id: string) => api('DELETE', `/api/admin/administrators/${id}/totp`), { ok: 'Secondo fattore rimosso: al prossimo accesso registra di nuovo l’app', invalidate: inval })
-  const pw = useAction(({ id, password }: { id: string; password: string }) => api('POST', `/api/admin/administrators/${id}/password`, { password }), { ok: 'Password reimpostata' })
+  const totp = useAction((id: string) => api('DELETE', `/api/admin/administrators/${id}/totp`), { ok: t('Secondo fattore rimosso: al prossimo accesso registra di nuovo l’app'), invalidate: inval })
+  const pw = useAction(({ id, password }: { id: string; password: string }) => api('POST', `/api/admin/administrators/${id}/password`, { password }), { ok: t('Password reimpostata') })
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
   return (
     <div className="grid max-w-4xl gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-xl text-sm text-muted-foreground">
-          Account della piattaforma, separati da quelli dei tenant: accedono da «Accesso amministratori» con password locale e secondo fattore. Ne resta sempre almeno uno attivo.
+          {t('Account della piattaforma, separati da quelli dei tenant: accedono da «Accesso amministratori» con password locale e secondo fattore. Ne resta sempre almeno uno attivo.')}
         </p>
         <Button onClick={() => setDlg('new')}>
           <Plus />
-          Nuovo Administrator
+          {t('Nuovo Administrator')}
         </Button>
       </div>
       <div className="overflow-hidden rounded-xl border bg-card">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Administrator</TableHead>
-              <TableHead>Stato</TableHead>
-              <TableHead>Secondo fattore</TableHead>
-              <TableHead>Creato</TableHead>
+              <TableHead>{t('Administrator')}</TableHead>
+              <TableHead>{t('Stato')}</TableHead>
+              <TableHead>{t('Secondo fattore')}</TableHead>
+              <TableHead>{t('Creato')}</TableHead>
               <TableHead className="w-10" />
             </TableRow>
           </TableHeader>
@@ -691,32 +703,32 @@ function Admins({ me }: { me: string }) {
                 <TableCell>
                   <StatusBadge status={a.status} />
                 </TableCell>
-                <TableCell>{a.totp ? <Badge className="bg-ok/10 font-normal text-ok">attivo</Badge> : <Badge variant="secondary" className="font-normal">da registrare</Badge>}</TableCell>
+                <TableCell>{a.totp ? <Badge className="bg-ok/10 font-normal text-ok">attivo</Badge> : <Badge variant="secondary" className="font-normal">{t('da registrare')}</Badge>}</TableCell>
                 <TableCell className="text-muted-foreground">{fmtDate(a.created_at)}</TableCell>
                 <TableCell>
                   {a.user_id !== me && (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" aria-label={`Azioni per ${a.username}`}>
+                        <Button variant="ghost" size="icon" aria-label={t('Azioni per {username}', { username: a.username })}>
                           <MoreHorizontal />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onSelect={() => setDlg(a)}>
                           <KeyRound />
-                          Reimposta la password
+                          {t('Reimposta la password')}
                         </DropdownMenuItem>
                         {a.totp && (
-                          <DropdownMenuItem onSelect={async () => (await confirm(`Togliere il secondo fattore a ${a.username}?`, true)) && totp.mutate(a.user_id)}>
+                          <DropdownMenuItem onSelect={async () => (await confirm(t('Togliere il secondo fattore a {username}?', { username: a.username }), true)) && totp.mutate(a.user_id)}>
                             <ShieldCheck />
-                            Reimposta il secondo fattore
+                            {t('Reimposta il secondo fattore')}
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuItem
                           variant={a.status === 'active' ? 'destructive' : 'default'}
                           onSelect={async () => {
                             const active = a.status !== 'active'
-                            if (active || (await confirm(`Disabilitare ${a.username}? Le sue sessioni vengono chiuse.`, true))) status.mutate({ id: a.user_id, active })
+                            if (active || (await confirm(t('Disabilitare {username}? Le sue sessioni vengono chiuse.', { username: a.username }), true))) status.mutate({ id: a.user_id, active })
                           }}
                         >
                           <Users />
@@ -734,22 +746,22 @@ function Admins({ me }: { me: string }) {
       <FormDialog
         open={dlg === 'new'}
         onOpenChange={(o) => !o && setDlg(null)}
-        title="Nuovo Administrator"
-        description="Al primo accesso registra il secondo fattore."
+        title={t('Nuovo Administrator')}
+        description={t('Al primo accesso registra il secondo fattore.')}
         fields={[
-          { name: 'username', label: 'Username', required: true },
-          { name: 'display_name', label: 'Nome' },
-          { name: 'password', label: 'Password iniziale', type: 'password', required: true, hint: 'Almeno 10 caratteri' },
+          { name: 'username', label: t('Username'), required: true },
+          { name: 'display_name', label: t('Nome') },
+          { name: 'password', label: t('Password iniziale'), type: 'password', required: true, hint: t('Almeno 10 caratteri') },
         ]}
-        submit="Crea"
+        submit={t('Crea')}
         onSubmit={(v) => create.mutateAsync(v)}
       />
       <FormDialog
         open={!!dlg && dlg !== 'new'}
         onOpenChange={(o) => !o && setDlg(null)}
-        title={`Nuova password per ${dlg && dlg !== 'new' ? dlg.username : ''}`}
-        fields={[{ name: 'password', label: 'Nuova password', type: 'password', required: true, hint: 'Almeno 10 caratteri' }]}
-        submit="Reimposta"
+        title={t('Nuova password per {v}', { v: dlg && dlg !== 'new' ? dlg.username : '' })}
+        fields={[{ name: 'password', label: t('Nuova password'), type: 'password', required: true, hint: t('Almeno 10 caratteri') }]}
+        submit={t('Reimposta')}
         onSubmit={(v) => pw.mutateAsync({ id: (dlg as AdminUser).user_id, password: v.password })}
       />
     </div>

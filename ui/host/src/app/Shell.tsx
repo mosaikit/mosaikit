@@ -69,21 +69,17 @@ import { NotificationsBell } from './notifications.tsx'
 import { useNotes } from './notes.ts'
 import { bandOf, sidebarOpen } from './prefs.ts'
 import { go, personal, to, type Route } from './router.ts'
-import { markSvg } from './mark.ts'
-import { setTheme, useTheme, type Mode } from './theme.ts'
+import { markSvg, type MarkVariant } from './mark.ts'
+import { effectiveMode, setTheme, useTheme, type Mode } from './theme.ts'
 
-/** Il simbolo dell'applicazione (o il logo del marchio): lo stesso disegno della favicon (mark.ts). */
-export function AppMark({ className }: { className?: string }) {
+/** Il simbolo dell'applicazione (o il logo del marchio), come nella favicon (mark.ts): `negative` sulla
+ *  barra e sul pannello dell'accesso, sempre scuri; altrove segue il modo chiaro o scuro. */
+export function AppMark({ className, variant }: { className?: string; variant?: MarkVariant }) {
   const brand = useBrand()
-  useTheme() // il colore segue il tema
+  const th = useTheme()
   if (brand.logo) return <img src="brand/logo" alt="" className={cn('size-7 object-contain', className)} />
-  return (
-    <span
-      aria-hidden="true"
-      className={cn('block size-7 shrink-0 [&>svg]:size-full', className)}
-      dangerouslySetInnerHTML={{ __html: markSvg('var(--primary)') }}
-    />
-  )
+  const v = variant ?? (effectiveMode(th) === 'dark' ? 'negative' : 'positive')
+  return <span aria-hidden="true" className={cn('block size-7 shrink-0 [&>svg]:size-full', className)} dangerouslySetInnerHTML={{ __html: markSvg(v) }} />
 }
 
 interface NavItem {
@@ -111,8 +107,8 @@ function useNav(session: Session, route: Route): { groups: NavGroup[]; bottom: N
         {
           items: [
             { label: t('Panoramica della piattaforma'), short: t('Panoramica'), icon: <LayoutDashboard />, href: to.admin(), active: page === 'overview' },
-            { label: 'Tenant', icon: <Building2 />, href: to.admin('tenants'), active: page === 'tenants' || page === 'tenant' },
-            { label: 'Plugin', icon: <Puzzle />, href: to.admin('plugins'), active: page === 'plugins' },
+            { label: t('Tenant'), icon: <Building2 />, href: to.admin('tenants'), active: page === 'tenants' || page === 'tenant' },
+            { label: t('Plugin'), icon: <Puzzle />, href: to.admin('plugins'), active: page === 'plugins' },
           ],
         },
       ],
@@ -141,7 +137,7 @@ function useNav(session: Session, route: Route): { groups: NavGroup[]; bottom: N
       label: t('Gestione del tenant'),
       items: [
         { label: t('Gestisci'), icon: <Users />, href: to.tenant(slug, 'manage'), active: page === 'manage' },
-        { label: 'Plugin', icon: <Puzzle />, href: to.tenant(slug, 'plugins'), active: page === 'plugins' },
+        { label: t('Plugin'), icon: <Puzzle />, href: to.tenant(slug, 'plugins'), active: page === 'plugins' },
         { label: t('Condivisioni'), icon: <Share2 />, href: to.tenant(slug, 'shares'), active: page === 'shares' },
         { label: t('Consumi'), icon: <Gauge />, href: to.tenant(slug, 'usage'), active: page === 'usage' },
       ],
@@ -205,7 +201,7 @@ function AppSidebar({ session, route, band }: { session: Session; route: Route; 
         <SidebarHeader className="h-[50px] flex-row items-center gap-2.5 border-r border-b border-band-line bg-band px-4 text-band-foreground group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:px-0">
           {band.logo || isMobile ? (
             <>
-              <AppMark />
+              <AppMark variant="negative" />
               <span className="truncate text-[17px] font-bold group-data-[collapsible=icon]:hidden">{brand.name}</span>
             </>
           ) : (
@@ -239,7 +235,7 @@ function TenantSwitcher({ session, route, variant = 'band' }: { session: Session
     return (
       <span
         title={t('L’Administrator lavora sulla piattaforma, non dentro un tenant')}
-        className={cn('flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-semibold', band ? 'bg-white/15 text-band-foreground ring-1 ring-white/25' : 'bg-primary/10 text-primary')}
+        className={cn('flex h-7 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-semibold', band ? 'bg-white/15 text-band-foreground ring-1 ring-white/25' : 'bg-primary/10 text-primary-strong')}
       >
         <ShieldCheck className="size-4" />
         {t('Piattaforma')}
@@ -337,7 +333,7 @@ function LanguageMenu() {
   const name = LANGS.find((l) => l.id === lang)?.name ?? lang
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className={cn(bandIcon, 'font-mono text-xs font-semibold')} aria-label={t('Lingua: {name}', { name })} title={t('Lingua: {name}', { name })}>
+      <DropdownMenuTrigger className={cn(bandIcon, 'font-mono text-xs font-semibold')} aria-label={`${lang.toUpperCase()} · ${t('Lingua: {name}', { name })}`} title={t('Lingua: {name}', { name })}>
         {lang.toUpperCase()}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
@@ -415,14 +411,16 @@ function UserMenu({ session, route, band }: { session: Session; route: Route; ba
     <DropdownMenu>
       <DropdownMenuTrigger
         className="flex items-center gap-2 rounded-md py-0.5 pr-0.5 pl-2 text-band-foreground outline-none hover:bg-band-hover focus-visible:ring-2 focus-visible:ring-white/60"
-        aria-label={t('Menu di {name}', { name })}
       >
-        <span className="hidden text-right leading-tight min-[1100px]:block">
+        {/* the name comes from the content, so it always holds the visible text (WCAG 2.5.3); on a
+            narrow bar person and role are sr-only */}
+        <span className="sr-only text-right leading-tight min-[1100px]:not-sr-only min-[1100px]:block">
           <span className="block text-[13px] font-semibold">{name}</span>
           <span className="block text-[11px] text-band-muted">{role}</span>
         </span>
-        <Avatar className="size-7">
-          <AvatarFallback className="bg-teal-500 text-[11px] font-semibold text-white">{initials(name)}</AvatarFallback>
+        <span className="sr-only">{t('menu della persona')}</span>
+        <Avatar className="size-7" aria-hidden="true">
+          <AvatarFallback className="bg-teal-700 text-[11px] font-semibold text-white">{initials(name)}</AvatarFallback>
         </Avatar>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">

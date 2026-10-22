@@ -50,9 +50,9 @@ iniziale (kernel std-only, persistenza JSON, `ui.js` trusted).
 ```
  Browser ─────────────────────────────────────────────────────────────────────
   ┌───────────────────────────────┐        ┌───────────────────────────────┐
-  │ Host UI (React)  app origin   │ post-  │ UI plugin (iframe)            │
-  │ login, rail, condivisione,    │ Message│ plugin origin (separata)      │
-  │ console gestore/admin         │◀──────▶│ @mosaikit/plugin-api          │
+  │ Shell (React)    app origin   │ post-  │ UI plugin (iframe)            │
+  │ accesso, sidebar, Account,    │ Message│ plugin origin (separata)      │
+  │ gestione tenant e piattaforma │◀──────▶│ @mosaikit/plugin-api          │
   └──────────────┬────────────────┘ bridge └───────────────────────────────┘
                  │ REST + cookie HttpOnly + X-CSRF-Token
  Server (mosaikit-server, un solo eseguibile) ─────────────────────────────────
@@ -70,6 +70,16 @@ iniziale (kernel std-only, persistenza JSON, `ui.js` trusted).
  oppure SQLite (un file) ─ tabelle core_* · plg_*__* (query riscritte, trigger)
  Disco ─── data dir: blobs/ (contenuti file e siti) · plugins/ (codice) · backups/
 ```
+
+**La shell** (`ui/host`, servita dall'origine dell'app) segue il mockup (`docs/mockup`) e le regole di
+[refactoring-ui.md](refactoring-ui.md): ogni cosa ha una sola casa (lavoro e gestione nella sidebar,
+cio' che e' personale nel menu della persona). Componenti shadcn/ui su Radix (accessibili), Tailwind v4
+con i temi come insiemi di variabili CSS (`data-preset`: `mosaikit`, `italia`, `tessera`), dati con
+TanStack Query, lingue con i18next (la chiave e' la frase italiana; `src/app/locales`). Gli errori delle
+API hanno un `code` stabile (`wrong_credentials`, `password_too_short`, `forbidden`…) che la shell
+traduce; il messaggio resta per i log. Il tema lo sceglie l'Administrator per la piattaforma e il Tenant
+Manager per il tenant; il modo (chiaro, scuro) e la lingua sono di ciascuno. Test: vitest per le unita',
+Playwright con axe (`cargo xtask e2e`) per i flussi e l'accessibilita'.
 
 ## 3. Tenant, utenti e ruoli
 
@@ -610,7 +620,8 @@ mosaikit/
 │   ├── desktop/             mosaikit.exe (Windows): senza console, icona nell'area di notifica
 │   └── plugin-sdk/          crate per i plugin (lato guest)
 ├── ui/
-│   ├── host/                UI host (React + Vite)
+│   ├── host/                la shell (React + Vite, Tailwind v4, shadcn/ui, TanStack Query, i18next):
+│   │                        src/app (pagine, kit, lingue), src/components (PluginFrame, ui/ di shadcn)
 │   └── plugin-api/          @mosaikit/plugin-api (bridge, mountCrud)
 ├── branding/                marchio di Mosaikit (brand.toml documentato)
 ├── distribution.toml        distribuzione "Mosaikit" (§14)

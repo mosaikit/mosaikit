@@ -1,4 +1,4 @@
-// Tema del prototipo: preset (insieme di variabili CSS in index.css) e modo (chiaro, scuro, automatico).
+// Tema della shell: preset (insieme di variabili CSS in index.css) e modo (chiaro, scuro, automatico).
 // Il preset non e' una scelta personale: lo decide il Tenant Manager per il tenant, o l'Administrator
 // per la piattaforma (e per i tenant che non ne scelgono uno), e arriva dal server. Il browser ricorda
 // l'ultimo usato solo per la pagina di accesso. Il modo e' di ciascuno.
@@ -9,10 +9,11 @@ export type Mode = 'light' | 'dark' | 'auto'
 export const PRESETS = [
   { id: 'mosaikit', name: 'Mosaikit', note: 'i colori di Microsoft Teams' },
   { id: 'italia', name: 'Italia', note: 'Designers Italia, per i tenant della PA' },
+  { id: 'tessera', name: 'Tessera', note: 'i colori del logo' },
 ] as const
 export type PresetId = (typeof PRESETS)[number]['id']
 
-const KEY = 'msk_next_theme'
+const KEY = 'msk_theme'
 interface Theme {
   preset: PresetId
   mode: Mode

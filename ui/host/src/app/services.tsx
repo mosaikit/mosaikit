@@ -4,6 +4,7 @@ import { useCallback, useMemo, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { UiContext, type Ui } from '../ui-context.ts'
 import { ConfirmCtx } from './confirm.ts'
+import { t } from './i18n.ts'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,10 +33,8 @@ export function UiServices({ children }: { children: ReactNode }) {
     () => ({
       toast: (text, error = false) => (error ? toast.error(text) : toast(text)),
       confirm,
-      // il dialogo di condivisione non e' ancora nel prototipo
-      share: async () => {
-        toast.info('La condivisione non e’ ancora nel prototipo: usala dall’app attuale.')
-      },
+      // la finestra di condivisione la apre la pagina del plugin, che conosce il tenant (PluginPage)
+      share: async () => {},
     }),
     [confirm],
   )
@@ -50,16 +49,16 @@ export function UiServices({ children }: { children: ReactNode }) {
         <AlertDialog open={!!ask} onOpenChange={(o) => !o && close(false)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Conferma</AlertDialogTitle>
+              <AlertDialogTitle>{t('Conferma')}</AlertDialogTitle>
               <AlertDialogDescription>{ask?.message}</AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => close(false)}>Annulla</AlertDialogCancel>
+              <AlertDialogCancel onClick={() => close(false)}>{t('Annulla')}</AlertDialogCancel>
               <AlertDialogAction
                 className={ask?.danger ? 'bg-destructive text-white hover:bg-destructive/90' : undefined}
                 onClick={() => close(true)}
               >
-                Conferma
+                {t('Conferma')}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
