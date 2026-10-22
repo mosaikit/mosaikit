@@ -33,11 +33,40 @@ At the top, the review bar, which is not part of the product:
 - **Mark reviewed** and **Index**: the index lists every screen and dialog of the role, with its
   id, and keeps a count of the reviewed ones in this browser.
 - **Notes**: what the screen is for and what the role sees.
+- **Layout** (phase 10, to verify): the frame of every screen in another layout. *Auto* follows the
+  settings (System and Tenant settings › Identity and appearance › Layout); Teams, Console, Workspace,
+  Suite, Project and Tabs force one, for every role and screen. On a phone the layout is set from the
+  settings only.
 
 Files: `index.html`, `mockup.css` (tokens, components, frame), `kit.js` (icons, page frames and the
 marks of inherited settings), `data.js` (sample data), `screens.js` (sign-in, Home, Account and the
-pages of the tenant), `platform.js` (administrator, settings, appearance), `shell.js` (frame,
-menus, generic dialogs, review bar, events).
+pages of the tenant), `platform.js` (administrator, settings, appearance), `layouts.js` (phase 10:
+layouts, navigation tree, Layout and Style settings, layout plugins), `shell.js` (frame, menus,
+generic dialogs, review bar, events).
+
+## Layouts (phase 10, design to verify)
+
+Three independent levels decide how the shell looks: the **theme** (colours), the **style** (corners,
+density, font, tabs, main buttons, band image) and the **layout** (structure). The shell is a set of
+slots (brand, tenant switcher, navigation, search, actions, breadcrumb, content); a layout arranges
+them and has its own phone behaviour. Every layout works with every theme, style, mode and high
+contrast, and keeps the landmarks, the «Skip to the content» link (first in the keyboard order) and
+the focus.
+
+| Layout | Desktop | Phone (≤ 900 px) | Pages of an app (navigation tree) |
+|---|---|---|---|
+| Teams (built-in) | top band, rail of icons with their names | drawer | flyout next to the rail; a tree when the sidebar is open |
+| Console | band with the breadcrumb (optionally on an image), floating sidebar card with the tenant at the top | the card becomes a drawer | groups that open |
+| Workspace | top bar with a wide search, drawer open or icons only | drawer | groups that open |
+| Suite | launcher grid of every app and page, bar of the pages of the area under the band | launcher, bar that scrolls | menu under the item of the bar |
+| Project | global navigation (areas) in the colours of the band, sidebar of the area | both in a drawer | groups that open |
+| Tabs | every page as a tab under the band | the tabs go into a drawer | menu under the tab |
+
+The sample app **Devices** declares five pages (List, Profiles, Commands, Schedules, Firmware) and
+**Notes** three, to show the tree. Layouts other than Teams are **layout plugins** (kind *Layout* in
+Plugins): declarative packages with the arrangement of the slots, style variables, a checked
+stylesheet and images, signed like any plugin, never code running in the shell; Suite is in the
+catalog, to show the installation.
 
 ## Conventions of the pages
 
@@ -124,6 +153,7 @@ Roles: A administrator, M Tenant Manager, U user.
 | `mosaikit:mpmod/overview` | Plugin · overview | A | Description, kind, what it extends, publisher, trust, versions and release notes. |
 | `mosaikit:mpmod/requests` | Plugin · what it asks | A | What it asks of the platform, what it needs, the permissions it brings. |
 | `mosaikit:mpmod/extensions` | Plugin · extensions | A | The extensions of the plugin, installed and in the catalog. |
+| `mosaikit:mpmod/contents` | Plugin · what it contains | A | For a layout plugin: arrangement of the slots, what is inside the package (layout.toml, style variables, checked stylesheet, images, signature) and what a layout may not do. |
 | `mosaikit:mpmod/organizations` | Plugin · tenants | A | To which tenants it is available, and whether each one turned it on. |
 | `mosaikit:mpmod/configuration` | Plugin · configuration | A | Settings of the plugin at platform level. |
 | `mosaikit:monitoring/status` | Monitoring · status | A | Services with state, version, response time and errors; detail of one. |
@@ -145,6 +175,8 @@ Roles: A administrator, M Tenant Manager, U user.
 | `mosaikit:system/theme` | System · identity and appearance · theme and mode | A | Default theme, themes available to tenants, mode, sidebar, and whether tenants may customize each. |
 | `mosaikit:system/languages` | System · identity and appearance · languages and formats | A | Languages of the platform and the default one, formats. |
 | `mosaikit:system/topbar` | System · identity and appearance · top bar | A | What the band shows, for everybody, with a preview. |
+| `mosaikit:system/layout` | System · identity and appearance · layout | A | The layout of everybody among the installed ones, cards with live previews, «Tenants may customize it», what a layout changes and what it does not. |
+| `mosaikit:system/style` | System · identity and appearance · style | A | Corners, density, font, tabs, main buttons, band image (with the contrast check over the image), applied at once, with a preview. |
 | `mosaikit:config/security` | Tenant settings · security | M | Rules of the tenant, only stricter than the platform. |
 | `mosaikit:config/keys` | Tenant settings · keys | M | Keys of the tenant. |
 | `mosaikit:config/embedding` | Tenant settings · embedding | M | Sites of the tenant that may embed its pages, next to the ones of the platform. |
@@ -152,6 +184,8 @@ Roles: A administrator, M Tenant Manager, U user.
 | `mosaikit:config/identity` | Tenant settings · identity and appearance · identity and texts | M | Name, logos, landing page, welcome and legal notes. |
 | `mosaikit:config/theme` | Tenant settings · identity and appearance · theme and mode | M | Default theme among the ones offered, mode, sidebar: inherited or customized. |
 | `mosaikit:config/languages` | Tenant settings · identity and appearance · languages and formats | M | Languages of the tenant (a subset of the platform) and the formats, inherited or customized. |
+| `mosaikit:config/layout` | Tenant settings · identity and appearance · layout | M | The layout of the tenant, inherited from the platform or customized (locked when the platform does not allow it). |
+| `mosaikit:config/style` | Tenant settings · identity and appearance · style | M | The style of the tenant, inherited or customized. |
 | `mosaikit:config/profiles` | — | — | Retired: permission profiles are in Manage (`mosaikit:members/profiles`). |
 | `mosaikit:config/appearance` | — | — | Retired: it is Account (`mosaikit:account/appearance`). |
 | `mosaikit:themeedit` | Theme editor | M A | A theme from colour, band and greys, with previews and the WCAG check. |

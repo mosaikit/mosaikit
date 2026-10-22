@@ -40,10 +40,13 @@ const S = {
       from: 'Mosaikit <noreply@apps.example.org>',
       footer: 'Automatic message, do not reply.',
       themes: ['mosaikit', 'tessera', 'civic', 'slate', 'forest', 'terracotta', 'aurora', 'contrast'],
+      // the layout (structure) and the style (shapes, density, font) of everybody: phase 10, layouts.js
+      layout: 'teams',
+      style: Object.assign({}, STYLE0),
       // what the top band shows, for everybody: decided by the administrator only
       bar: { logo: true, search: true, lang: true, help: true, mode: true },
       // which of its defaults the tenants may customize
-      cust: { theme: true, mode: true, side: true, fmt: true },
+      cust: { theme: true, mode: true, side: true, fmt: true, layout: true, style: true },
     },
     tnt: {
       theme: 'mosaikit',
@@ -60,6 +63,8 @@ const S = {
       land: 'home',
       landId: '',
       fmtSame: true,
+      layout: null,
+      style: null,
     },
   },
   customThemes: [],
@@ -155,6 +160,8 @@ const ROUTES = [
   ['work', 'app:activities', 'Activities', 'calendar', ['user', 'manager'], 'app'],
   ['work', 'app:estimates', 'Estimates', 'receipt', ['user', 'manager'], 'app'],
   ['work', 'app:tasks', 'Tasks', 'checklist', ['user', 'manager'], 'app'],
+  // an app with pages of its own, declared in its manifest: the navigation tree of phase 10
+  ['work', 'app:devices', 'Devices', 'cpu', ['user', 'manager'], 'app'],
   ['org', 'space', 'Overview', 'overview', ['manager']],
   ['org', 'members', 'Manage', 'users', ['manager']],
   ['org', 'splugins', 'Plugins', 'puzzle', ['manager']],
@@ -813,6 +820,7 @@ function presetCss(id) {
       : ''
   }
 #stage .lg-hero { --band-bg: ${n[0]}; --band-fg: ${n[1]}; --band-muted: ${n[2]}; }
+#stage .lp-g { background: ${n[0]}; --text: ${n[1]}; --text2: ${n[2]}; --text3: ${n[3]}; --bg3: ${n[5]}; --line: ${n[6]}; --accent: ${n[1]}; --accent-soft: rgba(255,255,255,.16); }
 #stage .side-h { background: ${n[0]}; border-bottom-color: ${n[6]}; --text: ${n[1]}; --text2: ${n[2]}; --text3: ${n[3]}; --bg3: ${n[5]}; --accent: ${n[1]}; --on-accent: ${n[0]}; }${
     v.navGrad
       ? `
@@ -1244,13 +1252,16 @@ function cmdResults() {
    shows (System › Identity and appearance › Top bar): without the logo, the button of the sidebar
    takes the corner. */
 function shellA(content) {
+  applyStyle();
+  const lay = layoutOf();
+  if (lay !== 'teams') return layoutShell(content, lay) + flyoutHtml();
   const groups = navFor(S.role);
   const mini = !S.drawer && S.side !== 'open';
   const B = bar();
   const label = (g) => GROUP_LABEL[g];
   const open = !mini;
   const toggle = `<button type="button" class="ib stg" data-act="sidetoggle" aria-expanded="${S.drawer || open}" aria-label="${S.drawer || open ? 'Close the sidebar' : 'Open the sidebar'}" data-tip="${S.drawer || open ? 'Close the sidebar' : 'Open the sidebar'}" data-tip-start>${ic('sidebar', 18)}</button>`;
-  return `<div class="app pA ${S.drawer ? 'drawer' : ''}">
+  return `<div class="app pA ${S.drawer ? 'drawer' : ''}">${skipLink()}
     <div class="band ${B.logo ? '' : 'nologo'}"><div class="side-h ${mini ? 'mini' : ''}">${B.logo ? appLogo(mini) : toggle}</div>
       <header class="top"><div class="top-l">${toggle}${tenantSwitch()}</div>${B.search ? searchBox() : '<span class="sbox-none"></span>'}${topRight()}</header></div>
     <div class="body"><nav class="side ${mini ? 'mini' : ''} ${mini && S.sideLabels ? 'labels' : ''}" aria-label="Navigation">
@@ -1259,16 +1270,16 @@ function shellA(content) {
         .filter((x) => x[0] !== 'bottom')
         .map(
           ([g, items]) =>
-            `<div class="sg sg-${g}">${g === 'top' ? '' : `<div class="sg-l">${label(g)}</div>`}${items.map(navItem).join('')}</div>`,
+            `<div class="sg sg-${g}">${g === 'top' ? '' : `<div class="sg-l">${label(g)}</div>`}${items.map((r) => treeItem(r, mini)).join('')}</div>`,
         )
         .join('')}</div>
       ${groups
         .filter((x) => x[0] === 'bottom')
-        .map((x) => `<div class="sg sg-bottom">${x[1].map(navItem).join('')}</div>`)
+        .map((x) => `<div class="sg sg-bottom">${x[1].map((r) => treeItem(r, mini)).join('')}</div>`)
         .join('')}
       <div class="side-f">${quotaWidget(S)}</div></nav>
       <div class="scrim-d" data-act="drawer"></div>
-      <main class="main">${content}</main></div></div>`;
+      <main class="main" id="main" tabindex="-1">${content}</main></div></div>${flyoutHtml()}`;
 }
 
 /* ── Generic dialogs ─────────────────────────────────────────────────── */
@@ -1448,6 +1459,10 @@ function reviewBar() {
           `<button type="button" data-role="${i[0]}" aria-pressed="${!login && S.role === i[0]}" aria-label="${i[1]}" title="${i[1]}"><b class="rs-l">${i[1]}</b><b class="rs-s" aria-hidden="true">${i[2]}</b></button>`,
       )
       .join('')}</div>
+    <label class="rev-lay" title="Layout of the frame (mockup only): Auto follows the settings"><span class="sr">Layout</span>${ic('dash', 14)}<select data-revlayout>${[['', 'Auto (' + LAYOUT(layoutSet())[1] + ')']]
+      .concat(LAYOUTS.map((l) => [l[0], l[1]]))
+      .map((o) => `<option value="${o[0]}" ${(S.revLayout || '') === o[0] ? 'selected' : ''}>${o[1]}</option>`)
+      .join('')}</select></label>
     <button type="button" class="rev-id" data-act="copyid" title="Screen id, as requirements cite it: click to copy">${screenId()}</button>
     <span class="grow"></span>
     <button type="button" class="rbtn ${on ? 'on' : ''}" data-chk="${key}" aria-pressed="${on}">${ic('check', 15)}<span>${on ? 'Reviewed' : 'Mark reviewed'}</span></button>
@@ -1525,6 +1540,7 @@ function render() {
         sideLabels: S.sideLabels,
         mode: S.mode,
         preset: S.preset,
+        revLayout: S.revLayout || null,
       }),
     );
   } catch (e) {
@@ -1795,6 +1811,7 @@ document.addEventListener('click', (e) => {
 });
 /* What every data-act does. */
 function act(a, t) {
+  if (layoutAct(a, t)) return;
   const v = t.dataset.v;
   if (['usermenu', 'langmenu', 'helpmenu', 'theme', 'tenants'].includes(a)) S.bellMenu = false;
   const slug = () => (S.resId && S.resId.ten) || TENANTS[0].slug;
@@ -2307,6 +2324,12 @@ function act(a, t) {
     // Installed, an extension becomes a plugin of tenants (off until the administrator enables it).
     const m = MP_CATALOG.find((x) => x.id === v);
     S.mpInst = (S.mpInst || []).concat(m.id);
+    if (m.kind === 'Layout') {
+      S.bulkDone = `<b>${m.n}</b> installed: choose it in System › Identity and appearance › Layout. Its stylesheet was checked: no scripts, no outside addresses.`;
+      S.resId = Object.assign({}, S.resId, { mp: m.id });
+      render();
+      return;
+    }
     MP.push(Object.assign({}, m, { tenants: [] }));
     FEATS.push(extFeat(m));
     MOD_PERMS['ext:' + m.id] = m.perms || [];

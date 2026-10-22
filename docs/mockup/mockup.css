@@ -7126,3 +7126,717 @@ button.side-ring {
   flex: 1;
   min-width: 0;
 }
+
+/* ── Layouts (phase 10, design) ─────────────────────────────────────────
+   The frame is a set of slots; a layout arranges them. Every layout reads the same tokens as the
+   Teams frame: the band zone is .top, the navigation zone is .side, the content is .main. */
+.skip {
+  position: absolute;
+  z-index: 60;
+  top: 8px;
+  left: 12px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-weight: 600;
+}
+/* out of sight until it gets the focus from the keyboard */
+.skip:not(:focus-visible) {
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.app {
+  position: relative;
+}
+.lband {
+  gap: 14px;
+}
+.lb-l {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+.lburger {
+  display: none;
+}
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 13.5px;
+  color: var(--text2);
+  white-space: nowrap;
+}
+.crumbs i {
+  font-style: normal;
+  opacity: 0.6;
+}
+.crumbs b {
+  color: var(--text);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lband .lb-l {
+  flex: 0 1 auto;
+}
+.lband .lb-l > .app-logo,
+.lband .lb-l > .tsw {
+  flex: none;
+}
+.lband .crumbs {
+  overflow: hidden;
+}
+.lband .sbox-w {
+  flex: 0 1 340px;
+  margin-left: auto;
+}
+.lband .sbox {
+  width: 100%;
+}
+.lband > .grow {
+  flex: 1;
+}
+/* The pages of an app: a group that opens in a tree, a flyout next to a rail, a menu under a tab. */
+.nt-h svg:last-child {
+  transition: transform 0.15s;
+}
+.nt.open .nt-h svg:last-child {
+  transform: rotate(180deg);
+}
+.nt-c {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 0 6px 28px;
+}
+.nv.nt-i {
+  padding: 6px 10px;
+  font-size: 13.5px;
+  color: var(--text2);
+}
+.flyout,
+.tabmenu {
+  position: fixed;
+  z-index: 45;
+  min-width: 190px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.flyout .eyebrow {
+  padding: 6px 10px 4px;
+}
+.flyout button,
+.tabmenu button {
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text);
+  text-align: left;
+  font-size: 13.5px;
+}
+.flyout button:hover,
+.tabmenu button:hover {
+  background: var(--bg3);
+}
+
+/* Console: dark band with the breadcrumb, a floating sidebar card with groups that open. */
+.L-console .lc-band {
+  height: 60px;
+}
+.L-console .body {
+  background: var(--bg3);
+}
+.L-console .main {
+  background: transparent;
+}
+.L-console .lc-side {
+  background: var(--surface);
+  width: 264px;
+  margin: 12px 0 12px 12px;
+  border: 0;
+  border-radius: 14px;
+  box-shadow: 0 2px 10px rgba(10, 20, 40, 0.12);
+  padding: 8px;
+}
+.L-console .lc-side.mini {
+  width: 64px;
+  align-items: center;
+}
+.L-console .lc-side.mini .nv span,
+.L-console .lc-side.mini .sg-l {
+  display: none;
+}
+.lc-tools {
+  display: flex;
+  padding: 2px 2px 6px;
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 4px;
+}
+.lc-ten {
+  padding: 6px 6px 10px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+.lc-ten .tsw {
+  width: 100%;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+.L-console .main {
+  padding-left: 4px;
+}
+
+/* Workspace: a top bar with a wide search, a drawer that opens or shows only the icons. */
+.L-workspace .lw-band {
+  height: 60px;
+}
+.L-workspace .lw-band .sbox-w {
+  flex: 1 1 640px;
+  max-width: 720px;
+  margin: 0 auto;
+}
+.lw-r {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.L-workspace .lw-side {
+  width: 256px;
+  border-right: 0;
+  padding: 10px 10px 10px 0;
+}
+.L-workspace .lw-side .nv {
+  border-radius: 0 999px 999px 0;
+  padding-left: 22px;
+}
+.L-workspace .lw-side.mini {
+  width: 76px;
+}
+.L-workspace .lw-side.mini .nv {
+  justify-content: center;
+  padding-left: 10px;
+}
+.L-workspace .lw-side.mini .nv span,
+.L-workspace .lw-side.mini .nt-c {
+  display: none;
+}
+.L-workspace .lw-side .nv.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Suite: a launcher with every app and page, the pages of the area in a bar under the band. */
+.ls-sub {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 44px;
+  padding: 0 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg2);
+  overflow-x: auto;
+}
+.ls-area {
+  margin-right: 10px;
+  font-size: 13px;
+  color: var(--text);
+  white-space: nowrap;
+}
+.ls-i,
+.lt-t {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--text2);
+  white-space: nowrap;
+  font-size: 13.5px;
+}
+.ls-i:hover,
+.lt-t:hover {
+  background: var(--bg3);
+  color: var(--text);
+}
+.ls-i.on {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+.ls-i.off,
+.lt-t.off {
+  opacity: 0.55;
+}
+.launcher {
+  position: absolute;
+  z-index: 40;
+  top: 56px;
+  left: 10px;
+  width: min(560px, calc(100vw - 20px));
+  max-height: 78vh;
+  overflow: auto;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+.launcher .eyebrow {
+  margin: 6px 4px;
+}
+.ln-g {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 6px;
+  margin-bottom: 8px;
+}
+.ln-t {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 6px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--text);
+  font-size: 13px;
+  text-align: center;
+}
+.ln-t:hover {
+  background: var(--bg3);
+}
+.ln-t .ic {
+  color: var(--accent);
+}
+.ln-t em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--text3);
+}
+
+/* Project: global navigation (the areas) in the colours of the band, the sidebar of the area. */
+.L-project .lp-nav {
+  width: auto;
+  flex-direction: row;
+  padding: 0;
+  gap: 0;
+  border-right: 0;
+}
+.lp-g {
+  width: 76px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  color: var(--text);
+}
+.lp-me {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 8px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+}
+.lp-gi {
+  width: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 2px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--text2);
+  font: 600 10.5px/1.15 var(--f-body);
+  text-align: center;
+}
+.lp-gi:hover,
+.lp-gi.on {
+  background: var(--bg3);
+  color: var(--text);
+}
+.lp-s {
+  width: 236px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 14px 10px;
+  border-right: 1px solid var(--line);
+  overflow-y: auto;
+}
+.lp-st {
+  padding: 4px 10px 12px;
+  font: 700 16px var(--f-head);
+  color: var(--text);
+}
+
+/* Tabs: every page of the navigation as a tab under the band; a menu for the pages of an app. */
+.lt-tabs {
+  flex: none;
+  display: flex;
+  align-items: stretch;
+  gap: 2px;
+  height: 44px;
+  padding: 0 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--bg2);
+  overflow-x: auto;
+}
+.lt-t {
+  border-radius: 0;
+  border-bottom: 2px solid transparent;
+  padding: 0 12px;
+}
+.lt-t:hover {
+  background: none;
+}
+.lt-t.on {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+  font-weight: 600;
+}
+.lt-t em {
+  font-style: normal;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--bad);
+  color: #fff;
+  font-size: 11px;
+  line-height: 18px;
+}
+.L-tabs .lt-drawer {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .lburger {
+    display: inline-grid;
+  }
+  .lband .crumbs span,
+  .lband .crumbs i {
+    display: none;
+  }
+  .L-console .lc-side {
+    margin: 0;
+    border-radius: 0;
+    width: 280px;
+  }
+  .L-workspace .lw-tg {
+    display: none;
+  }
+  .L-workspace .lw-side {
+    width: 280px;
+    padding: 10px;
+  }
+  .L-workspace .lw-band .sbox-w {
+    flex: 0 1 320px;
+    margin-left: auto;
+  }
+  .lw-r .tsw {
+    display: none;
+  }
+  .L-suite .lburger {
+    display: none;
+  }
+  .ls-area {
+    display: none;
+  }
+  .L-tabs .lt-tabs {
+    display: none;
+  }
+  .L-tabs .lt-drawer {
+    display: flex;
+  }
+  .lb-l .app-logo b {
+    display: none;
+  }
+}
+
+/* ── Style: shapes, density, font, tabs, buttons, band image ─────────── */
+#stage[data-radius='square'] .btn,
+#stage[data-radius='square'] .nv,
+#stage[data-radius='square'] .field,
+#stage[data-radius='square'] input,
+#stage[data-radius='square'] select,
+#stage[data-radius='square'] .sbox {
+  border-radius: 2px;
+}
+#stage[data-radius='square'] .panel,
+#stage[data-radius='square'] .dlg,
+#stage[data-radius='square'] .lcard,
+#stage[data-radius='square'] .lc-side {
+  border-radius: 3px;
+}
+#stage[data-radius='round'] .btn,
+#stage[data-radius='round'] .nv,
+#stage[data-radius='round'] .sbox {
+  border-radius: 999px;
+}
+#stage[data-radius='round'] .field,
+#stage[data-radius='round'] input,
+#stage[data-radius='round'] select {
+  border-radius: 12px;
+}
+#stage[data-radius='round'] .panel,
+#stage[data-radius='round'] .dlg,
+#stage[data-radius='round'] .lcard,
+#stage[data-radius='round'] .lc-side {
+  border-radius: 20px;
+}
+#stage[data-density='compact'] .btn {
+  height: 28px;
+}
+#stage[data-density='compact'] .nv {
+  padding-top: 5px;
+  padding-bottom: 5px;
+}
+#stage[data-density='compact'] .panel {
+  padding: 11px 14px;
+}
+#stage[data-density='compact'] .tbl td,
+#stage[data-density='compact'] .tbl th {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+#stage[data-density='compact'] .tabs button {
+  padding: 6px 12px;
+}
+#stage[data-font='humanist'] {
+  --f-body: Inter, 'Segoe UI Variable Text', 'Helvetica Neue', Arial, sans-serif;
+  --f-head: Inter, 'Segoe UI Variable Display', 'Helvetica Neue', Arial, sans-serif;
+  font-family: var(--f-body);
+}
+#stage[data-font='serif'] {
+  --f-body: Georgia, Cambria, 'Times New Roman', serif;
+  --f-head: Georgia, Cambria, 'Times New Roman', serif;
+  font-family: var(--f-body);
+}
+#stage[data-tabs='pill'] .tabs {
+  gap: 6px;
+  border-bottom: 0;
+}
+#stage[data-tabs='pill'] .tabs button {
+  border-bottom: 0;
+  border-radius: 999px;
+}
+#stage[data-tabs='pill'] .tabs button[aria-selected='true'] {
+  background: var(--accent-soft);
+}
+#stage[data-tabs='boxed'] .tabs button {
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  margin-bottom: -1px;
+}
+#stage[data-tabs='boxed'] .tabs button[aria-selected='true'] {
+  border-color: var(--line);
+  background: var(--surface);
+  color: var(--text);
+}
+#stage[data-buttons='outline'] .btn.pri {
+  background: transparent;
+  color: var(--accent);
+}
+#stage[data-buttons='soft'] .btn.pri {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent);
+}
+#stage[data-band='image'] .top,
+#stage[data-band='image'] .side-h {
+  background-image:
+    radial-gradient(ellipse 60% 140% at 78% 0%, rgba(255, 255, 255, 0.16), transparent 70%),
+    repeating-radial-gradient(ellipse 120% 90% at 70% 140%, transparent 0 22px, rgba(255, 255, 255, 0.1) 22px 23px),
+    linear-gradient(100deg, rgba(0, 0, 0, 0.18), rgba(0, 0, 0, 0) 55%);
+}
+
+/* ── Settings: layout cards and the Style editor ─────────────────────── */
+.lcards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+.lcard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+}
+.lcard.on {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+.lcard.more {
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border-style: dashed;
+  min-height: 170px;
+}
+.lc-t {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.lc-t .ic {
+  margin-left: auto;
+  color: var(--accent);
+}
+.lthumb {
+  display: flex;
+  flex-direction: column;
+  height: 112px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.lthumb > i {
+  display: block;
+  flex: none;
+}
+.lt-row {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+}
+.lt-b {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 7px 6px;
+}
+.lt-ln {
+  display: block;
+  height: 4px;
+  border-radius: 2px;
+}
+.lt-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  padding: 6px;
+}
+.lt-grid i {
+  height: 18px;
+  border-radius: 4px;
+  background: var(--a);
+  opacity: 0.35;
+}
+.lthumb .lt-tabs {
+  height: auto;
+  padding: 3px 6px;
+  gap: 4px;
+  border: 0;
+  overflow: hidden;
+}
+.lthumb .lt-tabs i {
+  width: 22px;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(127, 127, 127, 0.35);
+}
+.lthumb .lt-tabs i.on {
+  background: var(--a);
+}
+.st-rows {
+  display: flex;
+  flex-direction: column;
+}
+.st-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+.st-row .rt {
+  display: flex;
+  flex-direction: column;
+}
+.st-row .rt span {
+  font-size: 12.5px;
+  color: var(--text3);
+}
+.st-row .seg {
+  flex-wrap: wrap;
+}
+.st-img {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.st-img-p {
+  width: 140px;
+  height: 40px;
+  border-radius: 6px;
+  background-color: var(--accent);
+  background-image:
+    linear-gradient(115deg, rgba(255, 255, 255, 0) 35%, rgba(255, 255, 255, 0.18) 52%, rgba(255, 255, 255, 0) 68%),
+    repeating-radial-gradient(circle at 82% 20%, rgba(255, 255, 255, 0.12) 0 1px, transparent 1px 14px);
+}
+.st-prev {
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+}
+.rev-lay {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 6px;
+  color: var(--text2);
+}
+.rev-lay select {
+  height: 28px;
+  border: 1px solid var(--rev-line);
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 12.5px;
+}
+@media (max-width: 620px) {
+  .rev-lay {
+    display: none;
+  }
+}

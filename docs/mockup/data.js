@@ -680,6 +680,36 @@ const PROF = (id) => PROFILES.find((x) => x.id === id) || PROFILES[0];
    plugin available to a tenant; its Tenant Manager turns it on and decides who gets it. */
 const MP = [
   {
+    id: 'layout-teams',
+    n: 'Teams layout',
+    sys: 'layout',
+    kind: 'Layout',
+    ver: '1.0.0',
+    trust: 'Official',
+    repo: 'Mosaikit',
+    ed: 'Mosaikit',
+    d: 'Top band, rail of icons with their names, panels at the side. The layout of a new installation.',
+    notes: [],
+    asks: [],
+  },
+  ...['console', 'workspace', 'project', 'tabs'].map((k) => ({
+    id: 'layout-' + k,
+    n: k[0].toUpperCase() + k.slice(1) + ' layout',
+    kind: 'Layout',
+    ver: '1.0.0',
+    trust: 'Official',
+    repo: 'Mosaikit',
+    ed: 'Mosaikit',
+    d: {
+      console: 'Dark band with the breadcrumb, a floating sidebar with groups that open.',
+      workspace: 'Top bar with a wide search, a drawer that opens and closes.',
+      project: 'Global navigation at the left, the sidebar of the area next to it.',
+      tabs: 'Apps and pages as tabs under the band, a menu for the pages of an app.',
+    }[k],
+    notes: [],
+    asks: [],
+  })),
+  {
     id: 'notes',
     n: 'Notes',
     sys: 'notes',
@@ -802,6 +832,16 @@ const MP = [
 ];
 const MP_CATALOG = [
   {
+    id: 'layout-suite',
+    kind: 'Layout',
+    n: 'Suite layout',
+    ver: '1.0.0',
+    trust: 'Official',
+    repo: 'Mosaikit',
+    ed: 'Mosaikit',
+    d: 'Apps from a launcher grid, the pages of the area in a bar under the band.',
+  },
+  {
     id: 'field-forms',
     kind: 'App',
     n: 'Forms on the phone',
@@ -880,11 +920,12 @@ function extFeat(m) {
 function featKind(f) {
   return f.kind || { app: 'App', int: 'Service', ext: 'Extension' }[f.g];
 }
-const KIND_IC = { App: 'grid', Service: 'cpu', Extension: 'puzzle' };
+const KIND_IC = { App: 'grid', Service: 'cpu', Extension: 'puzzle', Layout: 'dash' };
 function kindPill(kind) {
   return pill(kind, kind === 'App' ? 'info' : '', KIND_IC[kind]);
 }
-MP.filter((m) => !m.sys).forEach((m) => {
+// layouts are chosen in System › Identity and appearance, not turned on in the tenants
+MP.filter((m) => !m.sys && m.kind !== 'Layout').forEach((m) => {
   FEATS.push(extFeat(m));
 });
 const EXT_GROUP = {
@@ -892,7 +933,7 @@ const EXT_GROUP = {
   invoicing: ['Group Finance', '17 people'],
   timeline: ['Group Planning', '23 people'],
 };
-MP.filter((m) => !m.sys).forEach((m) => {
+MP.filter((m) => !m.sys && m.kind !== 'Layout').forEach((m) => {
   const g = EXT_GROUP[m.id] || ['Group Operations office', '6 people'];
   MOD_PERMS['ext:' + m.id] = m.perms;
   MOD_GRANTS['ext:' + m.id] = [['users', g[0], g[1], m.perms.map(() => 1)]];

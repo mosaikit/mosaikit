@@ -385,14 +385,14 @@ function secMarketplace(S) {
     sc === 'cat'
       ? `<div class="tbl-w"><table class="tbl"><thead><tr><th>Plugin</th><th>Kind</th><th>Version</th><th>Trust</th><th>Publisher</th><th>Requires</th><th></th></tr></thead><tbody>${cat.map((m) => `<tr class="clk" data-res="mp:${m.id}" data-go="mpmod"><td><b>${m.n}</b><div class="small muted">${m.d}</div>${ext(m)}</td><td>${mpKind(m)}</td><td class="num">${m.ver}</td><td>${pill(m.trust, MP_TRUST[m.trust])}</td><td class="small">${m.ed}<div class="muted">${m.repo}</div></td><td class="small">${(m.needs || []).map((k) => FEAT(k).n).join(', ')}</td><td class="r"><button type="button" class="btn pri sm" data-act="mpinstall" data-v="${m.id}">${ic('download', 14)}<span>Install</span></button></td></tr>`).join('') || '<tr><td colspan="7" class="muted">The whole catalog is installed already.</td></tr>'}</tbody></table></div>`
       : `${upd.length ? `<div class="banner warn">${ic('refresh', 18)}<div><b>${upd.length === 1 ? '1 update to apply' : upd.length + ' updates to apply'}.</b> ${upd.map((m) => `${m.n} from ${m.ver} to ${m.next}`).join(' · ')}. Open sessions do not stop: whoever has an app open gets the new version at the next load.</div>${btn('Apply', { kind: 'pri', act: 'mpupdate' })}</div>` : ''}
-    <div class="tbl-w"><table class="tbl"><thead><tr><th class="cbx"><span class="sr">Select</span></th><th>Plugin</th><th>Kind</th><th>Version</th><th>Trust</th><th>Available to</th></tr></thead><tbody>${rows.map((m) => `<tr class="clk ${selOf(S, 'mp').includes(m.id) ? 'picked' : ''}" data-res="mp:${m.id}" data-go="mpmod">${selTd(S, 'mp', m.id, m.n)}<td><b>${m.n}</b><div class="mono small muted">${m.id}</div>${ext(m)}</td><td>${mpKind(m)}</td><td class="num">${m.ver}${m.next && !(S.mpUpd || []).includes(m.id) ? ` <span class="small warn-t">→ ${m.next}</span>` : ''}</td><td>${pill(m.trust, MP_TRUST[m.trust])}</td><td class="num">${mpTenants(S, m)} of ${TENANTS.length} tenants</td></tr>`).join('')}</tbody></table></div>`;
+    <div class="tbl-w"><table class="tbl"><thead><tr><th class="cbx"><span class="sr">Select</span></th><th>Plugin</th><th>Kind</th><th>Version</th><th>Trust</th><th>Available to</th></tr></thead><tbody>${rows.map((m) => `<tr class="clk ${selOf(S, 'mp').includes(m.id) ? 'picked' : ''}" data-res="mp:${m.id}" data-go="mpmod">${selTd(S, 'mp', m.id, m.n)}<td><b>${m.n}</b><div class="mono small muted">${m.id}</div>${ext(m)}</td><td>${mpKind(m)}</td><td class="num">${m.ver}${m.next && !(S.mpUpd || []).includes(m.id) ? ` <span class="small warn-t">→ ${m.next}</span>` : ''}</td><td>${pill(m.trust, MP_TRUST[m.trust])}</td><td class="num">${m.kind === 'Layout' ? '<span class="small muted">Chosen in System › Identity and appearance</span>' : `${mpTenants(S, m)} of ${TENANTS.length} tenants`}</td></tr>`).join('')}</tbody></table></div>`;
   const list = sc === 'cat' ? cat : inst;
   return resPage(
     S,
     {
       title: 'Plugins',
       total: `${inst.length} installed · ${upd.length} to update`,
-      create: { label: 'Install from file', act: 'toast', v: 'In the product you pick a signed .mskp package: the platform checks the signature before installing.' },
+      create: { label: 'Install from file', act: 'toast', v: 'In the product you pick a signed .mskp package: an app, a service, an extension or a layout. The platform checks the signature before installing; for a layout it also checks its stylesheet (no scripts, no outside addresses).' },
       bulk:
         sc === 'cat'
           ? null
@@ -410,7 +410,7 @@ function secMarketplace(S) {
       S,
       'mp',
       [
-        ['Kind', ['App', 'Service', 'Extension'].map((k) => [k === 'App' ? 'Apps' : k + 's', list.filter((m) => m.kind === k).length])],
+        ['Kind', ['App', 'Service', 'Extension', 'Layout'].map((k) => [k === 'App' ? 'Apps' : k + 's', list.filter((m) => m.kind === k).length])],
         [
           'Origin',
           [
@@ -446,21 +446,29 @@ function secMpMod(S) {
   const m = MP.concat(MP_CATALOG).find((x) => x.id === id) || MP[0];
   const installed = MP.includes(m) || (S.mpInst || []).includes(m.id);
   const key = m.sys || 'ext:' + m.id;
-  const tabsL = [
-    ['over', 'Overview'],
-    ['asks', 'What it asks'],
-  ]
-    .concat(m.kind === 'Extension' ? [] : [['ext', 'Extensions']])
-    .concat([
-      ['ten', 'Tenants'],
-      ['conf', 'Configuration'],
-    ]);
+  const tabsL =
+    m.kind === 'Layout'
+      ? [
+          ['over', 'Overview'],
+          ['lay', 'What it contains'],
+        ]
+      : [
+          ['over', 'Overview'],
+          ['asks', 'What it asks'],
+        ]
+          .concat(m.kind === 'Extension' ? [] : [['ext', 'Extensions']])
+          .concat([
+            ['ten', 'Tenants'],
+            ['conf', 'Configuration'],
+          ]);
   const t0 = tabOf(S, 'mpm', 'over');
   const t = tabsL.some((x) => x[0] === t0) ? t0 : 'over';
-  setSub({ over: 'overview', asks: 'requests', ext: 'extensions', ten: 'organizations', conf: 'configuration' }[t]);
+  setSub({ over: 'overview', asks: 'requests', ext: 'extensions', ten: 'organizations', conf: 'configuration', lay: 'contents' }[t]);
   const base = mpExtends(m);
   let body;
-  if (t === 'asks') {
+  if (t === 'lay') {
+    body = layoutContents(m);
+  } else if (t === 'asks') {
     body = `<div class="two"><section class="panel"><h2>What it asks of the platform</h2><ul class="feats">${(m.asks.length ? m.asks : ['No access beyond the ones of its plugin']).map((a) => `<li class="on">${ic('key', 15)}<span>${a}</span></li>`).join('')}</ul></section>
       <section class="panel"><h2>What it needs</h2>${(m.needs || []).length ? `<ul class="feats">${m.needs.map((k) => `<li class="on">${ic('check', 15)}<span>${FEAT(k).n}</span><span class="muted small">${featKind(FEAT(k))}</span></li>`).join('')}</ul>` : '<p class="muted">Nothing beyond the platform.</p>'}</section>
       <section class="panel span2"><h2>Permissions it brings to Tenant Managers</h2><p class="muted small">They show in <i>Plugins → Permissions</i> of each tenant, where the Tenant Manager gives them to the whole tenant, to groups or to people.</p>${(m.perms || []).length ? `<div class="gchips">${m.perms.map((p) => `<span class="gchip">${ic('key', 13)}${p}</span>`).join('')}</div>` : '<p class="muted">It uses the permissions it declares in its manifest.</p>'}</section></div>`;
@@ -903,11 +911,15 @@ function appearancePage(S, lvl) {
     theme: [theme, mode, side],
     languages: [langs, fmts],
     topbar: [topbar],
+    layout: [layoutSection(lvl)],
+    style: [styleSection(lvl)],
   };
   const tl = [
     ['identity', 'Identity and texts'],
     ['theme', 'Theme and mode'],
     ['languages', 'Languages and formats'],
+    ['layout', 'Layout'],
+    ['style', 'Style'],
   ].concat(sys ? [['topbar', 'Top bar']] : []);
   const cur = tl.some((x) => x[0] === tabOf(S, 'idt', 'identity')) ? tabOf(S, 'idt', 'identity') : 'identity';
   return [
