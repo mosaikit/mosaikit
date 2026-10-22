@@ -2141,7 +2141,6 @@ label.assoc input {
   display: flex;
   flex-direction: column;
 }
-.lg-hero-b > .bmk,
 .lg-hero-b > svg {
   border-radius: 10px;
   box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
@@ -2446,10 +2445,37 @@ label.assoc input {
   place-items: center;
   flex: none;
 }
-.bmk img {
+.bmk img,
+.bmk > svg {
   width: 100%;
   height: 100%;
   display: block;
+}
+.bmk > svg.lv-d {
+  display: none;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) .bmk > svg.lv-l {
+    display: none;
+  }
+  :root:not([data-theme='light']) .bmk > svg.lv-d {
+    display: block;
+  }
+}
+:root[data-theme='dark'] .bmk > svg.lv-l {
+  display: none;
+}
+:root[data-theme='dark'] .bmk > svg.lv-d {
+  display: block;
+}
+/* on the dark band and on the panel of the sign-in: always the negative symbol */
+.band.navdark .bmk > svg.lv-l,
+.lg-hero .bmk > svg.lv-l {
+  display: none !important;
+}
+.band.navdark .bmk > svg.lv-d,
+.lg-hero .bmk > svg.lv-d {
+  display: block !important;
 }
 .bmk img.lv-d {
   display: none;

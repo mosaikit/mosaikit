@@ -95,10 +95,31 @@ function ic(name, size, cls) {
 }
 
 /* The mark of Mosaikit: four tiles on the brand colour. */
-const MARK_SHAPES =
-  '<rect width="32" height="32" rx="8" fill="#5b5fc7"/><rect x="7" y="7" width="8" height="8" rx="2" fill="#ffffff"/><rect x="17" y="7" width="8" height="8" rx="2" fill="#ffffff" opacity=".55"/><rect x="7" y="17" width="8" height="8" rx="2" fill="#ffffff" opacity=".55"/><rect x="17" y="17" width="8" height="8" rx="2" fill="#ffffff"/>';
+/* The symbol of Mosaikit (docs/logo): nine tiles, the one at the top right lifted out of its dashed place
+   in yellow, a plugin going in. Positive (burgundy tiles) for light backgrounds, negative (cream tiles)
+   for dark ones; the page shows the one for its mode, the band and the sign-in panel the negative one. */
+const MARK_VIEW = '70 44 398 398';
+const MARK_TILES = {
+  l: ['#8A1C2B', '#A8293A', '#6E1522', '#8A1C2B', '#A8293A', '#6E1522', '#8A1C2B', '#A8293A'],
+  d: ['#F3EDE2', '#E8DFCE', '#DDD2BD', '#EDE5D6', '#E2D8C4', '#F1EADD', '#DFD5C1', '#EAE2D2'],
+};
+function markShapes(v) {
+  const c = MARK_TILES[v],
+    at = [
+      [82, 82],
+      [204, 82],
+      [82, 204],
+      [204, 204],
+      [326, 204],
+      [82, 326],
+      [204, 326],
+      [326, 326],
+    ];
+  return `${at.map(([x, y], i) => `<rect x="${x}" y="${y}" width="104" height="104" rx="14" fill="${c[i]}"/>`).join('')}<rect x="326" y="82" width="104" height="104" rx="14" fill="none" stroke="#C9707C" stroke-width="5" stroke-dasharray="14 10"/><rect x="352" y="56" width="104" height="104" rx="14" fill="#F0B23A"/>`;
+}
+const MARK_SHAPES = `<svg class="lv-l" viewBox="${MARK_VIEW}" width="32" height="32">${markShapes('l')}</svg><svg class="lv-d" viewBox="${MARK_VIEW}" width="32" height="32">${markShapes('d')}</svg>`;
 function brandMark(s) {
-  return `<span class="bmk" style="width:${s}px;height:${s}px" role="img" aria-label="Mosaikit"><svg viewBox="0 0 32 32" width="${s}" height="${s}" aria-hidden="true">${MARK_SHAPES}</svg></span>`;
+  return `<span class="bmk" style="width:${s}px;height:${s}px" role="img" aria-label="Mosaikit">${['l', 'd'].map((v) => `<svg class="lv-${v}" viewBox="${MARK_VIEW}" width="${s}" height="${s}" aria-hidden="true">${markShapes(v)}</svg>`).join('')}</span>`;
 }
 
 /* The art of the sign-in page: tiles in the corner of the band, some in the accent colour, that

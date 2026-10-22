@@ -1,14 +1,20 @@
-// Icona di Mosaikit disegnata a codice (stesso disegno del favicon della UI):
-// riquadro scuro arrotondato con quattro tessere, una ambra.
+// Icona di Mosaikit disegnata a codice: il simbolo ufficiale (docs/logo) su un riquadro crema
+// arrotondato, come l'avatar, leggibile su barre chiare e scure. Nove tessere bordeaux, quella in alto a
+// destra sollevata in giallo; il tratteggio del suo posto, troppo fine per un'icona, non c'e'.
 // Usato sia a runtime (icona nell'area di notifica) sia da build.rs (icona dell'exe).
 
-/// (x, y, lato, raggio, colore RGBA) nello spazio 48x48 del favicon.
-const SHAPES: [(f32, f32, f32, f32, [u8; 4]); 5] = [
-    (0.0, 0.0, 48.0, 10.0, [0x0b, 0x0c, 0x0f, 255]),
-    (8.0, 8.0, 15.0, 3.0, [0xf0, 0xb2, 0x3e, 255]),
-    (25.0, 8.0, 15.0, 3.0, [0x2a, 0x2e, 0x37, 255]),
-    (8.0, 25.0, 15.0, 3.0, [0x2a, 0x2e, 0x37, 255]),
-    (25.0, 25.0, 15.0, 3.0, [0x55, 0x52, 0x4b, 255]),
+/// (x, y, lato, raggio, colore RGBA) nello spazio 48x48.
+const SHAPES: [(f32, f32, f32, f32, [u8; 4]); 10] = [
+    (0.0, 0.0, 48.0, 10.0, [0xf5, 0xf0, 0xe6, 255]),
+    (7.5, 9.79, 9.18, 1.4, [0x8a, 0x1c, 0x2b, 255]),
+    (18.26, 9.79, 9.18, 1.4, [0xa8, 0x29, 0x3a, 255]),
+    (7.5, 20.56, 9.18, 1.4, [0x6e, 0x15, 0x22, 255]),
+    (18.26, 20.56, 9.18, 1.4, [0x8a, 0x1c, 0x2b, 255]),
+    (29.03, 20.56, 9.18, 1.4, [0xa8, 0x29, 0x3a, 255]),
+    (7.5, 31.32, 9.18, 1.4, [0x6e, 0x15, 0x22, 255]),
+    (18.26, 31.32, 9.18, 1.4, [0x8a, 0x1c, 0x2b, 255]),
+    (29.03, 31.32, 9.18, 1.4, [0xa8, 0x29, 0x3a, 255]),
+    (31.32, 7.5, 9.18, 1.4, [0xf0, 0xb2, 0x3a, 255]),
 ];
 
 fn inside(px: f32, py: f32, x: f32, y: f32, side: f32, r: f32) -> bool {

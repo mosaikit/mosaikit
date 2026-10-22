@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/logo/mosaikit-A-tessera-giallorossa-orizzontale-negativo.svg">
+  <img src="docs/logo/mosaikit-A-tessera-giallorossa-orizzontale-positivo.svg" alt="Mosaikit" width="320">
+</picture>
+
 # Mosaikit
 
 Piattaforma web **multi-tenant a plugin**. Il kernel è domain-agnostic: conosce
