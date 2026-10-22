@@ -75,7 +75,7 @@ function Page({ session, route }: { session: Session; route: Route }) {
     if (route.page === 'manage') return <Manage slug={route.tenant} section={route.section} />
     if (route.page === 'plugins') return <TenantPlugins slug={route.tenant} />
     if (route.page === 'shares') return <Shares slug={route.tenant} />
-    if (route.page === 'usage') return <Usage slug={route.tenant} />
+    if (route.page === 'usage') return <Usage slug={route.tenant} section={route.section} />
     if (route.page === 'log') return <LogPage slug={route.tenant} />
     if (route.page === 'settings') return <TenantSettingsPage slug={route.tenant} section={route.section} />
     return <TenantHome session={session} slug={route.tenant} />

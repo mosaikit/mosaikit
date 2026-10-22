@@ -26,6 +26,7 @@ pub mod notify;
 pub mod oidc;
 pub mod overview;
 pub mod plugins;
+pub mod quotas;
 pub mod secret;
 pub mod tenancy;
 pub mod testing;

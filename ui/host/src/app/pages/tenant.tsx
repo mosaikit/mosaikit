@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Bell, Frame, Gauge, Grid2x2, KeyRound, KeySquare, Link2, Lock, Mail, MoreHorizontal, Palette, Plus, Share2, ShieldCheck, ShieldOff, Trash2, UserRound, Users } from 'lucide-react'
+import { Activity, Bell, Frame, Gauge, Grid2x2, KeyRound, KeySquare, Link2, Lock, Mail, MoreHorizontal, Palette, Plus, Share2, ShieldCheck, ShieldOff, Trash2, TrendingUp, UserRound, Users } from 'lucide-react'
 import { api, appUrl, fmtBytes, fmtDate } from '../../api.ts'
 import PluginFrame from '../../components/PluginFrame.tsx'
 import { UiContext, useUi, type Ui } from '../../ui-context.ts'
@@ -32,6 +32,8 @@ import { TenantTheme } from '../ThemeSettings.tsx'
 import { useTenantSignIn } from '../signin.ts'
 import { LinkDialog, ProfilesSection, RequestsTable } from './people.tsx'
 import { EmbeddingPanel, IdentityPanel, KeysPanel, LanguagesPanel, ManagedPanel, ModePanel, NotificationsPanel, SecurityPanel } from '../SettingsPanels.tsx'
+import { UsageAlerts, UsageConsumers, UsagePanel, UsageQuotas, UsageTrend } from '../Quotas.tsx'
+import { totals, trashHint } from '../usage.ts'
 
 const enc = encodeURIComponent
 const ROLE: Record<string, string> = { tenant_manager: 'Tenant Manager', user: 'User' }
@@ -45,7 +47,8 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
   if (ctx.error) return <ErrorBox error={ctx.error} />
   const c = ctx.data!
   const d = o.data
-  const mine = d?.me.resources.reduce((s, r) => s + r.count, 0) ?? 0
+  const me = totals(d?.me.resources ?? [])
+  const mine = me.count
   return (
     <>
       <PageHeader
@@ -57,7 +60,7 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
           <section className="grid gap-3">
             <h2 className="text-sm font-semibold">{t('Your space')}</h2>
             <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3">
-              <Kpi label={t('Your items')} value={mine} hint={fmtBytes(d.me.resources.reduce((s, r) => s + r.bytes, 0))} />
+              <Kpi label={t('Your items')} value={mine} hint={[fmtBytes(me.bytes), trashHint(me.trashCount, 'items')].filter(Boolean).join(' · ')} />
               <Kpi label={t('Shared by me')} value={d.me.shared_by_me} />
               <Kpi label={t('Shared with me')} value={d.me.shared_with_me} />
               <Kpi label={t('My active public links')} value={d.me.public_links} hint={t('{n} views', { n: d.me.link_views })} />
@@ -74,6 +77,7 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
               <Kpi label={t('Items')} value={d.tenant.resources.reduce((s, r) => s + r.count, 0)} />
               <Kpi label={t('Shares')} value={d.tenant.shares} hint={t('{count} public links', { count: d.tenant.public_links })} onClick={() => go(to.tenant(slug, 'shares'))} />
             </div>
+            <UsagePanel slug={slug} />
           </section>
         )}
         <section className="grid gap-3">
@@ -1036,69 +1040,63 @@ function LinksDialog({ slug, row, onClose }: { slug: string; row: ResourceRow | 
 
 /* ── Usage ───────────────────────────────────────────────────────────── */
 
-/** The usage of the tenant. Quotas are decided by the Administrator: when the kernel has them, they will
- *  show here read only next to the usage (docs/refactoring-ui.md §6). */
-export function Usage({ slug }: { slug: string }) {
+/** The usage of the tenant (Tenant Manager): the quotas, read only (the Administrator sets them), the
+ *  trend, who uses the most, the activity and the alerts (docs/refactoring-ui.md §6). */
+export function Usage({ slug, section }: { slug: string; section?: string }) {
+  const sections = [
+    { id: 'quotas', label: t('Quotas'), icon: <Gauge /> },
+    { id: 'trend', label: t('Trend'), icon: <TrendingUp /> },
+    { id: 'consumers', label: t('Who uses the most'), icon: <Users /> },
+    { id: 'activity', label: t('Activity'), icon: <Activity /> },
+    { id: 'alerts', label: t('Alerts'), icon: <Bell /> },
+  ]
+  const cur = sections.some((s) => s.id === section) ? section! : 'quotas'
+  return (
+    <>
+      <PageHeader title={t('Usage')} crumbs={[{ label: t('Tenant management') }]} sub={t('Quotas set by the Administrator of the platform')} />
+      <Sections sections={sections} current={cur} href={(id) => to.tenant(slug, 'usage', id === 'quotas' ? undefined : id)}>
+        <div className="grid max-w-4xl gap-6">
+          {cur === 'quotas' && <UsageQuotas slug={slug} />}
+          {cur === 'trend' && <UsageTrend slug={slug} />}
+          {cur === 'consumers' && <UsageConsumers slug={slug} />}
+          {cur === 'activity' && <UsageActivity slug={slug} />}
+          {cur === 'alerts' && <UsageAlerts slug={slug} />}
+        </div>
+      </Sections>
+    </>
+  )
+}
+
+/** Storage, items and activity of the tenant, with the KPIs of the plugins. */
+function UsageActivity({ slug }: { slug: string }) {
   const q = useApi<TenantKpi>(['m-kpi', slug], `/api/t/${enc(slug)}/manage/kpi`)
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
   const k = q.data!.core
-  const bytes = k.resources.reduce((s, r) => s + r.bytes, 0)
+  const all = totals(k.resources)
   const max = Math.max(1, ...k.activity.map((d) => d.events))
   return (
     <>
-      <PageHeader title={t('Usage')} crumbs={[{ label: t('Tenant management') }]} sub={t('Storage, items and activity of the tenant')} />
-      <div className="grid gap-6 p-6 max-[620px]:p-4">
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3">
-          <Kpi label={t('Storage used')} value={fmtBytes(bytes)} hint={t('Quota: not in the kernel yet')} />
-          <Kpi label={t('Items')} value={k.resources.reduce((s, r) => s + r.count, 0)} />
-          <Kpi label={t('People')} value={k.members} hint={t('{guests} guests · {groups} groups', { guests: k.guests, groups: k.groups })} />
-          <Kpi label={t('Active in the last 30 days')} value={k.active_users_30d} />
-          <Kpi label={t('Shares')} value={k.shares} hint={t('{n} active public links · {v} views', { n: k.public_links, v: k.link_views })} onClick={() => go(to.tenant(slug, 'shares'))} />
-        </div>
-        <section className="grid gap-3">
-          <h2 className="text-sm font-semibold">{t('Activity of the last days')}</h2>
-          {k.activity.length === 0 ? (
-            <Empty icon={<Gauge />} title={t('No activity')} />
-          ) : (
-            <div className="flex h-36 items-end gap-1 rounded-xl border bg-card p-4" role="img" aria-label={t('Events per day')}>
-              {k.activity.map((d) => (
-                <span key={d.day} title={t('{day}: {events} events, {users} people', { day: d.day, events: d.events, users: d.users })} className="min-w-1 flex-1 rounded-t bg-primary/70" style={{ height: `${Math.max(4, (d.events / max) * 100)}%` }} />
-              ))}
-            </div>
-          )}
-        </section>
-        <section className="grid gap-3">
-          <h2 className="text-sm font-semibold">{t('By app')}</h2>
-          {k.resources.length === 0 ? (
-            <Empty icon={<Gauge />} title={t('No items')} />
-          ) : (
-            <div className="overflow-hidden rounded-xl border bg-card">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('Apps')}</TableHead>
-                    <TableHead>{t('Kind')}</TableHead>
-                    <TableHead className="text-right">{t('Items')}</TableHead>
-                    <TableHead className="text-right">{t('Space')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {k.resources.map((r) => (
-                    <TableRow key={r.plugin_id + r.kind}>
-                      <TableCell className="font-medium">{r.plugin}</TableCell>
-                      <TableCell className="text-muted-foreground">{r.kind}</TableCell>
-                      <TableCell className="text-right tabular-nums">{r.count}</TableCell>
-                      <TableCell className="text-right tabular-nums">{fmtBytes(r.bytes)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-        </section>
-        <PluginKpis items={q.data!.plugins} />
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3">
+        <Kpi label={t('Storage used')} value={fmtBytes(all.bytes)} hint={trashHint(all.trashBytes, 'bytes')} />
+        <Kpi label={t('Items')} value={all.count} hint={trashHint(all.trashCount, 'items')} />
+        <Kpi label={t('People')} value={k.members} hint={t('{guests} guests · {groups} groups', { guests: k.guests, groups: k.groups })} />
+        <Kpi label={t('Active in the last 30 days')} value={k.active_users_30d} />
+        <Kpi label={t('Shares')} value={k.shares} hint={t('{n} active public links · {v} views', { n: k.public_links, v: k.link_views })} onClick={() => go(to.tenant(slug, 'shares'))} />
       </div>
+      <section className="grid gap-3">
+        <h2 className="text-sm font-semibold">{t('Activity of the last days')}</h2>
+        {k.activity.length === 0 ? (
+          <Empty icon={<Gauge />} title={t('No activity')} />
+        ) : (
+          <div className="flex h-36 items-end gap-1 rounded-xl border bg-card p-4" role="img" aria-label={t('Events per day')}>
+            {k.activity.map((d) => (
+              <span key={d.day} title={t('{day}: {events} events, {users} people', { day: d.day, events: d.events, users: d.users })} className="min-w-1 flex-1 rounded-t bg-primary/70" style={{ height: `${Math.max(4, (d.events / max) * 100)}%` }} />
+            ))}
+          </div>
+        )}
+      </section>
+      <PluginKpis items={q.data!.plugins} />
     </>
   )
 }

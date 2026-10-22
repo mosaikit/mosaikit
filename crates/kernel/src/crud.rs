@@ -299,6 +299,7 @@ pub async fn create(
     let tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
     let (values, mut tx) = run_hook(k, c, &p, d, tx, "before_create", None, values, None).await?;
     check_required(d, &values)?;
+    crate::quotas::check(k, c.tenant.tenant_id, crate::quotas::Add::items(1)).await?;
     let id = tx.create_resource(&d.name, &title_of(d, &values), parent, &json!({})).await?;
     let cols: Vec<String> = d.fields.iter().map(|f| qi(&f.key)).collect();
     let ph: Vec<String> =
@@ -318,6 +319,7 @@ pub async fn create(
     let row =
         get_in(k, &mut tx, &p, d, id).await?.ok_or_else(|| Error::internal("created record not visible"))?;
     tx.commit().await?;
+    crate::quotas::touched(k, c.tenant.tenant_id);
     events::record(
         k,
         Some(c.tenant.tenant_id),

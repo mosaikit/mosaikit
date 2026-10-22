@@ -441,8 +441,12 @@ export interface ResourceStat {
   plugin_id: string
   plugin: string
   kind: string
+  /** the ones in the trash included (they count toward the quotas until purged) */
   count: number
   bytes: number
+  /** of which in the trash (recent servers) */
+  trash_count?: number
+  trash_bytes?: number
 }
 
 export interface PluginKpi {
@@ -643,4 +647,92 @@ export interface SharedByMe {
 export interface Revoked {
   shares: number
   links: number
+}
+
+/* ── Quotas (docs/architecture.md, "Quotas and usage") ── */
+
+export type QuotaMetric = 'storage' | 'people' | 'items'
+
+/** a limit for each quota; null: no limit */
+export interface QuotaLimits {
+  storage: number | null
+  people: number | null
+  items: number | null
+}
+
+/** one quota of a tenant: of the platform or of the tenant, with its usage */
+export interface QuotaRow {
+  metric: QuotaMetric
+  /** the quota of the platform for new tenants */
+  platform: number | null
+  /** the tenant has a quota of its own (set by the Administrator) */
+  customized: boolean
+  limit: number | null
+  used: number
+  percent: number | null
+  /** days until the limit at the pace of the last 30 days */
+  forecast_days: number | null
+}
+
+export interface TenantQuotas {
+  tenant_id: string
+  rows: QuotaRow[]
+}
+
+export interface PlatformQuotaRow {
+  metric: QuotaMetric
+  default: number | null
+  capacity: number | null
+  given: number
+  unlimited: number
+  used: number
+  over: boolean
+}
+
+export interface PlatformQuotas {
+  rows: PlatformQuotaRow[]
+  tenants: {
+    id: string
+    slug: string
+    name: string
+    status: string
+    limits: QuotaLimits
+    own: QuotaMetric[]
+    usage: Record<QuotaMetric, number>
+  }[]
+}
+
+export interface QuotaDay {
+  day: string
+  storage: number
+  people: number
+  items: number
+}
+
+export interface QuotaConsumer {
+  id: string
+  name: string
+  items: number
+  bytes: number
+}
+
+export interface QuotaConsumers {
+  people: QuotaConsumer[]
+  groups: QuotaConsumer[]
+  plugins: QuotaConsumer[]
+}
+
+export interface QuotaAlerts {
+  at_80: boolean
+  at_100: boolean
+  forecast: boolean
+  managers: boolean
+  people: string[]
+  groups: string[]
+}
+
+export interface MyUsage {
+  storage: number
+  items: number
+  tenant: QuotaRow[]
 }

@@ -224,6 +224,33 @@ enough as items.
 | P5-26 | As Administrator: System › **Retention** | Trash kept (30) and Log kept (365) days; values outside 1–365 / 30–3650 refused |
 | P5-27 | Italian, and dark mode, on Trash, Log, the side pane and Shares | Everything translated (events too) and readable |
 
+## Phase 6 — Quotas and usage
+
+Quotas are off until the Administrator sets them: put every quota back as it was at the end (Restore,
+or empty fields in System › Quotas). Storage is in GB (1 GB = 1024 MB).
+
+| Id | Check | Expected |
+|---|---|---|
+| P6-01 | As Administrator: System › Quotas | «Quotas of new tenants» (Storage, People, Items, empty = no limit), «Capacity of the platform» with what is given to the tenants and what they use, the tenants with their usage and quotas |
+| P6-02 | Capacity: People 1, save | The save bar appears only after the change; a warning «More is given than the platform has: people» and «Over the capacity» (tenants without a limit while a capacity is set); empty it again |
+| P6-03 | Tenants › Comune di Roma › Details | A Quotas box: each quota «Of the platform: …» with Customize; Used: … |
+| P6-04 | Items: Customize, type a number a little above what Comune di Roma has, save | «Of this tenant», «Quotas of the tenant saved»; System › Quotas shows it in the tenant row with «of this tenant» |
+| P6-05 | As `e.ricci` (Tenant Manager): Usage | Sections Quotas, Trend, Who uses the most, Activity, Alerts; Quotas read only with «Managed by the Administrator», a bar per quota, «At the limit: …» and, when growing, «At the pace of the last 30 days the limit arrives in about N days» |
+| P6-06 | Create notes until the quota of items is reached | Above 80 % an alert appears at the bottom of the sidebar (also for `s.greco`); the bell of `e.ricci` gets «Items of Comune di Roma: N% of the quota» (within a few seconds); at 100 % «the quota is used up, additions stop» |
+| P6-07 | One more note | Refused; the plugin says the quota of the tenant is used up; nothing is created |
+| P6-08 | Delete two notes, create one | Still refused: the notes in the trash count until they are deleted for good (Usage › Activity shows «of which in the trash»); restoring one works; empty the trash, then a new note is created; the 80 % alert comes again only after the usage went below 80 % and back above |
+| P6-09 | As Administrator: Comune di Roma › People quota equal to its people today | As `e.ricci`: Manage › New user → «The tenant has reached one of its quotas…» (Italian: «Il tenant ha raggiunto una delle sue quote…»); an invitation to a person of Regione Lazio is refused the same way |
+| P6-10 | Suspend a person, then create the user again | Works (a suspended membership does not count); reactivating the suspended person is refused while the tenant is full |
+| P6-11 | As Administrator: Storage quota 0.001 GB (about 1 MB) for Comune di Roma | As `s.greco`: upload a file of a few MB in Files → refused; a smaller file replaces a bigger one without problems |
+| P6-12 | As `e.ricci`: Usage › Trend | A chart per quota with the line of the limit and «Show as a table»; the history grows by one day a day (on a new installation only today) |
+| P6-13 | Usage › Who uses the most | By person, by group (a person in two groups counts in both), by app: items and storage |
+| P6-14 | Usage › Alerts | Switches at 80 %, at 100 %, Forecast; recipients: the Tenant Managers and chosen people and groups; save; only the chosen recipients get the next alert |
+| P6-15 | Tenant settings › Managed by the platform | A Quotas row (Storage …, People …, Items …) with the padlock and a link to Usage |
+| P6-16 | Tenant overview of `e.ricci` | A Usage panel with the bars and Details |
+| P6-17 | As `s.greco`: Account › Usage | Their items and space; «What is left in the tenant» with the quotas of storage and items; without quotas «The tenant has no quotas…» |
+| P6-18 | Italian, dark mode | Everything translated («Quote», «Consumi», «Andamento», «Chi consuma di più», «Avvisi»); bars and alerts readable in dark mode |
+| P6-19 | As Administrator: Restore every quota of the tenants and empty System › Quotas | No limit again; the sidebar alert disappears |
+
 ## Phase 8 — Sign-in through the identity provider of a tenant (OIDC)
 
 **Test identity provider.** In a second terminal, from the `mosaikit` folder:

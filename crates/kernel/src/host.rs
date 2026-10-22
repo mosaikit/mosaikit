@@ -70,6 +70,7 @@ impl KernelHost {
 
     fn resource(&mut self, op: &str, req: &Value) -> std::result::Result<Value, String> {
         let rt = self.rt.clone();
+        let (k, tenant) = (self.kernel.clone(), self.caller.tenant.tenant_id);
         let tx = self.tx()?;
         match op {
             "resource.create" => {
@@ -82,6 +83,11 @@ impl KernelHost {
                     None => None,
                 };
                 rt.block_on(async move {
+                    if let Some(k) = &k {
+                        crate::quotas::check(k, tenant, crate::quotas::Add::items(1))
+                            .await
+                            .map_err(|e| e.message)?;
+                    }
                     tx.create_resource(&kind, &title, parent, &json!({}))
                         .await
                         .map(|id| Value::String(id.to_string()))

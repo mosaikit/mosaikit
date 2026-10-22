@@ -3,7 +3,7 @@
 
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Bell, Building2, CircleHelp, Contrast, Frame, History, KeyRound, KeySquare, Mail, MoreHorizontal, Palette, PanelLeft, Plus, Power, Search, ShieldCheck, Users } from 'lucide-react'
+import { Bell, Building2, CircleHelp, Contrast, Frame, Gauge, History, KeyRound, KeySquare, Mail, MoreHorizontal, Palette, PanelLeft, Plus, Power, Search, ShieldCheck, Users } from 'lucide-react'
 import { api, fmtBytes, fmtDate } from '../../api.ts'
 import { useBrand } from '../../brand.ts'
 import type { AdminUser, GlobalKpi, Member, Session, ShellBand, SystemOverview, TenantInfo } from '../../types.ts'
@@ -26,6 +26,7 @@ import { EmbeddingPanel, IdentityPanel, KeysPanel, LanguagesPanel, ModePanel, No
 import { SignInSettings } from '../SignInSettings.tsx'
 import { EmailPanel } from '../EmailPanel.tsx'
 import { TenantPluginsOfAdmin } from './plugins.tsx'
+import { PlatformQuotasPanel, TenantQuotasPanel } from '../Quotas.tsx'
 import { t } from '../i18n.ts'
 
 
@@ -206,6 +207,7 @@ export function AdminTenant({ id, section }: { id: string; section?: string }) {
       <div className="p-6 max-[620px]:p-4">
 
         {cur === 'details' ? (
+          <div className="grid gap-6">
           <Card className="max-w-2xl">
             <CardHeader>
               <CardTitle>{t('Tenant')}</CardTitle>
@@ -232,6 +234,8 @@ export function AdminTenant({ id, section }: { id: string; section?: string }) {
               </dl>
             </CardContent>
           </Card>
+          <TenantQuotasPanel id={id} />
+          </div>
         ) : cur === 'sign-in' ? (
           <SignInSettings id={id} />
         ) : cur === 'plugins' ? (
@@ -343,6 +347,7 @@ export function AdminSystem({ session, section }: { session: Session; section?: 
     { id: 'notifications', label: t('Notifications'), icon: <Bell /> },
     { id: 'retention', label: t('Retention'), icon: <History /> },
     { id: 'security', label: t('Passwords and sessions'), icon: <KeyRound /> },
+    { id: 'quotas', label: t('Quotas'), icon: <Gauge /> },
     { id: 'keys', label: t('Keys of outside services'), icon: <KeySquare /> },
     { id: 'embedding', label: t('Embedding'), icon: <Frame /> },
     { id: 'appearance', label: t('Identity and appearance'), icon: <Palette />, group: t('Appearance') },
@@ -365,6 +370,7 @@ export function AdminSystem({ session, section }: { session: Session; section?: 
         {cur === 'notifications' && <NotificationsPanel level={PLATFORM} />}
         {cur === 'retention' && <RetentionPanel level={PLATFORM} />}
         {cur === 'security' && <SecurityPanel level={PLATFORM} />}
+        {cur === 'quotas' && <PlatformQuotasPanel />}
         {cur === 'keys' && <KeysPanel level={PLATFORM} />}
         {cur === 'embedding' && <EmbeddingPanel level={PLATFORM} />}
         {cur === 'appearance' && tab && (

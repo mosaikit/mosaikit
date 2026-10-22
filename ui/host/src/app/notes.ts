@@ -139,6 +139,12 @@ export function noteTitle(n: Note): string {
       return t('{plugin} is available to the tenant', { plugin: d.plugin })
     case 'plugin.unavailable':
       return t('{plugin} is no longer available to the tenant', { plugin: d.plugin })
+    case 'quota.alert': {
+      const q = ({ storage: t('Storage'), people: t('People'), items: t('Items') } as Record<string, string>)[d.metric] ?? d.metric
+      if (d.level === '100') return t('{quota} of {tenant}: the quota is used up, additions stop', { quota: q, tenant: d.tenant })
+      if (d.level === 'forecast') return t('{quota} of {tenant}: at this pace the quota is used up in about {n} days', { quota: q, tenant: d.tenant, n: String(d.days ?? '') })
+      return t('{quota} of {tenant}: {p}% of the quota', { quota: q, tenant: d.tenant, p: String(d.percent) })
+    }
     default:
       return n.title
   }

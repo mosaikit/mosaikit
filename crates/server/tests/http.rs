@@ -1558,3 +1558,99 @@ async fn trash_log_and_shares_over_http() {
     let csv = a.call(Some(&admin), Method::GET, "/api/admin/log.csv", None).await;
     assert!(csv.text().contains("time,tenant,person"));
 }
+
+#[tokio::test]
+async fn quotas_over_http() {
+    let a = App::new().await;
+    a.t.install("notes").await;
+    let g = a.t.tenant("alfa").await;
+    a.t.member(&g, "anna").await;
+    let admin = a.admin().await;
+    let m = a.login("alfa", "alfa-manager", PASSWORD).await;
+    let anna = a.login("alfa", "anna", PASSWORD).await;
+
+    // the Administrator: quotas of new tenants and capacity; nobody else
+    let r = a
+        .call(
+            Some(&admin),
+            Method::PUT,
+            "/api/admin/quotas",
+            Some(json!({ "defaults": { "storage": 1000000, "people": 10, "items": null },
+                         "capacity": { "storage": 500000 } })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let storage =
+        r.json()["rows"].as_array().unwrap().iter().find(|x| x["metric"] == "storage").cloned().unwrap();
+    assert_eq!((storage["given"].clone(), storage["over"].clone()), (json!(1000000), json!(true)));
+    assert_eq!(a.call(Some(&m), Method::GET, "/api/admin/quotas", None).await.status, StatusCode::FORBIDDEN);
+
+    // a quota of the tenant: one note
+    let tenant = r.json()["tenants"][0]["id"].as_str().unwrap().to_string();
+    let r = a
+        .call(
+            Some(&admin),
+            Method::PUT,
+            &format!("/api/admin/tenants/{tenant}/quotas"),
+            Some(json!({ "items": { "customized": true, "limit": 1 } })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let r = a
+        .call(
+            Some(&m),
+            Method::PUT,
+            &format!("/api/admin/tenants/{tenant}/quotas"),
+            Some(json!({ "items": { "customized": false } })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN);
+
+    // at the limit the addition is refused with a stable code
+    let note = |title: &str| {
+        a.call(
+            Some(&anna),
+            Method::POST,
+            "/api/t/alfa/p/com.mosaikit.notes/r/notes",
+            Some(json!({ "values": { "title": title } })),
+        )
+    };
+    assert_eq!(note("one").await.status, StatusCode::CREATED);
+    let r = note("two").await;
+    assert_eq!((r.status, r.json()["code"].clone()), (StatusCode::CONFLICT, json!("quota_exceeded")));
+
+    // the Tenant Manager reads the quotas (managed by the platform), the trend, the alerts
+    let q = a.call(Some(&m), Method::GET, "/api/t/alfa/manage/quotas", None).await.json();
+    let items = q["rows"].as_array().unwrap().iter().find(|x| x["metric"] == "items").cloned().unwrap();
+    assert_eq!(
+        (items["limit"].clone(), items["used"].clone(), items["percent"].clone()),
+        (json!(1), json!(1), json!(100))
+    );
+    assert_eq!(
+        a.call(Some(&anna), Method::GET, "/api/t/alfa/manage/quotas", None).await.status,
+        StatusCode::FORBIDDEN
+    );
+    let trend = a.call(Some(&m), Method::GET, "/api/t/alfa/manage/usage/trend?days=30", None).await.json();
+    assert_eq!(trend.as_array().unwrap().len(), 1);
+    let r = a
+        .call(
+            Some(&m),
+            Method::PUT,
+            "/api/t/alfa/manage/usage/alerts",
+            Some(json!({ "at_80": true, "at_100": true, "forecast": false, "managers": true })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    assert_eq!(
+        a.call(Some(&m), Method::GET, "/api/t/alfa/manage/usage/alerts", None).await.json()["forecast"],
+        false
+    );
+    let c = a.call(Some(&m), Method::GET, "/api/t/alfa/manage/usage/consumers", None).await.json();
+    assert_eq!(c["plugins"][0]["items"], 1);
+
+    // every member: their own usage, the alert of the sidebar
+    let mine = a.call(Some(&anna), Method::GET, "/api/t/alfa/usage/mine", None).await.json();
+    assert_eq!(mine["items"], 1);
+    let near = a.call(Some(&anna), Method::GET, "/api/t/alfa/usage/near", None).await.json();
+    assert_eq!(near.as_array().unwrap().len(), 1);
+}

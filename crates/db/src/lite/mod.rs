@@ -40,6 +40,7 @@ const MIGRATIONS: &[(i64, &str, &str)] = &[
     (6, "oidc", include_str!("0006_oidc.sql")),
     (7, "plugins", include_str!("0007_plugins.sql")),
     (8, "trash_log", include_str!("0008_trash_log.sql")),
+    (9, "quotas", include_str!("0009_quotas.sql")),
 ];
 
 /// Context of the transaction on the connection (read by `core_ctx_*()`).

@@ -13,6 +13,7 @@ development and release. The choices described here replace the initial PoC
    - [3.1 Settings on three levels](#31-settings-on-three-levels)
    - [3.2 People and permissions](#32-people-and-permissions)
    - [3.3 Sign-in through an identity provider (OIDC)](#33-sign-in-through-an-identity-provider-oidc)
+   - [3.4 Quotas and usage](#34-quotas-and-usage)
 4. [Resources, ownership and sharing](#4-resources-ownership-and-sharing)
    - [4.1 Trash](#41-trash)
    - [4.2 Log](#42-log)
@@ -330,6 +331,55 @@ is in one module next to its tests. **Test provider**: `mosaikit-fake-idp`
 (`crates/server/src/fake_idp.rs`), started by the tests in-process and by `cargo xtask e2e`; for manual
 tests `cargo run -p mosaikit-server --bin mosaikit-fake-idp` (port 5556, client `mosaikit`, secret
 `fake-secret`). It has no passwords: never in production.
+
+### 3.4 Quotas and usage
+
+Kernel module `quotas`; decisions in docs/refactoring-ui.md §6. Three quotas, the ones the kernel can
+measure exactly:
+
+| Quota | Measured as | At the limit |
+|---|---|---|
+| `storage` | the sum of `size_bytes` of the items of the tenant (files, contents) | uploads and copies that add bytes are refused; a replaced file counts only the difference |
+| `people` | the active memberships of the tenant (guests included, suspended ones excluded) | new people (Tenant Manager, Administrator, OIDC first sign-in), invitations and their acceptance, reactivations are refused |
+| `items` | the items (resources) of every plugin | CRUD create, new folders, copies, items created by the logic of a plugin are refused |
+
+There are no quotas per person, and none for automation minutes or AI credits: nothing in the kernel
+consumes them yet.
+
+- **Who sets them.** The Administrator only: System › Quotas holds the quotas of new tenants and the
+  capacity of the platform (settings of the system tenant, `quota.defaults` and `quota.capacity`;
+  `null` is no limit). On the page of a tenant (Details) a quota of its own replaces the one of the
+  platform (settings of the tenant, `quota.<metric>.limit`; a metric not listed is inherited, `null`
+  is "no limit of its own"). For the Tenant Manager they are managed by the platform: Usage and Tenant
+  settings › Managed by the platform show them read only. System › Quotas also sums what is given to
+  the tenants that are not suspended and warns when it is more than the capacity (or tenants have no
+  limit while a capacity is set).
+- **Measure.** Always from the data with aggregate queries, never with counters that could drift. An
+  item in the trash still counts until it is deleted for good (it takes its space), so restoring it is
+  never refused; the usage figures (Usage, Home, Account › Usage) show the total with «of which in the
+  trash».
+- **Enforcement.** `quotas::check` runs before what adds storage, people or items and refuses it with
+  `409` and code `quota_exceeded`; existing data is never deleted. The check reads the usage before the
+  change: two additions at the same instant may go slightly beyond the limit (a soft limit, never a
+  loss of data). A static site is checked on the size of its zip before it is unpacked.
+- **Trend.** `core.quota_usage` keeps the usage of each tenant at the end of each day (UTC), for 400
+  days; the background work (every 10 minutes, with the queue of the emails) and the Usage page update
+  the row of today. The forecast is the pace of the last 30 days: the days until the limit.
+- **Alerts.** At 80 %, at 100 % and on the forecast (the limit within 30 days), each one switchable by
+  the Tenant Manager, to the Tenant Managers and/or chosen people and groups of the tenant. They are
+  notifications of the kind `system` (code `quota.alert`, translated by the shell; email according to
+  the preferences of each person). Each threshold warns once per crossing: `core.quota_alerts` keeps the
+  ones sent, and a threshold is re-armed when the usage goes back below it. They are checked after
+  every addition (in the background) and by the periodic work.
+- **Who sees what.** Tenant Manager: Usage (Quotas, Trend, Who uses the most by person, group and app,
+  Activity, Alerts) and the Usage panel of the tenant overview. Every member: Account › Usage (their
+  own items and storage, what is left in the tenant) and an alert in the sidebar when a quota passes
+  80 % (no fixed widget).
+
+API: `GET|PUT /api/admin/quotas`, `GET|PUT /api/admin/tenants/{id}/quotas` (Administrator);
+`GET /api/t/{t}/manage/quotas`, `GET /api/t/{t}/manage/usage/{trend,consumers}`,
+`GET|PUT /api/t/{t}/manage/usage/alerts` (Tenant Manager); `GET /api/t/{t}/usage/{mine,near}` (every
+member).
 
 ## 4. Resources, ownership and sharing
 

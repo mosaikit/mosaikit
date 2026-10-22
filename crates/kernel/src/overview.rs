@@ -82,8 +82,11 @@ fn label(k: &Kernel, id: &str) -> String {
 async fn personal(k: &Kernel, c: &Caller) -> Result<Personal> {
     let (me, t) = (c.user.user_id, c.tenant.tenant_id);
     let rows = mosaikit_db::query(
-        "select plugin_id, kind, count(*), coalesce(sum(size_bytes), 0)::bigint from core.resources
-         where tenant_id = $1 and owner_id = $2 and not core.in_trash(id) group by plugin_id, kind order by 3 desc",
+        "select plugin_id, kind, count(*), coalesce(sum(size_bytes), 0)::bigint,
+                sum(case when core.in_trash(id) then 1 else 0 end),
+                coalesce(sum(case when core.in_trash(id) then size_bytes else 0 end), 0)::bigint
+         from core.resources
+         where tenant_id = $1 and owner_id = $2 group by plugin_id, kind order by 3 desc",
     )
     .bind(t)
     .bind(me)
@@ -99,6 +102,8 @@ async fn personal(k: &Kernel, c: &Caller) -> Result<Personal> {
                 kind: r.get(1),
                 count: r.get(2),
                 bytes: r.get(3),
+                trash_count: r.get(4),
+                trash_bytes: r.get(5),
             }
         })
         .collect();

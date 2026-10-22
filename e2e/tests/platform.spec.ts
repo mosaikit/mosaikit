@@ -103,6 +103,11 @@ async function appearanceTab(page: Page, tab: string) {
   await page.getByRole('navigation', { name: 'Tabs' }).getByRole('link', { name: tab, exact: true }).click()
 }
 
+/** A section of a page with sections (Usage, System, Tenant settings…). */
+async function section(page: Page, name: string) {
+  await page.getByRole('navigation', { name: 'Sections' }).getByRole('link', { name, exact: true }).click()
+}
+
 /** An item of the sidebar (icon bar or open panel). */
 const nav = (page: Page, name: string) => page.locator('[data-sidebar="sidebar"]').getByRole('link', { name, exact: true })
 
@@ -304,6 +309,9 @@ test.describe.serial('platform', () => {
     await accessible(page, 'shares')
 
     await nav(page, 'Usage').click()
+    await accessible(page, 'usage, quotas')
+    // the activity of the tenant and the KPIs of the plugins have their own section
+    await section(page, 'Activity')
     await expect(page.getByText('Notes by tag')).toBeVisible()
     await expect(page.getByRole('table', { name: /Notes by tag/ })).toContainText('personal')
     await accessible(page, 'usage')
@@ -1072,5 +1080,84 @@ test.describe.serial('platform', () => {
     await expect(page.getByRole('row', { name: /Deleted for good/ }).first()).toContainText(/Alfa/)
     await accessible(page, 'log of the platform')
     await logout(page)
+  })
+
+  test('quotas: set by the Administrator, read by the Tenant Manager, refused at the limit, what is left', async ({ page }) => {
+    test.setTimeout(240_000)
+    // the Administrator: System › Quotas, then quotas of their own for Beta (people) and Alfa (storage)
+    await adminLogin(page)
+    await nav(page, 'System').click()
+    await section(page, 'Quotas')
+    await expect(page.getByText('Quotas of new tenants', { exact: true })).toBeVisible()
+    await expect(page.getByText('Capacity of the platform', { exact: true })).toBeVisible()
+    await accessible(page, 'system quotas')
+    await nav(page, 'Tenant').click()
+    await page.getByRole('row', { name: /City of Beta/ }).getByRole('link').first().click()
+    const people = page.locator('[data-quota="people"]')
+    await people.getByRole('button', { name: 'Customize' }).click()
+    await people.getByLabel('Quota of the tenant: People').fill('1')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByText('Quotas of the tenant saved').first()).toBeVisible()
+    await expect(people).toContainText('Of this tenant')
+    await accessible(page, 'quotas of a tenant')
+    await nav(page, 'Tenant').click()
+    await page.getByRole('row', { name: /City of Alfa/ }).getByRole('link').first().click()
+    const storage = page.locator('[data-quota="storage"]')
+    await storage.getByRole('button', { name: 'Customize' }).click()
+    await storage.getByLabel('Quota of the tenant: Storage').fill('1')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByText('Quotas of the tenant saved').first()).toBeVisible()
+    await logout(page)
+
+    // the Tenant Manager of Beta: the alert in the sidebar, the quotas read only, the refusal at the limit
+    await login(page, 'City of Beta', 'manager', PASSWORD)
+    await expect(page.locator('[data-quota-alert="people"]')).toBeVisible()
+    await nav(page, 'Usage').click()
+    await expect(page.getByText('Managed by the Administrator').first()).toBeVisible()
+    await expect(page.locator('[data-quota="people"]')).toContainText(' of 1 · ')
+    await expect(page.getByRole('spinbutton')).toHaveCount(0)
+    await accessible(page, 'usage quotas')
+    await section(page, 'Trend')
+    await expect(page.getByRole('img', { name: /People in the last/ })).toBeVisible()
+    await accessible(page, 'usage trend')
+    await section(page, 'Who uses the most')
+    await expect(page.getByText('By person', { exact: true })).toBeVisible()
+    await accessible(page, 'usage consumers')
+    await section(page, 'Alerts')
+    await page.getByRole('switch', { name: 'Forecast' }).click()
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByText('Alerts saved').first()).toBeVisible()
+    await accessible(page, 'usage alerts')
+    await nav(page, 'Manage').click()
+    await page.getByRole('button', { name: 'New user' }).click()
+    const d = page.getByRole('dialog', { name: 'New user' })
+    await d.getByLabel('Username').fill('carla')
+    await d.getByLabel('Display name').fill('Carla Bianchi')
+    await d.getByLabel('Initial password').fill(PASSWORD)
+    await d.getByRole('button', { name: 'Create user' }).click()
+    await expect(page.getByText('The tenant has reached one of its quotas').first()).toBeVisible()
+    await page.keyboard.press('Escape')
+    await nav(page, 'Tenant settings').click()
+    await section(page, 'Managed by the platform')
+    await expect(page.getByText('People 1').first()).toBeVisible()
+    await logout(page)
+
+    // a person of Alfa: their usage and what is left in the tenant
+    await login(page, 'Alfa Municipality', 'anna', 'password-e2e-789')
+    await page.goto('./#/t/alfa/account/usage')
+    await expect(page.getByText('What is left in the tenant', { exact: true })).toBeVisible()
+    await expect(page.locator('[data-quota="storage"]')).toContainText('1.0 GB')
+    await accessible(page, 'account usage')
+    await logout(page)
+
+    // back as before
+    await adminLogin(page)
+    for (const [tenant, quota] of [['City of Beta', 'people'], ['City of Alfa', 'storage']]) {
+      await nav(page, 'Tenant').click()
+      await page.getByRole('row', { name: new RegExp(tenant) }).getByRole('link').first().click()
+      await page.locator(`[data-quota="${quota}"]`).getByRole('button', { name: 'Restore' }).click()
+      await page.getByRole('button', { name: 'Save' }).click()
+      await expect(page.getByText('Quotas of the tenant saved').first()).toBeVisible()
+    }
   })
 })

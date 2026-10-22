@@ -201,9 +201,11 @@ pub async fn mkdir(
     if sibling(&mut tx, parent, name, None).await?.is_some() {
         return Err(Error::conflict(format!("an item called '{name}' already exists")));
     }
+    crate::quotas::check(k, c.tenant.tenant_id, crate::quotas::Add::items(1)).await?;
     let id = tx.create_resource("folder", name, parent, &json!({})).await?;
     let e = get_entry(&mut tx, id).await?;
     tx.commit().await?;
+    crate::quotas::touched(k, c.tenant.tenant_id);
     Ok(e)
 }
 
@@ -224,7 +226,14 @@ pub async fn upload(
     let tenant = c.tenant.tenant_id;
     let mut tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
     folder(&mut tx, parent).await?;
-    let id = match sibling(&mut tx, parent, name, None).await? {
+    let existing = sibling(&mut tx, parent, name, None).await?;
+    // at the limit nothing new comes in: a new file adds an item and its bytes, a replaced one the difference
+    let add = match &existing {
+        Some(e) => crate::quotas::Add::storage(data.len() as i64 - e.size),
+        None => crate::quotas::Add { items: 1, storage: data.len() as i64, people: 0 },
+    };
+    crate::quotas::check(k, tenant, add).await?;
+    let id = match existing {
         Some(e) if e.is_dir => return Err(Error::conflict(format!("a folder '{name}' already exists"))),
         Some(_) if !replace => return Err(Error::conflict(format!("a file '{name}' already exists"))),
         Some(e) => {
@@ -252,6 +261,7 @@ pub async fn upload(
         json!({ "size": data.len() }),
     )
     .await;
+    crate::quotas::touched(k, tenant);
     Ok(e)
 }
 
@@ -337,7 +347,10 @@ pub async fn copy_to(
         n += 1;
     }
     let mut copied: Vec<(Uuid, Uuid)> = Vec::new();
-    let root = copy_rec(&mut tx, &src, parent, &name, &mut copied).await?;
+    let mut add = crate::quotas::Add::default();
+    let root = copy_rec(&mut tx, &src, parent, &name, &mut copied, &mut add).await?;
+    // the copy is still in the transaction: the quota is checked on what it adds
+    crate::quotas::check(k, tenant, add).await?;
     for (from, to) in &copied {
         k.blobs.copy_file(tenant, *from, *to)?;
     }
@@ -348,6 +361,7 @@ pub async fn copy_to(
         }
         return Err(err.into());
     }
+    crate::quotas::touched(k, tenant);
     Ok(e)
 }
 
@@ -365,6 +379,7 @@ async fn copy_rec(
     parent: Option<Uuid>,
     name: &str,
     copied: &mut Vec<(Uuid, Uuid)>,
+    add: &mut crate::quotas::Add,
 ) -> Result<Uuid> {
     if copied.len() > MAX_COPY_ITEMS {
         return Err(Error::bad("too many items to copy"));
@@ -372,6 +387,7 @@ async fn copy_rec(
     let kind = if src.is_dir { "folder" } else { "file" };
     let meta = if src.is_dir { json!({}) } else { json!({ "mime": src.mime }) };
     let id = tx.create_resource(kind, name, parent, &meta).await?;
+    add.items += 1;
     if src.is_dir {
         let children: Vec<Entry> =
             mosaikit_db::query(format!("{ENTRY_SQL} where parent_id = $1 and kind in ('file', 'folder')"))
@@ -382,10 +398,11 @@ async fn copy_rec(
                 .map(entry)
                 .collect();
         for ch in children {
-            Box::pin(copy_rec(tx, &ch, Some(id), &ch.name, copied)).await?;
+            Box::pin(copy_rec(tx, &ch, Some(id), &ch.name, copied, add)).await?;
         }
     } else {
         tx.update_resource(id, None, None, Some(src.size)).await?;
+        add.storage += src.size;
         copied.push((src.id, id));
     }
     Ok(id)

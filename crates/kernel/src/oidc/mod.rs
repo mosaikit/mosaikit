@@ -954,6 +954,8 @@ async fn create_person(
     email: Option<String>,
     role: &str,
 ) -> Result<Uuid> {
+    // a new person of the tenant: refused at the limit of its people
+    crate::quotas::check(k, tenant, crate::quotas::Add::people(1)).await?;
     let base = username_from(claim_str(&id.claims, &s.claim_username).as_deref(), &id.subject);
     for n in 1..=50 {
         let username = if n == 1 { base.clone() } else { format!("{base}-{n}") };

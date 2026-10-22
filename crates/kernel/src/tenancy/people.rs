@@ -647,6 +647,7 @@ pub async fn add_to_tenant(
     if member_role(k, tenant, user).await?.is_some() {
         return Err(Error::conflict("the person is already a member of the tenant"));
     }
+    crate::quotas::check(k, tenant, crate::quotas::Add::people(1)).await?;
     mosaikit_db::query(
         "insert into core.memberships (tenant_id, user_id, role, invited_by, profile_id) values ($1, $2, $3, $4, $5)",
     )

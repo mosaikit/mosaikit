@@ -14,8 +14,12 @@ pub struct ResourceStat {
     pub plugin_id: String,
     pub plugin: String,
     pub kind: String,
+    /// items and bytes, the ones in the trash included: they count toward the quotas until purged
     pub count: i64,
     pub bytes: i64,
+    /// of which in the trash
+    pub trash_count: i64,
+    pub trash_bytes: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -93,8 +97,11 @@ fn plugin_label(k: &Kernel, id: &str) -> String {
 
 async fn resource_stats(k: &Kernel, tenant: Option<Uuid>) -> Result<Vec<ResourceStat>> {
     let rows = mosaikit_db::query(
-        "select plugin_id, kind, count(*), coalesce(sum(size_bytes), 0)::bigint from core.resources
-         where ($1::uuid is null or tenant_id = $1) and not core.in_trash(id)
+        "select plugin_id, kind, count(*), coalesce(sum(size_bytes), 0)::bigint,
+                sum(case when core.in_trash(id) then 1 else 0 end),
+                coalesce(sum(case when core.in_trash(id) then size_bytes else 0 end), 0)::bigint
+         from core.resources
+         where ($1::uuid is null or tenant_id = $1)
          group by plugin_id, kind order by 3 desc",
     )
     .bind(tenant)
@@ -110,6 +117,8 @@ async fn resource_stats(k: &Kernel, tenant: Option<Uuid>) -> Result<Vec<Resource
                 kind: r.get(1),
                 count: r.get(2),
                 bytes: r.get(3),
+                trash_count: r.get(4),
+                trash_bytes: r.get(5),
             }
         })
         .collect())

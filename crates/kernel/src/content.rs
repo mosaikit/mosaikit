@@ -26,9 +26,18 @@ pub async fn upload_site(k: &Kernel, c: &Caller, plugin_id: &str, rid: Uuid, zip
     if lvl < 2 {
         return Err(Error::forbidden("the write permission is required"));
     }
+    let before: i64 = mosaikit_db::query_scalar("select size_bytes from core.resources where id = $1")
+        .bind(rid)
+        .fetch_one(&k.db)
+        .await?;
+    // checked before the content on disk is replaced: on the size of the zip (the unpacked size counts
+    // from then on)
+    crate::quotas::check(k, c.tenant.tenant_id, crate::quotas::Add::storage(zip.len() as i64 - before))
+        .await?;
     let info = k.blobs.extract_site(c.tenant.tenant_id, rid, zip)?;
     tx.update_resource(rid, None, Some(&json!({ "content": info })), Some(info.size as i64)).await?;
     tx.commit().await?;
+    crate::quotas::touched(k, c.tenant.tenant_id);
     events::record(
         k,
         Some(c.tenant.tenant_id),

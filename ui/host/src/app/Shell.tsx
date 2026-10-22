@@ -72,6 +72,7 @@ import { useLiveNotes, useUnread } from './notes.ts'
 import { bandOf, sidebarOpen } from './prefs.ts'
 import { go, personal, to, type Route } from './router.ts'
 import { markSvg, type MarkVariant } from './mark.ts'
+import { QuotaAlert } from './Quotas.tsx'
 import { effectiveMode, setTheme, useTheme, type Mode } from './theme.ts'
 
 /** The symbol of the application (or the brand logo), as in the favicon (mark.ts): `negative` on the
@@ -194,9 +195,10 @@ const bandIcon =
 
 function AppSidebar({ session, route, band }: { session: Session; route: Route; band: ShellBand }) {
   const brand = useBrand()
-  const { isMobile } = useSidebar()
+  const { isMobile, state } = useSidebar()
   const nav = useNav(session, route)
   const admin = session.user.is_system_admin
+  const manager = route.area === 'tenant' && session.memberships.find((m) => m.slug === route.tenant)?.role === 'tenant_manager'
   return (
     // the right border is drawn by the parts: light on the top bar, grey below
     <Sidebar collapsible="icon" className="border-r-0!">
@@ -229,6 +231,12 @@ function AppSidebar({ session, route, band }: { session: Session; route: Route; 
         ))}
       </SidebarContent>
       <SidebarFooter className="border-r border-sidebar-border pb-3 group-data-[collapsible=icon]:px-0">
+        {/* only when a quota of the tenant passes 80 %: no fixed widget */}
+        {route.area === 'tenant' && (
+          <div className="px-2 group-data-[collapsible=icon]:px-2.5">
+            <QuotaAlert slug={route.tenant} manager={manager} compact={state === 'collapsed' && !isMobile} />
+          </div>
+        )}
         <NavList items={nav.bottom} />
       </SidebarFooter>
     </Sidebar>

@@ -25,6 +25,8 @@ import { go, personal, to, type Route } from '../router.ts'
 import { SIDEBAR_PREF } from '../prefs.ts'
 import { TenantBadge } from '../Shell.tsx'
 import { KeysPanel } from '../SettingsPanels.tsx'
+import { TenantLeft } from '../Quotas.tsx'
+import { totals, trashHint } from '../usage.ts'
 import { kindLabel, type NoteKind } from '../notes.ts'
 import { setTheme, useTheme, type Mode } from '../theme.ts'
 
@@ -432,24 +434,26 @@ function MyTenants({ session }: { session: Session }) {
   )
 }
 
-/** One's own usage in the active tenant. Quotas per tenant are not in the kernel yet: when they
- *  are, this will also show how much is left. */
+/** One's own usage in the active tenant and what is left of the quotas of the tenant (there are no
+ *  quotas per person). */
 function MyUsage({ slug }: { slug: string }) {
   const q = useApi<Overview>(['overview', slug], `/api/t/${enc(slug)}/overview`)
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
   const res = q.data!.me.resources
-  const bytes = res.reduce((s, r) => s + r.bytes, 0)
+  const all = totals(res)
   return (
     <div className="grid max-w-3xl gap-4">
       <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3">
         <div className="rounded-xl border bg-card p-4">
           <span className="text-xs text-muted-foreground">{t('Space you use')}</span>
-          <b className="block text-2xl font-semibold tabular-nums">{fmtBytes(bytes)}</b>
+          <b className="block text-2xl font-semibold tabular-nums">{fmtBytes(all.bytes)}</b>
+          {all.trashBytes > 0 && <span className="text-xs text-muted-foreground">{trashHint(all.trashBytes, 'bytes')}</span>}
         </div>
         <div className="rounded-xl border bg-card p-4">
           <span className="text-xs text-muted-foreground">{t('Your items')}</span>
-          <b className="block text-2xl font-semibold tabular-nums">{res.reduce((s, r) => s + r.count, 0)}</b>
+          <b className="block text-2xl font-semibold tabular-nums">{all.count}</b>
+          {all.trashCount > 0 && <span className="text-xs text-muted-foreground">{trashHint(all.trashCount, 'items')}</span>}
         </div>
       </div>
       {res.length === 0 ? (
@@ -478,7 +482,7 @@ function MyUsage({ slug }: { slug: string }) {
           </Table>
         </div>
       )}
-      <p className="text-xs text-muted-foreground">{t('The Administrator decides the quotas of the tenant: once they exist, you will also see here what is left.')}</p>
+      <TenantLeft slug={slug} />
     </div>
   )
 }

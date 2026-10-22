@@ -113,6 +113,7 @@ pub(super) async fn create_member_in(
         return Err(Error::bad("invalid username: lower case, digits, '.', '-', '_' (2-64)"));
     }
     check_password_len(password, password_min(k, Some(tenant)).await?)?;
+    crate::quotas::check(k, tenant, crate::quotas::Add::people(1)).await?;
     let hash = hash_password(k, password).await?;
     let mut tx = k.db.begin_app().await?;
     let id: Uuid = mosaikit_db::query_scalar(
@@ -387,6 +388,19 @@ pub(super) async fn set_suspended_in(
     let role = member_role(k, tenant, user_id).await?.ok_or_else(|| Error::not_found("member not found"))?;
     if suspended && role == Role::TenantManager && managers_count(k, tenant).await? <= 1 {
         return Err(Error::bad("the tenant must have at least one active manager"));
+    }
+    if !suspended {
+        // a reactivated membership takes a place among the people of the tenant again
+        let was: Option<String> = mosaikit_db::query_scalar(
+            "select status from core.memberships where tenant_id = $1 and user_id = $2",
+        )
+        .bind(tenant)
+        .bind(user_id)
+        .fetch_optional(&k.db)
+        .await?;
+        if was.as_deref() == Some("suspended") {
+            crate::quotas::check(k, tenant, crate::quotas::Add::people(1)).await?;
+        }
     }
     mosaikit_db::query("update core.memberships set status = $3 where tenant_id = $1 and user_id = $2")
         .bind(tenant)

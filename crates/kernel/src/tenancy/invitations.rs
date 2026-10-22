@@ -82,6 +82,7 @@ pub async fn invite_with(
     if member_role(k, c.tenant.tenant_id, user).await?.is_some() {
         return Err(Error::conflict("the user is already a member of the tenant"));
     }
+    crate::quotas::check(k, c.tenant.tenant_id, crate::quotas::Add::people(1)).await?;
     let pending: bool = mosaikit_db::query_scalar(
         "select exists (select 1 from core.invitations where tenant_id = $1 and user_id = $2 and status = 'pending' and expires_at > now())",
     )
@@ -165,6 +166,9 @@ pub async fn respond_invitation(k: &Kernel, user: &SessionUser, id: Uuid, accept
     let role: String = row.get(1);
     let invited_by: Option<Uuid> = row.get(2);
     let profile: Option<Uuid> = row.get(3);
+    if accept {
+        crate::quotas::check(k, tenant, crate::quotas::Add::people(1)).await?;
+    }
     mosaikit_db::query("update core.invitations set status = $2 where id = $1")
         .bind(id)
         .bind(if accept { "accepted" } else { "declined" })

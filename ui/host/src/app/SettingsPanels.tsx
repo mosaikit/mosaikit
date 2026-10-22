@@ -25,6 +25,7 @@ import { useApi, useTenantCtx } from './core.ts'
 import { useTenantSignIn } from './signin.ts'
 import { LANGS, t } from './i18n.ts'
 import { ErrorBox, Loading, Locked, SaveBar } from './kit.tsx'
+import { QuotasLocked } from './Quotas.tsx'
 
 const enc = encodeURIComponent
 
@@ -613,6 +614,7 @@ export function ManagedPanel({ slug }: { slug: string }) {
           hint={method === 'oidc' ? t('People and passwords come from the provider: the Tenant Manager does not create local accounts.') : t('Or an identity provider (OIDC), never both.')}
         />
         <Locked label={t('Top bar')} value={t('{n} of 5 items shown', { n: bandOn })} hint={t('The same for every tenant.')} />
+        <QuotasLocked slug={slug} />
         {locked.map((s) => (
           <Locked key={s.key} label={L[s.key]?.[0] ?? s.key} value={show(s.value)} hint={t('Tenants may not customize it.')} />
         ))}

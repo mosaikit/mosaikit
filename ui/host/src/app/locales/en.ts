@@ -13,6 +13,7 @@ export const EN: Record<string, string> = {
   '{count} selected_other': '{count} selected',
   'errors.server_unavailable': 'The server is not responding. Trying again…',
   'errors.unexpected': 'Something went wrong. Try again.',
+  'errors.quota_exceeded': 'The tenant has reached one of its quotas: nothing more can be added. The Tenant Manager sees the usage in Usage.',
   'errors.plugin_off': 'This plugin is not turned on in the tenant',
   'errors.plugin_unavailable': 'The Administrator has not made this plugin available to the tenant',
   'errors.base_off': 'Turn on first the plugin it extends',
