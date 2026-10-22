@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/
 import { toast } from 'sonner'
 import { api, ApiError, errText, isUnavailable, setCsrf } from '../api.ts'
 import { retryDelay } from '../brand.ts'
-import type { Session, TenantContext } from '../types.ts'
+import type { Config, Session, TenantContext } from '../types.ts'
 export { useConfirm } from './confirm.ts'
 
 /** The session: `null` if nobody signed in. */
@@ -41,6 +41,20 @@ export function useTenantCtx(slug: string) {
     queryFn: () => api<TenantContext>('GET', `/api/t/${encodeURIComponent(slug)}/context`),
     enabled: !!slug,
   })
+}
+
+/** The settings in use where one is: the tenant of the address, otherwise the home tenant of the person
+ *  (the platform's for the Administrator). */
+export function useConfig(slug?: string): Config {
+  const s = useSession().data
+  const ctx = useTenantCtx(slug ?? '')
+  return (slug ? ctx.data?.config : undefined) ?? s?.config ?? {}
+}
+
+/** The minimum length of passwords in use (for the hints next to the fields). */
+export function passwordMin(c: Config): number {
+  const n = Number(c['security.password_min'])
+  return Number.isFinite(n) && n >= 10 ? n : 10
 }
 
 export function useApi<T>(key: QueryKey, path: string | null) {

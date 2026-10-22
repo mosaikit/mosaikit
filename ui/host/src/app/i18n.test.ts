@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { api, ApiError, errText, isUnavailable } from '../api.ts'
-import { setLang, t } from './i18n.ts'
+import { fmtNumber, lang, setLang, setLanguageContext, t } from './i18n.ts'
 
 describe('i18n', () => {
   it('without a translation the English phrase stays, with its placeholders', () => {
@@ -69,3 +69,33 @@ describe('api errors', () => {
     expect(errText(await failure())).toBe('You are not allowed to do this')
   })
 })
+
+describe('languages of the platform or of the tenant', () => {
+  afterEach(() => {
+    localStorage.clear()
+    setLanguageContext({})
+    setLang('en')
+  })
+  it('a choice of the person stays while the language is offered', () => {
+    setLang('it')
+    setLanguageContext({ enabled: ['en', 'it'], language: 'en' })
+    expect(lang()).toBe('it')
+    // no longer offered: the first one offered
+    setLanguageContext({ enabled: ['en'] })
+    expect(lang()).toBe('en')
+  })
+  it('without a choice, the default language of the place', () => {
+    localStorage.clear()
+    setLanguageContext({ enabled: ['en', 'it'], language: 'it' })
+    expect(lang()).toBe('it')
+    expect(t('Sign in')).toBe('Accedi')
+  })
+  it('the format of numbers can differ from the language', () => {
+    setLang('en')
+    setLanguageContext({ locale: 'it-IT' })
+    expect(fmtNumber(1234567.5)).toBe('1.234.567,5')
+    setLanguageContext({ locale: 'auto' })
+    expect(fmtNumber(1234567.5)).toBe('1,234,567.5')
+  })
+})
+

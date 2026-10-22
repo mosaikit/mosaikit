@@ -30,15 +30,14 @@ pub fn cookie(parts: &Parts, name: &str) -> Option<String> {
         .map(|(_, v)| v.to_string())
 }
 
-/// `Set-Cookie` of the session (empty + expired for the logout).
-pub fn session_cookie(state: &AppState, token: Option<&str>) -> HeaderValue {
+/// `Set-Cookie` of the session, token and lifetime in seconds (empty + expired for the logout).
+pub fn session_cookie(state: &AppState, token: Option<(&str, i64)>) -> HeaderValue {
     let secure = if state.k.cfg.cookie_secure() { "; Secure" } else { "" };
     let path = format!("{}/", state.k.cfg.base_path);
     let v = match token {
-        Some(t) => format!(
-            "{SESSION_COOKIE}={t}; HttpOnly; SameSite=Strict; Path={path}; Max-Age={}{secure}",
-            state.k.cfg.session_ttl_hours * 3600
-        ),
+        Some((t, max_age)) => {
+            format!("{SESSION_COOKIE}={t}; HttpOnly; SameSite=Strict; Path={path}; Max-Age={max_age}{secure}")
+        }
         None => format!("{SESSION_COOKIE}=; HttpOnly; SameSite=Strict; Path={path}; Max-Age=0{secure}"),
     };
     HeaderValue::from_str(&v).expect("valid cookie")

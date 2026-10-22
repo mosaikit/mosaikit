@@ -64,7 +64,7 @@ import { cn } from '@/lib/utils'
 import AppIcon from './AppIcon.tsx'
 import SearchBox, { type SearchGroup } from './SearchBox.tsx'
 import { initials, useTenantCtx } from './core.ts'
-import { LANGS, setLang, t, useLang, type Lang } from './i18n.ts'
+import { setLang, t, useLang, useLanguages, type Lang } from './i18n.ts'
 import { NotificationsBell } from './notifications.tsx'
 import { useNotes } from './notes.ts'
 import { bandOf, sidebarOpen } from './prefs.ts'
@@ -77,8 +77,11 @@ import { effectiveMode, setTheme, useTheme, type Mode } from './theme.ts'
 export function AppMark({ className, variant }: { className?: string; variant?: MarkVariant }) {
   const brand = useBrand()
   const th = useTheme()
-  if (brand.logo) return <img src="brand/logo" alt="" className={cn('size-7 object-contain', className)} />
   const v = variant ?? (effectiveMode(th) === 'dark' ? 'negative' : 'positive')
+  // the logo of the platform (System › Identity and texts, or brand.toml): the one for dark backgrounds on
+  // the bar and on the sign-in panel, if there is one
+  if (v === 'negative' && brand.logo_dark) return <img src="brand/logo-dark" alt="" className={cn('size-7 object-contain', className)} />
+  if (brand.logo) return <img src="brand/logo" alt="" className={cn('size-7 object-contain', className)} />
   return <span aria-hidden="true" className={cn('block size-7 shrink-0 [&>svg]:size-full', className)} dangerouslySetInnerHTML={{ __html: markSvg(v) }} />
 }
 
@@ -231,6 +234,7 @@ function AppSidebar({ session, route, band }: { session: Session; route: Route; 
  *  works on the platform: a fixed badge says so, without a menu. */
 function TenantSwitcher({ session, route, variant = 'band' }: { session: Session; route: Route; variant?: 'band' | 'sidebar' }) {
   const band = variant === 'band'
+  const ctx = useTenantCtx(route.area === 'tenant' && !session.user.is_system_admin ? route.tenant : '')
   if (session.user.is_system_admin)
     return (
       <span
@@ -242,7 +246,12 @@ function TenantSwitcher({ session, route, variant = 'band' }: { session: Session
       </span>
     )
   const slug = route.area === 'tenant' ? route.tenant : ''
-  const cur = session.memberships.find((m) => m.slug === slug)
+  const member = session.memberships.find((m) => m.slug === slug)
+  // the identity of the tenant (Tenant settings › Identity and texts): its name and logo
+  const ctxName = ctx.data?.config?.['identity.name']
+  const cur = member && { ...member, name: typeof ctxName === 'string' && ctxName ? ctxName : member.name }
+  const logo = ctx.data?.config?.['identity.logo_dark'] ? 'logo_dark' : ctx.data?.config?.['identity.logo_light'] ? 'logo_light' : null
+  const badge = (name: string) => (logo && slug ? <img src={`api/auth/tenants/${encodeURIComponent(slug)}/logo/${logo}`} alt="" className="size-6 shrink-0 object-contain" /> : <TenantBadge name={name} />)
   const home = session.memberships.filter((m) => m.is_home)
   const guest = session.memberships.filter((m) => !m.is_home)
   const item = (m: (typeof session.memberships)[number]) => (
@@ -258,7 +267,7 @@ function TenantSwitcher({ session, route, variant = 'band' }: { session: Session
   if (session.memberships.length <= 1)
     return (
       <span className={cn('flex h-9 min-w-0 items-center gap-2 px-2 text-sm font-semibold', band ? 'text-band-foreground' : 'w-full')}>
-        <TenantBadge name={cur?.name ?? '?'} />
+        {badge(cur?.name ?? '?')}
         <span className={cn('truncate', band ? 'max-w-44' : 'flex-1')}>{cur?.name ?? 'Tenant'}</span>
       </span>
     )
@@ -271,7 +280,7 @@ function TenantSwitcher({ session, route, variant = 'band' }: { session: Session
         )}
         aria-label={t('Tenant: {name}. Switch tenant', { name: cur?.name ?? '' })}
       >
-        <TenantBadge name={cur?.name ?? '?'} />
+        {badge(cur?.name ?? '?')}
         <span className={cn('truncate', band ? 'max-w-44' : 'flex-1 text-left')}>{cur?.name ?? 'Tenant'}</span>
         <ChevronDown className="size-4 opacity-70" />
       </DropdownMenuTrigger>
@@ -328,9 +337,12 @@ function ModeMenu({ route }: { route: Route }) {
   )
 }
 
+/** The languages offered here (Languages and formats); with only one there is nothing to choose. */
 function LanguageMenu() {
   const lang = useLang()
-  const name = LANGS.find((l) => l.id === lang)?.name ?? lang
+  const langs = useLanguages()
+  const name = langs.find((l) => l.id === lang)?.name ?? lang
+  if (langs.length < 2) return null
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className={cn(bandIcon, 'font-mono text-xs font-semibold')} aria-label={`${lang.toUpperCase()} · ${t('Language: {name}', { name })}`} title={t('Language: {name}', { name })}>
@@ -339,7 +351,7 @@ function LanguageMenu() {
       <DropdownMenuContent align="end" className="w-48">
         <DropdownMenuLabel className="text-xs uppercase text-muted-foreground">{t('Language')}</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={lang} onValueChange={(v) => setLang(v as Lang)}>
-          {LANGS.map((l) => (
+          {langs.map((l) => (
             <DropdownMenuRadioItem key={l.id} value={l.id}>
               {l.name}
             </DropdownMenuRadioItem>

@@ -1,7 +1,8 @@
 // Theme of the shell: preset (set of CSS variables in index.css) and mode (light, dark, automatic).
 // The preset is not a personal choice: the Tenant Manager decides it for the tenant, or the Administrator
 // for the platform (and for the tenants that do not choose one), and it comes from the server. The browser
-// remembers the last one used only for the sign-in page. The mode is everyone's own.
+// remembers the last one used only for the sign-in page. The mode is everyone's own; without a choice
+// the default of the platform or of the tenant applies (Theme and mode).
 
 import { useSyncExternalStore } from 'react'
 
@@ -14,9 +15,23 @@ export const PRESETS = [
 export type PresetId = (typeof PRESETS)[number]['id']
 
 const KEY = 'msk_theme'
+/** the mode chosen by the person (absent: the default of the place) */
+const MODE_KEY = 'msk_mode'
 interface Theme {
   preset: PresetId
   mode: Mode
+}
+
+function chosenMode(): Mode | null {
+  try {
+    const m = localStorage.getItem(MODE_KEY)
+    if (m === 'light' || m === 'dark' || m === 'auto') return m
+    // before: the mode was saved with the preset
+    const old = (JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Theme>).mode
+    return old === 'light' || old === 'dark' ? old : null
+  } catch {
+    return null
+  }
 }
 
 function read(): Theme {
@@ -24,7 +39,7 @@ function read(): Theme {
     const t = JSON.parse(localStorage.getItem(KEY) ?? '{}') as Partial<Theme>
     return {
       preset: PRESETS.some((p) => p.id === t.preset) ? (t.preset as PresetId) : 'mosaikit',
-      mode: t.mode === 'light' || t.mode === 'dark' ? t.mode : 'auto',
+      mode: chosenMode() ?? 'auto',
     }
   } catch {
     return { preset: 'mosaikit', mode: 'auto' }
@@ -50,7 +65,19 @@ export function effectiveMode(t: Theme = current): 'light' | 'dark' {
 
 /** The mode chosen by the person. */
 export function setTheme(t: Partial<Pick<Theme, 'mode'>>) {
+  if (t.mode)
+    try {
+      localStorage.setItem(MODE_KEY, t.mode)
+    } catch {
+      /* storage not available */
+    }
   update(t)
+}
+
+/** The default mode of the platform or of the tenant, for whoever did not choose one. */
+export function setDefaultMode(m: string | undefined) {
+  if (chosenMode() || (m !== 'light' && m !== 'dark' && m !== 'auto') || m === current.mode) return
+  update({ mode: m })
 }
 
 /** The preset in use, from what the server says (tenant or platform); unknown: the base one. */

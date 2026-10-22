@@ -6,7 +6,7 @@
 //!   users (always with CSP `sandbox`), public links.
 
 pub mod admin;
-mod api;
+pub(crate) mod api;
 mod auth;
 mod pages;
 mod ui;

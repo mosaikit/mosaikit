@@ -3,7 +3,8 @@
 // Users: tenant from a menu (hidden if there is only one, preselected by #/login/<tenant>) and credentials
 // of the tenant. Administrators (#/admin): local password, then the TOTP second factor or, at the first
 // sign-in, the registration of the app and the recovery codes.
-// The page takes the theme of the platform, and the one of the tenant as soon as the tenant is known.
+// The page takes the theme, the identity (name, logo, welcome, legal notes) and the languages of the
+// platform, and the ones of the tenant as soon as the tenant is known.
 // While the server does not answer it says so and tries again, never "no tenant".
 
 import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
@@ -13,13 +14,14 @@ import { api, errText, isUnavailable, setCsrf } from '../api.ts'
 import { retryDelay, useBrandState } from '../brand.ts'
 import type { LoginTenant, PendingLogin, Session, TotpSetup } from '../types.ts'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { LANGS, setLang, t, useLang, type Lang } from './i18n.ts'
+import { setLanguageContext, setLang, t, useLang, useLanguages, type Lang } from './i18n.ts'
 import { go, to } from './router.ts'
 import { AppMark } from './Shell.tsx'
-import { setPreset, setTheme, useTheme, type Mode } from './theme.ts'
+import { setDefaultMode, setPreset, setTheme, useTheme, type Mode } from './theme.ts'
 
 const LAST = 'msk_last_login_tenant'
 
@@ -70,6 +72,18 @@ export default function Login({ door, tenant }: { door: 'tenant' | 'admin'; tena
   const qc = useQueryClient()
   useLang() // the texts follow the chosen language
   const admin = door === 'admin'
+  // the tenant chosen on the page: its identity and languages, otherwise the platform's
+  const [picked, setPicked] = useState<LoginTenant | null>(null)
+  const tn = admin ? null : picked
+  const langs = JSON.stringify(tn?.languages ?? brand.languages ?? null)
+  const language = tn?.language ?? brand.language
+  useEffect(() => {
+    setLanguageContext({ enabled: (JSON.parse(langs) as string[] | null) ?? undefined, language, locale: brand.locale })
+  }, [langs, language, brand.locale])
+  useEffect(() => setDefaultMode(brand.mode), [brand.mode])
+  const privacy = tn?.privacy_url || brand.privacy_url
+  const legal = tn?.legal_url || brand.legal_url
+  const footer = tn?.footer || brand.footer
   const enter = (s: Session) => {
     setCsrf(s.csrf)
     qc.setQueryData(['session'], s)
@@ -78,7 +92,7 @@ export default function Login({ door, tenant }: { door: 'tenant' | 'admin'; tena
   }
   return (
     <div className="grid min-h-full bg-background lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
-      <Hero admin={admin} name={brand.name} tagline={brand.tagline} version={brand.version} />
+      <Hero admin={admin} name={tn?.name ?? brand.name} product={brand.name} tagline={brand.tagline} welcome={tn?.welcome || brand.welcome} version={brand.version} logo={tn && (tn.logo_dark || tn.logo_light) ? `api/auth/tenants/${encodeURIComponent(tn.slug)}/logo/${tn.logo_dark ? 'logo_dark' : 'logo_light'}` : undefined} />
       <section className="flex min-h-full flex-col">
         <div className="flex items-center justify-end gap-1 p-4">
           <LanguageSelect />
@@ -103,18 +117,31 @@ export default function Login({ door, tenant }: { door: 'tenant' | 'admin'; tena
                 <Waiting unavailable={status === 'unavailable'} />
               )
             ) : (
-              <TenantDoor initial={tenant ?? remembered()} platformTheme={brand.theme} onEnter={enter} />
+              <TenantDoor initial={tenant ?? remembered()} platformTheme={brand.theme} onEnter={enter} onPick={setPicked} />
             )}
             {brand.login_message && <p className="mt-6 border-l-2 border-primary pl-3 text-sm">{brand.login_message}</p>}
           </div>
         </main>
         <footer className="flex flex-wrap items-center justify-end gap-3 border-t px-6 py-4 text-xs text-muted-foreground">
+          {footer && <span className="mr-auto">{footer}</span>}
           <nav className="flex gap-4" aria-label={t('Legal notes')}>
-            {['Accessibility', 'Privacy', 'Legal notes'].map((x) => (
-              <a key={x} href="#/" onClick={(e) => e.preventDefault()} className="underline-offset-4 hover:text-foreground hover:underline">
-                {t(x)}
-              </a>
-            ))}
+            {(
+              [
+                ['Accessibility', ''],
+                ['Privacy', privacy ?? ''],
+                ['Legal notes', legal ?? ''],
+              ] as [string, string][]
+            ).map(([x, url]) =>
+              url ? (
+                <a key={x} href={url} target="_blank" rel="noreferrer" className="underline-offset-4 hover:text-foreground hover:underline">
+                  {t(x)}
+                </a>
+              ) : (
+                <a key={x} href="#/" onClick={(e) => e.preventDefault()} className="underline-offset-4 hover:text-foreground hover:underline">
+                  {t(x)}
+                </a>
+              ),
+            )}
           </nav>
         </footer>
       </section>
@@ -133,7 +160,7 @@ function mosaic(seed: number) {
 }
 
 /** The brand panel: colours of the band of the theme and a mosaic of tiles that moves slowly. */
-function Hero({ admin, name, tagline, version }: { admin: boolean; name: string; tagline: string; version: string }) {
+function Hero({ admin, name, product, tagline, welcome, version, logo }: { admin: boolean; name: string; product: string; tagline: string; welcome?: string; version: string; logo?: string }) {
   const tiles = useMemo(() => mosaic(admin ? 7 : 3), [admin])
   const features = admin
     ? ['Tenants, users and managers', 'Signed plugins, catalog and KPIs', 'Second factor at every sign-in']
@@ -157,7 +184,7 @@ function Hero({ admin, name, tagline, version }: { admin: boolean; name: string;
       </div>
       <div className="relative flex h-full min-h-[640px] flex-col justify-between p-12">
         <div className="flex items-center gap-3">
-          <AppMark variant="negative" className="size-12" />
+          {logo ? <img src={logo} alt="" className="size-12 object-contain" /> : <AppMark variant="negative" className="size-12" />}
           <div>
             <b className="block text-xl">{name}</b>
             <span className="text-sm text-band-muted">{admin ? t('Platform') : tagline || t('Workspace')}</span>
@@ -166,7 +193,7 @@ function Hero({ admin, name, tagline, version }: { admin: boolean; name: string;
         <div className="max-w-md">
           <h2 className="text-4xl leading-tight font-bold">{admin ? t('The platform, in one place') : t('Your work, in one place')}</h2>
           <p className="mt-4 text-lg text-band-muted">
-            {admin ? t('Tenants, plugins and administrators: the whole platform from here.') : t('The apps of your tenant, for the people who work in it every day.')}
+            {admin ? t('Tenants, plugins and administrators: the whole platform from here.') : welcome || t('The apps of your tenant, for the people who work in it every day.')}
           </p>
           <ul className="mt-8 grid gap-3">
             {features.map((f) => (
@@ -180,7 +207,7 @@ function Hero({ admin, name, tagline, version }: { admin: boolean; name: string;
           </ul>
         </div>
         {/* on the same line as the legal links on the right: as tall as that footer */}
-        <p className="absolute bottom-0 left-12 flex h-12 items-center text-xs text-band-muted">{version && `${name} ${version}`}</p>
+        <p className="absolute bottom-0 left-12 flex h-12 items-center text-xs text-band-muted">{version && `${product} ${version}`}</p>
         <span aria-hidden="true" />
       </div>
     </section>
@@ -189,6 +216,8 @@ function Hero({ admin, name, tagline, version }: { admin: boolean; name: string;
 
 function LanguageSelect() {
   const lang = useLang()
+  const langs = useLanguages()
+  if (langs.length < 2) return null
   return (
     <Select value={lang} onValueChange={(v) => setLang(v as Lang)}>
       <SelectTrigger size="sm" className="w-auto gap-2 border-0 shadow-none hover:bg-accent" aria-label={t('Language')}>
@@ -196,7 +225,7 @@ function LanguageSelect() {
         <SelectValue />
       </SelectTrigger>
       <SelectContent align="end">
-        {LANGS.map((l) => (
+        {langs.map((l) => (
           <SelectItem key={l.id} value={l.id}>
             {l.name}
           </SelectItem>
@@ -257,7 +286,7 @@ function Title({ icon, title, sub }: { icon?: ReactNode; title: string; sub: Rea
   )
 }
 
-function TenantDoor({ initial, platformTheme, onEnter }: { initial: string; platformTheme?: string; onEnter: (s: Session) => void }) {
+function TenantDoor({ initial, platformTheme, onEnter, onPick }: { initial: string; platformTheme?: string; onEnter: (s: Session) => void; onPick: (t: LoginTenant | null) => void }) {
   const [tenants, setTenants] = useState<LoginTenant[] | null>(null)
   const [unavailable, setUnavailable] = useState(false)
   const [tenant, setTenant] = useState('')
@@ -265,6 +294,7 @@ function TenantDoor({ initial, platformTheme, onEnter }: { initial: string; plat
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [remember, setRemember] = useState(false)
 
   useEffect(() => {
     let live = true
@@ -297,8 +327,10 @@ function TenantDoor({ initial, platformTheme, onEnter }: { initial: string; plat
   }, [initial])
 
   // the theme of the tenant as soon as it is known (address, only tenant, choice), else the platform's
-  const tenantTheme = tenants?.find((x) => x.slug === tenant)?.theme
+  const picked = tenants?.find((x) => x.slug === tenant) ?? null
+  const tenantTheme = picked?.theme
   useEffect(() => setPreset(tenantTheme ?? platformTheme), [tenantTheme, platformTheme])
+  useEffect(() => onPick(picked), [picked, onPick])
 
   async function submit(e: FormEvent) {
     e.preventDefault()
@@ -306,7 +338,7 @@ function TenantDoor({ initial, platformTheme, onEnter }: { initial: string; plat
     if (!tenant) return setError(t('Choose your tenant'))
     setBusy(true)
     try {
-      const s = await api<Session>('POST', '/api/auth/login', { tenant, username, password })
+      const s = await api<Session>('POST', '/api/auth/login', { tenant, username, password, remember: remember && !!picked?.remember })
       try {
         localStorage.setItem(LAST, tenant)
       } catch {
@@ -382,6 +414,12 @@ function TenantDoor({ initial, platformTheme, onEnter }: { initial: string; plat
           <Field id="lp" label={t('Password')}>
             <Input id="lp" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
           </Field>
+          {picked?.remember && (
+            <label className="-mt-1 flex items-center gap-2 text-sm">
+              <Checkbox checked={remember} onCheckedChange={(on) => setRemember(on === true)} />
+              {t('Remember me on this device')}
+            </label>
+          )}
           <Button type="submit" size="lg" disabled={busy}>
             {busy && <Loader2 className="animate-spin" />}
             {t('Sign in')}

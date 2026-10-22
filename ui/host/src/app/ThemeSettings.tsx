@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { cn } from '@/lib/utils'
 import { useAction, useTenantCtx } from './core.ts'
-import { Loading } from './kit.tsx'
+import { Loading, Locked } from './kit.tsx'
 import { PRESETS } from './theme.ts'
 import { t } from './i18n.ts'
 
@@ -95,6 +95,8 @@ export function TenantTheme({ slug }: { slug: string }) {
   })
   if (ctx.isLoading) return <Loading />
   const th = ctx.data?.theme ?? { platform: 'mosaikit', tenant: null, preset: 'mosaikit' }
+  // the Administrator turned off "tenants may customize it": the theme of the platform, with the padlock
+  if (th.locked) return <Locked label={t('Theme of the tenant')} value={nameOf(th.preset)} hint={t('Tenants may not customize it.')} />
   const own = th.tenant !== null
   return (
     <Card className="max-w-3xl">

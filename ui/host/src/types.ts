@@ -34,6 +34,45 @@ export interface Session {
   band?: ShellBand
   /** theme of the platform, chosen by the Administrator (recent servers) */
   theme?: string
+  /** settings in use for the home tenant of the person (the platform's for the Administrator) */
+  config?: Config
+}
+
+/** Values in use of the settings on three levels, by key (`security.password_min`, `lang.enabled`...). */
+export type Config = Record<string, unknown>
+
+/** A setting on three levels (docs/refactoring-ui.md §5), as the server describes it. */
+export interface Setting {
+  key: string
+  kind: 'managed' | 'limit' | 'custom'
+  /** settings with a limit: how the tenant may only be stricter */
+  rule?: 'min' | 'max' | 'subset'
+  scope: 'both' | 'platform' | 'tenant'
+  /** value of the platform (its own or the default) */
+  platform: unknown
+  /** value the tenant set (tenant view) */
+  tenant?: unknown
+  /** value in use */
+  value: unknown
+  source: 'default' | 'platform' | 'tenant'
+  /** tenants may customize it */
+  customizable: boolean
+  /** the tenant cannot change it */
+  locked: boolean
+  /** without a value of its own the tenant uses the platform's (false: a default of the tenant) */
+  inherits: boolean
+}
+
+/** A key of an outside service: never the value, only its last four characters (or the address). */
+export interface ServiceKey {
+  service: string
+  group: 'ai' | 'msg' | 'doc'
+  address: boolean
+  set: boolean
+  hint?: string
+  shared: boolean
+  updated_at?: string
+  in_use: 'own' | 'tenant' | 'platform' | 'none'
 }
 
 /** The theme of a tenant: the one of the platform and, if any, the one chosen by the Tenant Manager. */
@@ -42,6 +81,8 @@ export interface ThemeChoice {
   tenant: string | null
   /** the one in use */
   preset: string
+  /** the Administrator turned off "tenants may customize it" (recent servers) */
+  locked?: boolean
 }
 
 /** Items of the top bar: when off, they show for nobody. */
@@ -77,6 +118,8 @@ export interface TenantContext {
   prefs: { hidden?: string[] }
   /** recent servers */
   theme?: ThemeChoice
+  /** settings in use in the tenant (recent servers) */
+  config?: Config
 }
 
 export interface Principal {
@@ -283,6 +326,18 @@ export interface LoginTenant {
   auth: 'local'
   /** theme in use for the tenant: its own or the one of the platform (recent servers) */
   theme?: string
+  /** identity of the tenant on its sign-in page (recent servers) */
+  logo_light?: boolean
+  logo_dark?: boolean
+  welcome?: string
+  footer?: string
+  privacy_url?: string
+  legal_url?: string
+  /** languages of the tenant and the default one ("auto": the one of the browser) */
+  languages?: string[]
+  language?: string
+  /** "remember me" is allowed */
+  remember?: boolean
 }
 
 /** answer of the administrator sign-in waiting for the second factor */

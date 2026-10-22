@@ -61,7 +61,25 @@ fn branded(b: &mosaikit_kernel::brand::Brand, app_url: &str, html: String) -> St
 /// Mosaikit symbol, embedded from the source: it does not depend on the compiled UI.
 const DEFAULT_ICON: &str = include_str!("../../../ui/host/public/favicon.svg");
 
-fn brand_file(s: &AppState, which: &str) -> Response {
+/// Images of the identity of the platform set by the Administrator (System › Identity and texts) come
+/// first; then the files of the brand; then the Mosaikit symbol. `logo-dark` is the logo for dark
+/// backgrounds (404 without one: the light logo is used).
+async fn brand_file(s: &AppState, which: &str) -> Response {
+    use mosaikit_kernel::tenancy::levels;
+    let slot = match which {
+        "logo" => Some("logo_light"),
+        "logo-dark" => Some("logo_dark"),
+        "favicon" | "icon" => Some("icon"),
+        _ => None,
+    };
+    if let Some(slot) = slot {
+        if let Ok(Some((data, mime))) = levels::image(&s.k, None, slot).await {
+            return crate::api::image_response(data, &mime);
+        }
+    }
+    if which == "logo-dark" {
+        return StatusCode::NOT_FOUND.into_response();
+    }
     let (data, name) = match s.k.brand.file(which).and_then(|p| std::fs::read(&p).ok().map(|d| (d, p))) {
         Some((d, p)) => (d, p.to_string_lossy().into_owned()),
         None => match which {
@@ -93,7 +111,7 @@ async fn serve(State(s): State<AppState>, method: Method, uri: Uri) -> Response 
         return StatusCode::NOT_FOUND.into_response();
     }
     if let Some(which) = path.strip_prefix("brand/") {
-        return brand_file(&s, which);
+        return brand_file(&s, which).await;
     }
     if !path.is_empty() && path != "index.html" {
         if let Some(f) = HostUi::get(path) {

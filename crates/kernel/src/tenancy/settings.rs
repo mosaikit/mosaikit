@@ -143,13 +143,15 @@ pub struct ThemeChoice {
     pub tenant: Option<String>,
     /// the one in use
     pub preset: String,
+    /// the tenant cannot choose (the Administrator turned off "tenants may customize it")
+    pub locked: bool,
 }
 
 pub(super) fn theme_in(s: &Value) -> Option<String> {
     s.get("theme").and_then(Value::as_str).map(str::to_owned)
 }
 
-fn check_theme(preset: &str) -> Result<()> {
+pub(super) fn check_theme(preset: &str) -> Result<()> {
     let ok = !preset.is_empty()
         && preset.len() <= 32
         && preset.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
@@ -165,11 +167,23 @@ pub async fn platform_theme(k: &Kernel) -> Result<String> {
     Ok(theme_in(&system_settings(k).await?).unwrap_or_else(|| DEFAULT_THEME.into()))
 }
 
-/// The theme of a tenant, with the one of the platform it inherits from.
+/// The theme of a tenant, with the one of the platform it inherits from. With "tenants may customize
+/// it" off (settings on three levels) the platform's is in use.
 pub async fn tenant_theme(k: &Kernel, tenant: uuid::Uuid) -> Result<ThemeChoice> {
-    let platform = platform_theme(k).await?;
+    let system = system_settings(k).await?;
+    let platform = theme_in(&system).unwrap_or_else(|| DEFAULT_THEME.into());
     let own = theme_in(&settings_of(k, tenant).await?);
-    Ok(ThemeChoice { preset: own.clone().unwrap_or_else(|| platform.clone()), platform, tenant: own })
+    let preset = if theme_locked(&system) {
+        platform.clone()
+    } else {
+        own.clone().unwrap_or_else(|| platform.clone())
+    };
+    Ok(ThemeChoice { preset, platform, tenant: own, locked: theme_locked(&system) })
+}
+
+/// The Administrator turned off "tenants may customize it" for the theme.
+pub(super) fn theme_locked(system: &Value) -> bool {
+    system.pointer("/cust/theme").and_then(Value::as_bool) == Some(false)
 }
 
 pub async fn set_platform_theme(k: &Kernel, admin: &SessionUser, preset: &str) -> Result<()> {
@@ -189,6 +203,9 @@ pub async fn set_platform_theme(k: &Kernel, admin: &SessionUser, preset: &str) -
 /// The Tenant Manager chooses the theme of the tenant; `None` goes back to the one of the platform.
 pub async fn set_tenant_theme(k: &Kernel, c: &Caller, preset: Option<&str>) -> Result<()> {
     c.require_manager()?;
+    if theme_locked(&system_settings(k).await?) {
+        return Err(Error::forbidden("managed by the Administrator").with_code("setting_locked"));
+    }
     let mut s = settings_of(k, c.tenant.tenant_id).await?;
     match preset {
         Some(p) => {

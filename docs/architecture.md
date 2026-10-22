@@ -115,11 +115,12 @@ The same user can be User in a tenant and Tenant Manager in another one.
   (`totp_last_step`). Once the second factor is done the token is renewed.
   Emergency access from the machine: `reset-password --user` and `reset-totp`.
 - **Sign-in page of the users.** Drop-down menu of the active tenants
-  (`GET /api/auth/tenants`: only slug, name, sign-in method and theme in use), hidden if
-  there is only one tenant; `#/login/<tenant>` preselects it. The form of the tenants
-  refuses the system tenant. The page takes the theme of the platform (`GET /api/brand`, public:
-  brand, theme and top bar of the platform) and, as soon as the tenant is known (address, only
-  tenant, choice), the theme of that tenant.
+  (`GET /api/auth/tenants`: slug, name, sign-in method, theme in use, logos, texts of the sign-in
+  page, languages and whether «remember me» is allowed), hidden if there is only one tenant;
+  `#/login/<tenant>` preselects it. The form of the tenants refuses the system tenant. The page
+  takes the identity, theme, languages and top bar of the platform (`GET /api/brand`, public) and,
+  as soon as the tenant is known (address, only tenant, choice), the ones of that tenant
+  (logos: `GET /api/auth/tenants/<slug>/logo/<logo_light|logo_dark>`).
 - **No tenant without a manager.** At least one active Tenant Manager always stays
   per tenant: even when a user is disabled from their home
   tenant, if they are the only manager of another tenant the operation is
@@ -146,6 +147,48 @@ The same user can be User in a tenant and Tenant Manager in another one.
   - for the Administrator, who has no active tenant, an overview of their own
     (`GET /api/admin/overview`): the aggregates of the system (tenants, users,
     Administrators, resources, space, plugins, active users).
+
+### 3.1 Settings on three levels
+
+The platform (the settings of the `system` tenant) sets a value for everybody; a tenant may change it
+within what the platform allows ([refactoring-ui.md](refactoring-ui.md) §5,
+`crates/kernel/src/tenancy/levels.rs`). Every setting has a kind:
+
+| Kind | Settings | The tenant |
+|---|---|---|
+| managed | top bar, sign-in method | sees it with a padlock |
+| with a limit | `security.password_min` (min), `security.lock_attempts`, `security.session_hours`, `security.remember_days` (max), `security.lock_minutes` (min), `lang.enabled`, `embed.sites` (subset) | may only be stricter; the stricter value is always in use, also when the platform changes later |
+| customizable | `identity.*` (name, logos, welcome text, footer, privacy and legal links, landing page), `theme`, `appearance.mode`, `lang.default`, `format.locale` | replaces the value of the platform and can restore it, unless the Administrator turned off «tenants may customize it» (`cust` in the settings of the platform) |
+
+Name and logos of a tenant are its own (without them: the tenant name and its initials); the other
+customizable values are inherited. Values live in `core.tenants.settings` under `cfg` (the theme
+and the top bar keep `theme` and `band`); a change is logged (`platform.settings`,
+`tenant.config`), never with secret values. APIs: `GET/PUT /api/admin/settings` (values and
+`customizable` switches), `GET/PUT /api/t/<t>/manage/config`; the values in use go to the shell in
+`/api/session` (home tenant, or platform) and `/api/t/<t>/context` (`config`).
+
+The kernel enforces them: the minimum length of passwords of the home tenant of the account
+(never below `MIN_PASSWORD_LEN`, 10) when an account is created and when a password changes; the
+lock after the failed attempts of the tenant (the address follows the platform's); the length of the
+session and, with «remember me», of the days the tenant allows (`max_age` of the cookie).
+
+**Images of the identity** (logos for light and dark backgrounds, browser icon of the platform):
+`PUT/DELETE /api/admin/identity/<slot>` and `/api/t/<t>/manage/identity/<slot>`, the type comes from
+the bytes (SVG, PNG, WebP; ICO for the icon), at most 512 KB; an SVG with scripts, event handlers,
+embedded documents or external references is refused, and every image is served with
+`Content-Security-Policy: … sandbox` and `nosniff`. Files: `<data_dir>/blobs/identity/<platform|tenant>/`.
+The logos of the platform take the place of the brand (`/brand/logo`, `/brand/logo-dark`,
+`/brand/favicon`).
+
+**Keys of outside services** (AI providers, text messages, push, translation, document recognition)
+at three levels, `core.service_keys`: whoever has a key of their own uses it; otherwise the tenant's
+if shared (not shared: only its Tenant Managers); otherwise the platform's if shared. The value is
+encrypted with ChaCha20-Poly1305 by the kernel (`crates/kernel/src/secret.rs`), bound to its place
+(associated data: scope, owner, service), with the key of the installation (`secret_key`, §10): the
+database alone does not reveal it. It never goes back to the browser: the pages see the last four
+characters (the address of a self-hosted model shows whole). APIs: `/api/admin/keys`,
+`/api/t/<t>/manage/keys`, `/api/t/<t>/me/keys` (`PUT` with `value` and/or `shared`, `DELETE`);
+the kernel reads the key in use with `keys::key_in_use`.
 
 ## 4. Resources, ownership and sharing
 
@@ -561,8 +604,12 @@ are limited to the path.
 - **User contents** (static sites, previews): always with
   `Content-Security-Policy: sandbox …` without `allow-same-origin` (opaque
   origin), `nosniff`, `Referrer-Policy: no-referrer`.
-- **Passwords**: argon2id, at least 10 characters. Sign-in with a limit of 8 failed attempts in 15
-  minutes per user/IP.
+- **Passwords**: argon2id, at least 10 characters (the platform and the tenants may ask for more,
+  §3.1). Sign-in with a limit of failed attempts per account and per address (default 8 in 15
+  minutes, settings of the platform and of the tenant).
+- **Embedding**: the host UI is never embedded (`frame-ancestors 'none'`); the public pages of a
+  tenant (public links) may be embedded only by the sites in `embed.sites` of the tenant, a subset
+  of the platform's (`frame-ancestors <sites>`, otherwise `'none'`).
 - In production the two origins are two hostnames behind the reverse proxy
   (e.g. `app.example.com` and `plugins.example.com`), with HTTPS.
 - **Social preview**: the server writes `og:image`, `twitter:image` and `og:url` of the page as
@@ -594,6 +641,8 @@ backend = "sqlite"      # or "postgres"; default: postgres if there is url or em
 <data_dir>/
 ├── plugins/<id>/<version>/    code of the installed plugins (read only)
 ├── blobs/<tenant>/<resource>/ contents: files (file) and sites (site/...)
+├── blobs/identity/            logos and browser icon of the platform and of the tenants
+├── secret.key                 key that encrypts the keys of outside services (without `secret_key`)
 ├── mosaikit.db                SQLite (with -wal and -shm), if the backend is SQLite
 ├── pg/                        desktop with PostgreSQL only: embedded cluster and generated credentials
 ├── logs/mosaikit.log          desktop only
@@ -603,8 +652,10 @@ backend = "sqlite"      # or "postgres"; default: postgres if there is url or em
 
 The contents of deleted resources are removed at once; at start a cleanup
 removes possible leftovers (folders without a resource, older than one hour).
-A backup is a dump of the database plus the `blobs/` folder; in the
-desktop version copying the whole data dir with the server stopped is enough.
+A backup is a dump of the database plus the `blobs/` folder and `secret.key` (without it the keys
+of outside services cannot be read: they have to be entered again); in the
+desktop version copying the whole data dir with the server stopped is enough. With several
+servers on the same database, set the same `secret_key` (or `MOSAIKIT_SECRET_KEY`) on all of them.
 
 The structured data are all in the database. At the first start the
 `system` tenant and the Administrator `admin` are created: the password is `MOSAIKIT_ADMIN_PASSWORD`

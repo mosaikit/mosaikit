@@ -31,8 +31,11 @@ use uuid::Uuid;
 use crate::value::{ts_text, Param, Row, Val};
 use crate::{Ctx, DbError, Query, Result};
 
-const MIGRATIONS: &[(i64, &str, &str)] =
-    &[(1, "core", include_str!("0001_core.sql")), (2, "admins", include_str!("0002_admins.sql"))];
+const MIGRATIONS: &[(i64, &str, &str)] = &[
+    (1, "core", include_str!("0001_core.sql")),
+    (2, "admins", include_str!("0002_admins.sql")),
+    (3, "service_keys", include_str!("0003_service_keys.sql")),
+];
 
 /// Context of the transaction on the connection (read by `core_ctx_*()`).
 #[derive(Debug, Clone, Default)]
@@ -776,8 +779,10 @@ impl LiteTx {
 fn authorize(prefix: &str, a: &AuthContext<'_>) -> Authorization {
     match a.action {
         AuthAction::Read { table_name, column_name } => {
-            let secret_table =
-                matches!(table_name, "core_secrets" | "core_sessions" | "core_tickets" | "core_migrations");
+            let secret_table = matches!(
+                table_name,
+                "core_secrets" | "core_sessions" | "core_tickets" | "core_migrations" | "core_service_keys"
+            );
             let secret_col = matches!(
                 column_name,
                 "password_hash" | "role_password" | "token_hash" | "csrf" | "totp_secret" | "totp_recovery"

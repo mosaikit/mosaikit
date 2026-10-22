@@ -21,6 +21,7 @@ pub mod kpi;
 pub mod links;
 pub mod overview;
 pub mod plugins;
+pub mod secret;
 pub mod tenancy;
 pub mod testing;
 pub mod totp;
@@ -167,6 +168,8 @@ pub struct Kernel {
     pub dev_events: broadcast::Sender<DevEvent>,
     /// secret for signed cookies (unlocking password-protected links)
     pub(crate) cookie_secret: Vec<u8>,
+    /// encryption of the keys of outside services
+    pub(crate) secrets: secret::SecretBox,
     embedded: tokio::sync::Mutex<Option<embedded::EmbeddedPg>>,
     /// reference to itself (calls between plugins from the WASM logic)
     me: std::sync::OnceLock<std::sync::Weak<Kernel>>,
@@ -215,6 +218,7 @@ impl Kernel {
             mosaikit_db::query_scalar("select value from core.secrets where name = 'cookie'")
                 .fetch_one(&db)
                 .await?;
+        let secrets = secret::SecretBox::load(&cfg)?;
         let brand = match &cfg.brand {
             Some(dir) => brand::Brand::load(dir)?,
             None => brand::Brand::default(),
@@ -236,6 +240,7 @@ impl Kernel {
                 .map_err(|e| Error::internal(e.to_string()))?,
             dev_events,
             cookie_secret,
+            secrets,
             embedded: tokio::sync::Mutex::new(embedded),
             me: std::sync::OnceLock::new(),
             cfg,

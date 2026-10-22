@@ -123,7 +123,26 @@ fn ancestors(s: &AppState) -> String {
     format!("'self' {} {}", s.k.cfg.app_origin(), s.k.cfg.plugin_origin())
 }
 
+/// Who may embed the public pages of a tenant: the sites the tenant (within the platform's) allows,
+/// besides the origins of Mosaikit for the static sites; nobody else.
+async fn embedders(s: &AppState, tenant: Uuid, own: bool) -> String {
+    let sites = mosaikit_kernel::tenancy::levels::embed_sites(&s.k, tenant).await.unwrap_or_default();
+    let mut list: Vec<String> = if own { vec![ancestors(s)] } else { Vec::new() };
+    list.extend(sites);
+    if list.is_empty() {
+        "'none'".to_string()
+    } else {
+        list.join(" ")
+    }
+}
+
+/// The CSP of a page with `frame-ancestors 'none'` opened to the sites of the tenant.
+fn embeddable(csp: &str, ancestors: &str) -> String {
+    csp.replace("frame-ancestors 'none'", &format!("frame-ancestors {ancestors}"))
+}
+
 async fn serve_site(s: &AppState, tenant: Uuid, rid: Uuid, rel: &str, base: &str, entry: &str) -> Response {
+    let fa = embedders(s, tenant, true).await;
     let rel = if rel.is_empty() { entry } else { rel };
     let site = s.k.blobs.site_dir(tenant, rid);
     // folder without trailing "/": relative URLs would resolve badly
@@ -132,7 +151,7 @@ async fn serve_site(s: &AppState, tenant: Uuid, rid: Uuid, rel: &str, base: &str
     }
     match s.k.blobs.site_file(tenant, rid, rel) {
         Some(path) => match tokio::fs::read(&path).await {
-            Ok(data) => user_content(data, &path.to_string_lossy(), true, false, &ancestors(s)),
+            Ok(data) => user_content(data, &path.to_string_lossy(), true, false, &fa),
             Err(_) => (StatusCode::NOT_FOUND, "not found").into_response(),
         },
         None => (StatusCode::NOT_FOUND, "not found").into_response(),
@@ -246,6 +265,7 @@ async fn public_path(
         links::count_view(&s.k, &r).await;
     }
     let base = format!("{}/p/{token}/", s.k.cfg.plugin_base_path);
+    let fa = embedders(&s, r.tenant, false).await;
     // static site
     if let Some(entry) = r.meta.pointer("/content/entry").and_then(Value::as_str) {
         return serve_site(&s, r.tenant, r.resource, &path, &base, entry).await;
@@ -255,10 +275,10 @@ async fn public_path(
     }
     match r.kind.as_str() {
         "file" => match s.k.blobs.read_file(r.tenant, r.resource) {
-            Ok(data) => user_content(data, &r.title, false, false, "'none'"),
+            Ok(data) => user_content(data, &r.title, false, false, &fa),
             Err(_) => not_found_page(),
         },
-        "folder" => folder_page(&s, &r, r.resource, &r.title, &token).await,
+        "folder" => with_ancestors(folder_page(&s, &r, r.resource, &r.title, &token).await, &fa),
         _ => {
             let Ok(p) = s.k.plugins.active(&r.plugin_id) else { return not_found_page() };
             if let Some(view) =
@@ -277,10 +297,15 @@ async fn public_path(
                      frame-src {}; frame-ancestors 'none'; base-uri 'none'",
                     s.k.cfg.plugin_origin()
                 );
-                return html(pages::viewer(&r.title, &src, &s.k.cfg.plugin_origin(), &nonce), &csp);
+                return html(
+                    pages::viewer(&r.title, &src, &s.k.cfg.plugin_origin(), &nonce),
+                    &embeddable(&csp, &fa),
+                );
             }
             match public_values(&s, &r).await {
-                Some((label, fields)) => html(pages::record(&r.title, &label, &fields), PAGE_CSP),
+                Some((label, fields)) => {
+                    html(pages::record(&r.title, &label, &fields), &embeddable(PAGE_CSP, &fa))
+                }
                 None => not_found_page(),
             }
         }
@@ -454,4 +479,14 @@ async fn public_unlock(
             res
         }
     }
+}
+
+/// The CSP of a response opened to the sites that may embed it.
+fn with_ancestors(mut res: Response, ancestors: &str) -> Response {
+    let csp =
+        res.headers().get(header::CONTENT_SECURITY_POLICY).and_then(|v| v.to_str().ok()).map(str::to_owned);
+    if let Some(csp) = csp {
+        set(&mut res, header::CONTENT_SECURITY_POLICY, &embeddable(&csp, ancestors));
+    }
+    res
 }

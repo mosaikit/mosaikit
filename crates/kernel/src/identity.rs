@@ -19,7 +19,10 @@ use uuid::Uuid;
 use crate::util::{random_token, sha256};
 use crate::{events, totp, Error, Kernel, Result, Role, SessionUser};
 
+/// The shortest password allowed anywhere: the platform and the tenants may only ask for more
+/// (settings on three levels, `security.password_min`).
 pub const MIN_PASSWORD_LEN: usize = 10;
+/// Limit on the attempts of the second factor (the ones of the password come from the settings).
 const MAX_FAILURES: u32 = 8;
 const FAILURE_WINDOW: Duration = Duration::from_secs(15 * 60);
 /// lifetime of a session waiting for the second factor
@@ -32,13 +35,20 @@ pub struct LoginLimiter(Mutex<HashMap<String, (u32, Instant)>>);
 
 impl LoginLimiter {
     fn blocked(&self, key: &str) -> bool {
+        self.blocked_after(key, MAX_FAILURES, FAILURE_WINDOW)
+    }
+    /// `max` failures within `window` lock the key until the window passes.
+    fn blocked_after(&self, key: &str, max: u32, window: Duration) -> bool {
         let map = self.0.lock().expect("lock limiter");
-        map.get(key).is_some_and(|(n, t)| *n >= MAX_FAILURES && t.elapsed() < FAILURE_WINDOW)
+        map.get(key).is_some_and(|(n, t)| *n >= max && t.elapsed() < window)
     }
     fn fail(&self, key: &str) {
+        self.fail_within(key, FAILURE_WINDOW)
+    }
+    fn fail_within(&self, key: &str, window: Duration) {
         let mut map = self.0.lock().expect("lock limiter");
         let e = map.entry(key.to_string()).or_insert((0, Instant::now()));
-        if e.1.elapsed() >= FAILURE_WINDOW {
+        if e.1.elapsed() >= window {
             *e = (0, Instant::now());
         }
         e.0 += 1;
@@ -49,9 +59,16 @@ impl LoginLimiter {
     }
 }
 
+/// The shortest password allowed anywhere ([`MIN_PASSWORD_LEN`]).
 pub fn check_password_policy(pw: &str) -> Result<()> {
-    if pw.chars().count() < MIN_PASSWORD_LEN {
-        return Err(Error::bad(format!("the password must have at least {MIN_PASSWORD_LEN} characters"))
+    check_password_len(pw, MIN_PASSWORD_LEN)
+}
+
+/// The rules of a password with the minimum length in use (see [`password_min`]).
+pub fn check_password_len(pw: &str, min: usize) -> Result<()> {
+    let min = min.max(MIN_PASSWORD_LEN);
+    if pw.chars().count() < min {
+        return Err(Error::bad(format!("the password must have at least {min} characters"))
             .with_code("password_too_short"));
     }
     let first = pw.chars().next();
@@ -213,6 +230,8 @@ async fn initial_tenant(k: &Kernel, slug: &str) -> Result<Option<String>> {
 pub struct LoginResult {
     pub token: String,
     pub user: SessionUser,
+    /// lifetime of the session in seconds (for the cookie)
+    pub max_age: i64,
 }
 
 impl std::fmt::Debug for LoginResult {
@@ -232,6 +251,18 @@ pub async fn login(
     password: &str,
     ip: &str,
 ) -> Result<LoginResult> {
+    login_remembered(k, tenant_slug, username, password, ip, false).await
+}
+
+/// Like [`login`]; with `remember` the session lasts the days of "remember me" of the tenant, if allowed.
+pub async fn login_remembered(
+    k: &Kernel,
+    tenant_slug: &str,
+    username: &str,
+    password: &str,
+    ip: &str,
+    remember: bool,
+) -> Result<LoginResult> {
     let tenant_slug = tenant_slug.trim().to_lowercase();
     let system: Option<bool> =
         mosaikit_db::query_scalar("select is_system from core.tenants where slug = $1")
@@ -243,7 +274,7 @@ pub async fn login(
             .with_code("admin_door"));
     }
     let user_id = check_credentials(k, &tenant_slug, username, password, ip).await?;
-    finish_login(k, user_id, ip).await
+    finish_session(k, user_id, ip, remember).await
 }
 
 /// Outcome of the sign-in of an Administrator: complete, or waiting for the second factor.
@@ -274,7 +305,7 @@ pub async fn admin_login(k: &Kernel, username: &str, password: &str, ip: &str) -
     } else {
         return Ok(AdminLogin::Done(finish_login(k, user_id, ip).await?));
     };
-    let (token, csrf) = open_session(k, user_id, Some(step)).await?;
+    let (token, csrf) = open_session(k, user_id, Some(step), PENDING_MINUTES).await?;
     Ok(AdminLogin::Pending { token, csrf, step })
 }
 
@@ -289,7 +320,17 @@ async fn check_credentials(
     let username = username.trim().to_lowercase();
     let user_key = format!("u:{tenant_slug}/{username}");
     let ip_key = format!("ip:{ip}");
-    if k.limiter.blocked(&user_key) || k.limiter.blocked(&ip_key) {
+    // the limit of the tenant for its accounts, the one of the platform for the address
+    let tenant: Option<Uuid> = mosaikit_db::query_scalar("select id from core.tenants where slug = $1")
+        .bind(tenant_slug)
+        .fetch_optional(&k.db)
+        .await?;
+    let own = crate::tenancy::levels::security(k, tenant).await?;
+    let platform = crate::tenancy::levels::security(k, None).await?;
+    let window = |s: crate::tenancy::levels::Security| Duration::from_secs(u64::from(s.lock_minutes) * 60);
+    if k.limiter.blocked_after(&user_key, own.lock_attempts, window(own))
+        || k.limiter.blocked_after(&ip_key, platform.lock_attempts.max(own.lock_attempts), window(platform))
+    {
         return Err(too_many());
     }
     let row = mosaikit_db::query(
@@ -306,8 +347,8 @@ async fn check_credentials(
     };
     let ok = verify_password(k, hash, password).await?;
     let Some(user_id) = user_id.filter(|_| ok) else {
-        k.limiter.fail(&user_key);
-        k.limiter.fail(&ip_key);
+        k.limiter.fail_within(&user_key, window(own));
+        k.limiter.fail_within(&ip_key, window(platform));
         return Err(Error::unauthorized("invalid credentials").with_code("wrong_credentials"));
     };
     k.limiter.clear(&user_key);
@@ -319,14 +360,15 @@ fn too_many() -> Error {
         .with_code("too_many_attempts")
 }
 
-/// New session (complete, or waiting for the second factor); returns token and CSRF.
-async fn open_session(k: &Kernel, user_id: Uuid, pending: Option<&str>) -> Result<(String, String)> {
+/// New session (complete, or waiting for the second factor) of `minutes`; returns token and CSRF.
+async fn open_session(
+    k: &Kernel,
+    user_id: Uuid,
+    pending: Option<&str>,
+    minutes: i32,
+) -> Result<(String, String)> {
     let token = random_token(32);
     let csrf = random_token(16);
-    let minutes = match pending {
-        Some(_) => PENDING_MINUTES,
-        None => (k.cfg.session_ttl_hours * 60) as i32,
-    };
     mosaikit_db::query(
         "insert into core.sessions (token_hash, user_id, csrf, expires_at, pending)
          values ($1, $2, $3, now() + make_interval(mins => $4), $5)",
@@ -344,11 +386,29 @@ async fn open_session(k: &Kernel, user_id: Uuid, pending: Option<&str>) -> Resul
 }
 
 async fn finish_login(k: &Kernel, user_id: Uuid, ip: &str) -> Result<LoginResult> {
-    let (token, _) = open_session(k, user_id, None).await?;
+    finish_session(k, user_id, ip, false).await
+}
+
+/// Opens the session with the length of the home tenant of the user (the platform's for the
+/// Administrators): hours of a session, or days of "remember me" if asked and allowed.
+async fn finish_session(k: &Kernel, user_id: Uuid, ip: &str, remember: bool) -> Result<LoginResult> {
+    let home: Uuid = mosaikit_db::query_scalar("select home_tenant_id from core.users where id = $1")
+        .bind(user_id)
+        .fetch_one(&k.db)
+        .await?;
+    let sec = crate::tenancy::levels::security(k, Some(home)).await?;
+    let minutes =
+        if remember && sec.remember_days > 0 { sec.remember_days * 24 * 60 } else { sec.session_hours * 60 };
+    let (token, _) = open_session(k, user_id, None, minutes as i32).await?;
     let user = session(k, &token).await?.ok_or_else(|| Error::internal("session just created not found"))?;
     events::record(k, Some(user.home_tenant_id), Some(user_id), None, None, "login", json!({ "ip": ip }))
         .await;
-    Ok(LoginResult { token, user })
+    Ok(LoginResult { token, user, max_age: minutes * 60 })
+}
+
+/// The minimum length of passwords in use for the accounts of a tenant (`None`: the platform's).
+pub async fn password_min(k: &Kernel, tenant: Option<Uuid>) -> Result<usize> {
+    Ok(crate::tenancy::levels::security(k, tenant).await?.password_min)
 }
 
 /// Session waiting for the second factor (only good to complete the sign-in).
@@ -642,7 +702,11 @@ pub async fn change_password(k: &Kernel, user: &SessionUser, old: &str, new: &st
 }
 
 pub async fn set_password(k: &Kernel, user_id: Uuid, new: &str) -> Result<()> {
-    check_password_policy(new)?;
+    let home: Option<Uuid> = mosaikit_db::query_scalar("select home_tenant_id from core.users where id = $1")
+        .bind(user_id)
+        .fetch_optional(&k.db)
+        .await?;
+    check_password_len(new, password_min(k, home).await?)?;
     let hash = hash_password(k, new).await?;
     mosaikit_db::query("update core.users set password_hash = $2 where id = $1")
         .bind(user_id)

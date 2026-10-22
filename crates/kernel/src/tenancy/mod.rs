@@ -8,6 +8,8 @@ mod administrators;
 mod directory;
 mod groups;
 mod invitations;
+pub mod keys;
+pub mod levels;
 mod members;
 mod settings;
 mod support;

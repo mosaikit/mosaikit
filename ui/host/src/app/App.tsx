@@ -8,7 +8,7 @@ import type { Session } from '../types.ts'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { useSession, useTenantCtx } from './core.ts'
-import { useLang, t } from './i18n.ts'
+import { setLanguageContext, useLang, t } from './i18n.ts'
 import { useFavicon } from './mark.ts'
 import { UiServices } from './services.tsx'
 import { Empty } from './kit.tsx'
@@ -19,7 +19,7 @@ import { AccountPage } from './pages/common.tsx'
 import { Manage, PluginPage, Shares, TenantHome, TenantPlugins, TenantSettingsPage, Usage } from './pages/tenant.tsx'
 import { go, href, parse, to, useHash, type Route } from './router.ts'
 import Shell from './Shell.tsx'
-import { setPreset } from './theme.ts'
+import { setDefaultMode, setPreset } from './theme.ts'
 
 const LAST_TENANT = 'msk_tenant'
 
@@ -36,6 +36,9 @@ function landing(s: Session, r: Route, hash: string): string | null {
     /* storage not available */
   }
   const slug = [last, s.user.home_tenant_slug].find((x) => s.memberships.some((m) => m.slug === x)) ?? s.memberships[0]?.slug
+  // the landing page of the home tenant (Identity and texts): an app instead of Home
+  const page = slug === s.user.home_tenant_slug ? s.config?.['identity.landing'] : undefined
+  if (slug && typeof page === 'string' && page !== 'home') return to.plugin(slug, page)
   return slug ? to.tenant(slug) : null
 }
 
@@ -79,6 +82,19 @@ export default function App() {
   const ctx = useTenantCtx(s && route.area === 'tenant' ? route.tenant : '')
   const preset = route.area === 'tenant' ? ctx.data?.theme?.preset : s?.theme
   useEffect(() => setPreset(preset), [preset])
+  // languages, formats and default mode of the tenant one works in, otherwise of the home tenant (the
+  // platform's for the Administrator)
+  const config = route.area === 'tenant' ? ctx.data?.config : s?.config
+  const known = !!config
+  const enabled = JSON.stringify(config?.['lang.enabled'] ?? null)
+  const language = config?.['lang.default'] as string | undefined
+  const locale = config?.['format.locale'] as string | undefined
+  const mode = config?.['appearance.mode'] as string | undefined
+  useEffect(() => {
+    if (!known) return
+    setLanguageContext({ enabled: (JSON.parse(enabled) as string[] | null) ?? undefined, language, locale })
+    setDefaultMode(mode)
+  }, [known, enabled, language, locale, mode])
   useEffect(() => {
     if (target) go(target)
   }, [target])

@@ -49,6 +49,10 @@ pub struct Config {
     pub preinstall: bool,
     #[serde(default = "d_session_hours")]
     pub session_ttl_hours: i64,
+    /// key (32 bytes, base64) that encrypts the keys of outside services; default: the file
+    /// `secret.key` in `data_dir`, created at the first start
+    #[serde(default)]
+    pub secret_key: Option<String>,
     /// at the first start also creates this work tenant with the Tenant Manager `utente` (desktop)
     #[serde(default)]
     pub initial_tenant: Option<String>,
@@ -297,6 +301,7 @@ impl Config {
                 "MOSAIKIT_TRUST_PROXY" => self.trust_proxy = truthy(&v),
                 "MOSAIKIT_OPEN_BROWSER" => self.open_browser = truthy(&v),
                 "MOSAIKIT_ADMIN_TOTP" => self.admin_totp = truthy(&v),
+                "MOSAIKIT_SECRET_KEY" => self.secret_key = Some(v).filter(|s| !s.is_empty()),
                 "MOSAIKIT_INITIAL_PASSWORD" => self.initial_password = Some(v).filter(|s| !s.is_empty()),
                 "MOSAIKIT_INITIAL_TENANT" => self.initial_tenant = Some(v).filter(|s| !s.is_empty()),
                 "MOSAIKIT_REGISTRY" => self.registry = Some(v.into()),

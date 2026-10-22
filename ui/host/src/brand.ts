@@ -18,6 +18,18 @@ export interface Brand {
   theme?: string
   /** top bar of the platform (recent servers) */
   band?: ShellBand
+  /** identity of the platform (System › Identity and texts), recent servers */
+  logo_dark?: boolean
+  icon?: boolean
+  welcome?: string
+  privacy_url?: string
+  legal_url?: string
+  /** languages of the platform and the default one ("auto": the one of the browser) */
+  languages?: string[]
+  language?: string
+  locale?: string
+  /** default mode (light, dark, auto) for whoever did not choose one */
+  mode?: string
 }
 
 export const DEFAULT_BRAND: Brand = {
@@ -63,6 +75,13 @@ function start() {
       })
   }
   attempt(0)
+}
+
+/** Reads the brand again (after a change of the identity of the platform). */
+export function reloadBrand() {
+  api<Brand>('GET', '/api/brand')
+    .then((b) => set({ brand: { ...DEFAULT_BRAND, ...b }, status: 'ok' }))
+    .catch(() => undefined)
 }
 
 export function useBrandState(): { brand: Brand; status: BrandStatus } {

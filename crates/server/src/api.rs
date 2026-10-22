@@ -11,7 +11,8 @@ use axum::routing::{delete, get, post, put};
 use axum::{Json, Router};
 use futures_util::StreamExt;
 use mosaikit_kernel::acl::{self, Level, ResourceFilter};
-use mosaikit_kernel::tenancy::{self, NewTenant};
+use mosaikit_kernel::tenancy::keys::{self, Level as KeyLevel};
+use mosaikit_kernel::tenancy::{self, levels, NewTenant};
 use mosaikit_kernel::{content, crud, files, identity, kpi, links, plugins, Error, Role, TenantSettings};
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
@@ -36,6 +37,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/brand", get(brand))
         .route("/api/auth/login", post(login))
         .route("/api/auth/tenants", get(login_tenants))
+        .route("/api/auth/tenants/{slug}/logo/{slot}", get(tenant_logo))
         .route("/api/auth/admin/login", post(admin_login))
         .route("/api/auth/totp/setup", post(totp_setup))
         .route("/api/auth/totp/enable", post(totp_enable))
@@ -83,6 +85,12 @@ pub fn router() -> Router<AppState> {
         .route("/api/t/{t}/manage/resources/reassign", post(m_reassign))
         .route("/api/t/{t}/manage/settings", get(m_settings).put(m_set_settings))
         .route("/api/t/{t}/manage/theme", put(m_set_theme))
+        .route("/api/t/{t}/manage/config", get(m_config).put(m_set_config))
+        .route("/api/t/{t}/manage/identity/{slot}", put(m_set_image).delete(m_remove_image))
+        .route("/api/t/{t}/manage/keys", get(m_keys))
+        .route("/api/t/{t}/manage/keys/{service}", put(m_set_key).delete(m_remove_key))
+        .route("/api/t/{t}/me/keys", get(my_keys))
+        .route("/api/t/{t}/me/keys/{service}", put(my_set_key).delete(my_remove_key))
         .route("/api/t/{t}/manage/kpi", get(m_kpi))
         // system administrator
         .route("/api/admin/tenants", get(a_tenants).post(a_create_tenant))
@@ -102,6 +110,10 @@ pub fn router() -> Router<AppState> {
         .route("/api/admin/administrators/{id}/password", post(a_admin_password))
         .route("/api/admin/administrators/{id}/totp", delete(a_admin_totp))
         .route("/api/admin/band", put(a_set_band))
+        .route("/api/admin/settings", get(a_settings).put(a_set_settings))
+        .route("/api/admin/identity/{slot}", put(a_set_image).delete(a_remove_image))
+        .route("/api/admin/keys", get(a_keys))
+        .route("/api/admin/keys/{service}", put(a_set_key).delete(a_remove_key))
         .route("/api/admin/theme", put(a_set_theme))
         .route("/api/{*rest}", axum::routing::any(api_not_found))
         .merge(uploads)
@@ -127,15 +139,66 @@ async fn health(State(s): State<AppState>) -> Json<Value> {
     Json(json!({ "ok": true, "version": mosaikit_kernel::KERNEL_VERSION, "dev": s.k.cfg.dev.enabled }))
 }
 
-/// Brand of the product, with the theme and the top bar of the platform: public, so the sign-in page
-/// has them before a session exists.
+/// Brand of the product, with the identity, the theme, the top bar and the languages of the platform:
+/// public, so the sign-in page has them before a session exists.
 async fn brand(State(s): State<AppState>) -> ApiResult<Json<Value>> {
     let mut b = s.k.brand.public();
+    let v = levels::effective(&s.k, None).await?;
+    let text = |key: &str| v.get(key).cloned().unwrap_or(Value::Null);
     if let Some(o) = b.as_object_mut() {
         o.insert("theme".into(), json!(tenancy::platform_theme(&s.k).await?));
         o.insert("band".into(), json!(tenancy::shell_band(&s.k).await?));
+        o.insert("name".into(), text("identity.name"));
+        let uploaded = |key: &str| v.get(key).is_some_and(|x| !x.is_null());
+        o.insert("logo".into(), json!(s.k.brand.logo.is_some() || uploaded("identity.logo_light")));
+        o.insert("logo_dark".into(), json!(uploaded("identity.logo_dark")));
+        o.insert("icon".into(), json!(s.k.brand.favicon.is_some() || uploaded("identity.icon")));
+        o.insert("welcome".into(), text("identity.welcome"));
+        if v.get("identity.footer").and_then(Value::as_str).is_some_and(|f| !f.is_empty()) {
+            o.insert("footer".into(), text("identity.footer"));
+        }
+        o.insert("privacy_url".into(), text("identity.privacy_url"));
+        o.insert("legal_url".into(), text("identity.legal_url"));
+        o.insert("languages".into(), text("lang.enabled"));
+        o.insert("language".into(), text("lang.default"));
+        o.insert("locale".into(), text("format.locale"));
+        o.insert("mode".into(), text("appearance.mode"));
     }
     Ok(Json(b))
+}
+
+/// Logo of a tenant for its sign-in page (public, only active tenants).
+async fn tenant_logo(
+    State(s): State<AppState>,
+    Path((slug, slot)): Path<(String, String)>,
+) -> ApiResult<Response> {
+    let id: Option<Uuid> = mosaikit_db::query_scalar(
+        "select id from core.tenants where slug = $1 and status = 'active' and not is_system",
+    )
+    .bind(&slug)
+    .fetch_optional(&s.k.db)
+    .await
+    .map_err(Error::from)?;
+    let Some(id) = id else { return Err(Error::not_found("tenant not found").into()) };
+    match levels::image(&s.k, Some(id), &slot).await? {
+        Some((data, mime)) => Ok(image_response(data, &mime)),
+        None => Err(Error::not_found("no logo").into()),
+    }
+}
+
+/// An image of the identity: it runs nothing (an SVG may not run scripts) and is not sniffed.
+pub fn image_response(data: Vec<u8>, mime: &str) -> Response {
+    let mut res = data.into_response();
+    let h = res.headers_mut();
+    if let Ok(v) = HeaderValue::from_str(mime) {
+        h.insert(header::CONTENT_TYPE, v);
+    }
+    h.insert(header::CACHE_CONTROL, HeaderValue::from_static("public, max-age=300"));
+    h.insert(
+        header::CONTENT_SECURITY_POLICY,
+        HeaderValue::from_static("default-src 'none'; style-src 'unsafe-inline'; sandbox"),
+    );
+    res
 }
 
 #[derive(Deserialize)]
@@ -143,6 +206,9 @@ struct LoginReq {
     tenant: String,
     username: String,
     password: String,
+    /// "remember me": the session lasts the days the tenant allows
+    #[serde(default)]
+    remember: bool,
 }
 
 async fn session_body(s: &AppState, user: &mosaikit_kernel::SessionUser) -> ApiResult<Value> {
@@ -157,6 +223,8 @@ async fn session_body(s: &AppState, user: &mosaikit_kernel::SessionUser) -> ApiR
         "dev": s.k.cfg.dev.enabled,
         "band": tenancy::shell_band(&s.k).await?,
         "theme": tenancy::platform_theme(&s.k).await?,
+        // settings in use for the home tenant of the person (the platform's for the Administrator)
+        "config": levels::effective(&s.k, (!user.is_system_admin).then_some(user.home_tenant_id)).await?,
     }))
 }
 
@@ -165,7 +233,7 @@ async fn login(
     ClientIp(ip): ClientIp,
     Json(r): Json<LoginReq>,
 ) -> ApiResult<Response> {
-    let lr = identity::login(&s.k, &r.tenant, &r.username, &r.password, &ip).await?;
+    let lr = identity::login_remembered(&s.k, &r.tenant, &r.username, &r.password, &ip, r.remember).await?;
     logged_in(&s, lr, json!({})).await
 }
 
@@ -176,7 +244,7 @@ async fn logged_in(s: &AppState, lr: identity::LoginResult, extra: Value) -> Api
         b.extend(e);
     }
     let mut res = Json(body).into_response();
-    res.headers_mut().insert(header::SET_COOKIE, session_cookie(s, Some(&lr.token)));
+    res.headers_mut().insert(header::SET_COOKIE, session_cookie(s, Some((&lr.token, lr.max_age))));
     Ok(res)
 }
 
@@ -202,7 +270,8 @@ async fn admin_login(
         identity::AdminLogin::Done(lr) => logged_in(&s, lr, json!({})).await,
         identity::AdminLogin::Pending { token, csrf, step } => {
             let mut res = Json(json!({ "pending": step, "csrf": csrf })).into_response();
-            res.headers_mut().insert(header::SET_COOKIE, session_cookie(&s, Some(&token)));
+            // waiting for the second factor: the session lasts a few minutes
+            res.headers_mut().insert(header::SET_COOKIE, session_cookie(&s, Some((&token, 600))));
             Ok(res)
         }
     }
@@ -306,6 +375,7 @@ async fn context(State(s): State<AppState>, Tenant(c): Tenant) -> ApiResult<Json
         "plugins": plugins::active_views(&s.k),
         "prefs": tenancy::prefs(&s.k, &c).await?,
         "theme": tenancy::tenant_theme(&s.k, c.tenant.tenant_id).await?,
+        "config": levels::effective(&s.k, Some(c.tenant.tenant_id)).await?,
     })))
 }
 
@@ -860,6 +930,176 @@ async fn m_set_settings(
 ) -> ApiResult<Json<Value>> {
     tenancy::set_settings(&s.k, &c, &r).await?;
     Ok(ok())
+}
+
+// ------------------------------------------------------------------ settings on three levels
+
+#[derive(Deserialize)]
+struct SettingsReq {
+    /// key -> value (null: back to the default, or to the value of the platform)
+    #[serde(default)]
+    values: Map<String, Value>,
+    /// "tenants may customize it" (platform only)
+    #[serde(default)]
+    customizable: Map<String, Value>,
+}
+
+async fn a_settings(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Json<Value>> {
+    tenancy::require_admin(&u)?;
+    Ok(Json(json!(levels::platform_settings(&s.k).await?)))
+}
+
+async fn a_set_settings(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Json(r): Json<SettingsReq>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(levels::set_platform(&s.k, &u, &r.values, &r.customizable).await?)))
+}
+
+async fn m_config(State(s): State<AppState>, Tenant(c): Tenant) -> ApiResult<Json<Value>> {
+    c.require_manager()?;
+    Ok(Json(json!(levels::tenant_settings(&s.k, c.tenant.tenant_id).await?)))
+}
+
+async fn m_set_config(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Json(r): Json<SettingsReq>,
+) -> ApiResult<Json<Value>> {
+    if !r.customizable.is_empty() {
+        return Err(bad("only the Administrator decides what tenants may customize"));
+    }
+    Ok(Json(json!(levels::set_tenant(&s.k, &c, &r.values).await?)))
+}
+
+async fn a_set_image(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Path(slot): Path<String>,
+    body: Bytes,
+) -> ApiResult<Json<Value>> {
+    levels::set_image(&s.k, levels::Who::Platform(&u), &slot, &body).await?;
+    Ok(ok())
+}
+
+async fn a_remove_image(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Path(slot): Path<String>,
+) -> ApiResult<Json<Value>> {
+    levels::remove_image(&s.k, levels::Who::Platform(&u), &slot).await?;
+    Ok(ok())
+}
+
+async fn m_set_image(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path((_, slot)): Path<(String, String)>,
+    body: Bytes,
+) -> ApiResult<Json<Value>> {
+    levels::set_image(&s.k, levels::Who::Tenant(&c), &slot, &body).await?;
+    Ok(ok())
+}
+
+async fn m_remove_image(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path((_, slot)): Path<(String, String)>,
+) -> ApiResult<Json<Value>> {
+    levels::remove_image(&s.k, levels::Who::Tenant(&c), &slot).await?;
+    Ok(ok())
+}
+
+#[derive(Deserialize)]
+struct KeyReq {
+    /// the key (or the address); absent: only `shared` changes
+    #[serde(default)]
+    value: Option<String>,
+    #[serde(default)]
+    shared: Option<bool>,
+}
+
+async fn a_keys(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(keys::platform_keys(&s.k, &u).await?)))
+}
+
+async fn a_set_key(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Path(service): Path<String>,
+    Json(r): Json<KeyReq>,
+) -> ApiResult<Json<Value>> {
+    tenancy::require_admin(&u)?;
+    keys::set_key(&s.k, u.user_id, KeyLevel::Platform, &service, r.value.as_deref(), r.shared).await?;
+    Ok(Json(json!(keys::platform_keys(&s.k, &u).await?)))
+}
+
+async fn a_remove_key(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Path(service): Path<String>,
+) -> ApiResult<Json<Value>> {
+    tenancy::require_admin(&u)?;
+    keys::remove_key(&s.k, u.user_id, KeyLevel::Platform, &service).await?;
+    Ok(Json(json!(keys::platform_keys(&s.k, &u).await?)))
+}
+
+async fn m_keys(State(s): State<AppState>, Tenant(c): Tenant) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(keys::tenant_keys(&s.k, &c).await?)))
+}
+
+async fn m_set_key(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path((_, service)): Path<(String, String)>,
+    Json(r): Json<KeyReq>,
+) -> ApiResult<Json<Value>> {
+    c.require_manager()?;
+    let level = KeyLevel::Tenant(c.tenant.tenant_id);
+    keys::set_key(&s.k, c.user.user_id, level, &service, r.value.as_deref(), r.shared).await?;
+    Ok(Json(json!(keys::tenant_keys(&s.k, &c).await?)))
+}
+
+async fn m_remove_key(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path((_, service)): Path<(String, String)>,
+) -> ApiResult<Json<Value>> {
+    c.require_manager()?;
+    keys::remove_key(&s.k, c.user.user_id, KeyLevel::Tenant(c.tenant.tenant_id), &service).await?;
+    Ok(Json(json!(keys::tenant_keys(&s.k, &c).await?)))
+}
+
+async fn my_keys(State(s): State<AppState>, Tenant(c): Tenant) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(keys::my_keys(&s.k, &c).await?)))
+}
+
+async fn my_set_key(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path((_, service)): Path<(String, String)>,
+    Json(r): Json<KeyReq>,
+) -> ApiResult<Json<Value>> {
+    keys::set_key(
+        &s.k,
+        c.user.user_id,
+        KeyLevel::User(c.user.user_id),
+        &service,
+        r.value.as_deref(),
+        r.shared,
+    )
+    .await?;
+    Ok(Json(json!(keys::my_keys(&s.k, &c).await?)))
+}
+
+async fn my_remove_key(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path((_, service)): Path<(String, String)>,
+) -> ApiResult<Json<Value>> {
+    keys::remove_key(&s.k, c.user.user_id, KeyLevel::User(c.user.user_id), &service).await?;
+    Ok(Json(json!(keys::my_keys(&s.k, &c).await?)))
 }
 
 async fn m_kpi(State(s): State<AppState>, Tenant(c): Tenant) -> ApiResult<Json<Value>> {

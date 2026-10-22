@@ -6,7 +6,7 @@ use serde::Serialize;
 use serde_json::json;
 use uuid::Uuid;
 
-use crate::identity::{check_password_policy, hash_password, valid_username};
+use crate::identity::{check_password_len, hash_password, password_min, valid_username};
 use crate::{events, Caller, Error, Kernel, Result, Role};
 
 #[derive(Debug, Clone, Serialize)]
@@ -81,7 +81,7 @@ pub(super) async fn create_member_in(
     if !valid_username(&username) {
         return Err(Error::bad("invalid username: lower case, digits, '.', '-', '_' (2-64)"));
     }
-    check_password_policy(password)?;
+    check_password_len(password, password_min(k, Some(tenant)).await?)?;
     let hash = hash_password(k, password).await?;
     let mut tx = k.db.begin_app().await?;
     let id: Uuid = mosaikit_db::query_scalar(

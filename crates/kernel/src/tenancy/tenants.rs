@@ -6,7 +6,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use super::{require_admin, valid_slug};
-use crate::identity::{check_password_policy, hash_password, valid_username};
+use crate::identity::{check_password_len, hash_password, password_min, valid_username};
 use crate::{events, Error, Kernel, Result, SessionUser};
 
 #[derive(Debug, Clone, Serialize)]
@@ -44,24 +44,60 @@ pub struct LoginTenant {
     /// theme in use: the one the Tenant Manager chose, otherwise the one of the platform (the
     /// sign-in page switches to it as soon as the tenant is known)
     pub theme: String,
+    /// logos of the tenant for light and dark backgrounds (`/api/auth/tenants/<slug>/logo/<slot>`)
+    pub logo_light: bool,
+    pub logo_dark: bool,
+    /// texts of the sign-in page
+    pub welcome: String,
+    pub footer: String,
+    pub privacy_url: String,
+    pub legal_url: String,
+    /// languages of the tenant and the default one ("auto": the one of the browser)
+    pub languages: Vec<String>,
+    pub language: String,
+    /// "remember me" is allowed (days > 0)
+    pub remember: bool,
 }
 
-/// Active tenants for the sign-in page (public: only slug, name and theme). The system
-/// tenant has a sign-in of its own.
+/// Active tenants for the sign-in page (public: names, theme, logos and texts of the sign-in). The
+/// system tenant has a sign-in of its own.
 pub async fn login_tenants(k: &Kernel) -> Result<Vec<LoginTenant>> {
     let rows = mosaikit_db::query(
         "select slug, name, settings from core.tenants where status = 'active' and not is_system order by name",
     )
     .fetch_all(&k.db)
     .await?;
-    let platform = super::settings::platform_theme(k).await?;
+    let platform = super::levels::system_settings(k).await?;
+    let defaults = super::levels::Defaults::of(k);
     Ok(rows
         .iter()
         .map(|r| {
-            let settings: Option<serde_json::Value> = r.get(2);
-            let theme =
-                settings.as_ref().and_then(super::settings::theme_in).unwrap_or_else(|| platform.clone());
-            LoginTenant { slug: r.get(0), name: r.get(1), auth: "local", theme }
+            let own: Option<serde_json::Value> = r.get(2);
+            let own = own.filter(serde_json::Value::is_object).unwrap_or_else(|| serde_json::json!({}));
+            let name: String = r.get(1);
+            let v = super::levels::values(&super::levels::tenant_view(&platform, &own, &name, &defaults));
+            let text =
+                |key: &str| v.get(key).and_then(serde_json::Value::as_str).unwrap_or_default().to_string();
+            LoginTenant {
+                slug: r.get(0),
+                name: text("identity.name"),
+                auth: "local",
+                theme: text("theme"),
+                logo_light: v.get("identity.logo_light").is_some_and(|x| !x.is_null()),
+                logo_dark: v.get("identity.logo_dark").is_some_and(|x| !x.is_null()),
+                welcome: text("identity.welcome"),
+                footer: text("identity.footer"),
+                privacy_url: text("identity.privacy_url"),
+                legal_url: text("identity.legal_url"),
+                languages: v
+                    .get("lang.enabled")
+                    .and_then(serde_json::Value::as_array)
+                    .map(|a| a.iter().filter_map(|x| x.as_str().map(str::to_owned)).collect())
+                    .unwrap_or_default(),
+                language: text("lang.default"),
+                remember: v.get("security.remember_days").and_then(serde_json::Value::as_i64).unwrap_or(0)
+                    > 0,
+            }
         })
         .collect())
 }
@@ -110,7 +146,8 @@ pub async fn create_tenant(k: &Kernel, admin: &SessionUser, t: NewTenant<'_>) ->
     if !valid_username(&username) {
         return Err(Error::bad("invalid username of the manager"));
     }
-    check_password_policy(t.manager_password)?;
+    // a new tenant has the rules of the platform
+    check_password_len(t.manager_password, password_min(k, None).await?)?;
     let hash = hash_password(k, t.manager_password).await?;
     let mut tx = k.db.begin_app().await?;
     let id: Uuid =

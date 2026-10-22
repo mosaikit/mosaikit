@@ -4,7 +4,7 @@
 
 import { useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Bell, Building2, Gauge, KeyRound, Loader2, Palette, UserRound } from 'lucide-react'
+import { Bell, Building2, Gauge, KeyRound, KeySquare, Loader2, Palette, UserRound } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, errText, fmtBytes } from '../../api.ts'
 import type { Overview, Session } from '../../types.ts'
@@ -17,12 +17,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
-import { initials, useApi, useTenantCtx } from '../core.ts'
-import { LANGS, setLang, t, useLang, type Lang } from '../i18n.ts'
+import { initials, passwordMin, useApi, useTenantCtx } from '../core.ts'
+import { setLang, t, useLang, useLanguages, type Lang } from '../i18n.ts'
 import { Empty, ErrorBox, Loading, Locked, PageHeader, Sections, type Section } from '../kit.tsx'
 import { go, personal, to, type Route } from '../router.ts'
 import { SIDEBAR_PREF } from '../prefs.ts'
 import { TenantBadge } from '../Shell.tsx'
+import { KeysPanel } from '../SettingsPanels.tsx'
 import { setTheme, useTheme, type Mode } from '../theme.ts'
 
 const enc = encodeURIComponent
@@ -40,6 +41,7 @@ export function AccountPage({ session, route }: { session: Session; route: Route
       : [
           { id: 'tenants', label: t('My tenants'), icon: <Building2 />, count: session.memberships.length },
           { id: 'usage', label: t('Usage'), icon: <Gauge /> },
+          ...(route.area === 'tenant' ? [{ id: 'keys', label: t('Keys'), icon: <KeySquare /> }] : []),
         ]),
   ]
   const cur = sections.some((s) => s.id === section) ? section! : 'profile'
@@ -54,6 +56,7 @@ export function AccountPage({ session, route }: { session: Session; route: Route
         {cur === 'appearance' && <Appearance route={route} />}
         {cur === 'tenants' && <MyTenants session={session} />}
         {cur === 'usage' && route.area === 'tenant' && <MyUsage slug={route.tenant} />}
+        {cur === 'keys' && route.area === 'tenant' && <KeysPanel level={{ kind: 'me', slug: route.tenant }} />}
       </Sections>
     </>
   )
@@ -112,7 +115,9 @@ function Security({ session }: { session: Session }) {
       setBusy(false)
     }
   }
-  const short = pw.new.length > 0 && pw.new.length < 10
+  // the rules of the home tenant (the platform's for the Administrator)
+  const min = passwordMin(session.config ?? {})
+  const short = pw.new.length > 0 && pw.new.length < min
   const differ = pw.again.length > 0 && pw.again !== pw.new
   return (
     <div className="grid max-w-2xl gap-6">
@@ -129,15 +134,15 @@ function Security({ session }: { session: Session }) {
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="pw-new">{t('New password')}</Label>
-              <Input id="pw-new" type="password" autoComplete="new-password" minLength={10} required aria-describedby="pw-rule" value={pw.new} onChange={(e) => setPw({ ...pw, new: e.target.value })} />
+              <Input id="pw-new" type="password" autoComplete="new-password" minLength={min} required aria-describedby="pw-rule" value={pw.new} onChange={(e) => setPw({ ...pw, new: e.target.value })} />
               {/* the rule next to the field, not after sending */}
               <p id="pw-rule" className={cn('text-xs', short ? 'text-destructive' : 'text-muted-foreground')}>
-                {t('At least 10 characters, not all the same.')}
+                {t('At least {n} characters, not all the same.', { n: min })}
               </p>
             </div>
             <div className="grid gap-1.5">
               <Label htmlFor="pw-again">{t('Repeat the new password')}</Label>
-              <Input id="pw-again" type="password" autoComplete="new-password" minLength={10} required aria-invalid={differ} value={pw.again} onChange={(e) => setPw({ ...pw, again: e.target.value })} />
+              <Input id="pw-again" type="password" autoComplete="new-password" minLength={min} required aria-invalid={differ} value={pw.again} onChange={(e) => setPw({ ...pw, again: e.target.value })} />
               {differ && <p className="text-xs text-destructive">{t('The two passwords do not match')}</p>}
             </div>
             <Button type="submit" disabled={busy || short || differ} className="justify-self-start">
@@ -203,6 +208,7 @@ function NotificationPrefs({ admin }: { admin: boolean }) {
 function Appearance({ route }: { route: Route }) {
   const th = useTheme()
   const lang = useLang()
+  const langs = useLanguages()
   const [side, setSide] = useState(() => {
     try {
       return localStorage.getItem(SIDEBAR_PREF) === '1'
@@ -242,7 +248,7 @@ function Appearance({ route }: { route: Route }) {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {LANGS.map((l) => (
+              {langs.map((l) => (
                 <SelectItem key={l.id} value={l.id}>
                   {l.name}
                 </SelectItem>

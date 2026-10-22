@@ -798,3 +798,152 @@ async fn sign_in_page_knows_the_themes() {
     assert_eq!(themes(r.json()), [("alfa".into(), "tessera".into()), ("beta".into(), "italia".into())]);
     assert_eq!(a.call(None, Method::GET, "/api/brand", None).await.json()["theme"], "italia");
 }
+
+#[tokio::test]
+async fn settings_on_three_levels_over_http() {
+    let a = App::new().await;
+    a.t.tenant("alfa").await;
+    let admin = a.admin().await;
+    let m = a.login("alfa", "alfa-manager", PASSWORD).await;
+
+    // the Administrator: values and "tenants may customize it"
+    let r = a
+        .call(
+            Some(&admin),
+            Method::PUT,
+            "/api/admin/settings",
+            Some(json!({ "values": { "security.password_min": 12, "identity.name": "Atlas" },
+                         "customizable": { "identity.welcome": false } })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let pm =
+        r.json().as_array().unwrap().iter().find(|s| s["key"] == "security.password_min").cloned().unwrap();
+    assert_eq!(
+        (pm["value"].clone(), pm["kind"].clone(), pm["rule"].clone()),
+        (json!(12), json!("limit"), json!("min"))
+    );
+    // nobody else
+    assert_eq!(
+        a.call(Some(&m), Method::GET, "/api/admin/settings", None).await.status,
+        StatusCode::FORBIDDEN
+    );
+    assert_eq!(a.call(None, Method::GET, "/api/brand", None).await.json()["name"], "Atlas");
+
+    // the Tenant Manager: limits, locks, values of its own
+    let cfg = a.call(Some(&m), Method::GET, "/api/t/alfa/manage/config", None).await.json();
+    let row = |key: &str| cfg.as_array().unwrap().iter().find(|s| s["key"] == key).cloned().unwrap();
+    assert_eq!(row("security.password_min")["platform"], 12);
+    assert_eq!(row("identity.welcome")["locked"], true);
+    assert_eq!(row("band")["locked"], true);
+    let put = |values: Value| {
+        a.call(Some(&m), Method::PUT, "/api/t/alfa/manage/config", Some(json!({ "values": values })))
+    };
+    let r = put(json!({ "security.password_min": 11 })).await;
+    assert_eq!(
+        (r.status, r.json()["code"].clone()),
+        (StatusCode::BAD_REQUEST, json!("setting_beyond_platform"))
+    );
+    let r = put(json!({ "identity.welcome": "x" })).await;
+    assert_eq!((r.status, r.json()["code"].clone()), (StatusCode::FORBIDDEN, json!("setting_locked")));
+    let r =
+        put(json!({ "lang.enabled": ["it"], "lang.default": "it", "identity.name": "Comune di Alfa" })).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let ctx = a.call(Some(&m), Method::GET, "/api/t/alfa/context", None).await.json();
+    assert_eq!(ctx["config"]["lang.enabled"], json!(["it"]));
+    assert_eq!(ctx["config"]["lang.default"], json!("it"));
+    let session = a.call(Some(&m), Method::GET, "/api/session", None).await.json();
+    assert_eq!(session["config"]["security.password_min"], 12);
+
+    // the sign-in page of the tenant: name, languages, logo
+    let upload = |slot: &str, body: &'static str| {
+        Request::builder()
+            .method(Method::PUT)
+            .uri(format!("/api/t/alfa/manage/identity/{slot}"))
+            .header(header::COOKIE, &m.cookie)
+            .header("x-csrf-token", &m.csrf)
+            .body(Body::from(body))
+            .unwrap()
+    };
+    let svg = "<svg xmlns=\"http://www.w3.org/2000/svg\"><rect width=\"4\" height=\"4\"/></svg>";
+    assert_eq!(send(&a.app, upload("logo_light", svg)).await.status, StatusCode::OK);
+    let list = a.call(None, Method::GET, "/api/auth/tenants", None).await.json();
+    let alfa = &list[0];
+    assert_eq!(alfa["name"], "Comune di Alfa");
+    assert_eq!(alfa["languages"], json!(["it"]));
+    assert_eq!(alfa["logo_light"], true);
+    let logo = a.call(None, Method::GET, "/api/auth/tenants/alfa/logo/logo_light", None).await;
+    assert_eq!(logo.status, StatusCode::OK);
+    assert_eq!(logo.header(header::CONTENT_TYPE), "image/svg+xml");
+    assert!(logo.header(header::CONTENT_SECURITY_POLICY).contains("sandbox"));
+    let r = send(&a.app, upload("logo_dark", "<svg><script>alert(1)</script></svg>")).await;
+    assert_eq!((r.status, r.json()["code"].clone()), (StatusCode::BAD_REQUEST, json!("image_unsafe")));
+    let r = a.call(None, Method::GET, "/api/auth/tenants/alfa/logo/logo_dark", None).await;
+    assert_eq!(r.status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn keys_never_go_back_to_the_browser() {
+    let a = App::new().await;
+    let g = a.t.tenant("alfa").await;
+    a.t.member(&g, "anna").await;
+    let admin = a.admin().await;
+    let anna = a.login("alfa", "anna", PASSWORD).await;
+    let body = json!({ "value": "sk-platform-abcd", "shared": true });
+    let r = a.call(Some(&admin), Method::PUT, "/api/admin/keys/ai-hosted", Some(body)).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    assert!(!r.text().contains("sk-platform"), "{}", r.text());
+    let mine = a.call(Some(&anna), Method::GET, "/api/t/alfa/me/keys", None).await.json();
+    let ai = mine.as_array().unwrap().iter().find(|k| k["service"] == "ai-hosted").cloned().unwrap();
+    assert_eq!(ai["set"], false);
+    assert_eq!(ai["in_use"], "platform");
+    let body = json!({ "value": "my-own-key-wxyz" });
+    let r = a.call(Some(&anna), Method::PUT, "/api/t/alfa/me/keys/ai-hosted", Some(body)).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let ai = r.json().as_array().unwrap().iter().find(|k| k["service"] == "ai-hosted").cloned().unwrap();
+    assert_eq!(ai["hint"], "wxyz");
+    assert_eq!(ai["in_use"], "own");
+    assert!(!r.text().contains("my-own"));
+    // a person does not see or change the keys of the tenant
+    let r = a.call(Some(&anna), Method::GET, "/api/t/alfa/manage/keys", None).await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN);
+    let r = a.call(Some(&anna), Method::DELETE, "/api/t/alfa/me/keys/ai-hosted", None).await;
+    assert_eq!(r.status, StatusCode::OK);
+}
+
+#[tokio::test]
+async fn remember_me_and_embedding_of_public_pages() {
+    let a = App::new().await;
+    a.t.install("notes").await;
+    a.t.tenant("alfa").await;
+    let admin = a.admin().await;
+    let m = a.login("alfa", "alfa-manager", PASSWORD).await;
+    let values = json!({ "values": { "security.session_hours": 4, "security.remember_days": 10,
+                                     "embed.sites": ["https://www.alfa.example", "https://intranet.example"] } });
+    let r = a.call(Some(&admin), Method::PUT, "/api/admin/settings", Some(values)).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let sign_in = |remember: bool| json!({ "tenant": "alfa", "username": "alfa-manager", "password": PASSWORD, "remember": remember });
+    let r = a.call(None, Method::POST, "/api/auth/login", Some(sign_in(false))).await;
+    let cookie = r.header(header::SET_COOKIE);
+    assert!(cookie.contains(&format!("Max-Age={}", 4 * 3600)), "{cookie}");
+    let r = a.call(None, Method::POST, "/api/auth/login", Some(sign_in(true))).await;
+    assert!(r.header(header::SET_COOKIE).contains(&format!("Max-Age={}", 10 * 86400)));
+
+    // the tenant allows one of the sites of the platform: only that one embeds its public pages
+    let only = json!({ "values": { "embed.sites": ["https://www.alfa.example"] } });
+    let r = a.call(Some(&m), Method::PUT, "/api/t/alfa/manage/config", Some(only)).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let note = json!({ "values": { "title": "Open day" } });
+    let n = a.call(Some(&m), Method::POST, "/api/t/alfa/p/com.mosaikit.notes/r/notes", Some(note)).await;
+    let rid = n.json()["id"].as_str().unwrap().to_string();
+    let l =
+        a.call(Some(&m), Method::POST, &format!("/api/t/alfa/resources/{rid}/links"), Some(json!({}))).await;
+    let path = l.json()["url"].as_str().unwrap().trim_start_matches(&a.t.cfg.public_url).to_string();
+    let csp = a.get_untrusted(&path, None).await.header(header::CONTENT_SECURITY_POLICY);
+    assert!(csp.contains("frame-ancestors https://www.alfa.example"), "{csp}");
+    assert!(!csp.contains("intranet"), "{csp}");
+    // a site the platform does not allow is refused
+    let evil = json!({ "values": { "embed.sites": ["https://evil.example"] } });
+    let r = a.call(Some(&m), Method::PUT, "/api/t/alfa/manage/config", Some(evil)).await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST);
+}

@@ -27,7 +27,7 @@ Order: 0 → 0b → 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9. Phase 8 c
 |---|---|
 | 0 | done: the shell is the UI (old UI removed), real Share dialog, i18next (it/en) with server error codes, official logo and Tessera theme, Playwright e2e with axe, Windows dev watcher fixed |
 | 0b | done: English by default (code, comments, docs, server messages, i18n keys, default language); the sign-in page takes the theme of the platform and of the tenant before a session exists; absolute social preview URLs; a server that does not answer is said and retried, never a bare HTTP status |
-| 1 | to do |
+| 1 | done: settings on three levels (managed, with a limit, customizable, «tenants may customize it») for identity and logos, theme and mode, languages and formats, passwords and sessions (enforced by the kernel), embedding of public pages, keys of outside services encrypted at three levels; System, Tenant settings and Account › Keys |
 | 2 | to do |
 | 3 | to do |
 | 4 | to do |

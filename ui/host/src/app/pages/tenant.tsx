@@ -4,7 +4,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Gauge, Grid2x2, KeyRound, Mail, MoreHorizontal, Palette, Plus, Puzzle, Share2, ShieldCheck, Trash2, UserRound, Users } from 'lucide-react'
+import { Frame, Gauge, Grid2x2, KeyRound, KeySquare, Lock, Mail, MoreHorizontal, Palette, Plus, Puzzle, Share2, ShieldCheck, Trash2, UserRound, Users } from 'lucide-react'
 import { api, appUrl, fmtBytes, fmtDate } from '../../api.ts'
 import PluginFrame from '../../components/PluginFrame.tsx'
 import { UiContext, useUi, type Ui } from '../../ui-context.ts'
@@ -21,13 +21,14 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { initials, useAction, useApi, useConfirm, useTenantCtx } from '../core.ts'
+import { initials, passwordMin, useAction, useApi, useConfig, useConfirm, useTenantCtx } from '../core.ts'
 import { t, useLang } from '../i18n.ts'
-import { Empty, ErrorBox, FormDialog, Kpi, Loading, Locked, PageHeader, Pills, PluginKpis, SaveBar, Sections, StatusBadge } from '../kit.tsx'
+import { Empty, ErrorBox, FormDialog, Kpi, Loading, PageHeader, Pills, PluginKpis, SaveBar, Sections, StatusBadge, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import { effectiveMode, useTheme } from '../theme.ts'
 import AppIcon from '../AppIcon.tsx'
 import { TenantTheme } from '../ThemeSettings.tsx'
+import { EmbeddingPanel, IdentityPanel, KeysPanel, LanguagesPanel, ManagedPanel, ModePanel, SecurityPanel } from '../SettingsPanels.tsx'
 
 const enc = encodeURIComponent
 const ROLE: Record<string, string> = { tenant_manager: 'Tenant Manager', user: 'User' }
@@ -161,6 +162,7 @@ export function PluginPage({ session, slug, id }: { session: Session; slug: stri
 /* ── People ──────────────────────────────────────────────────────────── */
 
 export function Manage({ slug, section }: { slug: string; section?: string }) {
+  const pwMin = passwordMin(useConfig(slug))
   const base = `/api/t/${enc(slug)}/manage`
   const members = useApi<Member[]>(['members', slug], `${base}/members`)
   const groups = useApi<Group[]>(['groups', slug], `${base}/groups`)
@@ -216,7 +218,7 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
         fields={[
           { name: 'username', label: t('Username'), required: true },
           { name: 'display_name', label: t('Display name') },
-          { name: 'password', label: t('Initial password'), type: 'password', required: true, hint: t('At least 10 characters') },
+          { name: 'password', label: t('Initial password'), type: 'password', required: true, hint: t('At least {n} characters', { n: pwMin }) },
           { name: 'role', label: t('Role'), options: [['user', 'User'], ['tenant_manager', 'Tenant Manager']] },
         ]}
         submit={t('Create user')}
@@ -250,6 +252,7 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
 type Q<T> = { data?: T; isLoading: boolean; error: unknown }
 
 function People({ slug, q }: { slug: string; q: Q<Member[]> }) {
+  const pwMin = passwordMin(useConfig(slug))
   const base = `/api/t/${enc(slug)}/manage/members`
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState('')
@@ -397,7 +400,7 @@ function People({ slug, q }: { slug: string; q: Q<Member[]> }) {
         onOpenChange={(o) => !o && setPwFor(null)}
         title={t('New password for {username}', { username: pwFor?.username ?? '' })}
         description={t('Their open sessions are closed.')}
-        fields={[{ name: 'password', label: t('New password'), type: 'password', required: true, hint: t('At least 10 characters') }]}
+        fields={[{ name: 'password', label: t('New password'), type: 'password', required: true, hint: t('At least {n} characters', { n: pwMin }) }]}
         submit={t('Reset')}
         onSubmit={(v) => resetPw.mutateAsync({ id: pwFor!.user_id, password: v.password })}
       />
@@ -986,29 +989,45 @@ export function TenantSettingsPage({ slug, section }: { slug: string; section?: 
   const ctx = useTenantCtx(slug)
   if (ctx.isLoading) return <Loading />
   if (ctx.data?.tenant.role !== 'tenant_manager') return <Empty title={t('Reserved to Tenant Managers')} />
+  const level = { kind: 'tenant', slug } as const
   const sections = [
     { id: 'sharing', label: t('Sharing'), icon: <Share2 />, group: t('Tenant') },
-    { id: 'sign-in', label: t('Sign-in'), icon: <KeyRound /> },
-    { id: 'theme', label: t('Theme'), icon: <Palette />, group: t('Identity and appearance') },
+    { id: 'security', label: t('Passwords and sessions'), icon: <KeyRound /> },
+    { id: 'keys', label: t('Keys of outside services'), icon: <KeySquare /> },
+    { id: 'embedding', label: t('Embedding'), icon: <Frame /> },
+    { id: 'appearance', label: t('Identity and appearance'), icon: <Palette />, group: t('Appearance') },
+    { id: 'platform', label: t('Managed by the platform'), icon: <Lock />, group: t('Platform') },
   ]
-  const cur = sections.some((s) => s.id === section) ? section! : 'sharing'
+  const tabs = [
+    { id: 'identity', label: t('Identity and texts') },
+    { id: 'theme', label: t('Theme and mode') },
+    { id: 'languages', label: t('Languages and formats') },
+  ]
+  // before: Sign-in (now in Managed by the platform)
+  const sec = section === 'sign-in' ? 'platform' : section
+  const tab = tabs.some((x) => x.id === sec) ? sec! : sec === 'appearance' ? 'identity' : null
+  const cur = tab ? 'appearance' : sections.some((s) => s.id === sec) ? sec! : 'sharing'
   return (
     <>
       <PageHeader title={t('Tenant settings')} sub={t('They apply to everybody in {name}', { name: ctx.data.tenant.name })} />
-      <Sections sections={sections} current={cur} href={(id) => to.tenant(slug, 'settings', id)}>
+      <Sections sections={sections} current={cur} href={(id) => to.tenant(slug, 'settings', id === 'appearance' ? 'identity' : id)}>
         {cur === 'sharing' && <Policy slug={slug} />}
-        {cur === 'theme' && <TenantTheme slug={slug} />}
-        {cur === 'sign-in' && (
-          <Card className="max-w-2xl">
-            <CardHeader>
-              <CardTitle>{t('Sign-in')}</CardTitle>
-              <CardDescription>{t('The Administrator decides it for the tenant.')}</CardDescription>
-            </CardHeader>
-            <CardContent className="grid gap-3">
-              <Locked label={t('Sign-in method')} value={t('Local accounts of the tenant')} hint={t('Or an identity provider (OIDC), never both.')} />
-              <Locked label={t('Password rules')} value={t('At least 10 characters, not all the same')} hint={t('The tenant will be able to make them stricter, not weaker.')} />
-            </CardContent>
-          </Card>
+        {cur === 'security' && <SecurityPanel level={level} />}
+        {cur === 'keys' && <KeysPanel level={level} />}
+        {cur === 'embedding' && <EmbeddingPanel level={level} />}
+        {cur === 'platform' && <ManagedPanel slug={slug} />}
+        {cur === 'appearance' && tab && (
+          <div className="grid gap-6">
+            <Tabs tabs={tabs} current={tab} href={(id) => to.tenant(slug, 'settings', id)} />
+            {tab === 'identity' && <IdentityPanel level={level} />}
+            {tab === 'theme' && (
+              <div className="grid gap-6">
+                <TenantTheme slug={slug} />
+                <ModePanel level={level} />
+              </div>
+            )}
+            {tab === 'languages' && <LanguagesPanel level={level} />}
+          </div>
         )}
       </Sections>
     </>

@@ -3,7 +3,7 @@
 
 import { useRef, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Bell, Building2, CircleHelp, Contrast, Info, KeyRound, MoreHorizontal, Palette, PanelLeft, PanelTop, Plus, Power, Puzzle, Search, ShieldCheck, Trash2, Upload, Users } from 'lucide-react'
+import { Bell, Building2, CircleHelp, Contrast, Frame, KeyRound, KeySquare, MoreHorizontal, Palette, PanelLeft, Plus, Power, Puzzle, Search, ShieldCheck, Trash2, Upload, Users } from 'lucide-react'
 import { api, fmtBytes, fmtDate } from '../../api.ts'
 import { useBrand } from '../../brand.ts'
 import type { AdminPlugin, AdminUser, CatalogItem, GlobalKpi, Member, Session, ShellBand, SystemOverview, TenantInfo } from '../../types.ts'
@@ -16,13 +16,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
-import { initials, useAction, useApi, useConfirm } from '../core.ts'
+import { initials, passwordMin, useAction, useApi, useConfig, useConfirm } from '../core.ts'
 import AppIcon from '../AppIcon.tsx'
 import { DataTable, Empty, ErrorBox, FormDialog, Kpi, Loading, PageHeader, Pills, PluginKpis, SaveBar, Sections, StatusBadge, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import { bandOf } from '../prefs.ts'
 import { AppMark } from '../Shell.tsx'
 import { PlatformTheme } from '../ThemeSettings.tsx'
+import { EmbeddingPanel, IdentityPanel, KeysPanel, LanguagesPanel, ModePanel, SecurityPanel, ThemeSwitch } from '../SettingsPanels.tsx'
 import { t } from '../i18n.ts'
 
 const enc = encodeURIComponent
@@ -74,6 +75,7 @@ export function AdminOverview({ session }: { session: Session }) {
 /* ── Tenant ──────────────────────────────────────────────────────────── */
 
 export function AdminTenants() {
+  const pwMin = passwordMin(useConfig())
   const q = useApi<TenantInfo[]>(['admin-tenants'], '/api/admin/tenants')
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -150,7 +152,7 @@ export function AdminTenants() {
           { name: 'name', label: t('Name'), required: true },
           { name: 'manager_username', label: t('Username of the Tenant Manager'), required: true },
           { name: 'manager_display_name', label: t('Name of the Tenant Manager') },
-          { name: 'manager_password', label: t('Initial password'), type: 'password', required: true, hint: t('At least 10 characters') },
+          { name: 'manager_password', label: t('Initial password'), type: 'password', required: true, hint: t('At least {n} characters', { n: pwMin }) },
         ]}
         submit={t('Create the tenant')}
         onSubmit={(v) => create.mutateAsync(v)}
@@ -231,6 +233,7 @@ export function AdminTenant({ id, section }: { id: string; section?: string }) {
 }
 
 function TenantUsers({ id, q }: { id: string; q: { data?: Member[]; isLoading: boolean; error: unknown } }) {
+  const pwMin = passwordMin(useConfig())
   const base = `/api/admin/tenants/${id}`
   const [dlg, setDlg] = useState<null | 'manager' | Member>(null)
   const inval = [['admin-members', id], ['admin-tenants']]
@@ -302,7 +305,7 @@ function TenantUsers({ id, q }: { id: string; q: { data?: Member[]; isLoading: b
         fields={[
           { name: 'username', label: t('Username'), required: true },
           { name: 'display_name', label: t('Name') },
-          { name: 'password', label: t('Initial password'), type: 'password', required: true, hint: t('At least 10 characters') },
+          { name: 'password', label: t('Initial password'), type: 'password', required: true, hint: t('At least {n} characters', { n: pwMin }) },
         ]}
         submit={t('Create')}
         onSubmit={(v) => newManager.mutateAsync(v)}
@@ -311,7 +314,7 @@ function TenantUsers({ id, q }: { id: string; q: { data?: Member[]; isLoading: b
         open={!!dlg && dlg !== 'manager'}
         onOpenChange={(o) => !o && setDlg(null)}
         title={t('New password for {v}', { v: dlg && dlg !== 'manager' ? dlg.username : '' })}
-        fields={[{ name: 'password', label: t('New password'), type: 'password', required: true, hint: t('At least 10 characters') }]}
+        fields={[{ name: 'password', label: t('New password'), type: 'password', required: true, hint: t('At least {n} characters', { n: pwMin }) }]}
         submit={t('Reset')}
         onSubmit={(v) => resetPw.mutateAsync({ uid: (dlg as Member).user_id, password: v.password })}
       />
@@ -503,47 +506,49 @@ export function AdminPlugins({ section }: { section?: string }) {
 export function AdminSystem({ session, section }: { session: Session; section?: string }) {
   const sections = [
     { id: 'admins', label: t('Administrators'), icon: <ShieldCheck />, group: t('Platform') },
-    { id: 'identity', label: t('Identity and texts'), icon: <Info />, group: t('Identity and appearance') },
-    { id: 'theme', label: t('Theme'), icon: <Palette /> },
-    { id: 'topbar', label: t('Top bar'), icon: <PanelTop /> },
+    { id: 'security', label: t('Passwords and sessions'), icon: <KeyRound /> },
+    { id: 'keys', label: t('Keys of outside services'), icon: <KeySquare /> },
+    { id: 'embedding', label: t('Embedding'), icon: <Frame /> },
+    { id: 'appearance', label: t('Identity and appearance'), icon: <Palette />, group: t('Appearance') },
   ]
-  const cur = sections.some((s) => s.id === section) ? section! : 'admins'
+  // Identity and appearance has tabs: identity and texts, theme and mode, languages and formats, top bar
+  const tabs = [
+    { id: 'identity', label: t('Identity and texts') },
+    { id: 'theme', label: t('Theme and mode') },
+    { id: 'languages', label: t('Languages and formats') },
+    { id: 'topbar', label: t('Top bar') },
+  ]
+  const tab = tabs.some((x) => x.id === section) ? section! : section === 'appearance' ? 'identity' : null
+  const cur = tab ? 'appearance' : sections.some((s) => s.id === section) ? section! : 'admins'
   return (
     <>
       <PageHeader title={t('System')} sub={t('Settings of the platform, for every tenant')} />
-      <Sections sections={sections} current={cur} href={(id) => to.admin('system', id)}>
+      <Sections sections={sections} current={cur} href={(id) => to.admin('system', id === 'appearance' ? 'identity' : id)}>
         {cur === 'admins' && <Admins me={session.user.user_id} />}
-        {cur === 'identity' && <Identity />}
-        {cur === 'theme' && <PlatformTheme session={session} />}
-        {cur === 'topbar' && <BandSettings session={session} />}
+        {cur === 'security' && <SecurityPanel level={PLATFORM} />}
+        {cur === 'keys' && <KeysPanel level={PLATFORM} />}
+        {cur === 'embedding' && <EmbeddingPanel level={PLATFORM} />}
+        {cur === 'appearance' && tab && (
+          <div className="grid gap-6">
+            <Tabs tabs={tabs} current={tab} href={(id) => to.admin('system', id)} />
+            {tab === 'identity' && <IdentityPanel level={PLATFORM} />}
+            {tab === 'theme' && (
+              <div className="grid gap-6">
+                <PlatformTheme session={session} />
+                <ThemeSwitch />
+                <ModePanel level={PLATFORM} />
+              </div>
+            )}
+            {tab === 'languages' && <LanguagesPanel level={PLATFORM} />}
+            {tab === 'topbar' && <BandSettings session={session} />}
+          </div>
+        )}
       </Sections>
     </>
   )
 }
 
-function Identity() {
-  const brand = useBrand()
-  return (
-    <Card className="max-w-2xl">
-      <CardHeader>
-        <CardTitle>{t('Identity and texts')}</CardTitle>
-        <CardDescription>{t('From the brand of the distribution (brand.toml). Editing them from here will come with the kernel.')}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <dl className="grid grid-cols-[max-content_1fr] items-center gap-x-6 gap-y-3 text-sm">
-          <dt className="text-muted-foreground">{t('Logo')}</dt>
-          <dd>
-            <AppMark />
-          </dd>
-          <dt className="text-muted-foreground">{t('Name')}</dt>
-          <dd>{brand.name}</dd>
-          <dt className="text-muted-foreground">{t('Version')}</dt>
-          <dd className="font-mono">{brand.version}</dd>
-        </dl>
-      </CardContent>
-    </Card>
-  )
-}
+const PLATFORM = { kind: 'platform' } as const
 
 const bandItems = (): { key: keyof ShellBand; label: string; off: string }[] => [
   { key: 'logo', label: t('Logo and name of the application'), off: t('the sidebar button takes the place of the logo.') },
@@ -646,6 +651,7 @@ function BandPreview({ band }: { band: ShellBand }) {
 }
 
 function Admins({ me }: { me: string }) {
+  const pwMin = passwordMin(useConfig())
   const q = useApi<AdminUser[]>(['admins'], '/api/admin/administrators')
   const confirm = useConfirm()
   const [dlg, setDlg] = useState<null | 'new' | AdminUser>(null)
@@ -751,7 +757,7 @@ function Admins({ me }: { me: string }) {
         fields={[
           { name: 'username', label: t('Username'), required: true },
           { name: 'display_name', label: t('Name') },
-          { name: 'password', label: t('Initial password'), type: 'password', required: true, hint: t('At least 10 characters') },
+          { name: 'password', label: t('Initial password'), type: 'password', required: true, hint: t('At least {n} characters', { n: pwMin }) },
         ]}
         submit={t('Create')}
         onSubmit={(v) => create.mutateAsync(v)}
@@ -760,7 +766,7 @@ function Admins({ me }: { me: string }) {
         open={!!dlg && dlg !== 'new'}
         onOpenChange={(o) => !o && setDlg(null)}
         title={t('New password for {v}', { v: dlg && dlg !== 'new' ? dlg.username : '' })}
-        fields={[{ name: 'password', label: t('New password'), type: 'password', required: true, hint: t('At least 10 characters') }]}
+        fields={[{ name: 'password', label: t('New password'), type: 'password', required: true, hint: t('At least {n} characters', { n: pwMin }) }]}
         submit={t('Reset')}
         onSubmit={(v) => pw.mutateAsync({ id: (dlg as AdminUser).user_id, password: v.password })}
       />

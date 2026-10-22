@@ -18,6 +18,7 @@ toml.workspace = true
 uuid.workspace = true
 chrono.workspace = true
 argon2.workspace = true
+ring.workspace = true
 rand.workspace = true
 sha2.workspace = true
 hmac.workspace = true

@@ -57,8 +57,16 @@ url = "http://127.0.0.1:8080/mosaikit"
 # Env: MOSAIKIT_PREINSTALL
 # preinstall = false
 
-# Lifetime of a sign-in session, in hours.
+# Lifetime of a sign-in session, in hours: the default of the setting «Length of the session» of
+# the platform (System › Passwords and sessions), which the Administrator can change.
 # session_ttl_hours = 12
+
+# Key (32 bytes in base64) that encrypts the keys of outside services in the database. Without it,
+# the file `secret.key` in data_dir, created at the first start: keep it with the backups (without
+# it the keys must be entered again). With several servers on the same database, the same value on
+# all of them. Generate one with: openssl rand -base64 32
+# Env: MOSAIKIT_SECRET_KEY
+# secret_key = "…"
 
 # Second factor (TOTP: Google/Microsoft Authenticator, FreeOTP...) required for the
 # Administrators. At the first sign-in the app shows the QR code to register and the recovery

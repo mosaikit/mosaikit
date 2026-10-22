@@ -33,7 +33,7 @@ export function markSvg(variant: MarkVariant, slot = true): string {
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${VIEW}">${tiles}${dashed}<rect x="352" y="56" width="104" height="104" rx="14" fill="#F0B23A"/></svg>`
 }
 
-/** The favicon: the positive symbol, or the brand logo. */
+/** The favicon: the browser icon of the platform, its logo, or the positive symbol. */
 export function useFavicon() {
   const brand = useBrand()
   useEffect(() => {
@@ -43,12 +43,13 @@ export function useFavicon() {
       link.rel = 'icon'
       document.head.appendChild(link)
     }
-    if (brand.logo) {
+    if (brand.icon || brand.logo) {
+      // the browser icon of the platform (System › Identity and texts, brand.toml), otherwise its logo
       link.type = ''
-      link.href = 'brand/logo'
+      link.href = brand.icon ? 'brand/favicon' : 'brand/logo'
     } else {
       link.type = 'image/svg+xml'
       link.href = `data:image/svg+xml,${encodeURIComponent(markSvg('positive', false))}`
     }
-  }, [brand.logo])
+  }, [brand.logo, brand.icon])
 }

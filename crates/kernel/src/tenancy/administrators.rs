@@ -9,7 +9,7 @@ use serde_json::json;
 use uuid::Uuid;
 
 use super::require_admin;
-use crate::identity::{check_password_policy, hash_password, valid_username};
+use crate::identity::{check_password_len, hash_password, password_min, valid_username};
 use crate::{events, Error, Kernel, Result, SessionUser};
 
 /// Administrator account.
@@ -59,7 +59,7 @@ pub async fn create_administrator(
     if !valid_username(&username) {
         return Err(Error::bad("invalid username: lower case, digits, '.', '-', '_' (2-64)"));
     }
-    check_password_policy(password)?;
+    check_password_len(password, password_min(k, None).await?)?;
     let hash = hash_password(k, password).await?;
     let id: Uuid = mosaikit_db::query_scalar(
         "insert into core.users (home_tenant_id, username, display_name, password_hash, is_system_admin)
