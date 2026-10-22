@@ -73,6 +73,14 @@ function values(v: unknown): Args {
   return o
 }
 
+const PAGE = /^[A-Za-z0-9_.-]+(\/[A-Za-z0-9_.-]+)*\.html$/
+
+/** The page of a tab of an extension is an .html file of its UI (no `..`, no absolute path). */
+export function safePage(page: string): string {
+  if (!PAGE.test(page) || page.split('/').some((s) => s === '.' || s === '..')) throw new OpError('invalid page of the tab')
+  return page
+}
+
 /** Operations handled locally by the host (they do not become REST calls). */
 export const LOCAL_OPS = new Set(['hello', 'share', 'toast', 'confirm'])
 
@@ -168,7 +176,7 @@ export async function execute(call: RestCall): Promise<unknown> {
 
 /** Variables of the theme of the host passed to the UIs of the plugins. */
 export const THEME_VARS = [
-  '--bg', '--panel', '--panel2', '--line', '--fg', '--dim', '--acc', '--acc-soft', '--acc-line', '--ok', '--err',
+  '--bg', '--panel', '--panel2', '--line', '--fg', '--dim', '--acc', '--acc-soft', '--acc-line', '--ok', '--err', '--on-acc', '--on-err',
 ]
 
 export function themeVars(): Record<string, string> {

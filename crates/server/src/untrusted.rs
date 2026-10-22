@@ -84,6 +84,9 @@ async fn plugin_ui(State(s): State<AppState>, Path((plugin, path)): Path<(String
     set(&mut res, header::CONTENT_SECURITY_POLICY, &plugin_csp(&s, &p));
     let cache = if p.dev || rel.ends_with(".html") { "no-cache" } else { "public, max-age=300" };
     set(&mut res, header::CACHE_CONTROL, cache);
+    // the tab of an extension runs in a frame without an origin of its own (sandbox without
+    // allow-same-origin): its module scripts are fetched with CORS. The files of a UI are public anyway.
+    set(&mut res, header::ACCESS_CONTROL_ALLOW_ORIGIN, "*");
     res
 }
 

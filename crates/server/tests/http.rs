@@ -1904,3 +1904,105 @@ async fn search_prefs_and_themes_over_http() {
         StatusCode::FORBIDDEN
     );
 }
+
+#[tokio::test]
+async fn extension_tabs_over_http() {
+    let a = App::new().await;
+    a.t.install("notes").await;
+    let g = a.t.tenant("alfa").await;
+    a.t.member(&g, "anna").await;
+    let admin = a.admin().await;
+    let anna = a.login("alfa", "anna", PASSWORD).await;
+
+    // an extension of Notes with a tab: a page of its UI
+    let manifest = r#"
+id = "com.example.tabs"
+name = "Tabs"
+version = "0.1.0"
+kind = "extension"
+[contribution]
+icon = "✔"
+label = "Tabs"
+[extends]
+plugin = "com.mosaikit.notes"
+[ui]
+entry = "index.html"
+[[extension.tabs]]
+resource = "notes"
+key = "review"
+label = "Review"
+page = "tab.html"
+[i18n.it]
+extension = { tabs = { review = "Revisione" } }
+"#;
+    let files = std::collections::BTreeMap::from([
+        ("plugin.toml".to_string(), manifest.as_bytes().to_vec()),
+        ("ui/index.html".to_string(), b"<!doctype html><title>tabs</title>".to_vec()),
+        ("ui/tab.html".to_string(), b"<!doctype html><title>tab</title><p>the tab</p>".to_vec()),
+    ]);
+    let pkg = mosaikit_mskp::pack(&files, Some(&mosaikit_kernel::testing::test_key())).unwrap();
+    let r = a.raw(&admin, "/api/admin/plugins", pkg).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let r = a.call(Some(&admin), Method::POST, "/api/admin/plugins/com.example.tabs/activate", None).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+
+    // the tab in the list of the extensions of the notes (its Italian label: kernel tests)
+    let ext =
+        a.call(Some(&anna), Method::GET, "/api/t/alfa/p/com.mosaikit.notes/ext/notes", None).await.json();
+    let tab = &ext[0]["tabs"][0];
+    assert_eq!(
+        (tab["key"].clone(), tab["label"].clone(), tab["page"].clone()),
+        (json!("review"), json!("Review"), json!("tab.html"))
+    );
+
+    // its page on the origin of the plugins: framed only by the app, readable from a frame without an origin
+    let r = a.get_untrusted("/ui/com.example.tabs/tab.html", None).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    assert!(r.text().contains("the tab"));
+    assert_eq!(r.header(header::ACCESS_CONTROL_ALLOW_ORIGIN), "*");
+    let csp = r.header(header::CONTENT_SECURITY_POLICY);
+    assert!(csp.contains(&format!("frame-ancestors {}", a.t.cfg.app_origin())), "{csp}");
+}
+
+#[tokio::test]
+async fn one_item_from_a_backup_over_http() {
+    let a = App::new().await;
+    a.t.install("notes").await;
+    let g = a.t.tenant("alfa").await;
+    let anna_u = a.t.member(&g, "anna").await;
+    let admin = a.admin().await;
+    let admin_u = a.t.admin().await;
+    let anna = a.login("alfa", "anna", PASSWORD).await;
+    let note = a
+        .call(
+            Some(&anna),
+            Method::POST,
+            "/api/t/alfa/p/com.mosaikit.notes/r/notes",
+            Some(json!({ "values": { "title": "Minutes" } })),
+        )
+        .await
+        .json();
+    let id: uuid::Uuid = note["id"].as_str().unwrap().parse().unwrap();
+    let b = mosaikit_kernel::ops::backup::run(&a.t, Some(&admin_u)).await.unwrap();
+    let anna_c = a.t.home(&anna_u).await;
+    mosaikit_kernel::crud::delete(&a.t, &anna_c, "com.mosaikit.notes", "notes", id).await.unwrap();
+    mosaikit_kernel::trash::purge(&a.t, &anna_c, id).await.unwrap();
+
+    // looked for by its title, then restored with its id
+    let path = format!("/api/admin/backups/{}/tenants/alfa/items", b.id);
+    let r = a.call(Some(&admin), Method::GET, &format!("{path}?q=minutes"), None).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let list = r.json();
+    assert_eq!((list["total"].clone(), list["items"][0]["state"].clone()), (json!(1), json!("missing")));
+    let restore = format!("{path}/{id}/restore");
+    let r = a.call(Some(&admin), Method::POST, &restore, Some(json!({}))).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    assert_eq!(r.json()["mode"], "original");
+    // again: it is there now, the Administrator must choose
+    let r = a.call(Some(&admin), Method::POST, &restore, Some(json!({}))).await;
+    assert_eq!((r.status, r.json()["code"].clone()), (StatusCode::CONFLICT, json!("item_exists")));
+    let r = a.call(Some(&admin), Method::POST, &restore, Some(json!({ "mode": "copy" }))).await;
+    assert_eq!(r.json()["mode"], "copy", "{}", r.text());
+    // only the Administrators
+    assert_eq!(a.call(Some(&anna), Method::GET, &path, None).await.status, StatusCode::FORBIDDEN);
+}

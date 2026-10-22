@@ -1,8 +1,20 @@
-import { useEffect, useRef, useState } from 'react'
-import { errorReply, execute, routeOp, themeVars, uuid } from '../bridge.ts'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { errorReply, execute, OpError, routeOp, safePage, themeVars, uuid } from '../bridge.ts'
 import type { PluginView, Session, TenantContext } from '../types.ts'
 import { useUi } from '../ui-context.ts'
 import { t } from '../app/i18n.ts'
+import ExtensionTab, { type TabState } from './ExtensionTab.tsx'
+
+const IDENT = /^[a-z][a-z0-9_]{0,47}$/
+const EXT_ID = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/
+/** at most this many tabs of extensions open at a time in a frame (the oldest closes) */
+const MAX_TABS = 4
+
+function rectArg(v: unknown): TabState['rect'] {
+  const r = (v ?? {}) as Record<string, unknown>
+  const n = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) ? Math.round(x) : 0)
+  return { top: n(r.top), left: n(r.left), width: Math.max(n(r.width), 0), height: Math.max(n(r.height), 0) }
+}
 
 interface Props {
   plugin: PluginView
@@ -38,13 +50,22 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
   const ref = useRef<HTMLIFrameElement>(null)
   const ui = useUi()
   const [loaded, setLoaded] = useState(false)
+  // the tabs of extensions open in the detail of an item of this plugin (drawn by the host, see ExtensionTab)
+  const [tabs, setTabs] = useState<TabState[]>([])
   const origin = session.plugin_origin
   const tenant = ctx.tenant.slug
   const src = `${session.plugin_url ?? origin}/ui/${encodeURIComponent(plugin.id)}/?host=${encodeURIComponent(window.location.origin)}&v=${reloadKey}`
 
   useEffect(() => {
     setLoaded(false)
+    setTabs([])
   }, [src])
+
+  /** An event for the page of the plugin (from a tab of an extension: its height, changed values). */
+  const toBase = useCallback(
+    (event: string, data: unknown) => ref.current?.contentWindow?.postMessage({ msk: 1, event, data }, origin),
+    [origin],
+  )
 
   // at every change of language, theme or mode the plugin receives the new context (and the theme only, for
   // the plugins written before the `context` event)
@@ -96,6 +117,53 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
           case 'confirm':
             reply({ ok: await ui.confirm(String(m.args?.text ?? '').slice(0, 500), true) })
             return
+          // a tab of an extension in the detail of an item: the host checks that the extension offers it to
+          // this person and that the item is visible to them, then draws the page of the extension over `rect`
+          case 'ext.tab.open': {
+            const a = m.args ?? {}
+            const resource = String(a.resource ?? '')
+            const ext = String(a.extension ?? '')
+            const key = String(a.tab ?? '')
+            if (!IDENT.test(resource) || !EXT_ID.test(ext) || !IDENT.test(key)) throw new OpError('invalid tab')
+            const item = uuid(a.id)
+            const list = (await execute(routeOp(tenant, plugin.id, 'ext.list', { resource }))) as {
+              id: string
+              tabs?: { key: string; label: string; page: string }[]
+            }[]
+            const decl = list.find((e) => e.id === ext)?.tabs?.find((x) => x.key === key)
+            if (!decl) throw new OpError('this tab is not available')
+            const row = (await execute(routeOp(tenant, plugin.id, 'crud.get', { resource, id: item }))) as { my_level?: TabState['level'] }
+            const tab: TabState = {
+              handle: crypto.randomUUID(),
+              ext,
+              key,
+              label: decl.label,
+              page: safePage(decl.page),
+              base: plugin.id,
+              resource,
+              item,
+              level: row.my_level ?? 'read',
+              rect: rectArg(a.rect),
+              visible: true,
+            }
+            setTabs((cur) => [...cur, tab].slice(-MAX_TABS))
+            reply({ ok: { handle: tab.handle } })
+            return
+          }
+          case 'ext.tab.place': {
+            const handle = String(m.args?.handle ?? '')
+            const rect = rectArg(m.args?.rect)
+            const visible = m.args?.visible !== false
+            setTabs((cur) => cur.map((x) => (x.handle === handle ? { ...x, rect, visible } : x)))
+            reply({ ok: null })
+            return
+          }
+          case 'ext.tab.close': {
+            const handle = String(m.args?.handle ?? '')
+            setTabs((cur) => cur.filter((x) => x.handle !== handle))
+            reply({ ok: null })
+            return
+          }
           default:
             reply({ ok: await execute(routeOp(tenant, plugin.id, m.op, m.args)) })
         }
@@ -116,7 +184,7 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
   }
 
   return (
-    <div className="frame-wrap">
+    <div className="frame-wrap" style={{ overflow: 'hidden' }}>
       <iframe
         key={src}
         ref={ref}
@@ -126,8 +194,15 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals"
         allow="fullscreen; geolocation; clipboard-write"
         referrerPolicy="no-referrer"
-        onLoad={() => setLoaded(true)}
+        onLoad={() => {
+          setLoaded(true)
+          // a new page of the plugin: its tabs went with the old one
+          setTabs([])
+        }}
       />
+      {tabs.map((tab) => (
+        <ExtensionTab key={tab.handle} tab={tab} session={session} ctx={ctx} reloadKey={reloadKey} context={() => uiContext(shellRef.current)} uiKey={uiKey} toBase={toBase} />
+      ))}
       {!loaded && <div className="frame-msg">{t('Loading {label}…', { label: plugin.label })}</div>}
     </div>
   )

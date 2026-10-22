@@ -115,7 +115,7 @@ fn backend(k: &Kernel) -> &'static str {
 }
 
 /// Physical name of a table of the kernel.
-fn core_table(k: &Kernel, name: &str) -> String {
+pub(crate) fn core_table(k: &Kernel, name: &str) -> String {
     if k.db.is_sqlite() {
         format!("core_{name}")
     } else {
@@ -136,7 +136,7 @@ fn qi(s: &str) -> String {
 }
 
 /// Columns of a table: (name, type). On PostgreSQL `schema.table`.
-async fn columns(k: &Kernel, tx: &mut Tx, physical: &str) -> Result<Vec<(String, String)>> {
+pub(crate) async fn columns(k: &Kernel, tx: &mut Tx, physical: &str) -> Result<Vec<(String, String)>> {
     if k.db.is_sqlite() {
         let rows = mosaikit_db::query("select 1")
             .sqlite("select name, lower(type) from pragma_table_info(?1)")
@@ -198,7 +198,13 @@ async fn dump(k: &Kernel, tx: &mut Tx, physical: &str, cond: &str, tenant: Uuid)
 }
 
 /// Inserts rows (JSON objects) into a table: only the columns the table still has.
-async fn restore(k: &Kernel, tx: &mut Tx, physical: &str, table: &str, rows: &[Value]) -> Result<usize> {
+pub(crate) async fn restore(
+    k: &Kernel,
+    tx: &mut Tx,
+    physical: &str,
+    table: &str,
+    rows: &[Value],
+) -> Result<usize> {
     if rows.is_empty() {
         return Ok(0);
     }
@@ -263,7 +269,7 @@ fn lite_param(v: &Value, ty: &str) -> Param {
 }
 
 /// Tables of an installed plugin: (logical name, physical name).
-async fn plugin_tables(k: &Kernel, tx: &mut Tx, schema: &str) -> Result<Vec<(String, String)>> {
+pub(crate) async fn plugin_tables(k: &Kernel, tx: &mut Tx, schema: &str) -> Result<Vec<(String, String)>> {
     if k.db.is_sqlite() {
         let prefix = format!("{schema}__");
         let rows = mosaikit_db::query("select 1")
@@ -469,7 +475,7 @@ fn prune_exports(k: &Kernel) {
     }
 }
 
-fn read_json<R: Read + Seek>(zip: &mut ZipArchive<R>, name: &str) -> Result<Option<Value>> {
+pub(crate) fn read_json<R: Read + Seek>(zip: &mut ZipArchive<R>, name: &str) -> Result<Option<Value>> {
     let mut f = match zip.by_name(name) {
         Ok(f) => f,
         Err(zip::result::ZipError::FileNotFound) => return Ok(None),
@@ -510,7 +516,7 @@ pub fn tenants_in<R: Read + Seek>(zip: &mut ZipArchive<R>) -> Result<Vec<Manifes
 }
 
 /// Extracts the files of a folder of the archive into `dest` (safe paths only).
-fn extract<R: Read + Seek>(zip: &mut ZipArchive<R>, prefix: &str, dest: &Path) -> Result<usize> {
+pub(crate) fn extract<R: Read + Seek>(zip: &mut ZipArchive<R>, prefix: &str, dest: &Path) -> Result<usize> {
     let names: Vec<String> =
         zip.file_names().filter(|n| n.starts_with(prefix) && !n.ends_with('/')).map(str::to_owned).collect();
     let mut n = 0;
@@ -715,7 +721,11 @@ fn keep_row(
 
 /// Rows of the tables of a plugin, which may refer to each other: a table that fails because of another
 /// one not yet inserted is tried again after the others (on SQLite the foreign keys wait for the commit).
-async fn restore_plugin(k: &Kernel, tx: &mut Tx, mut pending: Vec<(String, Vec<Value>)>) -> Result<usize> {
+pub(crate) async fn restore_plugin(
+    k: &Kernel,
+    tx: &mut Tx,
+    mut pending: Vec<(String, Vec<Value>)>,
+) -> Result<usize> {
     let mut n = 0;
     while !pending.is_empty() {
         let before = pending.len();

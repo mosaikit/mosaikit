@@ -1,7 +1,7 @@
 //! REST API of the lifecycle of the tenants and of the operations (Administrator; see
 //! `docs/architecture.md`, "Lifecycle of the tenants" and "Operations"):
 //! - tenants: what they hold, trial period, archive, deletion, export and import;
-//! - backups: list, run now, download, delete, schedule, restore of one tenant;
+//! - backups: list, run now, download, delete, schedule, restore of one tenant or of one item;
 //! - maintenance mode;
 //! - monitoring: services, performance, errors, tenants, capacity, alerts; metrics as text.
 
@@ -14,7 +14,7 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use chrono::{DateTime, Utc};
-use mosaikit_kernel::ops::{backup, maintenance, metrics, monitor};
+use mosaikit_kernel::ops::{backup, backup_item, maintenance, metrics, monitor};
 use mosaikit_kernel::tenancy::lifecycle;
 use mosaikit_kernel::transfer::{self, ImportOptions};
 use mosaikit_kernel::{tenancy, Error};
@@ -47,6 +47,8 @@ pub fn router() -> Router<AppState> {
         .route("/api/admin/backups/{id}/file", get(a_backup_file))
         .route("/api/admin/backups/{id}/tenants", get(a_backup_tenants))
         .route("/api/admin/backups/{id}/restore", post(a_backup_restore))
+        .route("/api/admin/backups/{id}/tenants/{slug}/items", get(a_backup_items))
+        .route("/api/admin/backups/{id}/tenants/{slug}/items/{rid}/restore", post(a_backup_item_restore))
         // maintenance
         .route("/api/admin/maintenance", get(a_maintenance).put(a_set_maintenance))
         // monitoring
@@ -254,6 +256,26 @@ async fn a_backup_restore(
     let rep =
         backup::restore_tenant(&s.k, &u, uuid(&id)?, &r.slug, &ImportOptions { replace: r.replace }).await?;
     Ok(Json(json!(rep)))
+}
+
+/// The items of a tenant in a backup (search by title, app, owner).
+async fn a_backup_items(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Path((id, slug)): Path<(String, String)>,
+    Query(q): Query<backup_item::ItemQuery>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(backup_item::items(&s.k, &u, uuid(&id)?, &slug, &q).await?)))
+}
+
+/// One item restored from a backup (`mode` when it is still in the tenant: `copy` or `replace`).
+async fn a_backup_item_restore(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Path((id, slug, rid)): Path<(String, String, String)>,
+    Json(r): Json<backup_item::ItemRestore>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(backup_item::restore(&s.k, &u, uuid(&id)?, &slug, uuid(&rid)?, &r).await?)))
 }
 
 // ------------------------------------------------------------------ maintenance

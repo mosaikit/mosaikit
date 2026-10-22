@@ -151,6 +151,8 @@ export function noteTitle(n: Note): string {
       return t('The trial of {tenant} ended: the tenant is suspended', { tenant: d.tenant })
     case 'backup.failed':
       return t('The backup failed')
+    case 'backup.item_restored':
+      return t('{item} was restored from the backup of {date}', { item: d.item ? `«${d.item}»` : t('An item'), date: d.date })
     case 'alert.raised':
       return t('Alert: {detail}', { detail: d.detail })
     default:
@@ -184,6 +186,8 @@ export function noteBody(n: Note): string {
       return t('Reactivate it or extend the trial from its page.')
     case 'alert.raised':
       return t('See Monitoring for the state of the platform.')
+    case 'backup.item_restored':
+      return d.mode === 'copy' ? t('As a copy, next to the current one.') : ''
     default:
       return n.body
   }

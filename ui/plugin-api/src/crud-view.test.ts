@@ -143,4 +143,62 @@ describe('mountCrud', () => {
     await tick()
     expect(calls.find((c) => c.op === 'ext.set')!.args).toEqual({ resource: 'notes', id: '1', extension: 'com.x.review', values: { reviewed: true } })
   })
+
+  it('shows the tabs of the extensions in the detail and asks the host to draw them', async () => {
+    const el = document.createElement('div')
+    document.body.append(el)
+    const calls: { op: string; args: any }[] = []
+    const listeners: ((event: string, data: unknown) => void)[] = []
+    const ext = [
+      { id: 'com.x.review', label: 'Review', fields: [{ key: 'history', label: 'History', kind: 'text', hidden: true }], actions: [], tabs: [{ key: 'review', label: 'Review', page: 'tab.html' }] },
+    ]
+    const bridge = {
+      call: async (op: string, args: any) => {
+        calls.push({ op, args })
+        if (op === 'crud.list') return { resource: 'notes', fields, rows: [row('1', 'mine', 'manage')] }
+        if (op === 'ext.list') return ext
+        if (op === 'ext.values') return { '1': { 'com.x.review': { history: '[]' } } }
+        if (op === 'ext.tab.open') return { handle: 'h1' }
+        return null
+      },
+      onEvent: (fn: (event: string, data: unknown) => void) => {
+        listeners.push(fn)
+        return () => {}
+      },
+    } as unknown as Bridge
+    const emit = (event: string, data: unknown) => listeners.forEach((l) => l(event, data))
+    const unmount = mountCrud(el, new Msk(bridge, { public: false }), 'notes')
+    await tick()
+    // no tab bar without an item; with an item: Detail and the tab of the extension
+    expect(el.querySelector<HTMLElement>('[role="tablist"]')!.hidden).toBe(true)
+    ;(el.querySelector('tbody tr.row') as HTMLElement).click()
+    const tabs = [...el.querySelectorAll<HTMLButtonElement>('[role="tab"]')]
+    expect(tabs.map((t) => [t.textContent, t.getAttribute('aria-selected')])).toEqual([['Detail', 'true'], ['Review', 'false']])
+    // the hidden field of the extension and an extension without visible fields: no fieldset
+    expect(el.querySelector('fieldset')).toBeNull()
+    tabs[1].click()
+    await tick()
+    expect(calls.find((c) => c.op === 'ext.tab.open')!.args).toMatchObject({ resource: 'notes', id: '1', extension: 'com.x.review', tab: 'review' })
+    const panel = el.querySelector<HTMLElement>('[role="tabpanel"]')!
+    expect(panel.hidden).toBe(false)
+    expect(el.querySelector<HTMLElement>('.msk-form > div:not(.msk-ext):not(.msk-tabs):not(.msk-tabpanel):not(.msk-actions):not(.msk-readonly):not(.msk-msg)')!.hidden).toBe(true)
+    // the height asked by the page of the extension, through the host
+    emit('ext.tab.height', { handle: 'h1', height: 420 })
+    expect(panel.style.height).toBe('420px')
+    emit('ext.tab.height', { handle: 'other', height: 90 })
+    expect(panel.style.height).toBe('420px')
+    // the extension changed its values: the values again
+    const before = calls.filter((c) => c.op === 'ext.values').length
+    emit('ext.changed', { extension: 'com.x.review', id: '1' })
+    await tick()
+    expect(calls.filter((c) => c.op === 'ext.values').length).toBe(before + 1)
+    // back to the fields: the tab closes; arrows move between the tabs
+    el.querySelector<HTMLButtonElement>('[role="tab"]')!.click()
+    expect(calls.find((c) => c.op === 'ext.tab.close')!.args).toEqual({ handle: 'h1' })
+    expect(panel.hidden).toBe(true)
+    el.querySelector<HTMLButtonElement>('[role="tab"]')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight' }))
+    expect(el.querySelectorAll('[role="tab"]')[1].getAttribute('aria-selected')).toBe('true')
+    unmount()
+    el.remove()
+  })
 })

@@ -10,15 +10,19 @@ import { toast } from 'sonner'
 import { api, ApiError, appUrl, errText, fmtBytes } from '../../api.ts'
 import { reloadBrand, useBrand } from '../../brand.ts'
 import type {
+  AdminPlugin,
   AdminUser,
   AlertSettings,
   AlertState,
   BackupInfo,
+  BackupItem,
+  BackupItems,
   BackupSettings,
   CatalogItem,
   Capacity,
   ExportManifest,
   ImportReport,
+  ItemRestoreReport,
   Maintenance,
   MetricPoint,
   ServiceState,
@@ -643,6 +647,7 @@ export function BackupPanel() {
   }, [running, qc])
   const [v, setV] = useState<BackupSettings | null>(null)
   const [restore, setRestore] = useState<BackupInfo | null>(null)
+  const [restoreItem, setRestoreItem] = useState<BackupInfo | null>(null)
   const run = useAction(() => api('POST', '/api/admin/backups'), { ok: t('Backup started'), invalidate: [['admin-backups']] })
   const save = useAction((s: BackupSettings) => api('PUT', '/api/admin/backups/settings', s), {
     ok: t('Settings saved'),
@@ -722,6 +727,9 @@ export function BackupPanel() {
                           <Button variant="ghost" size="sm" onClick={() => setRestore(b)}>
                             {t('Restore a tenant')}
                           </Button>
+                          <Button variant="ghost" size="sm" onClick={() => setRestoreItem(b)}>
+                            {t('Restore an item')}
+                          </Button>
                         </span>
                       )}
                       {b.status !== 'running' && (
@@ -767,7 +775,198 @@ export function BackupPanel() {
       </Card>
       <SaveBar dirty={dirty} busy={save.isPending} onSave={() => save.mutate(s, { onSuccess: () => setV(null) })} onCancel={() => setV(null)} />
       {restore && <RestoreTenantDialog backup={restore} onOpenChange={(o) => !o && setRestore(null)} />}
+      {restoreItem && <RestoreItemDialog backup={restoreItem} onOpenChange={(o) => !o && setRestoreItem(null)} />}
     </div>
+  )
+}
+
+const ITEM_STATE: Record<BackupItem['state'], string> = {
+  missing: 'No longer in the tenant',
+  trash: 'In the trash',
+  present: 'In the tenant',
+}
+
+/** One item of a tenant from a backup: found by title, app or owner, then restored. An item still in the
+ *  tenant comes back only as a copy or in place of the current one, by choice (never silently). */
+function RestoreItemDialog({ backup, onOpenChange }: { backup: BackupInfo; onOpenChange: (v: boolean) => void }) {
+  const qc = useQueryClient()
+  const inside = useApi<ExportManifest[]>(['backup-tenants', backup.id], `/api/admin/backups/${backup.id}/tenants`)
+  const plugins = useApi<AdminPlugin[]>(['admin-plugins'], '/api/admin/plugins')
+  const [slug, setSlug] = useState('')
+  const [form, setForm] = useState({ q: '', plugin: '', owner: '' })
+  const [filter, setFilter] = useState(form)
+  const [pending, setPending] = useState<BackupItem | null>(null)
+  const [mode, setMode] = useState<'copy' | 'replace'>('copy')
+  const [shares, setShares] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const tenant = slug || inside.data?.[0]?.tenant.slug || ''
+  const qs = new URLSearchParams(Object.entries(filter).filter(([, v]) => v.trim())).toString()
+  const key = ['backup-items', backup.id, tenant, qs]
+  const items = useApi<BackupItems>(key, tenant ? `/api/admin/backups/${backup.id}/tenants/${encodeURIComponent(tenant)}/items${qs ? '?' + qs : ''}` : null)
+  const label = (id: string) => plugins.data?.find((p) => p.id === id)?.label ?? id
+  async function restore() {
+    if (!pending) return
+    setBusy(true)
+    try {
+      const body = pending.state === 'missing' ? { shares } : { shares, mode }
+      const r = await api<ItemRestoreReport>('POST', `/api/admin/backups/${backup.id}/tenants/${encodeURIComponent(tenant)}/items/${pending.id}/restore`, body)
+      toast.success(r.mode === 'copy' ? t('«{title}» restored as a copy', { title: r.title }) : t('«{title}» restored', { title: r.title }))
+      setPending(null)
+      await qc.invalidateQueries({ queryKey: ['backup-items', backup.id] })
+    } catch (e) {
+      toast.error(errText(e))
+    } finally {
+      setBusy(false)
+    }
+  }
+  const date = fmtDay(backup.started_at, { dateStyle: 'medium', timeStyle: 'short' })
+  return (
+    <Dialog open onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>{t('Restore an item')}</DialogTitle>
+          <DialogDescription>{t('From the backup of {date}: the item comes back as it was then, with what is in it and its files. Public links do not come back.', { date })}</DialogDescription>
+        </DialogHeader>
+        {inside.isLoading ? (
+          <Loading />
+        ) : inside.error ? (
+          <ErrorBox error={inside.error} />
+        ) : pending ? (
+          <div className="grid gap-4">
+            <p className="text-sm">
+              <b>{pending.title || pending.kind}</b> · {label(pending.plugin_id)} · {pending.owner_name}
+              {pending.children > 0 && <span className="text-muted-foreground"> · {t('{n} items inside', { n: String(pending.children) })}</span>}
+            </p>
+            {pending.state !== 'missing' && (
+              <fieldset className="grid gap-2">
+                <legend className="mb-1 text-sm font-medium">{t('The item is still in the tenant ({state}).', { state: t(ITEM_STATE[pending.state]).toLowerCase() })}</legend>
+                <label className="flex items-start gap-2 text-sm">
+                  <input type="radio" name="restore-mode" checked={mode === 'copy'} onChange={() => setMode('copy')} className="mt-1" />
+                  <span>
+                    <b className="block">{t('As a copy')}</b>
+                    <span className="text-muted-foreground">{t('A new item next to the current one, which stays as it is.')}</span>
+                  </span>
+                </label>
+                <label className="flex items-start gap-2 text-sm">
+                  <input type="radio" name="restore-mode" checked={mode === 'replace'} onChange={() => setMode('replace')} className="mt-1" />
+                  <span>
+                    <b className="block">{t('In place of the current one')}</b>
+                    <span className="text-muted-foreground">{t('The current version, with what is in it, is deleted for good.')}</span>
+                  </span>
+                </label>
+              </fieldset>
+            )}
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" checked={shares} onChange={(e) => setShares(e.target.checked)} />
+              {t('Also its shares with the people and groups that still exist')}
+            </label>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setPending(null)}>
+                {t('Back')}
+              </Button>
+              <Button variant={pending.state !== 'missing' && mode === 'replace' ? 'destructive' : 'default'} disabled={busy} onClick={() => void restore()}>
+                {busy && <Loader2 className="animate-spin" />}
+                {t('Restore')}
+              </Button>
+            </DialogFooter>
+          </div>
+        ) : (
+          <div className="grid gap-4">
+            <form
+              className="grid gap-3 sm:grid-cols-[1fr_1fr_1fr_1fr_auto] sm:items-end"
+              onSubmit={(e) => {
+                e.preventDefault()
+                setFilter(form)
+              }}
+            >
+              <Field id="ri-tenant" label={t('Tenant')}>
+                <select id="ri-tenant" className="h-9 rounded-md border bg-background px-2 text-sm" value={tenant} onChange={(e) => setSlug(e.target.value)}>
+                  {inside.data!.map((m) => (
+                    <option key={m.tenant.slug} value={m.tenant.slug}>
+                      {m.tenant.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field id="ri-q" label={t('Title')}>
+                <Input id="ri-q" value={form.q} onChange={(e) => setForm({ ...form, q: e.target.value })} />
+              </Field>
+              <Field id="ri-app" label={t('App')}>
+                <select id="ri-app" className="h-9 rounded-md border bg-background px-2 text-sm" value={form.plugin} onChange={(e) => setForm({ ...form, plugin: e.target.value })}>
+                  <option value="">{t('All')}</option>
+                  {(plugins.data ?? []).map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.label}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+              <Field id="ri-owner" label={t('Owner')}>
+                <Input id="ri-owner" value={form.owner} onChange={(e) => setForm({ ...form, owner: e.target.value })} />
+              </Field>
+              <Button type="submit" variant="outline">
+                {t('Search')}
+              </Button>
+            </form>
+            {items.isLoading ? (
+              <Loading />
+            ) : items.error ? (
+              <ErrorBox error={items.error} />
+            ) : !items.data?.items.length ? (
+              <p className="text-sm text-muted-foreground">{t('No item of the backup matches.')}</p>
+            ) : (
+              <div className="max-h-[50vh] overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t('Title')}</TableHead>
+                      <TableHead>{t('App')}</TableHead>
+                      <TableHead>{t('Owner')}</TableHead>
+                      <TableHead>{t('State')}</TableHead>
+                      <TableHead className="text-right">
+                        <span className="sr-only">{t('Actions')}</span>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {items.data.items.map((it) => (
+                      <TableRow key={it.id}>
+                        <TableCell>
+                          {it.title || it.kind}
+                          {it.children > 0 && <span className="text-xs text-muted-foreground"> · {t('{n} items inside', { n: String(it.children) })}</span>}
+                        </TableCell>
+                        <TableCell>{label(it.plugin_id)}</TableCell>
+                        <TableCell>{it.owner_name}</TableCell>
+                        <TableCell>
+                          <Badge variant={it.state === 'missing' ? 'secondary' : 'outline'}>{t(ITEM_STATE[it.state])}</Badge>
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            aria-label={t('Restore «{title}»', { title: it.title || it.kind })}
+                            onClick={() => {
+                              setMode('copy')
+                              setShares(false)
+                              setPending(it)
+                            }}
+                          >
+                            {t('Restore')}
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                {items.data.total > items.data.items.length && (
+                  <p className="mt-2 text-xs text-muted-foreground">{t('The first {n} of {total}: narrow the search.', { n: String(items.data.items.length), total: String(items.data.total) })}</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   )
 }
 

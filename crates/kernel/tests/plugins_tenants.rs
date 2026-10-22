@@ -312,3 +312,81 @@ async fn settings_update_and_uninstall() {
     assert_eq!(secrets, 0);
     assert!(tenants::tenant_plugins(&t, &manager, "en").await.unwrap().iter().all(|p| p.id != REVIEW));
 }
+
+#[tokio::test]
+async fn extension_tabs_need_the_ui_and_the_permission() {
+    let t = start().await;
+    t.install("notes").await;
+    let manifest = format!(
+        r#"
+id = "com.example.note-tabs"
+name = "Note tabs"
+version = "0.1.0"
+kind = "extension"
+[contribution]
+icon = "✔"
+label = "Note tabs"
+[extends]
+plugin = "{NOTES}"
+min_version = "0.1.0"
+[ui]
+entry = "index.html"
+[[extension.tabs]]
+resource = "notes"
+key = "review"
+label = "Review"
+icon = "clipboard-check"
+page = "tab.html"
+[[extension.tabs]]
+resource = "notes"
+key = "plain"
+label = "Plain"
+[[extension.fields]]
+resource = "notes"
+key = "history"
+label = "History"
+kind = "text"
+hidden = true
+[i18n.it]
+extension = {{ tabs = {{ review = "Revisione" }} }}
+"#
+    );
+    let files = BTreeMap::from([
+        ("plugin.toml".to_string(), manifest.into_bytes()),
+        ("ui/index.html".to_string(), b"<!doctype html><title>x</title>".to_vec()),
+        ("ui/tab.html".to_string(), b"<!doctype html><title>tab</title>".to_vec()),
+    ]);
+    let pkg = mosaikit_mskp::pack(&files, Some(&test_key())).unwrap();
+    let p = plugins::install_package(&t, None, &pkg, InstallSource::Upload).await.unwrap();
+    plugins::set_active(&t, None, &p.id, true).await.unwrap();
+    let g = t.tenant("alfa").await;
+    let anna = t.member(&g, "anna").await;
+    let anna = t.home(&anna).await;
+
+    // only tabs and a hidden field: still an extension of the notes, with its tabs in the language of the person
+    let views = extensions::for_resource(&t, &anna, NOTES, "notes", "it").await.unwrap();
+    assert_eq!(views.len(), 1);
+    let tabs = &views[0].tabs;
+    assert_eq!(tabs.len(), 2);
+    assert_eq!(
+        (tabs[0].key.as_str(), tabs[0].label.as_str(), tabs[0].page.as_str()),
+        ("review", "Revisione", "tab.html")
+    );
+    assert_eq!(tabs[0].icon.as_deref(), Some("clipboard-check"));
+    assert_eq!(tabs[1].page, "index.html", "without a page: the entry of the UI");
+    assert!(views[0].fields[0].hidden, "the hidden field is kept but not shown");
+
+    // the hidden field keeps the data of the tab like any other value of the extension
+    let row = crud::create(&t, &anna, NOTES, "notes", &obj(json!({ "title": "draft" })), None).await.unwrap();
+    let id: uuid::Uuid = row["id"].as_str().unwrap().parse().unwrap();
+    extensions::set_values(&t, &anna, NOTES, "notes", id, &p.id, &obj(json!({ "history": "[]" })))
+        .await
+        .unwrap();
+    let v = extensions::values(&t, &anna, NOTES, "notes", &[id]).await.unwrap();
+    assert_eq!(v[&id][&p.id]["history"], "[]");
+
+    // the extension turned off in the tenant: no tab
+    let manager = t.home(&g).await;
+    tenants::set_enabled(&t, &manager, &p.id, false).await.unwrap();
+    assert!(extensions::for_resource(&t, &anna, NOTES, "notes", "en").await.unwrap().is_empty());
+}

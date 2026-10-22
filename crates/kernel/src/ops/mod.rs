@@ -2,6 +2,7 @@
 //! and the background work that runs them (docs/architecture.md, "Operations").
 
 pub mod backup;
+pub mod backup_item;
 pub mod maintenance;
 pub mod metrics;
 pub mod monitor;

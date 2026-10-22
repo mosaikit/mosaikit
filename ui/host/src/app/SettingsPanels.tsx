@@ -21,7 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
-import { useApi, useTenantCtx } from './core.ts'
+import { isApp, useApi, useTenantCtx } from './core.ts'
 import { useTenantSignIn } from './signin.ts'
 import { LANGS, t } from './i18n.ts'
 import { ErrorBox, Loading, Locked, SaveBar } from './kit.tsx'
@@ -264,7 +264,7 @@ function ChoiceRow({ level, d, s, options }: { level: Level; d: Draft; s: Settin
  *  page (tenant). Images are saved at once; the texts with the save bar. */
 export function IdentityPanel({ level }: { level: Level }) {
   const ctx = useTenantCtx(level.kind === 'tenant' ? level.slug : '')
-  const apps = ctx.data?.plugins.filter((p) => p.has_ui) ?? []
+  const apps = ctx.data?.plugins.filter(isApp) ?? []
   return (
     <div className="grid gap-6">
       <Images level={level} />

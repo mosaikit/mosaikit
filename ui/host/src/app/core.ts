@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/
 import { toast } from 'sonner'
 import { api, ApiError, errText, isUnavailable, setCsrf } from '../api.ts'
 import { retryDelay } from '../brand.ts'
-import type { Config, Session, TenantContext } from '../types.ts'
+import type { Config, PluginView, Session, TenantContext } from '../types.ts'
 export { useConfirm } from './confirm.ts'
 
 /** The session: `null` if nobody signed in. */
@@ -73,6 +73,12 @@ export function useAction<A>(fn: (a: A) => Promise<unknown>, o: { ok?: string | 
     },
     onError: (e) => toast.error(errText(e)),
   })
+}
+
+/** An app: a plugin with pages of its own, in the sidebar and on the Home (not a service, not an
+ *  extension, whose pages open only inside the plugin they extend). */
+export function isApp(p: PluginView): boolean {
+  return p.has_ui && (p.kind ?? 'app') === 'app'
 }
 
 export function initials(name: string): string {

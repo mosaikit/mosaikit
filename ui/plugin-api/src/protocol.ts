@@ -67,13 +67,46 @@ export interface ListResult {
   rows: Row[]
 }
 
-/** An extension of the plugin: the fields and actions it adds to the items of a resource. */
+/** An extension of the plugin: the fields, actions and tabs it adds to the items of a resource. */
 export interface ExtensionView {
   /** id of the extension (another plugin) */
   id: string
   label: string
   fields: FieldDecl[]
   actions: { key: string; label: string }[]
+  /** tabs in the detail of an item (older hosts: absent) */
+  tabs?: ExtensionTab[]
+}
+
+/** A tab an extension adds to the detail of an item: a page of its UI, shown by the host. */
+export interface ExtensionTab {
+  key: string
+  label: string
+  /** name of a Lucide icon */
+  icon?: string
+  /** page of the UI of the extension */
+  page: string
+}
+
+/** Where a page of an extension is shown when it is a tab (`msk.tab`). */
+export interface TabInfo {
+  /** the plugin the extension extends */
+  base: string
+  resource: string
+  /** id of the item */
+  item: string
+  /** key of the tab */
+  key: string
+  /** level of the person on the item */
+  level: Level
+}
+
+/** A rectangle in CSS pixels, relative to the viewport of the page that sends it. */
+export interface Rect {
+  top: number
+  left: number
+  width: number
+  height: number
 }
 
 export interface FileEntry {
@@ -135,6 +168,8 @@ export interface Hello {
   perms?: string[]
   /** only in public links: the shared resource */
   resource?: PublicResource
+  /** only in the tab of an extension: the item it is shown for */
+  tab?: TabInfo
 }
 
 /** A notification of the plugin (`msk.notify`). */

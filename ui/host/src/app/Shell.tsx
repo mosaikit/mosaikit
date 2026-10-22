@@ -64,7 +64,7 @@ import {
 import { cn } from '@/lib/utils'
 import AppIcon from './AppIcon.tsx'
 import SearchBox, { type SearchGroup } from './SearchBox.tsx'
-import { initials, useTenantCtx } from './core.ts'
+import { initials, isApp, useTenantCtx } from './core.ts'
 import { setLang, t, useLang, useLanguages, type Lang } from './i18n.ts'
 import { NotificationsBell } from './notifications.tsx'
 import { useLiveNotes, useUnread } from './notes.ts'
@@ -131,7 +131,7 @@ function useNav(session: Session, route: Route): { groups: NavGroup[]; bottom: N
   const hidden = new Set(ctx.data?.prefs.hidden ?? [])
   const page = route.page
   const apps: NavItem[] = (ctx.data?.plugins ?? [])
-    .filter((p) => p.has_ui && !hidden.has(p.id))
+    .filter((p) => isApp(p) && !hidden.has(p.id))
     .map((p) => ({ label: p.label, icon: <AppIcon id={p.id} name={p.icon_name} />, href: to.plugin(slug, p.id), active: page === 'plugin' && route.id === p.id }))
   const groups: NavGroup[] = [
     {

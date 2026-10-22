@@ -373,6 +373,27 @@ The OIDC checks use the test identity provider and a tenant set up as in Phase 8
 | FU-A-11 | In another OIDC tenant: as its Tenant Manager create a Mosaikit group `staff` first, then turn the mirror on and sign in as Bruno | The group of the provider is «staff (identity provider)»; the group of Mosaikit stays as it was |
 | FU-A-12 | Italian and dark mode on the Sign-in tab and on Manage › Groups | Translated and readable |
 
+## Follow-ups B — Tabs of an extension, one item from a backup
+
+The sample extension *Note review* (`com.mosaikit.note-review`) adds a **Review** tab to the notes.
+
+| Id | Check | Expected |
+|---|---|---|
+| FU-B-01 | As `e.ricci`: the sidebar and the Home | *Note review* is not an app: not in the sidebar nor among the apps of the Home |
+| FU-B-02 | Notes: open a note | Above the detail two tabs: **Detail** and **Review**; the columns and the fieldset of Note review as before |
+| FU-B-03 | Review | The page of the extension inside the detail: «Review of «title»», «Not reviewed yet», a comment field, **Mark as reviewed**, the history |
+| FU-B-04 | Write a comment, Mark as reviewed | «Reviewed by Elena Ricci», the comment in the history with the date; the column *Reviewed* of the note shows ✓ at once |
+| FU-B-05 | Scroll the page of Notes, make the window narrower, reload | The tab stays in its place over the detail and grows with its content; nothing overflows the page |
+| FU-B-06 | Arrows left and right on the tabs; Detail | The tabs move with the keyboard; on Detail the tab closes and the fields come back |
+| FU-B-07 | Share the note with `s.greco` read only; as `s.greco` open it, Review | The history is there; no comment field and no button: «only who can edit the note reviews it» |
+| FU-B-08 | Italian, dark mode, high contrast on the tab | Translated («Revisione», «Segna come revisionata»), readable, the colours of the shell |
+| FU-B-09 | As Administrator: System › Backup and restore › Run now; when it is listed, as `e.ricci` delete the reviewed note and empty the Trash | — |
+| FU-B-10 | As Administrator: **Restore an item** on that backup; tenant *Comune di Roma*, title of the note, Search | The note, its owner, «No longer in the tenant» |
+| FU-B-11 | Restore, then Restore | ««title» restored»; the state becomes «In the tenant»; `e.ricci` gets a notification and finds the note with its review history |
+| FU-B-12 | Restore it again | It is still in the tenant: choose **As a copy** (a second note next to the current one) or **In place of the current one** (red button: the current version is deleted for good) |
+| FU-B-13 | A folder of Files restored the same way | The folder comes back with the files in it, contents included; a file whose folder no longer exists comes back at the top |
+| FU-B-14 | With «Also its shares…» ticked | The shares come back for the people and groups that still exist; public links never come back |
+
 ---
 
 Every phase of the plan has its section. New work adds its checks here when it is committed.

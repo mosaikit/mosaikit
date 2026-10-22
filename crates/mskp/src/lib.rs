@@ -12,8 +12,8 @@ mod version;
 
 pub use collect::collect_plugin_dir;
 pub use manifest::{
-    is_plugin_id, schema_name, ConfigDecl, ConfigKind, Contribution, ExtActionDecl, ExtFieldDecl, Extends,
-    ExtensionDecl, ExtensionTranslation, FieldDecl, FieldKind, KpiDecl, KpiTranslation, Manifest,
+    is_plugin_id, schema_name, ConfigDecl, ConfigKind, Contribution, ExtActionDecl, ExtFieldDecl, ExtTabDecl,
+    Extends, ExtensionDecl, ExtensionTranslation, FieldDecl, FieldKind, KpiDecl, KpiTranslation, Manifest,
     PermissionTranslation, Permissions, PluginKind, Requires, ResourceDecl, ResourceTranslation, Translation,
     UiDecl, UserPermission, ABI_VERSION, STANDARD_PERMISSIONS,
 };

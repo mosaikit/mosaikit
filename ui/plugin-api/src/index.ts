@@ -1,5 +1,5 @@
 export { Bridge, BridgeError } from './bridge.ts'
-export { Msk, connect, applyTheme, applyContext, type CrudClient, type ExtensionsClient } from './client.ts'
+export { Msk, connect, applyTheme, applyContext, type CrudClient, type ExtensionsClient, type TabClient } from './client.ts'
 export { mountCrud, errText, type CrudOptions } from './crud-view.ts'
 export { errorText } from './errors.ts'
 export type * from './protocol.ts'

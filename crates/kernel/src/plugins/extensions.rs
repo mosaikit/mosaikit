@@ -10,7 +10,9 @@
 //! - an action either sets some fields (`set`) or runs a command of the logic of the extension, which
 //!   receives the item and the current values and answers with the values to set;
 //! - the UI of the extended plugin shows fields and actions through the bridge (`msk.extensions`),
-//!   `mountCrud` does it by itself.
+//!   `mountCrud` does it by itself;
+//! - a tab (`[[extension.tabs]]`) is a page of the UI of the extension that the host shows inside the
+//!   detail of an item, in a frame of its own (docs/architecture.md, "Tabs of an extension").
 
 use std::collections::BTreeMap;
 
@@ -30,12 +32,23 @@ pub struct ExtensionView {
     pub label: String,
     pub fields: Vec<FieldDecl>,
     pub actions: Vec<ActionView>,
+    pub tabs: Vec<TabView>,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ActionView {
     pub key: String,
     pub label: String,
+}
+
+/// A tab of an extension in the detail of an item: the host opens `page` of the UI of the extension.
+#[derive(Debug, Clone, Serialize)]
+pub struct TabView {
+    pub key: String,
+    pub label: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+    pub page: String,
 }
 
 /// The extensions of `base` on in the tenant that the caller may use, with what they add to `resource`.
@@ -69,10 +82,32 @@ pub async fn for_resource(
             .filter(|a| a.resource == resource)
             .map(|a| ActionView { key: a.key.clone(), label: a.label.clone() })
             .collect();
-        if fields.is_empty() && actions.is_empty() {
+        // a tab needs the UI of the extension, built and served
+        let tabs: Vec<TabView> = match (&m.ui, e.ui_dir.is_some()) {
+            (Some(ui), true) => m
+                .extension
+                .tabs
+                .iter()
+                .filter(|t| t.resource == resource)
+                .map(|t| TabView {
+                    key: t.key.clone(),
+                    label: t.label.clone(),
+                    icon: t.icon.clone(),
+                    page: t.page.clone().unwrap_or_else(|| ui.entry.clone()),
+                })
+                .collect(),
+            _ => Vec::new(),
+        };
+        if fields.is_empty() && actions.is_empty() && tabs.is_empty() {
             continue;
         }
-        out.push(ExtensionView { id: e.id.clone(), label: m.contribution.label.clone(), fields, actions });
+        out.push(ExtensionView {
+            id: e.id.clone(),
+            label: m.contribution.label.clone(),
+            fields,
+            actions,
+            tabs,
+        });
     }
     Ok(out)
 }

@@ -338,3 +338,132 @@ async fn metrics_monitoring_and_alerts_once_per_crossing() {
     let text = metrics::prometheus(&t).await.unwrap();
     assert!(text.contains("mosaikit_requests_total 40"));
 }
+
+#[tokio::test]
+async fn one_item_from_a_backup() {
+    use mosaikit_kernel::acl::{self, Level};
+    use mosaikit_kernel::ops::backup_item::{self, ItemQuery, ItemRestore, Mode};
+    let t = start().await;
+    t.install("notes").await;
+    t.install("files").await;
+    let admin = t.admin().await;
+    let g = t.tenant("alfa").await;
+    let anna = t.member(&g, "anna").await;
+    let bruno = t.member(&g, "bruno").await;
+    let anna_c = t.home(&anna).await;
+    let bruno_c = t.home(&bruno).await;
+    let budget = note(&t, &anna_c, "Budget 2026").await;
+    acl::set_grant(&t, &anna_c, budget, "user", bruno.user_id, Some(Level::Write)).await.unwrap();
+    let doc = files::upload(&t, &anna_c, FILES, None, "report.txt", b"hello", false).await.unwrap();
+    // a folder with a file in it
+    let docs = files::mkdir(&t, &anna_c, FILES, None, "Docs").await.unwrap();
+    let inner =
+        files::upload(&t, &anna_c, FILES, Some(docs.id), "inner.txt", b"inside", false).await.unwrap();
+    let b = backup::run(&t, Some(&admin)).await.unwrap();
+    assert_eq!(b.status, "ok", "{}", b.error);
+
+    // both deleted for good after the backup
+    crud::delete(&t, &anna_c, NOTES, "notes", budget).await.unwrap();
+    mosaikit_kernel::trash::purge(&t, &anna_c, budget).await.unwrap();
+    files::delete(&t, &anna_c, FILES, doc.id).await.unwrap();
+    mosaikit_kernel::trash::purge(&t, &anna_c, doc.id).await.unwrap();
+
+    // the items of alfa in the backup, by title, app, owner; their state now
+    let q = |q: &str, plugin: &str, owner: &str| ItemQuery {
+        q: Some(q.into()),
+        plugin: Some(plugin.into()),
+        owner: Some(owner.into()),
+    };
+    let list = backup_item::items(&t, &admin, b.id, "alfa", &q("budget", "", "")).await.unwrap();
+    assert_eq!(list.items.len(), 1);
+    assert_eq!(
+        (list.items[0].id, list.items[0].state, list.items[0].owner_name.as_str()),
+        (budget, "missing", "anna")
+    );
+    assert_eq!(
+        backup_item::items(&t, &admin, b.id, "alfa", &q("", FILES, "anna")).await.unwrap().items.len(),
+        3,
+        "the file, the folder and the file in it"
+    );
+    assert!(backup_item::items(&t, &admin, b.id, "alfa", &q("", "", "bruno"))
+        .await
+        .unwrap()
+        .items
+        .is_empty());
+
+    // back with its id; the shares only on request
+    let r = backup_item::restore(&t, &admin, b.id, "alfa", budget, &ItemRestore::default()).await.unwrap();
+    assert_eq!((r.id, r.mode, r.items, r.shares), (budget, "original", 1, 0));
+    assert_eq!(titles(&t, &anna_c).await, vec!["Budget 2026".to_string()]);
+    assert!(titles(&t, &bruno_c).await.is_empty(), "the share did not come back");
+    assert_eq!(notifications(&t, anna.user_id, "backup.item_restored").await, 1, "the owner is told");
+    // the file, with its content
+    let r = backup_item::restore(&t, &admin, b.id, "alfa", doc.id, &ItemRestore::default()).await.unwrap();
+    assert_eq!(r.files, 1);
+    assert_eq!(files::read(&t, &anna_c, FILES, doc.id).await.unwrap().1, b"hello");
+
+    // a folder comes back with what is in it
+    files::delete(&t, &anna_c, FILES, docs.id).await.unwrap();
+    mosaikit_kernel::trash::purge(&t, &anna_c, docs.id).await.unwrap();
+    let list = backup_item::items(&t, &admin, b.id, "alfa", &q("docs", FILES, "")).await.unwrap();
+    assert_eq!(list.items[0].children, 1);
+    let r = backup_item::restore(&t, &admin, b.id, "alfa", docs.id, &ItemRestore::default()).await.unwrap();
+    assert_eq!((r.items, r.files), (2, 1));
+    let inside = files::list(&t, &anna_c, FILES, Some(docs.id)).await.unwrap();
+    assert_eq!(inside.entries.iter().map(|e| e.name.as_str()).collect::<Vec<_>>(), vec!["inner.txt"]);
+    assert_eq!(files::read(&t, &anna_c, FILES, inner.id).await.unwrap().1, b"inside");
+    // a file of a folder that is gone again: at the top
+    files::delete(&t, &anna_c, FILES, docs.id).await.unwrap();
+    mosaikit_kernel::trash::purge(&t, &anna_c, docs.id).await.unwrap();
+    backup_item::restore(&t, &admin, b.id, "alfa", inner.id, &ItemRestore::default()).await.unwrap();
+    let top = files::list(&t, &anna_c, FILES, None).await.unwrap();
+    assert!(top.entries.iter().any(|e| e.name == "inner.txt"), "at the top");
+
+    // still in the tenant: never overwritten without saying so
+    let e =
+        backup_item::restore(&t, &admin, b.id, "alfa", budget, &ItemRestore::default()).await.unwrap_err();
+    assert_eq!((e.kind, e.code), (Kind::Conflict, Some("item_exists")));
+    // a copy, with the shares this time: a new item next to the current one
+    let copy = ItemRestore { mode: Some(Mode::Copy), shares: true };
+    let r = backup_item::restore(&t, &admin, b.id, "alfa", budget, &copy).await.unwrap();
+    assert!(r.id != budget && r.mode == "copy" && r.shares == 1);
+    assert_eq!(titles(&t, &anna_c).await, vec!["Budget 2026".to_string(), "Budget 2026".to_string()]);
+    assert_eq!(
+        titles(&t, &bruno_c).await,
+        vec!["Budget 2026".to_string()],
+        "bruno sees the copy, shared again"
+    );
+    // replace: the current version goes, the one of the backup takes its place with the same id
+    crud::update(&t, &anna_c, NOTES, "notes", budget, json!({ "title": "Changed" }).as_object().unwrap())
+        .await
+        .unwrap();
+    let replace = ItemRestore { mode: Some(Mode::Replace), shares: false };
+    let r = backup_item::restore(&t, &admin, b.id, "alfa", budget, &replace).await.unwrap();
+    assert_eq!((r.id, r.mode), (budget, "replace"));
+    let row = crud::get(&t, &anna_c, NOTES, "notes", budget).await.unwrap();
+    assert_eq!(row["values"]["title"], "Budget 2026");
+    // in the trash it is still there
+    crud::delete(&t, &anna_c, NOTES, "notes", budget).await.unwrap();
+    let list = backup_item::items(&t, &admin, b.id, "alfa", &q("budget", NOTES, "")).await.unwrap();
+    assert_eq!(list.items[0].state, "trash");
+    let e =
+        backup_item::restore(&t, &admin, b.id, "alfa", budget, &ItemRestore::default()).await.unwrap_err();
+    assert_eq!(e.code, Some("item_exists"));
+
+    // only the Administrators; a tenant or an item not in the backup
+    assert_eq!(
+        backup_item::items(&t, &g, b.id, "alfa", &ItemQuery::default()).await.unwrap_err().kind,
+        Kind::Forbidden
+    );
+    assert_eq!(
+        backup_item::items(&t, &admin, b.id, "gamma", &ItemQuery::default()).await.unwrap_err().kind,
+        Kind::NotFound
+    );
+    assert_eq!(
+        backup_item::restore(&t, &admin, b.id, "alfa", Uuid::new_v4(), &ItemRestore::default())
+            .await
+            .unwrap_err()
+            .kind,
+        Kind::NotFound
+    );
+}

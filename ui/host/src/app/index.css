@@ -271,6 +271,9 @@
   --acc-soft: color-mix(in srgb, var(--primary) 12%, transparent);
   --acc-line: color-mix(in srgb, var(--primary) 40%, transparent);
   --err: var(--destructive);
+  /* text on the accent and on the colour of errors (the buttons of the plugins), as in the shell */
+  --on-acc: var(--primary-foreground);
+  --on-err: #ffffff;
 }
 
 @theme inline {

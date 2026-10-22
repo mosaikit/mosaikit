@@ -46,11 +46,12 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 
 .msk-btn {
   font-weight: 600; font-size: 13px; border-radius: 9px; padding: 8px 14px; cursor: pointer;
-  border: 1px solid var(--acc); color: #221806; background: var(--acc);
+  /* the text on the accent comes from the host (older hosts: the dark text of the default theme) */
+  border: 1px solid var(--acc); color: var(--on-acc, #221806); background: var(--acc);
 }
 .msk-btn.ghost { background: var(--panel2); border-color: var(--line); color: var(--fg); }
 .msk-btn.ghost:hover:not(:disabled) { border-color: var(--acc-line); color: var(--acc); }
-.msk-btn.danger { background: var(--err); border-color: var(--err); color: #2b0f0e; }
+.msk-btn.danger { background: var(--err); border-color: var(--err); color: var(--on-err, #2b0f0e); }
 .msk-btn.mini { padding: 5px 9px; font-size: 12px; border-radius: 7px; }
 .msk-btn:disabled { opacity: 0.5; cursor: default; }
 
@@ -79,6 +80,12 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .msk-extset { margin: 6px 0 14px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px 4px; }
 .msk-extset legend { font-size: 12px; color: var(--dim); padding: 0 6px; }
 .msk-extset .msk-actions { margin: 4px 0 8px; }
+/* tabs of the extensions in the detail of an item: the host draws the page of the extension over the panel */
+.msk-tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin: -4px 0 14px; flex-wrap: wrap; }
+.msk-tab { background: none; border: none; border-bottom: 2px solid transparent; color: var(--dim); padding: 6px 10px; font: inherit; font-size: 13px; cursor: pointer; margin-bottom: -1px; }
+.msk-tab[aria-selected='true'] { color: var(--fg); border-bottom-color: var(--acc); font-weight: 600; }
+.msk-tab:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+.msk-tabpanel { min-height: 80px; border-radius: 10px; }
 .msk-field label { display: block; font-size: 12px; color: var(--dim); margin-bottom: 5px; }
 .msk-field.req label { color: var(--fg); font-weight: 600; }
 .msk-field .star { color: var(--err); }

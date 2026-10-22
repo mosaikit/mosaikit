@@ -116,11 +116,13 @@ pub struct ExtensionDecl {
     pub fields: Vec<ExtFieldDecl>,
     #[serde(default)]
     pub actions: Vec<ExtActionDecl>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tabs: Vec<ExtTabDecl>,
 }
 
 impl ExtensionDecl {
     pub fn is_empty(&self) -> bool {
-        self.fields.is_empty() && self.actions.is_empty()
+        self.fields.is_empty() && self.actions.is_empty() && self.tabs.is_empty()
     }
 
     /// The fields of the extension on a resource of the extended plugin.
@@ -145,6 +147,9 @@ pub struct ExtFieldDecl {
     pub options: Vec<String>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub option_labels: BTreeMap<String, String>,
+    /// kept by the kernel but not shown by `mountCrud` (e.g. data that only a tab of the extension uses)
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub hidden: bool,
 }
 
 impl ExtFieldDecl {
@@ -156,7 +161,7 @@ impl ExtFieldDecl {
             required: false,
             multiline: self.multiline,
             options: self.options.clone(),
-            hidden: false,
+            hidden: self.hidden,
             option_labels: self.option_labels.clone(),
             // values of an extension live in the kernel, not in the search text of the base plugin
             search: Some(false),
@@ -177,6 +182,22 @@ pub struct ExtActionDecl {
     pub set: BTreeMap<String, serde_json::Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub command: Option<String>,
+}
+
+/// A tab an extension adds to the detail of the items of a resource (`[[extension.tabs]]`): a page of
+/// the UI of the extension, shown by the host in a sandboxed frame inside the detail of the item.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ExtTabDecl {
+    pub resource: String,
+    pub key: String,
+    pub label: String,
+    /// name of a Lucide icon, like the `icon` of the plugin
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+    /// page of the UI of the extension (relative to its `[ui]` folder); default: the entry
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub page: Option<String>,
 }
 
 /// A setting of the plugin (`[[config]]`).
@@ -282,6 +303,8 @@ pub struct ExtensionTranslation {
     pub fields: BTreeMap<String, String>,
     #[serde(default)]
     pub actions: BTreeMap<String, String>,
+    #[serde(default)]
+    pub tabs: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -710,6 +733,40 @@ impl Manifest {
                 }
             }
         }
+        let mut tabs = std::collections::HashSet::new();
+        for t in &self.extension.tabs {
+            if !is_identifier(&t.resource) || !is_identifier(&t.key) {
+                return Err(format!("extension tab '{}.{}' invalid", t.resource, t.key));
+            }
+            if !tabs.insert((t.resource.as_str(), t.key.as_str())) {
+                return Err(format!("duplicate extension tab '{}'", t.key));
+            }
+            if t.label.trim().is_empty() || t.label.chars().count() > 40 {
+                return Err(format!("the extension tab '{}' needs a label (at most 40 characters)", t.key));
+            }
+            if let Some(icon) = &t.icon {
+                let ok = !icon.is_empty()
+                    && icon.len() <= 48
+                    && icon.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-');
+                if !ok {
+                    return Err(format!("the extension tab '{}': invalid icon '{icon}'", t.key));
+                }
+            }
+            if self.ui.is_none() {
+                return Err(format!(
+                    "the extension tab '{}' needs [ui]: the tab is a page of the extension",
+                    t.key
+                ));
+            }
+            if let Some(page) = &t.page {
+                if !is_safe_path(page) || !page.ends_with(".html") {
+                    return Err(format!(
+                        "the extension tab '{}': page '{page}' is not an .html file of the UI",
+                        t.key
+                    ));
+                }
+            }
+        }
         Ok(())
     }
 
@@ -787,6 +844,12 @@ impl Manifest {
             }
             all.push(label);
         }
+        for (key, label) in &tr.extension.tabs {
+            if !self.extension.tabs.iter().any(|t| &t.key == key) {
+                return Err(format!("extension tab '{key}' is not declared"));
+            }
+            all.push(label);
+        }
         for (key, ct) in &tr.config {
             if !self.config.iter().any(|c| &c.key == key) {
                 return Err(format!("config '{key}' is not declared"));
@@ -852,6 +915,11 @@ impl Manifest {
         for a in &mut m.extension.actions {
             if let Some(label) = tr.extension.actions.get(&a.key) {
                 a.label = label.clone();
+            }
+        }
+        for t in &mut m.extension.tabs {
+            if let Some(label) = tr.extension.tabs.get(&t.key) {
+                t.label = label.clone();
             }
         }
         for c in &mut m.config {
@@ -1126,6 +1194,56 @@ mod tests {
         let stray =
             format!("{NOTES}\n[[extension.fields]]\nresource = \"notes\"\nkey = \"x\"\nkind = \"text\"\n");
         assert!(Manifest::from_toml(&stray).is_err());
+    }
+
+    #[test]
+    fn extension_tabs_and_hidden_fields() {
+        let tabs = r#"
+            [ui]
+            entry = "index.html"
+            [[extension.tabs]]
+            resource = "notes"
+            key = "review"
+            label = "Review"
+            icon = "clipboard-check"
+            page = "tab.html"
+            [[extension.fields]]
+            resource = "notes"
+            key = "history"
+            label = "History"
+            kind = "text"
+            hidden = true
+        "#;
+        let src = REVIEW.replace("[i18n.it]", &format!("{tabs}\n[i18n.it]")).replace(
+            "actions = { mark_reviewed = \"Segna come revisionata\" } }",
+            "actions = { mark_reviewed = \"Segna come revisionata\" }, tabs = { review = \"Revisione\" } }",
+        );
+        let m = Manifest::from_toml(&src).unwrap();
+        assert_eq!(m.extension.tabs.len(), 1);
+        assert_eq!(m.extension.tabs[0].page.as_deref(), Some("tab.html"));
+        assert_eq!(m.localized("it").extension.tabs[0].label, "Revisione");
+        let fields = m.extension.fields_of("notes");
+        assert!(fields.iter().find(|f| f.key == "history").unwrap().hidden, "a hidden field stays hidden");
+        assert!(!fields.iter().find(|f| f.key == "reviewed").unwrap().hidden);
+        let json = serde_json::to_string(&m).unwrap();
+        assert_eq!(serde_json::from_str::<Manifest>(&json).unwrap(), m);
+        // an extension with only a tab is not empty
+        assert!(!ExtensionDecl { tabs: m.extension.tabs.clone(), ..Default::default() }.is_empty());
+        for bad in [
+            src.replace("key = \"review\"", "key = \"Review!\""),
+            src.replace("label = \"Review\"", "label = \"\""),
+            src.replace("icon = \"clipboard-check\"", "icon = \"Clipboard\""),
+            src.replace("page = \"tab.html\"", "page = \"../notes/index.html\""),
+            src.replace("page = \"tab.html\"", "page = \"tab.js\""),
+            src.replace("[ui]\n            entry = \"index.html\"", ""),
+            src.replace("tabs = { review", "tabs = { other"),
+            src.replace(
+                "page = \"tab.html\"",
+                "page = \"tab.html\"\n[[extension.tabs]]\nresource = \"notes\"\nkey = \"review\"\nlabel = \"Again\"",
+            ),
+        ] {
+            assert!(Manifest::from_toml(&bad).is_err(), "{bad}");
+        }
     }
 
     #[test]

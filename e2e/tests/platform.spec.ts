@@ -1050,6 +1050,70 @@ test.describe.serial('platform', () => {
     await expect(page.getByRole('switch', { name: 'Available to City of Beta' })).toBeChecked()
   })
 
+  test('the tab of an extension in the detail of a note: its page, its data, the level of the person', async ({ page }) => {
+    test.setTimeout(180_000)
+    await login(page, 'Alfa Municipality', 'manager', PASSWORD)
+    // the extension has pages of its own but it is not an app: not in the sidebar
+    await expect(nav(page, 'Note review')).toHaveCount(0)
+    await nav(page, 'Notes').click()
+    const frame = page.frameLocator('iframe.plugin-frame')
+    await frame.getByRole('button', { name: /New/ }).click()
+    await frame.locator('[data-key="title"]').first().fill('Note with a tab')
+    await frame.getByRole('button', { name: 'Save' }).click()
+    const row = frame.locator('tbody tr.row', { hasText: 'Note with a tab' })
+    await expect(row).toBeVisible()
+    await expect(frame.getByRole('tablist', { name: 'Sections of the item' })).toBeVisible()
+    await frame.getByRole('tab', { name: 'Review' }).click()
+    await expect(frame.getByRole('tab', { name: 'Review' })).toHaveAttribute('aria-selected', 'true')
+
+    // the page of the extension, drawn by the host over the tab, in a frame without an origin of its own
+    const tabFrame = page.locator('iframe.ext-tab-frame')
+    await expect(tabFrame).toHaveAttribute('sandbox', 'allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox')
+    const tab = page.frameLocator('iframe.ext-tab-frame')
+    await expect(tab.getByRole('heading', { name: 'Review of «Note with a tab»' })).toBeVisible()
+    await expect(tab.getByText('Not reviewed yet')).toBeVisible()
+    await tab.getByLabel('Comment (optional)').fill('Looks right')
+    await tab.getByRole('button', { name: 'Mark as reviewed' }).click()
+    await expect(tab.getByText(/^Reviewed by /)).toBeVisible()
+    await expect(tab.getByRole('listitem').filter({ hasText: 'Looks right' })).toBeVisible()
+    // the note saw the change: its column shows it
+    await expect(row).toContainText('✓')
+    await accessible(page, 'tab of an extension')
+    // back to the fields of the note: the tab closes
+    await frame.getByRole('tab', { name: 'Detail' }).click()
+    await expect(tabFrame).toHaveCount(0)
+    await expect(frame.locator('[data-key="title"]').first()).toHaveValue('Note with a tab')
+
+    // shared read only with Anna: she sees the reviews, she cannot review
+    const shared = await page.evaluate(async ([base, title]) => {
+      const s = await (await fetch(`${base}/api/session`)).json()
+      const headers = { 'content-type': 'application/json', 'x-csrf-token': s.csrf }
+      const notes = await (await fetch(`${base}/api/t/alfa/p/com.mosaikit.notes/r/notes`)).json()
+      const note = notes.rows.find((r: { values: { title: string } }) => r.values.title === title)
+      const members = await (await fetch(`${base}/api/t/alfa/manage/members`)).json()
+      const anna = (Array.isArray(members) ? members : members.members).find((m: { username: string }) => m.username === 'anna')
+      const r = await fetch(`${base}/api/t/alfa/resources/${note.id}/grants`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ principal_type: 'user', principal_id: anna.user_id ?? anna.id, level: 'read' }),
+      })
+      return r.status
+    }, [BASE, 'Note with a tab'] as const)
+    expect(shared).toBe(200)
+    await logout(page)
+
+    await login(page, 'Alfa Municipality', 'anna', 'password-e2e-789')
+    await nav(page, 'Notes').click()
+    const annaRow = frame.locator('tbody tr.row', { hasText: 'Note with a tab' })
+    await expect(annaRow).toContainText('read only')
+    await annaRow.click()
+    await frame.getByRole('tab', { name: 'Review' }).click()
+    await expect(tab.getByText('only who can edit the note reviews it')).toBeVisible()
+    await expect(tab.getByRole('listitem').filter({ hasText: 'Looks right' })).toBeVisible()
+    await expect(tab.getByRole('button', { name: 'Mark as reviewed' })).toHaveCount(0)
+    await logout(page)
+  })
+
   test('shares, trash and log: revoke, delete, restore, delete for good, the log of tenant and platform', async ({ page }) => {
     test.setTimeout(240_000)
     const call = async (method: string, path: string, body?: unknown) =>
@@ -1321,6 +1385,51 @@ test.describe.serial('platform', () => {
     await done.getByRole('button', { name: 'Restore a tenant' }).click()
     await expect(page.getByRole('dialog', { name: 'Restore a tenant' })).toContainText('Town of Delta')
     await page.keyboard.press('Escape')
+
+    // one item from the backup: deleted for good after it, found by its title, back with its id and the
+    // values of its extension (the history of the reviews)
+    const mgr = await (await browser.newContext()).newPage()
+    await login(mgr, 'Alfa Municipality', 'manager', PASSWORD)
+    const manager = async (what: 'delete' | 'check') =>
+      mgr.evaluate(
+        async ([base, what]) => {
+          const s = await (await fetch(`${base}/api/session`)).json()
+          const headers = { 'content-type': 'application/json', 'x-csrf-token': s.csrf }
+          const notes = await (await fetch(`${base}/api/t/alfa/p/com.mosaikit.notes/r/notes`)).json()
+          const note = notes.rows.find((r: { values: { title: string } }) => r.values.title === 'Note with a tab')
+          if (what === 'check') {
+            if (!note) return 'missing'
+            const v = await (await fetch(`${base}/api/t/alfa/p/com.mosaikit.notes/ext/notes/values`, { method: 'POST', headers, body: JSON.stringify({ ids: [note.id] }) })).json()
+            return String(v[note.id]?.['com.mosaikit.note-review']?.history ?? '')
+          }
+          await fetch(`${base}/api/t/alfa/p/com.mosaikit.notes/r/notes/${note.id}`, { method: 'DELETE', headers })
+          return String((await fetch(`${base}/api/t/alfa/trash/${note.id}`, { method: 'DELETE', headers })).status)
+        },
+        [BASE, what] as const,
+      )
+    expect(await manager('delete')).toBe('200')
+    expect(await manager('check')).toBe('missing')
+    await done.getByRole('button', { name: 'Restore an item' }).click()
+    const ri = page.getByRole('dialog', { name: 'Restore an item' })
+    await ri.getByLabel('Tenant').selectOption('alfa')
+    await ri.getByLabel('Title').fill('Note with a tab')
+    await ri.getByRole('button', { name: 'Search' }).click()
+    const line = ri.getByRole('row', { name: /Note with a tab/ })
+    await expect(line).toContainText('No longer in the tenant')
+    await accessible(page, 'restore an item')
+    await line.getByRole('button', { name: 'Restore «Note with a tab»' }).click()
+    await ri.getByRole('button', { name: 'Restore', exact: true }).click()
+    await expect(page.getByText('«Note with a tab» restored')).toBeVisible()
+    await expect(line).toContainText('In the tenant')
+    expect(await manager('check')).toContain('Looks right')
+    // still in the tenant: only as a copy or in place of the current one, by choice
+    await line.getByRole('button', { name: 'Restore «Note with a tab»' }).click()
+    await expect(ri.getByRole('radio', { name: /As a copy/ })).toBeChecked()
+    await expect(ri.getByRole('radio', { name: /In place of the current one/ })).toBeVisible()
+    await accessible(page, 'restore an item still in the tenant')
+    await ri.getByRole('button', { name: 'Back' }).click()
+    await page.keyboard.press('Escape')
+    await mgr.close()
 
     // monitoring: every section
     await nav(page, 'Monitoring').click()

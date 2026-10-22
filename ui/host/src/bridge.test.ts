@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError } from './api.ts'
-import { errorReply, OpError, routeOp } from './bridge.ts'
+import { errorReply, OpError, routeOp, safePage } from './bridge.ts'
 
 const ID = '8b0f6f3e-2d6a-4c7e-9a51-0c6a3d2b1f10'
 
@@ -73,5 +73,15 @@ describe('errorReply', () => {
   })
   it('sends only the text for an error that is not of the server', () => {
     expect(errorReply(new OpError('unknown operation'))).toEqual({ err: 'unknown operation' })
+  })
+})
+
+describe('safePage', () => {
+  it('accepts only an .html file of the UI of the extension', () => {
+    expect(safePage('tab.html')).toBe('tab.html')
+    expect(safePage('tabs/review.html')).toBe('tabs/review.html')
+    for (const bad of ['../notes/index.html', '/tab.html', 'tab.js', 'a/./b.html', 'https://evil.x/a.html', 'tab.html?x=1', 'a\\b.html', '']) {
+      expect(() => safePage(bad), bad).toThrow(OpError)
+    }
   })
 })

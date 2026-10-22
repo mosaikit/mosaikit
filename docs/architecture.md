@@ -991,7 +991,9 @@ await msk.share(rows[0].id)                  // share dialog of the host
 API of the bridge: `crud(name).list/get/create/update/delete`, `call`,
 `files.*` (if `files`), `content.upload/ticket` (if `content`),
 `resource.meta`, `share`, `toast`, `notify` (§5.1), `theme`,
-`extensions(name).list/values/set/action` (§8.9).
+`extensions(name).list/values/set/action/mountTab` (§8.9), and in the page of a tab
+`tab` and `tabClient()` (§8.9). The theme variables include `--on-acc` and `--on-err`, the text on the
+accent and on the colour of errors (the buttons of `mountCrud`).
 
 ```ts
 await msk.notify({ title: 'Due today', body: 'Site visit', at: `notes/${id}`, resource: id })
@@ -1106,9 +1108,40 @@ must be on in the tenant and the person must have `use` on it (permission profil
 The UI of the extended plugin reads them through the bridge
 (`msk.extensions('notes').list()`, `.values(ids)`, `.set(id, extension, values)`,
 `.action(id, extension, key)`); `mountCrud` shows them by itself: the fields as columns and in the
-detail, the actions as buttons. REST: `/api/t/{t}/p/{plugin}/ext/{resource}` (list),
-`…/values` (POST of the ids), `…/{id}/{extension}` (PUT of the values), `…/{id}/{extension}/{action}`.
-The sample is `com.mosaikit.note-review` in mosaikit-plugins.
+detail (not the fields declared `hidden = true`, kept for the extension only), the actions as buttons.
+REST: `/api/t/{t}/p/{plugin}/ext/{resource}` (list), `…/values` (POST of the ids), `…/{id}/{extension}`
+(PUT of the values), `…/{id}/{extension}/{action}`. The sample is `com.mosaikit.note-review` in
+mosaikit-plugins: two fields, an action and a tab.
+
+**Tabs of an extension.** An extension with a UI can add a tab to the detail of the items:
+
+```toml
+[ui]
+entry = "index.html"
+
+[[extension.tabs]]
+resource = "notes"
+key = "review"
+label = "Review"          # translated in [i18n.<lang>] extension.tabs
+icon = "clipboard-check"  # optional, a Lucide name
+page = "tab.html"         # an .html page of its UI (default: the entry)
+```
+
+The extended plugin keeps a place for it in the detail (`msk.extensions('notes').mountTab(el, id,
+extension, key)`; `mountCrud` shows the tabs next to the detail by itself). The host checks that the
+extension is on and offered to the person and that the item is visible to them, then draws the page of
+the extension in a frame of its own, placed over that place and kept in step with it (position, size,
+visibility); the page asks for its height (`tabClient().autoResize()`), the place follows. The frame is
+**sandboxed without `allow-same-origin`**: its origin is opaque, so neither the extended plugin nor the
+extension can reach into the other's page, storage or cookies (the files of the UIs are served with
+`Access-Control-Allow-Origin: *` for its module scripts, which are public anyway; its pages cannot use
+`localStorage`). The bridge accepts only that frame and limits it to the extension and to that one item:
+`msk.tab` says where it is (`base`, `resource`, `item`, `key`, `level`); `tabClient()` reads the item as
+the person sees it (`item()`), reads and changes the values of the extension on it (`values()`,
+`set(values)`, `action(key)`) — the kernel checks the level of the person on every call — and the other
+calls are the ones of the extension itself (its resources, its commands). After a change the extended
+plugin receives the `ext.changed` event (`mountCrud` reads the values again). An extension with a UI is
+not an app: the shell does not list it in the sidebar nor on the Home.
 
 ### 8.10 Settings, updates, uninstall
 
@@ -1249,13 +1282,28 @@ tenants/<slug>/      the export of each tenant (§3.5) without contents (they ar
   --if-exists --no-owner` (or replace the SQLite file), put back `blobs/` and `plugins/`, keep the same
   key, start.
 - **Restore one tenant**, in the running installation: Restore a tenant on a backup imports its
-  `tenants/<slug>/` with the contents of `blobs/` (replacing the tenant if it exists). Restoring a single
-  item from a backup is not offered: the trash keeps deleted items for `trash.retention_days`.
+  `tenants/<slug>/` with the contents of `blobs/` (replacing the tenant if it exists).
+- **Restore one item** (module `ops::backup_item`), in the running installation: Restore an item on a
+  backup looks for the items of a tenant in its `tenants/<slug>/` (by title, app, owner; the first 200,
+  with their state now: no longer in the tenant, in the trash, in the tenant) and brings one back with
+  what is under it (the items of a folder), its rows in the tables of its plugin, the values of the
+  extensions and its files from `blobs/`. On request also its shares, only to people and groups that
+  still exist; public links never come back (a revoked link stays revoked). Under its parent if the
+  parent is still there, otherwise at the top; an owner who no longer exists gives way to the first
+  Tenant Manager; the quotas do not stop it.
+  - an item no longer in the tenant comes back with its id;
+  - an item still there (also in the trash) is never overwritten silently (`409`, code `item_exists`):
+    the Administrator chooses `copy` (a new item with new ids, next to the current one) or `replace`
+    (the current version, with what is under it, is deleted for good and the backup one takes its id).
+
+  The owner receives a notification (`backup.item_restored`) and the log the event
+  `backup.restore_item`. The trash stays the quick way back for recent deletions.
 - A failed backup notifies every Administrator (`backup.failed`) and raises the alert «Backup failed».
 
 API: `GET|POST /api/admin/backups`, `GET|PUT /api/admin/backups/settings`,
 `GET /api/admin/backups/{id}/file`, `GET …/tenants`, `POST …/restore` (`{"slug", "replace"}`),
-`DELETE /api/admin/backups/{id}`.
+`GET …/tenants/{slug}/items?q=&plugin=&owner=`, `POST …/tenants/{slug}/items/{id}/restore`
+(`{"mode": "copy" | "replace", "shares": bool}`), `DELETE /api/admin/backups/{id}`.
 
 ### 10.2 Maintenance mode
 

@@ -1,7 +1,8 @@
 // Generic CRUD view driven by the metadata of the resource (fields of the manifest).
 // It respects the level of the user on every row: read, write, manage.
 // The extensions of the plugin (other plugins that add fields and actions to its items) show by
-// themselves: their fields as columns and in the detail, their actions as buttons.
+// themselves: their fields as columns and in the detail, their actions as buttons, their tabs next to
+// the detail of an item (the host draws the page of the extension over the tab: `mountTab`).
 // Its texts are in English, or in Italian when the host is in Italian (the `context` of the bridge).
 
 import type { Msk } from './client.ts'
@@ -25,6 +26,8 @@ type State = {
   /** extensions of the resource and their values: item id -> extension id -> values */
   ext: ExtensionView[]
   extValues: Record<string, Record<string, Values>>
+  /** the tab of an extension shown in the detail (null: the fields of the item) */
+  tab: { ext: string; key: string } | null
 }
 
 function h<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string, string> = {}, ...children: (Node | string)[]) {
@@ -61,6 +64,7 @@ const TEXTS = {
     noItem: 'no item',
     shared: 'shared',
     detail: 'Detail',
+    sections: 'Sections of the item',
     newItem: 'New item',
     sharedReadOnly: 'Shared with you, read only.',
     ownerIs: 'Owner: {name}',
@@ -87,6 +91,7 @@ const TEXTS = {
     noItem: 'nessun elemento',
     shared: 'condivisa',
     detail: 'Dettaglio',
+    sections: 'Sezioni dell’elemento',
     newItem: 'Nuovo elemento',
     sharedReadOnly: 'Condiviso con te in sola lettura.',
     ownerIs: 'Proprietario: {name}',
@@ -103,8 +108,10 @@ type Text = keyof (typeof TEXTS)['en']
 export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: CrudOptions = {}): () => void {
   const api = msk.crud(resource)
   const extApi = msk.extensions(resource)
-  const st: State = { fields: [], rows: [], selected: null, filter: '', busy: false, ext: [], extValues: {} }
+  const st: State = { fields: [], rows: [], selected: null, filter: '', busy: false, ext: [], extValues: {}, tab: null }
   let disposed = false
+  /** the tab mounted now (row|extension|key) and the function that closes it */
+  let mounted: { key: string; close: () => void } | null = null
   const tr = (k: Text, vars: Record<string, string | number> = {}) =>
     TEXTS[msk.context?.lang === 'it' ? 'it' : 'en'][k].replace(/\{(\w+)\}/g, (_, v: string) => String(vars[v] ?? ''))
 
@@ -119,6 +126,8 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   const readonly = h('div', { class: 'msk-readonly' })
   const fieldsBox = h('div')
   const extBox = h('div', { class: 'msk-ext' })
+  const tabsBar = h('div', { class: 'msk-tabs', role: 'tablist' })
+  const tabPanel = h('div', { class: 'msk-tabpanel', role: 'tabpanel', id: 'msk-tabpanel' })
   const btnSave = h('button', { type: 'button', class: 'msk-btn' })
   const btnCancel = h('button', { type: 'button', class: 'msk-btn ghost' })
   const btnShare = h('button', { type: 'button', class: 'msk-btn ghost' })
@@ -133,7 +142,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     btnDel.textContent = tr('del')
   }
   const msg = h('div', { class: 'msk-msg', role: 'status' })
-  const form = h('section', { class: 'msk-form' }, formTitle, readonly, fieldsBox, extBox, h('div', { class: 'msk-actions' }, btnSave, btnCancel, btnShare, btnDel), msg)
+  const form = h('section', { class: 'msk-form' }, formTitle, tabsBar, readonly, fieldsBox, extBox, tabPanel, h('div', { class: 'msk-actions' }, btnSave, btnCancel, btnShare, btnDel), msg)
 
   root.replaceChildren(
     title,
@@ -184,6 +193,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
         line.append(h('td', { class: 'msk-owner' }, r.owner_name))
         const pick = () => {
           st.selected = st.selected === r.id ? null : r.id
+          st.tab = null
           renderTable()
           renderForm()
         }
@@ -219,18 +229,71 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     return h('div', { class: 'msk-field' + (f.required ? ' req' : '') }, label, el)
   }
 
+  /** the tabs of the extensions for the items of the resource */
+  const extTabs = () => st.ext.flatMap((e) => (e.tabs ?? []).map((t) => ({ ext: e.id, key: t.key, label: t.label })))
+
+  /** Closes the tab of an extension shown now, if any. */
+  function closeTab() {
+    mounted?.close()
+    mounted = null
+    tabPanel.style.height = ''
+    tabPanel.replaceChildren()
+  }
+
+  function renderTabs(row: Row | null) {
+    const tabs = row ? extTabs() : []
+    if (st.tab && !tabs.some((t) => t.ext === st.tab!.ext && t.key === st.tab!.key)) st.tab = null
+    tabsBar.hidden = !tabs.length
+    tabsBar.setAttribute('aria-label', tr('sections'))
+    if (!tabs.length) {
+      tabsBar.replaceChildren()
+      return
+    }
+    const all = [{ ext: '', key: '', label: tr('detail') }, ...tabs]
+    const buttons = all.map((t, i) => {
+      const on = st.tab ? st.tab.ext === t.ext && st.tab.key === t.key : i === 0
+      const b = h('button', { type: 'button', role: 'tab', class: 'msk-tab', 'aria-selected': String(on), 'aria-controls': 'msk-tabpanel', tabindex: on ? '0' : '-1' }, t.label)
+      b.addEventListener('click', () => {
+        st.tab = i === 0 ? null : { ext: t.ext, key: t.key }
+        renderForm()
+        tabsBar.querySelectorAll<HTMLElement>('[role="tab"]')[i]?.focus()
+      })
+      b.addEventListener('keydown', (e) => {
+        const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0
+        if (!d) return
+        e.preventDefault()
+        const next = (i + d + all.length) % all.length
+        ;(tabsBar.querySelectorAll<HTMLElement>('[role="tab"]')[next] as HTMLButtonElement | undefined)?.click()
+      })
+      return b
+    })
+    tabsBar.replaceChildren(...buttons)
+  }
+
   function renderForm() {
     const row = selectedRow()
     const canWrite = !row || row.my_level === 'write' || row.my_level === 'manage'
     const canManage = !row || row.my_level === 'manage'
     formTitle.textContent = row ? tr('detail') : tr('newItem')
+    renderTabs(row)
     readonly.textContent = row && !canWrite ? tr('sharedReadOnly') : row ? tr('ownerIs', { name: row.owner_name }) : ''
+    const inTab = !!(row && st.tab)
+    fieldsBox.hidden = extBox.hidden = inTab
+    tabPanel.hidden = !inTab
     fieldsBox.replaceChildren(...visibleFields().map((f) => input(f, row?.values[f.key], !canWrite)))
-    btnSave.hidden = !canWrite
-    btnDel.hidden = !row || !canManage
-    btnShare.hidden = !row || !canManage
+    btnSave.hidden = !canWrite || inTab
+    btnDel.hidden = !row || !canManage || inTab
+    btnShare.hidden = !row || !canManage || inTab
     btnCancel.textContent = row ? tr('close') : tr('cancel')
     renderExtensions(row, canWrite)
+    if (row && st.tab) {
+      const key = `${row.id}|${st.tab.ext}|${st.tab.key}`
+      if (mounted?.key !== key) {
+        closeTab()
+        tabPanel.style.height = '240px'
+        mounted = { key, close: extApi.mountTab(tabPanel, row.id, st.tab.ext, st.tab.key) }
+      }
+    } else closeTab()
   }
 
   /** The fields and actions of the extensions, for an existing item. */
@@ -240,7 +303,9 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
       return
     }
     extBox.replaceChildren(
-      ...st.ext.map((e, i) => {
+      ...st.ext.flatMap((e, i) => {
+        // an extension with only tabs or hidden fields has nothing to show here
+        if (!e.fields.some((f) => !f.hidden) && !(canWrite && e.actions.length)) return []
         const vals = st.extValues[row.id]?.[e.id] ?? {}
         const inputs = e.fields
           .filter((f) => !f.hidden)
@@ -263,7 +328,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
               return b
             })
           : []
-        return h('fieldset', { class: 'msk-extset' }, h('legend', {}, e.label), ...inputs, ...(actions.length ? [h('div', { class: 'msk-actions' }, ...actions)] : []))
+        return [h('fieldset', { class: 'msk-extset' }, h('legend', {}, e.label), ...inputs, ...(actions.length ? [h('div', { class: 'msk-actions' }, ...actions)] : []))]
       }),
     )
   }
@@ -332,6 +397,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   })
   btnNew.addEventListener('click', () => {
     st.selected = null
+    st.tab = null
     setMsg('')
     renderTable()
     renderForm()
@@ -339,6 +405,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   })
   btnCancel.addEventListener('click', () => {
     st.selected = null
+    st.tab = null
     setMsg('')
     renderTable()
     renderForm()
@@ -381,10 +448,23 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     renderTable()
     renderForm()
   })
+  // a tab of an extension changed its values on an item: the columns again
+  const offExt = msk.onEvent((event) => {
+    if (event !== 'ext.changed' || disposed) return
+    void extApi
+      .values(st.rows.map((x) => x.id))
+      .then((v) => {
+        st.extValues = v
+        renderTable()
+      })
+      .catch(() => {})
+  })
   void load()
   return () => {
     disposed = true
     off()
+    offExt()
+    closeTab()
     root.replaceChildren()
   }
 }

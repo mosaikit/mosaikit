@@ -22,7 +22,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { initials, passwordMin, useAction, useApi, useConfig, useConfirm, useTenantCtx } from '../core.ts'
+import { initials, isApp, passwordMin, useAction, useApi, useConfig, useConfirm, useTenantCtx } from '../core.ts'
 import { t, useLang } from '../i18n.ts'
 import { Empty, ErrorBox, FormDialog, Kpi, Loading, PageHeader, Pills, PluginKpis, SaveBar, Sections, StatusBadge, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
@@ -82,13 +82,13 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
         )}
         <section className="grid gap-3">
           <h2 className="text-sm font-semibold">{t('Apps')}</h2>
-          {c.plugins.length === 0 ? (
+          {!c.plugins.some(isApp) ? (
             <Empty icon={<Grid2x2 />} title={t('No active apps')}>
               {t('An Administrator installs and turns them on.')}
             </Empty>
           ) : (
             <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
-              {c.plugins.map((p) => (
+              {c.plugins.filter(isApp).map((p) => (
                 <button
                   key={p.id}
                   type="button"

@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
-import { initials, passwordMin, useAction, useApi, useTenantCtx } from '../core.ts'
+import { initials, isApp, passwordMin, useAction, useApi, useTenantCtx } from '../core.ts'
 import { setLang, t, useLang, useLanguages, type Lang } from '../i18n.ts'
 import { Empty, ErrorBox, Loading, Locked, PageHeader, SaveBar, Sections, type Section } from '../kit.tsx'
 import { go, personal, to, type Route } from '../router.ts'
@@ -374,7 +374,7 @@ function Appearance({ route }: { route: Route }) {
 function AppsInSidebar({ slug }: { slug: string }) {
   const qc = useQueryClient()
   const ctx = useTenantCtx(slug)
-  const apps = (ctx.data?.plugins ?? []).filter((p) => p.has_ui)
+  const apps = (ctx.data?.plugins ?? []).filter(isApp)
   if (!apps.length) return null
   const hidden = new Set(ctx.data?.prefs.hidden ?? [])
   async function toggle(id: string, show: boolean) {

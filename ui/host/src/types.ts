@@ -626,6 +626,35 @@ export interface GlobalKpi {
   plugins: PluginKpi[]
 }
 
+/** An item of a tenant inside a backup, with its state in the tenant now. */
+export interface BackupItem {
+  id: string
+  plugin_id: string
+  kind: string
+  title: string
+  owner_name: string
+  updated_at: string | null
+  /** items under it (a folder), restored with it */
+  children: number
+  state: 'missing' | 'trash' | 'present'
+}
+
+export interface BackupItems {
+  tenant: string
+  exported_at: string
+  total: number
+  items: BackupItem[]
+}
+
+export interface ItemRestoreReport {
+  id: string
+  title: string
+  mode: 'original' | 'copy' | 'replace'
+  items: number
+  files: number
+  shares: number
+}
+
 export interface AdminPlugin extends PluginView {
   status: 'installed' | 'active' | 'blocked'
   sha256: string

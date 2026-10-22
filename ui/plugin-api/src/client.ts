@@ -1,5 +1,5 @@
 import { Bridge, BridgeError } from './bridge.ts'
-import type { ExtensionView, FileEntry, Hello, ListResult, Listing, Notify, PublicResource, Row, SiteInfo, UiContext, Values } from './protocol.ts'
+import type { ExtensionView, FileEntry, Hello, ListResult, Listing, Notify, PublicResource, Rect, Row, SiteInfo, TabInfo, UiContext, Values } from './protocol.ts'
 
 /** The extensions of the plugin on a resource (fields and actions other plugins add to its items). */
 export interface ExtensionsClient {
@@ -11,6 +11,75 @@ export interface ExtensionsClient {
   set(id: string, extension: string, values: Values): Promise<Values>
   /** runs an action of an extension on an item; returns the new values of the extension */
   action(id: string, extension: string, action: string): Promise<Values>
+  /** Shows the tab `tab` of `extension` for the item `id` over `el`: the host draws the page of the
+   *  extension in a frame of its own, placed and sized on `el` (which this keeps in step). Returns the
+   *  function that closes it. */
+  mountTab(el: HTMLElement, id: string, extension: string, tab: string): () => void
+}
+
+/** In a page of an extension opened as a tab: the item it is shown for, and its values. */
+export interface TabClient {
+  /** the item of the extended plugin, as the person sees it */
+  item(): Promise<Row>
+  /** the values of this extension on the item */
+  values(): Promise<Values>
+  /** changes some values of this extension on the item (the person must be able to edit it) */
+  set(values: Values): Promise<Values>
+  /** runs an action of this extension on the item */
+  action(action: string): Promise<Values>
+  /** asks the host for this height (the tab grows with its content: see `autoResize`) */
+  resize(height: number): Promise<void>
+  /** keeps the height of the tab equal to the height of `el` (default: the body); returns the stop */
+  autoResize(el?: HTMLElement): () => void
+}
+
+function rectOf(el: HTMLElement): Rect {
+  const r = el.getBoundingClientRect()
+  return { top: Math.round(r.top), left: Math.round(r.left), width: Math.round(r.width), height: Math.round(r.height) }
+}
+
+/** Base side of a tab: asks the host to open it and keeps its frame on `el` (position, size, visibility). */
+function mountTab(b: Bridge, el: HTMLElement, resource: string, id: string, extension: string, tab: string): () => void {
+  let closed = false
+  let handle: string | null = null
+  let last = ''
+  let frame = 0
+  const place = () => {
+    if (closed) return
+    frame = requestAnimationFrame(place)
+    if (!handle) return
+    const rect = rectOf(el)
+    const visible = el.isConnected && el.getClientRects().length > 0
+    const key = `${rect.top},${rect.left},${rect.width},${rect.height},${visible}`
+    if (key === last) return
+    last = key
+    void b.call('ext.tab.place', { handle, rect, visible }).catch(() => {})
+  }
+  const off = b.onEvent((event, data) => {
+    const d = data as { handle?: string; height?: number }
+    if (event === 'ext.tab.height' && d?.handle === handle && typeof d.height === 'number') {
+      el.style.height = `${Math.min(Math.max(Math.round(d.height), 80), 4000)}px`
+    }
+  })
+  void b
+    .call<{ handle: string }>('ext.tab.open', { resource, id, extension, tab, rect: rectOf(el) })
+    .then((r) => {
+      if (closed) {
+        void b.call('ext.tab.close', { handle: r.handle }).catch(() => {})
+        return
+      }
+      handle = r.handle
+    })
+    .catch((e) => {
+      el.textContent = e instanceof Error ? e.message : String(e)
+    })
+  frame = requestAnimationFrame(place)
+  return () => {
+    closed = true
+    cancelAnimationFrame(frame)
+    off()
+    if (handle) void b.call('ext.tab.close', { handle }).catch(() => {})
+  }
 }
 
 export interface CrudClient {
@@ -34,6 +103,8 @@ export class Msk {
   readonly at: string | undefined
   /** permissions of the person in the plugin (older hosts: undefined, everything allowed) */
   readonly perms: string[] | undefined
+  /** in a page of an extension opened as a tab of an item: where (otherwise undefined) */
+  readonly tab: TabInfo | undefined
 
   constructor(
     readonly bridge: Bridge,
@@ -47,6 +118,37 @@ export class Msk {
     this.context = hello.context
     this.at = hello.at
     this.perms = hello.perms
+    this.tab = hello.tab
+  }
+
+  /** In a page opened as a tab of an item (`msk.tab`): the item and the values of the extension on it. */
+  tabClient(): TabClient {
+    if (!this.tab) throw new BridgeError('this page is not open as the tab of an item')
+    const b = this.bridge
+    const resize = async (height: number) => {
+      await b.call('tab.resize', { height: Math.round(height) })
+    }
+    return {
+      item: () => b.call<Row>('tab.item'),
+      values: () => b.call<Values>('tab.values'),
+      set: async (values) => (await b.call<{ values: Values }>('tab.set', { values })).values,
+      action: async (action) => (await b.call<{ values: Values }>('tab.action', { action })).values,
+      resize,
+      autoResize: (el = document.body) => {
+        let last = 0
+        const send = () => {
+          const h = Math.ceil(el.scrollHeight)
+          if (h !== last) {
+            last = h
+            void resize(h).catch(() => {})
+          }
+        }
+        const ro = new ResizeObserver(send)
+        ro.observe(el)
+        send()
+        return () => ro.disconnect()
+      },
+    }
   }
 
   /** The person has the permission `key` in the plugin (to hide what they may not do; the kernel and the
@@ -87,6 +189,7 @@ export class Msk {
       values: async (ids) => (ids.length ? b.call('ext.values', { resource, ids }) : {}),
       set: async (id, extension, values) => (await b.call<{ values: Values }>('ext.set', { resource, id, extension, values })).values,
       action: async (id, extension, action) => (await b.call<{ values: Values }>('ext.action', { resource, id, extension, action })).values,
+      mountTab: (el, id, extension, tab) => mountTab(b, el, resource, id, extension, tab),
     }
   }
 
