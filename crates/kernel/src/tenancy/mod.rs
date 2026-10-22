@@ -25,7 +25,10 @@ pub use invitations::{
 pub use members::{
     create_member, members, remove_member, reset_member_password, set_role, MemberInfo, RemoveReport,
 };
-pub use settings::{prefs, set_prefs, set_settings};
+pub use settings::{
+    platform_theme, prefs, set_platform_theme, set_prefs, set_settings, set_shell_band, set_tenant_theme,
+    shell_band, tenant_theme, ShellBand, ThemeChoice, DEFAULT_THEME,
+};
 pub use support::{create_tenant_manager, reset_tenant_password, set_tenant_role, tenant_members};
 pub use tenants::{
     create_tenant, list_tenants, login_tenants, set_tenant_status, LoginTenant, NewTenant, TenantInfo,

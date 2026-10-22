@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest'
 import { Bridge, BridgeError } from './bridge.ts'
-import { applyTheme } from './client.ts'
+import { applyContext, applyTheme, Msk } from './client.ts'
+import type { UiContext } from './protocol.ts'
 
 /** Finestra finta: registra i postMessage e permette di simulare risposte. */
 function fakeHost() {
@@ -69,5 +70,44 @@ describe('applyTheme', () => {
     expect(el.style.getPropertyValue('--acc')).toBe('#f00')
     expect(el.style.getPropertyValue('color')).toBe('')
     expect(el.style.getPropertyValue('--x')).toBe('')
+  })
+})
+
+const CTX: UiContext = { lang: 'en', preset: 'italia', mode: 'dark', preference: 'auto', theme: { '--acc': '#06c' } }
+
+describe('applyContext', () => {
+  it('applica lingua, modo, preset e tema', () => {
+    const el = document.createElement('div')
+    applyContext(CTX, el)
+    expect(el.lang).toBe('en')
+    expect(el.dataset.mode).toBe('dark')
+    expect(el.dataset.preset).toBe('italia')
+    expect(el.style.colorScheme).toBe('dark')
+    expect(el.style.getPropertyValue('--acc')).toBe('#06c')
+  })
+
+  it('ignora valori non validi', () => {
+    const el = document.createElement('div')
+    applyContext({ ...CTX, lang: 'en"><script>', mode: 'nero' as 'dark', preset: 'a b' }, el)
+    expect(el.lang).toBe('')
+    expect(el.dataset.mode).toBeUndefined()
+    expect(el.dataset.preset).toBeUndefined()
+  })
+})
+
+describe('Msk.onContext', () => {
+  it("riceve il contesto dell'handshake e i suoi cambi", () => {
+    const { host } = fakeHost()
+    const b = new Bridge(host, 'https://app.example', window)
+    const msk = new Msk(b, { public: false, context: CTX })
+    expect(msk.context?.lang).toBe('en')
+    const fn = vi.fn()
+    msk.onContext(fn)
+    const next = { ...CTX, lang: 'it', mode: 'light' as const }
+    reply(window, host, 'https://app.example', { msk: 1, event: 'context', data: next })
+    expect(fn).toHaveBeenCalledWith(next)
+    reply(window, host, 'https://app.example', { msk: 1, event: 'theme', data: {} })
+    expect(fn).toHaveBeenCalledTimes(1)
+    b.dispose()
   })
 })

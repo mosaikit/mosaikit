@@ -3,7 +3,7 @@
 /* eslint-disable -- plain browser scripts of a static mockup: they share globals across files */
 
 /* Mosaikit mockup: the screens of the platform administrator, the settings of platform,
-   organization and person (with appearance and the theme editor), and the table of screens. */
+   tenant and person (with appearance and the theme editor), and the table of screens. */
 
 /* ── Platform overview ───────────────────────────────────────────────── */
 
@@ -19,12 +19,12 @@ function secPlatform(S) {
     susp = TENANTS.filter((x) => tenSt(S, x) === 'Suspended').length;
   return detailPage(S, {
     title: 'Platform overview',
-    sub: `Mosaikit (Platform) · ${TENANTS.length} organizations · 433 people · version 1.0`,
-    actions: btn('New organization', { kind: 'pri', icon: 'plus', act: 'newten' }),
+    sub: `Mosaikit (Platform) · ${TENANTS.length} tenants · 433 people · version 1.0`,
+    actions: btn('New tenant', { kind: 'pri', icon: 'plus', act: 'newten' }),
     body: `
     ${kpis([
       [
-        'Active organizations',
+        'Active tenants',
         String(live.length - trial),
         `${trial} on trial · ${susp} suspended`,
       ],
@@ -38,13 +38,13 @@ function secPlatform(S) {
       [
         'Updates',
         String(upd.length),
-        upd.length ? 'to apply from the Marketplace' : 'none',
+        upd.length ? 'to apply from Plugins' : 'none',
         upd.length ? 'warn' : 'ok',
       ],
     ])}
     <div class="grid-home"><section class="panel span2"><div class="panel-h"><h2>Services of the platform</h2><a data-go="monitoring">Monitoring</a></div><ul class="health cols">${MON_SVC.map((s) => `<li><i class="dot ${s[2]}"></i><b>${s[1]}</b><span class="muted small">${s[3]}</span></li>`).join('')}</ul></section>
     <section class="panel"><div class="panel-h"><h2>To do</h2></div><ul class="rows">${upd.length ? `<li><span class="ri">${ic('refresh', 15)}</span><div class="rt"><b>${upd.length} update${upd.length === 1 ? '' : 's'} to apply</b><span>${upd.map((m) => `${m.n} ${m.ver} → ${m.next}`).join(' · ')}</span></div>${btn('See', { go: 'marketplace' })}</li>` : ''}<li><span class="ri">${ic('building', 15)}</span><div class="rt"><b>Sandbox ends in 4 days</b><span>7 people · then it is suspended</span></div>${btn('Open', { go: 'tenant', res: 'ten:sandbox' })}</li><li><span class="ri">${ic('alert', 15)}</span><div class="rt"><b>The backup of 5 Oct failed</b><span>The last two succeeded</span></div>${btn('See', { act: 'sysgo', v: '2' })}</li></ul></section>
-    <section class="panel span2"><div class="panel-h"><h2>Organizations by storage used</h2><a data-go="tenants">All</a></div><div class="tbl-w"><table class="tbl sm"><tbody>${TENANTS.slice()
+    <section class="panel span2"><div class="panel-h"><h2>Tenants by storage used</h2><a data-go="tenants">All</a></div><div class="tbl-w"><table class="tbl sm"><tbody>${TENANTS.slice()
       .sort((a, b) => b.data - a.data)
       .map((t) => {
         const u = tenUsage(S, t).space,
@@ -52,11 +52,11 @@ function secPlatform(S) {
         return `<tr class="clk ${tenSt(S, t) === 'Suspended' ? 'dim' : ''}" data-res="ten:${t.slug}" data-go="tenant"><td><b>${t.n}</b>${tenSt(S, t) !== 'Active' ? ` ${stPillT(tenSt(S, t))}` : ''}</td><td class="sp-c">${meter(Math.min(u, q), q, `${fmtN(u)} of ${fmtN(q)} GB`)}</td><td class="num r">${t.users} people</td></tr>`;
       })
       .join('')}</tbody></table></div></section>
-    <section class="panel"><div class="panel-h"><h2>Recent errors</h2><a data-go="monitoring">All</a></div><ul class="rows"><li><span class="ri">${ic('alert', 15)}</span><div class="rt"><b>Automation worker: time limit exceeded</b><span>Example City · Monthly report of open tasks · yesterday 16:12</span></div></li><li><span class="ri">${ic('alert', 15)}</span><div class="rt"><b>Keycloak: groups not synchronized</b><span>Example City · Field team · 6 Oct 08:02</span></div></li></ul></section></div>`,
+    <section class="panel"><div class="panel-h"><h2>Recent errors</h2><a data-go="monitoring">All</a></div><ul class="rows"><li><span class="ri">${ic('alert', 15)}</span><div class="rt"><b>Automation worker: time limit exceeded</b><span>Example City · Monthly report of open tasks · yesterday 16:12</span></div></li><li><span class="ri">${ic('alert', 15)}</span><div class="rt"><b>Identity provider: groups not synchronized</b><span>Example City · Field team · 6 Oct 08:02</span></div></li></ul></section></div>`,
   });
 }
 
-/* ── Organizations ───────────────────────────────────────────────────── */
+/* ── Tenants ─────────────────────────────────────────────────────────── */
 
 function secTenants(S) {
   setSub(null);
@@ -66,16 +66,15 @@ function secTenants(S) {
   return resPage(
     S,
     {
-      title: 'Organizations',
-      total: `${TENANTS.length} organizations · 437 people`,
-      create: { label: 'New organization', act: 'newten' },
+      title: 'Tenants',
+      total: `${TENANTS.length} tenants · 437 people`,
+      create: { label: 'New tenant', act: 'newten' },
       bulk: {
         key: 'ten',
         ids: rows.map((x) => x.slug),
         acts: [
           ['lock', 'Suspend'],
           ['refresh', 'Reactivate'],
-          ['sliders', 'Change plan'],
           ['download', 'Export'],
           ['trash', 'Delete', 1],
         ],
@@ -86,23 +85,15 @@ function secTenants(S) {
       'ten',
       [
         [
-          'Plan',
-          [
-            ['Enterprise', 2],
-            ['Pro', 3],
-            ['Free', 1],
-          ],
-        ],
-        [
           'Sign-in',
           [
-            ['SSO', 2],
+            ['Identity provider (OIDC)', 2],
             ['Local accounts', 4],
           ],
         ],
       ],
       {
-        search: 'Search an organization',
+        search: 'Search a tenant',
         sort: SORT_NAME,
         scopeKey: 'tenst',
         scope: [
@@ -113,11 +104,11 @@ function secTenants(S) {
         ],
       },
     ),
-    `<div class="tbl-w"><table class="tbl"><thead><tr><th class="cbx"><span class="sr">Select</span></th><th>Organization</th><th>Plan</th><th class="r">People</th><th class="r">Storage</th><th>Sign-in</th><th>Status</th></tr></thead><tbody>
-    ${rows.map((x) => `<tr class="clk ${tenSt(S, x) === 'Suspended' ? 'dim' : ''} ${selOf(S, 'ten').includes(x.slug) ? 'picked' : ''}" data-res="ten:${x.slug}" data-go="tenant">${selTd(S, 'ten', x.slug, x.n)}<td><div><b>${x.n}</b><span class="muted small mono"> ${x.slug}</span></div></td><td>${tenPlan(S, x)}</td><td class="r num">${x.users}</td><td class="r num">${fmtN(x.data)} GB</td><td class="small">${x.auth}</td><td>${stPillT(tenSt(S, x))}</td></tr>`).join('')}</tbody></table></div>`,
+    `<div class="tbl-w"><table class="tbl"><thead><tr><th class="cbx"><span class="sr">Select</span></th><th>Tenant</th><th class="r">People</th><th class="r">Storage</th><th>Sign-in</th><th>Status</th></tr></thead><tbody>
+    ${rows.map((x) => `<tr class="clk ${tenSt(S, x) === 'Suspended' ? 'dim' : ''} ${selOf(S, 'ten').includes(x.slug) ? 'picked' : ''}" data-res="ten:${x.slug}" data-go="tenant">${selTd(S, 'ten', x.slug, x.n)}<td><div><b>${x.n}</b><span class="muted small mono"> ${x.slug}</span></div></td><td class="r num">${x.users}</td><td class="r num">${fmtN(x.data)} GB</td><td class="small">${x.auth}</td><td>${stPillT(tenSt(S, x))}</td></tr>`).join('')}</tbody></table></div>`,
   );
 }
-/* The trial: start, end and what happens at the end. An organization put «on trial» starts today for 30 days. */
+/* The trial: start, end and what happens at the end. A tenant put «on trial» starts today for 30 days. */
 const TODAY = '2026-10-08';
 function dayDiff(a, b) {
   return Math.round((new Date(b) - new Date(a)) / 864e5);
@@ -138,187 +129,145 @@ function trialPanel(S, x) {
   return `<section class="panel trial"><div class="panel-h"><div><h2>${ic('clock', 16)} Trial period</h2><p class="muted small">${len < 1 ? '<b class="bad">The end must come after the start.</b>' : `${len} days · ${left > 0 ? `<b>${left}</b> left` : left === 0 ? '<b>ends today</b>' : `<b class="bad">ended ${-left} days ago</b>`}`}</p></div>
       <div class="row">${btn('+15 days', { act: 'trialext', v: '15' })}${btn('+30 days', { act: 'trialext', v: '30' })}</div></div>
     <div class="fgrid"><label class="lbl">Start<input type="date" data-trial="from" value="${tr.from}" max="${tr.to}"></label><label class="lbl">End<input type="date" data-trial="to" value="${tr.to}" min="${tr.from}"></label></div>
-    <div class="trial-a"><span class="small">At the end</span>${opt('suspended', 'Suspend the organization')}${opt('free', 'Move to the Free plan')}${opt('plan', 'Move to the ' + (tenPlan(S, x) === 'Free' ? 'Pro' : tenPlan(S, x)) + ' plan')}</div>
+    <div class="trial-a"><span class="small">At the end</span>${opt('suspended', 'Suspend the tenant')}${opt('active', 'Make it active')}</div>
     <p class="muted small">Seven days before, the platform warns the contact and the administrators.</p></section>`;
+}
+/* How the people of a tenant sign in: local accounts kept by Mosaikit, or the external identity
+   provider of the tenant (OIDC). One or the other, never both. Roles come from one source only.
+   Administrators never sign in through a tenant: they have their own access, always local. */
+function tenSignIn(S, x, e) {
+  const auth = (S.tenAuth && S.tenAuth[x.slug]) || e.auth;
+  const roles = (S.tenRoles && S.tenRoles[x.slug]) || e.roles;
+  const opt = (name, act, cur, v, b, d) =>
+    `<label class="opt ${cur === v ? 'sel' : ''}"><input type="radio" name="${name}" data-act="${act}" data-v="${v}" ${cur === v ? 'checked' : ''}><b>${b}</b><span>${d}</span></label>`;
+  const oidc = auth === 'oidc';
+  const rules = (list) =>
+    `<ul class="sync">${list.map((r) => `<li><i class="dot ${r[0]}"></i><div><b>${r[1]}</b><span class="muted small">${r[2]}</span></div></li>`).join('')}</ul>`;
+  return `<section class="panel"><h2>How people sign in</h2><div class="opts">${opt('ta', 'tenauth', auth, 'local', 'Local accounts', 'Username and password kept by Mosaikit (argon2id). The Tenant Manager creates people and resets passwords.')}${opt('ta', 'tenauth', auth, 'oidc', 'External identity provider (OIDC)', 'The provider of the customer (Keycloak, Entra ID…). People sign in there; Mosaikit never sees their password.')}</div>
+      <div class="banner info mt">${ic('shield', 18)}<div><b>Administrators are not affected.</b> They sign in from the Administrator access page, always with the local password of the platform and the second factor, whatever this tenant uses.</div></div></section>
+    ${
+      oidc
+        ? `<section class="panel mt"><div class="panel-h"><div><h2>Identity provider</h2><p class="muted small">Authorization code with PKCE; the token is checked with the keys the provider publishes.</p></div>${btn('Check the configuration', { icon: 'refresh', act: 'toast', v: 'Discovery read, keys downloaded, client accepted: the configuration works.' })}</div>
+      <div class="fgrid">${fld('Address of the provider (issuer)', e.issuer || 'https://login.' + e.mail + '/realms/staff', { mono: true, wide: true, hint: 'The rest (endpoints, keys) is read from its discovery document' })}${fld('Client id', 'mosaikit', { mono: true })}${fld('Client secret', '••••••••••••', { type: 'password', hint: 'Encrypted, never sent to the browser' })}${fld('Scopes', 'openid profile email', { mono: true })}${fld('Text of the button', 'Sign in with ' + (e.idpName || 'the identity provider'))}${fld('Return address (to register in the provider)', 'https://apps.example.org/api/auth/oidc/' + x.slug + '/callback', { mono: true, ro: true, wide: true })}</div>
+      <ul class="rows mt"><li><div class="rt grow"><b>Go straight to the provider</b><span>The sign-in page skips the button and sends people to ${e.idpName || 'the provider'}</span></div>${toggle(0)}</li></ul></section>
+    <section class="panel mt"><h2>Where roles come from</h2><p class="muted small">One source only, so that a role is never decided in two places.</p><div class="opts">${opt('tr', 'tenroles', roles, 'mosaikit', 'Managed in Mosaikit', 'The provider only says who the person is; the Tenant Manager gives roles and groups.')}${opt('tr', 'tenroles', roles, 'idp', 'Groups of the identity provider', 'Role and groups are read from the token at every sign-in; nobody changes them by hand in Mosaikit.')}</div>
+      ${
+        roles === 'idp'
+          ? `<div class="fgrid mt">${fld('Claim with the groups', 'groups', { mono: true })}</div><div class="tbl-w mt"><table class="tbl sm"><thead><tr><th>Group in the identity provider</th><th>Role in Mosaikit</th></tr></thead><tbody>${[
+              ['Operations-Managers', 'Tenant Manager'],
+              ['Staff', 'User · Standard profile'],
+              ['*', 'User · View and edit'],
+            ]
+              .map((r) => `<tr><td class="mono">${r[0]}</td><td>${pill(r[1])}</td></tr>`)
+              .join('')}</tbody></table></div><p class="muted small mt">At least one Tenant Manager must come out of the rules: otherwise the configuration is refused.</p>`
+          : ''
+      }</section>
+    <section class="panel mt"><h2>Accounts</h2>${rules([
+      ['ok', 'Who is who', 'issuer plus the subject (sub) of the token. Never linked by email: a provider that changes an email does not take another account'],
+      ['ok', 'First sign-in', 'creates the account, with this tenant as home; name and email update at every sign-in'],
+      ['ok', 'Whoever is disabled in the provider', 'loses the sessions at once with back-channel logout, otherwise at the next check (15 minutes)'],
+      ['warn', 'Local accounts already here', 'stay until the Tenant Manager links each one, once, to its identity in the provider: resources and permissions follow'],
+      ['ok', 'Off in this tenant', 'creating people with a password and resetting passwords: the provider decides'],
+    ])}</section>`
+        : `<section class="panel mt"><h2>Local accounts</h2><p class="muted small">Kept by Mosaikit: the platform stores only the hash of the password.</p><dl class="kv"><dt>Password</dt><dd>At least 10 characters, the minimum of the platform</dd><dt>Failed attempts</dt><dd>8 in 15 minutes, then the sign-in of that account or address waits 15 minutes</dd><dt>Who resets a password</dt><dd>The Tenant Manager; the administrator too, from the page of the tenant</dd><dt>Who creates people</dt><dd>The Tenant Manager, with an initial password</dd></dl></section>`
+    }
+    <section class="panel mt"><div class="panel-h"><div><h2>Guests from other tenants</h2><p class="muted small">People who belong to another tenant and are invited here. They sign in with the method of their home tenant, then switch from the logo at the top; here they only get role and groups.</p></div>${toggle(1)}</div>
+      <dl class="kv"><dt>Highest role for a guest</dt><dd>User</dd><dt>Guests now</dt><dd>${x.slug === 'example-city' ? '1 · from Green Region' : 'None'}</dd></dl></section>`;
+}
+/* Whether a quota of the tenant is its own or the one of the platform for new tenants. */
+function qCust(S, x, k) {
+  const c = S.tenQc && S.tenQc[x.slug] && S.tenQc[x.slug][k];
+  return c != null ? c : x.q[k] !== QDEF[k];
+}
+/* The plugins available to a tenant, as the administrator sees them on its page: availability changes
+   on the page of each plugin (tab Tenants); whether it is on is decided by the Tenant Manager. */
+function tenPlugins(S, x) {
+  const av = tenFeats(S, x),
+    on = x === TENANTS[0] ? mgrFeats(S) : av;
+  return `<p class="muted small">The administrator makes a plugin available on its page, tab <i>Tenants</i>; the Tenant Manager of ${x.n} turns it on and decides who gets which permission.</p>
+    ${['App', 'Service', 'Extension']
+      .map((k) => {
+        const list = FEATS.filter((f) => featKind(f) === k);
+        return `<h3 class="h3">${k === 'App' ? 'Apps' : k + 's'}</h3><ul class="rows panel">${list
+          .map((f) => {
+            const mp = MP.concat(MP_CATALOG).find((m) => m.sys === f.k || 'ext:' + m.id === f.k);
+            return `<li class="${av[f.k] ? '' : 'off'}"><span class="ri">${ic(f.ic, 15)}</span><div class="rt grow"><b>${f.n}</b><span>${f.ext ? 'Extends ' + FEAT(f.ext).n + ' · ' : ''}${f.d}</span></div>${av[f.k] ? pill(on[f.k] ? 'On' : 'Off: the Tenant Manager turned it off', on[f.k] ? 'ok' : '') : pill('Not available')}${mp ? btn('Open', { go: 'mpmod', res: 'mp:' + mp.id }) : '<span class="muted small">Service of the platform</span>'}</li>`;
+          })
+          .join('')}</ul>`;
+      })
+      .join('')}`;
 }
 function secTenant(S) {
   const x = TENANTS.find((y) => y.slug === (S.resId && S.resId.ten)) || TENANTS[0];
   const e = TEN_EXTRA[x.slug];
-  const st = tenSt(S, x),
-    plan = tenPlan(S, x);
-  const auth = (S.tenAuth && S.tenAuth[x.slug]) || e.sso;
-  const idp = (S.tenIdp && S.tenIdp[x.slug]) || e.idp;
-  const inPlan = (f) => PLAN_F.find((y) => y[0] === f)[1].includes(plan);
-  const t = tabOf(S, 'ten', 'data');
-  setSub({ data: 'details', auth: 'sign-in', feat: 'modules', plan: 'plan', life: 'lifecycle' }[t]);
+  const st = tenSt(S, x);
+  const t0 = tabOf(S, 'ten', 'data'),
+    t = ['data', 'auth', 'feat'].includes(t0) ? t0 : 'data';
+  setSub({ data: 'details', auth: 'sign-in', feat: 'modules' }[t]);
+  const tsel = TENANT_SEL.find((y) => y.id === x.slug);
   let body;
   if (t === 'auth') {
-    const opt = (v, b, s) =>
-      `<label class="opt ${auth === v ? 'sel' : ''}"><input type="radio" name="ta" data-act="tenauth" data-v="${v}" ${auth === v ? 'checked' : ''}><b>${b}</b><span>${s}</span></label>`;
-    const sso = auth !== 'local';
-    body = `<section class="panel"><h2>How people sign in</h2><div class="opts row3">${opt('local', 'Local accounts', 'Email and password in the Keycloak realm of the organization, without its single sign-on.')}${opt('sso', 'Single sign-on with Keycloak', 'A realm for the organization. People sign in with the identity of the organization.')}${opt('both', 'Both', 'Single sign-on for the staff, local accounts for guests and suppliers.')}</div>
-      ${sso && !inPlan('Single sign-on with Keycloak') ? `<div class="banner warn mt">${ic('alert', 18)}<div><b>The ${plan} plan does not include single sign-on.</b> It turns on moving to Pro or Enterprise, from the Plan tab.</div></div>` : ''}</section>
-    <section class="panel mt"><div class="panel-h"><div><h2>Guests from other organizations</h2><p class="muted small">People who belong to another organization and are invited here. They sign in with the identity of their home organization, not with this one; here they only get role and groups.</p></div>${toggle(1)}</div>
-      <dl class="kv"><dt>Highest role for a guest</dt><dd>User</dd><dt>Second factor for guests</dt><dd>Required: whoever does not have it on in their home organization cannot enter here</dd><dt>Guests now</dt><dd>${x.slug === 'example-city' ? '1 · from Green Region' : 'None'}</dd></dl></section>
-    ${
-      sso
-        ? `<section class="panel mt"><div class="panel-h"><div><h2>Keycloak</h2><p class="muted small">The platform prepares what is needed: you choose where identities come from.</p></div>${btn('Check the connection', { icon: 'refresh' })}</div>
-      <div class="fgrid">${fld('Realm', x.slug, { mono: true, ro: true, hint: 'Created by the platform with the name of the organization; it does not change after creation' })}${fld('Email domain', e.mail, { mono: true, hint: 'Whoever writes an address of this domain is sent to this realm' })}</div>
-      <h3 class="h3">Where identities come from</h3>
-      <div class="opts"><label class="opt ${idp === 'kc' ? 'sel' : ''}"><input type="radio" name="idp" data-act="tenidp" data-v="kc" ${idp === 'kc' ? 'checked' : ''}><b>People created in Keycloak</b><span>The realm is the list of people. Invitations from People create the account in Keycloak.</span></label>
-        <label class="opt ${idp === 'fed' ? 'sel' : ''}"><input type="radio" name="idp" data-act="tenidp" data-v="fed" ${idp === 'fed' ? 'checked' : ''}><b>Identity provider of the organization, federated</b><span>Keycloak passes the sign-in to the identity provider of the organization (OIDC or SAML): it needs an address, a client and the role in the token.</span></label></div>
-      ${idp === 'fed' && !inPlan('Federation with the identity provider of the organization') ? `<div class="banner warn mt">${ic('lock', 18)}<div><b>Federation with the identity provider of the organization is in the Enterprise plan.</b> With ${plan}, people are created in Keycloak.</div></div>` : ''}
-      ${
-        idp === 'fed'
-          ? `<div class="fgrid mt">${fld('Address of the identity provider (issuer)', 'https://login.' + e.mail + '/realms/staff', { mono: true, wide: true })}${fld('Client id', 'mosaikit', { mono: true })}${fld('Client secret', '••••••••••••', { type: 'password', hint: 'Encrypted, never sent to the browser' })}${fld('Claim with the role', 'groups', { mono: true })}${fld('Scopes', 'openid profile email', { mono: true })}</div>
-        <div class="tbl-w mt"><table class="tbl sm"><thead><tr><th>Group in the identity provider</th><th>Role and profile in Mosaikit</th></tr></thead><tbody>${[
-          ['Operations-Managers', 'Manager'],
-          ['Staff', 'User · Standard profile'],
-          ['*', 'User · View and edit'],
-        ]
-          .map((r) => `<tr><td class="mono">${r[0]}</td><td>${pill(r[1])}</td></tr>`)
-          .join('')}</tbody></table></div>`
-          : ''
-      }
-      <h3 class="h3">What the platform does by itself</h3>
-      <ul class="sync">${[
-        [
-          'ok',
-          'Realm, client of the shell and roles',
-          'created on save, and rebuilt if someone changes them by hand',
-        ],
-        idp === 'fed'
-          ? [
-              'ok',
-              'Connection with the identity provider of the organization',
-              'plus a rule for every row of the table',
-            ]
-          : null,
-        [
-          'ok',
-          'People',
-          'enter Mosaikit at the first sign-in; role and groups update at every sign-in',
-        ],
-        [
-          'warn',
-          'Whoever leaves the organization',
-          'stays in Mosaikit until they no longer sign in: the nightly comparison with the realm reports it',
-        ],
-      ]
-        .filter(Boolean)
-        .map(
-          (r) =>
-            `<li><i class="dot ${r[0]}"></i><div><b>${r[1]}</b><span class="muted small">${r[2]}</span></div></li>`,
-        )
-        .join('')}</ul></section>`
-        : ''
-    }
-    ${auth !== 'sso' ? `<section class="panel mt"><h2>Local accounts</h2><p class="muted small">They are in the Keycloak realm <span class="mono">${x.slug}</span>: passwords, second factor and locks are managed by Keycloak; the platform keeps no password.</p><dl class="kv"><dt>Rules</dt><dd>The minimum ones of the platform (<a data-act="sysgo" data-v="3">System › Security</a>), which the manager can only make stricter from the Settings of the organization</dd><dt>Today</dt><dd>Password of at least 14 characters, expires after 90 days, second factor for everybody</dd></dl></section>` : ''}`;
+    body = `<div data-dirty="tenant">${tenSignIn(S, x, e)}</div>${saveBar(S, 'tenant')}`;
   } else if (t === 'feat') {
-    // What is on for the organization. Apps are in every plan; the rest depends on the plan.
-    // Dependencies hold by themselves: turning a module on turns on what it needs, turning it off
-    // asks first if others would stop working.
-    const on = tenFeats(S, x);
-    const row = (f) => featRow(S, f, on, { ok: !f.plan || inPlan(f.plan), plan });
-    const nOn = FEATS.filter((f) => on[f.k]).length;
-    body = `${S.featNote ? `<div class="banner info fnote">${ic('check', 18)}<div>${S.featNote}</div></div>` : ''}<p class="muted small">${nOn} on of ${FEATS.length}. The ones the ${plan} plan does not include stay off.</p>${[
-      ['app', 'Apps'],
-      ['int', 'Services'],
-      ['ext', 'Extensions from the marketplace'],
-    ]
-      .map(
-        (g) =>
-          `<h3 class="h3">${g[1]}</h3><ul class="ints">${FEATS.filter((f) => f.g === g[0])
-            .map(row)
-            .join('')}</ul>`,
-      )
-      .join('')}`;
-  } else if (t === 'life') {
-    const bk = BACKUPS.filter((b) => b[4] === 'ok').slice(0, 3);
-    body = `<section class="panel"><div class="panel-h"><div><h2>Who is in now</h2><p class="muted small">Sessions open in the organization.</p></div>${btn('Close every session', { act: 'toast', v: 'Sessions closed: whoever was in must sign in again.' })}</div><dl class="kv"><dt>Open sessions</dt><dd class="num">${st === 'Suspended' ? 0 : Math.round(x.users * 0.18)}</dd><dt>Shared sessions</dt><dd class="num">${st === 'Suspended' ? 0 : x.slug === 'example-city' ? 3 : 1}</dd></dl></section>
-      <section class="panel mt"><div class="panel-h"><div><h2>Backup and restore of the organization</h2><p class="muted small">Only this organization is restored: the others go on working.</p></div></div><ul class="rows">${bk.map((b) => `<li><div class="rt grow"><b>${b[1]}</b><span>${b[2]}</span></div>${btn('Restore this organization', { act: 'toast', v: 'Restore of ' + x.n + ' from the backup of ' + b[1] + ' started: about 10 minutes.' })}</li>`).join('')}</ul></section>
-      <section class="panel mt"><div class="panel-h"><div><h2>Export the data</h2><p class="muted small">Everything the organization has in Mosaikit, in open formats: the items of every app in JSON, files as they are, the activity log in CSV. It also serves the exit plan.</p></div>${btn('Export', { icon: 'download', act: 'toast', v: 'Export started: the manager gets the link to download it.' })}</div></section>
-      <section class="panel mt danger"><div class="panel-h"><div><h2>Archive</h2><p class="muted small">The organization closes: nobody signs in, the data stays. It reopens whenever you want.</p></div>${btn('Archive', { act: 'ask', v: 'tenarch' })}</div>
-        <div class="panel-h mt"><div><h2>Delete</h2><p class="muted small">Everything is deleted after 30 days: until then it can be undone. Export first.</p></div>${btn('Delete the organization', { icon: 'trash', kind: 'danger', act: 'ask', v: 'tendel' })}</div></section>`;
-  } else if (t === 'plan') {
-    const used = tenUsage(S, x),
-      P = PLANS[plan];
-    const ask = S.planAsk && S.planAsk.slug === x.slug ? S.planAsk.to : null;
-    const askHtml = ask
-      ? (() => {
-          const nq = PLANS[ask].q;
-          const over = PLAN_Q.filter((q) => nq[q[0]] != null && used[q[0]] > nq[q[0]]).map(
-            (q) => `${q[1]}: ${qText(q[0], used[q[0]], nq[q[0]])}`,
-          );
-          const lost = PLAN_F.filter((f) => f[1].includes(plan) && !f[1].includes(ask)).map(
-            (f) => f[0],
-          );
-          const gain = PLAN_F.filter((f) => !f[1].includes(plan) && f[1].includes(ask)).map(
-            (f) => f[0],
-          );
-          return `<div class="banner warn">${ic('alert', 18)}<div><b>Move from ${plan} to ${ask}?</b> It applies at once to all the ${x.users} people of the organization.
-        ${lost.length ? `<br><b>Turn off:</b> ${lost.join(', ')}.` : ''}${gain.length ? `<br><b>Turn on:</b> ${gain.join(', ')}.` : ''}${over.length ? `<br><b>Over the new limits:</b> ${over.join(' · ')}. Nothing is deleted: additions stop.` : ''}</div>${btn('Cancel', { act: 'planno' })}${btn('Change plan', { kind: 'pri', act: 'planok' })}</div>`;
-        })()
-      : '';
-    const card = (k) =>
-      `<label class="opt ${(ask || plan) === k ? 'sel' : ''}"><input type="radio" name="plan" data-act="tenplan" data-v="${k}" ${(ask || plan) === k ? 'checked' : ''}><b>${k}</b><span>${PLANS[k].price}</span></label>`;
-    body = `<section class="panel"><div class="panel-h"><h2>Plan</h2><span class="muted small">Only the administrator changes it. Before applying it, the platform says what turns off and what goes over the limits</span></div><div class="opts row3">${Object.keys(PLANS).map(card).join('')}</div>${askHtml ? `<div class="mt">${askHtml}</div>` : ''}</section>
-    <div class="two mt"><section class="panel"><h2>Quotas</h2><ul class="quota">${PLAN_Q.map(
-      (q) => {
-        const lim = P.q[q[0]],
-          u = used[q[0]],
-          over = lim != null && u > lim;
-        return `<li><div class="q-l"><b>${q[1]}</b><span class="num ${over ? 'bad' : 'muted'}">${qText(q[0], u, lim)}${qPct(u, lim)}</span></div><div class="meter-b ${over ? 'over' : ''}"><i style="width:${lim == null ? 4 : lim === 0 ? 100 : Math.min(100, Math.round((u / lim) * 100))}%"></i></div></li>`;
-      },
-    ).join('')}</ul></section>
-      <section class="panel"><h2>Features</h2><ul class="feats">${PLAN_F.map((f) => {
-        const on = f[1].includes(plan);
-        return `<li class="${on ? 'on' : ''}">${on ? ic('check', 15) : ic('x', 15)}<span>${f[0]}</span>${on ? '' : `<span class="muted small">from ${f[1][0]}</span>`}</li>`;
-      }).join('')}</ul></section></div>`;
+    body = tenPlugins(S, x);
   } else {
-    body = `<section class="panel"><h2>Organization</h2><div class="fgrid">${fld('Name', x.n, { wide: true })}${fld('Identifier', x.slug, { mono: true, ro: true, hint: 'Name of the realm, of the schema and of the address: it does not change' })}${fld('Address', x.slug + '.apps.example.org', { mono: true })}${fld('Registration number', e.reg, { mono: true })}${fld('VAT number', e.vat, { mono: true })}${fld('Contact email', e.contact, { type: 'email', wide: true })}</div></section>
-    <section class="panel mt"><h2>Contact person</h2><div class="fgrid">${fld('Full name', x.slug === 'example-city' ? 'Elena Ricci' : 'To be named')}${fld('Email', x.slug === 'example-city' ? 'e.ricci@city.example.org' : '', { type: 'email' })}</div></section>`;
+    const used = tenUsage(S, x),
+      q = tenQuota(S, x);
+    const qrow = (k) => {
+      const own = qCust(S, x, k[0]),
+        v = own ? q[k[0]] : QDEF[k[0]];
+      return `<li><div class="rt grow"><b>${k[1]}${k[2] ? ' (' + k[2] + ')' : ''}</b><span>Used: ${qText(k[0], used[k[0]], v)}${qPct(used[k[0]], v)}</span></div>
+        <input type="number" class="q-in" min="0" value="${v == null ? '' : v}" placeholder="no limit" aria-label="${k[1]}" ${own ? '' : 'disabled'}>
+        <span class="inh-w"><span class="inh ${own ? 'cust' : ''}">${ic(own ? 'pencil' : 'refresh', 12)}${own ? 'Of this tenant' : `Of the platform: ${QDEF[k[0]] == null ? 'no limit' : fmtN(QDEF[k[0]])}`}</span>${btn(own ? 'Restore' : 'Customize', { act: 'qcust', v: k[0] })}</span></li>`;
+    };
+    body = `<div data-dirty="tenant"><section class="panel"><h2>Tenant</h2><div class="fgrid">${fld('Name', x.n, { wide: true })}${fld('Identifier', x.slug, { mono: true, ro: true, hint: 'In the address and in the database: it does not change' })}${fld('Address', x.slug + '.apps.example.org', { mono: true })}${fld('Registration number', e.reg, { mono: true })}${fld('VAT number', e.vat, { mono: true })}${fld('Contact email', e.contact, { type: 'email', wide: true })}</div></section>
+    <section class="panel mt"><div class="panel-h"><div><h2>Logo</h2><p class="muted small">Set by the Tenant Manager, in Tenant settings › Identity and appearance: here it is only shown.</p></div>${inhLock('the Tenant Manager')}</div>
+      <div class="logos"><div class="logo-p lp-l">${tsel ? tenantLogo(tsel, 30) : `<span class="lgx">${ic('building', 22)}<b>${x.n}</b></span>`}<span class="muted small">on a light background</span></div><div class="logo-p lp-d">${tsel ? tenantLogo(tsel, 30) : `<span class="lgx">${ic('building', 22)}<b>${x.n}</b></span>`}<span class="small">on a dark background</span></div></div></section>
+    <section class="panel mt"><h2>Contact person</h2><div class="fgrid">${fld('Full name', x.slug === 'example-city' ? 'Elena Ricci' : 'To be named')}${fld('Email', x.slug === 'example-city' ? 'e.ricci@city.example.org' : '', { type: 'email' })}</div></section>
+    <section class="panel mt"><div class="panel-h"><div><h2>Quotas</h2><p class="muted small">A tenant takes the quotas of the platform (System › Quotas) unless it has its own. At the limit nothing is deleted: additions stop. The Tenant Manager reads them in Usage.</p></div></div>
+      <ul class="rows qrows">${QUOTA_Q.map(qrow).join('')}</ul></section></div>${saveBar(S, 'tenant')}
+    <section class="panel mt danger"><div class="panel-h"><div><h2>Archive the tenant</h2><p class="muted small">Nobody signs in any more; the data stays and the tenant reopens whenever you want.</p></div>${btn('Archive', { icon: 'box', act: 'ask', v: 'tenarch' })}</div>
+      <div class="panel-h mt"><div><h2>Delete the tenant</h2><p class="muted small">Everything is deleted in 30 days: until then it can be undone from this page. Guests go back to their home tenant only.</p></div>${btn('Delete the tenant', { icon: 'trash', kind: 'danger', act: 'ask', v: 'tendel' })}</div></section>`;
   }
   const stBanner =
     st === 'Suspended'
-      ? `<div class="banner bad">${ic('lock', 18)}<div><b>Organization suspended.</b> ${TEN_ST.Suspended.d}</div>${btn('Reactivate', { kind: 'pri', act: 'tenst', v: 'Active' })}</div>`
+      ? `<div class="banner bad">${ic('lock', 18)}<div><b>Tenant suspended.</b> ${TEN_ST.Suspended.d}</div>${btn('Reactivate', { kind: 'pri', act: 'tenst', v: 'Active' })}</div>`
       : st === 'Trial'
         ? trialPanel(S, x)
         : '';
-  const stMenu = S.tenStMenu
-    ? `<div class="sortmenu stmenu" role="menu" aria-label="State of the organization">${Object.keys(
-        TEN_ST,
-      )
-        .map(
-          (k) =>
-            `<button type="button" role="menuitemradio" aria-checked="${k === st}" data-act="tenst" data-v="${k}">${k === st ? ic('check', 14) : '<i></i>'}<span><b>${TEN_ST[k].label || k}</b><span class="muted small">${TEN_ST[k].d}</span></span></button>`,
-        )
-        .join('')}</div>`
-    : '';
-  const stBtn = `<span class="st-w"><button type="button" class="btn st-btn" data-act="tenstmenu" aria-haspopup="menu" aria-expanded="${!!S.tenStMenu}" aria-label="State: ${TEN_ST[st].label || st}"><i class="dot ${TEN_ST[st].tone}"></i><span>${TEN_ST[st].label || st}</span>${ic('down', 13)}</button>${stMenu}</span>`;
-  const secs = [
-    ['data', 'Details', 'building'],
-    ['auth', 'Sign-in', 'key'],
-    ['feat', 'Modules', 'puzzle'],
-    ['plan', 'Plan', 'gauge'],
-    ['life', 'Lifecycle', 'refresh'],
-  ];
+  // The state is a badge next to the name; changing it is in «⋯».
+  const more = moreMenu(
+    S,
+    'tenant',
+    Object.keys(TEN_ST)
+      .filter((k) => k !== st)
+      .map((k) => [
+        k === 'Suspended' ? 'lock' : k === 'Trial' ? 'clock' : 'refresh',
+        k === 'Suspended' ? 'Suspend' : k === 'Trial' ? 'Put on trial' : 'Make active',
+        `data-act="tenst" data-v="${k}"`,
+        TEN_ST[k].d,
+      ]),
+  );
   return detailPage(S, {
-    back: ['tenants', 'Back to Organizations'],
+    back: ['tenants', 'Back to Tenants'],
     title: x.n,
-    sub: `${x.slug} · ${plan} · ${x.users} people`,
-    actions:
-      stBtn +
-      (['data', 'auth'].includes(t)
-        ? btn('Cancel', { icon: 'undo' }) + btn('Save', { kind: 'pri', icon: 'save' })
-        : ''),
-    side: `<aside class="facets secnav" aria-label="Sections"><label class="secnav-sel"><span class="sr">Section</span><select data-tabsel="ten">${secs.map((s) => `<option value="${s[0]}" ${t === s[0] ? 'selected' : ''}>${s[1]}</option>`).join('')}</select></label><nav class="secnav-l">${secs.map((s) => `<button type="button" data-tab="ten:${s[0]}" aria-current="${t === s[0]}" class="${t === s[0] ? 'on' : ''}">${ic(s[2], 16)}<span>${s[1]}</span></button>`).join('')}</nav></aside>`,
-    sideNav: true,
+    badges: stPillT(st),
+    sub: `${x.slug} · ${x.users} people · ${tenAuthOf(S, x.slug) === 'oidc' ? 'identity provider (OIDC)' : 'local accounts'}`,
+    actions: more,
+    tabs: tabs(
+      [
+        ['data', 'Details'],
+        ['auth', 'Sign-in'],
+        ['feat', 'Plugins'],
+      ],
+      t,
+      'ten',
+    ),
     body: stBanner + body,
   });
 }
 
-/* ── All people (administrator) ──────────────────────────────────────── */
+/* ── People (administrator) ──────────────────────────────────────── */
 
 function secGusers(S) {
   const adm = tabOf(S, 'gus', 'all') === 'adm';
@@ -326,7 +275,7 @@ function secGusers(S) {
   return resPage(
     S,
     {
-      title: 'All people',
+      title: 'People',
       total: '433 people · 437 memberships',
       actions: `<button type="button" class="btn">${ic('download', 15)}<span>Export</span></button>`,
       create: { label: 'New person', act: 'newuser' },
@@ -336,7 +285,7 @@ function secGusers(S) {
         acts: [
           ['lock', 'Suspend'],
           ['refresh', 'Reactivate'],
-          ['building', 'Add to an organization'],
+          ['building', 'Add to a tenant'],
           ['mail', 'Send the password link'],
           ['trash', 'Delete the account', 1],
         ],
@@ -346,19 +295,19 @@ function secGusers(S) {
       S,
       'gu',
       [
-        ['Organization', TENANTS.map((x) => [x.n, x.users])],
+        ['Tenant', TENANTS.map((x) => [x.n, x.users])],
         [
           'Role',
           [
             ['Administrator', 3],
-            ['Manager', 9],
+            ['Tenant Manager', 9],
             ['User', 421],
           ],
         ],
         [
           'Signs in with',
           [
-            ['SSO', 262],
+            ['Identity provider (OIDC)', 262],
             ['Local account', 171],
           ],
         ],
@@ -377,23 +326,23 @@ function secGusers(S) {
         scopeKey: 'gus',
         scope: [
           ['All', 433, 'all'],
-          ['In several organizations', 7, 'multi'],
+          ['In several tenants', 7, 'multi'],
           ['Administrators', 3, 'adm'],
         ],
       },
     ),
     adm
-      ? `<div class="panel-h"><p class="muted small">They configure the platform and do not see the content of organizations. They sign in with Keycloak and the second factor; if Keycloak does not answer there is the emergency access, in System › Security.</p>${btn('New administrator', { kind: 'pri', icon: 'plus', act: 'newadmin' })}</div><div class="tbl-w mt"><table class="tbl"><thead><tr><th>Name</th><th>Second factor</th><th>Last sign-in</th><th></th></tr></thead><tbody>${[
+      ? `<div class="panel-h"><p class="muted small">They configure the platform and do not see the content of tenants. They are accounts of the platform, separate from the accounts in tenants: they sign in from the Administrator access page, always with a local password and the second factor (TOTP). Without phone and recovery codes, another administrator resets the second factor, or the console of the server does.</p>${btn('New administrator', { kind: 'pri', icon: 'plus', act: 'newadmin' })}</div><div class="tbl-w mt"><table class="tbl"><thead><tr><th>Name</th><th>Second factor</th><th>Last sign-in</th><th></th></tr></thead><tbody>${[
           ['PF', 'Paola Ferri', 'p.ferri@platform.example.org', 'Today 08:02', 1],
           ['AM', 'Andrea Moretti', 'a.moretti@platform.example.org', 'Yesterday 18:40', 0],
           ['GB', 'Giorgio Bassi', 'g.bassi@platform.example.org', '28 Sep 2026', 0],
         ]
           .map(
             (a) =>
-              `<tr><td><div class="cell-t">${av(a[0], 5, 26)}<div><b>${a[1]}</b><span class="muted small">${a[2]}</span></div></div></td><td>${pill('On', 'ok', 'check')}</td><td class="num muted">${a[3]}</td><td class="r">${a[4] ? '<span class="muted small">that is you</span>' : btn('Revoke', { act: 'toast', v: a[1] + ' is no longer an administrator. The account stays.' })}</td></tr>`,
+              `<tr><td><div class="cell-t">${av(a[0], 5, 26)}<div><b>${a[1]}</b><span class="muted small">${a[2]}</span></div></div></td><td>${pill('On', 'ok', 'check')}</td><td class="num muted">${a[3]}</td><td class="r">${a[4] ? '<span class="muted small">that is you</span>' : btn('Disable', { act: 'toast', v: a[1] + ' is disabled: the sessions are closed. At least one administrator always stays active.' })}</td></tr>`,
           )
           .join('')}</tbody></table></div>`
-      : `<div class="tbl-w"><table class="tbl"><thead><tr><th class="cbx"><span class="sr">Select</span></th><th>Name</th><th>Home organization</th><th>Also in</th><th>Role</th><th>Signs in with</th><th>Status</th><th>Last sign-in</th></tr></thead><tbody>
+      : `<div class="tbl-w"><table class="tbl"><thead><tr><th class="cbx"><span class="sr">Select</span></th><th>Name</th><th>Home tenant</th><th>Also in</th><th>Role</th><th>Signs in with</th><th>Status</th><th>Last sign-in</th></tr></thead><tbody>
     ${PEOPLE.filter((p) => p.ini !== 'GM')
       .map(
         (p) =>
@@ -408,7 +357,7 @@ function secGusers(S) {
   );
 }
 
-/* ── Marketplace ─────────────────────────────────────────────────────── */
+/* ── Plugins ─────────────────────────────────────────────────────────── */
 
 function mpTenants(S, m) {
   const key = m.sys || 'ext:' + m.id;
@@ -417,6 +366,13 @@ function mpTenants(S, m) {
 function mpInstalled(S) {
   return MP.concat(MP_CATALOG.filter((m) => (S.mpInst || []).includes(m.id)));
 }
+/* The plugin another one extends, by the key of the tenants («notes») or by its id. */
+function mpExtends(m) {
+  return m.ext ? MP.find((x) => x.id === m.ext || x.sys === m.ext) : null;
+}
+function mpKind(m) {
+  return `<span class="kind-c">${kindPill(m.kind)}${m.sys ? `<span class="muted small">${ic('lock', 11)} Built-in</span>` : ''}</span>`;
+}
 function secMarketplace(S) {
   const inst = mpInstalled(S),
     cat = MP_CATALOG.filter((m) => !(S.mpInst || []).includes(m.id));
@@ -424,18 +380,19 @@ function secMarketplace(S) {
   const sc = tabOf(S, 'mpk', 'inst');
   setSub({ inst: 'installed', upd: 'updates', cat: 'catalog' }[sc]);
   const rows = sc === 'upd' ? upd : inst;
-  const typeP = (m) => (m.sys ? pill('System', '', 'lock') : pill('Extension', 'info', 'puzzle'));
+  const ext = (m) => (mpExtends(m) ? `<div class="small muted">${ic('puzzle', 11)} Extends ${mpExtends(m).n}</div>` : '');
   const content =
     sc === 'cat'
-      ? `<div class="tbl-w"><table class="tbl"><thead><tr><th>Module</th><th>Version</th><th>Trust</th><th>Publisher</th><th>Requires</th><th></th></tr></thead><tbody>${cat.map((m) => `<tr class="clk" data-res="mp:${m.id}" data-go="mpmod"><td><b>${m.n}</b><div class="small muted">${m.d}</div></td><td class="num">${m.ver}</td><td>${pill(m.trust, MP_TRUST[m.trust])}</td><td class="small">${m.ed}<div class="muted">${m.repo}</div></td><td class="small">${(m.needs || []).map((k) => FEAT(k).n).join(', ')}</td><td class="r"><button type="button" class="btn pri sm" data-act="mpinstall" data-v="${m.id}">${ic('download', 14)}<span>Install</span></button></td></tr>`).join('') || '<tr><td colspan="6" class="muted">The whole catalog is installed already.</td></tr>'}</tbody></table></div>`
+      ? `<div class="tbl-w"><table class="tbl"><thead><tr><th>Plugin</th><th>Kind</th><th>Version</th><th>Trust</th><th>Publisher</th><th>Requires</th><th></th></tr></thead><tbody>${cat.map((m) => `<tr class="clk" data-res="mp:${m.id}" data-go="mpmod"><td><b>${m.n}</b><div class="small muted">${m.d}</div>${ext(m)}</td><td>${mpKind(m)}</td><td class="num">${m.ver}</td><td>${pill(m.trust, MP_TRUST[m.trust])}</td><td class="small">${m.ed}<div class="muted">${m.repo}</div></td><td class="small">${(m.needs || []).map((k) => FEAT(k).n).join(', ')}</td><td class="r"><button type="button" class="btn pri sm" data-act="mpinstall" data-v="${m.id}">${ic('download', 14)}<span>Install</span></button></td></tr>`).join('') || '<tr><td colspan="7" class="muted">The whole catalog is installed already.</td></tr>'}</tbody></table></div>`
       : `${upd.length ? `<div class="banner warn">${ic('refresh', 18)}<div><b>${upd.length === 1 ? '1 update to apply' : upd.length + ' updates to apply'}.</b> ${upd.map((m) => `${m.n} from ${m.ver} to ${m.next}`).join(' · ')}. Open sessions do not stop: whoever has an app open gets the new version at the next load.</div>${btn('Apply', { kind: 'pri', act: 'mpupdate' })}</div>` : ''}
-    <div class="tbl-w"><table class="tbl"><thead><tr><th class="cbx"><span class="sr">Select</span></th><th>Module</th><th>Kind</th><th>Version</th><th>Trust</th><th>Organizations</th></tr></thead><tbody>${rows.map((m) => `<tr class="clk ${selOf(S, 'mp').includes(m.id) ? 'picked' : ''}" data-res="mp:${m.id}" data-go="mpmod">${selTd(S, 'mp', m.id, m.n)}<td><b>${m.n}</b><div class="mono small muted">${m.id}</div></td><td>${typeP(m)}</td><td class="num">${m.ver}${m.next && !(S.mpUpd || []).includes(m.id) ? ` <span class="small warn-t">→ ${m.next}</span>` : ''}</td><td>${pill(m.trust, MP_TRUST[m.trust])}</td><td class="num">${mpTenants(S, m)}/${TENANTS.length}</td></tr>`).join('')}</tbody></table></div>`;
+    <div class="tbl-w"><table class="tbl"><thead><tr><th class="cbx"><span class="sr">Select</span></th><th>Plugin</th><th>Kind</th><th>Version</th><th>Trust</th><th>Available to</th></tr></thead><tbody>${rows.map((m) => `<tr class="clk ${selOf(S, 'mp').includes(m.id) ? 'picked' : ''}" data-res="mp:${m.id}" data-go="mpmod">${selTd(S, 'mp', m.id, m.n)}<td><b>${m.n}</b><div class="mono small muted">${m.id}</div>${ext(m)}</td><td>${mpKind(m)}</td><td class="num">${m.ver}${m.next && !(S.mpUpd || []).includes(m.id) ? ` <span class="small warn-t">→ ${m.next}</span>` : ''}</td><td>${pill(m.trust, MP_TRUST[m.trust])}</td><td class="num">${mpTenants(S, m)} of ${TENANTS.length} tenants</td></tr>`).join('')}</tbody></table></div>`;
+  const list = sc === 'cat' ? cat : inst;
   return resPage(
     S,
     {
-      title: 'Marketplace',
+      title: 'Plugins',
       total: `${inst.length} installed · ${upd.length} to update`,
-      actions: `<button type="button" class="btn">${ic('upload', 15)}<span>Install from file</span></button>`,
+      create: { label: 'Install from file', act: 'toast', v: 'In the product you pick a signed .mskp package: the platform checks the signature before installing.' },
       bulk:
         sc === 'cat'
           ? null
@@ -453,26 +410,21 @@ function secMarketplace(S) {
       S,
       'mp',
       [
+        ['Kind', ['App', 'Service', 'Extension'].map((k) => [k === 'App' ? 'Apps' : k + 's', list.filter((m) => m.kind === k).length])],
         [
-          'Kind',
+          'Origin',
           [
-            ['System', inst.filter((m) => m.sys).length],
-            ['Extension', inst.filter((m) => !m.sys).length],
+            ['Built-in', list.filter((m) => m.sys).length],
+            ['From the catalog', list.filter((m) => !m.sys).length],
           ],
         ],
         [
           'Trust',
-          ['Official', 'Verified', 'Experimental'].map((x) => [
-            x,
-            (sc === 'cat' ? cat : inst).filter((m) => m.trust === x).length,
-          ]),
+          ['Official', 'Verified', 'Experimental'].map((x) => [x, list.filter((m) => m.trust === x).length]),
         ],
         [
           'Repository',
-          ['Mosaikit', 'Acme Labs', 'Green Software', 'Internal'].map((x) => [
-            x,
-            (sc === 'cat' ? cat : inst).filter((m) => m.repo === x).length,
-          ]),
+          ['Mosaikit', 'Acme Labs', 'Green Software', 'Internal'].map((x) => [x, list.filter((m) => m.repo === x).length]),
         ],
       ],
       {
@@ -494,69 +446,78 @@ function secMpMod(S) {
   const m = MP.concat(MP_CATALOG).find((x) => x.id === id) || MP[0];
   const installed = MP.includes(m) || (S.mpInst || []).includes(m.id);
   const key = m.sys || 'ext:' + m.id;
+  const tabsL = [
+    ['over', 'Overview'],
+    ['asks', 'What it asks'],
+  ]
+    .concat(m.kind === 'Extension' ? [] : [['ext', 'Extensions']])
+    .concat([
+      ['ten', 'Tenants'],
+      ['conf', 'Configuration'],
+    ]);
   const t0 = tabOf(S, 'mpm', 'over');
-  const t = ['over', 'asks', 'ten', 'conf'].includes(t0) ? t0 : 'over';
-  setSub({ over: 'overview', asks: 'requests', ten: 'organizations', conf: 'configuration' }[t]);
+  const t = tabsL.some((x) => x[0] === t0) ? t0 : 'over';
+  setSub({ over: 'overview', asks: 'requests', ext: 'extensions', ten: 'organizations', conf: 'configuration' }[t]);
+  const base = mpExtends(m);
   let body;
   if (t === 'asks') {
-    body = `<div class="two"><section class="panel"><h2>What it asks of the platform</h2><ul class="feats">${(m.asks.length ? m.asks : ['No access beyond the ones of its module']).map((a) => `<li class="on">${ic('key', 15)}<span>${a}</span></li>`).join('')}</ul></section>
-      <section class="panel"><h2>What it needs</h2>${(m.needs || []).length ? `<ul class="feats">${m.needs.map((k) => `<li class="on">${ic('check', 15)}<span>${FEAT(k).n}</span><span class="muted small">app</span></li>`).join('')}</ul>` : '<p class="muted">Nothing beyond the platform.</p>'}</section>
-      <section class="panel span2"><h2>Permissions it brings to managers</h2><p class="muted small">They show in <i>Modules → Access and permissions</i>, where the manager gives them to the organization, to groups or to people.</p>${(m.perms || []).length ? `<div class="gchips">${m.perms.map((p) => `<span class="gchip">${ic('key', 13)}${p}</span>`).join('')}</div>` : '<p class="muted">It uses the permissions of the system module it belongs to.</p>'}</section></div>`;
+    body = `<div class="two"><section class="panel"><h2>What it asks of the platform</h2><ul class="feats">${(m.asks.length ? m.asks : ['No access beyond the ones of its plugin']).map((a) => `<li class="on">${ic('key', 15)}<span>${a}</span></li>`).join('')}</ul></section>
+      <section class="panel"><h2>What it needs</h2>${(m.needs || []).length ? `<ul class="feats">${m.needs.map((k) => `<li class="on">${ic('check', 15)}<span>${FEAT(k).n}</span><span class="muted small">${featKind(FEAT(k))}</span></li>`).join('')}</ul>` : '<p class="muted">Nothing beyond the platform.</p>'}</section>
+      <section class="panel span2"><h2>Permissions it brings to Tenant Managers</h2><p class="muted small">They show in <i>Plugins → Permissions</i> of each tenant, where the Tenant Manager gives them to the whole tenant, to groups or to people.</p>${(m.perms || []).length ? `<div class="gchips">${m.perms.map((p) => `<span class="gchip">${ic('key', 13)}${p}</span>`).join('')}</div>` : '<p class="muted">It uses the permissions it declares in its manifest.</p>'}</section></div>`;
+  } else if (t === 'ext') {
+    // The extensions of a plugin: the installed ones, and the ones of the catalog to install.
+    const mine = (x) => x.ext === m.id || (m.sys && x.ext === m.sys);
+    const ins = mpInstalled(S).filter(mine),
+      av = MP_CATALOG.filter((x) => mine(x) && !(S.mpInst || []).includes(x.id));
+    const row = (x, inst) =>
+      `<li><span class="ri">${ic('puzzle', 15)}</span><div class="rt grow"><b>${x.n}</b><span>${x.d} · ${x.ed} · ${x.ver}</span></div>${pill(x.trust, MP_TRUST[x.trust])}${inst ? btn('Open', { go: 'mpmod', res: 'mp:' + x.id }) : `<button type="button" class="btn pri sm" data-act="mpinstall" data-v="${x.id}">${ic('download', 14)}<span>Install</span></button>`}</li>`;
+    body = `<p class="muted small">An extension adds fields, actions or tabs to the pages of ${m.n}: it has no pages of its own and needs ${m.n} on in the tenant.</p>
+      <section class="panel mt"><h2>Installed <span class="num muted">${ins.length}</span></h2>${ins.length ? `<ul class="rows">${ins.map((x) => row(x, 1)).join('')}</ul>` : `<p class="muted small">No installed extension extends ${m.n}.</p>`}</section>
+      <section class="panel mt"><h2>In the catalog <span class="num muted">${av.length}</span></h2>${av.length ? `<ul class="rows">${av.map((x) => row(x, 0)).join('')}</ul>` : '<p class="muted small">Nothing else in the repositories, for now.</p>'}</section>`;
   } else if (t === 'ten') {
-    if (m.sys) {
-      body = `<div class="banner info">${ic('lock', 18)}<div><b>System module.</b> It is in every organization; for each one it is turned on or off from the page of the organization → <i>Modules</i>.</div></div>
-        <div class="tbl-w mt"><table class="tbl"><thead><tr><th>Organization</th><th>Plan</th><th>On</th></tr></thead><tbody>${TENANTS.map((x) => `<tr class="clk" data-res="ten:${x.slug}" data-go="tenant"><td><b>${x.n}</b></td><td>${tenPlan(S, x)}</td><td>${tenFeats(S, x)[key] ? pill('On', 'ok') : pill('Off')}</td></tr>`).join('')}</tbody></table></div>`;
-    } else {
-      body = `<p class="muted small">Enabling it here is like turning it on in the <i>Modules</i> tab of the organization. It needs the Enterprise plan; then the manager of the organization decides who gets it.</p>
-        <div class="tbl-w mt"><table class="tbl"><thead><tr><th>Organization</th><th>Plan</th><th>Enabled</th></tr></thead><tbody>${TENANTS.map(
+    body = `<div class="banner info">${ic('building', 18)}<div><b>Available</b> is decided here, by the administrator. <b>On</b> is decided in each tenant by its Tenant Manager, who also gives the permissions.${m.sys ? ' A built-in plugin is available to new tenants by default.' : ''}</div></div>
+        <div class="tbl-w mt"><table class="tbl"><thead><tr><th>Tenant</th><th>Available</th><th>On in the tenant</th></tr></thead><tbody>${TENANTS.map(
           (x) => {
-            const ok = PLAN_F.find((f) => f[0] === 'Extensions from the marketplace')[1].includes(
-              tenPlan(S, x),
-            );
-            const on = ok && tenFeats(S, x)[key];
-            return `<tr><td><b>${x.n}</b></td><td>${tenPlan(S, x)}</td><td>${ok ? `<button type="button" class="tgl" role="switch" data-act="mpten" data-v="${x.slug}" aria-label="${m.n} for ${x.n}" aria-checked="${!!on}" ${installed ? '' : 'disabled'}><i></i></button>` : pill('Not included in the ' + tenPlan(S, x) + ' plan', 'warn', 'lock')}</td></tr>`;
+            const av = tenFeats(S, x)[key],
+              on = av && (x === TENANTS[0] ? mgrFeats(S)[key] : true);
+            return `<tr><td><b>${x.n}</b><div class="small muted">${TEN_ST[tenSt(S, x)].label || tenSt(S, x)}</div></td><td><button type="button" class="tgl" role="switch" data-act="mpten" data-v="${x.slug}" aria-label="${m.n} available to ${x.n}" aria-checked="${!!av}" ${installed ? '' : 'disabled'}><i></i></button></td><td>${av ? pill(on ? 'On' : 'Off', on ? 'ok' : '') : '<span class="muted small">—</span>'}</td></tr>`;
           },
         ).join('')}</tbody></table></div>`;
-    }
   } else if (t === 'conf') {
     body =
       m.id === 'time-tracking'
         ? `<section class="panel"><h2>Configuration</h2><div class="fgrid">${fld('Payroll service', 'https://payroll.example.org/api', { mono: true, wide: true })}${fld('Key', '••••••••••', { type: 'password', hint: 'Encrypted, never sent to the browser' })}${fld('Synchronization', 'every hour')}</div></section>`
-        : `<section class="panel"><h2>Configuration</h2><p class="muted">This module has no platform settings${m.sys ? '' : ': it is configured per organization'}.</p></section>`;
+        : `<section class="panel"><h2>Configuration</h2><p class="muted">This plugin has no platform settings${m.sys ? '' : ': it is configured in each tenant'}.</p></section>`;
   } else {
-    body = `<div class="two"><section class="panel"><h2>The module</h2><p>${m.d}</p><dl class="kv"><dt>Identifier</dt><dd class="mono">${m.id}</dd><dt>Publisher</dt><dd>${m.ed}</dd><dt>Repository</dt><dd>${m.repo}</dd><dt>Trust</dt><dd>${pill(m.trust, MP_TRUST[m.trust])}</dd><dt>Kind</dt><dd>${m.sys ? 'System: it updates, it is neither disabled nor uninstalled' : 'Extension'}</dd></dl></section>
+    body = `<div class="two"><section class="panel"><h2>The plugin</h2><p>${m.d}</p><dl class="kv"><dt>Identifier</dt><dd class="mono">${m.id}</dd><dt>Kind</dt><dd>${mpKind(m)}</dd>${base ? `<dt>Extends</dt><dd><a data-res="mp:${base.id}" data-go="mpmod">${base.n}</a>: it adds to its pages</dd>` : ''}<dt>Publisher</dt><dd>${m.ed}</dd><dt>Repository</dt><dd>${m.repo}</dd><dt>Trust</dt><dd>${pill(m.trust, MP_TRUST[m.trust])}</dd><dt>Origin</dt><dd>${m.sys ? 'Built-in: it updates, it is neither disabled nor uninstalled' : 'From the catalog'}</dd></dl></section>
       <section class="panel"><h2>Versions</h2><dl class="kv"><dt>${installed ? 'Installed' : 'Available'}</dt><dd class="num">${m.ver}</dd>${m.next ? `<dt>New</dt><dd class="num">${m.next}</dd>` : ''}</dl>${m.notes.length ? `<ul class="rows mt">${m.notes.map((n) => `<li><b class="num">${n[0]}</b><span class="muted small">${n[1]}</span></li>`).join('')}</ul>` : '<p class="muted small mt">No release notes.</p>'}</section></div>`;
   }
-  const acts = !installed
+  // One primary action (install or update); disabling and uninstalling are in «⋯».
+  const pri = !installed
     ? btn('Install', { kind: 'pri', icon: 'download', act: 'mpinstall', v: m.id })
-    : (m.next && !(S.mpUpd || []).includes(m.id)
-        ? btn('Update to ' + m.next, { kind: 'pri', icon: 'refresh', act: 'mpupdate', v: m.id })
-        : '') +
-      (m.sys
-        ? ''
-        : btn('Disable', { icon: 'x', act: 'ask', v: 'mpoff' }) +
-          btn('Uninstall', { act: 'ask', v: 'mpdel', icon: 'trash', kind: 'danger' }));
+    : m.next && !(S.mpUpd || []).includes(m.id)
+      ? btn('Update to ' + m.next, { kind: 'pri', icon: 'refresh', act: 'mpupdate', v: m.id })
+      : '';
+  const more =
+    installed && !m.sys
+      ? moreMenu(S, 'mp', [
+          ['x', 'Disable', 'data-act="ask" data-v="mpoff"', 'It turns off in every tenant; nothing is lost'],
+          ['trash', 'Uninstall', 'data-act="ask" data-v="mpdel"', 'It is removed from the platform'],
+        ])
+      : '';
   return detailPage(S, {
-    back: ['marketplace', 'Back to the Marketplace'],
+    back: ['marketplace', 'Back to Plugins'],
     title: m.n,
-    sub: `${m.sys ? 'System' : 'Extension'} · ${m.ed} · version ${m.ver}${installed ? '' : ' · not installed'}`,
-    actions: acts,
-    tabs: tabs(
-      [
-        ['over', 'Overview'],
-        ['asks', 'What it asks'],
-        ['ten', 'Organizations'],
-        ['conf', 'Configuration'],
-      ],
-      t,
-      'mpm',
-    ),
+    badges: kindPill(m.kind),
+    sub: `${m.sys ? 'Built-in' : 'From the catalog'} · ${m.ed} · version ${m.ver}${installed ? '' : ' · not installed'}${base ? ' · extends ' + base.n : ''}`,
+    actions: more + pri,
+    tabs: tabs(tabsL, t, 'mpm'),
     body,
   });
 }
 
 /* ── Monitoring ───────────────────────────────────────────────────────
-   First «is something wrong?» (Status), then why (Performance, Errors), for whom (Organizations),
+   First «is something wrong?» (Status), then why (Performance, Errors), for whom (Tenants),
    how far one can grow (Capacity), and whom to warn (Alerts). */
 function monSeries(S, base) {
   const p = S.monPer || '12h',
@@ -639,13 +600,13 @@ function secMonitoring(S) {
       'errors',
     ],
     [
-      'Organizations',
+      'Tenants',
       'building',
-      `<div class="tbl-w"><table class="tbl"><thead><tr><th>Organization</th><th class="r">Requests/min</th><th class="r">Jobs today</th><th class="r">Errors</th><th>Nearest quota</th></tr></thead><tbody>${TENANTS.map(
+      `<div class="tbl-w"><table class="tbl"><thead><tr><th>Tenant</th><th class="r">Requests/min</th><th class="r">Jobs today</th><th class="r">Errors</th><th>Nearest quota</th></tr></thead><tbody>${TENANTS.map(
         (x) => {
           const w = tenWorst(S, x)[0],
             f = tenSt(S, x) === 'Suspended' ? 0 : x.users / 128;
-          return `<tr class="clk" data-res="ten:${x.slug}" data-go="tenant"><td><b>${x.n}</b><div class="small muted">${tenPlan(S, x)} · ${TEN_ST[tenSt(S, x)].label || tenSt(S, x)}</div></td><td class="r num">${fmtN(Math.round(1400 * f))}</td><td class="r num">${Math.round(42 * f)}</td><td class="r num ${x.slug === 'example-city' ? 'warn-t' : ''}">${x.slug === 'example-city' ? '0.8%' : '0.1%'}</td><td>${pill(`${Q_SHORT[w[0]]} ${w[1] > 900 ? 'used up' : w[1] + '%'}`, qTone(w[1]) === 'ok' ? '' : qTone(w[1]))}</td></tr>`;
+          return `<tr class="clk" data-res="ten:${x.slug}" data-go="tenant"><td><b>${x.n}</b><div class="small muted">${TEN_ST[tenSt(S, x)].label || tenSt(S, x)}</div></td><td class="r num">${fmtN(Math.round(1400 * f))}</td><td class="r num">${Math.round(42 * f)}</td><td class="r num ${x.slug === 'example-city' ? 'warn-t' : ''}">${x.slug === 'example-city' ? '0.8%' : '0.1%'}</td><td>${pill(`${Q_SHORT[w[0]]} ${w[1] > 900 ? 'used up' : w[1] + '%'}`, qTone(w[1]) === 'ok' ? '' : qTone(w[1]))}</td></tr>`;
         },
       ).join('')}</tbody></table></div>`,
       'organizations',
@@ -678,7 +639,7 @@ function secMonitoring(S) {
         ['Too many errors', 'over 2% for 10 minutes', 1],
         ['Disk or storage almost full', 'over 80%', 1],
         ['Long queue on the worker', 'over 10 jobs for 15 minutes', 0],
-        ['An organization over a quota', 'once per organization and quota', 1],
+        ['A tenant over a quota', 'once per tenant and quota', 1],
       ]
         .map(
           (a) =>
@@ -721,7 +682,7 @@ function secMonitoring(S) {
 }
 
 /* ── Keys of outside services, at three levels ────────────────────────
-   Whoever has a key of their own uses it; otherwise the one of the organization, if the manager
+   Whoever has a key of their own uses it; otherwise the one of the tenant, if the Tenant Manager
    shares it; otherwise the one of the platform, if shared. */
 function keyUse(S, lvl, id) {
   const K = S.keys,
@@ -731,24 +692,24 @@ function keyUse(S, lvl, id) {
   if (lvl === 'sys')
     return sy
       ? sy.share
-        ? ['ok', 'Used by every organization without a key of its own']
-        : ['warn', 'Only for the platform: organizations must add a key of their own']
+        ? ['ok', 'Used by every tenant without a key of its own']
+        : ['warn', 'Only for the platform: tenants must add a key of their own']
       : ['off', 'The service is off for whoever has no key of their own'];
   if (lvl === 'tnt')
     return tn
       ? tn.share
-        ? ['ok', 'Used by every person of the organization']
+        ? ['ok', 'Used by every person of the tenant']
         : [
             'warn',
-            `Used only by managers; people use ${sy && sy.share ? 'the key of the platform' : 'a key of their own'}`,
+            `Used only by Tenant Managers; people use ${sy && sy.share ? 'the key of the platform' : 'a key of their own'}`,
           ]
       : sy && sy.share
         ? ['ok', 'In use: the key of the platform']
-        : ['off', 'No key: the service is off for the organization'];
+        : ['off', 'No key: the service is off for the tenant'];
   return me
     ? ['ok', 'In use: your key']
     : tn && tn.share
-      ? ['ok', 'In use: the key of the organization']
+      ? ['ok', 'In use: the key of the tenant']
       : sy && sy.share
         ? ['ok', 'In use: the key of the platform']
         : ['off', 'No key available: to use it, add your own'];
@@ -756,9 +717,9 @@ function keyUse(S, lvl, id) {
 function keyRows(S, lvl) {
   const shareLbl =
     lvl === 'sys'
-      ? 'Shared with every organization'
+      ? 'Shared with every tenant'
       : lvl === 'tnt'
-        ? 'Shared with the people of the organization'
+        ? 'Shared with the people of the tenant'
         : '';
   return KEY_GROUPS.map(
     (g) =>
@@ -783,24 +744,24 @@ function keyRows(S, lvl) {
 function keysSection(S, lvl) {
   const intro =
     lvl === 'sys'
-      ? 'The keys of the services the platform pays for. A shared key is used by every organization without one of its own; a key not shared stays with the platform.'
+      ? 'The keys of the services the platform pays for. A shared key is used by every tenant without one of its own; a key not shared stays with the platform.'
       : lvl === 'tnt'
-        ? 'The keys the organization pays for. A shared key is used by every person of the organization; one not shared only by managers. Where the organization has no key, the one of the platform applies, if the administrator shares it.'
-        : 'Your keys apply only to you and nobody else sees them. Where you have none, you use the one of the organization or of the platform, if shared.';
+        ? 'The keys the tenant pays for. A shared key is used by every person of the tenant; one not shared only by Tenant Managers. Where the tenant has no key, the one of the platform applies, if the administrator shares it.'
+        : 'Your keys apply only to you and nobody else sees them. Where you have none, you use the one of the tenant or of the platform, if shared.';
   return `<section class="panel"><h2>Keys of outside services</h2><p class="muted small">${intro}</p>${keyRows(S, lvl)}
     <p class="muted small mt">${ic('lock', 12)} Keys are kept encrypted and never go back to the browser: after saving, only the last four characters show.</p></section>
     ${
       lvl === 'sys'
-        ? `<section class="panel mt"><h2>AI assistant</h2><div class="fgrid">${fld('Default model', 'default-large', { mono: true })}</div><p class="muted small mt">AI credits come from the plan of each organization and are counted in Usage: with the key of the platform credits are consumed, with a key of the organization or of the person they are not.</p></section>`
+        ? `<section class="panel mt"><h2>AI assistant</h2><div class="fgrid">${fld('Default model', 'default-large', { mono: true })}</div><p class="muted small mt">AI credits come from the quotas of each tenant and are counted in its Usage: with the key of the platform credits are consumed, with a key of the tenant or of the person they are not.</p></section>`
         : lvl === 'tnt'
-          ? `<p class="muted small mt">${ic('gauge', 12)} The AI credits of the plan show in <a data-go="usage">Usage</a>: with a key of the organization they are not consumed.</p>`
+          ? `<p class="muted small mt">${ic('gauge', 12)} The AI credits of the tenant show in <a data-go="usage">Usage</a>: with a key of the tenant they are not consumed.</p>`
           : ''
     }`;
 }
 
 /* ── Appearance, at three levels ──────────────────────────────────────
-   Platform (administrator): the defaults of everybody and the themes available. Organization
-   (manager): the defaults of the organization, among the ones the platform offers. Person
+   Platform (administrator): the defaults of everybody and the themes available. Tenant
+   (Tenant Manager): the defaults of the tenant, among the ones the platform offers. Person
    (Appearance menu at the top): mode, language and sidebar for oneself. */
 function sidePrefs(S, lvl) {
   const me = !lvl || lvl === 'me';
@@ -839,8 +800,8 @@ function themeCards(S, lvl) {
       return `<div class="tgc ${on ? 'sel' : ''} ${sys && !avail ? 'off' : ''}">
       <button type="button" class="tgc-main" data-act="appset" data-lvl="${lvl}" data-k="theme" data-v="${p.id}" aria-pressed="${on}" ${sys && !avail ? 'disabled' : ''}>
         <span class="tgc-th"><span class="tr-m">${themeSwatch(p, false)}<em>light</em></span><span class="tr-m">${themeSwatch(p, true)}<em>dark</em></span></span>
-        <span class="tgc-t"><b>${p.name}</b>${on ? ic('check', 16) : ''}</span><span class="muted small">${on ? 'Default' : c ? (c.scope === 'sys' ? 'Of the platform' : 'Of the organization') : 'Of Mosaikit'}</span></button>
-      <div class="tr-a">${sys ? `<label class="tc-av"><input type="checkbox" class="pchk" data-act="appthemeav" data-v="${p.id}" ${avail ? 'checked' : ''} ${on ? 'disabled' : ''}> Available to organizations</label>` : ''}${c ? `<button type="button" class="btn sm" data-act="teedit" data-v="${p.id}">${ic('sliders', 14)}<span>Edit</span></button>` : ''}</div></div>`;
+        <span class="tgc-t"><b>${p.name}</b>${on ? ic('check', 16) : ''}</span><span class="muted small">${on ? 'Default' : c ? (c.scope === 'sys' ? 'Of the platform' : 'Of the tenant') : 'Of Mosaikit'}</span></button>
+      <div class="tr-a">${sys ? `<label class="tc-av"><input type="checkbox" class="pchk" data-act="appthemeav" data-v="${p.id}" ${avail ? 'checked' : ''} ${on ? 'disabled' : ''}> Available to tenants</label>` : ''}${c ? `<button type="button" class="btn sm" data-act="teedit" data-v="${p.id}">${ic('sliders', 14)}<span>Edit</span></button>` : ''}</div></div>`;
     })
     .join('')}</div>`;
 }
@@ -878,9 +839,9 @@ function appearancePage(S, lvl) {
        <div class="logos mt"><div class="logo-p lp-l"><span class="lgx">${brandMark(30)}${L.showName ? `<b>${L.name}</b>` : ''}</span><span class="muted small">on a light background</span></div><div class="logo-p lp-d"><span class="lgx">${brandMark(30)}${L.showName ? `<b>${L.name}</b>` : ''}</span><span class="small">on a dark background</span></div></div>
        <div class="row mt">${btn('Logo for light backgrounds', { icon: 'upload' })}${btn('Logo for dark backgrounds', { icon: 'upload' })}</div>${showName}
        <div class="favi mt"><div><b>Browser icon</b><span class="muted small">The small icon in the browser tab and on the phone, when the platform is added to the home screen.</span></div>
-         <div class="favi-p"><span class="favi-tab">${brandMark(14)}${L.name} · Overview<span class="muted">×</span></span></div>${btn('Upload the icon', { icon: 'upload' })}</div>
+         <div class="favi-p"><span class="favi-tab">${brandMark(14)}${L.name} · Home<span class="muted">×</span></span></div>${btn('Upload the icon', { icon: 'upload' })}</div>
        <p class="muted small mt">The address of the platform shows in <a data-act="sysgo" data-v="1">System › Addresses</a>: it is not a matter of appearance.</p></section>`
-    : `<section class="panel"><h2>Identity of the organization</h2><div class="fgrid">${f('name', 'Name of the organization', { wide: true, hint: 'On the sign-in page of the organization, in the title of the tab and in the emails sent for the organization' })}</div>
+    : `<section class="panel"><h2>Identity of the tenant</h2><div class="fgrid">${f('name', 'Name of the tenant', { wide: true, hint: 'On the sign-in page of the tenant, in the title of the tab and in the emails sent for the tenant' })}</div>
        <div class="logos mt"><div class="logo-p lp-l">${L.showName ? tenantLogo(tn, 30) : crest(tn, 30)}<span class="muted small">on a light background</span></div><div class="logo-p lp-d">${L.showName ? tenantLogo(tn, 30) : crest(tn, 30)}<span class="small">on a dark background</span></div></div>
        <div class="row mt">${btn('Logo for light backgrounds', { icon: 'upload' })}${btn('Logo for dark backgrounds', { icon: 'upload' })}</div>${showName}
        <p class="muted small mt">The address (<span class="mono">${tn.id}.apps.example.org</span>) is changed by the administrator of the platform.</p></section>`;
@@ -888,59 +849,78 @@ function appearancePage(S, lvl) {
     `<div class="lgp"><div class="lgp-card">${logo}<b class="lgp-h">Sign in to ${who}</b><span class="lgp-w">${L.welcome}</span><span class="lgp-in"></span><span class="lgp-btn">Continue</span><span class="lgp-l">Privacy · Legal notes</span></div></div>`;
   let extra;
   if (sys) {
-    extra = `<section class="panel"><h2>Sign-in page</h2><p class="muted small">It is the first page one sees, before knowing which organization one belongs to. Organizations with an address of their own show it with their logo and their links.</p>
+    extra = `<section class="panel"><h2>Sign-in page</h2><p class="muted small">It is the first page one sees: the list of the tenants (hidden when there is only one) and the link to the Administrator access. An address that names a tenant (<span class="mono">#/login/&lt;tenant&gt;</span>) opens it with the tenant already chosen.</p>
         <div class="lg-split mt"><div class="fgrid one">${f('welcome', 'Welcome text')}${f('privacy', 'Privacy notice', { mono: true })}${f('legal', 'Legal notes', { mono: true })}<div>${btn('Background image', { icon: 'upload' })}</div></div>
           ${loginPrev(L.name, `<span class="lgx">${brandMark(26)}<b>${L.name}</b></span>`)}</div></section>
       <section class="panel"><h2>Formats</h2>${FORMATS}</section>`;
   } else {
     const kinds = [
-      ['home', 'The Overview'],
+      ['home', 'Home'],
       ['app', 'An app'],
     ];
     const app = APPS.find((a) => a.id === L.landId) || APPS[0];
-    extra = `<section class="panel"><h2>Landing page</h2><p class="muted small">Where whoever enters the organization arrives. Whoever cannot open the chosen app arrives at the Overview.</p>
+    extra = `<section class="panel"><h2>Landing page</h2><p class="muted small">Where whoever enters the tenant arrives. Whoever cannot open the chosen app arrives at Home.</p>
         <div class="lg-split mt"><div class="fgrid one"><label class="lbl">After sign-in one arrives at<select data-appf="tnt:land">${kinds.map((k) => `<option value="${k[0]}" ${L.land === k[0] ? 'selected' : ''}>${k[1]}</option>`).join('')}</select></label>
           ${L.land === 'app' ? `<label class="lbl">Which app<select data-appf="tnt:landId">${APPS.map((x) => `<option value="${x.id}" ${app.id === x.id ? 'selected' : ''}>${x.n}</option>`).join('')}</select></label>` : ''}</div>
-          <div class="land-p"><div class="land-ic">${ic(L.land === 'app' ? app.ic : 'overview', 30)}</div><span class="small">${L.land === 'app' ? app.n : 'The Overview'}</span></div></div></section>
-      <section class="panel"><h2>Welcome and legal notes</h2><p class="muted small">The welcome shows on top of everybody's Overview; privacy and legal notes on the sign-in page of the organization and at the foot of the Profile.</p>
+          <div class="land-p"><div class="land-ic">${ic(L.land === 'app' ? app.ic : 'home', 30)}</div><span class="small">${L.land === 'app' ? app.n : 'Home'}</span></div></div></section>
+      <section class="panel"><h2>Welcome and legal notes</h2><p class="muted small">The welcome shows on top of everybody's Home; privacy and legal notes on the sign-in page of the tenant and at the foot of Account › Profile.</p>
         <div class="lg-split mt"><div class="fgrid one">${f('welcome', 'Welcome text')}${f('privacy', 'Privacy notice', { mono: true })}${f('legal', 'Legal notes', { mono: true })}</div>${loginPrev(L.name, crest(tn, 28))}</div></section>
       <section class="panel"><div class="panel-h"><div><h2>Formats</h2><p class="muted small">Dates, numbers, time zone and units</p></div><label class="tc-av"><input type="checkbox" class="pchk" data-act="appset" data-lvl="tnt" data-k="fmtSame" data-toggle="1" ${L.fmtSame ? 'checked' : ''}> Like the platform</label></div>
-        ${L.fmtSame ? '<p class="muted small">The organization uses the formats of the platform: 8 Oct 2026, 1,234.5, Europe/Rome, metric.</p>' : FORMATS + '<p class="muted small mt">They apply only to this organization, instead of the ones of the platform.</p>'}</section>`;
+        ${L.fmtSame ? '<p class="muted small">The tenant uses the formats of the platform: 8 Oct 2026, 1,234.5, Europe/Rome, metric.</p>' : FORMATS + '<p class="muted small mt">They apply only to this tenant, instead of the ones of the platform.</p>'}</section>`;
   }
-  const parts = [
-    id,
-    `<section class="panel th-sec"><div class="panel-h th-h"><div><h2>Default theme</h2><p class="muted small">${sys ? 'Choose the theme of everybody, and which themes organizations may use.' : 'Among the themes the platform offers, plus the ones of the organization.'} It shows at once, as a preview.</p></div>${btn('New theme', { kind: 'pri', icon: 'plus', act: 'tenew' })}</div>${themeCards(S, lvl)}</section>`,
-    `<section class="panel"><h2>Default mode</h2>${modeOpts(S, lvl)}<p class="muted small mt">Everybody can change it for themselves, from the palette at the top.</p></section>`,
-    sidePrefs(S, lvl),
-    `<section class="panel"><h2>Languages</h2><p class="muted small">${sys ? 'The languages the platform offers: organizations pick a subset.' : 'A subset of the ones of the platform. Everybody picks theirs among these.'}</p>${langList(S, lvl)}</section>`,
-  ].concat(extra.split(/(?=<section class="panel)/).filter((x) => x.trim()));
-  const title = (h) =>
-    (h.match(/<h2>([^<]*)/) || [, ''])[1]
-      .replace(/^Identity of the (platform|organization)$/, 'Identity')
-      .replace('Default ', '');
-  const by = (n) => parts.filter((p) => n.includes(title(p)));
-  const grp = (n, icon, list, sid) => [n, icon, `<div class="stack-s">${list.join('')}</div>`, sid];
+  // The platform says, setting by setting, whether tenants may customize it; the tenant sees the mark.
+  const C = S.app.sys.cust;
+  const mark = (key) =>
+    sys
+      ? `<label class="tc-av"><input type="checkbox" class="pchk" data-act="syscust" data-v="${key}" ${C[key] ? 'checked' : ''}> Tenants may customize it</label>`
+      : inhCust(S, key, !C[key]);
+  const lock = (key, html) => (sys || C[key] ? html : `<div class="is-locked" inert>${html}</div>`);
+  const theme = `<section class="panel th-sec"><div class="panel-h th-h"><div><h2>Default theme</h2><p class="muted small">${sys ? 'Choose the theme of everybody, and which themes tenants may use.' : 'Among the themes the platform offers, plus the ones of the tenant.'} It shows at once, as a preview.</p></div><div class="row">${mark('theme')}${sys || C.theme ? btn('New theme', { kind: 'pri', icon: 'plus', act: 'tenew' }) : ''}</div></div>${lock('theme', themeCards(S, lvl))}</section>`;
+  const mode = `<section class="panel"><div class="panel-h"><h2>Default mode</h2>${mark('mode')}</div>${lock('mode', modeOpts(S, lvl))}<p class="muted small mt">Everybody can change it for themselves, in Account › Appearance and language${bar().mode ? ' or from the palette at the top' : ''}.</p></section>`;
+  const side = sidePrefs(S, lvl).replace('<h2>Sidebar</h2>', `<div class="panel-h"><h2>Sidebar</h2>${mark('side')}</div>`);
+  const langs = `<section class="panel"><div class="panel-h"><div><h2>Languages</h2><p class="muted small">${sys ? 'The languages the platform offers: tenants pick a subset.' : 'A subset of the ones of the platform. Everybody picks theirs among these.'}</p></div>${sys ? '' : inhLimit('A subset of the languages of the platform')}</div>${langList(S, lvl)}</section>`;
+  const fmts = sys
+    ? `<section class="panel"><div class="panel-h"><div><h2>Formats</h2><p class="muted small">Dates, numbers, time zone and units</p></div>${mark('fmt')}</div>${FORMATS}</section>`
+    : `<section class="panel"><div class="panel-h"><div><h2>Formats</h2><p class="muted small">Dates, numbers, time zone and units</p></div>${mark('fmt')}</div>
+        ${S.cust && S.cust.fmt ? FORMATS + '<p class="muted small mt">They apply only to this tenant, instead of the ones of the platform.</p>' : '<p class="muted small">The tenant uses the formats of the platform: 8 Oct 2026, 1,234.5, Europe/Rome, metric.</p>'}</section>`;
+  const B = bar();
+  const p = PRESETS.find((x) => x.id === S.preset) || PRESETS[0],
+    v = isDark() ? p.dark : p.light;
+  const topbar = `<section class="panel"><div class="panel-h"><div><h2>Top bar</h2><p class="muted small">What the band at the top shows, for everybody in every tenant. Decided here only: tenants do not change it.</p></div></div>
+      <div class="barprev" style="background:${v.navGrad || v.nav[0]};color:${v.nav[1]}" role="img" aria-label="Preview of the top bar"><span class="bp-c">${B.logo ? brandMark(18) + '<b>' + S.app.sys.name + '</b>' : ic('sidebar', 16)}</span><span class="bp-l">${B.logo ? ic('sidebar', 16) : ''}<b>Example City</b>${ic('down', 12)}</span>${B.search ? `<span class="bp-s" style="background:${(v.navInput || [v.nav[4]])[0]};color:${(v.navInput || [0, v.nav[3]])[1]}">${ic('search', 12)}Search everything</span>` : '<span class="grow"></span>'}<span class="bp-r">${B.lang ? '<b>EN</b>' : ''}${B.mode ? ic('contrast', 15) : ''}${B.help ? ic('help', 15) : ''}${ic('bell', 15)}<span class="av av2" style="--s:22px">ER</span></span></div>
+      <ul class="rows mt">${[
+        ['logo', 'Logo and name of the application', 'Off: the button of the sidebar takes the corner, on the phone too'],
+        ['search', 'Search', 'Off: the field and Ctrl K go away; the search inside the pages stays'],
+        ['lang', 'Language', 'Off: each person picks it in Account › Appearance and language. With one language it never shows'],
+        ['help', 'Help', 'Off: the guided tour, the guide and what is new go to the menu of the person'],
+        ['mode', 'Mode: light, dark, automatic', 'Off: the default mode applies; each person changes it in Account'],
+      ]
+        .map((r) => `<li><div class="rt grow"><b>${r[1]}</b><span>${r[2]}</span></div><button type="button" class="tgl" role="switch" data-act="barset" data-v="${r[0]}" aria-label="${r[1]}" aria-checked="${!!B[r[0]]}"><i></i></button></li>`)
+        .join('')}</ul>
+      <p class="muted small mt">Always there: the bell, the menu of the person and, for whoever works in more than one tenant, the switcher of the tenant.</p></section>`;
+  const blocks = {
+    identity: [id].concat(extra.split(/(?=<section class="panel)/).filter((x) => x.trim() && !/<h2>Formats<\/h2>/.test(x))),
+    theme: [theme, mode, side],
+    languages: [langs, fmts],
+    topbar: [topbar],
+  };
+  const tl = [
+    ['identity', 'Identity and texts'],
+    ['theme', 'Theme and mode'],
+    ['languages', 'Languages and formats'],
+  ].concat(sys ? [['topbar', 'Top bar']] : []);
+  const cur = tl.some((x) => x[0] === tabOf(S, 'idt', 'identity')) ? tabOf(S, 'idt', 'identity') : 'identity';
   return [
-    grp(
-      'Identity and texts',
-      'building',
-      by(['Identity', 'Sign-in page', 'Landing page', 'Welcome and legal notes']),
-      'identity',
-    ),
-    grp('Theme and mode', 'palette', by(['theme', 'mode', 'Sidebar']), 'theme'),
-    grp('Languages and formats', 'globe', by(['Languages', 'Formats']), 'languages'),
+    'Identity and appearance',
+    'palette',
+    `<div class="idt">${tabs(tl, cur, 'idt')}</div><div class="stack-s mt">${blocks[cur].join('')}</div>`,
+    cur,
   ];
 }
-/* Where the Theme section is, to go back to it from the editor and from the palette at the top. */
-const THEME_TAB = { admin: ['system', 'sys', '8'], manager: ['config', 'cfg', '5'] };
-const PROF_TAB = ['config', 'cfg', '2'];
-/* The first section of Appearance, where the item of the person menu leads. */
-const ASPECT_TAB = {
-  admin: ['system', 'sys', '7'],
-  manager: ['config', 'cfg', '4'],
-  user: ['config', 'cfg', '1'],
-  collab: ['config', 'cfg', '1'],
-};
+/* Where the Theme section is, to go back to it from the editor: section, then the tab Theme. */
+const THEME_TAB = { admin: ['system', 'sys', '8'], manager: ['config', 'cfg', '4'] };
+/* The permission profiles are a section of Manage. */
+const PROF_TAB = ['members', 'mem', 'prof'];
 function myAppearance(S) {
   const avl = S.role === 'admin' ? S.app.sys.langs : S.app.tnt.langs;
   return `<div class="app-cols"><div class="app-col"><section class="panel"><h2>Mode</h2>${modeOpts(S, 'me')}
@@ -951,8 +931,8 @@ function myAppearance(S) {
       .map((l) => `<option value="${l[0]}" ${S.lang === l[0] ? 'selected' : ''}>${l[1]}</option>`)
       .join(
         '',
-      )}</select><span class="hint">${S.role === 'admin' ? 'Among the languages of the platform' : 'Among the languages your organization chose'}</span></label></div></section></div>
-    <div class="app-col">${sidePrefs(S, 'me')}<p class="muted small">The same choices are at hand in the top band: the palette.</p></div></div>`;
+      )}</select><span class="hint">${S.role === 'admin' ? 'Among the languages of the platform' : 'Among the languages your tenant chose'}</span></label></div></section></div>
+    <div class="app-col">${sidePrefs(S, 'me')}${bar().mode ? '<p class="muted small">Mode and contrast are also at hand in the palette of the top band.</p>' : ''}</div></div>`;
 }
 
 /* ── Theme editor ─────────────────────────────────────────────────────
@@ -970,9 +950,9 @@ function teProposals(S) {
         { accent: '#9a6a00', bar: 'dark', grays: 'warm' },
       ]
     : [
-        { accent: '#3654c9', bar: 'color', grays: 'neutral' },
+        { accent: '#5b5fc7', bar: 'color', grays: 'neutral' },
         { accent: '#0b7285', bar: 'gradient', grays: 'cool' },
-        { accent: '#3654c9', bar: 'light', grays: 'cool' },
+        { accent: '#5b5fc7', bar: 'light', grays: 'cool' },
       ];
 }
 function themePreview(p, dark, logoTxt) {
@@ -987,7 +967,7 @@ function secThemeEdit(S) {
   if (!S.te)
     S.te = {
       name: '',
-      accent: '#3654c9',
+      accent: '#5b5fc7',
       bar: 'color',
       grays: 'neutral',
       adv: {},
@@ -999,7 +979,7 @@ function secThemeEdit(S) {
     bad = checks.filter((c) => c[1] < c[2]);
   const back = S.role === 'admin' ? ['system', 'Back to System'] : ['config', 'Back to Settings'];
   const sw = [
-    '#3654c9',
+    '#5b5fc7',
     '#0066cc',
     '#0b7285',
     '#15803d',
@@ -1087,14 +1067,14 @@ function secSystem(S) {
     [
       'Addresses',
       'link',
-      `<section class="panel"><h2>Addresses</h2><dl class="kv"><dt>Platform</dt><dd class="mono">https://apps.example.org</dd><dt>Organization</dt><dd class="mono">https://&lt;organization&gt;.apps.example.org</dd></dl><p class="muted small">Fixed at installation: changing them means new certificates and new return addresses for single sign-on.</p></section>
-      <section class="panel mt"><h2>Sites that may embed pages</h2><p class="muted small">Only these sites can show a page of the platform inside one of theirs: for every other the browser refuses to open it. A direct link always works, and whoever opens it sees only what their permissions allow.</p><div class="gchips mt">${['*.apps.example.org', 'intranet.example.org'].map((g) => `<span class="gchip mono">${g}<button type="button" aria-label="Remove ${g}">${ic('x', 12)}</button></span>`).join('')}<button type="button" class="gchip add">${ic('plus', 13)}Add</button></div><p class="muted small mt">Every organization can add the sites of its own from its Settings.</p></section>`,
+      `<section class="panel"><h2>Addresses</h2><dl class="kv"><dt>Platform</dt><dd class="mono">https://apps.example.org</dd><dt>Tenant</dt><dd class="mono">https://&lt;tenant&gt;.apps.example.org</dd></dl><p class="muted small">Fixed at installation: changing them means new certificates and new return addresses for single sign-on.</p></section>
+      <section class="panel mt"><h2>Sites that may embed pages</h2><p class="muted small">Only these sites can show a page of the platform inside one of theirs: for every other the browser refuses to open it. A direct link always works, and whoever opens it sees only what their permissions allow.</p><div class="gchips mt">${['*.apps.example.org', 'intranet.example.org'].map((g) => `<span class="gchip mono">${g}<button type="button" aria-label="Remove ${g}">${ic('x', 12)}</button></span>`).join('')}<button type="button" class="gchip add">${ic('plus', 13)}Add</button></div><p class="muted small mt">Every tenant can add the sites of its own from its Settings.</p></section>`,
       'addresses',
     ],
     [
       'Backup and restore',
       'box',
-      `<section class="panel"><div class="panel-h"><div><h2>Backup</h2><p class="muted small">PostgreSQL, the file storage, the configuration of Keycloak and of the platform.</p></div>${btn('Run now', { icon: 'play', act: 'sysbackup' })}</div>
+      `<section class="panel"><div class="panel-h"><div><h2>Backup</h2><p class="muted small">PostgreSQL, the file storage and the configuration of the platform.</p></div>${btn('Run now', { icon: 'play', act: 'sysbackup' })}</div>
         <div class="fgrid">${sel('When', ['Every night at 02:00', 'Every 6 hours', 'Every week'], 'Every night at 02:00')}${sel('Keep', ['30 daily and 12 monthly', '14 daily and 6 monthly', '7 daily'], '30 daily and 12 monthly')}${fld('Destination', 's3://platform-backup', { mono: true })}${sel('Second copy elsewhere', ['Yes, in another data centre', 'No, only here'], 'Yes, in another data centre', 'If the main data centre is lost, backups stay')}</div>
         <ul class="rows mt">${sw(1, 'Encrypted', 'With a key different from the one of the data')}${sw(1, 'Check after every backup', 'A test restore in a separate environment, every Sunday')}</ul></section>
       <section class="panel mt"><h2>Latest backups</h2>${S.sysBackupRun ? `<div class="banner info">${ic('refresh', 18)}<div><b>Backup running.</b> It takes about 25 minutes; you can go on working.</div></div>` : ''}<div class="tbl-w"><table class="tbl"><thead><tr><th>When</th><th>Kind</th><th class="r">Size</th><th>Outcome</th><th></th></tr></thead><tbody>${BACKUPS.map((b) => `<tr class="${S.restoreSel === b[0] ? 'picked' : ''}"><td class="num">${b[1]}</td><td>${b[2]}</td><td class="r num">${b[3]}</td><td>${pill(b[4] === 'ok' ? 'Succeeded' : 'Failed', b[4])}${b[4] === 'ok' ? '' : '<div class="small muted">No space left on the destination</div>'}</td><td class="r">${b[4] === 'ok' ? btn('Restore', { act: 'sysrestore', v: b[0] }) : btn('Retry', { icon: 'refresh', act: 'toast', v: 'Backup started again: about 25 minutes.' })}</td></tr>`).join('')}</tbody></table></div>
@@ -1107,7 +1087,7 @@ function secSystem(S) {
               'The whole platform',
               'It stops for about 40 minutes; everything goes back to that day',
             ],
-            ['org', 'One organization', 'The other organizations go on working'],
+            ['org', 'One tenant', 'The other tenants go on working'],
             ['item', 'One item', "A note, an estimate or a task, next to today's version"],
           ]
             .map(
@@ -1123,21 +1103,19 @@ function secSystem(S) {
     [
       'Security',
       'shield',
-      `<section class="panel"><div class="panel-h"><div><h2>Minimum rules</h2><p class="muted small">They apply to every local account and Keycloak enforces them in every realm; an organization can only be stricter. Whoever signs in with the single sign-on of the organization follows the rules of the organization.</p></div></div>
-        <div class="fgrid">${fld('Minimum length of the password', '12', { type: 'number' })}${fld('Password expiry, in days', '180', { type: 'number', hint: '0 = never expires' })}${fld('Attempts before the lock', '5', { type: 'number' })}${fld('Length of the lock, in minutes', '15', { type: 'number' })}${sel('Length of the session', ['8 hours', '12 hours', '24 hours'], '8 hours')}${sel('«Remember me»', ['30 days', '7 days', 'Never'], '30 days')}</div>
-        <ul class="rows mt">${sw(1, 'Second factor for managers and administrators', 'Required')}${sw(0, 'Second factor for everybody', 'Users too')}</ul></section>
-      <section class="panel mt"><div class="panel-h"><div><h2>Emergency access</h2><p class="muted small">A single administrator account that is not in Keycloak: for when Keycloak does not answer or is not configured yet. It is turned on and off only from the configuration of the server, not from here.</p></div>${pill('On', 'ok', 'check')}</div>
-        <dl class="kv"><dt>Account</dt><dd class="mono">emergency@platform.example.org</dd><dt>Address</dt><dd class="mono">https://apps.example.org/emergency-access</dd><dt>From where</dt><dd>Only from the internal network <span class="mono">10.20.0.0/16</span></dd><dt>Second factor</dt><dd>Required · recovery codes generated on 1 Sep 2026</dd><dt>Last use</dt><dd>Never</dd></dl>
-        <p class="muted small">Every sign-in goes to the audit log and warns every administrator. It does not enter organizations: it is an administrator of the platform, without content.</p>
-        <div class="row mt">${btn('Generate new recovery codes', { icon: 'refresh', act: 'toast', v: 'New codes generated: the old ones no longer work. Print them and keep them offline.' })}${btn('Test the access', { icon: 'key', act: 'toast', v: 'Test recorded: the emergency access answers. The other administrators were told.' })}</div>
-        <h3 class="h3">Uses</h3><ul class="rows"><li><div class="rt grow"><b>Periodic test</b><span>1 Sep 2026 · Paola Ferri · from the internal network</span></div>${pill('Succeeded', 'ok')}</li></ul></section>`,
+      `<section class="panel"><div class="panel-h"><div><h2>Minimum rules</h2><p class="muted small">They apply to every local account, of every tenant, and Mosaikit enforces them; a tenant can only be stricter. Whoever signs in with the identity provider (OIDC) of a tenant follows the rules of that provider.</p></div></div>
+        <div class="fgrid">${fld('Minimum length of the password', '10', { type: 'number' })}${fld('Password expiry, in days', '180', { type: 'number', hint: '0 = never expires' })}${fld('Attempts before the lock', '8', { type: 'number' })}${fld('Length of the lock, in minutes', '15', { type: 'number' })}${sel('Length of the session', ['8 hours', '12 hours', '24 hours'], '8 hours')}${sel('«Remember me»', ['30 days', '7 days', 'Never'], '30 days')}</div>
+        <ul class="rows mt">${sw(1, 'Second factor for Tenant Managers and administrators', 'Required')}${sw(0, 'Second factor for everybody', 'Users too')}</ul></section>
+      <section class="panel mt"><div class="panel-h"><div><h2>Administrator access</h2><p class="muted small">Administrators are accounts of the platform: they sign in from <span class="mono">#/admin</span>, always with the local password and the second factor (TOTP), whatever the tenants use. It works even when the identity provider of a tenant does not answer.</p></div>${pill('Second factor required', 'ok', 'check')}</div>
+        <dl class="kv"><dt>Address</dt><dd class="mono">https://apps.example.org/#/admin</dd><dt>Second factor</dt><dd>An authenticator app, registered at the first sign-in, and 10 recovery codes</dd><dt>Lost phone and codes</dt><dd>Another administrator removes the second factor, or the console of the server: <span class="mono">reset-totp --user &lt;name&gt;</span></dd></dl>
+        <p class="muted small">Every sign-in of an administrator goes to the log. Administrators do not enter tenants and do not see their content.</p></section>`,
       'security',
     ],
     ['Keys of outside services', 'key', keysSection(S, 'sys'), 'keys'],
     [
       'Retention',
       'clock',
-      `<section class="panel"><h2>How long things are kept</h2><div class="fgrid"><label class="lbl">Audit log<input type="text" value="From the plan: Enterprise 1 year · Pro 6 months · Free 30 days" readonly><span class="hint">Set by the plan of each organization</span></label>${sel('Technical logs of the services', ['30 days', '90 days'], '30 days')}${sel('Read notifications', ['90 days', '1 year'], '90 days')}${sel('Runs of automations', ['6 months', '1 year'], '6 months')}</div></section>`,
+      `<section class="panel"><h2>How long things are kept</h2><div class="fgrid">${sel('Log', ['30 days', '6 months', '1 year'], '1 year')}${sel('Technical logs of the services', ['30 days', '90 days'], '30 days')}${sel('Read notifications', ['90 days', '1 year'], '90 days')}${sel('Runs of automations', ['6 months', '1 year'], '6 months')}</div></section>`,
       'retention',
     ],
     [
@@ -1147,8 +1125,9 @@ function secSystem(S) {
       <section class="panel mt"><h2>Notice for everybody</h2><p class="muted small">A strip on top of every page, for example before an update.</p><div class="fgrid">${fld('Text', 'On Saturday 11 October from 20 to 22 the platform is not available.', { wide: true })}${sel('Until', ['Saturday 11 Oct at 22:00', 'Tomorrow', 'Until I remove it'], 'Saturday 11 Oct at 22:00')}</div><ul class="rows mt">${sw(1, 'Show the notice', '')}</ul></section>`,
       'maintenance',
     ],
+    ['Quotas', 'gauge', sysQuotas(S), 'quotas'],
   ];
-  parts.push('Appearance', ...appearancePage(S, 'sys'));
+  parts.push('Appearance', appearancePage(S, 'sys'));
   const nav = secNav(S, 'sys', parts);
   return detailPage(S, {
     title: 'System',
@@ -1161,12 +1140,12 @@ function secSystem(S) {
     sideNav: true,
   });
 }
-/* The profiles of the organization: where the permissions in the modules start, chosen when
-   inviting. Edited here, module by module; they apply to every person who has them. */
+/* The profiles of the tenant: where the permissions in the plugins start, chosen when
+   inviting. Edited here, plugin by plugin; they apply to every person who has them. */
 function profilesSection(S) {
   const cur = PROF(S.profSel || 'std');
   const mods = MGR_FEATS.filter((k) => MOD_PERMS[k]);
-  return `<section class="panel"><div class="panel-h"><div><h2>Profiles</h2><p class="muted small">Where the permissions of a User in the modules start. Groups and personal exceptions add; a profile never takes away.</p></div>${btn('New profile', { icon: 'plus', kind: 'pri', act: 'profnew' })}</div>
+  return `<section class="panel"><div class="panel-h"><div><h2>Permission profiles</h2><p class="muted small">Where the permissions of a User in the plugins start. Groups and personal exceptions add; a profile never takes away.</p></div></div>
       <div class="opts prof-o">${PROFILES.map((pr) => `<button type="button" class="opt ${pr.id === cur.id ? 'sel' : ''}" data-act="profsel" data-v="${pr.id}" aria-pressed="${pr.id === cur.id}"><b>${pr.n}</b><span>${pr.d}</span><span class="small num">${pr.cnt} people${pr.def ? ' · for new invitations' : ''}</span></button>`).join('')}</div></section>
     <section class="panel mt"><div class="panel-h"><div><h2>${cur.n}</h2><p class="muted small">${cur.cnt} people have this profile: a change applies to all of them, from their next sign-in.</p></div><div class="row">${btn('Duplicate', { icon: 'copy', act: 'profnew' })}${cur.def ? '' : btn('Use for new invitations', { act: 'profdef', v: cur.id })}</div></div>
       <div class="ptab">${mods
@@ -1182,50 +1161,85 @@ function profilesSection(S) {
               .join('')}</div></div>`,
         )
         .join('')}</div>
-      <p class="muted small mt">Extensions from the marketplace are not in profiles: they are given by group or by person, from Modules › Access and permissions.</p></section>`;
+      <p class="muted small mt">Plugins installed by the administrator are not in profiles: they are given by group or by person, from Plugins › Permissions.</p></section>`;
 }
-/* Settings of the manager and of people: the same page, with the sections the role uses. */
+/* The quotas of the platform: what a new tenant takes, how much the platform has, and how much is
+   given to the tenants already (it can be more than the capacity: not everybody uses everything). */
+function sysQuotas(S) {
+  const sum = (k) =>
+    TENANTS.filter((x) => tenSt(S, x) !== 'Suspended').reduce((s, x) => s + (tenQuota(S, x)[k] || 0), 0);
+  const caps = QUOTA_Q.filter((k) => QCAP[k[0]] != null);
+  const over = caps.filter((k) => sum(k[0]) > QCAP[k[0]]);
+  return `<section class="panel"><div class="panel-h"><div><h2>Quotas of new tenants</h2><p class="muted small">Every tenant takes these, unless it has its own on its page (Tenants › the tenant › Details). Tenant Managers read them in Usage, people in Account › Usage: nobody else changes them.</p></div></div>
+      <div class="fgrid">${QUOTA_Q.map((k) => `<label class="lbl">${k[1]}${k[2] ? ' (' + k[2] + ')' : ''}<input type="number" min="0" value="${QDEF[k[0]] == null ? '' : QDEF[k[0]]}" placeholder="no limit"></label>`).join('')}</div></section>
+    <section class="panel mt"><div class="panel-h"><div><h2>Capacity of the platform</h2><p class="muted small">How much the platform has in all, and how much is given to the tenants that are not suspended.</p></div></div>
+      ${over.length ? `<div class="banner warn">${ic('alert', 18)}<div><b>More is given than the platform has: ${over.map((k) => k[1].toLowerCase()).join(', ')}.</b> It works while the tenants do not all use their whole quota; Monitoring › Capacity says when the real use gets near.</div></div>` : ''}
+      <div class="tbl-w mt"><table class="tbl"><thead><tr><th>Quota</th><th class="r">Capacity</th><th class="r">Given to the tenants</th><th></th></tr></thead><tbody>${caps
+        .map((k) => {
+          const s = sum(k[0]),
+            c = QCAP[k[0]];
+          return `<tr><td><b>${k[1]}</b></td><td class="r"><input type="number" class="q-in" value="${c}" aria-label="Capacity: ${k[1]}"></td><td class="r num ${s > c ? 'warn-t' : ''}">${fmtN(s)} · ${Math.round((s / c) * 100)}%</td><td>${s > c ? pill('Over the capacity', 'warn') : pill('Within', 'ok')}</td></tr>`;
+        })
+        .join('')}</tbody></table></div></section>`;
+}
+/* Settings of the tenant: the Tenant Manager only; what is personal is in Account. Every setting
+   carries its mark: with a limit, customizable, or managed by the administrator (gathered in the last
+   section, to read). */
 function secConfig(S) {
-  const mgr = S.role === 'manager',
-    tn = TENANT_SEL[0];
+  const tn = TENANT_SEL[0],
+    x = TENANTS[0],
+    e = TEN_EXTRA[x.slug];
   const rule = (label, plat, val, max) =>
     `<label class="lbl">${label}<input type="number" value="${val}"><span class="hint">${max ? 'Maximum' : 'Minimum'} of the platform: ${plat}</span></label>`;
-  const parts = mgr
-    ? [
-        'Organization',
-        ['Keys of outside services', 'key', keysSection(S, 'tnt'), 'keys'],
-        [
-          'Security',
-          'shield',
-          `<section class="panel"><h2>Rules of the organization</h2><p class="muted small">They start from the rules of the platform and can only be stricter. They apply to whoever signs in with a local account, and Keycloak enforces them; whoever signs in with the single sign-on of the organization follows the rules of the organization.</p>
-        <div class="fgrid mt">${rule('Minimum length of the password', 12, 14)}${rule('Password expiry, in days', 180, 90, 1)}${rule('Attempts before the lock', 5, 5, 1)}<label class="lbl">Length of the session<select><option>8 hours</option><option selected>4 hours</option></select><span class="hint">Maximum of the platform: 8 hours</span></label></div>
-        <ul class="rows mt"><li><div class="rt grow"><b>Second factor for managers</b><span>Required by the platform</span></div>${toggle(1).replace('<button', '<button disabled')}</li><li><div class="rt grow"><b>Second factor for everybody</b><span>Users too</span></div>${toggle(1)}</li></ul></section>`,
-          'security',
-        ],
-        ['Profiles', 'user', profilesSection(S), 'profiles'],
-        [
-          'Embedding',
-          'link',
-          `<section class="panel"><h2>Sites of the organization that may embed pages</h2><p class="muted small">The pages of ${tn.name} can show inside the pages of these sites; for every other the browser refuses to open them. They add to the ones the platform allows for everybody.</p>
-        <div class="gchips mt">${['www.city.example.org', 'intranet.city.example.org'].map((g) => `<span class="gchip mono">${g}<button type="button" aria-label="Remove ${g}">${ic('x', 12)}</button></span>`).join('')}<button type="button" class="gchip add">${ic('plus', 13)}Add</button></div></section>`,
-          'embedding',
-        ],
-      ]
-    : [
-        ['Keys of outside services', 'key', keysSection(S, 'me'), 'keys'],
-        ['Appearance', 'eye', myAppearance(S), 'appearance'],
-      ];
-  if (mgr) parts.push('Appearance', ...appearancePage(S, 'tnt'));
+  const managed = [
+    ['key', 'Sign-in', `${tenAuthOf(S, x.slug) === 'oidc' ? `Identity provider (OIDC): ${e.idpName}` : 'Local accounts, kept by Mosaikit'} · roles from ${e.roles === 'idp' ? 'the groups of the identity provider' : 'Mosaikit'} · guests allowed, at most User`, null],
+    ['gauge', 'Quotas', `${QUOTA_Q.map((k) => `${Q_SHORT[k[0]]} ${tenQuota(S, x)[k[0]] == null ? 'no limit' : fmtN(tenQuota(S, x)[k[0]]) + (k[2] ? ' ' + k[2] : '')}`).join(' · ')}`, ['Usage', 'usage']],
+    ['puzzle', 'Plugins available', `${FEATS.filter((f) => tenFeats(S, x)[f.k]).length} of ${FEATS.length}: you turn them on and give the permissions`, ['Plugins', 'splugins']],
+    ['menu', 'Top bar', `${['logo', 'search', 'lang', 'help', 'mode'].filter((k) => bar()[k]).length} of 5 controls shown, the same in every tenant`, null],
+  ];
+  const parts = [
+    'Tenant',
+    [
+      'Security',
+      'shield',
+      `<section class="panel"><div class="panel-h"><div><h2>Rules of the tenant</h2><p class="muted small">They start from the rules of the platform and can only be stricter. They apply to whoever signs in with a local account, and Mosaikit enforces them; whoever signs in with an identity provider (OIDC) follows the rules of that provider.</p></div>${inhLimit()}</div>
+        <div class="fgrid mt">${rule('Minimum length of the password', 10, 12)}${rule('Password expiry, in days', 180, 90, 1)}${rule('Attempts before the lock', 8, 5, 1)}<label class="lbl">Length of the session<select><option>8 hours</option><option selected>4 hours</option></select><span class="hint">Maximum of the platform: 8 hours</span></label></div>
+        <ul class="rows mt"><li><div class="rt grow"><b>Second factor for Tenant Managers</b><span>Required by the platform</span></div>${toggle(1).replace('<button', '<button disabled')}</li><li><div class="rt grow"><b>Second factor for everybody</b><span>Users too</span></div>${toggle(1)}</li></ul></section>`,
+      'security',
+    ],
+    [
+      'Keys of outside services',
+      'key',
+      keysSection(S, 'tnt'),
+      'keys',
+    ],
+    [
+      'Embedding',
+      'link',
+      `<section class="panel"><div class="panel-h"><div><h2>Sites that may embed the pages of the tenant</h2><p class="muted small">The pages of ${tn.name} can show inside the pages of these sites; for every other the browser refuses to open them. The tenant adds its own to the ones of the platform.</p></div></div>
+        <div class="eyebrow mt">Of the platform ${inhLock()}</div><div class="gchips">${['*.apps.example.org', 'intranet.example.org'].map((g) => `<span class="gchip mono off">${ic('lock', 11)}${g}</span>`).join('')}</div>
+        <div class="eyebrow mt">Of the tenant</div><div class="gchips">${['www.city.example.org', 'intranet.city.example.org'].map((g) => `<span class="gchip mono">${g}<button type="button" aria-label="Remove ${g}">${ic('x', 12)}</button></span>`).join('')}<button type="button" class="gchip add">${ic('plus', 13)}Add</button></div></section>`,
+      'embedding',
+    ],
+    [
+      'Managed by the platform',
+      'lock',
+      `<section class="panel"><div class="panel-h"><div><h2>Managed by the platform</h2><p class="muted small">Decided by the administrator of the platform for ${tn.name}: here they are read, not changed. To change one, ask the administrators.</p></div>${inhLock()}</div>
+        <ul class="rows">${managed.map((m) => `<li><span class="ri">${ic(m[0], 15)}</span><div class="rt grow"><b>${m[1]}</b><span>${m[2]}</span></div>${m[3] ? btn(m[3][0], { icon: 'right', go: m[3][1] }) : ''}</li>`).join('')}</ul></section>`,
+      'platform',
+    ],
+  ];
+  parts.push('Appearance', appearancePage(S, 'tnt'));
   const nav = secNav(S, 'cfg', parts);
   return detailPage(S, {
-    title: 'Settings',
-    sub: mgr
-      ? `Settings and appearance of ${tn.name}, applied at once`
-      : 'Your keys and your appearance, for you only',
+    title: 'Tenant settings',
+    sub: `Settings and appearance of ${tn.name}, applied at once`,
     body:
+      `<p class="inh-legend small">${inhLimit('With a limit')}${`<span class="inh">${ic('refresh', 12)}Inherited or customized</span>`}${inhLock()}<span class="muted">: what each mark means for a setting of the tenant</span></p>` +
       (S.bulkDone
         ? `<div class="banner info bdone">${ic('check', 18)}<div>${S.bulkDone}</div></div>`
-        : '') + nav.body,
+        : '') +
+      nav.body,
     side: nav.side,
     sideNav: true,
   });
@@ -1237,9 +1251,10 @@ const SECTIONS = {
   login: secLogin,
   home: secHome,
   inbox: secInbox,
-  profile: secProfile,
+  account: secAccount,
   trash: secTrash,
   space: secSpace,
+  shares: secShares,
   members: secMembers,
   person: secPerson,
   group: secGroup,

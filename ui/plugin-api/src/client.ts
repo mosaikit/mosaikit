@@ -1,5 +1,5 @@
 import { Bridge, BridgeError } from './bridge.ts'
-import type { FileEntry, Hello, ListResult, Listing, PublicResource, Row, SiteInfo, Values } from './protocol.ts'
+import type { FileEntry, Hello, ListResult, Listing, PublicResource, Row, SiteInfo, UiContext, Values } from './protocol.ts'
 
 export interface CrudClient {
   list(opts?: { filter?: string; parent?: string }): Promise<ListResult>
@@ -16,6 +16,8 @@ export class Msk {
   readonly tenant: Hello['tenant']
   readonly plugin: Hello['plugin']
   readonly publicResource: PublicResource | undefined
+  /** lingua, tema e modo correnti dell'host (aggiornati a ogni evento `context`) */
+  context: UiContext | undefined
 
   constructor(
     readonly bridge: Bridge,
@@ -26,6 +28,14 @@ export class Msk {
     this.tenant = hello.tenant
     this.plugin = hello.plugin
     this.publicResource = hello.resource
+    this.context = hello.context
+  }
+
+  /** Avvisa quando l'host cambia lingua, tema o modo (gia' applicati a `<html>`). */
+  onContext(fn: (ctx: UiContext) => void) {
+    return this.bridge.onEvent((event, data) => {
+      if (event === 'context') fn(data as UiContext)
+    })
   }
 
   crud(resource: string): CrudClient {
@@ -100,6 +110,18 @@ export class Msk {
   }
 }
 
+/** Applica lingua, modo e tema dell'host a `<html>`: `lang`, `data-mode`, `data-preset`, `color-scheme`. */
+export function applyContext(ctx: UiContext | undefined, root: HTMLElement = document.documentElement) {
+  if (!ctx) return
+  if (/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(ctx.lang)) root.lang = ctx.lang
+  if (ctx.mode === 'light' || ctx.mode === 'dark') {
+    root.dataset.mode = ctx.mode
+    root.style.colorScheme = ctx.mode
+  }
+  if (/^[a-z0-9-]{1,32}$/.test(ctx.preset)) root.dataset.preset = ctx.preset
+  applyTheme(ctx.theme, root)
+}
+
 export function applyTheme(vars: Record<string, string> | undefined, root: HTMLElement = document.documentElement) {
   if (!vars) return
   for (const [k, v] of Object.entries(vars)) {
@@ -120,9 +142,14 @@ export async function connect(win: Window = window): Promise<Msk> {
   const bridge = new Bridge(win.parent, host, win)
   const hello = await bridge.call<Hello>('hello')
   applyTheme(hello.theme)
+  applyContext(hello.context)
   const msk = new Msk(bridge, hello)
   msk.onEvent((event, data) => {
     if (event === 'theme') applyTheme(data as Record<string, string>)
+    if (event === 'context') {
+      msk.context = data as UiContext
+      applyContext(msk.context)
+    }
   })
   return msk
 }

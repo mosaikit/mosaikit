@@ -51,8 +51,8 @@
     --text: #242424;
     --text2: #424242;
     --text3: #616161;
-    --accent: #3654c9;
-    --accent-soft: rgba(54, 84, 201, 0.1);
+    --accent: #5b5fc7;
+    --accent-soft: rgba(91, 95, 199, 0.1);
     --on-accent: #ffffff;
     --ok: #0c8a5f;
     --warn: #a96a05;
@@ -86,8 +86,8 @@
   --text: #242424;
   --text2: #424242;
   --text3: #616161;
-  --accent: #3654c9;
-  --accent-soft: rgba(54, 84, 201, 0.1);
+  --accent: #5b5fc7;
+  --accent-soft: rgba(91, 95, 199, 0.1);
   --on-accent: #ffffff;
   --ok: #0c8a5f;
   --warn: #a96a05;
@@ -411,6 +411,18 @@ kbd {
 }
 .ib.lang {
   font: 600 12px var(--f-mono);
+}
+.lmenu .hm-i[aria-selected='true'] {
+  background: var(--accent-soft);
+}
+.lmenu .hm-i > .ic:last-child {
+  margin-left: auto;
+  color: var(--accent);
+}
+.lm-c {
+  min-width: 22px;
+  font-size: 11px;
+  color: var(--text2);
 }
 .pill {
   display: inline-flex;
@@ -2056,56 +2068,90 @@ label.assoc input {
   color: var(--accent);
   background: none;
 }
+/* Sign-in, as in the shell: on the left the panel of the brand in the colours of the band, with tiles in
+   the top right corner; on the right language, mode and support, the form in the middle, the legal notes
+   at the foot. */
 .lg-page2 {
   position: absolute;
   inset: 0;
   overflow: auto;
   display: grid;
-  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
   background: var(--bg);
 }
 .lg-hero {
+  --band-bg: color-mix(in srgb, var(--accent) 62%, #1c1d33);
+  --band-fg: #ffffff;
+  --band-muted: rgba(255, 255, 255, 0.72);
   position: relative;
   overflow: hidden;
-  color: var(--text);
-  background: linear-gradient(165deg, var(--bg3), var(--bg));
-  border-right: 1px solid var(--line);
+  color: var(--band-fg);
+  background: linear-gradient(160deg, var(--band-bg) 0%, color-mix(in srgb, var(--band-bg) 78%, black) 100%);
   min-height: 100%;
 }
 .lg-art {
   position: absolute;
-  inset: 0;
-  opacity: 0.32;
-  filter: grayscale(1);
+  inset: 0 0 auto;
+  height: 60%;
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  align-content: start;
+  gap: 12px;
+  padding: 24px;
+  overflow: hidden;
+  -webkit-mask-image: radial-gradient(ellipse 75% 90% at 100% 0%, black 25%, transparent 72%);
+  mask-image: radial-gradient(ellipse 75% 90% at 100% 0%, black 25%, transparent 72%);
 }
-.lg-art svg {
-  width: 100%;
-  height: 100%;
+.lg-art span {
+  aspect-ratio: 1;
+  border-radius: 6px;
+  background: #fff;
+  animation: lg-tile 7s ease-in-out infinite;
+}
+.lg-art span.acc {
+  background: var(--accent);
+}
+@keyframes lg-tile {
+  50% {
+    transform: scale(0.92);
+    filter: brightness(1.25);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .lg-art span {
+    animation: none;
+  }
 }
 .lg-hero-in {
   position: relative;
   z-index: 1;
-  min-height: 100%;
+  min-height: 640px;
+  height: 100%;
   display: flex;
   flex-direction: column;
-  gap: 28px;
-  padding: 56px clamp(24px, 4.5vw, 64px) 40px;
+  justify-content: space-between;
+  padding: 48px;
 }
 .lg-hero-b {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
 }
 .lg-hero-b > div {
   display: flex;
   flex-direction: column;
 }
+.lg-hero-b > .bmk,
+.lg-hero-b > svg {
+  border-radius: 10px;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.2);
+}
 .lg-hero-b b {
-  font: 700 24px/1.15 var(--f-head);
+  font: 700 20px/1.2 var(--f-head);
 }
 .lg-hero-b span {
-  color: var(--text3);
-  font-size: 13.5px;
+  color: var(--band-muted);
+  font-size: 14px;
 }
 .lg-mark.big {
   width: 52px;
@@ -2115,93 +2161,153 @@ label.assoc input {
   color: var(--on-accent);
 }
 .lg-claim {
-  margin: auto 0;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  max-width: 28rem;
+  margin-bottom: 48px;
 }
 .lg-claim h2 {
-  font: 700 clamp(28px, 3.2vw, 40px)/1.12 var(--f-head);
+  font: 700 36px/1.2 var(--f-head);
   margin: 0;
-  text-wrap: balance;
-  color: var(--text);
+  color: var(--band-fg);
 }
 .lg-claim p {
-  margin: 0;
-  font-size: 17px;
-  line-height: 1.5;
-  max-width: 38ch;
-  color: var(--text2);
+  margin: 16px 0 0;
+  font-size: 18px;
+  line-height: 1.55;
+  color: var(--band-muted);
 }
 .lg-feat {
   list-style: none;
-  margin: 6px 0 0;
+  margin: 32px 0 0;
   padding: 0;
-  display: flex;
-  flex-direction: column;
+  display: grid;
   gap: 12px;
 }
 .lg-feat li {
   display: flex;
   align-items: center;
-  gap: 10px;
-  font-size: 14.5px;
-  color: var(--text2);
+  gap: 12px;
+  font-size: 16px;
 }
-.lg-feat .ic {
-  color: var(--accent);
+.lg-chk {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
 }
+/* on the line of the legal notes on the right: as tall as that foot */
 .lg-ver {
+  position: absolute;
+  left: 48px;
+  bottom: 0;
+  height: 48px;
+  display: flex;
+  align-items: center;
   margin: 0;
-  font-size: 12.5px;
-  color: var(--text3);
+  font-size: 12px;
+  color: var(--band-muted);
 }
 .lg-side {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+.lg-top {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 16px;
+}
+.lg-lang {
   position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 4px 0 10px;
+  border-radius: 6px;
+  color: var(--text);
+}
+.lg-lang:hover {
+  background: var(--bg3);
+}
+.lg-lang select {
+  height: 32px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  padding: 0 4px;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.lg-sup {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 8px;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--text2);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.lg-sup:hover {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.lg-main {
+  flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 18px;
-  padding: 80px 24px 24px;
+  gap: 24px;
+  padding: 0 24px 32px;
 }
-.lg-top {
-  position: absolute;
-  top: 20px;
-  right: 28px;
-  display: flex;
+.lg-mob {
+  display: none;
   align-items: center;
-  gap: 14px;
+  gap: 12px;
+  width: min(384px, 100%);
 }
-.lg-top .lnk {
-  font-size: 13.5px;
-  font-weight: 600;
-}
-.lg-lang select {
-  height: 34px;
-  border-radius: 8px;
-  border: 1px solid var(--line2);
-  background: var(--bg2);
-  color: var(--text);
-  padding: 0 8px;
-  font: inherit;
-  font-size: 13px;
+.lg-mob b {
+  font: 700 18px var(--f-head);
 }
 .lg-page2 .lg-card {
   box-shadow: none;
   border: 0;
+  border-radius: 0;
   background: none;
-  width: min(440px, 100%);
-  padding: 8px;
+  width: min(384px, 100%);
+  padding: 0;
   gap: 16px;
 }
-.lg-page2 .lg-card h1 {
-  font: 700 30px/1.15 var(--f-head);
+.lg-title {
+  margin-bottom: 8px;
 }
-.lg-ente {
-  margin: -6px 0 0 !important;
+.lg-page2 .lg-card h1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: 600 24px/1.3 var(--f-body);
+}
+.lg-page2 .lg-card h1 .ic {
+  color: var(--accent);
+}
+.lg-title p {
+  margin-top: 4px !important;
   color: var(--text2);
   font-size: 14px;
+}
+.lg-title p b {
+  color: var(--text);
 }
 .lg-idp {
   display: flex;
@@ -2219,12 +2325,25 @@ label.assoc input {
   color: var(--accent);
   background: var(--bg2);
 }
-.lg-page2 .lg-form .lbl input {
-  height: 44px;
+.lg-page2 .lg-form {
+  gap: 16px;
+}
+.lg-page2 .lg-form .lbl {
+  gap: 6px;
+  font-weight: 600;
+  font-size: 14px;
+  color: var(--text);
+}
+.lg-page2 .lg-form .lbl input,
+.lg-page2 .lg-form .lbl select {
+  height: 36px;
+  font-weight: 400;
   background: var(--bg2);
 }
-.lg-page2 .lg-form .btn.pri {
-  height: 44px;
+.lg-page2 .lg-form .btn.pri,
+.lg-page2 .lg-sso {
+  height: 40px;
+  width: 100%;
 }
 .lg-row {
   display: flex;
@@ -2232,66 +2351,77 @@ label.assoc input {
   justify-content: space-between;
   gap: 12px;
 }
-.lg-reg {
-  text-align: center;
+.lg-reg,
+.lg-note {
   margin: 0 !important;
+  color: var(--text2);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.lg-page2 .lg-switch {
+  margin-top: 8px;
+  padding-top: 16px;
+}
+.lg-door {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--text2);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.lg-door:hover {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 .lg-foot {
-  width: min(440px, 100%);
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-top: auto;
-  padding-top: 12px;
+  justify-content: flex-end;
+  height: 48px;
+  padding: 0 24px;
+  border-top: 1px solid var(--line);
 }
 .lg-legal2 {
   display: flex;
   gap: 16px;
   flex-wrap: wrap;
-  font-size: 12.5px;
+  font-size: 12px;
 }
 .lg-legal2 a {
   color: var(--text2);
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  cursor: pointer;
+  text-underline-offset: 4px;
 }
-@media (max-width: 900px) {
-  .lg-page2 {
-    grid-template-columns: minmax(0, 1fr);
-    align-content: start;
-  }
+.lg-legal2 a:hover {
+  color: var(--text);
+  text-decoration: underline;
+}
+.lg-page2 .lg-host {
+  width: min(384px, 100%);
+  justify-content: flex-start;
+  padding: 10px;
+  border: 1px dashed var(--line2);
+  border-radius: 8px;
+}
+/* as in the shell, under 1024px the panel of the brand gives way to its mark above the form */
+@media (max-width: 1024px) {
   .lg-page2 {
     display: block;
   }
   .lg-hero {
-    min-height: 0;
-    height: auto;
-  }
-  .lg-hero-in {
-    min-height: 0;
-    padding: 18px 16px;
-    gap: 10px;
-  }
-  .lg-hero-b b {
-    font-size: 18px;
-  }
-  .lg-claim,
-  .lg-ver {
     display: none;
   }
-  .lg-top {
-    position: static;
-    align-self: stretch;
-    justify-content: flex-end;
-  }
   .lg-side {
-    justify-content: flex-start;
-    padding: 12px 16px 24px;
+    min-height: 100%;
   }
-  .lg-page2 .lg-card h1 {
-    font-size: 24px;
+  .lg-mob {
+    display: flex;
   }
 }
 .lv-d {
@@ -3730,7 +3860,9 @@ label.assoc input {
   margin: 6px -4px 8px;
   border-top: 1px solid var(--line);
 }
-.side.mini .sg:first-of-type .sg-l {
+.side.mini .sg:first-of-type .sg-l,
+.side.mini .sg.sg-top + .sg > .sg-l {
+  /* no line under Overview: it leads straight into the first group */
   border-top: 0;
   margin: 0;
 }
@@ -6311,4 +6443,660 @@ button.side-ring {
   .rev-id {
     display: none;
   }
+}
+
+/* Sign-in: link to the Administrator access, QR code and recovery codes of the second factor. */
+.lg-switch {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  text-align: center;
+}
+.lg-qr {
+  width: 168px;
+  margin: 4px auto 0;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+.lg-qr svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.lg-codes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 16px;
+  margin: 4px 0 12px;
+  padding: 12px 14px;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg2);
+  font-size: 14px;
+}
+
+/* Manage: search and actions on the selection above the list of a section. */
+.mg-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  margin-bottom: 12px;
+}
+.mg-bar > .field {
+  width: 280px;
+  max-width: 100%;
+}
+.mg-bar .bulk {
+  margin-left: 0;
+}
+.secnav-l .sn-n {
+  margin-left: auto;
+  font-size: 12px;
+}
+
+/* Band: the logo of the application above the sidebar, as wide as the sidebar; then the button that
+   opens and closes the sidebar, the tenant and the search. */
+.pA .side-h {
+  width: 240px;
+  gap: 10px;
+  padding: 0 18px;
+  transition: width 0.15s;
+}
+.pA .side-h.mini {
+  width: 65px;
+  justify-content: center;
+  padding: 0;
+}
+/* the separator between the logo and the band, on the line of the border of the sidebar */
+.band .side-h {
+  border-right: 1px solid var(--line);
+}
+.band.navdark .side-h {
+  border-right-color: rgba(255, 255, 255, 0.18);
+}
+.app-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  color: var(--text);
+}
+.app-logo b {
+  font: 700 17px var(--f-head);
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+.top .stg {
+  flex: none;
+}
+.top .tsw {
+  flex: none;
+  width: auto;
+  max-width: 260px;
+  height: 36px;
+  gap: 8px;
+  padding: 0 8px;
+}
+.top .tsw .ts-name {
+  flex: none;
+  max-width: 180px;
+}
+.top .tsw.static {
+  color: var(--text2);
+}
+.pA .top {
+  /* the search sits in the middle of the band; the sides keep their content and the search gives
+     way when the band gets narrow (container queries below) */
+  display: grid;
+  grid-template-columns: minmax(max-content, 1fr) minmax(0, 420px) minmax(max-content, 1fr);
+  container-type: inline-size;
+}
+.top-l {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.top .sbox {
+  margin: 0;
+  max-width: none;
+  width: 100%;
+}
+.top .tr {
+  justify-self: end;
+}
+/* Narrow screen: in the band only the button that opens the sidebar; the drawer starts with the tenant
+   switcher (manager and user) or with the logo of the application (administrator). */
+@media (max-width: 900px) {
+  .top .tsw {
+    display: none;
+  }
+  /* narrow screen: the search goes to the right, next to the other controls */
+  .pA .top {
+    display: flex;
+  }
+  .top .sbox {
+    flex: 0 1 320px;
+    width: auto;
+    margin-left: auto;
+  }
+  .side-hd .tsw {
+    width: 100%;
+  }
+  .side-hd .tsw .ts-name {
+    flex: 1;
+  }
+}
+@media (max-width: 620px) {
+  /* phone: only the search icon, on the right, drawn like the other icons of the band */
+  .pA .top .sbox:not(.on) {
+    flex: none;
+    width: 32px;
+  }
+  #stage .pA .top .sbox:not(.on) {
+    height: 32px;
+    background: none;
+    border-color: transparent;
+    color: var(--text2);
+    filter: none;
+  }
+  #stage .pA .top .sbox:not(.on):hover {
+    background: var(--bg3);
+    color: var(--text);
+  }
+}
+
+/* Search on the band: brighter on hover and on focus. */
+#stage .top .sbox:hover,
+#stage .top .sbox:focus-visible {
+  filter: brightness(1.04);
+}
+/* No separators in the sidebar: neither between the groups nor above the quotas at the foot. */
+.side.mini .sg-l {
+  border-top: 0;
+}
+.pA .side-f,
+.side-f {
+  border-top: 0;
+}
+
+/* A narrow band (small window, or the sidebar open on a medium screen): first the shortcut goes,
+   then the search becomes an icon like the others, at the right of its column. */
+@container (max-width: 860px) {
+  .top .sbox kbd {
+    display: none;
+  }
+}
+@container (max-width: 600px) {
+  .top .sbox-w {
+    justify-content: flex-end;
+  }
+  #stage .pA .top .sbox:not(.on) {
+    justify-self: end;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    justify-content: center;
+    background: none;
+    border-color: transparent;
+    color: var(--text2);
+    filter: none;
+  }
+  #stage .pA .top .sbox:not(.on):hover {
+    background: var(--bg3);
+    color: var(--text);
+  }
+  .top .sbox:not(.on) span {
+    display: none;
+  }
+}
+
+/* Search as a drop-down: the field in the band and, under it, the pills and the results. */
+.top .sbox-w {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  min-width: 0;
+}
+.top .sbox-w .sbox {
+  width: 100%;
+}
+.top .sbox.on {
+  cursor: text;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.55);
+}
+#stage .top .sbox.on {
+  filter: none;
+}
+.sbox.on input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+}
+#stage .top .sbox.on input {
+  color: #242424;
+}
+.sbox.on input::placeholder {
+  color: inherit;
+  opacity: 0.8;
+}
+.cmd-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+}
+.top .sbox-w.on {
+  z-index: 31;
+}
+.cmdpop {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  width: max(100%, 520px);
+  max-width: calc(100vw - 16px);
+  z-index: 31;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface, #fff);
+  color: var(--text);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+}
+/* The drop-down lives inside the band, which redefines the colours: it takes back the ones of the page. */
+#stage {
+  --page-text: var(--text);
+  --page-text2: var(--text2);
+  --page-text3: var(--text3);
+  --page-line: var(--line);
+  --page-bg3: var(--bg3);
+  --page-surface: var(--surface, var(--bg));
+  --page-accent: var(--accent);
+  --page-on-accent: var(--on-accent);
+  --page-accent-soft: var(--accent-soft);
+}
+#stage .cmdpop {
+  --text: var(--page-text);
+  --text2: var(--page-text2);
+  --text3: var(--page-text3);
+  --line: var(--page-line);
+  --bg3: var(--page-bg3);
+  --accent: var(--page-accent);
+  --on-accent: var(--page-on-accent);
+  --accent-soft: var(--page-accent-soft);
+  background: var(--page-surface);
+}
+#stage .pA .top .sbox.on {
+  width: 100%;
+  padding: 0 12px;
+  justify-content: flex-start;
+}
+.cmd-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.cpill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: var(--text2);
+  font-size: 13px;
+  cursor: pointer;
+}
+.cpill .num {
+  font-size: 11px;
+  color: var(--text3);
+}
+.cpill:hover {
+  background: var(--bg3);
+}
+.cpill.on {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.cpill.on .num {
+  color: inherit;
+  opacity: 0.85;
+}
+.cmdpop .cmdr {
+  max-height: min(55vh, 460px);
+}
+/* narrow band: the field takes the room it has; the drop-down goes under the band, edge to edge */
+@media (max-width: 900px) {
+  .top {
+    position: relative;
+  }
+  .top .sbox-w {
+    position: static;
+    flex: 0 1 320px;
+    margin-left: auto;
+  }
+  .top .sbox-w.on {
+    flex: 1 1 auto;
+  }
+  .top .sbox-w .sbox {
+    margin-left: 0;
+    flex: 1;
+  }
+  .cmdpop {
+    left: 8px;
+    right: 8px;
+    width: auto;
+    transform: none;
+  }
+}
+@media (max-width: 620px) {
+  .top .sbox-w:not(.on) {
+    flex: none;
+  }
+}
+
+/* ── One home for each thing ──────────────────────────────────────────
+   The bell opens the latest notifications; the platform badge tells the administrator where they
+   are; without the logo of the application the button of the sidebar takes the corner. */
+.dot.info {
+  background: var(--accent);
+}
+.bmenu {
+  width: min(390px, calc(100% - 32px));
+  gap: 6px;
+}
+.bm-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 2px 8px;
+  border-bottom: 1px solid var(--line);
+}
+.bm-h .ib {
+  width: 30px;
+  height: 30px;
+}
+.bm-l {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.bm-l button {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+.bm-l button:hover {
+  background: var(--bg3);
+}
+.bm-l .ri {
+  margin-top: 1px;
+}
+.bm-t {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.bm-t > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bm-l li:not(.unread) b {
+  font-weight: 500;
+}
+.bm-l .dot {
+  flex: none;
+  margin-top: 6px;
+}
+.um-help {
+  border-top: 1px solid var(--line);
+  padding-top: 6px;
+}
+.um-help .eyebrow {
+  padding: 2px 8px 4px;
+}
+.top .tsw.plat {
+  height: 28px;
+  gap: 6px;
+  padding: 0 11px 0 9px;
+  border-radius: 999px;
+  background: rgba(127, 127, 127, 0.18);
+  color: inherit;
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+}
+.top .tsw.plat .ts-name {
+  font-size: 12.5px;
+}
+.side-hd .tsw.plat .ic {
+  margin: 0;
+}
+@media (min-width: 901px) {
+  .band.nologo .top .stg {
+    display: none;
+  }
+}
+.band.nologo .side-h .stg {
+  flex: none;
+}
+
+/* Marks of the inherited settings: managed by the platform (lock), with a limit (shield), inherited
+   or customized (with «Customize» and «Restore»). The same everywhere. */
+.inh {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line2);
+  background: var(--bg);
+  color: var(--text2);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.inh.lock {
+  background: var(--bg3);
+  border-color: transparent;
+}
+.inh.lim {
+  border-color: transparent;
+  background: var(--warn-soft);
+  color: var(--text);
+}
+.inh.cust {
+  border-color: transparent;
+  background: var(--accent-soft);
+  color: var(--text);
+}
+.inh-w {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.inh-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 8px;
+  margin: 0 0 14px;
+}
+.eyebrow .inh {
+  margin-left: 6px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+.is-locked {
+  opacity: 0.55;
+  pointer-events: none;
+}
+.gchip.off {
+  color: var(--text3);
+  gap: 5px;
+}
+/* page anatomy: the breadcrumb before the name, the state as a badge */
+.rh-1 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.crumbs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+  font-size: 15px;
+  color: var(--text3);
+}
+.crumbs a {
+  color: var(--text2);
+  cursor: pointer;
+}
+.crumbs a:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+.moremenu {
+  right: 0;
+  left: auto;
+}
+/* the save bar: only when something changed */
+.savebar {
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 10px 12px 10px 16px;
+  background: var(--bg2);
+  border: 1px solid var(--line2);
+  border-radius: 10px;
+  box-shadow: var(--shadow);
+}
+.savebar > .ic {
+  color: var(--accent);
+}
+/* plugins: the kind next to the name */
+.pl-n {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.pl-n .pill,
+.kind-c .pill {
+  font-weight: 500;
+}
+.kind-c {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+}
+.qrows li {
+  gap: 12px;
+}
+.q-in {
+  width: 110px;
+  text-align: right;
+}
+.mg-bar.in-panel {
+  margin: 4px 0 0;
+}
+.mg-bar.in-panel .bulk {
+  margin: 0;
+}
+.idt .tabs {
+  margin: 0;
+}
+/* the preview of the top bar, in System › Identity and appearance */
+.barprev {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 46px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 12.5px;
+  overflow: hidden;
+}
+.barprev .bp-c,
+.barprev .bp-l,
+.barprev .bp-r {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.barprev .bp-c {
+  min-width: 26px;
+  padding-right: 12px;
+  border-right: 1px solid rgba(127, 127, 127, 0.35);
+}
+.barprev .bp-s {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 300px;
+  margin: 0 auto;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+}
+.barprev .bp-r {
+  margin-left: auto;
+  gap: 12px;
+}
+.barprev .grow + .bp-r {
+  margin-left: 0;
+}
+@media (max-width: 620px) {
+  .crumbs {
+    display: none;
+  }
+  .savebar .btn span {
+    display: inline;
+  }
+}
+.lp-l .tlogo,
+.lp-d .tlogo {
+  color: inherit;
+}
+/* without the search, the controls stay on the right */
+.top .sbox-none {
+  flex: 1;
+  min-width: 0;
 }

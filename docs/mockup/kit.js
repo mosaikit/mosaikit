@@ -96,26 +96,27 @@ function ic(name, size, cls) {
 
 /* The mark of Mosaikit: four tiles on the brand colour. */
 const MARK_SHAPES =
-  '<rect width="32" height="32" rx="8" fill="#3654c9"/><rect x="7" y="7" width="8" height="8" rx="2" fill="#ffffff"/><rect x="17" y="7" width="8" height="8" rx="2" fill="#ffffff" opacity=".55"/><rect x="7" y="17" width="8" height="8" rx="2" fill="#ffffff" opacity=".55"/><rect x="17" y="17" width="8" height="8" rx="2" fill="#ffffff"/>';
+  '<rect width="32" height="32" rx="8" fill="#5b5fc7"/><rect x="7" y="7" width="8" height="8" rx="2" fill="#ffffff"/><rect x="17" y="7" width="8" height="8" rx="2" fill="#ffffff" opacity=".55"/><rect x="7" y="17" width="8" height="8" rx="2" fill="#ffffff" opacity=".55"/><rect x="17" y="17" width="8" height="8" rx="2" fill="#ffffff"/>';
 function brandMark(s) {
   return `<span class="bmk" style="width:${s}px;height:${s}px" role="img" aria-label="Mosaikit"><svg viewBox="0 0 32 32" width="${s}" height="${s}" aria-hidden="true">${MARK_SHAPES}</svg></span>`;
 }
 
-/* The art behind the sign-in page: a field of tiles, deterministic on the seed. */
+/* The art of the sign-in page: tiles in the corner of the band, some in the accent colour, that
+   breathe slowly; deterministic on the seed. */
 function mosaicArt(seed) {
-  let s = seed * 9301 + 49297;
+  let s = seed;
   const r = () => {
     s = (s * 9301 + 49297) % 233280;
     return s / 233280;
   };
   let out = '';
-  for (let y = 0; y < 12; y++)
-    for (let x = 0; x < 20; x++) {
-      const v = r();
-      if (v > 0.35)
-        out += `<rect x="${x * 20 + 2}" y="${y * 20 + 2}" width="16" height="16" rx="3" fill="currentColor" opacity="${(v * 0.5).toFixed(2)}"/>`;
-    }
-  return `<svg viewBox="0 0 400 240" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${out}</svg>`;
+  for (let i = 0; i < 96; i++) {
+    const o = r(),
+      acc = r() > 0.82,
+      d = r() * 6;
+    out += `<span class="${acc ? 'acc' : ''}" style="opacity:${acc ? 0.55 : (0.04 + o * 0.14).toFixed(2)};animation-delay:${d.toFixed(2)}s"></span>`;
+  }
+  return out;
 }
 
 /* ── Small helpers ───────────────────────────────────────────────────── */
@@ -195,9 +196,9 @@ function av(ini, c, size) {
   return `<span class="av av${c || 1}" style="${size ? `--s:${size}px` : ''}" title="${ini}">${ini}</span>`;
 }
 
-/* ── Organization marks ──────────────────────────────────────────────
+/* ── Tenant marks ──────────────────────────────────────────────
    The crests are generic drawings (shield, colours, initial), never the crest of a real body:
-   in the product every organization uploads its own from Appearance. */
+   in the product every tenant uploads its own from Appearance. */
 function crest(tn, size) {
   const s = size || 30;
   if (tn.id === 'platform') return brandMark(s);
@@ -220,7 +221,7 @@ function textW(font, s, spacing) {
   }
   return _tw[k];
 }
-/* The logo of an organization: crest and name in one image. The name uses currentColor, so the same
+/* The logo of a tenant: crest and name in one image. The name uses currentColor, so the same
    logo reads on a light band and on a coloured one. */
 function tenantLogo(tn, h) {
   const H = h || 34;
@@ -299,10 +300,15 @@ function filterCol(S, key, groups, o) {
     `<fieldset class="facet"><legend>${gr[0]}</legend>${gr[1].map((i) => `<label><input type="${gr[2] === 'one' ? 'radio' : 'checkbox'}" name="${key}-${gr[0]}" ${i[2] ? 'checked' : ''}><span>${i[0]}</span>${i[1] != null ? `<span class="num muted">${i[1]}</span>` : ''}</label>`).join('')}</fieldset>`;
   return `<aside class="facets ${on}" aria-label="Filters">${top}<div class="facets-scroll"><div class="facets-h"><b>Filters</b><a data-act="nofilters">Reset</a></div>${fq}${(x.pre || []).concat(groups).map(g).join('')}</div></aside>`;
 }
-/* A detail page: a fixed 57px header with the back button, the name and the actions; the tabs
-   under it; then the body that scrolls. Without «back» it is the frame of settings pages. With
-   «side» a column of filters or sections sits beside the content. */
+/* A detail page: a fixed 57px header with the back button, the breadcrumb, the name with its state
+   badge and the actions (one primary, the others in «⋯»); the tabs under it; then the body that
+   scrolls. Without «back» it is the frame of settings pages. With «side» a column of filters or
+   sections sits beside the content. A crumb is [label, route, tab to open]. */
 function detailPage(S, o) {
+  const crumbs = o.crumbs || (o.back ? [[o.back[1].replace(/^Back to /, ''), o.back[0]]] : []);
+  const crumb = crumbs.length
+    ? `<nav class="crumbs" aria-label="Breadcrumb">${crumbs.map((c) => `<a data-go="${c[1]}" ${c[2] ? `data-settab="${c[2]}"` : ''}>${c[0]}</a><span aria-hidden="true">›</span>`).join('')}</nav>`
+    : '';
   const shut = o.side && S.filtersHidden;
   const tg =
     o.side && !o.sideNav
@@ -310,13 +316,43 @@ function detailPage(S, o) {
       : '';
   return `<div class="page wide rpage dpage ${o.back ? '' : 'noback'} ${shut ? 'fhidden' : ''}"><div class="rcontent">
     <div class="rc-h"><div class="rc-l">${o.back ? `<button type="button" class="ib rc-back" data-go="${o.back[0]}" aria-label="${o.back[1]}" title="${o.back[1]}">${ic('back', 18)}</button>` : ''}
-      <div class="rh-t"><h1>${o.title}</h1>${o.sub ? `<span class="lh-n">${o.sub}</span>` : ''}</div><span class="dp-badges">${o.badges || ''}</span></div>
+      <div class="rh-t"><div class="rh-1">${crumb}<h1>${o.title}</h1></div>${o.sub ? `<span class="lh-n">${o.sub}</span>` : ''}</div><span class="dp-badges">${o.badges || ''}</span></div>
       <div class="dp-a">${o.actions || ''}</div></div>
     ${o.tabs ? `<div class="dp-tabs">${tg}${o.tabs}</div>` : ''}
     <div class="rc-row ${o.side ? 'dside' : ''} ${o.sideNav ? 'dside-nav' : ''}">${o.side || ''}${o.side && S.filtersOpen ? '<div class="fscrim" data-act="filters"></div>' : ''}<div class="rc-b">${o.body}</div>${o.aside || ''}</div></div></div>`;
 }
-/* Multiple selection: every item has its box; the content header has the «all» box, the count and
-   the actions on the selection (disabled until something is chosen). */
+/* The «⋯» of a page: the secondary actions and the change of state, out of the way. Every item is
+   [icon, label, attributes, description]. */
+function moreMenu(S, key, items) {
+  const open = S.more === key;
+  return `<span class="st-w"><button type="button" class="btn" data-act="more" data-v="${key}" aria-haspopup="menu" aria-expanded="${open}" aria-label="More actions" title="More actions">${ic('more', 15)}</button>${
+    open
+      ? `<div class="sortmenu stmenu moremenu" role="menu" aria-label="More actions">${items.map((i) => `<button type="button" role="menuitem" ${i[2]}>${ic(i[0], 14)}<span><b>${i[1]}</b>${i[3] ? `<span class="muted small">${i[3]}</span>` : ''}</span></button>`).join('')}</div>`
+      : ''
+  }</span>`;
+}
+/* The three kinds of setting a level inherits from the one above: managed by the platform (read
+   only, with a lock), with a limit (only stricter than the platform), customizable (inherited until
+   customized, then «Restore»). The same marks on every page, so that one knows what can change. */
+function inhLock(who) {
+  return `<span class="inh lock" title="Changed only by ${who || 'the administrator of the platform'}">${ic('lock', 12)}Managed by ${who || 'the administrator'}</span>`;
+}
+function inhLimit(text) {
+  return `<span class="inh lim">${ic('shield', 12)}${text || 'Only stricter than the platform'}</span>`;
+}
+function inhCust(S, key, locked) {
+  if (locked) return inhLock();
+  const on = !!(S.cust && S.cust[key]);
+  return `<span class="inh-w"><span class="inh ${on ? 'cust' : ''}">${ic(on ? 'pencil' : 'refresh', 12)}${on ? 'Customized' : 'Inherited from the platform'}</span>${btn(on ? 'Restore' : 'Customize', { act: 'cust', v: key })}</span>`;
+}
+/* Changes are saved with a bar that shows only when something changed. The fields sit in a block
+   with data-dirty="key"; the first change brings the bar, Cancel puts the page back as it was. */
+function saveBar(S, key) {
+  if (!(S.dirty && S.dirty[key])) return '';
+  return `<div class="savebar" data-savebar="${key}" role="region" aria-label="Unsaved changes">${ic('pencil', 15)}<b>Unsaved changes</b><span class="grow"></span>${btn('Cancel', { act: 'dirtyno', v: key })}${btn('Save', { kind: 'pri', icon: 'save', act: 'dirtyok', v: key })}</div>`;
+}
+/* Multiple selection: every item has its box; the content header has the «all» box, the count and,
+   only when something is chosen, the actions on the selection. */
 function selOf(S, key) {
   return (S.sel && S.sel[key]) || [];
 }
@@ -331,7 +367,7 @@ function bulkBar(S, b) {
   const n = selOf(S, b.key).filter((id) => b.ids.map(String).includes(id)).length;
   const all = n && n === b.ids.length;
   return `<div class="bulk ${n ? 'has' : ''}"><label class="bulk-all" title="${all ? 'Clear the selection' : 'Select all'}"><input type="checkbox" class="selbox" data-selall="${b.key}" data-ids="${b.ids.join(',')}" ${all ? 'checked' : ''} ${n && !all ? 'data-ind="1"' : ''} aria-label="Select all"><span class="bulk-n num">${n ? `${n} selected` : ''}</span></label>
-    <div class="bulk-a" role="group" aria-label="Actions on the selection">${b.acts.map((a) => `<button type="button" class="btn ${a[2] ? 'danger' : ''}" data-act="bulk" data-v="${a[1]}" data-key="${b.key}" ${n ? '' : 'disabled'} aria-label="${a[1]}" title="${a[1]}">${ic(a[0], 15)}<span>${a[1]}</span></button>`).join('')}</div></div>`;
+    ${n ? `<div class="bulk-a" role="group" aria-label="Actions on the selection">${b.acts.map((a) => `<button type="button" class="btn ${a[2] ? 'danger' : ''}" data-act="bulk" data-v="${a[1]}" data-key="${b.key}" aria-label="${a[1]}" title="${a[1]}">${ic(a[0], 15)}<span>${a[1]}</span></button>`).join('')}</div>` : ''}</div>`;
 }
 /* A resource page: the filter column with name and total on the left; on the right the content,
    with its own fixed header (the button that hides the column, the selection, the actions). */

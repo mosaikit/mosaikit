@@ -82,6 +82,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/t/{t}/manage/resources", get(m_resources))
         .route("/api/t/{t}/manage/resources/reassign", post(m_reassign))
         .route("/api/t/{t}/manage/settings", get(m_settings).put(m_set_settings))
+        .route("/api/t/{t}/manage/theme", put(m_set_theme))
         .route("/api/t/{t}/manage/kpi", get(m_kpi))
         // amministratore di sistema
         .route("/api/admin/tenants", get(a_tenants).post(a_create_tenant))
@@ -100,6 +101,8 @@ pub fn router() -> Router<AppState> {
         .route("/api/admin/administrators/{id}/status", put(a_admin_status))
         .route("/api/admin/administrators/{id}/password", post(a_admin_password))
         .route("/api/admin/administrators/{id}/totp", delete(a_admin_totp))
+        .route("/api/admin/band", put(a_set_band))
+        .route("/api/admin/theme", put(a_set_theme))
         .route("/api/{*rest}", axum::routing::any(api_not_found))
         .merge(uploads)
         .merge(packages)
@@ -145,6 +148,8 @@ async fn session_body(s: &AppState, user: &mosaikit_kernel::SessionUser) -> ApiR
         "plugin_url": s.k.cfg.plugin_url,
         "public_origin": s.k.cfg.public_origin(),
         "dev": s.k.cfg.dev.enabled,
+        "band": tenancy::shell_band(&s.k).await?,
+        "theme": tenancy::platform_theme(&s.k).await?,
     }))
 }
 
@@ -293,6 +298,7 @@ async fn context(State(s): State<AppState>, Tenant(c): Tenant) -> ApiResult<Json
                     "role": c.tenant.role, "settings": c.tenant.settings },
         "plugins": plugins::active_views(&s.k),
         "prefs": tenancy::prefs(&s.k, &c).await?,
+        "theme": tenancy::tenant_theme(&s.k, c.tenant.tenant_id).await?,
     })))
 }
 
@@ -1062,6 +1068,40 @@ async fn a_catalog_install(
 ) -> ApiResult<Json<Value>> {
     plugins::registry::install_from_catalog(&s.k, &u, &id).await?;
     Ok(ok())
+}
+
+async fn a_set_band(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Json(b): Json<tenancy::ShellBand>,
+) -> ApiResult<Json<Value>> {
+    tenancy::set_shell_band(&s.k, &u, &b).await?;
+    Ok(Json(json!(b)))
+}
+
+#[derive(serde::Deserialize)]
+struct ThemeReq {
+    /// assente o null: il tenant torna al tema della piattaforma
+    preset: Option<String>,
+}
+
+async fn a_set_theme(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Json(r): Json<ThemeReq>,
+) -> ApiResult<Json<Value>> {
+    let preset = r.preset.ok_or_else(|| Error::bad("tema mancante"))?;
+    tenancy::set_platform_theme(&s.k, &u, &preset).await?;
+    Ok(ok())
+}
+
+async fn m_set_theme(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Json(r): Json<ThemeReq>,
+) -> ApiResult<Json<Value>> {
+    tenancy::set_tenant_theme(&s.k, &c, r.preset.as_deref()).await?;
+    Ok(Json(json!(tenancy::tenant_theme(&s.k, c.tenant.tenant_id).await?)))
 }
 
 async fn a_kpi(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Json<Value>> {

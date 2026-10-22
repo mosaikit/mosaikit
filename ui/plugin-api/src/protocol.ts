@@ -86,12 +86,28 @@ export interface SiteInfo {
   entry: string
 }
 
+/** Lingua, tema e modo dell'host: arrivano con l'handshake e, a ogni cambio, con l'evento `context`. */
+export interface UiContext {
+  /** lingua dell'interfaccia (`it`, `en`…) */
+  lang: string
+  /** preset del tema dell'host (`mosaikit`, `italia`…) */
+  preset: string
+  /** modo effettivo */
+  mode: 'light' | 'dark'
+  /** la scelta della persona: con `auto` il modo segue il sistema */
+  preference: 'light' | 'dark' | 'auto'
+  /** variabili CSS del tema */
+  theme: Record<string, string>
+}
+
 export interface Hello {
   public: boolean
   user?: { id: string; username: string; name: string }
   tenant?: { slug: string; name: string; role: 'manager' | 'member' }
   plugin?: { id: string; version: string }
   theme?: Record<string, string>
+  /** host recenti: lingua, tema e modo (gli host precedenti mandano solo `theme`) */
+  context?: UiContext
   /** solo nei link pubblici: la risorsa condivisa */
   resource?: PublicResource
 }

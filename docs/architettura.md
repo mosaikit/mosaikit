@@ -464,6 +464,22 @@ API del bridge: `crud(name).list/get/create/update/delete`, `call`,
 `files.*` (se `files`), `content.upload/ticket` (se `content`),
 `resource.meta`, `share`, `toast`, `theme`.
 
+**Lingua, tema e modo.** L'handshake porta `context`: `lang` (`it`, `en`…),
+`preset` (tema dell'host), `mode` (`light` o `dark`, quello in uso),
+`preference` (`light`, `dark` o `auto`) e `theme` (variabili CSS). A ogni
+cambio l'host manda l'evento `context` con i valori nuovi (e, per i plugin
+scritti prima, l'evento `theme` con le sole variabili). `connect()` li applica
+a `<html>` (`lang`, `data-mode`, `data-preset`, `color-scheme`, variabili);
+per reagire, ad esempio cambiando le etichette:
+
+```ts
+msk.context?.lang                          // all'avvio
+msk.onContext((c) => render(c.lang))       // a ogni cambio
+```
+
+Il plugin li riceve anche quando l'Administrator nasconde i pulsanti di lingua
+o tonalità dalla barra in alto.
+
 ### 8.5 Pacchetto `.mskp` v3 e firma
 
 Uno zip con `plugin.toml`, `logic.wasm` (facoltativo), `ui/**`, `migrations/**`,

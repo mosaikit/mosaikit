@@ -30,6 +30,27 @@ export interface Session {
   plugin_url?: string
   public_origin: string
   dev: boolean
+  /** barra in alto della shell, decisa dall'Administrator (server recenti) */
+  band?: ShellBand
+  /** tema della piattaforma, scelto dall'Administrator (server recenti) */
+  theme?: string
+}
+
+/** Il tema di un tenant: quello della piattaforma e, se c'e', quello scelto dal Tenant Manager. */
+export interface ThemeChoice {
+  platform: string
+  tenant: string | null
+  /** quello in uso */
+  preset: string
+}
+
+/** Elementi della barra in alto: spenti, non compaiono per nessuno. */
+export interface ShellBand {
+  logo: boolean
+  search: boolean
+  lang: boolean
+  help: boolean
+  mode: boolean
 }
 
 export interface TenantSettings {
@@ -54,6 +75,8 @@ export interface TenantContext {
   tenant: { id: string; slug: string; name: string; role: Role; settings: TenantSettings }
   plugins: PluginView[]
   prefs: { hidden?: string[] }
+  /** server recenti */
+  theme?: ThemeChoice
 }
 
 export interface Principal {

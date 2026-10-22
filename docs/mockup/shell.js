@@ -6,7 +6,7 @@
    review bar with its index and notes, and the events. Loaded last: it boots the page. */
 
 const MOCKUP = 'mosaikit';
-const ALL = ['user', 'collab', 'manager', 'admin'];
+const ALL = ['user', 'manager', 'admin'];
 
 const S = {
   role: 'user',
@@ -21,6 +21,7 @@ const S = {
   mode: 'auto',
   preset: 'mosaikit',
   themeMenu: false,
+  langMenu: false,
   lang: 'en',
   hc: false,
   app: {
@@ -33,12 +34,16 @@ const S = {
       lang: 'en',
       name: 'Mosaikit',
       showName: true,
-      welcome: 'The workspace of your organization',
+      welcome: 'The workspace of your tenant',
       privacy: 'https://apps.example.org/privacy',
       legal: 'https://apps.example.org/legal',
       from: 'Mosaikit <noreply@apps.example.org>',
       footer: 'Automatic message, do not reply.',
       themes: ['mosaikit', 'civic', 'slate', 'forest', 'terracotta', 'aurora', 'contrast'],
+      // what the top band shows, for everybody: decided by the administrator only
+      bar: { logo: true, search: true, lang: true, help: true, mode: true },
+      // which of its defaults the tenants may customize
+      cust: { theme: true, mode: true, side: true, fmt: true },
     },
     tnt: {
       theme: 'mosaikit',
@@ -74,111 +79,115 @@ const S = {
     me: {},
   },
 };
-const LANDING = { user: 'home', collab: 'home', manager: 'space', admin: 'platform' };
+const LANDING = { user: 'home', manager: 'space', admin: 'platform' };
 
 /* ── Notes: what each screen is for ──────────────────────────────────── */
 
 const DECISION = {
-  idea: 'The frame of every Mosaikit installation. A fixed sidebar whose groups appear by role: <b>Work</b> for everybody, <b>Organization</b> for the manager, <b>Platform</b> for the administrator. On top, the switcher of organizations, search and commands, appearance, help, notifications and the person menu. The apps installed by extensions add their entries to Work and their tiles to the Overview; opened, they take the whole content under the same band.',
+  idea: 'The frame of every Mosaikit installation, with one home for each thing. In the sidebar the work (the apps) and the management of the tenant or of the platform; in the menu of the person what is personal (Account, Notifications, Trash). On top, the switcher of tenants, search, language, mode, help, the bell and the person: the administrator decides which of them the band shows. Plugins are of three kinds (App, Service, Extension); the apps add their entries to the sidebar and their tiles to Home, and opened they take the whole content under the same band.',
   roles: {
-    user: 'The Overview, then the apps installed in the organization (greyed here: their pages belong to the apps). Lands on the Overview, a launcher of the apps.',
-    collab:
-      'A User with the View and edit profile: sees only what is shared with them and creates nothing, because the profile does not give the permission to.',
+    user: 'Home, then the apps installed in the tenant (greyed here: their pages belong to the apps). No settings of the tenant: what is personal is in Account. Lands on Home, a launcher of the apps.',
     manager:
-      'First the five pages of the organization, then the apps (without Overview: theirs is the one of the organization). Lands on the overview of the organization.',
+      'The overview of the tenant, then the apps, then the management of the tenant: Manage, Plugins, Shares, Usage, Log; at the bottom the settings of the tenant. Lands on the overview of the tenant.',
     admin:
-      'The platform overview and six pages of the platform. No Work list: an administrator configures the platform and does not see the content of organizations.',
+      'The overview of the platform, Tenants, People, Plugins, Monitoring and Log; at the bottom System. No apps: an administrator configures the platform and does not see the content of tenants. The badge «Platform» in the band says so.',
   },
   how: 'To review: pick a role at the top, open the <b>Index</b> and go through every screen and dialog. «Mark reviewed» keeps the count per role in this browser. The chip with the screen id is what a requirement cites in its <span class="mono">ui</span> field.',
 };
 const NOTES = {
   login:
-    'Sign-in in three steps: the email says who you are and your home organization; the home organization says how you sign in (single sign-on, password, or both, with a second factor if required); then, with several organizations, where to work. The address you come from changes only the branding. Mockup: no credential is checked; the password «wrong» simulates an error.',
-  home: 'The Overview is a launcher: one tile for every app installed in the organization, then what to pick up again, what is due and what concerns you. Apps fill these panels; the platform only composes them. Notes, Activities, Estimates and Tasks are sample apps.',
+    'Two doors. People choose their tenant from a list (hidden when there is only one tenant, or when the address names it) and sign in the way the tenant decided: username and password kept by Mosaikit, or its identity provider (OIDC), never both. Guests sign in from their own tenant and switch from the top. Administrators have their own access, always local, with the second factor (TOTP): the first time they register an authenticator app and get ten recovery codes.',
+  home: 'Home is a launcher: one tile for every app of the tenant, then what to pick up again, what is due, what concerns you and what you shared. Apps fill these panels; the platform only composes them. Notes, Activities, Estimates and Tasks are sample apps.',
   inbox:
-    'One place for mentions, access, due dates and alerts of every app, with the same filters as every list.',
-  profile:
-    'Who you are, which organizations you belong to and how you sign in, plus personal access tokens for scripts and desktop tools.',
+    'One place for mentions, access, due dates and alerts of every app, with the same filters as every list. The bell opens the latest; «What I receive» is in Account › Notifications.',
+  account:
+    'What is personal, in one page: profile, sign-in and security (with the change of one’s own password, when the account is local), notifications, appearance and language, the tenants one belongs to, one’s own usage of the quotas of the tenant, and one’s keys.',
   trash:
     'What is deleted stays 30 days and goes back to its place with one click. Apps put their items here; the platform keeps the time.',
   space:
-    'The overview of the organization puts decisions on top (access requests, invitations, integrations down, public shares), not counts.',
+    'The overview of the tenant puts decisions on top (access requests, invitations, services down, public shares), not counts. Each one opens where it is decided.',
   members:
-    'People, groups, invitations and access requests of the organization. Every account is in Keycloak, local ones too; groups can come from the identity provider of the organization.',
+    'Manage: people, groups, permission profiles, and what is pending (invitations and access requests), one section at a time from the list on the left. Profiles are where the permissions of a User start; groups can come from the identity provider of the tenant.',
   person:
-    'A person in one organization: profile, sign-in, effective permissions with where each comes from, and activity. The administrator also sees every organization of the person.',
+    'A person in one tenant: profile, sign-in, effective permissions with where each comes from, and activity. The state is a badge next to the name, changed from «⋯»; the save bar shows only after a change. The administrator also sees every tenant of the person.',
   group:
-    'A group belongs to the organization: who is in it, what is shared with it, which permissions it adds in the modules. Extensions can add tabs of their own.',
+    'A group belongs to the tenant: who is in it, what is shared with it, which permissions it adds in the plugins (read only: they are given in Plugins › Permissions).',
   splugins:
-    'The manager turns modules on and off among the ones the administrator enabled, and from each one opens who gets which permission. The manager does not install anything.',
+    'The Tenant Manager turns plugins on and off among the ones the administrator made available, and from each one opens Permissions, the only place where permissions are given. Apps, services and extensions, with what each extension extends.',
   module:
-    'The permissions a module declares in its manifest, by profile, group and person. Profiles give the start; groups and people add.',
+    'The permissions a plugin declares in its manifest, by profile, group and person. Profiles give the start; groups and people add. The only place where they are given.',
+  shares:
+    'Every share of the tenant: public items and links first, because they leave the tenant, then groups, the whole tenant and people. The owner decides; the Tenant Manager can take a share back.',
   usage:
-    'The quotas of the plan, how they are used, who uses the most and whom to warn near a limit. The plan itself is chosen by the administrator.',
+    'The quotas of the tenant, read only (the administrator sets them), how they are used, who uses the most and whom to warn near a limit.',
   activity:
-    'The activity log of the organization: who did what, on which item, with what outcome. A click on a name or an item becomes a filter.',
+    'The log of the tenant: who did what, on which item, with what outcome. A click on a name or an item becomes a filter.',
   platform:
     'The health of the services of the platform at a glance, then what needs doing: updates, trials ending, failed backups.',
-  tenants: 'Every organization with plan, people, storage, sign-in and state.',
+  tenants: 'Every tenant with people, storage, sign-in and state.',
   tenant:
-    'One organization: details, how people sign in (local accounts, single sign-on or both), the modules on, the plan with its quotas, and the lifecycle down to deletion.',
+    'One tenant: details, the logo (set by the Tenant Manager, shown here), its quotas (of the platform or its own), how people sign in (local accounts or an external identity provider with OIDC, never both; roles from one source only), the plugins available, and archive or delete at the bottom. The state is a badge, changed from «⋯».',
   gusers:
-    'Every person of the installation: a person can belong to several organizations, with one home organization that decides how they sign in.',
+    'Every person of the installation: a person can belong to several tenants, with one home tenant that decides how they sign in. Administrators are separate accounts of the platform.',
   marketplace:
-    'System modules update; extensions install from the catalog, are enabled per organization by the administrator, and given to people by the manager.',
+    'Plugins of three kinds: apps, services and extensions (which extend another plugin). Built-in ones update; the others install from the catalog or from a signed package. The administrator makes them available to tenants; the Tenant Manager turns them on and gives the permissions.',
   mpmod:
-    'One module: what it asks of the platform, the permissions it brings, where it is on, and its configuration.',
+    'One plugin: what it asks of the platform, the permissions it brings, its extensions, to which tenants it is available, and its configuration.',
   monitoring:
-    'Is something wrong (status), why (performance, errors), for whom (organizations), how far one can grow (capacity) and whom to warn (alerts).',
-  audit: 'The audit log of the whole platform, with the organization of every event.',
+    'Is something wrong (status), why (performance, errors), for whom (tenants), how far one can grow (capacity) and whom to warn (alerts).',
+  audit: 'The log of the whole platform: the same page as the one of the tenants, with the tenant of every event.',
   system:
-    'The global parameters that change from the interface, one section at a time, plus the appearance of the platform. Extensions can add sections of their own.',
+    'The global parameters that change from the interface, one section at a time: operation, security, keys, quotas of the tenants and capacity, then identity and appearance, with the top bar. For each default, whether tenants may customize it.',
   config:
-    'The same page for the manager (settings and appearance of the organization) and for a person (own keys and appearance). Extensions can add sections of their own.',
+    'The settings of the tenant, for the Tenant Manager. Every setting carries its mark: with a limit (only stricter than the platform), inherited or customized (with Restore), managed by the administrator (gathered in a section to read).',
   themeedit:
     'One picks the main colour, the style of the band and the greys; the generator computes light and dark, and the WCAG check says whether it reads before saving.',
 };
 
 /* ── Navigation ───────────────────────────────────────────────────────
    [group, id, label, icon, roles, kind]. Entries of kind «app» belong to the sample apps: greyed,
-   because their pages come from their extensions, not from this mockup. */
+   because their pages come from their plugins, not from this mockup. Every thing has one home:
+   work and the management of the tenant or of the platform in the sidebar, what is personal in the
+   menu of the person (Account, Notifications, Trash). */
 const ROUTES = [
-  ['work', 'home', 'Overview', 'overview', ['user', 'collab']],
-  ['work', 'app:notes', 'Notes', 'note', ['user', 'collab', 'manager'], 'app'],
-  ['work', 'app:activities', 'Activities', 'calendar', ['user', 'collab', 'manager'], 'app'],
-  ['work', 'app:estimates', 'Estimates', 'receipt', ['user', 'collab', 'manager'], 'app'],
-  ['work', 'app:tasks', 'Tasks', 'checklist', ['user', 'collab', 'manager'], 'app'],
+  ['work', 'home', 'Home', 'home', ['user']],
+  ['work', 'app:notes', 'Notes', 'note', ['user', 'manager'], 'app'],
+  ['work', 'app:activities', 'Activities', 'calendar', ['user', 'manager'], 'app'],
+  ['work', 'app:estimates', 'Estimates', 'receipt', ['user', 'manager'], 'app'],
+  ['work', 'app:tasks', 'Tasks', 'checklist', ['user', 'manager'], 'app'],
   ['org', 'space', 'Overview', 'overview', ['manager']],
-  ['org', 'members', 'People', 'users', ['manager']],
-  ['org', 'splugins', 'Modules', 'puzzle', ['manager']],
+  ['org', 'members', 'Manage', 'users', ['manager']],
+  ['org', 'splugins', 'Plugins', 'puzzle', ['manager']],
+  ['org', 'shares', 'Shares', 'share', ['manager']],
   ['org', 'usage', 'Usage', 'pie', ['manager']],
-  ['org', 'activity', 'Activity log', 'history', ['manager']],
+  ['org', 'activity', 'Log', 'history', ['manager']],
   ['platform', 'platform', 'Overview', 'overview', ['admin']],
-  ['platform', 'tenants', 'Organizations', 'building', ['admin']],
-  ['platform', 'gusers', 'All people', 'users', ['admin']],
-  ['platform', 'marketplace', 'Marketplace', 'bag', ['admin']],
+  ['platform', 'tenants', 'Tenants', 'building', ['admin']],
+  ['platform', 'gusers', 'People', 'users', ['admin']],
+  ['platform', 'marketplace', 'Plugins', 'puzzle', ['admin']],
   ['platform', 'monitoring', 'Monitoring', 'activity', ['admin']],
-  ['platform', 'audit', 'Audit log', 'history', ['admin']],
+  ['platform', 'audit', 'Log', 'history', ['admin']],
   ['bottom', 'system', 'System', 'cog', ['admin']],
-  ['bottom', 'config', 'Settings', 'cog', ['manager', 'user', 'collab']],
+  ['bottom', 'config', 'Tenant settings', 'cog', ['manager']],
 ];
 /* Screens reached from others: [label, the sidebar entry that stays lit, roles]. */
 const HIDDEN = {
   login: ['Sign-in', null, ALL],
+  account: ['Account', null, ALL],
   inbox: ['Notifications', null, ALL],
-  profile: ['Profile', null, ALL],
   trash: ['Trash', null, ['user', 'manager']],
   person: ['Person', 'members', ['manager', 'admin']],
   group: ['Group', 'members', ['manager']],
-  module: ['Access and permissions of a module', 'splugins', ['manager']],
-  tenant: ['Organization', 'tenants', ['admin']],
-  mpmod: ['Module of the marketplace', 'marketplace', ['admin']],
+  module: ['Permissions of a plugin', 'splugins', ['manager']],
+  tenant: ['Tenant', 'tenants', ['admin']],
+  mpmod: ['Plugin', 'marketplace', ['admin']],
   themeedit: ['Theme editor', 'config', ['manager', 'admin']],
 };
-const GROUP_LABEL = { work: 'Work', org: 'Organization', platform: 'Platform', bottom: 'Settings' };
+const GROUP_LABEL = { work: 'Apps', org: 'Tenant management', platform: 'Platform', bottom: 'Settings' };
+/* The manager works in the apps every day: the apps come first, then the management of the tenant. */
 function navFor(role) {
   const order =
-    role === 'admin' ? ['platform', 'org', 'work', 'bottom'] : ['org', 'work', 'bottom'];
+    role === 'admin' ? ['platform', 'bottom'] : role === 'manager' ? ['work', 'org', 'bottom'] : ['work'];
   const first = ROUTES.find((r) => r[1] === LANDING[role]);
   const groups = order
     .map((g) => [g, ROUTES.filter((r) => r[0] === g && r[4].includes(role) && r !== first)])
@@ -199,6 +208,10 @@ function navItem(r) {
   const on = activeTop(S.route) === r[1];
   const tip = r[1] === 'marketplace' ? `${r[2]} · 2 updates` : r[2];
   return `<button type="button" class="nv ${on ? 'on' : ''}" data-go="${r[1]}" ${on ? 'aria-current="page"' : ''} data-stip="${tip}" aria-label="${tip}">${ic(r[3], 17)}<span>${r[2]}</span>${r[1] === 'marketplace' ? '<em>2</em>' : ''}</button>`;
+}
+/* The top band, as the administrator sets it in System › Identity and appearance › Top bar. */
+function bar() {
+  return S.app.sys.bar;
 }
 
 /* ── Themes ───────────────────────────────────────────────────────────
@@ -372,7 +385,7 @@ function makePreset(o) {
   return {
     id: o.id || 'custom',
     name: o.name || 'Custom theme',
-    note: o.scope === 'sys' ? 'of the platform' : o.scope === 'tnt' ? 'of the organization' : '',
+    note: o.scope === 'sys' ? 'of the platform' : o.scope === 'tnt' ? 'of the tenant' : '',
     custom: true,
     light: L,
     dark: D,
@@ -401,17 +414,24 @@ function themeChecks(p, logo) {
   });
   return out;
 }
+/* The default theme takes the colours of Microsoft Teams: accent #5b5fc7, band #444791, light search field. */
 const PRESETS = [
-  Object.assign(
-    makePreset({
-      id: 'mosaikit',
-      name: 'Mosaikit',
-      accent: '#3654c9',
-      bar: 'color',
-      grays: 'neutral',
-    }),
-    { note: 'default', custom: false },
-  ),
+  (() => {
+    const p = Object.assign(
+      makePreset({
+        id: 'mosaikit',
+        name: 'Mosaikit',
+        accent: '#5b5fc7',
+        bar: 'color',
+        grays: 'neutral',
+        adv: { barL: '#444791' },
+      }),
+      { note: 'default', custom: false },
+    );
+    p.light.navInput = ['#e8ebfa', '#616161'];
+    p.dark.navInput = ['#292929', '#adadad'];
+    return p;
+  })(),
   {
     id: 'civic',
     name: 'Civic',
@@ -775,6 +795,7 @@ function presetCss(id) {
 #stage .top .sbox kbd { color: ${v.navInput[1]}; border-color: ${v.navInput[1]}55; }`
       : ''
   }
+#stage .lg-hero { --band-bg: ${n[0]}; --band-fg: ${n[1]}; --band-muted: ${n[2]}; }
 #stage .side-h { background: ${n[0]}; border-bottom-color: ${n[6]}; --text: ${n[1]}; --text2: ${n[2]}; --text3: ${n[3]}; --bg3: ${n[5]}; --accent: ${n[1]}; --on-accent: ${n[0]}; }${
     v.navGrad
       ? `
@@ -801,26 +822,47 @@ function applyMode() {
 function menuRight() {
   return S.notes && innerWidth > 1100 ? 356 : 16;
 }
-/* Personal preferences: mode, contrast, language. The theme applies to everybody and is chosen in Appearance. */
+/* The palette holds only personal preferences: mode and contrast. The theme of the tenant or of the
+   platform is chosen in Settings or System › Identity and appearance, never from here. */
 function themeMenuHtml() {
   if (!S.themeMenu) return '';
-  const link =
-    S.role === 'admin'
-      ? 'Theme and appearance of the platform'
-      : S.role === 'manager'
-        ? 'Theme and appearance of the organization'
-        : null;
   return `<div class="tmenu" role="dialog" aria-label="Appearance" style="right:${menuRight()}px">
     <div class="eyebrow">Mode</div>
     <div class="tm-modes" role="radiogroup" aria-label="Mode">${MODES.map((m) => `<button type="button" role="radio" aria-checked="${S.mode === m[0]}" data-mode="${m[0]}">${ic(m[2], 16)}<span>${m[1]}</span></button>`).join('')}</div>
     <div class="tm-row"><div><b>High contrast</b><span class="muted small">Sharper colours, for whoever reads with effort</span></div><button type="button" class="tgl" role="switch" data-act="hc" aria-label="High contrast" aria-checked="${!!S.hc}"><i></i></button></div>
-    <label class="lbl">Language<select data-melang>${LANGS.filter((l) =>
-      (S.role === 'admin' ? S.app.sys.langs : S.app.tnt.langs).includes(l[0]),
-    )
-      .map((l) => `<option value="${l[0]}" ${S.lang === l[0] ? 'selected' : ''}>${l[1]}</option>`)
-      .join('')}</select></label>
     <p class="muted small">They apply only to you, at once.</p>
-    ${link ? `<button type="button" class="btn tm-link" data-act="themetab">${ic('eye', 15)}<span>${link}</span></button>` : `<button type="button" class="btn tm-link" data-act="aspgo">${ic('eye', 15)}<span>Sidebar and other preferences</span></button>`}</div>`;
+    <button type="button" class="btn tm-link" data-act="accgo" data-v="appearance">${ic('eye', 15)}<span>Language, sidebar and other preferences</span></button></div>`;
+}
+/* The language of the interface, for oneself: among the ones of the platform (administrator) or of the
+   tenant. One click and it applies at once. */
+function myLangs() {
+  return LANGS.filter((l) => (S.role === 'admin' ? S.app.sys.langs : S.app.tnt.langs).includes(l[0]));
+}
+function langMenuHtml() {
+  if (!S.langMenu) return '';
+  return `<div class="tmenu hmenu lmenu" role="listbox" aria-label="Language" style="right:${menuRight()}px">
+    <div class="eyebrow">Language</div>
+    <div class="hm-l">${myLangs()
+      .map(
+        (l) =>
+          `<button type="button" class="hm-i" role="option" aria-selected="${S.lang === l[0]}" data-act="setlang" data-v="${l[0]}"><span class="mono lm-c">${l[0].toUpperCase()}</span><span>${l[1]}</span>${S.lang === l[0] ? ic('check', 15) : ''}</button>`,
+      )
+      .join('')}</div>
+    <p class="muted small">${S.role === 'admin' ? 'Among the languages of the platform.' : 'Among the languages your tenant chose.'} It applies only to you, at once.</p></div>`;
+}
+/* What is personal, and nothing else: Account, Notifications, Trash. Settings and System are in the
+   sidebar. When the administrator hides the help from the band, its entries come here. */
+const HELP_ITEMS = [
+  ['play', 'Guided tour of this page'],
+  ['help', 'Guide of Mosaikit'],
+  ['star', 'What is new in version 1.0'],
+  ['key', 'Keyboard shortcuts'],
+];
+function helpItems() {
+  return HELP_ITEMS.map(
+    (x) =>
+      `<button type="button" class="hm-i" role="menuitem" data-act="toast" data-v="In the product: ${x[1].toLowerCase()}.">${ic(x[0], 16)}<span>${x[1]}</span></button>`,
+  ).join('');
 }
 function userMenuHtml() {
   if (!S.userMenu) return '';
@@ -831,44 +873,54 @@ function userMenuHtml() {
     `<button type="button" class="hm-i" role="menuitem" ${attr}>${ic(icon, 16)}<span>${label}</span>${sub ? `<em class="muted small">${sub}</em>` : ''}</button>`;
   return `<div class="tmenu hmenu umenu" role="menu" aria-label="Menu of ${R.who}" style="right:${menuRight()}px">
     <div class="um-h">${av(R.ini, adm ? 5 : S.role === 'manager' ? 2 : 3, 40)}<div><b>${R.who}</b><span class="muted small">${R.mail}</span><span class="small">${R.label}${tn ? ` · ${tn.name}` : ' · Platform'}</span></div></div>
-    <div class="hm-l">${it('user', 'Profile', 'data-go="profile"')}${adm ? it('cog', 'System', 'data-go="system"') : it('cog', 'Settings', 'data-go="config"')}${it('bell', 'Notifications', 'data-go="inbox"', inboxUnread() + ' new')}${['user', 'manager'].includes(S.role) ? it('trash', 'Trash', 'data-go="trash"') : ''}</div>
+    <div class="hm-l">${it('user', 'Account', 'data-go="account"')}${it('bell', 'Notifications', 'data-go="inbox"', inboxUnread() + ' new')}${adm ? '' : it('trash', 'Trash', 'data-go="trash"')}</div>
+    ${bar().help ? '' : `<div class="hm-l um-help"><div class="eyebrow">Help</div>${helpItems()}</div>`}
     <div class="hm-l um-out">${it('back', 'Sign out', 'data-act="logout"')}</div></div>`;
 }
 function helpMenuHtml() {
   if (!S.helpMenu) return '';
   return `<div class="tmenu hmenu" role="dialog" aria-label="Help" style="right:${menuRight()}px">
-    <div class="hm-l">${[
-      ['play', 'Guided tour of this page'],
-      ['help', 'Guide of Mosaikit'],
-      ['star', 'What is new in version 1.0'],
-      ['key', 'Keyboard shortcuts'],
-    ]
-      .map(
-        (x) =>
-          `<button type="button" class="hm-i" data-act="toast" data-v="In the product: ${x[1].toLowerCase()}.">${ic(x[0], 16)}<span>${x[1]}</span></button>`,
-      )
-      .join('')}</div>
+    <div class="hm-l">${helpItems()}</div>
     <div class="hm-v">${brandMark(18)}<div><b>Mosaikit 1.0.0</b><span class="muted small">Updated on 2 Oct 2026</span></div></div>
-    ${S.role === 'admin' ? `<button type="button" class="btn tm-link" data-go="marketplace">${ic('bag', 15)}<span>2 updates of modules</span></button>` : ''}</div>`;
+    ${S.role === 'admin' ? `<button type="button" class="btn tm-link" data-go="marketplace">${ic('puzzle', 15)}<span>2 updates of plugins</span></button>` : ''}</div>`;
+}
+/* The bell opens the latest notifications; the page Notifications has them all, with filters. */
+function bellMenuHtml() {
+  if (!S.bellMenu) return '';
+  const items = inboxItems().slice(0, 5),
+    n = inboxUnread();
+  return `<div class="tmenu hmenu bmenu" role="dialog" aria-label="Notifications" style="right:${menuRight()}px">
+    <div class="bm-h"><b>Notifications</b><span class="muted small">${n ? n + ' new' : 'nothing new'}</span><span class="grow"></span>${n ? `<button type="button" class="lnk small" data-act="readall">Mark all as read</button>` : ''}<button type="button" class="ib" data-act="accgo" data-v="notifications" aria-label="What I receive" title="What I receive">${ic('cog', 16)}</button></div>
+    <ul class="bm-l">${items.map((x) => `<li class="${x[4] ? 'unread' : ''}"><button type="button" data-go="inbox"><span class="ri">${ic(x[0], 15)}</span><span class="bm-t"><b>${x[1]}</b><span class="muted small">${x[2]}</span></span><span class="muted small num">${x[3]}</span>${x[4] ? '<i class="dot info" aria-label="new"></i>' : ''}</button></li>`).join('')}</ul>
+    <button type="button" class="btn tm-link" data-go="inbox">${ic('bell', 15)}<span>See all the notifications</span></button></div>`;
 }
 function curTenant() {
   if (S.role === 'admin') return PLATFORM;
   return TENANT_SEL.find((x) => x.id === S.tenant) || TENANT_SEL[0];
 }
+/* Right side of the band: language, mode and help when the administrator shows them, then the bell
+   and the person, always. */
 function topRight() {
   const R = ROLES[S.role],
-    n = inboxUnread();
-  return `<div class="tr"><button type="button" class="ib ${S.themeMenu ? 'on' : ''}" data-act="theme" aria-haspopup="dialog" aria-expanded="${S.themeMenu}" aria-label="Appearance" data-tip="${S.themeMenu ? '' : 'Appearance: mode, contrast, language'}">${ic('contrast', 18)}</button><button type="button" class="ib ${S.helpMenu ? 'on' : ''}" data-act="helpmenu" aria-haspopup="dialog" aria-expanded="${!!S.helpMenu}" aria-label="Help" data-tip="${S.helpMenu ? '' : 'Help and version'}">${ic('help', 18)}</button><button type="button" class="ib" data-go="inbox" aria-label="Notifications, ${n} new" data-tip="Notifications · ${n} new">${ic('bell', 18)}${n ? `<em>${n}</em>` : ''}</button><button type="button" class="me ${S.userMenu ? 'on' : ''}" data-act="usermenu" aria-haspopup="menu" aria-expanded="${!!S.userMenu}" aria-label="Menu of ${R.who}" data-tip="${S.userMenu ? '' : 'Profile and settings'}" data-tip-end><span class="me-t"><b>${R.who}</b><span>${R.label}</span></span>${av(R.ini, S.role === 'admin' ? 5 : S.role === 'manager' ? 2 : 3, 30)}</button></div>`;
+    n = inboxUnread(),
+    B = bar();
+  const lang = (LANGS.find((l) => l[0] === S.lang) || LANGS[0])[1];
+  return `<div class="tr">${B.lang && myLangs().length > 1 ? `<button type="button" class="ib lang ${S.langMenu ? 'on' : ''}" data-act="langmenu" aria-haspopup="listbox" aria-expanded="${!!S.langMenu}" aria-label="Language: ${lang}" data-tip="${S.langMenu ? '' : `Language · ${lang}`}">${S.lang.toUpperCase()}</button>` : ''}${B.mode ? `<button type="button" class="ib ${S.themeMenu ? 'on' : ''}" data-act="theme" aria-haspopup="dialog" aria-expanded="${S.themeMenu}" aria-label="Appearance" data-tip="${S.themeMenu ? '' : 'Appearance: mode and contrast'}">${ic('contrast', 18)}</button>` : ''}${B.help ? `<button type="button" class="ib ${S.helpMenu ? 'on' : ''}" data-act="helpmenu" aria-haspopup="dialog" aria-expanded="${!!S.helpMenu}" aria-label="Help" data-tip="${S.helpMenu ? '' : 'Help and version'}">${ic('help', 18)}</button>` : ''}<button type="button" class="ib ${S.bellMenu ? 'on' : ''}" data-act="bellmenu" aria-haspopup="dialog" aria-expanded="${!!S.bellMenu}" aria-label="Notifications, ${n} new" data-tip="${S.bellMenu ? '' : `Notifications · ${n} new`}">${ic('bell', 18)}${n ? `<em>${n}</em>` : ''}</button><button type="button" class="me ${S.userMenu ? 'on' : ''}" data-act="usermenu" aria-haspopup="menu" aria-expanded="${!!S.userMenu}" aria-label="Menu of ${R.who}" data-tip="${S.userMenu ? '' : 'Account, notifications, trash'}" data-tip-end><span class="me-t"><b>${R.who}</b><span>${R.label}</span></span>${av(R.ini, S.role === 'admin' ? 5 : S.role === 'manager' ? 2 : 3, 30)}</button></div>`;
 }
-/* The organization switcher heads the band: it shows the logo only. The administrator works on the
-   platform, not inside an organization: no switcher, only the logo. */
+/* The logo of the application, in the corner above the sidebar. */
+function appLogo(markOnly) {
+  return `<span class="app-logo" role="img" aria-label="${S.app.sys.name}">${brandMark(28)}${markOnly ? '' : `<b>${S.app.sys.name}</b>`}</span>`;
+}
+/* The tenant switcher, in the band after the sidebar button: crest, name, arrow. The administrator works
+   on the platform, not inside a tenant: there the band says so, without a menu. */
+/* The tenant in the band: with several tenants a menu to switch, with one only its logo and name. */
 function tenantSwitch() {
-  if (S.role === 'admin')
-    return `<div class="tsw static" role="img" aria-label="${PLATFORM.name}">${S.app.sys.showName ? tenantLogo(PLATFORM, 34) : crest(PLATFORM, 30)}</div>`;
+  if (S.role === 'admin') return `<span class="tsw static plat" title="The administrator works on the platform, not inside a tenant">${ic('shield', 15)}<span class="ts-name">Platform</span></span>`;
   const tn = curTenant();
-  return `<button type="button" class="tsw" data-act="tenants" aria-haspopup="listbox" aria-expanded="${!!S.tenantMenu}" aria-label="Organization: ${tn.name}. Switch organization" data-tip="${S.tenantMenu ? '' : `${tn.name} · switch organization`}" data-tip-start>${S.app.tnt.showName ? tenantLogo(tn, 34) : crest(tn, 30)}${ic('down', 14)}</button>`;
+  if ((MY_TENANTS[S.role] || []).length <= 1) return `<span class="tsw static">${crest(tn, 24)}<span class="ts-name">${tn.name}</span></span>`;
+  return `<button type="button" class="tsw" data-act="tenants" aria-haspopup="listbox" aria-expanded="${!!S.tenantMenu}" aria-label="Tenant: ${tn.name}. Switch tenant" data-tip="${S.tenantMenu ? '' : `${tn.name} · switch tenant`}" data-tip-start>${crest(tn, 24)}<span class="ts-name">${tn.name}</span>${ic('down', 14)}</button>`;
 }
-/* Whoever works in several organizations sees the home one first, then the ones they are a guest in. */
+/* Whoever works in several tenants sees the home one first, then the ones they are a guest in. */
 function tenantMenuHtml() {
   if (!S.tenantMenu || S.role === 'admin') return '';
   const cur = curTenant(),
@@ -877,7 +929,10 @@ function tenantMenuHtml() {
     const tn = TENANT_SEL.find((x) => x.id === m[0]);
     return `<button type="button" role="option" aria-selected="${tn.id === cur.id}" data-tenant="${tn.id}"><span class="tn-l">${tenantLogo(tn, 32)}<span class="muted small">${m[1]}</span></span>${tn.id === cur.id ? ic('check', 15) : ''}</button>`;
   };
-  return `<div class="tnmenu" role="listbox" aria-label="Switch organization" style="left:8px;top:${S.drawer ? 106 : 48}px">
+  // on a narrow screen the switcher heads the drawer; otherwise it is in the band, after the sidebar
+  const narrow = innerWidth <= 900,
+    sw = S.side === 'open' ? 240 : 65;
+  return `<div class="tnmenu" role="listbox" aria-label="Switch tenant" style="left:${narrow ? 8 : sw + 58}px;top:${narrow ? 106 : 48}px">
     <div class="eyebrow">Home</div>${mine
       .filter((m) => m[2] === 'home')
       .map(item)
@@ -890,10 +945,10 @@ function tenantMenuHtml() {
             .join('')}`
         : ''
     }
-    <p class="tn-note">${ic('key', 13)} You always sign in with the access of Example City: switching organization does not ask you to sign in again.</p></div>`;
+    <p class="tn-note">${ic('key', 13)} You always sign in with the access of Example City: switching tenant does not ask you to sign in again.</p></div>`;
 }
 /* The notifications of whoever is looking: one source for the page, the bell and the menu. */
-function inboxItems() {
+function inboxAll() {
   if (S.role === 'admin')
     return [
       [
@@ -912,7 +967,7 @@ function inboxItems() {
         1,
         'System',
       ],
-      ['clock', 'Trial ending', 'Sandbox · 4 days', 'Yesterday', 0, 'Organizations'],
+      ['clock', 'Trial ending', 'Sandbox · 4 days', 'Yesterday', 0, 'Tenants'],
       [
         'activity',
         'Service degraded',
@@ -940,7 +995,6 @@ function inboxItems() {
       'Access',
     ],
   ];
-  if (S.role === 'collab') return base;
   return base
     .concat([
       [
@@ -975,6 +1029,11 @@ function inboxItems() {
         : [],
     );
 }
+/* «Mark all as read» empties the count of the bell and of the page together. */
+function inboxItems() {
+  const all = inboxAll();
+  return S.readAll ? all.map((x) => x.slice(0, 4).concat(0, x.slice(5))) : all;
+}
 function inboxUnread() {
   return inboxItems().filter((x) => x[4]).length;
 }
@@ -992,7 +1051,7 @@ function toastHtml() {
 
 /* ── Search and commands ──────────────────────────────────────────────
    It searches the items of the apps by name and description; without text it shows the recent ones.
-   The administrator has no content: it searches organizations, people and pages of the platform. */
+   The administrator has no content: it searches tenants, people and pages of the platform. */
 function cmdNorm(s) {
   return String(s || '')
     .normalize('NFD')
@@ -1022,13 +1081,13 @@ function cmdSources() {
   if (S.role === 'admin')
     return [
       [
-        'Organizations',
+        'Tenants',
         'tenants',
         TENANTS.map((x) => ({
           t: x.n,
-          sub: `${x.plan} · ${x.users} people · ${TEN_ST[x.st].label || x.st}`,
+          sub: `${x.users} people · ${TEN_ST[x.st].label || x.st}`,
           icon: 'building',
-          f: [x.n, x.slug, x.plan, x.auth],
+          f: [x.n, x.slug, x.auth],
           attr: `data-res="ten:${x.slug}" data-go="tenant"`,
         })),
       ],
@@ -1054,6 +1113,8 @@ function cmdSources() {
           'Keys of outside services',
           'Retention',
           'Maintenance',
+          'Quotas',
+          'Identity and appearance',
         ]
           .map((n, i) => ({
             t: n,
@@ -1065,7 +1126,7 @@ function cmdSources() {
           .concat(
             MP.map((m) => ({
               t: m.n,
-              sub: 'Module · ' + m.ver,
+              sub: 'Plugin · ' + m.ver,
               icon: 'puzzle',
               f: [m.n, m.id],
               attr: `data-res="mp:${m.id}" data-go="mpmod"`,
@@ -1074,7 +1135,7 @@ function cmdSources() {
       ],
       pages,
     ];
-  const items = S.role === 'collab' ? ITEMS.filter((i) => COLLAB_SEES.includes(i.id)) : ITEMS;
+  const items = ITEMS;
   return APPS.map((a) => [
     a.n,
     null,
@@ -1089,13 +1150,43 @@ function cmdSources() {
       })),
   ]).concat([pages]);
 }
+/* The search in the band. Closed it is a field to click (or Ctrl K); open it is written in, and under it
+   a drop-down with the filters as pills and the results. Esc, a click outside or a result close it. */
+function searchBox() {
+  if (S.modal !== 'cmd')
+    return `<div class="sbox-w"><button type="button" class="sbox" data-act="cmd" data-tip="Search · Ctrl K">${ic('search', 15)}<span>Search everything</span><kbd>Ctrl K</kbd></button></div>`;
+  const ph = S.role === 'admin' ? 'Search tenants, people and pages' : 'Search notes, activities, estimates and tasks';
+  return `<div class="sbox-w on"><div class="sbox on">${ic('search', 15)}<input type="text" data-cmdq placeholder="${ph}" aria-label="Search" value="${(S.cmdQ || '').replace(/"/g, '&quot;')}" autocomplete="off"><kbd>Esc</kbd></div>
+    <div class="cmdpop" role="dialog" aria-label="Search"><div class="cmd-pills" role="tablist" aria-label="Show">${cmdPills()}</div><div class="cmdr" role="listbox">${cmdResults()}</div>
+      <div class="cmd-f muted small"><span><kbd>↑</kbd><kbd>↓</kbd> to choose</span><span><kbd>Enter</kbd> to open</span><span><kbd>Esc</kbd> to close</span></div></div></div>`;
+}
+/* The groups of results the search shows, after the pill chosen. */
+function cmdGroups() {
+  const f = S.cmdF || 'All';
+  return cmdSources().filter((g) => f === 'All' || g[0] === f);
+}
+/* The pills: All and one per group, with how many results each has for what is written. */
+function cmdPills() {
+  const nq = cmdNorm((S.cmdQ || '').trim());
+  const count = (g) => (nq ? g[2].filter((r) => r.f.some((x) => cmdNorm(x).includes(nq))).length : g[2].length);
+  const src = cmdSources();
+  const all = src.reduce((s, g) => s + count(g), 0);
+  const f = S.cmdF || 'All';
+  return [['All', all]]
+    .concat(src.map((g) => [g[0], count(g)]))
+    .map(
+      (p) =>
+        `<button type="button" class="cpill ${f === p[0] ? 'on' : ''}" role="tab" aria-selected="${f === p[0]}" data-act="cmdf" data-v="${p[0]}">${p[0]}<span class="num">${p[1]}</span></button>`,
+    )
+    .join('');
+}
 function cmdResults() {
   const q = (S.cmdQ || '').trim(),
     nq = cmdNorm(q);
   const item = (r, on) =>
     `<li><button type="button" class="cr ${on ? 'on' : ''}" ${r.attr}>${ic(r.icon, 16)}<span class="cr-t"><b>${cmdHl(r.t, q)}</b><span class="muted small">${r.sub}</span></span>${on ? '<kbd>Enter</kbd>' : ''}</button></li>`;
   let n = 0;
-  if (!q) {
+  if (!q && (S.cmdF || 'All') === 'All') {
     const src = cmdSources();
     const recent =
       S.role === 'admin'
@@ -1106,11 +1197,11 @@ function cmdResults() {
             .filter(Boolean);
     return `<div class="cr-g">Opened recently</div><ul class="cmdl">${recent.map((r) => item(r, n++ === 0)).join('')}</ul>`;
   }
-  const groups = cmdSources()
-    .map((g) => [g[0], g[1], g[2].filter((r) => r.f.some((f) => cmdNorm(f).includes(nq)))])
+  const groups = cmdGroups()
+    .map((g) => [g[0], g[1], g[2].filter((r) => !nq || r.f.some((f) => cmdNorm(f).includes(nq)))])
     .filter((g) => g[2].length);
   if (!groups.length)
-    return `<p class="cr-none">Nothing for «${cmdHl(q)}». Try a word of the description or the name of whoever created it.</p>`;
+    return `<p class="cr-none">${q ? `Nothing for «${cmdHl(q)}»${(S.cmdF || 'All') === 'All' ? '' : ' in ' + S.cmdF}. Try a word of the description or the name of whoever created it.` : 'Nothing here.'}</p>`;
   const tot = groups.reduce((s, g) => s + g[2].length, 0);
   return (
     `<p class="cr-n muted small">${tot} ${tot === 1 ? 'result' : 'results'}</p>` +
@@ -1129,23 +1220,24 @@ function cmdResults() {
 }
 
 /* ── The frame ────────────────────────────────────────────────────────
-   Two rows. On top a full-width band: the logo of the organization, which is also the switcher,
-   then search and the person. Under it, the sidebar and the content. On a wide screen the sidebar
-   is made of icons by default, with the labels in tips; on a narrow screen it opens as a drawer. */
+   Two rows. On top a full-width band: the logo of the application in the corner above the sidebar,
+   then the button of the sidebar, the tenant, the search, and on the right the controls. Under it,
+   the sidebar and the content. On a wide screen the sidebar is made of icons by default, with the
+   labels in tips; on a narrow screen it opens as a drawer. The administrator decides what the band
+   shows (System › Identity and appearance › Top bar): without the logo, the button of the sidebar
+   takes the corner. */
 function shellA(content) {
   const groups = navFor(S.role);
   const mini = !S.drawer && S.side !== 'open';
-  const label = (g) =>
-    g === 'org' && S.role === 'manager'
-      ? 'Organization management'
-      : g === 'org'
-        ? `Organization · ${curTenant().name}`
-        : GROUP_LABEL[g];
+  const B = bar();
+  const label = (g) => GROUP_LABEL[g];
+  const open = !mini;
+  const toggle = `<button type="button" class="ib stg" data-act="sidetoggle" aria-expanded="${S.drawer || open}" aria-label="${S.drawer || open ? 'Close the sidebar' : 'Open the sidebar'}" data-tip="${S.drawer || open ? 'Close the sidebar' : 'Open the sidebar'}" data-tip-start>${ic('sidebar', 18)}</button>`;
   return `<div class="app pA ${S.drawer ? 'drawer' : ''}">
-    <div class="band"><div class="side-h">${tenantSwitch()}</div>
-      <header class="top"><button type="button" class="ib sbt" data-act="drawer" aria-expanded="${!!S.drawer}" aria-label="${S.drawer ? 'Close the menu' : 'Open the menu'}">${ic(S.drawer ? 'x' : 'menu', 18)}</button><button type="button" class="sbox" data-act="cmd" data-tip="Search · Ctrl K">${ic('search', 15)}<span>Search everything</span><kbd>Ctrl K</kbd></button>${topRight()}</header></div>
+    <div class="band ${B.logo ? '' : 'nologo'}"><div class="side-h ${mini ? 'mini' : ''}">${B.logo ? appLogo(mini) : toggle}</div>
+      <header class="top"><div class="top-l">${toggle}${tenantSwitch()}</div>${B.search ? searchBox() : '<span class="sbox-none"></span>'}${topRight()}</header></div>
     <div class="body"><nav class="side ${mini ? 'mini' : ''} ${mini && S.sideLabels ? 'labels' : ''}" aria-label="Navigation">
-      ${S.drawer ? `<div class="side-hd">${tenantSwitch()}</div>` : ''}
+      ${S.drawer ? `<div class="side-hd">${S.role === 'admin' ? appLogo(false) : tenantSwitch()}</div>` : ''}
       <div class="side-list">${groups
         .filter((x) => x[0] !== 'bottom')
         .map(
@@ -1164,7 +1256,7 @@ function shellA(content) {
 
 /* ── Generic dialogs ─────────────────────────────────────────────────── */
 
-/* Share: subjects (person, group, organization, link, public) and levels (view, use, edit, manage). */
+/* Share: subjects (person, group, tenant, link, public) and levels (view, use, edit, manage). */
 DIALOGS.share = () => {
   const it = ITEMS.find((x) => x.id === S.shareRes) || ITEMS[1],
     mine = it.own === ROLES[S.role].who || S.role === 'manager';
@@ -1177,11 +1269,11 @@ DIALOGS.share = () => {
   ];
   return {
     html: `<div class="dlg-h"><h2>Share «${it.t}»</h2>${btn('', { icon: 'x', act: 'close' })}</div><div class="dlg-b stack">
-      <div class="field">${ic('search', 15)}<input type="text" placeholder="Add people or groups of the organization" aria-label="Add people or groups"></div>
+      <div class="field">${ic('search', 15)}<input type="text" placeholder="Add people or groups of the tenant" aria-label="Add people or groups"></div>
       <ul class="rows">${subj.map((x) => `<li>${av(x[0], x[3], 28)}<div class="rt"><b>${x[1]}</b></div><button type="button" class="chip">${x[2]} ${ic('down', 12)}</button></li>`).join('')}</ul>
       <div class="eyebrow">General access</div><div class="opts row3">${[
         ['lock', 'Only the people added'],
-        ['building', 'The whole organization'],
+        ['building', 'The whole tenant'],
       ]
         .concat(mine ? [['globe', 'Public']] : [])
         .map(
@@ -1193,7 +1285,7 @@ DIALOGS.share = () => {
       <div class="dlg-f"><span class="muted small">Levels: view, use, edit, manage. An app may name them its own way; the platform enforces them.</span>${btn('Done', { kind: 'pri', act: 'close' })}</div>`,
   };
 };
-/* Create: one entry for each app installed in the organization. */
+/* Create: one entry for each app installed in the tenant. */
 DIALOGS.new = () => ({
   html: `<div class="dlg-h"><h2>Create</h2>${btn('', { icon: 'x', act: 'close' })}</div><div class="dlg-b"><div class="newg">${[
     ['note', 'Note', 'An empty note or one from a template', 'notes'],
@@ -1207,14 +1299,15 @@ DIALOGS.new = () => ({
     )
     .join(
       '',
-    )}</div><p class="muted small mt">Every app installed in the organization adds its entries here.</p></div>`,
+    )}</div><p class="muted small mt">Every app installed in the tenant adds its entries here.</p></div>`,
 });
 DIALOGS.cmd = () => ({
   top: true,
-  html: `<div class="cmd"><div class="field big">${ic('search', 18)}<input type="text" data-cmdq placeholder="${S.role === 'admin' ? 'Search organizations, people and pages' : 'Search notes, activities, estimates and tasks'}" aria-label="Search" value="${(S.cmdQ || '').replace(/"/g, '&quot;')}" autocomplete="off"><kbd>Esc</kbd></div><div class="cmdr" role="listbox">${cmdResults()}</div>
+  html: `<div class="cmd"><div class="field big">${ic('search', 18)}<input type="text" data-cmdq placeholder="${S.role === 'admin' ? 'Search tenants, people and pages' : 'Search notes, activities, estimates and tasks'}" aria-label="Search" value="${(S.cmdQ || '').replace(/"/g, '&quot;')}" autocomplete="off"><kbd>Esc</kbd></div><div class="cmdr" role="listbox">${cmdResults()}</div>
       <div class="cmd-f muted small"><span><kbd>↑</kbd><kbd>↓</kbd> to choose</span><span><kbd>Enter</kbd> to open</span></div></div>`,
 });
 function modalHtml() {
+  if (S.modal === 'cmd') return '<div class="cmd-scrim" data-act="close"></div>';
   if (!S.modal || !DIALOGS[S.modal]) return '';
   const d = DIALOGS[S.modal](S);
   return `<div class="scrim" data-act="close"></div><div class="dlg ${d.top ? 'atop cmdd' : ''} ${d.wide ? 'wide' : ''}" role="dialog" aria-modal="true">${d.html}</div>`;
@@ -1229,11 +1322,11 @@ const MODALS = [
   ['invite', 'Invite people', 'dlg-invite', ['manager']],
   ['rolesinfo', 'What each role can do', 'dlg-roles', ['manager', 'admin']],
   ['groupnew', 'New group', 'dlg-new-group', ['manager']],
-  ['rmperson', 'Remove from the organization', 'dlg-remove-person', ['manager']],
+  ['rmperson', 'Remove from the tenant', 'dlg-remove-person', ['manager']],
   ['confirm', 'Confirm an action that cannot be undone', 'dlg-confirm', ['manager', 'admin']],
-  ['newten', 'New organization', 'dlg-new-organization', ['admin']],
+  ['newten', 'New tenant', 'dlg-new-organization', ['admin']],
   ['newadmin', 'New administrator', 'dlg-new-admin', ['admin']],
-  ['movehome', 'Move the home organization', 'dlg-move-home', ['admin']],
+  ['movehome', 'Move the home tenant', 'dlg-move-home', ['admin']],
 ];
 let CHECK = {};
 try {
@@ -1258,11 +1351,7 @@ function checkItems(role) {
           'go',
           r[1],
           r[2],
-          g === 'top'
-            ? 'Overview'
-            : g === 'org' && role === 'manager'
-              ? 'Organization management'
-              : GROUP_LABEL[g],
+          g === 'top' ? 'Start page' : GROUP_LABEL[g],
           r[3],
           r[1],
         ]),
@@ -1334,13 +1423,12 @@ function reviewBar() {
   return `<div class="rev-in"><span class="rev-t">Mosaikit · mockup</span>
     <div class="rseg" role="group"><button type="button" data-act="loginpage" aria-pressed="${login}" aria-label="Sign-in page" title="Sign-in page">${ic('key', 14)}<b>Sign-in</b></button>${[
       ['admin', 'Administrator', 'Admin'],
-      ['manager', 'Manager', 'Mgr'],
+      ['manager', 'Tenant Manager', 'Mgr'],
       ['user', 'User', 'User'],
-      ['collab', 'View and edit', 'View'],
     ]
       .map(
         (i) =>
-          `<button type="button" data-role="${i[0]}" aria-pressed="${!login && S.role === i[0]}" aria-label="${i[1]}" title="${i[0] === 'collab' ? 'A User with the View and edit profile' : i[1]}"><b class="rs-l">${i[1]}</b><b class="rs-s" aria-hidden="true">${i[2]}</b></button>`,
+          `<button type="button" data-role="${i[0]}" aria-pressed="${!login && S.role === i[0]}" aria-label="${i[1]}" title="${i[1]}"><b class="rs-l">${i[1]}</b><b class="rs-s" aria-hidden="true">${i[2]}</b></button>`,
       )
       .join('')}</div>
     <button type="button" class="rev-id" data-act="copyid" title="Screen id, as requirements cite it: click to copy">${screenId()}</button>
@@ -1399,7 +1487,9 @@ function render() {
         notesHtml() +
         toastHtml() +
         themeMenuHtml() +
+        langMenuHtml() +
         helpMenuHtml() +
+        bellMenuHtml() +
         userMenuHtml() +
         tenantMenuHtml() +
         modalHtml() +
@@ -1462,13 +1552,8 @@ function render() {
   const secOn = document.querySelector('.dside-nav .secnav-l .on');
   if (secOn && secOn.parentElement.scrollWidth > secOn.parentElement.clientWidth)
     secOn.parentElement.scrollLeft = secOn.offsetLeft - 12;
-  // The View and edit profile creates and shares nothing.
-  if (S.role === 'collab')
-    document
-      .querySelectorAll('#stage [data-act="share"], #stage [data-act="new"]')
-      .forEach((el) => el.remove());
   // A page without actions on the selection has no boxes either.
-  if (document.querySelector('.rpage .rc-b') && !document.querySelector('.rc-h .bulk'))
+  if (document.querySelector('.rpage .rc-b') && !document.querySelector('.rc-h .bulk, .mg-bar .bulk'))
     document.querySelectorAll('.rc-b .selbox, .rc-b .cbx').forEach((el) => el.remove());
   // Where there is a fixed header, the rest of the page goes in a body that scrolls by itself.
   const page = document.querySelector('.main > .page');
@@ -1502,37 +1587,32 @@ function render() {
   render.scrollTop = false;
 }
 
-/* Signing in: the chosen workspace decides the organization and the role the interface shows. */
+/* Signing in. People enter their home tenant (guests switch from the logo at the top); administrators
+   enter the platform after the second factor, the first time after registering the app. */
 function loginAdvance() {
-  const L = S.login,
-    acc = loginFind(L.email);
-  if (L.step === 'method' && acc.mfa) {
-    S.login = Object.assign({}, L, { step: 'mfa', err: 0 });
+  const L = S.login;
+  if (L.door === 'admin') {
+    const first = L.user === 'g.bassi';
+    if (L.step === 'cred') S.login = Object.assign({}, L, { step: first ? 'setup' : 'totp', err: 0 });
+    else if (L.step === 'setup') S.login = Object.assign({}, L, { step: 'codes' });
+    else return loginEnter('Mosaikit (Platform)', 'Administrator', true);
     render();
     return;
   }
-  if (acc.kind === 'newsso') {
-    loginEnter('Example City', 'User');
-    return;
-  }
-  if ((acc.tenants || []).length > 1) {
-    S.login = Object.assign({}, L, { step: 'pick', err: 0 });
-    render();
-    return;
-  }
-  loginEnter(acc.tenants[0][0], acc.tenants[0][1], acc.admin, acc.prof);
+  const acc = loginFind(L.tenant || (L.host === 'one' || L.host === 'pre' ? loginTenants(S)[0].slug : ''), L.user);
+  const home = acc.tenants.find((m) => m[2] === 'home') || acc.tenants[0];
+  loginEnter(home[0], home[1], false, acc.prof);
 }
 function loginEnter(name, roleName, admin, prof) {
   const role = admin
     ? 'admin'
-    : roleName === 'Manager'
+    : roleName === 'Tenant Manager'
       ? 'manager'
-      : prof === 'view'
-        ? 'collab'
-        : 'user';
+      : 'user';
   const tn = TENANT_SEL.find((x) => x.name === name);
   S.role = role;
   S.tenant = admin ? null : tn ? tn.id : 'example-city';
+  S.home = S.tenant;
   S.login = null;
   S.tab = {};
   go(LANDING[role]);
@@ -1545,6 +1625,11 @@ function go(route) {
     logSel: null,
     userMenu: false,
     helpMenu: false,
+    langMenu: false,
+    bellMenu: false,
+    themeMenu: false,
+    more: null,
+    dirty: {},
     sel: {},
     bulkDone: null,
     tenStMenu: false,
@@ -1567,8 +1652,16 @@ document.addEventListener('click', (e) => {
     S.themeMenu = false;
     render();
   }
+  if (S.langMenu && !e.target.closest('.lmenu, [data-act="langmenu"]')) {
+    S.langMenu = false;
+    render();
+  }
   if (S.helpMenu && !e.target.closest('.hmenu, [data-act="helpmenu"]')) {
     S.helpMenu = false;
+    render();
+  }
+  if (S.bellMenu && !e.target.closest('.bmenu, [data-act="bellmenu"]')) {
+    S.bellMenu = false;
     render();
   }
   if (S.userMenu && !e.target.closest('.umenu, [data-act="usermenu"]')) {
@@ -1577,6 +1670,10 @@ document.addEventListener('click', (e) => {
   }
   if (S.tenantMenu && !e.target.closest('.tnmenu, [data-act="tenants"]')) {
     S.tenantMenu = false;
+    render();
+  }
+  if (S.more && !e.target.closest('.moremenu, [data-act="more"]')) {
+    S.more = null;
     render();
   }
   if (S.sortMenu && !e.target.closest('.sortmenu, [data-act="sortmenu"]')) {
@@ -1595,6 +1692,7 @@ document.addEventListener('click', (e) => {
   }
   if (t.dataset.lvlmode) {
     S.app[t.dataset.lvlmode].mode = t.dataset.v;
+    if (t.dataset.lvlmode === 'tnt') S.cust = Object.assign({}, S.cust, { mode: true });
     S.mode = t.dataset.v;
     applyMode();
     render();
@@ -1668,6 +1766,10 @@ document.addEventListener('click', (e) => {
     const [k, id] = t.dataset.res.split(':');
     S.resId = Object.assign({}, S.resId, { [k]: id });
   }
+  if (t.dataset.settab) {
+    const [k, v] = t.dataset.settab.split(':');
+    S.tab[k] = v;
+  }
   if (t.dataset.go) {
     go(t.dataset.go);
     return;
@@ -1677,6 +1779,7 @@ document.addEventListener('click', (e) => {
 /* What every data-act does. */
 function act(a, t) {
   const v = t.dataset.v;
+  if (['usermenu', 'langmenu', 'helpmenu', 'theme', 'tenants'].includes(a)) S.bellMenu = false;
   const slug = () => (S.resId && S.resId.ten) || TENANTS[0].slug;
   if (a === 'close') {
     S.modal = S.modal === 'rolesinfo' && S.prevModal ? S.prevModal : null;
@@ -1778,7 +1881,8 @@ function act(a, t) {
     const guests = /account/.test(v)
       ? (S.sel[key] || []).filter((id) => (PEOPLE.find((p) => p.ini === id) || {}).home).length
       : 0;
-    S.bulkDone = `<b>${v}</b> on ${n} item${n === 1 ? '' : 's'}.${sysN ? (sysN === 1 ? ' One system module stays as it is: it updates, but it is neither disabled nor uninstalled.' : ` ${sysN} system modules stay as they are: they update, but they are neither disabled nor uninstalled.`) : ''}${guests ? (guests === 1 ? ' A guest is not deleted: they belong to another organization, so they are only removed from this one.' : ` ${guests} guests are not deleted: they belong to other organizations, so they are only removed from this one.`) : ''} Nothing changes in the mockup; in the product ${/Delete|Remove|Uninstall|Revoke/.test(v) ? 'it asks first, saying what is lost' : 'it starts at once and goes to the activity log'}.`;
+    if (key === 'sh') S.revoked = (S.revoked || []).concat((S.sel.sh || []).map(Number));
+    S.bulkDone = `<b>${v}</b> on ${n} item${n === 1 ? '' : 's'}.${sysN ? (sysN === 1 ? ' One built-in plugin stays as it is: it updates, but it is neither disabled nor uninstalled.' : ` ${sysN} built-in plugins stay as they are: they update, but they are neither disabled nor uninstalled.`) : ''}${guests ? (guests === 1 ? ' A guest is not deleted: they belong to another tenant, so they are only removed from this one.' : ` ${guests} guests are not deleted: they belong to other tenants, so they are only removed from this one.`) : ''} Nothing changes in the mockup; in the product ${/Delete|Remove|Uninstall|Revoke/.test(v) ? 'it asks first, saying what is lost' : 'it starts at once and goes to the log'}.`;
     S.sel = Object.assign({}, S.sel, { [key]: [] });
     render();
   } else if (a === 'avrm') {
@@ -1792,16 +1896,13 @@ function act(a, t) {
     const id = (S.resId && S.resId.person) || PEOPLE[1].ini;
     S.pSt = Object.assign({}, S.pSt, { [id]: v });
     S.pStMenu = false;
+    S.more = null;
     render();
   } else if (a === 'tenstmenu') {
     S.tenStMenu = !S.tenStMenu;
     render();
-  } else if (a === 'tenplan') {
-    const x = TENANTS.find((y) => y.slug === slug());
-    S.planAsk = tenPlan(S, x) === v ? null : { slug: x.slug, to: v };
-    render();
-  } else if (['tenst', 'tenauth', 'tenidp'].includes(a)) {
-    const k = { tenst: 'tenSt', tenauth: 'tenAuth', tenidp: 'tenIdp' }[a],
+  } else if (['tenst', 'tenauth', 'tenroles'].includes(a)) {
+    const k = { tenst: 'tenSt', tenauth: 'tenAuth', tenroles: 'tenRoles' }[a],
       s = slug();
     if (
       a === 'tenst' &&
@@ -1816,14 +1917,7 @@ function act(a, t) {
       });
     S[k] = Object.assign({}, S[k], { [s]: v });
     S.tenStMenu = false;
-    render();
-  } else if (a === 'planok') {
-    S.tenPlan = Object.assign({}, S.tenPlan, { [S.planAsk.slug]: S.planAsk.to });
-    S.toast = `Plan changed to ${S.planAsk.to}.`;
-    S.planAsk = null;
-    render();
-  } else if (a === 'planno') {
-    S.planAsk = null;
+    S.more = null;
     render();
   } else if (a === 'sidemode') {
     S.side = v;
@@ -1852,12 +1946,7 @@ function act(a, t) {
     const tt = THEME_TAB[S.role];
     S.themeMenu = false;
     S.tab[tt[1]] = tt[2];
-    go(tt[0]);
-  } else if (a === 'aspgo') {
-    const tt = ASPECT_TAB[S.role];
-    S.themeMenu = false;
-    S.userMenu = false;
-    S.tab[tt[1]] = tt[2];
+    S.tab.idt = 'theme';
     go(tt[0]);
   } else if (a === 'invprof') {
     S.inv.prof = v;
@@ -1928,11 +2017,10 @@ function act(a, t) {
     S.map = false;
     render();
   } else if (a === 'ntstep') {
-    S.nt.step = Math.max(0, Math.min(4, S.nt.step + +v));
+    S.nt.step = Math.max(0, Math.min(3, S.nt.step + +v));
     render();
   } else if (a === 'ntset') {
     S.nt[t.dataset.k] = v;
-    if (t.dataset.k === 'plan' && v === 'Free') S.nt.auth = 'local';
     render();
   } else if (a === 'memreq') {
     S.tab.mem = 'req';
@@ -1984,16 +2072,79 @@ function act(a, t) {
     S.userMenu = !S.userMenu;
     S.helpMenu = false;
     S.themeMenu = false;
+    S.langMenu = false;
     render();
+  } else if (a === 'langmenu') {
+    S.langMenu = !S.langMenu;
+    S.themeMenu = false;
+    S.helpMenu = false;
+    S.userMenu = false;
+    S.tenantMenu = false;
+    render();
+  } else if (a === 'setlang') {
+    S.lang = v;
+    S.langMenu = false;
+    S.toast = 'In the product the interface switches language at once; the mockup stays in English.';
+    render();
+  } else if (a === 'cust') {
+    // A customizable setting: «Customize» makes it of this tenant, «Restore» takes the platform's again.
+    S.cust = Object.assign({}, S.cust, { [v]: !(S.cust && S.cust[v]) });
+    if (!S.cust[v] && v in S.app.sys) S.app.tnt[v] = S.app.sys[v];
+    if (v === 'fmt') S.app.tnt.fmtSame = !S.cust.fmt;
+    render();
+  } else if (a === 'qcust') {
+    const x = TENANTS.find((y) => y.slug === slug()),
+      own = qCust(S, x, v);
+    S.tenQc = Object.assign({}, S.tenQc, { [x.slug]: Object.assign({}, S.tenQc && S.tenQc[x.slug], { [v]: !own }) });
+    if (own) S.tenQ = Object.assign({}, S.tenQ, { [x.slug]: Object.assign({}, S.tenQ && S.tenQ[x.slug], { [v]: QDEF[v] }) });
+    render();
+  } else if (a === 'barset') {
+    S.app.sys.bar = Object.assign({}, S.app.sys.bar, { [v]: !S.app.sys.bar[v] });
+    render();
+  } else if (a === 'revoke') {
+    S.revoked = (S.revoked || []).concat(+v);
+    S.toast = 'Share revoked: the owner gets a notification.';
+    render();
+  } else if (a === 'more') {
+    S.more = S.more === v ? null : v;
+    render();
+  } else if (a === 'dirtyno' || a === 'dirtyok') {
+    S.dirty = Object.assign({}, S.dirty, { [v]: false });
+    S.toast = a === 'dirtyok' ? 'Saved.' : null;
+    render();
+  } else if (a === 'bellmenu') {
+    S.bellMenu = !S.bellMenu;
+    S.userMenu = false;
+    S.helpMenu = false;
+    S.themeMenu = false;
+    S.langMenu = false;
+    S.tenantMenu = false;
+    render();
+  } else if (a === 'readall') {
+    S.readAll = true;
+    S.toast = 'All marked as read.';
+    render();
+  } else if (a === 'accgo') {
+    // A section of Account, from the palette, the bell or a link.
+    S.tab.acc = String(Math.max(0, accIds(S).indexOf(v)));
+    go('account');
   } else if (a === 'helpmenu') {
     S.helpMenu = !S.helpMenu;
     S.userMenu = false;
     S.themeMenu = false;
+    S.langMenu = false;
     render();
   } else if (a === 'theme') {
     S.themeMenu = !S.themeMenu;
+    S.langMenu = false;
     S.helpMenu = false;
     S.userMenu = false;
+    S.tenantMenu = false;
+    render();
+  } else if (a === 'sidetoggle') {
+    // on a narrow screen the sidebar is a drawer over the page; otherwise it opens and closes in place
+    if (innerWidth <= 900) S.drawer = !S.drawer;
+    else S.side = S.side === 'open' ? 'mini' : 'open';
     S.tenantMenu = false;
     render();
   } else if (a === 'tenants') {
@@ -2005,13 +2156,18 @@ function act(a, t) {
     S.hc = !S.hc;
     render();
   } else if (a === 'appset') {
-    // A default of the platform or of the organization. Whoever changes it sees it at once on themselves too.
+    // A default of the platform or of the tenant. Whoever changes it sees it at once on themselves too.
     const L = S.app[t.dataset.lvl],
       k = t.dataset.k;
     L[k] = t.dataset.toggle ? !L[k] : k === 'labels' ? !L.labels : v;
     if (k === 'theme') S.preset = v;
     if (k === 'side') S.side = v;
     if (k === 'labels') S.sideLabels = L.labels;
+    if (t.dataset.lvl === 'tnt' && ['theme', 'side', 'labels'].includes(k))
+      S.cust = Object.assign({}, S.cust, { [k === 'labels' ? 'side' : k]: true });
+    render();
+  } else if (a === 'syscust') {
+    S.app.sys.cust = Object.assign({}, S.app.sys.cust, { [v]: !S.app.sys.cust[v] });
     render();
   } else if (a === 'applang') {
     const L = S.app[t.dataset.lvl];
@@ -2033,7 +2189,7 @@ function act(a, t) {
       ? JSON.parse(JSON.stringify(c))
       : {
           name: '',
-          accent: S.role === 'manager' ? '#1f4e79' : '#3654c9',
+          accent: S.role === 'manager' ? '#1f4e79' : '#5b5fc7',
           bar: 'color',
           grays: 'neutral',
           adv: {},
@@ -2094,6 +2250,7 @@ function act(a, t) {
     S.te = null;
     const tt = THEME_TAB[S.role];
     S.tab[tt[1]] = tt[2];
+    S.tab.idt = 'theme';
     go(tt[0]);
     S.bulkDone = `Theme «${c.name}» saved: now it can be chosen as the default.`;
     render();
@@ -2116,7 +2273,7 @@ function act(a, t) {
       prof: N.prof || 'std',
       groups: ['—'],
       st: 'Invited',
-      via: /^SSO/.test(home.auth) ? 'SSO' : 'Local',
+      via: /^OIDC/.test(home.auth) ? 'SSO' : 'Local',
       last: 'Never',
       c: 2,
       home: N.home === 'Example City' ? undefined : N.home,
@@ -2130,16 +2287,16 @@ function act(a, t) {
     S.modKey = v;
     go('module');
   } else if (a === 'mpinstall') {
-    // Installed, an extension becomes a module of organizations (off until the administrator enables it).
+    // Installed, an extension becomes a plugin of tenants (off until the administrator enables it).
     const m = MP_CATALOG.find((x) => x.id === v);
     S.mpInst = (S.mpInst || []).concat(m.id);
     MP.push(Object.assign({}, m, { tenants: [] }));
     FEATS.push(extFeat(m));
     MOD_PERMS['ext:' + m.id] = m.perms || [];
     MOD_GRANTS['ext:' + m.id] = [
-      ['building', 'Whole organization', '128 people', (m.perms || []).map(() => 1)],
+      ['building', 'Whole tenant', '128 people', (m.perms || []).map(() => 1)],
     ];
-    S.bulkDone = `<b>${m.n}</b> installed. It is off in every organization: it is enabled from its page, Organizations tab, or from the page of each organization.`;
+    S.bulkDone = `<b>${m.n}</b> installed. It is off in every tenant: it is enabled from its page, Tenants tab, or from the page of each tenant.`;
     S.resId = Object.assign({}, S.resId, { mp: m.id });
     render();
   } else if (a === 'mpupdate') {
@@ -2155,11 +2312,11 @@ function act(a, t) {
     S.toast =
       list.length === 1
         ? `<b>${list[0].n}</b> updated to ${list[0].ver}.`
-        : `${list.length} modules updated.`;
+        : `${list.length} plugins updated.`;
     render();
   } else if (a === 'mpten') {
     const m = MP.find((x) => x.id === (S.resId && S.resId.mp)),
-      k = 'ext:' + m.id,
+      k = m.sys || 'ext:' + m.id,
       x = TENANTS.find((y) => y.slug === v),
       on = tenFeats(S, x)[k];
     S.tenFeat = Object.assign({}, S.tenFeat, {
@@ -2261,14 +2418,25 @@ function act(a, t) {
     go('system');
   } else if (a === 'logout') {
     S.userMenu = false;
-    S.login = { step: 'email' };
+    S.login = { door: 'tenant', step: 'cred' };
     go('login');
   } else if (a === 'loginpage') {
-    S.login = { step: 'email' };
+    S.login = { door: 'tenant', step: 'cred' };
     S.themeMenu = false;
     go('login');
   } else if (a === 'loginex') {
-    S.login = { step: 'method', email: v };
+    S.login = v.startsWith('admin')
+      ? { door: 'admin', step: 'cred', user: t.dataset.u }
+      : { door: 'tenant', step: 'cred', tenant: v, user: t.dataset.u };
+    render();
+  } else if (a === 'loginadmin') {
+    S.login = { door: 'admin', step: 'cred' };
+    render();
+  } else if (a === 'logintenant') {
+    S.login = { door: 'tenant', step: 'cred' };
+    render();
+  } else if (a === 'loginrec') {
+    S.login = Object.assign({}, S.login, { rec: !S.login.rec });
     render();
   } else if (a === 'lgmode') {
     const k = MODES.map((m) => m[0]);
@@ -2276,21 +2444,16 @@ function act(a, t) {
     applyMode();
     render();
   } else if (a === 'loginhost') {
-    S.loginHost = v;
-    render();
-  } else if (a === 'loginreset') {
-    S.login = Object.assign({}, S.login, { reset: true });
-    render();
-  } else if (a === 'loginback') {
-    S.login = { step: 'email', email: (S.login || {}).email };
+    S.login = { door: 'tenant', step: 'cred', host: v };
     render();
   } else if (a === 'loginok') {
     loginAdvance();
-  } else if (a === 'loginpick') {
-    const acc = loginFind(S.login.email);
-    loginEnter(v, t.dataset.r, false, acc.prof);
+  } else if (a === 'cmdf') {
+    S.cmdF = v;
+    render();
   } else if (a === 'cmd') {
     S.cmdQ = '';
+    S.cmdF = 'All';
     S.modal = 'cmd';
     S.map = false;
     S.userMenu = false;
@@ -2341,20 +2504,23 @@ document.addEventListener('keydown', (e) => {
     }
     return;
   }
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k' && S.route !== 'login') {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k' && S.route !== 'login' && bar().search) {
     e.preventDefault();
     S.cmdQ = '';
+    S.cmdF = 'All';
     S.modal = 'cmd';
     S.userMenu = false;
     render();
   } else if (e.key === 'Escape') {
     document.querySelectorAll('.ms.open').forEach((x) => x.classList.remove('open'));
-    if (S.modal || S.map || S.themeMenu || S.helpMenu || S.userMenu || S.tenantMenu || S.sortMenu) {
+    if (S.modal || S.map || S.themeMenu || S.langMenu || S.helpMenu || S.bellMenu || S.userMenu || S.tenantMenu || S.sortMenu) {
       Object.assign(S, {
         modal: null,
         map: false,
         themeMenu: false,
+        langMenu: false,
         helpMenu: false,
+        bellMenu: false,
         userMenu: false,
         tenantMenu: false,
         sortMenu: null,
@@ -2364,9 +2530,19 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
+/* The first change in a block of fields brings the save bar, without drawing the page again. */
+function markDirty(el) {
+  const dz = el.closest && el.closest('[data-dirty]');
+  if (!dz) return;
+  const k = dz.dataset.dirty;
+  if (S.dirty && S.dirty[k]) return;
+  S.dirty = Object.assign({}, S.dirty, { [k]: true });
+  if (!document.querySelector(`[data-savebar="${k}"]`)) dz.insertAdjacentHTML('afterend', saveBar(S, k));
+}
 /* Form fields: what changes while typing, without drawing the field again. */
 document.addEventListener('input', (e) => {
   const el = e.target;
+  markDirty(el);
   if (el.id === 'inv-email') {
     S.invEmail = el.value;
     const inf = inviteInfo(S);
@@ -2390,6 +2566,8 @@ document.addEventListener('input', (e) => {
     S.cmdQ = el.value;
     const box = document.querySelector('.cmdr');
     if (box) box.innerHTML = cmdResults();
+    const pills = document.querySelector('.cmd-pills');
+    if (pills) pills.innerHTML = cmdPills();
     return;
   }
   if (el.matches && el.matches('[data-msq]')) {
@@ -2406,6 +2584,7 @@ document.addEventListener('input', (e) => {
 document.addEventListener('change', (e) => {
   const el = e.target;
   if (!el.matches) return;
+  markDirty(el);
   if (el.matches('[data-avatar]') && el.files && el.files[0]) {
     const f = el.files[0],
       ini = el.dataset.avatar;
@@ -2454,6 +2633,9 @@ document.addEventListener('change', (e) => {
       S.te.adv = {};
     } else S.te.adv = Object.assign({}, S.te.adv, { [k]: el.value });
     render();
+  } else if (el.matches('[data-logintenant]')) {
+    S.login = Object.assign({}, S.login, { tenant: el.value, err: 0 });
+    render();
   } else if (el.matches('[data-melang]')) {
     S.lang = el.value;
     S.toast =
@@ -2498,23 +2680,15 @@ document.addEventListener('change', (e) => {
     render();
   }
 });
-/* Sign-in: the email leads to the sign-in of the home organization, then to the choice of the organization. */
+/* Sign-in: credentials (the password «wrong» simulates an error), then the second factor for administrators. */
 document.addEventListener('submit', (e) => {
   if (!e.target.matches('[data-form="login"]')) return;
   e.preventDefault();
-  const em = document.getElementById('lg-email');
-  if (em) {
-    const val = em.value.trim();
-    S.login = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(val)
-      ? { step: 'method', email: val }
-      : { step: 'email', email: val, bad: true };
-    render();
-    return;
-  }
-  // In the mockup the password «wrong» simulates an error; any other gets in.
+  const u = document.getElementById('lg-user');
+  if (u) S.login = Object.assign({}, S.login, { user: u.value.trim() });
   const pw = document.getElementById('lg-pwd');
   if (pw && pw.value.trim().toLowerCase() === 'wrong') {
-    S.login = Object.assign({}, S.login, { err: (S.login.err || 5) - 1 });
+    S.login = Object.assign({}, S.login, { err: (S.login.err || 9) - 1 });
     render();
     return;
   }
@@ -2550,7 +2724,7 @@ document.addEventListener('mousedown', (e) => {
   }
   if (!SECTIONS[S.route] || (S.route === 'person' && !(S.resId && S.resId.person)))
     S.route = LANDING[S.role];
-  if (S.route === 'login') S.login = { step: 'email' };
+  if (S.route === 'login') S.login = { door: 'tenant', step: 'cred' };
   // Logos are measured on the font: when the fonts arrive, measure and draw again.
   if (document.fonts && document.fonts.ready)
     document.fonts.ready.then(() => {

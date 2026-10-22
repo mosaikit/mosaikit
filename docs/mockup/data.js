@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 /* eslint-disable -- plain browser scripts of a static mockup: they share globals across files */
 
-/* Mosaikit mockup: sample data. Organizations, people and apps are invented; the four apps
+/* Mosaikit mockup: sample data. Tenants, people and apps are invented; the four apps
    (Notes, Activities, Estimates, Tasks) stand for whatever extensions an installation has. */
 
 /* ── People and roles ────────────────────────────────────────────────── */
@@ -17,24 +17,17 @@ const ROLES = {
     unit: 'Platform operations',
   },
   manager: {
-    label: 'Manager',
-    long: 'Manager',
+    label: 'Tenant Manager',
+    long: 'Tenant Manager',
     who: 'Elena Ricci',
     ini: 'ER',
     mail: 'e.ricci@city.example.org',
     unit: 'Operations office',
   },
-  collab: {
-    label: 'User',
-    long: 'User · View and edit profile',
-    who: 'Paolo Fontana',
-    ini: 'PO',
-    mail: 'p.fontana@city.example.org',
-    unit: 'Field team · Inspector',
-  },
+
   user: {
     label: 'User',
-    long: 'User of the organization',
+    long: 'User of the tenant',
     who: 'Davide Conti',
     ini: 'DC',
     mail: 'd.conti@city.example.org',
@@ -47,7 +40,7 @@ const PEOPLE = [
     n: 'Elena Ricci',
     ini: 'ER',
     mail: 'e.ricci@city.example.org',
-    role: 'Manager',
+    role: 'Tenant Manager',
     prof: '',
     assoc: ['Example County', 'Green Region'],
     groups: ['Operations office'],
@@ -161,34 +154,35 @@ const GROUPS = [
   { n: 'Finance', d: 'Budget, purchases and estimates', m: 17, res: 28, kc: true },
   { n: 'Field team', d: 'Inspections and site visits', m: 12, res: 19, kc: true },
   { n: 'Front office', d: 'Requests from the public', m: 31, res: 9, kc: false },
-  { n: 'Operations office', d: 'Managers of the organization', m: 6, res: 64, kc: true },
+  { n: 'Operations office', d: 'The Tenant Managers', m: 6, res: 64, kc: true },
 ];
 
-/* ── Organizations, plans and quotas ─────────────────────────────────── */
+/* ── Tenants and quotas ──────────────────────────────────────────────── */
+/* Quotas are set by the administrator, tenant by tenant (Details of the tenant). */
 
 const TENANTS = [
   {
     n: 'Example City',
     slug: 'example-city',
-    plan: 'Enterprise',
+    q: { space: 25, people: null, auto: 375, collab: 20, ai: 100 },
     users: 128,
     data: 7.4,
-    auth: 'SSO and local accounts · realm example-city',
+    auth: 'OIDC · Keycloak of the city',
     st: 'Active',
   },
   {
     n: 'Example County',
     slug: 'example-county',
-    plan: 'Enterprise',
+    q: { space: 25, people: null, auto: 1000, collab: 20, ai: 100 },
     users: 214,
     data: 18.1,
-    auth: 'SSO and local accounts · federated identity provider',
+    auth: 'OIDC · Entra ID of the county',
     st: 'Active',
   },
   {
     n: 'Green Region',
     slug: 'green-region',
-    plan: 'Pro',
+    q: { space: 10, people: 100, auto: 500, collab: 10, ai: 50 },
     users: 46,
     data: 3.9,
     auth: 'Local accounts',
@@ -197,7 +191,7 @@ const TENANTS = [
   {
     n: 'Acme Water Board',
     slug: 'acme-water',
-    plan: 'Pro',
+    q: { space: 10, people: 100, auto: 500, collab: 10, ai: 50 },
     users: 19,
     data: 1.2,
     auth: 'Local accounts',
@@ -206,7 +200,7 @@ const TENANTS = [
   {
     n: 'Sandbox',
     slug: 'sandbox',
-    plan: 'Free',
+    q: { space: 1, people: 10, auto: 60, collab: 2, ai: 0 },
     users: 7,
     data: 0.3,
     auth: 'Local accounts',
@@ -215,14 +209,14 @@ const TENANTS = [
   {
     n: 'Green Valley Union',
     slug: 'green-valley',
-    plan: 'Pro',
+    q: { space: 10, people: 100, auto: 500, collab: 10, ai: 50 },
     users: 23,
     data: 2.1,
     auth: 'Local accounts',
     st: 'Suspended',
   },
 ];
-/* The state of an organization: active, on trial (with an end date), suspended (nobody enters, the data stays). */
+/* The state of a tenant: active, on trial (with an end date), suspended (nobody enters, the data stays). */
 const TEN_ST = {
   Active: { tone: 'ok', d: 'People sign in and work as usual.' },
   Trial: {
@@ -235,89 +229,74 @@ const TEN_ST = {
     d: 'Nobody can sign in, open invitations close, scheduled automations stop. Data and permissions stay.',
   },
 };
-/* The plan says what an organization MAY have: limits and features. Modules say what is on;
-   the manager decides for whom. */
-const PLANS = {
-  Free: { price: 'Free of charge', q: { space: 1, people: 10, auto: 60, collab: 2, ai: 0 } },
-  Pro: {
-    price: 'For mid-sized organizations',
-    q: { space: 10, people: 100, auto: 500, collab: 10, ai: 50 },
-  },
-  Enterprise: {
-    price: 'For large organizations',
-    q: { space: 25, people: null, auto: 1000, collab: 20, ai: 100 },
-  },
-};
-const PLAN_Q = [
+/* The quotas of the platform: the ones a new tenant takes, and how much the platform has in all.
+   The administrator changes them in System › Quotas; a tenant can have its own, on its page. */
+const QDEF = { space: 10, people: 100, auto: 500, collab: 10, ai: 50 };
+const QCAP = { space: 200, people: null, auto: 2500, collab: 60, ai: 400 };
+/* The quotas a tenant has: [key, label, unit]. */
+const QUOTA_Q = [
   ['space', 'Storage', 'GB'],
   ['people', 'People', ''],
   ['auto', 'Automation minutes per month', 'min'],
   ['collab', 'Shared sessions open together', ''],
   ['ai', 'AI credits per month', ''],
 ];
-const PLAN_F = [
-  ['Notes, Activities, Estimates and Tasks', ['Free', 'Pro', 'Enterprise']],
-  ['Single sign-on with Keycloak', ['Pro', 'Enterprise']],
-  ['Federation with the identity provider of the organization', ['Enterprise']],
-  ['Real-time collaboration', ['Free', 'Pro', 'Enterprise']],
-  ['Scheduled automations', ['Pro', 'Enterprise']],
-  ['AI assistant', ['Pro', 'Enterprise']],
-  ['Extensions from the marketplace', ['Enterprise']],
-  ['Custom domain', ['Enterprise']],
-  ['Activity log kept for 1 year', ['Enterprise']],
-];
 const TEN_EXTRA = {
   'example-city': {
     reg: 'EX-0001',
     vat: 'EX00000000001',
     mail: 'city.example.org',
-    sso: 'sso',
-    idp: 'fed',
+    idpName: 'Keycloak of Example City',
+    issuer: 'https://login.city.example.org/realms/staff',
+    auth: 'oidc',
+    roles: 'idp',
     contact: 'contact@city.example.org',
   },
   'example-county': {
     reg: 'EX-0002',
     vat: 'EX00000000002',
     mail: 'county.example.org',
-    sso: 'sso',
-    idp: 'fed',
+    idpName: 'Entra ID of Example County',
+    issuer: 'https://login.microsoftonline.com/county-example/v2.0',
+    auth: 'oidc',
+    roles: 'mosaikit',
     contact: 'contact@county.example.org',
   },
   'green-region': {
     reg: 'EX-0003',
     vat: 'EX00000000003',
     mail: 'region.example.org',
-    sso: 'local',
-    idp: 'kc',
+    auth: 'local',
+    roles: 'mosaikit',
     contact: 'contact@region.example.org',
   },
   'acme-water': {
     reg: 'EX-0004',
     vat: 'EX00000000004',
     mail: 'acme.example.org',
-    sso: 'local',
-    idp: 'kc',
+    auth: 'local',
+    roles: 'mosaikit',
     contact: 'office@acme.example.org',
   },
   sandbox: {
     reg: '—',
     vat: '—',
     mail: 'sandbox.example.org',
-    sso: 'local',
-    idp: 'kc',
+    auth: 'local',
+    roles: 'mosaikit',
     contact: '—',
   },
   'green-valley': {
     reg: 'EX-0006',
     vat: 'EX00000000006',
     mail: 'valley.example.org',
-    sso: 'local',
-    idp: 'kc',
+    auth: 'local',
+    roles: 'mosaikit',
     contact: 'office@valley.example.org',
   },
 };
 
-/* The organizations of whoever is signed in, as the switcher draws them: crest, colours, initial. */
+/* The tenants of whoever is signed in, as the switcher draws them: crest, colours, initial. */
 const TENANT_SEL = [
   {
     id: 'example-city',
@@ -329,7 +308,7 @@ const TENANT_SEL = [
     mark: '#f2b632',
     ink: '#f2b632',
     pat: 'band',
-    roles: { user: 'User', collab: 'User', manager: 'Manager' },
+    roles: { user: 'User', collab: 'User', manager: 'Tenant Manager' },
   },
   {
     id: 'example-county',
@@ -357,19 +336,15 @@ const TENANT_SEL = [
   },
 ];
 const PLATFORM = { id: 'platform', name: 'Mosaikit (Platform)' };
-/* Home organization first, then the ones a person is a guest in. */
+/* Home tenant first, then the ones a person is a guest in. */
 const MY_TENANTS = {
   user: [
     ['example-city', 'User', 'home'],
     ['example-county', 'User', 'assoc'],
     ['green-region', 'User', 'assoc'],
   ],
-  collab: [
-    ['example-city', 'User', 'home'],
-    ['green-region', 'User', 'assoc'],
-  ],
   manager: [
-    ['example-city', 'Manager', 'home'],
+    ['example-city', 'Tenant Manager', 'home'],
     ['example-county', 'User', 'assoc'],
     ['green-region', 'User', 'assoc'],
   ],
@@ -490,7 +465,7 @@ const ITEMS = [
 const ACCESS = {
   private: { label: 'Private', icon: 'lock' },
   groups: { label: 'Groups', icon: 'users' },
-  org: { label: 'Whole organization', icon: 'building' },
+  org: { label: 'Whole tenant', icon: 'building' },
   public: { label: 'Public', icon: 'globe' },
 };
 function accPill(a) {
@@ -498,10 +473,10 @@ function accPill(a) {
   return pill(x.label, 'acc-' + a, x.icon);
 }
 
-/* ── Modules ─────────────────────────────────────────────────────────
-   «app»: the apps of the installation. «int»: services of the platform. «ext»: extensions from the
-   marketplace. «needs»: all required; «needsAny»: one is enough; «soft»: without it the module stays
-   but loses a part. «plan»: the line of PLAN_F that says in which plans it is. */
+/* ── Plugins ─────────────────────────────────────────────────────────
+   «app»: the apps of the installation. «int»: services of the platform. «ext»: plugins installed by
+   the administrator. «needs»: all required; «needsAny»: one is enough; «soft»: without it the plugin stays
+   but loses a part. */
 const FEATS = [
   {
     k: 'notes',
@@ -543,9 +518,8 @@ const FEATS = [
     g: 'int',
     ic: 'users',
     n: 'Real-time collaboration',
-    plan: 'Real-time collaboration',
     d: 'Several people on the same item, with the cursors of the others.',
-    how: 'Uses the relay of the platform, which trusts the identity the platform signs. The plan sets how many sessions can be open together.',
+    how: 'Uses the relay of the platform, which trusts the identity the platform signs. The quotas of the tenant set how many sessions can be open together.',
     needsAny: ['notes', 'activities', 'estimates', 'tasks'],
   },
   {
@@ -553,9 +527,8 @@ const FEATS = [
     g: 'int',
     ic: 'zap',
     n: 'Automations',
-    plan: 'Scheduled automations',
     d: 'Jobs that run on a schedule or on an event, on the worker of the platform.',
-    how: 'Shared among organizations; each one has its own queue and its own monthly minutes, from the plan.',
+    how: 'Shared among tenants; each one has its own queue and its own monthly minutes, from the quotas of the tenant.',
   },
   {
     k: 'files',
@@ -563,21 +536,20 @@ const FEATS = [
     ic: 'box',
     n: 'File storage',
     d: 'Where attachments and documents are kept.',
-    how: 'One bucket per organization. Links to files are signed by the platform after checking the permissions.',
+    how: 'One bucket per tenant. Links to files are signed by the platform after checking the permissions.',
   },
   {
     k: 'ai',
     g: 'int',
     ic: 'spark',
     n: 'AI assistant',
-    plan: 'AI assistant',
     d: 'Questions in plain language on the items of the apps, and AI steps in automations.',
-    how: 'Uses the key of the platform with the credits of the plan, or a key of the organization.',
+    how: 'Uses the key of the platform with the AI credits of the tenant, or a key of the tenant.',
   },
 ];
 const FEAT = (k) => FEATS.find((f) => f.k === k);
 const MGR_FEATS = ['notes', 'tasks', 'activities', 'estimates', 'collab', 'auto', 'ai'];
-/* The permissions every module declares in its manifest. A User starts from their profile;
+/* The permissions every plugin declares in its manifest. A User starts from their profile;
    groups and personal exceptions add. */
 const MOD_PERMS = {
   notes: ['Open notes', 'Create notes', 'Export'],
@@ -597,7 +569,7 @@ const PERM_DESC = {
   'Assign to others': 'Gives a task to another person',
   'See activities': 'Opens the activities shared with them',
   'Plan activities': 'Creates and moves activities',
-  'Invite outside people': 'Sends invitations to people outside the organization',
+  'Invite outside people': 'Sends invitations to people outside the tenant',
   'See estimates': 'Opens the estimates shared with them',
   'Create estimates': 'Creates estimates of their own',
   Approve: 'Approves estimates up to the amount of their role',
@@ -608,33 +580,33 @@ const PERM_DESC = {
   'Use the assistant': 'Asks questions on the items of the apps',
   'Use it in automations': 'Puts steps of the assistant in automations',
 };
-/* Who has access, and with which permissions: the whole organization, groups, people. */
+/* Who has access, and with which permissions: the whole tenant, groups, people. */
 const MOD_GRANTS = {
   notes: [
-    ['building', 'Whole organization', '128 people', [1, 1, 1]],
+    ['building', 'Whole tenant', '128 people', [1, 1, 1]],
     ['users', 'Group Operations office', '6 people', [1, 1, 1]],
   ],
   tasks: [
-    ['building', 'Whole organization', '128 people', [1, 1, 0]],
+    ['building', 'Whole tenant', '128 people', [1, 1, 0]],
     ['users', 'Group Planning', '23 people', [1, 1, 1]],
   ],
   activities: [
-    ['building', 'Whole organization', '128 people', [1, 0, 0]],
+    ['building', 'Whole tenant', '128 people', [1, 0, 0]],
     ['users', 'Group Planning', '23 people', [1, 1, 1]],
     ['user', 'Sara Greco', 'User', [1, 1, 1]],
   ],
   estimates: [
-    ['building', 'Whole organization', '128 people', [1, 0, 0, 0]],
+    ['building', 'Whole tenant', '128 people', [1, 0, 0, 0]],
     ['users', 'Group Finance', '17 people', [1, 1, 1, 1]],
     ['user', 'Davide Conti', 'User', [1, 1, 0, 1]],
   ],
-  collab: [['building', 'Whole organization', '128 people', [1, 1]]],
+  collab: [['building', 'Whole tenant', '128 people', [1, 1]]],
   auto: [['users', 'Group Planning', '23 people', [1, 1]]],
   ai: [['users', 'Group Operations office', '6 people', [1, 1]]],
 };
 
 /* Profiles: where the permissions of a User start. Not roles: groups and personal exceptions add
-   to them. p: module -> permissions of MOD_PERMS. */
+   to them. p: plugin -> permissions of MOD_PERMS. */
 const PROFILES = [
   {
     id: 'std',
@@ -700,17 +672,18 @@ const PROFILES = [
 ];
 const PROF = (id) => PROFILES.find((x) => x.id === id) || PROFILES[0];
 
-/* ── Marketplace ──────────────────────────────────────────────────────
-   Two families. SYSTEM modules come with the installation: they update, they are neither disabled
-   nor uninstalled, and each organization turns them on from its page. EXTENSIONS install from the
-   catalog of the repositories: once installed they appear among the modules of organizations,
-   where the administrator enables them if the plan includes them, and the manager then decides
-   who gets them. */
+/* ── Plugins ──────────────────────────────────────────────────────────
+   One name for everything an installation adds. Each plugin has a kind: an App has pages of its own,
+   a Service works behind the scenes, an Extension extends another plugin («ext»: fields, actions,
+   tabs). Built-in plugins («sys») come with the installation: they update, they are neither disabled
+   nor uninstalled. The others install from the catalog of the repositories. The administrator makes a
+   plugin available to a tenant; its Tenant Manager turns it on and decides who gets it. */
 const MP = [
   {
     id: 'notes',
     n: 'Notes',
     sys: 'notes',
+    kind: 'App',
     ver: '1.4.0',
     next: '1.5.0',
     trust: 'Official',
@@ -718,12 +691,13 @@ const MP = [
     ed: 'Mosaikit',
     d: 'The Notes app: notes, checklists and shared editing.',
     notes: [['1.5.0', 'Checklists inside notes, faster search']],
-    asks: ['Reads the people of the organization to mention them'],
+    asks: ['Reads the people of the tenant to mention them'],
   },
   {
     id: 'tasks',
     n: 'Tasks',
     sys: 'tasks',
+    kind: 'App',
     ver: '1.4.0',
     trust: 'Official',
     repo: 'Mosaikit',
@@ -736,6 +710,7 @@ const MP = [
     id: 'activities',
     n: 'Activities',
     sys: 'activities',
+    kind: 'App',
     ver: '1.4.0',
     trust: 'Official',
     repo: 'Mosaikit',
@@ -748,6 +723,7 @@ const MP = [
     id: 'estimates',
     n: 'Estimates',
     sys: 'estimates',
+    kind: 'App',
     ver: '1.4.0',
     trust: 'Official',
     repo: 'Mosaikit',
@@ -760,6 +736,7 @@ const MP = [
     id: 'collab',
     n: 'Collaboration',
     sys: 'collab',
+    kind: 'Service',
     ver: '1.0.0',
     trust: 'Official',
     repo: 'Mosaikit',
@@ -770,6 +747,8 @@ const MP = [
   },
   {
     id: 'timeline',
+    kind: 'Extension',
+    ext: 'activities',
     n: 'Timeline view',
     ver: '0.9.0',
     trust: 'Experimental',
@@ -784,6 +763,8 @@ const MP = [
   },
   {
     id: 'time-tracking',
+    kind: 'Extension',
+    ext: 'tasks',
     n: 'Time tracking',
     ver: '1.2.0',
     next: '1.3.0',
@@ -800,11 +781,12 @@ const MP = [
     ],
     asks: [
       'Reads the tasks the person can see',
-      'Calls the payroll service of the organization (payroll.example.org)',
+      'Calls the payroll service of the tenant (payroll.example.org)',
     ],
   },
   {
     id: 'invoicing',
+    kind: 'App',
     n: 'Invoicing',
     ver: '2.0.1',
     trust: 'Verified',
@@ -821,6 +803,7 @@ const MP = [
 const MP_CATALOG = [
   {
     id: 'field-forms',
+    kind: 'App',
     n: 'Forms on the phone',
     ver: '1.1.0',
     trust: 'Verified',
@@ -833,6 +816,8 @@ const MP_CATALOG = [
   },
   {
     id: 'e-signature',
+    kind: 'Extension',
+    ext: 'estimates',
     n: 'Electronic signature',
     ver: '0.7.0',
     trust: 'Experimental',
@@ -841,10 +826,12 @@ const MP_CATALOG = [
     d: 'Signs estimates and documents with a qualified signature.',
     needs: ['estimates'],
     perms: ['Sign', 'Ask for a signature'],
-    asks: ['Calls the signature service of the organization'],
+    asks: ['Calls the signature service of the tenant'],
   },
   {
     id: 'doc-templates',
+    kind: 'Extension',
+    ext: 'notes',
     n: 'Document templates',
     ver: '1.0.2',
     trust: 'Official',
@@ -857,6 +844,8 @@ const MP_CATALOG = [
   },
   {
     id: 'boards',
+    kind: 'Extension',
+    ext: 'tasks',
     n: 'Boards',
     ver: '1.0.0',
     trust: 'Verified',
@@ -873,18 +862,27 @@ MP_CATALOG.forEach((m) => {
   m.asks = m.asks || [];
 });
 const MP_TRUST = { Official: 'info', Verified: 'ok', Experimental: 'warn' };
-/* An installed extension becomes a module of organizations, with the key «ext:id». */
+/* An installed plugin from the catalog becomes a plugin of tenants, with the key «ext:id». */
 function extFeat(m) {
   return {
     k: 'ext:' + m.id,
     g: 'ext',
-    ic: 'puzzle',
+    kind: m.kind,
+    ext: m.ext,
+    ic: m.kind === 'App' ? 'grid' : 'puzzle',
     n: m.n,
-    plan: 'Extensions from the marketplace',
     d: m.d,
-    how: `Extension from the marketplace · ${m.ed} · version ${m.ver}.`,
+    how: `${m.ed} · version ${m.ver}.`,
     needs: m.needs || [],
   };
+}
+/* The kind of a plugin of tenants: the built-in apps and services, or what the catalog says. */
+function featKind(f) {
+  return f.kind || { app: 'App', int: 'Service', ext: 'Extension' }[f.g];
+}
+const KIND_IC = { App: 'grid', Service: 'cpu', Extension: 'puzzle' };
+function kindPill(kind) {
+  return pill(kind, kind === 'App' ? 'info' : '', KIND_IC[kind]);
 }
 MP.filter((m) => !m.sys).forEach((m) => {
   FEATS.push(extFeat(m));
@@ -938,7 +936,7 @@ function featRequired(k, on) {
   walk(k);
   return out;
 }
-/* Who has access to a module: the profiles that give at least one of its permissions, then groups and people. */
+/* Who has access to a plugin: the profiles that give at least one of its permissions, then groups and people. */
 function modRows(k) {
   const prof = PROFILES.filter((pr) => pr.p[k] && pr.p[k].some((v) => v)).map((pr) => [
     'id',
@@ -948,9 +946,9 @@ function modRows(k) {
     'prof',
     pr.id,
   ]);
-  return prof.concat((MOD_GRANTS[k] || []).filter((r) => r[1] !== 'Whole organization'));
+  return prof.concat((MOD_GRANTS[k] || []).filter((r) => r[1] !== 'Whole tenant'));
 }
-/* Effective permissions: by module, by permission, and where each comes from. */
+/* Effective permissions: by plugin, by permission, and where each comes from. */
 function effPerms(prof, groups, person, extra) {
   const out = {};
   Object.keys(MOD_PERMS).forEach((k) => {
@@ -992,7 +990,7 @@ const LOG_TYPE = {
   person: 'Person',
   group: 'Group',
   settings: 'Settings',
-  organization: 'Organization',
+  organization: 'Tenant',
 };
 const LOG = [
   {
@@ -1091,7 +1089,7 @@ const LOG = [
     type: 'activity',
     target: 'Open day 2026',
     ok: 1,
-    before: 'Whole organization',
+    before: 'Whole tenant',
     after: 'Public',
     ip: '10.12.7.33',
     dev: 'Firefox · Windows',
@@ -1160,7 +1158,7 @@ const LOG = [
     fam: 'create',
     act: 'Connected an integration',
     type: 'settings',
-    target: 'Mail relay of the organization',
+    target: 'Mail relay of the tenant',
     ok: 1,
     ip: '10.12.4.8',
     dev: 'Edge · Windows',
@@ -1173,7 +1171,7 @@ const LOG = [
     fam: 'settings',
     act: 'Changed the default theme',
     type: 'settings',
-    target: 'Appearance of the organization',
+    target: 'Appearance of the tenant',
     ok: 1,
     before: 'Slate',
     after: 'Mosaikit',
@@ -1271,7 +1269,7 @@ const LOG = [
     t: '11:11',
     who: 'Paola Ferri',
     fam: 'settings',
-    act: 'Organization suspended',
+    act: 'Tenant suspended',
     type: 'organization',
     target: 'Green Valley Union',
     ten: 'Mosaikit (Platform)',
@@ -1287,7 +1285,7 @@ LOG.forEach((e) => {
 });
 
 /* ── Sign-in and invitations ─────────────────────────────────────────
-   The sample accounts of the sign-in page, one per case. via: 'sso' | 'local' | 'both'. */
+   The accounts behind the samples of the sign-in page: home tenant, role in each tenant. */
 const ACCOUNTS = {
   'd.conti@city.example.org': {
     who: 'Davide Conti',
@@ -1305,7 +1303,7 @@ const ACCOUNTS = {
     home: 'Example City',
     via: 'sso',
     tenants: [
-      ['Example City', 'Manager', 'home'],
+      ['Example City', 'Tenant Manager', 'home'],
       ['Example County', 'User', 'assoc'],
       ['Green Region', 'User', 'assoc'],
     ],
@@ -1320,7 +1318,7 @@ const ACCOUNTS = {
   'a.verdi@county.example.org': {
     who: 'Anna Verdi',
     home: 'Example County',
-    via: 'both',
+    via: 'sso',
     tenants: [
       ['Example County', 'User', 'home'],
       ['Example City', 'User', 'assoc'],
@@ -1367,12 +1365,12 @@ const INVITES = [
   'p.serra@city.example.org · User · profile Standard · Planning · 4 days ago',
   'm.ferri@region.example.org · User · profile View and edit · guest from Green Region · Field team · yesterday',
   'f.costa@city.example.org · User · profile Field worker · Field team · 6 days ago',
-  'l.neri@city.example.org · Manager · Operations office · 2 days ago',
+  'l.neri@city.example.org · Tenant Manager · Operations office · 2 days ago',
 ];
 
 /* ── Settings ────────────────────────────────────────────────────────── */
 
-/* Languages: the platform decides which exist, the organization picks a subset, each person picks theirs. */
+/* Languages: the platform decides which exist, the tenant picks a subset, each person picks theirs. */
 const LANGS = [
   ['en', 'English'],
   ['it', 'Italiano'],
@@ -1490,12 +1488,12 @@ const MON_SVC = [
   ['kernel', 'Mosaikit kernel', 'ok', '1.0.0 · 2 instances', 180, 0.2, 'API, shell and extensions'],
   [
     'keycloak',
-    'Keycloak',
+    'Sign-in',
     'ok',
-    '24.0 · 6 realms',
+    '2 identity providers (OIDC)',
     95,
     0.0,
-    'All accounts: SSO of organizations and local accounts',
+    'Local accounts with argon2id, and the identity providers of the tenants',
   ],
   [
     'relay',

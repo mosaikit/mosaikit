@@ -8,7 +8,8 @@ use mosaikit_kernel::tenancy::{
     administrators, caller, create_administrator, create_group, create_member, create_tenant_manager,
     directory, invite, list_tenants, login_tenants, members, my_invitations, remove_member,
     reset_administrator_totp, reset_member_password, reset_tenant_password, respond_invitation,
-    set_administrator_active, set_group_member, set_role, set_tenant_role, set_tenant_status, tenant_members,
+    set_administrator_active, set_group_member, set_role, set_shell_band, set_tenant_role, set_tenant_status,
+    shell_band, tenant_members, ShellBand,
 };
 use mosaikit_kernel::testing::{start, start_with, ADMIN_PASSWORD, PASSWORD};
 use mosaikit_kernel::{totp, Kind, Role};
@@ -412,4 +413,58 @@ async fn password_iniziale_della_distribuzione() {
     assert_eq!(file.matches("password: mosaikit").count(), 2, "{file}");
     // cambiandola vale di nuovo la policy
     assert_eq!(change_password(&t, &u, "mosaikit", "corta").await.unwrap_err().kind, Kind::BadRequest);
+}
+
+#[tokio::test]
+async fn barra_in_alto_decisa_dall_administrator() {
+    let t = start().await;
+    let admin = t.admin().await;
+    let gestore = t.tenant("alfa").await;
+    // all'inizio tutto acceso
+    assert_eq!(shell_band(&t).await.unwrap(), ShellBand::default());
+    assert!(ShellBand::default().logo && ShellBand::default().mode);
+    let band = ShellBand { logo: false, search: false, lang: true, help: false, mode: true };
+    // solo l'Administrator la cambia
+    assert_eq!(set_shell_band(&t, &gestore, &band).await.unwrap_err().kind, Kind::Forbidden);
+    set_shell_band(&t, &admin, &band).await.unwrap();
+    assert_eq!(shell_band(&t).await.unwrap(), band);
+    // non tocca le altre impostazioni del tenant di sistema
+    set_shell_band(&t, &admin, &ShellBand::default()).await.unwrap();
+    assert_eq!(shell_band(&t).await.unwrap(), ShellBand::default());
+}
+
+#[tokio::test]
+async fn tema_della_piattaforma_e_del_tenant() {
+    use mosaikit_kernel::tenancy::{
+        platform_theme, set_platform_theme, set_settings, set_tenant_theme, tenant_theme,
+    };
+    let t = start().await;
+    let admin = t.admin().await;
+    let g = t.tenant("alfa").await;
+    let gestore = t.home(&g).await;
+    let anna = t.member(&g, "anna").await;
+    let anna = t.home(&anna).await;
+    let alfa = gestore.tenant.tenant_id;
+    // all'inizio il tema predefinito, ereditato dal tenant
+    assert_eq!(platform_theme(&t).await.unwrap(), "mosaikit");
+    assert_eq!(tenant_theme(&t, alfa).await.unwrap().tenant, None);
+    // la piattaforma: solo l'Administrator
+    assert_eq!(set_platform_theme(&t, &g, "italia").await.unwrap_err().kind, Kind::Forbidden);
+    assert_eq!(set_platform_theme(&t, &admin, "Non Valido").await.unwrap_err().kind, Kind::BadRequest);
+    set_platform_theme(&t, &admin, "italia").await.unwrap();
+    assert_eq!(tenant_theme(&t, alfa).await.unwrap().preset, "italia", "il tenant eredita");
+    // il tenant: solo il Tenant Manager, non chi ci lavora
+    assert_eq!(set_tenant_theme(&t, &anna, Some("mosaikit")).await.unwrap_err().kind, Kind::Forbidden);
+    set_tenant_theme(&t, &gestore, Some("mosaikit")).await.unwrap();
+    let th = tenant_theme(&t, alfa).await.unwrap();
+    assert_eq!(
+        (th.platform.as_str(), th.tenant.as_deref(), th.preset.as_str()),
+        ("italia", Some("mosaikit"), "mosaikit")
+    );
+    // le policy del tenant non cancellano il tema
+    set_settings(&t, &gestore, &gestore.tenant.settings).await.unwrap();
+    assert_eq!(tenant_theme(&t, alfa).await.unwrap().preset, "mosaikit");
+    // di nuovo quello della piattaforma
+    set_tenant_theme(&t, &gestore, None).await.unwrap();
+    assert_eq!(tenant_theme(&t, alfa).await.unwrap().preset, "italia");
 }

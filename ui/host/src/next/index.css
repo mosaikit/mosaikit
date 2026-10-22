@@ -1,0 +1,267 @@
+/* Prototipo della nuova shell (next.html): Tailwind v4 + componenti shadcn/ui.
+   I temi sono insiemi di variabili CSS, scelti da `data-preset` e dalla classe `dark` su <html>
+   (vedi theme.ts). Oltre alle variabili di shadcn ci sono quelle della barra in alto (band) e quelle
+   che i plugin leggono dal bridge (--bg, --fg, --acc...). */
+@import 'tailwindcss' source(none);
+@import 'tw-animate-css';
+@source './';
+@source '../components/ui';
+@source '../hooks';
+
+@custom-variant dark (&:is(.dark *));
+
+/* ── Mosaikit: i colori di Microsoft Teams ─────────────────────────── */
+:root,
+[data-preset='mosaikit'] {
+  --font-sans: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  --radius: 0.375rem;
+  --background: #ffffff;
+  --foreground: #242424;
+  --card: #ffffff;
+  --card-foreground: #242424;
+  --popover: #ffffff;
+  --popover-foreground: #242424;
+  --primary: #5b5fc7;
+  --primary-foreground: #ffffff;
+  --secondary: #f5f5f5;
+  --secondary-foreground: #242424;
+  --muted: #f5f5f5;
+  --muted-foreground: #616161;
+  --accent: #f0f0f0;
+  --accent-foreground: #242424;
+  --destructive: #c4314b;
+  --border: #e0e0e0;
+  --input: #d1d1d1;
+  --ring: #5b5fc7;
+  --ok: #107c10;
+  --warn: #a96a05;
+  --pane: #f5f5f5;
+  --band: #444791;
+  --band-foreground: #ffffff;
+  --band-muted: rgba(255, 255, 255, 0.82);
+  --band-hover: rgba(255, 255, 255, 0.16);
+  --band-line: rgba(255, 255, 255, 0.18);
+  --search: #e8ebfa;
+  --search-foreground: #616161;
+  --sidebar: #ebebeb;
+  --sidebar-foreground: #424242;
+  --sidebar-primary: #5b5fc7;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #ffffff;
+  --sidebar-accent-foreground: #5b5fc7;
+  --sidebar-border: #e0e0e0;
+  --sidebar-ring: #5b5fc7;
+  --sidebar-hover: #e0e0e0;
+  --rail-foreground: #616161;
+}
+.dark[data-preset='mosaikit'],
+.dark:not([data-preset]) {
+  --background: #1f1f1f;
+  --foreground: #f0f0f0;
+  --card: #292929;
+  --card-foreground: #f0f0f0;
+  --popover: #292929;
+  --popover-foreground: #f0f0f0;
+  --primary: #7f85f5;
+  --primary-foreground: #141414;
+  --secondary: #2b2b2b;
+  --secondary-foreground: #f0f0f0;
+  --muted: #2b2b2b;
+  --muted-foreground: #adadad;
+  --accent: #333333;
+  --accent-foreground: #f0f0f0;
+  --destructive: #f1707b;
+  --border: #3d3d3d;
+  --input: #4d4d4d;
+  --ring: #7f85f5;
+  --ok: #54b054;
+  --warn: #e3a634;
+  --pane: #242424;
+  --band: #2b2b40;
+  --search: #292929;
+  --search-foreground: #adadad;
+  --sidebar: #141414;
+  --sidebar-foreground: #d1d1d1;
+  --sidebar-primary: #7f85f5;
+  --sidebar-primary-foreground: #141414;
+  --sidebar-accent: #2b2b2b;
+  --sidebar-accent-foreground: #7f85f5;
+  --sidebar-border: #2b2b2b;
+  --sidebar-ring: #7f85f5;
+  --sidebar-hover: #2b2b2b;
+  --rail-foreground: #adadad;
+}
+
+/* ── Italia: i colori e il carattere di Designers Italia (tenant della PA) ── */
+[data-preset='italia'] {
+  --font-sans: 'Titillium Web', system-ui, sans-serif;
+  --radius: 0.25rem;
+  --background: #ffffff;
+  --foreground: #17324d;
+  --card: #ffffff;
+  --card-foreground: #17324d;
+  --popover: #ffffff;
+  --popover-foreground: #17324d;
+  --primary: #0066cc;
+  --primary-foreground: #ffffff;
+  --secondary: #f5f7fa;
+  --secondary-foreground: #17324d;
+  --muted: #f5f7fa;
+  --muted-foreground: #5c6f82;
+  --accent: #e6f0fa;
+  --accent-foreground: #17324d;
+  --destructive: #d9364f;
+  --border: #dde5ee;
+  --input: #c5d0dc;
+  --ring: #0066cc;
+  --ok: #008758;
+  --warn: #a66300;
+  --pane: #f5f7fa;
+  --band: #0066cc;
+  --band-foreground: #ffffff;
+  --band-muted: rgba(255, 255, 255, 0.85);
+  --band-hover: rgba(255, 255, 255, 0.16);
+  --band-line: rgba(255, 255, 255, 0.28);
+  --search: #ffffff;
+  --search-foreground: #5c6f82;
+  --sidebar: #ffffff;
+  --sidebar-foreground: #33485c;
+  --sidebar-primary: #0066cc;
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #e3eefb;
+  --sidebar-accent-foreground: #0066cc;
+  --sidebar-border: #dde5ee;
+  --sidebar-ring: #0066cc;
+  --sidebar-hover: #eef3f8;
+  --rail-foreground: #5c6f82;
+}
+.dark[data-preset='italia'] {
+  --background: #0c1520;
+  --foreground: #e6edf5;
+  --card: #101b29;
+  --card-foreground: #e6edf5;
+  --popover: #101b29;
+  --popover-foreground: #e6edf5;
+  --primary: #4da3ff;
+  --primary-foreground: #04121f;
+  --secondary: #1a2a3d;
+  --secondary-foreground: #e6edf5;
+  --muted: #1a2a3d;
+  --muted-foreground: #8195ab;
+  --accent: #1f3047;
+  --accent-foreground: #e6edf5;
+  --destructive: #ff7a8a;
+  --border: #1f3047;
+  --input: #2a3f59;
+  --ring: #4da3ff;
+  --pane: #101b29;
+  --band: #0a3d73;
+  --search: #0d4a8a;
+  --search-foreground: #cfe2ff;
+  --sidebar: #101b29;
+  --sidebar-foreground: #b9c7d6;
+  --sidebar-primary: #4da3ff;
+  --sidebar-primary-foreground: #04121f;
+  --sidebar-accent: #1a2a3d;
+  --sidebar-accent-foreground: #7cbcff;
+  --sidebar-border: #1f3047;
+  --sidebar-ring: #4da3ff;
+  --sidebar-hover: #1a2a3d;
+  --rail-foreground: #8195ab;
+}
+
+/* Le variabili che il bridge passa alle UI dei plugin (bridge.ts, THEME_VARS). */
+:root {
+  --bg: var(--background);
+  --panel: var(--card);
+  --panel2: var(--muted);
+  --line: var(--border);
+  --fg: var(--foreground);
+  --dim: var(--muted-foreground);
+  --acc: var(--primary);
+  --acc-soft: color-mix(in srgb, var(--primary) 12%, transparent);
+  --acc-line: color-mix(in srgb, var(--primary) 40%, transparent);
+  --err: var(--destructive);
+}
+
+@theme inline {
+  --font-sans: var(--font-sans);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-pane: var(--pane);
+  --color-band: var(--band);
+  --color-band-foreground: var(--band-foreground);
+  --color-band-muted: var(--band-muted);
+  --color-band-hover: var(--band-hover);
+  --color-band-line: var(--band-line);
+  --color-search: var(--search);
+  --color-search-foreground: var(--search-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-hover: var(--sidebar-hover);
+  --color-rail-foreground: var(--rail-foreground);
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  /* card, tabelle e riquadri: 6px come nel mockup (tema predefinito); i controlli restano a --radius */
+  --radius-xl: 6px;
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: var(--font-sans);
+  }
+}
+
+/* Pagina di accesso: le tessere del mosaico si accendono piano, una dopo l'altra. */
+@keyframes login-tile {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+.login-tile {
+  aspect-ratio: 1;
+  animation: login-tile 9s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .login-tile {
+    animation: none;
+  }
+}

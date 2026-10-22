@@ -10,13 +10,28 @@ interface Props {
   ctx: TenantContext
   /** cambia per forzare il ricaricamento (hot reload in sviluppo) */
   reloadKey: number
+  /** lingua e tema della shell: all'handshake e, a ogni cambio, con l'evento `context` */
+  ui?: { lang: string; preset: string; mode: 'light' | 'dark'; preference: 'light' | 'dark' | 'auto' }
+}
+
+/** Lingua, tema e modo da passare al plugin (senza `ui`, quelli della pagina). */
+function uiContext(ui: Props['ui']) {
+  const root = document.documentElement
+  const dark = root.classList.contains('dark') || root.dataset.theme === 'dark'
+  return {
+    lang: ui?.lang ?? (root.lang || 'it'),
+    preset: ui?.preset ?? (root.dataset.preset || 'mosaikit'),
+    mode: ui?.mode ?? (dark ? 'dark' : 'light'),
+    preference: ui?.preference ?? (dark ? 'dark' : 'light'),
+    theme: themeVars(),
+  }
 }
 
 /**
  * Iframe della UI del plugin (origine separata, sandbox) e lato host del bridge.
  * Accetta messaggi solo dall'iframe corrente e dall'origine dei plugin.
  */
-export default function PluginFrame({ plugin, session, ctx, reloadKey }: Props) {
+export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell }: Props) {
   const ref = useRef<HTMLIFrameElement>(null)
   const ui = useUi()
   const [loaded, setLoaded] = useState(false)
@@ -27,6 +42,21 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey }: Props) 
   useEffect(() => {
     setLoaded(false)
   }, [src])
+
+  // a ogni cambio di lingua, tema o modo il plugin riceve il contesto nuovo (e il solo tema, per i
+  // plugin scritti prima dell'evento `context`)
+  const shellRef = useRef(shell)
+  useEffect(() => {
+    shellRef.current = shell
+  })
+  const uiKey = shell ? `${shell.lang}|${shell.preset}|${shell.mode}|${shell.preference}` : ''
+  useEffect(() => {
+    const win = ref.current?.contentWindow
+    if (!win || !loaded) return
+    const c = uiContext(shellRef.current)
+    win.postMessage({ msk: 1, event: 'context', data: c }, origin)
+    win.postMessage({ msk: 1, event: 'theme', data: c.theme }, origin)
+  }, [uiKey, loaded, origin])
 
   useEffect(() => {
     const onMessage = async (ev: MessageEvent) => {
@@ -45,6 +75,7 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey }: Props) 
                 tenant: { slug: ctx.tenant.slug, name: ctx.tenant.name, role: ctx.tenant.role },
                 plugin: { id: plugin.id, version: plugin.version },
                 theme: themeVars(),
+                context: uiContext(shellRef.current),
               },
             })
             return
