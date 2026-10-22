@@ -134,7 +134,7 @@ test.describe.serial('platform', () => {
 
     // plugins preinstalled from the registry
     await nav(page, 'Plugins').click()
-    for (const name of ['Note', 'Attività', 'Contatti', 'Mappe', 'Siti statici', 'File']) {
+    for (const name of ['Notes', 'Tasks', 'Contacts', 'Maps', 'Static sites', 'Files']) {
       await expect(page.getByRole('row', { name: new RegExp(name) }).first()).toContainText('active')
     }
     await accessible(page, 'plugins of the platform')
@@ -240,16 +240,16 @@ test.describe.serial('platform', () => {
     await expect(page.getByRole('button', { name: /^Tenant: / })).toBeVisible()
 
     // a note in the plugin, in the iframe (the plugin labels come from its manifest)
-    await nav(page, 'Note').click()
+    await nav(page, 'Notes').click()
     const frame = page.frameLocator('iframe.plugin-frame')
-    await expect(frame.getByRole('heading', { name: 'Note' })).toBeVisible()
+    await expect(frame.getByRole('heading', { name: 'Notes' })).toBeVisible()
     await frame.locator('[data-key="title"]').fill('Meeting minutes')
     await frame.locator('[data-key="body"]').fill('<b>confidential content</b>')
     await frame.getByRole('button', { name: 'Save' }).click()
     const row = frame.locator('tbody tr.row', { hasText: 'Meeting minutes' })
     await expect(row).toBeVisible()
     // WASM hook of the plugin: default tag
-    await expect(row).toContainText('personale')
+    await expect(row).toContainText('personal')
 
     // read sharing with the manager, in the dialog of the host
     await frame.getByRole('button', { name: 'Share…' }).click()
@@ -286,7 +286,7 @@ test.describe.serial('platform', () => {
     await accessible(page, 'tenant overview, dark')
     await page.getByRole('button', { name: 'Mode' }).click()
     await page.getByRole('menuitemradio', { name: 'Light' }).click()
-    await nav(page, 'Note').click()
+    await nav(page, 'Notes').click()
     const frame = page.frameLocator('iframe.plugin-frame')
     const row = frame.locator('tbody tr.row', { hasText: 'Meeting minutes' })
     await expect(row).toContainText('read only')
@@ -301,15 +301,15 @@ test.describe.serial('platform', () => {
     await accessible(page, 'shares')
 
     await nav(page, 'Usage').click()
-    await expect(page.getByText('Note per tag')).toBeVisible()
-    await expect(page.getByRole('table', { name: /Note per tag/ })).toContainText('personale')
+    await expect(page.getByText('Notes by tag')).toBeVisible()
+    await expect(page.getByRole('table', { name: /Notes by tag/ })).toContainText('personal')
     await accessible(page, 'usage')
     await logout(page)
   })
 
   test('the iframe of the plugin does not reach the app', async ({ page }) => {
     await login(page, 'City of Alfa', 'anna', NEW_PASSWORD)
-    await nav(page, 'Note').click()
+    await nav(page, 'Notes').click()
     const frameEl = page.locator('iframe.plugin-frame')
     await expect(frameEl).toHaveAttribute('src', new RegExp(`^http://127\\.0\\.0\\.1:18081${BASE}/ui/`))
     const frame = page.frames().find((f) => f.url().includes(`:18081${BASE}/ui/`))!
@@ -361,10 +361,13 @@ test.describe.serial('platform', () => {
     // no English phrase of the frame left in the page
     const text = await page.locator('body').innerText()
     expect(text).not.toMatch(/\b(Your space|Shared by me|Tenant management|Sign out|Notifications)\b/)
-    // the plugin receives the language of the shell
+    // the plugin receives the language of the shell, and the texts of its manifest are in Italian:
+    // name in the sidebar, title, label of the value of the tag
     await nav(page, 'Note').click()
     const frame = page.frameLocator('iframe.plugin-frame')
     await expect(frame.getByPlaceholder('Filtra…')).toBeVisible()
+    await expect(frame.getByRole('heading', { name: 'Note' })).toBeVisible()
+    await expect(frame.locator('tbody tr.row', { hasText: 'Meeting minutes' })).toContainText('personale')
   })
 
   test('phone: the sidebar becomes a drawer', async ({ browser }) => {

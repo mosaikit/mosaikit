@@ -238,6 +238,8 @@ export interface PluginKpi {
   plugin: string
   view: string
   label: string
+  /** labels of the columns, in the language of the request (missing: the name of the column) */
+  columns?: Record<string, string>
   rows: Record<string, unknown>[]
 }
 

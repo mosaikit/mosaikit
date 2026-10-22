@@ -454,9 +454,35 @@ extensions = ["postgis"] # they must be installed in the database
 [[kpi]]
 view = "kpi_notes_by_tag"
 label = "Notes by tag"
+columns = { notes = "Notes" }   # optional labels of the columns of the view
+
+[i18n.it]                # optional: the texts in another language
+name = "Note"
+label = "Note"
+[i18n.it.resources.notes]
+label = "Note"
+fields = { title = "Titolo", body = "Testo" }
+options.tag = { personal = "personale", work = "lavoro" }
+[i18n.it.kpi.kpi_notes_by_tag]
+label = "Note per tag"
+columns = { notes = "note" }
 ```
 
-Field kinds: `text` (`multiline` too), `number`, `bool`, `date`, `choice`.
+Field kinds: `text` (`multiline` too), `number`, `bool`, `date`, `choice`. A choice
+field may give display labels to its values (`option_labels = { work = "Work" }`); the
+stored value stays the option.
+
+**Languages.** The texts of the manifest are English. `[i18n.<lang>]` (two or three
+lower-case letters, not `en`) translates the name, the description, the label of the
+contribution, the labels of resources and fields, the labels of the choice values, and
+label and columns of the KPIs; every key is optional and falls back to English, and the
+installation refuses a translation that names a resource, field, value or view the
+manifest does not have. The shell sends its language with every request
+(`Accept-Language`): the context of the tenant, the lists of the CRUD (fields and
+choice labels, which reach the UI of the plugin through the bridge), the KPIs, the
+administration of the plugins and the public page of a record answer in that language.
+The values stay identifiers: a plugin that translates stored values converts them with a
+migration.
 
 ### 8.3 WASM logic (ABI v1)
 

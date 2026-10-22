@@ -9,7 +9,7 @@
 import { useSyncExternalStore } from 'react'
 import i18next from 'i18next'
 import { initReactI18next } from 'react-i18next'
-import { setErrorTranslator } from '../api.ts'
+import { setErrorTranslator, setRequestLanguage } from '../api.ts'
 import { EN } from './locales/en.ts'
 import { IT } from './locales/it.ts'
 
@@ -48,6 +48,8 @@ void i18next.use(initReactI18next).init({
   initAsync: false,
 })
 document.documentElement.lang = i18next.language
+setRequestLanguage(i18next.language)
+i18next.on('languageChanged', (l) => setRequestLanguage(l))
 
 setErrorTranslator((code, message) => {
   const k = code ? `errors.${code}` : ''

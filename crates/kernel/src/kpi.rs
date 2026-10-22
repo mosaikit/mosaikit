@@ -44,7 +44,24 @@ pub struct PluginKpi {
     pub plugin: String,
     pub view: String,
     pub label: String,
+    /// labels of the columns (missing: the name of the column)
+    pub columns: std::collections::BTreeMap<String, String>,
     pub rows: Vec<Value>,
+}
+
+/// The texts of the KPIs of the plugins (name of the plugin, label, columns) in `lang`.
+pub fn localize(k: &Kernel, kpis: &mut [PluginKpi], lang: &str) {
+    for kpi in kpis {
+        let Some(p) = k.plugins.get(&kpi.plugin_id) else {
+            continue;
+        };
+        let m = p.manifest.localized(lang);
+        kpi.plugin = m.contribution.label.clone();
+        if let Some(d) = m.kpi.iter().find(|d| d.view == kpi.view) {
+            kpi.label = d.label.clone();
+            kpi.columns = d.columns.clone();
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -188,6 +205,7 @@ async fn plugin_kpis(k: &Kernel, tenant: Option<Uuid>) -> Result<Vec<PluginKpi>>
                         plugin: p.manifest.contribution.label.clone(),
                         view: decl.view.clone(),
                         label: decl.label.clone(),
+                        columns: decl.columns.clone(),
                         rows,
                     });
                 }

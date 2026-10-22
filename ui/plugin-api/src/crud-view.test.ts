@@ -15,13 +15,13 @@ function row(id: string, title: string, level: string, owner = 'anna') {
   return { id, values: { title, done: false, secret: 1 }, owner_id: 'u', owner_name: owner, my_level: level, shared: level !== 'manage', parent_id: null, created_at: '', updated_at: '' }
 }
 
-function fakeMsk(rows: any[], context?: UiContext) {
+function fakeMsk(rows: any[], context?: UiContext, decl: unknown[] = fields) {
   const calls: { op: string; args: any }[] = []
   const listeners: ((event: string, data: unknown) => void)[] = []
   const bridge = {
     call: async (op: string, args: any) => {
       calls.push({ op, args })
-      if (op === 'crud.list') return { resource: 'notes', fields, rows }
+      if (op === 'crud.list') return { resource: 'notes', fields: decl, rows }
       if (op === 'crud.create') return row('new', args.values.title, 'manage')
       if (op === 'confirm') return true
       return {}
@@ -67,6 +67,20 @@ describe('mountCrud', () => {
     await tick()
     const create = calls.find((c) => c.op === 'crud.create')!
     expect(create.args).toEqual({ resource: 'notes', values: { title: 'new note', done: true }, parent: undefined })
+  })
+
+  it('shows the labels of the choice values, and stores the values', async () => {
+    const el = document.createElement('div')
+    const decl = [{ key: 'tag', label: 'Etichetta', kind: 'choice', options: ['work', 'home'], option_labels: { work: 'lavoro' } }]
+    const r = { ...row('1', 'x', 'manage'), values: { tag: 'work' } }
+    const { msk } = fakeMsk([r], it_ctx, decl)
+    mountCrud(el, msk, 'notes')
+    await tick()
+    expect(el.querySelector('tbody td')!.textContent).toBe('lavoro')
+    ;(el.querySelector('tbody tr.row') as HTMLElement).click()
+    const options = [...el.querySelectorAll<HTMLOptionElement>('[data-key="tag"] option')].map((o) => [o.value, o.textContent])
+    // a value without a label shows the value
+    expect(options).toEqual([['', '—'], ['work', 'lavoro'], ['home', 'home']])
   })
 
   it('the text of the records does not become HTML', async () => {

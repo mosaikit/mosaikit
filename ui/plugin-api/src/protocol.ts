@@ -33,6 +33,8 @@ export interface FieldDecl {
   required?: boolean
   multiline?: boolean
   options?: string[]
+  /** labels of the values of a choice field (value -> label), in the language of the host */
+  option_labels?: Record<string, string>
   hidden?: boolean
 }
 

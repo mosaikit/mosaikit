@@ -149,7 +149,7 @@ mod tests {
     fn default_tag(ctx: &Ctx, hook: &Hook) -> Result<Option<Values>> {
         let mut v = hook.values.clone();
         if v.str("tag").is_empty() {
-            v.set("tag", "personale");
+            v.set("tag", "personal");
             ctx.log("default tag");
             return Ok(Some(v));
         }
@@ -180,7 +180,7 @@ mod tests {
         assert!(host.command(&reg, "notes.nope", json!({})).unwrap_err().contains("unknown"));
 
         let v = host.hook(&reg, "before_create", "notes", json!({ "title": "x" })).unwrap().unwrap();
-        assert_eq!(v.str("tag"), "personale");
+        assert_eq!(v.str("tag"), "personal");
         assert_eq!(host.logs(), vec!["default tag"]);
         assert_eq!(host.hook(&reg, "before_create", "notes", json!({ "tag": "work" })).unwrap(), None);
         assert_eq!(host.hook(&reg, "before_update", "notes", json!({})), Err("forbidden".into()));

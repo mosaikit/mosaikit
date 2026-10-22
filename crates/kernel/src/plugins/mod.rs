@@ -189,17 +189,26 @@ pub struct PluginView {
 
 impl PluginView {
     pub fn of(p: &LoadedPlugin) -> PluginView {
+        PluginView::with(p, &p.manifest)
+    }
+
+    /// With the texts of the manifest in `lang` (`it`, `it-IT`...), English where it has none.
+    pub fn localized(p: &LoadedPlugin, lang: &str) -> PluginView {
+        PluginView::with(p, &p.manifest.localized(lang))
+    }
+
+    fn with(p: &LoadedPlugin, m: &mosaikit_mskp::Manifest) -> PluginView {
         PluginView {
             id: p.id.clone(),
-            name: p.manifest.name.clone(),
-            version: p.manifest.version.clone(),
-            icon: p.manifest.contribution.icon.clone(),
-            label: p.manifest.contribution.label.clone(),
-            description: p.manifest.description.clone(),
-            has_ui: p.ui_dir.is_some() && p.manifest.ui.is_some(),
+            name: m.name.clone(),
+            version: m.version.clone(),
+            icon: m.contribution.icon.clone(),
+            label: m.contribution.label.clone(),
+            description: m.description.clone(),
+            has_ui: p.ui_dir.is_some() && m.ui.is_some(),
             dev: p.dev,
-            permissions: p.manifest.permissions.clone(),
-            resources: p.manifest.resources.clone(),
+            permissions: m.permissions.clone(),
+            resources: m.resources.clone(),
         }
     }
 }
@@ -218,24 +227,46 @@ pub struct PluginAdminView {
 }
 
 pub fn active_views(k: &Kernel) -> Vec<PluginView> {
-    k.plugins.list().iter().filter(|p| p.is_active()).map(|p| PluginView::of(p)).collect()
+    active_views_in(k, "en")
+}
+
+/// The active plugins, with their texts in `lang`.
+pub fn active_views_in(k: &Kernel, lang: &str) -> Vec<PluginView> {
+    k.plugins.list().iter().filter(|p| p.is_active()).map(|p| PluginView::localized(p, lang)).collect()
 }
 
 pub fn admin_views(k: &Kernel, admin: &SessionUser) -> Result<Vec<PluginAdminView>> {
+    admin_views_in(k, admin, "en")
+}
+
+/// Every plugin for the administrator, with its texts in `lang`.
+pub fn admin_views_in(k: &Kernel, admin: &SessionUser, lang: &str) -> Result<Vec<PluginAdminView>> {
     crate::tenancy::require_admin(admin)?;
     Ok(k.plugins
         .list()
         .iter()
         .map(|p| PluginAdminView {
-            view: PluginView::of(p),
+            view: PluginView::localized(p, lang),
             status: p.status,
             sha256: p.sha256.clone(),
             signed_by: p.signed_by.clone(),
             installed_at: p.installed_at,
             has_logic: p.module.is_some(),
-            kpi: p.manifest.kpi.clone(),
+            kpi: p.manifest.localized(lang).kpi,
         })
         .collect())
+}
+
+/// The fields of a resource of a plugin with their labels in `lang` (for the CRUD of the UIs).
+pub fn localized_fields(
+    k: &Kernel,
+    plugin: &str,
+    resource: &str,
+    lang: &str,
+) -> Option<Vec<mosaikit_mskp::FieldDecl>> {
+    let p = k.plugins.get(plugin)?;
+    let m = p.manifest.localized(lang);
+    m.resource(resource).map(|r| r.fields.clone())
 }
 
 // ------------------------------------------------------------------ activation and removal

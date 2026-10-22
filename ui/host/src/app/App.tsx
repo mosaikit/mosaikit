@@ -1,6 +1,6 @@
 // The shell of Mosaikit: sign-in, then the frame with the page of the route.
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
 import { errText, isUnavailable, setUnauthorizedHandler } from '../api.ts'
@@ -72,7 +72,14 @@ export default function App() {
   const qc = useQueryClient()
   const session = useSession()
   const hash = useHash()
-  useLang() // with the new language everything is drawn again
+  const uiLang = useLang() // with the new language everything is drawn again
+  // ...and the data of the server, which carry the texts of the plugins in that language
+  const shownLanguage = useRef(uiLang)
+  useEffect(() => {
+    if (shownLanguage.current === uiLang) return
+    shownLanguage.current = uiLang
+    void qc.invalidateQueries({ predicate: (q) => q.queryKey[0] !== 'session' })
+  }, [uiLang, qc])
   const route = parse(hash)
   useFavicon()
   useEffect(() => setUnauthorizedHandler(() => qc.setQueryData(['session'], null)), [qc])

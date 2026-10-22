@@ -367,7 +367,7 @@ export function Kpi({ label, value, hint, onClick }: { label: string; value: Rea
 }
 
 /** A table of any rows (the KPIs of the plugins): the columns are the keys of the first row. */
-export function DataTable({ rows, label }: { rows: Record<string, unknown>[]; label?: string }) {
+export function DataTable({ rows, label, columns = {} }: { rows: Record<string, unknown>[]; label?: string; columns?: Record<string, string> }) {
   if (!rows.length) return <p className="text-sm text-muted-foreground">{t('No data.')}</p>
   const cols = Object.keys(rows[0])
   return (
@@ -376,8 +376,8 @@ export function DataTable({ rows, label }: { rows: Record<string, unknown>[]; la
         <TableHeader>
           <TableRow>
             {cols.map((c) => (
-              <TableHead key={c} className="capitalize">
-                {c.replace(/_/g, ' ')}
+              <TableHead key={c} className={columns[c] ? undefined : 'capitalize'}>
+                {columns[c] ?? c.replace(/_/g, ' ')}
               </TableHead>
             ))}
           </TableRow>
@@ -408,7 +408,7 @@ export function PluginKpis({ items }: { items: PluginKpi[] }) {
           <h2 className="text-sm font-semibold">
             {p.plugin} · {p.label}
           </h2>
-          <DataTable rows={p.rows} label={`${p.plugin} · ${p.label}`} />
+          <DataTable rows={p.rows} label={`${p.plugin} · ${p.label}`} columns={p.columns} />
         </section>
       ))}
     </>

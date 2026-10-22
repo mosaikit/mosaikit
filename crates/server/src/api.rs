@@ -366,13 +366,24 @@ async fn dev_events(State(s): State<AppState>, Auth(_u): Auth) -> ApiResult<Resp
     Ok(Sse::new(stream).keep_alive(KeepAlive::default()).into_response())
 }
 
+/// Language of the request for the texts of the plugins: the first tag of `Accept-Language`
+/// (the shell sends the language of its interface), English without it.
+pub(crate) fn request_lang(h: &HeaderMap) -> String {
+    h.get(header::ACCEPT_LANGUAGE)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.split(',').next())
+        .map(|v| v.split(';').next().unwrap_or_default().trim().to_owned())
+        .filter(|v| !v.is_empty() && v.len() <= 35)
+        .unwrap_or_else(|| "en".into())
+}
+
 // ------------------------------------------------------------------ tenant
 
-async fn context(State(s): State<AppState>, Tenant(c): Tenant) -> ApiResult<Json<Value>> {
+async fn context(State(s): State<AppState>, Tenant(c): Tenant, h: HeaderMap) -> ApiResult<Json<Value>> {
     Ok(Json(json!({
         "tenant": { "id": c.tenant.tenant_id, "slug": c.tenant.slug, "name": c.tenant.name,
                     "role": c.tenant.role, "settings": c.tenant.settings },
-        "plugins": plugins::active_views(&s.k),
+        "plugins": plugins::active_views_in(&s.k, &request_lang(&h)),
         "prefs": tenancy::prefs(&s.k, &c).await?,
         "theme": tenancy::tenant_theme(&s.k, c.tenant.tenant_id).await?,
         "config": levels::effective(&s.k, Some(c.tenant.tenant_id)).await?,
@@ -511,11 +522,16 @@ async fn crud_list(
     Tenant(c): Tenant,
     Path(p): Path<ResPath>,
     Query(q): Query<HashMap<String, String>>,
+    h: HeaderMap,
 ) -> ApiResult<Json<Value>> {
     let parent = q.get("parent").filter(|v| !v.is_empty()).map(|v| uuid(v)).transpose()?;
-    Ok(Json(json!(
-        crud::list(&s.k, &c, &p.plugin, &p.res, q.get("filter").map(String::as_str), parent).await?
-    )))
+    let mut list =
+        crud::list(&s.k, &c, &p.plugin, &p.res, q.get("filter").map(String::as_str), parent).await?;
+    // the labels of the fields (and of the choice values) in the language of the request
+    if let Some(fields) = plugins::localized_fields(&s.k, &p.plugin, &p.res, &request_lang(&h)) {
+        list.fields = fields;
+    }
+    Ok(Json(json!(list)))
 }
 
 async fn crud_get(
@@ -1102,8 +1118,10 @@ async fn my_remove_key(
     Ok(Json(json!(keys::my_keys(&s.k, &c).await?)))
 }
 
-async fn m_kpi(State(s): State<AppState>, Tenant(c): Tenant) -> ApiResult<Json<Value>> {
-    Ok(Json(json!(kpi::tenant(&s.k, &c).await?)))
+async fn m_kpi(State(s): State<AppState>, Tenant(c): Tenant, h: HeaderMap) -> ApiResult<Json<Value>> {
+    let mut r = kpi::tenant(&s.k, &c).await?;
+    kpi::localize(&s.k, &mut r.plugins, &request_lang(&h));
+    Ok(Json(json!(r)))
 }
 
 // ------------------------------------------------------------------ system administrator
@@ -1266,8 +1284,8 @@ async fn a_tenant_status(
     Ok(ok())
 }
 
-async fn admin_plugins(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Json<Value>> {
-    Ok(Json(json!(plugins::admin_views(&s.k, &u)?)))
+async fn admin_plugins(State(s): State<AppState>, Auth(u): Auth, h: HeaderMap) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(plugins::admin_views_in(&s.k, &u, &request_lang(&h))?)))
 }
 
 async fn admin_install(
@@ -1351,6 +1369,8 @@ async fn m_set_theme(
     Ok(Json(json!(tenancy::tenant_theme(&s.k, c.tenant.tenant_id).await?)))
 }
 
-async fn a_kpi(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Json<Value>> {
-    Ok(Json(json!(kpi::global(&s.k, &u).await?)))
+async fn a_kpi(State(s): State<AppState>, Auth(u): Auth, h: HeaderMap) -> ApiResult<Json<Value>> {
+    let mut r = kpi::global(&s.k, &u).await?;
+    kpi::localize(&s.k, &mut r.plugins, &request_lang(&h));
+    Ok(Json(json!(r)))
 }

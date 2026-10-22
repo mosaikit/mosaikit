@@ -28,6 +28,7 @@ function h<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string, 
 function display(f: FieldDecl, v: unknown): string {
   if (v === null || v === undefined) return ''
   if (f.kind === 'bool') return v ? '✓' : ''
+  if (f.kind === 'choice') return f.option_labels?.[String(v)] ?? String(v)
   return String(v)
 }
 
@@ -184,7 +185,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
       el = h('input', { type: 'checkbox', id })
       ;(el as HTMLInputElement).checked = !!v
     } else if (f.kind === 'choice') {
-      el = h('select', { id }, h('option', { value: '' }, '—'), ...(f.options ?? []).map((o) => h('option', { value: o }, o)))
+      el = h('select', { id }, h('option', { value: '' }, '—'), ...(f.options ?? []).map((o) => h('option', { value: o }, f.option_labels?.[o] ?? o)))
       el.value = v == null ? '' : String(v)
     } else if (f.multiline) {
       el = h('textarea', { id, rows: '4' })

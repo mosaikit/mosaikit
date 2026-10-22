@@ -51,6 +51,14 @@ export function setErrorTranslator(fn: (code: string | undefined, message: strin
   translate = fn
 }
 
+/** Language of the interface, sent with every request: the server answers with the texts of the
+ *  plugins (names, labels, choices, KPIs) in that language. */
+let language = ''
+
+export function setRequestLanguage(l: string) {
+  language = l
+}
+
 export interface CallOptions {
   /** binary body (upload) */
   raw?: Blob
@@ -65,6 +73,7 @@ function unavailable(): ApiError {
 export async function api<T = unknown>(method: string, path: string, body?: unknown, opts: CallOptions = {}): Promise<T> {
   const headers: Record<string, string> = {}
   if (method !== 'GET' && method !== 'HEAD') headers['X-CSRF-Token'] = csrf
+  if (language) headers['Accept-Language'] = language
   let payload: BodyInit | undefined
   if (opts.raw) {
     headers['Content-Type'] = 'application/octet-stream'

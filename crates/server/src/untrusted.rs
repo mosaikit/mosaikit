@@ -302,7 +302,7 @@ async fn public_path(
                     &embeddable(&csp, &fa),
                 );
             }
-            match public_values(&s, &r).await {
+            match public_values(&s, &r, &crate::api::request_lang(&headers)).await {
                 Some((label, fields)) => {
                     html(pages::record(&r.title, &label, &fields), &embeddable(PAGE_CSP, &fa))
                 }
@@ -324,10 +324,16 @@ fn urlenc(s: &str) -> String {
         .collect()
 }
 
-/// Visible (not hidden) fields of a CRUD record reached through a link.
-async fn public_values(s: &AppState, r: &links::Resolved) -> Option<(String, Vec<(String, String)>)> {
+/// Visible (not hidden) fields of a CRUD record reached through a link, with the texts of the
+/// plugin in the language of the visitor.
+async fn public_values(
+    s: &AppState,
+    r: &links::Resolved,
+    lang: &str,
+) -> Option<(String, Vec<(String, String)>)> {
     let p = s.k.plugins.active(&r.plugin_id).ok()?;
-    let decl = p.manifest.resource(&r.kind)?;
+    let manifest = p.manifest.localized(lang);
+    let decl = manifest.resource(&r.kind)?;
     let row = crud::get_ctx(&s.k, &r.ctx(), &p, &r.kind, r.resource).await.ok()?;
     let fields = decl
         .fields
@@ -344,13 +350,13 @@ async fn public_values(s: &AppState, r: &links::Resolved) -> Option<(String, Vec
                         "no".into()
                     }
                 }
-                Value::String(s) => s.clone(),
+                Value::String(s) => f.option_labels.get(s).cloned().unwrap_or_else(|| s.clone()),
                 o => o.to_string(),
             };
             (if f.label.is_empty() { f.key.clone() } else { f.label.clone() }, text)
         })
         .collect();
-    Some((p.manifest.contribution.label.clone(), fields))
+    Some((manifest.contribution.label.clone(), fields))
 }
 
 async fn folder_page(s: &AppState, r: &links::Resolved, folder: Uuid, title: &str, token: &str) -> Response {

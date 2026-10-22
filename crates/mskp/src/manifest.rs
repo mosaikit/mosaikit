@@ -1,5 +1,7 @@
 //! Manifest v3 (`plugin.toml`).
 
+use std::collections::BTreeMap;
+
 use serde::{Deserialize, Serialize};
 
 use crate::{is_identifier, is_safe_path, Error, Result, Version};
@@ -33,6 +35,52 @@ pub struct Manifest {
     pub kpi: Vec<KpiDecl>,
     #[serde(default)]
     pub requires: Requires,
+    /// Texts in other languages (`[i18n.it]`, ...); the texts above are the English ones.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub i18n: BTreeMap<String, Translation>,
+}
+
+/// Texts of the manifest in another language. Every key is optional: what is missing stays in
+/// English.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(deny_unknown_fields)]
+pub struct Translation {
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub description: Option<String>,
+    /// `contribution.label`
+    #[serde(default)]
+    pub label: Option<String>,
+    /// by name of the resource
+    #[serde(default)]
+    pub resources: BTreeMap<String, ResourceTranslation>,
+    /// by name of the KPI view
+    #[serde(default)]
+    pub kpi: BTreeMap<String, KpiTranslation>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(deny_unknown_fields)]
+pub struct ResourceTranslation {
+    #[serde(default)]
+    pub label: Option<String>,
+    /// labels of the fields, by key
+    #[serde(default)]
+    pub fields: BTreeMap<String, String>,
+    /// labels of the values of the choice fields: key of the field -> value -> label
+    #[serde(default)]
+    pub options: BTreeMap<String, BTreeMap<String, String>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
+#[serde(deny_unknown_fields)]
+pub struct KpiTranslation {
+    #[serde(default)]
+    pub label: Option<String>,
+    /// labels of the columns of the view
+    #[serde(default)]
+    pub columns: BTreeMap<String, String>,
 }
 
 /// Requirements of the plugin towards the installation.
@@ -97,6 +145,9 @@ pub struct FieldDecl {
     /// Computed field (e.g. by a hook): not shown in forms.
     #[serde(default)]
     pub hidden: bool,
+    /// Labels of the values of a choice field (value -> label), shown instead of the value.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub option_labels: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
@@ -164,6 +215,9 @@ pub struct Permissions {
 pub struct KpiDecl {
     pub view: String,
     pub label: String,
+    /// Labels of the columns of the view (default: the names of the columns).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub columns: BTreeMap<String, String>,
 }
 
 impl Manifest {
@@ -260,7 +314,7 @@ impl Manifest {
                 return bad(format!("requires.extensions: invalid name '{e}'"));
             }
             if self.requires.database.is_none() {
-                return bad("requires.extensions richiede requires.database = \"postgres\"".into());
+                return bad("requires.extensions needs requires.database = \"postgres\"".into());
             }
         }
         if let Some(ui) = &self.ui {
@@ -273,8 +327,106 @@ impl Manifest {
                 return bad(format!("KPI view '{}' must be called kpi_*", k.view));
             }
         }
+        for r in &self.resources {
+            for f in &r.fields {
+                if f.option_labels.keys().any(|v| !f.options.contains(v)) {
+                    return bad(format!(
+                        "option_labels of '{}.{}' name a value that is not an option",
+                        r.name, f.key
+                    ));
+                }
+            }
+        }
+        for (lang, tr) in &self.i18n {
+            self.validate_translation(lang, tr).map_err(|m| Error::Manifest(format!("i18n.{lang}: {m}")))?;
+        }
         Ok(())
     }
+
+    fn validate_translation(&self, lang: &str, tr: &Translation) -> std::result::Result<(), String> {
+        if !is_lang(lang) || lang == "en" {
+            return Err("invalid language (two or three lower-case letters, not en)".into());
+        }
+        let texts = [&tr.name, &tr.description, &tr.label].into_iter().flatten();
+        let mut all: Vec<&String> = texts.collect();
+        for (name, rt) in &tr.resources {
+            let Some(r) = self.resource(name) else {
+                return Err(format!("resource '{name}' does not exist"));
+            };
+            all.extend(rt.label.iter());
+            for (key, label) in &rt.fields {
+                if !r.fields.iter().any(|f| &f.key == key) {
+                    return Err(format!("field '{name}.{key}' does not exist"));
+                }
+                all.push(label);
+            }
+            for (key, labels) in &rt.options {
+                let Some(f) = r.fields.iter().find(|f| &f.key == key && f.kind == FieldKind::Choice) else {
+                    return Err(format!("'{name}.{key}' is not a choice field"));
+                };
+                if let Some(v) = labels.keys().find(|v| !f.options.contains(v)) {
+                    return Err(format!("'{v}' is not an option of '{name}.{key}'"));
+                }
+                all.extend(labels.values());
+            }
+        }
+        for (view, kt) in &tr.kpi {
+            if !self.kpi.iter().any(|k| &k.view == view) {
+                return Err(format!("KPI view '{view}' is not declared"));
+            }
+            all.extend(kt.label.iter());
+            all.extend(kt.columns.values());
+        }
+        if all.iter().any(|t| t.chars().count() > 300) {
+            return Err("text longer than 300 characters".into());
+        }
+        Ok(())
+    }
+
+    /// The manifest with the texts of `lang` (e.g. `it`, `it-IT`) where it has them; English for
+    /// the rest and for the languages it does not have.
+    pub fn localized(&self, lang: &str) -> Manifest {
+        let mut m = self.clone();
+        let base = lang.split(['-', '_']).next().unwrap_or_default().to_ascii_lowercase();
+        let Some(tr) = self.i18n.get(&base) else {
+            return m;
+        };
+        let set = |target: &mut String, v: &Option<String>| {
+            if let Some(v) = v {
+                *target = v.clone();
+            }
+        };
+        set(&mut m.name, &tr.name);
+        set(&mut m.description, &tr.description);
+        set(&mut m.contribution.label, &tr.label);
+        for r in &mut m.resources {
+            let Some(rt) = tr.resources.get(&r.name) else {
+                continue;
+            };
+            set(&mut r.label, &rt.label);
+            for f in &mut r.fields {
+                if let Some(label) = rt.fields.get(&f.key) {
+                    f.label = label.clone();
+                }
+                if let Some(labels) = rt.options.get(&f.key) {
+                    f.option_labels.extend(labels.iter().map(|(k, v)| (k.clone(), v.clone())));
+                }
+            }
+        }
+        for k in &mut m.kpi {
+            let Some(kt) = tr.kpi.get(&k.view) else {
+                continue;
+            };
+            set(&mut k.label, &kt.label);
+            k.columns.extend(kt.columns.iter().map(|(c, v)| (c.clone(), v.clone())));
+        }
+        m
+    }
+}
+
+/// Language code of a translation: two or three lower-case letters (`it`, `fr`, `fur`).
+fn is_lang(s: &str) -> bool {
+    (2..=3).contains(&s.len()) && s.bytes().all(|b| b.is_ascii_lowercase())
 }
 
 /// `com.company.name`: at least two segments, lower case, digits and `-`.
@@ -315,11 +467,11 @@ mod tests {
 
     const NOTES: &str = r#"
         id = "com.mosaikit.notes"
-        name = "Note"
+        name = "Notes"
         version = "0.3.0"
         [contribution]
         icon = "📝"
-        label = "Note"
+        label = "Notes"
         [[resources]]
         name = "notes"
         fields = [
@@ -335,7 +487,7 @@ mod tests {
     "#;
 
     #[test]
-    fn parse_valido() {
+    fn parse_valid() {
         let m = Manifest::from_toml(NOTES).unwrap();
         assert_eq!(m.schema_name(), "plg_com_mosaikit_notes");
         assert_eq!(m.resources[0].title_key(), Some("title"));
@@ -358,6 +510,58 @@ mod tests {
         assert!(Manifest::from_toml(&bad_kpi).is_err());
         let unknown = format!("{NOTES}\nunknown = 1");
         assert!(Manifest::from_toml(&unknown).is_err());
+    }
+
+    const ITALIAN: &str = r#"
+        [i18n.it]
+        name = "Note"
+        label = "Note"
+        [i18n.it.resources.notes]
+        label = "Note"
+        fields = { title = "Titolo" }
+        options.tag = { a = "prima" }
+        [i18n.it.kpi.kpi_notes_by_tag]
+        label = "Note per tag"
+        columns = { n = "numero" }
+    "#;
+
+    #[test]
+    fn translations() {
+        let m = Manifest::from_toml(&format!("{NOTES}{ITALIAN}")).unwrap();
+        let it = m.localized("it-IT");
+        assert_eq!((it.name.as_str(), it.contribution.label.as_str()), ("Note", "Note"));
+        assert_eq!(it.resources[0].label, "Note");
+        assert_eq!(it.resources[0].fields[0].label, "Titolo");
+        // what the translation does not have stays in English
+        assert_eq!(it.resources[0].fields[1].label, "Tag");
+        assert_eq!(it.resources[0].fields[1].option_labels.get("a").map(String::as_str), Some("prima"));
+        assert_eq!(it.kpi[0].label, "Note per tag");
+        assert_eq!(it.kpi[0].columns.get("n").map(String::as_str), Some("numero"));
+        // English, and the languages without a translation
+        assert_eq!(m.localized("en").contribution.label, "Notes");
+        assert_eq!(m.localized("fr"), m);
+        // the translations survive the round trip through JSON (the manifest stored by the kernel)
+        let json = serde_json::to_string(&m).unwrap();
+        assert_eq!(serde_json::from_str::<Manifest>(&json).unwrap(), m);
+    }
+
+    #[test]
+    fn translation_errors() {
+        for bad in [
+            ITALIAN.replace("[i18n.it]", "[i18n.IT]"),
+            ITALIAN.replace("[i18n.it]", "[i18n.en]"),
+            ITALIAN.replace("title = \"Titolo\"", "missing = \"Titolo\""),
+            ITALIAN.replace("a = \"prima\"", "z = \"prima\""),
+            ITALIAN.replace("options.tag", "options.title"),
+            ITALIAN.replace("i18n.it.kpi.kpi_notes_by_tag", "i18n.it.kpi.kpi_other"),
+            ITALIAN.replace("i18n.it.resources.notes", "i18n.it.resources.other"),
+            format!("{ITALIAN}\nunknown = 1"),
+        ] {
+            assert!(Manifest::from_toml(&format!("{NOTES}{bad}")).is_err(), "{bad}");
+        }
+        let labels = NOTES
+            .replace(r#"options = ["a", "b"] }"#, r#"options = ["a", "b"], option_labels = { c = "C" } }"#);
+        assert!(Manifest::from_toml(&labels).is_err());
     }
 
     #[test]

@@ -68,7 +68,7 @@ async fn ownership_and_sharing_levels() {
     let row = note(t, &w.anna, "piano").await;
     let rid = id(&row);
     assert_eq!(row["my_level"], "manage");
-    assert_eq!(row["values"]["tag"], "personale", "before_create hook of the notes plugin");
+    assert_eq!(row["values"]["tag"], "personal", "before_create hook of the notes plugin");
 
     assert_eq!(titles(t, &w.anna).await, vec!["piano"]);
     assert!(titles(t, &w.bruno).await.is_empty(), "not shared");
@@ -237,7 +237,7 @@ async fn validation_and_refusing_hooks() {
     )
     .await
     .unwrap_err();
-    assert!(e.message.contains("email non valida"), "{e}");
+    assert!(e.message.contains("invalid email"), "{e}");
     // the hook refused: no orphan resource
     let n: i64 = mosaikit_db::query_scalar(
         "select count(*) from core.resources where plugin_id = 'com.mosaikit.contacts'",
@@ -265,7 +265,7 @@ async fn hook_with_previous_values_and_computed_fields() {
     )
     .await
     .unwrap();
-    assert_eq!(task["values"]["priority"], "media");
+    assert_eq!(task["values"]["priority"], "medium");
     assert!(task["values"]["completed_on"].is_null());
     let done = crud::update(t, c, "com.mosaikit.tasks", "tasks", id(&task), &vals(json!({ "done": true })))
         .await
@@ -291,7 +291,7 @@ async fn wasm_commands_respect_rls() {
     let w = world().await;
     let t = &w.t;
     note(t, &w.anna, "a1").await;
-    crud::create(t, &w.anna, NOTES, "notes", &vals(json!({ "title": "a2", "tag": "lavoro" })), None)
+    crud::create(t, &w.anna, NOTES, "notes", &vals(json!({ "title": "a2", "tag": "work" })), None)
         .await
         .unwrap();
     note(t, &w.bruno, "b1").await;
@@ -307,7 +307,7 @@ async fn kpis_per_tenant_and_global() {
     let w = world().await;
     let t = &w.t;
     note(t, &w.anna, "1").await;
-    crud::create(t, &w.bruno, NOTES, "notes", &vals(json!({ "title": "2", "tag": "lavoro" })), None)
+    crud::create(t, &w.bruno, NOTES, "notes", &vals(json!({ "title": "2", "tag": "work" })), None)
         .await
         .unwrap();
     note(t, &w.other_tenant, "beta").await;
@@ -316,7 +316,7 @@ async fn kpis_per_tenant_and_global() {
     assert_eq!(k.core.members, 3);
     assert_eq!(k.core.resources.iter().map(|r| r.count).sum::<i64>(), 2);
     let notes_kpi = k.plugins.iter().find(|p| p.view == "kpi_notes_by_tag").unwrap();
-    let total: i64 = notes_kpi.rows.iter().map(|r| r["note"].as_i64().unwrap()).sum();
+    let total: i64 = notes_kpi.rows.iter().map(|r| r["notes"].as_i64().unwrap()).sum();
     assert_eq!(total, 2, "only the alfa tenant");
     assert!(notes_kpi.rows.iter().all(|r| r.get("tenant_id").is_none()));
     assert_eq!(kpi::tenant(t, &w.anna).await.unwrap_err().kind, Kind::Forbidden);
