@@ -81,7 +81,7 @@ pub async fn request_access(
     }
     let row = mosaikit_db::query(
         "select r.owner_id, r.title, r.plugin_id, core.level_for($2, r.tenant_id, r.id, r.ancestors)
-         from core.resources r where r.id = $1 and r.tenant_id = $3",
+         from core.resources r where r.id = $1 and r.tenant_id = $3 and not core.in_trash(r.id)",
     )
     .bind(rid)
     .bind(c.user.user_id)

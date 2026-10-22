@@ -94,7 +94,8 @@ fn plugin_label(k: &Kernel, id: &str) -> String {
 async fn resource_stats(k: &Kernel, tenant: Option<Uuid>) -> Result<Vec<ResourceStat>> {
     let rows = mosaikit_db::query(
         "select plugin_id, kind, count(*), coalesce(sum(size_bytes), 0)::bigint from core.resources
-         where $1::uuid is null or tenant_id = $1 group by plugin_id, kind order by 3 desc",
+         where ($1::uuid is null or tenant_id = $1) and not core.in_trash(id)
+         group by plugin_id, kind order by 3 desc",
     )
     .bind(tenant)
     .fetch_all(&k.db)
@@ -120,9 +121,10 @@ pub(crate) async fn core(k: &Kernel, tenant: Uuid) -> Result<CoreKpi> {
            (select count(*) from core.memberships m join core.users u on u.id = m.user_id where m.tenant_id = $1 and u.home_tenant_id = $1),
            (select count(*) from core.memberships m join core.users u on u.id = m.user_id where m.tenant_id = $1 and u.home_tenant_id <> $1),
            (select count(*) from core.groups where tenant_id = $1),
-           (select count(*) from core.grants g join core.resources r on r.id = g.resource_id where r.tenant_id = $1),
+           (select count(*) from core.grants g join core.resources r on r.id = g.resource_id where r.tenant_id = $1 and not core.in_trash(r.id)),
            (select count(*) from core.public_links l join core.resources r on r.id = l.resource_id
-              where r.tenant_id = $1 and l.revoked_at is null and (l.expires_at is null or l.expires_at > now())),
+              where r.tenant_id = $1 and l.revoked_at is null and (l.expires_at is null or l.expires_at > now())
+                and not core.in_trash(r.id)),
            (select coalesce(sum(l.view_count), 0)::bigint from core.public_links l join core.resources r on r.id = l.resource_id where r.tenant_id = $1),
            (select count(distinct user_id) from core.events where tenant_id = $1 and ts > now() - interval '30 days' and user_id is not null)",
     )
@@ -235,9 +237,10 @@ pub async fn global(k: &Kernel, admin: &SessionUser) -> Result<GlobalKpi> {
         let r = mosaikit_db::query(
             "select
                (select count(distinct user_id) from core.events where tenant_id = $1 and ts > now() - interval '30 days' and user_id is not null),
-               (select count(*) from core.grants g join core.resources r on r.id = g.resource_id where r.tenant_id = $1),
+               (select count(*) from core.grants g join core.resources r on r.id = g.resource_id where r.tenant_id = $1 and not core.in_trash(r.id)),
                (select count(*) from core.public_links l join core.resources r on r.id = l.resource_id
-                  where r.tenant_id = $1 and l.revoked_at is null and (l.expires_at is null or l.expires_at > now()))",
+                  where r.tenant_id = $1 and l.revoked_at is null and (l.expires_at is null or l.expires_at > now())
+                    and not core.in_trash(r.id))",
         )
         .bind(t.id)
         .fetch_one(&k.db)

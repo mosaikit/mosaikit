@@ -292,7 +292,8 @@ impl TxConn {
         }
     }
 
-    /// Deletes a resource and its descendants (manage required). Returns the deleted ids.
+    /// Moves a resource to the trash with its descendants (manage required). Returns the resource and
+    /// its descendants (their blobs are removed only when the trash is purged).
     pub async fn delete_resource(&mut self, id: Uuid) -> Result<Vec<Uuid>> {
         match self {
             TxConn::Pg(_) => {

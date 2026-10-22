@@ -342,6 +342,14 @@ async fn check_credentials(
     if k.limiter.blocked_after(&user_key, own.lock_attempts, window(own))
         || k.limiter.blocked_after(&ip_key, platform.lock_attempts.max(own.lock_attempts), window(platform))
     {
+        events::record_failure(
+            k,
+            tenant,
+            None,
+            "login.blocked",
+            json!({ "username": username, "tenant": tenant_slug }),
+        )
+        .await;
         return Err(too_many());
     }
     let row = mosaikit_db::query(
@@ -360,6 +368,14 @@ async fn check_credentials(
     let Some(user_id) = user_id.filter(|_| ok) else {
         k.limiter.fail_within(&user_key, window(own));
         k.limiter.fail_within(&ip_key, window(platform));
+        events::record_failure(
+            k,
+            tenant,
+            user_id,
+            "login.failed",
+            json!({ "username": username, "tenant": tenant_slug }),
+        )
+        .await;
         return Err(Error::unauthorized("invalid credentials").with_code("wrong_credentials"));
     };
     k.limiter.clear(&user_key);
@@ -593,6 +609,7 @@ pub async fn totp_verify(k: &Kernel, p: &PendingLogin, code: &str, ip: &str) -> 
     };
     if !ok {
         k.limiter.fail(&key);
+        events::record_failure(k, None, Some(p.user_id), "login.second_factor_failed", json!({})).await;
         return Err(Error::unauthorized("invalid code").with_code("wrong_code"));
     }
     k.limiter.clear(&key);

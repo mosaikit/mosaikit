@@ -156,12 +156,25 @@ async fn files_and_folders_with_inheritance() {
     names.sort();
     assert_eq!(names, vec!["Attachments/report.txt", "note.md"]);
 
-    // deletion: the contents go away from the disk too
+    // deletion: the folder and what it contains go to the trash, the contents stay on the disk until
+    // the purge; restoring brings everything back
     let blob = t.blobs.file_path(anna.tenant.tenant_id, doc.id);
     assert!(blob.is_file());
     files::delete(&t, &anna, FILES, project.id).await.unwrap();
-    assert!(!blob.exists());
+    assert!(blob.is_file());
     assert!(files::list(&t, &anna, FILES, None).await.unwrap().entries.is_empty());
+    assert!(files::read(&t, &anna, FILES, doc.id).await.is_err(), "inside the trash: not readable");
+    let in_trash = mosaikit_kernel::trash::list(&t, &anna, None, None).await.unwrap();
+    assert_eq!(in_trash.len(), 1, "only the folder, its content goes with it");
+    assert_eq!(in_trash[0].size_bytes, 11 + 6, "the folder counts what it contains");
+    mosaikit_kernel::trash::restore(&t, &anna, project.id).await.unwrap();
+    let (_, back) = files::read(&t, &anna, FILES, doc.id).await.unwrap();
+    assert_eq!(back, b"hello world");
+    // deleted for good: the contents go away from the disk too
+    files::delete(&t, &anna, FILES, project.id).await.unwrap();
+    mosaikit_kernel::trash::purge(&t, &anna, project.id).await.unwrap();
+    assert!(!blob.exists());
+    assert!(mosaikit_kernel::trash::list(&t, &anna, None, None).await.unwrap().is_empty());
 }
 
 fn zip_of(entries: &[(&str, &[u8])]) -> Vec<u8> {

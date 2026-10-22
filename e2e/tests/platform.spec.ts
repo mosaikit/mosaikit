@@ -963,4 +963,114 @@ test.describe.serial('platform', () => {
     await page.getByRole('row', { name: /City of Beta/ }).getByRole('button', { name: 'Restore' }).click()
     await expect(page.getByRole('switch', { name: 'Available to City of Beta' })).toBeChecked()
   })
+
+  test('shares, trash and log: revoke, delete, restore, delete for good, the log of tenant and platform', async ({ page }) => {
+    test.setTimeout(240_000)
+    const call = async (method: string, path: string, body?: unknown) =>
+      page.evaluate(
+        async ([base, method, path, body]) => {
+          const s = await (await fetch(`${base}/api/session`)).json()
+          const r = await fetch(`${base}${path}`, {
+            method: method as string,
+            headers: { 'content-type': 'application/json', 'x-csrf-token': s.csrf },
+            body: body === undefined ? undefined : JSON.stringify(body),
+          })
+          const text = await r.text()
+          return { status: r.status, json: text ? JSON.parse(text) : null }
+        },
+        [BASE, method, path, body] as const,
+      )
+    // a refused sign-in, for the filter of the failures
+    await fresh(page)
+    await page.evaluate(
+      async (base) => fetch(`${base}/api/auth/login`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ tenant: 'alfa', username: 'anna', password: 'not the password' }) }),
+      BASE,
+    )
+    await login(page, 'Alfa Municipality', 'manager', PASSWORD)
+    const created = await call('POST', '/api/t/alfa/p/com.mosaikit.notes/r/notes', { values: { title: 'Trash me' } })
+    expect(created.status).toBe(201)
+    const id = created.json.id as string
+    expect((await call('POST', `/api/t/alfa/resources/${id}/links`, {})).status).toBeLessThan(300)
+
+    // Home: shared by me (the page was open before the note was created through the API)
+    await page.reload()
+    const mine = page.getByRole('region', { name: 'Shared by me' })
+    await expect(mine.getByText('Trash me')).toBeVisible()
+    await expect(mine).toContainText('1 public link')
+
+    // Shares: revoke every share and link of the item
+    await nav(page, 'Shares').click()
+    await page.getByRole('radio', { name: /Public and links/ }).click()
+    const row = page.getByRole('row', { name: /Trash me/ })
+    await row.getByRole('button', { name: 'Revoke', exact: true }).click()
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Confirm' }).click()
+    await expect(page.getByText('Revoked: 0 shares, 1 public links')).toBeVisible()
+    await expect(page.getByRole('row', { name: /Trash me/ })).toBeHidden()
+    await accessible(page, 'shares with selection')
+
+    // delete from the plugin: it goes to the trash
+    await nav(page, 'Notes').click()
+    const frame = page.frameLocator('iframe.plugin-frame')
+    await frame.locator('tbody tr.row', { hasText: 'Trash me' }).click()
+    await frame.getByRole('button', { name: 'Delete' }).click()
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Confirm' }).click()
+    await expect(frame.locator('tbody tr.row', { hasText: 'Trash me' })).toBeHidden()
+
+    // the Trash, from the person menu: restore with one click
+    await page.getByRole('button', { name: /person menu/ }).click()
+    await page.getByRole('menuitem', { name: 'Trash' }).click()
+    await expect(page.getByRole('heading', { name: 'Trash' })).toBeVisible()
+    const trashed = page.getByRole('row', { name: /Trash me/ })
+    await expect(trashed).toContainText('Notes')
+    await accessible(page, 'trash')
+    await trashed.getByRole('button', { name: 'Restore' }).click()
+    await expect(page.getByText('Restored').first()).toBeVisible()
+    await expect(page.getByText('The trash is empty')).toBeVisible()
+    expect((await call('GET', `/api/t/alfa/p/com.mosaikit.notes/r/notes/${id}`)).status).toBe(200)
+
+    // deleted again, then for good from the trash
+    expect((await call('DELETE', `/api/t/alfa/p/com.mosaikit.notes/r/notes/${id}`)).status).toBeLessThan(300)
+    await page.reload()
+    await page.getByRole('row', { name: /Trash me/ }).getByRole('button', { name: 'Delete Trash me for good' }).click()
+    await page.getByRole('alertdialog').getByRole('button', { name: 'Confirm' }).click()
+    await expect(page.getByText('The trash is empty')).toBeVisible()
+    expect((await call('POST', `/api/t/alfa/trash/${id}/restore`)).status).toBe(404)
+
+    // the Log of the tenant: what happened, failures, the detail of an event, CSV
+    await nav(page, 'Log').click()
+    await expect(page.getByRole('heading', { name: 'Log' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Deleted for good' }).first()).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Restored from the trash' }).first()).toBeVisible()
+    await accessible(page, 'log')
+    await page.getByRole('radio', { name: 'Only failures' }).click()
+    await expect(page.getByRole('button', { name: 'Sign-in refused' }).first()).toBeVisible()
+    await page.getByRole('radio', { name: 'Everything' }).click()
+    await page.getByRole('combobox', { name: 'What', exact: true }).click()
+    await page.getByRole('option', { name: 'Items' }).click()
+    await page.getByRole('button', { name: 'Moved to the trash' }).first().click()
+    const pane = page.getByRole('dialog', { name: 'Moved to the trash' })
+    await expect(pane).toContainText('Trash me')
+    await accessible(page, 'detail of an event')
+    await pane.getByRole('button', { name: 'Only this item' }).click()
+    const rows = page.locator('table tbody tr')
+    await expect(rows).toHaveCount(5)
+    const download = page.waitForEvent('download')
+    await page.getByRole('link', { name: 'Export everything as CSV' }).click()
+    const file = await download
+    const csv = await (await file.createReadStream()).toArray()
+    const text = Buffer.concat(csv).toString('utf8')
+    expect(text).toContain('resource.purge')
+    expect(text.split('\r\n').filter(Boolean)).toHaveLength(6)
+    await logout(page)
+
+    // the Log of the platform: every tenant, with the tenant filter
+    await adminLogin(page)
+    await nav(page, 'Log').click()
+    await page.getByRole('combobox', { name: 'Tenant', exact: true }).click()
+    // the name in the registry of the tenants (the identity of the tenant may show another one)
+    await page.getByRole('option', { name: /Alfa/ }).click()
+    await expect(page.getByRole('row', { name: /Deleted for good/ }).first()).toContainText(/Alfa/)
+    await accessible(page, 'log of the platform')
+    await logout(page)
+  })
 })

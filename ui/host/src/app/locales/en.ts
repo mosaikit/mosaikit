@@ -73,4 +73,16 @@ export const EN: Record<string, string> = {
   'errors.reset_expired': 'The link is not valid any more: ask for a new one',
   'errors.access_already': 'You already have this access to the item',
   'errors.access_pending': 'You already asked for access: wait for the answer',
+  // trash, log and shares (phase 5)
+  '{count} items restored_one': '1 item restored',
+  '{count} items restored_other': '{count} items restored',
+  '{count} items deleted for good_one': '1 item deleted for good',
+  '{count} items deleted for good_other': '{count} items deleted for good',
+  'Delete {count} items for good? They cannot be restored any more._one': 'Delete 1 item for good? It cannot be restored any more.',
+  'Delete {count} items for good? They cannot be restored any more._other': 'Delete {count} items for good? They cannot be restored any more.',
+  'Revoke every share and public link of {count} items? The owners keep their items._one': 'Revoke every share and public link of 1 item? The owner keeps it.',
+  'Revoke every share and public link of {count} items? The owners keep their items._other': 'Revoke every share and public link of {count} items? The owners keep their items.',
+  'errors.trash_not_found': 'Item not found in the trash',
+  'errors.trash_parent_deleted': 'The item is inside another item of the trash: restore that one first',
+  'errors.trash_plugin_missing': 'The app of the item is not installed any more',
 }

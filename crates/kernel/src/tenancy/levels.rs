@@ -110,6 +110,9 @@ const DEFS: &[Def] = &[
     def("notify.email_mode", Kind::Custom, Scope::Both, email_mode),
     def("notify.digest_hour", Kind::Managed, Scope::Platform, digest_hour),
     def("notify.retention_days", Kind::Managed, Scope::Platform, retention_days),
+    // trash and log
+    def("trash.retention_days", Kind::Managed, Scope::Platform, trash_days),
+    def("log.retention_days", Kind::Managed, Scope::Platform, log_days),
 ];
 
 fn find(key: &str) -> Result<&'static Def> {
@@ -255,6 +258,14 @@ fn retention_days(v: &Value) -> Result<()> {
     int(v, 7, 3650)
 }
 
+fn trash_days(v: &Value) -> Result<()> {
+    int(v, 1, 365)
+}
+
+fn log_days(v: &Value) -> Result<()> {
+    int(v, 30, 3650)
+}
+
 /// An origin that may embed public pages: `https://host[:port]`, without a path.
 pub fn valid_origin(s: &str) -> bool {
     let Some(rest) = s.strip_prefix("https://").or_else(|| s.strip_prefix("http://")) else {
@@ -322,6 +333,8 @@ impl Defaults {
             "notify.email_mode" => json!("digest"),
             "notify.digest_hour" => json!(7),
             "notify.retention_days" => json!(90),
+            "trash.retention_days" => json!(crate::trash::DEFAULT_RETENTION_DAYS),
+            "log.retention_days" => json!(crate::log::DEFAULT_RETENTION_DAYS),
             _ => Value::Null,
         }
     }

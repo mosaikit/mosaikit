@@ -11,7 +11,6 @@ import { api, errText, fmtDate, ApiError } from '../../api.ts'
 import { useBrand } from '../../brand.ts'
 import type {
   AccessRequest,
-  EventInfo,
   Group,
   GroupDetail,
   Member,
@@ -43,6 +42,7 @@ import { go, to } from '../router.ts'
 import AppIcon from '../AppIcon.tsx'
 import { AppMark } from '../Shell.tsx'
 import { RemoveDialog } from './tenant.tsx'
+import { ActivityLog } from './history.tsx'
 
 const enc = encodeURIComponent
 
@@ -187,54 +187,6 @@ function SignInPanel({ base, qk, name }: { base: string; qk: string[]; name: str
         </CardContent>
       </Card>
       <LinkDialog link={link} name={name} onClose={() => setLink(null)} />
-    </div>
-  )
-}
-
-function actionLabel(a: string): string {
-  const known: Record<string, string> = {
-    login: t('Signed in'),
-    'resource.create': t('Created an item'),
-    'resource.update': t('Changed an item'),
-    'resource.delete': t('Deleted an item'),
-    share: t('Shared an item'),
-    unshare: t('Stopped sharing an item'),
-    'link.create': t('Created a public link'),
-    'invitation.accept': t('Accepted an invitation'),
-    'invitation.decline': t('Declined an invitation'),
-    'access.request': t('Asked for access to an item'),
-    'person.reset_password': t('Chose a new password'),
-  }
-  return known[a] ?? a
-}
-
-function ActivityTable({ url, qk }: { url: string; qk: string[] }) {
-  const q = useApi<EventInfo[]>(qk, url)
-  if (q.isLoading) return <Loading />
-  if (q.error) return <ErrorBox error={q.error} />
-  if (!q.data?.length) return <Empty title={t('No activity yet')} />
-  return (
-    <div className="max-w-4xl overflow-hidden rounded-xl border bg-card">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('When')}</TableHead>
-            <TableHead>{t('What')}</TableHead>
-            <TableHead>{t('Tenant')}</TableHead>
-            <TableHead>{t('App')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {q.data.map((e, i) => (
-            <TableRow key={i}>
-              <TableCell className="whitespace-nowrap text-muted-foreground">{fmtDate(e.ts)}</TableCell>
-              <TableCell>{actionLabel(e.action)}</TableCell>
-              <TableCell>{e.tenant ?? '—'}</TableCell>
-              <TableCell className="text-muted-foreground">{e.plugin_id ?? '—'}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
     </div>
   )
 }
@@ -411,7 +363,7 @@ export function PersonPage({ slug, id, tab }: { slug: string; id: string; tab?: 
             </Card>
           ))}
         {cur === 'permissions' && <PermissionsSummary slug={slug} detail={d} />}
-        {cur === 'activity' && <ActivityTable url={`${base}/activity`} qk={['member', slug, id, 'activity']} />}
+        {cur === 'activity' && <ActivityLog scope={{ api: `/api/t/${enc(slug)}/manage/log`, slug }} fixed={{ user: id }} more={to.tenant(slug, 'log')} />}
       </div>
       <RemoveDialog
         member={removing}
@@ -556,7 +508,7 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
   const g = q.data!
-  const cur = ['members', 'shared', 'plugins'].includes(tab ?? '') ? tab! : 'members'
+  const cur = ['members', 'shared', 'plugins', 'activity'].includes(tab ?? '') ? tab! : 'members'
   const others = (members.data ?? []).filter((m) => !g.members.some((x) => x.user_id === m.user_id))
   const label = (pid: string) => ctx.data?.plugins.find((p) => p.id === pid)?.label ?? pid
   return (
@@ -601,6 +553,7 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
           { id: 'members', label: t('Members'), count: g.members.length },
           { id: 'shared', label: t('Shared items'), count: g.shared.length },
           { id: 'plugins', label: t('Plugins') },
+          { id: 'activity', label: t('Activity') },
         ]}
         current={cur}
         href={(x) => to.group(slug, id, x)}
@@ -688,6 +641,7 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
             ))}
           </div>
         )}
+        {cur === 'activity' && <ActivityLog scope={{ api: `/api/t/${enc(slug)}/manage/log`, slug }} fixed={{ group: id }} more={to.tenant(slug, 'log')} />}
       </div>
     </>
   )
@@ -1756,7 +1710,7 @@ export function AdminPersonPage({ id, tab }: { id: string; tab?: string }) {
           </div>
         )}
         {cur === 'sign-in' && <SignInPanel base={base} qk={['person', id]} name={name} />}
-        {cur === 'activity' && <ActivityTable url={`${base}/activity`} qk={['person', id, 'activity']} />}
+        {cur === 'activity' && <ActivityLog scope={{ api: '/api/admin/log', admin: true }} fixed={{ user: id }} more={to.admin('log')} />}
       </div>
       <AddToTenantDialog open={dlg === 'add'} title={t('Add to a tenant')} onClose={() => setDlg(null)} tenants={clients.filter((x) => !p.tenants.some((m) => m.tenant_id === x.id))} onSubmit={(v) => add.mutateAsync(v)} />
       <Dialog open={dlg === 'home'} onOpenChange={(o) => !o && setDlg(null)}>

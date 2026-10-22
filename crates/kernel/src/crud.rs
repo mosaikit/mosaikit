@@ -398,13 +398,16 @@ pub async fn delete(k: &Kernel, c: &Caller, plugin: &str, resource: &str, id: Uu
         return Err(Error::forbidden("the manage permission is required to delete"));
     }
     let previous: Values = prev_row.get("values").and_then(Value::as_object).cloned().unwrap_or_default();
-    let gone = tx.delete_resource(id).await?;
+    // the log keeps the title: after the purge the resource is gone
+    let title: Option<String> = mosaikit_db::query_scalar("select title from core.resources where id = $1")
+        .bind(id)
+        .fetch_optional(&k.db)
+        .await?;
+    // to the trash: the contents on disk stay until the purge
+    tx.delete_resource(id).await?;
     let (_, tx) =
         run_hook(k, c, &p, d, tx, "after_delete", Some(id), previous.clone(), Some(&previous)).await?;
     tx.commit().await?;
-    for g in gone {
-        k.blobs.remove(c.tenant.tenant_id, g);
-    }
     events::record(
         k,
         Some(c.tenant.tenant_id),
@@ -412,7 +415,7 @@ pub async fn delete(k: &Kernel, c: &Caller, plugin: &str, resource: &str, id: Uu
         Some(&p.id),
         Some(id),
         "resource.delete",
-        json!({ "kind": d.name }),
+        json!({ "kind": d.name, "title": title }),
     )
     .await;
     Ok(())

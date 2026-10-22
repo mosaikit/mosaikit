@@ -214,8 +214,20 @@ async fn extensions_add_fields_and_actions() {
     tenants::set_enabled(&t, &manager, REVIEW, true).await.unwrap();
     assert_eq!(extensions::for_resource(&t, &anna, NOTES, "notes", "en").await.unwrap().len(), 1);
 
-    // the values go with the item
+    // the values follow the item: hidden in the trash, back with it, gone when it is purged
     crud::delete(&t, &anna, NOTES, "notes", id).await.unwrap();
+    assert!(extensions::values(&t, &anna, NOTES, "notes", &[id]).await.unwrap().is_empty(), "in the trash");
+    assert!(extensions::set_values(&t, &anna, NOTES, "notes", id, REVIEW, &obj(json!({ "reviewer": "x" })))
+        .await
+        .is_err());
+    mosaikit_kernel::trash::restore(&t, &anna, id).await.unwrap();
+    let v = extensions::values(&t, &anna, NOTES, "notes", &[id]).await.unwrap();
+    assert_eq!(v[&id][REVIEW]["reviewer"], "anna");
+    crud::delete(&t, &anna, NOTES, "notes", id).await.unwrap();
+    // turned off in the tenant: the trash still shows the item and purges it
+    tenants::set_enabled(&t, &manager, NOTES, false).await.unwrap();
+    assert_eq!(mosaikit_kernel::trash::list(&t, &anna, None, None).await.unwrap().len(), 1);
+    mosaikit_kernel::trash::purge(&t, &anna, id).await.unwrap();
     let left: i64 = mosaikit_db::query_scalar("select count(*) from core.extension_values")
         .fetch_one(&t.k.db)
         .await

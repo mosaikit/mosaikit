@@ -17,6 +17,7 @@ import { NotificationsPage } from './notifications.tsx'
 import { AdminOverview, AdminSystem, AdminTenant, AdminTenants } from './pages/admin.tsx'
 import { AdminPluginPage, AdminPlugins, TenantPlugins } from './pages/plugins.tsx'
 import { AccountPage } from './pages/common.tsx'
+import { LogPage, TrashPage } from './pages/history.tsx'
 import { AdminPeople, AdminPersonPage, GroupPage, ItemPage, PersonPage, PluginAccessPage, RequestsPage, ResetPage } from './pages/people.tsx'
 import { Manage, PluginPage, Shares, TenantHome, TenantSettingsPage, Usage } from './pages/tenant.tsx'
 import { go, href, parse, to, useHash, type Route } from './router.ts'
@@ -56,6 +57,7 @@ function Page({ session, route }: { session: Session; route: Route }) {
     if (route.page === 'system') return <AdminSystem session={session} section={route.section} />
     if (route.page === 'account') return <AccountPage session={session} route={route} />
     if (route.page === 'notifications') return <NotificationsPage session={session} route={route} />
+    if (route.page === 'log') return <LogPage />
     return <AdminOverview session={session} />
   }
   if (route.area === 'tenant') {
@@ -65,6 +67,7 @@ function Page({ session, route }: { session: Session; route: Route }) {
     if (route.page === 'notifications') return <NotificationsPage session={session} route={route} />
     if (route.page === 'requests') return <RequestsPage slug={route.tenant} />
     if (route.page === 'item') return <ItemPage slug={route.tenant} id={route.id!} />
+    if (route.page === 'trash') return <TrashPage slug={route.tenant} />
     if (route.page !== 'home' && !manager) return <Empty title={t('Reserved to Tenant Managers')} />
     if (route.page === 'person') return <PersonPage slug={route.tenant} id={route.id!} tab={route.section} />
     if (route.page === 'group') return <GroupPage slug={route.tenant} id={route.id!} tab={route.section} />
@@ -73,6 +76,7 @@ function Page({ session, route }: { session: Session; route: Route }) {
     if (route.page === 'plugins') return <TenantPlugins slug={route.tenant} />
     if (route.page === 'shares') return <Shares slug={route.tenant} />
     if (route.page === 'usage') return <Usage slug={route.tenant} />
+    if (route.page === 'log') return <LogPage slug={route.tenant} />
     if (route.page === 'settings') return <TenantSettingsPage slug={route.tenant} section={route.section} />
     return <TenantHome session={session} slug={route.tenant} />
   }

@@ -189,6 +189,41 @@ The dev environment loads the plugins of `mosaikit-plugins` from their folders (
 | P4-20 | Uninstall *Note review* (⋯ › Uninstall) | The confirmation says how many items and tenants are touched; the extension disappears, Notes keeps working; reinstall it from Catalog |
 | P4-21 | Dark mode on the new pages | Readable; switches and badges visible |
 
+## Phase 5 — Shares, Trash, Log
+
+As `e.ricci` (Tenant Manager of *Comune di Roma*) unless said otherwise. Notes from the Notes app are
+enough as items.
+
+| Id | Check | Expected |
+|---|---|---|
+| P5-01 | As `s.greco`: create a note, share it with `l.bianchi` and create a public link (Share) | — |
+| P5-02 | As `s.greco`: Home | Section **Shared by me** with the note, «with Luca Bianchi · 1 public link», buttons Share and Revoke all |
+| P5-03 | Revoke all, Confirm | The note leaves the section; the public link opened in a private window says it is not valid; `l.bianchi` no longer sees the note |
+| P5-04 | As `s.greco`: share the note again with a public link; as `e.ricci`: Shares › pill **Public and links** | The note of Sara Greco with 1 public link; a check box on the rows that have shares or links |
+| P5-05 | Tick it (or several) › **Revoke shares and links**, Confirm | «Revoked: 0 shares, 1 public links»; the row leaves the list; Sara Greco still owns the note |
+| P5-06 | As `s.greco`: delete the note in Notes | It disappears from Notes and from the Home figures |
+| P5-07 | Person menu › **Trash** | The note with app, when it was deleted and by whom, size, the day it will be deleted for good (30 days later) |
+| P5-08 | Restore | «Restored»; the trash is empty; the note is back in Notes with its shares and links (if it had any) |
+| P5-09 | Delete it again, then in the Trash the bin icon of the row › Confirm | «Deleted for good»; it cannot be restored any more |
+| P5-10 | Delete two notes; Trash: select both › Restore; again › Delete for good | The bar of the selection appears only with a selection; both restored, then both gone |
+| P5-11 | Empty the trash (with something inside) | Confirmation; what Sara owns or deleted is deleted for good |
+| P5-12 | As `e.ricci`: Trash | The whole trash of the tenant, with the column Owner; Restore works on the items of others too |
+| P5-13 | As `l.bianchi`: Trash, while Sara's note is in the trash | Not shown: only what one owns or deleted |
+| P5-14 | In the Files app: delete a folder with files, then Trash | One row for the folder (its size counts the files); Restore brings back the folder and its files |
+| P5-15 | Sign out, sign in as `s.greco` with a wrong password, then as `e.ricci`: **Log** (sidebar, Tenant management) | The events of the tenant, the latest first: when, who, what (in words), on what, result |
+| P5-16 | Pill **Only failures** | «Sign-in refused» for Sara Greco, result Failed |
+| P5-17 | Filters Who = Sara Greco, What = Items, period Last 24 hours, search «note» | Only her events on items: Created, Moved to the trash, Restored from the trash, Deleted for good |
+| P5-18 | Click an event | Side pane: who, result, app, item, event name, address, browser, details; buttons «Only Sara Greco» and «Only this item» |
+| P5-19 | Only this item | A filter chip «Only this item» with its ×; the table shows the history of that note |
+| P5-20 | Tick two events › Export the selected; then «Export everything as CSV» | Two CSV files: the selected events, then all the events of the filters (opens in a spreadsheet, accents included) |
+| P5-21 | Older events (with more than 50 events) | The next 50 below |
+| P5-22 | Manage › People › Sara Greco › Activity | Her events, the same descriptions as the Log, «See everything in the log» |
+| P5-23 | Manage › Groups › a group › Activity, after adding and removing a person | «Added a person to a group», «Removed a person from a group» |
+| P5-24 | As `s.greco`: open `#/t/comune-roma/log` | «Reserved to Tenant Managers» |
+| P5-25 | As Administrator: **Log** (sidebar) | Every tenant, column Tenant; filter Tenant = *Comune di Roma* shows only its events; a person's page › Activity shows the person everywhere |
+| P5-26 | As Administrator: System › **Retention** | Trash kept (30) and Log kept (365) days; values outside 1–365 / 30–3650 refused |
+| P5-27 | Italian, and dark mode, on Trash, Log, the side pane and Shares | Everything translated (events too) and readable |
+
 ## Phase 8 — Sign-in through the identity provider of a tenant (OIDC)
 
 **Test identity provider.** In a second terminal, from the `mosaikit` folder:
@@ -226,4 +261,4 @@ cannot sign in. At the end put it back to local accounts (P8-14).
 
 ---
 
-Phases 5 to 7 and 9 add their sections here when they are committed.
+Phases 6, 7 and 9 add their sections here when they are committed.

@@ -83,7 +83,7 @@ async fn personal(k: &Kernel, c: &Caller) -> Result<Personal> {
     let (me, t) = (c.user.user_id, c.tenant.tenant_id);
     let rows = mosaikit_db::query(
         "select plugin_id, kind, count(*), coalesce(sum(size_bytes), 0)::bigint from core.resources
-         where tenant_id = $1 and owner_id = $2 group by plugin_id, kind order by 3 desc",
+         where tenant_id = $1 and owner_id = $2 and not core.in_trash(id) group by plugin_id, kind order by 3 desc",
     )
     .bind(t)
     .bind(me)
@@ -110,11 +110,11 @@ async fn personal(k: &Kernel, c: &Caller) -> Result<Personal> {
     let n = mosaikit_db::query(format!(
         "select
            (select count(*) from core.grants g join core.resources r on r.id = g.resource_id
-              where r.tenant_id = $1 and r.owner_id = $2),
+              where r.tenant_id = $1 and r.owner_id = $2 and not core.in_trash(r.id)),
            (select count(distinct r.id) from core.grants g join core.resources r on r.id = g.resource_id
-              where r.tenant_id = $1 and r.owner_id <> $2 and {TO_ME}),
+              where r.tenant_id = $1 and r.owner_id <> $2 and {TO_ME} and not core.in_trash(r.id)),
            (select count(*) from core.public_links l join core.resources r on r.id = l.resource_id
-              where r.tenant_id = $1 and r.owner_id = $2 and l.revoked_at is null
+              where r.tenant_id = $1 and r.owner_id = $2 and not core.in_trash(r.id) and l.revoked_at is null
                 and (l.expires_at is null or l.expires_at > now())),
            (select coalesce(sum(l.view_count), 0)::bigint from core.public_links l
               join core.resources r on r.id = l.resource_id where r.tenant_id = $1 and r.owner_id = $2)"
@@ -126,7 +126,7 @@ async fn personal(k: &Kernel, c: &Caller) -> Result<Personal> {
     let shares = mosaikit_db::query(format!(
         "select r.id, r.plugin_id, r.title, coalesce(nullif(u.display_name, ''), u.username), max(g.level), max(g.granted_at)
          from core.grants g join core.resources r on r.id = g.resource_id join core.users u on u.id = r.owner_id
-         where r.tenant_id = $1 and r.owner_id <> $2 and {TO_ME}
+         where r.tenant_id = $1 and r.owner_id <> $2 and {TO_ME} and not core.in_trash(r.id)
          group by r.id, r.plugin_id, r.title, u.display_name, u.username
          order by max(g.granted_at) desc limit 6"
     ))

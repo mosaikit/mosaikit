@@ -1,11 +1,11 @@
 //! Groups of the tenant (recipients of shares).
 
 use serde::Serialize;
-use serde_json::Value;
+use serde_json::{json, Value};
 use uuid::Uuid;
 
 use super::members::member_role;
-use crate::{Caller, Error, Kernel, Result};
+use crate::{events, Caller, Error, Kernel, Result};
 
 #[derive(Debug, Clone, Serialize)]
 pub struct GroupMember {
@@ -75,11 +75,27 @@ pub async fn create_group(k: &Kernel, c: &Caller, name: &str) -> Result<Uuid> {
                 }
                 err => err,
             })?;
+    events::record(
+        k,
+        Some(c.tenant.tenant_id),
+        Some(c.user.user_id),
+        None,
+        None,
+        "group.create",
+        json!({ "group": id, "name": name }),
+    )
+    .await;
     Ok(id)
 }
 
 pub async fn delete_group(k: &Kernel, c: &Caller, id: Uuid) -> Result<()> {
     c.require_manager()?;
+    let name: Option<String> =
+        mosaikit_db::query_scalar("select name from core.groups where id = $1 and tenant_id = $2")
+            .bind(id)
+            .bind(c.tenant.tenant_id)
+            .fetch_optional(&k.db)
+            .await?;
     let mut tx = k.db.begin_app().await?;
     let n = mosaikit_db::query("delete from core.groups where id = $1 and tenant_id = $2")
         .bind(id)
@@ -95,6 +111,16 @@ pub async fn delete_group(k: &Kernel, c: &Caller, id: Uuid) -> Result<()> {
         .execute(&mut *tx)
         .await?;
     tx.commit().await?;
+    events::record(
+        k,
+        Some(c.tenant.tenant_id),
+        Some(c.user.user_id),
+        None,
+        None,
+        "group.delete",
+        json!({ "group": id, "name": name }),
+    )
+    .await;
     Ok(())
 }
 
@@ -128,5 +154,15 @@ pub async fn set_group_member(k: &Kernel, c: &Caller, group: Uuid, user: Uuid, m
             .execute(&k.db)
             .await?;
     }
+    events::record(
+        k,
+        Some(c.tenant.tenant_id),
+        Some(c.user.user_id),
+        None,
+        None,
+        if member { "group.member_add" } else { "group.member_remove" },
+        json!({ "group": group, "user": user }),
+    )
+    .await;
     Ok(())
 }

@@ -396,11 +396,9 @@ pub async fn delete(k: &Kernel, c: &Caller, plugin_id: &str, id: Uuid) -> Result
     let mut tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
     let e = get_entry(&mut tx, id).await?;
     need(&e, 3)?;
-    let gone = tx.delete_resource(id).await?;
+    // to the trash: the contents on disk stay until the purge
+    tx.delete_resource(id).await?;
     tx.commit().await?;
-    for g in gone {
-        k.blobs.remove(c.tenant.tenant_id, g);
-    }
     events::record(
         k,
         Some(c.tenant.tenant_id),
@@ -408,7 +406,7 @@ pub async fn delete(k: &Kernel, c: &Caller, plugin_id: &str, id: Uuid) -> Result
         Some(&p.id),
         Some(id),
         "file.delete",
-        json!({}),
+        json!({ "title": e.name }),
     )
     .await;
     Ok(())

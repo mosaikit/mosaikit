@@ -579,3 +579,68 @@ export interface TotpSetup {
   uri: string
   qr_svg: string
 }
+
+/** An item of the trash (`/api/t/<t>/trash`). */
+export interface TrashItem {
+  id: string
+  plugin_id: string
+  kind: string
+  /** empty when the policy of the tenant hides the titles from the manager */
+  title: string
+  owner_id: string
+  owner_name: string
+  deleted_at: string
+  deleted_by: string | null
+  deleted_by_name: string | null
+  size_bytes: number
+  purge_at: string
+  /** inside another item of the trash: it comes back with that one */
+  inside_deleted: boolean
+}
+
+export interface TrashList {
+  items: TrashItem[]
+  retention_days: number
+}
+
+/** An event of the Log. */
+export interface LogEvent {
+  id: number
+  ts: string
+  tenant_id: string | null
+  tenant_slug: string | null
+  tenant_name: string | null
+  user_id: string | null
+  username: string | null
+  user_name: string | null
+  plugin_id: string | null
+  resource_id: string | null
+  resource_title: string | null
+  action: string
+  detail: Record<string, unknown>
+  ok: boolean
+  ip: string | null
+  agent: string | null
+}
+
+export interface LogPage {
+  events: LogEvent[]
+  next: number | null
+}
+
+/** An item I shared (Home › Shared by me). */
+export interface SharedByMe {
+  id: string
+  plugin_id: string
+  kind: string
+  title: string
+  with: string[]
+  shares: number
+  public_links: number
+  updated_at: string
+}
+
+export interface Revoked {
+  shares: number
+  links: number
+}

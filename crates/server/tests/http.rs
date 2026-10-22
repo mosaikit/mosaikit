@@ -393,7 +393,7 @@ async fn plugin_uis_only_on_the_untrusted_origin() {
         a.get_untrusted("/ui/com.mosaikit.maps/../../../etc/passwd", None).await.status,
         StatusCode::NOT_FOUND
     );
-    assert_eq!(a.get_untrusted("/ui/com.inesistente.x/", None).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(a.get_untrusted("/ui/com.nonexistent.x/", None).await.status, StatusCode::NOT_FOUND);
     // the app origin does not serve the UIs of the plugins (SPA fallback of the host, not the file of the plugin)
     let r = a.call(None, Method::GET, "/ui/com.mosaikit.maps/index.html", None).await;
     assert!(!r.text().contains("<h1>mappe</h1>"));
@@ -617,7 +617,7 @@ async fn base_path_from_a_single_url() {
     assert_eq!(r.json()["plugin_url"], "http://127.0.0.1:9101/mosaikit");
     // origin of the plugins: same base
     assert_eq!(a.get_untrusted("/ui/x/", None).await.status, StatusCode::NOT_FOUND);
-    let r = a.get_untrusted("/mosaikit/ui/inesistente/", None).await;
+    let r = a.get_untrusted("/mosaikit/ui/nonexistent/", None).await;
     assert_eq!(r.text(), "plugin not active");
 }
 
@@ -1441,4 +1441,120 @@ kind = "secret"
     let impact =
         a.call(Some(&admin), Method::GET, "/api/admin/plugins/com.mosaikit.notes/impact", None).await.json();
     assert_eq!((impact["items"].clone(), impact["extensions"].clone()), (json!(1), json!(["Review"])));
+}
+
+#[tokio::test]
+async fn trash_log_and_shares_over_http() {
+    let a = App::new().await;
+    a.t.install("notes").await;
+    let g = a.t.tenant("alfa").await;
+    let bruno_user = a.t.member(&g, "bruno").await;
+    a.t.member(&g, "anna").await;
+    let mgr = a.login("alfa", "alfa-manager", PASSWORD).await;
+    let anna = a.login("alfa", "anna", PASSWORD).await;
+    const NOTES: &str = "/api/t/alfa/p/com.mosaikit.notes/r/notes";
+
+    // a note shared with Bruno and with a public link: it shows in "Shared by me"
+    let r = a.call(Some(&anna), Method::POST, NOTES, Some(json!({ "values": { "title": "Plan" } }))).await;
+    assert_eq!(r.status, StatusCode::CREATED, "{}", r.text());
+    let rid = r.json()["id"].as_str().unwrap().to_string();
+    let r = a
+        .call(
+            Some(&anna),
+            Method::PUT,
+            &format!("/api/t/alfa/resources/{rid}/grants"),
+            Some(json!({ "principal_type": "user", "principal_id": bruno_user.user_id, "level": "read" })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let r = a
+        .call(Some(&anna), Method::POST, &format!("/api/t/alfa/resources/{rid}/links"), Some(json!({})))
+        .await;
+    assert!(r.status.is_success(), "{}", r.text());
+    let mine = a.call(Some(&anna), Method::GET, "/api/t/alfa/me/shared", None).await.json();
+    assert_eq!(mine.as_array().unwrap().len(), 1);
+    assert_eq!(mine[0]["shares"], 1);
+    assert_eq!(mine[0]["public_links"], 1);
+
+    // the manager revokes everything from the Shares page
+    let r = a
+        .call(Some(&anna), Method::POST, "/api/t/alfa/manage/resources/revoke", Some(json!({ "ids": [rid] })))
+        .await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN);
+    let r = a
+        .call(Some(&mgr), Method::POST, "/api/t/alfa/manage/resources/revoke", Some(json!({ "ids": [rid] })))
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    assert_eq!(r.json(), json!({ "shares": 1, "links": 1 }));
+    assert!(a
+        .call(Some(&anna), Method::GET, "/api/t/alfa/me/shared", None)
+        .await
+        .json()
+        .as_array()
+        .unwrap()
+        .is_empty());
+
+    // delete → trash → restore → delete for good
+    let r = a.call(Some(&anna), Method::DELETE, &format!("{NOTES}/{rid}"), None).await;
+    assert!(r.status.is_success(), "{}", r.text());
+    let tr = a.call(Some(&anna), Method::GET, "/api/t/alfa/trash", None).await.json();
+    assert_eq!(tr["retention_days"], 30);
+    assert_eq!(tr["items"][0]["title"], "Plan");
+    assert_eq!(
+        a.call(Some(&anna), Method::GET, &format!("{NOTES}/{rid}"), None).await.status,
+        StatusCode::NOT_FOUND
+    );
+    let r = a.call(Some(&anna), Method::POST, &format!("/api/t/alfa/trash/{rid}/restore"), None).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    assert_eq!(
+        a.call(Some(&anna), Method::GET, &format!("{NOTES}/{rid}"), None).await.status,
+        StatusCode::OK
+    );
+    a.call(Some(&anna), Method::DELETE, &format!("{NOTES}/{rid}"), None).await;
+    let r = a.call(Some(&anna), Method::DELETE, &format!("/api/t/alfa/trash/{rid}"), None).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let r = a.call(Some(&anna), Method::POST, &format!("/api/t/alfa/trash/{rid}/restore"), None).await;
+    assert_eq!(r.status, StatusCode::NOT_FOUND);
+    assert_eq!(r.json()["code"], "trash_not_found");
+
+    // a refused sign-in, with the browser of the request
+    let req = Request::builder()
+        .method(Method::POST)
+        .uri("/api/auth/login")
+        .header(header::CONTENT_TYPE, "application/json")
+        .header(header::USER_AGENT, "TestBrowser/1.0")
+        .body(Body::from(json!({ "tenant": "alfa", "username": "anna", "password": "nope" }).to_string()))
+        .unwrap();
+    assert_eq!(send(&a.app, req).await.status, StatusCode::UNAUTHORIZED);
+
+    // the Log of the manager: filters, failures, CSV; not for whoever is not a manager
+    assert_eq!(
+        a.call(Some(&anna), Method::GET, "/api/t/alfa/manage/log", None).await.status,
+        StatusCode::FORBIDDEN
+    );
+    let log = a.call(Some(&mgr), Method::GET, "/api/t/alfa/manage/log?what=items", None).await.json();
+    let actions: Vec<&str> =
+        log["events"].as_array().unwrap().iter().map(|e| e["action"].as_str().unwrap()).collect();
+    for a in ["resource.create", "resource.delete", "resource.restore", "resource.purge"] {
+        assert!(actions.contains(&a), "{a} in {actions:?}");
+    }
+    let failed = a.call(Some(&mgr), Method::GET, "/api/t/alfa/manage/log?failed=true", None).await.json();
+    assert_eq!(failed["events"].as_array().unwrap().len(), 1);
+    assert_eq!(failed["events"][0]["action"], "login.failed");
+    assert_eq!(failed["events"][0]["agent"], "TestBrowser/1.0");
+    let csv = a.call(Some(&mgr), Method::GET, "/api/t/alfa/manage/log.csv?failed=true", None).await;
+    assert_eq!(csv.status, StatusCode::OK);
+    assert!(csv.header(header::CONTENT_TYPE).starts_with("text/csv"));
+    assert!(csv.header(header::CONTENT_DISPOSITION).contains("log-alfa.csv"));
+    assert!(csv.text().contains("login.failed"));
+
+    // the Administrator: the platform, one tenant
+    let admin = a.admin().await;
+    assert_eq!(a.call(Some(&mgr), Method::GET, "/api/admin/log", None).await.status, StatusCode::FORBIDDEN);
+    let all =
+        a.call(Some(&admin), Method::GET, &format!("/api/admin/log?tenant={}", g.home_tenant_id), None).await;
+    assert_eq!(all.status, StatusCode::OK, "{}", all.text());
+    assert!(all.json()["events"].as_array().unwrap().iter().all(|e| e["tenant_slug"] == "alfa"));
+    let csv = a.call(Some(&admin), Method::GET, "/api/admin/log.csv", None).await;
+    assert!(csv.text().contains("time,tenant,person"));
 }

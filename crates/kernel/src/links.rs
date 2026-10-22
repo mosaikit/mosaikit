@@ -175,7 +175,8 @@ pub async fn resolve(k: &Kernel, token: &str) -> Result<Resolved> {
          join core.resources r on r.id = l.resource_id
          join core.tenants t on t.id = r.tenant_id and t.status = 'active'
          join core.plugins p on p.id = r.plugin_id and p.status = 'active'
-         where l.token_hash = $1 and l.revoked_at is null and (l.expires_at is null or l.expires_at > now())",
+         where l.token_hash = $1 and l.revoked_at is null and (l.expires_at is null or l.expires_at > now())
+           and not core.in_trash(r.id)",
     )
     .bind(sha256(token.as_bytes()))
     .fetch_optional(&k.db)

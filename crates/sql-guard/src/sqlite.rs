@@ -85,6 +85,7 @@ pub fn level_row(r: &str) -> String {
         "(CASE \
            WHEN core_ctx_tenant() IS NULL OR {r}.tenant_id IS DISTINCT FROM core_ctx_tenant() THEN 0 \
            WHEN core_ctx_plugin() IS NOT NULL AND {r}.plugin_id IS DISTINCT FROM core_ctx_plugin() THEN 0 \
+           WHEN {trash} THEN 0 \
            WHEN core_ctx_link() IS NOT NULL THEN (CASE WHEN {r}.id = core_ctx_link() \
                 OR core_ctx_link() IN (SELECT value FROM json_each({r}.ancestors)) THEN 1 ELSE 0 END) \
            ELSE {} END)",
@@ -93,7 +94,25 @@ pub fn level_row(r: &str) -> String {
             &format!("{r}.tenant_id"),
             &format!("{r}.id"),
             &format!("{r}.ancestors")
-        )
+        ),
+        trash = in_trash_row(r)
+    )
+}
+
+/// The row of `core_resources` with alias `r`, or one of its ancestors, is in the trash.
+fn in_trash_row(r: &str) -> String {
+    format!(
+        "({r}.deleted_at IS NOT NULL OR EXISTS (SELECT 1 FROM core_resources msk_tr \
+           WHERE msk_tr.deleted_at IS NOT NULL AND msk_tr.id IN (SELECT value FROM json_each({r}.ancestors))))"
+    )
+}
+
+/// `core.in_trash(rid)`: the resource or one of its ancestors is in the trash.
+pub fn in_trash(rid: &str) -> String {
+    format!(
+        "EXISTS (SELECT 1 FROM (SELECT ({rid}) AS v) msk_ix JOIN core_resources msk_ir ON msk_ir.id = msk_ix.v \
+           WHERE {})",
+        in_trash_row("msk_ir")
     )
 }
 
@@ -116,6 +135,8 @@ pub fn level_for(u: &str, t: &str, rid: &str, anc: &str) -> String {
     format!(
         "(SELECT CASE \
            WHEN msk_a.u IS NULL OR NOT {member} THEN 0 \
+           WHEN EXISTS (SELECT 1 FROM core_resources msk_d WHERE msk_d.deleted_at IS NOT NULL \
+                AND (msk_d.id = msk_a.rid OR msk_d.id IN (SELECT value FROM json_each(msk_a.anc)))) THEN 0 \
            WHEN EXISTS (SELECT 1 FROM core_resources msk_o WHERE msk_o.owner_id = msk_a.u \
                 AND (msk_o.id = msk_a.rid OR msk_o.id IN (SELECT value FROM json_each(msk_a.anc)))) THEN 3 \
            ELSE coalesce((SELECT max(msk_g.level) FROM core_grants msk_g \
@@ -499,6 +520,7 @@ impl<'a> Tr<'a> {
                     "can_access" => format!("({} >= ({}))", level_of(&arg(0)?), arg(1)?),
                     "level_for" => level_for(&arg(0)?, &arg(1)?, &arg(2)?, &arg(3)?),
                     "is_member" => is_member(&arg(0)?, &arg(1)?),
+                    "in_trash" => in_trash(&arg(0)?),
                     "ctx_user" => "core_ctx_user()".into(),
                     "ctx_tenant" => "core_ctx_tenant()".into(),
                     "ctx_plugin" => "core_ctx_plugin()".into(),

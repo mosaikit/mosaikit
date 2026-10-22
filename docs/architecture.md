@@ -14,6 +14,8 @@ development and release. The choices described here replace the initial PoC
    - [3.2 People and permissions](#32-people-and-permissions)
    - [3.3 Sign-in through an identity provider (OIDC)](#33-sign-in-through-an-identity-provider-oidc)
 4. [Resources, ownership and sharing](#4-resources-ownership-and-sharing)
+   - [4.1 Trash](#41-trash)
+   - [4.2 Log](#42-log)
 5. [Public links](#5-public-links)
    - [5.1 Notifications](#51-notifications)
 6. [KPIs](#6-kpis)
@@ -360,6 +362,52 @@ folders).
 
 The share dialog belongs to **the host**: plugins open it with
 `msk.share(resourceId)` and never reimplement the checks.
+
+**Shares page** (Tenant Manager): every item of the tenant shared with people, groups or a public link,
+with filters (owner, app, «Public and links», title) and **Revoke** for one or many items at once: every
+grant is removed and every link revoked, the owner keeps the item (`POST /api/t/<t>/manage/resources/revoke`,
+or `POST /api/t/<t>/resources/<id>/revoke-all` for whoever manages the item). **Shared by me** on the Home
+lists the items of the person with grants or active links (`GET /api/t/<t>/me/shared`).
+
+### 4.1 Trash
+
+Deleting a resource (CRUD of a plugin, files, `resource.delete` of the WASM logic) **moves it to the
+trash**: `core.resources.deleted_at` and `deleted_by` are set on the resource, nothing else changes.
+
+- **Invisible to everybody.** The level of a resource in the trash, or inside one (an ancestor is in the
+  trash), is 0 in `core.level_for` and `core.level_of` (PostgreSQL) and in the level templates of
+  sql-guard (SQLite): it disappears from `core.visible_resources`, from the tables of the plugins (RLS),
+  from search, KPIs, overviews, Shares, and public links stop working. `core.in_trash(id)` tells it to the
+  queries of the kernel.
+- **Restore** (`POST /api/t/<t>/trash/<id>/restore`): clears the mark; grants, public links, the rows of
+  the plugin and the contents on disk come back as they were. An item inside another item of the trash is
+  restored with that one (`trash_parent_deleted`). The `after_delete` hook of the plugin ran when the item
+  went to the trash; no hook runs on restore or purge.
+- **Who.** Whoever owns the item or deleted it; the Tenant Manager for the whole tenant (titles under the
+  policy `managers_see_titles`). The Administrator has no trash.
+- **Purge.** «Delete for good» (`DELETE /api/t/<t>/trash/<id>`), «Empty the trash» (what one owns or
+  deleted, `POST /api/t/<t>/trash/empty`) and the background work, every 10 minutes, for what has been in the
+  trash longer than `trash.retention_days` (platform setting, default **30**, 1–365): the rows are deleted
+  (the tables of the plugins follow through their foreign keys) and the contents on disk removed.
+
+### 4.2 Log
+
+`core.events` records every operation of the kernel: who (`user_id`), where (`tenant_id`), on what
+(`plugin_id`, `resource_id`), the action, details, the **outcome** (`ok`: refused sign-ins, blocked
+sign-ins and wrong second-factor codes are recorded as failures) and the **address and browser** of the
+request (the server runs every request inside `events::with_request`).
+
+- **Log page.** The same component for everyone: the Tenant Manager sees the events of the tenant
+  (`/api/t/<t>/manage/log`), never those of other tenants; the Administrator the whole platform with the
+  tenant of each event (`/api/admin/log?tenant=`). Filters: who, kind of event (sign-in, items, sharing,
+  people and groups, plugins, settings — fixed SQL, never built from the request), app, item, group,
+  period, only failures, search; pages of 50 (`before` cursor); detail of an event in a side pane with
+  «Only <person>» and «Only this item».
+- **CSV.** `…/log.csv` with the same filters, or `ids=` for a selection, at most 10 000 events; cells that a
+  spreadsheet would read as a formula start with `'`.
+- **Activity.** The Activity tab of a person and of a group is the Log with a fixed filter.
+- **Retention.** Events older than `log.retention_days` (platform setting, default **365**, 30–3650) are
+  purged by the background work.
 
 ## 5. Public links
 

@@ -399,8 +399,8 @@ pub async fn digest(k: &Kernel, force: bool) -> Result<usize> {
 
 // ------------------------------------------------------------------ worker
 
-/// The background work of the notifications: the queue every 15 seconds, the digest, the retention and
-/// the cleaning of the queue every 10 minutes. Stops with the kernel.
+/// The background work: the queue of the emails every 15 seconds; every 10 minutes the digest, the
+/// retention of notifications and log, the purge of the trash and the cleaning of the queue. Stops with the kernel.
 pub(crate) fn spawn_worker(k: &Arc<Kernel>) {
     let weak: Weak<Kernel> = Arc::downgrade(k);
     tokio::spawn(async move {
@@ -417,6 +417,12 @@ pub(crate) fn spawn_worker(k: &Arc<Kernel>) {
                 }
                 if let Err(e) = notify::purge(&k).await {
                     tracing::warn!("retention of the notifications: {e}");
+                }
+                if let Err(e) = crate::trash::purge_expired(&k).await {
+                    tracing::warn!("purge of the trash: {e}");
+                }
+                if let Err(e) = crate::log::purge(&k).await {
+                    tracing::warn!("retention of the log: {e}");
                 }
                 if let Err(e) = tidy(&k).await {
                     tracing::warn!("cleaning of the queue of the emails: {e}");

@@ -9,6 +9,7 @@ pub mod admin;
 pub(crate) mod api;
 mod auth;
 pub mod fake_idp;
+mod history_api;
 mod oidc_api;
 mod pages;
 mod people_api;
@@ -73,11 +74,38 @@ async fn common_headers(req: axum::extract::Request, next: axum::middleware::Nex
     res
 }
 
+/// The address and the browser of the request go with the events it records (the Log shows them).
+async fn request_info(
+    axum::extract::State(s): axum::extract::State<AppState>,
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Response {
+    let h = req.headers();
+    let forwarded =
+        s.k.cfg
+            .trust_proxy
+            .then(|| h.get("x-forwarded-for").and_then(|v| v.to_str().ok()).and_then(|v| v.split(',').next()))
+            .flatten()
+            .map(|v| v.trim().to_string());
+    let ip = forwarded.or_else(|| {
+        req.extensions()
+            .get::<axum::extract::ConnectInfo<std::net::SocketAddr>>()
+            .map(|c| c.0.ip().to_string())
+    });
+    let agent = h.get(header::USER_AGENT).and_then(|v| v.to_str().ok()).map(str::to_string);
+    mosaikit_kernel::events::with_request(mosaikit_kernel::events::RequestInfo { ip, agent }, next.run(req))
+        .await
+}
+
 /// Router of the app origin (API + host UI), under the base path of `url`.
 pub fn app_router(k: Arc<Kernel>) -> Router {
     let base = k.cfg.base_path.clone();
     let state = AppState { k };
-    let r = api::router().merge(oidc_api::router()).merge(ui::router()).with_state(state);
+    let r = api::router()
+        .merge(oidc_api::router())
+        .merge(ui::router())
+        .layer(axum::middleware::from_fn_with_state(state.clone(), request_info))
+        .with_state(state);
     under_base(&base, r).layer(axum::middleware::from_fn(common_headers))
 }
 
@@ -86,7 +114,8 @@ pub fn app_router(k: Arc<Kernel>) -> Router {
 pub fn untrusted_router(k: Arc<Kernel>) -> Router {
     let base = k.cfg.plugin_base_path.clone();
     let state = AppState { k };
-    under_base(&base, untrusted::router().with_state(state)).layer(axum::middleware::from_fn(common_headers))
+    let r = untrusted::router().layer(axum::middleware::from_fn_with_state(state.clone(), request_info));
+    under_base(&base, r.with_state(state)).layer(axum::middleware::from_fn(common_headers))
 }
 
 /// Mounts `r` under `base` ("" = root): removes the prefix from the path before

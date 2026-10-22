@@ -39,6 +39,7 @@ const MIGRATIONS: &[(i64, &str, &str)] = &[
     (5, "people", include_str!("0005_people.sql")),
     (6, "oidc", include_str!("0006_oidc.sql")),
     (7, "plugins", include_str!("0007_plugins.sql")),
+    (8, "trash_log", include_str!("0008_trash_log.sql")),
 ];
 
 /// Context of the transaction on the connection (read by `core_ctx_*()`).
@@ -750,7 +751,15 @@ impl LiteTx {
             )
             .await?;
         let ids: Vec<Uuid> = rows.iter().map(|r| r.try_get(0)).collect::<Result<_>>()?;
-        self.raw("delete from core_resources where id = ?1".into(), vec![Param::Uuid(id)], false).await?;
+        // to the trash: the descendants are hidden through their ancestors
+        let user = self.ctx().await?.user;
+        self.raw(
+            "update core_resources set deleted_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), deleted_by = ?2 where id = ?1"
+                .into(),
+            vec![Param::Uuid(id), user.map(Param::Text).unwrap_or(Param::Null(crate::Ty::Uuid))],
+            false,
+        )
+        .await?;
         Ok(ids)
     }
 

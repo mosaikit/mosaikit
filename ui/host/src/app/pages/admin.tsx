@@ -3,7 +3,7 @@
 
 import { useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Bell, Building2, CircleHelp, Contrast, Frame, KeyRound, KeySquare, Mail, MoreHorizontal, Palette, PanelLeft, Plus, Power, Search, ShieldCheck, Users } from 'lucide-react'
+import { Bell, Building2, CircleHelp, Contrast, Frame, History, KeyRound, KeySquare, Mail, MoreHorizontal, Palette, PanelLeft, Plus, Power, Search, ShieldCheck, Users } from 'lucide-react'
 import { api, fmtBytes, fmtDate } from '../../api.ts'
 import { useBrand } from '../../brand.ts'
 import type { AdminUser, GlobalKpi, Member, Session, ShellBand, SystemOverview, TenantInfo } from '../../types.ts'
@@ -22,7 +22,7 @@ import { go, to } from '../router.ts'
 import { bandOf } from '../prefs.ts'
 import { AppMark } from '../Shell.tsx'
 import { PlatformTheme } from '../ThemeSettings.tsx'
-import { EmbeddingPanel, IdentityPanel, KeysPanel, LanguagesPanel, ModePanel, NotificationsPanel, SecurityPanel, ThemeSwitch } from '../SettingsPanels.tsx'
+import { EmbeddingPanel, IdentityPanel, KeysPanel, LanguagesPanel, ModePanel, NotificationsPanel, RetentionPanel, SecurityPanel, ThemeSwitch } from '../SettingsPanels.tsx'
 import { SignInSettings } from '../SignInSettings.tsx'
 import { EmailPanel } from '../EmailPanel.tsx'
 import { TenantPluginsOfAdmin } from './plugins.tsx'
@@ -341,6 +341,7 @@ export function AdminSystem({ session, section }: { session: Session; section?: 
     { id: 'admins', label: t('Administrators'), icon: <ShieldCheck />, group: t('Platform') },
     { id: 'email', label: t('Email'), icon: <Mail /> },
     { id: 'notifications', label: t('Notifications'), icon: <Bell /> },
+    { id: 'retention', label: t('Retention'), icon: <History /> },
     { id: 'security', label: t('Passwords and sessions'), icon: <KeyRound /> },
     { id: 'keys', label: t('Keys of outside services'), icon: <KeySquare /> },
     { id: 'embedding', label: t('Embedding'), icon: <Frame /> },
@@ -362,6 +363,7 @@ export function AdminSystem({ session, section }: { session: Session; section?: 
         {cur === 'admins' && <Admins me={session.user.user_id} />}
         {cur === 'email' && <EmailPanel session={session} />}
         {cur === 'notifications' && <NotificationsPanel level={PLATFORM} />}
+        {cur === 'retention' && <RetentionPanel level={PLATFORM} />}
         {cur === 'security' && <SecurityPanel level={PLATFORM} />}
         {cur === 'keys' && <KeysPanel level={PLATFORM} />}
         {cur === 'embedding' && <EmbeddingPanel level={PLATFORM} />}

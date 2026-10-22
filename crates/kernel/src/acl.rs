@@ -246,7 +246,9 @@ pub async fn set_grant(
 /// Transfers the ownership of a resource: the owner or the manager of the tenant may do it.
 pub async fn transfer_owner(k: &Kernel, c: &Caller, rid: Uuid, new_owner: Uuid) -> Result<()> {
     let row =
-        mosaikit_db::query("select owner_id, plugin_id from core.resources where id = $1 and tenant_id = $2")
+        mosaikit_db::query(
+            "select owner_id, plugin_id from core.resources where id = $1 and tenant_id = $2 and not core.in_trash(id)",
+        )
             .bind(rid)
             .bind(c.tenant.tenant_id)
             .fetch_optional(&k.db)
@@ -336,7 +338,8 @@ pub async fn tenant_resources(
                 (select count(*) from core.public_links l where l.resource_id = r.id and l.revoked_at is null
                     and (l.expires_at is null or l.expires_at > now()))
          from core.resources r join core.users u on u.id = r.owner_id
-         where r.tenant_id = $1 and ($3::uuid is null or r.owner_id = $3) and ($4::text is null or r.plugin_id = $4)
+         where r.tenant_id = $1 and not core.in_trash(r.id)
+           and ($3::uuid is null or r.owner_id = $3) and ($4::text is null or r.plugin_id = $4)
            and ($5::text is null or r.title ilike $5 escape '\\')
          order by r.updated_at desc limit 1000",
     )
@@ -402,4 +405,119 @@ pub async fn reassign_all(k: &Kernel, c: &Caller, from: Uuid, to: Uuid) -> Resul
     )
     .await;
     Ok(n)
+}
+
+/// What a revocation removed.
+#[derive(Debug, Clone, Copy, Default, Serialize)]
+pub struct Revoked {
+    pub shares: i64,
+    pub links: i64,
+}
+
+/// Removes every share and revokes every public link of an item: whoever manages it, or the Tenant
+/// Manager for any item of the tenant (the Shares page). The owner keeps it, nothing is deleted.
+pub async fn revoke_all(k: &Kernel, c: &Caller, rid: Uuid) -> Result<Revoked> {
+    let row = mosaikit_db::query(
+        "select plugin_id, core.level_for($2, tenant_id, id, ancestors) from core.resources
+         where id = $1 and tenant_id = $3 and not core.in_trash(id)",
+    )
+    .bind(rid)
+    .bind(c.user.user_id)
+    .bind(c.tenant.tenant_id)
+    .fetch_optional(&k.db)
+    .await?
+    .ok_or_else(|| Error::not_found("resource not found"))?;
+    let plugin: String = row.get(0);
+    let level: i32 = row.get(1);
+    if level < Level::Manage as i32 && !c.is_manager() {
+        return Err(Error::not_found("resource not found"));
+    }
+    let mut tx = k.db.begin_app().await?;
+    let shares = mosaikit_db::query("delete from core.grants where resource_id = $1")
+        .bind(rid)
+        .execute(&mut *tx)
+        .await?
+        .rows_affected() as i64;
+    let links = mosaikit_db::query(
+        "update core.public_links set revoked_at = now() where resource_id = $1 and revoked_at is null",
+    )
+    .bind(rid)
+    .execute(&mut *tx)
+    .await?
+    .rows_affected() as i64;
+    tx.commit().await?;
+    let r = Revoked { shares, links };
+    if shares + links > 0 {
+        events::record(
+            k,
+            Some(c.tenant.tenant_id),
+            Some(c.user.user_id),
+            Some(&plugin),
+            Some(rid),
+            "share.revoke_all",
+            json!({ "shares": shares, "links": links }),
+        )
+        .await;
+    }
+    Ok(r)
+}
+
+/// An item the caller shared: with whom and with how many links.
+#[derive(Debug, Clone, Serialize)]
+pub struct SharedByMe {
+    pub id: Uuid,
+    pub plugin_id: String,
+    pub kind: String,
+    pub title: String,
+    /// people and groups, the first ones by name
+    pub with: Vec<String>,
+    pub shares: i64,
+    pub public_links: i64,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// The items of the caller shared with people, groups or a public link (Home › Shared by me).
+pub async fn shared_by_me(k: &Kernel, c: &Caller) -> Result<Vec<SharedByMe>> {
+    let rows = mosaikit_db::query(
+        "select r.id, r.plugin_id, r.kind, r.title, r.updated_at,
+                (select count(*) from core.grants g where g.resource_id = r.id),
+                (select count(*) from core.public_links l where l.resource_id = r.id and l.revoked_at is null
+                    and (l.expires_at is null or l.expires_at > now()))
+         from core.resources r
+         where r.tenant_id = $1 and r.owner_id = $2 and not core.in_trash(r.id)
+           and (exists (select 1 from core.grants g where g.resource_id = r.id)
+                or exists (select 1 from core.public_links l where l.resource_id = r.id and l.revoked_at is null
+                    and (l.expires_at is null or l.expires_at > now())))
+         order by r.updated_at desc limit 200",
+    )
+    .bind(c.tenant.tenant_id)
+    .bind(c.user.user_id)
+    .fetch_all(&k.db)
+    .await?;
+    let mut out = Vec::with_capacity(rows.len());
+    for r in &rows {
+        let id: Uuid = r.get(0);
+        let names: Vec<String> = mosaikit_db::query_scalar(
+            "select coalesce(case when g.principal_type = 'user' then coalesce(nullif(u.display_name, ''), u.username)
+                                  else gr.name end, '')
+             from core.grants g
+             left join core.users u on g.principal_type = 'user' and u.id = g.principal_id
+             left join core.groups gr on g.principal_type = 'group' and gr.id = g.principal_id
+             where g.resource_id = $1 order by g.granted_at limit 3",
+        )
+        .bind(id)
+        .fetch_all(&k.db)
+        .await?;
+        out.push(SharedByMe {
+            id,
+            plugin_id: r.get(1),
+            kind: r.get(2),
+            title: r.get(3),
+            updated_at: r.get(4),
+            with: names,
+            shares: r.get(5),
+            public_links: r.get(6),
+        });
+    }
+    Ok(out)
 }

@@ -56,6 +56,8 @@ function labels(): Record<string, [string, string]> {
     'notify.email_mode': [t('Emails of the notifications'), t('For whoever did not choose; everyone can change it in Account › Notifications')],
     'notify.digest_hour': [t('Hour of the daily summary'), t('0-23, UTC time of the server')],
     'notify.retention_days': [t('Notifications kept, in days'), t('Older ones are deleted, read or not')],
+    'trash.retention_days': [t('Trash kept, in days'), t('Then what was deleted is deleted for good')],
+    'log.retention_days': [t('Log kept, in days'), t('Older events are deleted')],
     theme: [t('Theme'), ''],
     band: [t('Top bar'), ''],
   }
@@ -500,6 +502,16 @@ export function NotificationsPanel({ level }: { level: Level }) {
           !s(k) ? null : k === 'notify.email_mode' ? <ChoiceRow key={k} level={level} d={d} s={s(k)!} options={modes} /> : <NumberRow key={k} level={level} d={d} s={s(k)!} />,
         )
       }
+    </Panel>
+  )
+}
+
+/** How long the platform keeps what was deleted and the events of the log. */
+export function RetentionPanel({ level }: { level: Level }) {
+  const keys = ['trash.retention_days', 'log.retention_days']
+  return (
+    <Panel level={level} keys={keys} title={t('Retention')} description={t('How long the trash and the log keep their content, for every tenant.')}>
+      {(d, s) => keys.map((k) => s(k) && <NumberRow key={k} level={level} d={d} s={s(k)!} />)}
     </Panel>
   )
 }

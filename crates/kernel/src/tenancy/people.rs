@@ -808,7 +808,8 @@ pub async fn group_detail(k: &Kernel, c: &Caller, group: Uuid) -> Result<GroupDe
     let titles = c.tenant.settings.managers_see_titles;
     let rows = mosaikit_db::query(
         "select r.id, r.title, r.plugin_id, gr.level from core.grants gr join core.resources r on r.id = gr.resource_id
-         where gr.principal_type = 'group' and gr.principal_id = $1 and r.tenant_id = $2 order by r.updated_at desc limit 500",
+         where gr.principal_type = 'group' and gr.principal_id = $1 and r.tenant_id = $2 and not core.in_trash(r.id)
+         order by r.updated_at desc limit 500",
     )
     .bind(group)
     .bind(c.tenant.tenant_id)

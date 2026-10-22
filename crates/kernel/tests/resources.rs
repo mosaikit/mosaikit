@@ -207,7 +207,7 @@ async fn validation_and_refusing_hooks() {
         .await
         .unwrap_err();
     assert!(e.message.contains("required"), "{e}");
-    let e = crud::create(t, c, NOTES, "notes", &vals(json!({ "title": "x", "tag": "inesistente" })), None)
+    let e = crud::create(t, c, NOTES, "notes", &vals(json!({ "title": "x", "tag": "nonexistent" })), None)
         .await
         .unwrap_err();
     assert!(e.message.contains("options"), "{e}");
@@ -298,7 +298,7 @@ async fn wasm_commands_respect_rls() {
     let mine = crud::call(t, &w.anna, NOTES, "notes.count_by_tag", json!({})).await.unwrap();
     let total: i64 = mine.as_array().unwrap().iter().map(|r| r["n"].as_i64().unwrap()).sum();
     assert_eq!(total, 2, "the command sees only anna's notes: {mine}");
-    let e = crud::call(t, &w.anna, NOTES, "notes.inesistente", json!({})).await.unwrap_err();
+    let e = crud::call(t, &w.anna, NOTES, "notes.nonexistent", json!({})).await.unwrap_err();
     assert!(e.message.contains("unknown"));
 }
 

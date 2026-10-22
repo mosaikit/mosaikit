@@ -20,6 +20,7 @@ mod host;
 pub mod identity;
 pub mod kpi;
 pub mod links;
+pub mod log;
 pub mod mail;
 pub mod notify;
 pub mod oidc;
@@ -29,6 +30,7 @@ pub mod secret;
 pub mod tenancy;
 pub mod testing;
 pub mod totp;
+pub mod trash;
 mod util;
 
 use std::sync::Arc;

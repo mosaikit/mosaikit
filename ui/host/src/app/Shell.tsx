@@ -17,6 +17,7 @@ import {
   CirclePlay,
   Contrast,
   Gauge,
+  History,
   House,
   KeyRound,
   Keyboard,
@@ -27,6 +28,7 @@ import {
   Share2,
   ShieldCheck,
   Sparkles,
+  Trash2,
   UserRound,
   Users,
 } from 'lucide-react'
@@ -113,6 +115,7 @@ function useNav(session: Session, route: Route): { groups: NavGroup[]; bottom: N
             { label: t('Tenant'), icon: <Building2 />, href: to.admin('tenants'), active: page === 'tenants' || page === 'tenant' },
             { label: t('People'), icon: <Users />, href: to.admin('people'), active: page === 'people' || page === 'person' },
             { label: t('Plugins'), icon: <Puzzle />, href: to.admin('plugins'), active: page === 'plugins' },
+            { label: t('Log'), icon: <History />, href: to.admin('log'), active: page === 'log' },
           ],
         },
       ],
@@ -144,6 +147,7 @@ function useNav(session: Session, route: Route): { groups: NavGroup[]; bottom: N
         { label: t('Plugins'), icon: <Puzzle />, href: to.tenant(slug, 'plugins'), active: page === 'plugins' },
         { label: t('Shares'), icon: <Share2 />, href: to.tenant(slug, 'shares'), active: page === 'shares' },
         { label: t('Usage'), icon: <Gauge />, href: to.tenant(slug, 'usage'), active: page === 'usage' },
+        { label: t('Log'), icon: <History />, href: to.tenant(slug, 'log'), active: page === 'log' },
       ],
     })
   return {
@@ -462,6 +466,12 @@ function UserMenu({ session, route, band }: { session: Session; route: Route; ba
           <span className="flex-1">{t('Notifications')}</span>
           {unread > 0 && <span className="text-xs text-muted-foreground">{t('{n} new', { n: String(unread) })}</span>}
         </DropdownMenuItem>
+        {route.area === 'tenant' && (
+          <DropdownMenuItem onSelect={() => go(to.tenant(route.tenant, 'trash'))}>
+            <Trash2 />
+            {t('Trash')}
+          </DropdownMenuItem>
+        )}
         {!band.help && (
           <>
             <DropdownMenuSeparator />

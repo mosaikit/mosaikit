@@ -9,7 +9,8 @@ import { api, appUrl, fmtBytes, fmtDate } from '../../api.ts'
 import PluginFrame from '../../components/PluginFrame.tsx'
 import { UiContext, useUi, type Ui } from '../../ui-context.ts'
 import ShareDialog from '../ShareDialog.tsx'
-import type { AccessRequest, Group, Invitation, LinkInfo, Member, Overview, Profile, ResetLink, ResourceRow, Session, TenantContext, TenantKpi, TenantSettings } from '../../types.ts'
+import { SharedByMeSection } from './history.tsx'
+import type { AccessRequest, Group, Invitation, LinkInfo, Member, Overview, Profile, ResetLink, ResourceRow, Revoked, Session, TenantContext, TenantKpi, TenantSettings } from '../../types.ts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -63,6 +64,7 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
             </div>
           </section>
         )}
+        <SharedByMeSection slug={slug} />
         {d?.tenant && (
           <section className="grid gap-3">
             <h2 className="text-sm font-semibold">{t('The tenant {name}', { name: c.tenant.name })}</h2>
@@ -716,9 +718,34 @@ export function Shares({ slug }: { slug: string }) {
   const [links, setLinks] = useState<ResourceRow | null>(null)
   const [sharing, setSharing] = useState<string | null>(null)
   const [reassign, setReassign] = useState(false)
+  const [sel, setSel] = useState<Set<string>>(new Set())
+  const confirm = useConfirm()
+  const revoke = useAction((ids: string[]) => api<Revoked>('POST', `/api/t/${enc(slug)}/manage/resources/revoke`, { ids }), {
+    invalidate: [['m-resources', slug], ['overview', slug], ['shared-by-me', slug]],
+  })
+  const askRevoke = async (list: ResourceRow[]) => {
+    const text =
+      list.length === 1
+        ? t('Revoke every share and public link of «{name}»? The owner keeps the item.', { name: list[0].title || list[0].kind })
+        : t('Revoke every share and public link of {count} items? The owners keep their items.', { count: list.length })
+    if (await confirm(text, true))
+      revoke.mutate(
+        list.map((r) => r.id),
+        {
+          onSuccess: (r) => {
+            const x = r as Revoked
+            toast.success(t('Revoked: {shares} shares, {links} public links', { shares: x.shares, links: x.links }))
+            setSel(new Set())
+          },
+        },
+      )
+  }
   const all = q.data ?? []
   const shared = all.filter((r) => r.shares > 0 || r.public_links > 0)
   const rows = show === 'items' ? all : show === 'public' ? shared.filter((r) => r.public_links > 0) : shared
+  const ids = [...sel].filter((id) => rows.some((r) => r.id === id && (r.shares > 0 || r.public_links > 0)))
+  const selectable = rows.filter((r) => r.shares > 0 || r.public_links > 0)
+  const allSel = selectable.length > 0 && ids.length === selectable.length
   const plugins = ctx.data?.plugins ?? []
   const label = (id: string) => plugins.find((p) => p.id === id)?.label ?? id
   const seeTitles = ctx.data?.tenant.settings.managers_see_titles
@@ -740,7 +767,7 @@ export function Shares({ slug }: { slug: string }) {
           <Pills
             items={[
               { id: 'all', label: t('Shared'), count: shared.length },
-              { id: 'public', label: t('Public'), count: shared.filter((r) => r.public_links > 0).length },
+              { id: 'public', label: t('Public and links'), count: shared.filter((r) => r.public_links > 0).length },
               { id: 'items', label: t('All items'), count: all.length },
             ]}
             value={show}
@@ -775,6 +802,17 @@ export function Shares({ slug }: { slug: string }) {
           {seeTitles && (
             <Input type="search" className="h-8 w-56" placeholder={t('Search in the title')} aria-label={t('Search in the title')} value={filter.q} onChange={(e) => setFilter({ ...filter, q: e.target.value })} />
           )}
+          {ids.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 rounded-lg bg-primary/10 py-1 pr-1 pl-3" role="group" aria-label={t('Actions on the selection')}>
+              <span className="text-sm font-medium tabular-nums">{t('{count} selected', { count: ids.length })}</span>
+              <Button variant="outline" size="sm" onClick={() => void askRevoke(rows.filter((r) => ids.includes(r.id)))}>
+                {t('Revoke shares and links')}
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => setSel(new Set())}>
+                {t('Deselect')}
+              </Button>
+            </div>
+          )}
         </div>
         {q.isLoading ? (
           <Loading />
@@ -787,6 +825,14 @@ export function Shares({ slug }: { slug: string }) {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      aria-label={t('Select all')}
+                      disabled={!selectable.length}
+                      checked={allSel ? true : ids.length ? 'indeterminate' : false}
+                      onCheckedChange={(v) => setSel(v ? new Set(selectable.map((r) => r.id)) : new Set())}
+                    />
+                  </TableHead>
                   <TableHead>{t('Item')}</TableHead>
                   <TableHead>{t('Owner')}</TableHead>
                   <TableHead className="text-right">{t('Size')}</TableHead>
@@ -798,7 +844,21 @@ export function Shares({ slug }: { slug: string }) {
               </TableHeader>
               <TableBody>
                 {rows.map((r) => (
-                  <TableRow key={r.id}>
+                  <TableRow key={r.id} data-state={sel.has(r.id) ? 'selected' : undefined}>
+                    <TableCell>
+                      {(r.shares > 0 || r.public_links > 0) && (
+                        <Checkbox
+                          aria-label={t('Select {name}', { name: r.title || r.kind })}
+                          checked={sel.has(r.id)}
+                          onCheckedChange={(v) => {
+                            const n = new Set(sel)
+                            if (v) n.add(r.id)
+                            else n.delete(r.id)
+                            setSel(n)
+                          }}
+                        />
+                      )}
+                    </TableCell>
                     <TableCell>
                       <b className="block font-medium">{r.title || <span className="font-normal text-muted-foreground italic">{t('title hidden')}</span>}</b>
                       <span className="text-xs text-muted-foreground">
@@ -834,6 +894,11 @@ export function Shares({ slug }: { slug: string }) {
                       <Button variant="ghost" size="sm" onClick={() => setSharing(r.id)}>
                         {t('Share')}
                       </Button>
+                      {(r.shares > 0 || r.public_links > 0) && (
+                        <Button variant="ghost" size="sm" onClick={() => void askRevoke([r])}>
+                          {t('Revoke')}
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
