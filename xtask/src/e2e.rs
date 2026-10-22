@@ -1,7 +1,11 @@
 //! `cargo xtask e2e`: tests in the browser on a full installation.
 //!
 //! New database, plugins built, signed and preinstalled from the registry
-//! (as in production), server on 18080/18081 under the base path `/mosaikit`, Playwright.
+//! (as in production), server under the base path `/mosaikit`, Playwright.
+//!
+//! Several checkouts (worktrees) can run their suites at the same time: each one has its own
+//! database (`mosaikit_e2e` plus the folder name of the checkout) and takes the first free pair of
+//! ports from 18080/18081 (in steps of 10), or `MOSAIKIT_E2E_PORT` and the next one.
 
 use std::process::{Command, Stdio};
 use std::time::{Duration, Instant};
@@ -12,7 +16,6 @@ use crate::dev::kill_tree;
 use crate::plugins;
 use crate::util::{exe, npm, output, pg_bin, root, run, which};
 
-const DB: &str = "mosaikit_e2e";
 const ADMIN_PASSWORD: &str = "e2e-admin-password";
 
 /// Administrative role of the tests: `MOSAIKIT_TEST_DATABASE_URL` (CI) or the development cluster.
@@ -28,16 +31,47 @@ fn psql(sql: &str) -> Result<String> {
     output(Command::new(psql).args(["-v", "ON_ERROR_STOP=1", "-d"]).arg(admin_url()).args(["-tAc", sql]))
 }
 
-fn reset_db() -> Result<()> {
-    psql(&format!("drop database if exists {DB} with (force)"))?;
-    for r in psql(&format!("select rolname from pg_roles where rolname like 'msk_{DB}%'"))?
+/// The database of this checkout: `mosaikit_e2e` for a folder called `mosaikit`, otherwise with the
+/// folder name (`mosaikit-phase8` → `mosaikit_e2e_phase8`).
+fn db_name() -> String {
+    let folder = root().file_name().map(|f| f.to_string_lossy().to_lowercase()).unwrap_or_default();
+    let suffix: String = folder
+        .strip_prefix("mosaikit")
+        .unwrap_or(&folder)
+        .chars()
+        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
+        .collect();
+    let suffix = suffix.trim_matches('_');
+    if suffix.is_empty() {
+        "mosaikit_e2e".into()
+    } else {
+        format!("mosaikit_e2e_{suffix}")
+    }
+}
+
+/// The app port of this run (the plugins use the next one): `MOSAIKIT_E2E_PORT`, or the first pair
+/// free on 127.0.0.1 among 18080, 18090, 18100…
+fn ports() -> Result<u16> {
+    if let Some(p) = std::env::var("MOSAIKIT_E2E_PORT").ok().and_then(|p| p.parse().ok()) {
+        return Ok(p);
+    }
+    let free = |p: u16| std::net::TcpListener::bind(("127.0.0.1", p)).is_ok();
+    (0..20)
+        .map(|i| 18080 + i * 10)
+        .find(|&p| free(p) && free(p + 1))
+        .context("no free pair of ports from 18080 to 18271")
+}
+
+fn reset_db(db: &str) -> Result<()> {
+    psql(&format!("drop database if exists {db} with (force)"))?;
+    for r in psql(&format!("select rolname from pg_roles where rolname like 'msk_{db}%'"))?
         .lines()
         .map(str::trim)
         .filter(|l| !l.is_empty())
     {
         psql(&format!("drop role if exists \"{r}\""))?;
     }
-    psql(&format!("create database {DB}"))?;
+    psql(&format!("create database {db}"))?;
     Ok(())
 }
 
@@ -61,7 +95,10 @@ pub fn e2e(headed: bool) -> Result<()> {
     if std::env::var_os("MOSAIKIT_TEST_DATABASE_URL").is_none() {
         crate::db::up()?;
     }
-    reset_db()?;
+    let db = db_name();
+    let port = ports()?;
+    eprintln!("== e2e on http://127.0.0.1:{port}/mosaikit (plugins on {}), database {db}", port + 1);
+    reset_db(&db)?;
     let dir = root().join(".dev").join("e2e");
     if dir.exists() {
         std::fs::remove_dir_all(&dir)?;
@@ -75,12 +112,12 @@ pub fn e2e(headed: bool) -> Result<()> {
     plugins::build_wasm(&all, false)?;
     plugins::pack_all(&all, false, &dir.join("registry"))?;
     let trusted = std::fs::read_to_string(dir.join("registry").join("trusted_key.txt"))?;
-    let url = admin_url().replace("/postgres", &format!("/{DB}"));
+    let url = admin_url().replace("/postgres", &format!("/{db}"));
     std::fs::write(
         dir.join("mosaikit.toml"),
         format!(
             "# installation of the e2e tests (properties described in mosaikit.example.toml)\n\
-             url = \"http://127.0.0.1:18080/mosaikit\"\ndata_dir = \"data\"\n\
+             url = \"http://127.0.0.1:{port}/mosaikit\"\ndata_dir = \"data\"\n\
              registry = \"registry/index.json\"\npreinstall = true\ntrusted_keys = [\"{}\"]\n\n[database]\nurl = \"{url}\"\n",
             trusted.trim()
         ),
@@ -94,9 +131,13 @@ pub fn e2e(headed: bool) -> Result<()> {
         .stderr(Stdio::from(std::fs::File::create(dir.join("server.err.log"))?))
         .spawn()?;
     let result = (|| -> Result<()> {
-        wait_health("http://127.0.0.1:18080/mosaikit/api/health")?;
+        wait_health(&format!("http://127.0.0.1:{port}/mosaikit/api/health"))?;
         let mut cmd = npm();
-        cmd.current_dir(root()).args(["run", "e2e", "-w", "e2e"]).env("E2E_ADMIN_PASSWORD", ADMIN_PASSWORD);
+        cmd.current_dir(root())
+            .args(["run", "e2e", "-w", "e2e"])
+            .env("E2E_ADMIN_PASSWORD", ADMIN_PASSWORD)
+            .env("E2E_BASE_URL", format!("http://127.0.0.1:{port}/mosaikit/"))
+            .env("E2E_PLUGIN_ORIGIN", format!("http://127.0.0.1:{}", port + 1));
         if headed {
             cmd.env("E2E_HEADED", "1");
         }
