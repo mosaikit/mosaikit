@@ -403,3 +403,101 @@ impl App {
         assert_eq!(r["has_secret"], json!(false));
     }
 }
+
+#[tokio::test]
+async fn front_channel_logout() {
+    let a = App::new().await;
+    let id = a.oidc_tenant("fcl", "idp").await;
+    let admin = a.admin().await;
+    let view = a.call(Some(&admin), Method::GET, &format!("/api/admin/tenants/{id}/sign-in"), None).await;
+    let front = view.json()["frontchannel_logout_uri"].as_str().unwrap_or_default().to_string();
+    assert!(front.ends_with("/api/auth/oidc/fcl/frontchannel-logout"), "{front}");
+
+    let anna = a.session_of(&a.sign_in("fcl", "anna.rossi").await).await;
+    let (sid, _) = a.idp.sessions().last().unwrap().clone();
+    let anna2 = a.session_of(&a.sign_in("fcl", "anna.rossi").await).await;
+    let (sid2, _) = a.idp.sessions().last().unwrap().clone();
+
+    // the page the provider loads in its iframe: only that session closes
+    let url = url::Url::parse(&a.idp.frontchannel_url(&sid).expect("front-channel address")).unwrap();
+    let path = format!("{}?{}", url.path(), url.query().unwrap_or_default());
+    let r = a.call(None, Method::GET, &path, None).await;
+    assert_eq!(r.status, StatusCode::OK);
+    let csp = r.headers.get(header::CONTENT_SECURITY_POLICY).unwrap().to_str().unwrap().to_string();
+    assert!(csp.contains(&format!("frame-ancestors {}", a.idp.issuer)), "{csp}");
+    assert!(r.headers.get(header::CACHE_CONTROL).unwrap().to_str().unwrap().contains("no-store"));
+    assert_eq!(a.call(Some(&anna), Method::GET, "/api/session", None).await.status, StatusCode::UNAUTHORIZED);
+    assert_eq!(a.call(Some(&anna2), Method::GET, "/api/session", None).await.status, StatusCode::OK);
+
+    // another issuer, or no session: refused, nothing closes
+    let wrong = format!("/api/auth/oidc/fcl/frontchannel-logout?iss=https%3A%2F%2Fevil.example&sid={sid2}");
+    assert_eq!(a.call(None, Method::GET, &wrong, None).await.status, StatusCode::BAD_REQUEST);
+    let none = format!(
+        "{}?iss={}",
+        url.path(),
+        url::form_urlencoded::byte_serialize(a.idp.issuer.as_bytes()).collect::<String>()
+    );
+    assert_eq!(a.call(None, Method::GET, &none, None).await.status, StatusCode::BAD_REQUEST);
+    assert_eq!(a.call(Some(&anna2), Method::GET, "/api/session", None).await.status, StatusCode::OK);
+
+    // the logout page of the provider frames the address of the session in its cookie
+    let page = a
+        .http
+        .get(format!("{}/logout?client_id=mosaikit", a.idp.issuer))
+        .header(header::COOKIE, format!("fake_idp_sid={sid2}"))
+        .send()
+        .await
+        .unwrap()
+        .text()
+        .await
+        .unwrap();
+    assert!(page.contains("/api/auth/oidc/fcl/frontchannel-logout?iss="), "{page}");
+    assert!(page.contains(&format!("sid={sid2}")), "{page}");
+}
+
+#[tokio::test]
+async fn groups_of_the_provider_over_http() {
+    let a = App::new().await;
+    let id = a.oidc_tenant("grp", "idp").await;
+    let admin = a.admin().await;
+    // turn the mirror of the groups on, only the groups starting with "s" (staff, not mosaikit-*)
+    let r = a
+        .call(
+            Some(&admin),
+            Method::PUT,
+            &format!("/api/admin/tenants/{id}/sign-in"),
+            Some(json!({
+                "enabled": true,
+                "issuer": a.idp.issuer,
+                "client_id": "mosaikit",
+                "roles_source": "idp",
+                "manager_groups": ["mosaikit-managers"],
+                "user_groups": ["mosaikit-users"],
+                "sync_groups": true,
+                "group_prefix": "s",
+            })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", String::from_utf8_lossy(&r.body));
+    assert_eq!(
+        (r.json()["sync_groups"].as_bool(), r.json()["group_prefix"].as_str()),
+        (Some(true), Some("s"))
+    );
+    assert_eq!(r.json()["has_secret"].as_bool(), Some(true), "the secret is kept");
+
+    let anna = a.session_of(&a.sign_in("grp", "anna.rossi").await).await;
+    a.session_of(&a.sign_in("grp", "bruno.neri").await).await;
+    let list = a.call(Some(&anna), Method::GET, "/api/t/grp/manage/groups", None).await;
+    assert_eq!(list.status, StatusCode::OK);
+    let groups = list.json();
+    let groups = groups.as_array().unwrap();
+    let names: Vec<&str> = groups.iter().filter_map(|g| g["name"].as_str()).collect();
+    assert_eq!(names, vec!["staff"], "only the groups with the prefix");
+    let staff = &groups[0];
+    assert_eq!((staff["source"].as_str(), staff["members"].as_array().unwrap().len()), (Some("idp"), 2));
+
+    // read-only: neither deleted nor changed by the Tenant Manager
+    let gid = staff["id"].as_str().unwrap();
+    let r = a.call(Some(&anna), Method::DELETE, &format!("/api/t/grp/manage/groups/{gid}"), None).await;
+    assert_eq!((r.status, r.json()["code"].as_str()), (StatusCode::BAD_REQUEST, Some("group_from_idp")));
+}

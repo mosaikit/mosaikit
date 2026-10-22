@@ -41,7 +41,7 @@ import { Empty, ErrorBox, Loading, PageHeader, Pills, SaveBar, StatusBadge, Tabs
 import { go, to } from '../router.ts'
 import AppIcon from '../AppIcon.tsx'
 import { AppMark } from '../Shell.tsx'
-import { RemoveDialog } from './tenant.tsx'
+import { IdpBadge, RemoveDialog } from './tenant.tsx'
 import { ActivityLog } from './history.tsx'
 
 const enc = encodeURIComponent
@@ -511,14 +511,17 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
   const cur = ['members', 'shared', 'plugins', 'activity'].includes(tab ?? '') ? tab! : 'members'
   const others = (members.data ?? []).filter((m) => !g.members.some((x) => x.user_id === m.user_id))
   const label = (pid: string) => ctx.data?.plugins.find((p) => p.id === pid)?.label ?? pid
+  const idp = g.source === 'idp'
   return (
     <>
       <PageHeader
         title={g.name}
         crumbs={[{ label: t('Tenant management') }, { label: t('Manage'), href: to.tenant(slug, 'manage', 'groups') }]}
         sub={t('{count} members', { count: g.members.length })}
+        badge={idp ? <IdpBadge /> : undefined}
         actions={
-          cur === 'members' && (
+          cur === 'members' &&
+          !idp && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button disabled={!others.length}>
@@ -537,15 +540,17 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
           )
         }
         more={
-          <DropdownMenuItem
-            variant="destructive"
-            onSelect={async () => {
-              if (await confirm(t('Delete the group {name}? The shares with the group are revoked.', { name: g.name }), true)) del.mutate(undefined, { onSuccess: () => go(to.tenant(slug, 'manage', 'groups')) })
-            }}
-          >
-            <Trash2 />
-            {t('Delete the group')}
-          </DropdownMenuItem>
+          idp ? undefined : (
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={async () => {
+                if (await confirm(t('Delete the group {name}? The shares with the group are revoked.', { name: g.name }), true)) del.mutate(undefined, { onSuccess: () => go(to.tenant(slug, 'manage', 'groups')) })
+              }}
+            >
+              <Trash2 />
+              {t('Delete the group')}
+            </DropdownMenuItem>
+          )
         }
       />
       <Tabs
@@ -581,9 +586,11 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
                         <span className="ml-2 text-xs text-muted-foreground">{m.username}</span>
                       </TableCell>
                       <TableCell className="text-right">
-                        <Button variant="ghost" size="sm" aria-label={t('Remove {username} from the group', { username: m.username })} onClick={() => rm.mutate(m.user_id)}>
-                          {t('Remove')}
-                        </Button>
+                        {!idp && (
+                          <Button variant="ghost" size="sm" aria-label={t('Remove {username} from the group', { username: m.username })} onClick={() => rm.mutate(m.user_id)}>
+                            {t('Remove')}
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}

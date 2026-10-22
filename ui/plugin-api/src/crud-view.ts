@@ -5,6 +5,7 @@
 // Its texts are in English, or in Italian when the host is in Italian (the `context` of the bridge).
 
 import type { Msk } from './client.ts'
+import { errorText } from './errors.ts'
 import type { ExtensionView, FieldDecl, Row, Values } from './protocol.ts'
 
 export interface CrudOptions {
@@ -307,7 +308,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
       renderTable()
       renderForm()
     } catch (e) {
-      setMsg(errText(e), true)
+      setMsg(errText(e, msk.context?.lang), true)
     }
   }
 
@@ -318,7 +319,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     try {
       await fn()
     } catch (e) {
-      setMsg(errText(e), true)
+      setMsg(errText(e, msk.context?.lang), true)
     } finally {
       st.busy = false
       btnSave.disabled = btnDel.disabled = false
@@ -367,7 +368,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   btnShare.addEventListener('click', async () => {
     const row = selectedRow()
     if (row) {
-      await msk.share(row.id).catch((e) => setMsg(errText(e), true))
+      await msk.share(row.id).catch((e) => setMsg(errText(e, msk.context?.lang), true))
       await load()
     }
   })
@@ -388,6 +389,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   }
 }
 
-export function errText(e: unknown): string {
-  return e instanceof Error ? e.message : String(e)
+/** The text of an error in the language of the host (see `errorText`). */
+export function errText(e: unknown, lang?: string): string {
+  return errorText(e, lang)
 }

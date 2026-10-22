@@ -797,6 +797,8 @@ pub struct GroupDetail {
     pub shared: Vec<SharedItem>,
     /// permissions of plugins given to the group: plugin id -> keys
     pub plugins: Vec<(String, Vec<String>)>,
+    /// "mosaikit", or "idp" for a group of the identity provider (read-only)
+    pub source: String,
 }
 
 pub async fn group_detail(k: &Kernel, c: &Caller, group: Uuid) -> Result<GroupDetail> {
@@ -820,6 +822,7 @@ pub async fn group_detail(k: &Kernel, c: &Caller, group: Uuid) -> Result<GroupDe
         id: g.id,
         name: g.name,
         members: g.members,
+        source: g.source,
         shared: rows
             .iter()
             .map(|r| SharedItem {

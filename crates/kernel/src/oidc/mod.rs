@@ -58,6 +58,8 @@ pub struct Discovery {
     #[serde(default)]
     pub backchannel_logout_supported: Option<bool>,
     #[serde(default)]
+    pub frontchannel_logout_supported: Option<bool>,
+    #[serde(default)]
     pub code_challenge_methods_supported: Option<Vec<String>>,
     #[serde(default)]
     pub token_endpoint_auth_methods_supported: Option<Vec<String>>,
@@ -197,9 +199,14 @@ pub struct OidcView {
     pub claim_name: String,
     pub claim_email: String,
     pub claim_groups: String,
+    /// mirror the groups of the token as read-only groups of the tenant
+    pub sync_groups: bool,
+    /// only the groups whose name starts with this (empty: all of them)
+    pub group_prefix: String,
     /// addresses to register in the provider
     pub redirect_uri: String,
     pub backchannel_logout_uri: String,
+    pub frontchannel_logout_uri: String,
     pub post_logout_redirect_uri: String,
     /// people of the tenant: local accounts (they cannot sign in while OIDC is on), accounts of the
     /// provider, guests from other tenants
@@ -234,6 +241,10 @@ pub struct OidcInput {
     pub claim_email: Option<String>,
     #[serde(default)]
     pub claim_groups: Option<String>,
+    #[serde(default)]
+    pub sync_groups: bool,
+    #[serde(default)]
+    pub group_prefix: Option<String>,
 }
 
 /// The stored configuration, with the encrypted secret.
@@ -253,6 +264,8 @@ struct Settings {
     claim_name: String,
     claim_email: String,
     claim_groups: String,
+    sync_groups: bool,
+    group_prefix: String,
 }
 
 fn strings(v: Option<Value>) -> Vec<String> {
@@ -264,7 +277,8 @@ fn strings(v: Option<Value>) -> Vec<String> {
 async fn settings(k: &Kernel, tenant: Uuid) -> Result<Option<Settings>> {
     let row = mosaikit_db::query(
         "select enabled, issuer, client_id, client_secret, secret_hint, scopes, button_text, roles_source,
-                manager_groups, user_groups, claim_username, claim_name, claim_email, claim_groups
+                manager_groups, user_groups, claim_username, claim_name, claim_email, claim_groups,
+                sync_groups, group_prefix
          from core.tenant_oidc where tenant_id = $1",
     )
     .bind(tenant)
@@ -285,6 +299,8 @@ async fn settings(k: &Kernel, tenant: Uuid) -> Result<Option<Settings>> {
         claim_name: r.get(11),
         claim_email: r.get(12),
         claim_groups: r.get(13),
+        sync_groups: r.get(14),
+        group_prefix: r.get(15),
     }))
 }
 
@@ -372,6 +388,8 @@ pub async fn config(k: &Kernel, admin: &SessionUser, tenant: Uuid) -> Result<Oid
         claim_name: "name".into(),
         claim_email: "email".into(),
         claim_groups: "groups".into(),
+        sync_groups: false,
+        group_prefix: String::new(),
     };
     let s = s.unwrap_or(d);
     Ok(OidcView {
@@ -389,8 +407,11 @@ pub async fn config(k: &Kernel, admin: &SessionUser, tenant: Uuid) -> Result<Oid
         claim_name: s.claim_name,
         claim_email: s.claim_email,
         claim_groups: s.claim_groups,
+        sync_groups: s.sync_groups,
+        group_prefix: s.group_prefix,
         redirect_uri: redirect_uri(k, &slug),
         backchannel_logout_uri: format!("{}/api/auth/oidc/{slug}/backchannel-logout", k.cfg.app_url),
+        frontchannel_logout_uri: format!("{}/api/auth/oidc/{slug}/frontchannel-logout", k.cfg.app_url),
         post_logout_redirect_uri: format!("{}/", k.cfg.app_url),
         local_accounts,
         provider_accounts,
@@ -456,18 +477,23 @@ pub async fn set_config(k: &Kernel, admin: &SessionUser, tenant: Uuid, i: &OidcI
         }
     };
     let button = i.button_text.clone().unwrap_or_default().trim().chars().take(80).collect::<String>();
+    let prefix = i.group_prefix.clone().unwrap_or_default().trim().to_string();
+    if prefix.chars().count() > 100 {
+        return Err(Error::bad("group prefix too long"));
+    }
     mosaikit_db::query(
         "insert into core.tenant_oidc (tenant_id, enabled, issuer, client_id, client_secret, secret_hint, scopes,
              button_text, roles_source, manager_groups, user_groups, claim_username, claim_name, claim_email,
-             claim_groups, updated_by, updated_at)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, now())
+             claim_groups, updated_by, sync_groups, group_prefix, updated_at)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, now())
          on conflict (tenant_id) do update set enabled = excluded.enabled, issuer = excluded.issuer,
              client_id = excluded.client_id, client_secret = excluded.client_secret,
              secret_hint = excluded.secret_hint, scopes = excluded.scopes, button_text = excluded.button_text,
              roles_source = excluded.roles_source, manager_groups = excluded.manager_groups,
              user_groups = excluded.user_groups, claim_username = excluded.claim_username,
              claim_name = excluded.claim_name, claim_email = excluded.claim_email,
-             claim_groups = excluded.claim_groups, updated_by = excluded.updated_by, updated_at = now()",
+             claim_groups = excluded.claim_groups, sync_groups = excluded.sync_groups,
+             group_prefix = excluded.group_prefix, updated_by = excluded.updated_by, updated_at = now()",
     )
     .bind(tenant)
     .bind(i.enabled)
@@ -485,6 +511,8 @@ pub async fn set_config(k: &Kernel, admin: &SessionUser, tenant: Uuid, i: &OidcI
     .bind(claim_name(i.claim_email.clone(), "email")?)
     .bind(claim_name(i.claim_groups.clone(), "groups")?)
     .bind(admin.user_id)
+    .bind(i.sync_groups)
+    .bind(&prefix)
     .execute(&k.db)
     .await?;
     // the cache of the provider is fetched again with the new configuration
@@ -496,7 +524,8 @@ pub async fn set_config(k: &Kernel, admin: &SessionUser, tenant: Uuid, i: &OidcI
         None,
         None,
         "tenant.sign_in",
-        json!({ "method": if i.enabled { "oidc" } else { "local" }, "issuer": issuer, "roles": roles_source }),
+        json!({ "method": if i.enabled { "oidc" } else { "local" }, "issuer": issuer, "roles": roles_source,
+                "sync_groups": i.sync_groups }),
     )
     .await;
     config(k, admin, tenant).await
@@ -572,6 +601,11 @@ pub async fn check(k: &Kernel, admin: &SessionUser, issuer: &str) -> Result<Vec<
             "warning",
             "back-channel logout not announced: sessions end only when they expire or the person signs out",
         )
+    });
+    out.push(if doc.frontchannel_logout_supported == Some(true) {
+        step("frontchannel_logout", "ok", "supported")
+    } else {
+        step("frontchannel_logout", "warning", "front-channel logout not announced")
     });
     Ok(out)
 }
@@ -942,7 +976,131 @@ async fn person(k: &Kernel, tenant: Uuid, s: &Settings, id: &Identity) -> Result
         }
         None => create_person(k, tenant, s, id, display, email, role.unwrap_or("user")).await?,
     };
+    if s.sync_groups {
+        let groups = synced_groups(&claim_groups(claims, &s.claim_groups), &s.group_prefix);
+        sync_groups(k, tenant, user, &groups).await?;
+    }
     Ok(user)
+}
+
+/// The groups of the token to mirror: those starting with the prefix (all without one), each once, at
+/// most 100.
+pub fn synced_groups(groups: &[String], prefix: &str) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for g in groups {
+        let g = g.trim();
+        if g.is_empty() || g.chars().count() > 200 || !g.starts_with(prefix) || out.iter().any(|x| x == g) {
+            continue;
+        }
+        out.push(g.to_string());
+        if out.len() == 100 {
+            break;
+        }
+    }
+    out
+}
+
+/// Mirrors the groups of the provider for a person: the groups are created when new (read-only,
+/// `source = 'idp'`), the person joins those of the token and leaves the other groups of the provider.
+/// Groups are never deleted here: a group the provider no longer sends empties as its people sign in.
+pub async fn sync_groups(k: &Kernel, tenant: Uuid, user: Uuid, groups: &[String]) -> Result<()> {
+    let mut ids: Vec<Uuid> = Vec::with_capacity(groups.len());
+    for external in groups {
+        let found: Option<Uuid> = mosaikit_db::query_scalar(
+            "select id from core.groups where tenant_id = $1 and external_name = $2",
+        )
+        .bind(tenant)
+        .bind(external)
+        .fetch_optional(&k.db)
+        .await?;
+        let id = match found {
+            Some(id) => id,
+            None => create_idp_group(k, tenant, external).await?,
+        };
+        ids.push(id);
+    }
+    let mut tx = k.db.begin_app().await?;
+    let current: Vec<Uuid> = mosaikit_db::query_scalar(
+        "select gm.group_id from core.group_members gm join core.groups g on g.id = gm.group_id
+          where gm.user_id = $1 and g.tenant_id = $2 and g.source = 'idp'",
+    )
+    .bind(user)
+    .bind(tenant)
+    .fetch_all(&mut *tx)
+    .await?;
+    for g in current.iter().filter(|g| !ids.contains(g)) {
+        mosaikit_db::query("delete from core.group_members where group_id = $1 and user_id = $2")
+            .bind(g)
+            .bind(user)
+            .execute(&mut *tx)
+            .await?;
+    }
+    for g in ids.iter().filter(|g| !current.contains(g)) {
+        mosaikit_db::query(
+            "insert into core.group_members (group_id, user_id) values ($1, $2) on conflict do nothing",
+        )
+        .bind(g)
+        .bind(user)
+        .execute(&mut *tx)
+        .await?;
+    }
+    tx.commit().await?;
+    Ok(())
+}
+
+/// A new group of the provider. Its name in Mosaikit is the one of the provider or, when a group of
+/// Mosaikit already has it, the same with "(identity provider)".
+async fn create_idp_group(k: &Kernel, tenant: Uuid, external: &str) -> Result<Uuid> {
+    let base: String = external.chars().take(80).collect();
+    for n in 0..20 {
+        let name = match n {
+            0 => base.clone(),
+            1 => format!("{} (identity provider)", base.chars().take(60).collect::<String>()),
+            _ => format!("{} (identity provider {n})", base.chars().take(56).collect::<String>()),
+        };
+        let r = mosaikit_db::query_scalar::<Uuid>(
+            "insert into core.groups (tenant_id, name, source, external_name) values ($1, $2, 'idp', $3)
+             returning id",
+        )
+        .bind(tenant)
+        .bind(&name)
+        .bind(external)
+        .fetch_one(&k.db)
+        .await;
+        match r {
+            Ok(id) => {
+                events::record(
+                    k,
+                    Some(tenant),
+                    None,
+                    None,
+                    None,
+                    "group.create.oidc",
+                    json!({ "group": id, "name": name }),
+                )
+                .await;
+                return Ok(id);
+            }
+            Err(e) => {
+                let e = Error::from(e);
+                if e.kind != Kind::Conflict {
+                    return Err(e);
+                }
+                // created meanwhile by another sign-in with the same group
+                let found: Option<Uuid> = mosaikit_db::query_scalar(
+                    "select id from core.groups where tenant_id = $1 and external_name = $2",
+                )
+                .bind(tenant)
+                .bind(external)
+                .fetch_optional(&k.db)
+                .await?;
+                if let Some(id) = found {
+                    return Ok(id);
+                }
+            }
+        }
+    }
+    Err(Error::conflict("no free name for the group of the identity provider"))
 }
 
 async fn create_person(
@@ -1096,6 +1254,40 @@ pub async fn backchannel_logout(k: &Kernel, slug: &str, logout_token: &str) -> R
     Ok(closed)
 }
 
+/// Front-channel logout (OpenID Connect Front-Channel Logout 1.0): the provider loads the page of the
+/// tenant in an iframe with its issuer and the session (`sid`) that ended; the sessions of Mosaikit
+/// opened with that `sid` close. The iframe may not carry the cookies of Mosaikit (a third-party frame),
+/// so the sessions are found by `sid`, never by cookie. Returns how many closed.
+pub async fn frontchannel_logout(k: &Kernel, slug: &str, iss: &str, sid: &str) -> Result<u64> {
+    let (tenant, s) = enabled_tenant(k, &slug.trim().to_lowercase()).await?;
+    if iss != s.issuer {
+        return Err(token_error("the logout comes from another issuer"));
+    }
+    if sid.is_empty() || sid.len() > 255 {
+        return Err(token_error("the logout names no session (sid)"));
+    }
+    let closed = mosaikit_db::query(
+        "delete from core.sessions where oidc_sid = $1
+           and user_id in (select user_id from core.user_identities where tenant_id = $2 and issuer = $3)",
+    )
+    .bind(sid)
+    .bind(tenant)
+    .bind(&s.issuer)
+    .execute(&k.db)
+    .await?
+    .rows_affected();
+    events::record(k, Some(tenant), None, None, None, "logout.frontchannel", json!({ "sessions": closed }))
+        .await;
+    Ok(closed)
+}
+
+/// The origin of the provider of a tenant (the `frame-ancestors` of the front-channel logout page).
+pub async fn issuer_origin(k: &Kernel, slug: &str) -> Option<String> {
+    let (_, s) = enabled_tenant(k, &slug.trim().to_lowercase()).await.ok()?;
+    let u = url::Url::parse(&s.issuer).ok()?;
+    Some(u.origin().ascii_serialization())
+}
+
 #[cfg(test)]
 mod tests {
     use super::fake::{self, FakeKeys};
@@ -1186,6 +1378,18 @@ mod tests {
         assert_eq!(role_from_groups(&g(&["staff"]), &managers, &users), None);
         // no user groups: everybody the provider lets in is a User
         assert_eq!(role_from_groups(&g(&[]), &managers, &[]), Some("user"));
+    }
+
+    #[test]
+    fn groups_to_mirror() {
+        let g = |v: &[&str]| v.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        assert_eq!(synced_groups(&g(&["staff", " staff ", "", "sales"]), ""), g(&["staff", "sales"]));
+        assert_eq!(
+            synced_groups(&g(&["msk-staff", "other", "msk-sales"]), "msk-"),
+            g(&["msk-staff", "msk-sales"])
+        );
+        let many: Vec<String> = (0..150).map(|i| format!("g{i}")).collect();
+        assert_eq!(synced_groups(&many, "").len(), 100);
     }
 
     #[test]

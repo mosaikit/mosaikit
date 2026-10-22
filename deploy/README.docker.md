@@ -81,9 +81,10 @@ docker compose exec -it app /app/mosaikit-server reset-password --user admin
 - Volumes: `pgdata` (database) and `appdata` (uploaded files, plugin packages).
 - Backup: `docker compose exec db pg_dump -U postgres mosaikit > backup.sql` and
   a copy of the `appdata` volume. System › Backup and restore makes daily backups in
-  `appdata/backups` too: the image has no `pg_dump`, so they hold every tenant (restorable one by
-  one from the app) but not the dump of the whole database; keep the dump above for that. Keep
-  `appdata/secret.key` apart from the backups.
+  `appdata/backups` too, complete: the dump of the whole database (the image has the PostgreSQL 17
+  client), the files and every tenant (restorable one by one from the app). With a database newer than
+  PostgreSQL 17 rebuild the image with `--build-arg PG_CLIENT_MAJOR=<major>`, otherwise the backups say
+  "tenants only" with the reason. Keep `appdata/secret.key` apart from the backups.
 - Update: `docker load` of the new image, `MOSAIKIT_VERSION` in
   `.env`, then `docker compose up -d` (the migrations apply at start).
 

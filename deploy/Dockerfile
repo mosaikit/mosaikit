@@ -38,14 +38,27 @@ RUN --mount=type=secret,id=signing_key,required=false \
 
 # ---------------------------------------------------------------- runtime
 FROM debian:bookworm-slim
-RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl \
+# PostgreSQL client tools for the scheduled backups (System › Backup and restore): pg_dump from the
+# PostgreSQL apt repository, of the newest major version the releases support. pg_dump dumps servers of
+# its own major version or older, never newer: keep PG_CLIENT_MAJOR >= the major version of the server
+# (the default database image is postgres:17). With an older pg_dump the backup records the reason and
+# still holds every tenant.
+ARG PG_CLIENT_MAJOR=17
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
+    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+       | gpg --dearmor -o /usr/share/keyrings/postgresql.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/postgresql.gpg] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
+       > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update && apt-get install -y --no-install-recommends "postgresql-client-${PG_CLIENT_MAJOR}" \
+    && apt-get purge -y gnupg && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --system --uid 10001 --home /data mosaikit \
     && mkdir -p /data && chown mosaikit /data
 COPY --from=build /out/ /app/
 WORKDIR /app
 ENV MOSAIKIT_CONFIG=/app/mosaikit.toml \
-    MOSAIKIT_LOG=info,sqlx=warn
+    MOSAIKIT_LOG=info,sqlx=warn \
+    MOSAIKIT_PG_BIN=/usr/lib/postgresql/${PG_CLIENT_MAJOR}/bin
 VOLUME ["/data"]
 EXPOSE 8080 8081
 USER mosaikit

@@ -15,6 +15,8 @@ export const EN: Record<string, string> = {
   'errors.unexpected': 'Something went wrong. Try again.',
   'errors.quota_exceeded': 'The tenant has reached one of its quotas: nothing more can be added. The Tenant Manager sees the usage in Usage.',
   'errors.plugin_off': 'This plugin is not turned on in the tenant',
+  'errors.quota_invalid': 'A quota cannot be negative',
+  'errors.quota_unknown': 'Unknown quota',
   'errors.plugin_unavailable': 'The Administrator has not made this plugin available to the tenant',
   'errors.base_off': 'Turn on first the plugin it extends',
   'errors.bad_request': 'Invalid request',
@@ -100,4 +102,5 @@ export const EN: Record<string, string> = {
   'errors.theme_not_allowed': 'The Administrator does not offer this theme to the tenants',
   'errors.theme_unknown': 'Unknown theme',
   'errors.theme_in_use': 'It is the theme of the platform: choose another one before deleting it',
+  'errors.group_from_idp': 'This group comes from the identity provider: it changes only there',
 }

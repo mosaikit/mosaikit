@@ -280,12 +280,14 @@ platform. Administrators always sign in with their local password and second fac
 **Configuration** (`core.tenant_oidc`, one row per tenant, `/api/admin/tenants/{id}/sign-in`): issuer,
 client id, client secret (encrypted with the secret key of the installation, §10; only the last four
 characters go back to the browser), scopes (with `openid`), text of the button, where the roles come
-from, the groups of the Tenant Managers and of the Users, the names of the claims (username, name,
-email, groups). The page shows the addresses to register in the provider: return address
-`<url>/api/auth/oidc/<tenant>/callback`, back-channel logout `<url>/api/auth/oidc/<tenant>/backchannel-logout`,
-address after the sign-out `<url>/`. **Check the configuration** (`POST /api/admin/oidc/check`) reads the
-discovery document and the keys as a sign-in would and says what is missing (PKCE S256, keys RS256 or
-ES256, end-session endpoint, back-channel logout). Addresses of a provider must be `https`, plain
+from, the groups of the Tenant Managers and of the Users, the mirror of the groups of the provider
+(below), the names of the claims (username, name, email, groups). The page shows the addresses to
+register in the provider: return address `<url>/api/auth/oidc/<tenant>/callback`, back-channel logout
+`<url>/api/auth/oidc/<tenant>/backchannel-logout`, front-channel logout
+`<url>/api/auth/oidc/<tenant>/frontchannel-logout` (with "session required"), address after the
+sign-out `<url>/`. **Check the configuration** (`POST /api/admin/oidc/check`) reads the discovery
+document and the keys as a sign-in would and says what is missing (PKCE S256, keys RS256 or ES256,
+end-session endpoint, back-channel and front-channel logout). Addresses of a provider must be `https`, plain
 `http` only on this computer (development and tests).
 
 **Flow** (authorization code with PKCE):
@@ -319,6 +321,17 @@ Users (or any group, if that list is empty) gives User, otherwise the sign-in is
 too) can no longer sign in: with roles in Mosaikit the Administrator gives the Tenant Manager role to a
 person of the provider after their first sign-in.
 
+**Groups of the provider in Mosaikit** (`sync_groups`, optional, independent of where the roles come
+from). At every sign-in the groups of the token (the groups claim; only those starting with
+`group_prefix` when it is set; at most 100) become groups of the tenant to share items with
+(`core.groups.source = 'idp'`, `external_name` = the name in the provider): a group is created the first
+time it appears — with the name of the provider, or "<name> (identity provider)" when a group of
+Mosaikit already has it — and the person joins the groups of the token and leaves the other groups of
+the provider. They are **read-only in Mosaikit** (`group_from_idp` on delete or a change of members;
+Manage marks them "From the identity provider"): only the provider changes them. A group the provider
+no longer sends loses its members as they sign in again; it is **never deleted**, so the items shared
+with it keep their grants and come back to whoever joins it again.
+
 **Local features turned off** in an OIDC tenant: local sign-in (`oidc_tenant`), creation of people
 with a password, change and reset of passwords, password links, moving the home tenant of an account
 of the provider. Guests from other tenants sign in with their own tenant, as before.
@@ -328,14 +341,28 @@ the shell sends the browser to the end-session endpoint (`client_id`, `post_logo
 The provider closes sessions with the **back-channel logout** (`POST …/backchannel-logout`,
 `logout_token`): signature, `iss`, `aud`, `iat` within 10 minutes, the back-channel event, no `nonce`,
 `jti` used once; with `sid` it closes that session of the provider (kept in `core.sessions.oidc_sid`),
-with `sub` every session of the person.
+with `sub` every session of the person. With the **front-channel logout** (OpenID Connect Front-Channel
+Logout 1.0) the provider loads `GET …/frontchannel-logout?iss=…&sid=…` in an iframe of its own logout
+page: the issuer must be the one of the tenant and the sessions with that `sid` close. A third-party
+iframe may not carry the cookies of Mosaikit, so the session is found by `sid`, never by cookie; the
+page is never cached and only the origin of the provider may frame it (`frame-ancestors`).
 
 **Implementation.** A small client on `ring` and `reqwest`, already in the tree (`crates/kernel/src/oidc`),
 rather than a general OIDC library: Mosaikit needs one flow and two signature algorithms, and every check
 is in one module next to its tests. **Test provider**: `mosaikit-fake-idp`
 (`crates/server/src/fake_idp.rs`), started by the tests in-process and by `cargo xtask e2e`; for manual
 tests `cargo run -p mosaikit-server --bin mosaikit-fake-idp` (port 5556, client `mosaikit`, secret
-`fake-secret`). It has no passwords: never in production.
+`fake-secret`). It has no passwords: never in production. Its session is a cookie of its own; its
+logout page frames the front-channel logout address of the client (`--frontchannel-logout-uri`, or the
+return address with `/callback` replaced by `/frontchannel-logout`) and then goes back to the client.
+
+**Errors inside the plugin UIs.** The bridge answers a failed request with the text in the language of
+the host *and* the stable `code`, the HTTP status and the untranslated message of the server
+(`BridgeError.code`, `.status`, `.serverMessage` in `@mosaikit/plugin-api`). `errorText(e)` (and
+`mountCrud`) keeps the text the host translated, and translates the codes plugin UIs meet most
+(`missing_permission`, `plugin_off`, `base_off`, `quota_exceeded`, `maintenance`, …) when an older host
+sent them untranslated. The errors of the logic of a plugin carry `plugin_error`, so their own message
+reaches the person instead of the generic text of `bad_request`.
 
 ### 3.4 Quotas and usage
 
@@ -1210,8 +1237,11 @@ tenants/<slug>/      the export of each tenant (§3.5) without contents (they ar
 - **pg_dump**: looked for in `database.pg_bin`, `pgsql/bin` next to the executable, `MOSAIKIT_PG_BIN`,
   `PGBIN` and the PATH. It must be of the same major version as the server or newer: otherwise (or
   without it) the backup is made without the dump — `whole: false`, "tenants only" with the reason —
-  and every tenant can still be restored. The Docker image does not include `pg_dump`: for complete
-  backups install `postgresql-client-<major>` in an image of your own, or dump the database container.
+  and every tenant can still be restored; the note of the backup carries the message of `pg_dump`
+  (e.g. "server version mismatch", with both versions). The Docker image includes the PostgreSQL client
+  of the newest major version the releases support (`PG_CLIENT_MAJOR`, default 17, from the PostgreSQL
+  apt repository; `MOSAIKIT_PG_BIN` points to it): its backups are complete for servers up to that
+  version. For a newer server rebuild the image with `--build-arg PG_CLIENT_MAJOR=<major>`.
 - **Never inside**: the key of the secrets (`<data_dir>/secret.key` or `secret_key`). Keep it apart:
   without it the encrypted values (keys of outside services, OIDC secrets, the password of the mail
   server) cannot be read after a restore.
@@ -1390,9 +1420,8 @@ Mosaikit refers to no distribution.
 
 ## 15. Known limits and next steps
 
-- **OIDC**: the groups of the provider give roles, not the groups of Mosaikit (no sync of groups);
-  no front-channel logout; the ID token is not kept, so the end-session request carries `client_id`
-  instead of `id_token_hint`.
+- **OIDC**: the ID token is not kept, so the end-session request carries `client_id` instead of
+  `id_token_hint`.
 - **Subdomains per plugin**: all the plugin UIs share the untrusted
   origin; a subdomain per plugin would also isolate the plugins from each other.
 - **S3 storage** for the blobs: today the filesystem only.

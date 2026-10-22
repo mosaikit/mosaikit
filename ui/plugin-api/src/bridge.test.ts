@@ -47,6 +47,24 @@ describe('Bridge', () => {
     b.dispose()
   })
 
+  it('carries the code, the status and the message of the server', async () => {
+    const { host, sent } = fakeHost()
+    const b = new Bridge(host, 'https://app.example', window)
+    const p = b.call('crud.create')
+    reply(window, host, 'https://app.example', {
+      msk: 1,
+      id: sent[0].msg.id,
+      err: 'Il tenant ha raggiunto una delle sue quote',
+      code: 'quota_exceeded',
+      status: 409,
+      message: 'quota exceeded: storage',
+    })
+    const e = (await p.catch((x: unknown) => x)) as BridgeError
+    expect(e).toBeInstanceOf(BridgeError)
+    expect([e.message, e.code, e.status, e.serverMessage]).toEqual(['Il tenant ha raggiunto una delle sue quote', 'quota_exceeded', 409, 'quota exceeded: storage'])
+    b.dispose()
+  })
+
   it('refuses a wildcard origin', () => {
     const { host } = fakeHost()
     expect(() => new Bridge(host, '*', window)).toThrow(BridgeError)

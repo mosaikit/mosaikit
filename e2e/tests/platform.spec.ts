@@ -908,6 +908,78 @@ test.describe.serial('platform', () => {
     await expect(page.getByText('oidc_no_role')).toBeHidden()
   })
 
+  test('OIDC: groups of the provider in the tenant, a share to one of them, front-channel logout', async ({ page, context }) => {
+    const idp = process.env.E2E_IDP_URL ?? 'http://127.0.0.1:18082'
+    test.setTimeout(240_000)
+    // the Administrator turns the mirror of the groups on for the tenant of the provider
+    await adminLogin(page)
+    await nav(page, 'Tenant').click()
+    await page.getByRole('link', { name: 'City of Omega' }).click()
+    await page.getByRole('link', { name: 'Sign-in', exact: true }).click()
+    await expect(page.getByText('Front-channel logout address')).toBeVisible()
+    await page.getByRole('switch', { name: /Groups of the provider in Mosaikit/ }).click()
+    await expect(page.getByLabel('Only the groups starting with')).toBeVisible()
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByText('Sign-in saved').last()).toBeVisible()
+    await logout(page)
+
+    const viaProvider = async (who: string) => {
+      await fresh(page, '#/login/omega')
+      await page.getByRole('link', { name: 'Sign in with Test provider' }).click()
+      await page.getByRole('button', { name: `Sign in as ${who}` }).click()
+      await expect(page.getByRole('button', { name: /person menu/ })).toBeVisible()
+    }
+    // Bruno (groups mosaikit-users and staff) signs in first, then Anna, the Tenant Manager
+    await viaProvider('Bruno Neri')
+    await page.getByRole('button', { name: /person menu/ }).click()
+    await page.getByRole('menuitem', { name: 'Sign out' }).click()
+    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
+    await viaProvider('Anna Rossi')
+    await page.goto('./#/t/omega/manage/groups')
+    const staff = page.locator('[data-slot="card"]', { hasText: 'staff' }).first()
+    await expect(staff).toContainText('From the identity provider')
+    await expect(staff).toContainText('Bruno Neri')
+    await expect(staff).toContainText('Anna Rossi')
+    // read-only: no add, no delete, no removal of a member
+    await expect(page.getByRole('button', { name: 'Delete the group staff' })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'Remove bruno.neri from the group' })).toHaveCount(0)
+    await accessible(page, 'groups of the provider')
+
+    // a note shared with the group of the provider
+    await nav(page, 'Notes').click()
+    const frame = page.frameLocator('iframe.plugin-frame')
+    await frame.locator('[data-key="title"]').fill('Plan of the staff')
+    await frame.getByRole('button', { name: 'Save' }).click()
+    await expect(frame.locator('tbody tr.row', { hasText: 'Plan of the staff' })).toBeVisible()
+    await frame.getByRole('button', { name: 'Share…' }).click()
+    const dialog = page.getByRole('dialog', { name: 'Sharing' })
+    await dialog.getByLabel('Search people or groups').fill('staff')
+    await dialog.getByRole('option', { name: /staff/ }).click()
+    await dialog.getByRole('button', { name: 'Share', exact: true }).click()
+    await expect(dialog.getByRole('list', { name: 'Shared with' })).toContainText('staff')
+    await dialog.getByRole('button', { name: 'Close' }).click()
+    await page.getByRole('button', { name: /person menu/ }).click()
+    await page.getByRole('menuitem', { name: 'Sign out' }).click()
+    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
+
+    // Bruno sees it through the group
+    await viaProvider('Bruno Neri')
+    await nav(page, 'Notes').click()
+    await expect(page.frameLocator('iframe.plugin-frame').locator('tbody tr.row', { hasText: 'Plan of the staff' })).toBeVisible()
+
+    // front-channel logout: the provider ends its session and frames the address of Mosaikit
+    const provider = await context.newPage()
+    await provider.goto(`${idp}/logout`)
+    await expect(provider.getByRole('heading', { name: 'Signed out' })).toBeVisible()
+    const frameEl = provider.locator('iframe')
+    await expect(frameEl).toHaveAttribute('src', /\/api\/auth\/oidc\/omega\/frontchannel-logout\?iss=/)
+    await expect(provider.frameLocator('iframe').getByText('Signed out of Mosaikit.')).toBeVisible()
+    await provider.close()
+    // the session of Mosaikit is over
+    await page.reload()
+    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible()
+  })
+
   test('plugins: available to a tenant, turned on by its Tenant Manager, an extension and the icons', async ({ page }) => {
     test.setTimeout(240_000)
     // the Administrator: kinds, the page of a plugin, what it asks, its tenants and extensions

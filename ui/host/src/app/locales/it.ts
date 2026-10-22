@@ -1049,6 +1049,8 @@ export const IT: Record<string, string> = {
   'The Administrator took it back: the people of the tenant no longer see it.': 'L’Administrator lo ha ritirato: le persone del tenant non lo vedono più.',
   'errors.quota_exceeded': 'Il tenant ha raggiunto una delle sue quote: non si può aggiungere altro. Il Tenant Manager vede i consumi in Consumi.',
   'errors.plugin_off': 'Questo plugin non è acceso nel tenant',
+  'errors.quota_invalid': 'Una quota non può essere negativa',
+  'errors.quota_unknown': 'Quota sconosciuta',
   'errors.plugin_unavailable': 'L’Administrator non ha reso disponibile questo plugin al tenant',
   'errors.base_off': 'Accendi prima il plugin che estende',
   // trash, log and shares (phase 5)
@@ -1588,4 +1590,13 @@ export const IT: Record<string, string> = {
   'errors.theme_not_allowed': 'L\'Administrator non offre questo tema ai tenant',
   'errors.theme_unknown': 'Tema sconosciuto',
   'errors.theme_in_use': 'È il tema della piattaforma: scegline un altro prima di eliminarlo',
+  'Front-channel logout': 'Logout front-channel',
+  'Front-channel logout address': 'Indirizzo del logout front-channel',
+  'Groups of the provider in Mosaikit': 'Gruppi del provider in Mosaikit',
+  'The groups of the token become groups of the tenant at every sign-in, to share items with. Only the provider changes them; a group it no longer sends empties, it is never deleted.': 'I gruppi del token diventano gruppi del tenant a ogni accesso, per condividere elementi. Li cambia solo il provider; un gruppo che non invia più si svuota, non viene mai eliminato.',
+  'Only the groups starting with': 'Solo i gruppi che iniziano con',
+  'Empty: every group of the token.': 'Vuoto: tutti i gruppi del token.',
+  'From the identity provider': 'Dal provider di identità',
+  'Only the identity provider changes it': 'Lo cambia solo il provider di identità',
+  'errors.group_from_idp': 'Questo gruppo viene dal provider di identità: si cambia solo lì',
 }

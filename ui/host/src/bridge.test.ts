@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { OpError, routeOp } from './bridge.ts'
+import { ApiError } from './api.ts'
+import { errorReply, OpError, routeOp } from './bridge.ts'
 
 const ID = '8b0f6f3e-2d6a-4c7e-9a51-0c6a3d2b1f10'
 
@@ -55,5 +56,22 @@ describe('routeOp', () => {
     expect(() => routeOp('alfa', 'p.x', 'ext.set', { resource: 'notes', id: ID, extension: '../admin', values: {} })).toThrow(OpError)
     expect(() => routeOp('alfa', 'p.x', 'ext.values', { resource: 'notes', ids: ['x'] })).toThrow(OpError)
     expect(() => routeOp('alfa', 'p.x', 'ext.action', { resource: 'notes', id: ID, extension: 'com.x.y', action: 'a/b' })).toThrow(OpError)
+  })
+})
+
+describe('errorReply', () => {
+  it('carries the stable code, the status and the message of the server', () => {
+    const r = errorReply(new ApiError('quota exceeded: storage', 409, 'quota_exceeded'))
+    expect(r.code).toBe('quota_exceeded')
+    expect(r.status).toBe(409)
+    expect(r.message).toBe('quota exceeded: storage')
+    expect(typeof r.err).toBe('string')
+  })
+  it('keeps the message of a plugin under its own code', () => {
+    const r = errorReply(new ApiError('invalid email: x', 400, 'plugin_error'))
+    expect(r.err).toBe('invalid email: x')
+  })
+  it('sends only the text for an error that is not of the server', () => {
+    expect(errorReply(new OpError('unknown operation'))).toEqual({ err: 'unknown operation' })
   })
 })

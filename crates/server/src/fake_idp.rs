@@ -1,6 +1,9 @@
 //! A test identity provider (OpenID Connect) for the tests and the development environment: discovery,
-//! keys, an authorization page that lists its people, the token endpoint with PKCE, end session and the
-//! sending of back-channel logout tokens. Not a real provider: no passwords, fixed client.
+//! keys, an authorization page that lists its people, the token endpoint with PKCE, end session with the
+//! front-channel logout of the client, and the sending of back-channel logout tokens. Not a real
+//! provider: no passwords, fixed client. Its session is a cookie (`fake_idp_sid`); the front-channel
+//! logout address of the client is the one in its configuration or, without it, the return address with
+//! `/callback` replaced by `/frontchannel-logout` (the address Mosaikit shows for the tenant).
 //!
 //! Started in-process by the tests ([`FakeIdp::spawn`]) or as `mosaikit-fake-idp` (e2e and manual tests,
 //! see docs/manual-tests.md).
@@ -28,11 +31,18 @@ pub struct FakeConfig {
     pub client_secret: String,
     /// algorithm of the ID tokens: "ES256" or "RS256"
     pub alg: String,
+    /// front-channel logout address of the client (`None`: derived from the return address)
+    pub frontchannel_logout_uri: Option<String>,
 }
 
 impl Default for FakeConfig {
     fn default() -> FakeConfig {
-        FakeConfig { client_id: "mosaikit".into(), client_secret: "fake-secret".into(), alg: "ES256".into() }
+        FakeConfig {
+            client_id: "mosaikit".into(),
+            client_secret: "fake-secret".into(),
+            alg: "ES256".into(),
+            frontchannel_logout_uri: None,
+        }
     }
 }
 
@@ -54,6 +64,8 @@ struct Inner {
     aud: Option<String>,
     /// sessions opened: sid -> sub
     sessions: Vec<(String, String)>,
+    /// front-channel logout address of the client of each session: sid -> address
+    frontchannel: HashMap<String, String>,
 }
 
 /// A running test provider.
@@ -77,6 +89,7 @@ impl FakeIdp {
                 ttl: 300,
                 aud: None,
                 sessions: vec![],
+                frontchannel: HashMap::new(),
             })),
         };
         let app = router(idp.clone());
@@ -117,6 +130,15 @@ impl FakeIdp {
         i.keys.sign(&i.cfg.alg, &fake::logout_claims(&self.issuer, &i.cfg.client_id, sub, sid))
     }
 
+    /// The address the provider loads in an iframe when the session `sid` ends (front-channel logout).
+    pub fn frontchannel_url(&self, sid: &str) -> Option<String> {
+        let i = self.inner.lock().expect("fake idp");
+        let base = i.frontchannel.get(sid)?;
+        let mut u = url::Url::parse(base).ok()?;
+        u.query_pairs_mut().append_pair("iss", &self.issuer).append_pair("sid", sid);
+        Some(u.to_string())
+    }
+
     /// Signs claims with the current key (tests of tokens built by hand).
     pub fn sign(&self, claims: &Value) -> String {
         let i = self.inner.lock().expect("fake idp");
@@ -146,6 +168,8 @@ async fn discovery(State(idp): State<FakeIdp>) -> Json<Value> {
         "end_session_endpoint": format!("{i}/logout"),
         "backchannel_logout_supported": true,
         "backchannel_logout_session_supported": true,
+        "frontchannel_logout_supported": true,
+        "frontchannel_logout_session_supported": true,
         "response_types_supported": ["code"],
         "subject_types_supported": ["public"],
         "id_token_signing_alg_values_supported": ["ES256", "RS256"],
@@ -242,6 +266,14 @@ fn issue_code(idp: &FakeIdp, q: &AuthReq, who: &str) -> Response {
     let code = hex::encode(rand::random::<[u8; 16]>());
     let sid = hex::encode(rand::random::<[u8; 8]>());
     i.sessions.push((sid.clone(), u.sub.to_string()));
+    let front = i
+        .cfg
+        .frontchannel_logout_uri
+        .clone()
+        .or_else(|| q.redirect_uri.strip_suffix("/callback").map(|b| format!("{b}/frontchannel-logout")));
+    if let Some(front) = front {
+        i.frontchannel.insert(sid.clone(), front);
+    }
     i.codes.insert(
         code.clone(),
         Code {
@@ -249,7 +281,7 @@ fn issue_code(idp: &FakeIdp, q: &AuthReq, who: &str) -> Response {
             redirect_uri: q.redirect_uri.clone(),
             nonce: q.nonce.clone(),
             challenge: q.code_challenge.clone(),
-            sid,
+            sid: sid.clone(),
         },
     );
     let mut to = match url::Url::parse(&q.redirect_uri) {
@@ -262,8 +294,14 @@ fn issue_code(idp: &FakeIdp, q: &AuthReq, who: &str) -> Response {
         .append_pair("iss", &idp.issuer);
     let mut res = StatusCode::SEE_OTHER.into_response();
     res.headers_mut().insert(header::LOCATION, HeaderValue::from_str(to.as_str()).expect("location"));
+    // the session of the provider in the browser (its logout page finds it here)
+    if let Ok(v) = HeaderValue::from_str(&format!("{SESSION_COOKIE}={sid}; Path=/; HttpOnly; SameSite=Lax")) {
+        res.headers_mut().insert(header::SET_COOKIE, v);
+    }
     res
 }
+
+const SESSION_COOKIE: &str = "fake_idp_sid";
 
 #[derive(Debug, Deserialize)]
 struct TokenReq {
@@ -335,18 +373,57 @@ struct EndSessionReq {
     post_logout_redirect_uri: Option<String>,
 }
 
-async fn end_session(Query(q): Query<EndSessionReq>) -> Response {
-    match q.post_logout_redirect_uri {
-        Some(to) if to.starts_with("http") => {
-            let mut res = StatusCode::SEE_OTHER.into_response();
-            if let Ok(v) = HeaderValue::from_str(&to) {
-                res.headers_mut().insert(header::LOCATION, v);
-            }
-            res
-        }
-        _ => Html("<!doctype html><title>Signed out</title><p>Signed out of the test identity provider.</p>")
-            .into_response(),
+/// End of the session of the provider: the front-channel logout address of the client is loaded in an
+/// iframe (the client closes its session), then the browser goes back to the client.
+async fn end_session(
+    State(idp): State<FakeIdp>,
+    headers: HeaderMap,
+    Query(q): Query<EndSessionReq>,
+) -> Response {
+    let sid = headers
+        .get_all(header::COOKIE)
+        .iter()
+        .filter_map(|v| v.to_str().ok())
+        .flat_map(|v| v.split(';'))
+        .filter_map(|c| c.trim().split_once('='))
+        .find(|(k, _)| *k == SESSION_COOKIE)
+        .map(|(_, v)| v.to_string());
+    let frame = sid.as_deref().and_then(|sid| idp.frontchannel_url(sid));
+    if let Some(sid) = &sid {
+        let mut i = idp.inner.lock().expect("fake idp");
+        i.sessions.retain(|(x, _)| x != sid);
+        i.frontchannel.remove(sid);
     }
+    let back = q.post_logout_redirect_uri.filter(|to| to.starts_with("http"));
+    let iframe = frame
+        .map(|f| {
+            format!(
+                "<iframe title=\"Sign-out of the client\" src=\"{}\" width=\"320\" height=\"60\"></iframe>",
+                esc(&f)
+            )
+        })
+        .unwrap_or_default();
+    let next = back
+        .map(|b| {
+            format!(
+                "<p><a id=\"back\" href=\"{0}\">Back to the application</a></p>\
+                 <script>setTimeout(function(){{location.href={1}}}, 800)</script>",
+                esc(&b),
+                serde_json::to_string(&b).unwrap_or_default()
+            )
+        })
+        .unwrap_or_default();
+    let mut res = Html(format!(
+        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><title>Signed out</title></head>\
+         <body><main><h1>Signed out</h1><p>Signed out of the test identity provider.</p>{iframe}{next}</main></body></html>"
+    ))
+    .into_response();
+    if let Ok(v) =
+        HeaderValue::from_str(&format!("{SESSION_COOKIE}=; Path=/; HttpOnly; SameSite=Lax; Max-Age=0"))
+    {
+        res.headers_mut().insert(header::SET_COOKIE, v);
+    }
+    res
 }
 
 #[derive(Debug, Deserialize)]

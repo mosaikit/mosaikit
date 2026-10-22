@@ -387,7 +387,7 @@ function People({ slug, q, profiles, groups }: { slug: string; q: Q<Member[]>; p
               </DropdownMenuTrigger>
               <DropdownMenuContent className="max-h-72 overflow-auto">
                 {groups.map((g) => (
-                  <DropdownMenuItem key={g.id} onSelect={() => toGroup.mutate({ ids, group: g.id })}>
+                  <DropdownMenuItem key={g.id} disabled={g.source === 'idp'} onSelect={() => toGroup.mutate({ ids, group: g.id })}>
                     {g.name}
                   </DropdownMenuItem>
                 ))}
@@ -587,6 +587,15 @@ export function RemoveDialog({ member, members, busy, onConfirm, onClose }: { me
   )
 }
 
+/** A group of the identity provider of the tenant: read-only in Mosaikit. */
+export function IdpBadge() {
+  return (
+    <Badge variant="outline" className="font-normal" title={t('Only the identity provider changes it')}>
+      {t('From the identity provider')}
+    </Badge>
+  )
+}
+
 function Groups({ slug, q, members }: { slug: string; q: Q<Group[]>; members: Member[] }) {
   const base = `/api/t/${enc(slug)}/manage/groups`
   const confirm = useConfirm()
@@ -606,18 +615,20 @@ function Groups({ slug, q, members }: { slug: string; q: Q<Group[]>; members: Me
     <div className="grid gap-3 lg:grid-cols-2">
       {q.data.map((g) => {
         const others = members.filter((m) => !g.members.some((x) => x.user_id === m.user_id))
+        const idp = g.source === 'idp'
         return (
           <Card key={g.id}>
             <CardHeader className="flex-row items-center justify-between">
               <div>
-                <CardTitle className="text-base">
+                <CardTitle className="flex flex-wrap items-center gap-2 text-base">
                   <a className="hover:underline" href={to.group(slug, g.id)}>
                     {g.name}
                   </a>
+                  {idp && <IdpBadge />}
                 </CardTitle>
                 <CardDescription>{t('{count} members', { count: g.members.length })}</CardDescription>
               </div>
-              <div className="flex gap-1">
+              {!idp && <div className="flex gap-1">
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="outline" size="sm" disabled={!others.length}>
@@ -641,16 +652,18 @@ function Groups({ slug, q, members }: { slug: string; q: Q<Group[]>; members: Me
                 >
                   <Trash2 />
                 </Button>
-              </div>
+              </div>}
             </CardHeader>
             <CardContent className="flex flex-wrap gap-1.5">
               {g.members.length === 0 && <span className="text-sm text-muted-foreground">{t('No members.')}</span>}
               {g.members.map((m) => (
                 <Badge key={m.user_id} variant="secondary" className="gap-1 font-normal">
                   {m.display_name || m.username}
-                  <button type="button" aria-label={t('Remove {username} from the group', { username: m.username })} className="ml-0.5 opacity-60 hover:opacity-100" onClick={() => rmMember.mutate({ g: g.id, u: m.user_id })}>
-                    ×
-                  </button>
+                  {!idp && (
+                    <button type="button" aria-label={t('Remove {username} from the group', { username: m.username })} className="ml-0.5 opacity-60 hover:opacity-100" onClick={() => rmMember.mutate({ g: g.id, u: m.user_id })}>
+                      ×
+                    </button>
+                  )}
                 </Badge>
               ))}
             </CardContent>

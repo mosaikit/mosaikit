@@ -4,7 +4,7 @@
 // plugin of the iframe** (the plugin cannot name another one) and to the active
 // tenant. Unknown operations or invalid arguments are refused.
 
-import { api, enc } from './api.ts'
+import { api, ApiError, enc, errText } from './api.ts'
 
 export interface RestCall {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE'
@@ -15,6 +15,13 @@ export interface RestCall {
 }
 
 export class OpError extends Error {}
+
+/** The answer to a request that failed: the text in the language of the host and, for the errors of the
+ *  server, the stable code, the HTTP status and the untranslated message (the plugin may translate the
+ *  code itself, or react to it). */
+export function errorReply(e: unknown): { err: string; code?: string; status?: number; message?: string } {
+  return e instanceof ApiError ? { err: errText(e), code: e.code, status: e.status, message: e.message } : { err: errText(e) }
+}
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const IDENT = /^[a-z][a-z0-9_]{0,47}$/

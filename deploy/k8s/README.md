@@ -109,6 +109,9 @@ kubectl -n {{id}} exec -it deploy/{{id}} -- /app/mosaikit-server reset-password 
   (or the backups of the managed PostgreSQL).
 - Files: a copy of the volume `{{id}}-data` (snapshot of the StorageClass or
   `kubectl cp {{id}}/<pod>:/data ./data`).
+- System › Backup and restore makes complete daily backups in `/data/backups` of the volume (the image
+  has the PostgreSQL 17 client; for a newer server rebuild it with `--build-arg PG_CLIENT_MAJOR=<major>`).
+  Keep `/data/secret.key` apart from the backups.
 
 ## Update
 

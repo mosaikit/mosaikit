@@ -2,7 +2,18 @@ import { isEvent, isReply, type BridgeRequest } from './protocol.ts'
 
 type Pending = { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }
 
-export class BridgeError extends Error {}
+/** An error of the host or of the server. `message` is in the language of the host; `code` is stable. */
+export class BridgeError extends Error {
+  constructor(
+    message: string,
+    readonly code?: string,
+    readonly status?: number,
+    /** the message of the server, untranslated */
+    readonly serverMessage?: string,
+  ) {
+    super(message)
+  }
+}
 
 /**
  * Plugin side of the bridge: it sends requests to the host (parent window) and
@@ -66,7 +77,15 @@ export class Bridge {
     if (!p) return
     this.pending.delete(d.id)
     clearTimeout(p.timer)
-    if (d.err !== undefined) p.reject(new BridgeError(d.err))
+    if (d.err !== undefined)
+      p.reject(
+        new BridgeError(
+          String(d.err),
+          typeof d.code === 'string' ? d.code : undefined,
+          typeof d.status === 'number' ? d.status : undefined,
+          typeof d.message === 'string' ? d.message : undefined,
+        ),
+      )
     else p.resolve(d.ok)
   }
 }

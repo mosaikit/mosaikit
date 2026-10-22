@@ -21,12 +21,20 @@ struct Args {
     /// algorithm of the ID tokens: ES256 or RS256
     #[arg(long, default_value = "ES256")]
     alg: String,
+    /// front-channel logout address of the client (default: derived from its return address)
+    #[arg(long)]
+    frontchannel_logout_uri: Option<String>,
 }
 
 #[tokio::main]
 async fn main() -> std::io::Result<()> {
     let a = Args::parse();
-    let cfg = FakeConfig { client_id: a.client_id, client_secret: a.client_secret, alg: a.alg };
+    let cfg = FakeConfig {
+        client_id: a.client_id,
+        client_secret: a.client_secret,
+        alg: a.alg,
+        frontchannel_logout_uri: a.frontchannel_logout_uri,
+    };
     let idp = FakeIdp::spawn(SocketAddr::from(([127, 0, 0, 1], a.port)), cfg.clone()).await?;
     println!(
         "test identity provider: {} (client {}, secret {})",

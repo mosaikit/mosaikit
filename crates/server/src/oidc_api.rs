@@ -1,5 +1,6 @@
 //! Sign-in through the identity provider of a tenant (OIDC): start, return from the provider,
-//! back-channel logout, and the configuration of the Administrator (docs/architecture.md, OIDC).
+//! back-channel and front-channel logout, and the configuration of the Administrator
+//! (docs/architecture.md, OIDC).
 
 use axum::extract::{Path, Query, State};
 use axum::http::request::Parts;
@@ -25,6 +26,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/auth/oidc/{slug}/start", get(start))
         .route("/api/auth/oidc/{slug}/callback", get(callback))
         .route("/api/auth/oidc/{slug}/backchannel-logout", post(backchannel))
+        .route("/api/auth/oidc/{slug}/frontchannel-logout", get(frontchannel))
         .route("/api/admin/tenants/{id}/sign-in", get(a_config).put(a_set_config))
         .route("/api/admin/oidc/check", post(a_check))
 }
@@ -125,6 +127,45 @@ async fn backchannel(
         }
     };
     res.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
+    res
+}
+
+#[derive(Deserialize)]
+struct FrontchannelReq {
+    #[serde(default)]
+    iss: String,
+    #[serde(default)]
+    sid: String,
+}
+
+/// Front-channel logout (OpenID Connect Front-Channel Logout 1.0): a page the provider loads in an
+/// iframe of its own logout page. Only the provider of the tenant may frame it; nothing is cached.
+async fn frontchannel(
+    State(s): State<AppState>,
+    Path(slug): Path<String>,
+    Query(q): Query<FrontchannelReq>,
+) -> Response {
+    let (status, text) = match oidc::frontchannel_logout(&s.k, &slug, &q.iss, &q.sid).await {
+        Ok(_) => (StatusCode::OK, "Signed out of Mosaikit."),
+        Err(e) => {
+            tracing::warn!("front-channel logout of {slug} refused: {}", e.message);
+            (StatusCode::BAD_REQUEST, "Sign-out refused.")
+        }
+    };
+    let ancestors = oidc::issuer_origin(&s.k, &slug).await.unwrap_or_else(|| "'none'".into());
+    let mut res = (
+        status,
+        [(header::CONTENT_TYPE, "text/html; charset=utf-8")],
+        format!("<!doctype html><html lang=\"en\"><meta charset=\"utf-8\"><title>Sign-out</title><p>{text}</p></html>"),
+    )
+        .into_response();
+    let h = res.headers_mut();
+    h.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache, no-store"));
+    if let Ok(v) = HeaderValue::from_str(&format!(
+        "default-src 'none'; frame-ancestors {ancestors}; base-uri 'none'; form-action 'none'"
+    )) {
+        h.insert(header::CONTENT_SECURITY_POLICY, v);
+    }
     res
 }
 

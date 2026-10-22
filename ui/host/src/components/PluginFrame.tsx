@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { errText } from '../api.ts'
-import { execute, routeOp, themeVars, uuid } from '../bridge.ts'
+import { errorReply, execute, routeOp, themeVars, uuid } from '../bridge.ts'
 import type { PluginView, Session, TenantContext } from '../types.ts'
 import { useUi } from '../ui-context.ts'
 import { t } from '../app/i18n.ts'
@@ -68,7 +67,8 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
       if (!win || ev.source !== win || ev.origin !== origin) return
       const m = ev.data as { msk?: number; id?: unknown; op?: unknown; args?: Record<string, unknown> }
       if (!m || m.msk !== 1 || typeof m.id !== 'string' || typeof m.op !== 'string') return
-      const reply = (x: { ok?: unknown; err?: string }) => win.postMessage({ msk: 1, id: m.id, ...x }, origin)
+      const reply = (x: { ok?: unknown; err?: string; code?: string; status?: number; message?: string }) =>
+        win.postMessage({ msk: 1, id: m.id, ...x }, origin)
       try {
         switch (m.op) {
           case 'hello':
@@ -100,7 +100,7 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
             reply({ ok: await execute(routeOp(tenant, plugin.id, m.op, m.args)) })
         }
       } catch (e) {
-        reply({ err: errText(e) })
+        reply(errorReply(e))
       }
     }
     window.addEventListener('message', onMessage)

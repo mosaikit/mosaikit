@@ -238,6 +238,8 @@ async fn validation_and_refusing_hooks() {
     .await
     .unwrap_err();
     assert!(e.message.contains("invalid email"), "{e}");
+    // the message of the plugin keeps its own code: the interface shows it, not the generic text
+    assert_eq!(e.code(), "plugin_error");
     // the hook refused: no orphan resource
     let n: i64 = mosaikit_db::query_scalar(
         "select count(*) from core.resources where plugin_id = 'com.mosaikit.contacts'",

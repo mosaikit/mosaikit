@@ -353,6 +353,26 @@ cannot sign in. At the end put it back to local accounts (P8-14).
 | P9-26 | Choose the theme of the tenant, then delete it | The tenant uses it; after the delete it goes back to the theme of the platform |
 | P9-27 | Italian and dark mode on the search, the help dialogs, the tour and the theme editor | Everything translated and readable |
 
+
+## Follow-ups A — Docker backups, errors in the plugins, OIDC logout and groups
+
+The OIDC checks use the test identity provider and a tenant set up as in Phase 8 (P8-01 … P8-05).
+
+| Id | Check | Expected |
+|---|---|---|
+| FU-A-01 | (Release, with Docker) `cargo xtask release docker`, start the compose, System › Backup and restore › Run now | The backup is «complete»: the zip has `database/mosaikit.pgdump` (the image has the PostgreSQL 17 client) |
+| FU-A-02 | As `s.greco`, Notes, with the Tenant Manager having removed «create» from Sara's profile (P3): create a note | The message in the app is the translated one («Your permission profile does not allow it»), in Italian too; never a code |
+| FU-A-03 | Contacts: save a contact with the email `x` | The message of the plugin itself («invalid email: x»), not «Invalid request» |
+| FU-A-04 | As Administrator, the OIDC tenant › Sign-in | The addresses include **Front-channel logout address** (`…/frontchannel-logout`); Check the configuration has a green line «Front-channel logout» |
+| FU-A-05 | Sign in as Anna Rossi through the provider; in another tab open `http://127.0.0.1:5556/logout` | The page of the provider «Signed out» shows a small frame «Signed out of Mosaikit.»; back on the Mosaikit tab, a reload shows the sign-in page |
+| FU-A-06 | Sign-in tab › **Groups of the provider in Mosaikit** on, «Only the groups starting with» empty, Save | Saved |
+| FU-A-07 | Sign in as Bruno Neri, then as Anna Rossi; Manage › Groups | `staff`, `mosaikit-managers`, `mosaikit-users` marked «From the identity provider»; `staff` has Anna and Bruno; no Add, no delete, no × on the members |
+| FU-A-08 | Open `staff`: its page | The badge «From the identity provider»; no «Add a member», no «Delete the group», no Remove |
+| FU-A-09 | As Anna: a note in Notes › Share… › search `staff` › Share | Shared with `staff`; as Bruno (through the provider) the note is in Notes |
+| FU-A-10 | Prefix `mosaikit-`, Save, sign in again as Bruno | Bruno leaves `staff` (it stays, with its shares, and Anna until her next sign-in); he stays in `mosaikit-users` |
+| FU-A-11 | In another OIDC tenant: as its Tenant Manager create a Mosaikit group `staff` first, then turn the mirror on and sign in as Bruno | The group of the provider is «staff (identity provider)»; the group of Mosaikit stays as it was |
+| FU-A-12 | Italian and dark mode on the Sign-in tab and on Manage › Groups | Translated and readable |
+
 ---
 
 Every phase of the plan has its section. New work adds its checks here when it is committed.

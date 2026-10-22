@@ -211,7 +211,10 @@ pub(crate) async fn run(
     let tx = host.tx.ok_or_else(|| Error::internal("transaction lost"))?;
     let reply = res?;
     if let Some(e) = reply.get("err") {
-        return Err(Error::bad(e.as_str().map(str::to_string).unwrap_or_else(|| e.to_string())));
+        // the message of the plugin itself: its own code, so the interface shows it instead of the
+        // generic text of `bad_request`
+        return Err(Error::bad(e.as_str().map(str::to_string).unwrap_or_else(|| e.to_string()))
+            .with_code("plugin_error"));
     }
     Ok((reply.get("ok").cloned().unwrap_or(Value::Null), tx))
 }

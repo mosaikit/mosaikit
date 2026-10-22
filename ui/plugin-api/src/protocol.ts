@@ -1,7 +1,7 @@
 // Protocol of the bridge host <-> plugin UIs (postMessage).
 //
 // plugin -> host: { msk: 1, id, op, args }
-// host -> plugin: { msk: 1, id, ok } | { msk: 1, id, err }
+// host -> plugin: { msk: 1, id, ok } | { msk: 1, id, err, code?, status?, message? }
 // host -> plugin (events): { msk: 1, event, data }
 
 export interface BridgeRequest {
@@ -15,7 +15,14 @@ export interface BridgeReply {
   msk: 1
   id: string
   ok?: unknown
+  /** the error, in the language of the host */
   err?: string
+  /** stable code of the error (`missing_permission`, `quota_exceeded`, `plugin_error`…); hosts before 1.1 omit it */
+  code?: string
+  /** HTTP status of the request that failed, if it reached the server */
+  status?: number
+  /** the message of the server, untranslated */
+  message?: string
 }
 
 export interface BridgeEvent {

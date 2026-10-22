@@ -351,6 +351,8 @@ export interface GroupDetail {
   members: { user_id: string; username: string; display_name: string }[]
   shared: { resource_id: string; title: string; plugin_id: string; level: string }[]
   plugins: [string, string[]][]
+  /** 'idp': a group of the identity provider, read-only */
+  source?: 'mosaikit' | 'idp'
 }
 
 export interface AccessRequest {
@@ -413,6 +415,8 @@ export interface Group {
   id: string
   name: string
   members: { user_id: string; username: string; display_name: string }[]
+  /** 'idp': a group of the identity provider, read-only (servers before 1.1 omit it) */
+  source?: 'mosaikit' | 'idp'
 }
 
 export interface ResourceRow {

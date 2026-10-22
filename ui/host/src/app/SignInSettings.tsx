@@ -1,7 +1,8 @@
 // How the people of a tenant sign in (Administrator › Tenants › a tenant › Sign-in), as in the mockup
 // (tenant/sign-in): local accounts or the identity provider of the tenant (OIDC), never both; the
 // addresses to register in the provider, "Check the configuration", where the roles come from, the
-// claims, and how many accounts the choice touches (docs/architecture.md, OIDC).
+// mirror of the groups of the provider, the claims, and how many accounts the choice touches
+// (docs/architecture.md, OIDC).
 
 import { useState } from 'react'
 import { AlertTriangle, CheckCircle2, Copy, Loader2, ShieldCheck, XCircle } from 'lucide-react'
@@ -11,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { cn } from '@/lib/utils'
 import { useAction, useApi, useConfirm } from './core.ts'
 import { t } from './i18n.ts'
@@ -32,8 +34,13 @@ export interface OidcView {
   claim_name: string
   claim_email: string
   claim_groups: string
+  /** mirror the groups of the token as read-only groups of the tenant */
+  sync_groups: boolean
+  /** only the groups starting with this ('' = all) */
+  group_prefix: string
   redirect_uri: string
   backchannel_logout_uri: string
+  frontchannel_logout_uri: string
   post_logout_redirect_uri: string
   local_accounts: number
   provider_accounts: number
@@ -62,6 +69,7 @@ const STEP_LABEL: Record<string, string> = {
   keys: 'Signing keys',
   end_session: 'Sign-out at the provider',
   backchannel_logout: 'Back-channel logout',
+  frontchannel_logout: 'Front-channel logout',
 }
 
 function draftOf(v: OidcView): Draft {
@@ -141,6 +149,8 @@ export function SignInSettings({ id }: { id: string }) {
         claim_name: x.claim_name,
         claim_email: x.claim_email,
         claim_groups: x.claim_groups,
+        sync_groups: x.sync_groups,
+        group_prefix: x.group_prefix,
       }),
     { ok: t('Sign-in saved'), invalidate: [['admin-sign-in', id], ['admin-tenants']] },
   )
@@ -250,6 +260,7 @@ export function SignInSettings({ id }: { id: string }) {
               <div className="grid gap-3 rounded-lg border p-3">
                 <Address label={t('Return address (redirect URI)')} value={v.redirect_uri} />
                 <Address label={t('Back-channel logout address')} value={v.backchannel_logout_uri} />
+                <Address label={t('Front-channel logout address')} value={v.frontchannel_logout_uri} />
                 <Address label={t('Address after the sign-out')} value={v.post_logout_redirect_uri} />
               </div>
               <div className="grid gap-3">
@@ -313,6 +324,22 @@ export function SignInSettings({ id }: { id: string }) {
                   </Field>
                 </div>
               )}
+              <div className="grid gap-3 rounded-lg border p-3">
+                <div className="flex items-start justify-between gap-4">
+                  <Label htmlFor="oi-sync" className="grid gap-1">
+                    <b>{t('Groups of the provider in Mosaikit')}</b>
+                    <span className="text-xs font-normal text-muted-foreground">
+                      {t('The groups of the token become groups of the tenant at every sign-in, to share items with. Only the provider changes them; a group it no longer sends empties, it is never deleted.')}
+                    </span>
+                  </Label>
+                  <Switch id="oi-sync" checked={cur.sync_groups} onCheckedChange={(on) => set({ sync_groups: on })} />
+                </div>
+                {cur.sync_groups && (
+                  <Field id="oi-prefix" label={t('Only the groups starting with')} hint={t('Empty: every group of the token.')}>
+                    <Input id="oi-prefix" className="font-mono" value={cur.group_prefix} onChange={(e) => set({ group_prefix: e.target.value })} />
+                  </Field>
+                )}
+              </div>
               <details className="rounded-lg border p-3 text-sm">
                 <summary className="cursor-pointer font-medium">{t('Claims of the token')}</summary>
                 <div className="mt-3 grid gap-4 sm:grid-cols-2">
