@@ -193,7 +193,7 @@ pub async fn search(k: &Kernel, c: &Caller, q: &str, lang: &str) -> Result<Vec<G
            and (r.search_vec @@ to_tsquery('simple', $3)
                 or (r.title ilike $4 escape '!' and r.title ilike $5 escape '!' and r.title ilike $6 escape '!'
                     and r.title ilike $7 escape '!' and r.title ilike $8 escape '!'))
-           and core.level_for($2, r.tenant_id, r.id, r.ancestors) >= 1
+           and r.id in (select v.id from core.levels_for($2, $1) v)
          order by ts_rank(r.search_vec, to_tsquery('simple', $3)) desc, r.updated_at desc
          limit $9"
     };

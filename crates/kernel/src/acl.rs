@@ -329,8 +329,8 @@ pub async fn tenant_resources(
         f.q.as_deref()
             .filter(|q| !q.trim().is_empty() && see_titles)
             .map(|q| format!("%{}%", crate::util::like_escape(q.trim())));
-    let rows = mosaikit_db::query(
-        "select r.id, r.plugin_id, r.kind, case when $2 then r.title else '' end, r.owner_id,
+    // PostgreSQL: the trash of the tenant as one set, not core.in_trash() for every item
+    let sql = "select r.id, r.plugin_id, r.kind, case when $2 then r.title else '' end, r.owner_id,
                 coalesce(nullif(u.display_name, ''), u.username), u.status = 'active'
                     and exists (select 1 from core.memberships m where m.tenant_id = r.tenant_id and m.user_id = u.id),
                 r.size_bytes, r.created_at, r.updated_at,
@@ -341,8 +341,15 @@ pub async fn tenant_resources(
          where r.tenant_id = $1 and not core.in_trash(r.id)
            and ($3::uuid is null or r.owner_id = $3) and ($4::text is null or r.plugin_id = $4)
            and ($5::text is null or r.title ilike $5 escape '\\')
-         order by r.updated_at desc limit 1000",
-    )
+         order by r.updated_at desc limit 1000";
+    let rows = mosaikit_db::query(if k.db.is_sqlite() {
+        sql.to_string()
+    } else {
+        sql.replace(
+            "not core.in_trash(r.id)",
+            "not exists (select 1 from core.trashed($1) x where x.id = r.id)",
+        )
+    })
     .bind(tenant)
     .bind(see_titles)
     .bind(f.owner)

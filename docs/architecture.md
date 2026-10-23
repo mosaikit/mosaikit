@@ -728,6 +728,8 @@ that role: there is no more privileged role to go back to).
 | `core.create_resource(kind, title, parent, meta)` | creates a resource of the current plugin, owner = user of the context |
 | `core.update_resource`, `core.move_resource`, `core.delete_resource` | changes with a check of the level |
 | view `core.visible_resources` | metadata of the resources of the current plugin visible to the user |
+| `core.levels_for(user, tenant)`, `core.ctx_levels()` | what a person sees in a tenant, as a set with the level (owned, shared to them or their groups, and the descendants through the GIN index on `ancestors`); `ctx_levels()` reads the context like `level_of()` (public links included) and is what the view is built on. Same rules as `level_of()`, without one call per item ([performance](reports/performance.md)) |
+| `core.trashed(tenant)` | the items in the trash (deleted, or under a deleted folder) as a set, for counts and KPIs |
 
 For every table of a plugin the host creates the policies:
 
@@ -1390,6 +1392,7 @@ mosaikit/
 | `cargo xtask plugin pack <dir>` | builds and packs (signs with the development key) |
 | `cargo xtask test` | Rust tests on PostgreSQL and on SQLite, tests of the plugins and of the distribution, UI tests |
 | `cargo xtask ci` | fmt, clippy `-D warnings`, tests, lint and UI build |
+| `cargo xtask perf` | load test at scale (`--scale full`: 200 tenants, 1M items, 5M events; `--backend sqlite --scale desktop`), `--reuse`, `--no-build`, `--clean`; results in `.dev/perf/`, see [reports/performance.md](reports/performance.md) |
 
 Every command accepts `--dist <folder>` (§14).
 

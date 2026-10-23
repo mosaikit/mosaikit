@@ -6,6 +6,17 @@ pub fn random_token(n: usize) -> String {
     hex::encode(bytes)
 }
 
+/// Condition "the item `$n` is an ancestor": on PostgreSQL written as `ancestors @> array[$n]`, which the
+/// GIN index on `ancestors` answers (`$n = any(ancestors)` reads the whole table); SQLite has no
+/// arrays and keeps `= any` (translated to `json_each`).
+pub fn under(sqlite: bool, n: usize) -> String {
+    if sqlite {
+        format!("${n} = any(ancestors)")
+    } else {
+        format!("ancestors @> array[${n}::uuid]")
+    }
+}
+
 pub fn sha256(data: &[u8]) -> Vec<u8> {
     Sha256::digest(data).to_vec()
 }

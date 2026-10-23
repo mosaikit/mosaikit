@@ -472,12 +472,20 @@ async fn people_rows(k: &Kernel, only: Option<Uuid>) -> Result<Vec<PersonRow>> {
     .bind(only)
     .fetch_all(&k.db)
     .await?;
+    // the memberships of each person, grouped once (not a scan of all of them for every person)
+    let mut by_user: std::collections::HashMap<Uuid, Vec<&mosaikit_db::Row>> =
+        std::collections::HashMap::new();
+    for m in &ms {
+        by_user.entry(m.get::<Uuid, _>(0)).or_default().push(m);
+    }
     rows.iter()
         .map(|r| {
             let id: Uuid = r.get(0);
-            let tenants = ms
+            let tenants = by_user
+                .get(&id)
+                .map(Vec::as_slice)
+                .unwrap_or_default()
                 .iter()
-                .filter(|m| m.get::<Uuid, _>(0) == id)
                 .map(|m| {
                     Ok(PersonTenant {
                         tenant_id: m.get(1),
