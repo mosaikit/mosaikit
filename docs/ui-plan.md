@@ -41,3 +41,43 @@ Order: 0 → 0b → 1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10. Ph
 | Follow-ups A | done: the Docker image has the PostgreSQL client (`PG_CLIENT_MAJOR`, default 17), so its scheduled backups are complete; errors inside the plugin UIs carry their stable code through the bridge (`BridgeError.code`, `errorText`), the errors of plugin logic keep their own message (`plugin_error`); OIDC front-channel logout (`…/frontchannel-logout`, framed only by the provider); the groups of the provider mirrored as read-only groups of the tenant, to share with |
 | Follow-ups B | done: tabs of an extension in the detail of an item (`[[extension.tabs]]`, a page of its UI drawn by the host over the place `mountCrud` keeps, in a frame without an origin of its own, bridge limited to the extension and the item; `tabClient()`; hidden extension fields), the Review tab of `com.mosaikit.note-review`; one item restored from a backup (search by title, app, owner; back with its id, or as a copy or in place of the current one by choice; what is under it, plugin rows, extension values, files, shares on request; never public links) |
 | 10 | designed in the mockup, to verify: layouts Teams (built-in), Console, Workspace, Suite, Project, Tabs re-arrange the frame of every screen and role, with their phone behaviour; the navigation tree (sample app Devices with five pages, Notes with three) as groups that open, a flyout, menus; System and Tenant settings › Identity and appearance › Layout and Style (corners, density, font, tabs, buttons, band image with its contrast check), inherited or customized; layout plugins (kind Layout, «What it contains», Suite in the catalog); a layout switcher in the review bar. Screen ids `system/layout`, `system/style`, `config/layout`, `config/style`, `mpmod/contents`. Implementation after the verification |
+
+## Review round 1 (user, 2026-10-23)
+
+Observations from the user's manual tests; ids as in the user's notes. Status is updated as items close.
+
+| Id | Item |
+|---|---|
+| A | Overview as a role-based dashboard of widgets (counters, charts, lists, gauges): the person's KPIs (fast to compute), notifications, recent activity to pick up, due dates and problems; app cards reconsidered. Designed in the mockup first |
+| B1 | Page headers and their filters never scroll |
+| B2 | Thin scrollbars |
+| B3 | Sidebar scrollbar only on hover |
+| B4 | No extra space above the first and below the last icon of the sidebar |
+| B5 | Collapsed icon bar: a gap between groups (Apps, Management…) |
+| B6 | Lists have the filter sidebar of the mockup (e.g. Tenants) |
+| B7 | Lists have selection and the header action bar of the mockup (e.g. Administrator › Tenants) |
+| B8 | Hierarchical lists indented (e.g. the System section list) |
+| B9 | Paging and infinite scroll for every table and list |
+| C1 | Italian: «Tenant» becomes «Organizzazione» |
+| C2 | English, Administrator: «Tenants» |
+| C3 | Sign-in: «Forgot your password?» (self-service by email) |
+| C4 | Files, Maps, Static sites, Tasks/Activities: connection refused — fix |
+| D1 | Tenants list with the tenant logo (default if none) |
+| D2 | Tenant detail: quotas in their own tab |
+| D3 | Tenant detail: name and identifier editable |
+| D4 | Users and managers list with avatars |
+| D5 | Tenant detail: logo next to the name in the header |
+| D6 | Tenant › Plugins: a status pill for unavailable plugins too |
+| D7 | Tenant › Plugins: link to the Plugins page after the availability sentence |
+| D8 | Quotas: explain «items» (items of the apps) |
+| D9 | Email of a person: required (decision) |
+| D10 | Plugin detail as a brochure: gallery, description, author, licence, links |
+| D11–D13 | Answers: monitoring refresh, mail server setup, keys of outside services (clarify in the UI and the guides) |
+| D14 | An Administrator edits their own data and other Administrators' data |
+| E1 | Manage › People: click on a row opens the person |
+| E2 | Permission profiles: clearer description, rename, localized texts (no plugin ids), a compact layout for many plugins |
+| E3 | Plugins: «Access and permissions» becomes «Permissions» |
+| E4, F1 | Account › Profile editable (name and picture) |
+| G1–G4 | Docker compose: PostgreSQL configured, optional Keycloak (realm, Mosaikit-like sign-in theme, no registration), optional mail server, nginx reverse proxy; README sections |
+| H1 | Static sites: publish from a URL as well as a zip |
+| H2 | Static sites: card view (default) with thumbnail, name and description; list view with thumbnail |
