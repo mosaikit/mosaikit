@@ -16,13 +16,24 @@ in Help › What is new (one `## <version>` heading per version, `- ` items, `##
 
 ### People and tenants
 
-- Settings on three levels: the platform, the tenant and each person, with what the platform manages.
-- People and permissions: permission profiles, groups, pending invitations and access requests.
-- Sign-in through the identity provider of a tenant (OIDC), next to local accounts.
+- Settings on three levels: the platform, the tenant and each person. Each setting says whether it is
+  inherited, customized or managed by the platform.
+- People and permissions: permission profiles, groups, invitations of people of other tenants, and
+  requests to see or edit an item, decided by its owner or a Tenant Manager.
+- A forgotten password is replaced with a link that works once.
+- Sign-in through the identity provider of a tenant (OIDC), next to local accounts; the groups of the
+  provider can become groups of the tenant.
 - Quotas of the tenants with the usage, the trend and the alerts.
 
 ### Your work
 
 - Notifications in the bell, by email and in a daily digest.
 - Shares and public links of every item, the trash for 30 days and the log of what happened.
-- Plugins on and off per tenant, with extensions, settings and updates.
+- Plugins on and off per tenant, with extensions that add fields, actions and tabs to the apps.
+
+### The platform
+
+- Tenants with a trial period, archived or deleted, exported and imported again.
+- Backups every day, with the restore of a whole tenant or of one item.
+- Maintenance mode, also planned in advance, with a notice for everybody.
+- Monitoring of the services, the performance, the errors and the capacity, with alerts.
