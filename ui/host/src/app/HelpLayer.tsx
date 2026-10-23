@@ -3,11 +3,22 @@
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import changelog from '../../../../CHANGELOG.md?raw'
+import changelogIt from '../../../../CHANGELOG.it.md?raw'
+import guideUser from '../../../../docs/guide/user.md?raw'
+import guideManager from '../../../../docs/guide/tenant-manager.md?raw'
+import guideAdmin from '../../../../docs/guide/administrator.md?raw'
+import guideUserIt from '../../../../docs/guide/it/user.md?raw'
+import guideManagerIt from '../../../../docs/guide/it/tenant-manager.md?raw'
+import guideAdminIt from '../../../../docs/guide/it/administrator.md?raw'
+import type { Session } from '../types.ts'
 import { useBrand } from '../brand.ts'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { openHelp, openSearch, releaseNotes, set, targetOf, TOURS, useHelpState, useTourDone } from './help.ts'
-import { t } from './i18n.ts'
+import { t, useLang, type Lang } from './i18n.ts'
+import { useSession } from './core.ts'
+import { GuideText } from './GuideText.tsx'
 import { go, personal, to, type Route } from './router.ts'
 import { press, SHORTCUTS, typing, type ShortcutAction, type ShortcutState } from './shortcuts.ts'
 
@@ -101,29 +112,51 @@ function TourOverlay() {
 
 // ------------------------------------------------------------------ guide and what is new
 
-/** The short guide of the shell, when the identity has no address of a guide. */
-function Guide() {
-  const parts: [string, string][] = [
-    ['Getting around', 'The sidebar has the apps and the pages of your role; the top bar the search, the notifications and your account. The name of the tenant at the top switches tenant, if you work in more than one.'],
-    ['Sharing', 'Every item has Share: people and groups with a level (view, edit, manage) and, if the tenant allows it, a public link. Shares lists everything shared in the tenant.'],
-    ['Notifications', 'The bell shows them at once; Account › Notifications decides which ones also arrive by email, at once or in a daily digest.'],
-    ['Trash', 'What you delete stays in the trash for a while and comes back with one click, with its shares.'],
-    ['Your preferences', 'Account › Appearance and language: mode, high contrast, language and the sidebar. The theme is chosen by whoever manages the tenant.'],
+/** The guides of docs/guide, in English and Italian, one per role. */
+const GUIDES: Record<Lang, Record<GuideName, string>> = {
+  en: { user: guideUser, 'tenant-manager': guideManager, administrator: guideAdmin },
+  it: { user: guideUserIt, 'tenant-manager': guideManagerIt, administrator: guideAdminIt },
+}
+type GuideName = 'user' | 'tenant-manager' | 'administrator'
+
+/** The guide of the role of the person: the Administrator's on the platform, the Tenant Manager's in a
+ *  tenant they manage, otherwise the one for the people who work in a tenant. */
+function guideOf(route: Route, session: Session | null | undefined): GuideName {
+  if (route.area === 'admin') return 'administrator'
+  if (route.area === 'tenant' && session?.memberships.find((m) => m.slug === route.tenant)?.role === 'tenant_manager') return 'tenant-manager'
+  return 'user'
+}
+
+/** The guides built into the shell (when the identity has no address of a guide of its own). */
+function Guide({ start }: { start: GuideName }) {
+  const lang = useLang()
+  const [name, setName] = useState<GuideName>(start)
+  useEffect(() => setName(start), [start])
+  const tabs: [GuideName, string][] = [
+    ['user', t('Working in a tenant')],
+    ['tenant-manager', t('Tenant Manager')],
+    ['administrator', t('Administrator')],
   ]
   return (
-    <div className="grid gap-4">
-      {parts.map(([h, p]) => (
-        <section key={h}>
-          <h3 className="text-sm font-semibold">{t(h)}</h3>
-          <p className="mt-1 text-sm text-muted-foreground">{t(p)}</p>
-        </section>
-      ))}
+    <div className="grid gap-3">
+      <div role="tablist" aria-label={t('Guides')} className="flex flex-wrap gap-1 border-b pb-2">
+        {tabs.map(([id, label]) => (
+          <Button key={id} type="button" role="tab" aria-selected={name === id} size="sm" variant={name === id ? 'secondary' : 'ghost'} onClick={() => setName(id)}>
+            {label}
+          </Button>
+        ))}
+      </div>
+      <div role="tabpanel">
+        <GuideText text={GUIDES[lang][name]} onGuide={(g) => (g === 'user' || g === 'tenant-manager' || g === 'administrator') && setName(g)} />
+      </div>
     </div>
   )
 }
 
 function WhatsNew({ version }: { version: string }) {
-  const notes = releaseNotes(changelog, version)
+  // the notes in the language of the person (CHANGELOG.md in English, CHANGELOG.it.md in Italian)
+  const lang = useLang()
+  const notes = releaseNotes(lang === 'it' ? changelogIt : changelog, version)
   if (!notes.length) return <p className="text-sm text-muted-foreground">{t('No notes for this version.')}</p>
   return (
     <div className="grid gap-4">
@@ -153,10 +186,10 @@ function Keys({ keys }: { keys: string[] }) {
   )
 }
 
-function HelpDialog({ open, title, description, children }: { open: boolean; title: string; description: string; children: ReactNode }) {
+function HelpDialog({ open, title, description, wide, children }: { open: boolean; title: string; description: string; wide?: boolean; children: ReactNode }) {
   return (
     <Dialog open={open} onOpenChange={(o) => !o && set({ open: null })}>
-      <DialogContent className="max-h-[85vh] overflow-y-auto sm:max-w-lg">
+      <DialogContent className={cn('max-h-[85vh] overflow-y-auto', wide ? 'sm:max-w-3xl' : 'sm:max-w-lg')}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>{description}</DialogDescription>
@@ -171,6 +204,7 @@ function HelpDialog({ open, title, description, children }: { open: boolean; tit
 export function HelpLayer({ route, search }: { route: Route; search: boolean }) {
   const { open } = useHelpState()
   const brand = useBrand()
+  const session = useSession().data
   const seq = useRef<ShortcutState>({ pending: null, at: 0 })
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -187,8 +221,8 @@ export function HelpLayer({ route, search }: { route: Route; search: boolean }) 
   return (
     <>
       <TourOverlay />
-      <HelpDialog open={open === 'guide'} title={t('Guide of Mosaikit')} description={t('The essentials, in short.')}>
-        <Guide />
+      <HelpDialog open={open === 'guide'} title={t('Guide of Mosaikit')} description={t('The guide of your role; the others are a click away.')} wide>
+        <Guide start={guideOf(route, session)} />
       </HelpDialog>
       <HelpDialog open={open === 'whatsnew'} title={t('What is new in version {v}', { v: brand.version || '1.0' })} description={t('The changes of this version.')}>
         <WhatsNew version={brand.version} />

@@ -2,12 +2,13 @@
 //! identity images, keys of outside services encrypted at rest.
 
 use mosaikit_kernel::identity::{admin_login, change_password, login, login_remembered, AdminLogin};
+use mosaikit_kernel::plugins::{self, InstallSource};
 use mosaikit_kernel::tenancy::keys::{self, key_in_use, Level};
 use mosaikit_kernel::tenancy::levels::{
     self, effective, platform_settings, set_platform, set_tenant, tenant_settings, Who,
 };
 use mosaikit_kernel::tenancy::{login_tenants, set_tenant_theme, tenant_theme};
-use mosaikit_kernel::testing::{start, PASSWORD};
+use mosaikit_kernel::testing::{start, test_key, TestKernel, PASSWORD};
 use mosaikit_kernel::Kind;
 use serde_json::{json, Map, Value};
 
@@ -219,6 +220,17 @@ async fn identity_images_and_sign_in_page() {
     assert!(levels::image(&t, Some(alfa), "logo_light").await.unwrap().is_none());
 }
 
+/// A plugin without logic that only declares keys of outside services.
+async fn install_key_plugin(t: &TestKernel, id: &str, keys: &str) {
+    let manifest = format!(
+        "id = \"{id}\"\nname = \"Keys\"\nversion = \"1.0.0\"\n[contribution]\nicon = \"K\"\nlabel = \"{id}\"\n{keys}"
+    );
+    let files = std::collections::BTreeMap::from([("plugin.toml".to_string(), manifest.into_bytes())]);
+    let pkg = mosaikit_mskp::pack(&files, Some(&test_key())).unwrap();
+    let p = plugins::install_package(t, None, &pkg, InstallSource::Upload).await.unwrap();
+    plugins::set_active(t, None, &p.id, true).await.unwrap();
+}
+
 #[tokio::test]
 async fn keys_of_outside_services() {
     let t = start().await;
@@ -228,6 +240,40 @@ async fn keys_of_outside_services() {
     let anna = t.member(&g, "anna").await;
     let anna = t.home(&anna).await;
     let alfa = manager.tenant.tenant_id;
+
+    // no plugin declares the service: no key for it, and the pages list nothing
+    let err =
+        keys::set_key(&t, admin.user_id, Level::Platform, "translate", Some("pk-1"), None).await.unwrap_err();
+    assert_eq!(err.kind, Kind::NotFound);
+    assert!(keys::platform_keys(&t, &admin, "en").await.unwrap().is_empty());
+
+    // the plugins declare the services: two plugins share "translate", the scopes add up
+    install_key_plugin(
+        &t,
+        "com.example.translator",
+        "[[service_keys]]\nid = \"translate\"\nlabel = \"Translation service\"\nscopes = [\"platform\", \"tenant\"]\n\
+         [[service_keys]]\nid = \"ai-local\"\nlabel = \"Self-hosted model\"\naddress = true\nscopes = [\"platform\"]\n\
+         [i18n.it]\nservice_keys = { translate = { label = \"Servizio di traduzione\" } }\n",
+    )
+    .await;
+    install_key_plugin(
+        &t,
+        "com.example.voice",
+        "[[service_keys]]\nid = \"translate\"\nlabel = \"Translator\"\nscopes = [\"personal\"]\n",
+    )
+    .await;
+    let services = keys::services(&t, "it");
+    let tr = services.iter().find(|s| s.id == "translate").unwrap();
+    assert_eq!(
+        tr.label, "Servizio di traduzione",
+        "the first plugin (in the order of the ids) gives the texts"
+    );
+    assert_eq!(tr.plugins.len(), 2);
+    assert_eq!(tr.scopes.len(), 3);
+    // a scope nobody declares is refused
+    let me = Level::User(anna.user.user_id);
+    let err = keys::set_key(&t, anna.user.user_id, me, "ai-local", Some("http://x"), None).await.unwrap_err();
+    assert_eq!(err.kind, Kind::NotFound);
 
     // the platform's key, not shared: nobody in the tenant uses it
     keys::set_key(&t, admin.user_id, Level::Platform, "translate", Some("pk-platform-1234"), Some(false))
@@ -245,20 +291,21 @@ async fn keys_of_outside_services() {
     assert_eq!(key_in_use(&t, &anna, "translate").await.unwrap().as_deref(), Some("pk-platform-1234"));
 
     // a personal key wins, and is never shared
-    let me = Level::User(anna.user.user_id);
     keys::set_key(&t, anna.user.user_id, me, "translate", Some("my-key-9999"), None).await.unwrap();
     assert_eq!(key_in_use(&t, &anna, "translate").await.unwrap().as_deref(), Some("my-key-9999"));
     assert!(keys::set_key(&t, anna.user.user_id, me, "translate", None, Some(true)).await.is_err());
 
-    // the pages see only the last four characters and which key is in use
-    let mine = keys::my_keys(&t, &anna).await.unwrap();
-    let tr = mine.iter().find(|k| k.service == "translate").unwrap();
-    assert_eq!((tr.hint.as_deref(), tr.in_use), (Some("9999"), "own"));
+    // the pages see only the last four characters, which key is in use and the plugins using it
+    let mine = keys::my_keys(&t, &anna, "en").await.unwrap();
+    assert_eq!(mine.len(), 1, "only the services with the personal scope: {mine:?}");
+    let tr = &mine[0];
+    assert_eq!((tr.hint.as_deref(), tr.in_use, tr.declared), (Some("9999"), "own", true));
     let json = serde_json::to_string(&mine).unwrap();
     assert!(!json.contains("my-key"), "{json}");
-    let tenant = keys::tenant_keys(&t, &manager).await.unwrap();
+    let tenant = keys::tenant_keys(&t, &manager, "en").await.unwrap();
     assert_eq!(tenant.iter().find(|k| k.service == "translate").unwrap().hint.as_deref(), Some("5678"));
-    assert_eq!(keys::tenant_keys(&t, &anna).await.unwrap_err().kind, Kind::Forbidden);
+    assert!(tenant.iter().all(|k| k.service != "ai-local"), "platform only");
+    assert_eq!(keys::tenant_keys(&t, &anna, "en").await.unwrap_err().kind, Kind::Forbidden);
 
     // encrypted in the database
     let raw: Vec<u8> = mosaikit_db::query_scalar("select secret from core.service_keys where hint = '9999'")
@@ -274,7 +321,7 @@ async fn keys_of_outside_services() {
     keys::set_key(&t, admin.user_id, Level::Platform, "ai-local", Some("http://llm.internal:11434"), None)
         .await
         .unwrap();
-    let p = keys::platform_keys(&t, &admin).await.unwrap();
+    let p = keys::platform_keys(&t, &admin, "en").await.unwrap();
     assert_eq!(
         p.iter().find(|k| k.service == "ai-local").unwrap().hint.as_deref(),
         Some("http://llm.internal:11434")
@@ -282,6 +329,24 @@ async fn keys_of_outside_services() {
 
     keys::remove_key(&t, anna.user.user_id, me, "translate").await.unwrap();
     assert_eq!(key_in_use(&t, &anna, "translate").await.unwrap().as_deref(), Some("pk-platform-1234"));
+
+    // a key whose service no installed plugin declares any more: shown as not used, removable
+    mosaikit_db::query(
+        "insert into core.service_keys (scope, tenant_id, user_id, service, secret, hint, shared, updated_by)
+         values ('platform', null, null, 'sms', $1, '0000', false, $2)",
+    )
+    .bind(vec![0u8; 4])
+    .bind(admin.user_id)
+    .execute(&t.db)
+    .await
+    .unwrap();
+    let p = keys::platform_keys(&t, &admin, "en").await.unwrap();
+    let sms = p.iter().find(|k| k.service == "sms").unwrap();
+    assert!(!sms.declared && sms.set && sms.plugins.is_empty());
+    assert!(keys::set_key(&t, admin.user_id, Level::Platform, "sms", Some("x"), None).await.is_err());
+    assert_eq!(key_in_use(&t, &anna, "sms").await.unwrap_err().kind, Kind::NotFound);
+    keys::remove_key(&t, admin.user_id, Level::Platform, "sms").await.unwrap();
+    assert!(keys::platform_keys(&t, &admin, "en").await.unwrap().iter().all(|k| k.service != "sms"));
 }
 
 #[tokio::test]

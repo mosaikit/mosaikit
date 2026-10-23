@@ -1,7 +1,9 @@
 # Changelog
 
 What changes from one version of Mosaikit to the next. The shell shows the section of its own version
-in Help › What is new (one `## <version>` heading per version, `- ` items, `### ` groups).
+in Help › What is new (one `## <version>` heading per version, `- ` items, `### ` groups), in the
+language of the person: this file in English, [CHANGELOG.it.md](CHANGELOG.it.md) in Italian (keep them
+in step).
 
 ## 1.0.0
 
@@ -21,6 +23,8 @@ in Help › What is new (one `## <version>` heading per version, `- ` items, `##
 - People and permissions: permission profiles, groups, invitations of people of other tenants, and
   requests to see or edit an item, decided by its owner or a Tenant Manager.
 - A forgotten password is replaced with a link that works once.
+- Your own name and picture: you change them in Account › Profile (the name comes from the identity
+  provider in the tenants that use one).
 - Sign-in through the identity provider of a tenant (OIDC), next to local accounts; the groups of the
   provider can become groups of the tenant.
 - Quotas of the tenants with the usage, the trend and the alerts.
@@ -30,6 +34,7 @@ in Help › What is new (one `## <version>` heading per version, `- ` items, `##
 - Notifications in the bell, by email and in a daily digest.
 - Shares and public links of every item, the trash for 30 days and the log of what happened.
 - Plugins on and off per tenant, with extensions that add fields, actions and tabs to the apps.
+- Keys of outside services: the plugins say which services they use, and only those are listed.
 
 ### The platform
 

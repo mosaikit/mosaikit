@@ -115,6 +115,15 @@ impl Ctx {
     pub fn log(&self, msg: &str) {
         host::log(msg);
     }
+    /// The key of an outside service (declared in `[[service_keys]]` of the manifest) in use for the
+    /// caller: their own, else the tenant's, else the platform's; `None` when there is none. Never
+    /// send it to the UI.
+    pub fn service_key(&self, service: &str) -> Result<Option<String>> {
+        match host::call("key.get", serde_json::json!({ "service": service }))? {
+            Value::String(s) => Ok(Some(s)),
+            _ => Ok(None),
+        }
+    }
     /// Command of another plugin (declared in `permissions.calls`), with the
     /// same user: the called plugin applies its own access rules.
     pub fn call_plugin(&self, plugin: &str, name: &str, args: Value) -> Result<Value> {

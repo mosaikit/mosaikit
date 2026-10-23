@@ -13,6 +13,7 @@ pub mod levels;
 pub mod lifecycle;
 mod members;
 mod people;
+pub mod profile;
 mod requests;
 mod settings;
 mod support;

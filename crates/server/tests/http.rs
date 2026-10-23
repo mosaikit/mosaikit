@@ -909,7 +909,28 @@ async fn keys_never_go_back_to_the_browser() {
     a.t.member(&g, "anna").await;
     let admin = a.admin().await;
     let anna = a.login("alfa", "anna", PASSWORD).await;
+    // no installed plugin declares the service yet: refused, and nothing is listed
     let body = json!({ "value": "sk-platform-abcd", "shared": true });
+    let r = a.call(Some(&admin), Method::PUT, "/api/admin/keys/ai-hosted", Some(body.clone())).await;
+    assert_eq!((r.status, r.json()["code"].clone()), (StatusCode::NOT_FOUND, json!("service_unknown")));
+    // a plugin declares it, with an Italian label
+    let manifest = r#"
+id = "com.example.assistant"
+name = "Assistant"
+version = "1.0.0"
+[contribution]
+icon = "A"
+label = "Assistant"
+[[service_keys]]
+id = "ai-hosted"
+label = "Hosted AI provider"
+[i18n.it]
+service_keys = { ai-hosted = { label = "Provider AI esterno" } }
+"#;
+    let files = std::collections::BTreeMap::from([("plugin.toml".to_string(), manifest.as_bytes().to_vec())]);
+    let pkg = mosaikit_mskp::pack(&files, Some(&mosaikit_kernel::testing::test_key())).unwrap();
+    let r = a.raw(&admin, "/api/admin/plugins", pkg).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
     let r = a.call(Some(&admin), Method::PUT, "/api/admin/keys/ai-hosted", Some(body)).await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.text());
     assert!(!r.text().contains("sk-platform"), "{}", r.text());
@@ -917,6 +938,10 @@ async fn keys_never_go_back_to_the_browser() {
     let ai = mine.as_array().unwrap().iter().find(|k| k["service"] == "ai-hosted").cloned().unwrap();
     assert_eq!(ai["set"], false);
     assert_eq!(ai["in_use"], "platform");
+    assert_eq!(
+        (ai["label"].clone(), ai["plugins"].clone()),
+        (json!("Hosted AI provider"), json!(["Assistant"]))
+    );
     let body = json!({ "value": "my-own-key-wxyz" });
     let r = a.call(Some(&anna), Method::PUT, "/api/t/alfa/me/keys/ai-hosted", Some(body)).await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.text());
@@ -2068,4 +2093,45 @@ async fn one_origin_per_plugin_with_a_wildcard_plugin_url() {
         a.get_untrusted_on("com-mosaikit-notes.localhost:9301", &path).await.status,
         StatusCode::NOT_FOUND
     );
+
+async fn own_profile_name_and_picture_over_http() {
+    let a = App::new().await;
+    let alfa = a.t.tenant("alfa").await;
+    a.t.member(&alfa, "anna").await;
+    a.t.tenant("beta").await;
+    let anna = a.login("alfa", "anna", PASSWORD).await;
+    let manager = a.login("alfa", "alfa-manager", PASSWORD).await;
+    let beta = a.login("beta", "beta-manager", PASSWORD).await;
+    let r = a
+        .call(Some(&anna), Method::PUT, "/api/me/profile", Some(json!({ "display_name": "Anna Rossi" })))
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let s = a.call(Some(&anna), Method::GET, "/api/session", None).await.json();
+    assert_eq!((s["user"]["display_name"].clone(), s["picture"].clone()), (json!("Anna Rossi"), Value::Null));
+    // the picture goes up raw, then the session carries its version
+    let png = b"\x89PNG\r\n\x1a\nsomething".to_vec();
+    let req = Request::builder()
+        .method(Method::PUT)
+        .uri("/api/me/picture")
+        .header(header::COOKIE, &anna.cookie)
+        .header("x-csrf-token", &anna.csrf)
+        .header(header::CONTENT_TYPE, "application/octet-stream")
+        .body(Body::from(png.clone()))
+        .unwrap();
+    let r = send(&a.app, req).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let s = a.call(Some(&anna), Method::GET, "/api/session", None).await.json();
+    let id = s["user"]["user_id"].as_str().unwrap().to_string();
+    assert!(s["picture"].is_string());
+    // the Tenant Manager of the same tenant sees it, sandboxed; another tenant does not
+    let r = a.call(Some(&manager), Method::GET, &format!("/api/people/{id}/picture"), None).await;
+    assert_eq!(r.status, StatusCode::OK);
+    assert_eq!(r.header(header::CONTENT_TYPE), "image/png");
+    assert!(r.header(header::CONTENT_SECURITY_POLICY).contains("sandbox"));
+    let r = a.call(Some(&beta), Method::GET, &format!("/api/people/{id}/picture"), None).await;
+    assert_eq!(r.status, StatusCode::NOT_FOUND);
+    let r = a.call(Some(&anna), Method::DELETE, "/api/me/picture", None).await;
+    assert_eq!(r.status, StatusCode::OK);
+    let r = a.call(Some(&manager), Method::GET, &format!("/api/people/{id}/picture"), None).await;
+    assert_eq!(r.status, StatusCode::NOT_FOUND);
 }

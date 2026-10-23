@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useApi, useConfirm } from './core.ts'
 import { t } from './i18n.ts'
+import { levelHint, levelName } from './levels.ts'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 
@@ -21,9 +22,9 @@ const enc = encodeURIComponent
 
 function levels(): { v: Level; label: string; hint: string }[] {
   return [
-    { v: 'read', label: t('Read'), hint: t('sees the content') },
-    { v: 'write', label: t('Write'), hint: t('edits the content') },
-    { v: 'manage', label: t('Manage'), hint: t('shares, moves, deletes') },
+    { v: 'read', label: levelName('read'), hint: levelHint('read') },
+    { v: 'write', label: levelName('write'), hint: levelHint('write') },
+    { v: 'manage', label: levelName('manage'), hint: levelHint('manage') },
   ]
 }
 

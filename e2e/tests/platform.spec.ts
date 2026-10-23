@@ -124,7 +124,7 @@ async function createTenant(page: Page, slug: string, name: string) {
   await d.getByRole('button', { name: 'Next' }).click()
   await d.getByRole('button', { name: 'Create the tenant' }).click()
   await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
-  await nav(page, 'Tenant').click()
+  await nav(page, 'Tenants').click()
   await expect(page.getByRole('row', { name: new RegExp(name) })).toBeVisible()
 }
 
@@ -154,11 +154,11 @@ test.describe.serial('platform', () => {
     await accessible(page, 'plugins of the platform')
 
     // two tenants, each with its Tenant Manager
-    await nav(page, 'Tenant').click()
+    await nav(page, 'Tenants').click()
     await createTenant(page, 'alfa', 'City of Alfa')
     await createTenant(page, 'beta', 'City of Beta')
     await page.getByRole('link', { name: 'City of Alfa' }).click()
-    await page.getByRole('link', { name: 'Users and managers' }).click()
+    await page.getByRole('navigation', { name: 'Tabs' }).getByRole('link', { name: /^People/ }).click()
     await expect(page.getByRole('row', { name: /manager/ })).toContainText('Tenant Manager')
     await accessible(page, 'detail of the tenant')
 
@@ -220,7 +220,7 @@ test.describe.serial('platform', () => {
     await login(page, 'City of Beta', 'manager', PASSWORD)
     await nav(page, 'Manage').click()
     await page.getByRole('link', { name: /Pending/ }).click()
-    await page.getByRole('button', { name: 'Invite' }).click()
+    await page.getByRole('button', { name: 'Invite people' }).click()
     const inv = page.getByRole('dialog', { name: 'Invite a person of another tenant' })
     await inv.getByLabel('Home tenant').fill('alfa')
     await inv.getByLabel('Username').fill('anna')
@@ -352,7 +352,7 @@ test.describe.serial('platform', () => {
     await expect(mgr.getByTestId('bell-badge')).toBeHidden()
     await nav(mgr, 'Manage').click()
     await mgr.getByRole('link', { name: /Pending/ }).click()
-    await mgr.getByRole('button', { name: 'Invite' }).click()
+    await mgr.getByRole('button', { name: 'Invite people' }).click()
     const inv = mgr.getByRole('dialog', { name: 'Invite a person of another tenant' })
     await inv.getByLabel('Home tenant').fill('alfa')
     await inv.getByLabel('Username').fill('bruno')
@@ -859,7 +859,7 @@ test.describe.serial('platform', () => {
     const idp = process.env.E2E_IDP_URL ?? 'http://127.0.0.1:18082'
     test.setTimeout(240_000)
     await adminLogin(page)
-    await nav(page, 'Tenant').click()
+    await nav(page, 'Tenants').click()
     await createTenant(page, 'omega', 'City of Omega')
     await page.getByRole('link', { name: 'City of Omega' }).click()
     await page.getByRole('link', { name: 'Sign-in', exact: true }).click()
@@ -915,7 +915,7 @@ test.describe.serial('platform', () => {
     test.setTimeout(240_000)
     // the Administrator turns the mirror of the groups on for the tenant of the provider
     await adminLogin(page)
-    await nav(page, 'Tenant').click()
+    await nav(page, 'Tenants').click()
     await page.getByRole('link', { name: 'City of Omega' }).click()
     await page.getByRole('link', { name: 'Sign-in', exact: true }).click()
     await expect(page.getByText('Front-channel logout address')).toBeVisible()
@@ -999,7 +999,7 @@ test.describe.serial('platform', () => {
     await page.goto('./#/admin/plugin/com.mosaikit.notes/extensions')
     await expect(page.getByRole('link', { name: 'Note review' })).toBeVisible()
     // Notes no longer available to Beta: its Tenant Manager is told, its people no longer see it
-    await page.getByRole('link', { name: 'Tenants' }).click()
+    await page.getByRole('navigation', { name: 'Tabs' }).getByRole('link', { name: /^Tenants/ }).click()
     await page.getByRole('switch', { name: 'Available to City of Beta' }).click()
     await expect(page.getByText('Availability updated')).toBeVisible()
     await accessible(page, 'tenants of a plugin')
@@ -1235,7 +1235,7 @@ test.describe.serial('platform', () => {
     await expect(page.getByText('Quotas of new tenants', { exact: true })).toBeVisible()
     await expect(page.getByText('Capacity of the platform', { exact: true })).toBeVisible()
     await accessible(page, 'system quotas')
-    await nav(page, 'Tenant').click()
+    await nav(page, 'Tenants').click()
     await page.getByRole('row', { name: /City of Beta/ }).getByRole('link').first().click()
     const people = page.locator('[data-quota="people"]')
     await people.getByRole('button', { name: 'Customize' }).click()
@@ -1244,7 +1244,7 @@ test.describe.serial('platform', () => {
     await expect(page.getByText('Quotas of the tenant saved').first()).toBeVisible()
     await expect(people).toContainText('Of this tenant')
     await accessible(page, 'quotas of a tenant')
-    await nav(page, 'Tenant').click()
+    await nav(page, 'Tenants').click()
     await page.getByRole('row', { name: /City of Alfa/ }).getByRole('link').first().click()
     const storage = page.locator('[data-quota="storage"]')
     await storage.getByRole('button', { name: 'Customize' }).click()
@@ -1297,7 +1297,7 @@ test.describe.serial('platform', () => {
     // back as before
     await adminLogin(page)
     for (const [tenant, quota] of [['City of Beta', 'people'], ['City of Alfa', 'storage']]) {
-      await nav(page, 'Tenant').click()
+      await nav(page, 'Tenants').click()
       await page.getByRole('row', { name: new RegExp(tenant) }).getByRole('link').first().click()
       await page.locator(`[data-quota="${quota}"]`).getByRole('button', { name: 'Restore' }).click()
       await page.getByRole('button', { name: 'Save' }).click()
@@ -1308,7 +1308,7 @@ test.describe.serial('platform', () => {
   test('lifecycle and operations: new tenant in four steps, trial, export, archive, delete, maintenance, backups, monitoring', async ({ page, browser }) => {
     test.setTimeout(300_000)
     await adminLogin(page)
-    await nav(page, 'Tenant').click()
+    await nav(page, 'Tenants').click()
 
     // new tenant in four steps, with a trial period
     await page.getByRole('button', { name: 'New tenant' }).click()
@@ -1450,7 +1450,7 @@ test.describe.serial('platform', () => {
     }
 
     // delete with the address typed: the tenant is gone
-    await nav(page, 'Tenant').click()
+    await nav(page, 'Tenants').click()
     await page.getByRole('link', { name: 'Town of Delta' }).click()
     await page.getByRole('button', { name: 'Delete the tenant' }).click()
     const del = page.getByRole('dialog', { name: 'Delete Town of Delta for good?' })
@@ -1575,6 +1575,61 @@ test.describe.serial('platform', () => {
     await accessible(page, 'custom theme of the tenant')
     await page.getByRole('button', { name: 'Restore the theme of the platform' }).click()
     await expect(page.locator('html')).not.toHaveAttribute('data-preset', /^c-/)
+    await logout(page)
+  })
+
+  test('own profile, access requests in the person menu, invite in People, guides and what is new in Italian', async ({ page }) => {
+    await login(page, 'Alfa Municipality', 'manager', PASSWORD)
+    // the requests to one's own items, from the person menu
+    await page.getByRole('button', { name: /person menu/ }).click()
+    await page.getByRole('menuitem', { name: 'Access requests' }).click()
+    await expect(page.getByRole('heading', { name: 'Access requests' })).toBeVisible()
+
+    // inviting is the main action of People
+    await nav(page, 'Manage').click()
+    await page.getByRole('button', { name: 'Invite people' }).click()
+    await expect(page.getByRole('dialog', { name: 'Invite a person of another tenant' })).toBeVisible()
+    await page.keyboard.press('Escape')
+
+    // the own name and picture (a real 1x1 PNG); the band shows them at once
+    await page.getByRole('button', { name: /person menu/ }).click()
+    await page.getByRole('menuitem', { name: 'Account' }).click()
+    await page.getByLabel('Display name').fill('Marta Alfieri')
+    await page.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(page.getByText('Name saved').first()).toBeVisible()
+    await expect(page.getByRole('button', { name: /person menu/ })).toContainText('Marta Alfieri')
+    const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==', 'base64')
+    await page.locator('input[type="file"]').setInputFiles({ name: 'me.png', mimeType: 'image/png', buffer: png })
+    await expect(page.getByText('Picture saved').first()).toBeVisible()
+    await expect(page.getByRole('button', { name: /person menu/ }).locator('img')).toBeVisible()
+    await page.locator('input[type="file"]').setInputFiles({ name: 'notes.txt', mimeType: 'text/plain', buffer: Buffer.from('not an image') })
+    await expect(page.getByText(/only SVG, PNG or WebP|Only SVG, PNG or WebP/i).first()).toBeVisible()
+    await accessible(page, 'account, profile with a picture')
+    await page.getByRole('button', { name: 'Remove the picture' }).click()
+    await expect(page.getByRole('button', { name: /person menu/ }).locator('img')).toHaveCount(0)
+
+    // the guides of the roles, inside the app
+    await page.getByRole('button', { name: 'Help', exact: true }).click()
+    await page.getByRole('menuitem', { name: 'Guide of Mosaikit' }).click()
+    const guide = page.getByRole('dialog', { name: 'Guide of Mosaikit' })
+    await expect(guide.getByRole('heading', { name: /Guide for the Tenant Manager/ })).toBeVisible()
+    await guide.getByRole('tab', { name: 'Administrator' }).click()
+    await expect(guide.getByRole('heading', { name: /Guide for the Administrator/ })).toBeVisible()
+    await accessible(page, 'guide')
+    await page.keyboard.press('Escape')
+
+    // in Italian: what is new and the guide in Italian
+    await page.evaluate(() => localStorage.setItem('msk_lang', 'it'))
+    await page.reload()
+    await page.getByRole('button', { name: 'Aiuto', exact: true }).click()
+    await page.getByRole('menuitem', { name: /Novità della versione/ }).click()
+    await expect(page.getByRole('dialog', { name: /Novità della versione/ })).toContainText('La shell')
+    await page.keyboard.press('Escape')
+    await page.getByRole('button', { name: 'Aiuto', exact: true }).click()
+    await page.getByRole('menuitem', { name: 'Guida di Mosaikit' }).click()
+    await expect(page.getByRole('dialog', { name: 'Guida di Mosaikit' }).getByRole('heading', { name: /Guida per il Tenant Manager/ })).toBeVisible()
+    await page.keyboard.press('Escape')
+    await page.evaluate(() => localStorage.setItem('msk_lang', 'en'))
     await logout(page)
   })
 })

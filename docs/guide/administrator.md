@@ -31,7 +31,7 @@ While you work, the band shows **Platform**: you are on the platform, not inside
 
 ## Your sidebar
 
-**Platform overview**, **Tenant**, **People**, **Plugins**, **Monitoring**, **Log**, and **System** at the
+**Platform overview**, **Tenants**, **People**, **Plugins**, **Monitoring**, **Log**, and **System** at the
 bottom. The overview has the figures of the platform, **Services** (their state) and **To do** (alerts, a
 failed backup, trials ending within a week, plugin updates), with links.
 
@@ -41,7 +41,7 @@ Search (`Ctrl K`) finds tenants and people besides the pages.
 
 ### Creating a tenant
 
-**Tenant › New tenant** opens a dialog in four steps:
+**Tenants › New tenant** opens a dialog in four steps:
 
 1. **Tenant**: **Name** and **Identifier** (lowercase letters, digits and hyphens: it goes in the address and
    does not change); optional **Trial period** with its **End of the trial**.
@@ -55,13 +55,13 @@ Search (`Ctrl K`) finds tenants and people besides the pages.
 
 ### The page of a tenant
 
-Tabs **Details**, **Users and managers**, **Sign-in**, **Plugins**; the status badge (active, on trial,
+Tabs **Details**, **People**, **Sign-in**, **Plugins**; the status badge (active, on trial,
 suspended, archived) next to the name; **⋯** with **Suspend the tenant** / **Reactivate the tenant**.
 
 - **Details**: name and identifier, the **Quotas** of the tenant, the **Trial period** (**Update the trial**,
   **Remove the trial**), the **Logo of the tenant** (read only: its Tenant Manager chooses it), **Export**
   and the area **Archive or delete**.
-- **Users and managers**: users and roles, never the contents — to appoint or replace a Tenant Manager (**New
+- **People**: users and roles, never the contents — to appoint or replace a Tenant Manager (**New
   Tenant Manager**, change a **Role**) and to unlock a sign-in (**Reset the password**).
 - **Sign-in**: see *Sign-in of a tenant* below.
 - **Plugins**: which plugins are available and on in the tenant (read only; availability is decided on the
@@ -80,7 +80,7 @@ suspended, archived) next to the name; **⋯** with **Suspend the tenant** / **R
 
 - **Export the tenant** (Details): a zip with the data of the tenant, the rows of its plugins and its
   contents.
-- **Tenant › ⋯ › Import a tenant** with that zip: the tenant comes back with its people, items and contents.
+- **Tenants › ⋯ › Import a tenant** with that zip: the tenant comes back with its people, items and contents.
   If the tenant exists, Mosaikit asks before replacing it (everything it holds now is deleted). People of
   other tenants that no longer exist are left out.
 - An export comes back only on the same kind of database (PostgreSQL or SQLite), and its encrypted secrets
@@ -119,7 +119,7 @@ For the identity provider:
 When the provider signs a person out (back-channel or front-channel logout), their Mosaikit sessions close.
 
 Tip: with **Managed in Mosaikit**, after the first sign-in of the future Tenant Manager through the provider,
-give them the role in **Users and managers**: the first local Tenant Manager cannot sign in any more.
+give them the role in **People**: the first local Tenant Manager cannot sign in any more.
 
 ## People of the installation
 
@@ -134,6 +134,7 @@ give them the role in **Users and managers**: the first local Tenant Manager can
   home —, **Add to a tenant**, **Move the home tenant**), **Sign-in** (password link, sessions), **Activity**
   (their events in every tenant).
 - **Disable the account** / **Reactivate the account**: a disabled account cannot sign in anywhere.
+- People change their own name and picture in Account › Profile; their email is changed here.
 
 In tenants with an identity provider the password actions are not offered: the provider manages passwords.
 
@@ -169,11 +170,11 @@ change.
 |---|---|
 | **Administrators** | Accounts of the platform (see *First start*). |
 | **Email** | **Mail server** (**SMTP server**, **Port**, **Security**, **User**, **Password** stored encrypted), **Sender** and **Footer** with a preview, **Send a test**. Without a server nothing is sent by email. |
-| **Notifications** | The defaults of the emails (**Never**, **At once**, **One summary a day**), the hour of the daily summary, how long notifications are kept. |
-| **Retention** | How long the trash (default 30 days) and the log (default 365 days) keep their content. |
+| **Notifications** | The defaults of the emails (**Never**, **At once**, **One summary a day**) and the hour of the daily summary. |
+| **Retention** | How long the trash (default 30 days), the log (default 365 days) and the notifications (default 90 days) keep their content. |
 | **Passwords and sessions** | Minimum length of the password (never below 10), attempts before the lock, length of the lock, length of the session, «Remember me» in days (0: the option does not show). |
 | **Quotas** | **Quotas of new tenants** (storage, people, items; empty: no limit), **Capacity of the platform** with what is given to and used by the tenants (a warning when more is given than the platform has), the tenants with their quotas. A tenant's own quotas are on its page (Details › Quotas: **Customize**, **Restore**). |
-| **Keys of outside services** | Keys the platform pays for; a shared key is used by every tenant without one of its own. Only the last four characters show after saving. |
+| **Keys of outside services** | Keys the platform pays for, for the services the installed plugins declare (each says which plugins use it; no plugin, no service). A shared key is used by every tenant without one of its own. Only the last four characters show after saving. A key of a service no installed plugin uses any more is marked as not used: remove it. |
 | **Embedding** | Sites that may show the public pages (public links) inside their own pages. Without sites, nobody may. |
 | **Backup and restore** | See *Backups* below. |
 | **Maintenance** | See *Maintenance* below. |
@@ -182,8 +183,8 @@ change.
 ### Identity and appearance
 
 - **Identity and texts**: **Name** (top bar, sign-in page, title of the browser), **Welcome text**, **Footer**,
-  **Privacy notice**, **Legal notes**, **Guide** (the address opened by Help › Guide of Mosaikit; empty: the
-  short guide built into the shell — publish these guides somewhere and put their address here), logos for
+  **Privacy notice**, **Legal notes**, **Guide** (an address opened by Help › Guide of Mosaikit instead of the
+  guides built into the shell, in the language of the person), logos for
   light and dark backgrounds and **Browser icon** (SVG, PNG or WebP, at most 512 KB). Tenants inherit the texts.
 - **Theme and mode**: **Default theme** (for the platform, the sign-in page and the tenants that do not
   choose one), **New theme** (the theme editor: main colour, top band, greys, contrast checks, **Fix it for

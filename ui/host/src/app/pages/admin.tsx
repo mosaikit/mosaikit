@@ -87,7 +87,7 @@ export function AdminTenants() {
   return (
     <>
       <PageHeader
-        title={t('Tenant')}
+        title={t('Tenants')}
         sub={q.data ? `${q.data.length} tenant` : undefined}
         actions={
           <Button onClick={() => setOpen(true)}>
@@ -174,7 +174,7 @@ export function AdminTenant({ id, section }: { id: string; section?: string }) {
   return (
     <>
       <PageHeader
-        crumbs={[{ label: t('Tenant'), href: to.admin('tenants') }]}
+        crumbs={[{ label: t('Tenants'), href: to.admin('tenants') }]}
         title={tn.name}
         badge={<TenantState tn={tn} />}
         sub={t('{slug} · {members} members · {guests} guests', { slug: tn.slug, members: tn.members, guests: tn.guests })}
@@ -188,7 +188,7 @@ export function AdminTenant({ id, section }: { id: string; section?: string }) {
       <Tabs
         tabs={[
           { id: 'details', label: t('Details') },
-          { id: 'users', label: t('Users and managers'), count: members.data?.length },
+          { id: 'users', label: t('People'), count: members.data?.length },
           { id: 'sign-in', label: t('Sign-in') },
           { id: 'plugins', label: t('Plugins') },
         ]}

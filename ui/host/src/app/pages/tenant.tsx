@@ -203,12 +203,21 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
         <Plus />
         {t('New profile')}
       </Button>
-    ) : cur === 'people' && !oidc ? (
-      // with an identity provider the people come from the provider, at their first sign-in
-      <Button onClick={() => setDlg('member')}>
-        <Plus />
-        {t('New user')}
-      </Button>
+    ) : cur === 'people' ? (
+      // as in the mockup: inviting is the primary action of People; with an identity provider the
+      // people of the tenant come from the provider, at their first sign-in, so there is no New user
+      <div className="flex gap-2">
+        {!oidc && (
+          <Button variant="outline" onClick={() => setDlg('member')}>
+            <Plus />
+            {t('New user')}
+          </Button>
+        )}
+        <Button onClick={() => setDlg('invite')}>
+          <Plus />
+          {t('Invite people')}
+        </Button>
+      </div>
     ) : cur === 'groups' ? (
       <Button onClick={() => setDlg('group')}>
         <Plus />
@@ -217,7 +226,7 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
     ) : (
       <Button onClick={() => setDlg('invite')}>
         <Plus />
-        {t('Invite')}
+        {t('Invite people')}
       </Button>
     )
   return (

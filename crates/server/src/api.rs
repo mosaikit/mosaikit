@@ -47,6 +47,9 @@ pub fn router() -> Router<AppState> {
         .route("/api/auth/logout", post(logout))
         .route("/api/session", get(session))
         .route("/api/me/password", post(change_password))
+        .route("/api/me/profile", put(my_set_profile))
+        .route("/api/me/picture", put(my_set_picture).delete(my_remove_picture))
+        .route("/api/people/{id}/picture", get(person_picture))
         .route("/api/me/invitations", get(my_invitations))
         .route("/api/me/invitations/{id}/{answer}", post(answer_invitation))
         .route("/api/dev/events", get(dev_events))
@@ -241,6 +244,8 @@ async fn session_body(s: &AppState, user: &mosaikit_kernel::SessionUser) -> ApiR
         "csrf": user.csrf,
         // signs in through the identity provider of the home tenant (no local password)
         "external": mosaikit_kernel::oidc::is_external(&s.k, user.user_id).await?,
+        // version of the picture of Account › Profile (none: the initials)
+        "picture": tenancy::profile::picture_version(&s.k, user.user_id).await?,
         "memberships": identity::memberships(&s.k, user).await?,
         "invitations": tenancy::my_invitations(&s.k, user).await?.len(),
         "plugin_origin": s.k.cfg.plugin_origin(),
@@ -366,6 +371,47 @@ async fn change_password(
 ) -> ApiResult<Json<Value>> {
     identity::change_password(&s.k, &u, &r.old, &r.new).await?;
     Ok(ok())
+}
+
+#[derive(Deserialize)]
+struct ProfileReq {
+    display_name: String,
+}
+
+/// The person changes their own display name (not in the tenants of an identity provider).
+async fn my_set_profile(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Json(r): Json<ProfileReq>,
+) -> ApiResult<Json<Value>> {
+    tenancy::profile::set_my_name(&s.k, &u, &r.display_name).await?;
+    Ok(ok())
+}
+
+async fn my_set_picture(State(s): State<AppState>, Auth(u): Auth, body: Bytes) -> ApiResult<Json<Value>> {
+    tenancy::profile::set_my_picture(&s.k, &u, &body).await?;
+    Ok(Json(json!({ "picture": tenancy::profile::picture_version(&s.k, u.user_id).await? })))
+}
+
+async fn my_remove_picture(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Json<Value>> {
+    tenancy::profile::remove_my_picture(&s.k, &u).await?;
+    Ok(ok())
+}
+
+/// The picture of a person, for whoever shares a tenant with them (and the Administrators).
+async fn person_picture(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Path(id): Path<Uuid>,
+) -> ApiResult<Response> {
+    match tenancy::profile::picture(&s.k, &u, id).await? {
+        Some((data, mime)) => {
+            let mut res = image_response(data, &mime);
+            res.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("private, max-age=300"));
+            Ok(res)
+        }
+        None => Err(Error::not_found("no picture").into()),
+    }
 }
 
 async fn my_invitations(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Json<Value>> {
@@ -1201,65 +1247,70 @@ struct KeyReq {
     shared: Option<bool>,
 }
 
-async fn a_keys(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Json<Value>> {
-    Ok(Json(json!(keys::platform_keys(&s.k, &u).await?)))
+async fn a_keys(State(s): State<AppState>, Auth(u): Auth, h: HeaderMap) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(keys::platform_keys(&s.k, &u, &request_lang(&h)).await?)))
 }
 
 async fn a_set_key(
     State(s): State<AppState>,
     Auth(u): Auth,
     Path(service): Path<String>,
+    h: HeaderMap,
     Json(r): Json<KeyReq>,
 ) -> ApiResult<Json<Value>> {
     tenancy::require_admin(&u)?;
     keys::set_key(&s.k, u.user_id, KeyLevel::Platform, &service, r.value.as_deref(), r.shared).await?;
-    Ok(Json(json!(keys::platform_keys(&s.k, &u).await?)))
+    Ok(Json(json!(keys::platform_keys(&s.k, &u, &request_lang(&h)).await?)))
 }
 
 async fn a_remove_key(
     State(s): State<AppState>,
     Auth(u): Auth,
     Path(service): Path<String>,
+    h: HeaderMap,
 ) -> ApiResult<Json<Value>> {
     tenancy::require_admin(&u)?;
     keys::remove_key(&s.k, u.user_id, KeyLevel::Platform, &service).await?;
-    Ok(Json(json!(keys::platform_keys(&s.k, &u).await?)))
+    Ok(Json(json!(keys::platform_keys(&s.k, &u, &request_lang(&h)).await?)))
 }
 
-async fn m_keys(State(s): State<AppState>, Tenant(c): Tenant) -> ApiResult<Json<Value>> {
-    Ok(Json(json!(keys::tenant_keys(&s.k, &c).await?)))
+async fn m_keys(State(s): State<AppState>, Tenant(c): Tenant, h: HeaderMap) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(keys::tenant_keys(&s.k, &c, &request_lang(&h)).await?)))
 }
 
 async fn m_set_key(
     State(s): State<AppState>,
     Tenant(c): Tenant,
     Path((_, service)): Path<(String, String)>,
+    h: HeaderMap,
     Json(r): Json<KeyReq>,
 ) -> ApiResult<Json<Value>> {
     c.require_manager()?;
     let level = KeyLevel::Tenant(c.tenant.tenant_id);
     keys::set_key(&s.k, c.user.user_id, level, &service, r.value.as_deref(), r.shared).await?;
-    Ok(Json(json!(keys::tenant_keys(&s.k, &c).await?)))
+    Ok(Json(json!(keys::tenant_keys(&s.k, &c, &request_lang(&h)).await?)))
 }
 
 async fn m_remove_key(
     State(s): State<AppState>,
     Tenant(c): Tenant,
     Path((_, service)): Path<(String, String)>,
+    h: HeaderMap,
 ) -> ApiResult<Json<Value>> {
     c.require_manager()?;
     keys::remove_key(&s.k, c.user.user_id, KeyLevel::Tenant(c.tenant.tenant_id), &service).await?;
-    Ok(Json(json!(keys::tenant_keys(&s.k, &c).await?)))
+    Ok(Json(json!(keys::tenant_keys(&s.k, &c, &request_lang(&h)).await?)))
 }
 
-async fn my_keys(State(s): State<AppState>, Tenant(c): Tenant) -> ApiResult<Json<Value>> {
-    Ok(Json(json!(keys::my_keys(&s.k, &c).await?)))
+async fn my_keys(State(s): State<AppState>, Tenant(c): Tenant, h: HeaderMap) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(keys::my_keys(&s.k, &c, &request_lang(&h)).await?)))
 }
 
 async fn my_set_key(
     State(s): State<AppState>,
     Tenant(c): Tenant,
     Path((_, service)): Path<(String, String)>,
+    h: HeaderMap,
     Json(r): Json<KeyReq>,
 ) -> ApiResult<Json<Value>> {
     keys::set_key(
@@ -1271,16 +1322,17 @@ async fn my_set_key(
         r.shared,
     )
     .await?;
-    Ok(Json(json!(keys::my_keys(&s.k, &c).await?)))
+    Ok(Json(json!(keys::my_keys(&s.k, &c, &request_lang(&h)).await?)))
 }
 
 async fn my_remove_key(
     State(s): State<AppState>,
     Tenant(c): Tenant,
     Path((_, service)): Path<(String, String)>,
+    h: HeaderMap,
 ) -> ApiResult<Json<Value>> {
     keys::remove_key(&s.k, c.user.user_id, KeyLevel::User(c.user.user_id), &service).await?;
-    Ok(Json(json!(keys::my_keys(&s.k, &c).await?)))
+    Ok(Json(json!(keys::my_keys(&s.k, &c, &request_lang(&h)).await?)))
 }
 
 async fn m_kpi(State(s): State<AppState>, Tenant(c): Tenant, h: HeaderMap) -> ApiResult<Json<Value>> {

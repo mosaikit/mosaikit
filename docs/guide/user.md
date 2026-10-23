@@ -35,7 +35,7 @@ one. The link works once and for a limited time (**Choose a new password** page)
 | **Language**, **Mode** | The language of the interface; light, dark or automatic mode and **High contrast**. |
 | **Help** (?) | **Guided tour of this page**, **Guide of Mosaikit**, **What is new in version …**, **Keyboard shortcuts**. A dot on the button means a tour of this page is waiting for you. |
 | **Bell** | Your notifications (see below). |
-| **Person menu** (your name) | **Account**, **Notifications**, **Trash**, **Sign out**. |
+| **Person menu** (your name) | **Account**, **Notifications**, **Access requests**, **Trash**, **Sign out**. |
 
 Some of these may be missing: the Administrator decides what the top bar shows. When **Help** is not in
 the bar, its items are in the person menu.
@@ -67,8 +67,8 @@ When a quota of the tenant is used up, the apps refuse new items or files and sa
 Open the item in its app and choose **Share**.
 
 1. **People and groups of the tenant**: search a person or a group, choose the **Level** and **Share**.
-   - **Read**: sees the content.
-   - **Write**: edits the content.
+   - **View**: sees the content.
+   - **Edit**: edits the content.
    - **Manage**: shares, moves, deletes.
 2. **Shared with** lists who has access; change the level or **Revoke**.
 3. **Public link (read only)**: a link anybody can open without signing in. Optional **Expiry (days)** and
@@ -85,14 +85,14 @@ The person you share with gets a notification with a link to the item.
 
 If you open the address of an item you cannot see, the page says **You cannot see this item**.
 
-1. Choose **See** or **Edit** under **Access**, write a **Message (optional)**.
+1. Choose **View** or **Edit** under **Access**, write a **Message (optional)**.
 2. **Send the request**.
 
 The owner, or a Tenant Manager, decides; you get a notification with the answer. When it is approved the
 same address opens the item.
 
-If you own items, the requests of other people arrive in the bell; the page with your requests is
-**Requests to see or edit your items** (from the notification): **Approve** or **Refuse**.
+If you own items, the requests of other people arrive in the bell; person menu › **Access requests** opens
+**Requests to see or edit your items**: **Approve** or **Refuse**.
 
 ## Notifications
 
@@ -124,13 +124,13 @@ Person menu › **Account**. Sections:
 
 | Section | What you find |
 |---|---|
-| **Profile** | Name, username, role, home tenant. They are changed by the Tenant Manager of your home tenant. |
+| **Profile** | Your **Picture** (SVG, PNG or WebP, at most 512 KB: the people of your tenants see it) and your **Display name**, which you change yourself; username and home tenant. The email is changed by the Tenant Manager of your home tenant. In a tenant that signs in through an identity provider the name comes from the provider. |
 | **Sign-in and security** | **Change password** (current, new, repeat; the rule of the tenant is shown under the field). Changing it closes your other sessions. In a tenant that signs in through an identity provider there is no password here: it is managed by the provider. |
 | **Notifications** | **What I receive**: for each kind, in the app and by **Email** (**Never**, **At once**, **One summary a day**); your **Email address**. |
 | **Appearance and language** | **Mode** (**Light**, **Dark**, **Automatic (like the system)**), **High contrast**, **Language**, **Sidebar** (**Open at start**) and **Apps in the sidebar** (the ones turned off stay in Home and in the search). The theme is chosen by whoever manages the tenant. |
 | **My tenants** | Your home tenant and the tenants where you are a guest, with your role; **Open** one. |
 | **Usage** | **Your items** and the space you use; **What is left in the tenant** when the tenant has quotas. |
-| **Keys** | Your personal keys of outside services, if the tenant uses any: they apply only to you, and after saving only the last four characters show. |
+| **Keys** | Your personal keys of the outside services the installed plugins use (each says which plugins use it): they apply only to you, and after saving only the last four characters show. |
 
 Your preferences follow you on every device.
 

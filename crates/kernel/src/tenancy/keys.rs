@@ -1,10 +1,16 @@
 //! Keys of outside services at three levels (mockup `system/keys`, `config/keys`, `account/keys`).
 //!
+//! The services are the ones the installed plugins declare in their manifests (`[[service_keys]]`):
+//! no fixed list. Several plugins may declare the same service and share its keys; the first one (in
+//! the order of the plugins) gives label and kind, the scopes add up. Keys of a service no installed
+//! plugin declares any more stay, shown as not used, until someone removes them.
+//!
 //! Whoever has a key of their own uses it; otherwise the one of the tenant, if the Tenant Manager
 //! shares it (a key not shared serves only the Tenant Managers); otherwise the one of the platform, if
 //! the Administrator shares it. Keys are encrypted ([`crate::secret`]) and never go back to the browser:
 //! after saving only the last four characters show (the address of a self-hosted model shows whole).
 
+use mosaikit_mskp::KeyScope;
 use serde::Serialize;
 use serde_json::json;
 use uuid::Uuid;
@@ -12,25 +18,59 @@ use uuid::Uuid;
 use super::require_admin;
 use crate::{events, Caller, Error, Kernel, Result, SessionUser};
 
-/// A service: id, group, the value is an address (shown) instead of a secret.
+/// A service declared by the installed plugins, with the plugins that use it.
+#[derive(Debug, Clone, Serialize)]
 pub struct Service {
-    pub id: &'static str,
-    pub group: &'static str,
+    pub id: String,
+    pub label: String,
+    pub description: String,
+    /// the value is an address (shown whole) instead of a secret
     pub address: bool,
+    pub scopes: Vec<KeyScope>,
+    /// names of the plugins that declare it
+    pub plugins: Vec<String>,
 }
 
-pub const SERVICES: &[Service] = &[
-    Service { id: "ai-hosted", group: "ai", address: false },
-    Service { id: "ai-second", group: "ai", address: false },
-    Service { id: "ai-local", group: "ai", address: true },
-    Service { id: "sms", group: "msg", address: false },
-    Service { id: "push", group: "msg", address: false },
-    Service { id: "translate", group: "doc", address: false },
-    Service { id: "ocr", group: "doc", address: false },
-];
+/// The services the installed plugins declare, with the texts in `lang`.
+pub fn services(k: &Kernel, lang: &str) -> Vec<Service> {
+    let mut out: Vec<Service> = Vec::new();
+    let mut list = k.plugins.list();
+    list.sort_by(|a, b| a.id.cmp(&b.id));
+    for p in list {
+        let m = p.manifest.localized(lang);
+        for d in &m.service_keys {
+            match out.iter_mut().find(|s| s.id == d.id) {
+                Some(s) => {
+                    for sc in &d.scopes {
+                        if !s.scopes.contains(sc) {
+                            s.scopes.push(*sc);
+                        }
+                    }
+                    s.plugins.push(m.contribution.label.clone());
+                }
+                None => out.push(Service {
+                    id: d.id.clone(),
+                    label: d.label.clone(),
+                    description: d.description.clone(),
+                    address: d.address,
+                    scopes: d.scopes.clone(),
+                    plugins: vec![m.contribution.label.clone()],
+                }),
+            }
+        }
+    }
+    out.sort_by_key(|s| s.label.to_lowercase());
+    out
+}
 
-fn service(id: &str) -> Result<&'static Service> {
-    SERVICES.iter().find(|s| s.id == id).ok_or_else(|| Error::not_found(format!("unknown service: {id}")))
+fn service(k: &Kernel, id: &str, scope: Option<KeyScope>) -> Result<Service> {
+    services(k, "en")
+        .into_iter()
+        .find(|s| s.id == id && scope.is_none_or(|sc| s.scopes.contains(&sc)))
+        .ok_or_else(|| {
+            Error::not_found(format!("no installed plugin uses the service {id} here"))
+                .with_code("service_unknown")
+        })
 }
 
 /// Where a key belongs.
@@ -50,6 +90,13 @@ impl Level {
             Level::User(u) => format!("user:{u}:{service}"),
         }
     }
+    fn scope(self) -> KeyScope {
+        match self {
+            Level::Platform => KeyScope::Platform,
+            Level::Tenant(_) => KeyScope::Tenant,
+            Level::User(_) => KeyScope::Personal,
+        }
+    }
     fn filter(self) -> (&'static str, Option<Uuid>, Option<Uuid>) {
         match self {
             Level::Platform => ("platform", None, None),
@@ -62,10 +109,15 @@ impl Level {
 /// A key as a page shows it.
 #[derive(Debug, Clone, Serialize)]
 pub struct KeyInfo {
-    pub service: &'static str,
-    pub group: &'static str,
+    pub service: String,
+    pub label: String,
+    pub description: String,
     /// the value is an address, shown whole
     pub address: bool,
+    /// names of the plugins that use the service (empty: no installed plugin declares it any more)
+    pub plugins: Vec<String>,
+    /// an installed plugin declares the service; otherwise the key is not used and can only be removed
+    pub declared: bool,
     /// there is a key at this level
     pub set: bool,
     /// last four characters (or the address)
@@ -102,11 +154,14 @@ async fn rows(k: &Kernel, level: Level) -> Result<Vec<Row>> {
         .collect())
 }
 
-fn info(s: &'static Service, own: Option<&Row>, in_use: &'static str) -> KeyInfo {
+fn info(s: &Service, own: Option<&Row>, in_use: &'static str) -> KeyInfo {
     KeyInfo {
-        service: s.id,
-        group: s.group,
+        service: s.id.clone(),
+        label: s.label.clone(),
+        description: s.description.clone(),
         address: s.address,
+        plugins: s.plugins.clone(),
+        declared: true,
         set: own.is_some(),
         hint: own.map(|r| r.hint.clone()),
         shared: own.is_some_and(|r| r.shared),
@@ -115,68 +170,85 @@ fn info(s: &'static Service, own: Option<&Row>, in_use: &'static str) -> KeyInfo
     }
 }
 
-/// The keys of the platform (Administrator).
-pub async fn platform_keys(k: &Kernel, admin: &SessionUser) -> Result<Vec<KeyInfo>> {
-    require_admin(admin)?;
-    let own = rows(k, Level::Platform).await?;
-    Ok(SERVICES
+/// The services of a level, then the keys of services no installed plugin declares any more.
+fn listing(
+    k: &Kernel,
+    level: Level,
+    lang: &str,
+    own: &[Row],
+    in_use: impl Fn(&Service, Option<&Row>) -> &'static str,
+) -> Vec<KeyInfo> {
+    let all = services(k, lang);
+    let mut out: Vec<KeyInfo> = all
         .iter()
+        .filter(|s| s.scopes.contains(&level.scope()))
         .map(|s| {
             let r = own.iter().find(|r| r.service == s.id);
-            info(s, r, if r.is_some() { "own" } else { "none" })
+            info(s, r, in_use(s, r))
         })
-        .collect())
+        .collect();
+    let listed: Vec<String> = out.iter().map(|i| i.service.clone()).collect();
+    for r in own.iter().filter(|r| !listed.contains(&r.service)) {
+        let declared = all.iter().find(|s| s.id == r.service);
+        out.push(KeyInfo {
+            service: r.service.clone(),
+            label: declared.map_or_else(|| r.service.clone(), |s| s.label.clone()),
+            description: String::new(),
+            address: declared.is_some_and(|s| s.address),
+            plugins: Vec::new(),
+            declared: false,
+            set: true,
+            hint: Some(r.hint.clone()),
+            shared: r.shared,
+            updated_at: Some(r.updated_at),
+            in_use: "none",
+        });
+    }
+    out
+}
+
+/// The keys of the platform (Administrator).
+pub async fn platform_keys(k: &Kernel, admin: &SessionUser, lang: &str) -> Result<Vec<KeyInfo>> {
+    require_admin(admin)?;
+    let own = rows(k, Level::Platform).await?;
+    Ok(listing(k, Level::Platform, lang, &own, |_, r| if r.is_some() { "own" } else { "none" }))
 }
 
 /// The keys of the tenant (Tenant Manager), with the one in use for each service.
-pub async fn tenant_keys(k: &Kernel, c: &Caller) -> Result<Vec<KeyInfo>> {
+pub async fn tenant_keys(k: &Kernel, c: &Caller, lang: &str) -> Result<Vec<KeyInfo>> {
     c.require_manager()?;
-    let own = rows(k, Level::Tenant(c.tenant.tenant_id)).await?;
+    let level = Level::Tenant(c.tenant.tenant_id);
+    let own = rows(k, level).await?;
     let platform = rows(k, Level::Platform).await?;
-    Ok(SERVICES
-        .iter()
-        .map(|s| {
-            let r = own.iter().find(|r| r.service == s.id);
-            let p = platform.iter().any(|r| r.service == s.id && r.shared);
-            info(
-                s,
-                r,
-                if r.is_some() {
-                    "own"
-                } else if p {
-                    "platform"
-                } else {
-                    "none"
-                },
-            )
-        })
-        .collect())
+    Ok(listing(k, level, lang, &own, |s, r| {
+        if r.is_some() {
+            "own"
+        } else if platform.iter().any(|p| p.service == s.id && p.shared) {
+            "platform"
+        } else {
+            "none"
+        }
+    }))
 }
 
 /// The keys of the person, with the one in use in the tenant where they are working.
-pub async fn my_keys(k: &Kernel, c: &Caller) -> Result<Vec<KeyInfo>> {
-    let own = rows(k, Level::User(c.user.user_id)).await?;
+pub async fn my_keys(k: &Kernel, c: &Caller, lang: &str) -> Result<Vec<KeyInfo>> {
+    let level = Level::User(c.user.user_id);
+    let own = rows(k, level).await?;
     let tenant = rows(k, Level::Tenant(c.tenant.tenant_id)).await?;
     let platform = rows(k, Level::Platform).await?;
     let manager = c.is_manager();
-    Ok(SERVICES
-        .iter()
-        .map(|s| {
-            let r = own.iter().find(|r| r.service == s.id);
-            let t = tenant.iter().any(|r| r.service == s.id && (r.shared || manager));
-            let p = platform.iter().any(|r| r.service == s.id && r.shared);
-            let in_use = if r.is_some() {
-                "own"
-            } else if t {
-                "tenant"
-            } else if p {
-                "platform"
-            } else {
-                "none"
-            };
-            info(s, r, in_use)
-        })
-        .collect())
+    Ok(listing(k, level, lang, &own, |s, r| {
+        if r.is_some() {
+            "own"
+        } else if tenant.iter().any(|t| t.service == s.id && (t.shared || manager)) {
+            "tenant"
+        } else if platform.iter().any(|p| p.service == s.id && p.shared) {
+            "platform"
+        } else {
+            "none"
+        }
+    }))
 }
 
 /// Saves a key (`value`) and/or whether it is shared (`shared`, not for personal keys).
@@ -188,7 +260,7 @@ pub async fn set_key(
     value: Option<&str>,
     shared: Option<bool>,
 ) -> Result<()> {
-    let s = service(service_id)?;
+    let s = service(k, service_id, Some(level.scope()))?;
     let (scope, tenant, user) = level.filter();
     if matches!(level, Level::User(_)) && shared.is_some() {
         return Err(Error::bad("a personal key is never shared"));
@@ -276,10 +348,10 @@ pub async fn set_key(
     Ok(())
 }
 
+/// Removes a key; also of a service no installed plugin declares any more.
 pub async fn remove_key(k: &Kernel, by: Uuid, level: Level, service_id: &str) -> Result<()> {
-    service(service_id)?;
     let (scope, tenant, user) = level.filter();
-    mosaikit_db::query(
+    let n = mosaikit_db::query(
         "delete from core.service_keys
          where scope = $1 and tenant_id is not distinct from $2 and user_id is not distinct from $3 and service = $4",
     )
@@ -288,7 +360,11 @@ pub async fn remove_key(k: &Kernel, by: Uuid, level: Level, service_id: &str) ->
     .bind(user)
     .bind(service_id)
     .execute(&k.db)
-    .await?;
+    .await?
+    .rows_affected();
+    if n == 0 {
+        return Err(Error::not_found("no key to remove"));
+    }
     events::record(
         k,
         tenant,
@@ -326,7 +402,7 @@ async fn read(k: &Kernel, level: Level, service_id: &str, only_shared: bool) -> 
 /// The key in use for a person in a tenant (for the services of the kernel and of the plugins; never
 /// sent to the browser).
 pub async fn key_in_use(k: &Kernel, c: &Caller, service_id: &str) -> Result<Option<String>> {
-    service(service_id)?;
+    service(k, service_id, None)?;
     if let Some(v) = read(k, Level::User(c.user.user_id), service_id, false).await? {
         return Ok(Some(v));
     }

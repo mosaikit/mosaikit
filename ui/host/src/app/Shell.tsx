@@ -63,6 +63,7 @@ import {
 } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
 import AppIcon from './AppIcon.tsx'
+import { PersonPicture } from './picture.tsx'
 import SearchBox, { type SearchGroup } from './SearchBox.tsx'
 import { initials, isApp, useTenantCtx } from './core.ts'
 import { setLang, t, useLang, useLanguages, type Lang } from './i18n.ts'
@@ -115,7 +116,7 @@ function useNav(session: Session, route: Route): { groups: NavGroup[]; bottom: N
         {
           items: [
             { label: t('Platform overview'), short: t('Overview'), icon: <LayoutDashboard />, href: to.admin(), active: page === 'overview' },
-            { label: t('Tenant'), icon: <Building2 />, href: to.admin('tenants'), active: page === 'tenants' || page === 'tenant' },
+            { label: t('Tenants'), icon: <Building2 />, href: to.admin('tenants'), active: page === 'tenants' || page === 'tenant' },
             { label: t('People'), icon: <Users />, href: to.admin('people'), active: page === 'people' || page === 'person' },
             { label: t('Plugins'), icon: <Puzzle />, href: to.admin('plugins'), active: page === 'plugins' },
             { label: t('Monitoring'), icon: <Activity />, href: to.admin('monitoring'), active: page === 'monitoring' },
@@ -454,9 +455,15 @@ function UserMenu({ session, route, band }: { session: Session; route: Route; ba
           <span className="block text-[11px] text-band-muted">{role}</span>
         </span>
         <span className="sr-only">{t('person menu')}</span>
-        <Avatar className="size-7" aria-hidden="true">
-          <AvatarFallback className="bg-teal-700 text-[11px] font-semibold text-white">{initials(name)}</AvatarFallback>
-        </Avatar>
+        {session.picture ? (
+          <span aria-hidden="true">
+            <PersonPicture id={u.user_id} name={name} version={session.picture} className="size-7 text-[11px]" />
+          </span>
+        ) : (
+          <Avatar className="size-7" aria-hidden="true">
+            <AvatarFallback className="bg-teal-700 text-[11px] font-semibold text-white">{initials(name)}</AvatarFallback>
+          </Avatar>
+        )}
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
         <DropdownMenuLabel>
@@ -477,10 +484,17 @@ function UserMenu({ session, route, band }: { session: Session; route: Route; ba
           {unread > 0 && <span className="text-xs text-muted-foreground">{t('{n} new', { n: String(unread) })}</span>}
         </DropdownMenuItem>
         {route.area === 'tenant' && (
-          <DropdownMenuItem onSelect={() => go(to.tenant(route.tenant, 'trash'))}>
-            <Trash2 />
-            {t('Trash')}
-          </DropdownMenuItem>
+          <>
+            {/* requests to see or edit the person's own items: personal, so in this menu (one home) */}
+            <DropdownMenuItem onSelect={() => go(to.tenant(route.tenant, 'requests'))}>
+              <KeyRound />
+              {t('Access requests')}
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => go(to.tenant(route.tenant, 'trash'))}>
+              <Trash2 />
+              {t('Trash')}
+            </DropdownMenuItem>
+          </>
         )}
         {!band.help && (
           <>

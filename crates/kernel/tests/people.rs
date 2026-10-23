@@ -325,3 +325,68 @@ async fn managers_only_see_and_touch_their_tenant() {
     assert!(request_access(&t, &mgr_b, rid(&item), Level::Read, "").await.is_err());
     let _ = access::USE;
 }
+
+#[tokio::test]
+async fn a_person_changes_their_own_name_and_picture() {
+    use mosaikit_kernel::tenancy::profile;
+    let t = start().await;
+    let admin = t.admin().await;
+    let alfa = t.tenant("alfa").await;
+    let anna = t.member(&alfa, "anna").await;
+    let beta = t.tenant("beta").await;
+
+    // the name: trimmed, 1 to 120 characters, recorded in the log
+    profile::set_my_name(&t, &anna, "  Anna Rossi ").await.unwrap();
+    let name: String = mosaikit_db::query_scalar("select display_name from core.users where id = $1")
+        .bind(anna.user_id)
+        .fetch_one(&t.db)
+        .await
+        .unwrap();
+    assert_eq!(name, "Anna Rossi");
+    for bad in ["", "   ", &"x".repeat(121)] {
+        let e = profile::set_my_name(&t, &anna, bad).await.unwrap_err();
+        assert_eq!(e.code, Some("profile_name_invalid"), "{bad:?}");
+    }
+    let n: i64 = mosaikit_db::query_scalar("select count(*) from core.events where action = 'profile.name'")
+        .fetch_one(&t.db)
+        .await
+        .unwrap();
+    assert_eq!(n, 1);
+
+    // the picture: checked like the logos, a new version every time
+    let png = b"\x89PNG\r\n\x1a\nrest-of-a-picture".to_vec();
+    assert_eq!(
+        profile::set_my_picture(&t, &anna, b"not an image").await.unwrap_err().code,
+        Some("image_type")
+    );
+    let svg = b"<svg xmlns=\"http://www.w3.org/2000/svg\"><script>x</script></svg>";
+    assert_eq!(profile::set_my_picture(&t, &anna, svg).await.unwrap_err().code, Some("image_unsafe"));
+    profile::set_my_picture(&t, &anna, &png).await.unwrap();
+    let v1 = profile::picture_version(&t, anna.user_id).await.unwrap().unwrap();
+    profile::set_my_picture(&t, &anna, &png).await.unwrap();
+    let v2 = profile::picture_version(&t, anna.user_id).await.unwrap().unwrap();
+    assert_ne!(v1, v2);
+
+    // who sees it: the person, the people of the same tenant, the Administrators; not other tenants
+    let (data, mime) = profile::picture(&t, &alfa, anna.user_id).await.unwrap().unwrap();
+    assert_eq!((data, mime.as_str()), (png.clone(), "image/png"));
+    assert!(profile::picture(&t, &anna, anna.user_id).await.unwrap().is_some());
+    assert!(profile::picture(&t, &admin, anna.user_id).await.unwrap().is_some());
+    assert!(profile::picture(&t, &beta, anna.user_id).await.unwrap().is_none());
+
+    profile::remove_my_picture(&t, &anna).await.unwrap();
+    assert!(profile::picture_version(&t, anna.user_id).await.unwrap().is_none());
+    assert!(profile::picture(&t, &alfa, anna.user_id).await.unwrap().is_none());
+
+    // an account of an identity provider: the name comes from the provider
+    mosaikit_db::query("insert into core.user_identities (issuer, subject, user_id, tenant_id) values ('https://idp', 's1', $1, $2)")
+        .bind(anna.user_id)
+        .bind(anna.home_tenant_id)
+        .execute(&t.db)
+        .await
+        .unwrap();
+    let e = profile::set_my_name(&t, &anna, "Other").await.unwrap_err();
+    assert_eq!(e.code, Some("profile_from_provider"));
+    // the picture stays the person's own
+    profile::set_my_picture(&t, &anna, &png).await.unwrap();
+}

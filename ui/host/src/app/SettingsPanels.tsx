@@ -490,9 +490,9 @@ export function SecurityPanel({ level }: { level: Level }) {
 }
 
 /** How the notifications arrive by email: the default of the people (customizable by the tenants) and, for
- *  the platform, the hour of the daily summary and how long the notifications are kept. */
+ *  the platform, the hour of the daily summary (how long they are kept is in Retention). */
 export function NotificationsPanel({ level }: { level: Level }) {
-  const keys = level.kind === 'platform' ? ['notify.email_mode', 'notify.digest_hour', 'notify.retention_days'] : ['notify.email_mode']
+  const keys = level.kind === 'platform' ? ['notify.email_mode', 'notify.digest_hour'] : ['notify.email_mode']
   const modes: [string, string][] = [
     ['digest', t('One summary a day')],
     ['immediate', t('At once')],
@@ -509,11 +509,11 @@ export function NotificationsPanel({ level }: { level: Level }) {
   )
 }
 
-/** How long the platform keeps what was deleted and the events of the log. */
+/** How long the platform keeps what was deleted, the events of the log and the notifications. */
 export function RetentionPanel({ level }: { level: Level }) {
-  const keys = ['trash.retention_days', 'log.retention_days']
+  const keys = ['trash.retention_days', 'log.retention_days', 'notify.retention_days']
   return (
-    <Panel level={level} keys={keys} title={t('Retention')} description={t('How long the trash and the log keep their content, for every tenant.')}>
+    <Panel level={level} keys={keys} title={t('Retention')} description={t('How long the trash, the log and the notifications keep their content, for every tenant.')}>
       {(d, s) => keys.map((k) => s(k) && <NumberRow key={k} level={level} d={d} s={s(k)!} />)}
     </Panel>
   )
@@ -634,19 +634,8 @@ function keysPath(l: KeyLevel): string {
   return l.kind === 'tenant' ? `/api/t/${enc(l.slug)}/manage/keys` : `/api/t/${enc(l.slug)}/me/keys`
 }
 
-function services(): Record<string, [string, string]> {
-  return {
-    'ai-hosted': [t('Hosted AI provider'), t('Assistant and AI steps in automations')],
-    'ai-second': [t('Second AI provider'), t('Assistant and AI steps in automations')],
-    'ai-local': [t('Self-hosted model'), t('A model running on one of your servers')],
-    sms: [t('Text message gateway'), t('Sign-in codes and urgent notifications')],
-    push: [t('Push notifications'), t('Notifications on phones')],
-    translate: [t('Translation service'), t('Translation of texts in the apps')],
-    ocr: [t('Document recognition'), t('Reads scanned documents and receipts')],
-  }
-}
-
 function inUse(k: ServiceKey, l: KeyLevel): [string, 'ok' | 'off'] {
+  if (!k.declared) return [t('Not used by any installed plugin: you can remove it'), 'off']
   if (k.in_use === 'own') return [l.kind === 'me' ? t('In use: your key') : l.kind === 'tenant' ? (k.shared ? t('Used by every person of the tenant') : t('Used only by Tenant Managers')) : k.shared ? t('Used by every tenant without a key of its own') : t('Only for the platform: tenants need a key of their own'), 'ok']
   if (k.in_use === 'tenant') return [t('In use: the key of the tenant'), 'ok']
   if (k.in_use === 'platform') return [t('In use: the key of the platform'), 'ok']
@@ -661,7 +650,6 @@ export function KeysPanel({ level }: { level: KeyLevel }) {
   const [busy, setBusy] = useState(false)
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
-  const S = services()
   const run = async (fn: () => Promise<ServiceKey[]>, ok: string) => {
     setBusy(true)
     try {
@@ -676,11 +664,6 @@ export function KeysPanel({ level }: { level: KeyLevel }) {
       setBusy(false)
     }
   }
-  const groups: [string, string][] = [
-    ['ai', t('Artificial intelligence')],
-    ['msg', t('Messages')],
-    ['doc', t('Documents and languages')],
-  ]
   const intro =
     level.kind === 'platform'
       ? t('The keys of the services the platform pays for. A shared key is used by every tenant without one of its own; a key not shared stays with the platform.')
@@ -695,14 +678,14 @@ export function KeysPanel({ level }: { level: KeyLevel }) {
         <CardDescription>{intro}</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-5">
-        {groups.map(([g, gl]) => (
-          <section key={g} className="grid gap-2">
-            <h3 className="text-xs font-semibold tracking-wide text-muted-foreground uppercase">{gl}</h3>
+        {q.data!.length === 0 && <p className="text-sm text-muted-foreground">{t('No installed plugin uses keys of outside services.')}</p>}
+        {q.data!.length > 0 && (
+          <section className="grid gap-2">
             <ul className="grid gap-2">
               {q.data!
-                .filter((k) => k.group === g)
                 .map((k) => {
-                  const [name, desc] = S[k.service] ?? [k.service, '']
+                  const name = k.label
+                  const desc = [k.description, k.plugins.length ? t('Used by {plugins}', { plugins: k.plugins.join(', ') }) : ''].filter(Boolean).join(' · ')
                   const [use, tone] = inUse(k, level)
                   const editing = edit === k.service
                   const base = `${keysPath(level)}/${enc(k.service)}`
@@ -716,7 +699,7 @@ export function KeysPanel({ level }: { level: KeyLevel }) {
                         </span>
                         <span className="flex items-center gap-2">
                           {k.set && <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-xs">{k.address ? k.hint : `••••${k.hint ?? ''}`}</code>}
-                          {!editing && (
+                          {!editing && k.declared && (
                             <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => (setEdit(k.service), setValue(''))}>
                               {k.set ? <Pencil /> : <Plus />}
                               {k.set ? t('Change') : k.address ? t('Set') : t('Add')}
@@ -757,7 +740,7 @@ export function KeysPanel({ level }: { level: KeyLevel }) {
                           </Button>
                         </form>
                       )}
-                      {k.set && level.kind !== 'me' && (
+                      {k.set && k.declared && level.kind !== 'me' && (
                         <label className="flex items-center gap-2 text-xs text-muted-foreground">
                           <Switch checked={k.shared} disabled={busy} aria-label={`${shareLabel}: ${name}`} onCheckedChange={(on) => void run(() => api<ServiceKey[]>('PUT', base, { shared: on }), on ? t('Key shared') : t('Key no longer shared'))} />
                           {shareLabel}
@@ -768,7 +751,7 @@ export function KeysPanel({ level }: { level: KeyLevel }) {
                 })}
             </ul>
           </section>
-        ))}
+        )}
         <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
           <Lock className="size-3" />
           {t('Keys are kept encrypted and never go back to the browser: after saving, only the last four characters show.')}

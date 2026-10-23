@@ -195,15 +195,28 @@ embedded documents or external references is refused, and every image is served 
 The logos of the platform take the place of the brand (`/brand/logo`, `/brand/logo-dark`,
 `/brand/favicon`).
 
-**Keys of outside services** (AI providers, text messages, push, translation, document recognition)
-at three levels, `core.service_keys`: whoever has a key of their own uses it; otherwise the tenant's
+**Keys of outside services** at three levels, `core.service_keys`. The services are the ones the
+installed plugins declare in their manifests (`[[service_keys]]`, §8.2): no fixed list. Plugins that
+declare the same service share its keys (the first, by plugin id, gives label and kind; the scopes add
+up); a key whose service no installed plugin declares any more is listed as not used, can only be
+removed, and is never read. Whoever has a key of their own uses it; otherwise the tenant's
 if shared (not shared: only its Tenant Managers); otherwise the platform's if shared. The value is
 encrypted with ChaCha20-Poly1305 by the kernel (`crates/kernel/src/secret.rs`), bound to its place
 (associated data: scope, owner, service), with the key of the installation (`secret_key`, §10): the
 database alone does not reveal it. It never goes back to the browser: the pages see the last four
 characters (the address of a self-hosted model shows whole). APIs: `/api/admin/keys`,
-`/api/t/<t>/manage/keys`, `/api/t/<t>/me/keys` (`PUT` with `value` and/or `shared`, `DELETE`);
-the kernel reads the key in use with `keys::key_in_use`.
+`/api/t/<t>/manage/keys`, `/api/t/<t>/me/keys` (`PUT` with `value` and/or `shared`, `DELETE`;
+`404 service_unknown` for a service no installed plugin declares at that level); the kernel reads the
+key in use with `keys::key_in_use`, the logic of a plugin with the host operation `key.get` (SDK:
+`ctx.service_key("id")`), only for the services its manifest declares. The key never reaches a UI.
+
+**Own profile.** A person changes their display name (`PUT /api/me/profile`; not for the accounts of
+an identity provider, whose name comes from the provider: `profile_from_provider`) and picture (`PUT`
+raw / `DELETE /api/me/picture`, checked like the logos). The picture is kept in
+`<data_dir>/blobs/identity/<home tenant>/people/<user>` (so it travels with the export of the tenant),
+its type and version in `core.users.picture_type` / `picture_v`; `/api/session` carries the version;
+`GET /api/people/<id>/picture` serves it, sandboxed, to the person, the Administrators and whoever
+shares a tenant with them. The email stays with the Tenant Manager of the home tenant.
 
 ### 3.2 People and permissions
 
@@ -615,8 +628,11 @@ background worker of the kernel, a batch every 15 seconds, read with the rights 
 whose steps point at elements marked `data-tour` (a step whose element is not on the page is skipped);
 a tour seen to the end or skipped is remembered with the person, so the dot on the help button goes
 away on every device. The guide is the address of `identity.guide_url` (Identity and texts) or, empty,
-a short guide built into the shell. What is new shows the section of the current version of
-`CHANGELOG.md`, shipped with the build. Keyboard shortcuts, outside the fields where one types: Ctrl K
+the guides of `docs/guide` (user, Tenant Manager, Administrator; `docs/guide/it` in Italian) built into
+the shell and drawn as React elements by `GuideText.tsx` (a small Markdown reader: nothing in a text runs),
+opening on the guide of the role of the person. What is new shows the section of the current version of
+`CHANGELOG.md` (English) or `CHANGELOG.it.md` (Italian), shipped with the build; a test keeps the two in
+step. Keyboard shortcuts, outside the fields where one types: Ctrl K
 and `/` (search), `?` (the list), `g h` (Home), `g n` (notifications), `g a` (account), `g t` (trash).
 
 **Preferences of a person** (`core.person_prefs`, `GET/PUT /api/me/prefs`, also in `/api/session` as
@@ -878,6 +894,13 @@ key = "export"
 label = "Export"
 description = "PDF of what they can see"
 default = true           # given by the profiles that do not say otherwise
+
+[[service_keys]]         # optional: keys of outside services it uses (§3.1)
+id = "translate"         # shared with the plugins that declare the same id
+label = "Translation service"
+description = "Translation of the notes"
+address = false          # true: the value is an address (a self-hosted model), shown whole
+scopes = ["platform", "tenant", "personal"]   # where a key may be set (default: everywhere)
 
 [[config]]               # optional: settings at platform level (§8.10)
 key = "endpoint"

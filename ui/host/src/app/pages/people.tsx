@@ -37,6 +37,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { initials, useAction, useApi, useConfirm, useTenantCtx } from '../core.ts'
 import { t } from '../i18n.ts'
+import { levelName } from '../levels.ts'
+import { PersonPicture } from '../picture.tsx'
 import { Empty, ErrorBox, Loading, PageHeader, Pills, SaveBar, StatusBadge, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import AppIcon from '../AppIcon.tsx'
@@ -293,6 +295,7 @@ export function PersonPage({ slug, id, tab }: { slug: string; id: string; tab?: 
       <div className="p-6 max-[620px]:p-4">
         {cur === 'profile' && (
           <div className="grid max-w-3xl gap-6">
+            <PersonPicture id={id} name={name} />
             <PersonForm base={`${base}/person`} name={m.display_name} email={m.email} invalidate={inval} editable={d.home_here} />
             <Card>
               <CardHeader>
@@ -490,7 +493,7 @@ function WhyCard({ slug, userId }: { slug: string; userId: string }) {
 }
 
 function levelLabel(l: string): string {
-  return { none: t('none'), read: t('Can view'), write: t('Can edit'), manage: t('Can manage') }[l] ?? l
+  return levelName(l)
 }
 
 /* ── A group ─────────────────────────────────────────────────────────── */
@@ -1025,7 +1028,7 @@ export function RequestsTable({ slug, manager }: { slug: string; manager: boolea
                 {r.requester_name}
                 <div className="text-xs text-muted-foreground">{fmtDate(r.created_at)}</div>
               </TableCell>
-              <TableCell>{r.level === 'write' ? t('Edit') : t('See')}</TableCell>
+              <TableCell>{levelName(r.level)}</TableCell>
               <TableCell className="max-w-64 text-sm text-muted-foreground">{r.message || '—'}</TableCell>
               <TableCell>{r.status === 'forwarded' ? <Badge variant="secondary">{t('Forwarded to the owner')}</Badge> : <StatusBadge status={r.status} />}</TableCell>
               <TableCell>
@@ -1115,8 +1118,8 @@ export function ItemPage({ slug, id }: { slug: string; id: string }) {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="read">{t('See')}</SelectItem>
-                      <SelectItem value="write">{t('Edit')}</SelectItem>
+                      <SelectItem value="read">{levelName('read')}</SelectItem>
+                      <SelectItem value="write">{levelName('write')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1620,6 +1623,7 @@ export function AdminPersonPage({ id, tab }: { id: string; tab?: string }) {
       <div className="p-6 max-[620px]:p-4">
         {cur === 'profile' && (
           <div className="grid max-w-3xl gap-6">
+            <PersonPicture id={id} name={name} />
             <PersonForm base={base} name={p.display_name} email={p.email} invalidate={inval} editable />
             <Card>
               <CardContent className="pt-6">

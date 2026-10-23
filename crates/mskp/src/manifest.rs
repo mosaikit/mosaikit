@@ -59,6 +59,11 @@ pub struct Manifest {
     /// logic reads them in `ctx.config`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub config: Vec<ConfigDecl>,
+    /// Keys of outside services the plugin uses (`[[service_keys]]`): the keys pages of the platform,
+    /// of the tenants and of the people list only the services the installed plugins declare. The
+    /// logic reads the key in use for the caller (own, else the tenant's, else the platform's).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub service_keys: Vec<ServiceKeyDecl>,
     /// Texts in other languages (`[i18n.it]`, ...); the texts above are the English ones.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub i18n: BTreeMap<String, Translation>,
@@ -200,6 +205,46 @@ pub struct ExtTabDecl {
     pub page: Option<String>,
 }
 
+/// A key of an outside service the plugin uses (`[[service_keys]]`). Several plugins may declare
+/// the same service (`id`): they share its keys.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ServiceKeyDecl {
+    /// identifier of the service (`openai`, `sms-gateway`...): lower case, digits and `-`
+    pub id: String,
+    pub label: String,
+    #[serde(default)]
+    pub description: String,
+    /// the value is an address (a self-hosted model, for example), shown whole instead of masked
+    #[serde(default)]
+    pub address: bool,
+    /// where a key may be set: the platform, the tenants, the people (default: everywhere)
+    #[serde(default = "all_key_scopes")]
+    pub scopes: Vec<KeyScope>,
+}
+
+/// Where a key of an outside service may be set.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum KeyScope {
+    Platform,
+    Tenant,
+    Personal,
+}
+
+fn all_key_scopes() -> Vec<KeyScope> {
+    vec![KeyScope::Platform, KeyScope::Tenant, KeyScope::Personal]
+}
+
+/// `openai`, `sms-gateway`: lower case, digits and `-`, at most 40 characters.
+pub fn is_service_id(s: &str) -> bool {
+    !s.is_empty()
+        && s.len() <= 40
+        && s.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+        && !s.starts_with('-')
+        && !s.ends_with('-')
+}
+
 /// A setting of the plugin (`[[config]]`).
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -294,6 +339,9 @@ pub struct Translation {
     /// by key of the setting
     #[serde(default)]
     pub config: BTreeMap<String, PermissionTranslation>,
+    /// by id of the service of `[[service_keys]]`
+    #[serde(default)]
+    pub service_keys: BTreeMap<String, PermissionTranslation>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -634,6 +682,7 @@ impl Manifest {
         }
         self.validate_kind().map_err(Error::Manifest)?;
         self.validate_config().map_err(Error::Manifest)?;
+        self.validate_service_keys().map_err(Error::Manifest)?;
         for (lang, tr) in &self.i18n {
             self.validate_translation(lang, tr).map_err(|m| Error::Manifest(format!("i18n.{lang}: {m}")))?;
         }
@@ -770,6 +819,23 @@ impl Manifest {
         Ok(())
     }
 
+    fn validate_service_keys(&self) -> std::result::Result<(), String> {
+        let mut ids = std::collections::HashSet::new();
+        for s in &self.service_keys {
+            if !is_service_id(&s.id) || !ids.insert(s.id.as_str()) {
+                return Err(format!("service key '{}' invalid or duplicate", s.id));
+            }
+            if s.label.trim().is_empty() {
+                return Err(format!("the service key '{}' has no label", s.id));
+            }
+            let repeated = s.scopes.iter().enumerate().any(|(i, x)| s.scopes[..i].contains(x));
+            if s.scopes.is_empty() || repeated {
+                return Err(format!("the scopes of the service key '{}' are empty or repeated", s.id));
+            }
+        }
+        Ok(())
+    }
+
     fn validate_config(&self) -> std::result::Result<(), String> {
         let mut keys = std::collections::HashSet::new();
         for c in &self.config {
@@ -857,6 +923,13 @@ impl Manifest {
             all.extend(ct.label.iter());
             all.extend(ct.description.iter());
         }
+        for (id, st) in &tr.service_keys {
+            if !self.service_keys.iter().any(|s| &s.id == id) {
+                return Err(format!("service key '{id}' is not declared"));
+            }
+            all.extend(st.label.iter());
+            all.extend(st.description.iter());
+        }
         if all.iter().any(|t| t.chars().count() > 300) {
             return Err("text longer than 300 characters".into());
         }
@@ -928,6 +1001,13 @@ impl Manifest {
             };
             set(&mut c.label, &ct.label);
             set(&mut c.description, &ct.description);
+        }
+        for s in &mut m.service_keys {
+            let Some(st) = tr.service_keys.get(&s.id) else {
+                continue;
+            };
+            set(&mut s.label, &st.label);
+            set(&mut s.description, &st.description);
         }
         m
     }
@@ -1243,6 +1323,71 @@ mod tests {
             ),
         ] {
             assert!(Manifest::from_toml(&bad).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn service_keys() {
+        let keys = r#"
+            [[service_keys]]
+            id = "translator"
+            label = "Translation service"
+            description = "Translation of the notes"
+            scopes = ["platform", "tenant"]
+            [[service_keys]]
+            id = "local-model"
+            label = "Self-hosted model"
+            address = true
+            [i18n.it]
+            service_keys = { translator = { label = "Servizio di traduzione" } }
+        "#;
+        let m = Manifest::from_toml(&format!("{NOTES}{keys}")).unwrap();
+        assert_eq!(m.service_keys.len(), 2);
+        assert_eq!(m.service_keys[0].scopes, vec![KeyScope::Platform, KeyScope::Tenant]);
+        assert_eq!(m.service_keys[1].scopes.len(), 3, "everywhere by default");
+        assert!(m.service_keys[1].address);
+        let it = m.localized("it");
+        assert_eq!(it.service_keys[0].label, "Servizio di traduzione");
+        assert_eq!(
+            it.service_keys[0].description, "Translation of the notes",
+            "English where not translated"
+        );
+        let plain = serde_json::to_string(&Manifest::from_toml(NOTES).unwrap()).unwrap();
+        assert!(!plain.contains("service_keys"), "nothing new when absent");
+        for bad in [
+            "[[service_keys]]
+id = \"Bad Id\"
+label = \"x\"
+",
+            "[[service_keys]]
+id = \"a\"
+label = \" \"
+",
+            "[[service_keys]]
+id = \"a\"
+label = \"x\"
+[[service_keys]]
+id = \"a\"
+label = \"y\"
+",
+            "[[service_keys]]
+id = \"a\"
+label = \"x\"
+scopes = []
+",
+            "[[service_keys]]
+id = \"a\"
+label = \"x\"
+scopes = [\"tenant\", \"tenant\"]
+",
+            "[[service_keys]]
+id = \"a\"
+label = \"x\"
+[i18n.it]
+service_keys = { b = { label = \"y\" } }
+",
+        ] {
+            assert!(Manifest::from_toml(&format!("{NOTES}{bad}")).is_err(), "{bad}");
         }
     }
 

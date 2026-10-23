@@ -4,7 +4,7 @@
 
 import { useState, type FormEvent } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Bell, Building2, Gauge, KeyRound, KeySquare, Loader2, Palette, UserRound } from 'lucide-react'
+import { Bell, Building2, Gauge, KeyRound, KeySquare, Loader2, Palette, Trash2, Upload, UserRound } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, errText, fmtBytes } from '../../api.ts'
 import type { Overview, Session } from '../../types.ts'
@@ -18,7 +18,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
-import { initials, isApp, passwordMin, useAction, useApi, useTenantCtx } from '../core.ts'
+import { isApp, passwordMin, useAction, useApi, useTenantCtx } from '../core.ts'
 import { setLang, t, useLang, useLanguages, type Lang } from '../i18n.ts'
 import { Empty, ErrorBox, Loading, Locked, PageHeader, SaveBar, Sections, type Section } from '../kit.tsx'
 import { go, personal, to, type Route } from '../router.ts'
@@ -30,6 +30,7 @@ import { totals, trashHint } from '../usage.ts'
 import { kindLabel, type NoteKind } from '../notes.ts'
 import { setTheme, useTheme, type Mode } from '../theme.ts'
 import { useSetContrast } from '../personal.ts'
+import { PersonPicture } from '../picture.tsx'
 
 const enc = encodeURIComponent
 
@@ -68,29 +69,92 @@ export function AccountPage({ session, route }: { session: Session; route: Route
 }
 
 function Profile({ session }: { session: Session }) {
+  const qc = useQueryClient()
   const u = session.user
   const name = u.display_name || u.username
   const home = session.memberships.find((m) => m.is_home)
+  // with an identity provider the name comes from the provider at every sign-in
+  const fromProvider = !!session.external
+  const [draft, setDraft] = useState(u.display_name)
+  const [busy, setBusy] = useState(false)
+  const dirty = draft.trim() !== u.display_name && draft.trim() !== ''
+  const run = async (fn: () => Promise<unknown>, ok: string) => {
+    setBusy(true)
+    try {
+      await fn()
+      await qc.invalidateQueries({ queryKey: ['session'] })
+      toast.success(ok)
+    } catch (e) {
+      toast.error(errText(e))
+    } finally {
+      setBusy(false)
+    }
+  }
   return (
     <div className="grid max-w-2xl gap-6">
       <Card>
-        <CardContent className="flex items-center gap-4 pt-6">
-          <span className="flex size-16 items-center justify-center rounded-full bg-teal-700 text-xl font-semibold text-white">{initials(name)}</span>
-          <div>
-            <b className="block text-lg">{name}</b>
-            <span className="text-sm text-muted-foreground">{u.is_system_admin ? `${u.username} · Administrator` : `${u.username}@${u.home_tenant_slug}`}</span>
+        <CardHeader>
+          <CardTitle>{t('Picture')}</CardTitle>
+          <CardDescription>{t('SVG, PNG or WebP, at most 512 KB. The people of your tenants see it.')}</CardDescription>
+        </CardHeader>
+        <CardContent className="flex flex-wrap items-center gap-4">
+          <PersonPicture id={u.user_id} name={name} version={session.picture ?? null} />
+          <div className="flex flex-wrap gap-2">
+            <Button asChild variant="outline" disabled={busy}>
+              <label>
+                <Upload />
+                {session.picture ? t('Change the picture') : t('Add a picture')}
+                <input
+                  type="file"
+                  accept="image/svg+xml,image/png,image/webp"
+                  className="sr-only"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0]
+                    e.target.value = ''
+                    if (f) void run(() => api('PUT', '/api/me/picture', undefined, { raw: f }), t('Picture saved'))
+                  }}
+                />
+              </label>
+            </Button>
+            {session.picture && (
+              <Button variant="outline" disabled={busy} onClick={() => void run(() => api('DELETE', '/api/me/picture'), t('Picture removed'))}>
+                <Trash2 />
+                {t('Remove the picture')}
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
       <Card>
         <CardHeader>
           <CardTitle>{t('Details')}</CardTitle>
-          <CardDescription>{u.is_system_admin ? t('Another Administrator changes them.') : t('The Tenant Manager of your home tenant changes them.')}</CardDescription>
+          <CardDescription>
+            {fromProvider
+              ? t('Your name comes from the identity provider of your tenant. The email is changed by the Tenant Manager.')
+              : u.is_system_admin
+                ? t('You change your name; the email is changed by another Administrator.')
+                : t('You change your name; the email is changed by the Tenant Manager of your home tenant.')}
+          </CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="grid gap-4">
+          <form
+            className="grid gap-1.5"
+            onSubmit={(e) => {
+              e.preventDefault()
+              if (dirty) void run(() => api('PUT', '/api/me/profile', { display_name: draft.trim() }), t('Name saved'))
+            }}
+          >
+            <Label htmlFor="me-name">{t('Display name')}</Label>
+            <div className="flex flex-wrap gap-2">
+              <Input id="me-name" className="w-72 max-w-full" maxLength={120} disabled={fromProvider || busy} value={draft} onChange={(e) => setDraft(e.target.value)} />
+              {!fromProvider && (
+                <Button type="submit" disabled={!dirty || busy}>
+                  {t('Save')}
+                </Button>
+              )}
+            </div>
+          </form>
           <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
-            <dt className="text-muted-foreground">{t('Name')}</dt>
-            <dd>{u.display_name || '—'}</dd>
             <dt className="text-muted-foreground">{t('Username')}</dt>
             <dd className="font-mono">{u.username}</dd>
             <dt className="text-muted-foreground">{u.is_system_admin ? t('Role') : t('Home tenant')}</dt>

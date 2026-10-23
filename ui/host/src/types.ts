@@ -27,6 +27,8 @@ export interface Session {
   csrf: string
   /** signs in through the identity provider of the home tenant: no local password (recent servers) */
   external?: boolean
+  /** version of the picture of Account › Profile (null: the initials) */
+  picture?: string | null
   memberships: Membership[]
   invitations: number
   plugin_origin: string
@@ -72,10 +74,16 @@ export interface Setting {
   inherits: boolean
 }
 
-/** A key of an outside service: never the value, only its last four characters (or the address). */
+/** A key of an outside service: never the value, only its last four characters (or the address). The
+ *  services are the ones the installed plugins declare (`[[service_keys]]`). */
 export interface ServiceKey {
   service: string
-  group: 'ai' | 'msg' | 'doc'
+  label: string
+  description: string
+  /** names of the plugins that use the service */
+  plugins: string[]
+  /** false: no installed plugin declares the service any more; the key can only be removed */
+  declared: boolean
   address: boolean
   set: boolean
   hint?: string

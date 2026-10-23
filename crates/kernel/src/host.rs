@@ -30,6 +30,8 @@ pub(crate) struct KernelHost {
     schema: String,
     plugin_id: String,
     network: Vec<String>,
+    /// the services of `[[service_keys]]` the plugin declares: the only keys it may read
+    service_keys: Vec<String>,
     http: reqwest::Client,
 }
 
@@ -156,6 +158,26 @@ impl KernelHost {
     }
 }
 
+impl KernelHost {
+    /// `key.get`: the key of an outside service in use for the caller (own, else the tenant's, else
+    /// the platform's), only for a service the plugin declares in `[[service_keys]]`; `null` if none.
+    fn key(&mut self, req: &Value) -> std::result::Result<Value, String> {
+        let service = req.get("service").and_then(Value::as_str).ok_or("missing service")?;
+        if !self.service_keys.iter().any(|s| s == service) {
+            return Err(format!("the plugin does not declare the service {service} in [[service_keys]]"));
+        }
+        let k = self.kernel.clone().ok_or("kernel not available")?;
+        let caller = self.caller.clone();
+        let service = service.to_string();
+        self.rt.block_on(async move {
+            crate::tenancy::keys::key_in_use(&k, &caller, &service)
+                .await
+                .map(|v| json!(v))
+                .map_err(|e| e.message)
+        })
+    }
+}
+
 impl Host for KernelHost {
     fn call(&mut self, op: &str, req: &Value) -> std::result::Result<Value, String> {
         match op {
@@ -164,6 +186,7 @@ impl Host for KernelHost {
             "resource.create" | "resource.delete" => self.resource(op, req),
             "http.fetch" => self.http(req),
             "plugin.call" => self.plugin_call(req),
+            "key.get" => self.key(req),
             other => Err(format!("unknown host operation: {other}")),
         }
     }
@@ -203,6 +226,7 @@ pub(crate) async fn run(
         schema: p.schema(),
         plugin_id: p.id.clone(),
         network: p.manifest.permissions.network.clone(),
+        service_keys: p.manifest.service_keys.iter().map(|s| s.id.clone()).collect(),
         http: k.http.clone(),
     };
     let engine = k.engine.clone();

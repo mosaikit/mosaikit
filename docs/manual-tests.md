@@ -51,11 +51,11 @@ differs from the mockup counts as a problem too.
 | P0-02 | Look at the browser tab | Favicon: the Mosaikit symbol (burgundy tiles, yellow tile) |
 | P0-03 | Narrow the window under 1024 px (or a phone) | The brand panel disappears, the symbol and name stay above the form; no horizontal scroll |
 | P0-04 | Sign in as `s.greco` | Home of *Comune di Roma*; sidebar: Home and the apps; top bar: sidebar button, tenant, search, language, mode, help, bell, person menu |
-| P0-05 | Person menu | Account, Notifications, Trash, Sign out |
+| P0-05 | Person menu | Account, Notifications, Access requests, Trash, Sign out |
 | P0-06 | Open an app (e.g. Notes) from the sidebar | The app opens inside the shell; create an item |
 | P0-07 | On that item: **Share** | Share dialog: people and groups with a level, public link, transfer of ownership |
 | P0-08 | Create a public link, open it in a private window | The item read-only, without signing in |
-| P0-09 | Help menu (?) | Guided tour of this page, Guide, What is new, Keyboard shortcuts, version; each item opens its page or dialog |
+| P0-09 | Help menu (?) | Guided tour of this page, Guide of Mosaikit, What is new, Keyboard shortcuts, version; each item opens (tour over the page, the guides, the notes of the version, the list of shortcuts) |
 | P0-10 | Sign out, sign in as `e.ricci` | Sidebar with Tenant overview, the apps, Tenant management (Manage, Plugins, Shares, Usage) and Tenant settings at the bottom |
 | P0-11 | Manage › People: tick a person | The action bar appears only with a selection |
 | P0-12 | Manage › People › a person › Remove from the tenant | If the person owns items, asks who gets them (new owner); then removes |
@@ -412,6 +412,26 @@ start of the development server with a wildcard `plugin_url` (below); the others
 | SEC-08 | Start a second server with `MOSAIKIT_PLUGIN_URL=http://*.localhost:47081/mosaikit cargo xtask dev` (or the same line in `xtask/mosaikit.dev.toml`); open Notes | The frame of Notes comes from `http://com-mosaikit-notes.localhost:47081/…`; the plugin works as usual |
 | SEC-09 | In the browser, open `http://com-mosaikit-notes.localhost:47081/mosaikit/ui/com.mosaikit.tasks/` | 404: the UI of Tasks is served only on its own host |
 | SEC-10 | Make a public link | Its address starts with `http://public.localhost:47081/…` and opens there |
+
+## UX follow-ups — labels, keys of the plugins, own profile, guides
+
+| Id | Check | Expected |
+|---|---|---|
+| UX-01 | As Administrator, the sidebar and the list of the tenants | The entry and the page title say **Tenants** (plural); the tabs of a tenant are **Details**, **People**, **Sign-in**, **Plugins** |
+| UX-02 | Share an item, then open an access request and the **Permissions** tab of a person | The levels are named the same everywhere: **View**, **Edit**, **Manage** (Italian: Visualizzazione, Modifica, Gestione) |
+| UX-03 | As `s.greco`, person menu | **Access requests** opens *Requests to see or edit your items* |
+| UX-04 | As `e.ricci`, Manage › People | **Invite people** is the main action (and **New user** next to it in a tenant with local accounts); **Pending** has **Invite people** too |
+| UX-05 | As Administrator, System › Retention | Trash, log **and notifications** kept, in days; System › Notifications no longer has the retention |
+| UX-06 | As Administrator, System › Keys of outside services | Only the services the installed plugins declare (in development: *Translation service*, used by Notes); each says **Used by …**; a key stored for a service no plugin declares (if any) says *Not used by any installed plugin* and can only be removed |
+| UX-07 | Add a platform key for *Translation service*, share it; as `s.greco` Account › Keys | *In use: the key of the platform*; add a personal key: *In use: your key*, masked |
+| UX-08 | As `s.greco`, Account › Profile: change **Display name**, **Save** | The name changes in the band at once; as `e.ricci`, Manage › People shows the new name |
+| UX-09 | Account › Profile: **Add a picture** (PNG or SVG under 512 KB), then a text file | The picture shows in Profile and in the band; the text file is refused with a clear message |
+| UX-10 | As `e.ricci`, the page of `s.greco` | The picture shows on the **Profile** tab; as `l.verdi` (other tenant) it does not |
+| UX-11 | **Remove the picture** | The initials come back |
+| UX-12 | In an OIDC tenant (Phase 8, fake provider), Account › Profile | The name is read-only (it comes from the provider); the picture can be changed |
+| UX-13 | Help › **What is new**, in English and in Italian | The notes of the version in the language of the interface |
+| UX-14 | Help › **Guide of Mosaikit** as User, as Tenant Manager, as Administrator | A wide dialog with the guide of the role, tabs for the other two, in the language of the interface; links to another guide switch tab |
+| UX-15 | System › Identity and texts › **Guide** set to an address | Help › Guide of Mosaikit opens that address instead |
 
 ---
 

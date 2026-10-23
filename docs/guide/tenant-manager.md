@@ -26,9 +26,12 @@ Sections: **People**, **Groups**, **Permission profiles**, **Pending**.
 The table shows each person with **Role and profile**, groups, **Status** and **Last sign-in**; guests are
 marked *guest*.
 
+- **To invite a person of another tenant**: **Invite people**, the main action of People (see below).
 - **To create a person** (tenant with local accounts): **New user** → **Username**, **Display name**,
   **Initial password**, **Role** → **Create user**. With an identity provider (OIDC) there is no **New
   user**: people are created by the provider at their first sign-in.
+- People change their own name and picture in Account › Profile; you see the change here. Their email is
+  yours to change, in the **Profile** tab.
 - **To act on several people**: tick them; the bar **Actions on the selection** appears with **Make Tenant
   Manager**, **Make User**, **Change profile**, **Add to a group**, **Suspend**.
 - **The page of a person** (click the name) has the tabs:
@@ -48,7 +51,7 @@ marked *guest*.
 
 ### Inviting a person of another tenant
 
-**Manage › Pending › Invite** (**Invite a person of another tenant**): choose their **Home tenant**, their
+**Manage › People › Invite people** (also in **Pending**): **Invite a person of another tenant**, choose their **Home tenant**, their
 **Username** there, **Role**, **Permission profile** → **Send the invitation**. They join as a guest: they keep signing
 in from their own tenant and accept from the bell. Pending invitations are listed under **Invitations**,
 with **Revoke**.
@@ -153,7 +156,7 @@ They apply to everybody in the tenant. Each setting shows where its value comes 
 |---|---|
 | **Sharing** | Public links on or off, maximum length of links, whether Tenant Managers see the titles of the items. |
 | **Passwords and sessions** | Minimum length of the password, attempts before the lock, length of the lock and of the session, «Remember me» — only stricter than the platform. |
-| **Keys of outside services** | Keys the tenant pays for; a shared key is used by everybody in the tenant, one not shared only by Tenant Managers. Only the last four characters show after saving. |
+| **Keys of outside services** | Keys the tenant pays for, for the services the installed plugins use (each says which plugins use it); a shared key is used by everybody in the tenant, one not shared only by Tenant Managers. Only the last four characters show after saving. A key of a service no plugin uses any more is marked as not used: remove it. |
 | **Embedding** | The sites that may show the public pages of the tenant, among the ones the platform allows. |
 | **Notifications** | The defaults of the emails of the notifications for the people of the tenant. |
 | **Identity and appearance** | **Identity and texts** (name, welcome text, footer, privacy and legal notes, guide, **Landing page**, logos for light and dark backgrounds), **Theme and mode** (the theme of the tenant among the ones offered, **New theme** with the theme editor if allowed, default mode), **Languages and formats** (the languages offered, among the platform's, and the default). |
