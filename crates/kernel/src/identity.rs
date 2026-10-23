@@ -430,6 +430,23 @@ async fn finish_session(k: &Kernel, user_id: Uuid, ip: &str, remember: bool) -> 
         .bind(user_id)
         .fetch_one(&k.db)
         .await?;
+    // A person signs in only with somewhere to work: suspended in the home tenant and in every other one
+    // means no session (a suspended membership is not a membership). Suspended only at home but active
+    // as a guest elsewhere: the session opens and the shell lands in the other tenant. Administrators
+    // (system tenant) have no memberships.
+    let works: bool = mosaikit_db::query_scalar(
+        "select t.is_system or exists (select 1 from core.memberships m join core.tenants mt on mt.id = m.tenant_id
+                                       where m.user_id = $1 and m.status = 'active' and mt.status = 'active')
+         from core.tenants t where t.id = $2",
+    )
+    .bind(user_id)
+    .bind(home)
+    .fetch_one(&k.db)
+    .await?;
+    if !works {
+        events::record_failure(k, Some(home), Some(user_id), "login.suspended", json!({ "ip": ip })).await;
+        return Err(Error::forbidden("your access to the tenant is suspended").with_code("membership_suspended"));
+    }
     let sec = crate::tenancy::levels::security(k, Some(home)).await?;
     let minutes =
         if remember && sec.remember_days > 0 { sec.remember_days * 24 * 60 } else { sec.session_hours * 60 };

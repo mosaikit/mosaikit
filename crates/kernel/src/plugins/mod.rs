@@ -4,6 +4,7 @@ pub mod config;
 pub mod dev;
 pub mod extensions;
 mod install;
+mod memory;
 pub mod registry;
 pub mod tenants;
 
@@ -371,16 +372,46 @@ pub struct UninstallImpact {
 
 pub async fn uninstall_impact(k: &Kernel, admin: &SessionUser, id: &str) -> Result<UninstallImpact> {
     crate::tenancy::require_admin(admin)?;
-    k.plugins.get(id).ok_or_else(|| Error::not_found(format!("plugin not installed: {id}")))?;
-    let r = mosaikit_db::query(
-        "select count(*), count(distinct tenant_id) from core.resources where plugin_id = $1",
-    )
-    .bind(id)
-    .fetch_one(&k.db)
-    .await?;
+    let p = k.plugins.get(id).ok_or_else(|| Error::not_found(format!("plugin not installed: {id}")))?;
+    // an extension has no items of its own: what goes away are its values on the items of the plugin it
+    // extends, in the tenants where it is on or holds values
+    let (items, tenants): (i64, i64) = if p.manifest.extends.is_some() {
+        let r = mosaikit_db::query(
+            "select count(*), count(distinct tenant_id) from core.extension_values where extension_id = $1",
+        )
+        .bind(id)
+        .fetch_one(&k.db)
+        .await?;
+        let with_values: std::collections::HashSet<Uuid> = mosaikit_db::query_scalar(
+            "select distinct tenant_id from core.extension_values where extension_id = $1",
+        )
+        .bind(id)
+        .fetch_all(&k.db)
+        .await?
+        .into_iter()
+        .collect();
+        let mut on = with_values.clone();
+        let all: Vec<Uuid> = mosaikit_db::query_scalar("select id from core.tenants where not is_system")
+            .fetch_all(&k.db)
+            .await?;
+        for t in all {
+            if tenants::is_on(k, t, id).await? {
+                on.insert(t);
+            }
+        }
+        (r.get(0), on.len() as i64)
+    } else {
+        let r = mosaikit_db::query(
+            "select count(*), count(distinct tenant_id) from core.resources where plugin_id = $1",
+        )
+        .bind(id)
+        .fetch_one(&k.db)
+        .await?;
+        (r.get(0), r.get(1))
+    };
     Ok(UninstallImpact {
-        items: r.get(0),
-        tenants: r.get(1),
+        items,
+        tenants,
         extensions: k
             .plugins
             .list()
@@ -448,6 +479,8 @@ pub async fn uninstall(k: &Kernel, admin: &SessionUser, id: &str) -> Result<()> 
     k.db.forget_plugin_pool(id).await;
     let ps = k.db.plugin_schema(id, &p.schema());
     let mut tx = k.db.begin_app().await?;
+    // its state and the choices of the tenants, for an install again (memory.rs)
+    memory::remember(&mut tx, id).await?;
     ps.drop(&mut tx).await?;
     mosaikit_db::query("delete from core.plugins where id = $1").bind(id).execute(&mut *tx).await?;
     tx.commit().await?;

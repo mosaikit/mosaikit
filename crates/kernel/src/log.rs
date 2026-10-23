@@ -199,12 +199,38 @@ async fn fetch(k: &Kernel, scope: Scope<'_>, f: &LogFilter, limit: i64) -> Resul
         Scope::Tenant(c) => Some(c.tenant.settings.managers_see_titles),
         Scope::Platform(_) => None,
     };
+    // the person an event is about (`detail.user`: suspended, made active again, role changed…) by name,
+    // so that «On what» is never empty; one query per person of the page
+    let mut names: std::collections::HashMap<String, String> = std::collections::HashMap::new();
+    for r in &rows {
+        let detail: Value = r.get(13);
+        let Some(id) = detail.get("user").and_then(Value::as_str).filter(|_| detail.get("name").is_none()) else {
+            continue;
+        };
+        if names.contains_key(id) {
+            continue;
+        }
+        let Ok(uid) = id.parse::<uuid::Uuid>() else { continue };
+        let name: Option<String> = mosaikit_db::query_scalar(
+            "select coalesce(nullif(display_name, ''), username) from core.users where id = $1",
+        )
+        .bind(uid)
+        .fetch_optional(&k.db)
+        .await?;
+        if let Some(n) = name {
+            names.insert(id.to_string(), n);
+        }
+    }
     Ok(rows
         .iter()
         .map(|r| {
             let settings: Option<Value> = r.get(5);
             let titles = manager_titles.unwrap_or_else(|| settings.as_ref().is_none_or(see_titles));
             let mut detail: Value = r.get(13);
+            let about = detail.get("user").and_then(Value::as_str).and_then(|u| names.get(u)).cloned();
+            if let (Some(n), Some(o)) = (about, detail.as_object_mut()) {
+                o.insert("name".into(), Value::String(n));
+            }
             if !titles {
                 // the title kept by the events of deleted items follows the same policy
                 if let Some(o) = detail.as_object_mut() {

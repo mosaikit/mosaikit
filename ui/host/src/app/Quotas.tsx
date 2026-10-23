@@ -609,11 +609,12 @@ export function QuotaAlert({ slug, manager, compact }: { slug: string; manager: 
       className={cn(
         'flex items-center gap-2 rounded-md border px-2 py-1.5 text-xs font-medium',
         full ? 'border-destructive/40 bg-destructive/10 text-destructive' : 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300',
-        compact && 'justify-center px-0',
+        compact && 'flex-col justify-center gap-0.5 px-0 py-1 text-[10px]',
       )}
     >
       <AlertTriangle className="size-4 shrink-0" />
-      {!compact && <span className="min-w-0 truncate">{text}</span>}
+      {/* with the sidebar closed the icon keeps a visible figure, like the labels of the rail */}
+      {compact ? <span aria-hidden="true" className="tabular-nums">{full ? '100%' : `${worst.percent}%`}</span> : <span className="min-w-0 truncate">{text}</span>}
     </a>
   )
 }

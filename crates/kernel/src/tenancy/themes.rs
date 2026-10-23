@@ -152,8 +152,16 @@ fn primary_hover(primary: &str, mode: &str) -> Option<String> {
     Some(format!("#{:02x}{:02x}{:02x}", m(c[0]), m(c[1]), m(c[2])))
 }
 
+/// The background of the selected item of a list: the pane with a 10 % tint of the accent (the
+/// `bg-primary/10` of the shell's section lists), as `#rrggbb`.
+fn selected_bg(pane: &str, primary: &str) -> Option<String> {
+    let (a, b) = (rgb(pane)?, rgb(primary)?);
+    let m = |i: usize| ((a[i] + (b[i] - a[i]) * 0.1) * 255.0).round().clamp(0.0, 255.0) as u8;
+    Some(format!("#{:02x}{:02x}{:02x}", m(0), m(1), m(2)))
+}
+
 /// The checks that fail in a set of variables: `(text, background, mode, ratio)`; the main button is
-/// checked also under the pointer.
+/// checked also under the pointer, the strong accent on the selected item of a list.
 pub fn failing(vars: &BTreeMap<String, String>, mode: &str) -> Vec<(String, String, String, f64)> {
     let mut out: Vec<(String, String, String, f64)> = CHECKS
         .iter()
@@ -169,6 +177,17 @@ pub fn failing(vars: &BTreeMap<String, String>, mode: &str) -> Vec<(String, Stri
             out.push((
                 "--primary-foreground".into(),
                 "--primary (hover)".into(),
+                mode.into(),
+                (r * 100.0).round() / 100.0,
+            ));
+        }
+    }
+    let selected = vars.get("--pane").zip(vars.get("--primary")).and_then(|(pane, p)| selected_bg(pane, p));
+    if let (Some(bg), Some(fg)) = (selected, vars.get("--primary-strong")) {
+        if let Some(r) = contrast(fg, &bg).filter(|r| r + 1e-9 < 4.5) {
+            out.push((
+                "--primary-strong".into(),
+                "--pane (selected)".into(),
                 mode.into(),
                 (r * 100.0).round() / 100.0,
             ));
@@ -502,5 +521,16 @@ mod tests {
         let mut inject = ok.clone();
         inject.dark.insert("--card".into(), "#000; } body { display:none".into());
         assert!(check(&inject).is_err());
+        // the selected item of a list: the strong accent on the pane tinted 10 % with the accent
+        let mut dark = ok.clone();
+        dark.dark.insert("--pane".into(), "#242424".into());
+        dark.dark.insert("--primary".into(), "#7f85f5".into());
+        dark.dark.insert("--primary-foreground".into(), "#141414".into());
+        dark.dark.insert("--background".into(), "#1f1f1f".into());
+        dark.dark.insert("--foreground".into(), "#f0f0f0".into());
+        dark.dark.insert("--primary-strong".into(), "#7f85f5".into());
+        assert!(failing(&dark.dark, "dark").iter().any(|f| f.0 == "--primary-strong"));
+        dark.dark.insert("--primary-strong".into(), "#9196f7".into());
+        assert!(!failing(&dark.dark, "dark").iter().any(|f| f.0 == "--primary-strong"));
     }
 }

@@ -3,7 +3,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { api, ApiError, errText, isUnavailable, setCsrf } from '../api.ts'
-import { retryDelay } from '../brand.ts'
+import { reloadBrand, retryDelay } from '../brand.ts'
 import type { Config, PluginView, Session, TenantContext } from '../types.ts'
 export { useConfirm } from './confirm.ts'
 
@@ -18,7 +18,11 @@ export function useSession() {
         return s
       } catch (e) {
         // signed out, or only the Administrators work (maintenance): the sign-in page with the notice
-        if (e instanceof ApiError && (e.status === 401 || e.code === 'maintenance')) return null
+        if (e instanceof ApiError && e.code === 'maintenance') {
+          reloadBrand()
+          return null
+        }
+        if (e instanceof ApiError && e.status === 401) return null
         throw e
       }
     },

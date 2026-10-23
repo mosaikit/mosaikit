@@ -25,6 +25,9 @@ pub struct Service {
     /// time of the check, in milliseconds
     pub ms: Option<f64>,
     pub detail: String,
+    /// more about the service for the side panel of Monitoring: (label, value), labels in English (the
+    /// shell translates them)
+    pub facts: Vec<[String; 2]>,
 }
 
 fn service(
@@ -35,7 +38,7 @@ fn service(
     ms: Option<f64>,
     detail: String,
 ) -> Service {
-    Service { key: key.into(), name: name.into(), state, version: version.into(), ms, detail }
+    Service { key: key.into(), name: name.into(), state, version: version.into(), ms, detail, facts: Vec::new() }
 }
 
 /// Reachability of the identity providers of the tenants, checked at most every 5 minutes.
@@ -77,6 +80,46 @@ async fn providers(k: &Kernel) -> Result<Vec<Service>> {
     }
     *k.ops.providers.lock().expect("providers") = Some((Instant::now(), out.clone()));
     Ok(out)
+}
+
+/// Reachability of the mail server, checked at most every minute.
+const MAIL_CACHE: StdDuration = StdDuration::from_secs(60);
+
+async fn mail_service(k: &Kernel) -> Result<Service> {
+    if let Some((at, s)) = k.ops.mail_probe.lock().expect("mail_probe").clone() {
+        if at.elapsed() < MAIL_CACHE {
+            return Ok(s);
+        }
+    }
+    let (pending, failed) = metrics::mail_queue(k).await?;
+    let probe = crate::mail::probe(k).await?;
+    let last = k.ops.mail_last.lock().expect("mail_last").clone();
+    let mut facts = vec![
+        ["Waiting in the queue".to_string(), pending.to_string()],
+        ["Failed in 24 hours".to_string(), failed.to_string()],
+    ];
+    if let Some((at, err, detail)) = &last {
+        facts.push(["Last delivery".to_string(), at.format("%Y-%m-%d %H:%M:%S UTC").to_string()]);
+        facts.push(["Outcome".to_string(), if err.is_some() { detail.clone() } else { "delivered".to_string() }]);
+    }
+    let (state, ms, detail) = match &probe {
+        None => ("off", None, "no mail server".to_string()),
+        Some(Err(e)) => ("down", None, e.message.trim_start_matches("mail server: ").to_string()),
+        Some(Ok(ms)) => {
+            let recent_error = last.as_ref().is_some_and(|(at, err, _)| {
+                err.is_some() && Utc::now() - *at < Duration::hours(1)
+            });
+            (
+                if failed > 0 || recent_error { "degraded" } else { "ok" },
+                Some(*ms),
+                format!("{pending} waiting, {failed} failed in 24 hours"),
+            )
+        }
+    };
+    let mut s = service("mail", "Emails", state, "SMTP", ms, detail);
+    s.facts = facts;
+    *k.ops.mail_probe.lock().expect("mail_probe") = Some((Instant::now(), s.clone()));
+    Ok(s)
 }
 
 /// The services of the platform and their state.
@@ -123,27 +166,8 @@ pub async fn services(k: &Kernel) -> Result<Vec<Service>> {
         ),
         Err(e) => service("storage", "Storage of the contents", "down", "file system", ms, e.to_string()),
     });
-    // emails
-    let (pending, failed) = metrics::mail_queue(k).await?;
-    let configured = crate::mail::is_configured(k).await?;
-    let state = if !configured {
-        "off"
-    } else if failed > 0 {
-        "degraded"
-    } else {
-        "ok"
-    };
-    out.push(service(
-        "mail",
-        "Emails",
-        state,
-        "SMTP",
-        None,
-        format!(
-            "{pending} waiting, {failed} failed in 24 hours{}",
-            if configured { "" } else { " · no mail server" }
-        ),
-    ));
+    // emails: the queue, the last delivery and whether the server accepts a connection now
+    out.push(mail_service(k).await?);
     // background work
     let ticks = k.ops.ticks();
     let state = if k.cfg.no_background {
@@ -177,6 +201,21 @@ pub async fn services(k: &Kernel) -> Result<Vec<Service>> {
             if blocked > 0 { format!(", {blocked} blocked") } else { String::new() }
         ),
     ));
+    // search index: the items still waiting for their searchable text (the background work indexes them a
+    // batch at a time)
+    let waiting: i64 = mosaikit_db::query_scalar("select count(*) from core.resources where search_text is null")
+        .fetch_one(&k.db)
+        .await?;
+    let mut search = service(
+        "search",
+        "Search index",
+        if waiting > 5000 { "degraded" } else { "ok" },
+        if k.db.is_sqlite() { "SQLite" } else { "PostgreSQL full text" },
+        None,
+        if waiting == 0 { "every item indexed".to_string() } else { format!("{waiting} items waiting") },
+    );
+    search.facts = vec![["Items waiting".to_string(), waiting.to_string()]];
+    out.push(search);
     // backups
     let last: Option<(String, DateTime<Utc>)> = mosaikit_db::query(
         "select status, started_at from core.backups where status <> 'running' order by started_at desc limit 1",

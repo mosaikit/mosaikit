@@ -23,6 +23,10 @@ pub struct Ops {
     ticks: Mutex<HashMap<&'static str, DateTime<Utc>>>,
     pub(crate) maintenance: Mutex<Option<(Instant, maintenance::Maintenance)>>,
     pub(crate) providers: Mutex<Option<(Instant, Vec<monitor::Service>)>>,
+    /// the last attempt to hand a message to the mail server: when, error code (`None`: delivered), detail
+    pub(crate) mail_last: Mutex<Option<(DateTime<Utc>, Option<&'static str>, String)>>,
+    /// reachability of the mail server, checked at most every minute
+    pub(crate) mail_probe: Mutex<Option<(Instant, monitor::Service)>>,
     pub backup_running: AtomicBool,
     pub(crate) started: Instant,
 }
@@ -34,6 +38,8 @@ impl Default for Ops {
             ticks: Mutex::new(HashMap::new()),
             maintenance: Mutex::new(None),
             providers: Mutex::new(None),
+            mail_last: Mutex::new(None),
+            mail_probe: Mutex::new(None),
             backup_running: AtomicBool::new(false),
             started: Instant::now(),
         }
@@ -41,6 +47,14 @@ impl Default for Ops {
 }
 
 impl Ops {
+    /// Records the outcome of a delivery to the mail server (monitoring shows it).
+    pub(crate) fn mail_result(&self, err: Option<&crate::Error>) {
+        let v = (Utc::now(), err.map(|e| e.code()), err.map(|e| e.message.clone()).unwrap_or_default());
+        *self.mail_last.lock().expect("mail_last") = Some(v);
+        // the next look at Monitoring checks the server again
+        *self.mail_probe.lock().expect("mail_probe") = None;
+    }
+
     pub(crate) fn tick(&self, job: &'static str) {
         self.ticks.lock().expect("ticks").insert(job, Utc::now());
     }

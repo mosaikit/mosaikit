@@ -103,6 +103,20 @@ describe('mountCrud', () => {
     expect(buttons.filter((b) => !b.hidden).map((b) => b.textContent)).toEqual(['Close'])
   })
 
+  it('does not offer what the profile of the person does not allow', async () => {
+    const el = document.createElement('div')
+    const { msk: base } = fakeMsk([row('1', 'mine', 'manage')])
+    // only "use": no New, and on an item managed by the person no Share or Delete
+    const msk = new Msk(base.bridge, { public: false, perms: ['use'] } as never)
+    mountCrud(el, msk, 'notes')
+    await tick()
+    const toolbar = [...el.querySelectorAll<HTMLButtonElement>('.msk-toolbar button')]
+    expect(toolbar.filter((b) => !b.hidden)).toEqual([])
+    ;(el.querySelector('tbody tr.row') as HTMLElement).click()
+    const buttons = [...el.querySelectorAll<HTMLButtonElement>('.msk-actions button')]
+    expect(buttons.filter((b) => !b.hidden).map((b) => b.textContent)).toEqual(['Save', 'Close'])
+  })
+
   it('creates an item with typed values', async () => {
     const el = document.createElement('div')
     const { msk, calls } = fakeMsk([])

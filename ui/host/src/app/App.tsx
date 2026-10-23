@@ -2,11 +2,13 @@
 
 import { useEffect, useRef } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Loader2 } from 'lucide-react'
-import { errText, isUnavailable, setUnauthorizedHandler } from '../api.ts'
+import { Loader2, LogOut } from 'lucide-react'
+import { api, errText, isUnavailable, setUnauthorizedHandler } from '../api.ts'
+import { reloadBrand } from '../brand.ts'
 import type { Session } from '../types.ts'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { Button } from '@/components/ui/button'
 import { useSession, useTenantCtx } from './core.ts'
 import { setLanguageContext, useLang, t } from './i18n.ts'
 import { useFavicon } from './mark.ts'
@@ -45,6 +47,34 @@ function landing(s: Session, r: Route, hash: string): string | null {
   const page = slug === s.user.home_tenant_slug ? s.config?.['identity.landing'] : undefined
   if (slug && typeof page === 'string' && page !== 'home') return to.plugin(slug, page)
   return slug ? to.tenant(slug) : null
+}
+
+/** A session without any tenant to work in (every membership suspended meanwhile): a clear page with
+ *  Sign out instead of a shell that cannot load anything. Signing in again is refused with the same
+ *  reason (`membership_suspended`). */
+function NoTenant() {
+  const qc = useQueryClient()
+  async function signOut() {
+    try {
+      await api('POST', '/api/auth/logout')
+    } catch {
+      /* session already closed */
+    }
+    qc.setQueryData(['session'], null)
+    qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'session' })
+    go('#/')
+  }
+  return (
+    <main className="flex h-full items-center justify-center p-6">
+      <Empty title={t('Your access to the tenant is suspended')}>
+        <p className="max-w-sm text-sm text-muted-foreground">{t('There is no tenant you can work in now. Ask the Tenant Manager of your tenant.')}</p>
+        <Button className="mt-4" onClick={() => void signOut()}>
+          <LogOut />
+          {t('Sign out')}
+        </Button>
+      </Empty>
+    </main>
+  )
 }
 
 function Page({ session, route }: { session: Session; route: Route }) {
@@ -99,7 +129,16 @@ export default function App() {
   }, [uiLang, qc])
   const route = parse(hash)
   useFavicon()
-  useEffect(() => setUnauthorizedHandler(() => qc.setQueryData(['session'], null)), [qc])
+  // signed out by the server (expired session, or maintenance that started meanwhile): the sign-in page,
+  // with the brand asked again so that it shows the notice of a maintenance
+  useEffect(
+    () =>
+      setUnauthorizedHandler(() => {
+        qc.setQueryData(['session'], null)
+        reloadBrand()
+      }),
+    [qc],
+  )
   const s = session.data
   const target = s ? landing(s, route, hash) : null
   // the theme of the tenant one works in, otherwise the one of the platform
@@ -154,6 +193,8 @@ export default function App() {
           <ResetPage token={route.token} />
         ) : !s ? (
           <Login door={route.area === 'login' ? route.door : route.area === 'admin' ? 'admin' : 'tenant'} tenant={route.area === 'login' ? route.tenant : undefined} />
+        ) : !s.user.is_system_admin && s.memberships.length === 0 ? (
+          <NoTenant />
         ) : target ? null : (
           <Shell session={s} route={route}>
             <Page session={s} route={route} />

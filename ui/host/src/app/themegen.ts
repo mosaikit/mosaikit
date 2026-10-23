@@ -120,7 +120,7 @@ export function generate(o: ThemeChoices): { light: Vars; dark: Vars } {
     '--popover-foreground': l.text,
     '--primary': acc,
     '--primary-foreground': onColor(acc),
-    '--primary-strong': mix(acc, '#000000', 0.12),
+    '--primary-strong': readable(mix(acc, '#000000', 0.12), mix(l.pane, acc, 0.1), 'light'),
     '--secondary': l.pane,
     '--secondary-foreground': l.text,
     '--muted': l.pane,
@@ -155,7 +155,7 @@ export function generate(o: ThemeChoices): { light: Vars; dark: Vars } {
     '--popover-foreground': d.text,
     '--primary': accD,
     '--primary-foreground': onColor(accD),
-    '--primary-strong': accD,
+    '--primary-strong': readable(accD, mix(d.pane, accD, 0.1), 'dark'),
     '--secondary': d.hover,
     '--secondary-foreground': d.text,
     '--muted': d.hover,
@@ -182,6 +182,19 @@ export function generate(o: ThemeChoices): { light: Vars; dark: Vars } {
     '--rail-foreground': d.text3,
   }
   return { light, dark }
+}
+
+/** A text colour that reads on `bg` (AA with a small margin): darker in light mode, lighter in dark mode. */
+export function readable(fg: string, bg: string, mode: 'light' | 'dark'): string {
+  let c = fg
+  for (let i = 0; i < 40 && contrast(c, bg) < 4.6; i++) c = mix(c, mode === 'dark' ? '#ffffff' : '#000000', 0.06)
+  return c
+}
+
+/** The background of the selected item of a list: the pane with a 10 % tint of the accent (the
+ *  `bg-primary/10` of the «Sections» lists). */
+export function selectedBg(pane: string, primary: string): string {
+  return mix(pane, primary, 0.1)
 }
 
 /** The pairs that must read (text, background): the same list as the kernel. */
@@ -225,7 +238,13 @@ export function checks(t: { light: Vars; dark: Vars }): Check[] {
       out.push({ label, mode, fg, bg, ratio: Math.round(ratio * 100) / 100, ok: ratio >= 4.5 })
     }
     const p = t[mode]['--primary'],
-      pf = t[mode]['--primary-foreground']
+      pf = t[mode]['--primary-foreground'],
+      ps = t[mode]['--primary-strong'],
+      pane = t[mode]['--pane']
+    if (p && ps && pane && isHex(p) && isHex(ps) && isHex(pane)) {
+      const ratio = contrast(ps, selectedBg(pane, p))
+      out.push({ label: 'Selected item of a list', mode, fg: '--primary-strong', bg: '--pane', ratio: Math.round(ratio * 100) / 100, ok: ratio >= 4.5 })
+    }
     if (p && pf && isHex(p) && isHex(pf)) {
       const ratio = contrast(pf, primaryHover(p, mode))
       out.push({ label: 'Main button under the pointer', mode, fg: '--primary-foreground', bg: '--primary', ratio: Math.round(ratio * 100) / 100, ok: ratio >= 4.5 })

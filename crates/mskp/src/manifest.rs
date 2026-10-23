@@ -462,6 +462,13 @@ pub struct ResourceDecl {
     /// Field used as the title of the resource (default: the first text field).
     #[serde(default)]
     pub title_field: Option<String>,
+    /// Date field that is the due date of an item: the kernel copies it, and the Home of a person lists
+    /// what is due soon (`kind = "date"`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub due_field: Option<String>,
+    /// Bool field that says an item is done: a done item is no longer due (`kind = "bool"`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub done_field: Option<String>,
     pub fields: Vec<FieldDecl>,
 }
 
@@ -652,6 +659,19 @@ impl Manifest {
             if let Some(t) = &r.title_field {
                 if !r.fields.iter().any(|f| &f.key == t) {
                     return bad(format!("title_field '{t}' does not exist in '{}'", r.name));
+                }
+            }
+            for (what, key, kind) in
+                [("due_field", &r.due_field, FieldKind::Date), ("done_field", &r.done_field, FieldKind::Bool)]
+            {
+                if let Some(key) = key {
+                    if !r.fields.iter().any(|f| &f.key == key && f.kind == kind) {
+                        return bad(format!(
+                            "{what} '{key}' must be a {} field of '{}'",
+                            if kind == FieldKind::Date { "date" } else { "bool" },
+                            r.name
+                        ));
+                    }
                 }
             }
         }

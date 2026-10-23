@@ -220,7 +220,7 @@ export function AdminPlugins({ section }: { section?: string }) {
                             {p.version}
                             {c?.update_available && <span className="ml-1.5 text-primary-strong">→ {c.latest}</span>}
                           </TableCell>
-                          <TableCell className="text-sm">{p.signed_by ?? <span className="text-warn">{t('unsigned')}</span>}</TableCell>
+                          <TableCell className="text-sm">{p.signed_by ? <SignedBy value={p.signed_by} /> : <span className="text-warn">{t('unsigned')}</span>}</TableCell>
                           <TableCell>
                             <StatusBadge status={p.status} />
                           </TableCell>
@@ -250,7 +250,7 @@ export function AdminPlugins({ section }: { section?: string }) {
                     </CardTitle>
                     <CardDescription>
                       {c.description}
-                      {c.extends && <> · {t('Extends {name}', { name: c.extends })}</>}
+                      {c.extends && <> · {t('Extends {name}', { name: installed.data?.find((x) => x.id === c.extends)?.label ?? c.extends })}</>}
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-3">
@@ -318,7 +318,10 @@ export function AdminPluginPage({ id, tab }: { id: string; tab?: string }) {
   async function remove() {
     const impact = await api<UninstallImpact>('GET', `/api/admin/plugins/${enc(id)}/impact`)
     const what = [
-      t('{items} items in {tenants} tenants are removed with their shares and links.', { items: impact.items, tenants: impact.tenants }),
+      kind === 'extension'
+        ? t('Its values on {items} items in {tenants} tenants are removed; the items stay.', { items: impact.items, tenants: impact.tenants })
+        : t('{items} items in {tenants} tenants are removed with their shares and links.', { items: impact.items, tenants: impact.tenants }),
+      t('Installing it again brings back its state and the choices of the tenants.'),
       impact.extensions.length ? t('These extensions stop working: {names}.', { names: impact.extensions.join(', ') }) : '',
     ]
       .filter(Boolean)
@@ -474,22 +477,25 @@ function PluginAsks({ p, base }: { p: AdminPlugin; base?: string }) {
           </dl>
         </CardContent>
       </Card>
-      {!!p.user_permissions?.length && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{t('Permissions it brings')}</CardTitle>
-            <CardDescription>{t('Besides use, create, delete and share: given by the permission profiles of each tenant.')}</CardDescription>
-          </CardHeader>
-          <CardContent className="grid gap-2 text-sm">
-            {p.user_permissions.map((u) => (
-              <div key={u.key}>
-                <b>{u.label}</b> <span className="font-mono text-xs text-muted-foreground">{u.key}</span>
-                {u.description && <p className="text-muted-foreground">{u.description}</p>}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('Permissions it brings')}</CardTitle>
+          <CardDescription>{t('Given by the permission profiles of each tenant; the standard ones are enforced by the kernel, the others by the plugin.')}</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-2 text-sm">
+          {(kindOf(p) === 'extension' ? ['Use the extension'] : kindOf(p) === 'service' ? ['Use the service'] : ['Use the app']).concat(['Create items', 'Delete items', 'Share items']).map((l) => (
+            <div key={l}>
+              <b>{t(l)}</b> <span className="text-xs text-muted-foreground">{t('standard')}</span>
+            </div>
+          ))}
+          {(p.user_permissions ?? []).map((u) => (
+            <div key={u.key}>
+              <b>{u.label}</b> <span className="font-mono text-xs text-muted-foreground">{u.key}</span>
+              {u.description && <p className="text-muted-foreground">{u.description}</p>}
+            </div>
+          ))}
+        </CardContent>
+      </Card>
       {!!(p.extension?.fields.length || p.extension?.actions.length) && (
         <Card>
           <CardHeader>
@@ -868,7 +874,7 @@ export function TenantPlugins({ slug }: { slug: string }) {
                             <KeySquare />
                             {t('Access and permissions')}
                           </Button>
-                          {p.has_ui && p.on && (
+                          {p.has_ui && p.on && p.kind !== 'extension' && (
                             <Button variant="ghost" size="sm" onClick={() => go(to.plugin(slug, p.id))}>
                               {t('Open')}
                             </Button>
@@ -959,4 +965,15 @@ function patternLabel(pattern: string): string {
     tabs: t('Apps and pages as tabs'),
   }
   return names[pattern] ?? pattern
+}
+
+/** Who signed a package: the name of a known publisher, or a short fingerprint of the key (the whole key in
+ *  the tooltip) instead of the raw base64. */
+function SignedBy({ value }: { value: string }) {
+  if (value.length <= 24) return <>{value}</>
+  return (
+    <span className="font-mono text-xs" title={value}>
+      {t('key {fingerprint}', { fingerprint: `${value.slice(0, 8)}…` })}
+    </span>
+  )
 }

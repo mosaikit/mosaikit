@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useApi, useConfirm } from './core.ts'
-import { t } from './i18n.ts'
+import { fmtDay, t } from './i18n.ts'
 import { levelHint, levelName } from './levels.ts'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -265,7 +265,7 @@ export default function ShareDialog({ ctx, resourceId, onClose }: { ctx: TenantC
                           <span className="min-w-0 flex-1">
                             {t('Created on {date}', { date: fmtDate(l.created_at) })}
                             <span className="block text-xs text-muted-foreground">
-                              {l.expires_at ? t('Expires on {date}', { date: fmtDate(l.expires_at) }) : t('No expiry')} · {t('{n} views', { n: l.view_count })}
+                              {l.expires_at ? t('Expires on {date}', { date: fmtDay(l.expires_at) }) : t('No expiry')} · {t('{n} views', { n: l.view_count })}
                               {l.has_password ? ` · ${t('with password')}` : ''}
                             </span>
                           </span>

@@ -152,6 +152,8 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     filter.setAttribute('aria-label', tr('filterLabel'))
     btnNew.textContent = opts.newLabel ?? tr('new')
     btnMore.textContent = tr('more')
+    // what the profile of the person does not allow is not offered (the kernel refuses it anyway)
+    btnNew.hidden = !msk.can('create')
     btnSave.textContent = tr('save')
     btnShare.textContent = tr('share')
     btnDel.textContent = tr('del')
@@ -301,8 +303,8 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     tabPanel.hidden = !inTab
     fieldsBox.replaceChildren(...visibleFields().map((f) => input(f, row?.values[f.key], !canWrite)))
     btnSave.hidden = !canWrite || inTab
-    btnDel.hidden = !row || !canManage || inTab
-    btnShare.hidden = !row || !canManage || inTab
+    btnDel.hidden = !row || !canManage || inTab || !msk.can('delete')
+    btnShare.hidden = !row || !canManage || inTab || !msk.can('share')
     btnCancel.textContent = row ? tr('close') : tr('cancel')
     renderExtensions(row, canWrite)
     if (row && st.tab) {

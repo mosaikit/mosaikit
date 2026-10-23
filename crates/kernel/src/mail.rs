@@ -112,9 +112,21 @@ fn configured(s: &EmailSettings) -> bool {
     !s.host.is_empty() && !s.sender.is_empty()
 }
 
-/// A server and a sender are set: the platform can send emails (Monitoring).
-pub(crate) async fn is_configured(k: &Kernel) -> Result<bool> {
-    Ok(configured(&stored(k).await?))
+/// Whether the mail server accepts a connection now (Monitoring): `Ok(ms)` or the coded error. Only the
+/// TCP connection is opened, no message is sent.
+pub(crate) async fn probe(k: &Kernel) -> Result<Option<std::result::Result<f64, Error>>> {
+    let s = stored(k).await?;
+    if !configured(&s) {
+        return Ok(None);
+    }
+    let t = std::time::Instant::now();
+    let res = tokio::time::timeout(StdDuration::from_secs(3), TcpStream::connect((s.host.as_str(), s.port))).await;
+    Ok(Some(match res {
+        Ok(Ok(_)) => Ok(t.elapsed().as_secs_f64() * 1000.0),
+        Ok(Err(e)) => Err(connect_err(&e, &s.host, s.port)),
+        Err(_) => Err(Error::new(crate::Kind::BadRequest, format!("mail server: {}:{} does not answer", s.host, s.port))
+            .with_code("email_timeout")),
+    }))
 }
 
 pub async fn settings(k: &Kernel, admin: &SessionUser) -> Result<EmailView> {
@@ -197,7 +209,9 @@ pub async fn send_test(k: &Kernel, admin: &SessionUser, to: &str) -> Result<()> 
         .unwrap_or("Mosaikit")
         .to_string();
     let body = format!("This is a test message of {name}: the mail server works.\n\n-- \n{}", s.footer);
-    deliver(&s, password(k).await?.as_deref(), to, &format!("Test message of {name}"), &body).await
+    let res = deliver(&s, password(k).await?.as_deref(), to, &format!("Test message of {name}"), &body).await;
+    k.ops.mail_result(res.as_ref().err());
+    res
 }
 
 // ------------------------------------------------------------------ queue
@@ -267,7 +281,9 @@ pub async fn drain(k: &Kernel) -> Result<usize> {
                 .await?;
         let (to, subject, body, attempts): (String, String, String, i32) =
             (row.get(0), row.get(1), row.get(2), row.get(3));
-        match deliver(&s, pw.as_deref(), &to, &subject, &body).await {
+        let res = deliver(&s, pw.as_deref(), &to, &subject, &body).await;
+        k.ops.mail_result(res.as_ref().err());
+        match res {
             Ok(()) => {
                 sent += 1;
                 mosaikit_db::query("update core.mail_outbox set status = 'sent', attempts = $2, sent_at = $3, last_error = '' where id = $1")
@@ -465,6 +481,22 @@ fn smtp_err(m: impl std::fmt::Display) -> Error {
     Error::new(crate::Kind::BadRequest, format!("mail server: {m}")).with_code("email_failed")
 }
 
+/// A connection that does not open, with a code the shell translates and an English message without the
+/// text of the operating system (it changes with its language).
+fn connect_err(e: &std::io::Error, host: &str, port: u16) -> Error {
+    let (code, what) = match e.kind() {
+        std::io::ErrorKind::ConnectionRefused => ("email_refused", "refuses the connection"),
+        std::io::ErrorKind::TimedOut => ("email_timeout", "does not answer"),
+        _ => ("email_unreachable", "cannot be reached"),
+    };
+    Error::new(crate::Kind::BadRequest, format!("mail server: {host}:{port} {what}")).with_code(code)
+}
+
+fn tls_err(m: impl std::fmt::Display) -> Error {
+    tracing::debug!("TLS with the mail server: {m}");
+    Error::new(crate::Kind::BadRequest, "mail server: the secure connection (TLS) failed").with_code("email_tls")
+}
+
 const TIMEOUT: StdDuration = StdDuration::from_secs(20);
 
 impl Smtp {
@@ -518,11 +550,11 @@ async fn tls(host: &str, io: Box<dyn Io>) -> Result<Box<dyn Io>> {
     roots.extend(webpki_roots::TLS_SERVER_ROOTS.iter().cloned());
     let cfg = rustls::ClientConfig::builder_with_provider(Arc::new(rustls::crypto::ring::default_provider()))
         .with_safe_default_protocol_versions()
-        .map_err(smtp_err)?
+        .map_err(tls_err)?
         .with_root_certificates(roots)
         .with_no_client_auth();
-    let name = rustls::pki_types::ServerName::try_from(host.to_string()).map_err(smtp_err)?;
-    let s = tokio_rustls::TlsConnector::from(Arc::new(cfg)).connect(name, io).await.map_err(smtp_err)?;
+    let name = rustls::pki_types::ServerName::try_from(host.to_string()).map_err(tls_err)?;
+    let s = tokio_rustls::TlsConnector::from(Arc::new(cfg)).connect(name, io).await.map_err(tls_err)?;
     Ok(Box::new(s))
 }
 
@@ -566,8 +598,11 @@ pub async fn deliver(
     }
     let tcp = tokio::time::timeout(TIMEOUT, TcpStream::connect((s.host.as_str(), s.port)))
         .await
-        .map_err(|_| smtp_err("no answer"))?
-        .map_err(smtp_err)?;
+        .map_err(|_| {
+            Error::new(crate::Kind::BadRequest, format!("mail server: {}:{} does not answer", s.host, s.port))
+                .with_code("email_timeout")
+        })?
+        .map_err(|e| connect_err(&e, &s.host, s.port))?;
     let mut io: Box<dyn Io> = Box::new(tcp);
     if s.security == Security::Tls {
         io = tls(&s.host, io).await?;
@@ -590,7 +625,10 @@ pub async fn deliver(
             return Err(smtp_err("the server does not offer authentication"));
         }
         let token = base64::engine::general_purpose::STANDARD.encode(format!("\0{}\0{pw}", s.username));
-        c.cmd(&format!("AUTH PLAIN {token}"), &[235]).await?;
+        c.cmd(&format!("AUTH PLAIN {token}"), &[235]).await.map_err(|e| {
+            Error::new(crate::Kind::BadRequest, e.message.replace("mail server: ", "mail server refused the sign-in: "))
+                .with_code("email_auth")
+        })?;
     }
     c.cmd(&format!("MAIL FROM:<{}>", address_of(&s.sender)), &[250]).await?;
     c.cmd(&format!("RCPT TO:<{to}>"), &[250, 251]).await?;

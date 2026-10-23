@@ -52,6 +52,8 @@ export function EmailPanel({ session }: { session: Session }) {
   const [v, setV] = useState<Draft | null>(null)
   const [to, setTo] = useState('')
   const [testing, setTesting] = useState(false)
+  // the outcome of the last test, shown next to the button (and in a toast)
+  const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null)
   const save = useAction((d: Draft) => api('PUT', '/api/admin/email', d.password === null ? { ...d, password: undefined } : d), { ok: t('Mail server saved'), invalidate: [['email']] })
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
@@ -62,13 +64,25 @@ export function EmailPanel({ session }: { session: Session }) {
   const set = (x: Partial<Draft>) => setV({ ...d, ...x })
   async function test() {
     setTesting(true)
+    setResult(null)
     try {
       await api('POST', '/api/admin/email/test', { to: to.trim() })
-      toast.success(t('Test message sent to {to}', { to: to.trim() }))
+      const text = t('Test message sent to {to}', { to: to.trim() })
+      setResult({ ok: true, text })
+      toast.success(text)
     } catch (e) {
-      // the answer of the mail server helps whoever sets it: it shows next to the translated message
-      const detail = e instanceof ApiError && e.code === 'email_failed' ? e.message.replace(/^mail server: /, '') : ''
-      toast.error(detail ? `${errText(e)}: ${detail}` : errText(e))
+      // the translated message, with the address of the server; for a refusal of the server its own
+      // answer (SMTP replies are in English) helps whoever sets it — never the text of the operating system
+      const code = e instanceof ApiError ? e.code : undefined
+      const where = `${view.host}:${view.port}`
+      const reply = (code === 'email_failed' || code === 'email_auth') && e instanceof ApiError ? e.message.replace(/^mail server( refused the sign-in)?: /, '') : ''
+      const text = ['email_refused', 'email_timeout', 'email_unreachable'].includes(code ?? '')
+        ? `${errText(e)} (${where})`
+        : reply
+          ? `${errText(e)}: ${reply}`
+          : errText(e)
+      setResult({ ok: false, text })
+      toast.error(text)
     } finally {
       setTesting(false)
     }
@@ -80,7 +94,7 @@ export function EmailPanel({ session }: { session: Session }) {
         <CardHeader>
           <CardTitle className="flex flex-wrap items-center gap-2">
             {t('Mail server')}
-            <Badge variant={view.configured ? 'default' : 'secondary'}>{view.configured ? t('Ready') : t('Not set')}</Badge>
+            <Badge variant="secondary" className={view.configured ? 'bg-ok/10 text-ok' : ''}>{view.configured ? t('Ready') : t('Not set')}</Badge>
           </CardTitle>
           <CardDescription>{t('Used for the notifications by email and their daily summary. Without a server nothing is sent.')}</CardDescription>
         </CardHeader>
@@ -170,6 +184,11 @@ export function EmailPanel({ session }: { session: Session }) {
             {testing ? <Loader2 className="animate-spin" /> : <Mail />}
             {t('Send a test')}
           </Button>
+          {result && (
+            <p role={result.ok ? 'status' : 'alert'} className={result.ok ? 'basis-full text-sm text-ok' : 'basis-full text-sm text-destructive'}>
+              {result.text}
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>

@@ -76,6 +76,9 @@ export default function SearchBox({ session, route, groups }: { session: Session
   const [q, setQ] = useState('')
   const [dq, setDq] = useState('')
   const [pill, setPill] = useState('all')
+  // every opening of the box asks the server again: a share, a restore or a delete made meanwhile (by
+  // anybody) shows at once, never a stale answer of an earlier search
+  const [opened, setOpened] = useState(0)
   const box = useRef<HTMLDivElement>(null)
   const admin = session.user.is_system_admin
   const me = session.user.user_id
@@ -87,27 +90,29 @@ export default function SearchBox({ session, route, groups }: { session: Session
   }, [q])
   const ask = open && searchable(dq)
   const items = useQuery({
-    queryKey: ['search', slug, dq],
+    queryKey: ['search', slug, dq, opened],
     queryFn: () => api<SearchGroupResult[]>('GET', `/api/t/${enc(slug)}/search?q=${enc(dq)}`),
     enabled: ask && !admin && !!slug,
-    staleTime: 15_000,
+    staleTime: 0,
+    gcTime: 30_000,
   })
   const found = useQuery({
-    queryKey: ['admin-search', dq],
+    queryKey: ['admin-search', dq, opened],
     queryFn: () => api<AdminResults>('GET', `/api/admin/search?q=${enc(dq)}`),
     enabled: ask && admin,
-    staleTime: 15_000,
+    staleTime: 0,
+    gcTime: 30_000,
   })
   const [recent, setRecent] = useState<string[]>([])
 
   const all: SearchGroup[] = useMemo(() => {
     const extra: SearchGroup[] = admin
       ? [
-          { id: 'tenants', label: t('Tenant'), remote: true, items: (found.data?.tenants ?? []).map((x) => ({ label: x.name, sub: x.sub, icon: <Building2 />, href: to.adminTenant(x.id) })) },
+          { id: 'tenants', label: t('Tenants'), remote: true, items: (found.data?.tenants ?? []).map((x) => ({ label: x.name, sub: x.sub, icon: <Building2 />, href: to.adminTenant(x.id) })) },
           { id: 'people', label: t('People'), remote: true, items: (found.data?.people ?? []).map((x) => ({ label: x.name, sub: x.sub, icon: <UserRound />, href: to.adminPerson(x.id) })) },
         ]
       : session.memberships.length > 1
-        ? [{ id: 'tenants', label: t('Tenant'), items: session.memberships.map((m) => ({ label: m.name, sub: m.is_home ? 'home' : 'guest', icon: <Building2 />, href: to.tenant(m.slug) })) }]
+        ? [{ id: 'tenants', label: t('Tenants'), items: session.memberships.map((m) => ({ label: m.name, sub: m.is_home ? 'home' : 'guest', icon: <Building2 />, href: to.tenant(m.slug) })) }]
         : []
     const apps: SearchGroup[] = (items.data ?? []).map((g) => ({
       id: `app:${g.plugin_id}`,
@@ -136,9 +141,14 @@ export default function SearchBox({ session, route, groups }: { session: Session
     setDq('')
     setPill('all')
     setRecent(readRecent(me))
+    setOpened((n) => n + 1)
     setOpen(true)
   }, [me])
-  const close = () => setOpen(false)
+  // a search that found something is remembered also when no result is opened (the person read the answer)
+  const close = () => {
+    if (searchable(q.trim()) && shown.length) remember(me, q)
+    setOpen(false)
+  }
   const pick = (href: string) => {
     remember(me, q)
     close()
@@ -225,7 +235,7 @@ export default function SearchBox({ session, route, groups }: { session: Session
             className="absolute top-[calc(100%+6px)] left-1/2 z-50 flex w-[max(100%,520px)] max-w-[calc(100vw-16px)] -translate-x-1/2 flex-col overflow-hidden rounded-lg border bg-popover text-popover-foreground shadow-lg max-[900px]:right-2 max-[900px]:left-2 max-[900px]:w-auto max-[900px]:translate-x-0"
           >
             <div role="tablist" aria-label={t('Show')} className="flex flex-wrap gap-1.5 border-b px-3.5 py-3">
-              {[{ id: 'all', label: t('All'), n: counts.reduce((s, c) => s + c, 0) }, ...all.map((g, i) => ({ id: g.id, label: g.label, n: counts[i] }))].map((p) => (
+              {[{ id: 'all', label: t('All'), n: counts.reduce((s, c) => s + c, 0) }, ...all.map((g, i) => ({ id: g.id, label: g.label, n: counts[i] })).filter((p) => p.n > 0 || p.id === pill)].map((p) => (
                 <button
                   key={p.id}
                   type="button"

@@ -550,6 +550,8 @@ export interface ServiceState {
   version: string
   ms: number | null
   detail: string
+  /** more for the side panel: [label, value], labels in English (translated by the shell) */
+  facts?: [string, string][]
 }
 
 export interface MetricPoint {

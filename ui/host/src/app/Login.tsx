@@ -110,7 +110,7 @@ export default function Login({ door, tenant }: { door: 'tenant' | 'admin'; tena
   }
   return (
     <div className="grid min-h-full bg-background lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
-      <Hero admin={admin} name={tn?.name ?? brand.name} product={brand.name} tagline={brand.tagline} welcome={tn?.welcome || brand.welcome} version={brand.version} logo={tn && (tn.logo_dark || tn.logo_light) ? `api/auth/tenants/${encodeURIComponent(tn.slug)}/logo/${tn.logo_dark ? 'logo_dark' : 'logo_light'}` : undefined} />
+      <Hero admin={admin} name={tn?.name ?? brand.name} product={brand.name} tagline={tn ? '' : brand.tagline} welcome={tn?.welcome || brand.welcome} version={brand.version} logo={tn && (tn.logo_dark || tn.logo_light) ? `api/auth/tenants/${encodeURIComponent(tn.slug)}/logo/${tn.logo_dark ? 'logo_dark' : 'logo_light'}` : undefined} />
       <section className="flex min-h-full flex-col">
         <div className="flex items-center justify-end gap-1 p-4">
           <LanguageSelect />

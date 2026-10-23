@@ -85,10 +85,18 @@ pub async fn install_package(
         std::fs::write(path, data)?;
     }
 
+    // installed again after an uninstall: its state of then comes back (super::memory)
+    let memory = if existing.is_none() { super::memory::recall(k, &m.id).await? } else { None };
+    if let Some(mem) = &memory {
+        status = mem.status;
+    }
     let result = async {
         let mut tx = k.db.begin_app().await?;
         upsert_row(&mut tx, k, m, &pkg.sha256, signed_by.as_deref(), false, status).await?;
         apply_schema(k, &mut tx, m, &pkg.migrations()?, false).await?;
+        if let Some(mem) = &memory {
+            super::memory::restore(&mut tx, &m.id, mem).await?;
+        }
         tx.commit().await?;
         Ok::<_, Error>(())
     }

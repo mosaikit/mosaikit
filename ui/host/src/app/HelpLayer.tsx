@@ -46,6 +46,23 @@ function TourOverlay() {
   useEffect(() => {
     card.current?.focus()
   }, [tour?.step, tour?.id])
+  // the keys work wherever the focus is (the menu that started the tour gives the focus back to its
+  // button after the card took it)
+  const count = steps.length
+  useEffect(() => {
+    if (!tour) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        void done(tour.id)
+        set({ tour: null })
+      } else if (e.key === 'ArrowRight' && tour.step < count - 1) set({ tour: { ...tour, step: tour.step + 1 } })
+      else if (e.key === 'ArrowLeft' && tour.step > 0) set({ tour: { ...tour, step: tour.step - 1 } })
+      else return
+      e.preventDefault()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [tour, count, done])
   // no element of the tour on this page: nothing to show
   const missing = !!tour && !step
   useEffect(() => {
@@ -72,11 +89,6 @@ function TourOverlay() {
         aria-modal="true"
         aria-labelledby="tour-title"
         tabIndex={-1}
-        onKeyDown={(e) => {
-          if (e.key === 'Escape') finish()
-          if (e.key === 'ArrowRight' && !last) set({ tour: { ...tour, step: tour.step + 1 } })
-          if (e.key === 'ArrowLeft' && tour.step > 0) set({ tour: { ...tour, step: tour.step - 1 } })
-        }}
         className="fixed w-80 rounded-lg border bg-popover p-4 text-popover-foreground shadow-xl outline-none"
         style={{ top, left }}
       >

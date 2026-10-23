@@ -7,7 +7,7 @@
 import { useState } from 'react'
 import { AlertTriangle, CheckCircle2, Copy, Loader2, ShieldCheck, XCircle } from 'lucide-react'
 import { toast } from 'sonner'
-import { api, errText } from '../api.ts'
+import { api, ApiError, errText } from '../api.ts'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -60,6 +60,8 @@ interface CheckStep {
   step: string
   level: 'ok' | 'warning' | 'error'
   detail: string
+  /** for an error: its code, shown translated (the detail, in English, stays apart) */
+  code?: string | null
 }
 
 const STEP_LABEL: Record<string, string> = {
@@ -169,7 +171,8 @@ export function SignInSettings({ id }: { id: string }) {
       )
       if (!ok) return
     }
-    save.mutate(cur, { onSuccess: () => setD(null) })
+    // a check made before saving describes the old configuration: it goes away with the save
+    save.mutate(cur, { onSuccess: () => (setD(null), setSteps(null)) })
   }
 
   async function check() {
@@ -280,7 +283,14 @@ export function SignInSettings({ id }: { id: string }) {
                           <XCircle className="mt-0.5 size-4 shrink-0 text-destructive" aria-label={t('Error')} />
                         )}
                         <span className="min-w-0">
-                          <b>{t(STEP_LABEL[s.step] ?? s.step)}</b> <span className="break-all text-muted-foreground">{s.detail}</span>
+                          <b>{t(STEP_LABEL[s.step] ?? s.step)}</b>{' '}
+                          {s.code ? (
+                            <>
+                              {errText(new ApiError(s.detail, 0, s.code))} <span className="block break-all text-xs text-muted-foreground">{s.detail}</span>
+                            </>
+                          ) : (
+                            <span className="break-all text-muted-foreground">{s.detail}</span>
+                          )}
                         </span>
                       </li>
                     ))}

@@ -166,7 +166,8 @@ export function noteBody(n: Note): string {
     case 'invitation.received':
       return t('You can work in {tenant} as {role}: accept or decline.', { tenant: d.tenant, role: d.role === 'tenant_manager' ? 'Tenant Manager' : t('User') })
     case 'share.received':
-      return t('In {tenant}.', { tenant: d.tenant })
+      // the tenant is already shown next to every notification
+      return ''
     case 'link.created':
       return t('Whoever has the link can open the item without signing in.')
     case 'invitation.accepted':

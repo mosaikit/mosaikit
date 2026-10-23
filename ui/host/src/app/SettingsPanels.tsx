@@ -313,6 +313,8 @@ export function ImageSlot({ level, slot, label, hint, setting, accept = 'image/s
             type="file"
             accept={accept}
             className="sr-only"
+            // reached through the button: one tab stop per action, not two
+            tabIndex={-1}
             aria-label={t('Upload: {name}', { name: label })}
             onChange={(e) => {
               const f = e.target.files?.[0]
@@ -320,12 +322,13 @@ export function ImageSlot({ level, slot, label, hint, setting, accept = 'image/s
               if (f) void run(() => api('PUT', `${base}/${slot}`, undefined, { raw: f }), t('Image saved'))
             }}
           />
-          <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => input.current?.click()}>
+          {/* names that tell the images apart, starting with the visible text (WCAG 2.5.3) */}
+          <Button type="button" variant="outline" size="sm" disabled={busy} aria-label={`${value ? t('Replace') : t('Upload')} (${label})`} onClick={() => input.current?.click()}>
             <Upload />
             {value ? t('Replace') : t('Upload')}
           </Button>
           {!!value && (
-            <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void run(() => api('DELETE', `${base}/${slot}`), t('Image removed'))}>
+            <Button type="button" variant="outline" size="sm" disabled={busy} aria-label={`${t('Remove')} (${label})`} onClick={() => void run(() => api('DELETE', `${base}/${slot}`), t('Image removed'))}>
               <Trash2 />
               {t('Remove')}
             </Button>

@@ -23,7 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { initials, isApp, passwordMin, useAction, useApi, useConfig, useConfirm, usePaged, useTenantCtx, type PageOf } from '../core.ts'
-import { t, useLang } from '../i18n.ts'
+import { fmtDay, t, useLang } from '../i18n.ts'
 import { Empty, ErrorBox, FormDialog, Kpi, Loading, MoreRows, PageHeader, Pills, PluginKpis, SaveBar, SelectAllRows, Sections, StatusBadge, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import { effectiveMode, useTheme } from '../theme.ts'
@@ -1115,7 +1115,7 @@ function LinksDialog({ slug, row, onClose }: { slug: string; row: ResourceRow | 
                     {l.created_by ? ` ${t('by {name}', { name: l.created_by })}` : ''}
                   </span>
                   <span className="text-xs text-muted-foreground">
-                    {l.expires_at ? t('Expires on {date}', { date: fmtDate(l.expires_at) }) : t('No expiry')} · {t('{n} views', { n: l.view_count })}
+                    {l.expires_at ? t('Expires on {date}', { date: fmtDay(l.expires_at) }) : t('No expiry')} · {t('{n} views', { n: l.view_count })}
                     {l.has_password ? ` · ${t('with password')}` : ''}
                   </span>
                 </span>

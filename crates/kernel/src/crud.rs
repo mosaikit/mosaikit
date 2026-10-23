@@ -369,6 +369,32 @@ fn bind_value(kind: FieldKind, v: &Value) -> mosaikit_db::Param {
     }
 }
 
+/// The due date of an item (`due_field` of the resource), none once it is done (`done_field`): kept in
+/// core.resources for the Home of the people (what is due soon).
+fn due_of(d: &ResourceDecl, v: &Values) -> Option<chrono::DateTime<chrono::Utc>> {
+    let due = d.due_field.as_deref()?;
+    if d.done_field.as_deref().and_then(|k| v.get(k)).and_then(Value::as_bool) == Some(true) {
+        return None;
+    }
+    let s = v.get(due)?.as_str()?;
+    let day = chrono::NaiveDate::parse_from_str(s.get(..10)?, "%Y-%m-%d").ok()?;
+    Some(day.and_hms_opt(0, 0, 0)?.and_utc())
+}
+
+async fn set_due(k: &Kernel, d: &ResourceDecl, id: Uuid, v: &Values) {
+    if d.due_field.is_none() {
+        return;
+    }
+    if let Err(e) = mosaikit_db::query("update core.resources set due_at = $2 where id = $1")
+        .bind(id)
+        .bind(due_of(d, v))
+        .execute(&k.db)
+        .await
+    {
+        tracing::warn!("due date of {id}: {e}");
+    }
+}
+
 fn title_of(d: &ResourceDecl, v: &Values) -> String {
     let t = d.title_key().and_then(|k| v.get(k)).map(|v| match v {
         Value::String(s) => s.clone(),
@@ -445,6 +471,7 @@ pub async fn create(
         get_in(k, &mut tx, &p, d, id).await?.ok_or_else(|| Error::internal("created record not visible"))?;
     tx.commit().await?;
     crate::search::index(k, id, &crate::search::text_of(d, &values)).await;
+    set_due(k, d, id, &values).await;
     crate::quotas::touched(k, c.tenant.tenant_id);
     events::record(
         k,
@@ -504,6 +531,7 @@ pub async fn update(
     let row = get_in(k, &mut tx, &p, d, id).await?.ok_or_else(|| Error::internal("record not visible"))?;
     tx.commit().await?;
     crate::search::index(k, id, &crate::search::text_of(d, &values)).await;
+    set_due(k, d, id, &values).await;
     events::record(
         k,
         Some(c.tenant.tenant_id),

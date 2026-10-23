@@ -107,11 +107,22 @@ fn discovery_url(issuer: &str) -> String {
 
 async fn get_json<T: serde::de::DeserializeOwned>(k: &Kernel, what: &str, u: &str) -> Result<T> {
     check_url(what, u)?;
-    let res = k.http.get(u).send().await.map_err(|e| provider_error(format!("{what}: {e}")))?;
+    // the messages never carry the text of the HTTP library (English, technical, sometimes in the
+    // language of the operating system): a code the shell translates and the address
+    let res = k.http.get(u).send().await.map_err(|e| {
+        let (code, what_happened) = if e.is_timeout() {
+            ("oidc_timeout", "no answer in time")
+        } else {
+            ("oidc_unreachable", "cannot be reached")
+        };
+        Error::bad(format!("{what}: {u} {what_happened}")).with_code(code)
+    })?;
     if !res.status().is_success() {
-        return Err(provider_error(format!("{what}: the provider answered {}", res.status())));
+        return Err(Error::bad(format!("{what}: {u} answered HTTP {}", res.status().as_u16())).with_code("oidc_http"));
     }
-    res.json::<T>().await.map_err(|e| provider_error(format!("{what}: {e}")))
+    res.json::<T>()
+        .await
+        .map_err(|_| Error::bad(format!("{what}: {u} did not answer with a valid document")).with_code("oidc_document"))
 }
 
 async fn fetch_discovery(k: &Kernel, issuer: &str) -> Result<Discovery> {
@@ -538,10 +549,16 @@ pub struct CheckStep {
     /// "ok", "warning" or "error"
     pub level: &'static str,
     pub detail: String,
+    /// for an error: its stable code (the shell shows its translation, with the detail in English apart)
+    pub code: Option<&'static str>,
 }
 
 fn step(step: &'static str, level: &'static str, detail: impl Into<String>) -> CheckStep {
-    CheckStep { step, level, detail: detail.into() }
+    CheckStep { step, level, detail: detail.into(), code: None }
+}
+
+fn failed(step: &'static str, e: Error) -> CheckStep {
+    CheckStep { step, level: "error", code: e.code, detail: e.message }
 }
 
 /// "Check the configuration": reads the discovery document and the keys of `issuer` as a sign-in
@@ -551,7 +568,7 @@ pub async fn check(k: &Kernel, admin: &SessionUser, issuer: &str) -> Result<Vec<
     let issuer = issuer.trim();
     let mut out = vec![];
     if let Err(e) = check_url("issuer", issuer) {
-        out.push(step("issuer", "error", e.message));
+        out.push(failed("issuer", e));
         return Ok(out);
     }
     let doc = match fetch_discovery(k, issuer).await {
@@ -560,7 +577,7 @@ pub async fn check(k: &Kernel, admin: &SessionUser, issuer: &str) -> Result<Vec<
             d
         }
         Err(e) => {
-            out.push(step("discovery", "error", e.message));
+            out.push(failed("discovery", e));
             return Ok(out);
         }
     };
@@ -583,7 +600,7 @@ pub async fn check(k: &Kernel, admin: &SessionUser, issuer: &str) -> Result<Vec<
                 step("keys", "error", "no RS256 or ES256 key")
             });
         }
-        Err(e) => out.push(step("keys", "error", e.message)),
+        Err(e) => out.push(failed("keys", e)),
     }
     out.push(match &doc.end_session_endpoint {
         Some(u) => step("end_session", "ok", u.clone()),

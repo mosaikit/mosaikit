@@ -109,7 +109,7 @@ export function AdminTenants() {
     <>
       <PageHeader
         title={t('Tenants')}
-        sub={q.isLoading ? undefined : `${q.total} tenant`}
+        sub={q.isLoading ? undefined : t('{count} tenants', { count: q.total })}
         actions={
           <Button onClick={() => setOpen(true)}>
             <Plus />
@@ -565,7 +565,7 @@ function Admins({ me }: { me: string }) {
                         {a.display_name || a.username}
                         {a.user_id === me && (
                           <Badge variant="secondary" className="ml-2 font-normal">
-                            tu
+                            {t('you')}
                           </Badge>
                         )}
                       </div>

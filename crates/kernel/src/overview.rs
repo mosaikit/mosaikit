@@ -32,6 +32,20 @@ pub struct Personal {
     pub link_views: i64,
     pub recent_shares: Vec<SharedItem>,
     pub activity: Vec<Activity>,
+    /// «Pick up where you left off»: the items the person created or changed last, still visible
+    pub pick_up: Vec<HomeItem>,
+    /// «Due soon»: visible items with a due date (`due_field` of the plugins) within a week, late ones too
+    pub due: Vec<HomeItem>,
+}
+
+/// An item of the Home of a person, with the time that matters (last change, or due date).
+#[derive(Debug, Clone, Serialize)]
+pub struct HomeItem {
+    pub resource_id: Uuid,
+    pub plugin_id: String,
+    pub plugin: String,
+    pub title: String,
+    pub at: DateTime<Utc>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -190,7 +204,40 @@ async fn personal(k: &Kernel, c: &Caller) -> Result<Personal> {
             }
         })
         .collect();
+    // the items the person worked on last (created, changed, restored), still visible and not in the trash
+    let picked = mosaikit_db::query(
+        "select r.id, r.plugin_id, r.title, max(e.ts)
+         from core.events e join core.resources r on r.id = e.resource_id
+         where e.tenant_id = $1 and e.user_id = $2
+           and e.action in ('resource.create', 'resource.update', 'resource.restore', 'file.upload')
+           and not core.in_trash(r.id)
+           and (r.owner_id = $2 or core.level_for($2, r.tenant_id, r.id, r.ancestors) > 0)
+         group by r.id, r.plugin_id, r.title order by 4 desc limit 6",
+    )
+    .bind(t)
+    .bind(me)
+    .fetch_all(&k.db)
+    .await?;
+    // due within a week (and late), visible, not in the trash, soonest first
+    let due = mosaikit_db::query(
+        "select r.id, r.plugin_id, r.title, r.due_at from core.resources r
+         where r.tenant_id = $1 and r.due_at is not null and r.due_at < $3
+           and not core.in_trash(r.id)
+           and (r.owner_id = $2 or core.level_for($2, r.tenant_id, r.id, r.ancestors) > 0)
+         order by r.due_at limit 6",
+    )
+    .bind(t)
+    .bind(me)
+    .bind(Utc::now() + chrono::Duration::days(7))
+    .fetch_all(&k.db)
+    .await?;
+    let item = |r: &mosaikit_db::Row| {
+        let pid: String = r.get(1);
+        HomeItem { resource_id: r.get(0), plugin: label(k, &pid), plugin_id: pid, title: r.get(2), at: r.get(3) }
+    };
     Ok(Personal {
+        pick_up: picked.iter().map(item).collect(),
+        due: due.iter().map(item).collect(),
         resources,
         shared_by_me: n.get(0),
         shared_with_me: n.get(1),

@@ -400,3 +400,40 @@ extension = {{ tabs = {{ review = "Revisione" }} }}
     tenants::set_enabled(&t, &manager, &p.id, false).await.unwrap();
     assert!(extensions::for_resource(&t, &anna, NOTES, "notes", "en").await.unwrap().is_empty());
 }
+
+#[tokio::test]
+async fn uninstalling_an_extension_counts_its_values_and_installing_it_again_brings_back_the_choices() {
+    let t = start().await;
+    t.install("notes").await;
+    install_review(&t, "0.1.0", "0.1.0").await.unwrap();
+    let admin = t.admin().await;
+    let ga = t.tenant("alfa").await;
+    let gb = t.tenant("beta").await;
+    let alfa = t.home(&ga).await;
+    let beta = t.home(&gb).await;
+    let note = crud::create(&t, &alfa, NOTES, "notes", &obj(json!({ "title": "x" })), None).await.unwrap();
+    let id: uuid::Uuid = note["id"].as_str().unwrap().parse().unwrap();
+    extensions::set_values(&t, &alfa, NOTES, "notes", id, REVIEW, &obj(json!({ "reviewer": "me" })))
+        .await
+        .unwrap();
+    // on in both tenants, values in one: an extension has no items of its own
+    let impact = plugins::uninstall_impact(&t, &admin, REVIEW).await.unwrap();
+    assert_eq!((impact.items, impact.tenants), (1, 2));
+    // beta turns it off, then the Administrator uninstalls it
+    tenants::set_enabled(&t, &beta, REVIEW, false).await.unwrap();
+    plugins::uninstall(&t, &admin, REVIEW).await.unwrap();
+    assert!(t.plugins.get(REVIEW).is_none());
+    // installed again (not turned on by hand): on in the platform as it was, on in alfa, off in beta
+    let files = BTreeMap::from([("plugin.toml".to_string(), review_manifest("0.1.0", "0.1.0").into_bytes())]);
+    let pkg = mosaikit_mskp::pack(&files, Some(&test_key())).unwrap();
+    plugins::install_package(&t, None, &pkg, InstallSource::Upload).await.unwrap();
+    assert_eq!(t.plugins.get(REVIEW).unwrap().status, plugins::Status::Active);
+    assert!(tenants::is_on(&t, alfa.tenant.tenant_id, REVIEW).await.unwrap());
+    assert!(!tenants::is_on(&t, beta.tenant.tenant_id, REVIEW).await.unwrap());
+    // the memory is used once: an uninstall of a plugin never installed again leaves nothing behind
+    let left: i64 = mosaikit_db::query_scalar("select count(*) from core.plugin_memory")
+        .fetch_one(&t.k.db)
+        .await
+        .unwrap();
+    assert_eq!(left, 0);
+}

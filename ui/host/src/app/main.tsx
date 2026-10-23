@@ -1,6 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { isUnavailable } from '../api.ts'
 import { retryDelay } from '../brand.ts'
@@ -16,7 +16,9 @@ applyTheme()
 
 // a query that fails because the server does not answer is tried again until it answers; the other
 // errors once
-const queryClient = new QueryClient({
+// any change made from the shell (share, restore, delete…) drops the search answers kept in memory
+const queryClient: QueryClient = new QueryClient({
+  mutationCache: new MutationCache({ onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['search'] }) }),
   defaultOptions: {
     queries: { refetchOnWindowFocus: false, retry: (n, e) => isUnavailable(e) || n < 1, retryDelay },
   },

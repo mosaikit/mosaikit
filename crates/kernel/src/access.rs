@@ -62,11 +62,29 @@ fn standard() -> Vec<PermDecl> {
     .collect()
 }
 
-/// The permissions of a plugin: the standard ones, then the ones of the manifest in `lang`.
+/// The permissions of a plugin: the standard ones, then the ones of the manifest in `lang`. «Use» says
+/// what using means for the kind of plugin (an extension or a service has no app of its own).
 pub fn declared(p: &LoadedPlugin, lang: &str) -> Vec<PermDecl> {
     let m = p.manifest.localized(lang);
+    let kind = p.manifest.effective_kind();
     standard()
         .into_iter()
+        .map(|mut d| {
+            if d.key == USE {
+                match kind {
+                    mosaikit_mskp::PluginKind::Extension => {
+                        d.label = "Use the extension".into();
+                        d.description = "Sees and uses what the extension adds to the items".into();
+                    }
+                    mosaikit_mskp::PluginKind::Service => {
+                        d.label = "Use the service".into();
+                        d.description = "Gets what the service does for the people of the tenant".into();
+                    }
+                    _ => {}
+                }
+            }
+            d
+        })
         .chain(m.user_permissions.iter().map(|u| PermDecl {
             key: u.key.clone(),
             label: u.label.clone(),

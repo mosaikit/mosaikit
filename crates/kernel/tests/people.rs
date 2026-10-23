@@ -389,4 +389,24 @@ async fn a_person_changes_their_own_name_and_picture() {
     assert_eq!(e.code, Some("profile_from_provider"));
     // the picture stays the person's own
     profile::set_my_picture(&t, &anna, &png).await.unwrap();
+
+async fn suspended_everywhere_cannot_sign_in_suspended_at_home_lands_elsewhere() {
+    let t = start().await;
+    let admin = t.admin().await;
+    let ga = t.tenant("alfa").await;
+    let gb = t.tenant("beta").await;
+    let anna = t.member(&ga, "anna").await;
+    let mgr = t.home(&ga).await;
+    // suspended in the home tenant and nowhere else to work: the sign-in is refused with its own code
+    set_member_suspended(&t, &mgr, anna.user_id, true).await.unwrap();
+    let e = login(&t, "alfa", "anna", PASSWORD, "x").await.unwrap_err();
+    assert_eq!((e.kind, e.code()), (Kind::Forbidden, "membership_suspended"));
+    // active as a guest in another tenant: the session opens, and its only tenant is the other one
+    add_to_tenant(&t, &admin, anna.user_id, gb.home_tenant_id, Role::User, None).await.unwrap();
+    let lr = login(&t, "alfa", "anna", PASSWORD, "x").await.unwrap();
+    let ms = mosaikit_kernel::identity::memberships(&t, &lr.user).await.unwrap();
+    assert_eq!(ms.iter().map(|m| m.slug.as_str()).collect::<Vec<_>>(), ["beta"]);
+    // back to active: the home tenant again
+    set_member_suspended(&t, &mgr, anna.user_id, false).await.unwrap();
+    assert!(login(&t, "alfa", "anna", PASSWORD, "x").await.is_ok());
 }

@@ -9,7 +9,7 @@ import { themeCss } from './themegen.ts'
 
 export type Mode = 'light' | 'dark' | 'auto'
 export const PRESETS = [
-  { id: 'mosaikit', name: 'Mosaikit', note: 'the colours of Microsoft Teams' },
+  { id: 'mosaikit', name: 'Mosaikit', note: 'indigo and grey, the default colours' },
   { id: 'italia', name: 'Italia', note: 'Designers Italia, for public administration tenants' },
   { id: 'tessera', name: 'Tessera', note: 'the colours of the logo' },
 ] as const

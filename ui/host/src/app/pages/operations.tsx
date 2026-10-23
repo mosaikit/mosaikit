@@ -3,7 +3,7 @@
 // deletion of a tenant, import of an export, System › Backup and Maintenance, the Monitoring pages, the
 // services and "To do" panels of the overview, and the notice of the maintenance for everybody.
 
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { Activity, AlertTriangle, Archive, BellRing, Check, CircleAlert, Download, Gauge, HardDrive, Loader2, Play, Server, ShieldAlert, Trash2, Upload, Wrench } from 'lucide-react'
 import { toast } from 'sonner'
@@ -36,6 +36,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
@@ -839,7 +840,7 @@ function RestoreItemDialog({ backup, onOpenChange }: { backup: BackupInfo; onOpe
             </p>
             {pending.state !== 'missing' && (
               <fieldset className="grid gap-2">
-                <legend className="mb-1 text-sm font-medium">{t('The item is still in the tenant ({state}).', { state: t(ITEM_STATE[pending.state]).toLowerCase() })}</legend>
+                <legend className="mb-1 text-sm font-medium">{pending.state === 'trash' ? t('The item is in the trash of the tenant.') : t('The item is still in the tenant.')}</legend>
                 <label className="flex items-start gap-2 text-sm">
                   <input type="radio" name="restore-mode" checked={mode === 'copy'} onChange={() => setMode('copy')} className="mt-1" />
                   <span>
@@ -894,7 +895,7 @@ function RestoreItemDialog({ backup, onOpenChange }: { backup: BackupInfo; onOpe
               <Field id="ri-app" label={t('App')}>
                 <select id="ri-app" className="h-9 rounded-md border bg-background px-2 text-sm" value={form.plugin} onChange={(e) => setForm({ ...form, plugin: e.target.value })}>
                   <option value="">{t('All')}</option>
-                  {(plugins.data ?? []).map((p) => (
+                  {(plugins.data ?? []).filter((p) => !p.extends).map((p) => (
                     <option key={p.id} value={p.id}>
                       {p.label}
                     </option>
@@ -1275,12 +1276,12 @@ function StatusPanel() {
           </TableHeader>
           <TableBody>
             {d.services.map((s) => (
-              <TableRow key={s.key} className="cursor-pointer" onClick={() => setOpen(open === s.key ? null : s.key)}>
+              <TableRow key={s.key} className="cursor-pointer" onClick={() => setOpen(s.key)}>
                 <TableCell>
-                  <button type="button" className="text-left font-medium hover:underline" aria-expanded={open === s.key} onClick={(e) => (e.stopPropagation(), setOpen(open === s.key ? null : s.key))}>
+                  <button type="button" className="text-left font-medium hover:underline" aria-haspopup="dialog" onClick={(e) => (e.stopPropagation(), setOpen(s.key))}>
                     {s.name}
                   </button>
-                  {open === s.key && <span className="mt-1 block text-xs text-muted-foreground">{s.detail || '—'}</span>}
+                  {s.detail && <span className="mt-0.5 block text-xs text-muted-foreground">{s.detail}</span>}
                 </TableCell>
                 <TableCell>
                   <ServiceBadge state={s.state} />
@@ -1292,7 +1293,43 @@ function StatusPanel() {
           </TableBody>
         </Table>
       </div>
+      <ServiceDetail service={d.services.find((s) => s.key === open) ?? null} onClose={() => setOpen(null)} />
     </div>
+  )
+}
+
+/** A quick look at a service (refactoring-ui §9: side panel for a quick look): state, version, time of
+ *  the check, what the kernel knows of it. */
+function ServiceDetail({ service: s, onClose }: { service: ServiceState | null; onClose: () => void }) {
+  return (
+    <Sheet open={!!s} onOpenChange={(o) => !o && onClose()}>
+      <SheetContent className="w-[min(28rem,100vw)] sm:max-w-none">
+        {s && (
+          <>
+            <SheetHeader>
+              <SheetTitle>{t(s.name)}</SheetTitle>
+              <SheetDescription>
+                <ServiceBadge state={s.state} />
+              </SheetDescription>
+            </SheetHeader>
+            <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 px-4 pb-6 text-sm">
+              <dt className="text-muted-foreground">{t('Version')}</dt>
+              <dd>{s.version || '—'}</dd>
+              <dt className="text-muted-foreground">{t('Response')}</dt>
+              <dd className="tabular-nums">{s.ms === null ? '—' : `${fmtNumber(s.ms, { maximumFractionDigits: 1 })} ms`}</dd>
+              <dt className="text-muted-foreground">{t('Details')}</dt>
+              <dd className="break-words">{s.detail || '—'}</dd>
+              {(s.facts ?? []).map(([k, v]) => (
+                <Fragment key={k}>
+                  <dt className="text-muted-foreground">{t(k)}</dt>
+                  <dd className="break-words">{v === 'delivered' ? t('delivered') : v}</dd>
+                </Fragment>
+              ))}
+            </dl>
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
   )
 }
 

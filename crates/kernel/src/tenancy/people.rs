@@ -195,11 +195,13 @@ pub async fn person_activity(k: &Kernel, by: By<'_>, user: Uuid) -> Result<Vec<E
     let rows = mosaikit_db::query(
         "select e.ts, e.action, t.slug, e.plugin_id, e.resource_id, e.detail
          from core.events e left join core.tenants t on t.id = e.tenant_id
-         where e.user_id = $1 and ($2::uuid is null or e.tenant_id = $2)
+         where (e.user_id = $1 or e.detail->>'user' = $3) and ($2::uuid is null or e.tenant_id = $2)
          order by e.ts desc, e.id desc limit 100",
     )
     .bind(user)
     .bind(tenant)
+    // the actions by the person and the ones on the person (suspended, role changed, added…)
+    .bind(user.to_string())
     .fetch_all(&k.db)
     .await?;
     Ok(rows

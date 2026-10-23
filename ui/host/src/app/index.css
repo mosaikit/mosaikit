@@ -10,7 +10,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* ── Mosaikit: the colours of Microsoft Teams ──────────────────────── */
+/* ── Mosaikit: indigo and grey, the default colours ─────────────────── */
 :root,
 [data-preset='mosaikit'] {
   --font-sans: 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
@@ -66,7 +66,8 @@
   --popover-foreground: #f0f0f0;
   --primary: #7f85f5;
   --primary-foreground: #141414;
-  --primary-strong: var(--primary);
+  /* lighter than the accent: text of the selected item of a list on its 10 % tint (WCAG AA) */
+  --primary-strong: #9196f7;
   --secondary: #2b2b2b;
   --secondary-foreground: #f0f0f0;
   --muted: #2b2b2b;
@@ -230,7 +231,7 @@
   --popover-foreground: #f2ece6;
   --primary: #e0707c;
   --primary-foreground: #1f1a16;
-  --primary-strong: var(--primary);
+  --primary-strong: #e5838d;
   --secondary: #2e2822;
   --secondary-foreground: #f2ece6;
   --muted: #2e2822;

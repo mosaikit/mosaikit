@@ -55,6 +55,7 @@ const MIGRATIONS: &[(i64, &str, &str)] = &[
     (14, "session_id_token", include_str!("0014_session_id_token.sql")),
     (15, "profile", include_str!("0015_profile.sql")),
     (16, "performance_sets", include_str!("0016_performance_sets.sql")),
+    (17, "qa_followups", include_str!("0017_qa_followups.sql")),
 ];
 
 /// Context of the transaction on the connection (read by `core_ctx_*()`).

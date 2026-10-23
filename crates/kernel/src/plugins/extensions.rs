@@ -148,7 +148,14 @@ fn decl_of(e: &LoadedPlugin, resource: &str) -> Result<ResourceDecl> {
     if fields.is_empty() {
         return Err(Error::not_found(format!("the extension adds no field to {resource}")));
     }
-    Ok(ResourceDecl { name: resource.to_string(), label: String::new(), title_field: None, fields })
+    Ok(ResourceDecl {
+        name: resource.to_string(),
+        label: String::new(),
+        title_field: None,
+        due_field: None,
+        done_field: None,
+        fields,
+    })
 }
 
 async fn stored(k: &Kernel, id: Uuid, ext: &str) -> Result<Option<Values>> {

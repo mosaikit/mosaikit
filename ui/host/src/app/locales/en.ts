@@ -114,4 +114,10 @@ export const EN: Record<string, string> = {
   'errors.layout_unknown': 'Unknown layout',
   'errors.layout_not_allowed': 'The Administrator does not offer this layout to the tenants',
   'errors.band_image_contrast': 'The texts of the band would not read over this image (WCAG 4.5:1), even darkened: choose a darker one',
+  'errors.membership_suspended': 'Your access to this tenant is suspended: ask its Tenant Manager',
+  'errors.email_refused': 'The mail server refuses the connection',
+  'errors.email_timeout': 'The mail server does not answer',
+  'errors.email_unreachable': 'The mail server cannot be reached: check the address and the port',
+  'errors.email_tls': 'The secure connection (TLS) with the mail server failed: check the security setting',
+  'errors.email_auth': 'The mail server refused the user or the password',
 }
