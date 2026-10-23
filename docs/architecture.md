@@ -1392,6 +1392,7 @@ mosaikit/
 | `cargo xtask plugin pack <dir>` | builds and packs (signs with the development key) |
 | `cargo xtask test` | Rust tests on PostgreSQL and on SQLite, tests of the plugins and of the distribution, UI tests |
 | `cargo xtask ci` | fmt, clippy `-D warnings`, tests, lint and UI build |
+| `cargo xtask test-report` | [tests/results/test-results.md](../tests/results/test-results.md) from the latest results in `tests/results/raw` (`test`, `ci` and `e2e` run it at the end) |
 | `cargo xtask perf` | load test at scale (`--scale full`: 200 tenants, 1M items, 5M events; `--backend sqlite --scale desktop`), `--reuse`, `--no-build`, `--clean`; results in `.dev/perf/`, see [reports/performance.md](reports/performance.md) |
 
 Every command accepts `--dist <folder>` (§14).
@@ -1409,6 +1410,15 @@ set by `cargo xtask dev` with the plugins of the distribution):
 
 The plugins in development are read from the folder, there is no need to pack them; the
 dev mode exists only in debug builds.
+
+**Results of the automated tests.** Every suite leaves a machine-readable file in
+`tests/results/raw/` (git-ignored): JUnit of nextest (profiles `pg` and `sqlite` in `.config/nextest.toml`), the
+libtest output of `cargo test` (doc tests, plugin workspaces, distribution tests), the JSON reporter of
+vitest for every npm workspace with a vitest `test` script, the JSON reporter of Playwright for the e2e.
+`cargo xtask test`, `ci` and `e2e` run every suite even when one fails, then regenerate
+[tests/results/test-results.md](../tests/results/test-results.md): totals per suite, every test with its result and duration, the
+failures with their message, the commit of each run. Every phase, and every change that adds or changes
+tests, commits the regenerated file. [tests/README.md](../tests/README.md) lists every suite.
 
 **Build speed.** The repository configures what is the same for everybody; the rest is per machine:
 

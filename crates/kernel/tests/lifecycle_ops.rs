@@ -319,6 +319,14 @@ async fn metrics_monitoring_and_alerts_once_per_crossing() {
     assert!(services.iter().any(|s| s.key == "storage" && s.state == "ok"));
     let cap = monitor::capacity(&t).await.unwrap();
     assert!(cap.disk_total > 0 && cap.memory_total > 0, "{cap:?}");
+    // only the error rate is armed: free disk, services and the mail queue depend on the machine
+    // running the tests (a full disk or a slow service would raise their own alerts)
+    let mut c = monitor::alert_config(&t).await.unwrap();
+    c.disk_free_pct = 0;
+    c.service_down = false;
+    c.backup_failed = false;
+    c.mail_failed = u32::MAX;
+    monitor::set_alert_config(&t, &admin, &c).await.unwrap();
     // 25% of errors over the threshold of 5%: one alert, notified once
     monitor::check_alerts(&t).await.unwrap();
     monitor::check_alerts(&t).await.unwrap();

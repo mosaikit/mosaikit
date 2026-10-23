@@ -19,6 +19,9 @@ zip.workspace = true
 mosaikit-mskp.workspace = true
 ed25519-dalek.workspace = true
 ctrlc = "3"
+# tests/results/test-results.md: date and machine of the run
+chrono.workspace = true
+sysinfo.workspace = true
 
 [lints]
 workspace = true

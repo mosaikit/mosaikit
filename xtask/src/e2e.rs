@@ -14,8 +14,8 @@ use std::time::{Duration, Instant};
 use anyhow::{bail, Context, Result};
 
 use crate::dev::kill_tree;
-use crate::plugins;
 use crate::util::{exe, npm, output, pg_bin, root, run, which};
+use crate::{plugins, report};
 
 const ADMIN_PASSWORD: &str = "e2e-admin-password";
 
@@ -153,12 +153,29 @@ pub fn e2e(headed: bool) -> Result<()> {
         if headed {
             cmd.env("E2E_HEADED", "1");
         }
-        run(&mut cmd)
+        let json = report::dir().join("e2e.json");
+        std::fs::create_dir_all(report::dir())?;
+        let _ = std::fs::remove_file(&json);
+        cmd.env("E2E_JSON", &json);
+        let ok = report::run_suite(report::Suite {
+            id: "e2e".into(),
+            title: "End-to-end tests in the browser (Playwright)".into(),
+            order: 90,
+            format: report::Format::Playwright,
+            junit_from: None,
+            cmd: &mut cmd,
+        })?;
+        if !ok {
+            bail!("end-to-end tests failed");
+        }
+        Ok(())
     })();
     kill_tree(&mut server);
     kill_tree(&mut idp);
     if result.is_err() {
         eprintln!("server log: {}", dir.join("server.err.log").display());
     }
+    // the report also when the run failed (a missing result marks the suite)
+    report::generate()?;
     result
 }

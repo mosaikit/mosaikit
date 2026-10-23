@@ -8,6 +8,7 @@ mod e2e;
 mod perf;
 mod plugins;
 mod release;
+mod report;
 mod util;
 
 use std::path::PathBuf;
@@ -51,6 +52,8 @@ enum Cmd {
     },
     /// CI checks: fmt, clippy, deny, typecheck, lint, build, test
     Ci,
+    /// tests/results/test-results.md from the latest results of every suite (tests/results/raw)
+    TestReport,
     /// End-to-end tests in the browser (Playwright) on a full installation
     E2e {
         /// show the browser
@@ -210,6 +213,7 @@ fn main() -> Result<()> {
         },
         Cmd::Test { skip_db } => ci::test(skip_db),
         Cmd::Ci => ci::ci(),
+        Cmd::TestReport => report::generate().map(|_| ()),
         Cmd::E2e { headed } => e2e::e2e(headed),
         Cmd::Perf { clean: true, .. } => perf::clean(),
         Cmd::Perf { backend, scale, reuse, no_build, .. } => perf::perf(&backend, &scale, reuse, no_build),

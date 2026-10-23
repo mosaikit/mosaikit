@@ -11,7 +11,8 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   fullyParallel: false,
   workers: 1,
-  reporter: [['list']],
+  // `cargo xtask e2e` also asks for the JSON results, for tests/results/test-results.md
+  reporter: process.env.E2E_JSON ? [['list'], ['json', { outputFile: process.env.E2E_JSON }]] : [['list']],
   use: {
     // with the base path and the trailing `/`: page.goto('./') opens the app
     baseURL: process.env.E2E_BASE_URL ?? 'http://127.0.0.1:18080/mosaikit/',
