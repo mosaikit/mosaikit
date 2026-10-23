@@ -142,7 +142,7 @@ fn git(args: &[&str]) -> String {
         .unwrap_or_default()
 }
 
-/// Whether the code changed since `commit` (the report in tests/results does not count).
+/// Whether the code changed since `commit` (the report in tests/results, the docs and the generator of the report do not count).
 fn changed_since(commit: &str) -> bool {
     if commit.is_empty() {
         return true;
@@ -158,6 +158,8 @@ fn changed_since(commit: &str) -> bool {
         "--",
         ".",
         ":(exclude)tests/results",
+        ":(exclude)docs",
+        ":(exclude)xtask/src/report.rs",
     ]));
     diff.map(|d| !d.trim().is_empty()).unwrap_or(true)
 }
@@ -514,9 +516,17 @@ pub fn generate() -> Result<PathBuf> {
     let head = commit();
     let branch = git(&["rev-parse", "--abbrev-ref", "HEAD"]);
     // the report itself does not count as a change of the code
-    let dirty =
-        !git(&["status", "--porcelain", "--untracked-files=no", "--", ".", ":(exclude)tests/results"])
-            .is_empty();
+    let dirty = !git(&[
+        "status",
+        "--porcelain",
+        "--untracked-files=no",
+        "--",
+        ".",
+        ":(exclude)tests/results",
+        ":(exclude)docs",
+        ":(exclude)xtask/src/report.rs",
+    ])
+    .is_empty();
 
     let mut doc = String::new();
     doc.push_str("# Mosaikit — Results of the automated tests\n\n");
