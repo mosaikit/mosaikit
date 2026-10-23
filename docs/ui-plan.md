@@ -70,7 +70,7 @@ Observations from the user's manual tests; ids as in the user's notes. Status is
 | D6 | Tenant › Plugins: a status pill for unavailable plugins too |
 | D7 | Tenant › Plugins: link to the Plugins page after the availability sentence |
 | D8 | Quotas: explain «items» (items of the apps) |
-| D9 | Email of a person: required (decision) |
+| D9 | Email required for local accounts (user decision); OIDC accounts take it from the provider |
 | D10 | Plugin detail as a brochure: gallery, description, author, licence, links |
 | D11–D13 | Answers: monitoring refresh, mail server setup, keys of outside services (clarify in the UI and the guides) |
 | D14 | An Administrator edits their own data and other Administrators' data |
@@ -79,5 +79,5 @@ Observations from the user's manual tests; ids as in the user's notes. Status is
 | E3 | Plugins: «Access and permissions» becomes «Permissions» |
 | E4, F1 | Account › Profile editable (name and picture) |
 | G1–G4 | Docker compose: PostgreSQL configured, optional Keycloak (realm, Mosaikit-like sign-in theme, no registration), optional mail server, nginx reverse proxy; README sections |
-| H1 | Static sites: publish from a URL as well as a zip |
-| H2 | Static sites: card view (default) with thumbnail, name and description; list view with thumbnail |
+| H1 | Static sites: a site by URL, embedded in an iframe (not downloaded); sites that forbid framing are detected and opened in a new tab (user decision) |
+| H2 | Static sites: card view (default) with thumbnail, name and description; list view with thumbnail; the thumbnail can be uploaded, otherwise og:image, first image or a placeholder (user decision) |
