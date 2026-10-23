@@ -51,18 +51,18 @@ differs from the mockup counts as a problem too.
 | P0-02 | Look at the browser tab | Favicon: the Mosaikit symbol (burgundy tiles, yellow tile) |
 | P0-03 | Narrow the window under 1024 px (or a phone) | The brand panel disappears, the symbol and name stay above the form; no horizontal scroll |
 | P0-04 | Sign in as `s.greco` | Home of *Comune di Roma*; sidebar: Home and the apps; top bar: sidebar button, tenant, search, language, mode, help, bell, person menu |
-| P0-05 | Person menu | Account, Notifications, Sign out (Trash is not there yet) |
+| P0-05 | Person menu | Account, Notifications, Trash, Sign out |
 | P0-06 | Open an app (e.g. Notes) from the sidebar | The app opens inside the shell; create an item |
 | P0-07 | On that item: **Share** | Share dialog: people and groups with a level, public link, transfer of ownership |
 | P0-08 | Create a public link, open it in a private window | The item read-only, without signing in |
-| P0-09 | Help menu (?) | Guided tour of this page, Guide, What is new, Keyboard shortcuts, version; the items say they come later |
+| P0-09 | Help menu (?) | Guided tour of this page, Guide, What is new, Keyboard shortcuts, version; each item opens its page or dialog |
 | P0-10 | Sign out, sign in as `e.ricci` | Sidebar with Tenant overview, the apps, Tenant management (Manage, Plugins, Shares, Usage) and Tenant settings at the bottom |
 | P0-11 | Manage › People: tick a person | The action bar appears only with a selection |
-| P0-12 | Manage › People › a person › Remove from the tenant | Asks who gets the items of the person (new owner), then removes |
+| P0-12 | Manage › People › a person › Remove from the tenant | If the person owns items, asks who gets them (new owner); then removes |
 | P0-13 | Shares | All the shared items of the tenant, filter by owner, app and title; Public filter; Revoke a public link |
 | P0-14 | Usage | Figures of the tenant and the KPIs of the plugins |
 | P0-15 | Sign in at `#/admin` as `admin` (second factor) | Platform overview with the KPIs; a stable "Platform" badge in the band |
-| P0-16 | Sidebar of the Administrator | Platform overview, Tenants, Plugins, System |
+| P0-16 | Sidebar of the Administrator | Platform overview, Tenants, People, Plugins, Monitoring, Log, System |
 | P0-17 | Tenants › *Comune di Roma* | Breadcrumb, status badge, "⋯" menu with suspend/reactivate, tabs |
 | P0-18 | Plugins | Installed, Updates, Catalog; activate, deactivate, Install from file |
 | P0-19 | Dark mode (mode button), then light | Every page reads well in both modes; no white-on-white or invisible text |
@@ -91,14 +91,14 @@ As Administrator (`#/admin`) unless said otherwise.
 | P1-04 | Theme and mode: choose **Tessera**, save | Burgundy band and accent for the Administrator; the sign-in page in a private window uses Tessera too |
 | P1-05 | Languages and formats: offer only English | The language menu disappears for everybody; put Italian back afterwards |
 | P1-06 | Top bar: turn off search and help | For every tenant: no search box, Ctrl K does nothing, the help items move into the person menu; logo off: the sidebar button takes the corner. Put everything back on |
-| P1-07 | Passwords and sessions: minimum length 12 | As `s.greco`, Account › Sign-in and security › Change password: the hint says 12, a 10-character password is refused |
+| P1-07 | Passwords and sessions: minimum length 12 | As `s.greco`, Account › Sign-in and security › Change password: the hint reads «At least 12 characters»; with a 10-character password **Update password** stays disabled |
 | P1-08 | Tenants may customize it: turn off for the theme | As `e.ricci`, Tenant settings: the theme row is locked ("Managed by the Administrator") |
 | P1-09 | Put the minimum back to 10 | — |
-| P1-10 | As `e.ricci`: Tenant settings › Identity and appearance › Theme: choose Tessera (with the switch of P1-08 on again) | Marked **Customized**, the whole tenant in Tessera; **Restore** goes back to the platform theme (**Inherited**) |
+| P1-10 | As `e.ricci`: Tenant settings › Identity and appearance › Theme: choose a theme other than the platform one (Mosaikit if the platform is on Tessera after P1-08; switch of P1-08 on again) | Marked **Customized**, the whole tenant in that theme; **Restore** goes back to the platform theme (**Inherited**) |
 | P1-11 | As `e.ricci`: Passwords and sessions | Values with "Platform minimum: N"; a value below the platform minimum is refused, a stricter one is accepted |
 | P1-12 | As `e.ricci`: Managed by the platform | Sign-in method and the other platform rules shown read-only with a padlock |
 | P1-13 | As `e.ricci`: Identity and texts: tenant name and logo | They show in the band (tenant switcher) and on `#/login/comune-roma` |
-| P1-14 | As Administrator: Keys of outside services: add a key, mark it shared with tenants | After saving only the last four characters show; Replace and Remove work |
+| P1-14 | As Administrator: Keys of outside services: add a key, mark it shared with tenants | After saving only the last four characters show; the switch «Shared with every tenant» appears on the saved key; Change and Remove work |
 | P1-15 | As `s.greco`: Account › Keys: add a personal key | Saved and masked; the Administrator has no Keys section in Account |
 | P1-16 | As Administrator: Embedding: add a site | Accepted; as `e.ricci` the tenant can choose only among the platform's sites |
 
@@ -114,7 +114,7 @@ As Administrator (`#/admin`) unless said otherwise.
 
 | Id | Check | Expected |
 |---|---|---|
-| P2-01 | As `l.verdi` (*Regione Lazio*): invite `s.greco` of *Comune di Roma* (Manage › Invite a person of another tenant) | — |
+| P2-01 | As `l.verdi` (*Regione Lazio*): invite `s.greco` of *Comune di Roma* (Manage › Pending › Invite: type her address, Home tenant shows *Comune di Roma*) | — |
 | P2-02 | In another window signed in as `s.greco` (no reload) | The bell gets a badge by itself |
 | P2-03 | Open the bell panel | The invitation with Accept and Decline, "Mark all as read", a gear, "See all" |
 | P2-04 | Accept | `s.greco` can switch to *Regione Lazio* from the tenant switcher; `l.verdi` gets a notification of the answer |
@@ -122,7 +122,7 @@ As Administrator (`#/admin`) unless said otherwise.
 | P2-06 | Create a public link on your item while someone else owns it, or vice versa | The owner is notified |
 | P2-07 | See all | The Notifications page: filters (Unread, kind, period, search), selection with mark read / delete |
 | P2-08 | Mark all as read | The badge disappears |
-| P2-09 | Gear (or Account › Notifications) | For each kind: in-app, email off / immediately / daily digest; saved after reload |
+| P2-09 | Gear (or Account › Notifications) | Emails: off / immediately / daily digest; for each kind the checkboxes In the app and Email; saved after reload |
 | P2-10 | As Administrator: System › Email | SMTP server, port, TLS, user, password (masked after saving), sender, footer, test message. Without a mail server in the development environment the test message fails with a readable message; with a local catcher (e.g. Mailpit on port 1025) the message arrives |
 | P2-11 | Dark mode on the panel and the page | Readable, unread dot visible |
 
@@ -140,17 +140,17 @@ As `e.ricci` (Tenant Manager of *Comune di Roma*) unless said otherwise.
 | P3-06 | Manage › People › Sara Greco (click the name) | Her page: tabs Profile, Sign-in, Permissions, Activity; breadcrumb back to Manage |
 | P3-07 | Profile tab: Permission profile → Reader | «Profile updated»; in People her profile reads Reader |
 | P3-08 | Permissions tab | Notes: Use the app ✓ (Profile Reader), Create items — ; the other plugins still from her profile |
-| P3-09 | As `s.greco`, open Notes and try to create a note | Refused: «your permission profile does not allow «Create items» in Notes» (inside the apps the messages of the server are in English for now) |
+| P3-09 | As `s.greco`, open Notes and try to create a note | Refused: «Your permission profile does not allow it» |
 | P3-10 | As `e.ricci`, Plugins › Notes › Access and permissions › Add a group or person › Sara Greco, tick Create items, Save | As `s.greco` creating a note works again; her Permissions tab shows Create items from «Personal» |
 | P3-11 | People: tick two people, «Change profile», «Add to a group», «Suspend» | The action bar appears only with a selection; each action applies to all of them |
 | P3-12 | A suspended person (e.g. `l.bianchi`) signs in | The tenant is not offered to them any more; reactivate from their page («⋯» › Reactivate in the tenant) |
 | P3-13 | Groups: click a group | Group page: Members (add, remove), Shared items, Plugins (what the group adds) |
 | P3-14 | As `e.ricci`, create a note in Notes and copy its address; take the identifier after the last `/` | — |
 | P3-15 | As `s.greco` open `#/t/comune-roma/item/<identifier>` | «You cannot see this item» with Access (See, Edit) and a message; Send the request; «Request sent» |
-| P3-16 | As `e.ricci`: the bell | «Sara Greco asks to see «…»»; Manage › Pending lists it under Access requests with Approve, Refuse, Forward to the owner |
+| P3-16 | As `e.ricci`: the bell | «Sara Greco asks to see «…»»; Manage › Pending lists it under Access requests with Approve and Refuse (Forward to the owner only when the manager is not the owner of the item) |
 | P3-17 | Approve | `s.greco` gets «… gave you access to …»; the same address now opens the note in Notes |
 | P3-18 | Sara's page › Permissions › «Why can't they see an item?» with an identifier | The steps (account, membership, use of the app, owner, shared) with ✓ or — |
-| P3-19 | Sara's page › Sign-in | Send the password link: a dialog with the link to copy (valid until …); her open sessions, Close and Close every session |
+| P3-19 | Sara's page › Sign-in | Send the password link: a dialog with the link to copy («it works once, until <date>»); her open sessions, Close and Close every session |
 | P3-20 | Open the link in a private window | «Choose a new password» with the rule of the tenant; after saving, «Done: sign in with the new password.»; the link does not work a second time |
 | P3-21 | A guest (`d.conti` seen from *Regione Lazio* as `l.verdi`) › Sign-in tab | It says that the home tenant handles password and sessions |
 | P3-22 | As Administrator: the sidebar | A new item People |
@@ -171,8 +171,8 @@ The dev environment loads the plugins of `mosaikit-plugins` from their folders (
 | P4-02 | Tick two plugins | The selection bar appears only now: Update (when an update exists), Turn off, Uninstall, Deselect |
 | P4-03 | Updates and Catalog | Updates lists only newer versions with what they bring (release notes); Catalog what is not installed yet |
 | P4-04 | Click *Notes* | Its page: breadcrumb to Plugins, status badge, tabs Overview, What it asks, Tenants, Extensions; the "⋯" menu has Turn off and Uninstall |
-| P4-05 | What it asks | Logic on the server, hooks, files, network, other plugins, database; the permissions it brings |
-| P4-06 | Extensions tab | *Note review* (installed); a link opens its page, whose What it asks lists the field «Reviewed» and the action «Mark as reviewed» |
+| P4-05 | What it asks | What the plugin uses: logic on the server, hooks, files, network, other plugins, database (the permissions it brings are listed in Access and permissions, not here) |
+| P4-06 | Extensions tab | *Note review* (active); a link opens its page, whose What it asks lists the field «Reviewed» and the action «Mark as reviewed» |
 | P4-07 | Tenants tab | One row per tenant: Available switch, whether the tenant turned it on, Restore when the tenant has its own choice; the switch «Available to every tenant» on top |
 | P4-08 | Turn off «Available to Regione Lazio» | «Availability updated»; Tenants › Regione Lazio › Plugins tab: Notes «not available» |
 | P4-09 | As `l.verdi` (Tenant Manager of Regione Lazio) | Notes is gone from the sidebar and from Plugins; the bell says «Notes is no longer available to the tenant»; *Note review* says «Turn on Notes first» |
@@ -186,7 +186,7 @@ The dev environment loads the plugins of `mosaikit-plugins` from their folders (
 | P4-17 | Switch to Italiano | «Revisionata», «Segna come revisionata»; kinds App / Servizio / Estensione in the pages of the plugins |
 | P4-18 | A public link to a note, then turn Notes off in the tenant | The link stops working; on again, it works again |
 | P4-19 | As Administrator: a plugin with settings (`[[config]]`), Configuration tab | A field per setting; secrets show «Saved: type to replace» and never their value; the save bar appears only after a change (none of the official plugins has settings yet: try with a package of your own) |
-| P4-20 | Uninstall *Note review* (⋯ › Uninstall) | The confirmation says how many items and tenants are touched; the extension disappears, Notes keeps working; reinstall it from Catalog |
+| P4-20 | Uninstall *Note review* (⋯ › Uninstall) | The confirmation says how many items and tenants are touched; the extension disappears, Notes keeps working; reinstall it from Catalog (Install), then ⋯ › Turn on: until then it is installed but off |
 | P4-21 | Dark mode on the new pages | Readable; switches and badges visible |
 
 ## Phase 5 — Shares, Trash, Log
@@ -259,7 +259,7 @@ Town*, address `test-town`): Comune di Roma and Regione Lazio are only read.
 | Id | Check | Expected |
 |---|---|---|
 | P7-01 | Tenants › New tenant | A dialog in four steps (Tenant, Sign-in, Tenant Manager, Summary) with the bar of the steps; Next is disabled until the step is complete |
-| P7-02 | Step 1: Name *Test Town* | The identifier fills in by itself (`test-town`); Trial period on with a date 10 days ahead |
+| P7-02 | Step 1: Name *Test Town* | The identifier fills in by itself (`test-town`); Trial period: turn it on and choose a date 10 days ahead (the date is empty until chosen) |
 | P7-03 | Step 2 | Local accounts chosen; Identity provider (OIDC) asks issuer and client id and says that roles and the check are on the Sign-in tab |
 | P7-04 | Step 3 and 4: Tenant Manager `boss` with a password, Summary, Create the tenant | The summary lists what the platform prepares by itself; the page of the tenant opens with «on trial until …» |
 | P7-05 | Details of Test Town | Below the details and the quotas: Trial period (date, Update the trial, Remove the trial), Logo of the tenant (read only, or «No logo»), Export, the red area Archive or delete |
@@ -329,14 +329,14 @@ cannot sign in. At the end put it back to local accounts (P8-14).
 | P9-02 | Home, press `/` (not in a field) and type `north well` | The search opens; a pill **Notes 1** next to All, Pages, Apps; the note with a piece of its text around «north well» |
 | P9-03 | Type `insp` | The note is found by the beginning of a word of its title |
 | P9-04 | Arrows down to the note, Enter | The note opens in Notes |
-| P9-05 | Ctrl K again, with the field empty | «Recent searches» lists `north well`; choosing it searches again |
+| P9-05 | Ctrl K again, with the field empty | «Recent searches» lists `north well` (searches are remembered when one of their results was opened); choosing it searches again |
 | P9-06 | As `s.greco` (same tenant): search `north well` | «No results»: the note of Elena is not shared with Sara |
 | P9-07 | As `e.ricci`: share the note with Sara (read); as `s.greco` search again | Now found |
 | P9-08 | As `e.ricci`: delete the note, search it | Not found (it is in the trash); restore it from the Trash: found again |
-| P9-09 | As Administrator: search `roma` | Pills Tenant and People: *Comune di Roma* and its people; a result opens the tenant or the person |
+| P9-09 | As Administrator: search `roma`, then the name of one of its people (e.g. `greco`) | Pill Tenant: *Comune di Roma*; with the name, pill People: the person; a result opens the tenant or the person |
 | P9-10 | As Administrator: System › Identity and appearance › Top bar: search off | No search box, `/` and Ctrl K do nothing; put it back on |
 | P9-11 | As `s.greco`, on the Home: the help button (?) | A small dot: a guided tour of this page is waiting |
-| P9-12 | Help › Guided tour of this page | The page darkens around the sidebar, a card «Step 1 of 5»; Next, Back, Skip the tour; arrows and Esc work |
+| P9-12 | Help › Guided tour of this page | The page darkens around the sidebar, a card «Step 1 of 5»; Next, Back, Skip the tour; Esc works, the arrow keys once the focus is in the card |
 | P9-13 | Go to the end (Done), reload the page, sign in again from another browser | The dot is gone everywhere (the tour is remembered with the person) |
 | P9-14 | As `e.ricci`: Manage, Plugins, Tenant settings; as Administrator: System | Manage and Plugins have their tour; System too (Administrator); Tenant settings has none (the item is greyed) |
 | P9-15 | Help › Guide of Mosaikit | A dialog with the short guide; as Administrator, Identity and texts › Guide = an address: the item opens that address in a new tab (put it back empty) |
