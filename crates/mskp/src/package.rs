@@ -54,13 +54,14 @@ impl Package {
             if !is_safe_path(&name) {
                 return Err(bad(format!("unsafe path: {name}")));
             }
-            total += f.size();
-            if f.size() > MAX_FILE_BYTES as u64 || total > MAX_TOTAL_BYTES {
+            if f.size() > MAX_FILE_BYTES as u64 || total.saturating_add(f.size()) > MAX_TOTAL_BYTES {
                 return Err(bad("content beyond the limits".into()));
             }
-            let mut buf = Vec::with_capacity(f.size() as usize);
+            // the sizes in the headers are not trusted: the limits apply to what the entries inflate to
+            let mut buf = Vec::with_capacity(f.size().min(16 << 20) as usize);
             (&mut f).take(MAX_FILE_BYTES as u64 + 1).read_to_end(&mut buf).map_err(|e| bad(e.to_string()))?;
-            if buf.len() > MAX_FILE_BYTES {
+            total += buf.len() as u64;
+            if buf.len() > MAX_FILE_BYTES || total > MAX_TOTAL_BYTES {
                 return Err(bad("file beyond the limits".into()));
             }
             if files.insert(name.clone(), buf).is_some() {

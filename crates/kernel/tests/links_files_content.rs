@@ -242,3 +242,16 @@ async fn files_and_content_permission_required() {
     let rid = note(&t, &anna, "x").await;
     assert_eq!(content::upload_site(&t, &anna, NOTES, rid, &[]).await.unwrap_err().kind, Kind::Forbidden);
 }
+
+#[tokio::test]
+async fn guessing_the_password_of_a_link_is_limited() {
+    let (t, _g, anna, _b) = setup().await;
+    let rid = note(&t, &anna, "protected").await;
+    let lp = links::create(&t, &anna, rid, None, Some("secret1")).await.unwrap();
+    let r = links::resolve(&t, &token_of(&lp.url)).await.unwrap();
+    for _ in 0..10 {
+        assert!(!links::check_password(&t, &r, "wrong").await.unwrap());
+    }
+    // the link waits: even the right password is not checked any more for a while
+    assert_eq!(links::check_password(&t, &r, "secret1").await.unwrap_err().kind, Kind::TooMany);
+}

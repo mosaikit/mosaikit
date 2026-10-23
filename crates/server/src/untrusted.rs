@@ -46,13 +46,17 @@ fn mime(path: &str) -> String {
 
 // ------------------------------------------------------------------ UI of the plugins
 
+/// CSP of the UI of a plugin. Scripts and workers come only from the folder of its own UI: the same
+/// origin also serves the contents of the users (`/c/…`) and the public links (`/p/…`), and a file
+/// uploaded there must never run as a script of a plugin.
 fn plugin_csp(s: &AppState, p: &mosaikit_kernel::plugins::LoadedPlugin) -> String {
     let net = p.manifest.permissions.network.join(" ");
     let frames = p.manifest.permissions.frame_src.join(" ");
+    let own = format!("{}/ui/{}/", s.k.cfg.plugin_url.trim_end_matches('/'), p.id);
     format!(
-        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; \
+        "default-src 'self'; script-src {own}; style-src 'self' 'unsafe-inline'; \
          img-src 'self' data: blob: {net} {frames}; font-src 'self' data:; media-src 'self' data: blob:; \
-         connect-src 'self' {net}; frame-src 'self' blob: {frames}; worker-src 'self' blob:; \
+         connect-src 'self' {net}; frame-src 'self' blob: {frames}; worker-src {own} blob:; \
          frame-ancestors {} {}; object-src 'none'; base-uri 'self'; form-action 'self'",
         s.k.cfg.app_origin(),
         s.k.cfg.public_origin()

@@ -34,7 +34,26 @@ pub async fn upload_site(k: &Kernel, c: &Caller, plugin_id: &str, rid: Uuid, zip
     // from then on)
     crate::quotas::check(k, c.tenant.tenant_id, crate::quotas::Add::storage(zip.len() as i64 - before))
         .await?;
-    let info = k.blobs.extract_site(c.tenant.tenant_id, rid, zip)?;
+    // a zip can inflate far beyond its size: the unpacked content may take at most what the storage quota
+    // still leaves (the current content counts as freed)
+    let room = crate::quotas::limits(k, c.tenant.tenant_id).await?.storage.map(|limit| (limit, before));
+    let room = match room {
+        Some((limit, before)) => {
+            let used = crate::quotas::usage(k, c.tenant.tenant_id).await?.storage;
+            Some((limit - used + before).max(0) as u64)
+        }
+        None => None,
+    };
+    let max = room.map_or(crate::blobs::SITE_MAX_BYTES, |r| r.min(crate::blobs::SITE_MAX_BYTES));
+    let info = match k.blobs.extract_site_within(c.tenant.tenant_id, rid, zip, max) {
+        Err(e)
+            if e.code() == "content_too_large" && room.is_some_and(|r| r < crate::blobs::SITE_MAX_BYTES) =>
+        {
+            return Err(Error::conflict("the unpacked content goes beyond the storage quota of the tenant")
+                .with_code("quota_exceeded"));
+        }
+        r => r?,
+    };
     tx.update_resource(rid, None, Some(&json!({ "content": info })), Some(info.size as i64)).await?;
     tx.commit().await?;
     crate::quotas::touched(k, c.tenant.tenant_id);

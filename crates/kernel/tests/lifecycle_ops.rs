@@ -467,3 +467,59 @@ async fn one_item_from_a_backup() {
         Kind::NotFound
     );
 }
+
+/// A copy of the export at `path` with `core/<table>.json` changed by `edit`.
+fn tampered(
+    path: &std::path::Path,
+    table: &str,
+    edit: impl Fn(&mut Vec<serde_json::Value>),
+) -> std::path::PathBuf {
+    use std::io::{Read, Write};
+    let mut zin = zip::ZipArchive::new(std::fs::File::open(path).unwrap()).unwrap();
+    let out = path.with_file_name(format!("tampered-{table}-{}.zip", Uuid::new_v4()));
+    let mut zout = zip::ZipWriter::new(std::fs::File::create(&out).unwrap());
+    for i in 0..zin.len() {
+        let mut f = zin.by_index(i).unwrap();
+        let name = f.name().to_string();
+        let mut data = Vec::new();
+        f.read_to_end(&mut data).unwrap();
+        if name == format!("core/{table}.json") {
+            let mut rows: Vec<serde_json::Value> = serde_json::from_slice(&data).unwrap();
+            edit(&mut rows);
+            data = serde_json::to_vec(&rows).unwrap();
+        }
+        zout.start_file(name, zip::write::SimpleFileOptions::default()).unwrap();
+        zout.write_all(&data).unwrap();
+    }
+    zout.finish().unwrap();
+    out
+}
+
+#[tokio::test]
+async fn an_export_cannot_reach_outside_its_tenant() {
+    let t = start().await;
+    let admin = t.admin().await;
+    let g = t.tenant("alfa").await;
+    t.member(&g, "anna").await;
+    t.tenant("beta").await;
+    let alfa = tenant_id(&t, "alfa").await;
+    let beta = tenant_id(&t, "beta").await;
+    let (path, _) = transfer::export_tenant(&t, &admin, alfa).await.unwrap();
+    let replace = ImportOptions { replace: true };
+    // an account of the export turned into an Administrator of the platform
+    let p = tampered(&path, "users", |rows| {
+        rows[0]["is_system_admin"] = json!(true);
+    });
+    let e = transfer::import_tenant(&t, &admin, &p, "", &replace).await.unwrap_err();
+    assert_eq!(e.code(), "export_invalid", "{}", e.message);
+    // a person of the export added to another tenant of the installation
+    let p = tampered(&path, "memberships", |rows| {
+        let mut m = rows[0].clone();
+        m["tenant_id"] = json!(beta.to_string());
+        rows.push(m);
+    });
+    let e = transfer::import_tenant(&t, &admin, &p, "", &replace).await.unwrap_err();
+    assert_eq!(e.code(), "export_invalid", "{}", e.message);
+    // the untouched export still goes in
+    transfer::import_tenant(&t, &admin, &path, "", &replace).await.unwrap();
+}

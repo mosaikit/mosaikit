@@ -203,11 +203,25 @@ pub async fn resolve(k: &Kernel, token: &str) -> Result<Resolved> {
     })
 }
 
+/// Wrong passwords allowed on a public link in the window, before it waits.
+const LINK_ATTEMPTS: u32 = 10;
+const LINK_WINDOW: std::time::Duration = std::time::Duration::from_secs(15 * 60);
+
+/// The password of a protected link, with a limit on the wrong attempts on that link (the page is
+/// public: without it anyone could guess at will, and every guess costs the server an argon2 check).
 pub async fn check_password(k: &Kernel, r: &Resolved, password: &str) -> Result<bool> {
-    match &r.password_hash {
-        None => Ok(true),
-        Some(h) => verify_password(k, Some(h.clone()), password).await,
+    let Some(h) = &r.password_hash else { return Ok(true) };
+    let key = format!("link:{}", r.link_id);
+    if k.limiter.blocked_after(&key, LINK_ATTEMPTS, LINK_WINDOW) {
+        return Err(crate::identity::too_many());
     }
+    let ok = verify_password(k, Some(h.clone()), password).await?;
+    if ok {
+        k.limiter.clear(&key);
+    } else {
+        k.limiter.fail_within(&key, LINK_WINDOW);
+    }
+    Ok(ok)
 }
 
 /// Value of the cookie that remembers the unlocking of a password-protected link.

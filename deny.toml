@@ -5,6 +5,17 @@ all-features = true
 [advisories]
 version = 2
 yanked = "deny"
+# Every exception says why it does not apply and when to drop it (docs/reports/dependencies.md).
+ignore = [
+  # zip 2.x: the three advisories are about ZipArchive::extract / ZipStreamReader::extract (symlinks,
+  # SUID bits). Mosaikit never calls them: every archive is read entry by entry with checked paths
+  # (blobs::extract_site, transfer::extract, mskp::Package::read). Drop when moving to zip >= 9.
+  { id = "RUSTSEC-2026-0367", reason = "extract() not used; entries read one by one with safe paths" },
+  { id = "RUSTSEC-2026-0368", reason = "extract() not used; entries read one by one with safe paths" },
+  { id = "RUSTSEC-2026-0369", reason = "extract() not used; entries read one by one with safe paths" },
+  # proc-macro-error (unmaintained): build-time only, through gtk -> tray-icon of the desktop on Linux.
+  { id = "RUSTSEC-2024-0370", reason = "build-time proc macro of the Linux tray (gtk), no runtime code" },
+]
 
 [licenses]
 version = 2
@@ -22,13 +33,20 @@ allow = [
   "CDLA-Permissive-2.0",
   "0BSD",
   "BSL-1.0",
+  # notify (file watching of the plugins in development)
+  "CC0-1.0",
 ]
+# the crates of this workspace that are not published (xtask) have no license field
+private = { ignore = true }
 confidence-threshold = 0.9
 
 [bans]
 multiple-versions = "warn"
+# the crates of the workspace depend on each other by path (no version): cargo-deny counts them as
+# wildcards because the crates are not marked `publish = false`
 wildcards = "allow"
 
 [sources]
 unknown-registry = "deny"
 unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]

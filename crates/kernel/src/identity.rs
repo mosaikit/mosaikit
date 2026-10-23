@@ -25,6 +25,8 @@ pub const MIN_PASSWORD_LEN: usize = 10;
 /// Limit on the attempts of the second factor (the ones of the password come from the settings).
 const MAX_FAILURES: u32 = 8;
 const FAILURE_WINDOW: Duration = Duration::from_secs(15 * 60);
+/// Size of the map of the failed attempts beyond which the stale entries are removed.
+const LIMITER_PRUNE_AT: usize = 10_000;
 /// lifetime of a session waiting for the second factor
 const PENDING_MINUTES: i32 = 10;
 const RECOVERY_CODES: usize = 10;
@@ -38,15 +40,20 @@ impl LoginLimiter {
         self.blocked_after(key, MAX_FAILURES, FAILURE_WINDOW)
     }
     /// `max` failures within `window` lock the key until the window passes.
-    fn blocked_after(&self, key: &str, max: u32, window: Duration) -> bool {
+    pub(crate) fn blocked_after(&self, key: &str, max: u32, window: Duration) -> bool {
         let map = self.0.lock().expect("lock limiter");
         map.get(key).is_some_and(|(n, t)| *n >= max && t.elapsed() < window)
     }
     fn fail(&self, key: &str) {
         self.fail_within(key, FAILURE_WINDOW)
     }
-    fn fail_within(&self, key: &str, window: Duration) {
+    pub(crate) fn fail_within(&self, key: &str, window: Duration) {
         let mut map = self.0.lock().expect("lock limiter");
+        // the keys are chosen by whoever tries (usernames, addresses): the stale ones go, so that the
+        // map cannot grow without end (no lock lasts more than a day)
+        if map.len() >= LIMITER_PRUNE_AT {
+            map.retain(|_, (_, t)| t.elapsed() < Duration::from_secs(24 * 3600));
+        }
         let e = map.entry(key.to_string()).or_insert((0, Instant::now()));
         if e.1.elapsed() >= window {
             *e = (0, Instant::now());
@@ -54,7 +61,7 @@ impl LoginLimiter {
         e.0 += 1;
         e.1 = Instant::now();
     }
-    fn clear(&self, key: &str) {
+    pub(crate) fn clear(&self, key: &str) {
         self.0.lock().expect("lock limiter").remove(key);
     }
 }
@@ -382,7 +389,7 @@ async fn check_credentials(
     Ok(user_id)
 }
 
-fn too_many() -> Error {
+pub(crate) fn too_many() -> Error {
     Error::new(crate::Kind::TooMany, "too many failed attempts: try again in a few minutes")
         .with_code("too_many_attempts")
 }
@@ -795,4 +802,24 @@ pub fn valid_username(u: &str) -> bool {
         && u.len() >= 2
         && u.len() <= 64
         && c.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || ".-_".contains(c))
+}
+
+#[cfg(test)]
+mod limiter_tests {
+    use super::*;
+
+    #[test]
+    fn the_limiter_forgets_stale_keys() {
+        let l = LoginLimiter::default();
+        {
+            let mut m = l.0.lock().unwrap();
+            let old = Instant::now() - Duration::from_secs(25 * 3600);
+            for i in 0..LIMITER_PRUNE_AT {
+                m.insert(format!("u:x/{i}"), (1, old));
+            }
+        }
+        l.fail_within("u:x/new", FAILURE_WINDOW);
+        let m = l.0.lock().unwrap();
+        assert_eq!(m.len(), 1, "only the fresh key stays");
+    }
 }
