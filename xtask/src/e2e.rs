@@ -65,11 +65,14 @@ fn ports() -> Result<u16> {
 
 pub(crate) fn reset_db(db: &str) -> Result<()> {
     psql(&format!("drop database if exists {db} with (force)"))?;
-    for r in psql(&format!("select rolname from pg_roles where rolname like 'msk_{db}%'"))?
-        .lines()
-        .map(str::trim)
-        .filter(|l| !l.is_empty())
-    {
+    // the roles of this database only: `msk_mosaikit_e2e_%` also matches the roles of another
+    // checkout's `mosaikit_e2e_phase8`, so the roles of longer database names are left out
+    let others = psql(&format!("select datname from pg_database where datname like '{db}\\_%'"))?;
+    let mut sql = format!("select rolname from pg_roles where rolname like 'msk_{db}\\_%'");
+    for o in others.lines().map(str::trim).filter(|l| !l.is_empty()) {
+        sql.push_str(&format!(" and rolname not like 'msk_{o}\\_%'"));
+    }
+    for r in psql(&sql)?.lines().map(str::trim).filter(|l| !l.is_empty()) {
         psql(&format!("drop role if exists \"{r}\""))?;
     }
     psql(&format!("create database {db}"))?;
