@@ -56,17 +56,36 @@ pub async fn list(k: &Kernel, c: &Caller, plugin: Option<&str>, q: Option<&str>)
     let manager = c.is_manager();
     let see_titles = !manager || c.tenant.settings.managers_see_titles;
     let days = retention_days(k).await;
+    // the size of what an item contains: on PostgreSQL through the GIN index on ancestors (not
+    // `r.id = any(x.ancestors)`, which reads every item of the platform for each item of the trash); on
+    // SQLite the sizes of the contents of the tenant summed in one pass over the ancestors
     let rows = mosaikit_db::query(
         "select r.id, r.plugin_id, r.kind, r.title, r.owner_id, coalesce(nullif(u.display_name, ''), u.username),
                 r.deleted_at, r.deleted_by, coalesce(nullif(d.display_name, ''), d.username),
                 (r.size_bytes + coalesce((select sum(x.size_bytes) from core.resources x
-                                          where r.id = any(x.ancestors)), 0))::bigint,
+                                          where x.ancestors @> array[r.id]), 0))::bigint,
                 exists (select 1 from core.resources a where a.id = any(r.ancestors) and a.deleted_at is not null)
          from core.resources r join core.users u on u.id = r.owner_id
          left join core.users d on d.id = r.deleted_by
          where r.tenant_id = $1 and r.deleted_at is not null
            and ($2 or r.owner_id = $3 or r.deleted_by = $3)
            and ($4::text is null or r.plugin_id = $4)
+         order by r.deleted_at desc limit 2000",
+    )
+    .sqlite(
+        "select r.id, r.plugin_id, r.kind, r.title, r.owner_id, coalesce(nullif(u.display_name, ''), u.username),
+                r.deleted_at, r.deleted_by, coalesce(nullif(d.display_name, ''), d.username),
+                r.size_bytes + coalesce(s.inside, 0),
+                exists (select 1 from core_resources a
+                        where a.deleted_at is not null and a.id in (select value from json_each(r.ancestors)))
+         from core_resources r join core_users u on u.id = r.owner_id
+         left join core_users d on d.id = r.deleted_by
+         left join (select a.value as root, sum(x.size_bytes) as inside
+                    from core_resources x, json_each(x.ancestors) a
+                    where x.tenant_id = ?1 group by a.value) s on s.root = r.id
+         where r.tenant_id = ?1 and r.deleted_at is not null
+           and (?2 or r.owner_id = ?3 or r.deleted_by = ?3)
+           and (?4 is null or r.plugin_id = ?4)
          order by r.deleted_at desc limit 2000",
     )
     .bind(c.tenant.tenant_id)
@@ -167,11 +186,13 @@ pub async fn restore(k: &Kernel, c: &Caller, id: Uuid) -> Result<()> {
 
 /// Deletes for good an item and what it contains (rows, grants, links, contents on disk).
 async fn purge_ids(k: &Kernel, tenant: Uuid, id: Uuid) -> Result<()> {
-    let ids: Vec<Uuid> =
-        mosaikit_db::query_scalar("select id from core.resources where id = $1 or $1 = any(ancestors)")
-            .bind(id)
-            .fetch_all(&k.db)
-            .await?;
+    let ids: Vec<Uuid> = mosaikit_db::query_scalar(format!(
+        "select id from core.resources where id = $1 or {}",
+        crate::util::under(k.db.is_sqlite(), 1)
+    ))
+    .bind(id)
+    .fetch_all(&k.db)
+    .await?;
     mosaikit_db::query("delete from core.resources where id = $1").bind(id).execute(&k.db).await?;
     for g in ids {
         k.blobs.remove(tenant, g);

@@ -81,12 +81,21 @@ fn label(k: &Kernel, id: &str) -> String {
 
 async fn personal(k: &Kernel, c: &Caller) -> Result<Personal> {
     let (me, t) = (c.user.user_id, c.tenant.tenant_id);
+    // the trash as one set: core.trashed on PostgreSQL, the same in SQL of SQLite
     let rows = mosaikit_db::query(
-        "select plugin_id, kind, count(*), coalesce(sum(size_bytes), 0)::bigint,
-                sum(case when core.in_trash(id) then 1 else 0 end),
-                coalesce(sum(case when core.in_trash(id) then size_bytes else 0 end), 0)::bigint
-         from core.resources
-         where tenant_id = $1 and owner_id = $2 group by plugin_id, kind order by 3 desc",
+        "select r.plugin_id, r.kind, count(*), coalesce(sum(r.size_bytes), 0)::bigint,
+                count(x.id), coalesce(sum(case when x.id is not null then r.size_bytes else 0 end), 0)::bigint
+         from core.resources r left join core.trashed($1) x on x.id = r.id
+         where r.tenant_id = $1 and r.owner_id = $2 group by r.plugin_id, r.kind order by 3 desc",
+    )
+    .sqlite(
+        "with roots as (select id from core_resources where deleted_at is not null and tenant_id = ?1),
+         tr as (select id from roots
+                union select x.id from core_resources x, json_each(x.ancestors) a where a.value in (select id from roots))
+         select r.plugin_id, r.kind, count(*), coalesce(sum(r.size_bytes), 0),
+                count(tr.id), coalesce(sum(case when tr.id is not null then r.size_bytes else 0 end), 0)
+         from core_resources r left join tr on tr.id = r.id
+         where r.tenant_id = ?1 and r.owner_id = ?2 group by r.plugin_id, r.kind order by 3 desc",
     )
     .bind(t)
     .bind(me)

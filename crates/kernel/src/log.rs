@@ -114,6 +114,15 @@ fn what_sql(what: Option<&str>) -> &'static str {
     }
 }
 
+/// The condition of a filter in use, or the one that says it is not (`$n is null`).
+fn opt(on: bool, used: &'static str, unused: &'static str) -> &'static str {
+    if on {
+        used
+    } else {
+        unused
+    }
+}
+
 fn see_titles(settings: &Value) -> bool {
     serde_json::from_value::<TenantSettings>(settings.clone()).map(|s| s.managers_see_titles).unwrap_or(true)
 }
@@ -142,20 +151,27 @@ async fn fetch(k: &Kernel, scope: Scope<'_>, f: &LogFilter, limit: i64) -> Resul
          left join core.tenants t on t.id = e.tenant_id
          left join core.users u on u.id = e.user_id
          left join core.resources r on r.id = e.resource_id
-         where ($1::uuid is null or e.tenant_id = $1)
-           and ($2::uuid is null or e.user_id = $2)
-           and ($3::text is null or e.plugin_id = $3)
-           and ($4::uuid is null or e.resource_id = $4)
-           and ($5::text is null or e.detail->>'group' = $5)
-           and ($6::timestamptz is null or e.ts >= $6)
-           and ($7::timestamptz is null or e.ts < $7)
-           and (not $8 or not e.ok)
-           and ($9::text is null or e.action ilike $9 escape '\\' or u.username ilike $9 escape '\\'
-                or u.display_name ilike $9 escape '\\' or e.detail::text ilike $9 escape '\\'
-                or e.ip ilike $9 escape '\\')
-           and ($10::bigint is null or e.id < $10)
-           and {what}
+         where {tenant} and {user} and {plugin} and {resource} and {group} and {from} and {to} and {failed}
+           and {search} and {before} and {what}
          order by e.id desc limit $11",
+        // only the filters in use become conditions (an unused one is `$n is null`, true): with
+        // `($n is null or column = $n)` the plan prepared once cannot use the indexes of the column
+        tenant = opt(tenant.is_some(), "e.tenant_id = $1", "$1::uuid is null"),
+        user = opt(f.user.is_some(), "e.user_id = $2", "$2::uuid is null"),
+        plugin = opt(f.plugin.is_some(), "e.plugin_id = $3", "$3::text is null"),
+        resource = opt(f.resource.is_some(), "e.resource_id = $4", "$4::uuid is null"),
+        group = opt(f.group.is_some(), "e.detail->>'group' = $5", "$5::text is null"),
+        from = opt(f.from.is_some(), "e.ts >= $6", "$6::timestamptz is null"),
+        to = opt(f.to.is_some(), "e.ts < $7", "$7::timestamptz is null"),
+        failed = opt(f.failed, "(not e.ok and $8)", "not $8"),
+        search = opt(
+            like.is_some(),
+            "(e.action ilike $9 escape '\\' or u.username ilike $9 escape '\\'
+              or u.display_name ilike $9 escape '\\' or e.detail::text ilike $9 escape '\\'
+              or e.ip ilike $9 escape '\\')",
+            "$9::text is null"
+        ),
+        before = opt(f.before.is_some(), "e.id < $10", "$10::bigint is null"),
         what = what_sql(f.what.as_deref()),
     );
     let rows = mosaikit_db::query(sql)

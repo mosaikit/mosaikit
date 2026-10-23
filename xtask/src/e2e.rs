@@ -20,11 +20,11 @@ use crate::util::{exe, npm, output, pg_bin, root, run, which};
 const ADMIN_PASSWORD: &str = "e2e-admin-password";
 
 /// Administrative role of the tests: `MOSAIKIT_TEST_DATABASE_URL` (CI) or the development cluster.
-fn admin_url() -> String {
+pub(crate) fn admin_url() -> String {
     std::env::var("MOSAIKIT_TEST_DATABASE_URL").unwrap_or_else(|_| crate::db::test_url())
 }
 
-fn psql(sql: &str) -> Result<String> {
+pub(crate) fn psql(sql: &str) -> Result<String> {
     let psql = pg_bin()
         .map(|b| b.join(exe("psql")))
         .or_else(|| which("psql"))
@@ -63,7 +63,7 @@ fn ports() -> Result<u16> {
         .context("no three free ports from 18080 to 18272")
 }
 
-fn reset_db(db: &str) -> Result<()> {
+pub(crate) fn reset_db(db: &str) -> Result<()> {
     psql(&format!("drop database if exists {db} with (force)"))?;
     for r in psql(&format!("select rolname from pg_roles where rolname like 'msk_{db}%'"))?
         .lines()
@@ -76,7 +76,7 @@ fn reset_db(db: &str) -> Result<()> {
     Ok(())
 }
 
-fn wait_health(url: &str) -> Result<()> {
+pub(crate) fn wait_health(url: &str) -> Result<()> {
     let start = Instant::now();
     while start.elapsed() < Duration::from_secs(120) {
         let ok = Command::new("curl")

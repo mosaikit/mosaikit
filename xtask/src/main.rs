@@ -5,6 +5,7 @@ mod db;
 mod dev;
 mod dist;
 mod e2e;
+mod perf;
 mod plugins;
 mod release;
 mod util;
@@ -55,6 +56,24 @@ enum Cmd {
         /// show the browser
         #[arg(long)]
         headed: bool,
+    },
+    /// Load test of a full installation at scale (docs/reports/performance.md)
+    Perf {
+        /// postgres or sqlite
+        #[arg(long, default_value = "postgres")]
+        backend: String,
+        /// size of the data: full (200 tenants, 1M items, 5M events), medium, desktop
+        #[arg(long, default_value = "full")]
+        scale: String,
+        /// measure again on the data of the previous run (new migrations are applied)
+        #[arg(long)]
+        reuse: bool,
+        /// do not build the server: measure the binary already in target/release (before and after)
+        #[arg(long)]
+        no_build: bool,
+        /// drop the database and the data of the load test
+        #[arg(long)]
+        clean: bool,
     },
     /// Release
     Release {
@@ -192,6 +211,8 @@ fn main() -> Result<()> {
         Cmd::Test { skip_db } => ci::test(skip_db),
         Cmd::Ci => ci::ci(),
         Cmd::E2e { headed } => e2e::e2e(headed),
+        Cmd::Perf { clean: true, .. } => perf::clean(),
+        Cmd::Perf { backend, scale, reuse, no_build, .. } => perf::perf(&backend, &scale, reuse, no_build),
         Cmd::Release { cmd } => match cmd {
             ReleaseCmd::Bundle { out, skip_ui, flavor } => release::bundle(&out, skip_ui, flavor),
             ReleaseCmd::Desktop { pg_dir, no_pg } => release::desktop(pg_dir, no_pg),

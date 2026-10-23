@@ -158,6 +158,27 @@ impl LitePluginSchema {
                 )
                 .await?;
             }
+            // index on tenant_id: the KPIs and the views of a tenant read the rows of one tenant
+            let (tidx, _) = tx
+                .raw(
+                    "select 1 from pragma_index_list(?1) l join pragma_index_info(l.name) i                      where i.seqno = 0 and i.name = 'tenant_id'"
+                        .into(),
+                    vec![Param::Text(physical.clone())],
+                    true,
+                )
+                .await?;
+            if tidx.is_empty() {
+                tx.raw(
+                    format!(
+                        "create index {} on {} (tenant_id)",
+                        q(&format!("{physical}_tenant_idx")),
+                        q(&physical)
+                    ),
+                    Vec::new(),
+                    false,
+                )
+                .await?;
+            }
             // check triggers (active only in the transactions of the plugins)
             let lv = |r: &str| tr::level_of(r);
             let triggers = [

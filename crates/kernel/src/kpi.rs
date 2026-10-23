@@ -1,6 +1,8 @@
 //! KPIs: of the kernel (always available) and of the plugins (views `kpi_*`).
 //! They are aggregates: whoever looks at them never sees the content of the resources.
 
+use std::collections::HashMap;
+
 use mosaikit_db::qi;
 use serde::Serialize;
 use serde_json::Value;
@@ -96,17 +98,31 @@ fn plugin_label(k: &Kernel, id: &str) -> String {
 }
 
 async fn resource_stats(k: &Kernel, tenant: Option<Uuid>) -> Result<Vec<ResourceStat>> {
-    let rows = mosaikit_db::query(
-        "select plugin_id, kind, count(*), coalesce(sum(size_bytes), 0)::bigint,
-                sum(case when core.in_trash(id) then 1 else 0 end),
-                coalesce(sum(case when core.in_trash(id) then size_bytes else 0 end), 0)::bigint
-         from core.resources
-         where ($1::uuid is null or tenant_id = $1)
-         group by plugin_id, kind order by 3 desc",
-    )
-    .bind(tenant)
-    .fetch_all(&k.db)
-    .await?;
+    // PostgreSQL: the items in the trash as one set (core.trashed), not core.in_trash() twice per item;
+    // and the tenant as the only condition, so that the plan reads one tenant through its index
+    let filter = if tenant.is_some() { "r.tenant_id = $1" } else { "$1::uuid is null" };
+    let sql = format!(
+        "select r.plugin_id, r.kind, count(*), coalesce(sum(r.size_bytes), 0)::bigint,
+                count(x.id), coalesce(sum(case when x.id is not null then r.size_bytes else 0 end), 0)::bigint
+         from core.resources r left join core.trashed($1) x on x.id = r.id
+         where {filter}
+         group by r.plugin_id, r.kind order by 3 desc"
+    );
+    // SQLite: the same, with the trash as a set too (deleted items and the contents of deleted folders)
+    let rows = mosaikit_db::query(sql)
+        .sqlite(
+            "with roots as (select id from core_resources where deleted_at is not null and (?1 is null or tenant_id = ?1)),
+             tr as (select id from roots
+                    union select x.id from core_resources x, json_each(x.ancestors) a where a.value in (select id from roots))
+             select r.plugin_id, r.kind, count(*), coalesce(sum(r.size_bytes), 0),
+                    count(tr.id), coalesce(sum(case when tr.id is not null then r.size_bytes else 0 end), 0)
+             from core_resources r left join tr on tr.id = r.id
+             where (?1 is null or r.tenant_id = ?1)
+             group by r.plugin_id, r.kind order by 3 desc",
+        )
+        .bind(tenant)
+        .fetch_all(&k.db)
+        .await?;
     Ok(rows
         .iter()
         .map(|r| {
@@ -150,7 +166,7 @@ pub(crate) async fn core(k: &Kernel, tenant: Uuid) -> Result<CoreKpi> {
         "with recursive d(day) as (
            select date('now', '-29 days') union all select date(day, '+1 day') from d where day < date('now'))
          select d.day, count(e.id), count(distinct e.user_id)
-         from d left join core_events e on e.tenant_id = ?1 and substr(e.ts, 1, 10) = d.day
+         from d left join core_events e on e.tenant_id = ?1 and e.ts >= d.day and e.ts < date(d.day, '+1 day')
          group by d.day order by d.day",
     )
     .bind(tenant)
@@ -174,10 +190,14 @@ async fn plugin_kpis(k: &Kernel, tenant: Option<Uuid>) -> Result<Vec<PluginKpi>>
     let mut out = Vec::new();
     for p in k.plugins.list().iter().filter(|p| p.is_active()) {
         for decl in &p.manifest.kpi {
+            // two statements, not `$1 is null or tenant_id = $1`: with the condition alone the planner
+            // pushes it into the view (one tenant read through the index on tenant_id) instead of
+            // aggregating the whole table of the plugin for every tenant
+            let filter = if tenant.is_some() { "v.tenant_id = $1" } else { "$1::uuid is null" };
             let sql = format!(
                 "select coalesce(json_agg(x), '[]'::json) from (
                    select t.slug as tenant, v.* from {}.{} v join core.tenants t on t.id = v.tenant_id
-                   where $1::uuid is null or v.tenant_id = $1 order by t.slug) x",
+                   where {filter} order by t.slug) x",
                 qi(&p.schema()),
                 qi(&decl.view)
             );
@@ -242,7 +262,34 @@ pub async fn tenant(k: &Kernel, c: &Caller) -> Result<TenantKpi> {
 pub async fn global(k: &Kernel, admin: &SessionUser) -> Result<GlobalKpi> {
     require_admin(admin)?;
     let mut tenants = Vec::new();
+    // PostgreSQL: the figures of every tenant in one query (one pass on the events, the shares and the
+    // links), not three queries per tenant
+    let mut by_tenant: HashMap<Uuid, (i64, i64, i64)> = HashMap::new();
+    if !k.db.is_sqlite() {
+        for r in mosaikit_db::query(
+            "with tr as materialized (select id from core.trashed(null)),
+             ev as (select tenant_id, count(distinct user_id) as n from core.events
+                    where ts > now() - interval '30 days' and user_id is not null group by tenant_id),
+             sh as (select r.tenant_id, count(*) as n from core.grants g join core.resources r on r.id = g.resource_id
+                    where not exists (select 1 from tr where tr.id = r.id) group by r.tenant_id),
+             li as (select r.tenant_id, count(*) as n from core.public_links l join core.resources r on r.id = l.resource_id
+                    where l.revoked_at is null and (l.expires_at is null or l.expires_at > now())
+                      and not exists (select 1 from tr where tr.id = r.id) group by r.tenant_id)
+             select t.id, coalesce(ev.n, 0), coalesce(sh.n, 0), coalesce(li.n, 0)
+             from core.tenants t
+             left join ev on ev.tenant_id = t.id left join sh on sh.tenant_id = t.id left join li on li.tenant_id = t.id",
+        )
+        .fetch_all(&k.db)
+        .await?
+        {
+            by_tenant.insert(r.get(0), (r.get(1), r.get(2), r.get(3)));
+        }
+    }
     for t in list_tenants(k, admin).await? {
+        if let Some(&(active, shares, links)) = by_tenant.get(&t.id) {
+            tenants.push(TenantSummary { info: t, active_users_30d: active, shares, public_links: links });
+            continue;
+        }
         let r = mosaikit_db::query(
             "select
                (select count(distinct user_id) from core.events where tenant_id = $1 and ts > now() - interval '30 days' and user_id is not null),

@@ -235,6 +235,19 @@ impl PgPluginSchema {
                     if !has_index {
                         Self::exec(tx, &format!("create index on {t} (resource_id)")).await?;
                     }
+                    // the KPIs and the views of a tenant read the rows of one tenant
+                    let has_tenant_index: bool = sqlx::query_scalar(
+                        "select exists (select 1 from pg_index i
+                           join pg_attribute a on a.attrelid = i.indrelid and a.attnum = i.indkey[0]
+                           where i.indrelid = ($1 || '.' || $2)::regclass and a.attname = 'tenant_id')",
+                    )
+                    .bind(qi(&self.schema))
+                    .bind(qi(name))
+                    .fetch_one(&mut **tx)
+                    .await?;
+                    if !has_tenant_index {
+                        Self::exec(tx, &format!("create index on {t} (tenant_id)")).await?;
+                    }
                     Self::exec(tx, &format!("alter table {t} enable row level security")).await?;
                     for p in ["msk_select", "msk_insert", "msk_update", "msk_delete"] {
                         Self::exec(tx, &format!("drop policy if exists {p} on {t}")).await?;

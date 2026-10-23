@@ -457,11 +457,13 @@ pub async fn restore(
     // replace: the current version goes first, with everything under it
     let mut removed: Vec<Uuid> = Vec::new();
     if mode == "replace" {
-        removed =
-            mosaikit_db::query_scalar("select id from core.resources where id = $1 or $1 = any(ancestors)")
-                .bind(rid)
-                .fetch_all(&mut tx)
-                .await?;
+        removed = mosaikit_db::query_scalar(format!(
+            "select id from core.resources where id = $1 or {}",
+            crate::util::under(k.db.is_sqlite(), 1)
+        ))
+        .bind(rid)
+        .fetch_all(&mut tx)
+        .await?;
         mosaikit_db::query("delete from core.resources where id = $1").bind(rid).execute(&mut tx).await?;
     }
     if k.db.is_sqlite() {
