@@ -469,6 +469,27 @@ fn cell(s: &str) -> String {
     s.replace('|', "\\|").replace('\n', " ")
 }
 
+/// Without the colour codes of the terminal (Playwright and vitest messages carry them).
+fn plain(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        if c == '\u{1b}' {
+            if chars.peek() == Some(&'[') {
+                chars.next();
+                for d in chars.by_ref() {
+                    if d.is_ascii_alphabetic() {
+                        break;
+                    }
+                }
+            }
+        } else {
+            out.push(c);
+        }
+    }
+    out
+}
+
 fn icon(s: Status) -> &'static str {
     match s {
         Status::Passed => "passed",
@@ -582,6 +603,7 @@ pub fn generate() -> Result<PathBuf> {
             for c in &failed {
                 doc.push_str(&format!("- **{}** — {}\n", cell(&c.group), cell(&c.name)));
                 if let Some(msg) = &c.message {
+                    let msg = plain(msg);
                     let lines: Vec<&str> = msg.lines().filter(|l| !l.trim().is_empty()).take(12).collect();
                     if !lines.is_empty() {
                         doc.push_str("\n  ```text\n");
@@ -685,5 +707,6 @@ mod tests {
         assert_eq!((c[0].name.as_str(), c[0].duration), ("Shell › sign in", Some(1200.0)));
         assert_eq!((c[1].name.as_str(), c[1].status), ("Shell › flaky one (flaky)", Status::Passed));
         assert_eq!((c[2].status, c[2].message.as_deref()), (Status::Failed, Some("timeout")));
+        assert_eq!(plain("\u{1b}[31mTest timeout\u{1b}[39m."), "Test timeout.");
     }
 }
