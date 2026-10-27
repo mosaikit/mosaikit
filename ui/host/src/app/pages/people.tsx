@@ -213,14 +213,19 @@ function PersonForm({ base, name, email, invalidate, editable }: { base: string;
         </div>
         <div className="grid gap-1.5">
           <Label htmlFor="p-email">{t('Email')}</Label>
-          <Input id="p-email" type="email" disabled={!editable} value={v.email} onChange={(e) => setV({ ...v, email: e.target.value })} />
+          <Input id="p-email" type="email" required disabled={!editable} value={v.email} aria-invalid={!v.email} aria-describedby="p-email-hint" onChange={(e) => setV({ ...v, email: e.target.value })} />
+          {!v.email && (
+            <p id="p-email-hint" className="text-xs text-destructive">
+              {t('Email missing: required for a local account, add it to save any change.')}
+            </p>
+          )}
         </div>
         {editable && dirty && (
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setV({ display_name: name, email: email ?? '' })}>
               {t('Cancel')}
             </Button>
-            <Button disabled={save.isPending} onClick={() => save.mutate(v)}>
+            <Button disabled={save.isPending || !v.email.trim()} onClick={() => save.mutate(v)}>
               {t('Save')}
             </Button>
           </div>
@@ -1273,7 +1278,7 @@ function NewPersonDialog({ open, onClose, tenants, onCreated }: { open: boolean;
       api<{ person: PersonRow; reset_link: ResetLink | null }>('POST', '/api/admin/people', {
         username: v.username,
         display_name: v.display_name,
-        email: v.email || null,
+        email: v.email,
         password: v.password || null,
         home_tenant: v.m.tenant,
         role: v.m.role,
@@ -1312,7 +1317,7 @@ function NewPersonDialog({ open, onClose, tenants, onCreated }: { open: boolean;
           </div>
           <div className="grid gap-1.5">
             <Label htmlFor="np-email">{t('Email')}</Label>
-            <Input id="np-email" type="email" value={v.email} onChange={(e) => setV({ ...v, email: e.target.value })} />
+            <Input id="np-email" type="email" required value={v.email} onChange={(e) => setV({ ...v, email: e.target.value })} />
           </div>
           <MembershipFields prefix="np" tenants={tenants} value={v.m} onChange={(m) => setV({ ...v, m })} />
           <div className="grid gap-1.5">

@@ -419,6 +419,7 @@ function TenantUsers({ id, q }: { id: string; q: { data?: Member[]; isLoading: b
         fields={[
           { name: 'username', label: t('Username'), required: true },
           { name: 'display_name', label: t('Name') },
+          { name: 'email', label: t('Email'), type: 'email', required: true, hint: t('Required: the password is recovered at this address.') },
           { name: 'password', label: t('Initial password'), type: 'password', required: true, hint: t('At least {n} characters', { n: pwMin }) },
         ]}
         submit={t('Create')}

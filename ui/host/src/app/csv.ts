@@ -67,7 +67,8 @@ export function parseCsv(text: string): ImportRow[] {
     r.username = r.username.toLowerCase()
     if (!/^[a-z0-9._-]{2,64}$/.test(r.username)) r.problem = t('Invalid username')
     else if (seen.has(r.username)) r.problem = t('Twice in the file')
-    else if (r.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(r.email)) r.problem = t('Invalid email address')
+    else if (!r.email) r.problem = t('Email required')
+    else if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(r.email)) r.problem = t('Invalid email address')
     seen.add(r.username)
     return r
   })

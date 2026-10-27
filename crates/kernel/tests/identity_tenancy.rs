@@ -120,12 +120,12 @@ async fn members_and_roles() {
     // a member does not manage the tenant
     assert_eq!(members(&t, &ca).await.unwrap_err().kind, Kind::Forbidden);
     assert_eq!(
-        create_member(&t, &ca, "x1", "x", PASSWORD, Role::User).await.unwrap_err().kind,
+        create_member(&t, &ca, "x1", "x", "x1@example.org", PASSWORD, Role::User).await.unwrap_err().kind,
         Kind::Forbidden
     );
     // duplicate username
     assert_eq!(
-        create_member(&t, &c, "anna", "a", PASSWORD, Role::User).await.unwrap_err().kind,
+        create_member(&t, &c, "anna", "a", "a@example.org", PASSWORD, Role::User).await.unwrap_err().kind,
         Kind::Conflict
     );
     // at least one manager
@@ -284,7 +284,7 @@ async fn administrator_acts_on_the_tenants() {
     assert_eq!(m.iter().map(|x| x.username.as_str()).collect::<Vec<_>>(), vec!["alfa-manager", "anna"]);
 
     // appoints a new manager, promotes anna, unlocks the password of the manager
-    create_tenant_manager(&t, &admin, alfa, "newbie", "Newbie", PASSWORD).await.unwrap();
+    create_tenant_manager(&t, &admin, alfa, "newbie", "Newbie", "newbie@example.org", PASSWORD).await.unwrap();
     assert_eq!(
         caller(&t, &t.login("alfa", "newbie").await, "alfa").await.unwrap().tenant.role,
         Role::TenantManager
@@ -300,7 +300,7 @@ async fn administrator_acts_on_the_tenants() {
         .await
         .unwrap();
     assert_eq!(tenant_members(&t, &admin, system).await.unwrap_err().kind, Kind::BadRequest);
-    assert!(create_tenant_manager(&t, &admin, system, "x1", "", PASSWORD).await.is_err());
+    assert!(create_tenant_manager(&t, &admin, system, "x1", "", "x1@example.org", PASSWORD).await.is_err());
     assert!(reset_tenant_password(&t, &admin, system, admin.user_id, "new-password-2").await.is_err());
 }
 

@@ -322,6 +322,8 @@ function TenantDoor({ initial, platformTheme, onEnter, onPick }: { initial: stri
   })
   const [busy, setBusy] = useState(false)
   const [remember, setRemember] = useState(false)
+  // "Forgot your password?": the form of the request replaces the sign-in form
+  const [forgot, setForgot] = useState(false)
 
   useEffect(() => {
     // the code of the error is read once: a reload shows the clean page
@@ -393,6 +395,8 @@ function TenantDoor({ initial, platformTheme, onEnter, onPick }: { initial: stri
           <Title title={t('Sign in')} sub={t('No tenant available. First start: sign in as an administrator and create one.')} />
           <ErrorLine text={error} />
         </div>
+      ) : forgot && picked && picked.auth !== 'oidc' ? (
+        <ForgotForm tenant={picked} who={username} onBack={() => setForgot(false)} />
       ) : (
         <form className="grid gap-4" onSubmit={(e) => void submit(e)}>
           <Title
@@ -464,6 +468,12 @@ function TenantDoor({ initial, platformTheme, onEnter, onPick }: { initial: stri
               {t('Sign in')}
             </Button>
           )}
+          {picked && picked.auth !== 'oidc' && (
+            <button type="button" className="-mt-2 justify-self-start text-sm text-muted-foreground underline-offset-4 hover:text-primary hover:underline" onClick={() => setForgot(true)}>
+              {t('Forgot your password?')}
+            </button>
+          )}
+          {picked?.auth === 'oidc' && <p className="-mt-2 text-xs text-muted-foreground">{t('Forgot your password? It is managed by the identity provider of your organization: use its password recovery.')}</p>}
           <ErrorLine text={error} />
           <p className="-mt-2 text-xs text-muted-foreground">{t('Invited to other tenants? Sign in to your own, then switch from the top bar.')}</p>
         </form>
@@ -479,6 +489,54 @@ function TenantDoor({ initial, platformTheme, onEnter, onPick }: { initial: stri
 }
 
 /** The tenant signs in through its identity provider: the browser goes there and comes back signed in. */
+/** "Forgot your password?": asks for the username or the email address and says the same whatever the account. */
+function ForgotForm({ tenant, who, onBack }: { tenant: LoginTenant; who: string; onBack: () => void }) {
+  const [value, setValue] = useState(who)
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState('')
+  const [answer, setAnswer] = useState<{ mail: boolean } | null>(null)
+  async function submit(e: FormEvent) {
+    e.preventDefault()
+    setBusy(true)
+    setError('')
+    try {
+      setAnswer(await api<{ mail: boolean }>('POST', '/api/auth/forgot', { tenant: tenant.slug, who: value }))
+    } catch (err) {
+      setError(errText(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <form className="grid gap-4" onSubmit={(e) => void submit(e)}>
+      <Title title={t('Forgot your password?')} sub={t('We send a link to choose a new one to the email address of the account.')} />
+      {answer ? (
+        <p role="status" className="text-sm">
+          {answer.mail
+            ? t('If an account with these details exists, we sent a message to its email address with the link to choose a new password. The link works once.')
+            : t('This installation cannot send email. Ask the Tenant Manager of your tenant for a link to choose a new password.')}
+        </p>
+      ) : (
+        <>
+          <div className="grid gap-1.5">
+            <Label htmlFor="fp-who">{t('Username or email address')}</Label>
+            <Input id="fp-who" autoComplete="username" required value={value} onChange={(e) => setValue(e.target.value)} />
+            <p className="text-xs text-muted-foreground">{t('Tenant: {name}', { name: tenant.name })}</p>
+          </div>
+          <Button type="submit" size="lg" disabled={busy}>
+            {busy && <Loader2 className="animate-spin" />}
+            {t('Send the link')}
+          </Button>
+          <ErrorLine text={error} />
+        </>
+      )}
+      <Button type="button" variant="ghost" onClick={onBack}>
+        ← {t('Back to sign-in')}
+      </Button>
+    </form>
+  )
+}
+
 function OidcButton({ tenant, remember }: { tenant: LoginTenant; remember: boolean }) {
   const name = tenant.button || t('your identity provider')
   return (

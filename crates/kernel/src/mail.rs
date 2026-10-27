@@ -112,6 +112,11 @@ fn configured(s: &EmailSettings) -> bool {
     !s.host.is_empty() && !s.sender.is_empty()
 }
 
+/// Whether the platform can send email (a server and a sender are set).
+pub async fn is_configured(k: &Kernel) -> Result<bool> {
+    Ok(configured(&stored(k).await?))
+}
+
 /// Whether the mail server accepts a connection now (Monitoring): `Ok(ms)` or the coded error. Only the
 /// TCP connection is opened, no message is sent.
 pub(crate) async fn probe(k: &Kernel) -> Result<Option<std::result::Result<f64, Error>>> {

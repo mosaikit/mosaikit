@@ -248,7 +248,7 @@ async fn full_flow_tenant_crud_sharing() {
             Method::POST,
             "/api/admin/tenants",
             Some(json!({
-                "slug": "alfa", "name": "Alfa", "manager_username": "gestore", "manager_password": PASSWORD
+                "slug": "alfa", "name": "Alfa", "manager_username": "gestore", "manager_email": "gestore@example.org", "manager_password": PASSWORD
             })),
         )
         .await;
@@ -261,7 +261,7 @@ async fn full_flow_tenant_crud_sharing() {
             Some(&g),
             Method::POST,
             "/api/t/alfa/manage/members",
-            Some(json!({ "username": "anna", "password": PASSWORD })),
+            Some(json!({ "username": "anna", "email": "anna@example.org", "password": PASSWORD })),
         )
         .await;
     assert_eq!(r.status, StatusCode::OK, "{}", r.text());
@@ -1712,7 +1712,7 @@ async fn lifecycle_and_operations_over_http() {
             Some(&admin),
             Method::POST,
             "/api/admin/tenants",
-            Some(json!({ "slug": "gamma", "name": "Gamma", "manager_username": "boss", "manager_password": PASSWORD,
+            Some(json!({ "slug": "gamma", "name": "Gamma", "manager_username": "boss", "manager_email": "boss@example.org", "manager_password": PASSWORD,
                          "trial_until": until })),
         )
         .await;

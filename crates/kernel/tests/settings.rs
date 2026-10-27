@@ -128,6 +128,7 @@ async fn password_rules_and_sign_in_lock_follow_the_settings() {
         &c,
         "bruno",
         "Bruno",
+        "bruno@example.org",
         "short-pass-1",
         mosaikit_kernel::Role::User,
     )

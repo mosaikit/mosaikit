@@ -203,11 +203,12 @@ pub async fn create_member(
     c: &Caller,
     username: &str,
     display_name: &str,
+    email: &str,
     password: &str,
     role: Role,
 ) -> Result<Uuid> {
     c.require_manager()?;
-    create_member_in(k, c.tenant.tenant_id, c.user.user_id, username, display_name, password, role).await
+    create_member_in(k, c.tenant.tenant_id, c.user.user_id, username, display_name, email, password, role).await
 }
 
 /// Creates a local user of `tenant` (for the Administrator too, who appoints a manager).
@@ -217,6 +218,7 @@ pub(super) async fn create_member_in(
     actor: Uuid,
     username: &str,
     display_name: &str,
+    email: &str,
     password: &str,
     role: Role,
 ) -> Result<Uuid> {
@@ -226,16 +228,19 @@ pub(super) async fn create_member_in(
     if !valid_username(&username) {
         return Err(Error::bad("invalid username: lower case, digits, '.', '-', '_' (2-64)"));
     }
+    // a local account has an address: the person gets the link to choose or recover a password there
+    let email = crate::notify::required_email(email)?;
     check_password_len(password, password_min(k, Some(tenant)).await?)?;
     crate::quotas::check(k, tenant, crate::quotas::Add::people(1)).await?;
     let hash = hash_password(k, password).await?;
     let mut tx = k.db.begin_app().await?;
     let id: Uuid = mosaikit_db::query_scalar(
-        "insert into core.users (home_tenant_id, username, display_name, password_hash) values ($1, $2, $3, $4) returning id",
+        "insert into core.users (home_tenant_id, username, display_name, email, password_hash) values ($1, $2, $3, $4, $5) returning id",
     )
     .bind(tenant)
     .bind(&username)
     .bind(display_name.trim())
+    .bind(&email)
     .bind(hash)
     .fetch_one(&mut *tx)
     .await

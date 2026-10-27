@@ -299,6 +299,24 @@ pub async fn update_person(
     email: Option<&str>,
 ) -> Result<()> {
     check_account(k, by, user).await?;
+    // a local account keeps an address: it cannot be emptied, and an account made before the rule (none
+    // yet) gets one with the next edit
+    let current: Option<String> = mosaikit_db::query_scalar("select email from core.users where id = $1")
+        .bind(user)
+        .fetch_one(&k.db)
+        .await?;
+    let has_now = current.as_deref().is_some_and(|e| !e.trim().is_empty());
+    let new = match email {
+        Some(e) => Some(crate::notify::required_email_or_empty(e)?),
+        None => None,
+    };
+    let will_have = match &new {
+        Some(e) => !e.is_empty(),
+        None => has_now,
+    };
+    if !will_have && !crate::oidc::is_external(k, user).await? {
+        return Err(Error::bad("the email address is required").with_code("email_required"));
+    }
     if let Some(n) = display_name {
         if n.chars().count() > 120 {
             return Err(Error::bad("the name is too long"));
@@ -309,14 +327,10 @@ pub async fn update_person(
             .execute(&k.db)
             .await?;
     }
-    if let Some(e) = email {
-        let e = e.trim();
-        if !e.is_empty() && (!e.contains('@') || e.len() > 200 || e.contains(char::is_whitespace)) {
-            return Err(Error::bad("invalid email address"));
-        }
+    if let Some(e) = new {
         mosaikit_db::query("update core.users set email = $2 where id = $1")
             .bind(user)
-            .bind((!e.is_empty()).then(|| e.to_string()))
+            .bind((!e.is_empty()).then_some(e))
             .execute(&k.db)
             .await?;
     }
@@ -340,24 +354,7 @@ pub async fn reset_link(k: &Kernel, by: By<'_>, user: Uuid) -> Result<ResetLink>
     let (home, email, username) = check_account(k, by, user).await?;
     // the people of a tenant with an identity provider have no local password
     crate::oidc::refuse_local_password(k, home).await?;
-    let token = random_token(32);
-    let expires_at = Utc::now() + Duration::hours(RESET_HOURS);
-    let mut tx = k.db.begin_app().await?;
-    mosaikit_db::query("delete from core.password_resets where user_id = $1")
-        .bind(user)
-        .execute(&mut *tx)
-        .await?;
-    mosaikit_db::query(
-        "insert into core.password_resets (token_hash, user_id, created_by, expires_at) values ($1, $2, $3, $4)",
-    )
-    .bind(sha256(token.as_bytes()))
-    .bind(user)
-    .bind(actor_of(by))
-    .bind(expires_at)
-    .execute(&mut *tx)
-    .await?;
-    tx.commit().await?;
-    let url = format!("{}/#/reset/{token}", k.cfg.app_url.trim_end_matches('/'));
+    let (url, expires_at) = issue_token(k, user, actor_of(by)).await?;
     let mut emailed = false;
     if let Some(to) = email.filter(|e| !e.is_empty()) {
         let body = format!(
@@ -377,6 +374,104 @@ pub async fn reset_link(k: &Kernel, by: By<'_>, user: Uuid) -> Result<ResetLink>
     )
     .await;
     Ok(ResetLink { url, expires_at, emailed })
+}
+
+/// A new single-use token for the account (the previous ones stop working): the address of the page and
+/// the end of its validity.
+async fn issue_token(k: &Kernel, user: Uuid, actor: Uuid) -> Result<(String, DateTime<Utc>)> {
+    let token = random_token(32);
+    let expires_at = Utc::now() + Duration::hours(RESET_HOURS);
+    let mut tx = k.db.begin_app().await?;
+    mosaikit_db::query("delete from core.password_resets where user_id = $1")
+        .bind(user)
+        .execute(&mut *tx)
+        .await?;
+    mosaikit_db::query(
+        "insert into core.password_resets (token_hash, user_id, created_by, expires_at) values ($1, $2, $3, $4)",
+    )
+    .bind(sha256(token.as_bytes()))
+    .bind(user)
+    .bind(actor)
+    .bind(expires_at)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    Ok((format!("{}/#/reset/{token}", k.cfg.app_url.trim_end_matches('/')), expires_at))
+}
+
+/// Requests of "Forgot your password?" allowed per person and per address in the window.
+const FORGOT_PER_PERSON: u32 = 3;
+const FORGOT_PER_ADDRESS: u32 = 20;
+const FORGOT_WINDOW: std::time::Duration = std::time::Duration::from_secs(15 * 60);
+
+/// What "Forgot your password?" answers. The same for every username or address, existing or not: it
+/// never tells whether an account exists. Only whether the platform can send email at all (a fact of the
+/// installation, the same for everybody) is told, so that the page can say what to do instead.
+#[derive(Debug, Clone, Serialize)]
+pub struct ForgotAnswer {
+    pub mail: bool,
+}
+
+/// "Forgot your password?" of the sign-in page (public). `who` is the username or the email address of
+/// a local account of the tenant. If the account exists and has an address, a message goes to it with a
+/// single-use link to choose a new password (valid 48 hours, the earlier ones stop working); an account
+/// of an identity provider gets a message that says where the password is managed. Anything else: nothing
+/// happens, and the answer is the same. Too many requests are dropped silently (no mail bombing).
+pub async fn forgot_password(k: &Kernel, tenant: &str, who: &str, ip: &str) -> Result<ForgotAnswer> {
+    if !crate::mail::is_configured(k).await? {
+        return Ok(ForgotAnswer { mail: false });
+    }
+    let who = who.trim().to_lowercase();
+    let slug = tenant.trim().to_lowercase();
+    if who.is_empty() || who.len() > 254 {
+        return Ok(ForgotAnswer { mail: true });
+    }
+    let (key_who, key_ip) = (format!("forgot:{slug}/{who}"), format!("forgot-ip:{ip}"));
+    let blocked = k.limiter.blocked_after(&key_who, FORGOT_PER_PERSON, FORGOT_WINDOW)
+        || k.limiter.blocked_after(&key_ip, FORGOT_PER_ADDRESS, FORGOT_WINDOW);
+    k.limiter.fail_within(&key_who, FORGOT_WINDOW);
+    k.limiter.fail_within(&key_ip, FORGOT_WINDOW);
+    if blocked {
+        return Ok(ForgotAnswer { mail: true });
+    }
+    let rows = mosaikit_db::query(
+        "select u.id, u.username, u.email from core.users u join core.tenants t on t.id = u.home_tenant_id
+         where t.slug = $1 and not t.is_system and not u.is_system_admin and u.status = 'active'
+           and u.email is not null and (u.username = $2 or lower(u.email) = $2)",
+    )
+    .bind(&slug)
+    .bind(&who)
+    .fetch_all(&k.db)
+    .await?;
+    for r in rows {
+        let (user, username, to): (Uuid, String, String) = (r.get(0), r.get(1), r.get(2));
+        let name = &k.brand.name;
+        let (subject, body) = if crate::oidc::is_external(k, user).await? {
+            (
+                format!("Your password for {name}"),
+                format!(
+                    "A new password was asked for the account {username}.
+
+This account signs in through the identity provider of your organization: the password is managed there, not in {name}. Use the password recovery of your identity provider, or ask your administrator."
+                ),
+            )
+        } else {
+            let (url, _) = issue_token(k, user, user).await?;
+            (
+                format!("New password for {name}"),
+                format!(
+                    "A new password was asked for the account {username}.
+
+Choose it here, within {RESET_HOURS} hours: {url}
+
+The link works once. If you did not ask for it, ignore this message: your password is unchanged."
+                ),
+            )
+        };
+        let _ = crate::mail::enqueue(k, &to, &subject, &body).await;
+        events::record(k, None, Some(user), None, None, "person.forgot_password", json!({})).await;
+    }
+    Ok(ForgotAnswer { mail: true })
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -777,19 +872,17 @@ pub async fn create_person(
             return Err(Error::bad("the home tenant is already a tenant of the person"));
         }
     }
+    let email = crate::notify::required_email(n.email.as_deref().unwrap_or_default())?;
     let password = match n.password.as_deref().map(str::trim).filter(|p| !p.is_empty()) {
         Some(p) => p.to_string(),
         // nobody knows it: the person chooses theirs with the link
         None => random_token(24),
     };
     let user =
-        create_member_in(k, n.home_tenant, admin.user_id, &n.username, &n.display_name, &password, n.role)
+        create_member_in(k, n.home_tenant, admin.user_id, &n.username, &n.display_name, &email, &password, n.role)
             .await?;
     if n.profile.is_some() {
         access::set_member_profile_in(k, n.home_tenant, admin.user_id, user, n.profile).await?;
-    }
-    if let Some(e) = n.email.as_deref().filter(|e| !e.trim().is_empty()) {
-        update_person(k, By::Admin(admin), user, None, Some(e)).await?;
     }
     for o in &n.others {
         add_to_tenant(k, admin, user, o.tenant, o.role, o.profile).await?;

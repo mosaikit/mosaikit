@@ -1090,6 +1090,9 @@ struct NewMemberReq {
     username: String,
     #[serde(default)]
     display_name: String,
+    /// required: checked by the kernel (`email_required`)
+    #[serde(default)]
+    email: String,
     password: String,
     #[serde(default = "member_role")]
     role: String,
@@ -1105,7 +1108,7 @@ async fn m_create_member(
     Json(r): Json<NewMemberReq>,
 ) -> ApiResult<Json<Value>> {
     let id =
-        tenancy::create_member(&s.k, &c, &r.username, &r.display_name, &r.password, Role::parse(&r.role)?)
+        tenancy::create_member(&s.k, &c, &r.username, &r.display_name, &r.email, &r.password, Role::parse(&r.role)?)
             .await?;
     Ok(Json(json!({ "user_id": id })))
 }
@@ -1468,6 +1471,9 @@ struct NewAdminReq {
     username: String,
     #[serde(default)]
     display_name: String,
+    /// of the Tenant Manager of a tenant (required there); not used for an Administrator
+    #[serde(default)]
+    email: String,
     password: String,
 }
 
@@ -1556,7 +1562,8 @@ async fn a_tenant_manager(
     Json(r): Json<NewAdminReq>,
 ) -> ApiResult<Json<Value>> {
     let tenant = uuid(&id)?;
-    tenancy::create_tenant_manager(&s.k, &u, tenant, &r.username, &r.display_name, &r.password).await?;
+    tenancy::create_tenant_manager(&s.k, &u, tenant, &r.username, &r.display_name, &r.email, &r.password)
+        .await?;
     Ok(Json(json!(tenancy::tenant_members(&s.k, &u, tenant).await?)))
 }
 
@@ -1600,6 +1607,8 @@ struct NewTenantReq {
     manager_username: String,
     #[serde(default)]
     manager_display_name: String,
+    #[serde(default)]
+    manager_email: String,
     manager_password: String,
     /// end of the trial period (none: no trial)
     #[serde(default)]
@@ -1619,6 +1628,7 @@ async fn a_create_tenant(
             name: &r.name,
             manager_username: &r.manager_username,
             manager_display_name: &r.manager_display_name,
+            manager_email: &r.manager_email,
             manager_password: &r.manager_password,
             trial_until: r.trial_until,
         },

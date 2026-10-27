@@ -91,25 +91,14 @@ pub async fn import_people(k: &Kernel, c: &Caller, rows: &[ImportRow]) -> Result
                     Error::bad(format!("no group «{g}» that can be changed")).with_code("group_unknown")
                 })?);
             }
-            if let Some(e) = r.email.as_deref().map(str::trim).filter(|e| !e.is_empty()) {
-                if !notify::valid_email(e) {
-                    return Err(Error::bad("invalid email address").with_code("email_invalid"));
-                }
-            }
+            let email = notify::required_email(r.email.as_deref().unwrap_or_default())?;
             let password = crate::util::random_token(24);
             let name = if r.display_name.trim().is_empty() {
                 who.clone()
             } else {
                 r.display_name.trim().to_string()
             };
-            let user = super::create_member(k, c, &who, &name, &password, r.role).await?;
-            if let Some(e) = r.email.as_deref().map(str::trim).filter(|e| !e.is_empty()) {
-                mosaikit_db::query("update core.users set email = $2 where id = $1")
-                    .bind(user)
-                    .bind(e)
-                    .execute(&k.db)
-                    .await?;
-            }
+            let user = super::create_member(k, c, &who, &name, &email, &password, r.role).await?;
             if profile.is_some() {
                 crate::access::set_member_profile(k, c, user, profile).await?;
             }

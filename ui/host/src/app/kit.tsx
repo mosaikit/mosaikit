@@ -305,7 +305,7 @@ export function StatusBadge({ status }: { status: string }) {
 export interface FieldDef {
   name: string
   label: string
-  type?: 'text' | 'password' | 'number'
+  type?: 'text' | 'password' | 'number' | 'email'
   required?: boolean
   hint?: string
   options?: [string, string][]

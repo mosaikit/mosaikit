@@ -35,11 +35,13 @@ pub async fn create_tenant_manager(
     tenant: Uuid,
     username: &str,
     display_name: &str,
+    email: &str,
     password: &str,
 ) -> Result<Uuid> {
     require_admin(admin)?;
     client_tenant(k, tenant).await?;
-    create_member_in(k, tenant, admin.user_id, username, display_name, password, Role::TenantManager).await
+    create_member_in(k, tenant, admin.user_id, username, display_name, email, password, Role::TenantManager)
+        .await
 }
 
 /// Role of a member of the tenant (at least one Tenant Manager always stays).

@@ -242,6 +242,8 @@ pub struct NewTenant<'a> {
     pub name: &'a str,
     pub manager_username: &'a str,
     pub manager_display_name: &'a str,
+    /// required: the Tenant Manager recovers the password at this address
+    pub manager_email: &'a str,
     pub manager_password: &'a str,
     /// end of the trial period (none: no trial)
     pub trial_until: Option<DateTime<Utc>>,
@@ -260,6 +262,7 @@ pub async fn create_tenant(k: &Kernel, admin: &SessionUser, t: NewTenant<'_>) ->
     if !valid_username(&username) {
         return Err(Error::bad("invalid username of the manager"));
     }
+    let email = crate::notify::required_email(t.manager_email)?;
     // a new tenant has the rules of the platform
     check_password_len(t.manager_password, password_min(k, None).await?)?;
     if t.trial_until.is_some_and(|u| u <= chrono::Utc::now()) {
@@ -282,11 +285,12 @@ pub async fn create_tenant(k: &Kernel, admin: &SessionUser, t: NewTenant<'_>) ->
         err => err,
     })?;
     let manager: Uuid = mosaikit_db::query_scalar(
-        "insert into core.users (home_tenant_id, username, display_name, password_hash) values ($1, $2, $3, $4) returning id",
+        "insert into core.users (home_tenant_id, username, display_name, email, password_hash) values ($1, $2, $3, $4, $5) returning id",
     )
     .bind(id)
     .bind(&username)
     .bind(t.manager_display_name.trim())
+    .bind(&email)
     .bind(hash)
     .fetch_one(&mut *tx)
     .await?;

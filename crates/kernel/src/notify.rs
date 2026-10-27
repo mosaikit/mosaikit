@@ -459,6 +459,26 @@ pub fn valid_email(s: &str) -> bool {
         && !s.chars().any(|c| c.is_whitespace() || c.is_control() || "<>,;\"".contains(c))
 }
 
+/// The address of a local account, which must have one: trimmed, plausible, at most 254 characters.
+pub fn required_email(raw: &str) -> Result<String> {
+    let e = raw.trim();
+    if e.is_empty() {
+        return Err(Error::bad("the email address is required").with_code("email_required"));
+    }
+    if !valid_email(e) {
+        return Err(Error::bad("invalid email address").with_code("email_invalid"));
+    }
+    Ok(e.to_string())
+}
+
+/// Like [`required_email`], but an empty text is allowed (the caller decides whether it may be).
+pub fn required_email_or_empty(raw: &str) -> Result<String> {
+    if raw.trim().is_empty() {
+        return Ok(String::new());
+    }
+    required_email(raw)
+}
+
 pub async fn set_prefs(k: &Kernel, user: &SessionUser, c: &PrefsChange) -> Result<Prefs> {
     if let Some(address) = &c.address {
         let address = address.as_deref().map(str::trim).filter(|a| !a.is_empty());
@@ -466,6 +486,10 @@ pub async fn set_prefs(k: &Kernel, user: &SessionUser, c: &PrefsChange) -> Resul
             if !valid_email(a) {
                 return Err(Error::bad("invalid email address").with_code("email_invalid"));
             }
+        }
+        // a local account keeps its address (the one of an account of an identity provider may be removed)
+        if address.is_none() && !crate::oidc::is_external(k, user.user_id).await? {
+            return Err(Error::bad("the email address is required").with_code("email_required"));
         }
         mosaikit_db::query("update core.users set email = $2 where id = $1")
             .bind(user.user_id)

@@ -57,6 +57,8 @@ pub fn router() -> Router<AppState> {
         // public: the page of the link to choose a new password
         .route("/api/auth/reset/{token}", get(reset_info))
         .route("/api/auth/reset", post(reset_password))
+        // public: "Forgot your password?" of the sign-in page
+        .route("/api/auth/forgot", post(forgot_password))
 }
 
 #[derive(Deserialize)]
@@ -483,6 +485,21 @@ async fn reset_info(State(s): State<AppState>, Path(token): Path<String>) -> Api
 struct ResetReq {
     token: String,
     password: String,
+}
+
+#[derive(Deserialize)]
+struct ForgotReq {
+    tenant: String,
+    /// the username or the email address of the account
+    who: String,
+}
+
+async fn forgot_password(
+    State(s): State<AppState>,
+    crate::auth::ClientIp(ip): crate::auth::ClientIp,
+    Json(r): Json<ForgotReq>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(tenancy::forgot_password(&s.k, &r.tenant, &r.who, &ip).await?)))
 }
 
 async fn reset_password(State(s): State<AppState>, Json(r): Json<ResetReq>) -> ApiResult<Json<Value>> {

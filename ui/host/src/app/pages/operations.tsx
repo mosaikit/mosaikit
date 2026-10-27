@@ -127,6 +127,7 @@ interface Wizard {
   roles_source: 'mosaikit' | 'idp'
   manager_username: string
   manager_display_name: string
+  manager_email: string
   manager_password: string
 }
 
@@ -142,6 +143,7 @@ const EMPTY: Wizard = {
   roles_source: 'mosaikit',
   manager_username: '',
   manager_display_name: '',
+  manager_email: '',
   manager_password: '',
 }
 
@@ -186,7 +188,7 @@ export function NewTenantWizard({ open, onOpenChange }: { open: boolean; onOpenC
   const valid = [
     !!w.name.trim() && /^[a-z0-9][a-z0-9-]{1,39}$/.test(w.slug) && (!w.trial || !!w.trial_until),
     !w.oidc || (!!w.issuer.trim() && !!w.client_id.trim()),
-    !!w.manager_username.trim() && w.manager_password.length >= pwMin,
+    !!w.manager_username.trim() && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(w.manager_email.trim()) && w.manager_password.length >= pwMin,
     true,
   ]
   async function create() {
@@ -197,6 +199,7 @@ export function NewTenantWizard({ open, onOpenChange }: { open: boolean; onOpenC
         name: w.name.trim(),
         manager_username: w.manager_username.trim(),
         manager_display_name: w.manager_display_name.trim(),
+        manager_email: w.manager_email.trim(),
         manager_password: w.manager_password,
         trial_until: w.trial ? new Date(`${w.trial_until}T23:59:59`).toISOString() : null,
       })
@@ -332,6 +335,9 @@ export function NewTenantWizard({ open, onOpenChange }: { open: boolean; onOpenC
                   <Input id="nt-dname" value={w.manager_display_name} onChange={(e) => set({ manager_display_name: e.target.value })} />
                 </Field>
               </div>
+              <Field id="nt-email" label={t('Email of the Tenant Manager')} hint={t('Required: the password is recovered at this address.')}>
+                <Input id="nt-email" type="email" required autoComplete="off" value={w.manager_email} onChange={(e) => set({ manager_email: e.target.value })} />
+              </Field>
               <Field id="nt-pw" label={t('Initial password')} hint={t('At least {n} characters', { n: pwMin })}>
                 <Input id="nt-pw" type="password" autoComplete="new-password" required minLength={pwMin} value={w.manager_password} onChange={(e) => set({ manager_password: e.target.value })} />
               </Field>

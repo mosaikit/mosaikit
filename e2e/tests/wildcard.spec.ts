@@ -24,7 +24,7 @@ test('every plugin UI has an origin of its own', async ({ page }) => {
   const csrf = (await admin.json()).csrf as string
   const t = await api.post(`${BASE_URL}api/admin/tenants`, {
     headers: { 'x-csrf-token': csrf },
-    data: { slug: 'wild', name: 'Wild City', manager_username: 'manager', manager_password: PASSWORD },
+    data: { slug: 'wild', name: 'Wild City', manager_username: 'manager', manager_email: 'manager@wild.example.org', manager_password: PASSWORD },
   })
   expect(t.ok(), await t.text()).toBeTruthy()
   await api.post(`${BASE_URL}api/auth/logout`, { headers: { 'x-csrf-token': csrf } })

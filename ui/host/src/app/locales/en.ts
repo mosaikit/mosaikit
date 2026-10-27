@@ -126,4 +126,5 @@ export const EN: Record<string, string> = {
   'errors.oidc_document': 'The identity provider did not answer with a valid document',
   '{count} tenants_one': '1 tenant',
   '{count} tenants_other': '{count} tenants',
+  'errors.email_required': 'The email address is required',
 }

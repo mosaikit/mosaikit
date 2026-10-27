@@ -96,7 +96,7 @@ export function ImportDialog({ slug, open, onOpenChange }: { slug: string; open:
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{t('Import from CSV')}</DialogTitle>
-          <DialogDescription>{t('One person per row, with a header: username, name, email, role, profile, groups (separated by «|»). Each person gets a link to choose a password.')}</DialogDescription>
+          <DialogDescription>{t('One person per row, with a header: username, name, email (required), role, profile, groups (separated by «|»). Each person gets a link to choose a password.')}</DialogDescription>
         </DialogHeader>
         {report ? (
           <Report rows={report} />
