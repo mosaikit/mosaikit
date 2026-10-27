@@ -634,7 +634,7 @@ function DeleteTenantDialog({ tn, impact, open, onOpenChange, onDone }: { tn: Te
 export function TenantState({ tn }: { tn: TenantInfo }) {
   const cls = 'font-normal'
   if (tn.archived_at) return <Badge variant="secondary" className={cn(cls, 'bg-muted text-muted-foreground')}>{t('archived')}</Badge>
-  if (tn.status !== 'active') return <Badge variant="secondary" className={cn(cls, 'bg-destructive/10 text-destructive')}>{t('suspended')}</Badge>
+  if (tn.status !== 'active') return <Badge variant="secondary" className={cn(cls, 'bg-destructive/10 text-destructive dark:text-red-300')}>{t('suspended')}</Badge>
   if (tn.trial_until) return <Badge variant="secondary" className={cn(cls, 'bg-warn/10 text-warn')}>{t('on trial until {date}', { date: fmtDay(tn.trial_until) })}</Badge>
   return <Badge variant="secondary" className={cn(cls, 'bg-ok/10 text-ok')}>{t('active')}</Badge>
 }
@@ -1200,7 +1200,7 @@ const C = {
 const STATE: Record<ServiceState['state'], [string, string]> = {
   ok: ['ok', 'bg-ok/10 text-ok'],
   degraded: ['degraded', 'bg-warn/10 text-warn'],
-  down: ['not answering', 'bg-destructive/10 text-destructive'],
+  down: ['not answering', 'bg-destructive/10 text-destructive dark:text-red-300'],
   off: ['off', 'bg-muted text-muted-foreground'],
 }
 

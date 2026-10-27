@@ -288,11 +288,11 @@ export function ErrorBox({ error }: { error: unknown }) {
 export function StatusBadge({ status }: { status: string }) {
   const map: Record<string, [string, string]> = {
     active: [t('active'), 'bg-ok/10 text-ok'],
-    suspended: [t('suspended'), 'bg-destructive/10 text-destructive'],
-    disabled: [t('disabled'), 'bg-destructive/10 text-destructive'],
+    suspended: [t('suspended'), 'bg-destructive/10 text-destructive dark:text-red-300'],
+    disabled: [t('disabled'), 'bg-destructive/10 text-destructive dark:text-red-300'],
     pending: [t('pending'), 'bg-warn/10 text-warn'],
     installed: [t('installed'), 'bg-warn/10 text-warn'],
-    blocked: [t('blocked'), 'bg-destructive/10 text-destructive'],
+    blocked: [t('blocked'), 'bg-destructive/10 text-destructive dark:text-red-300'],
   }
   const [label, cls] = map[status] ?? [status, '']
   return (

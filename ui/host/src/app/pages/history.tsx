@@ -573,7 +573,7 @@ export function LogView({ scope, fixed = {}, compact = false }: { scope: LogScop
                     {e.ok ? (
                       <span className="text-sm text-muted-foreground">{t('Done')}</span>
                     ) : (
-                      <Badge variant="secondary" className="gap-1 bg-destructive/10 font-normal text-destructive">
+                      <Badge variant="secondary" className="gap-1 bg-destructive/10 font-normal text-destructive dark:text-red-300">
                         <CircleAlert className="size-3" />
                         {t('Failed')}
                       </Badge>
