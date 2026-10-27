@@ -27,7 +27,7 @@ function KindIcon({ n }: { n: Note }) {
   )
 }
 
-function NoteRow({ n, onOpen, select }: { n: Note; onOpen?: () => void; select?: { on: boolean; set: (on: boolean) => void } }) {
+export function NoteRow({ n, onOpen, select }: { n: Note; onOpen?: () => void; select?: { on: boolean; set: (on: boolean) => void } }) {
   const act = useNoteActions()
   const inv = pendingInvitation(n)
   const title = noteTitle(n)

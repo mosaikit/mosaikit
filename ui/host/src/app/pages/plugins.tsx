@@ -4,7 +4,7 @@
 // tenants; the Tenant Manager turns ON the available ones and decides their permissions.
 
 import { Fragment, useRef, useState, type ReactNode } from 'react'
-import { ArrowUpCircle, ExternalLink, KeySquare, Power, Puzzle, RotateCcw, Trash2, Upload } from 'lucide-react'
+import { ArrowUpCircle, ExternalLink, KeySquare, MessageSquarePlus, Power, Puzzle, RotateCcw, Trash2, Upload } from 'lucide-react'
 import { api, fmtDate } from '../../api.ts'
 import type { AdminPlugin, CatalogItem, ConfigDecl, PluginConfig, PluginKind, PluginTenant, TenantPlugin, UninstallImpact } from '../../types.ts'
 import { Badge } from '@/components/ui/badge'
@@ -18,7 +18,7 @@ import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAction, useApi, useConfirm } from '../core.ts'
 import AppIcon from '../AppIcon.tsx'
-import { Empty, ErrorBox, Loading, PageHeader, Pills, SaveBar, StatusBadge, Tabs } from '../kit.tsx'
+import { Empty, ErrorBox, FormDialog, Loading, PageHeader, Pills, SaveBar, StatusBadge, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import { t } from '../i18n.ts'
 
@@ -801,6 +801,9 @@ export function TenantPlugins({ slug }: { slug: string }) {
   const q = useApi<TenantPlugin[]>(['tenant-plugins', slug], path)
   const confirm = useConfirm()
   const [kind, setKind] = useState('all')
+  const [state, setState] = useState('all')
+  const [asking, setAsking] = useState(false)
+  const ask = useAction((v: Record<string, string>) => api('POST', `${path}/ask`, { text: v.text }), { ok: t('Request sent to the Administrators') })
   const set = useAction(({ id, on }: { id: string; on: boolean }) => api('PUT', `${path}/${enc(id)}/on`, { on }), {
     ok: ({ on }) => (on ? t('Turned on for the tenant') : t('Turned off for the tenant')),
     invalidate: [['tenant-plugins', slug], ['ctx', slug]],
@@ -809,7 +812,7 @@ export function TenantPlugins({ slug }: { slug: string }) {
   if (q.error) return <ErrorBox error={q.error} />
   const all = q.data ?? []
   const label = (id: string) => all.find((p) => p.id === id)?.label ?? all.find((p) => p.extends === id)?.extends_label ?? id
-  const rows = all.filter((p) => kind === 'all' || p.kind === kind)
+  const rows = all.filter((p) => (kind === 'all' || p.kind === kind) && (state === 'all' || (state === 'on') === p.on))
   async function toggle(p: TenantPlugin, on: boolean) {
     const ext = p.extensions.filter((e) => all.find((x) => x.id === e)?.on)
     if (!on && ext.length && !(await confirm(t('Turn off {label}? Its extensions go off with it: {names}.', { label: p.label, names: ext.map(label).join(', ') }), true))) return
@@ -817,7 +820,26 @@ export function TenantPlugins({ slug }: { slug: string }) {
   }
   return (
     <>
-      <PageHeader title={t('Plugins')} crumbs={[{ label: t('Tenant management') }]} sub={t('{n} available to the tenant', { n: all.length })} />
+      <PageHeader
+        title={t('Plugins')}
+        crumbs={[{ label: t('Tenant management') }]}
+        sub={t('{n} available to the tenant', { n: all.length })}
+        actions={
+          <Button variant="outline" onClick={() => setAsking(true)}>
+            <MessageSquarePlus />
+            {t('Ask for a plugin')}
+          </Button>
+        }
+      />
+      <FormDialog
+        open={asking}
+        onOpenChange={setAsking}
+        title={t('Ask for a plugin')}
+        description={t('The Administrators of the platform get your request as a notification.')}
+        fields={[{ name: 'text', label: t('Which plugin, and what for'), required: true }]}
+        submit={t('Send the request')}
+        onSubmit={(v) => ask.mutateAsync(v)}
+      />
       <div className="grid gap-3 p-6 max-[620px]:p-4">
         <p className="max-w-2xl text-sm text-muted-foreground">
           {t('The Administrator makes them available; here you turn them on for the people of the tenant and decide their permissions. Apps appear in the sidebar, services work behind the scenes, extensions add to another plugin.')}
@@ -826,7 +848,19 @@ export function TenantPlugins({ slug }: { slug: string }) {
           <Empty icon={<Puzzle />} title={t('No plugins available')} />
         ) : (
           <>
-            <KindPills value={kind} onChange={setKind} counts={countKinds(all)} />
+            <div className="flex flex-wrap items-center gap-3">
+              <KindPills value={kind} onChange={setKind} counts={countKinds(all)} />
+              <Pills
+                label={t('State')}
+                value={state}
+                onChange={setState}
+                items={[
+                  { id: 'all', label: t('All') },
+                  { id: 'on', label: t('On'), count: all.filter((p) => p.on).length },
+                  { id: 'off', label: t('Off'), count: all.filter((p) => !p.on).length },
+                ]}
+              />
+            </div>
             <div className="overflow-x-auto rounded-xl border bg-card">
               <Table>
                 <TableHeader>

@@ -30,6 +30,7 @@ import { PlatformQuotasPanel, TenantQuotasPanel } from '../Quotas.tsx'
 import { BackupPanel, ImportTenantDialog, MaintenancePanel, NewTenantWizard, OverviewOps, TenantLifecycle, TenantState } from './operations.tsx'
 import { t } from '../i18n.ts'
 import { LayoutPanel, StylePanel } from '../LayoutSettings.tsx'
+import { TenantContact } from '../TenantContact.tsx'
 
 
 /* ── Overview ────────────────────────────────────────────────────────── */
@@ -247,6 +248,7 @@ export function AdminTenant({ id, section }: { id: string; section?: string }) {
               </dl>
             </CardContent>
           </Card>
+          <TenantContact id={id} />
           <TenantQuotasPanel id={id} />
           <TenantLifecycle tn={tn} />
           </div>

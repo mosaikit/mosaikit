@@ -727,8 +727,20 @@ export interface Overview {
     link_views: number
     recent_shares: { resource_id: string; plugin_id: string; plugin: string; title: string; owner: string; level: Level; granted_at: string }[]
     activity: { ts: string; action: string; plugin_id: string | null; plugin: string | null; title: string | null }[]
+    /** «Pick up where you left off» and «Due soon» (recent servers) */
+    pick_up?: HomeItem[]
+    due?: HomeItem[]
   }
   tenant?: TenantKpi['core']
+}
+
+/** an item of the Home: last change (pick up) or due date (due soon) */
+export interface HomeItem {
+  resource_id: string
+  plugin_id: string
+  plugin: string
+  title: string
+  at: string
 }
 
 /** overview of the Administrator (`/api/admin/overview`) */

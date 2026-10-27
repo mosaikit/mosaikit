@@ -383,6 +383,16 @@ async fn email_settings_of_the_platform() {
         (r.get(0), r.get(1))
     };
     assert_eq!((status.as_str(), attempts), ("pending", 1));
+    // the test message says why, with a code (never the text of the operating system)
+    let e = mail::send_test(&t, &admin, "p@example.org").await.unwrap_err();
+    assert!(matches!(e.code(), "email_refused" | "email_unreachable" | "email_timeout"), "{}", e.code());
+    assert!(e.message.contains("127.0.0.1:1"), "{}", e.message);
+    // Monitoring: the mail server down, with the outcome of the last delivery
+    let s = mosaikit_kernel::ops::monitor::services(&t).await.unwrap();
+    let m = s.iter().find(|x| x.key == "mail").unwrap();
+    assert_eq!(m.state, "down");
+    assert!(m.facts.iter().any(|f| f[0] == "Outcome"));
+    assert!(s.iter().any(|x| x.key == "search"));
 }
 
 #[tokio::test]

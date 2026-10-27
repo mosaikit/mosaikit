@@ -120,4 +120,10 @@ export const EN: Record<string, string> = {
   'errors.email_unreachable': 'The mail server cannot be reached: check the address and the port',
   'errors.email_tls': 'The secure connection (TLS) with the mail server failed: check the security setting',
   'errors.email_auth': 'The mail server refused the user or the password',
+  'errors.oidc_unreachable': 'The identity provider cannot be reached: check the address',
+  'errors.oidc_timeout': 'The identity provider does not answer in time',
+  'errors.oidc_http': 'The identity provider answered with an error',
+  'errors.oidc_document': 'The identity provider did not answer with a valid document',
+  '{count} tenants_one': '1 tenant',
+  '{count} tenants_other': '{count} tenants',
 }

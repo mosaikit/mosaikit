@@ -1,16 +1,16 @@
 // Pages of a tenant: Home or overview, apps (in the iframe) and, for the Tenant Manager, the management of
 // the tenant: People, Plugins, Shares, Usage and Tenant settings (docs/refactoring-ui.md §2).
 
-import { useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import { Activity, Bell, Frame, Gauge, Grid2x2, KeyRound, KeySquare, Link2, Lock, Mail, MoreHorizontal, Palette, Plus, Share2, ShieldCheck, ShieldOff, Trash2, TrendingUp, UserRound, Users } from 'lucide-react'
+import { Activity, Bell, Frame, Gauge, Grid2x2, KeyRound, KeySquare, Link2, Lock, Mail, MoreHorizontal, Palette, Plus, Share2, ShieldCheck, ShieldOff, Trash2, TrendingUp, Upload, UserRound, Users } from 'lucide-react'
 import { api, appUrl, fmtBytes, fmtDate } from '../../api.ts'
 import PluginFrame from '../../components/PluginFrame.tsx'
 import { UiContext, useUi, type Ui } from '../../ui-context.ts'
 import ShareDialog from '../ShareDialog.tsx'
 import { SharedByMeSection } from './history.tsx'
-import type { AccessRequest, Group, Invitation, LinkInfo, Member, Overview, Profile, ResetLink, ResourceRow, Revoked, Session, TenantContext, TenantKpi, TenantSettings } from '../../types.ts'
+import type { AccessRequest, Group, HomeItem, Invitation, LinkInfo, Member, Overview, Profile, ResetLink, ResourceRow, Revoked, Session, TenantContext, TenantKpi, TenantSettings } from '../../types.ts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -26,8 +26,11 @@ import { initials, isApp, passwordMin, useAction, useApi, useConfig, useConfirm,
 import { fmtDay, t, useLang } from '../i18n.ts'
 import { Empty, ErrorBox, FormDialog, Kpi, Loading, MoreRows, PageHeader, Pills, PluginKpis, SaveBar, SelectAllRows, Sections, StatusBadge, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
+import { useNoteList } from '../notes.ts'
+import { NoteRow } from '../notifications.tsx'
 import { effectiveMode, useTheme } from '../theme.ts'
 import AppIcon from '../AppIcon.tsx'
+import { ImportDialog, InviteManyDialog } from '../BulkPeople.tsx'
 import { TenantTheme } from '../ThemeSettings.tsx'
 import { useTenantSignIn } from '../signin.ts'
 import { LinkDialog, ProfilesSection, RequestsTable } from './people.tsx'
@@ -40,6 +43,75 @@ const enc = encodeURIComponent
 const ROLE: Record<string, string> = { tenant_manager: 'Tenant Manager', user: 'User' }
 
 /* ── Overview ────────────────────────────────────────────────────────── */
+
+/** Good morning, afternoon or evening, by the hour of the person. */
+function greeting(): string {
+  const h = new Date().getHours()
+  return h < 12 ? t('Good morning') : h < 18 ? t('Good afternoon') : t('Good evening')
+}
+
+/** The Home as in the mockup: what to pick up again, what is due soon, what is for you (notifications). */
+function HomeLists({ slug, pickUp, due }: { slug: string; pickUp: HomeItem[]; due: HomeItem[] }) {
+  const notes = useNoteList({ limit: 4 })
+  const today = new Date().toISOString().slice(0, 10)
+  const item = (x: HomeItem, when: ReactNode) => (
+    <li key={x.resource_id}>
+      <a href={to.item(slug, x.resource_id)} className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent">
+        <AppIcon id={x.plugin_id} />
+        <span className="min-w-0 flex-1">
+          <b className="block truncate font-medium">{x.title || t('(untitled)')}</b>
+          <span className="text-xs text-muted-foreground">{x.plugin}</span>
+        </span>
+        <span className="shrink-0 text-xs text-muted-foreground">{when}</span>
+      </a>
+    </li>
+  )
+  const box = (id: string, title: string, children: ReactNode, footer?: ReactNode) => (
+    <section aria-labelledby={id} className="grid content-start gap-2 rounded-xl border bg-card p-4">
+      <h2 id={id} className="text-sm font-semibold">
+        {title}
+      </h2>
+      {children}
+      {footer}
+    </section>
+  )
+  return (
+    <div className="grid gap-4 md:grid-cols-3">
+      {box(
+        'home-pick-up',
+        t('Pick up where you left off'),
+        pickUp.length ? <ul className="grid gap-0.5">{pickUp.map((x) => item(x, fmtDay(x.at)))}</ul> : <p className="text-sm text-muted-foreground">{t('The items you create or change show here.')}</p>,
+      )}
+      {box(
+        'home-due',
+        t('Due soon'),
+        due.length ? (
+          <ul className="grid gap-0.5">
+            {due.map((x) => item(x, x.at.slice(0, 10) < today ? <span className="font-medium text-destructive">{t('late, {date}', { date: fmtDay(x.at) })}</span> : fmtDay(x.at)))}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted-foreground">{t('Nothing due in the next 7 days.')}</p>
+        ),
+      )}
+      {box(
+        'home-for-you',
+        t('For you'),
+        (notes.data?.items ?? []).length ? (
+          <ul className="grid gap-1">
+            {(notes.data?.items ?? []).map((n) => (
+              <NoteRow key={n.id} n={n} />
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted-foreground">{t('No notifications')}</p>
+        ),
+        <a href={to.tenant(slug, 'notifications')} className="text-sm text-primary-strong underline-offset-4 hover:underline">
+          {t('All notifications')}
+        </a>,
+      )}
+    </div>
+  )
+}
 
 export function TenantHome({ session, slug }: { session: Session; slug: string }) {
   const ctx = useTenantCtx(slug)
@@ -54,7 +126,7 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
     <>
       <PageHeader
         title={c.tenant.role === 'tenant_manager' ? t('Tenant overview') : t('Home')}
-        sub={`${t('Hello')} ${session.user.display_name || session.user.username} · ${ROLE[c.tenant.role]} in ${c.tenant.name}`}
+        sub={`${greeting()}, ${session.user.display_name || session.user.username} · ${ROLE[c.tenant.role]} in ${c.tenant.name}`}
       />
       <div className="grid gap-6 p-6 max-[620px]:p-4">
         {d && (
@@ -68,6 +140,7 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
             </div>
           </section>
         )}
+        {d && <HomeLists slug={slug} pickUp={d.me.pick_up ?? []} due={d.me.due ?? []} />}
         <SharedByMeSection slug={slug} />
         {d?.tenant && (
           <section className="grid gap-3">
@@ -190,7 +263,7 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
     { id: 'profiles', label: t('Permission profiles'), icon: <KeySquare />, count: profiles.data?.length },
     { id: 'pending', label: t('Pending'), icon: <Mail />, count: pending },
   ]
-  const [dlg, setDlg] = useState<null | 'member' | 'group' | 'invite' | 'profile'>(null)
+  const [dlg, setDlg] = useState<null | 'member' | 'group' | 'invite' | 'profile' | 'import' | 'invite-many'>(null)
   const inval = [['members', slug], ['groups', slug], ['invites', slug], ['overview', slug], ['profiles', slug]]
   const create = useAction((v: Record<string, string>) => api('POST', `${base}/members`, v), { ok: (v) => t('User {username} created', { username: v.username }), invalidate: inval })
   const newGroup = useAction((v: Record<string, string>) => api('POST', `${base}/groups`, v), { ok: (v) => t('Group {name} created', { name: v.name }), invalidate: inval })
@@ -209,13 +282,24 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
     ) : cur === 'people' ? (
       // as in the mockup: inviting is the primary action of People; with an identity provider the
       // people of the tenant come from the provider, at their first sign-in, so there is no New user
-      <div className="flex gap-2">
+      // nor import
+      <div className="flex flex-wrap gap-2">
+        {!oidc && (
+          <Button variant="outline" onClick={() => setDlg('import')}>
+            <Upload />
+            {t('Import from CSV')}
+          </Button>
+        )}
         {!oidc && (
           <Button variant="outline" onClick={() => setDlg('member')}>
             <Plus />
             {t('New user')}
           </Button>
         )}
+        <Button variant="outline" onClick={() => setDlg('invite-many')}>
+          <Users />
+          {t('Invite several people')}
+        </Button>
         <Button onClick={() => setDlg('invite')}>
           <Plus />
           {t('Invite people')}
@@ -227,10 +311,16 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
         {t('New group')}
       </Button>
     ) : (
-      <Button onClick={() => setDlg('invite')}>
-        <Plus />
-        {t('Invite people')}
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="outline" onClick={() => setDlg('invite-many')}>
+          <Users />
+          {t('Invite several people')}
+        </Button>
+        <Button onClick={() => setDlg('invite')}>
+          <Plus />
+          {t('Invite people')}
+        </Button>
+      </div>
     )
   return (
     <>
@@ -300,6 +390,8 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
         submit={t('Send the invitation')}
         onSubmit={(v) => invite.mutateAsync(v)}
       />
+      <ImportDialog slug={slug} open={dlg === 'import'} onOpenChange={(o) => !o && setDlg(null)} />
+      <InviteManyDialog slug={slug} profiles={profiles.data ?? []} open={dlg === 'invite-many'} onOpenChange={(o) => !o && setDlg(null)} />
       <FormDialog
         open={dlg === 'profile'}
         onOpenChange={(o) => !o && setDlg(null)}

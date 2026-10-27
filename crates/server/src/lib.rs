@@ -15,6 +15,7 @@ mod ops_api;
 mod pages;
 mod people_api;
 mod plugins_api;
+mod qa_api;
 mod quotas_api;
 mod shell_api;
 mod ui;

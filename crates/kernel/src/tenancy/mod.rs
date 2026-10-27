@@ -5,6 +5,7 @@
 //! `tenancy::<function>` without knowing the sub-modules.
 
 mod administrators;
+pub mod bulk;
 mod directory;
 mod groups;
 mod invitations;
