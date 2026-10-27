@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { PASSWORD, BASE, adminLogin, fresh, login, logout, section, nav, accessible } from './support'
+import { PASSWORD, BASE, adminLogin, fresh, login, logout, nav, accessible } from './support'
 
 // Lifecycle and operations of a tenant. Runs in order after the previous file (the state of the installation is shared).
 

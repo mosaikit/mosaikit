@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { PASSWORD, BASE, adminLogin, fresh, login, logout, appearanceTab, nav, accessible } from './support'
+import { PASSWORD, BASE, adminLogin, login, logout, appearanceTab, nav, accessible } from './support'
 
 // Search, help, own profile, QA follow-ups. Runs in order after the previous file (the state of the installation is shared).
 

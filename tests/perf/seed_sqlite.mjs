@@ -111,7 +111,7 @@ export function seedSqlite(file, S) {
       if (n % 5 === 1) folder = add('com.mosaikit.files', 'folder', n, `Folder ${n}`).rid
       else add('com.mosaikit.files', 'file', n, `Document ${n}.pdf`, { parent: folder, size: 1000 + ((n * 7919) % 5000000), meta: '{"mime":"application/pdf"}' })
     }
-    people.forEach((uid, j) => {
+    people.forEach((uid) => {
       for (let k = 1; k <= 10; k++) {
         notif.run(randomUUID(), uid, id, ['share', 'link', 'system', 'plugin'][k % 4], `Notification ${k}`, iso(now - k * day), k > 3 ? iso(now) : null)
       }
