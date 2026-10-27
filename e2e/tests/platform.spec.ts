@@ -1959,7 +1959,7 @@ test.describe.serial('platform', () => {
     const created: { id: string; slug: string }[] = []
     for (let n = 1; n <= 55; n++) {
       const slug = `rl-${String(n).padStart(2, '0')}`
-      const r = await call('POST', 'api/admin/tenants', { slug, name: `Rl ${String(n).padStart(2, '0')}`, manager_username: 'mgr', manager_password: PASSWORD })
+      const r = await call('POST', 'api/admin/tenants', { slug, name: `Rl ${String(n).padStart(2, '0')}`, manager_username: 'mgr', manager_email: `mgr@${slug}.example.org`, manager_password: PASSWORD })
       expect(r.status, slug).toBe(200)
       created.push({ id: r.json.id, slug })
     }
