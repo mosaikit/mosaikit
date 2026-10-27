@@ -12,6 +12,8 @@ export interface TabState {
   key: string
   label: string
   page: string
+  /** where the UI of the extension is served (from the server; its own host with a wildcard plugin_url) */
+  ui_url?: string
   /** the plugin it extends (the one of the frame), the resource and the item */
   base: string
   resource: string
@@ -43,7 +45,7 @@ export default function ExtensionTab({ tab, session, ctx, reloadKey, context, ui
   const ref = useRef<HTMLIFrameElement>(null)
   const ui = useUi()
   const tenant = ctx.tenant.slug
-  const src = `${session.plugin_url ?? session.plugin_origin}/ui/${encodeURIComponent(tab.ext)}/${safePage(tab.page)}?host=${encodeURIComponent(window.location.origin)}&v=${reloadKey}`
+  const src = `${tab.ui_url ?? session.plugin_url ?? session.plugin_origin}/ui/${encodeURIComponent(tab.ext)}/${safePage(tab.page)}?host=${encodeURIComponent(window.location.origin)}&v=${reloadKey}`
 
   // the frame has an opaque origin ("null"): the messages go to the window, whatever its origin
   const post = (msg: unknown) => ref.current?.contentWindow?.postMessage(msg, '*')

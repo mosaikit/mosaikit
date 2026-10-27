@@ -394,6 +394,25 @@ The sample extension *Note review* (`com.mosaikit.note-review`) adds a **Review*
 | FU-B-13 | A folder of Files restored the same way | The folder comes back with the files in it, contents included; a file whose folder no longer exists comes back at the top |
 | FU-B-14 | With «Also its shares…» ticked | The shares come back for the people and groups that still exist; public links never come back |
 
+
+## Security follow-ups
+
+The open items of the security review (docs/reports/security-review.md). SEC-08 to SEC-10 need a second
+start of the development server with a wildcard `plugin_url` (below); the others work as usual.
+
+| Id | Check | Expected |
+|---|---|---|
+| SEC-01 | As Administrator: System › Identity and appearance › Identity and texts: upload an SVG logo with `<script>`, with `onload=`, with `<image href="https://…">` or with `<style>` | Refused: «SVG not allowed: …»; a plain drawing (shapes, paths, text, gradients) is accepted |
+| SEC-02 | Make a public link to a note and open `…/p/<token>/api` | Only the fields the plugin shows; fields a plugin declares `hidden = true` never appear (no official plugin has one on its own resources: covered by an automated test) |
+| SEC-03 | As Administrator: in `xtask/mosaikit.dev.toml` set `[archives] max_entries = 5`, restart, import the export of a tenant | Refused: «the archive unpacks to more than the limits of the installation»; remove the setting afterwards |
+| SEC-04 | Upload a static site whose zip has a file `con.txt`, `nul`, `a.` or `name ` | Refused: unsafe path |
+| SEC-05 | As `e.ricci`: a password link for `s.greco` (Manage › People › Sara Greco › Sign-in); open it in two tabs and send both | One sets the password, the other says the link is not valid any more |
+| SEC-06 | Look at the permissions of `<data_dir>/secret.key` (Windows: `icacls`; Linux/macOS: `ls -l`) on a new data folder | Only the owner (and SYSTEM on Windows), no inherited entries; mode `-rw-------` on Unix |
+| SEC-07 | With the test identity provider (Phase 8): sign in to an OIDC tenant, sign out | The provider's logout page receives `id_token_hint` (visible in its address) and signs the person out |
+| SEC-08 | Start a second server with `MOSAIKIT_PLUGIN_URL=http://*.localhost:47081/mosaikit cargo xtask dev` (or the same line in `xtask/mosaikit.dev.toml`); open Notes | The frame of Notes comes from `http://com-mosaikit-notes.localhost:47081/…`; the plugin works as usual |
+| SEC-09 | In the browser, open `http://com-mosaikit-notes.localhost:47081/mosaikit/ui/com.mosaikit.tasks/` | 404: the UI of Tasks is served only on its own host |
+| SEC-10 | Make a public link | Its address starts with `http://public.localhost:47081/…` and opens there |
+
 ---
 
 Every phase of the plan has its section. New work adds its checks here when it is committed.

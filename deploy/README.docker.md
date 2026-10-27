@@ -62,6 +62,19 @@ MOSAIKIT_TRUST_PROXY=true                           # the proxy sets X-Forwarded
 
 With `https://` the session cookie becomes `Secure`.
 
+**One origin per plugin (optional, recommended with plugins of third parties).** With a wildcard host
+every plugin UI gets a hostname of its own and the plugins cannot reach each other either:
+
+```sh
+MOSAIKIT_PLUGIN_URL=https://*.plugins.{{id}}.example.com
+```
+
+It needs a wildcard DNS record (`*.plugins.{{id}}.example.com` to the proxy) and a wildcard certificate
+for it (e.g. Let's Encrypt with the DNS-01 challenge). The proxy forwards every
+`*.plugins.{{id}}.example.com` host to `MOSAIKIT_PLUGIN_PORT` and must keep the `Host` header: Mosaikit
+serves the UI of a plugin only on `<plugin>.plugins.{{id}}.example.com` (its id with `-` for `.`, e.g.
+`com-mosaikit-notes`) and files and public links only on `public.plugins.{{id}}.example.com`.
+
 ## Configuration
 
 Every property of `mosaikit.toml` is set with the matching `MOSAIKIT_*` variable

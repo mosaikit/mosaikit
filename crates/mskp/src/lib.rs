@@ -49,11 +49,75 @@ pub fn is_identifier(s: &str) -> bool {
         && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
 }
 
-/// Safe relative path inside a package: no absolute paths, `..`, `\`.
+/// Safe relative path inside a package: no absolute paths, `..`, `\`, control characters, nor
+/// names Windows treats as devices or rewrites (`CON`, `NUL`, `COM1`, `name.`, `name `…), on every
+/// platform, so that a package or an archive behaves the same wherever it is unpacked.
 pub fn is_safe_path(p: &str) -> bool {
     !p.is_empty()
         && !p.starts_with('/')
         && !p.contains('\\')
         && !p.contains(':')
-        && p.split('/').all(|seg| !seg.is_empty() && seg != "." && seg != "..")
+        && !p.chars().any(char::is_control)
+        && p.split('/').all(|seg| !seg.is_empty() && seg != "." && seg != ".." && is_portable_name(seg))
+}
+
+/// A file or folder name that Windows does not reserve nor rewrite.
+fn is_portable_name(seg: &str) -> bool {
+    if seg.ends_with('.') || seg.ends_with(' ') {
+        return false;
+    }
+    // the device names are reserved with any extension: `nul.txt` is the device `NUL`
+    let stem = seg.split('.').next().unwrap_or(seg).trim_end().to_ascii_uppercase();
+    let numbered = |prefix: &str| {
+        stem.strip_prefix(prefix).is_some_and(|n| {
+            matches!(n, "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" | "¹" | "²" | "³")
+        })
+    };
+    let device = matches!(stem.as_str(), "CON" | "PRN" | "AUX" | "NUL" | "CONIN$" | "CONOUT$")
+        || numbered("COM")
+        || numbered("LPT");
+    !device && !seg.chars().any(|c| matches!(c, '<' | '>' | '"' | '|' | '?' | '*'))
+}
+
+#[cfg(test)]
+mod safe_path_tests {
+    use super::is_safe_path;
+
+    #[test]
+    fn paths_safe_on_every_platform() {
+        for ok in ["index.html", "assets/app.js", "a/b/c.txt", "console.log", "com10.txt", "lpt.txt"] {
+            assert!(is_safe_path(ok), "{ok}");
+        }
+        for bad in [
+            "",
+            "/etc/passwd",
+            "../x",
+            "a/../b",
+            "a\\b",
+            "c:x",
+            "a//b",
+            "./a",
+            "CON",
+            "con.txt",
+            "a/NUL",
+            "nul.tar.gz",
+            "Aux",
+            "PRN.html",
+            "COM1",
+            "com9.log",
+            "LPT1.txt",
+            "COM¹",
+            "name.",
+            "name ",
+            "dir./x",
+            "a\u{0}b",
+            "a\nb",
+            "what?.txt",
+            "a*b",
+            "x|y",
+            "<x>",
+        ] {
+            assert!(!is_safe_path(bad), "{bad:?}");
+        }
+    }
 }

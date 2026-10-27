@@ -152,7 +152,8 @@ async fn files_and_folders_with_inheritance() {
     let (name, zip) = files::zip_folder(&t, &anna, FILES, project.id).await.unwrap();
     assert_eq!(name, "Project.zip");
     let mut z = zip::ZipArchive::new(std::io::Cursor::new(zip)).unwrap();
-    let mut names: Vec<String> = (0..z.len()).map(|i| z.by_index(i).unwrap().name().to_string()).collect();
+    let mut names: Vec<String> =
+        (0..z.len()).map(|i| z.by_index(i).unwrap().name().unwrap().into_owned()).collect();
     names.sort();
     assert_eq!(names, vec!["Attachments/report.txt", "note.md"]);
 

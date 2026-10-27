@@ -103,7 +103,7 @@ impl Blobs {
                 if f.is_dir() {
                     continue;
                 }
-                let name = f.name().replace('\\', "/");
+                let name = f.name().map_err(|e| Error::bad(format!("zip: {e}")))?.replace('\\', "/");
                 if !mosaikit_mskp::is_safe_path(&name) || f.enclosed_name().is_none() {
                     return Err(Error::bad(format!("unsafe path in the zip: {name}")));
                 }
@@ -212,6 +212,13 @@ mod tests {
     use super::*;
 
     /// A zip with one deflated entry of `size` zero bytes whose headers declare 10 bytes.
+    fn zip_of_size(size: usize) -> Vec<u8> {
+        let mut w = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        w.start_file("index.html", zip::write::SimpleFileOptions::default()).unwrap();
+        w.write_all(&vec![0u8; size]).unwrap();
+        w.finish().unwrap().into_inner()
+    }
+
     fn lying_zip(size: usize) -> Vec<u8> {
         let mut w = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
         w.start_file("index.html", zip::write::SimpleFileOptions::default()).unwrap();
@@ -229,11 +236,16 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let blobs = Blobs::new(dir.path().to_path_buf());
         let (t, r) = (Uuid::new_v4(), Uuid::new_v4());
-        // what is counted (quotas) is what the entry really inflates to
-        let info = blobs.extract_site_within(t, r, &lying_zip(3 << 20), 8 << 20).unwrap();
+        // a site within the limit
+        let zip = zip_of_size(3 << 20);
+        let info = blobs.extract_site_within(t, r, &zip, 8 << 20).unwrap();
         assert_eq!(info.size, 3 << 20);
-        // and the limit applies to it: nothing is left on disk
-        let err = blobs.extract_site_within(t, r, &lying_zip(9 << 20), 8 << 20).unwrap_err();
+        // an entry that inflates to more than it declares is refused (zip >= 9 checks it while
+        // reading, and the bytes are counted anyway): nothing changes on disk
+        let err = blobs.extract_site_within(t, r, &lying_zip(4 << 20), 8 << 20).unwrap_err();
+        assert!(err.message.contains("larger than its declared"), "{}", err.message);
+        // a site over the limit is refused: the previous one stays
+        let err = blobs.extract_site_within(t, r, &zip_of_size(9 << 20), 8 << 20).unwrap_err();
         assert!(err.message.contains("over 8 MB"), "{}", err.message);
         let site = blobs.dir(t, r).join("site");
         assert_eq!(std::fs::read(site.join("index.html")).unwrap().len(), 3 << 20, "the previous site stays");

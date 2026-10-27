@@ -46,6 +46,13 @@ its PostgreSQL database, with persistent volumes and an Ingress with two hostnam
    under a base path, e.g. `MOSAIKIT_URL=https://gis.example.com/{{id}}`:
    in that case the Ingress still forwards the whole domain.
 
+   **One origin per plugin (optional).** `MOSAIKIT_PLUGIN_URL=https://*.plugins.{{id}}.example.com`
+   gives every plugin UI a hostname of its own (`com-mosaikit-notes.plugins.{{id}}.example.com`;
+   files and public links on `public.plugins.{{id}}.example.com`). In `ingress.yaml` use the host
+   `*.plugins.{{id}}.example.com` in the rule and in `tls`, with a wildcard certificate (cert-manager
+   with a DNS-01 issuer) and a wildcard DNS record. Ingress controllers keep the `Host` header, which
+   Mosaikit checks.
+
 3. **Passwords.** Change the values in `secret.env`. Do not commit the file: in
    production generate the Secret with the secret manager of the cluster (Sealed
    Secrets, External Secrets, Vault) and remove `secretGenerator` from

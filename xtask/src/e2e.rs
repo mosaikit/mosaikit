@@ -117,11 +117,19 @@ pub fn e2e(headed: bool) -> Result<()> {
     plugins::pack_all(&all, false, &dir.join("registry"))?;
     let trusted = std::fs::read_to_string(dir.join("registry").join("trusted_key.txt"))?;
     let url = admin_url().replace("/postgres", &format!("/{db}"));
+    // `MOSAIKIT_E2E_WILDCARD=1`: one origin per plugin (http://<plugin>.localhost:<port>, the browser
+    // resolves *.localhost to the computer itself), only the scenario of tests/wildcard.spec.ts
+    let wildcard = std::env::var("MOSAIKIT_E2E_WILDCARD").is_ok_and(|v| v == "1");
+    let extra = if wildcard {
+        format!("plugin_url = \"http://*.localhost:{}/mosaikit\"\nadmin_totp = false\n", port + 1)
+    } else {
+        String::new()
+    };
     std::fs::write(
         dir.join("mosaikit.toml"),
         format!(
             "# installation of the e2e tests (properties described in mosaikit.example.toml)\n\
-             url = \"http://127.0.0.1:{port}/mosaikit\"\ndata_dir = \"data\"\n\
+             url = \"http://127.0.0.1:{port}/mosaikit\"\ndata_dir = \"data\"\n{extra}\
              registry = \"registry/index.json\"\npreinstall = true\ntrusted_keys = [\"{}\"]\n\n[database]\nurl = \"{url}\"\n",
             trusted.trim()
         ),
@@ -152,6 +160,13 @@ pub fn e2e(headed: bool) -> Result<()> {
             .env("E2E_IDP_URL", format!("http://127.0.0.1:{idp_port}"));
         if headed {
             cmd.env("E2E_HEADED", "1");
+        }
+        if wildcard {
+            // only the scenario of the wildcard: not the results of the whole suite
+            cmd.env("E2E_WILDCARD", "1")
+                .env("E2E_PLUGIN_ORIGIN", format!("http://localhost:{}", port + 1))
+                .args(["--", "tests/wildcard.spec.ts"]);
+            return run(&mut cmd);
         }
         let json = report::dir().join("e2e.json");
         std::fs::create_dir_all(report::dir())?;

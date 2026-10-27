@@ -273,6 +273,16 @@ async fn the_administrator_handles_every_person() {
         reset_with_link(&t, &token, "again-password-2").await.unwrap_err().code,
         Some("reset_expired")
     );
+    // two uses of the same link at the same instant: only one wins
+    let again = reset_link(&t, By::Admin(&admin), carla.user_id).await.unwrap();
+    let token2 = again.url.rsplit('/').next().unwrap().to_string();
+    let (a, b) = tokio::join!(
+        reset_with_link(&t, &token2, "first-password-3"),
+        reset_with_link(&t, &token2, "second-password-4")
+    );
+    assert_eq!(usize::from(a.is_ok()) + usize::from(b.is_ok()), 1, "single use");
+    let winner = if a.is_ok() { "first-password-3" } else { "second-password-4" };
+    login(&t, "alfa", "carla", winner, "x").await.unwrap();
     // sessions and activity
     assert_eq!(person_sessions(&t, By::Admin(&admin), carla.user_id).await.unwrap().len(), 1);
     assert!(person_activity(&t, By::Admin(&admin), carla.user_id)

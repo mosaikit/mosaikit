@@ -126,6 +126,8 @@ export interface PluginView {
   label: string
   description: string
   has_ui: boolean
+  /** where its UI is served: the address of the plugins, or its own host with a wildcard plugin_url (recent servers) */
+  ui_url?: string
   dev: boolean
   permissions: { hooks: string[]; files: boolean; content: boolean; network: string[]; frame_src: string[]; calls?: string[] }
 }

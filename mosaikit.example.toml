@@ -18,8 +18,13 @@ url = "http://127.0.0.1:8080/mosaikit"
 # so the code of the plugins cannot read the cookies nor call the API of the app.
 # Default: the same address as `url` on the next port (e.g. :8081).
 # Behind a reverse proxy a second hostname is normally used.
+# With a wildcard as the first label of the host every plugin UI gets an origin of its own
+# (<plugin>.plugins.example.com, e.g. com-mosaikit-notes.plugins.example.com), so that plugins are
+# isolated from each other too; contents and public links go to public.plugins.example.com. It needs a
+# wildcard DNS record and certificate; in development "http://*.localhost:8081" works as it is.
 # Env: MOSAIKIT_PLUGIN_URL
 # plugin_url = "https://plugins.example.com/mosaikit"
+# plugin_url = "https://*.plugins.example.com"
 
 # Address and port the server listens on for the app.
 # Default: the port of `url`; local only (127.0.0.1) if the host of `url` is local,
@@ -124,6 +129,16 @@ url = "http://127.0.0.1:8080/mosaikit"
 
 # Maximum number of connections to the database of the app.
 # max_connections = 20
+
+[archives]
+# Limits on what an archive may unpack when an Administrator imports the export of a tenant or restores
+# from a backup. The sizes written in a zip can lie: the bytes are counted as they are unpacked.
+# Total of the unpacked bytes, in MB.
+# max_unpacked_mb = 51200
+# Number of entries.
+# max_entries = 1000000
+# One table of data (JSON) read into memory, in MB.
+# max_json_mb = 1024
 
 [dev]
 # Development mode: the plugins are read from the source folders with hot reload

@@ -4,7 +4,7 @@
 use chrono::{Duration, Utc};
 use mosaikit_kernel::ops::{backup, maintenance, metrics, monitor};
 use mosaikit_kernel::tenancy::{lifecycle, list_tenants, set_tenant_status};
-use mosaikit_kernel::testing::{start, TestKernel, PASSWORD};
+use mosaikit_kernel::testing::{start, start_with, TestKernel, PASSWORD};
 use mosaikit_kernel::transfer::{self, ImportOptions};
 use mosaikit_kernel::{crud, files, identity, Caller, Kind};
 use serde_json::json;
@@ -305,6 +305,10 @@ async fn metrics_monitoring_and_alerts_once_per_crossing() {
     let t = start().await;
     let admin = t.admin().await;
     t.tenant("alfa").await;
+    // only the alert under test: the free disk of the computer running the tests must not count
+    let mut quiet = monitor::alert_config(&t).await.unwrap();
+    quiet.disk_free_pct = 0;
+    monitor::set_alert_config(&t, &admin, &quiet).await.unwrap();
     for i in 0..40 {
         t.ops.metrics.record(10.0 + i as f64, if i < 10 { 500 } else { 200 }, Some("alfa"));
     }
@@ -488,7 +492,7 @@ fn tampered(
     let mut zout = zip::ZipWriter::new(std::fs::File::create(&out).unwrap());
     for i in 0..zin.len() {
         let mut f = zin.by_index(i).unwrap();
-        let name = f.name().to_string();
+        let name = f.name().unwrap().into_owned();
         let mut data = Vec::new();
         f.read_to_end(&mut data).unwrap();
         if name == format!("core/{table}.json") {
@@ -529,5 +533,36 @@ async fn an_export_cannot_reach_outside_its_tenant() {
     let e = transfer::import_tenant(&t, &admin, &p, "", &replace).await.unwrap_err();
     assert_eq!(e.code(), "export_invalid", "{}", e.message);
     // the untouched export still goes in
+    transfer::import_tenant(&t, &admin, &path, "", &replace).await.unwrap();
+}
+
+#[tokio::test]
+async fn imports_stay_within_the_limits_of_the_archives() {
+    // an installation that accepts archives of at most 5 entries
+    let t = start_with(|c| c.archives.max_entries = 5).await;
+    let admin = t.admin().await;
+    let g = t.tenant("alfa").await;
+    t.member(&g, "anna").await;
+    let alfa = tenant_id(&t, "alfa").await;
+    let (path, _) = transfer::export_tenant(&t, &admin, alfa).await.unwrap();
+    let replace = ImportOptions { replace: true };
+    let e = transfer::import_tenant(&t, &admin, &path, "", &replace).await.unwrap_err();
+    assert_eq!(e.code(), "archive_too_big", "{}", e.message);
+
+    // one table bigger than the limit of a table read into memory
+    let t = start_with(|c| c.archives.max_json_mb = 0).await;
+    let admin = t.admin().await;
+    t.tenant("alfa").await;
+    let alfa = tenant_id(&t, "alfa").await;
+    let (path, _) = transfer::export_tenant(&t, &admin, alfa).await.unwrap();
+    let e = transfer::import_tenant(&t, &admin, &path, "", &replace).await.unwrap_err();
+    assert_eq!(e.code(), "archive_too_big", "{}", e.message);
+
+    // with the default limits it goes in
+    let t = start().await;
+    let admin = t.admin().await;
+    t.tenant("alfa").await;
+    let alfa = tenant_id(&t, "alfa").await;
+    let (path, _) = transfer::export_tenant(&t, &admin, alfa).await.unwrap();
     transfer::import_tenant(&t, &admin, &path, "", &replace).await.unwrap();
 }

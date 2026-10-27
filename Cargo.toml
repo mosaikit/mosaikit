@@ -48,7 +48,9 @@ ed25519-dalek = { version = "2", features = ["rand_core"] }
 argon2 = "0.5"
 # authenticated encryption of the keys of outside services (already in the tree through rustls)
 ring = "0.17"
-zip = { version = "2", default-features = false, features = ["deflate"] }
+# XML parser of the SVG allow-list check (no dependencies, no DTD)
+roxmltree = "0.20"
+zip = { version = "9", default-features = false, features = ["deflate"] }
 sqlparser = { version = "=0.52.0", features = ["visitor"] }
 # SQLite included in the executable (desktop version): no external dependency
 rusqlite = { version = "0.32", features = ["bundled", "hooks", "functions", "column_decltype"] }

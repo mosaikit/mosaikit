@@ -7,12 +7,6 @@ version = 2
 yanked = "deny"
 # Every exception says why it does not apply and when to drop it (docs/reports/dependencies.md).
 ignore = [
-  # zip 2.x: the three advisories are about ZipArchive::extract / ZipStreamReader::extract (symlinks,
-  # SUID bits). Mosaikit never calls them: every archive is read entry by entry with checked paths
-  # (blobs::extract_site, transfer::extract, mskp::Package::read). Drop when moving to zip >= 9.
-  { id = "RUSTSEC-2026-0367", reason = "extract() not used; entries read one by one with safe paths" },
-  { id = "RUSTSEC-2026-0368", reason = "extract() not used; entries read one by one with safe paths" },
-  { id = "RUSTSEC-2026-0369", reason = "extract() not used; entries read one by one with safe paths" },
   # proc-macro-error (unmaintained): build-time only, through gtk -> tray-icon of the desktop on Linux.
   { id = "RUSTSEC-2024-0370", reason = "build-time proc macro of the Linux tray (gtk), no runtime code" },
 ]

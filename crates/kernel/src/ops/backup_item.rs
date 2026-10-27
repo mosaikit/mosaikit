@@ -99,6 +99,7 @@ const LIMIT: usize = 200;
 
 struct Opened {
     zip: ZipArchive<File>,
+    budget: transfer::Budget,
     prefix: String,
     manifest: Manifest,
     resources: Vec<Value>,
@@ -111,12 +112,14 @@ async fn open(k: &Kernel, admin: &SessionUser, backup_id: Uuid, slug: &str) -> R
     let prefix = format!("tenants/{slug}/");
     let manifest = transfer::read_manifest(&mut zip, &prefix)
         .map_err(|_| Error::not_found(format!("the tenant '{slug}' is not in this backup")))?;
-    let resources = rows(&mut zip, &format!("{prefix}core/resources.json"))?;
-    Ok(Opened { zip, prefix, manifest, resources })
+    let mut budget = transfer::Budget::new(&k.cfg.archives);
+    budget.check(&mut zip, &prefix)?;
+    let resources = rows(&mut zip, &mut budget, &format!("{prefix}core/resources.json"))?;
+    Ok(Opened { zip, budget, prefix, manifest, resources })
 }
 
-fn rows(zip: &mut ZipArchive<File>, name: &str) -> Result<Vec<Value>> {
-    Ok(transfer::read_json(zip, name)?.and_then(|v| v.as_array().cloned()).unwrap_or_default())
+fn rows(zip: &mut ZipArchive<File>, budget: &mut transfer::Budget, name: &str) -> Result<Vec<Value>> {
+    Ok(transfer::read_json(zip, name, budget)?.and_then(|v| v.as_array().cloned()).unwrap_or_default())
 }
 
 fn text<'a>(row: &'a Value, col: &str) -> &'a str {
@@ -154,9 +157,14 @@ async fn live_ids(k: &Kernel, tenant: Uuid, deleted: bool) -> Result<HashSet<Uui
 }
 
 /// Names of the people: the ones in the backup, then the ones of the installation.
-async fn names(k: &Kernel, zip: &mut ZipArchive<File>, prefix: &str) -> Result<HashMap<String, String>> {
+async fn names(
+    k: &Kernel,
+    zip: &mut ZipArchive<File>,
+    budget: &mut transfer::Budget,
+    prefix: &str,
+) -> Result<HashMap<String, String>> {
     let mut out: HashMap<String, String> = HashMap::new();
-    for u in rows(zip, &format!("{prefix}core/users.json"))? {
+    for u in rows(zip, budget, &format!("{prefix}core/users.json"))? {
         let name = if text(&u, "display_name").trim().is_empty() {
             text(&u, "username")
         } else {
@@ -194,7 +202,7 @@ pub async fn items(
 ) -> Result<ItemList> {
     let mut o = open(k, admin, backup_id, slug).await?;
     let tenant = o.manifest.tenant.id;
-    let names = names(k, &mut o.zip, &o.prefix).await?;
+    let names = names(k, &mut o.zip, &mut o.budget, &o.prefix).await?;
     let present = live_ids(k, tenant, false).await?;
     let trashed = live_ids(k, tenant, true).await?;
     let mut found: Vec<BackupItem> = o
@@ -408,26 +416,28 @@ pub async fn restore(
         if !cols.iter().any(|(c, _)| c == "resource_id") {
             continue;
         }
-        let rows: Vec<Value> = rows(&mut o.zip, &format!("{}plugins/{plugin}/{logical}.json", o.prefix))?
-            .into_iter()
-            .filter(|r| set.contains(text(r, "resource_id")))
-            .collect();
+        let rows: Vec<Value> =
+            rows(&mut o.zip, &mut o.budget, &format!("{}plugins/{plugin}/{logical}.json", o.prefix))?
+                .into_iter()
+                .filter(|r| set.contains(text(r, "resource_id")))
+                .collect();
         if !rows.is_empty() {
             plugin_rows.push((physical, rows));
         }
     }
-    let ext_values: Vec<Value> = rows(&mut o.zip, &format!("{}core/extension_values.json", o.prefix))?
-        .into_iter()
-        .filter(|r| set.contains(text(r, "resource_id")) && installed.contains(text(r, "extension_id")))
-        .map(|mut r| {
-            if !users.contains(text(&r, "updated_by")) {
-                r["updated_by"] = Value::Null;
-            }
-            r
-        })
-        .collect();
+    let ext_values: Vec<Value> =
+        rows(&mut o.zip, &mut o.budget, &format!("{}core/extension_values.json", o.prefix))?
+            .into_iter()
+            .filter(|r| set.contains(text(r, "resource_id")) && installed.contains(text(r, "extension_id")))
+            .map(|mut r| {
+                if !users.contains(text(&r, "updated_by")) {
+                    r["updated_by"] = Value::Null;
+                }
+                r
+            })
+            .collect();
     let grants: Vec<Value> = if opts.shares {
-        rows(&mut o.zip, &format!("{}core/grants.json", o.prefix))?
+        rows(&mut o.zip, &mut o.budget, &format!("{}core/grants.json", o.prefix))?
             .into_iter()
             .filter(|r| set.contains(text(r, "resource_id")))
             .filter(|r| match text(r, "principal_type") {
@@ -497,7 +507,7 @@ pub async fn restore(
             format!("blobs/{tenant}/{old}/")
         };
         let dest = k.blobs.root().join(tenant.to_string()).join(new);
-        files += transfer::extract(&mut o.zip, &from, &dest)?;
+        files += transfer::extract(&mut o.zip, &from, &dest, &mut o.budget)?;
     }
 
     let owner: Option<Uuid> = mosaikit_db::query_scalar("select owner_id from core.resources where id = $1")

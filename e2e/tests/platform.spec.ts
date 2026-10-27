@@ -431,6 +431,8 @@ test.describe.serial('platform', () => {
     const frameEl = page.locator('iframe.plugin-frame')
     const uiPrefix = `${PLUGIN_ORIGIN}${BASE}/ui/`
     await expect(frameEl).toHaveAttribute('src', new RegExp(`^${uiPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`))
+    // the element gets its src before the frame navigates: wait for the frame itself
+    await expect.poll(() => page.frames().some((f) => f.url().startsWith(uiPrefix))).toBe(true)
     const frame = page.frames().find((f) => f.url().startsWith(uiPrefix))!
     // a different origin: no session cookie, no DOM of the parent
     expect(await frame.evaluate(() => document.cookie)).not.toContain('msk_session')

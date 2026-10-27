@@ -50,7 +50,7 @@ impl Package {
             if f.is_dir() {
                 continue;
             }
-            let name = f.name().to_string();
+            let name = f.name().map_err(|e| bad(format!("zip: {e}")))?.into_owned();
             if !is_safe_path(&name) {
                 return Err(bad(format!("unsafe path: {name}")));
             }
@@ -273,7 +273,7 @@ label = "Demo"
         let mut replaced = false;
         for i in 0..zip.len() {
             let mut f = zip.by_index(i).unwrap();
-            let fname = f.name().to_string();
+            let fname = f.name().unwrap().into_owned();
             let mut buf = Vec::new();
             f.read_to_end(&mut buf).unwrap();
             if fname == name {

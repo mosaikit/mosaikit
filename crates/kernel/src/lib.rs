@@ -31,6 +31,7 @@ pub mod plugins;
 pub mod quotas;
 pub mod search;
 pub mod secret;
+pub mod svg;
 pub mod tenancy;
 pub mod testing;
 pub mod totp;

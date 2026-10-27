@@ -52,7 +52,7 @@ fn mime(path: &str) -> String {
 fn plugin_csp(s: &AppState, p: &mosaikit_kernel::plugins::LoadedPlugin) -> String {
     let net = p.manifest.permissions.network.join(" ");
     let frames = p.manifest.permissions.frame_src.join(" ");
-    let own = format!("{}/ui/{}/", s.k.cfg.plugin_url.trim_end_matches('/'), p.id);
+    let own = format!("{}/ui/{}/", s.k.cfg.plugin_url_for(&p.id).trim_end_matches('/'), p.id);
     format!(
         "default-src 'self'; script-src {own}; style-src 'self' 'unsafe-inline'; \
          img-src 'self' data: blob: {net} {frames}; font-src 'self' data:; media-src 'self' data: blob:; \
@@ -294,7 +294,7 @@ async fn public_path(
                 let nonce = hex::encode(rand::random::<[u8; 16]>());
                 let src = format!(
                     "{}/ui/{}/{}?mode=public&host={}",
-                    s.k.cfg.plugin_url,
+                    s.k.cfg.plugin_url_for(&p.id),
                     p.id,
                     view,
                     urlenc(&s.k.cfg.public_origin())
@@ -302,10 +302,10 @@ async fn public_path(
                 let csp = format!(
                     "default-src 'none'; script-src 'nonce-{nonce}'; style-src 'unsafe-inline'; connect-src 'self'; \
                      frame-src {}; frame-ancestors 'none'; base-uri 'none'",
-                    s.k.cfg.plugin_origin()
+                    s.k.cfg.plugin_origin_for(&p.id)
                 );
                 return html(
-                    pages::viewer(&r.title, &src, &s.k.cfg.plugin_origin(), &nonce),
+                    pages::viewer(&r.title, &src, &s.k.cfg.plugin_origin_for(&p.id), &nonce),
                     &embeddable(&csp, &fa),
                 );
             }
@@ -433,6 +433,17 @@ async fn public_child_folder(
     }
 }
 
+/// The values of a record without its hidden fields.
+fn public_fields<'a>(values: &Value, hidden: impl Iterator<Item = &'a str>) -> Value {
+    let mut v = values.clone();
+    if let Some(o) = v.as_object_mut() {
+        for k in hidden {
+            o.remove(k);
+        }
+    }
+    v
+}
+
 async fn public_api(State(s): State<AppState>, Path(token): Path<String>, headers: HeaderMap) -> Response {
     let r = match open(&s, &token, &headers).await {
         Ok(r) => r,
@@ -441,9 +452,12 @@ async fn public_api(State(s): State<AppState>, Path(token): Path<String>, header
     let Ok(p) = s.k.plugins.active(&r.plugin_id) else {
         return (StatusCode::NOT_FOUND, Json(json!({ "error": "plugin not active" }))).into_response();
     };
-    let values = if p.manifest.resource(&r.kind).is_some() {
+    let values = if let Some(decl) = p.manifest.resource(&r.kind) {
         match crud::get_ctx(&s.k, &r.ctx(), &p, &r.kind, r.resource).await {
-            Ok(row) => row["values"].clone(),
+            // a public link never shows the fields the plugin keeps hidden
+            Ok(row) => {
+                public_fields(&row["values"], decl.fields.iter().filter(|f| f.hidden).map(|f| f.key.as_str()))
+            }
             Err(e) if e.kind == Kind::NotFound => Value::Null,
             Err(e) => return (StatusCode::BAD_REQUEST, Json(json!({ "error": e.message }))).into_response(),
         }
@@ -502,4 +516,17 @@ fn with_ancestors(mut res: Response, ancestors: &str) -> Response {
         set(&mut res, header::CONTENT_SECURITY_POLICY, &embeddable(&csp, ancestors));
     }
     res
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    #[test]
+    fn public_links_leave_hidden_fields_out() {
+        let values = json!({ "title": "Plan", "notes": "visible", "history": "[secret]" });
+        let out = super::public_fields(&values, ["history"].into_iter());
+        assert_eq!(out, json!({ "title": "Plan", "notes": "visible" }));
+        assert_eq!(super::public_fields(&json!(null), ["history"].into_iter()), json!(null));
+    }
 }

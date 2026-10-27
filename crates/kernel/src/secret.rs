@@ -67,16 +67,51 @@ fn read_or_create(path: &Path) -> Result<String> {
     }
     let key: [u8; 32] = rand::random();
     let text = base64::engine::general_purpose::STANDARD.encode(key);
-    if let Some(dir) = path.parent() {
-        std::fs::create_dir_all(dir)?;
+    let dir = path.parent().unwrap_or(Path::new("."));
+    std::fs::create_dir_all(dir)?;
+    // written to a temporary file that only the owner can read from the start, then linked under its
+    // name in one step: never readable by others, never half written, and of two starts at the same
+    // time the first one wins (the other reads its key)
+    let tmp = dir.join(format!(".{KEY_FILE}.{}.tmp", std::process::id()));
+    write_private(&tmp, text.as_bytes())?;
+    let linked = std::fs::hard_link(&tmp, path);
+    let _ = std::fs::remove_file(&tmp);
+    match linked {
+        Ok(()) => Ok(text),
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => Ok(std::fs::read_to_string(path)?),
+        Err(e) => Err(e.into()),
     }
-    std::fs::write(path, &text)?;
+}
+
+/// A new file readable and writable by its owner only: mode `0600` on Unix; on Windows the inherited
+/// permissions are removed and only the owner and the system keep access (`icacls`).
+fn write_private(path: &Path, data: &[u8]) -> Result<()> {
+    use std::io::Write;
+    let mut opts = std::fs::OpenOptions::new();
+    opts.write(true).create_new(true);
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
-        let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o600));
+        use std::os::unix::fs::OpenOptionsExt;
+        opts.mode(0o600);
     }
-    Ok(text)
+    let mut f = opts.open(path)?;
+    #[cfg(windows)]
+    {
+        // S-1-3-4: OWNER RIGHTS, S-1-5-18: SYSTEM
+        let ok = std::process::Command::new("icacls")
+            .arg(path)
+            .args(["/inheritance:r", "/grant:r", "*S-1-3-4:F", "*S-1-5-18:F"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .is_ok_and(|s| s.success());
+        if !ok {
+            tracing::warn!("{}: the permissions could not be restricted (icacls)", path.display());
+        }
+    }
+    f.write_all(data)?;
+    f.sync_all()?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -103,5 +138,27 @@ mod tests {
         let a = read_or_create(&p).unwrap();
         assert_eq!(read_or_create(&p).unwrap(), a);
         assert_eq!(base64::engine::general_purpose::STANDARD.decode(a.trim()).unwrap().len(), 32);
+        // no temporary file left behind
+        let names: Vec<_> = std::fs::read_dir(dir.path()).unwrap().map(|e| e.unwrap().file_name()).collect();
+        assert_eq!(names, vec![std::ffi::OsString::from(KEY_FILE)]);
+    }
+
+    #[test]
+    fn key_file_private_from_the_start() {
+        let dir = tempfile::tempdir().unwrap();
+        let p = dir.path().join(KEY_FILE);
+        read_or_create(&p).unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            assert_eq!(std::fs::metadata(&p).unwrap().permissions().mode() & 0o777, 0o600);
+        }
+        #[cfg(windows)]
+        {
+            // no permission inherited from the folder: only the explicit owner and system entries
+            let out = std::process::Command::new("icacls").arg(&p).output().unwrap();
+            let acl = String::from_utf8_lossy(&out.stdout);
+            assert!(!acl.contains("(I)"), "{acl}");
+        }
     }
 }

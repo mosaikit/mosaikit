@@ -774,45 +774,12 @@ pub fn sniff_image(data: &[u8], icon: bool) -> Result<&'static str> {
         return Ok("image/x-icon");
     }
     if let Ok(text) = std::str::from_utf8(data) {
-        let lower = text.to_ascii_lowercase();
-        if lower.contains("<svg") {
-            check_svg(&lower)?;
+        if text.to_ascii_lowercase().contains("<svg") {
+            crate::svg::check(text)?;
             return Ok("image/svg+xml");
         }
     }
     Err(Error::bad("only SVG, PNG or WebP images").with_code("image_type"))
-}
-
-/// An SVG with scripts, event handlers, embedded documents or external references is refused (it is
-/// also served with a CSP that runs nothing).
-fn check_svg(lower: &str) -> Result<()> {
-    const BAD: &[&str] = &[
-        "<script",
-        "javascript:",
-        "<foreignobject",
-        "<iframe",
-        "<embed",
-        "<object",
-        "<!entity",
-        "href=\"http",
-        "href='http",
-        "url(http",
-    ];
-    // an attribute on...= after a blank or a slash: an event handler
-    let bytes = lower.as_bytes();
-    let handler = lower.match_indices("on").any(|(i, _)| {
-        let before = i.checked_sub(1).map(|j| bytes[j]);
-        if !before.is_some_and(|b| b.is_ascii_whitespace() || b == b'/') {
-            return false;
-        }
-        let rest = &lower[i + 2..];
-        let name = rest.bytes().take_while(u8::is_ascii_alphabetic).count();
-        name > 0 && rest[name..].trim_start().starts_with('=')
-    });
-    if handler || BAD.iter().any(|b| lower.contains(b)) {
-        return Err(Error::bad("SVG with scripts or external references").with_code("image_unsafe"));
-    }
-    Ok(())
 }
 
 fn image_path(k: &Kernel, tenant: Option<Uuid>, key: &str) -> std::path::PathBuf {

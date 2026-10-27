@@ -44,6 +44,8 @@ pub struct ActionView {
 /// A tab of an extension in the detail of an item: the host opens `page` of the UI of the extension.
 #[derive(Debug, Clone, Serialize)]
 pub struct TabView {
+    /// where the UI of the extension is served (its own host with a wildcard `plugin_url`)
+    pub ui_url: String,
     pub key: String,
     pub label: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -90,6 +92,7 @@ pub async fn for_resource(
                 .iter()
                 .filter(|t| t.resource == resource)
                 .map(|t| TabView {
+                    ui_url: k.cfg.plugin_url_for(&e.id),
                     key: t.key.clone(),
                     label: t.label.clone(),
                     icon: t.icon.clone(),
@@ -227,6 +230,18 @@ async fn editable(
     }
     if lv < 2 {
         return Err(Error::forbidden("the write permission is required"));
+    }
+    // only an item of the extended plugin and of that resource: an extension never writes its values
+    // on the items of another plugin, even ones the person may edit
+    let of =
+        mosaikit_db::query("select plugin_id, kind from core.resources where id = $1 and tenant_id = $2")
+            .bind(id)
+            .bind(c.tenant.tenant_id)
+            .fetch_optional(&k.db)
+            .await?
+            .map(|r| (r.get::<String, _>(0), r.get::<String, _>(1)));
+    if of.as_ref().is_none_or(|(p, kind)| p != base || kind != resource) {
+        return Err(Error::not_found("record not found"));
     }
     let d = decl_of(&e, resource)?;
     let current = stored(k, id, ext).await?.unwrap_or_default();

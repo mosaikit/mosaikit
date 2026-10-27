@@ -118,6 +118,22 @@ async fn measure(
 }
 
 /// Public links and contents are closed during maintenance.
+/// With a wildcard `plugin_url` every plugin UI has a host of its own: the UI of a plugin is served
+/// only on its host, contents and public links only on the public host. A page of one plugin then
+/// cannot frame and script the UI of another one, nor read its storage (same-origin policy).
+async fn host_gate(
+    axum::extract::State(s): axum::extract::State<AppState>,
+    req: axum::extract::Request,
+    next: axum::middleware::Next,
+) -> Response {
+    let host = req.headers().get(header::HOST).and_then(|h| h.to_str().ok());
+    let plugin = req.uri().path().strip_prefix("/ui/").and_then(|r| r.split('/').next());
+    if !s.k.cfg.untrusted_host_ok(host, plugin) {
+        return (StatusCode::NOT_FOUND, "not found").into_response();
+    }
+    next.run(req).await
+}
+
 async fn maintenance_gate(
     axum::extract::State(s): axum::extract::State<AppState>,
     req: axum::extract::Request,
@@ -162,6 +178,7 @@ pub fn untrusted_router(k: Arc<Kernel>) -> Router {
     let r = untrusted::router()
         .layer(axum::middleware::from_fn_with_state(state.clone(), request_info))
         .layer(axum::middleware::from_fn_with_state(state.clone(), maintenance_gate))
+        .layer(axum::middleware::from_fn_with_state(state.clone(), host_gate))
         .layer(axum::middleware::from_fn_with_state(state.clone(), measure));
     under_base(&base, r.with_state(state)).layer(axum::middleware::from_fn(common_headers))
 }

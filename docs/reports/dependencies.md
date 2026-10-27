@@ -73,3 +73,9 @@ npm: everything at the latest major; only patch releases of `i18next` (26.5.6) a
 | Sign-in of the first-start account (`locale` / `utente`) | `200` |
 
 The process was stopped and the release output deleted afterwards (`dist/` is not tracked).
+
+## Follow-up (2026-10-23)
+
+`zip` is now 9.0.5: the reading code was adapted (`ZipFile::name()` and `ZipArchive::file_names()` return
+a `Result`; an entry whose name cannot be decoded refuses the archive). RUSTSEC-2026-0367, -0368 and
+-0369 no longer apply and their exceptions are removed. `cargo deny check` and `cargo audit` are clean.

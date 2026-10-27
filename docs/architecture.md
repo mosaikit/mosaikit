@@ -1192,6 +1192,30 @@ are limited to the path.
   of the platform's (`frame-ancestors <sites>`, otherwise `'none'`).
 - In production the two origins are two hostnames behind the reverse proxy
   (e.g. `app.example.com` and `plugins.example.com`), with HTTPS.
+- **One origin per plugin (optional)**: with a wildcard host, `plugin_url =
+  "https://*.plugins.example.org"`, every plugin UI has a host of its own,
+  `<plugin>.plugins.example.org` (its id with `.` as `-`, e.g. `com-mosaikit-notes`), and the contents
+  and public links are on `public.plugins.example.org`. The untrusted listener serves the UI of a
+  plugin only on its host and contents and links only on the public one (404 otherwise, by the `Host`
+  header); the CSP of a plugin UI allows scripts only from its own folder on its own host, the host
+  frames each plugin from the address the server gives (`ui_url` of the plugin views), and the bridge
+  checks that exact origin. A malicious or broken plugin then cannot frame and script the UI of another
+  plugin nor read its storage. It needs a wildcard DNS record and a wildcard certificate (Docker and
+  Kubernetes notes in `deploy/`); the reverse proxy must keep the `Host` header. In development
+  `http://*.localhost:<port>` works without DNS (browsers resolve `*.localhost` to the computer);
+  `MOSAIKIT_E2E_WILDCARD=1 cargo xtask e2e` runs `e2e/tests/wildcard.spec.ts` that way.
+- **SVG images** (logos, browser icon) pass an allow-list check (`kernel::svg`: drawing elements and
+  attributes only, references inside the document only, no DTD) and are served with
+  `default-src 'none'; sandbox`.
+- **Archives an Administrator imports or restores** (exports of tenants, backups) are read within the
+  limits of `[archives]` (unpacked bytes, entries, one table read into memory), counted as the entries
+  inflate, not as the zip declares (`archive_too_big`).
+- **Paths inside packages and archives** refuse, on every platform, `..`, absolute paths, control
+  characters and the names Windows reserves (`CON`, `NUL`, `COM1`, `LPT1`… with any extension, names
+  ending with a dot or a space).
+- **`secret.key`** is created readable by its owner only from the start (mode `0600` on Unix; on Windows
+  the inherited permissions are removed and only the owner and the system keep access) and appears
+  under its name in one step.
 - **Social preview**: the server writes `og:image`, `twitter:image` and `og:url` of the page as
   absolute URLs from the public address of the app (`url`); with the Vite development server they
   stay relative.
@@ -1481,10 +1505,8 @@ Mosaikit refers to no distribution.
 
 ## 15. Known limits and next steps
 
-- **OIDC**: the ID token is not kept, so the end-session request carries `client_id` instead of
-  `id_token_hint`.
-- **Subdomains per plugin**: all the plugin UIs share the untrusted
-  origin; a subdomain per plugin would also isolate the plugins from each other.
+- **Subdomains per plugin** are optional (a wildcard `plugin_url`, §9): with a single `plugin_url` all
+  the plugin UIs share the untrusted origin.
 - **S3 storage** for the blobs: today the filesystem only.
 - **Signing of the packages with a production key**: the release uses the key
   given in `MOSAIKIT_SIGNING_KEY` / `MOSAIKIT_SIGNING_KEY_FILE`; in development

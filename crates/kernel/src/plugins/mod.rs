@@ -192,22 +192,24 @@ pub struct PluginView {
     pub label: String,
     pub description: String,
     pub has_ui: bool,
+    /// where the UI of the plugin is served: `plugin_url`, or its own host with a wildcard
+    pub ui_url: String,
     pub dev: bool,
     pub permissions: mosaikit_mskp::Permissions,
     pub resources: Vec<mosaikit_mskp::ResourceDecl>,
 }
 
 impl PluginView {
-    pub fn of(p: &LoadedPlugin) -> PluginView {
-        PluginView::with(p, &p.manifest)
+    pub fn of(cfg: &crate::Config, p: &LoadedPlugin) -> PluginView {
+        PluginView::with(cfg, p, &p.manifest)
     }
 
     /// With the texts of the manifest in `lang` (`it`, `it-IT`...), English where it has none.
-    pub fn localized(p: &LoadedPlugin, lang: &str) -> PluginView {
-        PluginView::with(p, &p.manifest.localized(lang))
+    pub fn localized(cfg: &crate::Config, p: &LoadedPlugin, lang: &str) -> PluginView {
+        PluginView::with(cfg, p, &p.manifest.localized(lang))
     }
 
-    fn with(p: &LoadedPlugin, m: &mosaikit_mskp::Manifest) -> PluginView {
+    fn with(cfg: &crate::Config, p: &LoadedPlugin, m: &mosaikit_mskp::Manifest) -> PluginView {
         PluginView {
             id: p.id.clone(),
             name: m.name.clone(),
@@ -219,6 +221,7 @@ impl PluginView {
             label: m.contribution.label.clone(),
             description: m.description.clone(),
             has_ui: p.ui_dir.is_some() && m.ui.is_some(),
+            ui_url: cfg.plugin_url_for(&p.id),
             dev: p.dev,
             permissions: m.permissions.clone(),
             resources: m.resources.clone(),
@@ -255,7 +258,12 @@ pub fn active_views(k: &Kernel) -> Vec<PluginView> {
 
 /// The active plugins, with their texts in `lang`.
 pub fn active_views_in(k: &Kernel, lang: &str) -> Vec<PluginView> {
-    k.plugins.list().iter().filter(|p| p.is_active()).map(|p| PluginView::localized(p, lang)).collect()
+    k.plugins
+        .list()
+        .iter()
+        .filter(|p| p.is_active())
+        .map(|p| PluginView::localized(&k.cfg, p, lang))
+        .collect()
 }
 
 pub fn admin_views(k: &Kernel, admin: &SessionUser) -> Result<Vec<PluginAdminView>> {
@@ -269,7 +277,7 @@ pub fn admin_views_in(k: &Kernel, admin: &SessionUser, lang: &str) -> Result<Vec
         .list()
         .iter()
         .map(|p| PluginAdminView {
-            view: PluginView::localized(p, lang),
+            view: PluginView::localized(&k.cfg, p, lang),
             status: p.status,
             sha256: p.sha256.clone(),
             signed_by: p.signed_by.clone(),

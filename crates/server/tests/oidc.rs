@@ -329,7 +329,17 @@ async fn back_channel_logout_and_end_session() {
     // sign-out from Mosaikit: the browser goes to the end-session endpoint of the provider
     let out = a.call(Some(&anna2), Method::POST, "/api/auth/logout", None).await;
     let to = out.json()["end_session"].as_str().unwrap_or_default().to_string();
-    assert!(to.starts_with(&format!("{}/logout?client_id=mosaikit", a.idp.issuer)), "{to}");
+    assert!(to.starts_with(&format!("{}/logout?id_token_hint=", a.idp.issuer)), "{to}");
+    assert!(to.contains("&client_id=mosaikit&post_logout_redirect_uri="), "{to}");
+    // the hint is the ID token of that sign-in (a JWT of the provider), gone with the session
+    let hint = url::Url::parse(&to)
+        .unwrap()
+        .query_pairs()
+        .find(|(k, _)| k == "id_token_hint")
+        .unwrap()
+        .1
+        .into_owned();
+    assert_eq!(hint.split('.').count(), 3, "{hint}");
 
     // the person (sub): all its sessions close
     let anna3 = a.session_of(&a.sign_in("eps", "anna.rossi").await).await;

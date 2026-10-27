@@ -409,11 +409,29 @@ pub async fn reset_info(k: &Kernel, token: &str) -> Result<ResetInfo> {
 pub async fn reset_with_link(k: &Kernel, token: &str, password: &str) -> Result<()> {
     let (user, _, home, _) = reset_row(k, token).await?;
     check_password_len(password, password_min(k, Some(home)).await?)?;
-    crate::identity::set_password(k, user, password).await?;
-    mosaikit_db::query("update core.password_resets set used_at = now() where token_hash = $1")
-        .bind(sha256(token.as_bytes()))
-        .execute(&k.db)
-        .await?;
+    // the link is used up in one statement: of two requests at the same instant only one wins
+    let hash = sha256(token.as_bytes());
+    let won = mosaikit_db::query(
+        "update core.password_resets set used_at = now()
+         where token_hash = $1 and used_at is null and expires_at > now()",
+    )
+    .bind(hash.clone())
+    .execute(&k.db)
+    .await?
+    .rows_affected();
+    if won != 1 {
+        return Err(
+            Error::not_found("the link is not valid any more: ask for a new one").with_code("reset_expired")
+        );
+    }
+    if let Err(e) = crate::identity::set_password(k, user, password).await {
+        // the password was refused: the link stays usable
+        mosaikit_db::query("update core.password_resets set used_at = null where token_hash = $1")
+            .bind(hash)
+            .execute(&k.db)
+            .await?;
+        return Err(e);
+    }
     mosaikit_db::query("delete from core.sessions where user_id = $1").bind(user).execute(&k.db).await?;
     events::record(k, Some(home), Some(user), None, None, "person.reset_password", json!({})).await;
     Ok(())

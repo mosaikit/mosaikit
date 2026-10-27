@@ -815,7 +815,8 @@ pub async fn finish(
     verify_signature(k, &s.issuer, &d).await?;
     let id = check_id_claims(&d.claims, &s.issuer, &s.client_id, &flow.nonce, now)?;
     let user = person(k, tenant, &s, &id).await?;
-    let lr = identity::external_session(k, user, ip, flow.remember, id.sid.as_deref()).await?;
+    let lr =
+        identity::external_session(k, user, ip, flow.remember, id.sid.as_deref(), Some(&id_token)).await?;
     events::record(k, Some(tenant), Some(user), None, None, "login.oidc", json!({ "ip": ip })).await;
     Ok(lr)
 }
@@ -1186,9 +1187,15 @@ pub async fn end_session_url(k: &Kernel, user: &SessionUser) -> Option<String> {
     let (issuer, client_id): (String, String) = (row.get(0), row.get(1));
     let (doc, _) = provider(k, &issuer).await.ok()?;
     let mut u = check_url("end-session endpoint", doc.end_session_endpoint.as_deref()?).ok()?;
-    u.query_pairs_mut()
-        .append_pair("client_id", &client_id)
-        .append_pair("post_logout_redirect_uri", &format!("{}/", k.cfg.app_url));
+    let hint = identity::session_id_token(k, user).await;
+    {
+        let mut q = u.query_pairs_mut();
+        if let Some(h) = &hint {
+            q.append_pair("id_token_hint", h);
+        }
+        q.append_pair("client_id", &client_id)
+            .append_pair("post_logout_redirect_uri", &format!("{}/", k.cfg.app_url));
+    }
     Some(u.to_string())
 }
 

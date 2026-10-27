@@ -93,6 +93,12 @@ impl App {
         send(&self.untrusted, b.body(Body::empty()).unwrap()).await
     }
 
+    /// A request to the address of the plugins with the `Host` the browser would send.
+    async fn get_untrusted_on(&self, host: &str, path: &str) -> Res {
+        let req = Request::builder().uri(path).header(header::HOST, host).body(Body::empty()).unwrap();
+        send(&self.untrusted, req).await
+    }
+
     async fn login(&self, tenant: &str, user: &str, password: &str) -> Session {
         let r = self
             .call(
@@ -2005,4 +2011,61 @@ async fn one_item_from_a_backup_over_http() {
     assert_eq!(r.json()["mode"], "copy", "{}", r.text());
     // only the Administrators
     assert_eq!(a.call(Some(&anna), Method::GET, &path, None).await.status, StatusCode::FORBIDDEN);
+}
+
+#[tokio::test]
+async fn one_origin_per_plugin_with_a_wildcard_plugin_url() {
+    let a = App::with(
+        start_with(|c| {
+            c.url = "http://127.0.0.1:9300".into();
+            c.plugin_url_setting = Some("http://*.localhost:9301".into());
+        })
+        .await,
+    );
+    assert!(a.t.cfg.plugin_wildcard);
+    a.t.install("notes").await;
+    a.t.install("tasks").await;
+    a.t.tenant("alfa").await;
+    let g = a.login("alfa", "alfa-manager", PASSWORD).await;
+    // the shell may frame any plugin host, and learns the address of each plugin from the server
+    let csp = a.call(None, Method::GET, "/", None).await.header(header::CONTENT_SECURITY_POLICY);
+    assert!(csp.contains("frame-src http://*.localhost:9301 http://public.localhost:9301"), "{csp}");
+    let ctx = a.call(Some(&g), Method::GET, "/api/t/alfa/context", None).await.json();
+    let notes = ctx["plugins"].as_array().unwrap().iter().find(|p| p["id"] == "com.mosaikit.notes").unwrap();
+    assert_eq!(notes["ui_url"], "http://com-mosaikit-notes.localhost:9301");
+
+    // the UI of a plugin only on its own host, its scripts only from there
+    let ui = "/ui/com.mosaikit.notes/";
+    let r = a.get_untrusted_on("com-mosaikit-notes.localhost:9301", ui).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let csp = r.header(header::CONTENT_SECURITY_POLICY);
+    assert!(
+        csp.contains("script-src http://com-mosaikit-notes.localhost:9301/ui/com.mosaikit.notes/;"),
+        "{csp}"
+    );
+    for other in ["com-mosaikit-tasks.localhost:9301", "public.localhost:9301", "localhost:9301"] {
+        assert_eq!(a.get_untrusted_on(other, ui).await.status, StatusCode::NOT_FOUND, "{other}");
+    }
+    assert_eq!(a.get_untrusted(ui, None).await.status, StatusCode::NOT_FOUND, "no Host");
+
+    // contents and public links only on the public host
+    let n = a
+        .call(
+            Some(&g),
+            Method::POST,
+            "/api/t/alfa/p/com.mosaikit.notes/r/notes",
+            Some(json!({ "values": { "title": "Open" } })),
+        )
+        .await;
+    let rid = n.json()["id"].as_str().unwrap().to_string();
+    let l =
+        a.call(Some(&g), Method::POST, &format!("/api/t/alfa/resources/{rid}/links"), Some(json!({}))).await;
+    let url = l.json()["url"].as_str().unwrap().to_string();
+    assert!(url.starts_with("http://public.localhost:9301/p/"), "{url}");
+    let path = url.trim_start_matches("http://public.localhost:9301").to_string();
+    assert_eq!(a.get_untrusted_on("public.localhost:9301", &path).await.status, StatusCode::OK);
+    assert_eq!(
+        a.get_untrusted_on("com-mosaikit-notes.localhost:9301", &path).await.status,
+        StatusCode::NOT_FOUND
+    );
 }

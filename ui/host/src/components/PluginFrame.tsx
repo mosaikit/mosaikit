@@ -52,9 +52,11 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
   const [loaded, setLoaded] = useState(false)
   // the tabs of extensions open in the detail of an item of this plugin (drawn by the host, see ExtensionTab)
   const [tabs, setTabs] = useState<TabState[]>([])
-  const origin = session.plugin_origin
+  // with a wildcard plugin_url every plugin UI has a host (an origin) of its own: the server says which
+  const base = plugin.ui_url ?? session.plugin_url ?? session.plugin_origin
+  const origin = new URL(base).origin
   const tenant = ctx.tenant.slug
-  const src = `${session.plugin_url ?? origin}/ui/${encodeURIComponent(plugin.id)}/?host=${encodeURIComponent(window.location.origin)}&v=${reloadKey}`
+  const src = `${base}/ui/${encodeURIComponent(plugin.id)}/?host=${encodeURIComponent(window.location.origin)}&v=${reloadKey}`
 
   useEffect(() => {
     setLoaded(false)
@@ -128,7 +130,7 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
             const item = uuid(a.id)
             const list = (await execute(routeOp(tenant, plugin.id, 'ext.list', { resource }))) as {
               id: string
-              tabs?: { key: string; label: string; page: string }[]
+              tabs?: { key: string; label: string; page: string; ui_url?: string }[]
             }[]
             const decl = list.find((e) => e.id === ext)?.tabs?.find((x) => x.key === key)
             if (!decl) throw new OpError('this tab is not available')
@@ -139,6 +141,7 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
               key,
               label: decl.label,
               page: safePage(decl.page),
+              ui_url: decl.ui_url,
               base: plugin.id,
               resource,
               item,

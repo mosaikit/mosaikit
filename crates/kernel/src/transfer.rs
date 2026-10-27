@@ -475,20 +475,84 @@ fn prune_exports(k: &Kernel) {
     }
 }
 
-pub(crate) fn read_json<R: Read + Seek>(zip: &mut ZipArchive<R>, name: &str) -> Result<Option<Value>> {
+/// What is left of the limits of an archive while it is read (`[archives]` of the configuration).
+/// The sizes a zip declares can lie: the bytes are counted as they are unpacked.
+pub struct Budget {
+    bytes: u64,
+    entries: u64,
+    json: u64,
+}
+
+impl Budget {
+    pub fn new(l: &crate::config::ArchiveLimits) -> Budget {
+        Budget {
+            bytes: l.max_unpacked_mb.saturating_mul(1 << 20),
+            entries: l.max_entries,
+            json: l.max_json_mb.saturating_mul(1 << 20),
+        }
+    }
+
+    /// A small budget for the manifests (a few KB each).
+    fn manifest() -> Budget {
+        Budget { bytes: 1 << 20, entries: 1, json: 1 << 20 }
+    }
+
+    fn too_big() -> Error {
+        Error::bad("the archive unpacks to more than the limits of the installation ([archives])")
+            .with_code("archive_too_big")
+    }
+
+    /// Checks what the archive declares under `prefix` before reading anything.
+    pub fn check<R: Read + Seek>(&self, zip: &mut ZipArchive<R>, prefix: &str) -> Result<()> {
+        let (mut n, mut bytes) = (0u64, 0u64);
+        for i in 0..zip.len() {
+            let f = zip.by_index_raw(i).map_err(|e| Error::bad(format!("invalid archive: {e}")))?;
+            if f.name().map_err(|e| Error::bad(format!("invalid archive: {e}")))?.starts_with(prefix) {
+                n += 1;
+                bytes = bytes.saturating_add(f.size());
+            }
+        }
+        if n > self.entries || bytes > self.bytes {
+            return Err(Budget::too_big());
+        }
+        Ok(())
+    }
+
+    /// Copies an entry, counting its real bytes against the budget (at most `cap` for this entry).
+    fn copy(&mut self, from: &mut impl Read, to: &mut impl std::io::Write, cap: u64) -> Result<u64> {
+        if self.entries == 0 {
+            return Err(Budget::too_big());
+        }
+        self.entries -= 1;
+        let limit = cap.min(self.bytes);
+        let n = std::io::copy(&mut from.take(limit.saturating_add(1)), to)?;
+        if n > limit {
+            return Err(Budget::too_big());
+        }
+        self.bytes -= n;
+        Ok(n)
+    }
+}
+
+pub(crate) fn read_json<R: Read + Seek>(
+    zip: &mut ZipArchive<R>,
+    name: &str,
+    budget: &mut Budget,
+) -> Result<Option<Value>> {
     let mut f = match zip.by_name(name) {
         Ok(f) => f,
         Err(zip::result::ZipError::FileNotFound) => return Ok(None),
         Err(e) => return Err(Error::bad(format!("invalid archive: {e}"))),
     };
     let mut buf = Vec::new();
-    f.read_to_end(&mut buf)?;
+    let cap = budget.json;
+    budget.copy(&mut f, &mut buf, cap)?;
     Ok(Some(serde_json::from_slice(&buf).map_err(|e| Error::bad(format!("invalid archive: {e}")))?))
 }
 
 /// The manifest of an export inside an archive.
 pub fn read_manifest<R: Read + Seek>(zip: &mut ZipArchive<R>, prefix: &str) -> Result<Manifest> {
-    let v = read_json(zip, &format!("{prefix}manifest.json"))?.ok_or_else(|| {
+    let v = read_json(zip, &format!("{prefix}manifest.json"), &mut Budget::manifest())?.ok_or_else(|| {
         Error::bad("not an export of a tenant: manifest.json missing").with_code("export_invalid")
     })?;
     let m: Manifest = serde_json::from_value(v)
@@ -499,12 +563,18 @@ pub fn read_manifest<R: Read + Seek>(zip: &mut ZipArchive<R>, prefix: &str) -> R
     Ok(m)
 }
 
+/// The names of the entries of an archive (an entry whose name cannot be decoded refuses the archive).
+pub(crate) fn entry_names<R: Read + Seek>(zip: &ZipArchive<R>) -> Result<Vec<String>> {
+    zip.file_names()
+        .map(|n| n.map(|n| n.into_owned()).map_err(|e| Error::bad(format!("invalid archive: {e}"))))
+        .collect()
+}
+
 /// Exports of tenants inside a backup: `tenants/<slug>/manifest.json`.
 pub fn tenants_in<R: Read + Seek>(zip: &mut ZipArchive<R>) -> Result<Vec<Manifest>> {
-    let names: Vec<String> = zip
-        .file_names()
+    let names: Vec<String> = entry_names(zip)?
+        .into_iter()
         .filter(|n| n.starts_with("tenants/") && n.ends_with("/manifest.json"))
-        .map(str::to_owned)
         .collect();
     let mut out = Vec::new();
     for n in names {
@@ -515,10 +585,15 @@ pub fn tenants_in<R: Read + Seek>(zip: &mut ZipArchive<R>) -> Result<Vec<Manifes
     Ok(out)
 }
 
-/// Extracts the files of a folder of the archive into `dest` (safe paths only).
-pub(crate) fn extract<R: Read + Seek>(zip: &mut ZipArchive<R>, prefix: &str, dest: &Path) -> Result<usize> {
+/// Extracts the files of a folder of the archive into `dest` (safe paths only), within the budget.
+pub(crate) fn extract<R: Read + Seek>(
+    zip: &mut ZipArchive<R>,
+    prefix: &str,
+    dest: &Path,
+    budget: &mut Budget,
+) -> Result<usize> {
     let names: Vec<String> =
-        zip.file_names().filter(|n| n.starts_with(prefix) && !n.ends_with('/')).map(str::to_owned).collect();
+        entry_names(zip)?.into_iter().filter(|n| n.starts_with(prefix) && !n.ends_with('/')).collect();
     let mut n = 0;
     for name in names {
         let rel = &name[prefix.len()..];
@@ -531,7 +606,11 @@ pub(crate) fn extract<R: Read + Seek>(zip: &mut ZipArchive<R>, prefix: &str, des
         }
         let mut f = zip.by_name(&name).map_err(|e| Error::bad(format!("archive: {e}")))?;
         let mut w = File::create(&out)?;
-        std::io::copy(&mut f, &mut w)?;
+        if let Err(e) = budget.copy(&mut f, &mut w, u64::MAX) {
+            drop(w);
+            let _ = std::fs::remove_file(&out);
+            return Err(e);
+        }
         n += 1;
     }
     Ok(n)
@@ -556,6 +635,8 @@ pub async fn import_tenant(
     let mut zip = ZipArchive::new(File::open(archive)?)
         .map_err(|e| Error::bad(format!("invalid archive: {e}")).with_code("export_invalid"))?;
     let m = read_manifest(&mut zip, prefix)?;
+    let mut budget = Budget::new(&k.cfg.archives);
+    budget.check(&mut zip, prefix)?;
     if m.backend != backend(k) {
         return Err(Error::bad(format!(
             "the export comes from {} and this installation uses {}",
@@ -595,7 +676,7 @@ pub async fn import_tenant(
     }
     let mut core: HashMap<&str, Vec<Value>> = HashMap::new();
     for (table, _) in CORE {
-        let v = read_json(&mut zip, &format!("{prefix}core/{table}.json"))?.unwrap_or(json!([]));
+        let v = read_json(&mut zip, &format!("{prefix}core/{table}.json"), &mut budget)?.unwrap_or(json!([]));
         core.insert(table, v.as_array().cloned().unwrap_or_default());
     }
     // people of this installation, so that the rows of missing people are left out
@@ -632,8 +713,8 @@ pub async fn import_tenant(
         let tables = plugin_tables(k, &mut tx, schema).await?;
         let mut pending: Vec<(String, Vec<Value>)> = Vec::new();
         for (logical, physical) in tables {
-            let v =
-                read_json(&mut zip, &format!("{prefix}plugins/{id}/{logical}.json"))?.unwrap_or(json!([]));
+            let v = read_json(&mut zip, &format!("{prefix}plugins/{id}/{logical}.json"), &mut budget)?
+                .unwrap_or(json!([]));
             let rows = v.as_array().cloned().unwrap_or_default();
             if rows.iter().any(|r| r.get("tenant_id").is_some_and(|v| !same_id(v, t))) {
                 return Err(foreign_rows(&format!("{id}/{logical}")));
@@ -651,8 +732,9 @@ pub async fn import_tenant(
     } else {
         (format!("blobs/{t}/"), format!("blobs/identity/{t}/"))
     };
-    let mut files = extract(&mut zip, &files_prefix, &k.blobs.root().join(t.to_string()))?;
-    files += extract(&mut zip, &logos_prefix, &k.blobs.root().join("identity").join(t.to_string()))?;
+    let mut files = extract(&mut zip, &files_prefix, &k.blobs.root().join(t.to_string()), &mut budget)?;
+    files +=
+        extract(&mut zip, &logos_prefix, &k.blobs.root().join("identity").join(t.to_string()), &mut budget)?;
     events::record(
         k,
         Some(t),

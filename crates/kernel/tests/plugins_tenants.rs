@@ -191,6 +191,16 @@ async fn extensions_add_fields_and_actions() {
         .await
         .unwrap_err();
     assert_eq!(e.kind, Kind::NotFound);
+    // only items of the extended plugin: not a task of Anna, although she may edit it
+    t.install("tasks").await;
+    let task = crud::create(&t, &anna, "com.mosaikit.tasks", "tasks", &obj(json!({ "title": "t" })), None)
+        .await
+        .unwrap();
+    let tid: uuid::Uuid = task["id"].as_str().unwrap().parse().unwrap();
+    let e = extensions::set_values(&t, &anna, NOTES, "notes", tid, REVIEW, &obj(json!({ "reviewer": "x" })))
+        .await
+        .unwrap_err();
+    assert_eq!(e.kind, Kind::NotFound, "an item of another plugin");
 
     // an action: the values it sets, with the name of the person
     let after = extensions::run_action(&t, &anna, NOTES, "notes", id, REVIEW, "mark_reviewed").await.unwrap();

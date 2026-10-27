@@ -452,16 +452,45 @@ pub(crate) async fn external_session(
     ip: &str,
     remember: bool,
     sid: Option<&str>,
+    id_token: Option<&str>,
 ) -> Result<LoginResult> {
     let lr = finish_session(k, user_id, ip, remember).await?;
+    let hash = sha256(lr.token.as_bytes());
     if let Some(sid) = sid.filter(|s| !s.is_empty() && s.len() <= 255) {
         mosaikit_db::query("update core.sessions set oidc_sid = $2 where token_hash = $1")
-            .bind(sha256(lr.token.as_bytes()))
+            .bind(hash.clone())
             .bind(sid)
             .execute(&k.db)
             .await?;
     }
+    // the ID token, encrypted and bound to this session, for the `id_token_hint` of the sign-out
+    if let Some(t) = id_token.filter(|t| !t.is_empty() && t.len() <= 16 * 1024) {
+        let sealed = k.secrets.seal(&id_token_aad(&hash), t.as_bytes());
+        mosaikit_db::query("update core.sessions set oidc_id_token = $2 where token_hash = $1")
+            .bind(hash)
+            .bind(sealed)
+            .execute(&k.db)
+            .await?;
+    }
     Ok(lr)
+}
+
+fn id_token_aad(token_hash: &[u8]) -> Vec<u8> {
+    let mut aad = b"session-id-token:".to_vec();
+    aad.extend_from_slice(hex::encode(token_hash).as_bytes());
+    aad
+}
+
+/// The ID token of the session of a sign-in through a provider, if any (for the sign-out).
+pub(crate) async fn session_id_token(k: &Kernel, user: &SessionUser) -> Option<String> {
+    let sealed: Option<Vec<u8>> =
+        mosaikit_db::query_scalar("select oidc_id_token from core.sessions where token_hash = $1")
+            .bind(user.token_hash.clone())
+            .fetch_optional(&k.db)
+            .await
+            .ok()??;
+    let plain = k.secrets.open(&id_token_aad(&user.token_hash), &sealed?).ok()?;
+    String::from_utf8(plain).ok()
 }
 
 /// The minimum length of passwords in use for the accounts of a tenant (`None`: the platform's).

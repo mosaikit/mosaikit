@@ -72,6 +72,9 @@ pub struct Config {
     pub database: DatabaseConfig,
     #[serde(default)]
     pub dev: DevConfig,
+    /// limits on the archives an Administrator imports or restores (exports of tenants, backups)
+    #[serde(default)]
+    pub archives: ArchiveLimits,
 
     /// no background work (queue of the emails, digest, retention): the tests run it by hand
     #[serde(skip)]
@@ -84,9 +87,13 @@ pub struct Config {
     /// URL of plugins and contents without trailing `/`
     #[serde(skip)]
     pub plugin_url: String,
-    /// URL of the public links (= plugin_url)
+    /// URL of the public links and contents (= plugin_url; with a wildcard, the host `public.…`)
     #[serde(skip)]
     pub public_url: String,
+    /// `plugin_url` has a wildcard host (`https://*.plugins.example.org`): every plugin UI has an
+    /// origin of its own (`<plugin>.plugins.example.org`), contents and public links `public.…`
+    #[serde(skip)]
+    pub plugin_wildcard: bool,
     #[serde(skip)]
     pub bind: String,
     #[serde(skip)]
@@ -145,6 +152,42 @@ pub struct DevConfig {
     /// fallback cargo `target` folder (normally the one of the plugin's workspace is used)
     #[serde(default = "d_target")]
     pub target_dir: PathBuf,
+}
+
+/// Limits on what an archive (export of a tenant, backup) may unpack when it is imported or restored:
+/// the sizes declared in a zip can lie, so they are also counted while reading.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ArchiveLimits {
+    /// total of the unpacked bytes, in MB (default 51200, 50 GB)
+    #[serde(default = "d_archive_mb")]
+    pub max_unpacked_mb: u64,
+    /// number of entries (default 1,000,000)
+    #[serde(default = "d_archive_entries")]
+    pub max_entries: u64,
+    /// one table of data (JSON) read into memory, in MB (default 1024)
+    #[serde(default = "d_archive_json_mb")]
+    pub max_json_mb: u64,
+}
+
+impl Default for ArchiveLimits {
+    fn default() -> ArchiveLimits {
+        ArchiveLimits {
+            max_unpacked_mb: d_archive_mb(),
+            max_entries: d_archive_entries(),
+            max_json_mb: d_archive_json_mb(),
+        }
+    }
+}
+
+fn d_archive_mb() -> u64 {
+    51_200
+}
+fn d_archive_entries() -> u64 {
+    1_000_000
+}
+fn d_archive_json_mb() -> u64 {
+    1024
 }
 
 impl Default for DatabaseConfig {
@@ -259,7 +302,8 @@ impl UrlParts {
     }
     /// Default listening: local only if the host is local, otherwise every interface.
     fn default_listen(&self) -> String {
-        let local = matches!(self.host.as_str(), "127.0.0.1" | "localhost" | "[::1]");
+        let local = matches!(self.host.as_str(), "127.0.0.1" | "localhost" | "[::1]")
+            || self.host.ends_with(".localhost");
         if local {
             format!("127.0.0.1:{}", self.port)
         } else {
@@ -360,7 +404,16 @@ impl Config {
         self.base_path = app.path.clone();
         self.plugin_url = plugin.to_url();
         self.plugin_base_path = plugin.path.clone();
-        self.public_url = self.plugin_url.clone();
+        self.plugin_wildcard = plugin.host.starts_with("*.");
+        let rest = plugin.host.strip_prefix("*.").unwrap_or(&plugin.host);
+        if rest.contains('*') || rest.is_empty() {
+            return Err(Error::bad("plugin_url: only one wildcard, as the first label of the host (https://*.plugins.example.org)"));
+        }
+        self.public_url = if self.plugin_wildcard {
+            self.plugin_url.replacen('*', PUBLIC_LABEL, 1)
+        } else {
+            self.plugin_url.clone()
+        };
         self.bind = self.listen.clone().unwrap_or_else(|| app.default_listen());
         self.untrusted_bind = self.plugin_listen.clone().unwrap_or_else(|| plugin.default_listen());
         if self.bind == self.untrusted_bind {
@@ -397,8 +450,40 @@ impl Config {
         self.app_url.starts_with("https://")
     }
 
+    /// The origin of the plugins as a CSP source: with a wildcard `https://*.plugins.example.org`,
+    /// which every plugin origin matches.
     pub fn plugin_origin(&self) -> String {
         origin_of(&self.plugin_url)
+    }
+
+    /// The address of the UI of one plugin (its own host with a wildcard `plugin_url`).
+    pub fn plugin_url_for(&self, plugin: &str) -> String {
+        if self.plugin_wildcard {
+            self.plugin_url.replacen('*', &plugin_label(plugin), 1)
+        } else {
+            self.plugin_url.clone()
+        }
+    }
+
+    /// The exact origin of the UI of one plugin.
+    pub fn plugin_origin_for(&self, plugin: &str) -> String {
+        origin_of(&self.plugin_url_for(plugin))
+    }
+
+    /// Whether a request to the address of the plugins came on the host it belongs to: the UI of a
+    /// plugin only on its own host, contents and public links only on the public host. Always true
+    /// without a wildcard (one origin for everything).
+    pub fn untrusted_host_ok(&self, host: Option<&str>, plugin: Option<&str>) -> bool {
+        if !self.plugin_wildcard {
+            return true;
+        }
+        let want = match plugin {
+            Some(p) => self.plugin_url_for(p),
+            None => self.public_url.clone(),
+        };
+        let want = origin_of(&want);
+        let want = want.split_once("://").map(|(_, h)| h).unwrap_or(&want);
+        host.is_some_and(|h| h.eq_ignore_ascii_case(want))
     }
 
     pub fn public_origin(&self) -> String {
@@ -415,6 +500,22 @@ fn truthy(v: &str) -> bool {
 }
 
 /// `https://host:port` of a URL.
+/// The first label of the host of the public links and contents with a wildcard `plugin_url`.
+pub const PUBLIC_LABEL: &str = "public";
+
+/// The DNS label of a plugin: its id with `.` and `_` as `-`, lower case (`com.mosaikit.notes` →
+/// `com-mosaikit-notes`); over 63 characters, shortened with a hash so that it stays unique.
+pub fn plugin_label(id: &str) -> String {
+    let label: String =
+        id.chars().map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '-' }).collect();
+    if label.len() <= 63 {
+        return label;
+    }
+    use sha2::Digest;
+    let hash = hex::encode(&sha2::Sha256::digest(id.as_bytes())[..6]);
+    format!("{}-{hash}", &label[..50])
+}
+
 pub fn origin_of(url: &str) -> String {
     let (scheme, rest) = url.split_once("://").unwrap_or(("http", url));
     let host = rest.split('/').next().unwrap_or_default();
@@ -507,5 +608,57 @@ mod tests {
         let text = include_str!("../../../mosaikit.example.toml");
         let mut c: Config = toml::from_str(text).expect("mosaikit.example.toml");
         c.derive().unwrap();
+    }
+
+    #[test]
+    fn one_origin_per_plugin_with_a_wildcard() {
+        let c = cfg(r#"
+            url = "https://apps.example.org"
+            plugin_url = "https://*.plugins.example.org"
+            listen = "0.0.0.0:8080"
+            plugin_listen = "0.0.0.0:8081"
+        "#)
+        .unwrap();
+        assert!(c.plugin_wildcard);
+        assert_eq!(c.plugin_origin(), "https://*.plugins.example.org", "a CSP source every plugin matches");
+        assert_eq!(c.plugin_url_for("com.mosaikit.notes"), "https://com-mosaikit-notes.plugins.example.org");
+        assert_eq!(
+            c.plugin_origin_for("com.example.note_review"),
+            "https://com-example-note-review.plugins.example.org"
+        );
+        assert_eq!(c.public_url, "https://public.plugins.example.org");
+        assert!(
+            c.untrusted_host_ok(Some("com-mosaikit-notes.plugins.example.org"), Some("com.mosaikit.notes"))
+        );
+        assert!(
+            !c.untrusted_host_ok(Some("com-mosaikit-tasks.plugins.example.org"), Some("com.mosaikit.notes"))
+        );
+        assert!(!c.untrusted_host_ok(Some("public.plugins.example.org"), Some("com.mosaikit.notes")));
+        assert!(c.untrusted_host_ok(Some("PUBLIC.plugins.example.org"), None));
+        assert!(!c.untrusted_host_ok(Some("com-mosaikit-notes.plugins.example.org"), None));
+        assert!(!c.untrusted_host_ok(None, None));
+        // in development: *.localhost resolves to the computer itself
+        let d = cfg(r#"
+            url = "http://127.0.0.1:5173"
+            plugin_url = "http://*.localhost:47081/mosaikit"
+        "#)
+        .unwrap();
+        assert_eq!(d.plugin_url_for("x.y"), "http://x-y.localhost:47081/mosaikit");
+        assert_eq!(d.untrusted_bind, "127.0.0.1:47081");
+        assert!(d.untrusted_host_ok(Some("x-y.localhost:47081"), Some("x.y")));
+        // without a wildcard: one origin, every host
+        let one = cfg(r#"
+            url = "https://apps.example.org"
+            plugin_url = "https://plugins.example.org"
+            listen = "0.0.0.0:8080"
+            plugin_listen = "0.0.0.0:8081"
+        "#)
+        .unwrap();
+        assert_eq!(one.plugin_url_for("a.b"), "https://plugins.example.org");
+        assert!(one.untrusted_host_ok(None, Some("a.b")));
+        for bad in ["https://x.*.org", "https://*.*.org", "https://*"] {
+            assert!(cfg(&format!("url = \"https://a.org\"\nplugin_url = \"{bad}\"")).is_err(), "{bad}");
+        }
+        assert_eq!(super::plugin_label(&"a.".repeat(40)).len(), 63);
     }
 }
