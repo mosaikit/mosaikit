@@ -43,7 +43,6 @@ const KNOWN: Record<string, string> = {
   'P4-20': 'F5: uninstall and reinstall of an extension (owner: QA follow-ups)',
   'P7-20': 'F6: Monitoring › Status (owner: QA follow-ups)',
   'P7-14': 'F7: maintenance notice lost for open sessions (owner: QA follow-ups)',
-  'P10-21': 'M1: Tabs package installed from file (owner: manual checks follow-up)',
   'FU-B-01': 'M1: Tabs package installed from file (owner: manual checks follow-up)',
   'FU-B-02': 'M1: Tabs package installed from file (owner: manual checks follow-up)',
   'FU-B-03': 'M1: Tabs package installed from file (owner: manual checks follow-up)',
@@ -57,7 +56,6 @@ const KNOWN: Record<string, string> = {
   'FU-A-07': 'M1: Tabs package installed from file (owner: manual checks follow-up)',
   'FU-A-08': 'M1: Tabs package installed from file (owner: manual checks follow-up)',
   'FU-A-09': 'M1: Tabs package installed from file (owner: manual checks follow-up)',
-  'P10-11': 'M2: themes and layout settings of the tenant (owner: manual checks follow-up)',
   'FU-A-12': 'M2: themes and layout settings of the tenant (owner: manual checks follow-up)',
   'P10-24': 'F2: contrast of the selected section in dark mode (owner: QA follow-ups)',
 }
