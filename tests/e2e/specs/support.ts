@@ -153,22 +153,17 @@ export async function accessible(page: Page, where: string) {
   expect(bad.map((v) => `${where}: ${v.id} ${v.nodes.map((n) => n.target.join(' ') + ' ' + n.html.slice(0, 300) + ' => ' + n.failureSummary).join(' | ')}`)).toEqual([])
 }
 
-/** Waits until the colours stopped changing (CSS transitions after a change of theme): 10 identical frames. */
+/** Waits until no CSS transition is running (colours after a change of theme): 5 frames without one (5 s at most: an endless spinner must not stall). */
 export async function colorsSettled(page: Page) {
   await page.evaluate(
     () =>
       new Promise<void>((resolve) => {
-        const sample = () =>
-          [document.body, document.querySelector('header'), document.querySelector('[data-sidebar="sidebar"]')]
-            .map((e) => (e ? getComputedStyle(e).backgroundColor + getComputedStyle(e).color : ''))
-            .join('|')
-        let last = sample()
-        let same = 0
+        const end = performance.now() + 5000
+        let idle = 0
         const tick = () => {
-          const now = sample()
-          same = now === last ? same + 1 : 0
-          last = now
-          if (same >= 10) resolve()
+          const running = document.getAnimations().some((a) => a.constructor.name === 'CSSTransition' && a.playState === 'running')
+          idle = running ? 0 : idle + 1
+          if (idle >= 5 || performance.now() > end) resolve()
           else requestAnimationFrame(tick)
         }
         requestAnimationFrame(tick)
