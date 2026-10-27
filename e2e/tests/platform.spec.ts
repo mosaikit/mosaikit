@@ -204,9 +204,9 @@ test.describe.serial('platform', () => {
     await d.getByRole('button', { name: 'Create user' }).click()
     await expect(page.getByRole('row', { name: /Anna Rossi/ })).toBeVisible()
     // the action bar appears only with a selection
-    await expect(page.getByRole('group', { name: 'Actions on the selection' })).toBeHidden()
+    await expect(page.getByRole('button', { name: 'Make Tenant Manager' })).toBeHidden()
     await page.getByRole('row', { name: /Anna Rossi/ }).getByRole('checkbox').click()
-    await expect(page.getByRole('group', { name: 'Actions on the selection' })).toBeVisible()
+    await expect(page.getByRole('button', { name: 'Make Tenant Manager' })).toBeVisible()
     await accessible(page, 'manage')
 
     // theme of the tenant: customized, then the one of the platform again
