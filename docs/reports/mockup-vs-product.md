@@ -65,6 +65,15 @@ Totals: **36 distinct screen ids**:
 
 The system sections are counted separately below.
 
+## Status after the QA follow-ups
+
+Done in `work-qafix`: Home of the User (pick up, due soon, for you, greeting); Manage › People import from
+CSV and the invitation of several people; tenant details (contact person, registration data); Monitoring
+side panel and the services of the search index and the mail server; «Ask for a plugin» and the State
+filter of tenant plugins. Left to other work: Account › Profile editing, filters of the lists of Tenants and
+People (performance branch), the «1 near limit» counter next to the Platform badge, «Signs in with» and
+Export in People of the platform, the «Support» link of the sign-in page (configured in System).
+
 ## Missing in the product (ranked)
 
 1. **Home of the User** (`home`): «Pick up where you left off», «Due soon», «For you» and the greeting

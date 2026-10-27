@@ -423,7 +423,8 @@ test.describe.serial('platform', () => {
     await expect(mgr.getByLabel('Password', { exact: true })).toHaveValue('')
     await mgr.getByLabel('To', { exact: true }).fill('admin@example.org')
     await mgr.getByRole('button', { name: 'Send a test' }).click()
-    await expect(mgr.getByText(/The mail server refused the message/)).toBeVisible()
+    // a readable reason with the address, never the text of the operating system (QA F4)
+    await expect(mgr.getByRole('alert').filter({ hasText: 'The mail server refuses the connection (127.0.0.1:1)' })).toBeVisible()
     await logout(mgr)
   })
 
@@ -1633,6 +1634,66 @@ test.describe.serial('platform', () => {
     await page.keyboard.press('Escape')
     await page.evaluate(() => localStorage.setItem('msk_lang', 'en'))
     await page.reload()
+
+  test('QA follow-ups: many people at once, suspended sign-in, Home, mail error, service detail, contact', async ({ page }) => {
+    await login(page, 'Alfa Municipality', 'manager', PASSWORD)
+    // Home: the sections of the mockup and the greeting
+    await nav(page, 'Tenant overview').click()
+    for (const name of ['Pick up where you left off', 'Due soon', 'For you']) await expect(page.getByRole('heading', { name })).toBeVisible()
+    await accessible(page, 'home')
+
+    // CSV: a preview with the problems, then only the good rows are created, with a link each
+    await nav(page, 'Manage').click()
+    await page.getByRole('button', { name: 'Import from CSV' }).click()
+    const imp = page.getByRole('dialog', { name: 'Import from CSV' })
+    await imp.getByLabel('CSV file').setInputFiles({ name: 'people.csv', mimeType: 'text/csv', buffer: Buffer.from('username,name,email,role\ncarla,Carla Neri,carla@example.org,user\nx y,Bad,,\n') })
+    await expect(imp.getByRole('cell', { name: 'Invalid username' })).toBeVisible()
+    await accessible(page, 'import dialog')
+    await imp.getByRole('button', { name: 'Create 1 people' }).click()
+    await expect(imp.getByRole('status')).toContainText('1 done, 0 not done')
+    await imp.getByRole('button', { name: 'Close', exact: true }).first().click()
+    await expect(page.getByRole('row', { name: /carla/ })).toBeVisible()
+
+    // several invitations: one outcome per line, nothing created for addresses that do not exist
+    await page.getByRole('navigation', { name: 'Sections' }).getByRole('link', { name: /^Pending/ }).click()
+    await page.getByRole('button', { name: 'Invite several people' }).click()
+    const inv = page.getByRole('dialog', { name: 'Invite several people' })
+    await inv.getByLabel('People', { exact: true }).fill('nobody\nghost@alfa')
+    await inv.getByRole('button', { name: 'Send 2 invitations' }).click()
+    await expect(inv.getByRole('status')).toContainText('0 done, 2 not done')
+    await inv.getByRole('button', { name: 'Close', exact: true }).first().click()
+
+    // suspended in the only tenant: no sign-in, with its own code and never a raw error; then back
+    await page.getByRole('navigation', { name: 'Sections' }).getByRole('link', { name: /^People/ }).click()
+    await page.getByRole('button', { name: 'Actions for anna' }).click()
+    await page.getByRole('menuitem', { name: 'Suspend in the tenant' }).click()
+    await expect(page.getByText('Suspended in the tenant').first()).toBeVisible()
+    const resp = await page.request.post(BASE + '/api/auth/login', { data: { tenant: 'alfa', username: 'anna', password: PASSWORD } })
+    expect(resp.status()).toBe(403)
+    expect((await resp.json()).code).toBe('membership_suspended')
+    await page.getByRole('button', { name: 'Actions for anna' }).click()
+    await page.getByRole('menuitem', { name: 'Reactivate in the tenant' }).click()
+    await expect(page.getByText('Active again').first()).toBeVisible()
+
+    // Monitoring: the mail server is not set or down, with a side panel for the row
+    await logout(page)
+    await adminLogin(page)
+    await nav(page, 'Monitoring').click()
+    await page.getByRole('button', { name: 'Emails' }).click()
+    const side = page.getByRole('dialog', { name: 'Emails' })
+    await expect(side).toContainText('Waiting in the queue')
+    await accessible(page, 'monitoring side panel')
+    await page.keyboard.press('Escape')
+
+    // details of a tenant: contact person and registration data
+    await nav(page, 'Tenant').click()
+    await page.getByRole('row', { name: /Alfa Municipality/ }).getByRole('link').first().click()
+    await page.getByLabel('Contact person').fill('Maria Bianchi')
+    await page.getByLabel('Registration data (VAT number, tax code)').fill('IT01234567890')
+    await page.getByRole('button', { name: 'Save' }).click()
+    await expect(page.getByText('Details saved').first()).toBeVisible()
+    await page.reload()
+    await expect(page.getByLabel('Contact person')).toHaveValue('Maria Bianchi')
     await logout(page)
   })
 

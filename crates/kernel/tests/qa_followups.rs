@@ -74,8 +74,12 @@ async fn the_home_lists_what_to_pick_up_and_what_is_due() {
     let soon = (today + chrono::Duration::days(2)).to_string();
     let later = (today + chrono::Duration::days(40)).to_string();
     let late = (today - chrono::Duration::days(1)).to_string();
-    let a = crud::create(&t, &anna, TODO, "todo", &obj(json!({ "title": "soon", "due": soon })), None).await.unwrap();
-    crud::create(&t, &anna, TODO, "todo", &obj(json!({ "title": "later", "due": later })), None).await.unwrap();
+    let a = crud::create(&t, &anna, TODO, "todo", &obj(json!({ "title": "soon", "due": soon })), None)
+        .await
+        .unwrap();
+    crud::create(&t, &anna, TODO, "todo", &obj(json!({ "title": "later", "due": later })), None)
+        .await
+        .unwrap();
     crud::create(&t, &anna, TODO, "todo", &obj(json!({ "title": "late", "due": late })), None).await.unwrap();
     let o = overview::overview(&t, &anna).await.unwrap();
     let due: Vec<&str> = o.me.due.iter().map(|x| x.title.as_str()).collect();
@@ -123,9 +127,10 @@ async fn many_people_at_once_with_an_outcome_per_row() {
         profile: String::new(),
         groups: groups.iter().map(|g| g.to_string()).collect(),
     };
-    let out = bulk::import_people(&t, &mgr, &[row("carla", &[]), row("carla", &[]), row("dino", &["nowhere"])])
-        .await
-        .unwrap();
+    let out =
+        bulk::import_people(&t, &mgr, &[row("carla", &[]), row("carla", &[]), row("dino", &["nowhere"])])
+            .await
+            .unwrap();
     assert!(out[0].ok && out[0].link.is_some());
     assert!(!out[1].ok, "the second carla already exists");
     assert_eq!((out[2].ok, out[2].code), (false, Some("group_unknown")));
@@ -139,9 +144,15 @@ async fn many_people_at_once_with_an_outcome_per_row() {
     // invitations of people of other tenants
     let b = t.tenant("beta").await;
     t.member(&b, "bruno").await;
-    let out = bulk::invite_many(&t, &mgr, &["bruno@beta".into(), "nobody".into(), "ghost@beta".into()], Role::User, None)
-        .await
-        .unwrap();
+    let out = bulk::invite_many(
+        &t,
+        &mgr,
+        &["bruno@beta".into(), "nobody".into(), "ghost@beta".into()],
+        Role::User,
+        None,
+    )
+    .await
+    .unwrap();
     assert_eq!(out.iter().map(|o| o.ok).collect::<Vec<_>>(), [true, false, false]);
     assert_eq!(out[1].code, Some("invite_address"));
 }

@@ -16,6 +16,9 @@ use chrono::{DateTime, Utc};
 
 use crate::Kernel;
 
+/// When, error code (`None`: delivered) and detail of the last delivery to the mail server.
+pub(crate) type MailResult = (DateTime<Utc>, Option<&'static str>, String);
+
 /// State of the operations kept by the kernel.
 pub struct Ops {
     pub metrics: metrics::Metrics,
@@ -24,7 +27,7 @@ pub struct Ops {
     pub(crate) maintenance: Mutex<Option<(Instant, maintenance::Maintenance)>>,
     pub(crate) providers: Mutex<Option<(Instant, Vec<monitor::Service>)>>,
     /// the last attempt to hand a message to the mail server: when, error code (`None`: delivered), detail
-    pub(crate) mail_last: Mutex<Option<(DateTime<Utc>, Option<&'static str>, String)>>,
+    pub(crate) mail_last: Mutex<Option<MailResult>>,
     /// reachability of the mail server, checked at most every minute
     pub(crate) mail_probe: Mutex<Option<(Instant, monitor::Service)>>,
     pub backup_running: AtomicBool,

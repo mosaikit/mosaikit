@@ -204,7 +204,8 @@ async fn fetch(k: &Kernel, scope: Scope<'_>, f: &LogFilter, limit: i64) -> Resul
     let mut names: std::collections::HashMap<String, String> = std::collections::HashMap::new();
     for r in &rows {
         let detail: Value = r.get(13);
-        let Some(id) = detail.get("user").and_then(Value::as_str).filter(|_| detail.get("name").is_none()) else {
+        let Some(id) = detail.get("user").and_then(Value::as_str).filter(|_| detail.get("name").is_none())
+        else {
             continue;
         };
         if names.contains_key(id) {

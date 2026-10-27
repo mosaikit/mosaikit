@@ -34,15 +34,19 @@ pub(crate) async fn remember(tx: &mut mosaikit_db::Tx, id: &str) -> Result<()> {
     let Some(row) = row else { return Ok(()) };
     let status: String = row.get(0);
     let available_default: bool = row.get(1);
-    let tenants: Vec<TenantChoice> =
-        mosaikit_db::query("select tenant_id, available, enabled from core.tenant_plugins where plugin_id = $1")
-            .bind(id)
-            .fetch_all(&mut **tx)
-            .await?
-            .iter()
-            .map(|r| TenantChoice { tenant_id: r.get(0), available: r.get(1), enabled: r.get(2) })
-            .collect();
-    mosaikit_db::query("delete from core.plugin_memory where plugin_id = $1").bind(id).execute(&mut **tx).await?;
+    let tenants: Vec<TenantChoice> = mosaikit_db::query(
+        "select tenant_id, available, enabled from core.tenant_plugins where plugin_id = $1",
+    )
+    .bind(id)
+    .fetch_all(&mut **tx)
+    .await?
+    .iter()
+    .map(|r| TenantChoice { tenant_id: r.get(0), available: r.get(1), enabled: r.get(2) })
+    .collect();
+    mosaikit_db::query("delete from core.plugin_memory where plugin_id = $1")
+        .bind(id)
+        .execute(&mut **tx)
+        .await?;
     mosaikit_db::query(
         "insert into core.plugin_memory (plugin_id, status, available_default, tenants) values ($1, $2, $3, $4)",
     )
@@ -86,10 +90,11 @@ pub(crate) async fn restore(tx: &mut mosaikit_db::Tx, id: &str, m: &Memory) -> R
         .execute(&mut **tx)
         .await?;
     for c in &m.tenants {
-        let exists: bool = mosaikit_db::query_scalar("select exists (select 1 from core.tenants where id = $1)")
-            .bind(c.tenant_id)
-            .fetch_one(&mut **tx)
-            .await?;
+        let exists: bool =
+            mosaikit_db::query_scalar("select exists (select 1 from core.tenants where id = $1)")
+                .bind(c.tenant_id)
+                .fetch_one(&mut **tx)
+                .await?;
         if !exists {
             continue;
         }
@@ -104,6 +109,9 @@ pub(crate) async fn restore(tx: &mut mosaikit_db::Tx, id: &str, m: &Memory) -> R
         .execute(&mut **tx)
         .await?;
     }
-    mosaikit_db::query("delete from core.plugin_memory where plugin_id = $1").bind(id).execute(&mut **tx).await?;
+    mosaikit_db::query("delete from core.plugin_memory where plugin_id = $1")
+        .bind(id)
+        .execute(&mut **tx)
+        .await?;
     Ok(())
 }

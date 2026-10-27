@@ -79,11 +79,9 @@ pub async fn import_people(k: &Kernel, c: &Caller, rows: &[ImportRow]) -> Result
             let profile = match r.profile.trim() {
                 "" => None,
                 name => Some(
-                    profiles
-                        .iter()
-                        .find(|p| p.name.eq_ignore_ascii_case(name))
-                        .map(|p| p.id)
-                        .ok_or_else(|| Error::bad(format!("no permission profile «{name}»")).with_code("profile_unknown"))?,
+                    profiles.iter().find(|p| p.name.eq_ignore_ascii_case(name)).map(|p| p.id).ok_or_else(
+                        || Error::bad(format!("no permission profile «{name}»")).with_code("profile_unknown"),
+                    )?,
                 ),
             };
             let mut group_ids = Vec::new();
@@ -99,7 +97,11 @@ pub async fn import_people(k: &Kernel, c: &Caller, rows: &[ImportRow]) -> Result
                 }
             }
             let password = crate::util::random_token(24);
-            let name = if r.display_name.trim().is_empty() { who.clone() } else { r.display_name.trim().to_string() };
+            let name = if r.display_name.trim().is_empty() {
+                who.clone()
+            } else {
+                r.display_name.trim().to_string()
+            };
             let user = super::create_member(k, c, &who, &name, &password, r.role).await?;
             if let Some(e) = r.email.as_deref().map(str::trim).filter(|e| !e.is_empty()) {
                 mosaikit_db::query("update core.users set email = $2 where id = $1")
@@ -206,8 +208,16 @@ pub async fn ask_for_plugin(k: &Kernel, c: &Caller, text: &str) -> Result<()> {
         )
         .await;
     }
-    events::record(k, Some(c.tenant.tenant_id), Some(c.user.user_id), None, None, "plugin.ask", json!({ "text": text }))
-        .await;
+    events::record(
+        k,
+        Some(c.tenant.tenant_id),
+        Some(c.user.user_id),
+        None,
+        None,
+        "plugin.ask",
+        json!({ "text": text }),
+    )
+    .await;
     Ok(())
 }
 
@@ -234,10 +244,20 @@ pub async fn tenant_details(k: &Kernel, admin: &SessionUser, tenant: Uuid) -> Re
     .fetch_optional(&k.db)
     .await?
     .ok_or_else(|| Error::not_found("tenant does not exist"))?;
-    Ok(TenantDetails { contact_name: r.get(0), contact_email: r.get(1), contact_phone: r.get(2), registration: r.get(3) })
+    Ok(TenantDetails {
+        contact_name: r.get(0),
+        contact_email: r.get(1),
+        contact_phone: r.get(2),
+        registration: r.get(3),
+    })
 }
 
-pub async fn set_tenant_details(k: &Kernel, admin: &SessionUser, tenant: Uuid, d: &TenantDetails) -> Result<()> {
+pub async fn set_tenant_details(
+    k: &Kernel,
+    admin: &SessionUser,
+    tenant: Uuid,
+    d: &TenantDetails,
+) -> Result<()> {
     require_admin(admin)?;
     let d = TenantDetails {
         contact_name: d.contact_name.trim().to_string(),
@@ -245,7 +265,10 @@ pub async fn set_tenant_details(k: &Kernel, admin: &SessionUser, tenant: Uuid, d
         contact_phone: d.contact_phone.trim().to_string(),
         registration: d.registration.trim().to_string(),
     };
-    if [&d.contact_name, &d.contact_email, &d.contact_phone, &d.registration].iter().any(|v| v.chars().count() > 200) {
+    if [&d.contact_name, &d.contact_email, &d.contact_phone, &d.registration]
+        .iter()
+        .any(|v| v.chars().count() > 200)
+    {
         return Err(Error::bad("at most 200 characters per field").with_code("setting_invalid"));
     }
     if !d.contact_email.is_empty() && !notify::valid_email(&d.contact_email) {

@@ -118,11 +118,13 @@ async fn get_json<T: serde::de::DeserializeOwned>(k: &Kernel, what: &str, u: &st
         Error::bad(format!("{what}: {u} {what_happened}")).with_code(code)
     })?;
     if !res.status().is_success() {
-        return Err(Error::bad(format!("{what}: {u} answered HTTP {}", res.status().as_u16())).with_code("oidc_http"));
+        return Err(
+            Error::bad(format!("{what}: {u} answered HTTP {}", res.status().as_u16())).with_code("oidc_http")
+        );
     }
-    res.json::<T>()
-        .await
-        .map_err(|_| Error::bad(format!("{what}: {u} did not answer with a valid document")).with_code("oidc_document"))
+    res.json::<T>().await.map_err(|_| {
+        Error::bad(format!("{what}: {u} did not answer with a valid document")).with_code("oidc_document")
+    })
 }
 
 async fn fetch_discovery(k: &Kernel, issuer: &str) -> Result<Discovery> {

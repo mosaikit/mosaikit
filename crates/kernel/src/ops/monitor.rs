@@ -38,7 +38,15 @@ fn service(
     ms: Option<f64>,
     detail: String,
 ) -> Service {
-    Service { key: key.into(), name: name.into(), state, version: version.into(), ms, detail, facts: Vec::new() }
+    Service {
+        key: key.into(),
+        name: name.into(),
+        state,
+        version: version.into(),
+        ms,
+        detail,
+        facts: Vec::new(),
+    }
 }
 
 /// Reachability of the identity providers of the tenants, checked at most every 5 minutes.
@@ -100,15 +108,18 @@ async fn mail_service(k: &Kernel) -> Result<Service> {
     ];
     if let Some((at, err, detail)) = &last {
         facts.push(["Last delivery".to_string(), at.format("%Y-%m-%d %H:%M:%S UTC").to_string()]);
-        facts.push(["Outcome".to_string(), if err.is_some() { detail.clone() } else { "delivered".to_string() }]);
+        facts.push([
+            "Outcome".to_string(),
+            if err.is_some() { detail.clone() } else { "delivered".to_string() },
+        ]);
     }
     let (state, ms, detail) = match &probe {
         None => ("off", None, "no mail server".to_string()),
         Some(Err(e)) => ("down", None, e.message.trim_start_matches("mail server: ").to_string()),
         Some(Ok(ms)) => {
-            let recent_error = last.as_ref().is_some_and(|(at, err, _)| {
-                err.is_some() && Utc::now() - *at < Duration::hours(1)
-            });
+            let recent_error = last
+                .as_ref()
+                .is_some_and(|(at, err, _)| err.is_some() && Utc::now() - *at < Duration::hours(1));
             (
                 if failed > 0 || recent_error { "degraded" } else { "ok" },
                 Some(*ms),
@@ -203,9 +214,10 @@ pub async fn services(k: &Kernel) -> Result<Vec<Service>> {
     ));
     // search index: the items still waiting for their searchable text (the background work indexes them a
     // batch at a time)
-    let waiting: i64 = mosaikit_db::query_scalar("select count(*) from core.resources where search_text is null")
-        .fetch_one(&k.db)
-        .await?;
+    let waiting: i64 =
+        mosaikit_db::query_scalar("select count(*) from core.resources where search_text is null")
+            .fetch_one(&k.db)
+            .await?;
     let mut search = service(
         "search",
         "Search index",

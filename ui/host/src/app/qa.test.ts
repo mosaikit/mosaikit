@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { csvFields, parseCsv } from './BulkPeople.tsx'
+import { csvFields, parseCsv } from './csv.ts'
 import { checks, contrast, generate, selectedBg } from './themegen.ts'
 
 describe('import of people from CSV', () => {

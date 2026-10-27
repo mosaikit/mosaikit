@@ -600,12 +600,14 @@ export function QuotaAlert({ slug, manager, compact }: { slug: string; manager: 
   const full = (worst.percent ?? 0) >= 100
   const text = full ? t('{quota}: quota used up', { quota: metricLabel(worst.metric) }) : t('{quota}: {p}% of the quota', { quota: metricLabel(worst.metric), p: String(worst.percent) })
   const href = manager ? to.tenant(slug, 'usage') : to.tenant(slug, 'account', 'usage')
+  const pct = full ? '100%' : `${worst.percent}%`
   return (
     <a
       href={href}
       data-quota-alert={worst.metric}
       title={text}
-      aria-label={text}
+      // the visible figure starts the name (WCAG 2.5.3)
+      aria-label={compact ? `${pct} · ${text}` : text}
       className={cn(
         'flex items-center gap-2 rounded-md border px-2 py-1.5 text-xs font-medium',
         full ? 'border-destructive/40 bg-destructive/10 text-destructive' : 'border-amber-500/40 bg-amber-500/10 text-amber-800 dark:text-amber-300',
@@ -614,7 +616,7 @@ export function QuotaAlert({ slug, manager, compact }: { slug: string; manager: 
     >
       <AlertTriangle className="size-4 shrink-0" />
       {/* with the sidebar closed the icon keeps a visible figure, like the labels of the rail */}
-      {compact ? <span aria-hidden="true" className="tabular-nums">{full ? '100%' : `${worst.percent}%`}</span> : <span className="min-w-0 truncate">{text}</span>}
+      {compact ? <span className="tabular-nums">{pct}</span> : <span className="min-w-0 truncate">{text}</span>}
     </a>
   )
 }

@@ -28,7 +28,11 @@ struct ImportReq {
     rows: Vec<ImportRow>,
 }
 
-async fn m_import(State(s): State<AppState>, Tenant(c): Tenant, Json(r): Json<ImportReq>) -> ApiResult<Json<Value>> {
+async fn m_import(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Json(r): Json<ImportReq>,
+) -> ApiResult<Json<Value>> {
     Ok(Json(json!(bulk::import_people(&s.k, &c, &r.rows).await?)))
 }
 
@@ -53,12 +57,20 @@ struct AskReq {
     text: String,
 }
 
-async fn m_ask(State(s): State<AppState>, Tenant(c): Tenant, Json(r): Json<AskReq>) -> ApiResult<Json<Value>> {
+async fn m_ask(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Json(r): Json<AskReq>,
+) -> ApiResult<Json<Value>> {
     bulk::ask_for_plugin(&s.k, &c, &r.text).await?;
     Ok(Json(json!({ "ok": true })))
 }
 
-async fn a_details(State(s): State<AppState>, Auth(u): Auth, Path(id): Path<String>) -> ApiResult<Json<Value>> {
+async fn a_details(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Path(id): Path<String>,
+) -> ApiResult<Json<Value>> {
     Ok(Json(json!(bulk::tenant_details(&s.k, &u, uuid(&id)?).await?)))
 }
 

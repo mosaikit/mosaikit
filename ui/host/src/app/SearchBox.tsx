@@ -144,11 +144,12 @@ export default function SearchBox({ session, route, groups }: { session: Session
     setOpened((n) => n + 1)
     setOpen(true)
   }, [me])
+  const close = () => setOpen(false)
   // a search that found something is remembered also when no result is opened (the person read the answer)
-  const close = () => {
-    if (searchable(q.trim()) && shown.length) remember(me, q)
-    setOpen(false)
-  }
+  const found_any = (items.data?.some((g) => g.items.length) ?? false) || !!found.data?.tenants.length || !!found.data?.people.length
+  useEffect(() => {
+    if (open && found_any && searchable(dq)) remember(me, dq)
+  }, [open, found_any, dq, me])
   const pick = (href: string) => {
     remember(me, q)
     close()

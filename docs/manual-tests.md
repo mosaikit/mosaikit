@@ -483,6 +483,28 @@ Needs many rows: the data of the load test (`cargo xtask perf --scale probe`, th
 | PERF-12 | Desktop (SQLite): two windows of the same person saving notes at the same time, while a third lists them | Every save succeeds (no «database is locked»), the list keeps answering while the others write |
 | PERF-13 | Share a folder with a group read only; as a member of the group: the notes of the folder, open one, try to edit it | Listed and readable, the edit refused (read access through the set rule, write checked per row); the same in the trash: not listed |
 
+## QA follow-ups — what the QA walkthrough found, and the gaps of the mockup
+
+| Id | Check | Expected |
+|---|---|---|
+| QA-01 | As Tenant Manager suspend `anna` in the only tenant she belongs to; try to sign in as `anna` | Refused with «Your access to this tenant is suspended: ask its Tenant Manager»; no shell, no raw server error. Reactivate her afterwards |
+| QA-02 | `anna` open in a second window, then suspend her; reload that window | A page «Your access to the tenant is suspended» with Sign out |
+| QA-03 | Dark mode, Account (or any page with a list of sections at the left) | The selected section reads clearly (contrast at least 4.5:1) in every theme |
+| QA-04 | As `s.greco` search for a word of a note she cannot see: no results. As the owner share the note with her; search the same word again in her window | The note is found now, without reloading; the pill «Tenants» is not offered to a User |
+| QA-05 | System › Email, set a port where nobody listens, **Send a test** | A readable message in the page language («The mail server refuses the connection (host:port)»), shown on the page and in a toast; «Ready» is not red |
+| QA-06 | Monitoring › Status, click **Emails**, then **Search index** | A side panel with state, version, response time and details (queue, last delivery, items waiting); the mail row is «down» while the port is closed |
+| QA-07 | Plugins › *Note review* › ⋯ › Uninstall | The confirmation counts its values and the tenants where it is on, and says that installing it again brings back the choices. Install it again: it is on and off in the tenants as before |
+| QA-08 | While a window is open as a user, turn on maintenance (System › Maintenance); act in that window | The sign-in page with the maintenance notice, not a bare sign-in |
+| QA-09 | Home as `s.greco` | Greeting by hour; «Pick up where you left off» (items she created or changed), «Due soon» (tasks with a due date within 7 days, late ones in red; done ones are not listed), «For you» (latest notifications, link to all) |
+| QA-10 | Manage › People › **Import from CSV**: a file with a header `username,name,email,role,profile,groups` and one wrong row | A preview shows the problem of the wrong row; only the good rows are created, each with a link to choose a password (emailed if there is an address); the report says «N done, M not done» |
+| QA-11 | Manage › Pending › **Invite several people**: `username@tenant` per line, one wrong | One outcome per line; the right ones become invitations |
+| QA-12 | System › Tenants › a tenant › Details | Contact person, email, phone and registration data, with the save bar only after a change |
+| QA-13 | Tenant Manager › Plugins › **Ask for a plugin**; the State filter | The Administrators get a notification with the text; the filter shows On or Off plugins |
+| QA-14 | Log: suspend and reactivate a person | «On what» names the person; the Activity tab of that person lists those events |
+| QA-15 | Tenant › Plugins: an extension | No «Open» button; its «Use» permission says «Use the extension» |
+| QA-16 | Tab through System › Identity and texts › the logos | One tab stop per action (Upload, Remove), names tell the images apart |
+| QA-17 | Start the tour of a page; press the arrow keys without clicking the card | They move between the steps |
+
 ---
 
 Every phase of the plan has its section. New work adds its checks here when it is committed.

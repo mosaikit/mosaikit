@@ -445,7 +445,9 @@ async fn finish_session(k: &Kernel, user_id: Uuid, ip: &str, remember: bool) -> 
     .await?;
     if !works {
         events::record_failure(k, Some(home), Some(user_id), "login.suspended", json!({ "ip": ip })).await;
-        return Err(Error::forbidden("your access to the tenant is suspended").with_code("membership_suspended"));
+        return Err(
+            Error::forbidden("your access to the tenant is suspended").with_code("membership_suspended")
+        );
     }
     let sec = crate::tenancy::levels::security(k, Some(home)).await?;
     let minutes =

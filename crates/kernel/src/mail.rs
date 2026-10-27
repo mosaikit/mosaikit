@@ -120,12 +120,16 @@ pub(crate) async fn probe(k: &Kernel) -> Result<Option<std::result::Result<f64, 
         return Ok(None);
     }
     let t = std::time::Instant::now();
-    let res = tokio::time::timeout(StdDuration::from_secs(3), TcpStream::connect((s.host.as_str(), s.port))).await;
+    let res =
+        tokio::time::timeout(StdDuration::from_secs(3), TcpStream::connect((s.host.as_str(), s.port))).await;
     Ok(Some(match res {
         Ok(Ok(_)) => Ok(t.elapsed().as_secs_f64() * 1000.0),
         Ok(Err(e)) => Err(connect_err(&e, &s.host, s.port)),
-        Err(_) => Err(Error::new(crate::Kind::BadRequest, format!("mail server: {}:{} does not answer", s.host, s.port))
-            .with_code("email_timeout")),
+        Err(_) => Err(Error::new(
+            crate::Kind::BadRequest,
+            format!("mail server: {}:{} does not answer", s.host, s.port),
+        )
+        .with_code("email_timeout")),
     }))
 }
 
@@ -494,7 +498,8 @@ fn connect_err(e: &std::io::Error, host: &str, port: u16) -> Error {
 
 fn tls_err(m: impl std::fmt::Display) -> Error {
     tracing::debug!("TLS with the mail server: {m}");
-    Error::new(crate::Kind::BadRequest, "mail server: the secure connection (TLS) failed").with_code("email_tls")
+    Error::new(crate::Kind::BadRequest, "mail server: the secure connection (TLS) failed")
+        .with_code("email_tls")
 }
 
 const TIMEOUT: StdDuration = StdDuration::from_secs(20);
@@ -626,8 +631,11 @@ pub async fn deliver(
         }
         let token = base64::engine::general_purpose::STANDARD.encode(format!("\0{}\0{pw}", s.username));
         c.cmd(&format!("AUTH PLAIN {token}"), &[235]).await.map_err(|e| {
-            Error::new(crate::Kind::BadRequest, e.message.replace("mail server: ", "mail server refused the sign-in: "))
-                .with_code("email_auth")
+            Error::new(
+                crate::Kind::BadRequest,
+                e.message.replace("mail server: ", "mail server refused the sign-in: "),
+            )
+            .with_code("email_auth")
         })?;
     }
     c.cmd(&format!("MAIL FROM:<{}>", address_of(&s.sender)), &[250]).await?;

@@ -233,7 +233,13 @@ async fn personal(k: &Kernel, c: &Caller) -> Result<Personal> {
     .await?;
     let item = |r: &mosaikit_db::Row| {
         let pid: String = r.get(1);
-        HomeItem { resource_id: r.get(0), plugin: label(k, &pid), plugin_id: pid, title: r.get(2), at: r.get(3) }
+        HomeItem {
+            resource_id: r.get(0),
+            plugin: label(k, &pid),
+            plugin_id: pid,
+            title: r.get(2),
+            at: r.get(3),
+        }
     };
     Ok(Personal {
         pick_up: picked.iter().map(item).collect(),

@@ -34,6 +34,19 @@ into `prototipo-shell`, 78a4214) change the kernel, the server, xtask and the do
 changes of `review-perf` (`performance.md`, point 4: visibility computed per set) are on the server.
 F3 is in the client: the API already returned the right results.
 
+## Status of the findings (follow-up branch `work-qafix`)
+
+| Finding | Status |
+|---|---|
+| F1 suspended in the home tenant | fixed: sign-in refused (`membership_suspended`), page for a session without a tenant; kernel test, e2e |
+| F2 dark contrast of the selected section | fixed: `--primary-strong` in dark presets, generator and kernel check the pair; vitest |
+| F3 stale search, «Tenant» pill | fixed: asked again at every opening and after any change; no empty pills |
+| F4 test email | fixed: coded errors, result on the page; kernel test with a closed port |
+| F5 uninstall and reinstall of an extension | fixed: counts, memory of the choices (`core.plugin_memory`); kernel test |
+| F6 Monitoring status | fixed: side panel, mail probe, search index service |
+| F7 maintenance notice for open sessions | fixed |
+| F8 minor issues | fixed, except the ones owned by other work: share level names, «Invite» in People, keys of services, profile editing, retention placement, «What is new» in Italian (UX branch) |
+
 ## Findings
 
 ### F1 — High — Suspended in the home tenant, still signs in (P3-12)
@@ -397,7 +410,8 @@ Left unchanged:
 | P5-17 | PASS | kinds: Moved to the trash QA P, Created QA P, Created Notes Done, Deleted for good QA P, Restored from the trash QA P, Created QA allowed note · Notes Done, Created QA tag note · Notes Done, Created Meeting notes · Notes Done, Created Shopping list · Notes Done |
 | P5-18 | PASS |  |
 | P5-19 | PASS |  |
-| P5-20 | PASS | BOM: true; header: ﻿time,person,username,action,app,item,item title,result,address,details |
+| P5-20 | PASS | BOM: true; header: ﻿time,person,username,action,app,item,item title,result,address,details
+ |
 | P5-21 | PASS |  |
 | P5-22 | PASS |  |
 | P5-23 | PASS |  |

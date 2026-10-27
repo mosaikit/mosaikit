@@ -53,7 +53,7 @@ function greeting(): string {
 /** The Home as in the mockup: what to pick up again, what is due soon, what is for you (notifications). */
 function HomeLists({ slug, pickUp, due }: { slug: string; pickUp: HomeItem[]; due: HomeItem[] }) {
   const notes = useNoteList({ limit: 4 })
-  const today = new Date().toISOString().slice(0, 10)
+  const [today] = useState(() => new Date().toISOString().slice(0, 10))
   const item = (x: HomeItem, when: ReactNode) => (
     <li key={x.resource_id}>
       <a href={to.item(slug, x.resource_id)} className="flex items-center gap-2.5 rounded-md px-2 py-1.5 text-sm hover:bg-accent">
