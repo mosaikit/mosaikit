@@ -921,6 +921,7 @@ content = false          # folder content from a zip (sites)
 network = []             # origins reachable by http.fetch
 frame_src = []           # origins the UI may embed
 calls = []               # plugins whose commands the logic calls (§8.6)
+notify = false           # the logic may send notifications (host operation `notify`, §8.3)
 
 [requires]               # optional
 database = "postgres"    # uses PostgreSQL functions: it does not install on SQLite
@@ -1007,7 +1008,28 @@ Messages: `{"abi":1,"kind":"command","name":…,"args":…,"ctx":…}` or
 `{"abi":1,"kind":"hook","hook":"before_create"|"before_update"|"after_delete",…}`;
 answer `{"ok":…}` or `{"err":"…"}`. Host operations: `db.query`, `db.exec`,
 `resource.create`, `resource.delete`, `http.fetch` (only towards `network`),
-`plugin.call` (only towards `calls`, §8.6).
+`plugin.call` (only towards `calls`, §8.6), `key.get` (only for the `[[service_keys]]`) and `notify`
+(only with `[permissions] notify = true`).
+
+**Context of the call** (`ctx`, `Ctx` in the SDK; old plugins ignore what they do not read): `user`,
+`username`, `tenant` (ids), `plugin`, `perms` (permissions of the caller, §3.2), `config` (settings of
+the plugin) and `groups`: the groups of the tenant the caller belongs to, by name, as
+`[{"id": "<uuid>", "name": "Field"}]` (`[]` when none; never groups of other tenants; read at every
+call). In tests: `MockHost::new().with_groups(&[("g1", "Field")])`.
+
+**`notify`**: `{"op":"notify","req":{"title":"…","body":"…","at":"notes/2f1c","resource":"<uuid>"}}`,
+answer `{"ok":null}`. SDK: `ctx.notify(&Notice::new("Title").body("Text").at("notes/1").resource(id))`.
+`title` is required (cut to 160 characters), `body` optional (600). The plugin never names recipients:
+without `resource` the notification goes to the caller alone; with the id of an item of the same
+plugin and tenant, on which the caller has the write level, it goes to the people who can see the
+item, the caller excluded. `at` is a place inside the plugin (letters, digits and `/_-.=&?%:`, up to
+200): the link is always `#/t/<tenant>/p/<plugin>/<at>`, never an outside address. The limits are the
+ones of `msk.notify` in the bridge: 30 a minute for each person and plugin, no other tenant, source =
+the plugin itself (kind `plugin`, same preferences and email rules). A wrong shape or the limit fail the
+call at once; the people are resolved and the notifications sent **after the operation commits**, so a
+rolled back operation notifies nobody and the item a hook just created can be named by a later call. A
+refusal then (no write level, item of another plugin or tenant) is logged and does not fail the
+operation. In tests `MockHost::notifications()` lists what the logic sent.
 
 With the **`mosaikit-plugin-sdk`** crate the plugin does not see the ABI:
 

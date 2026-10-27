@@ -34,7 +34,7 @@ pub use serde_json::{self, json, Map, Value};
 pub use values::Values;
 
 pub mod prelude {
-    pub use crate::{json, Ctx, Error, Hook, Result, Value, Values};
+    pub use crate::{json, Ctx, Error, Group, Hook, Notice, Result, Value, Values};
 }
 
 /// Error returned to the kernel: it rolls back the transaction of the operation.
@@ -87,10 +87,54 @@ pub struct Ctx {
     /// `delete`, `share`) and the `[[user_permissions]]` of the manifest that the caller has.
     #[serde(default)]
     pub perms: Vec<String>,
+    /// Groups of the tenant the caller belongs to, by name (empty when none).
+    #[serde(default)]
+    pub groups: Vec<Group>,
     /// Settings of the plugin chosen by the Administrator (`[[config]]` of the manifest), secrets
     /// included: key -> value (`null` when not set).
     #[serde(default)]
     pub config: serde_json::Value,
+}
+
+/// A group of the tenant the caller belongs to (`ctx.groups`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub struct Group {
+    pub id: String,
+    pub name: String,
+}
+
+/// A notification of the logic (`ctx.notify`). The plugin never names the recipients: with `resource`
+/// they are the people who can see that item of the plugin (the caller needs the write level on it, the
+/// caller is left out); without it, the caller alone.
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
+pub struct Notice {
+    pub title: String,
+    pub body: String,
+    /// a place inside the plugin (e.g. `notes/2f1c...`): letters, digits and `/_-.=&?%:`, at most 200
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub at: Option<String>,
+    /// id of an item of the plugin
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resource: Option<String>,
+}
+
+impl Notice {
+    pub fn new(title: &str) -> Notice {
+        Notice { title: title.into(), ..Notice::default() }
+    }
+    pub fn body(mut self, body: &str) -> Notice {
+        self.body = body.into();
+        self
+    }
+    pub fn at(mut self, at: &str) -> Notice {
+        self.at = Some(at.into());
+        self
+    }
+    /// Notify the people who can see this item instead of the caller.
+    pub fn resource(mut self, id: &str) -> Notice {
+        self.resource = Some(id.into());
+        self
+    }
 }
 
 impl Ctx {
@@ -123,6 +167,15 @@ impl Ctx {
             Value::String(s) => Ok(Some(s)),
             _ => Ok(None),
         }
+    }
+    /// Notifies the caller or the people who see an item (needs `[permissions] notify = true`). Rules
+    /// and limits are the ones of `msk.notify` in the UI (30 a minute per person and plugin, title 160
+    /// and text 600 characters). The notification is sent when the operation commits: if it fails and
+    /// rolls back, nobody is notified. A refusal on the item (no write level, other plugin) does not
+    /// fail the operation: it is logged.
+    pub fn notify(&self, n: &Notice) -> Result<()> {
+        host::call("notify", serde_json::to_value(n)?)?;
+        Ok(())
     }
     /// Command of another plugin (declared in `permissions.calls`), with the
     /// same user: the called plugin applies its own access rules.

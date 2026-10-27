@@ -33,6 +33,10 @@ pub(crate) struct KernelHost {
     /// the services of `[[service_keys]]` the plugin declares: the only keys it may read
     service_keys: Vec<String>,
     http: reqwest::Client,
+    /// `[permissions] notify`: the plugin may notify
+    notify: bool,
+    /// notifications asked by the logic: sent after the commit of the operation
+    notes: Vec<crate::notify::PluginNote>,
 }
 
 type Params = Vec<Value>;
@@ -178,6 +182,24 @@ impl KernelHost {
     }
 }
 
+impl KernelHost {
+    /// `notify`: queues a notification to the caller or, with `resource`, to the people who can see the
+    /// item. Shape and rate are checked now; the people are resolved and the notification is sent once
+    /// the operation has committed (an item created by the same operation is visible only then, and a
+    /// rolled back operation notifies nobody).
+    fn notify(&mut self, req: &Value) -> std::result::Result<Value, String> {
+        if !self.notify {
+            return Err("the plugin does not declare `notify` in [permissions]".into());
+        }
+        let n: crate::notify::PluginNote =
+            serde_json::from_value(req.clone()).map_err(|e| format!("invalid notification: {e}"))?;
+        let k = self.kernel.clone().ok_or("kernel not available")?;
+        crate::notify::check_note(&k, &self.caller, &self.plugin_id, &n).map_err(|e| e.message)?;
+        self.notes.push(n);
+        Ok(Value::Null)
+    }
+}
+
 impl Host for KernelHost {
     fn call(&mut self, op: &str, req: &Value) -> std::result::Result<Value, String> {
         match op {
@@ -187,6 +209,7 @@ impl Host for KernelHost {
             "http.fetch" => self.http(req),
             "plugin.call" => self.plugin_call(req),
             "key.get" => self.key(req),
+            "notify" => self.notify(req),
             other => Err(format!("unknown host operation: {other}")),
         }
     }
@@ -198,6 +221,7 @@ impl Host for KernelHost {
 
 /// Runs the logic of the plugin in the transaction `tx`. On error the
 /// transaction is discarded (rollback).
+#[allow(clippy::too_many_arguments)]
 pub(crate) async fn run(
     k: &Kernel,
     c: &crate::Caller,
@@ -206,12 +230,15 @@ pub(crate) async fn run(
     mut msg: Value,
     fuel: u64,
     depth: u8,
+    notes: &mut Vec<crate::notify::PluginNote>,
 ) -> Result<(Value, Tx)> {
     // what the caller may do in the plugin: the logic enforces the permissions it declares
     let perms = crate::access::effective(k, c, &p.id).await?;
     let config = crate::plugins::config::for_logic(k, &p.id).await?;
     if let Some(ctx) = msg.get_mut("ctx").filter(|v| v.is_object()) {
         ctx["perms"] = json!(perms);
+        // the groups of the caller in the tenant
+        ctx["groups"] = groups_of(k, c).await?;
         // the settings of the plugin chosen by the Administrator (`[[config]]`)
         ctx["config"] = config;
     }
@@ -228,11 +255,14 @@ pub(crate) async fn run(
         network: p.manifest.permissions.network.clone(),
         service_keys: p.manifest.service_keys.iter().map(|s| s.id.clone()).collect(),
         http: k.http.clone(),
+        notify: p.manifest.permissions.notify,
+        notes: Vec::new(),
     };
     let engine = k.engine.clone();
     let (res, host) =
         tokio::task::spawn_blocking(move || engine.call_with_fuel(&module, &msg, host, fuel)).await?;
     let tx = host.tx.ok_or_else(|| Error::internal("transaction lost"))?;
+    let asked = host.notes;
     let reply = res?;
     if let Some(e) = reply.get("err") {
         // the message of the plugin itself: its own code, so the interface shows it instead of the
@@ -240,7 +270,25 @@ pub(crate) async fn run(
         return Err(Error::bad(e.as_str().map(str::to_string).unwrap_or_else(|| e.to_string()))
             .with_code("plugin_error"));
     }
+    notes.extend(asked);
     Ok((reply.get("ok").cloned().unwrap_or(Value::Null), tx))
+}
+
+/// `ctx.groups`: `[{"id", "name"}]`, the groups of the tenant the caller belongs to (by name).
+async fn groups_of(k: &Kernel, c: &crate::Caller) -> Result<Value> {
+    let rows = mosaikit_db::query(
+        "select g.id, g.name from core.groups g join core.group_members gm on gm.group_id = g.id
+         where gm.user_id = $1 and g.tenant_id = $2 order by g.name, g.id",
+    )
+    .bind(c.user.user_id)
+    .bind(c.tenant.tenant_id)
+    .fetch_all(&k.db)
+    .await?;
+    Ok(Value::Array(
+        rows.iter()
+            .map(|r| json!({ "id": r.get::<uuid::Uuid, _>(0).to_string(), "name": r.get::<String, _>(1) }))
+            .collect(),
+    ))
 }
 
 pub(crate) fn ctx_json(c: &crate::Caller, plugin: &str) -> Value {

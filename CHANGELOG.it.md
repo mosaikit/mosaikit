@@ -36,6 +36,12 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 - Plugin attivi o spenti per tenant, con estensioni che aggiungono campi, azioni e schede alle app.
 - Chiavi dei servizi esterni: i plugin dicono quali servizi usano, e solo quelli compaiono.
 
+### Per chi scrive plugin
+
+- La logica di un plugin conosce i gruppi della persona che la chiama (`ctx.groups`).
+- La logica può notificare la persona che la chiama, o le persone che vedono uno dei suoi elementi,
+  con la nuova operazione `notify` dell'host (`[permissions] notify = true`, `ctx.notify` nell'SDK).
+
 ### La piattaforma
 
 - Tenant con un periodo di prova, archiviati o eliminati, esportati e importati di nuovo.

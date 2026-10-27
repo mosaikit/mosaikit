@@ -3,7 +3,7 @@
 //!
 //! A notification belongs to one person and says which tenant it is about (none: the platform). The
 //! kernel produces the ones of invitations, shares and public links; a plugin sends its own through the
-//! bridge (`msk.notify`), only to the person who is using it or to the people who can see one of its
+//! bridge (`msk.notify`) or its WASM logic (host operation `notify`), only to the person who is using it or to the people who can see one of its
 //! items. Every notification arrives in the app (the bell, updated live); by email only the kinds the
 //! person chose, at once or in a daily digest (`mail`).
 
@@ -696,12 +696,9 @@ fn valid_at(s: &str) -> bool {
         && s.bytes().all(|b| b.is_ascii_alphanumeric() || b"/_-.=&?%:".contains(&b))
 }
 
-/// Sends the notification of a plugin. Safe by design: the plugin names no recipient. Without an item it
-/// reaches only the person using it; with an item of the same plugin and tenant, on which the person can
-/// write, it reaches the people who can see the item. The text is plain, the link stays inside the page of
-/// the plugin.
-pub async fn from_plugin(k: &Kernel, c: &Caller, plugin: &str, n: &PluginNote) -> Result<i64> {
-    let (p, _) = crate::access::plugin_for(k, c, plugin).await?;
+/// Checks the shape of a notification of a plugin and counts it in the limit of the minute: the same
+/// rules for the bridge and for the logic.
+pub(crate) fn check_note(k: &Kernel, c: &Caller, plugin: &str, n: &PluginNote) -> Result<()> {
     if n.title.trim().is_empty() {
         return Err(Error::bad("the title of the notification is missing"));
     }
@@ -710,18 +707,42 @@ pub async fn from_plugin(k: &Kernel, c: &Caller, plugin: &str, n: &PluginNote) -
             return Err(Error::bad("invalid place of the notification"));
         }
     }
-    {
-        let mut rate = k.notify_rate.lock().expect("rate");
-        let now = std::time::Instant::now();
-        let key = (c.user.user_id, p.id.clone());
-        let seen = rate.entry(key).or_default();
-        seen.retain(|t| now.duration_since(*t) < std::time::Duration::from_secs(60));
-        if seen.len() >= PLUGIN_RATE {
-            return Err(Error::new(crate::Kind::TooMany, "too many notifications: try again in a minute")
-                .with_code("too_many_notifications"));
-        }
-        seen.push(now);
+    let mut rate = k.notify_rate.lock().expect("rate");
+    let now = std::time::Instant::now();
+    let key = (c.user.user_id, plugin.to_string());
+    let seen = rate.entry(key).or_default();
+    seen.retain(|t| now.duration_since(*t) < std::time::Duration::from_secs(60));
+    if seen.len() >= PLUGIN_RATE {
+        return Err(Error::new(crate::Kind::TooMany, "too many notifications: try again in a minute")
+            .with_code("too_many_notifications"));
     }
+    seen.push(now);
+    Ok(())
+}
+
+/// Sends the notifications that the logic of a plugin asked for during an operation, once it has
+/// committed. Best effort: a refusal (the caller cannot write the item, it is not of the plugin) is
+/// logged and the others go on.
+pub(crate) async fn flush(k: &Kernel, c: &Caller, plugin: &str, notes: Vec<PluginNote>) {
+    for n in notes {
+        if let Err(e) = deliver(k, c, plugin, &n).await {
+            tracing::warn!(target: "plugin", plugin, "notification not sent: {}", e.message);
+        }
+    }
+}
+
+/// Sends the notification of a plugin. Safe by design: the plugin names no recipient. Without an item it
+/// reaches only the person using it; with an item of the same plugin and tenant, on which the person can
+/// write, it reaches the people who can see the item. The text is plain, the link stays inside the page of
+/// the plugin.
+pub async fn from_plugin(k: &Kernel, c: &Caller, plugin: &str, n: &PluginNote) -> Result<i64> {
+    let (p, _) = crate::access::plugin_for(k, c, plugin).await?;
+    check_note(k, c, &p.id, n)?;
+    deliver(k, c, &p.id, n).await
+}
+
+async fn deliver(k: &Kernel, c: &Caller, plugin: &str, n: &PluginNote) -> Result<i64> {
+    let (p, _) = crate::access::plugin_for(k, c, plugin).await?;
     let users = match n.resource {
         None => vec![c.user.user_id],
         Some(rid) => {

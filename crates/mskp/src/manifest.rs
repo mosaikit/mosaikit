@@ -595,6 +595,10 @@ pub struct Permissions {
     /// user: the called plugin applies its own rules.
     #[serde(default)]
     pub calls: Vec<String>,
+    /// The logic may send notifications (host operation `notify`) to the person who calls it or to the
+    /// people who see one of its items.
+    #[serde(default)]
+    pub notify: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]

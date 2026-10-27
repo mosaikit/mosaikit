@@ -573,3 +573,22 @@ Use a throwaway name such as `devcheck`; never run these where a worktree with t
 | DEV-08 | `cargo xtask clean-temp` | Sizes of every folder of `mosaikit-temp` and its `target` folders; nothing deleted |
 | DEV-09 | `cargo xtask clean-temp --days 0` while a run holds a slot | The `target` of the running worktree says `in use`, others `would delete`; nothing deleted. With `--yes` they are deleted, the worktrees stay |
 | DEV-10 | `cargo xtask worktree remove devcheck` and `devcheck2` | Folders gone, `git worktree list` and `git branch` do not show them (unmerged branches are reported and kept), main `node_modules` still full, database `mosaikit_e2e_wt_devcheck` gone |
+
+## Plugin host additions
+
+Groups in the context of the logic and the host operation `notify`. Automated twins: `cargo test -p
+mosaikit-kernel --test host_ops` (PostgreSQL, and SQLite with `MOSAIKIT_TEST_BACKEND=sqlite`) and the
+tests of `crates/plugin-sdk`. By hand you need a plugin that uses them (a development plugin whose
+manifest has `[permissions] notify = true` and whose command calls `ctx.notify` and reads `ctx.groups`).
+
+| Id | Steps | Expected |
+|---|---|---|
+| HOST-01 | As a person who is in the groups Field and Office, run a command that returns `ctx.groups` | `[{"id":…,"name":"Field"},{"id":…,"name":"Office"}]`, by name |
+| HOST-02 | The same as a person in no group; then take someone out of a group and run it again | `[]`; the change shows at the next call |
+| HOST-03 | Run a command that notifies the caller (title, text, place `items/1`) | One notification in the bell, from the plugin; its link opens the plugin at that place; nobody else gets one |
+| HOST-04 | Share an item with Bruno (read) and not with Carla; the owner runs the command with that item | Bruno gets it, Carla and the owner do not |
+| HOST-05 | Bruno (read only) runs the same command | The command succeeds; no notification is sent |
+| HOST-06 | Remove `notify = true` from the manifest and run again | The command fails saying the plugin does not declare `notify` |
+| HOST-07 | Notify with a place such as `<script>` or an empty title | Refused with a clear message; nothing is sent |
+| HOST-08 | Notify 31 times in a minute | The 31st fails with «too many notifications» |
+| HOST-09 | As a person of another tenant, name the id of an item of the first tenant | Nothing is sent to anyone, in either tenant |

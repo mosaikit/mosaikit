@@ -45,6 +45,7 @@ impl MockHost {
                 tenant: Some("00000000-0000-0000-0000-0000000000aa".into()),
                 plugin: "com.test.plugin".into(),
                 perms: ["use", "create", "delete", "share"].map(String::from).to_vec(),
+                groups: Vec::new(),
                 config: serde_json::Value::Null,
             },
             ..MockHost::default()
@@ -55,6 +56,21 @@ impl MockHost {
     pub fn on(self, op: &str, f: impl FnMut(&Value) -> Result<Value, String> + 'static) -> MockHost {
         self.inner.borrow_mut().handlers.insert(op.to_string(), Box::new(f));
         self
+    }
+
+    /// Groups of the caller in the test (`ctx.groups`).
+    pub fn with_groups(mut self, groups: &[(&str, &str)]) -> MockHost {
+        self.ctx.groups = groups
+            .iter()
+            .map(|(id, name)| crate::Group { id: id.to_string(), name: name.to_string() })
+            .collect();
+        self
+    }
+
+    /// The notifications the logic sent (`ctx.notify`), as the host receives them. Without a handler
+    /// for `notify` the mock accepts them.
+    pub fn notifications(&self) -> Vec<Value> {
+        self.inner.borrow().calls.iter().filter(|(op, _)| op == "notify").map(|(_, b)| b.clone()).collect()
     }
 
     pub fn calls(&self) -> Vec<(String, Value)> {
@@ -128,6 +144,7 @@ pub(crate) fn mock_call(msg: &[u8]) -> Option<Vec<u8>> {
                 Ok(v) => json!({ "ok": v }),
                 Err(e) => json!({ "err": e }),
             },
+            None if op == "notify" => json!({ "ok": null }),
             None => json!({ "err": format!("MockHost: no answer for {op}") }),
         }
     });
@@ -168,7 +185,7 @@ mod tests {
 
     crate::plugin! {
         hooks: { "notes.before_create" => default_tag, "notes.before_update" => reject },
-        commands: { "notes.count" => count },
+        commands: { "notes.count" => count, "t.greet" => greet },
     }
 
     #[test]
@@ -188,6 +205,32 @@ mod tests {
         assert_eq!(host.hook(&reg, "before_update", "notes", json!({})), Err("forbidden".into()));
         // hook not registered: pass-through
         assert_eq!(host.hook(&reg, "after_delete", "notes", json!({})).unwrap(), None);
+    }
+
+    fn greet(ctx: &Ctx, args: Value) -> Result<Value> {
+        let names: Vec<&str> = ctx.groups.iter().map(|g| g.name.as_str()).collect();
+        let n = Notice::new("Hello").body(&names.join(",")).at("notes/1");
+        ctx.notify(&if args.is_null() { n } else { n.resource("r1") })?;
+        Ok(json!(names))
+    }
+
+    #[test]
+    fn groups_and_notifications() {
+        let reg = __msk_registry();
+        let host = MockHost::new();
+        assert_eq!(host.command(&reg, "t.greet", Value::Null), Ok(json!([])));
+        let host = MockHost::new().with_groups(&[("g1", "Field"), ("g2", "Office")]);
+        assert_eq!(host.command(&reg, "t.greet", json!(1)), Ok(json!(["Field", "Office"])));
+        assert_eq!(
+            host.notifications(),
+            vec![json!({ "title": "Hello", "body": "Field,Office", "at": "notes/1", "resource": "r1" })]
+        );
+        // a refusal of the host is an error of the logic
+        let host = MockHost::new().on("notify", |_| Err("too many notifications".into()));
+        assert_eq!(host.command(&reg, "t.greet", Value::Null), Err("too many notifications".into()));
+        // an old message without `groups` still deserializes
+        let ctx: Ctx = serde_json::from_value(json!({ "plugin": "x" })).unwrap();
+        assert!(ctx.groups.is_empty());
     }
 
     #[test]

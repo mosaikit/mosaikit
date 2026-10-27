@@ -36,6 +36,12 @@ in step).
 - Plugins on and off per tenant, with extensions that add fields, actions and tabs to the apps.
 - Keys of outside services: the plugins say which services they use, and only those are listed.
 
+### For plugin authors
+
+- The logic of a plugin knows the groups of the person who calls it (`ctx.groups`).
+- The logic can notify the person who calls it, or the people who can see one of its items, with the
+  new `notify` host operation (`[permissions] notify = true`, `ctx.notify` in the SDK).
+
 ### The platform
 
 - Tenants with a trial period, archived or deleted, exported and imported again.
