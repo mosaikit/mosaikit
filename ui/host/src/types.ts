@@ -829,6 +829,8 @@ export interface TrashItem {
 
 export interface TrashList {
   items: TrashItem[]
+  total: number
+  next: string | null
   retention_days: number
 }
 

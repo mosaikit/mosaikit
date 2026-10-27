@@ -26,7 +26,7 @@ pub struct InvitationInfo {
 const INVITE_SQL: &str = "
     select i.id, t.slug, t.name, u.id, u.username || '@' || h.slug, i.role,
            case when i.status = 'pending' and i.expires_at < now() then 'expired' else i.status end,
-           coalesce(nullif(b.display_name, ''), b.username), i.created_at, i.expires_at
+           coalesce(nullif(b.display_name, ''), b.username), i.created_at, i.expires_at, i.created_at::text
     from core.invitations i
     join core.tenants t on t.id = i.tenant_id
     join core.users u on u.id = i.user_id
@@ -125,6 +125,42 @@ pub async fn tenant_invitations(k: &Kernel, c: &Caller) -> Result<Vec<Invitation
         .fetch_all(&k.db)
         .await?;
     rows.iter().map(invitation).collect()
+}
+
+/// A page of the invitations of the tenant, the latest first (keyset on the creation time), with how
+/// many are still pending.
+pub async fn tenant_invitations_page(
+    k: &Kernel,
+    c: &Caller,
+    p: &crate::paging::PageQuery,
+) -> Result<(crate::paging::Page<InvitationInfo>, i64)> {
+    c.require_manager()?;
+    let counts = mosaikit_db::query(
+        "select count(*), coalesce(sum(case when status = 'pending' and expires_at >= now() then 1 else 0 end), 0)
+         from core.invitations where tenant_id = $1",
+    )
+    .bind(c.tenant.tenant_id)
+    .fetch_one(&k.db)
+    .await?;
+    let (total, pending): (i64, i64) = (counts.get(0), counts.get(1));
+    let limit = p.limit();
+    let after = p.after()?;
+    let cursor = if after.is_some() { "and (i.created_at, i.id) < ($2::timestamptz, $3::uuid)" } else { "" };
+    let mut q = mosaikit_db::query(format!(
+        "{INVITE_SQL} where i.tenant_id = $1 {cursor} order by i.created_at desc, i.id desc limit {}",
+        limit + 1
+    ))
+    .bind(c.tenant.tenant_id);
+    if let Some((text, id)) = &after {
+        q = q.bind(text.clone()).bind(*id);
+    }
+    let rows = q.fetch_all(&k.db).await?;
+    let items = rows
+        .iter()
+        .map(|r| invitation(r).map(|x| (x, r.get::<String, _>(10))))
+        .collect::<Result<Vec<_>>>()?;
+    let pg = crate::paging::page(items, limit, total, |(x, key)| (key.clone(), x.id));
+    Ok((crate::paging::Page { items: pg.items.into_iter().map(|(x, _)| x).collect(), total: pg.total, next: pg.next }, pending))
 }
 
 pub async fn revoke_invitation(k: &Kernel, c: &Caller, id: Uuid) -> Result<()> {

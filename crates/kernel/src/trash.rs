@@ -121,6 +121,33 @@ pub async fn list(k: &Kernel, c: &Caller, plugin: Option<&str>, q: Option<&str>)
         .collect())
 }
 
+/// A page of the trash, the latest deleted first (keyset on the time of deletion), filtered by app and
+/// by words in the title. The trash is bounded (retention and the cap of `list`), so it is cut in memory.
+pub async fn list_page(
+    k: &Kernel,
+    c: &Caller,
+    plugin: Option<&str>,
+    p: &crate::paging::PageQuery,
+) -> Result<crate::paging::Page<TrashItem>> {
+    let mut all = list(k, c, plugin, p.q.as_deref()).await?;
+    all.sort_by(|a, b| (b.deleted_at, b.id).cmp(&(a.deleted_at, a.id)));
+    let total = all.len() as i64;
+    let after = p
+        .after()?
+        .map(|(t, id)| DateTime::parse_from_rfc3339(&t).map(|d| (d.with_timezone(&Utc), id)))
+        .transpose()
+        .map_err(|_| Error::bad("invalid cursor"))?;
+    let limit = p.limit();
+    let rows: Vec<TrashItem> = all
+        .into_iter()
+        .filter(|x| after.is_none_or(|a| (x.deleted_at, x.id) < a))
+        .take(limit as usize + 1)
+        .collect();
+    Ok(crate::paging::page(rows, limit, total, |x| {
+        (x.deleted_at.to_rfc3339_opts(chrono::SecondsFormat::Micros, true), x.id)
+    }))
+}
+
 struct Entry {
     plugin_id: String,
     title: String,

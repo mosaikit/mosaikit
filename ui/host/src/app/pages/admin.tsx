@@ -31,6 +31,7 @@ import { TenantPluginsOfAdmin } from './plugins.tsx'
 import { PlatformQuotasPanel, TenantQuotasPanel } from '../Quotas.tsx'
 import { BackupPanel, ImportTenantDialog, MaintenancePanel, NewTenantWizard, OverviewOps, TenantLifecycle, TenantState } from './operations.tsx'
 import { t } from '../i18n.ts'
+import { AdminWidgets } from '../Overview.tsx'
 import { LayoutPanel, StylePanel } from '../LayoutSettings.tsx'
 import { TenantContact, TenantIdentity } from '../TenantContact.tsx'
 
@@ -61,6 +62,7 @@ export function AdminOverview({ session }: { session: Session }) {
           </div>
         )}
         <OverviewOps />
+        <AdminWidgets />
         {q.data?.tenants === 0 && (
           <Empty icon={<Building2 />} title={t('No tenants')}>
             <Button className="mt-2" onClick={() => go(to.admin('tenants'))}>

@@ -540,9 +540,25 @@ Needs many rows: the data of the load test (`cargo xtask perf --scale probe`, th
 | R1-L-14 | Administrator › a tenant | The logo (or the initials) is next to the name in the header |
 | R1-L-15 | Language Italian, then English, as Administrator | Italian says «Organizzazione» / «Organizzazioni» (the role stays «Tenant Manager»); English says «Tenants» |
 | R1-L-16 | Sidebar of an app with pages (Notes › Mine), open, then closed to icons | Open: the pages are indented under the app. Closed: the small arrow on the icon opens a menu with the pages and their sub-pages |
-| R1-L-17 | Mockup `docs/mockup`, Home of the User, Overview of the Tenant Manager and of the Administrator | The overview is a set of widgets: fast figures, notifications, recent activity, due dates and problems, a trend; the apps are a compact strip (design to verify before it is built) |
+| R1-L-17 | Mockup `docs/mockup`, Home of the User, Overview of the Tenant Manager and of the Administrator | The overview is a set of widgets: fast figures, notifications, recent activity, due dates and problems, a trend; the apps are a compact strip (verified: built, see Review round 1 - overview) |
 
 ---
+
+## Review round 1 - overview
+
+Automated twin of every check: the test «Review round 1, overview» of `e2e/tests/platform.spec.ts` (the steps carry the ids). The figures come from cheap sources: counters of the overview, the snapshot of the platform figures, pages of five rows.
+
+| Id | Check | Expected |
+|---|---|---|
+| R1-O-01 | Home of a User | The apps are chips in a strip under the title; then fast figures (items, unread notifications, shared by me, shared with me), «Pick up where you left off», «Due soon», «For you», «My recent activity» and «Shared by me» |
+| R1-O-02 | Overview of a Tenant Manager | Chips of the apps; figures of the tenant; «Waiting for you» (access requests, invitations, public links, each with its button), «Active people» with a trend, «Recent activity» (five events of the Log), «For you», usage; then «Your space» with the personal lists |
+| R1-O-03 | Platform overview (Administrator) | Figures, Services, To do, «Tenants by storage used» (top five, from the snapshot), «Requests» with a trend, «For you», «Recent errors»; the time of the figures and Refresh are still there |
+| R1-O-04 | The three overviews at phone width (390 px) | One column, no horizontal scroll |
+| R1-O-05 | Italian | Every widget title is translated (for example «Errori recenti», «Organizzazioni per spazio usato», «In attesa di te») |
+| R1-O-06 | The three overviews in light, dark and high contrast | No serious accessibility problem (axe) |
+| R1-O-07 | Tenant Manager › Manage | The sections (People, Groups, Permission profiles, Pending) are the «Show» group of the filter column; People has the search in the column and, with a row ticked, «1 selected» and the actions in the header |
+| R1-O-08 | Tenant Manager › Shares and Trash | Filter column (Show, Apps, search) and selection bar in the header (Revoke shares and links; Restore, Delete for good) |
+| R1-O-09 | Trash, Shared by me (Home) and Invitations (Manage › Pending) with more than one page | The next rows load while scrolling; the server answers a page (`?limit=`) with the total and the cursor |
 
 ## Review round 1 - tenant and people
 

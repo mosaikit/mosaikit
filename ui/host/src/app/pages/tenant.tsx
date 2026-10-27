@@ -11,6 +11,7 @@ import { UiContext, useUi, type Ui } from '../../ui-context.ts'
 import ShareDialog from '../ShareDialog.tsx'
 import { SharedByMeSection } from './history.tsx'
 import type { AccessRequest, Group, HomeItem, Invitation, LinkInfo, Member, Overview, Profile, ResetLink, ResourceRow, Revoked, Session, TenantContext, TenantKpi, TenantSettings } from '../../types.ts'
+import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -25,9 +26,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { PersonPicture } from '../picture.tsx'
 import { isApp, passwordMin, useAction, useApi, useConfig, useConfirm, usePaged, useTenantCtx, type PageOf } from '../core.ts'
 import { fmtDay, t, useLang } from '../i18n.ts'
-import { Empty, ErrorBox, FormDialog, Kpi, Loading, MoreRows, PageHeader, Pills, PluginKpis, SaveBar, SelectAllRows, Sections, StatusBadge, Tabs } from '../kit.tsx'
+import { Empty, ErrorBox, FormDialog, Kpi, Loading, MoreRows, PageHeader, PluginKpis, SaveBar, SelectAllRows, Sections, StatusBadge, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
-import { useNoteList } from '../notes.ts'
+import { useNoteList, useUnread } from '../notes.ts'
 import { NoteRow } from '../notifications.tsx'
 import { effectiveMode, useTheme } from '../theme.ts'
 import AppIcon from '../AppIcon.tsx'
@@ -35,13 +36,19 @@ import { ImportDialog, InviteManyDialog } from '../BulkPeople.tsx'
 import { TenantTheme } from '../ThemeSettings.tsx'
 import { useTenantSignIn } from '../signin.ts'
 import { LinkDialog, ProfilesSection, RequestsTable } from './people.tsx'
+import { ActivityWidget, AppsStrip, NotesWidget, TrendWidget, WaitingWidget, Widget, WidgetGrid } from '../Overview.tsx'
+import { describe } from '../logtext.ts'
+import { BulkBar, FilterColumn, ListPage, type FacetGroup } from '../listkit.tsx'
 import { EmbeddingPanel, IdentityPanel, KeysPanel, LanguagesPanel, ManagedPanel, ModePanel, NotificationsPanel, SecurityPanel } from '../SettingsPanels.tsx'
 import { UsageAlerts, UsageConsumers, UsagePanel, UsageQuotas, UsageTrend } from '../Quotas.tsx'
 import { totals, trashHint } from '../usage.ts'
 import { LayoutPanel, StylePanel } from '../LayoutSettings.tsx'
 
 const enc = encodeURIComponent
-const ROLE: Record<string, string> = { tenant_manager: 'Tenant Manager', user: 'User' }
+const ROLE: Record<string, string> = {
+  tenant_manager: 'Tenant Manager',
+  user: 'User',
+}
 
 /* ── Overview ────────────────────────────────────────────────────────── */
 
@@ -52,7 +59,7 @@ function greeting(): string {
 }
 
 /** The Home as in the mockup: what to pick up again, what is due soon, what is for you (notifications). */
-function HomeLists({ slug, pickUp, due }: { slug: string; pickUp: HomeItem[]; due: HomeItem[] }) {
+function HomeLists({ slug, pickUp, due, notifications = true }: { slug: string; pickUp: HomeItem[]; due: HomeItem[]; notifications?: boolean }) {
   const notes = useNoteList({ limit: 4 })
   const [today] = useState(() => new Date().toISOString().slice(0, 10))
   const item = (x: HomeItem, when: ReactNode) => (
@@ -77,7 +84,7 @@ function HomeLists({ slug, pickUp, due }: { slug: string; pickUp: HomeItem[]; du
     </section>
   )
   return (
-    <div className="grid gap-4 md:grid-cols-3">
+    <div className={cn('grid gap-4', notifications ? 'md:grid-cols-3' : 'md:grid-cols-2')}>
       {box(
         'home-pick-up',
         t('Pick up where you left off'),
@@ -94,22 +101,23 @@ function HomeLists({ slug, pickUp, due }: { slug: string; pickUp: HomeItem[]; du
           <p className="text-sm text-muted-foreground">{t('Nothing due in the next 7 days.')}</p>
         ),
       )}
-      {box(
-        'home-for-you',
-        t('For you'),
-        (notes.data?.items ?? []).length ? (
-          <ul className="grid gap-1">
-            {(notes.data?.items ?? []).map((n) => (
-              <NoteRow key={n.id} n={n} />
-            ))}
-          </ul>
-        ) : (
-          <p className="text-sm text-muted-foreground">{t('No notifications')}</p>
-        ),
-        <a href={to.tenant(slug, 'notifications')} className="text-sm text-primary-strong underline-offset-4 hover:underline">
-          {t('All notifications')}
-        </a>,
-      )}
+      {notifications &&
+        box(
+          'home-for-you',
+          t('For you'),
+          (notes.data?.items ?? []).length ? (
+            <ul className="grid gap-1">
+              {(notes.data?.items ?? []).map((n) => (
+                <NoteRow key={n.id} n={n} />
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground">{t('No notifications')}</p>
+          ),
+          <a href={to.tenant(slug, 'notifications')} className="text-sm text-primary-strong underline-offset-4 hover:underline">
+            {t('All notifications')}
+          </a>,
+        )}
     </div>
   )
 }
@@ -117,67 +125,90 @@ function HomeLists({ slug, pickUp, due }: { slug: string; pickUp: HomeItem[]; du
 export function TenantHome({ session, slug }: { session: Session; slug: string }) {
   const ctx = useTenantCtx(slug)
   const o = useApi<Overview>(['overview', slug], `/api/t/${enc(slug)}/overview`)
+  const unread = useUnread().data ?? 0
   if (ctx.isLoading || o.isLoading) return <Loading />
   if (ctx.error) return <ErrorBox error={ctx.error} />
   const c = ctx.data!
   const d = o.data
   const me = totals(d?.me.resources ?? [])
-  const mine = me.count
+  const manager = c.tenant.role === 'tenant_manager'
+  const days = d?.tenant?.activity ?? []
+  const personal = (
+    <>
+      {d && (
+        <section className="grid gap-3" aria-label={t('Your space')}>
+          <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3">
+            <Kpi label={t('Your items')} value={me.count} hint={[fmtBytes(me.bytes), trashHint(me.trashCount, 'items')].filter(Boolean).join(' · ')} />
+            <Kpi label={t('Unread notifications')} value={unread} hint={t('the latest below')} onClick={() => go(to.tenant(slug, 'notifications'))} />
+            <Kpi label={t('Shared by me')} value={d.me.shared_by_me} />
+            <Kpi label={t('Shared with me')} value={d.me.shared_with_me} hint={`${t('My active public links')}: ${d.me.public_links} · ${t('{n} views', { n: d.me.link_views })}`} />
+          </div>
+        </section>
+      )}
+      {d && <HomeLists slug={slug} pickUp={d.me.pick_up ?? []} due={d.me.due ?? []} notifications={!manager} />}
+      {d && d.me.activity.length > 0 && (
+        <WidgetGrid>
+          <Widget id="ov-mine" title={t('My recent activity')} span>
+            <ul className="grid gap-0.5">
+              {d.me.activity.slice(0, 5).map((e, i) => (
+                <li key={i} className="flex items-baseline justify-between gap-3 py-0.5 text-sm">
+                  <span className="min-w-0 truncate">{[describe(e), e.title].filter(Boolean).join(' · ')}</span>
+                  <span className="shrink-0 text-xs text-muted-foreground">{fmtDate(e.ts)}</span>
+                </li>
+              ))}
+            </ul>
+          </Widget>
+        </WidgetGrid>
+      )}
+      <SharedByMeSection slug={slug} />
+    </>
+  )
   return (
     <>
-      <PageHeader
-        title={c.tenant.role === 'tenant_manager' ? t('Tenant overview') : t('Home')}
-        sub={`${greeting()}, ${session.user.display_name || session.user.username} · ${ROLE[c.tenant.role]} in ${c.tenant.name}`}
-      />
+      <PageHeader title={manager ? t('Tenant overview') : t('Home')} sub={`${greeting()}, ${session.user.display_name || session.user.username} · ${ROLE[c.tenant.role]} in ${c.tenant.name}`} />
       <div className="grid gap-6 p-6 max-[620px]:p-4">
-        {d && (
-          <section className="grid gap-3">
-            <h2 className="text-sm font-semibold">{t('Your space')}</h2>
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3">
-              <Kpi label={t('Your items')} value={mine} hint={[fmtBytes(me.bytes), trashHint(me.trashCount, 'items')].filter(Boolean).join(' · ')} />
-              <Kpi label={t('Shared by me')} value={d.me.shared_by_me} />
-              <Kpi label={t('Shared with me')} value={d.me.shared_with_me} />
-              <Kpi label={t('My active public links')} value={d.me.public_links} hint={t('{n} views', { n: d.me.link_views })} />
-            </div>
-          </section>
+        {!c.plugins.some(isApp) ? (
+          <Empty icon={<Grid2x2 />} title={t('No active apps')}>
+            {t('An Administrator installs and turns them on.')}
+          </Empty>
+        ) : (
+          <AppsStrip slug={slug} plugins={c.plugins} />
         )}
-        {d && <HomeLists slug={slug} pickUp={d.me.pick_up ?? []} due={d.me.due ?? []} />}
-        <SharedByMeSection slug={slug} />
-        {d?.tenant && (
-          <section className="grid gap-3">
-            <h2 className="text-sm font-semibold">{t('The tenant {name}', { name: c.tenant.name })}</h2>
+        {manager && d?.tenant && (
+          <section className="grid gap-4" aria-label={t('The tenant {name}', { name: c.tenant.name })}>
             <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3">
               <Kpi label={t('Members')} value={d.tenant.members} hint={t('{count} guests', { count: d.tenant.guests })} onClick={() => go(to.tenant(slug, 'manage'))} />
               <Kpi label={t('Active users (30 days)')} value={d.tenant.active_users_30d} />
               <Kpi label={t('Items')} value={d.tenant.resources.reduce((s, r) => s + r.count, 0)} />
-              <Kpi label={t('Shares')} value={d.tenant.shares} hint={t('{count} public links', { count: d.tenant.public_links })} onClick={() => go(to.tenant(slug, 'shares'))} />
+              <Kpi
+                label={t('Shares')}
+                value={d.tenant.shares}
+                hint={t('{count} public links', {
+                  count: d.tenant.public_links,
+                })}
+                onClick={() => go(to.tenant(slug, 'shares'))}
+              />
             </div>
+            <WidgetGrid>
+              <WaitingWidget slug={slug} publicLinks={d.tenant.public_links} />
+              <TrendWidget
+                id="ov-people"
+                title={t('Active people')}
+                figure={d.tenant.active_users_30d}
+                caption={t('signed in the last 30 days, of {n}', {
+                  n: d.tenant.members,
+                })}
+                values={days.map((x) => x.users)}
+                link={{ href: to.tenant(slug, 'manage'), label: t('People') }}
+              />
+              <ActivityWidget slug={slug} />
+              <NotesWidget href={to.tenant(slug, 'notifications')} />
+            </WidgetGrid>
             <UsagePanel slug={slug} />
           </section>
         )}
-        <section className="grid gap-3">
-          <h2 className="text-sm font-semibold">{t('Apps')}</h2>
-          {!c.plugins.some(isApp) ? (
-            <Empty icon={<Grid2x2 />} title={t('No active apps')}>
-              {t('An Administrator installs and turns them on.')}
-            </Empty>
-          ) : (
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3">
-              {c.plugins.filter(isApp).map((p) => (
-                <button
-                  key={p.id}
-                  type="button"
-                  onClick={() => go(to.plugin(slug, p.id))}
-                  className="flex flex-col gap-1.5 rounded-xl border bg-card p-4 text-left hover:border-primary/50 hover:bg-accent/40"
-                >
-                  <AppIcon id={p.id} name={p.icon_name} className="size-[22px] fill-current text-primary [fill-opacity:0.12]" />
-                  <b className="text-base font-semibold">{p.label}</b>
-                  <span className="line-clamp-2 text-xs text-muted-foreground">{p.description}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </section>
+        {manager && <h2 className="-mb-3 text-sm font-semibold">{t('Your space')}</h2>}
+        {personal}
       </div>
     </>
   )
@@ -194,7 +225,12 @@ function useDevReload(session: Session, slug: string): Record<string, number> {
     const es = new EventSource(appUrl('/api/dev/events'))
     es.onmessage = (m) => {
       try {
-        const ev = JSON.parse(m.data) as { type: string; id: string; what?: string; error?: string }
+        const ev = JSON.parse(m.data) as {
+          type: string
+          id: string
+          what?: string
+          error?: string
+        }
         if (ev.type === 'plugin_changed') {
           setReloads((r) => ({ ...r, [ev.id]: (r[ev.id] ?? 0) + 1 }))
           if (ev.what === 'schema') void qc.invalidateQueries({ queryKey: ['ctx', slug] })
@@ -214,12 +250,24 @@ export function PluginPage({ session, slug, id, at }: { session: Session; slug: 
   // language, theme and mode of the shell: they reach the plugin at start and at every change
   const lang = useLang()
   const th = useTheme()
-  const ui = { lang, preset: th.preset, mode: effectiveMode(th), preference: th.mode, contrast: th.contrast }
+  const ui = {
+    lang,
+    preset: th.preset,
+    mode: effectiveMode(th),
+    preference: th.mode,
+    contrast: th.contrast,
+  }
   const base = useUi()
   const reloads = useDevReload(session, slug)
   const [share, setShare] = useState<{ id: string; done: () => void } | null>(null)
   // the sharing asked by the plugin opens the dialog of the host, which knows the tenant
-  const services = useMemo<Ui>(() => ({ ...base, share: (rid) => new Promise<void>((done) => setShare({ id: rid, done })) }), [base])
+  const services = useMemo<Ui>(
+    () => ({
+      ...base,
+      share: (rid) => new Promise<void>((done) => setShare({ id: rid, done })),
+    }),
+    [base],
+  )
   if (ctx.isLoading) return <Loading />
   if (ctx.error) return <ErrorBox error={ctx.error} />
   const c: TenantContext = ctx.data!
@@ -253,27 +301,62 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
   const members = useApi<Member[]>(['members', slug], section === 'groups' ? `${base}/members` : null)
   const people = usePaged<Member>(['members', slug, 'count'], `${base}/members`, {}, 1)
   const groups = useApi<Group[]>(['groups', slug], `${base}/groups`)
-  const invites = useApi<Invitation[]>(['invites', slug], `${base}/invitations`)
+  // a page at a time; the first one also says how many are pending
+  const invites = usePaged<Invitation, PageOf<Invitation> & { pending: number }>(['invites', slug], `${base}/invitations`, {}, 20)
   const profiles = useApi<Profile[]>(['profiles', slug], `${base}/profiles`)
   const requests = useApi<AccessRequest[]>(['requests', slug], `/api/t/${enc(slug)}/requests`)
   const cur = ['people', 'groups', 'profiles', 'pending'].includes(section ?? '') ? section! : 'people'
-  const pending = (invites.data?.filter((i) => i.status === 'pending').length ?? 0) + (requests.data?.length ?? 0)
+  const pending = (invites.first?.pending ?? 0) + (requests.data?.length ?? 0)
   const sections = [
-    { id: 'people', label: t('People'), icon: <Users />, count: people.isLoading ? undefined : people.total },
-    { id: 'groups', label: t('Groups'), icon: <Grid2x2 />, count: groups.data?.length },
-    { id: 'profiles', label: t('Permission profiles'), icon: <KeySquare />, count: profiles.data?.length },
+    {
+      id: 'people',
+      label: t('People'),
+      icon: <Users />,
+      count: people.isLoading ? undefined : people.total,
+    },
+    {
+      id: 'groups',
+      label: t('Groups'),
+      icon: <Grid2x2 />,
+      count: groups.data?.length,
+    },
+    {
+      id: 'profiles',
+      label: t('Permission profiles'),
+      icon: <KeySquare />,
+      count: profiles.data?.length,
+    },
     { id: 'pending', label: t('Pending'), icon: <Mail />, count: pending },
   ]
   const [dlg, setDlg] = useState<null | 'member' | 'group' | 'invite' | 'profile' | 'import' | 'invite-many'>(null)
-  const inval = [['members', slug], ['groups', slug], ['invites', slug], ['overview', slug], ['profiles', slug]]
-  const create = useAction((v: Record<string, string>) => api('POST', `${base}/members`, v), { ok: (v) => t('User {username} created', { username: v.username }), invalidate: inval })
-  const newGroup = useAction((v: Record<string, string>) => api('POST', `${base}/groups`, v), { ok: (v) => t('Group {name} created', { name: v.name }), invalidate: inval })
-  const invite = useAction((v: Record<string, string>) => api('POST', `${base}/invitations`, { ...v, profile: v.profile === 'default' ? null : v.profile }), { ok: t('Invitation sent'), invalidate: inval })
-  const newProfile = useAction((v: Record<string, string>) => api('POST', `${base}/profiles`, v), { ok: (v) => t('Profile {name} created', { name: v.name }), invalidate: inval })
-  const profileChoices: [string, string][] = [
-    ['default', t('Default profile')],
-    ...(profiles.data ?? []).filter((p) => !p.is_default).map((p): [string, string] => [p.id, p.name]),
+  const inval = [
+    ['members', slug],
+    ['groups', slug],
+    ['invites', slug],
+    ['overview', slug],
+    ['profiles', slug],
   ]
+  const create = useAction((v: Record<string, string>) => api('POST', `${base}/members`, v), {
+    ok: (v) => t('User {username} created', { username: v.username }),
+    invalidate: inval,
+  })
+  const newGroup = useAction((v: Record<string, string>) => api('POST', `${base}/groups`, v), {
+    ok: (v) => t('Group {name} created', { name: v.name }),
+    invalidate: inval,
+  })
+  const invite = useAction(
+    (v: Record<string, string>) =>
+      api('POST', `${base}/invitations`, {
+        ...v,
+        profile: v.profile === 'default' ? null : v.profile,
+      }),
+    { ok: t('Invitation sent'), invalidate: inval },
+  )
+  const newProfile = useAction((v: Record<string, string>) => api('POST', `${base}/profiles`, v), {
+    ok: (v) => t('Profile {name} created', { name: v.name }),
+    invalidate: inval,
+  })
+  const profileChoices: [string, string][] = [['default', t('Default profile')], ...(profiles.data ?? []).filter((p) => !p.is_default).map((p): [string, string] => [p.id, p.name])]
   const action =
     cur === 'profiles' ? (
       <Button onClick={() => setDlg('profile')}>
@@ -323,38 +406,49 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
         </Button>
       </div>
     )
+  const nav: FacetGroup = {
+    id: 'section',
+    label: t('Show'),
+    value: cur,
+    onChange: (id) => go(to.tenant(slug, 'manage', id)),
+    options: sections.map((x) => ({
+      id: x.id,
+      label: x.label,
+      count: x.count,
+    })),
+  }
+  const shell: Shell = {
+    title: t('Manage'),
+    sub: {
+      people: t('{count} people', { count: people.total }),
+      groups: t('{count} groups', { count: groups.data?.length ?? 0 }),
+      profiles: t('{count} profiles', { count: profiles.data?.length ?? 0 }),
+      pending: t('{count} pending', { count: pending }),
+    }[cur],
+    actions: action,
+    nav,
+  }
   return (
     <>
-      <PageHeader
-        title={t('Manage')}
-        crumbs={[{ label: t('Tenant management') }]}
-        sub={
-          {
-            people: t('{count} people', { count: people.total }),
-            groups: t('{count} groups', { count: groups.data?.length ?? 0 }),
-            profiles: t('{count} profiles', { count: profiles.data?.length ?? 0 }),
-            pending: t('{count} pending', { count: pending }),
-          }[cur]
-        }
-        actions={action}
-      />
-      <Sections sections={sections} current={cur} href={(id) => to.tenant(slug, 'manage', id)}>
-        {cur === 'people' && <People slug={slug} profiles={profiles.data ?? []} groups={groups.data ?? []} />}
-        {cur === 'groups' && <Groups slug={slug} members={members.data ?? []} />}
-        {cur === 'profiles' && <ProfilesSection slug={slug} />}
-        {cur === 'pending' && (
-          <div className="grid gap-6">
-            <section className="grid gap-2" aria-label={t('Access requests')}>
-              <h2 className="text-sm font-semibold">{t('Access requests')}</h2>
-              <RequestsTable slug={slug} manager />
-            </section>
-            <section className="grid gap-2" aria-label={t('Invitations')}>
-              <h2 className="text-sm font-semibold">{t('Invitations')}</h2>
-              <Invites slug={slug} q={invites} />
-            </section>
-          </div>
-        )}
-      </Sections>
+      {cur === 'people' && <People slug={slug} profiles={profiles.data ?? []} groups={groups.data ?? []} shell={shell} />}
+      {cur === 'groups' && <Groups slug={slug} members={members.data ?? []} shell={shell} />}
+      {(cur === 'profiles' || cur === 'pending') && (
+        <ListPage title={shell.title} sub={shell.sub} actions={shell.actions} filters={<FilterColumn groups={[nav]} />}>
+          {cur === 'profiles' && <ProfilesSection slug={slug} />}
+          {cur === 'pending' && (
+            <div className="grid gap-6">
+              <section className="grid gap-2" aria-label={t('Access requests')}>
+                <h2 className="text-sm font-semibold">{t('Access requests')}</h2>
+                <RequestsTable slug={slug} manager />
+              </section>
+              <section className="grid gap-2" aria-label={t('Invitations')}>
+                <h2 className="text-sm font-semibold">{t('Invitations')}</h2>
+                <Invites slug={slug} q={invites} />
+              </section>
+            </div>
+          )}
+        </ListPage>
+      )}
       <FormDialog
         open={dlg === 'member'}
         onOpenChange={(o) => !o && setDlg(null)}
@@ -386,8 +480,19 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
         fields={[
           { name: 'tenant', label: t('Home tenant'), required: true },
           { name: 'username', label: t('Username'), required: true },
-          { name: 'role', label: t('Role'), options: [['user', 'User'], ['tenant_manager', 'Tenant Manager']] },
-          { name: 'profile', label: t('Permission profile'), options: profileChoices },
+          {
+            name: 'role',
+            label: t('Role'),
+            options: [
+              ['user', 'User'],
+              ['tenant_manager', 'Tenant Manager'],
+            ],
+          },
+          {
+            name: 'profile',
+            label: t('Permission profile'),
+            options: profileChoices,
+          },
         ]}
         submit={t('Send the invitation')}
         onSubmit={(v) => invite.mutateAsync(v)}
@@ -410,9 +515,15 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
   )
 }
 
-type Q<T> = { data?: T; isLoading: boolean; error: unknown }
+/** What Manage gives to each section: the header and the section list of the filter column. */
+interface Shell {
+  title: string
+  sub: ReactNode
+  actions: ReactNode
+  nav: FacetGroup
+}
 
-function People({ slug, profiles, groups }: { slug: string; profiles: Profile[]; groups: Group[] }) {
+function People({ slug, profiles, groups, shell }: { slug: string; profiles: Profile[]; groups: Group[]; shell: Shell }) {
   const pwMin = passwordMin(useConfig(slug))
   const oidc = useTenantSignIn(slug) === 'oidc'
   const base = `/api/t/${enc(slug)}/manage/members`
@@ -420,7 +531,9 @@ function People({ slug, profiles, groups }: { slug: string; profiles: Profile[];
   const [search, setSearch] = useState('')
   const words = useDeferredValue(search.trim())
   // a page at a time, searched on the server
-  const q = usePaged<Member>(['members', slug, 'page'], base, { q: words || undefined })
+  const q = usePaged<Member>(['members', slug, 'page'], base, {
+    q: words || undefined,
+  })
   const [everyone, setEveryone] = useState(false)
   const [selKey, setSelKey] = useState(words)
   if (selKey !== words) {
@@ -439,7 +552,9 @@ function People({ slug, profiles, groups }: { slug: string; profiles: Profile[];
     ok: t('Person removed from the tenant'),
     invalidate: [...inval, ['m-resources', slug]],
   })
-  const resetPw = useAction(({ id, password }: { id: string; password: string }) => api('POST', `${base}/${id}/password`, { password }), { ok: t('Password reset') })
+  const resetPw = useAction(({ id, password }: { id: string; password: string }) => api('POST', `${base}/${id}/password`, { password }), {
+    ok: t('Password reset'),
+  })
   const setProfile = useAction(({ ids, profile }: { ids: string[]; profile: string | null }) => Promise.all(ids.map((id) => api('PUT', `${base}/${id}/profile`, { profile }))), {
     ok: t('Profile updated'),
     invalidate: [...inval, ['profiles', slug]],
@@ -456,85 +571,103 @@ function People({ slug, profiles, groups }: { slug: string; profiles: Profile[];
   const sendLink = useAction((m: Member) => api<ResetLink>('POST', `${base}/${m.user_id}/reset-link`), {})
   // the new owner of the items of a person removed is chosen among every member
   const everyMember = useApi<Member[]>(['members', slug], removing ? base : null)
-  if (q.isLoading) return <Loading />
-  if (q.error) return <ErrorBox error={q.error} />
+  const frame = (bar: ReactNode, content: ReactNode) => (
+    <ListPage
+      title={shell.title}
+      sub={shell.sub}
+      actions={shell.actions}
+      bar={bar}
+      filters={<FilterColumn search={search} onSearch={setSearch} searchLabel={t('Search by name or username')} onReset={() => setSearch('')} groups={[shell.nav]} />}
+    >
+      {content}
+    </ListPage>
+  )
+  if (q.isLoading) return frame(undefined, <Loading />)
+  if (q.error) return frame(undefined, <ErrorBox error={q.error} />)
   const rows = q.items
   // the selection may hold people of pages not loaded yet («Select all»)
   const ids = [...sel]
   const all = rows.length > 0 && ids.length >= rows.length
-  return (
-    <div className="grid gap-3">
-      <div className="flex flex-wrap items-center gap-3">
-        <Input type="search" placeholder={t('Search by name or username')} aria-label={t('Search by name or username')} className="w-72 max-w-full" value={search} onChange={(e) => setSearch(e.target.value)} />
-        {ids.length > 0 && (
-          // the action bar appears only with a selection
-          <div className="flex flex-wrap items-center gap-2 rounded-lg bg-primary/10 py-1 pr-1 pl-3" role="group" aria-label={t('Actions on the selection')}>
-            <span className="text-sm font-medium tabular-nums">{t('{count} selected', { count: ids.length })}</span>
-            {q.more && !everyone && all && (
-              <SelectAllRows
-                selected={ids.length}
-                total={q.total}
-                onAll={async () => {
-                  setSel(new Set(await q.allIds()))
-                  setEveryone(true)
-                }}
-              />
-            )}
-            <Button variant="outline" size="sm" onClick={() => setRole.mutate({ ids, role: 'tenant_manager' })}>
-              <ShieldCheck />
-              {t('Make Tenant Manager')}
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => setRole.mutate({ ids, role: 'user' })}>
-              <UserRound />
-              {t('Make User')}
-            </Button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm">
-                  {t('Change profile')}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onSelect={() => setProfile.mutate({ ids, profile: null })}>{t('Default profile')}</DropdownMenuItem>
-                {profiles
-                  .filter((p) => !p.is_default)
-                  .map((p) => (
-                    <DropdownMenuItem key={p.id} onSelect={() => setProfile.mutate({ ids, profile: p.id })}>
-                      {p.name}
-                    </DropdownMenuItem>
-                  ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" disabled={!groups.length}>
-                  {t('Add to a group')}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="max-h-72 overflow-auto">
-                {groups.map((g) => (
-                  <DropdownMenuItem key={g.id} disabled={g.source === 'idp'} onSelect={() => toGroup.mutate({ ids, group: g.id })}>
-                    {g.name}
+  const bar = (
+    <BulkBar
+      selected={ids.length}
+      total={rows.length}
+      all={all}
+      onAll={(on) => {
+        setSel(on ? new Set(rows.map((r) => r.user_id)) : new Set())
+        setEveryone(false)
+      }}
+      actions={
+        <>
+          {q.more && !everyone && all && (
+            <SelectAllRows
+              selected={ids.length}
+              total={q.total}
+              onAll={async () => {
+                setSel(new Set(await q.allIds()))
+                setEveryone(true)
+              }}
+            />
+          )}
+          <Button variant="outline" size="sm" onClick={() => setRole.mutate({ ids, role: 'tenant_manager' })}>
+            <ShieldCheck />
+            {t('Make Tenant Manager')}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => setRole.mutate({ ids, role: 'user' })}>
+            <UserRound />
+            {t('Make User')}
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                {t('Change profile')}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuItem onSelect={() => setProfile.mutate({ ids, profile: null })}>{t('Default profile')}</DropdownMenuItem>
+              {profiles
+                .filter((p) => !p.is_default)
+                .map((p) => (
+                  <DropdownMenuItem key={p.id} onSelect={() => setProfile.mutate({ ids, profile: p.id })}>
+                    {p.name}
                   </DropdownMenuItem>
                 ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button variant="outline" size="sm" onClick={() => suspend.mutate({ ids, suspended: true })}>
-              {t('Suspend')}
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setSel(new Set())
-                setEveryone(false)
-              }}
-            >
-              {t('Deselect')}
-            </Button>
-          </div>
-        )}
-      </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm" disabled={!groups.length}>
+                {t('Add to a group')}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="max-h-72 overflow-auto">
+              {groups.map((g) => (
+                <DropdownMenuItem key={g.id} disabled={g.source === 'idp'} onSelect={() => toGroup.mutate({ ids, group: g.id })}>
+                  {g.name}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <Button variant="outline" size="sm" onClick={() => suspend.mutate({ ids, suspended: true })}>
+            {t('Suspend')}
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setSel(new Set())
+              setEveryone(false)
+            }}
+          >
+            {t('Deselect')}
+          </Button>
+        </>
+      }
+    />
+  )
+  return frame(
+    bar,
+    <>
       <div className="overflow-hidden rounded-xl border bg-card">
         <Table>
           <TableHeader>
@@ -605,7 +738,13 @@ function People({ slug, profiles, groups }: { slug: string; profiles: Profile[];
                 <TableCell onClick={(e) => e.stopPropagation()}>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" aria-label={t('Actions for {username}', { username: m.username })}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        aria-label={t('Actions for {username}', {
+                          username: m.username,
+                        })}
+                      >
                         <MoreHorizontal />
                       </Button>
                     </DropdownMenuTrigger>
@@ -614,12 +753,29 @@ function People({ slug, profiles, groups }: { slug: string; profiles: Profile[];
                         <UserRound />
                         {t('Open')}
                       </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => setRole.mutate({ ids: [m.user_id], role: m.role === 'user' ? 'tenant_manager' : 'user' })}>
+                      <DropdownMenuItem
+                        onSelect={() =>
+                          setRole.mutate({
+                            ids: [m.user_id],
+                            role: m.role === 'user' ? 'tenant_manager' : 'user',
+                          })
+                        }
+                      >
                         <ShieldCheck />
                         {m.role === 'user' ? t('Make Tenant Manager') : t('Make User')}
                       </DropdownMenuItem>
                       {!m.is_guest && !oidc && (
-                        <DropdownMenuItem onSelect={() => sendLink.mutate(m, { onSuccess: (l) => setLink({ name: m.display_name || m.username, link: l as ResetLink }) })}>
+                        <DropdownMenuItem
+                          onSelect={() =>
+                            sendLink.mutate(m, {
+                              onSuccess: (l) =>
+                                setLink({
+                                  name: m.display_name || m.username,
+                                  link: l as ResetLink,
+                                }),
+                            })
+                          }
+                        >
                           <Link2 />
                           {t('Send the password link')}
                         </DropdownMenuItem>
@@ -630,7 +786,14 @@ function People({ slug, profiles, groups }: { slug: string; profiles: Profile[];
                           {t('Reset the password')}
                         </DropdownMenuItem>
                       )}
-                      <DropdownMenuItem onSelect={() => suspend.mutate({ ids: [m.user_id], suspended: m.membership !== 'suspended' })}>
+                      <DropdownMenuItem
+                        onSelect={() =>
+                          suspend.mutate({
+                            ids: [m.user_id],
+                            suspended: m.membership !== 'suspended',
+                          })
+                        }
+                      >
                         <ShieldOff />
                         {m.membership === 'suspended' ? t('Reactivate in the tenant') : t('Suspend in the tenant')}
                       </DropdownMenuItem>
@@ -655,9 +818,19 @@ function People({ slug, profiles, groups }: { slug: string; profiles: Profile[];
       <FormDialog
         open={!!pwFor}
         onOpenChange={(o) => !o && setPwFor(null)}
-        title={t('New password for {username}', { username: pwFor?.username ?? '' })}
+        title={t('New password for {username}', {
+          username: pwFor?.username ?? '',
+        })}
         description={t('Their open sessions are closed.')}
-        fields={[{ name: 'password', label: t('New password'), type: 'password', required: true, hint: t('At least {n} characters', { n: pwMin }) }]}
+        fields={[
+          {
+            name: 'password',
+            label: t('New password'),
+            type: 'password',
+            required: true,
+            hint: t('At least {n} characters', { n: pwMin }),
+          },
+        ]}
         submit={t('Reset')}
         onSubmit={(v) => resetPw.mutateAsync({ id: pwFor!.user_id, password: v.password })}
       />
@@ -669,7 +842,7 @@ function People({ slug, profiles, groups }: { slug: string; profiles: Profile[];
         onClose={() => setRemoving(null)}
         onConfirm={(newOwner) => remove.mutate({ id: removing!.user_id, newOwner }, { onSuccess: () => setRemoving(null) })}
       />
-    </div>
+    </>,
   )
 }
 
@@ -690,7 +863,11 @@ export function RemoveDialog({ member, members, busy, onConfirm, onClose }: { me
           <p>{member?.is_guest ? t('They are a guest: they lose access to this tenant, their account stays in their home tenant.') : t('It is their home tenant: the account is disabled.')}</p>
           {owns && (
             <div className="grid gap-1.5">
-              <Label htmlFor="rm-owner">{t('Who gets their {count} items', { count: member!.owned_resources })}</Label>
+              <Label htmlFor="rm-owner">
+                {t('Who gets their {count} items', {
+                  count: member!.owned_resources,
+                })}
+              </Label>
               <Select value={owner} onValueChange={setOwner}>
                 <SelectTrigger id="rm-owner" className="w-full">
                   <SelectValue placeholder={t('Choose the person…')} />
@@ -730,98 +907,130 @@ export function IdpBadge() {
   )
 }
 
-function Groups({ slug, members }: { slug: string; members: Member[] }) {
+function Groups({ slug, members, shell }: { slug: string; members: Member[]; shell: Shell }) {
   const base = `/api/t/${enc(slug)}/manage/groups`
   const [search, setSearch] = useState('')
   const words = useDeferredValue(search.trim())
   // a page at a time, searched on the server
-  const q = usePaged<Group>(['groups', slug, 'page'], base, { q: words || undefined })
+  const q = usePaged<Group>(['groups', slug, 'page'], base, {
+    q: words || undefined,
+  })
   const confirm = useConfirm()
   const inval = [['groups', slug]]
-  const del = useAction((id: string) => api('DELETE', `${base}/${id}`), { ok: t('Group deleted'), invalidate: inval })
-  const addMember = useAction(({ g, u }: { g: string; u: string }) => api('PUT', `${base}/${g}/members/${u}`), { ok: t('Added to the group'), invalidate: inval })
+  const del = useAction((id: string) => api('DELETE', `${base}/${id}`), {
+    ok: t('Group deleted'),
+    invalidate: inval,
+  })
+  const addMember = useAction(({ g, u }: { g: string; u: string }) => api('PUT', `${base}/${g}/members/${u}`), {
+    ok: t('Added to the group'),
+    invalidate: inval,
+  })
   const rmMember = useAction(({ g, u }: { g: string; u: string }) => api('DELETE', `${base}/${g}/members/${u}`), { invalidate: inval })
-  if (q.isLoading) return <Loading />
-  if (q.error) return <ErrorBox error={q.error} />
+  const frame = (content: ReactNode) => (
+    <ListPage
+      title={shell.title}
+      sub={shell.sub}
+      actions={shell.actions}
+      filters={<FilterColumn search={search} onSearch={setSearch} searchLabel={t('Search a group')} onReset={() => setSearch('')} groups={[shell.nav]} />}
+    >
+      {content}
+    </ListPage>
+  )
+  if (q.isLoading) return frame(<Loading />)
+  if (q.error) return frame(<ErrorBox error={q.error} />)
   if (!q.items.length && !words)
-    return (
+    return frame(
       <Empty icon={<Grid2x2 />} title={t('No groups')}>
         {t('Groups are for sharing with several people at once.')}
-      </Empty>
+      </Empty>,
     )
-  return (
-    <div className="grid gap-3">
-      <Input type="search" placeholder={t('Search a group')} aria-label={t('Search a group')} className="w-72 max-w-full" value={search} onChange={(e) => setSearch(e.target.value)} />
+  return frame(
+    <>
       {!q.items.length && <p className="text-sm text-muted-foreground">{t('No group found.')}</p>}
-    <div className="grid gap-3 lg:grid-cols-2">
-      {q.items.map((g) => {
-        const others = members.filter((m) => !g.members.some((x) => x.user_id === m.user_id))
-        const idp = g.source === 'idp'
-        return (
-          <Card key={g.id}>
-            <CardHeader className="flex-row items-center justify-between">
-              <div>
-                <CardTitle className="flex flex-wrap items-center gap-2 text-base">
-                  <a className="hover:underline" href={to.group(slug, g.id)}>
-                    {g.name}
-                  </a>
-                  {idp && <IdpBadge />}
-                </CardTitle>
-                <CardDescription>{t('{count} members', { count: g.members.length })}</CardDescription>
-              </div>
-              {!idp && <div className="flex gap-1">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="outline" size="sm" disabled={!others.length}>
-                      <Plus />
-                      {t('Add')}
+      <div className="grid gap-3 lg:grid-cols-2">
+        {q.items.map((g) => {
+          const others = members.filter((m) => !g.members.some((x) => x.user_id === m.user_id))
+          const idp = g.source === 'idp'
+          return (
+            <Card key={g.id}>
+              <CardHeader className="flex-row items-center justify-between">
+                <div>
+                  <CardTitle className="flex flex-wrap items-center gap-2 text-base">
+                    <a className="hover:underline" href={to.group(slug, g.id)}>
+                      {g.name}
+                    </a>
+                    {idp && <IdpBadge />}
+                  </CardTitle>
+                  <CardDescription>{t('{count} members', { count: g.members.length })}</CardDescription>
+                </div>
+                {!idp && (
+                  <div className="flex gap-1">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm" disabled={!others.length}>
+                          <Plus />
+                          {t('Add')}
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="max-h-72 overflow-auto">
+                        {others.map((m) => (
+                          <DropdownMenuItem key={m.user_id} onSelect={() => addMember.mutate({ g: g.id, u: m.user_id })}>
+                            {m.display_name || m.username}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={t('Delete the group {name}', {
+                        name: g.name,
+                      })}
+                      onClick={async () => (await confirm(t('Delete the group {name}? The shares with the group are revoked.', { name: g.name }), true)) && del.mutate(g.id)}
+                    >
+                      <Trash2 />
                     </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="max-h-72 overflow-auto">
-                    {others.map((m) => (
-                      <DropdownMenuItem key={m.user_id} onSelect={() => addMember.mutate({ g: g.id, u: m.user_id })}>
-                        {m.display_name || m.username}
-                      </DropdownMenuItem>
-                    ))}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label={t('Delete the group {name}', { name: g.name })}
-                  onClick={async () => (await confirm(t('Delete the group {name}? The shares with the group are revoked.', { name: g.name }), true)) && del.mutate(g.id)}
-                >
-                  <Trash2 />
-                </Button>
-              </div>}
-            </CardHeader>
-            <CardContent className="flex flex-wrap gap-1.5">
-              {g.members.length === 0 && <span className="text-sm text-muted-foreground">{t('No members.')}</span>}
-              {g.members.map((m) => (
-                <Badge key={m.user_id} variant="secondary" className="gap-1 font-normal">
-                  {m.display_name || m.username}
-                  {!idp && (
-                    <button type="button" aria-label={t('Remove {username} from the group', { username: m.username })} className="ml-0.5 opacity-60 hover:opacity-100" onClick={() => rmMember.mutate({ g: g.id, u: m.user_id })}>
-                      ×
-                    </button>
-                  )}
-                </Badge>
-              ))}
-            </CardContent>
-          </Card>
-        )
-      })}
-    </div>
+                  </div>
+                )}
+              </CardHeader>
+              <CardContent className="flex flex-wrap gap-1.5">
+                {g.members.length === 0 && <span className="text-sm text-muted-foreground">{t('No members.')}</span>}
+                {g.members.map((m) => (
+                  <Badge key={m.user_id} variant="secondary" className="gap-1 font-normal">
+                    {m.display_name || m.username}
+                    {!idp && (
+                      <button
+                        type="button"
+                        aria-label={t('Remove {username} from the group', {
+                          username: m.username,
+                        })}
+                        className="ml-0.5 opacity-60 hover:opacity-100"
+                        onClick={() => rmMember.mutate({ g: g.id, u: m.user_id })}
+                      >
+                        ×
+                      </button>
+                    )}
+                  </Badge>
+                ))}
+              </CardContent>
+            </Card>
+          )
+        })}
+      </div>
       <MoreRows shown={q.items.length} total={q.total} more={q.more} loading={q.loadingMore} onMore={q.loadMore} />
-    </div>
+      <MoreRows shown={q.items.length} total={q.total} more={q.more} loading={q.loadingMore} onMore={q.loadMore} />
+    </>,
   )
 }
 
-function Invites({ slug, q }: { slug: string; q: Q<Invitation[]> }) {
-  const revoke = useAction((id: string) => api('DELETE', `/api/t/${enc(slug)}/manage/invitations/${id}`), { ok: t('Invitation revoked'), invalidate: [['invites', slug]] })
+function Invites({ slug, q }: { slug: string; q: ReturnType<typeof usePaged<Invitation, PageOf<Invitation> & { pending: number }>> }) {
+  const revoke = useAction((id: string) => api('DELETE', `/api/t/${enc(slug)}/manage/invitations/${id}`), {
+    ok: t('Invitation revoked'),
+    invalidate: [['invites', slug]],
+  })
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
-  if (!q.data?.length)
+  if (!q.items.length)
     return (
       <Empty icon={<Mail />} title={t('Nothing pending')}>
         {t('Invitations to people of other tenants stay here until they answer.')}
@@ -840,7 +1049,7 @@ function Invites({ slug, q }: { slug: string; q: Q<Invitation[]> }) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {q.data.map((i) => (
+          {q.items.map((i) => (
             <TableRow key={i.id}>
               <TableCell className="font-medium">{i.user}</TableCell>
               <TableCell>{ROLE[i.role]}</TableCell>
@@ -859,6 +1068,7 @@ function Invites({ slug, q }: { slug: string; q: Q<Invitation[]> }) {
           ))}
         </TableBody>
       </Table>
+      <MoreRows shown={q.items.length} total={q.total} more={q.more} loading={q.loadingMore} onMore={q.loadMore} />
     </div>
   )
 }
@@ -869,7 +1079,9 @@ function Invites({ slug, q }: { slug: string; q: Q<Invitation[]> }) {
 
 /** The items of the tenant shared with others or with a public link; links are revoked from here. */
 /** A page of the items of the tenant, with the counts of the pills. */
-type ResourcePageData = PageOf<ResourceRow> & { counts: { items: number; shared: number; public: number } }
+type ResourcePageData = PageOf<ResourceRow> & {
+  counts: { items: number; shared: number; public: number }
+}
 
 export function Shares({ slug }: { slug: string }) {
   const ctx = useTenantCtx(slug)
@@ -897,9 +1109,19 @@ export function Shares({ slug }: { slug: string }) {
     setEveryone(false)
   }
   const confirm = useConfirm()
-  const revoke = useAction((ids: string[]) => api<Revoked>('POST', `/api/t/${enc(slug)}/manage/resources/revoke`, { ids }), {
-    invalidate: [['m-resources', slug], ['overview', slug], ['shared-by-me', slug]],
-  })
+  const revoke = useAction(
+    (ids: string[]) =>
+      api<Revoked>('POST', `/api/t/${enc(slug)}/manage/resources/revoke`, {
+        ids,
+      }),
+    {
+      invalidate: [
+        ['m-resources', slug],
+        ['overview', slug],
+        ['shared-by-me', slug],
+      ],
+    },
+  )
   // `ids` may hold items of pages not loaded yet («Select all»)
   const askRevoke = async (ids: string[], one?: ResourceRow) => {
     const text = one
@@ -909,7 +1131,12 @@ export function Shares({ slug }: { slug: string }) {
       revoke.mutate(ids, {
         onSuccess: (r) => {
           const x = r as Revoked
-          toast.success(t('Revoked: {shares} shares, {links} public links', { shares: x.shares, links: x.links }))
+          toast.success(
+            t('Revoked: {shares} shares, {links} public links', {
+              shares: x.shares,
+              links: x.links,
+            }),
+          )
           setSel(new Set())
           setEveryone(false)
         },
@@ -925,86 +1152,92 @@ export function Shares({ slug }: { slug: string }) {
   const seeTitles = ctx.data?.tenant.settings.managers_see_titles
   return (
     <>
-      <PageHeader
+      <ListPage
         title={t('Shares')}
-        crumbs={[{ label: t('Tenant management') }]}
         sub={t('Items shared with other people, with groups or with a public link')}
+        bar={
+          <BulkBar
+            selected={ids.length}
+            total={selectable.length}
+            all={allSel}
+            onAll={(on) => {
+              setSel(on ? new Set(selectable.map((r) => r.id)) : new Set())
+              setEveryone(false)
+            }}
+            actions={
+              <>
+                {show !== 'items' && q.more && !everyone && allSel && (
+                  <SelectAllRows
+                    selected={ids.length}
+                    total={q.total}
+                    onAll={async () => {
+                      setSel(new Set(await q.allIds()))
+                      setEveryone(true)
+                    }}
+                  />
+                )}
+                <Button variant="outline" size="sm" onClick={() => void askRevoke(ids, ids.length === 1 ? rows.find((r) => r.id === ids[0]) : undefined)}>
+                  {t('Revoke shares and links')}
+                </Button>
+              </>
+            }
+          />
+        }
         more={
           <DropdownMenuItem onSelect={() => setReassign(true)}>
             <Users />
             {t("Reassign a person's items")}
           </DropdownMenuItem>
         }
-      />
-      <div className="grid gap-3 p-6 max-[620px]:p-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <Pills
-            items={[
-              { id: 'all', label: t('Shared'), count: counts.shared },
-              { id: 'public', label: t('Public and links'), count: counts.public },
-              { id: 'items', label: t('All items'), count: counts.items },
+        filters={
+          <FilterColumn
+            search={seeTitles ? filter.q : undefined}
+            onSearch={seeTitles ? (v) => setFilter({ ...filter, q: v }) : undefined}
+            searchLabel={t('Search in the title')}
+            onReset={() => {
+              setShow('all')
+              setFilter({ owner: '', plugin: '', q: '' })
+            }}
+            groups={[
+              {
+                id: 'show',
+                label: t('Show'),
+                value: show,
+                onChange: setShow,
+                options: [
+                  { id: 'all', label: t('Shared'), count: counts.shared },
+                  {
+                    id: 'public',
+                    label: t('Public and links'),
+                    count: counts.public,
+                  },
+                  { id: 'items', label: t('All items'), count: counts.items },
+                ],
+              },
+              {
+                id: 'app',
+                label: t('Apps'),
+                value: filter.plugin || 'all',
+                onChange: (v) => setFilter({ ...filter, plugin: v === 'all' ? '' : v }),
+                options: [{ id: 'all', label: t('All apps') }, ...plugins.map((p) => ({ id: p.id, label: p.label }))],
+              },
             ]}
-            value={show}
-            onChange={setShow}
           />
-          <Select value={filter.owner || 'all'} onValueChange={(v) => setFilter({ ...filter, owner: v === 'all' ? '' : v })}>
-            <SelectTrigger size="sm" className="w-48" aria-label={t('Owner')}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t('All owners')}</SelectItem>
-              {(members.data ?? []).map((m) => (
-                <SelectItem key={m.user_id} value={m.user_id}>
-                  {m.display_name || m.username}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={filter.plugin || 'all'} onValueChange={(v) => setFilter({ ...filter, plugin: v === 'all' ? '' : v })}>
-            <SelectTrigger size="sm" className="w-40" aria-label={t('Apps')}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t('All apps')}</SelectItem>
-              {plugins.map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {seeTitles && (
-            <Input type="search" className="h-8 w-56" placeholder={t('Search in the title')} aria-label={t('Search in the title')} value={filter.q} onChange={(e) => setFilter({ ...filter, q: e.target.value })} />
-          )}
-          {ids.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 rounded-lg bg-primary/10 py-1 pr-1 pl-3" role="group" aria-label={t('Actions on the selection')}>
-              <span className="text-sm font-medium tabular-nums">{t('{count} selected', { count: ids.length })}</span>
-              {show !== 'items' && q.more && !everyone && allSel && (
-                <SelectAllRows
-                  selected={ids.length}
-                  total={q.total}
-                  onAll={async () => {
-                    setSel(new Set(await q.allIds()))
-                    setEveryone(true)
-                  }}
-                />
-              )}
-              <Button variant="outline" size="sm" onClick={() => void askRevoke(ids, ids.length === 1 ? rows.find((r) => r.id === ids[0]) : undefined)}>
-                {t('Revoke shares and links')}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSel(new Set())
-                  setEveryone(false)
-                }}
-              >
-                {t('Deselect')}
-              </Button>
-            </div>
-          )}
-        </div>
+        }
+      >
+        <Select value={filter.owner || 'all'} onValueChange={(v) => setFilter({ ...filter, owner: v === 'all' ? '' : v })}>
+          <SelectTrigger size="sm" className="w-56 max-w-full" aria-label={t('Owner')}>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">{t('All owners')}</SelectItem>
+            {(members.data ?? []).map((m) => (
+              <SelectItem key={m.user_id} value={m.user_id}>
+                {m.display_name || m.username}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
         {q.isLoading ? (
           <Loading />
         ) : q.error ? (
@@ -1039,7 +1272,9 @@ export function Shares({ slug }: { slug: string }) {
                     <TableCell>
                       {(r.shares > 0 || r.public_links > 0) && (
                         <Checkbox
-                          aria-label={t('Select {name}', { name: r.title || r.kind })}
+                          aria-label={t('Select {name}', {
+                            name: r.title || r.kind,
+                          })}
                           checked={sel.has(r.id)}
                           onCheckedChange={(v) => {
                             const n = new Set(sel)
@@ -1099,7 +1334,7 @@ export function Shares({ slug }: { slug: string }) {
         )}
         <MoreRows shown={rows.length} total={q.total} more={q.more} loading={q.loadingMore} onMore={q.loadMore} />
         {rows.length > 0 && !rows.some((r) => r.title) && <p className="text-xs text-muted-foreground">{t('Titles are hidden by the rules of the tenant (Tenant settings › Sharing).')}</p>}
-      </div>
+      </ListPage>
       <LinksDialog slug={slug} row={links} onClose={() => setLinks(null)} />
       {ctx.data && <ShareDialog ctx={ctx.data} resourceId={sharing} onClose={() => setSharing(null)} />}
       <ReassignDialog slug={slug} open={reassign} members={members.data ?? []} onClose={() => setReassign(false)} />
@@ -1164,7 +1399,11 @@ function ReassignDialog({ slug, open, members, onClose }: { slug: string; open: 
               onClick={() =>
                 run.mutate(undefined, {
                   onSuccess: (r) => {
-                    toast.success(t('{count} items reassigned', { count: (r as { reassigned: number }).reassigned }))
+                    toast.success(
+                      t('{count} items reassigned', {
+                        count: (r as { reassigned: number }).reassigned,
+                      }),
+                    )
                     setFrom('')
                     setDest('')
                     onClose()
@@ -1268,9 +1507,24 @@ function UsageActivity({ slug }: { slug: string }) {
       <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3">
         <Kpi label={t('Storage used')} value={fmtBytes(all.bytes)} hint={trashHint(all.trashBytes, 'bytes')} />
         <Kpi label={t('Items')} value={all.count} hint={trashHint(all.trashCount, 'items')} />
-        <Kpi label={t('People')} value={k.members} hint={t('{guests} guests · {groups} groups', { guests: k.guests, groups: k.groups })} />
+        <Kpi
+          label={t('People')}
+          value={k.members}
+          hint={t('{guests} guests · {groups} groups', {
+            guests: k.guests,
+            groups: k.groups,
+          })}
+        />
         <Kpi label={t('Active in the last 30 days')} value={k.active_users_30d} />
-        <Kpi label={t('Shares')} value={k.shares} hint={t('{n} active public links · {v} views', { n: k.public_links, v: k.link_views })} onClick={() => go(to.tenant(slug, 'shares'))} />
+        <Kpi
+          label={t('Shares')}
+          value={k.shares}
+          hint={t('{n} active public links · {v} views', {
+            n: k.public_links,
+            v: k.link_views,
+          })}
+          onClick={() => go(to.tenant(slug, 'shares'))}
+        />
       </div>
       <section className="grid gap-3">
         <h2 className="text-sm font-semibold">{t('Activity of the last days')}</h2>
@@ -1279,7 +1533,16 @@ function UsageActivity({ slug }: { slug: string }) {
         ) : (
           <div className="flex h-36 items-end gap-1 rounded-xl border bg-card p-4" role="img" aria-label={t('Events per day')}>
             {k.activity.map((d) => (
-              <span key={d.day} title={t('{day}: {events} events, {users} people', { day: d.day, events: d.events, users: d.users })} className="min-w-1 flex-1 rounded-t bg-primary/70" style={{ height: `${Math.max(4, (d.events / max) * 100)}%` }} />
+              <span
+                key={d.day}
+                title={t('{day}: {events} events, {users} people', {
+                  day: d.day,
+                  events: d.events,
+                  users: d.users,
+                })}
+                className="min-w-1 flex-1 rounded-t bg-primary/70"
+                style={{ height: `${Math.max(4, (d.events / max) * 100)}%` }}
+              />
             ))}
           </div>
         )}
@@ -1297,13 +1560,28 @@ export function TenantSettingsPage({ slug, section }: { slug: string; section?: 
   if (ctx.data?.tenant.role !== 'tenant_manager') return <Empty title={t('Reserved to Tenant Managers')} />
   const level = { kind: 'tenant', slug } as const
   const sections = [
-    { id: 'sharing', label: t('Sharing'), icon: <Share2 />, group: t('Tenant') },
+    {
+      id: 'sharing',
+      label: t('Sharing'),
+      icon: <Share2 />,
+      group: t('Tenant'),
+    },
     { id: 'security', label: t('Passwords and sessions'), icon: <KeyRound /> },
     { id: 'keys', label: t('Keys of outside services'), icon: <KeySquare /> },
     { id: 'embedding', label: t('Embedding'), icon: <Frame /> },
     { id: 'notifications', label: t('Notifications'), icon: <Bell /> },
-    { id: 'appearance', label: t('Identity and appearance'), icon: <Palette />, group: t('Appearance') },
-    { id: 'platform', label: t('Managed by the platform'), icon: <Lock />, group: t('Platform') },
+    {
+      id: 'appearance',
+      label: t('Identity and appearance'),
+      icon: <Palette />,
+      group: t('Appearance'),
+    },
+    {
+      id: 'platform',
+      label: t('Managed by the platform'),
+      icon: <Lock />,
+      group: t('Platform'),
+    },
   ]
   const tabs = [
     { id: 'identity', label: t('Identity and texts') },
@@ -1318,7 +1596,12 @@ export function TenantSettingsPage({ slug, section }: { slug: string; section?: 
   const cur = tab ? 'appearance' : sections.some((s) => s.id === sec) ? sec! : 'sharing'
   return (
     <>
-      <PageHeader title={t('Tenant settings')} sub={t('They apply to everybody in {name}', { name: ctx.data.tenant.name })} />
+      <PageHeader
+        title={t('Tenant settings')}
+        sub={t('They apply to everybody in {name}', {
+          name: ctx.data.tenant.name,
+        })}
+      />
       <Sections sections={sections} current={cur} href={(id) => to.tenant(slug, 'settings', id === 'appearance' ? 'identity' : id)}>
         {cur === 'sharing' && <Policy slug={slug} />}
         {cur === 'security' && <SecurityPanel level={level} />}
@@ -1372,7 +1655,19 @@ function Policy({ slug }: { slug: string }) {
           </label>
           <div className="grid gap-1.5">
             <Label htmlFor="maxd">{t('Maximum length of links, in days (0 = no limit)')}</Label>
-            <Input id="maxd" type="number" min={0} className="w-32" value={s.public_link_max_days} onChange={(e) => setV({ ...s, public_link_max_days: Math.max(0, +e.target.value) })} />
+            <Input
+              id="maxd"
+              type="number"
+              min={0}
+              className="w-32"
+              value={s.public_link_max_days}
+              onChange={(e) =>
+                setV({
+                  ...s,
+                  public_link_max_days: Math.max(0, +e.target.value),
+                })
+              }
+            />
           </div>
           <label className="flex items-center justify-between gap-4">
             <span>

@@ -4,11 +4,11 @@
 // filter.
 
 import { useDeferredValue, useMemo, useState, type ReactNode } from 'react'
-import { useInfiniteQuery } from '@tanstack/react-query'
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { CircleAlert, Download, History, RotateCcw, Share2, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, appUrl, fmtBytes, fmtDate } from '../../api.ts'
-import type { LogEvent, LogPage as LogPageData, Member, PersonRow, Revoked, SharedByMe, TenantInfo, TrashList } from '../../types.ts'
+import type { LogEvent, LogPage as LogPageData, Member, PersonRow, Revoked, SharedByMe, TenantInfo, TrashItem, TrashList } from '../../types.ts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -17,10 +17,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
-import { useAction, useApi, useConfirm, useTenantCtx } from '../core.ts'
+import { useAction, useApi, useConfirm, usePaged, useTenantCtx } from '../core.ts'
+import { BulkBar, FilterColumn, ListPage } from '../listkit.tsx'
 import { t } from '../i18n.ts'
 import { describe } from '../logtext.ts'
-import { Empty, ErrorBox, Loading, PageHeader, Pills } from '../kit.tsx'
+import { Empty, ErrorBox, Loading, MoreRows, PageHeader, Pills } from '../kit.tsx'
 import { go } from '../router.ts'
 import ShareDialog from '../ShareDialog.tsx'
 
@@ -45,11 +46,15 @@ export function TrashPage({ slug }: { slug: string }) {
   const label = useAppLabel(slug)
   const [plugin, setPlugin] = useState('')
   const [search, setSearch] = useState('')
-  const [sort, setSort] = useState('deleted')
   const [sel, setSel] = useState<Set<string>>(new Set())
-  const qs = new URLSearchParams(Object.entries({ plugin }).filter(([, v]) => v)).toString()
-  const q = useApi<TrashList>(['trash', slug, qs], `/api/t/${enc(slug)}/trash${qs ? '?' + qs : ''}`)
-  const inval = [['trash', slug], ['overview', slug], ['m-resources', slug]]
+  const words = useDeferredValue(search.trim())
+  // a page at a time, filtered on the server
+  const q = usePaged<TrashItem, TrashList>(['trash', slug, 'page'], `/api/t/${enc(slug)}/trash`, { plugin: plugin || undefined, q: words || undefined })
+  const inval = [
+    ['trash', slug],
+    ['overview', slug],
+    ['m-resources', slug],
+  ]
   const restore = useAction((ids: string[]) => Promise.all(ids.map((id) => api('POST', `/api/t/${enc(slug)}/trash/${id}/restore`))), {
     ok: (ids) => (ids.length === 1 ? t('Restored') : t('{count} items restored', { count: ids.length })),
     invalidate: inval,
@@ -60,20 +65,11 @@ export function TrashPage({ slug }: { slug: string }) {
   })
   const empty = useAction(() => api<{ deleted: number }>('POST', `/api/t/${enc(slug)}/trash/empty`), { invalidate: inval })
   const manager = ctx.data?.tenant.role === 'tenant_manager'
-  const rows = useMemo(() => {
-    const s = search.trim().toLowerCase()
-    const list = (q.data?.items ?? []).filter((r) => !s || r.title.toLowerCase().includes(s))
-    const by: Record<string, (a: (typeof list)[0], b: (typeof list)[0]) => number> = {
-      deleted: (a, b) => b.deleted_at.localeCompare(a.deleted_at),
-      name: (a, b) => a.title.localeCompare(b.title),
-      size: (a, b) => b.size_bytes - a.size_bytes,
-    }
-    return [...list].sort(by[sort] ?? by.deleted)
-  }, [q.data, search, sort])
+  const rows = q.items
   const ids = [...sel].filter((id) => rows.some((r) => r.id === id))
   const restorable = ids.filter((id) => !rows.find((r) => r.id === id)?.inside_deleted)
   const all = rows.length > 0 && ids.length === rows.length
-  const days = q.data?.retention_days ?? 30
+  const days = q.first?.retention_days ?? 30
   const askPurge = async (list: string[]) => {
     if (await confirm(list.length === 1 ? t('Delete it for good? It cannot be restored any more.') : t('Delete {count} items for good? They cannot be restored any more.', { count: list.length }), true)) {
       purge.mutate(list, { onSuccess: () => setSel(new Set()) })
@@ -81,66 +77,85 @@ export function TrashPage({ slug }: { slug: string }) {
   }
   return (
     <>
-      <PageHeader
+      <ListPage
         title={t('Trash')}
         sub={manager ? t('What was deleted in the tenant, kept {days} days before it is deleted for good', { days }) : t('What you deleted, kept {days} days before it is deleted for good', { days })}
+        bar={
+          <BulkBar
+            selected={ids.length}
+            total={rows.length}
+            all={all}
+            onAll={(on) => setSel(on ? new Set(rows.map((r) => r.id)) : new Set())}
+            actions={
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={!restorable.length}
+                  onClick={() =>
+                    restore.mutate(restorable, {
+                      onSuccess: () => setSel(new Set()),
+                    })
+                  }
+                >
+                  <RotateCcw />
+                  {t('Restore')}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => void askPurge(ids)}>
+                  <Trash2 />
+                  {t('Delete for good')}
+                </Button>
+              </>
+            }
+          />
+        }
         actions={
           <Button
             variant="outline"
             disabled={!rows.length || empty.isPending}
             onClick={async () => {
               if (await confirm(t('Empty the trash? What you own or deleted is deleted for good.'), true))
-                empty.mutate(undefined, { onSuccess: (r) => toast.success(t('{count} items deleted for good', { count: (r as { deleted: number }).deleted })) })
+                empty.mutate(undefined, {
+                  onSuccess: (r) =>
+                    toast.success(
+                      t('{count} items deleted for good', {
+                        count: (r as { deleted: number }).deleted,
+                      }),
+                    ),
+                })
             }}
           >
             <Trash2 />
             {t('Empty the trash')}
           </Button>
         }
-      />
-      <div className="grid gap-3 p-6 max-[620px]:p-4">
-        <div className="flex flex-wrap items-center gap-3">
-          <Input type="search" className="h-8 w-60 max-w-full" placeholder={t('Search in the trash')} aria-label={t('Search in the trash')} value={search} onChange={(e) => setSearch(e.target.value)} />
-          <Select value={plugin || 'all'} onValueChange={(v) => setPlugin(v === 'all' ? '' : v)}>
-            <SelectTrigger size="sm" className="w-40" aria-label={t('App')}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">{t('All apps')}</SelectItem>
-              {(ctx.data?.plugins ?? []).map((p) => (
-                <SelectItem key={p.id} value={p.id}>
-                  {p.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={sort} onValueChange={setSort}>
-            <SelectTrigger size="sm" className="w-48" aria-label={t('Sort')}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="deleted">{t('Deleted most recently')}</SelectItem>
-              <SelectItem value="name">{t('Name')}</SelectItem>
-              <SelectItem value="size">{t('Size')}</SelectItem>
-            </SelectContent>
-          </Select>
-          {ids.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 rounded-lg bg-primary/10 py-1 pr-1 pl-3" role="group" aria-label={t('Actions on the selection')}>
-              <span className="text-sm font-medium tabular-nums">{t('{count} selected', { count: ids.length })}</span>
-              <Button variant="outline" size="sm" disabled={!restorable.length} onClick={() => restore.mutate(restorable, { onSuccess: () => setSel(new Set()) })}>
-                <RotateCcw />
-                {t('Restore')}
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => void askPurge(ids)}>
-                <Trash2 />
-                {t('Delete for good')}
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => setSel(new Set())}>
-                {t('Deselect')}
-              </Button>
-            </div>
-          )}
-        </div>
+        filters={
+          <FilterColumn
+            search={search}
+            onSearch={setSearch}
+            searchLabel={t('Search in the trash')}
+            onReset={() => {
+              setSearch('')
+              setPlugin('')
+            }}
+            groups={[
+              {
+                id: 'app',
+                label: t('Apps'),
+                value: plugin || 'all',
+                onChange: (v) => setPlugin(v === 'all' ? '' : v),
+                options: [
+                  { id: 'all', label: t('All apps') },
+                  ...(ctx.data?.plugins ?? []).map((p) => ({
+                    id: p.id,
+                    label: p.label,
+                  })),
+                ],
+              },
+            ]}
+          />
+        }
+      >
         {q.isLoading ? (
           <Loading />
         ) : q.error ? (
@@ -170,7 +185,9 @@ export function TrashPage({ slug }: { slug: string }) {
                   <TableRow key={r.id} data-state={sel.has(r.id) ? 'selected' : undefined}>
                     <TableCell>
                       <Checkbox
-                        aria-label={t('Select {name}', { name: r.title || r.kind })}
+                        aria-label={t('Select {name}', {
+                          name: r.title || r.kind,
+                        })}
                         checked={sel.has(r.id)}
                         onCheckedChange={(v) => {
                           const n = new Set(sel)
@@ -199,7 +216,14 @@ export function TrashPage({ slug }: { slug: string }) {
                         <RotateCcw />
                         {t('Restore')}
                       </Button>
-                      <Button variant="ghost" size="sm" aria-label={t('Delete {name} for good', { name: r.title || r.kind })} onClick={() => void askPurge([r.id])}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        aria-label={t('Delete {name} for good', {
+                          name: r.title || r.kind,
+                        })}
+                        onClick={() => void askPurge([r.id])}
+                      >
                         <Trash2 />
                       </Button>
                     </TableCell>
@@ -209,7 +233,8 @@ export function TrashPage({ slug }: { slug: string }) {
             </Table>
           </div>
         )}
-      </div>
+        <MoreRows shown={rows.length} total={q.total} more={q.more} loading={q.loadingMore} onMore={q.loadMore} />
+      </ListPage>
     </>
   )
 }
@@ -221,17 +246,19 @@ export function SharedByMeSection({ slug }: { slug: string }) {
   const ctx = useTenantCtx(slug)
   const label = useAppLabel(slug)
   const confirm = useConfirm()
-  const q = useApi<SharedByMe[]>(['shared-by-me', slug], `/api/t/${enc(slug)}/me/shared`)
+  const qc = useQueryClient()
+  const q = usePaged<SharedByMe>(['shared-by-me', slug, 'page'], `/api/t/${enc(slug)}/me/shared`, {}, 5)
   const [sharing, setSharing] = useState<string | null>(null)
   const revoke = useAction((id: string) => api<Revoked>('POST', `/api/t/${enc(slug)}/resources/${id}/revoke-all`), {
     ok: t('Shares and links revoked'),
     invalidate: [['shared-by-me', slug], ['overview', slug]],
   })
-  const rows = q.data ?? []
+  const rows = q.items
   return (
     <section className="grid gap-3" aria-labelledby="shared-by-me">
       <h2 id="shared-by-me" className="text-sm font-semibold">
         {t('Shared by me')}
+        {q.total > 0 && <span className="ml-2 font-normal text-muted-foreground tabular-nums">{q.total}</span>}
       </h2>
       {q.isLoading ? (
         <Loading />
@@ -259,7 +286,15 @@ export function SharedByMeSection({ slug }: { slug: string }) {
                 variant="ghost"
                 size="sm"
                 onClick={async () => {
-                  if (await confirm(t('Revoke every share and public link of «{name}»?', { name: r.title || r.kind }), true)) revoke.mutate(r.id)
+                  if (
+                    await confirm(
+                      t('Revoke every share and public link of «{name}»?', {
+                        name: r.title || r.kind,
+                      }),
+                      true,
+                    )
+                  )
+                    revoke.mutate(r.id)
                 }}
               >
                 {t('Revoke all')}
@@ -268,13 +303,14 @@ export function SharedByMeSection({ slug }: { slug: string }) {
           ))}
         </ul>
       )}
+      <MoreRows shown={rows.length} total={q.total} more={q.more} loading={q.loadingMore} onMore={q.loadMore} />
       {ctx.data && (
         <ShareDialog
           ctx={ctx.data}
           resourceId={sharing}
           onClose={() => {
             setSharing(null)
-            void q.refetch()
+            void qc.invalidateQueries({ queryKey: ['shared-by-me', slug] })
           }}
         />
       )}
@@ -285,7 +321,7 @@ export function SharedByMeSection({ slug }: { slug: string }) {
 /* ── Log ─────────────────────────────────────────────────────────────── */
 
 /** What the event is about, beyond the item: the person, the group, the username of a refused sign-in. */
-function about(e: LogEvent): string {
+export function about(e: LogEvent): string {
   const d = e.detail ?? {}
   const pick = (k: string) => (typeof d[k] === 'string' || typeof d[k] === 'number' ? String(d[k]) : '')
   return e.resource_title || pick('name') || pick('username') || pick('title') || pick('email') || ''
@@ -326,7 +362,17 @@ interface Filters {
   group: string
 }
 
-const NO_FILTERS: Filters = { failed: false, q: '', user: '', what: '', plugin: '', period: '30d', tenant: '', resource: '', group: '' }
+const NO_FILTERS: Filters = {
+  failed: false,
+  q: '',
+  user: '',
+  what: '',
+  plugin: '',
+  period: '30d',
+  tenant: '',
+  resource: '',
+  group: '',
+}
 
 function query(f: Filters, extra: Record<string, string> = {}): string {
   const p = new URLSearchParams()
@@ -505,7 +551,9 @@ export function LogView({ scope, fixed = {}, compact = false }: { scope: LogScop
                   {!compact && (
                     <TableCell onClick={(ev) => ev.stopPropagation()}>
                       <Checkbox
-                        aria-label={t('Select the event of {when}', { when: fmtDate(e.ts) })}
+                        aria-label={t('Select the event of {when}', {
+                          when: fmtDate(e.ts),
+                        })}
                         checked={sel.has(e.id)}
                         onCheckedChange={(v) => {
                           const n = new Set(sel)
@@ -652,7 +700,9 @@ function EventSheet({
               <div className="flex flex-wrap gap-2">
                 {onPerson && e.user_id && (
                   <Button variant="outline" size="sm" onClick={() => onPerson(e.user_id!)}>
-                    {t('Only {name}', { name: e.user_name ?? personName(e.user_id) })}
+                    {t('Only {name}', {
+                      name: e.user_name ?? personName(e.user_id),
+                    })}
                   </Button>
                 )}
                 {onItem && e.resource_id && (
@@ -680,7 +730,13 @@ export function LogPage({ slug }: { slug?: string }) {
       <PageHeader
         title={t('Log')}
         crumbs={[{ label: slug ? t('Tenant management') : t('Platform') }]}
-        sub={slug ? t('What happened in {name}: who, what, on what, when', { name: ctx.data?.tenant.name ?? '' }) : t('What happened on the platform, in every tenant')}
+        sub={
+          slug
+            ? t('What happened in {name}: who, what, on what, when', {
+                name: ctx.data?.tenant.name ?? '',
+              })
+            : t('What happened on the platform, in every tenant')
+        }
       />
       <div className={cn('p-6 max-[620px]:p-4')}>
         <LogView scope={scope} />

@@ -1206,7 +1206,16 @@ async fn m_reset_password(
     Ok(ok())
 }
 
-async fn m_invitations(State(s): State<AppState>, Tenant(c): Tenant) -> ApiResult<Json<Value>> {
+/// Invitations of the tenant: all, or a page with `limit` (`pending` counts the open ones).
+async fn m_invitations(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Query(p): Query<mosaikit_kernel::paging::PageQuery>,
+) -> ApiResult<Json<Value>> {
+    if p.limit.is_some() {
+        let (page, pending) = tenancy::tenant_invitations_page(&s.k, &c, &p).await?;
+        return Ok(Json(json!({ "items": page.items, "total": page.total, "next": page.next, "pending": pending })));
+    }
     Ok(Json(json!(tenancy::tenant_invitations(&s.k, &c).await?)))
 }
 

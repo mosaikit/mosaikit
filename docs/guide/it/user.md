@@ -1,6 +1,6 @@
-# Mosaikit — Guida per chi lavora in un tenant
+# Mosaikit — Guida per chi lavora in un'organizzazione
 
-Questa guida è per chiunque acceda a un tenant per lavorare con le sue app. Quello che fanno il Tenant
+Questa guida è per chiunque acceda a un'organizzazione per lavorare con le sue app. Quello che fanno il Tenant
 Manager e l'Administrator è in [tenant-manager.md](tenant-manager.md) e [administrator.md](administrator.md).
 
 Le etichette sono quelle dell'interfaccia italiana; quella inglese ha gli stessi posti.
@@ -8,26 +8,26 @@ Le etichette sono quelle dell'interfaccia italiana; quella inglese ha gli stessi
 ## Accesso
 
 1. Apri l'indirizzo di Mosaikit.
-2. In **Tenant** scegli il tuo tenant (è già scelto quando ce n'è uno solo, o quando l'indirizzo finisce
+2. In **Organizzazione** scegli la tua organizzazione (è già scelta quando ce n'è una sola, o quando l'indirizzo finisce
    con `#/login/<tenant>`).
-3. Poi, secondo il tenant:
+3. Poi, secondo l'organizzazione:
    - **Utente** e **Password**, poi **Accedi**. **Ricordami su questo dispositivo** ti tiene dentro per
      alcuni giorni (quanti lo decide l'Administrator; l'opzione può mancare).
    - oppure **Accedi con …** (il provider di identità della tua organizzazione): la password la chiede il
      provider, mai Mosaikit. Torni dentro già autenticato.
 4. Troppe password sbagliate bloccano l'accesso di quell'account per alcuni minuti.
 
-**Ospite in altri tenant.** Accedi sempre al tuo tenant di *appartenenza*. Se sei stato invitato in altri
-tenant, passa dall'uno all'altro con il nome del tenant in alto a sinistra: il cambio non chiede un nuovo
+**Ospite in altre organizzazioni.** Accedi sempre alla tua organizzazione di *appartenenza*. Se sei stato invitato in altre
+organizzazioni, passa dall'una all'altra con il nome dell'organizzazione in alto a sinistra: il cambio non chiede un nuovo
 accesso.
 
-**Password dimenticata.** Nella pagina di accesso scegli il tenant e clicca **Password dimenticata?**:
+**Password dimenticata.** Nella pagina di accesso scegli l'organizzazione e clicca **Password dimenticata?**:
 scrivi il tuo utente o il tuo indirizzo email e **Invia il link**. Se esiste un account con quei dati, al suo
 indirizzo email arriva un messaggio con un link per scegliere una nuova password; il link vale una volta
 sola, per 48 ore, e una richiesta più recente annulla i link precedenti. La pagina risponde allo stesso modo
 qualunque cosa scriva (non dice mai se un account esiste). Se l'installazione non può inviare email, la
-pagina lo dice: chiedi invece un link al Tenant Manager del tuo tenant di appartenenza. Chi accede con un
-provider di identità non ha una password in Mosaikit: la pagina del suo tenant rimanda al recupero del
+pagina lo dice: chiedi invece un link al Tenant Manager della tua organizzazione di appartenenza. Chi accede con un
+provider di identità non ha una password in Mosaikit: la pagina del sua organizzazione rimanda al recupero del
 provider.
 
 **Lingua e tonalità** si scelgono già nella pagina di accesso (in alto a destra).
@@ -37,7 +37,7 @@ provider.
 | Dove | Cosa |
 |---|---|
 | **Sidebar** (a sinistra) | **Home** e le app che puoi usare. Il pulsante in cima alla barra la apre o la chiude (solo icone, oppure icone e nomi). |
-| **Tenant** (in alto a sinistra) | Il tenant in cui sei; se ne hai più d'uno, un menu per cambiare (**Appartenenza**, **Ospite in**). |
+| **Organizzazione** (in alto a sinistra) | L'organizzazione in cui sei; se ne hai più di una, un menu per cambiare (**Appartenenza**, **Ospite in**). |
 | **Cerca** (in alto al centro) | Pagine, app e gli elementi che puoi vedere. Anche con `Ctrl K` o `/`. |
 | **Lingua**, **Tonalità** | La lingua dell'interfaccia; tonalità chiara, scura o automatica e **Alto contrasto**. |
 | **Aiuto** (?) | **Tour guidato di questa pagina**, **Guida di Mosaikit**, **Novità della versione …**, **Scorciatoie da tastiera**. Un pallino sul pulsante indica che c'è un tour di questa pagina da vedere. |
@@ -59,14 +59,14 @@ Riprovo…* e torna da sola.
 ## Home
 
 La **Home** mostra il tuo spazio (**Elementi tuoi**), **Condivisi da me**, **Condivisi con me**, **Miei link
-pubblici attivi** e le app del tenant.
+pubblici attivi** e le app dell'organizzazione.
 
 - **Condivisi da me** elenca cosa hai condiviso, con chi e quanti link pubblici. **Revoca tutto** toglie
   ogni condivisione e link pubblico di un elemento (l'elemento resta tuo).
 
 ## App ed elementi
 
-Ogni app si apre nella shell (Note, Attività, Contatti, File, Mappe, Siti statici… secondo il tenant).
+Ogni app si apre nella shell (Note, Attività, Contatti, File, Mappe, Siti statici… secondo l'organizzazione).
 **Siti statici** mostra i siti come **schede** (predefinito, con una miniatura) o come **elenco** (pulsanti a
 destra della barra). Un sito è un **archivio zip** o un **indirizzo web**: un indirizzo si mostra dentro
 Mosaikit in un riquadro e non viene mai scaricato; un sito che vieta di essere incorporato (X-Frame-Options o
@@ -79,14 +79,14 @@ anche creare, eliminare o condividere. Quando qualcosa non è permesso, l'app lo
 Alcuni elementi hanno campi, pulsanti o schede in più aggiunti da un'**estensione** (per esempio *Revisione
 delle note* aggiunge *Revisionata*, *Segna come revisionata* e una scheda **Revisione** alle note).
 
-Quando una quota del tenant è esaurita, le app rifiutano nuovi elementi o file e lo dicono; non viene
+Quando una quota dell'organizzazione è esaurita, le app rifiutano nuovi elementi o file e lo dicono; non viene
 cancellato niente.
 
 ## Condividere un elemento
 
 Apri l'elemento nella sua app e scegli **Condividi**.
 
-1. **Persone e gruppi del tenant**: cerca una persona o un gruppo, scegli il **Livello** e **Condividi**.
+1. **Persone e gruppi dell'organizzazione**: cerca una persona o un gruppo, scegli il **Livello** e **Condividi**.
    - **Visualizzazione**: vede il contenuto.
    - **Modifica**: modifica il contenuto.
    - **Gestione**: condivide, sposta, elimina.
@@ -94,10 +94,10 @@ Apri l'elemento nella sua app e scegli **Condividi**.
 3. **Link pubblico (sola lettura)**: un link che chiunque può aprire senza accedere. Facoltativi **Scadenza
    (giorni)** e **Password (facoltativa)**, poi **Crea link**. *Il link si vede solo adesso*: copialo
    subito. L'elenco **Link pubblici** mostra quando è stato creato, quando scade e le visite; **Revoca** lo
-   chiude. Se il tenant ha spento i link pubblici, la finestra lo dice.
+   chiude. Se l'organizzazione ha spento i link pubblici, la finestra lo dice.
 4. **Proprietà**: cedi l'elemento a un'altra persona (**Trasferisci**).
 
-Le persone fuori dal tenant devono prima essere invitate dal Tenant Manager.
+Le persone fuori dall'organizzazione devono prima essere invitate dal Tenant Manager.
 
 La persona con cui condividi riceve una notifica con il link all'elemento.
 
@@ -135,9 +135,9 @@ Quello che elimini va nel **Cestino** (menu della persona), non sparisce subito.
 - Finché è nel cestino nessuno lo vede e i suoi link pubblici non funzionano.
 - **Ripristina** lo riporta indietro con le sue condivisioni, i link pubblici e i file.
 - **Elimina definitivamente** e **Svuota il cestino** non si possono annullare.
-- Vedi quello che possiedi o che hai eliminato; il Tenant Manager vede tutto il cestino del tenant.
+- Vedi quello che possiedi o che hai eliminato; il Tenant Manager vede tutto il cestino dell'organizzazione.
 
-Gli elementi nel cestino contano nelle quote del tenant finché non vengono eliminati definitivamente.
+Gli elementi nel cestino contano nelle quote dell'organizzazione finché non vengono eliminati definitivamente.
 
 ## Account
 
@@ -145,12 +145,12 @@ Menu della persona › **Account**. Sezioni:
 
 | Sezione | Cosa trovi |
 |---|---|
-| **Profilo** | La tua **Immagine** (SVG, PNG o WebP, al massimo 512 KB: la vedono le persone dei tuoi tenant) e il tuo **Nome visualizzato**, che cambi tu; utente e tenant di appartenenza. L'email la cambia il Tenant Manager del tuo tenant di appartenenza. In un tenant che accede con un provider di identità il nome arriva dal provider. |
-| **Accesso e sicurezza** | **Cambia password** (attuale, nuova, ripeti; sotto il campo si vede la regola del tenant). Cambiarla chiude le altre sessioni. In un tenant che accede con un provider di identità qui non c'è la password: la gestisce il provider. |
+| **Profilo** | La tua **Immagine** (SVG, PNG o WebP, al massimo 512 KB: la vedono le persone delle tue organizzazioni) e il tuo **Nome visualizzato**, che cambi tu; utente e organizzazione di appartenenza. L'email la cambia il Tenant Manager della tua organizzazione di appartenenza. In un'organizzazione che accede con un provider di identità il nome arriva dal provider. |
+| **Accesso e sicurezza** | **Cambia password** (attuale, nuova, ripeti; sotto il campo si vede la regola dell'organizzazione). Cambiarla chiude le altre sessioni. In un'organizzazione che accede con un provider di identità qui non c'è la password: la gestisce il provider. |
 | **Notifiche** | **Cosa ricevo**: per ogni tipo, nell'app e per **Email** (**Mai**, **Subito**, **Un riepilogo al giorno**); il tuo **Indirizzo email**. |
-| **Aspetto e lingua** | **Tonalità** (**Chiaro**, **Scuro**, **Automatico (come il sistema)**), **Alto contrasto**, **Lingua**, **Sidebar** (**Aperta all'avvio**) e **App nella sidebar** (quelle tolte restano nella Home e nella ricerca). Il tema lo sceglie chi gestisce il tenant. |
-| **I miei tenant** | Il tuo tenant di appartenenza e i tenant in cui sei ospite, con il tuo ruolo; **Apri** uno. |
-| **Consumi** | **Elementi tuoi** e lo spazio che usi; **Quanto resta nel tenant** quando il tenant ha delle quote. |
+| **Aspetto e lingua** | **Tonalità** (**Chiaro**, **Scuro**, **Automatico (come il sistema)**), **Alto contrasto**, **Lingua**, **Sidebar** (**Aperta all'avvio**) e **App nella sidebar** (quelle tolte restano nella Home e nella ricerca). Il tema lo sceglie chi gestisce l'organizzazione. |
+| **Le mie organizzazioni** | La tua organizzazione di appartenenza e le organizzazioni in cui sei ospite, con il tuo ruolo; **Apri** una. |
+| **Consumi** | **Elementi tuoi** e lo spazio che usi; **Quanto resta nell'organizzazione** quando l'organizzazione ha delle quote. |
 | **Chiavi** | Le tue chiavi personali dei servizi esterni usati dai plugin installati (ognuna dice quali plugin la usano): valgono solo per te, e dopo il salvataggio si vedono solo le ultime quattro cifre. |
 
 Le tue preferenze ti seguono su ogni dispositivo.

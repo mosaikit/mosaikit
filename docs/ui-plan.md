@@ -57,7 +57,7 @@ Observations from the user's manual tests; ids as in the user's notes. Status is
 
 | Id | Item |
 |---|---|
-| A | Overview as a role-based dashboard of widgets (counters, charts, lists, gauges): the person's KPIs (fast to compute), notifications, recent activity to pick up, due dates and problems; app cards reconsidered. Designed in the mockup first **Mockup designed** (Home, Tenant Manager and Administrator overviews, R1-L-17): to verify before implementation. |
+| A | Overview as a role-based dashboard of widgets (counters, charts, lists, gauges): the person's KPIs (fast to compute), notifications, recent activity to pick up, due dates and problems; app cards reconsidered. **Done** (R1-O): Home, Tenant Manager and Administrator overviews built as in the mockup; the lists of the Tenant Manager (Manage, Shares, Trash) have the filter column and the selection bar; Trash, Shared by me and Invitations are paged on the server. |
 | B1 | Page headers and their filters never scroll **Done** (R1-L). |
 | B2 | Thin scrollbars **Done** (R1-L). |
 | B3 | Sidebar scrollbar only on hover **Done** (R1-L). |

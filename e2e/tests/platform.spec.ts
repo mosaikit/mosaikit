@@ -2104,4 +2104,121 @@ test.describe.serial('platform', () => {
     })
     await logout(page)
   })
+  test('Review round 1, overview: widgets of the Home, of the Tenant Manager and of the Administrator; filter column and selection bar of the Manager', async ({ page }) => {
+    test.setTimeout(300_000)
+    /** A call of the API with the CSRF token of the session in the page. */
+    const call = (method: string, path: string, body?: unknown) =>
+      page.evaluate(
+        async ([method, path, body]) => {
+          const s = await (await fetch('api/session')).json()
+          const r = await fetch(path as string, { method: method as string, headers: { 'content-type': 'application/json', 'x-csrf-token': s.csrf }, body: body === undefined ? undefined : JSON.stringify(body) })
+          return { status: r.status, json: await r.json().catch(() => null) }
+        },
+        [method, path, body] as const,
+      )
+    /** The page in light, dark and high contrast without serious violations; then the phone without a horizontal scroll. */
+    const everywhere = async (where: string) => {
+      await page.setViewportSize({ width: 1280, height: 800 })
+      await page.emulateMedia({ colorScheme: 'light' })
+      await accessible(page, `${where}, light`)
+      await page.emulateMedia({ colorScheme: 'dark' })
+      await page.waitForTimeout(600)
+      await accessible(page, `${where}, dark`)
+      await page.emulateMedia({ colorScheme: 'light' })
+      await page.evaluate(() => document.documentElement.setAttribute('data-contrast', 'more'))
+      await accessible(page, `${where}, high contrast`)
+      await page.evaluate(() => document.documentElement.removeAttribute('data-contrast'))
+      await page.setViewportSize({ width: 390, height: 800 })
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), `${where}: phone`).toBe(true)
+      await page.setViewportSize({ width: 1280, height: 800 })
+    }
+
+    await adminLogin(page)
+    await test.step('R1-O-03 Administrator: figures, services, to do, tenants by storage, requests, notifications, recent errors', async () => {
+      await page.goto('./#/admin')
+      await expect(page.getByRole('heading', { name: 'Platform overview' })).toBeVisible()
+      for (const name of ['Services', 'To do', 'Tenants by storage used', 'Requests', 'For you', 'Recent errors']) await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
+      await expect(page.getByText('Figures of every tenant as of')).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Refresh' })).toBeVisible()
+      await everywhere('administrator overview')
+    })
+    await test.step('R1-O-05 Italian titles of the widgets', async () => {
+      await page.evaluate(() => localStorage.setItem('msk_lang', 'it'))
+      await page.reload()
+      await expect(page.getByRole('heading', { name: 'Errori recenti', exact: true })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Organizzazioni per spazio usato', exact: true })).toBeVisible()
+      await page.evaluate(() => localStorage.setItem('msk_lang', 'en'))
+      await page.reload()
+    })
+    // a tenant of its own, so that the test also runs alone
+    expect((await call('POST', 'api/admin/tenants', { slug: 'ovw', name: 'Overview Tenant', manager_username: 'mgr', manager_password: PASSWORD })).status).toBe(200)
+    await logout(page)
+
+    // a person of the tenant, for the Home of the User
+    await login(page, 'Overview Tenant', 'mgr', PASSWORD)
+    expect((await call('POST', 'api/t/ovw/manage/members', { username: 'ov-user', display_name: 'Ov User', password: PASSWORD, role: 'user' })).status).toBe(200)
+
+    await test.step('R1-O-02 Tenant Manager: waiting for you, active people, recent activity, notifications, usage, compact apps', async () => {
+      await page.goto('./#/t/ovw')
+      await expect(page.getByRole('heading', { name: 'Tenant overview' })).toBeVisible()
+      for (const name of ['Waiting for you', 'Active people', 'Recent activity', 'For you']) await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
+      const strip = page.getByRole('navigation', { name: 'Your apps' })
+      await expect(strip.getByRole('button', { name: 'Notes' })).toBeVisible()
+      // compact: chips, not cards
+      expect((await strip.boundingBox())!.height).toBeLessThan(80)
+      await expect(page.getByRole('heading', { name: 'Your space' })).toBeVisible()
+      await everywhere('tenant manager overview')
+    })
+
+    await test.step('R1-O-07 Manage › People: the sections and the filters in the filter column, the selection in the header', async () => {
+      await page.goto('./#/t/ovw/manage')
+      const facets = page.getByRole('complementary', { name: 'Filters' })
+      await expect(facets.getByRole('radiogroup', { name: 'Show' })).toBeVisible()
+      await facets.getByRole('searchbox', { name: 'Search by name or username' }).fill('ov-user')
+      await expect(page.locator('tbody tr')).toHaveCount(1)
+      await page.locator('tbody tr').first().getByRole('checkbox').click()
+      const bar = page.getByRole('group', { name: 'Actions on the selection' })
+      await expect(bar.getByText('1 selected')).toBeVisible()
+      await expect(bar.getByRole('button', { name: 'Make Tenant Manager' })).toBeVisible()
+      await accessible(page, 'manage people with a selection')
+      await facets.getByRole('radio', { name: /^Groups/ }).click()
+      await expect(page).toHaveURL(/manage\/groups/)
+      await expect(facets.getByRole('searchbox', { name: 'Search a group' })).toBeVisible()
+    })
+    await test.step('R1-O-08 Shares and Trash: filter column and selection bar', async () => {
+      await page.goto('./#/t/ovw/shares')
+      const facets = page.getByRole('complementary', { name: 'Filters' })
+      await expect(facets.getByRole('radio', { name: /^All items/ })).toBeVisible()
+      await facets.getByRole('radio', { name: /^All items/ }).click()
+      await expect(page.getByRole('group', { name: 'Actions on the selection' })).toBeAttached()
+      await page.goto('./#/t/ovw/trash')
+      await expect(page.getByRole('complementary', { name: 'Filters' }).getByRole('searchbox', { name: 'Search in the trash' })).toBeVisible()
+      await accessible(page, 'trash with the filter column')
+    })
+    await test.step('R1-O-09 Trash, Shared by me, Invitations and the log of the widgets come in pages from the server', async () => {
+      const shared = await call('GET', 'api/t/ovw/me/shared?limit=1')
+      expect(shared.json).toHaveProperty('total')
+      expect(shared.json).toHaveProperty('next')
+      const trash = await call('GET', 'api/t/ovw/trash?limit=1')
+      expect(trash.json).toMatchObject({ items: expect.any(Array), total: expect.any(Number) })
+      expect(trash.json.items.length).toBeLessThanOrEqual(1)
+      const inv = await call('GET', 'api/t/ovw/manage/invitations?limit=1')
+      expect(inv.json).toMatchObject({ items: expect.any(Array), total: expect.any(Number), pending: expect.any(Number) })
+      const log = await call('GET', 'api/t/ovw/manage/log?limit=2')
+      expect(log.json.events.length).toBeLessThanOrEqual(2)
+    })
+    await logout(page)
+
+    await login(page, 'Overview Tenant', 'ov-user', PASSWORD)
+    await test.step('R1-O-01 User: Home with the apps as chips, pick up, due soon, for you, recent activity and shared by me', async () => {
+      await page.goto('./#/t/ovw')
+      await expect(page.getByRole('heading', { name: 'Home', exact: true })).toBeVisible()
+      await expect(page.getByRole('navigation', { name: 'Your apps' })).toBeVisible()
+      for (const name of ['Pick up where you left off', 'Due soon', 'For you']) await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
+      await expect(page.getByRole('region', { name: 'Shared by me' })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Waiting for you' })).toHaveCount(0)
+      await everywhere('user home')
+    })
+    await logout(page)
+  })
 })

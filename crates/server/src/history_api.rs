@@ -39,7 +39,15 @@ pub fn router() -> Router<AppState> {
 
 // ------------------------------------------------------------------ shares
 
-async fn shared_by_me(State(s): State<AppState>, Tenant(c): Tenant) -> ApiResult<Json<Value>> {
+/// The items I shared: the whole list, or a page with `limit` (Home › Shared by me).
+async fn shared_by_me(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Query(p): Query<mosaikit_kernel::paging::PageQuery>,
+) -> ApiResult<Json<Value>> {
+    if p.limit.is_some() {
+        return Ok(Json(json!(acl::shared_by_me_page(&s.k, &c, &p).await?)));
+    }
     Ok(Json(json!(acl::shared_by_me(&s.k, &c).await?)))
 }
 
@@ -81,6 +89,8 @@ async fn m_revoke(
 struct TrashQuery {
     plugin: Option<String>,
     q: Option<String>,
+    limit: Option<i64>,
+    cursor: Option<String>,
 }
 
 async fn trash_list(
@@ -88,8 +98,14 @@ async fn trash_list(
     Tenant(c): Tenant,
     Query(q): Query<TrashQuery>,
 ) -> ApiResult<Json<Value>> {
+    let days = trash::retention_days(&s.k).await;
+    if q.limit.is_some() {
+        let p = mosaikit_kernel::paging::PageQuery { limit: q.limit, cursor: q.cursor, q: q.q };
+        let page = trash::list_page(&s.k, &c, q.plugin.as_deref(), &p).await?;
+        return Ok(Json(json!({ "items": page.items, "total": page.total, "next": page.next, "retention_days": days })));
+    }
     let items = trash::list(&s.k, &c, q.plugin.as_deref(), q.q.as_deref()).await?;
-    Ok(Json(json!({ "items": items, "retention_days": trash::retention_days(&s.k).await })))
+    Ok(Json(json!({ "items": items, "retention_days": days })))
 }
 
 async fn trash_restore(

@@ -46,6 +46,8 @@ pub struct LogFilter {
     pub q: Option<String>,
     /// paging: the events before this id
     pub before: Option<i64>,
+    /// a shorter page than the usual one (the widgets of the overview)
+    pub limit: Option<i64>,
     /// CSV of a selection: ids separated by commas
     pub ids: Option<String>,
 }
@@ -262,9 +264,10 @@ async fn fetch(k: &Kernel, scope: Scope<'_>, f: &LogFilter, limit: i64) -> Resul
 
 /// A page of events, the latest first.
 pub async fn page(k: &Kernel, scope: Scope<'_>, f: &LogFilter) -> Result<LogPage> {
-    let mut events = fetch(k, scope, f, PAGE + 1).await?;
-    let next = if events.len() as i64 > PAGE {
-        events.truncate(PAGE as usize);
+    let size = f.limit.map_or(PAGE, |l| l.clamp(1, PAGE));
+    let mut events = fetch(k, scope, f, size + 1).await?;
+    let next = if events.len() as i64 > size {
+        events.truncate(size as usize);
         events.last().map(|e| e.id)
     } else {
         None

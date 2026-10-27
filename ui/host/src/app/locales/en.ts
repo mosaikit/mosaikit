@@ -130,4 +130,10 @@ export const EN: Record<string, string> = {
   'errors.web_url': 'Enter a valid http or https address (without a user name and password)',
   'errors.web_blocked': 'This address is not allowed (only sites on the public Internet can be looked at)',
   'errors.web_unreachable': 'The site cannot be reached',
+  '{count} access requests_one': '1 access request',
+  '{count} access requests_other': '{count} access requests',
+  '{count} invitations not accepted yet_one': '1 invitation not accepted yet',
+  '{count} invitations not accepted yet_other': '{count} invitations not accepted yet',
+  '{count} active public links_one': '1 active public link',
+  '{count} active public links_other': '{count} active public links',
 }

@@ -15,6 +15,7 @@ in step).
   contrast (WCAG 2.1 AA). High contrast for whoever reads with effort.
 - Search everywhere: pages, apps and the items of the apps you can see (Ctrl K).
 - Help: a guided tour of the main pages, the guide, what is new and the keyboard shortcuts.
+- Overviews of widgets for every role: the apps as a compact strip, fast figures, notifications, recent activity, due dates and, for the Administrator, the tenants by storage, requests and recent errors.
 
 ### People and tenants
 

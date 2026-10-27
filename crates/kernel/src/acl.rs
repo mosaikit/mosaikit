@@ -640,22 +640,43 @@ pub struct SharedByMe {
 
 /// The items of the caller shared with people, groups or a public link (Home › Shared by me).
 pub async fn shared_by_me(k: &Kernel, c: &Caller) -> Result<Vec<SharedByMe>> {
-    let rows = mosaikit_db::query(
+    let p = crate::paging::PageQuery { limit: Some(200), ..Default::default() };
+    Ok(shared_by_me_page(k, c, &p).await?.items)
+}
+
+/// A page of the items the caller shared, the latest changed first (keyset on the change time).
+pub async fn shared_by_me_page(k: &Kernel, c: &Caller, p: &crate::paging::PageQuery) -> Result<crate::paging::Page<SharedByMe>> {
+    let shared = "(exists (select 1 from core.grants g where g.resource_id = r.id)
+                or exists (select 1 from core.public_links l where l.resource_id = r.id and l.revoked_at is null
+                    and (l.expires_at is null or l.expires_at > now())))";
+    let total: i64 = mosaikit_db::query_scalar(format!(
+        "select count(*) from core.resources r
+         where r.tenant_id = $1 and r.owner_id = $2 and not core.in_trash(r.id) and {shared}"
+    ))
+    .bind(c.tenant.tenant_id)
+    .bind(c.user.user_id)
+    .fetch_one(&k.db)
+    .await?;
+    let limit = p.limit();
+    let after = p.after()?;
+    let cursor = if after.is_some() { "and (r.updated_at, r.id) < ($3::timestamptz, $4::uuid)" } else { "" };
+    let mut q = mosaikit_db::query(format!(
         "select r.id, r.plugin_id, r.kind, r.title, r.updated_at,
                 (select count(*) from core.grants g where g.resource_id = r.id),
                 (select count(*) from core.public_links l where l.resource_id = r.id and l.revoked_at is null
-                    and (l.expires_at is null or l.expires_at > now()))
+                    and (l.expires_at is null or l.expires_at > now())),
+                r.updated_at::text
          from core.resources r
-         where r.tenant_id = $1 and r.owner_id = $2 and not core.in_trash(r.id)
-           and (exists (select 1 from core.grants g where g.resource_id = r.id)
-                or exists (select 1 from core.public_links l where l.resource_id = r.id and l.revoked_at is null
-                    and (l.expires_at is null or l.expires_at > now())))
-         order by r.updated_at desc limit 200",
-    )
+         where r.tenant_id = $1 and r.owner_id = $2 and not core.in_trash(r.id) and {shared} {cursor}
+         order by r.updated_at desc, r.id desc limit {}",
+        limit + 1
+    ))
     .bind(c.tenant.tenant_id)
-    .bind(c.user.user_id)
-    .fetch_all(&k.db)
-    .await?;
+    .bind(c.user.user_id);
+    if let Some((text, id)) = &after {
+        q = q.bind(text.clone()).bind(*id);
+    }
+    let rows = q.fetch_all(&k.db).await?;
     let mut out = Vec::with_capacity(rows.len());
     for r in &rows {
         let id: Uuid = r.get(0);
@@ -670,16 +691,20 @@ pub async fn shared_by_me(k: &Kernel, c: &Caller) -> Result<Vec<SharedByMe>> {
         .bind(id)
         .fetch_all(&k.db)
         .await?;
-        out.push(SharedByMe {
-            id,
-            plugin_id: r.get(1),
-            kind: r.get(2),
-            title: r.get(3),
-            updated_at: r.get(4),
-            with: names,
-            shares: r.get(5),
-            public_links: r.get(6),
-        });
+        out.push((
+            SharedByMe {
+                id,
+                plugin_id: r.get(1),
+                kind: r.get(2),
+                title: r.get(3),
+                updated_at: r.get(4),
+                with: names,
+                shares: r.get(5),
+                public_links: r.get(6),
+            },
+            r.get::<String, _>(7),
+        ));
     }
-    Ok(out)
+    let p = crate::paging::page(out, limit, total, |(x, key)| (key.clone(), x.id));
+    Ok(crate::paging::Page { items: p.items.into_iter().map(|(x, _)| x).collect(), total: p.total, next: p.next })
 }

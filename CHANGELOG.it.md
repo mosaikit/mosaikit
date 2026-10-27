@@ -14,6 +14,7 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
   (WCAG 2.1 AA). Alto contrasto per chi legge con fatica.
 - Ricerca ovunque: pagine, app e gli elementi delle app che puoi vedere (Ctrl K).
 - Aiuto: un tour guidato delle pagine principali, la guida, le novità e le scorciatoie da tastiera.
+- Panoramiche a widget per ogni ruolo: le app in una striscia compatta, numeri rapidi, notifiche, attività recente, scadenze e, per l’Amministratore, le organizzazioni per spazio, le richieste e gli errori recenti.
 
 ### Persone e tenant
 
