@@ -1444,7 +1444,7 @@ test.describe.serial('platform', () => {
       ['Capacity', 'Disk of the data'],
       ['Alerts', 'Conditions'],
     ]) {
-      await page.getByRole('link', { name: section, exact: true }).click()
+      await page.getByRole('navigation', { name: 'Sections' }).getByRole('link', { name: section, exact: true }).click()
       await expect(page.getByText(check).first()).toBeVisible()
       await accessible(page, `monitoring ${section}`)
     }
