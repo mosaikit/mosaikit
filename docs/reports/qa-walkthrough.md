@@ -511,11 +511,13 @@ Left unchanged:
 
 ## Findings of the automated manual checks (full run, 24 failures)
 
-The automated suite (`cargo xtask manual-tests`) ended with 263 passed, 10 skipped (not verifiable), 24 failed. The 24 are marked as expected failures in `tests/manual/manual.spec.ts` with these ids; none is diagnosed to the end, so each can be a product defect or a drifted check. Run one area alone with `cargo xtask manual-tests --area P10-`.
+The automated suite (`cargo xtask manual-tests`) ended with 263 passed, 10 skipped (not verifiable), 24 failed. All 24 were diagnosed one area at a time (`cargo xtask manual-tests --area P10-`; several areas: `-- --grep 'P[69]-'`). Verdict: no product defect, every one was a stale check, and the expected-failure marks of M1-M4 are gone. Note that a check that needs the state left by an earlier phase (for example FU-A-02, P5-23, P6-13, P6-14, FU-B-13) fails when its area runs alone: that is the area filter, not a defect.
 
-| Id | Checks | Description |
+| Id | Checks | Verdict |
 |---|---|---|
-| M1 | P10-21, FU-B-01, FU-B-02, FU-B-03, FU-B-04, FU-B-05, FU-B-06, FU-B-07, FU-B-08, FU-B-11, FU-B-14, FU-A-07, FU-A-08, FU-A-09 | Tabs package installed from file (P10-21) does not leave the extension usable: the checks that need its tabs fail (cascade; may be the pinned plugins build, not the product) |
-| M2 | P9-22, P9-25, P9-26, P10-11, FU-A-12 | themes and layout settings of the tenant (P9-22, P9-25, P9-26, P10-11, FU-A-12): the check does not reach the expected state; product or check not yet told apart |
-| M3 | P5-21, P6-06, UX-03, UX-07, UX-10 | lists, quota and own-profile checks (P5-21 paging, P6-06 quota of items, UX-03/07/10): the check does not reach the expected state; product or check not yet told apart |
-| M4 | P0b-02, P0b-04 | Language menu / wrong password checks fail since the language plugins (R1-A); seen in a smoke run, not diagnosed (check or product) |
+| M1 | P10-21, FU-B-01 to FU-B-08, FU-B-11, FU-B-14, FU-A-07, FU-A-08, FU-A-09 | Check fixed. The Tabs package installs and works (P10-21, FU-B-01/02/04/05/06/07/08/11 pass as they are). FU-B-03: the heading «History of the reviews» is shown in capitals, the check is now case-insensitive. FU-B-14: the shares option is in the confirmation that follows Restore, not in the list dialog. FU-A-07: the groups are cards, not table rows. FU-A-08/09 were its cascade. Root cause of the whole FU-A/P8 chain: a new tenant needs the email of its Tenant Manager (P7, P8, FU-A checks now fill it) |
+| M2 | P9-22, P9-25, P9-26, P10-11, FU-A-12 | Check fixed. P9-22 read «Everything reads» in the main region, the theme editor is a dialog. P9-24 did not wait for the list of themes to appear after turning «Every theme» off, so Lagoon stayed offered and P9-25 failed. P9-26, P10-11 and FU-A-12 pass (FU-A-12 after the email of the Tenant Manager) |
+| M3 | P5-21, P6-06, UX-03, UX-07, UX-10 | Check fixed. UX-03/07/10 and P5-21 pass as they are. P6-06: the quotas moved to the Quotas tab of the tenant (check opened Details), the items used are read from the quota block, and the sidebar alert is read after a reload (it is fetched when the page loads). Also fixed in P6: email for the new user (P6-09, P6-10), «Invite people» button, the refusal toast of P6-11, the Italian word «organizzazione» in P6-09 |
+| M4 | P0b-02, P0b-04 | Check fixed. In Italian the menu of the tenant is called «Organizzazione», the check looked for «Tenant» |
+
+Still open and not touched: F1 to F7 above (P3-12, P0-19, P3-28, P6-18, P7-27, P9-07, P9-08, P2-10, P4-20, P7-20, P7-14, P10-24). P6-18, P9-07, P9-08 and P10-24 pass when their area runs alone: they depend on the order of the full run. UX-12 (OIDC sign-in) needs the OIDC tenant of P8, so it fails alone as well. The pending ids (PERF, QA, DEV, HOST) are skipped tests that now name their automated twin (kernel tests host_ops, xtask unit tests, the QA follow-ups of e2e) or the reason they stay manual.
