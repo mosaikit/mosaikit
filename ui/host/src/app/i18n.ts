@@ -120,20 +120,30 @@ export interface LanguageContext {
 }
 
 let enabled: Lang[] = LANGS.map((l) => l.id)
-/** the languages of the plugins installed (always offered: turn the plugin off to withdraw one) */
+/** the languages of the plugins installed */
 let installed: string[] = []
+let lastContext: LanguageContext = {}
 let locale = 'auto'
 const ctxListeners = new Set<() => void>()
 
 /** The languages offered here, and the default language for new visitors. */
 export function setLanguageContext(c: LanguageContext) {
-  const list = (c.enabled ?? []).filter((x): x is Lang => BUILTIN.includes(x))
-  enabled = list.length ? list : BUILTIN.slice()
+  lastContext = c
+  applyContext()
+}
+
+/** What is offered: the list of the settings; the languages of the plugins installed come with it, unless
+ *  the list leaves out a built-in language (a restriction: then only what it names is offered). */
+function applyContext() {
+  const c = lastContext
+  const known = [...BUILTIN, ...installed]
+  const given = (c.enabled ?? []).filter((x) => known.includes(x))
+  const restricted = BUILTIN.some((b) => !given.includes(b)) && given.length > 0
+  enabled = restricted ? given : [...BUILTIN, ...installed]
   locale = c.locale && c.locale !== 'auto' ? c.locale : 'auto'
   const own = chosen()
-  const offered = [...enabled, ...installed]
-  const def: Lang = c.language && c.language !== 'auto' && offered.includes(c.language) ? c.language : enabled.includes(browser()) ? browser() : enabled[0]
-  const next = own && offered.includes(own) ? own : offered.includes(def) ? def : enabled[0]
+  const def: Lang = c.language && c.language !== 'auto' && enabled.includes(c.language) ? c.language : enabled.includes(browser()) ? browser() : enabled[0]
+  const next = own && enabled.includes(own) ? own : enabled.includes(def) ? def : enabled[0]
   if (next !== lang()) {
     if (BUILTIN.includes(next)) {
       void i18next.changeLanguage(next)
@@ -154,9 +164,7 @@ export async function refreshLanguages() {
   installed = list.map((l) => l.code).filter((c) => CODE.test(c) && !BUILTIN.includes(c))
   LANGS.splice(BUILTIN.length, LANGS.length, ...list.filter((l) => installed.includes(l.code)).map((l) => ({ id: l.code, name: l.name })))
   // the one chosen before, whose plugin has just been found
-  const own = chosen()
-  if (own && installed.includes(own) && lang() !== own) await switchTo(own)
-  ctxListeners.forEach((f) => f())
+  applyContext()
 }
 // not in the unit tests: there is no server to ask
 if (import.meta.env.MODE !== 'test') void refreshLanguages()
@@ -168,9 +176,9 @@ export function useLanguages(): typeof LANGS {
       ctxListeners.add(f)
       return () => ctxListeners.delete(f)
     },
-    () => enabled.join() + "|" + installed.join(),
+    () => enabled.join(),
   )
-  return LANGS.filter((l) => enabled.includes(l.id) || installed.includes(l.id))
+  return LANGS.filter((l) => enabled.includes(l.id))
 }
 
 /** The format of dates and numbers: the one chosen in the settings, otherwise the language's. */

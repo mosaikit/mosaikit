@@ -97,8 +97,9 @@ suspended, archived) next to the name; **⋯** with **Suspend the tenant** / **R
 
 English and Italian are built in. A **language plugin** (Plugins › kind **Language**, for example
 *Spanish*) adds a language: once installed and on, it is offered in every language menu (sign-in page,
-person menu) next to the built-in ones, for the whole platform; turn the plugin off or uninstall it to
-withdraw the language (the people who chose it go back to English). It brings the texts of the shell and
+person menu) next to the built-in ones, for the whole platform (unless **Languages offered** in
+Settings leaves a built-in language out: then only the languages listed are offered); turn the plugin off
+or uninstall it to withdraw the language (the people who chose it go back to English). It brings the texts of the shell and
 the names and labels of other plugins; the texts inside the screens of a plugin stay those of that plugin.
 Plugin authors: see the README of `mosaikit-plugins` (folder `lang/`).
 

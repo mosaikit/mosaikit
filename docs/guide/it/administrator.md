@@ -102,8 +102,9 @@ archiviato) accanto al nome; **⋯** con **Sospendi il tenant** / **Riattiva il 
 
 Inglese e italiano sono incorporati. Un **plugin di lingua** (Plugin › tipo **Lingua**, per esempio
 *Spagnolo*) aggiunge una lingua: una volta installato e attivo viene proposto in ogni menu delle lingue
-(pagina di accesso, menu della persona) accanto a quelle incorporate, per tutta la piattaforma; spegni il
-plugin o disinstallalo per ritirare la lingua (chi l'aveva scelta torna all'inglese). Porta i testi della
+(pagina di accesso, menu della persona) accanto a quelle incorporate, per tutta la piattaforma (a meno che
+**Lingue offerte** nelle Impostazioni escluda una lingua incorporata: allora si offrono solo quelle
+elencate); spegni il plugin o disinstallalo per ritirare la lingua (chi l'aveva scelta torna all'inglese). Porta i testi della
 shell e i nomi e le etichette degli altri plugin; i testi dentro le schermate di un plugin restano quelli
 del plugin. Per gli autori di plugin: vedi il README di `mosaikit-plugins` (cartella `lang/`).
 

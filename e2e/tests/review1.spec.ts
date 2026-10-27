@@ -16,7 +16,9 @@ async function login(page: Page, base: string, tenant: string, user: string, pas
     localStorage.setItem('msk_lang', 'en')
   })
   await page.goto(base)
+  // the menu of the tenants appears once the list has arrived (only when there is more than one)
   const select = page.getByRole('combobox', { name: 'Tenant' })
+  await expect(select.or(page.getByText('to the tenant'))).toBeVisible()
   if (await select.count()) {
     await select.click()
     await page.getByRole('option', { name: tenant }).click()
@@ -70,6 +72,7 @@ test.describe.serial('review round 1: auth and plugins', () => {
     })
     await page.goto(BASE_URL)
     const select = page.getByRole('combobox', { name: 'Tenant' })
+    await expect(select.or(page.getByText('to the tenant'))).toBeVisible()
     if (await select.count()) {
       await select.click()
       await page.getByRole('option', { name: 'City of Beta' }).click()
