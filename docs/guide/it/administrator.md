@@ -107,6 +107,8 @@ plugin o disinstallalo per ritirare la lingua (chi l'aveva scelta torna all'ingl
 shell e i nomi e le etichette degli altri plugin; i testi dentro le schermate di un plugin restano quelli
 del plugin. Per gli autori di plugin: vedi il README di `mosaikit-plugins` (cartella `lang/`).
 
+## Accesso di un tenant
+
 Pagina del tenant › **Accesso**. Un metodo per tenant, mai entrambi:
 
 - **Account locali**: utente e password gestiti da Mosaikit; le persone le crea il Tenant Manager.

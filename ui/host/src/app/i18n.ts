@@ -158,7 +158,8 @@ export async function refreshLanguages() {
   if (own && installed.includes(own) && lang() !== own) await switchTo(own)
   ctxListeners.forEach((f) => f())
 }
-void refreshLanguages()
+// not in the unit tests: there is no server to ask
+if (import.meta.env.MODE !== 'test') void refreshLanguages()
 
 /** The languages offered where one is. */
 export function useLanguages(): typeof LANGS {
