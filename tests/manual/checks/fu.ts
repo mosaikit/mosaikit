@@ -158,8 +158,9 @@ const checks: L.Check[] = [
       const t = await H.text(a)
       for (const g of ['staff', 'mosaikit-managers', 'mosaikit-users']) c.ok(t.includes(g), g)
       c.ok(/From the identity provider/.test(t), '«From the identity provider»')
-      const row = await a.getByRole('row', { name: /staff/ }).first().innerText().catch(() => '')
-      c.ok(/\b2\b/.test(row), `staff has Anna and Bruno («${row.replace(/\s+/g, ' ')}»)`)
+      // the groups are cards: «staff», its badge and «2 members»
+      const row = (t.match(/staff\s+From the identity provider\s+(\d+ members?)/) ?? [])[1] ?? ''
+      c.ok(/^2 members/.test(row), `staff has Anna and Bruno («${row}»)`)
       c.ok(!(await H.vis(a.getByRole('button', { name: /Delete/ }))), 'no delete')
       await L.shot(a, 'FU-A-07')
       ctx.pages['anna'] = a
