@@ -209,7 +209,7 @@ async function interactive() {
 
 // 50 people of different tenants at the same time, each a loop of the calls of a working session
 // paged: the notes and tasks lists as the shell asks them now (100 rows); otherwise the whole lists
-async function concurrent(people = 50, seconds = 30, paged = true) {
+async function concurrent(people = 50, seconds = 30, paged = true, only = null) {
   const ms = []
   const byPath = {}
   let errors = 0
@@ -227,11 +227,13 @@ async function concurrent(people = 50, seconds = 30, paged = true) {
       `/api/t/${slug}/p/com.mosaikit.tasks/r/tasks${paged ? '?limit=100' : ''}`,
       `/api/t/${slug}/overview`,
     ]
+    // `only`: a word of the path, to load one kind of request (to tell which one makes the others wait)
+    const mine = only ? loop.filter((x) => x.includes(only)) : loop
     for (let i = 0; Date.now() < end; i++) {
       try {
-        const t = (await call(loop[i % loop.length], h)).ms
+        const t = (await call(mine[i % mine.length], h)).ms
         ms.push(t)
-        const key = loop[i % loop.length].replace(/t\d{4}/, '{t}')
+        const key = mine[i % mine.length].replace(/t\d{4}/, '{t}')
         ;(byPath[key] ??= []).push(t)
       } catch (e) {
         errors++
@@ -311,6 +313,12 @@ const conc = env.PERF_NO_CONCURRENT ? null : await concurrent()
 const concWhole = env.PERF_NO_CONCURRENT ? null : await concurrent(50, 30, false)
 // the paged mix once more, on a warm database: the first mix reads the items of 50 tenants from disk
 const concAgain = env.PERF_NO_CONCURRENT ? null : await concurrent()
+// each of the heavy requests alone with 50 people: which one is slow by itself
+let isolated = null
+if (env.PERF_ISOLATE) {
+  isolated = {}
+  for (const w of ['notes', 'tasks', 'search']) isolated[w] = await concurrent(50, 15, true, w)
+}
 const report = {
   backend: env.PERF_BACKEND,
   scale: env.PERF_SCALE,
@@ -322,6 +330,7 @@ const report = {
   concurrent: conc,
   concurrent_whole_lists: concWhole,
   concurrent_again: concAgain,
+  concurrent_isolated: isolated,
   server: serverStats(),
 }
 writeFileSync(env.PERF_OUT, JSON.stringify(report, null, 2))

@@ -194,30 +194,91 @@ plugin. The errors of the concurrent mix came from the 6-second queries holding 
 plugin, not from the sizes; with the queries fixed there are no errors. Raising the plugin pools would
 multiply the connections (7 plugins × 8 + 20 already = 76, close to PostgreSQL's default 100).
 
+## Follow-ups: what was left open, and what changed
+
+Second round, on the same data (200 tenants, 20,000 people, 1,000,000 items, 5,000,000 events), PostgreSQL
+(ms, p50 / p95; "Before" is the state after the first round, measured again the same day). The machine
+was shared with other builds, so read the ratios, not the absolute values.
+
+| Operation | Before | After |
+|---|---|---|
+| notes: list (person) | 114 / 165 | 22 / 27 |
+| notes: list, first page of 100 (new) | — | 33 / 34 |
+| notes: list with filter | 75 / 104 | 24 / 24 |
+| notes: get one | 17 / 24 | 17 / 19 (no slower) |
+| tasks: list | 56 / 82 | 17 / 17 |
+| Tenant Manager: members (whole list / first page of 50) | 94 / 134 | 19 / 37 · 13 / 14 |
+| Tenant Manager: all items (1,000 / first page of 50) | 178 / 251 | 73 / 118 · 52 / 74 |
+| Tenant Manager: log, search | 609 / 908 | 46 / 52 |
+| Tenant Manager: plugin KPIs | 1,673 / 3,100 | 469 / 525 |
+| **Administrator: overview** | **7,014** | **29 / 30** |
+| **Administrator: platform KPIs** | **20,155** | **17 / 22** (snapshot; computing now: 8.5 s) |
+| Administrator: tenants (every tenant / first page of 50) | 9,575 | 755 · **196 / 215** |
+| Administrator: people (20,000: 11 MB / first page of 50: 27 KB) | 1,694 | 990 · **73 / 80** |
+| Administrator: people, search, every id of the filter (select all) | — | 120, 118 |
+| Administrator: quotas, monitoring tenants | 7,503, 3,772 | 332, 659 |
+
+1. **Set-based read policy** (migration `0018_performance_sets.sql`, SQLite `0016`). `msk_select` of every plugin
+   table is `resource_id in (select id from core.ctx_levels() where level >= 1)`: the person's visible set
+   is computed once per statement, not `core.can_access()` per row. Writes keep the per-row check.
+   The migration rewrites the policies of the installed plugins; new tables get it from the host.
+   *Equivalence*: `xtask/perf/check_rls.sql` compares both rules on every row of every plugin table for 8
+   callers (Tenant Managers, Users, a guest, a person of another tenant) plus a public link, with folders
+   shared at levels 1 and 2, a shared item in the trash and a share on top of a group share: 0 differences in
+   41 cases. Security tests: `reads_as_sets_follow_the_rules` (both backends: levels, groups, trash,
+   other tenants, public links, no context, and the writes still refused or allowed by level).
+   *Gain*: the notes list, 114 → 22 ms; a single-item read did not get slower (17 → 17 ms).
+   *Worst case*: a person who sees a very large set pays for the whole set on a single-item read.
+2. **Platform KPIs and the totals of the overview in the background.** `core.kpi_snapshots`, filled by
+   the worker every 10 minutes; the pages read the last snapshot and show its time with a Refresh button.
+   A snapshot is used only when computing it took 300 ms or more (small installations, the desktop and the
+   tests stay exact). Overview 7 s → 29 ms, KPIs 20 s → 17 ms.
+3. **Paging by key** (`?limit`, `cursor`, `q`, filters on the server; see architecture §7.3) for the
+   Administrator's people and tenants, the Tenant Manager's people, groups and shares/all items, and the
+   plugin lists (`mountCrud` asks 100 rows). Notifications and the Log already were. The tenant list got
+   its figures per tenant of the page (through the indexes); the people counts one grouped query instead of
+   a subquery per person (1.2 s → 73 ms). "Select all N": `?ids=true`, up to 10,000 ids. The cursor pages of
+   a plugin list skip the count (the first total is kept); on SQLite the first page counts in the same pass
+   (`count(*) over ()`): two passes had tripled it (2.1 s against 0.64 s).
+4. **Notes list under 50 people: the cause.** Isolated runs with 50 people on one kind of request at a
+   time (`PERF_ISOLATE=1`): the notes list 24 requests/s, tasks 64/s, search 373/s: each kind is served at
+   about 1 / its own latency (22, 17 and 3 ms), that is the machine is **CPU bound** (shared with other
+   builds) and requests queue for it; the notes list is simply the one that costs most in the mix
+   (the visibility set of 2,500 notes per tenant is computed for every request, whatever the page), so it
+   waits longest: p50 ≈ 50 people / throughput. It is not a pool problem (8 connections per plugin, never
+   exhausted) nor the payload (paging cut bytes by the page size, not the time: the database cost is the
+   same). What would help is a cheaper visibility (computed once per request and reused, or kept per
+   person): left open. The paged mix reached 118–176 requests/s with 0 errors; the whole-list mix 224 and
+   172 (the page costs a count more, the shell sends less).
+5. **Log search with `pg_trgm`.** Trigram GIN indexes on the events (action, details, address) and on the
+   usernames/names; the search 609 → 46 ms. Without the extension (not trusted or not installed) the
+   migration only notes it and the same query reads the Log of the tenant (the old behaviour).
+6. **SQLite writers.** Writers queue in the process (fair, one place) and then `BEGIN IMMEDIATE`, retried on
+   `SQLITE_BUSY` for up to 60 s; readers use a deferred transaction and never wait for a writer.
+   Tests with 24 concurrent transactions and 8 autocommit writes (all succeed), and a reader that answers
+   while a writer holds the lock. The desktop mix with 50 people on one tenant: 0 errors (12 "database is
+   locked" before).
+
+Smaller: `PERF_ONLY`/`PERF_SKIP` take names separated by `;`; the perf server runs on port 18470 (the
+e2e and dev servers use 18xxx too); the perf database is named after the checkout.
+
+SQLite desktop (35,000 items, the machine again busy: every number about 2.8 times the first round's):
+notes first page 619 ms against 693 for the whole list, next page 606, Administrator pages 2–10 ms, platform
+KPIs 2 ms (snapshot; 829 ms computed now). The first page of Tenant Manager › Shares and All items costs
+1.2 and 2.0 s against 0.44 s for the old capped list: the exact counts (items, shared, public) read the
+whole tenant; a desktop with 35,000 items is far past the target.
+
 ## Left open
 
-- **Platform KPIs: 10 s** for 200 tenants and 1,000,000 items. The statistics of the items group the whole
-  table (about 1 s in psql) and the page also reads every plugin's KPI view for every tenant; in the
-  server these statements took 3–5 times longer than in psql, for reasons not found. Next step: read the
-  daily snapshots that the quotas already keep (`core.quota_usage`) instead of scanning the items.
-- **Under 50 concurrent people the notes list has p50 1 s** while the tasks list, the same kind of query,
-  has 27 ms; alone it takes 19 ms. Not explained yet: something specific to the notes plugin (it has an
-  extension and a hook) or to its pool of 8 connections. To investigate with per-pool metrics.
-- **The access check per row** (`core.can_access()` in the row-level security of the plugin tables) is
-  about a third of a list now (7 of 19 ms). Replacing it with `resource_id in (select id from
-  core.ctx_levels())` would remove most of it, but it changes the policies of every plugin table and
-  makes single-item reads a few ms slower: a security-sensitive change left for a decision.
-- **Lists without paging**: a plugin list returns up to 5,000 rows, the Tenant Manager's all items 1,000,
-  the Administrator's people every person (11 MB for 20,000). Paging changes the API and the shell.
-- **Tenant Manager: log search, 1 s**: `ilike` on action, person, details and address cannot use an index;
-  with few matches the whole Log of the tenant is read. A trigram index (`pg_trgm`) would help but needs
-  the extension.
-- **Administrator: tenants (1.1 s), quotas (0.8 s), monitoring tenants (1.4 s)**: subqueries per tenant;
-  in psql the tenant list takes 0.3 s after vacuum. A single grouped query per page would bring them down.
-- **SQLite with concurrent writers**: "database is locked" with 15 s of `busy_timeout`, most likely a read
-  transaction that becomes a write (SQLite refuses the upgrade at once instead of waiting); `BEGIN
-  IMMEDIATE` for the transactions that write would avoid it. Not a desktop scenario.
-- **SQLite, the Log filtered by one person**: 123 ms (without the `(user_id, id)` index left out above).
+- **The visibility set per request** (above, item 4): every list request computes the person's visible
+  set of the tenant; under many people at once this is the CPU cost that queues.
+- **Platform KPIs computed now: 8–14 s** on PostgreSQL at this scale (it is the worker's cost, every 10
+  minutes, not the page's). Next step: the daily snapshots of `core.quota_usage`.
+- **Administrator: tenants (whole list, 0.8 s), quotas (0.3 s), monitoring tenants (0.7 s)**: the whole
+  lists are still computed per tenant; only the paged tenant list is fast.
+- **SQLite, Tenant Manager Shares/All items first page** (above) and **the Log filtered by one person**.
+- **`metrics_monitoring_and_alerts_once_per_crossing`** counts alerts; with the disk of the machine nearly
+  full (under 5% free) the disk alert is raised too and the test fails: not a code problem.
 
 ## Final check
 
