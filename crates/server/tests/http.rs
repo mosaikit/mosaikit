@@ -2093,7 +2093,9 @@ async fn one_origin_per_plugin_with_a_wildcard_plugin_url() {
         a.get_untrusted_on("com-mosaikit-notes.localhost:9301", &path).await.status,
         StatusCode::NOT_FOUND
     );
+}
 
+#[tokio::test]
 async fn own_profile_name_and_picture_over_http() {
     let a = App::new().await;
     let alfa = a.t.tenant("alfa").await;
