@@ -2,6 +2,7 @@
 
 mod ci;
 mod db;
+mod deploy_check;
 mod dev;
 mod dist;
 mod e2e;

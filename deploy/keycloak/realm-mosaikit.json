@@ -1,0 +1,95 @@
+{
+  "realm": "mosaikit",
+  "displayName": "Mosaikit",
+  "enabled": true,
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "registrationEmailAsUsername": false,
+  "resetPasswordAllowed": true,
+  "rememberMe": false,
+  "verifyEmail": false,
+  "loginTheme": "mosaikit",
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "bruteForceProtected": true,
+  "groups": [
+    { "name": "mosaikit-managers" },
+    { "name": "mosaikit-users" }
+  ],
+  "clients": [
+    {
+      "clientId": "mosaikit",
+      "name": "Mosaikit",
+      "enabled": true,
+      "protocol": "openid-connect",
+      "publicClient": false,
+      "secret": "${MOSAIKIT_OIDC_CLIENT_SECRET}",
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "rootUrl": "${MOSAIKIT_URL}",
+      "baseUrl": "/",
+      "redirectUris": [
+        "http://localhost:8080/api/auth/oidc/*",
+        "https://localhost/api/auth/oidc/*"
+      ],
+      "webOrigins": [],
+      "frontchannelLogout": true,
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "http://localhost:8080/*##https://localhost/*",
+        "backchannel.logout.session.required": "true",
+        "backchannel.logout.revoke.offline.tokens": "false",
+        "frontchannel.logout.session.required": "true"
+      },
+      "defaultClientScopes": ["web-origins", "profile", "email", "roles"],
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "groups",
+            "full.path": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "anna.manager",
+      "enabled": true,
+      "email": "anna.manager@example.test",
+      "emailVerified": true,
+      "firstName": "Anna",
+      "lastName": "Manager",
+      "groups": ["mosaikit-managers"],
+      "credentials": [{ "type": "password", "value": "change-me", "temporary": false }]
+    },
+    {
+      "username": "bruno.user",
+      "enabled": true,
+      "email": "bruno.user@example.test",
+      "emailVerified": true,
+      "firstName": "Bruno",
+      "lastName": "User",
+      "groups": ["mosaikit-users"],
+      "credentials": [{ "type": "password", "value": "change-me", "temporary": false }]
+    },
+    {
+      "username": "carla.noaccess",
+      "enabled": true,
+      "email": "carla.noaccess@example.test",
+      "emailVerified": true,
+      "firstName": "Carla",
+      "lastName": "NoAccess",
+      "credentials": [{ "type": "password", "value": "change-me", "temporary": false }]
+    }
+  ]
+}

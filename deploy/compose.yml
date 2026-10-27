@@ -1,13 +1,18 @@
-# Server of a Mosaikit distribution + PostgreSQL.
+# Server of a Mosaikit distribution + PostgreSQL, with optional profiles.
 #   cargo xtask release docker                 # builds the image mosaikit:<version>
 #   MOSAIKIT_VERSION=1.0.0 docker compose -f deploy/compose.yml up -d
 # A distribution (possibly with PostGIS):
 #   MOSAIKIT_IMAGE=product POSTGRES_IMAGE=postgis/postgis:17-3.5-alpine docker compose ... up -d
+# Optional profiles (see README.docker.md), combine them with --profile:
+#   keycloak   Keycloak identity provider (realm "mosaikit" imported, Mosaikit sign-in theme)
+#   mail       Mailpit: catches every email the app sends, web inbox on :8025
+#   proxy      nginx reverse proxy (HTTP, or HTTPS when a certificate is in deploy/nginx/certs)
 # App:   http://localhost:8080   (tenant system, user admin, password MOSAIKIT_ADMIN_PASSWORD)
 # Plugins and contents: http://localhost:8081
-# In production put an HTTPS reverse proxy in front with TWO hostnames
+# In production use the proxy profile (or your own HTTPS proxy) with TWO hostnames
 # (e.g. gis.example.com -> 8080, plugins.example.com -> 8081) and set MOSAIKIT_URL
 # (with a base path too, e.g. https://gis.example.com/mosaikit) and MOSAIKIT_PLUGIN_URL.
+# The database is never published on the host.
 
 services:
   db:
@@ -16,14 +21,19 @@ services:
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cambia-questa-password}
       MOSAIKIT_DB_PASSWORD: ${MOSAIKIT_DB_PASSWORD:-cambia-anche-questa}
+    shm_size: 256mb
     volumes:
       - pgdata:/var/lib/postgresql/data
+      # destination of the dumps (see README.docker.md, Backup)
+      - pgbackups:/backups
       - ./initdb:/docker-entrypoint-initdb.d:ro
     healthcheck:
+      # "mosaikit" exists only when the first initialization is complete
       test: ["CMD-SHELL", "pg_isready -U postgres -d mosaikit"]
       interval: 5s
       timeout: 3s
       retries: 20
+      start_period: 10s
 
   app:
     image: ${MOSAIKIT_IMAGE:-mosaikit}:${MOSAIKIT_VERSION:-1.0.0}
@@ -46,6 +56,72 @@ services:
     volumes:
       - appdata:/data
 
+  # ---- profile keycloak: identity provider for the tenants that sign in with OIDC ----
+  keycloak:
+    profiles: ["keycloak"]
+    image: ${KEYCLOAK_IMAGE:-quay.io/keycloak/keycloak:26.0}
+    restart: unless-stopped
+    # start-dev: HTTP, embedded database (volume kcdata). For production see README.docker.md.
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_ADMIN:-admin}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-cambiami-subito}
+      KC_HTTP_PORT: "8180"
+      # public address of Keycloak: it must be the one the browser uses
+      KC_HOSTNAME: ${KEYCLOAK_URL:-http://localhost:8180}
+      # replaced in the realm file at import
+      MOSAIKIT_OIDC_CLIENT_SECRET: ${MOSAIKIT_OIDC_CLIENT_SECRET:-mosaikit-dev-secret}
+      MOSAIKIT_URL: ${MOSAIKIT_URL:-http://localhost:8080}
+    ports:
+      - "${KEYCLOAK_PORT:-8180}:8180"
+    volumes:
+      - kcdata:/opt/keycloak/data
+      - ./keycloak/realm-mosaikit.json:/opt/keycloak/data/import/realm-mosaikit.json:ro
+      - ./keycloak/themes/mosaikit:/opt/keycloak/themes/mosaikit:ro
+
+  # Mosaikit accepts an http issuer only on localhost. Inside the app container "localhost:8180" is
+  # not Keycloak, so this forwarder shares the network of the app and relays the port to Keycloak.
+  # The issuer http://localhost:8180/realms/mosaikit then works for the browser and for the app.
+  keycloak-localhost:
+    profiles: ["keycloak"]
+    image: ${SOCAT_IMAGE:-alpine/socat:1.8.0.0}
+    restart: unless-stopped
+    network_mode: "service:app"
+    depends_on:
+      - keycloak
+    command: ["TCP-LISTEN:8180,fork,reuseaddr", "TCP:keycloak:8180"]
+
+  # ---- profile mail: Mailpit, a test SMTP server with a web inbox ----
+  mail:
+    profiles: ["mail"]
+    image: ${MAILPIT_IMAGE:-axllent/mailpit:v1.21}
+    restart: unless-stopped
+    ports:
+      - "${MAILPIT_WEB_PORT:-8025}:8025"
+    # SMTP on mail:1025 inside the compose network (not published)
+
+  # ---- profile proxy: nginx in front of the app (see deploy/nginx/) ----
+  proxy:
+    profiles: ["proxy"]
+    image: ${NGINX_IMAGE:-nginx:1.27-alpine}
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      # host names used by the templates in deploy/nginx/templates
+      NGINX_APP_HOST: ${NGINX_APP_HOST:-localhost}
+      NGINX_PLUGIN_HOST: ${NGINX_PLUGIN_HOST:-plugins.localhost}
+      NGINX_PLUGINS_WILDCARD: ${NGINX_PLUGINS_WILDCARD:-*.plugins.localhost}
+      NGINX_BASE_PATH: ${NGINX_BASE_PATH:-}
+    ports:
+      - "${PROXY_HTTP_PORT:-80}:80"
+      - "${PROXY_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./nginx/templates:/etc/nginx/templates:ro
+      - ./nginx/certs:/etc/nginx/certs:ro
+
 volumes:
   pgdata:
+  pgbackups:
   appdata:
+  kcdata:

@@ -452,6 +452,7 @@ mosaikit/dist/mosaikit-1.0.0-docker/
 ├── compose.yml                  PostgreSQL (or PostGIS) + app
 ├── .env                         image, passwords, addresses and ports to edit
 ├── initdb/                      creation of role, database and optional PostGIS
+├── keycloak/, nginx/            optional profiles: identity provider, reverse proxy
 └── README.md                    installation, production, backup, update
 ```
 
@@ -459,7 +460,10 @@ On the server: `docker load -i mosaikit-1.0.0-image.tar`, then edit `.env`
 and run `docker compose up -d`. From the repository, without the folder,
 `docker compose -f deploy/compose.yml up -d` is enough.
 
-The `README.md` of the folder comes from `deploy/README.docker.md`.
+The `README.md` of the folder comes from `deploy/README.docker.md`: quick start, the optional
+profiles (`keycloak` identity provider with a Mosaikit-like sign-in theme, `mail` test server,
+`proxy` nginx with TLS, base path and wildcard plugin host), environment variables, backup and update.
+The files are checked statically by `cargo test -p xtask deploy_check` (no Docker needed).
 
 **Build.** `xtask` prepares a temporary build context with mosaikit, the
 plugin folders and the folder of the distribution, read from

@@ -342,6 +342,9 @@ pub fn docker(tag: Option<String>) -> Result<()> {
     std::fs::create_dir_all(&out)?;
     std::fs::copy(root().join("deploy").join("compose.yml"), out.join("compose.yml"))?;
     copy_dir(&root().join("deploy").join("initdb"), &out.join("initdb"))?;
+    for d in ["keycloak", "nginx"] {
+        copy_dir(&root().join("deploy").join(d), &out.join(d))?;
+    }
     std::fs::write(out.join(".env"), docker_env(img, ver, &pg))?;
     let tar = format!("{}-{}-image.tar", d.product.id, d.product.version);
     eprintln!("saving the image in {}", out.join(&tar).display());
@@ -480,6 +483,9 @@ fn docker_env(image: &str, version: &str, pg: &str) -> String {
          MOSAIKIT_HTTP_PORT=8080\n\
          MOSAIKIT_PLUGIN_PORT=8081\n\
          # true only behind a reverse proxy that sets X-Forwarded-For\n\
-         MOSAIKIT_TRUST_PROXY=false\n"
+         MOSAIKIT_TRUST_PROXY=false\n\
+         # optional profiles (README.md): COMPOSE_PROFILES=keycloak,mail,proxy\n\
+         MOSAIKIT_OIDC_CLIENT_SECRET=cambia-questo-segreto\n\
+         KEYCLOAK_ADMIN_PASSWORD=cambiami-subito\n"
     )
 }

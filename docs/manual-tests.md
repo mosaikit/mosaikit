@@ -508,3 +508,30 @@ Needs many rows: the data of the load test (`cargo xtask perf --scale probe`, th
 ---
 
 Every phase of the plan has its section. New work adds its checks here when it is committed.
+
+## Review round 1 - Docker
+
+Run from `deploy/` with Docker (the build agent could not run Docker, so these are manual).
+Use a copy of `.env` with new passwords. Never run them against a stack that holds data you need:
+`docker compose -p mosaikit-r1 ...` uses its own project and volumes; remove them at the end with
+`docker compose -p mosaikit-r1 down -v`. The static part (files, variables, realm, templates) runs in
+`cargo test -p xtask deploy_check`.
+
+| Id | Steps | Expected |
+|---|---|---|
+| R1-G-01 | `docker compose -p mosaikit-r1 -f compose.yml up -d`; `docker compose -p mosaikit-r1 ps` | `db` and `app` healthy; no keycloak, mail or proxy container; port 5432 not published on the host |
+| R1-G-02 | `docker compose -p mosaikit-r1 exec db psql -U postgres -c "\du"` and `\l` | Role `mosaikit_app` (CREATEROLE, no superuser) and database `mosaikit` owned by it |
+| R1-G-03 | Change `POSTGRES_PASSWORD`, `up -d` again without removing volumes | Database password does not change (documented: used at volume creation); app still healthy |
+| R1-G-04 | Backup: `exec db sh -c 'pg_dump -U postgres -Fc mosaikit > /backups/t.dump'`, then `cp db:/backups ./b` | `./b/t.dump` exists and is not empty; `pg_restore -l` lists the tables |
+| R1-G-05 | Restore the dump with the README command into an emptied database | Restore ends without errors; the app lists the same tenants |
+| R1-G-06 | `--profile mail up -d`; in the app System › Email host `mail`, port 1025, no TLS; send the test message | Message appears in Mailpit `http://localhost:8025`; no mail leaves the computer |
+| R1-G-07 | `--profile keycloak up -d`; open `http://localhost:8180`, sign in to the console | Realm `mosaikit` exists with client `mosaikit` (PKCE S256), groups, 3 users; Realm settings › Login: user registration off |
+| R1-G-08 | Open `http://localhost:8180/realms/mosaikit/account` signed out | Login page with the Mosaikit look (card, logo, blue button), no "Register" link |
+| R1-G-09 | Tenant › Sign-in with the table of the README; *Check the configuration* | Check passes (issuer reachable from the app, PKCE S256 reported) |
+| R1-G-10 | Sign in to the tenant as `anna.manager` / `change-me`, then sign out, then `bruno.user`, then `carla.noaccess` | anna is a Tenant Manager, bruno a User; carla is refused (`oidc_no_role`); signing out ends the Keycloak session |
+| R1-G-11 | `--profile proxy up -d` with `MOSAIKIT_URL=http://localhost`, `MOSAIKIT_PLUGIN_URL=http://plugins.localhost`, `MOSAIKIT_TRUST_PROXY=true`; open `http://localhost` | App loads through nginx; plugin UIs load from `plugins.localhost`; `docker compose logs proxy` shows no errors |
+| R1-G-12 | Through the proxy upload a file of about 200 MB and run an export that lasts over a minute | Both complete (no 413, no 504) |
+| R1-G-13 | Base path: `NGINX_BASE_PATH=/mosaikit`, `MOSAIKIT_URL=http://localhost/mosaikit`; recreate; open `http://localhost/mosaikit/` | App works under the path |
+| R1-G-14 | Wildcard: `MOSAIKIT_PLUGIN_URL=http://*.plugins.localhost`; open a plugin UI | Its URL is `http://<plugin>.plugins.localhost/...`; each plugin on its own host |
+| R1-G-15 | TLS: self-signed certificates in `nginx/certs`, enable `20-https.conf.template`, recreate; `curl -kI https://localhost` | 200 with `Strict-Transport-Security`; session cookie is `Secure` with https URLs; Notifications live update still works (websocket/stream) |
+| R1-G-16 | Upgrade drill: back up, change `MOSAIKIT_VERSION` to a newer image, `up -d` | Migrations apply (`logs app`), data intact; `docker compose down -v` of the test project cleans up |

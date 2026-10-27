@@ -1,0 +1,43 @@
+# TLS: copy this file to 20-https.conf.template, put the certificates in deploy/nginx/certs and
+# recreate the proxy. app.pem and plugins.pem hold the certificate chain, *.key the private key.
+# The certificate of plugins must cover NGINX_PLUGIN_HOST and, with a wildcard plugin host,
+# NGINX_PLUGINS_WILDCARD (a wildcard certificate, e.g. Let's Encrypt with DNS-01).
+# Then turn the "listen 80" servers of 10-mosaikit.conf.template into redirects:
+#   return 301 https://$host$request_uri;
+# and set MOSAIKIT_URL, MOSAIKIT_PLUGIN_URL with https:// and MOSAIKIT_TRUST_PROXY=true.
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${NGINX_APP_HOST};
+    client_max_body_size 2g;
+
+    ssl_certificate     /etc/nginx/certs/app.pem;
+    ssl_certificate_key /etc/nginx/certs/app.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SSL:10m;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+
+    location ${NGINX_BASE_PATH}/ {
+        proxy_pass http://app:8080;
+        include /etc/nginx/conf.d/proxy.inc;
+    }
+}
+
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name ${NGINX_PLUGIN_HOST} ${NGINX_PLUGINS_WILDCARD};
+    client_max_body_size 2g;
+
+    ssl_certificate     /etc/nginx/certs/plugins.pem;
+    ssl_certificate_key /etc/nginx/certs/plugins.key;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_cache shared:SSL:10m;
+    add_header Strict-Transport-Security "max-age=31536000" always;
+
+    location / {
+        proxy_pass http://app:8081;
+        include /etc/nginx/conf.d/proxy.inc;
+    }
+}

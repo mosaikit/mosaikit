@@ -1,0 +1,43 @@
+/* Mosaikit look: light card on a soft background, one accent colour, rounded controls. */
+:root {
+  --msk-accent: #2f6fed;
+  --msk-accent-dark: #1f56c4;
+  --msk-bg: #f4f6fa;
+  --msk-card: #ffffff;
+  --msk-text: #1b2333;
+  --msk-border: #d5dbe6;
+}
+.pf-v5-c-login, .login-pf, body {
+  background: var(--msk-bg) !important;
+  color: var(--msk-text);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.pf-v5-c-login__container { max-width: 26rem; margin: 0 auto; display: block; }
+.pf-v5-c-login__main, .card-pf {
+  background: var(--msk-card);
+  border: 1px solid var(--msk-border);
+  border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(27, 35, 51, .08);
+}
+#kc-header-wrapper, .pf-v5-c-login__header {
+  text-align: center;
+  background: url("../img/logo.svg") no-repeat center top / 3.5rem;
+  padding-top: 4.5rem;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: .02em;
+}
+.pf-v5-c-form-control, input[type="text"], input[type="password"] {
+  border-radius: 8px;
+  border-color: var(--msk-border);
+}
+.pf-v5-c-button.pf-m-primary, #kc-login {
+  background: var(--msk-accent) !important;
+  border-radius: 8px;
+  font-weight: 600;
+}
+.pf-v5-c-button.pf-m-primary:hover, #kc-login:hover { background: var(--msk-accent-dark) !important; }
+a { color: var(--msk-accent); }
+@media (prefers-color-scheme: dark) {
+  :root { --msk-bg: #12161f; --msk-card: #1b2230; --msk-text: #e8ecf4; --msk-border: #2f394d; }
+}

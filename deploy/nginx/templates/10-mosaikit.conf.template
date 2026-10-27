@@ -1,0 +1,36 @@
+# Mosaikit behind nginx, plain HTTP. Variables come from the environment of the "proxy"
+# service (compose.yml): NGINX_APP_HOST, NGINX_PLUGIN_HOST, NGINX_PLUGINS_WILDCARD, NGINX_BASE_PATH.
+# For HTTPS copy 20-https.conf.example to 20-https.conf.template (see README.docker.md).
+
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+# Host mode: NGINX_BASE_PATH empty, the app is served at the root of its host.
+# Base path mode: NGINX_BASE_PATH=/mosaikit, the app is served under that path of its host
+# (MOSAIKIT_URL must carry the same path).
+server {
+    listen 80;
+    server_name ${NGINX_APP_HOST};
+    client_max_body_size 2g;
+
+    location ${NGINX_BASE_PATH}/ {
+        proxy_pass http://app:8080;
+        include /etc/nginx/conf.d/proxy.inc;
+    }
+}
+
+# Untrusted origin: plugin UIs, uploaded files, public links. A different host from the app.
+# With MOSAIKIT_PLUGIN_URL=https://*.plugins.example.com (optional, one origin per plugin) every
+# host under the wildcard reaches the same port: the app tells them apart by the Host header.
+server {
+    listen 80;
+    server_name ${NGINX_PLUGIN_HOST} ${NGINX_PLUGINS_WILDCARD};
+    client_max_body_size 2g;
+
+    location / {
+        proxy_pass http://app:8081;
+        include /etc/nginx/conf.d/proxy.inc;
+    }
+}
