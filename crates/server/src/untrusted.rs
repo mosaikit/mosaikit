@@ -58,7 +58,7 @@ fn plugin_csp(s: &AppState, p: &mosaikit_kernel::plugins::LoadedPlugin) -> Strin
          img-src 'self' data: blob: {net} {frames}; font-src 'self' data:; media-src 'self' data: blob:; \
          connect-src 'self' {net}; frame-src 'self' blob: {frames}; worker-src {own} blob:; \
          frame-ancestors {} {}; object-src 'none'; base-uri 'self'; form-action 'self'",
-        s.k.cfg.app_origin(),
+        s.k.cfg.app_origins().join(" "),
         s.k.cfg.public_origin()
     )
 }
@@ -127,7 +127,7 @@ fn user_content(
 }
 
 fn ancestors(s: &AppState) -> String {
-    format!("'self' {} {}", s.k.cfg.app_origin(), s.k.cfg.plugin_origin())
+    format!("'self' {} {}", s.k.cfg.app_origins().join(" "), s.k.cfg.plugin_origin())
 }
 
 /// Who may embed the public pages of a tenant: the sites the tenant (within the platform's) allows,

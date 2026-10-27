@@ -493,6 +493,32 @@ impl Config {
     pub fn app_origin(&self) -> String {
         origin_of(&self.app_url)
     }
+
+    /// The origins allowed to embed the plugin UIs: the one of the app and, in development, the other
+    /// ways the same computer is reached (`localhost` and `127.0.0.1`) on the port of the app and on
+    /// the port of the server itself (the app can be opened from Vite or from the server).
+    pub fn app_origins(&self) -> Vec<String> {
+        let mut list = vec![self.app_origin()];
+        if self.dev.enabled {
+            let mut ports = vec![self.app_origin()];
+            if let Some(listen) = &self.listen {
+                ports.push(format!("http://{listen}"));
+            }
+            for o in ports {
+                let Some((scheme, rest)) = o.split_once("://") else { continue };
+                let Some((host, port)) = rest.rsplit_once(':') else { continue };
+                if host == "localhost" || host == "127.0.0.1" {
+                    for h in ["localhost", "127.0.0.1"] {
+                        let v = format!("{scheme}://{h}:{port}");
+                        if !list.contains(&v) {
+                            list.push(v);
+                        }
+                    }
+                }
+            }
+        }
+        list
+    }
 }
 
 fn truthy(v: &str) -> bool {
@@ -646,6 +672,26 @@ mod tests {
         assert_eq!(d.plugin_url_for("x.y"), "http://x-y.localhost:47081/mosaikit");
         assert_eq!(d.untrusted_bind, "127.0.0.1:47081");
         assert!(d.untrusted_host_ok(Some("x-y.localhost:47081"), Some("x.y")));
+        // the app opened from the server itself (localhost:47080) or from Vite (127.0.0.1:5173) may embed the UIs
+        let dev = cfg(r#"
+            url = "http://127.0.0.1:5173"
+            plugin_url = "http://127.0.0.1:47081"
+            listen = "127.0.0.1:47080"
+            [dev]
+            enabled = true
+        "#)
+        .unwrap();
+        let origins = dev.app_origins();
+        for o in [
+            "http://127.0.0.1:5173",
+            "http://localhost:5173",
+            "http://127.0.0.1:47080",
+            "http://localhost:47080",
+        ] {
+            assert!(origins.iter().any(|x| x == o), "{o} in {origins:?}");
+        }
+        // in production only the origin of the app
+        assert_eq!(cfg("url = \"https://a.org\"").unwrap().app_origins(), vec!["https://a.org".to_string()]);
         // without a wildcard: one origin, every host
         let one = cfg(r#"
             url = "https://apps.example.org"
