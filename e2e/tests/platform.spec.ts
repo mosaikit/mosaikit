@@ -223,7 +223,7 @@ test.describe.serial('platform', () => {
     // the Tenant Manager of Beta invites Anna, who is in Alfa
     await login(page, 'City of Beta', 'manager', PASSWORD)
     await nav(page, 'Manage').click()
-    await page.getByRole('link', { name: /Pending/ }).click()
+    await page.getByRole('radio', { name: /Pending/ }).click()
     await page.getByRole('button', { name: 'Invite people' }).click()
     const inv = page.getByRole('dialog', { name: 'Invite a person of another tenant' })
     await inv.getByLabel('Home tenant').fill('alfa')
@@ -356,7 +356,7 @@ test.describe.serial('platform', () => {
     await mgr.keyboard.press('Escape')
     await expect(mgr.getByTestId('bell-badge')).toBeHidden()
     await nav(mgr, 'Manage').click()
-    await mgr.getByRole('link', { name: /Pending/ }).click()
+    await mgr.getByRole('radio', { name: /Pending/ }).click()
     await mgr.getByRole('button', { name: 'Invite people' }).click()
     const inv = mgr.getByRole('dialog', { name: 'Invite a person of another tenant' })
     await inv.getByLabel('Home tenant').fill('alfa')
@@ -778,7 +778,7 @@ test.describe.serial('platform', () => {
     // the Tenant Manager: a profile that may only open Notes, given to Anna
     await login(page, 'Alfa Municipality', 'manager', PASSWORD)
     await nav(page, 'Manage').click()
-    await page.getByRole('link', { name: /Permission profiles/ }).click()
+    await page.getByRole('radio', { name: /Permission profiles/ }).click()
     await expect(page.getByText('The permissions every plugin gives by default.', { exact: false })).toBeVisible()
     await page.getByRole('button', { name: 'New profile' }).click()
     const d = page.getByRole('dialog', { name: 'New profile' })
@@ -824,7 +824,7 @@ test.describe.serial('platform', () => {
     // the Tenant Manager approves it from Pending
     await login(page, 'Alfa Municipality', 'manager', PASSWORD)
     await nav(page, 'Manage').click()
-    await page.getByRole('link', { name: /Pending/ }).click()
+    await page.getByRole('radio', { name: /Pending/ }).click()
     const req = page.getByRole('table', { name: 'Access requests' }).getByRole('row', { name: /Budget plan/ })
     await expect(req).toContainText('Anna Rossi')
     await accessible(page, 'pending')
@@ -1916,7 +1916,7 @@ test.describe.serial('platform', () => {
     // R1-T-11: permission profiles: described, renamed, readable names, compact editor
     await login(page, 'Alfa Municipality', 'manager', PASSWORD)
     await nav(page, 'Manage').click()
-    await page.getByRole('link', { name: /Permission profiles/ }).click()
+    await page.getByRole('radio', { name: /Permission profiles/ }).click()
     await expect(page.getByText('A permission profile is a named set of permissions')).toBeVisible()
     await expect(page.getByTestId('profile-summary').first()).toContainText('plugins')
     await expect(page.getByTestId('profile-summary').first()).not.toContainText('com.mosaikit')
