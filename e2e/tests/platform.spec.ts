@@ -133,6 +133,8 @@ async function createTenant(page: Page, slug: string, name: string) {
 
 /** No serious or critical WCAG 2.1 AA violation (axe). */
 async function accessible(page: Page, where: string) {
+  // a menu or a list that is closing hides the page for a moment (aria-hidden): measure after it is gone
+  await page.waitForFunction(() => !document.querySelector('[data-aria-hidden="true"]'), undefined, { timeout: 3000 }).catch(() => {})
   // toasts fade in and out: measured half-transparent they would fail colour contrast by chance
   const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).exclude('[data-sonner-toaster]').analyze()
   const bad = r.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')
