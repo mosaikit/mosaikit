@@ -75,7 +75,7 @@ const checks: L.Check[] = [
       c.ok(/Not reviewed yet|Reviewed by/.test(t), '«Not reviewed yet»')
       c.ok(await H.vis(r.getByRole('textbox', { name: /Comment/ })), 'a comment field')
       c.ok(await H.vis(r.getByRole('button', { name: 'Mark as reviewed' })), 'Mark as reviewed')
-      c.ok(/History of the reviews/.test(t), 'the history')
+      c.ok(/History of the reviews/i.test(t), 'the history')
       await L.shot(m, 'FU-B-03')
       return c.result()
     },
@@ -311,7 +311,10 @@ const checks: L.Check[] = [
       const c = H.checker()
       const p = await L.as(ctx, 'admin')
       const d = await restoreDialog(p, 'Budget 2027')
-      const t = await d.innerText()
+      // the option is in the confirmation that follows the click on Restore
+      await d.getByRole('button', { name: /Restore «Budget 2027»/ }).first().click()
+      await p.waitForTimeout(1200)
+      const t = await p.locator('body').innerText()
       c.ok(/Also its shares/.test(t), '«Also its shares…»')
       await L.shot(p, 'FU-B-14')
       await p.keyboard.press('Escape')
