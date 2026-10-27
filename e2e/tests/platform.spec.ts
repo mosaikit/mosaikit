@@ -2151,12 +2151,12 @@ test.describe.serial('platform', () => {
       await page.reload()
     })
     // a tenant of its own, so that the test also runs alone
-    expect((await call('POST', 'api/admin/tenants', { slug: 'ovw', name: 'Overview Tenant', manager_username: 'mgr', manager_password: PASSWORD })).status).toBe(200)
+    expect((await call('POST', 'api/admin/tenants', { slug: 'ovw', name: 'Overview Tenant', manager_username: 'mgr', manager_email: 'mgr@ovw.example.org', manager_password: PASSWORD })).status).toBe(200)
     await logout(page)
 
     // a person of the tenant, for the Home of the User
     await login(page, 'Overview Tenant', 'mgr', PASSWORD)
-    expect((await call('POST', 'api/t/ovw/manage/members', { username: 'ov-user', display_name: 'Ov User', password: PASSWORD, role: 'user' })).status).toBe(200)
+    expect((await call('POST', 'api/t/ovw/manage/members', { username: 'ov-user', display_name: 'Ov User', email: 'ov-user@ovw.example.org', password: PASSWORD, role: 'user' })).status).toBe(200)
 
     await test.step('R1-O-02 Tenant Manager: waiting for you, active people, recent activity, notifications, usage, compact apps', async () => {
       await page.goto('./#/t/ovw')
