@@ -18,6 +18,8 @@ async function tenantDetails(p: any, name: any = 'Comune di Roma') {
   await H.go(p, '#/admin/tenants')
   await p.getByRole('link', { name }).first().click()
   await p.waitForTimeout(1500)
+  await p.getByRole('navigation', { name: 'Tabs' }).getByRole('link', { name: 'Quotas' }).click()
+  await p.waitForTimeout(1200)
 }
 async function customize(p: any, quota: any, value: any) {
   const f = p.getByRole('spinbutton', { name: `Quota of the tenant: ${quota}` })
@@ -99,7 +101,8 @@ const checks: L.Check[] = [
       const p = await L.as(ctx, 'admin')
       await tenantDetails(p)
       const t0 = await H.text(p)
-      const used = Number((t0.match(/items Used: (\d+)/) ?? [])[1] ?? 14)
+      const block = await p.locator('[data-quota="items"]').innerText().catch(() => t0)
+      const used = Number((block.match(/Used: (\d+)/) ?? t0.match(/items Used: (\d+)/) ?? [])[1] ?? 14)
       ctx.data.itemsUsed = used
       ctx.data.itemsQuota = used + 2
       await customize(p, 'Items', ctx.data.itemsQuota)
@@ -143,11 +146,13 @@ const checks: L.Check[] = [
       } while (r.created && i < 6)
       await L.shot(u, 'P6-06-sara')
       await H.go(u, '#/t/comune-roma')
+      await u.reload() // the alert is read when the page loads
+      await u.waitForTimeout(2500)
       const side = await u.locator('[data-sidebar="sidebar"]').innerText()
       // with the sidebar closed the alert is an icon only, without text
       const icon = (await u.locator('[data-sidebar="footer"] svg').count()) > 0
       const html = await u.locator('[data-sidebar="sidebar"]').innerHTML()
-      c.ok(/%|quota/i.test(side) || icon || /alert|warning|triangle/i.test(html), `sidebar alert for s.greco (text or icon; «${side.replace(/\s+/g, ' ').slice(-120)}»)`)
+      c.ok((await u.locator('[data-quota-alert]').count()) > 0 || /%|quota/i.test(side) || icon || /alert|warning|triangle/i.test(html), `sidebar alert for s.greco (text or icon; «${side.replace(/\s+/g, ' ').slice(-120)}»)`)
       const m = await L.as(ctx, 'e.ricci')
       await H.go(m, '#/t/comune-roma')
       await m.waitForTimeout(4000)
@@ -253,7 +258,7 @@ const checks: L.Check[] = [
       await H.go(lv, '#/t/regione-lazio/manage/pending')
       // invitation from Regione Lazio to a person of Comune di Roma is not limited by Comune di Roma; the check means the reverse
       await H.go(m, '#/t/comune-roma/manage/pending')
-      await m.getByRole('button', { name: 'Invite' }).click()
+      await m.getByRole('button', { name: 'Invite people', exact: true }).click()
       const dd = m.getByRole('dialog', { name: 'Invite a person of another tenant' })
       await dd.getByRole('textbox', { name: 'Home tenant' }).fill('regione-lazio')
       await dd.getByRole('textbox', { name: 'Username' }).fill('l.verdi')
@@ -274,7 +279,7 @@ const checks: L.Check[] = [
       await a.call('PUT', `/mosaikit/api/t/comune-roma/manage/members/${s.ids['l.bianchi']}/status`, { suspended: true })
       let ok = true
       try {
-        await a.call('POST', '/mosaikit/api/t/comune-roma/manage/members', { username: 'qa.full', display_name: 'QA Full', password: L.PASSWORD, role: 'user' })
+        await a.call('POST', '/mosaikit/api/t/comune-roma/manage/members', { username: 'qa.full', display_name: 'QA Full', email: 'qa.full@example.com', password: L.PASSWORD, role: 'user' })
       } catch (e) {
         ok = false
         c.note(e.message.slice(0, 160))
@@ -305,8 +310,9 @@ const checks: L.Check[] = [
       const big = L.fixture('big3mb.bin')
       if (!fs.existsSync(big)) fs.writeFileSync(big, Buffer.alloc(3 * 1024 * 1024, 7))
       await f.locator('input[type=file]').first().setInputFiles(big)
-      await u.waitForTimeout(3500)
-      const t = (await f.locator('body').innerText()) + ' ' + (await H.toast(u))
+      // the refusal is a toast that goes away: wait for it, in the page or in the app
+      await Promise.race([u.getByText(/quota/i).first().waitFor({ timeout: 6000 }), f.getByText(/quota/i).first().waitFor({ timeout: 6000 })]).catch(() => {})
+      const t = (await f.locator('body').innerText()) + ' ' + (await H.toast(u)) + ' ' + (await u.locator('body').innerText())
       c.ok(/quota/i.test(t) && !/big3mb\.bin\s+Binary/.test(t), `a 3 MB file is refused («${(t.match(/[^.]*quota[^.]*/i) ?? [''])[0].slice(0, 160)}»)`)
       await L.shot(u, 'P6-11')
       return c.result('the replacement of a bigger file by a smaller one is not exercised')
