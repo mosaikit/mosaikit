@@ -213,6 +213,7 @@ pub async fn create_member(
 }
 
 /// Creates a local user of `tenant` (for the Administrator too, who appoints a manager).
+#[allow(clippy::too_many_arguments)]
 pub(super) async fn create_member_in(
     k: &Kernel,
     tenant: Uuid,
