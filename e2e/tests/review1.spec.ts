@@ -78,14 +78,18 @@ test.describe.serial('review round 1: auth and plugins', () => {
       await page.getByRole('option', { name: 'City of Beta' }).click()
     }
     await page.getByRole('button', { name: 'Forgot your password?' }).click()
+    // with or without a mail server (the notifications scenario sets one) the answer is the same for an
+    // account that exists and one that does not: no user enumeration
+    const answers: string[] = []
     for (const who of ['manager', 'nobody-here']) {
       await page.getByLabel('Username or email address').fill(who)
       await page.getByRole('button', { name: 'Send the link' }).click()
-      // no mail server in this installation: the page says so, for any name (no user enumeration)
-      await expect(page.getByRole('status')).toContainText('cannot send email')
+      await expect(page.getByRole('status')).toContainText(/cannot send email|If an account with these details exists/)
+      answers.push((await page.getByRole('status').textContent()) ?? '')
       await page.getByRole('button', { name: /Back to sign-in/ }).click()
       await page.getByRole('button', { name: 'Forgot your password?' }).click()
     }
+    expect(answers[0]).toBe(answers[1])
   })
 
   test('R1-A-04 static sites by address in a frame, the ones that forbid framing in a new tab, cards and thumbnails', async ({ page, context }) => {
