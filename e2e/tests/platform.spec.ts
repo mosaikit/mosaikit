@@ -1630,6 +1630,7 @@ test.describe.serial('platform', () => {
     await expect(page.getByRole('dialog', { name: 'Guida di Mosaikit' }).getByRole('heading', { name: /Guida per il Tenant Manager/ })).toBeVisible()
     await page.keyboard.press('Escape')
     await page.evaluate(() => localStorage.setItem('msk_lang', 'en'))
+    await page.reload()
     await logout(page)
   })
 })
