@@ -64,9 +64,6 @@ const KNOWN: Record<string, string> = {
   'FU-A-12': 'M2: themes and layout settings of the tenant (owner: manual checks follow-up)',
   'P5-21': 'M3: lists, quota and own-profile checks (owner: manual checks follow-up)',
   'P6-06': 'M3: lists, quota and own-profile checks (owner: manual checks follow-up)',
-  'UX-03': 'M3: lists, quota and own-profile checks (owner: manual checks follow-up)',
-  'UX-07': 'M3: lists, quota and own-profile checks (owner: manual checks follow-up)',
-  'UX-10': 'M3: lists, quota and own-profile checks (owner: manual checks follow-up)',
   'P10-24': 'F2: contrast of the selected section in dark mode (owner: QA follow-ups)',
 }
 
