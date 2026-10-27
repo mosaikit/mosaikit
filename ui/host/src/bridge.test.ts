@@ -13,6 +13,14 @@ describe('routeOp', () => {
     expect(d.url).toBe(`/api/t/alfa/p/com.mosaikit.notes/r/notes/${ID}`)
   })
 
+  it('passes a page of the list, bounded', () => {
+    const c = routeOp('alfa', 'p.x', 'crud.list', { resource: 'notes', limit: 100, cursor: 'a|b' })
+    expect(c.url).toBe('/api/t/alfa/p/p.x/r/notes?limit=100&cursor=a%7Cb')
+    // at most 500 rows a page; a limit that is not a positive integer is ignored
+    expect(routeOp('alfa', 'p.x', 'crud.list', { resource: 'notes', limit: 9999 }).url).toBe('/api/t/alfa/p/p.x/r/notes?limit=500')
+    expect(routeOp('alfa', 'p.x', 'crud.list', { resource: 'notes', limit: -1 }).url).toBe('/api/t/alfa/p/p.x/r/notes')
+  })
+
   it('refuses identifiers that would change the path', () => {
     expect(() => routeOp('alfa', 'p.x', 'crud.list', { resource: '../../admin' })).toThrow(OpError)
     expect(() => routeOp('alfa', 'p.x', 'crud.get', { resource: 'notes', id: '1/../../x' })).toThrow(OpError)

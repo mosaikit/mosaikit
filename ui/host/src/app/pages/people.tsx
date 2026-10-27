@@ -3,7 +3,7 @@
 // the permissions of a plugin, access requests, the directory of every person, the page of a link to
 // choose a new password.
 
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
+import { useDeferredValue, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, Copy, KeyRound, Link2, LogOut, Minus, MoreHorizontal, Plus, Puzzle, ShieldCheck, ShieldOff, Trash2, UserPlus, Users } from 'lucide-react'
 import { toast } from 'sonner'
@@ -35,11 +35,11 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
-import { initials, useAction, useApi, useConfirm, useTenantCtx } from '../core.ts'
+import { initials, useAction, useApi, useConfirm, usePaged, useTenantCtx, type PageOf } from '../core.ts'
 import { t } from '../i18n.ts'
 import { levelName } from '../levels.ts'
 import { PersonPicture } from '../picture.tsx'
-import { Empty, ErrorBox, Loading, PageHeader, Pills, SaveBar, StatusBadge, Tabs } from '../kit.tsx'
+import { Empty, ErrorBox, Loading, MoreRows, PageHeader, Pills, SaveBar, SelectAllRows, StatusBadge, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import AppIcon from '../AppIcon.tsx'
 import { AppMark } from '../Shell.tsx'
@@ -1319,15 +1319,37 @@ function AddToTenantDialog({ open, onClose, tenants, onSubmit, title }: { open: 
   )
 }
 
+/** A page of the people of the installation, with the counts of the pills. */
+type PeoplePageData = PageOf<PersonRow> & { counts: { all: number; several: number; admins: number } }
+
 export function AdminPeople() {
-  const q = useApi<PersonRow[]>(['people'], '/api/admin/people')
+  const qc = useQueryClient()
   const tenants = useApi<TenantInfo[]>(['tenants'], '/api/admin/tenants')
   const [show, setShow] = useState('all')
   const [tenant, setTenant] = useState('any')
   const [role, setRole] = useState('any')
   const [status, setStatus] = useState('any')
   const [search, setSearch] = useState('')
+  const words = useDeferredValue(search.trim())
+  // filtered and paged on the server: 20,000 people are 11 MB at once
+  const q = usePaged<PersonRow, PeoplePageData>(['people', 'page'], '/api/admin/people', {
+    q: words || undefined,
+    show: show === 'all' ? undefined : show,
+    tenant: tenant === 'any' ? undefined : tenant,
+    role: role === 'any' ? undefined : role,
+    status: status === 'any' ? undefined : status,
+  })
   const [sel, setSel] = useState<Set<string>>(new Set())
+  // every person of the filter selected, loaded or not
+  const [everyone, setEveryone] = useState(false)
+  // another filter, another selection
+  const filterKey = [words, show, tenant, role, status].join('|')
+  const [selKey, setSelKey] = useState(filterKey)
+  if (selKey !== filterKey) {
+    setSelKey(filterKey)
+    setSel(new Set())
+    setEveryone(false)
+  }
   const [dlg, setDlg] = useState<null | 'new' | 'add'>(null)
   const [links, setLinks] = useState<{ name: string; link: ResetLink }[]>([])
   const inval = [['people']]
@@ -1336,23 +1358,15 @@ export function AdminPeople() {
     invalidate: inval,
   })
   const clients = (tenants.data ?? []).filter((x) => !x.is_system)
-  const rows = useMemo(() => {
-    const s = search.trim().toLowerCase()
-    return (q.data ?? []).filter(
-      (p) =>
-        (show === 'all' || (show === 'several' && p.tenants.length > 1) || (show === 'admins' && p.is_admin)) &&
-        (tenant === 'any' || p.tenants.some((x) => x.tenant_id === tenant)) &&
-        (role === 'any' || p.tenants.some((x) => x.role === role)) &&
-        (status === 'any' || p.status === status) &&
-        (!s || `${p.username} ${p.display_name} ${p.home_tenant} ${p.email ?? ''}`.toLowerCase().includes(s)),
-    )
-  }, [q.data, show, tenant, role, status, search])
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
-  const all = q.data ?? []
-  const ids = [...sel].filter((id) => rows.some((r) => r.user_id === id && !r.is_admin))
+  const rows = q.items
+  const counts = q.first?.counts ?? { all: 0, several: 0, admins: 0 }
+  // the selection may hold people of pages not loaded yet («Select all»): never the Administrators
+  const ids = [...sel].filter((id) => !rows.some((r) => r.user_id === id && r.is_admin))
+  const selectable = rows.filter((r) => !r.is_admin)
   const nameOf = (id: string) => {
-    const p = all.find((x) => x.user_id === id)
+    const p = rows.find((x) => x.user_id === id)
     return p ? p.display_name || p.username : id
   }
   async function sendLinks() {
@@ -1370,7 +1384,7 @@ export function AdminPeople() {
     <>
       <PageHeader
         title={t('People')}
-        sub={t('{count} people', { count: all.length })}
+        sub={t('{count} people', { count: counts.all })}
         actions={
           <Button onClick={() => setDlg('new')}>
             <Plus />
@@ -1383,9 +1397,9 @@ export function AdminPeople() {
           value={show}
           onChange={setShow}
           items={[
-            { id: 'all', label: t('All'), count: all.length },
-            { id: 'several', label: t('In several tenants'), count: all.filter((p) => p.tenants.length > 1).length },
-            { id: 'admins', label: t('Administrators'), count: all.filter((p) => p.is_admin).length },
+            { id: 'all', label: t('All'), count: counts.all },
+            { id: 'several', label: t('In several tenants'), count: counts.several },
+            { id: 'admins', label: t('Administrators'), count: counts.admins },
           ]}
         />
         <div className="flex flex-wrap items-center gap-2">
@@ -1426,6 +1440,16 @@ export function AdminPeople() {
           {ids.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 rounded-lg bg-primary/10 py-1 pr-1 pl-3" role="group" aria-label={t('Actions on the selection')}>
               <span className="text-sm font-medium tabular-nums">{t('{count} selected', { count: ids.length })}</span>
+              {q.more && !everyone && ids.length >= selectable.length && (
+                <SelectAllRows
+                  selected={ids.length}
+                  total={q.total}
+                  onAll={async () => {
+                    setSel(new Set(await q.allIds()))
+                    setEveryone(true)
+                  }}
+                />
+              )}
               <Button variant="outline" size="sm" onClick={() => status_.mutate({ ids, active: false })}>
                 {t('Disable')}
               </Button>
@@ -1438,7 +1462,14 @@ export function AdminPeople() {
               <Button variant="outline" size="sm" onClick={() => void sendLinks()}>
                 {t('Send the password link')}
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setSel(new Set())}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSel(new Set())
+                  setEveryone(false)
+                }}
+              >
                 {t('Deselect')}
               </Button>
             </div>
@@ -1451,8 +1482,8 @@ export function AdminPeople() {
                 <TableHead className="w-10">
                   <Checkbox
                     aria-label={t('Select all')}
-                    checked={rows.length > 0 && ids.length === rows.filter((r) => !r.is_admin).length ? true : ids.length ? 'indeterminate' : false}
-                    onCheckedChange={(v) => setSel(v ? new Set(rows.filter((r) => !r.is_admin).map((r) => r.user_id)) : new Set())}
+                    checked={selectable.length > 0 && ids.length >= selectable.length ? true : ids.length ? 'indeterminate' : false}
+                    onCheckedChange={(v) => setSel(v ? new Set(selectable.map((r) => r.user_id)) : new Set())}
                   />
                 </TableHead>
                 <TableHead>{t('Name')}</TableHead>
@@ -1510,6 +1541,7 @@ export function AdminPeople() {
           </Table>
           {rows.length === 0 && <p className="p-6 text-center text-sm text-muted-foreground">{t('No person found.')}</p>}
         </div>
+        <MoreRows shown={rows.length} total={q.total} more={q.more} loading={q.loadingMore} onMore={q.loadMore} />
       </div>
       <NewPersonDialog
         open={dlg === 'new'}
@@ -1534,7 +1566,7 @@ export function AdminPeople() {
             }
           }
           toast.success(t('Added to the tenant'))
-          void q.refetch()
+          void qc.invalidateQueries({ queryKey: ['people'] })
         }}
       />
       <LinksDialog links={links} onClose={() => setLinks([])} />

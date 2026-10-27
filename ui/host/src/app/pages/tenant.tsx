@@ -1,7 +1,7 @@
 // Pages of a tenant: Home or overview, apps (in the iframe) and, for the Tenant Manager, the management of
 // the tenant: People, Plugins, Shares, Usage and Tenant settings (docs/refactoring-ui.md §2).
 
-import { useEffect, useMemo, useState } from 'react'
+import { useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { Activity, Bell, Frame, Gauge, Grid2x2, KeyRound, KeySquare, Link2, Lock, Mail, MoreHorizontal, Palette, Plus, Share2, ShieldCheck, ShieldOff, Trash2, TrendingUp, UserRound, Users } from 'lucide-react'
@@ -22,9 +22,9 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { initials, isApp, passwordMin, useAction, useApi, useConfig, useConfirm, useTenantCtx } from '../core.ts'
+import { initials, isApp, passwordMin, useAction, useApi, useConfig, useConfirm, usePaged, useTenantCtx, type PageOf } from '../core.ts'
 import { t, useLang } from '../i18n.ts'
-import { Empty, ErrorBox, FormDialog, Kpi, Loading, PageHeader, Pills, PluginKpis, SaveBar, Sections, StatusBadge, Tabs } from '../kit.tsx'
+import { Empty, ErrorBox, FormDialog, Kpi, Loading, MoreRows, PageHeader, Pills, PluginKpis, SaveBar, SelectAllRows, Sections, StatusBadge, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import { effectiveMode, useTheme } from '../theme.ts'
 import AppIcon from '../AppIcon.tsx'
@@ -175,7 +175,9 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
   const pwMin = passwordMin(useConfig(slug))
   const oidc = useTenantSignIn(slug) === 'oidc'
   const base = `/api/t/${enc(slug)}/manage`
-  const members = useApi<Member[]>(['members', slug], `${base}/members`)
+  // the whole list only where a choice among the members is needed (members of a group); People is paged
+  const members = useApi<Member[]>(['members', slug], section === 'groups' ? `${base}/members` : null)
+  const people = usePaged<Member>(['members', slug, 'count'], `${base}/members`, {}, 1)
   const groups = useApi<Group[]>(['groups', slug], `${base}/groups`)
   const invites = useApi<Invitation[]>(['invites', slug], `${base}/invitations`)
   const profiles = useApi<Profile[]>(['profiles', slug], `${base}/profiles`)
@@ -183,7 +185,7 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
   const cur = ['people', 'groups', 'profiles', 'pending'].includes(section ?? '') ? section! : 'people'
   const pending = (invites.data?.filter((i) => i.status === 'pending').length ?? 0) + (requests.data?.length ?? 0)
   const sections = [
-    { id: 'people', label: t('People'), icon: <Users />, count: members.data?.length },
+    { id: 'people', label: t('People'), icon: <Users />, count: people.isLoading ? undefined : people.total },
     { id: 'groups', label: t('Groups'), icon: <Grid2x2 />, count: groups.data?.length },
     { id: 'profiles', label: t('Permission profiles'), icon: <KeySquare />, count: profiles.data?.length },
     { id: 'pending', label: t('Pending'), icon: <Mail />, count: pending },
@@ -237,7 +239,7 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
         crumbs={[{ label: t('Tenant management') }]}
         sub={
           {
-            people: t('{count} people', { count: members.data?.length ?? 0 }),
+            people: t('{count} people', { count: people.total }),
             groups: t('{count} groups', { count: groups.data?.length ?? 0 }),
             profiles: t('{count} profiles', { count: profiles.data?.length ?? 0 }),
             pending: t('{count} pending', { count: pending }),
@@ -246,8 +248,8 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
         actions={action}
       />
       <Sections sections={sections} current={cur} href={(id) => to.tenant(slug, 'manage', id)}>
-        {cur === 'people' && <People slug={slug} q={members} profiles={profiles.data ?? []} groups={groups.data ?? []} />}
-        {cur === 'groups' && <Groups slug={slug} q={groups} members={members.data ?? []} />}
+        {cur === 'people' && <People slug={slug} profiles={profiles.data ?? []} groups={groups.data ?? []} />}
+        {cur === 'groups' && <Groups slug={slug} members={members.data ?? []} />}
         {cur === 'profiles' && <ProfilesSection slug={slug} />}
         {cur === 'pending' && (
           <div className="grid gap-6">
@@ -316,12 +318,22 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
 
 type Q<T> = { data?: T; isLoading: boolean; error: unknown }
 
-function People({ slug, q, profiles, groups }: { slug: string; q: Q<Member[]>; profiles: Profile[]; groups: Group[] }) {
+function People({ slug, profiles, groups }: { slug: string; profiles: Profile[]; groups: Group[] }) {
   const pwMin = passwordMin(useConfig(slug))
   const oidc = useTenantSignIn(slug) === 'oidc'
   const base = `/api/t/${enc(slug)}/manage/members`
   const [sel, setSel] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState('')
+  const words = useDeferredValue(search.trim())
+  // a page at a time, searched on the server
+  const q = usePaged<Member>(['members', slug, 'page'], base, { q: words || undefined })
+  const [everyone, setEveryone] = useState(false)
+  const [selKey, setSelKey] = useState(words)
+  if (selKey !== words) {
+    setSelKey(words)
+    setSel(new Set())
+    setEveryone(false)
+  }
   const [pwFor, setPwFor] = useState<Member | null>(null)
   const inval = [['members', slug], ['overview', slug]]
   const setRole = useAction(({ ids, role }: { ids: string[]; role: string }) => Promise.all(ids.map((id) => api('PUT', `${base}/${id}/role`, { role }))), {
@@ -348,14 +360,14 @@ function People({ slug, q, profiles, groups }: { slug: string; q: Q<Member[]>; p
   })
   const [link, setLink] = useState<{ name: string; link: ResetLink } | null>(null)
   const sendLink = useAction((m: Member) => api<ResetLink>('POST', `${base}/${m.user_id}/reset-link`), {})
-  const rows = useMemo(() => {
-    const s = search.trim().toLowerCase()
-    return (q.data ?? []).filter((m) => !s || `${m.username} ${m.display_name} ${m.home_tenant}`.toLowerCase().includes(s))
-  }, [q.data, search])
+  // the new owner of the items of a person removed is chosen among every member
+  const everyMember = useApi<Member[]>(['members', slug], removing ? base : null)
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
-  const ids = [...sel].filter((id) => rows.some((r) => r.user_id === id))
-  const all = rows.length > 0 && ids.length === rows.length
+  const rows = q.items
+  // the selection may hold people of pages not loaded yet («Select all»)
+  const ids = [...sel]
+  const all = rows.length > 0 && ids.length >= rows.length
   return (
     <div className="grid gap-3">
       <div className="flex flex-wrap items-center gap-3">
@@ -364,6 +376,16 @@ function People({ slug, q, profiles, groups }: { slug: string; q: Q<Member[]>; p
           // the action bar appears only with a selection
           <div className="flex flex-wrap items-center gap-2 rounded-lg bg-primary/10 py-1 pr-1 pl-3" role="group" aria-label={t('Actions on the selection')}>
             <span className="text-sm font-medium tabular-nums">{t('{count} selected', { count: ids.length })}</span>
+            {q.more && !everyone && all && (
+              <SelectAllRows
+                selected={ids.length}
+                total={q.total}
+                onAll={async () => {
+                  setSel(new Set(await q.allIds()))
+                  setEveryone(true)
+                }}
+              />
+            )}
             <Button variant="outline" size="sm" onClick={() => setRole.mutate({ ids, role: 'tenant_manager' })}>
               <ShieldCheck />
               {t('Make Tenant Manager')}
@@ -406,7 +428,14 @@ function People({ slug, q, profiles, groups }: { slug: string; q: Q<Member[]>; p
             <Button variant="outline" size="sm" onClick={() => suspend.mutate({ ids, suspended: true })}>
               {t('Suspend')}
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => setSel(new Set())}>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => {
+                setSel(new Set())
+                setEveryone(false)
+              }}
+            >
               {t('Deselect')}
             </Button>
           </div>
@@ -528,6 +557,7 @@ function People({ slug, q, profiles, groups }: { slug: string; q: Q<Member[]>; p
         </Table>
         {rows.length === 0 && <p className="p-6 text-center text-sm text-muted-foreground">{t('No person found.')}</p>}
       </div>
+      <MoreRows shown={rows.length} total={q.total} more={q.more} loading={q.loadingMore} onMore={q.loadMore} />
       <FormDialog
         open={!!pwFor}
         onOpenChange={(o) => !o && setPwFor(null)}
@@ -540,7 +570,7 @@ function People({ slug, q, profiles, groups }: { slug: string; q: Q<Member[]>; p
       <LinkDialog link={link?.link ?? null} name={link?.name ?? ''} onClose={() => setLink(null)} />
       <RemoveDialog
         member={removing}
-        members={q.data ?? []}
+        members={everyMember.data ?? []}
         busy={remove.isPending}
         onClose={() => setRemoving(null)}
         onConfirm={(newOwner) => remove.mutate({ id: removing!.user_id, newOwner }, { onSuccess: () => setRemoving(null) })}
@@ -606,8 +636,12 @@ export function IdpBadge() {
   )
 }
 
-function Groups({ slug, q, members }: { slug: string; q: Q<Group[]>; members: Member[] }) {
+function Groups({ slug, members }: { slug: string; members: Member[] }) {
   const base = `/api/t/${enc(slug)}/manage/groups`
+  const [search, setSearch] = useState('')
+  const words = useDeferredValue(search.trim())
+  // a page at a time, searched on the server
+  const q = usePaged<Group>(['groups', slug, 'page'], base, { q: words || undefined })
   const confirm = useConfirm()
   const inval = [['groups', slug]]
   const del = useAction((id: string) => api('DELETE', `${base}/${id}`), { ok: t('Group deleted'), invalidate: inval })
@@ -615,15 +649,18 @@ function Groups({ slug, q, members }: { slug: string; q: Q<Group[]>; members: Me
   const rmMember = useAction(({ g, u }: { g: string; u: string }) => api('DELETE', `${base}/${g}/members/${u}`), { invalidate: inval })
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
-  if (!q.data?.length)
+  if (!q.items.length && !words)
     return (
       <Empty icon={<Grid2x2 />} title={t('No groups')}>
         {t('Groups are for sharing with several people at once.')}
       </Empty>
     )
   return (
+    <div className="grid gap-3">
+      <Input type="search" placeholder={t('Search a group')} aria-label={t('Search a group')} className="w-72 max-w-full" value={search} onChange={(e) => setSearch(e.target.value)} />
+      {!q.items.length && <p className="text-sm text-muted-foreground">{t('No group found.')}</p>}
     <div className="grid gap-3 lg:grid-cols-2">
-      {q.data.map((g) => {
+      {q.items.map((g) => {
         const others = members.filter((m) => !g.members.some((x) => x.user_id === m.user_id))
         const idp = g.source === 'idp'
         return (
@@ -681,6 +718,8 @@ function Groups({ slug, q, members }: { slug: string; q: Q<Group[]>; members: Me
         )
       })}
     </div>
+      <MoreRows shown={q.items.length} total={q.total} more={q.more} loading={q.loadingMore} onMore={q.loadMore} />
+    </div>
   )
 }
 
@@ -735,44 +774,58 @@ function Invites({ slug, q }: { slug: string; q: Q<Invitation[]> }) {
 /* ── Shares ──────────────────────────────────────────────────────────── */
 
 /** The items of the tenant shared with others or with a public link; links are revoked from here. */
+/** A page of the items of the tenant, with the counts of the pills. */
+type ResourcePageData = PageOf<ResourceRow> & { counts: { items: number; shared: number; public: number } }
+
 export function Shares({ slug }: { slug: string }) {
   const ctx = useTenantCtx(slug)
   const members = useApi<Member[]>(['members', slug], `/api/t/${enc(slug)}/manage/members`)
   const [show, setShow] = useState('all')
   const [filter, setFilter] = useState({ owner: '', plugin: '', q: '' })
-  const qs = new URLSearchParams(Object.entries(filter).filter(([, v]) => v)).toString()
-  const q = useApi<ResourceRow[]>(['m-resources', slug, qs], `/api/t/${enc(slug)}/manage/resources${qs ? '?' + qs : ''}`)
+  const words = useDeferredValue(filter.q.trim())
+  // filtered and paged on the server (a tenant may have hundreds of thousands of items)
+  const q = usePaged<ResourceRow, ResourcePageData>(['m-resources', slug, 'page'], `/api/t/${enc(slug)}/manage/resources`, {
+    show: show === 'all' ? 'shared' : show,
+    owner: filter.owner || undefined,
+    plugin: filter.plugin || undefined,
+    q: words || undefined,
+  })
   const [links, setLinks] = useState<ResourceRow | null>(null)
   const [sharing, setSharing] = useState<string | null>(null)
   const [reassign, setReassign] = useState(false)
   const [sel, setSel] = useState<Set<string>>(new Set())
+  const [everyone, setEveryone] = useState(false)
+  const filterKey = [show, filter.owner, filter.plugin, words].join('|')
+  const [selKey, setSelKey] = useState(filterKey)
+  if (selKey !== filterKey) {
+    setSelKey(filterKey)
+    setSel(new Set())
+    setEveryone(false)
+  }
   const confirm = useConfirm()
   const revoke = useAction((ids: string[]) => api<Revoked>('POST', `/api/t/${enc(slug)}/manage/resources/revoke`, { ids }), {
     invalidate: [['m-resources', slug], ['overview', slug], ['shared-by-me', slug]],
   })
-  const askRevoke = async (list: ResourceRow[]) => {
-    const text =
-      list.length === 1
-        ? t('Revoke every share and public link of «{name}»? The owner keeps the item.', { name: list[0].title || list[0].kind })
-        : t('Revoke every share and public link of {count} items? The owners keep their items.', { count: list.length })
+  // `ids` may hold items of pages not loaded yet («Select all»)
+  const askRevoke = async (ids: string[], one?: ResourceRow) => {
+    const text = one
+      ? t('Revoke every share and public link of «{name}»? The owner keeps the item.', { name: one.title || one.kind })
+      : t('Revoke every share and public link of {count} items? The owners keep their items.', { count: ids.length })
     if (await confirm(text, true))
-      revoke.mutate(
-        list.map((r) => r.id),
-        {
-          onSuccess: (r) => {
-            const x = r as Revoked
-            toast.success(t('Revoked: {shares} shares, {links} public links', { shares: x.shares, links: x.links }))
-            setSel(new Set())
-          },
+      revoke.mutate(ids, {
+        onSuccess: (r) => {
+          const x = r as Revoked
+          toast.success(t('Revoked: {shares} shares, {links} public links', { shares: x.shares, links: x.links }))
+          setSel(new Set())
+          setEveryone(false)
         },
-      )
+      })
   }
-  const all = q.data ?? []
-  const shared = all.filter((r) => r.shares > 0 || r.public_links > 0)
-  const rows = show === 'items' ? all : show === 'public' ? shared.filter((r) => r.public_links > 0) : shared
-  const ids = [...sel].filter((id) => rows.some((r) => r.id === id && (r.shares > 0 || r.public_links > 0)))
+  const counts = q.first?.counts ?? { items: 0, shared: 0, public: 0 }
+  const rows = q.items
   const selectable = rows.filter((r) => r.shares > 0 || r.public_links > 0)
-  const allSel = selectable.length > 0 && ids.length === selectable.length
+  const ids = [...sel]
+  const allSel = selectable.length > 0 && ids.length >= selectable.length
   const plugins = ctx.data?.plugins ?? []
   const label = (id: string) => plugins.find((p) => p.id === id)?.label ?? id
   const seeTitles = ctx.data?.tenant.settings.managers_see_titles
@@ -793,9 +846,9 @@ export function Shares({ slug }: { slug: string }) {
         <div className="flex flex-wrap items-center gap-3">
           <Pills
             items={[
-              { id: 'all', label: t('Shared'), count: shared.length },
-              { id: 'public', label: t('Public and links'), count: shared.filter((r) => r.public_links > 0).length },
-              { id: 'items', label: t('All items'), count: all.length },
+              { id: 'all', label: t('Shared'), count: counts.shared },
+              { id: 'public', label: t('Public and links'), count: counts.public },
+              { id: 'items', label: t('All items'), count: counts.items },
             ]}
             value={show}
             onChange={setShow}
@@ -832,10 +885,27 @@ export function Shares({ slug }: { slug: string }) {
           {ids.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 rounded-lg bg-primary/10 py-1 pr-1 pl-3" role="group" aria-label={t('Actions on the selection')}>
               <span className="text-sm font-medium tabular-nums">{t('{count} selected', { count: ids.length })}</span>
-              <Button variant="outline" size="sm" onClick={() => void askRevoke(rows.filter((r) => ids.includes(r.id)))}>
+              {show !== 'items' && q.more && !everyone && allSel && (
+                <SelectAllRows
+                  selected={ids.length}
+                  total={q.total}
+                  onAll={async () => {
+                    setSel(new Set(await q.allIds()))
+                    setEveryone(true)
+                  }}
+                />
+              )}
+              <Button variant="outline" size="sm" onClick={() => void askRevoke(ids, ids.length === 1 ? rows.find((r) => r.id === ids[0]) : undefined)}>
                 {t('Revoke shares and links')}
               </Button>
-              <Button variant="ghost" size="sm" onClick={() => setSel(new Set())}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setSel(new Set())
+                  setEveryone(false)
+                }}
+              >
                 {t('Deselect')}
               </Button>
             </div>
@@ -922,7 +992,7 @@ export function Shares({ slug }: { slug: string }) {
                         {t('Share')}
                       </Button>
                       {(r.shares > 0 || r.public_links > 0) && (
-                        <Button variant="ghost" size="sm" onClick={() => void askRevoke([r])}>
+                        <Button variant="ghost" size="sm" onClick={() => void askRevoke([r.id], r)}>
                           {t('Revoke')}
                         </Button>
                       )}
@@ -933,7 +1003,8 @@ export function Shares({ slug }: { slug: string }) {
             </Table>
           </div>
         )}
-        {all.length > 0 && !all.some((r) => r.title) && <p className="text-xs text-muted-foreground">{t('Titles are hidden by the rules of the tenant (Tenant settings › Sharing).')}</p>}
+        <MoreRows shown={rows.length} total={q.total} more={q.more} loading={q.loadingMore} onMore={q.loadMore} />
+        {rows.length > 0 && !rows.some((r) => r.title) && <p className="text-xs text-muted-foreground">{t('Titles are hidden by the rules of the tenant (Tenant settings › Sharing).')}</p>}
       </div>
       <LinksDialog slug={slug} row={links} onClose={() => setLinks(null)} />
       {ctx.data && <ShareDialog ctx={ctx.data} resourceId={sharing} onClose={() => setSharing(null)} />}

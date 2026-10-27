@@ -405,8 +405,8 @@ pub async fn digest(k: &Kernel, force: bool) -> Result<usize> {
 // ------------------------------------------------------------------ worker
 
 /// The background work: the queue of the emails and the search index every 15 seconds; every 10 minutes the digest, the
-/// retention of notifications and log, the purge of the trash, the cleaning of the queue and the quotas
-/// (usage of the day, alerts). Stops with the kernel.
+/// retention of notifications and log, the purge of the trash, the cleaning of the queue, the quotas
+/// (usage of the day, alerts) and the snapshot of the platform KPIs. Stops with the kernel.
 pub(crate) fn spawn_worker(k: &Arc<Kernel>) {
     let weak: Weak<Kernel> = Arc::downgrade(k);
     tokio::spawn(async move {
@@ -441,6 +441,10 @@ pub(crate) fn spawn_worker(k: &Arc<Kernel>) {
                 // quotas: the usage of the day, the alerts of the thresholds crossed
                 if let Err(e) = crate::quotas::tick(&k).await {
                     tracing::warn!("quotas of the tenants: {e}");
+                }
+                // the platform KPIs: a snapshot the page reads (computing them takes seconds at scale)
+                if let Err(e) = crate::kpi::refresh_global(&k).await {
+                    tracing::warn!("platform KPIs: {e}");
                 }
             }
             tick += 1;

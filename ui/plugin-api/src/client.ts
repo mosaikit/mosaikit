@@ -83,7 +83,9 @@ function mountTab(b: Bridge, el: HTMLElement, resource: string, id: string, exte
 }
 
 export interface CrudClient {
-  list(opts?: { filter?: string; parent?: string }): Promise<ListResult>
+  /** the rows, the latest changed first: all of them (up to 5,000), or a page with `limit` (the next with
+   *  `cursor`, the `next` of the previous page) */
+  list(opts?: { filter?: string; parent?: string; limit?: number; cursor?: string }): Promise<ListResult>
   get(id: string): Promise<Row>
   create(values: Values, parent?: string): Promise<Row>
   update(id: string, values: Values): Promise<Row>

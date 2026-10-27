@@ -1,7 +1,7 @@
 //! Tenants: list, creation with the first Tenant Manager, suspension (Administrator).
 
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -9,7 +9,7 @@ use super::{require_admin, valid_slug};
 use crate::identity::{check_password_len, hash_password, password_min, valid_username};
 use crate::{events, Error, Kernel, Result, SessionUser};
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TenantInfo {
     pub id: Uuid,
     pub slug: String,
@@ -128,12 +128,113 @@ fn tenant_info(r: &mosaikit_db::Row) -> TenantInfo {
     }
 }
 
+/// The tenants of a page (or all) with their figures, counted per tenant of the page through the
+/// indexes: with the filters as parameters the planner cannot tell how few tenants a page has, and
+/// grouping read every item (0.5 s for 1,000,000 items).
+fn tenant_list_sql(cond: &str, limit: &str) -> String {
+    format!(
+        "with tp as (select t.* from core.tenants t where not t.is_system and {cond}
+                     order by lower(t.name), t.id {limit})
+         select tp.id, tp.slug, tp.name, tp.status, tp.is_system,
+                (select count(*) from core.memberships mm join core.users u on u.id = mm.user_id
+                  where mm.tenant_id = tp.id and u.home_tenant_id = tp.id),
+                (select count(*) from core.memberships mm join core.users u on u.id = mm.user_id
+                  where mm.tenant_id = tp.id and u.home_tenant_id <> tp.id),
+                (select count(*) from core.resources r where r.tenant_id = tp.id),
+                (select coalesce(sum(r.size_bytes), 0)::bigint from core.resources r where r.tenant_id = tp.id),
+                tp.created_at, tp.trial_until, tp.archived_at, lower(tp.name)
+         from tp
+         order by lower(tp.name), tp.id"
+    )
+}
+
 pub async fn list_tenants(k: &Kernel, admin: &SessionUser) -> Result<Vec<TenantInfo>> {
     require_admin(admin)?;
-    let rows = mosaikit_db::query(format!("{TENANT_INFO_SQL} where not t.is_system order by t.name"))
-        .fetch_all(&k.db)
-        .await?;
+    all_tenants(k).await
+}
+
+/// Every tenant but the system one, with its figures (no check: for the kernel itself).
+pub(crate) async fn all_tenants(k: &Kernel) -> Result<Vec<TenantInfo>> {
+    let rows = mosaikit_db::query(tenant_list_sql("true", "")).fetch_all(&k.db).await?;
     Ok(rows.iter().map(tenant_info).collect())
+}
+
+/// Filters of the list of the tenants (Administrator).
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct TenantFilter {
+    #[serde(default)]
+    pub limit: Option<i64>,
+    #[serde(default)]
+    pub cursor: Option<String>,
+    #[serde(default)]
+    pub q: Option<String>,
+    /// active, trial, suspended, archived
+    #[serde(default)]
+    pub status: Option<String>,
+}
+
+impl TenantFilter {
+    pub fn page(&self) -> crate::paging::PageQuery {
+        crate::paging::PageQuery { limit: self.limit, cursor: self.cursor.clone(), q: self.q.clone() }
+    }
+}
+
+/// A page of the tenants, filtered by words (name, slug) and state, by name.
+pub async fn tenants_page(
+    k: &Kernel,
+    admin: &SessionUser,
+    f: &TenantFilter,
+) -> Result<crate::paging::Page<TenantInfo>> {
+    require_admin(admin)?;
+    let like = f.page().like();
+    let status = f.status.as_deref().filter(|s| !s.is_empty() && *s != "all");
+    let cond = |after: bool| {
+        let mut c = vec![if like.is_some() {
+            "(t.name ilike $1 escape '\\' or t.slug ilike $1 escape '\\')"
+        } else {
+            "$1::text is null"
+        }
+        .to_string()];
+        c.push(
+            match status {
+                Some("trial") => {
+                    "(t.trial_until is not null and t.status = 'active' and $2::text is not null)"
+                }
+                Some("archived") => "(t.archived_at is not null and $2::text is not null)",
+                Some(_) => "(t.status = $2 and t.archived_at is null)",
+                None => "$2::text is null",
+            }
+            .to_string(),
+        );
+        if after {
+            c.push("(lower(t.name), t.id) > ($3, $4::uuid)".to_string());
+        }
+        c.join(" and ")
+    };
+    let total: i64 = mosaikit_db::query_scalar(format!(
+        "select count(*) from core.tenants t where not t.is_system and {}",
+        cond(false)
+    ))
+    .bind(like.as_deref())
+    .bind(status)
+    .fetch_one(&k.db)
+    .await?;
+    let limit = f.page().limit();
+    let after = f.page().after()?;
+    let sql = tenant_list_sql(&cond(after.is_some()), &format!("limit {}", limit + 1));
+    let mut q = mosaikit_db::query(sql).bind(like.as_deref()).bind(status);
+    if let Some((text, id)) = &after {
+        q = q.bind(text.clone()).bind(*id);
+    }
+    let rows = q.fetch_all(&k.db).await?;
+    // the key of the order as the database computed it (lower() of the database, not of Rust)
+    let items: Vec<(TenantInfo, String)> = rows.iter().map(|r| (tenant_info(r), r.get(12))).collect();
+    let p = crate::paging::page(items, limit, total, |(t, key)| (key.clone(), t.id));
+    Ok(crate::paging::Page {
+        items: p.items.into_iter().map(|(t, _)| t).collect(),
+        total: p.total,
+        next: p.next,
+    })
 }
 
 pub struct NewTenant<'a> {

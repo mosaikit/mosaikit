@@ -26,14 +26,14 @@ pub use administrators::{
     set_administrator_active, AdminInfo,
 };
 pub use directory::{directory, Principal};
-pub use groups::{create_group, delete_group, groups, set_group_member, GroupInfo, GroupMember};
+pub use groups::{create_group, delete_group, groups, groups_page, set_group_member, GroupInfo, GroupMember};
 pub use invitations::{
     invite, invite_with, my_invitations, respond_invitation, revoke_invitation, tenant_invitations,
     InvitationInfo,
 };
 pub use members::{
-    create_member, members, remove_member, reset_member_password, set_member_suspended, set_role, MemberInfo,
-    RemoveReport,
+    create_member, members, members_page, remove_member, reset_member_password, set_member_suspended,
+    set_role, MemberFilter, MemberInfo, MemberPage, RemoveReport,
 };
 pub use people::{
     add_to_tenant, close_session, close_sessions, create_person, directory_of_people, group_detail,
@@ -42,14 +42,17 @@ pub use people::{
     GroupDetail, MemberDetail, MembershipChange, NewMembership, NewPerson, PersonRow, PersonTenant,
     ResetInfo, ResetLink, SessionInfo, SharedItem, Step, WhyNot,
 };
+pub use people::{people_page, PeopleCounts, PeopleFilter, PeoplePage};
 pub use requests::{decide_request, request_access, requests, AccessRequest};
 pub use settings::{
     platform_theme, prefs, set_platform_theme, set_prefs, set_settings, set_shell_band, set_tenant_theme,
     shell_band, tenant_theme, ShellBand, ThemeChoice, DEFAULT_THEME,
 };
 pub use support::{create_tenant_manager, reset_tenant_password, set_tenant_role, tenant_members};
+pub(crate) use tenants::all_tenants;
 pub use tenants::{
-    create_tenant, list_tenants, login_tenants, set_tenant_status, LoginTenant, NewTenant, TenantInfo,
+    create_tenant, list_tenants, login_tenants, set_tenant_status, tenants_page, LoginTenant, NewTenant,
+    TenantFilter, TenantInfo,
 };
 
 use serde_json::Value;

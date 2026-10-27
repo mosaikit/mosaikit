@@ -2,7 +2,8 @@
 //! password reset, leaving with reassignment of the resources.
 
 use chrono::{DateTime, Utc};
-use serde::Serialize;
+use mosaikit_db::IntoParam;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
 
@@ -37,19 +38,40 @@ pub async fn members(k: &Kernel, c: &Caller) -> Result<Vec<MemberInfo>> {
 }
 
 pub(super) async fn members_of(k: &Kernel, tenant: Uuid) -> Result<Vec<MemberInfo>> {
-    let rows = mosaikit_db::query(
-        "select u.id, u.username, u.display_name, h.slug, u.home_tenant_id <> m.tenant_id, m.role, u.status, m.joined_at,
-                (select count(*) from core.resources r where r.tenant_id = m.tenant_id and r.owner_id = u.id),
-                m.status, m.profile_id,
-                coalesce(p.name, (select d.name from core.permission_profiles d where d.tenant_id = m.tenant_id and d.is_default), ''),
-                u.email, u.last_sign_in_at
+    members_where(k, tenant, "true", &[], "order by u.username").await
+}
+
+const MEMBER_COLUMNS: &str =
+    "u.id, u.username, u.display_name, h.slug, u.home_tenant_id <> m.tenant_id, m.role, u.status, m.joined_at,
+     (select count(*) from core.resources r where r.tenant_id = m.tenant_id and r.owner_id = u.id),
+     m.status, m.profile_id,
+     coalesce(p.name, (select d.name from core.permission_profiles d where d.tenant_id = m.tenant_id and d.is_default), ''),
+     u.email, u.last_sign_in_at";
+
+/// The members of `tenant` matching `cond` ($1 is the tenant, the others `extra` from $2), with their
+/// groups: those of the members listed only.
+async fn members_where(
+    k: &Kernel,
+    tenant: Uuid,
+    cond: &str,
+    extra: &[mosaikit_db::Param],
+    tail: &str,
+) -> Result<Vec<MemberInfo>> {
+    let mut q = mosaikit_db::query(format!(
+        "select {MEMBER_COLUMNS}
          from core.memberships m join core.users u on u.id = m.user_id join core.tenants h on h.id = u.home_tenant_id
          left join core.permission_profiles p on p.id = m.profile_id
-         where m.tenant_id = $1 order by u.username",
-    )
-    .bind(tenant)
-    .fetch_all(&k.db)
-    .await?;
+         where m.tenant_id = $1 and {cond} {tail}"
+    ))
+    .bind(tenant);
+    for e in extra {
+        q = q.bind(e.clone());
+    }
+    let rows = q.fetch_all(&k.db).await?;
+    members_from(k, tenant, &rows).await
+}
+
+async fn members_from(k: &Kernel, tenant: Uuid, rows: &[mosaikit_db::Row]) -> Result<Vec<MemberInfo>> {
     let groups = mosaikit_db::query(
         "select gm.user_id, g.name from core.group_members gm join core.groups g on g.id = gm.group_id
          where g.tenant_id = $1 order by g.name",
@@ -57,9 +79,11 @@ pub(super) async fn members_of(k: &Kernel, tenant: Uuid) -> Result<Vec<MemberInf
     .bind(tenant)
     .fetch_all(&k.db)
     .await?;
-    let groups_of = |u: Uuid| -> Vec<String> {
-        groups.iter().filter(|g| g.get::<Uuid, _>(0) == u).map(|g| g.get::<String, _>(1)).collect()
-    };
+    // the groups of each person, grouped once (not a scan of all of them for every member)
+    let mut groups_of: std::collections::HashMap<Uuid, Vec<String>> = std::collections::HashMap::new();
+    for g in &groups {
+        groups_of.entry(g.get::<Uuid, _>(0)).or_default().push(g.get::<String, _>(1));
+    }
     rows.iter()
         .map(|r| {
             Ok(MemberInfo {
@@ -73,7 +97,7 @@ pub(super) async fn members_of(k: &Kernel, tenant: Uuid) -> Result<Vec<MemberInf
                 membership: r.get(9),
                 profile_id: r.get(10),
                 profile: r.get(11),
-                groups: groups_of(r.get(0)),
+                groups: groups_of.get(&r.get::<Uuid, _>(0)).cloned().unwrap_or_default(),
                 email: r.get(12),
                 last_sign_in_at: r.get(13),
                 joined_at: r.get(7),
@@ -81,6 +105,96 @@ pub(super) async fn members_of(k: &Kernel, tenant: Uuid) -> Result<Vec<MemberInf
             })
         })
         .collect()
+}
+
+/// Filters of Manage › People.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct MemberFilter {
+    #[serde(default)]
+    pub limit: Option<i64>,
+    #[serde(default)]
+    pub cursor: Option<String>,
+    #[serde(default)]
+    pub q: Option<String>,
+    /// tenant_manager or user
+    #[serde(default)]
+    pub role: Option<String>,
+    /// only the ids of every match (for "select all"), up to 10,000
+    #[serde(default)]
+    pub ids: bool,
+}
+
+impl MemberFilter {
+    pub fn page(&self) -> crate::paging::PageQuery {
+        crate::paging::PageQuery { limit: self.limit, cursor: self.cursor.clone(), q: self.q.clone() }
+    }
+}
+
+/// A page of the members of the tenant, by username, filtered on the server.
+#[derive(Debug, Clone, Serialize)]
+pub struct MemberPage {
+    #[serde(flatten)]
+    pub page: crate::paging::Page<MemberInfo>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ids: Option<Vec<Uuid>>,
+}
+
+pub async fn members_page(k: &Kernel, c: &Caller, f: &MemberFilter) -> Result<MemberPage> {
+    c.require_manager()?;
+    let tenant = c.tenant.tenant_id;
+    let like = f.page().like();
+    let role = f.role.as_deref().filter(|r| !r.is_empty() && *r != "any").map(str::to_string);
+    let cond = format!(
+        "{} and {}",
+        if like.is_some() {
+            "(u.username ilike $2 escape '\\' or u.display_name ilike $2 escape '\\' or h.slug ilike $2 escape '\\'
+              or coalesce(u.email, '') ilike $2 escape '\\')"
+        } else {
+            "$2::text is null"
+        },
+        if role.is_some() { "m.role = $3" } else { "$3::text is null" }
+    );
+    let base = || -> Vec<mosaikit_db::Param> { vec![like.clone().into_param(), role.clone().into_param()] };
+    let from = "from core.memberships m join core.users u on u.id = m.user_id join core.tenants h on h.id = u.home_tenant_id
+                where m.tenant_id = $1";
+    let mut q = mosaikit_db::query_scalar(format!("select count(*) {from} and {cond}")).bind(tenant);
+    for p in base() {
+        q = q.bind(p);
+    }
+    let total: i64 = q.fetch_one(&k.db).await?;
+    let ids = if f.ids {
+        let mut q = mosaikit_db::query_scalar(format!(
+            "select u.id {from} and {cond} order by lower(u.username), u.id limit 10000"
+        ))
+        .bind(tenant);
+        for p in base() {
+            q = q.bind(p);
+        }
+        Some(q.fetch_all(&k.db).await?)
+    } else {
+        None
+    };
+    let limit = f.page().limit();
+    let mut extra = base();
+    let mut cond = cond;
+    if let Some((text, id)) = f.page().after()? {
+        extra.push(mosaikit_db::Param::Text(text));
+        extra.push(mosaikit_db::Param::Uuid(id));
+        cond.push_str(" and (lower(u.username), u.id) > ($4, $5::uuid)");
+    }
+    let items = members_where(
+        k,
+        tenant,
+        &cond,
+        &extra,
+        &format!("order by lower(u.username), u.id limit {}", limit + 1),
+    )
+    .await?;
+    // usernames are lower case (valid_username), so the key of the order is the username itself
+    Ok(MemberPage {
+        page: crate::paging::page(items, limit, total, |m| (m.username.to_lowercase(), m.user_id)),
+        ids,
+    })
 }
 
 /// Creates a local user with this tenant as home tenant.

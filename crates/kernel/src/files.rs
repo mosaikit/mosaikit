@@ -142,16 +142,18 @@ async fn sibling(
 
 pub async fn list(k: &Kernel, c: &Caller, plugin_id: &str, parent: Option<Uuid>) -> Result<Listing> {
     let p = plugin(k, c, plugin_id, crate::access::USE).await?;
-    let mut tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
+    let mut tx = k.db.begin_plugin_read(&p.id, &c.ctx()).await?;
     let current = folder(&mut tx, parent).await?;
     let rows = match parent {
         Some(pid) => mosaikit_db::query(format!("{ENTRY_SQL} where parent_id = $1 and kind in ('file', 'folder') order by kind desc, lower(title)"))
             .bind(pid)
             .fetch_all(&mut *tx)
             .await?,
-        // root: own resources and the shared ones whose folder is not visible
+        // root: own resources and the shared ones whose folder is not visible (the visible ones as a
+        // set, not core.level_of() for every item)
         None => mosaikit_db::query(format!(
-            "{ENTRY_SQL} where kind in ('file', 'folder') and (parent_id is null or core.level_of(parent_id) = 0)
+            "{ENTRY_SQL} where kind in ('file', 'folder')
+               and (parent_id is null or parent_id not in (select id from core.visible_resources))
              order by kind desc, lower(title)"
         ))
         .fetch_all(&mut *tx)

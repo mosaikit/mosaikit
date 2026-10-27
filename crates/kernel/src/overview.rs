@@ -65,6 +65,9 @@ pub struct SystemOverview {
     pub plugins_installed: i64,
     pub plugins_active: i64,
     pub active_users_30d: i64,
+    /// items, space and active people come from the snapshot of the platform KPIs taken at this time
+    /// (they read every item and every event of the month); none: computed now
+    pub figures_at: Option<DateTime<Utc>>,
 }
 
 fn level_name(l: i16) -> &'static str {
@@ -208,24 +211,24 @@ pub async fn system_overview(k: &Kernel, admin: &SessionUser) -> Result<SystemOv
            (select count(*) from core.users u join core.tenants t on t.id = u.home_tenant_id
              where u.status = 'active' and not t.is_system),
            (select count(*) from core.users where is_system_admin and status = 'active'),
-           (select count(*) from core.resources),
-           (select coalesce(sum(size_bytes), 0)::bigint from core.resources),
            (select count(*) from core.plugins),
-           (select count(*) from core.plugins where status = 'active'),
-           (select count(distinct user_id) from core.events where ts > now() - interval '30 days' and user_id is not null)",
+           (select count(*) from core.plugins where status = 'active')",
     )
     .fetch_one(&k.db)
     .await?;
+    // the figures that read every item and the events of the month: from the snapshot on a large installation
+    let (totals, at) = kpi::overview_totals(k).await?;
     Ok(SystemOverview {
         tenants: r.get(0),
         active_tenants: r.get(1),
         users: r.get(2),
         administrators: r.get(3),
-        resources: r.get(4),
-        bytes: r.get(5),
-        plugins_installed: r.get(6),
-        plugins_active: r.get(7),
-        active_users_30d: r.get(8),
+        resources: totals.resources,
+        bytes: totals.bytes,
+        plugins_installed: r.get(4),
+        plugins_active: r.get(5),
+        active_users_30d: totals.active_users_30d,
+        figures_at: at,
     })
 }
 

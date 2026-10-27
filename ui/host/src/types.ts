@@ -649,6 +649,9 @@ export interface GlobalKpi {
   tenants: TenantInfo[]
   resources: ResourceStat[]
   plugins: PluginKpi[]
+  /** the snapshot the figures come from (computed every ten minutes, or now on request) */
+  computed_at?: string
+  took_ms?: number
 }
 
 /** An item of a tenant inside a backup, with its state in the tenant now. */

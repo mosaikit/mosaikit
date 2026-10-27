@@ -48,6 +48,44 @@ describe('mountCrud', () => {
     expect(el.textContent).toContain('bruno')
   })
 
+  it('asks a page at a time, loads more and filters on the server', async () => {
+    const el = document.createElement('div')
+    const calls: { op: string; args: any }[] = []
+    const bridge = {
+      call: async (op: string, args: any) => {
+        calls.push({ op, args })
+        if (op === 'crud.list') {
+          if (args.filter) return { resource: 'notes', fields, rows: [row('9', 'found', 'manage')], next: null, total: 1 }
+          if (args.cursor === 'c2') return { resource: 'notes', fields, rows: [row('3', 'c', 'manage')], next: null, total: 3 }
+          return { resource: 'notes', fields, rows: [row('1', 'a', 'manage'), row('2', 'b', 'manage')], next: 'c2', total: 3 }
+        }
+        if (op === 'ext.list') return []
+        return {}
+      },
+      onEvent: () => () => {},
+    } as unknown as Bridge
+    mountCrud(el, new Msk(bridge, { public: false }), 'notes')
+    await tick()
+    expect(calls.find((c) => c.op === 'crud.list')!.args).toEqual({ resource: 'notes', filter: undefined, limit: 100 })
+    expect(el.querySelector('.msk-count')!.textContent).toBe('2 of 3 items')
+    const more = el.querySelector<HTMLButtonElement>('.msk-more')!
+    expect(more.hidden).toBe(false)
+    more.click()
+    await tick()
+    expect(calls.filter((c) => c.op === 'crud.list')[1].args.cursor).toBe('c2')
+    expect(el.querySelectorAll('tbody tr.row').length).toBe(3)
+    expect(el.querySelector('.msk-count')!.textContent).toBe('3 items')
+    expect(more.hidden).toBe(true)
+    // the words go to the server, a moment after the last key
+    const input = el.querySelector<HTMLInputElement>('.msk-filter')!
+    input.value = 'found'
+    input.dispatchEvent(new Event('input'))
+    await new Promise((r) => setTimeout(r, 300))
+    await tick()
+    expect(calls.filter((c) => c.op === 'crud.list').at(-1)!.args.filter).toBe('found')
+    expect(el.querySelectorAll('tbody tr.row').length).toBe(1)
+  })
+
   it('shows rows and levels and hides the computed fields', async () => {
     const el = document.createElement('div')
     const { msk } = fakeMsk([row('1', 'mine', 'manage'), row('2', 'bruno\'s', 'read', 'bruno')])

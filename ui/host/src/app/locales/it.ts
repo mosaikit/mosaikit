@@ -1740,4 +1740,12 @@ export const IT: Record<string, string> = {
   'errors.layout_unknown': 'Layout sconosciuto',
   'errors.layout_not_allowed': 'L’Administrator non offre questo layout ai tenant',
   'errors.band_image_contrast': 'I testi della barra non si leggerebbero su questa immagine (WCAG 4,5:1), nemmeno scurita: scegline una più scura',
+  // long lists, a page at a time
+  Refresh: 'Aggiorna',
+  'Load more': 'Carica altri',
+  '{shown} of {total}': '{shown} di {total}',
+  'Select all {total}': 'Seleziona tutti i {total}',
+  'Figures of every tenant as of {time}': 'Dati di tutti i tenant al {time}',
+  'Search a group': 'Cerca un gruppo',
+  'No group found.': 'Nessun gruppo trovato.',
 }

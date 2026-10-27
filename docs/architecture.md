@@ -683,6 +683,15 @@ create view kpi_maps_by_layers as
 | System admin | `GET /api/admin/kpi` | every tenant, grouped |
 | External BI | role `<prefix>_reporting` | read only on the KPI views |
 
+**Snapshot of the platform KPIs.** The figures of every tenant read every item and every event of the
+month (about 10 s for 1,000,000 items). The worker of the kernel computes them every 10 minutes into
+`core.kpi_snapshots` (scope `platform`: the whole `GlobalKpi` as JSON, `computed_at`, `took_ms`), and
+`GET /api/admin/kpi` and the totals of the Administrator's overview (items, space, people active in 30
+days) read the last snapshot, with its time (`computed_at`, `figures_at`): the pages show "as of
+<time>" and a Refresh button (`?refresh=true`, computes now and stores). A snapshot is used only when
+computing took at least 300 ms: on a small installation (and the desktop, the tests) the figures are
+always computed live and exact.
+
 KPI views are aggregates and the plugin itself cannot read them (it does not see the
 other tenants). That they expose no contents (e.g. a `group by title`) is a point
 of review of the plugin before its publication in the registry.
@@ -750,12 +759,41 @@ that role: there is no more privileged role to go back to).
 For every table of a plugin the host creates the policies:
 
 ```sql
-create policy msk_select on t for select using (core.can_access(resource_id, 1));
+create policy msk_select on t for select
+  using (resource_id in (select l.id from core.ctx_levels() l where l.level >= 1));
 create policy msk_insert on t for insert with check (core.can_access(resource_id, 2)
                                                     and tenant_id = core.ctx_tenant());
 create policy msk_update on t for update using (core.can_access(resource_id, 2));
 create policy msk_delete on t for delete using (core.can_access(resource_id, 3));
 ```
+
+The read policy is a **set**: `core.ctx_levels()` (what the person of the context sees in the current
+plugin, public links included, the same rules as `can_access()`) is computed once per statement and
+the rows are kept by key, instead of one `can_access()` call per row (a third of the time of a list).
+The writes keep the check per row: they touch one row, or few. The role of every plugin may execute
+`ctx_levels()` (the function reads only the context, it takes no argument). The equivalence of the two
+rules is checked on the data of the load test (`xtask/perf/check_rls.sql`) and by the tests of the
+database (`reads_as_sets_follow_the_rules`, on both backends). Worst case: a single-item read of a
+person who sees very many items pays for the whole set (a few ms on the data of the load test).
+
+**Large lists are paged by key** (keyset): `?limit=N` (default 50, at most 500) returns a page with `total` (rows matching the filters) and `next` (`items` in the lists of the
+shell, `rows` in the plugin lists), and `&cursor=<next>` the following page; the order
+is fixed (e.g. latest changed first, then the id) and the cursor is the key of the last row, so a page
+costs the same wherever it is and does not skip or repeat rows when others are added. The filters and
+the search are applied by the server (`q`, and the filters of each list). Paged: the plugin lists
+(`crud.list` with `limit`/`cursor`, `mountCrud` asks 100 rows at a time), the Administrator's tenants and
+people, the Tenant Manager's people, groups and items/shares; the notifications and the Log were
+already paged. Without `limit` the old answers are unchanged (whole lists, for the dialogs that choose
+among all the members). **Select all**: on a page where every shown row is selected the shell offers
+"Select all N"; it asks `?ids=true` (the ids of every row matching the filters, at most 10,000, in the
+order of the list) and the bulk action then applies to all of them; changing the filters clears the
+selection.
+
+**Search in the Log** (`q`): on PostgreSQL with the `pg_trgm` extension (installed by the migration
+when the cluster has it; trusted, so the app role can create it) a trigram GIN index on the action,
+details and address of the events, and one on the username and name of the people, serve the
+`ilike '%words%'`; without the extension the same query reads the Log of the tenant (documented
+fallback, correct but slower). SQLite: `like` on the same fields.
 
 ### 7.4 Migrations of the plugins
 
@@ -822,8 +860,12 @@ TYPE`). The SQL templates evaluate their arguments in a subquery without
 tables: an unqualified column of the calling SQL is not resolved by
 mistake on the core tables inside them.
 
-Every transaction is `BEGIN IMMEDIATE` (serialized writes, no deadlocks from
-lock promotion); for this reason `plugin.call` (§8.6) and the plugins with
+Every transaction that may write is `BEGIN IMMEDIATE` (serialized writes, no deadlocks from
+lock promotion), and the writers queue in the process (a fair async semaphore with one place) before
+asking SQLite for the lock, so they wait in turn instead of polling against the `busy_timeout`; a
+`SQLITE_BUSY` on `BEGIN IMMEDIATE` (another process on the same file) is retried with backoff for up
+to 60 s. The reads that never write (lists, get, files) open a deferred transaction with
+`begin_read()`/`begin_plugin_read()` and do not wait for the writers (WAL); for this reason `plugin.call` (§8.6) and the plugins with
 `[requires] database = "postgres"` are not available on SQLite.
 
 ## 8. Plugins
@@ -1008,7 +1050,7 @@ import { connect, mountCrud } from '@mosaikit/plugin-api'
 const msk = await connect()                 // handshake: language, theme, mode, user, tenant
 mountCrud(document.getElementById('app')!, msk, 'notes', { title: 'Notes' })
 // or by hand:
-const rows = await msk.crud('notes').list({ filter: 'rome' })
+const { rows, next } = await msk.crud('notes').list({ filter: 'rome', limit: 100 })  // next page: { cursor: next }
 await msk.call('notes.count_by_tag', {})
 await msk.share(rows[0].id)                  // share dialog of the host
 ```

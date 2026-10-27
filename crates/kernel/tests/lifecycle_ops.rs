@@ -566,3 +566,65 @@ async fn imports_stay_within_the_limits_of_the_archives() {
     let (path, _) = transfer::export_tenant(&t, &admin, alfa).await.unwrap();
     transfer::import_tenant(&t, &admin, &path, "", &replace).await.unwrap();
 }
+
+#[tokio::test]
+async fn plugin_lists_are_paged_by_key_with_the_filter_on_the_server() {
+    let t = start().await;
+    t.install("notes").await;
+    let g = t.tenant("alfa").await;
+    let anna = t.member(&g, "anna").await;
+    let c = t.home(&anna).await;
+    for i in 0..7 {
+        note(&t, &c, &format!("page note {i}")).await;
+    }
+    note(&t, &c, "other").await;
+    let page = |limit: i64, cursor: Option<String>, filter: Option<&'static str>| {
+        let (t, c) = (&t, &c);
+        async move {
+            crud::list_paged(t, c, NOTES, "notes", filter, None, Some(&crud::Paging { limit, cursor }))
+                .await
+                .unwrap()
+        }
+    };
+    // three pages of 3, 3 and 2 rows: no row twice, none missing, the total only on the first
+    let first = page(3, None, None).await;
+    assert_eq!((first.rows.len(), first.total), (3, Some(8)));
+    let second = page(3, first.next.clone(), None).await;
+    assert_eq!((second.rows.len(), second.total), (3, None));
+    let third = page(3, second.next.clone(), None).await;
+    assert_eq!(third.rows.len(), 2);
+    assert!(third.next.is_none());
+    let mut ids: Vec<String> = [&first, &second, &third]
+        .iter()
+        .flat_map(|p| p.rows.iter().map(|r| r["id"].as_str().unwrap().to_string()))
+        .collect();
+    ids.sort();
+    ids.dedup();
+    assert_eq!(ids.len(), 8);
+    // the filter is applied before the paging and the total counts the matches
+    let f = page(5, None, Some("page note")).await;
+    assert_eq!((f.rows.len(), f.total), (5, Some(7)));
+    let rest = page(5, f.next.clone(), Some("page note")).await;
+    assert_eq!(rest.rows.len(), 2);
+    assert!(rest.next.is_none());
+    // a damaged cursor is refused, a person sees only their own rows
+    let bad = crud::list_paged(
+        &t,
+        &c,
+        NOTES,
+        "notes",
+        None,
+        None,
+        Some(&crud::Paging { limit: 3, cursor: Some("x".into()) }),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(bad.kind, Kind::BadRequest);
+    let bob = t.member(&g, "bob").await;
+    let cb = t.home(&bob).await;
+    let none =
+        crud::list_paged(&t, &cb, NOTES, "notes", None, None, Some(&crud::Paging { limit: 3, cursor: None }))
+            .await
+            .unwrap();
+    assert_eq!((none.rows.len(), none.total, none.next), (0, Some(0), None));
+}

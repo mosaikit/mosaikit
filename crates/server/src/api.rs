@@ -793,8 +793,24 @@ async fn crud_list(
     h: HeaderMap,
 ) -> ApiResult<Json<Value>> {
     let parent = q.get("parent").filter(|v| !v.is_empty()).map(|v| uuid(v)).transpose()?;
-    let mut list =
-        crud::list(&s.k, &c, &p.plugin, &p.res, q.get("filter").map(String::as_str), parent).await?;
+    // `limit` asks for one page at a time (the next with `cursor`); without it the list answers whole
+    let paging = match q.get("limit").filter(|v| !v.is_empty()) {
+        Some(l) => Some(crud::Paging {
+            limit: l.parse().map_err(|_| bad("invalid limit"))?,
+            cursor: q.get("cursor").cloned(),
+        }),
+        None => None,
+    };
+    let mut list = crud::list_paged(
+        &s.k,
+        &c,
+        &p.plugin,
+        &p.res,
+        q.get("filter").map(String::as_str),
+        parent,
+        paging.as_ref(),
+    )
+    .await?;
     // the labels of the fields (and of the choice values) in the language of the request
     if let Some(fields) = plugins::localized_fields(&s.k, &p.plugin, &p.res, &request_lang(&h)) {
         list.fields = fields;
@@ -1043,7 +1059,15 @@ struct UidPath {
     uid: String,
 }
 
-async fn m_members(State(s): State<AppState>, Tenant(c): Tenant) -> ApiResult<Json<Value>> {
+/// Members of the tenant: whole, or a page with `limit` (Manage › People).
+async fn m_members(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Query(f): Query<tenancy::MemberFilter>,
+) -> ApiResult<Json<Value>> {
+    if f.limit.is_some() || f.ids {
+        return Ok(Json(json!(tenancy::members_page(&s.k, &c, &f).await?)));
+    }
     Ok(Json(json!(tenancy::members(&s.k, &c).await?)))
 }
 
@@ -1145,7 +1169,15 @@ async fn m_revoke_invitation(
     Ok(ok())
 }
 
-async fn m_groups(State(s): State<AppState>, Tenant(c): Tenant) -> ApiResult<Json<Value>> {
+/// Groups of the tenant: whole, or a page with `limit`.
+async fn m_groups(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Query(f): Query<mosaikit_kernel::paging::PageQuery>,
+) -> ApiResult<Json<Value>> {
+    if f.limit.is_some() {
+        return Ok(Json(json!(tenancy::groups_page(&s.k, &c, &f).await?)));
+    }
     Ok(Json(json!(tenancy::groups(&s.k, &c).await?)))
 }
 
@@ -1184,11 +1216,16 @@ async fn m_group_remove(
     Ok(ok())
 }
 
+/// Items of the tenant (Shares, all items): up to 1,000 as before, or a page with `limit`.
 async fn m_resources(
     State(s): State<AppState>,
     Tenant(c): Tenant,
     Query(f): Query<ResourceFilter>,
+    Query(p): Query<acl::ResourcePageFilter>,
 ) -> ApiResult<Json<Value>> {
+    if p.limit.is_some() || p.ids {
+        return Ok(Json(json!(acl::manager_resources_page(&s.k, &c, &p).await?)));
+    }
     Ok(Json(json!(acl::manager_resources(&s.k, &c, &f).await?)))
 }
 
@@ -1513,7 +1550,15 @@ async fn a_tenant_password(
     Ok(ok())
 }
 
-async fn a_tenants(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Json<Value>> {
+/// Tenants: whole (for the lists of choices), or a page with `limit` (Administrator › Tenants).
+async fn a_tenants(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Query(f): Query<tenancy::TenantFilter>,
+) -> ApiResult<Json<Value>> {
+    if f.limit.is_some() {
+        return Ok(Json(json!(tenancy::tenants_page(&s.k, &u, &f).await?)));
+    }
     Ok(Json(json!(tenancy::list_tenants(&s.k, &u).await?)))
 }
 
@@ -1651,8 +1696,15 @@ async fn m_set_theme(
     Ok(Json(json!(tenancy::tenant_theme(&s.k, c.tenant.tenant_id).await?)))
 }
 
-async fn a_kpi(State(s): State<AppState>, Auth(u): Auth, h: HeaderMap) -> ApiResult<Json<Value>> {
-    let mut r = kpi::global(&s.k, &u).await?;
-    kpi::localize(&s.k, &mut r.plugins, &request_lang(&h));
+/// The platform KPIs: the last snapshot (computed every ten minutes), or computed now with `refresh=true`.
+async fn a_kpi(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Query(q): Query<HashMap<String, String>>,
+    h: HeaderMap,
+) -> ApiResult<Json<Value>> {
+    let refresh = q.get("refresh").is_some_and(|v| v == "true" || v == "1");
+    let mut r = kpi::global_snapshot(&s.k, &u, refresh).await?;
+    kpi::localize(&s.k, &mut r.kpi.plugins, &request_lang(&h));
     Ok(Json(json!(r)))
 }

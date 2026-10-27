@@ -467,14 +467,17 @@ pub struct PersonRow {
     pub tenants: Vec<PersonTenant>,
 }
 
+const PERSON_COLUMNS: &str =
+    "u.id, u.username, u.display_name, u.email, u.home_tenant_id, h.slug, u.is_system_admin,
+    u.status, u.totp_enabled, u.last_sign_in_at, u.created_at";
+
 async fn people_rows(k: &Kernel, only: Option<Uuid>) -> Result<Vec<PersonRow>> {
-    let rows = mosaikit_db::query(
-        "select u.id, u.username, u.display_name, u.email, u.home_tenant_id, h.slug, u.is_system_admin, u.status,
-                u.totp_enabled, u.last_sign_in_at, u.created_at
+    let rows = mosaikit_db::query(format!(
+        "select {PERSON_COLUMNS}
          from core.users u join core.tenants h on h.id = u.home_tenant_id
          where ($1::uuid is null or u.id = $1)
-         order by u.is_system_admin desc, h.slug, u.username",
-    )
+         order by u.is_system_admin desc, h.slug, u.username"
+    ))
     .bind(only)
     .fetch_all(&k.db)
     .await?;
@@ -490,10 +493,15 @@ async fn people_rows(k: &Kernel, only: Option<Uuid>) -> Result<Vec<PersonRow>> {
     .bind(only)
     .fetch_all(&k.db)
     .await?;
+    person_rows_with(&rows, &ms)
+}
+
+/// The people of the rows `rows` (columns `PERSON_COLUMNS`) with their memberships `ms`.
+fn person_rows_with(rows: &[mosaikit_db::Row], ms: &[mosaikit_db::Row]) -> Result<Vec<PersonRow>> {
     // the memberships of each person, grouped once (not a scan of all of them for every person)
     let mut by_user: std::collections::HashMap<Uuid, Vec<&mosaikit_db::Row>> =
         std::collections::HashMap::new();
-    for m in &ms {
+    for m in ms {
         by_user.entry(m.get::<Uuid, _>(0)).or_default().push(m);
     }
     rows.iter()
@@ -539,6 +547,183 @@ async fn people_rows(k: &Kernel, only: Option<Uuid>) -> Result<Vec<PersonRow>> {
 pub async fn directory_of_people(k: &Kernel, admin: &SessionUser) -> Result<Vec<PersonRow>> {
     require_admin(admin)?;
     people_rows(k, None).await
+}
+
+/// Filters of the people of the installation (Administrator › People).
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct PeopleFilter {
+    #[serde(default)]
+    pub limit: Option<i64>,
+    #[serde(default)]
+    pub cursor: Option<String>,
+    #[serde(default)]
+    pub q: Option<String>,
+    /// all, several (in more than one tenant), admins
+    #[serde(default)]
+    pub show: Option<String>,
+    #[serde(default)]
+    pub tenant: Option<Uuid>,
+    /// tenant_manager or user, in any of the tenants
+    #[serde(default)]
+    pub role: Option<String>,
+    /// active or disabled
+    #[serde(default)]
+    pub status: Option<String>,
+    /// only the ids of every match (for "select all"), up to 10,000
+    #[serde(default)]
+    pub ids: bool,
+}
+
+impl PeopleFilter {
+    pub fn page(&self) -> crate::paging::PageQuery {
+        crate::paging::PageQuery { limit: self.limit, cursor: self.cursor.clone(), q: self.q.clone() }
+    }
+}
+
+/// A page of the people, with the counts of the pills (all, in several tenants, Administrators).
+#[derive(Debug, Clone, Serialize)]
+pub struct PeoplePage {
+    #[serde(flatten)]
+    pub page: crate::paging::Page<PersonRow>,
+    pub counts: PeopleCounts,
+    /// with `ids`: every person the filter matches
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ids: Option<Vec<Uuid>>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PeopleCounts {
+    pub all: i64,
+    pub several: i64,
+    pub admins: i64,
+}
+
+/// A page of the people of the installation, filtered on the server, in the order of the directory
+/// (Administrators first, then by home tenant and username).
+pub async fn people_page(k: &Kernel, admin: &SessionUser, f: &PeopleFilter) -> Result<PeoplePage> {
+    require_admin(admin)?;
+    let like = f.page().like();
+    let several = "(select count(*) from core.memberships sm join core.tenants st on st.id = sm.tenant_id
+                     where sm.user_id = u.id and not st.is_system) > 1";
+    let mut conds: Vec<String> = vec![
+        if like.is_some() {
+            "(u.username ilike $1 escape '\\' or u.display_name ilike $1 escape '\\' or h.slug ilike $1 escape '\\'
+              or coalesce(u.email, '') ilike $1 escape '\\')"
+        } else {
+            "$1::text is null"
+        }
+        .to_string(),
+        match f.show.as_deref() {
+            Some("several") => several.to_string(),
+            Some("admins") => "u.is_system_admin".to_string(),
+            _ => "true".to_string(),
+        },
+        if f.tenant.is_some() {
+            "exists (select 1 from core.memberships fm where fm.user_id = u.id and fm.tenant_id = $2)"
+        } else {
+            "$2::uuid is null"
+        }
+        .to_string(),
+        if f.role.as_deref().is_some_and(|r| !r.is_empty() && r != "any") {
+            "exists (select 1 from core.memberships rm where rm.user_id = u.id and rm.role = $3)"
+        } else {
+            "$3::text is null"
+        }
+        .to_string(),
+        if f.status.as_deref().is_some_and(|x| !x.is_empty() && x != "any") {
+            "u.status = $4"
+        } else {
+            "$4::text is null"
+        }
+        .to_string(),
+    ];
+    let role = f.role.as_deref().filter(|r| !r.is_empty() && *r != "any");
+    let status = f.status.as_deref().filter(|x| !x.is_empty() && *x != "any");
+    // the key of the order: Administrators first, then home tenant and username
+    let key = "(case when u.is_system_admin then '0' else '1' end) || '/' || h.slug || '/' || u.username";
+    let from = "from core.users u join core.tenants h on h.id = u.home_tenant_id";
+    let total: i64 =
+        mosaikit_db::query_scalar(format!("select count(*) {from} where {}", conds.join(" and ")))
+            .bind(like.as_deref())
+            .bind(f.tenant)
+            .bind(role)
+            .bind(status)
+            .fetch_one(&k.db)
+            .await?;
+    let ids = if f.ids {
+        Some(
+            mosaikit_db::query_scalar(format!(
+                "select u.id {from} where {} and not u.is_system_admin order by {key}, u.id limit 10000",
+                conds.join(" and ")
+            ))
+            .bind(like.as_deref())
+            .bind(f.tenant)
+            .bind(role)
+            .bind(status)
+            .fetch_all(&k.db)
+            .await?,
+        )
+    } else {
+        None
+    };
+    let limit = f.page().limit();
+    let after = f.page().after()?;
+    if after.is_some() {
+        conds.push(format!("({key}, u.id) > ($5, $6::uuid)"));
+    }
+    let sql = format!(
+        "select {PERSON_COLUMNS}, {key} {from} where {} order by {key}, u.id limit {}",
+        conds.join(" and "),
+        limit + 1
+    );
+    let mut q = mosaikit_db::query(sql).bind(like.as_deref()).bind(f.tenant).bind(role).bind(status);
+    if let Some((text, id)) = &after {
+        q = q.bind(text.clone()).bind(*id);
+    }
+    let rows = q.fetch_all(&k.db).await?;
+    // the memberships of the people of the page only
+    let page_ids: Vec<Uuid> = rows.iter().map(|r| r.get::<Uuid, _>(0)).collect();
+    let ms = if page_ids.is_empty() {
+        Vec::new()
+    } else {
+        let marks: Vec<String> = (1..=page_ids.len()).map(|i| format!("${i}")).collect();
+        let mut q = mosaikit_db::query(format!(
+            "select m.user_id, t.id, t.slug, t.name, m.role, m.status, m.profile_id,
+                    coalesce(p.name, (select d.name from core.permission_profiles d where d.tenant_id = t.id and d.is_default), ''),
+                    t.id = u.home_tenant_id
+             from core.memberships m join core.tenants t on t.id = m.tenant_id join core.users u on u.id = m.user_id
+             left join core.permission_profiles p on p.id = m.profile_id
+             where not t.is_system and m.user_id in ({})
+             order by t.id = u.home_tenant_id desc, t.name",
+            marks.join(", ")
+        ));
+        for id in &page_ids {
+            q = q.bind(*id);
+        }
+        q.fetch_all(&k.db).await?
+    };
+    let keys: Vec<String> = rows.iter().map(|r| r.get::<String, _>(11)).collect();
+    let people = person_rows_with(&rows, &ms)?;
+    let items: Vec<(PersonRow, String)> = people.into_iter().zip(keys).collect();
+    let p = crate::paging::page(items, limit, total, |(person, key)| (key.clone(), person.user_id));
+    // grouped, not a subquery per person: 20,000 people took a second
+    let counts = mosaikit_db::query(
+        "select (select count(*) from core.users),
+                (select count(*) from (select sm.user_id from core.memberships sm join core.tenants st on st.id = sm.tenant_id
+                                       where not st.is_system group by sm.user_id having count(*) > 1) s),
+                (select count(*) from core.users where is_system_admin)",
+    )
+    .fetch_one(&k.db)
+    .await?;
+    Ok(PeoplePage {
+        page: crate::paging::Page {
+            items: p.items.into_iter().map(|(x, _)| x).collect(),
+            total: p.total,
+            next: p.next,
+        },
+        counts: PeopleCounts { all: counts.get(0), several: counts.get(1), admins: counts.get(2) },
+        ids,
+    })
 }
 
 pub async fn person(k: &Kernel, admin: &SessionUser, user: Uuid) -> Result<PersonRow> {

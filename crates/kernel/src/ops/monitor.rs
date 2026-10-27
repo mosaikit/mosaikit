@@ -299,12 +299,15 @@ pub async fn tenants(k: &Kernel) -> Result<Vec<TenantLoad>> {
     let now = Utc::now();
     let day = metrics::requests_by_tenant(k, now - Duration::days(1)).await?;
     let hour = metrics::requests_by_tenant(k, now - Duration::hours(1)).await?;
+    // the figures of every tenant grouped once, not three subqueries per tenant
     let rows = mosaikit_db::query(
-        "select t.id, t.slug, t.name, t.status, t.archived_at is not null,
-                (select count(*) from core.memberships m where m.tenant_id = t.id),
-                (select count(*) from core.resources r where r.tenant_id = t.id),
-                (select coalesce(sum(size_bytes), 0)::bigint from core.resources r where r.tenant_id = t.id)
-         from core.tenants t where not t.is_system order by t.name",
+        "with r as (select tenant_id, count(*) as n, coalesce(sum(size_bytes), 0) as bytes
+                    from core.resources group by tenant_id),
+              m as (select tenant_id, count(*) as n from core.memberships group by tenant_id)
+         select t.id, t.slug, t.name, t.status, t.archived_at is not null, coalesce(m.n, 0)::bigint,
+                coalesce(r.n, 0)::bigint, coalesce(r.bytes, 0)::bigint
+         from core.tenants t left join r on r.tenant_id = t.id left join m on m.tenant_id = t.id
+         where not t.is_system order by t.name",
     )
     .fetch_all(&k.db)
     .await?;
@@ -327,13 +330,9 @@ pub async fn tenants(k: &Kernel) -> Result<Vec<TenantLoad>> {
             }
         })
         .collect();
+    let mut nearest = crate::quotas::nearest_of_all(k).await?;
     for t in &mut out {
-        t.nearest_quota = crate::quotas::tenant(k, t.id)
-            .await?
-            .rows
-            .into_iter()
-            .filter(|q| q.percent.is_some())
-            .max_by_key(|q| q.percent.unwrap_or(0));
+        t.nearest_quota = nearest.remove(&t.id);
     }
     out.sort_by(|a, b| b.requests_24h.cmp(&a.requests_24h).then(a.name.cmp(&b.name)));
     Ok(out)

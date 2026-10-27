@@ -206,6 +206,43 @@ export function Sections({ sections, current, href, children }: { sections: Sect
   )
 }
 
+/** The foot of a long list: how many rows are shown of how many, and «Load more». */
+export function MoreRows({ shown, total, more, loading, onMore }: { shown: number; total: number; more: boolean; loading?: boolean; onMore: () => void }) {
+  if (!total) return null
+  return (
+    <div className="flex flex-wrap items-center justify-center gap-3 py-2 text-sm text-muted-foreground">
+      <span className="tabular-nums">{t('{shown} of {total}', { shown: String(shown), total: String(total) })}</span>
+      {more && (
+        <Button variant="outline" size="sm" disabled={loading} onClick={onMore}>
+          {loading && <Loader2 className="animate-spin" />}
+          {t('Load more')}
+        </Button>
+      )}
+    </div>
+  )
+}
+
+/** With a whole page selected and more rows matching: «Select all N». The selection then holds every
+ *  row of the filter (up to 10,000), loaded or not; the actions apply to all of them. */
+export function SelectAllRows({ selected, total, onAll }: { selected: number; total: number; onAll: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false)
+  if (selected >= total) return null
+  return (
+    <Button
+      variant="link"
+      size="sm"
+      className="h-auto p-0"
+      disabled={busy}
+      onClick={() => {
+        setBusy(true)
+        void onAll().finally(() => setBusy(false))
+      }}
+    >
+      {t('Select all {total}', { total: String(total) })}
+    </Button>
+  )
+}
+
 export function Loading() {
   return (
     <div className="flex flex-1 items-center justify-center p-10 text-muted-foreground">

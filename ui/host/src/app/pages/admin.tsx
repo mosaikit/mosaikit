@@ -1,9 +1,9 @@
 // Pages of the Administrator: platform overview, tenants and their tabbed detail, plugins, System
 // (administrators, identity and top bar). Account and Notifications are in common.tsx and notifications.tsx.
 
-import { useState } from 'react'
+import { useDeferredValue, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Bell, Building2, CircleHelp, Contrast, Frame, Gauge, HardDrive, History, KeyRound, KeySquare, Mail, MoreHorizontal, Palette, PanelLeft, Plus, Power, Search, ShieldCheck, Upload, Users, Wrench } from 'lucide-react'
+import { Bell, Building2, CircleHelp, Contrast, Frame, Gauge, HardDrive, History, KeyRound, KeySquare, Mail, MoreHorizontal, Palette, PanelLeft, Plus, Power, RefreshCw, Search, ShieldCheck, Upload, Users, Wrench } from 'lucide-react'
 import { api, fmtBytes, fmtDate } from '../../api.ts'
 import { useBrand } from '../../brand.ts'
 import type { AdminUser, GlobalKpi, Member, Session, ShellBand, SystemOverview, TenantInfo } from '../../types.ts'
@@ -16,8 +16,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
-import { initials, passwordMin, useAction, useApi, useConfig, useConfirm } from '../core.ts'
-import { DataTable, Empty, ErrorBox, FormDialog, Kpi, Loading, PageHeader, PluginKpis, SaveBar, Sections, StatusBadge, Tabs } from '../kit.tsx'
+import { initials, passwordMin, useAction, useApi, useConfig, useConfirm, usePaged } from '../core.ts'
+import { DataTable, Empty, ErrorBox, FormDialog, Kpi, Loading, MoreRows, PageHeader, PluginKpis, SaveBar, Sections, StatusBadge, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import { bandOf } from '../prefs.ts'
 import { AppMark } from '../Shell.tsx'
@@ -35,8 +35,11 @@ import { LayoutPanel, StylePanel } from '../LayoutSettings.tsx'
 /* ── Overview ────────────────────────────────────────────────────────── */
 
 export function AdminOverview({ session }: { session: Session }) {
+  const qc = useQueryClient()
   const q = useApi<SystemOverview>(['admin-overview'], '/api/admin/overview')
   const kpi = useApi<GlobalKpi>(['admin-kpi'], '/api/admin/kpi')
+  // the figures of every tenant come from a snapshot (computing them takes seconds at scale)
+  const refresh = useAction(() => api<GlobalKpi>('GET', '/api/admin/kpi?refresh=true'), {})
   return (
     <>
       <PageHeader title={t('Platform overview')} sub={t('Hello {name} · Administrator', { name: session.user.display_name || session.user.username })} />
@@ -62,6 +65,21 @@ export function AdminOverview({ session }: { session: Session }) {
             </Button>
           </Empty>
         )}
+        {kpi.data?.computed_at && (
+          <p className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            {t('Figures of every tenant as of {time}', { time: fmtDate(kpi.data.computed_at) })}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7"
+              disabled={refresh.isPending}
+              onClick={() => refresh.mutate(undefined, { onSuccess: (d) => qc.setQueryData(['admin-kpi'], d) })}
+            >
+              <RefreshCw className={cn(refresh.isPending && 'animate-spin')} />
+              {t('Refresh')}
+            </Button>
+          </p>
+        )}
         {kpi.data && kpi.data.resources.length > 0 && (
           <section className="grid gap-3">
             <h2 className="text-sm font-semibold">{t('Items by plugin, in every tenant')}</h2>
@@ -80,16 +98,18 @@ export function AdminOverview({ session }: { session: Session }) {
 /* ── Tenant ──────────────────────────────────────────────────────────── */
 
 export function AdminTenants() {
-  const q = useApi<TenantInfo[]>(['admin-tenants'], '/api/admin/tenants')
   const [open, setOpen] = useState(false)
   const [importing, setImporting] = useState(false)
   const [search, setSearch] = useState('')
-  const rows = (q.data ?? []).filter((tn) => !search || `${tn.name} ${tn.slug}`.toLowerCase().includes(search.toLowerCase()))
+  const words = useDeferredValue(search.trim())
+  // a page at a time, searched on the server
+  const q = usePaged<TenantInfo>(['admin-tenants', 'page'], '/api/admin/tenants', { q: words || undefined })
+  const rows = q.items
   return (
     <>
       <PageHeader
         title={t('Tenants')}
-        sub={q.data ? `${q.data.length} tenant` : undefined}
+        sub={q.isLoading ? undefined : `${q.total} tenant`}
         actions={
           <Button onClick={() => setOpen(true)}>
             <Plus />
@@ -110,7 +130,7 @@ export function AdminTenants() {
         ) : q.error ? (
           <ErrorBox error={q.error} />
         ) : rows.length === 0 ? (
-          <Empty icon={<Building2 />} title={q.data?.length ? t('No tenant found') : t('No tenants')} />
+          <Empty icon={<Building2 />} title={words ? t('No tenant found') : t('No tenants')} />
         ) : (
           <div className="overflow-hidden rounded-xl border bg-card">
             <Table>
@@ -148,6 +168,7 @@ export function AdminTenants() {
             </Table>
           </div>
         )}
+        <MoreRows shown={rows.length} total={q.total} more={q.more} loading={q.loadingMore} onMore={q.loadMore} />
       </div>
       <NewTenantWizard open={open} onOpenChange={setOpen} />
       <ImportTenantDialog open={importing} onOpenChange={setImporting} />

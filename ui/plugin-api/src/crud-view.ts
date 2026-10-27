@@ -19,9 +19,16 @@ export interface CrudOptions {
   where?: (row: Row) => boolean
 }
 
+/** Rows asked at a time: the list grows with «Load more». */
+const PAGE = 100
+
 type State = {
   fields: FieldDecl[]
   rows: Row[]
+  /** cursor of the next page (null: everything is loaded) */
+  next: string | null
+  /** rows matching the filter in all (from the server) */
+  total: number | null
   selected: string | null
   filter: string
   busy: boolean
@@ -62,6 +69,8 @@ const TEXTS = {
     owner: 'Owner',
     item: '1 item',
     items: '{n} items',
+    shownOf: '{shown} of {total} items',
+    more: 'Load more',
     noResult: 'no result',
     noItem: 'no item',
     shared: 'shared',
@@ -89,6 +98,8 @@ const TEXTS = {
     owner: 'Proprietario',
     item: '1 elemento',
     items: '{n} elementi',
+    shownOf: '{shown} di {total} elementi',
+    more: 'Carica altri',
     noResult: 'nessun risultato',
     noItem: 'nessun elemento',
     shared: 'condivisa',
@@ -110,7 +121,7 @@ type Text = keyof (typeof TEXTS)['en']
 export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: CrudOptions = {}): () => void {
   const api = msk.crud(resource)
   const extApi = msk.extensions(resource)
-  const st: State = { fields: [], rows: [], selected: null, filter: '', busy: false, ext: [], extValues: {}, tab: null }
+  const st: State = { fields: [], rows: [], next: null, total: null, selected: null, filter: '', busy: false, ext: [], extValues: {}, tab: null }
   let disposed = false
   /** the tab mounted now (row|extension|key) and the function that closes it */
   let mounted: { key: string; close: () => void } | null = null
@@ -121,6 +132,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   const filter = h('input', { type: 'search', class: 'msk-filter' })
   const btnNew = h('button', { type: 'button', class: 'msk-btn ghost' })
   const count = h('span', { class: 'msk-count' })
+  const btnMore = h('button', { type: 'button', class: 'msk-btn ghost msk-more' })
   const thead = h('thead')
   const tbody = h('tbody')
   const table = h('table', { class: 'msk-table' }, thead, tbody)
@@ -139,6 +151,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     filter.placeholder = tr('filter')
     filter.setAttribute('aria-label', tr('filterLabel'))
     btnNew.textContent = opts.newLabel ?? tr('new')
+    btnMore.textContent = tr('more')
     btnSave.textContent = tr('save')
     btnShare.textContent = tr('share')
     btnDel.textContent = tr('del')
@@ -150,6 +163,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     title,
     h('div', { class: 'msk-toolbar' }, filter, btnNew, h('span', { class: 'grow' }), count),
     h('div', { class: 'msk-tablewrap' }, table),
+    h('div', { class: 'msk-morebar' }, btnMore),
     form,
   )
 
@@ -170,11 +184,14 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     const cols = columns()
     const xcols = extColumns()
     thead.replaceChildren(h('tr', {}, ...cols.map((f) => h('th', {}, f.label || f.key)), ...xcols.map((x) => h('th', {}, x.f.label || x.f.key)), h('th', {}, tr('owner'))))
-    const q = st.filter.trim().toLowerCase()
-    const shown = st.rows.filter((r) => (!opts.where || opts.where(r)) && (!q || Object.values(r.values).some((v) => String(v ?? '').toLowerCase().includes(q))))
-    count.textContent = shown.length === 1 ? tr('item') : tr('items', { n: shown.length })
+    // the filter is applied by the server, a page at a time; a page of the navigation (`where`) is
+    // chosen here, so it loads every row (see load)
+    const shown = opts.where ? st.rows.filter(opts.where) : st.rows
+    const total = opts.where ? shown.length : (st.total ?? shown.length)
+    count.textContent = total > shown.length ? tr('shownOf', { shown: shown.length, total }) : total === 1 ? tr('item') : tr('items', { n: total })
+    btnMore.hidden = !st.next
     if (!shown.length) {
-      tbody.replaceChildren(h('tr', {}, h('td', { class: 'empty', colspan: String(cols.length + xcols.length + 1) }, st.rows.length ? tr('noResult') : tr('noItem'))))
+      tbody.replaceChildren(h('tr', {}, h('td', { class: 'empty', colspan: String(cols.length + xcols.length + 1) }, st.filter.trim() ? tr('noResult') : tr('noItem'))))
       return
     }
     tbody.replaceChildren(
@@ -362,12 +379,16 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     return out
   }
 
+  /** The first page again (after a change, with another filter). */
   async function load() {
     try {
-      const r = await api.list()
-      if (disposed) return
+      const filter = st.filter.trim() || undefined
+      const r = await api.list(opts.where ? { filter } : { filter, limit: PAGE })
+      if (disposed || filter !== (st.filter.trim() || undefined)) return
       st.fields = r.fields
       st.rows = r.rows
+      st.next = r.next ?? null
+      st.total = r.total ?? null
       st.ext = await extApi.list()
       st.extValues = st.ext.some((e) => e.fields.length) ? await extApi.values(r.rows.map((x) => x.id)) : {}
       if (disposed) return
@@ -376,6 +397,26 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
       renderForm()
     } catch (e) {
       setMsg(errText(e, msk.context?.lang), true)
+    }
+  }
+
+  /** The next page, after the rows already shown. */
+  async function loadMore() {
+    if (!st.next) return
+    try {
+      btnMore.disabled = true
+      const r = await api.list({ filter: st.filter.trim() || undefined, limit: PAGE, cursor: st.next })
+      if (disposed) return
+      st.rows = [...st.rows, ...r.rows]
+      st.next = r.next ?? null
+      st.total = r.total ?? st.total
+      if (st.ext.some((e) => e.fields.length)) Object.assign(st.extValues, await extApi.values(r.rows.map((x) => x.id)))
+      if (disposed) return
+      renderTable()
+    } catch (e) {
+      setMsg(errText(e, msk.context?.lang), true)
+    } finally {
+      btnMore.disabled = false
     }
   }
 
@@ -393,10 +434,14 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     }
   }
 
+  // the words go to the server a moment after the last key
+  let typing: ReturnType<typeof setTimeout> | undefined
   filter.addEventListener('input', () => {
     st.filter = filter.value
-    renderTable()
+    clearTimeout(typing)
+    typing = setTimeout(() => void load(), 250)
   })
+  btnMore.addEventListener('click', () => void loadMore())
   btnNew.addEventListener('click', () => {
     st.selected = null
     st.tab = null
@@ -464,6 +509,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   void load()
   return () => {
     disposed = true
+    clearTimeout(typing)
     off()
     offExt()
     closeTab()

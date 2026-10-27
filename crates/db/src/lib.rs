@@ -97,6 +97,17 @@ impl Db {
         Ok(Db { inner: Inner::Lite(lite::LiteDb::open(path, max_connections).await?) })
     }
 
+    /// Like `open_sqlite`, with the busy timeout of the connections (tests of the writers' queue).
+    pub async fn open_sqlite_with_busy_timeout(
+        path: &Path,
+        max_connections: u32,
+        busy: std::time::Duration,
+    ) -> Result<Db> {
+        Ok(Db {
+            inner: Inner::Lite(lite::LiteDb::open_with_busy_timeout(path, max_connections, busy).await?),
+        })
+    }
+
     pub fn backend(&self) -> Backend {
         match self.inner {
             Inner::Pg(_) => Backend::Postgres,
@@ -128,7 +139,7 @@ impl Db {
     pub async fn begin_app(&self) -> Result<Tx> {
         Ok(Tx(match &self.inner {
             Inner::Pg(p) => TxConn::Pg(p.begin_app().await?),
-            Inner::Lite(l) => TxConn::Lite(l.begin(None, false).await?),
+            Inner::Lite(l) => TxConn::Lite(l.begin(None, false, false).await?),
         }))
     }
 
@@ -136,7 +147,7 @@ impl Db {
     pub async fn begin(&self, ctx: &Ctx) -> Result<Tx> {
         Ok(Tx(match &self.inner {
             Inner::Pg(p) => TxConn::Pg(p.begin(ctx).await?),
-            Inner::Lite(l) => TxConn::Lite(l.begin(Some(ctx.clone()), false).await?),
+            Inner::Lite(l) => TxConn::Lite(l.begin(Some(ctx.clone()), false, false).await?),
         }))
     }
 
@@ -145,7 +156,25 @@ impl Db {
         let ctx = Ctx { plugin: Some(plugin_id.to_string()), ..ctx.clone() };
         Ok(Tx(match &self.inner {
             Inner::Pg(p) => TxConn::Pg(p.begin_plugin(plugin_id, &ctx).await?),
-            Inner::Lite(l) => TxConn::Lite(l.begin(Some(ctx), true).await?),
+            Inner::Lite(l) => TxConn::Lite(l.begin(Some(ctx), true, false).await?),
+        }))
+    }
+
+    /// Like `begin`, for reading only: on SQLite it does not wait for the writers. It must not write.
+    pub async fn begin_read(&self, ctx: &Ctx) -> Result<Tx> {
+        Ok(Tx(match &self.inner {
+            Inner::Pg(p) => TxConn::Pg(p.begin(ctx).await?),
+            Inner::Lite(l) => TxConn::Lite(l.begin(Some(ctx.clone()), false, true).await?),
+        }))
+    }
+
+    /// Like `begin_plugin`, for reading only: on SQLite it does not wait for the writers (WAL lets
+    /// readers run beside the one writer). It must not write; on PostgreSQL it is `begin_plugin`.
+    pub async fn begin_plugin_read(&self, plugin_id: &str, ctx: &Ctx) -> Result<Tx> {
+        let ctx = Ctx { plugin: Some(plugin_id.to_string()), ..ctx.clone() };
+        Ok(Tx(match &self.inner {
+            Inner::Pg(p) => TxConn::Pg(p.begin_plugin(plugin_id, &ctx).await?),
+            Inner::Lite(l) => TxConn::Lite(l.begin(Some(ctx), true, true).await?),
         }))
     }
 

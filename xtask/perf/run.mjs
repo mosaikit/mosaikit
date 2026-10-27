@@ -72,9 +72,9 @@ const pct = (xs, p) => {
   return s[Math.min(s.length - 1, Math.floor((p / 100) * s.length))]
 }
 const results = []
-// PERF_SKIP: names already measured (comma separated), PERF_ONLY: measure only these
-const SKIP = new Set((env.PERF_SKIP ?? '').split(',').map((x) => x.trim()).filter(Boolean))
-const ONLY = new Set((env.PERF_ONLY ?? '').split(',').map((x) => x.trim()).filter(Boolean))
+// PERF_SKIP: names already measured (separated by ';', the names have commas), PERF_ONLY: measure only these
+const SKIP = new Set((env.PERF_SKIP ?? '').split(';').map((x) => x.trim()).filter(Boolean))
+const ONLY = new Set((env.PERF_ONLY ?? '').split(';').map((x) => x.trim()).filter(Boolean))
 const CAP_MS = 120000 // at most about two minutes per operation
 async function measure(name, fn, n = 5) {
   if (SKIP.has(name) || (ONLY.size && !ONLY.has(name))) return
@@ -143,6 +143,13 @@ async function interactive() {
   await measure('notes: list (user)', () => call(notes, user))
   await measure('notes: list with filter (user)', () => call(`${notes}?filter=budget`, user))
   await measure('notes: list (manager)', () => call(notes, manager))
+  // a page as the shell asks it (mountCrud: 100 rows, the latest changed first)
+  await measure('notes: first page (user)', () => call(`${notes}?limit=100`, user))
+  await measure('notes: first page with filter (user)', () => call(`${notes}?limit=100&filter=budget`, user))
+  try {
+    const next = (await call(`${notes}?limit=100`, user)).json().next
+    if (next) await measure('notes: next page (user)', () => call(`${notes}?limit=100&cursor=${encodeURIComponent(next)}`, user))
+  } catch {}
   try {
     const rows = (await call(notes, user)).json().rows
     if (rows.length) await measure('notes: get one', () => call(`${notes}/${rows[0].id}`, user))
@@ -161,6 +168,12 @@ async function interactive() {
   await measure('manager: members', () => call(`/api/t/${slug}/manage/members`, manager))
   await measure('manager: groups', () => call(`/api/t/${slug}/manage/groups`, manager))
   await measure('manager: all items', () => call(`/api/t/${slug}/manage/resources`, manager))
+  // the pages of the shell (50 rows, searched on the server)
+  await measure('manager: members, first page', () => call(`/api/t/${slug}/manage/members?limit=50`, manager))
+  await measure('manager: members, search', () => call(`/api/t/${slug}/manage/members?limit=50&q=005`, manager))
+  await measure('manager: groups, first page', () => call(`/api/t/${slug}/manage/groups?limit=50`, manager))
+  await measure('manager: shares, first page', () => call(`/api/t/${slug}/manage/resources?limit=50&show=shared`, manager))
+  await measure('manager: all items, first page', () => call(`/api/t/${slug}/manage/resources?limit=50`, manager))
   await measure('manager: log (first page)', () => call(`/api/t/${slug}/manage/log`, manager))
   // a person with events in the tenant
   const uid = await one(`select e.user_id from core.events e where e.tenant_id = (select id from core.tenants where slug = '${slug}') and e.user_id is not null order by e.id desc limit 1`)
@@ -176,11 +189,17 @@ async function interactive() {
   await measure('admin: overview', () => call('/api/admin/overview', admin))
   await measure('admin: tenants', () => call('/api/admin/tenants', admin))
   await measure('admin: people', () => call('/api/admin/people', admin))
+  await measure('admin: tenants, first page', () => call('/api/admin/tenants?limit=50', admin))
+  await measure('admin: tenants, search', () => call('/api/admin/tenants?limit=50&q=t01', admin))
+  await measure('admin: people, first page', () => call('/api/admin/people?limit=50', admin))
+  await measure('admin: people, search', () => call(`/api/admin/people?limit=50&q=${userName(ti, 7)}`, admin))
+  await measure('admin: people, every id (select all)', () => call('/api/admin/people?limit=50&ids=true', admin), 3)
   await measure('admin: log (first page)', () => call('/api/admin/log', admin))
   const tid = await one(`select id from core.tenants where slug = '${slug}'`)
   await measure('admin: log, one tenant', () => call(`/api/admin/log?tenant=${tid}`, admin))
   await measure('admin: log, search', () => call('/api/admin/log?q=login', admin))
   await measure('admin: platform KPIs', () => call('/api/admin/kpi', admin))
+  await measure('admin: platform KPIs, computed now', () => call('/api/admin/kpi?refresh=true', admin), 1)
   await measure('admin: quotas', () => call('/api/admin/quotas', admin))
   await measure('admin: search', () => call('/api/admin/search?q=t0001', admin))
   for (const page of ['status', 'performance', 'errors', 'tenants', 'capacity', 'alerts']) {
@@ -189,7 +208,8 @@ async function interactive() {
 }
 
 // 50 people of different tenants at the same time, each a loop of the calls of a working session
-async function concurrent(people = 50, seconds = 30) {
+// paged: the notes and tasks lists as the shell asks them now (100 rows); otherwise the whole lists
+async function concurrent(people = 50, seconds = 30, paged = true) {
   const ms = []
   const byPath = {}
   let errors = 0
@@ -201,10 +221,10 @@ async function concurrent(people = 50, seconds = 30) {
     const h = session(userName(ti, 2 + (k % Math.min(10, S.people - 2))))
     const loop = [
       `/api/t/${slug}/context`,
-      `/api/t/${slug}/p/com.mosaikit.notes/r/notes`,
+      `/api/t/${slug}/p/com.mosaikit.notes/r/notes${paged ? '?limit=100' : ''}`,
       '/api/me/notifications/count',
       `/api/t/${slug}/search?q=meeting`,
-      `/api/t/${slug}/p/com.mosaikit.tasks/r/tasks`,
+      `/api/t/${slug}/p/com.mosaikit.tasks/r/tasks${paged ? '?limit=100' : ''}`,
       `/api/t/${slug}/overview`,
     ]
     for (let i = 0; Date.now() < end; i++) {
@@ -223,6 +243,7 @@ async function concurrent(people = 50, seconds = 30) {
   await Promise.all(Array.from({ length: people }, (_, k) => one(k)))
   const after = serverStats()
   const row = {
+    paged,
     people,
     seconds,
     requests: ms.length,
@@ -238,7 +259,7 @@ async function concurrent(people = 50, seconds = 30) {
     server: { before, after },
   }
   console.log(row.paths)
-  console.log(`concurrent ${people} people ${seconds}s: ${row.rps} req/s, p50 ${row.p50} ms, p95 ${row.p95} ms, p99 ${row.p99} ms, errors ${errors} ${firstError}`, after)
+  console.log(`concurrent ${people} people${paged ? ', paged lists' : ', whole lists'} ${seconds}s: ${row.rps} req/s, p50 ${row.p50} ms, p95 ${row.p95} ms, p99 ${row.p99} ms, errors ${errors} ${firstError}`, after)
   return row
 }
 
@@ -286,6 +307,10 @@ if (seeded !== null) console.log(`seeded in ${seeded.toFixed(0)} s`)
 await interactive()
 const bg = background()
 const conc = env.PERF_NO_CONCURRENT ? null : await concurrent()
+// the same mix with the whole lists (as before paging): what the database costs under load
+const concWhole = env.PERF_NO_CONCURRENT ? null : await concurrent(50, 30, false)
+// the paged mix once more, on a warm database: the first mix reads the items of 50 tenants from disk
+const concAgain = env.PERF_NO_CONCURRENT ? null : await concurrent()
 const report = {
   backend: env.PERF_BACKEND,
   scale: env.PERF_SCALE,
@@ -295,6 +320,8 @@ const report = {
   interactive: results,
   background: bg,
   concurrent: conc,
+  concurrent_whole_lists: concWhole,
+  concurrent_again: concAgain,
   server: serverStats(),
 }
 writeFileSync(env.PERF_OUT, JSON.stringify(report, null, 2))

@@ -30,6 +30,7 @@ const CORE_GRANTS: &[&str] = &[
     "core.ctx_plugin()",
     "core.level_of(uuid)",
     "core.can_access(uuid, int)",
+    "core.ctx_levels()",
     "core.create_resource(text, text, uuid, jsonb)",
     "core.update_resource(uuid, text, jsonb, bigint)",
     "core.move_resource(uuid, uuid)",
@@ -252,11 +253,14 @@ impl PgPluginSchema {
                     for p in ["msk_select", "msk_insert", "msk_update", "msk_delete"] {
                         Self::exec(tx, &format!("drop policy if exists {p} on {t}")).await?;
                     }
+                    // reads: what the context sees as a set, once per statement (not core.can_access()
+                    // for every row); writes: the per-row check of the rows they touch
                     Self::exec(
                         tx,
                         &format!(
-                        "create policy msk_select on {t} for select using (core.can_access(resource_id, 1))"
-                    ),
+                            "create policy msk_select on {t} for select \
+                             using (resource_id in (select l.id from core.ctx_levels() l where l.level >= 1))"
+                        ),
                     )
                     .await?;
                     Self::exec(

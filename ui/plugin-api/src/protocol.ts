@@ -65,6 +65,10 @@ export interface ListResult {
   resource: string
   fields: FieldDecl[]
   rows: Row[]
+  /** with `limit`: the cursor of the next page (none on the last one) */
+  next?: string | null
+  /** with `limit`: how many rows the filter matches in all */
+  total?: number
 }
 
 /** An extension of the plugin: the fields, actions and tabs it adds to the items of a resource. */

@@ -94,6 +94,8 @@ export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unk
       if (typeof a.filter === 'string' && a.filter) q.set('filter', a.filter.slice(0, 200))
       const parent = optUuid(a.parent)
       if (parent) q.set('parent', parent)
+      if (typeof a.limit === 'number' && Number.isInteger(a.limit) && a.limit > 0) q.set('limit', String(Math.min(a.limit, 500)))
+      if (typeof a.cursor === 'string' && a.cursor) q.set('cursor', a.cursor.slice(0, 200))
       const qs = q.toString()
       return { method: 'GET', url: `${base}/r/${ident(a.resource, 'resource')}${qs ? '?' + qs : ''}` }
     }

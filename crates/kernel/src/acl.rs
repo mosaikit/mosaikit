@@ -381,6 +381,161 @@ pub async fn manager_resources(k: &Kernel, c: &Caller, f: &ResourceFilter) -> Re
     tenant_resources(k, c.tenant.tenant_id, c.tenant.settings.managers_see_titles, f).await
 }
 
+/// Filters of a page of the items of the tenant (Shares, all items): `show` items, shared or public.
+#[derive(Debug, Clone, Default, serde::Deserialize)]
+pub struct ResourcePageFilter {
+    #[serde(default)]
+    pub limit: Option<i64>,
+    #[serde(default)]
+    pub cursor: Option<String>,
+    #[serde(default)]
+    pub q: Option<String>,
+    #[serde(default)]
+    pub owner: Option<Uuid>,
+    #[serde(default)]
+    pub plugin: Option<String>,
+    /// items (every one), shared (with people, groups or links), public (with a public link)
+    #[serde(default)]
+    pub show: Option<String>,
+    /// only the ids of every match (for "select all"), up to 10,000
+    #[serde(default)]
+    pub ids: bool,
+}
+
+impl ResourcePageFilter {
+    pub fn page(&self) -> crate::paging::PageQuery {
+        crate::paging::PageQuery { limit: self.limit, cursor: self.cursor.clone(), q: self.q.clone() }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ResourcePage {
+    #[serde(flatten)]
+    pub page: crate::paging::Page<ResourceRow>,
+    /// counts of the pills, with the owner, plugin and words filters
+    pub counts: ResourceCounts,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ids: Option<Vec<Uuid>>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ResourceCounts {
+    pub items: i64,
+    pub shared: i64,
+    pub public: i64,
+}
+
+/// A page of the items of the tenant (Tenant Manager), the latest changed first, filtered on the server.
+pub async fn manager_resources_page(k: &Kernel, c: &Caller, f: &ResourcePageFilter) -> Result<ResourcePage> {
+    c.require_manager()?;
+    let tenant = c.tenant.tenant_id;
+    let see_titles = c.tenant.settings.managers_see_titles;
+    let like = f.page().like().filter(|_| see_titles);
+    let trash = if k.db.is_sqlite() {
+        "not core.in_trash(r.id)"
+    } else {
+        "not exists (select 1 from core.trashed($1) x where x.id = r.id)"
+    };
+    let has_link =
+        "exists (select 1 from core.public_links l where l.resource_id = r.id and l.revoked_at is null
+                     and (l.expires_at is null or l.expires_at > now()))";
+    let has_share = "exists (select 1 from core.grants g where g.resource_id = r.id)";
+    let base = format!(
+        "r.tenant_id = $1 and {trash}
+         and ($3::uuid is null or r.owner_id = $3) and ($4::text is null or r.plugin_id = $4)
+         and ($5::text is null or r.title ilike $5 escape '\\')"
+    );
+    let show = match f.show.as_deref() {
+        Some("shared") => format!("({has_share} or {has_link})"),
+        Some("public") => has_link.to_string(),
+        _ => "true".to_string(),
+    };
+    let bind = |q: mosaikit_db::Query| {
+        q.bind(tenant).bind(see_titles).bind(f.owner).bind(f.plugin.as_deref()).bind(like.clone())
+    };
+    let counts = bind(mosaikit_db::query(format!(
+        "select count(*), coalesce(sum(case when {has_share} or {has_link} then 1 else 0 end), 0),
+                coalesce(sum(case when {has_link} then 1 else 0 end), 0)
+         from core.resources r where $2::bool is not null and {base}"
+    )))
+    .fetch_one(&k.db)
+    .await?;
+    let counts = ResourceCounts { items: counts.get(0), shared: counts.get(1), public: counts.get(2) };
+    let total = match f.show.as_deref() {
+        Some("shared") => counts.shared,
+        Some("public") => counts.public,
+        _ => counts.items,
+    };
+    let ids = if f.ids {
+        Some(
+            bind(mosaikit_db::query(format!(
+                "select r.id from core.resources r where $2::bool is not null and {base} and {show}
+                 order by r.updated_at desc, r.id desc limit 10000"
+            )))
+            .fetch_all(&k.db)
+            .await?
+            .iter()
+            .map(|r| r.get::<Uuid, _>(0))
+            .collect(),
+        )
+    } else {
+        None
+    };
+    let limit = f.page().limit();
+    let after = f.page().after()?;
+    let cursor = if after.is_some() { "and (r.updated_at, r.id) < ($6::timestamptz, $7::uuid)" } else { "" };
+    let mut q = bind(mosaikit_db::query(format!(
+        "select r.id, r.plugin_id, r.kind, case when $2 then r.title else '' end, r.owner_id,
+                coalesce(nullif(u.display_name, ''), u.username), u.status = 'active'
+                    and exists (select 1 from core.memberships m where m.tenant_id = r.tenant_id and m.user_id = u.id),
+                r.size_bytes, r.created_at, r.updated_at,
+                (select count(*) from core.grants g where g.resource_id = r.id),
+                (select count(*) from core.public_links l where l.resource_id = r.id and l.revoked_at is null
+                    and (l.expires_at is null or l.expires_at > now())),
+                r.updated_at::text
+         from core.resources r join core.users u on u.id = r.owner_id
+         where {base} and {show} {cursor}
+         order by r.updated_at desc, r.id desc limit {}",
+        limit + 1
+    )));
+    if let Some((text, id)) = &after {
+        q = q.bind(text.clone()).bind(*id);
+    }
+    let rows = q.fetch_all(&k.db).await?;
+    let items: Vec<(ResourceRow, String)> = rows
+        .iter()
+        .map(|r| {
+            (
+                ResourceRow {
+                    id: r.get(0),
+                    plugin_id: r.get(1),
+                    kind: r.get(2),
+                    title: r.get(3),
+                    owner_id: r.get(4),
+                    owner_name: r.get(5),
+                    owner_active: r.get(6),
+                    size_bytes: r.get(7),
+                    created_at: r.get(8),
+                    updated_at: r.get(9),
+                    shares: r.get(10),
+                    public_links: r.get(11),
+                },
+                r.get(12),
+            )
+        })
+        .collect();
+    let p = crate::paging::page(items, limit, total, |(row, key)| (key.clone(), row.id));
+    Ok(ResourcePage {
+        page: crate::paging::Page {
+            items: p.items.into_iter().map(|(x, _)| x).collect(),
+            total: p.total,
+            next: p.next,
+        },
+        counts,
+        ids,
+    })
+}
+
 /// Reassigns all the resources of a user in the tenant (e.g. a user who left without reassignment).
 pub async fn reassign_all(k: &Kernel, c: &Caller, from: Uuid, to: Uuid) -> Result<i64> {
     c.require_manager()?;

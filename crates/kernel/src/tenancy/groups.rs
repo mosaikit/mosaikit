@@ -46,15 +46,58 @@ async fn editable(k: &Kernel, c: &Caller, id: Uuid) -> Result<()> {
 }
 
 pub async fn groups(k: &Kernel, c: &Caller) -> Result<Vec<GroupInfo>> {
-    let rows = mosaikit_db::query(
-        "select g.id, g.name, coalesce(json_agg(json_build_object('user_id', u.id, 'username', u.username,
-                'display_name', u.display_name) order by u.username) filter (where u.id is not null), '[]'), g.source
-         from core.groups g left join core.group_members gm on gm.group_id = g.id left join core.users u on u.id = gm.user_id
-         where g.tenant_id = $1 group by g.id order by g.name",
-    )
+    let rows =
+        mosaikit_db::query(format!("{GROUPS_SQL} where g.tenant_id = $1 group by g.id order by g.name"))
+            .bind(c.tenant.tenant_id)
+            .fetch_all(&k.db)
+            .await?;
+    groups_from(&rows)
+}
+
+const GROUPS_SQL: &str = "select g.id, g.name, coalesce(json_agg(json_build_object('user_id', u.id, 'username', u.username,
+        'display_name', u.display_name) order by u.username) filter (where u.id is not null), '[]'), g.source, lower(g.name)
+     from core.groups g left join core.group_members gm on gm.group_id = g.id left join core.users u on u.id = gm.user_id";
+
+/// A page of the groups of the tenant, by name, filtered by words in the name.
+pub async fn groups_page(
+    k: &Kernel,
+    c: &Caller,
+    f: &crate::paging::PageQuery,
+) -> Result<crate::paging::Page<GroupInfo>> {
+    c.require_manager()?;
+    let like = f.like();
+    let cond = if like.is_some() { "g.name ilike $2 escape '\\'" } else { "$2::text is null" };
+    let total: i64 = mosaikit_db::query_scalar(format!(
+        "select count(*) from core.groups g where g.tenant_id = $1 and {cond}"
+    ))
     .bind(c.tenant.tenant_id)
-    .fetch_all(&k.db)
+    .bind(like.as_deref())
+    .fetch_one(&k.db)
     .await?;
+    let limit = f.limit();
+    let after = f.after()?;
+    let cursor = if after.is_some() { "and (lower(g.name), g.id) > ($3, $4::uuid)" } else { "" };
+    let mut q = mosaikit_db::query(format!(
+        "{GROUPS_SQL} where g.tenant_id = $1 and {cond} {cursor} group by g.id order by lower(g.name), g.id limit {}",
+        limit + 1
+    ))
+    .bind(c.tenant.tenant_id)
+    .bind(like.as_deref());
+    if let Some((text, id)) = &after {
+        q = q.bind(text.clone()).bind(*id);
+    }
+    let rows = q.fetch_all(&k.db).await?;
+    let keys: Vec<String> = rows.iter().map(|r| r.get::<String, _>(4)).collect();
+    let items: Vec<(GroupInfo, String)> = groups_from(&rows)?.into_iter().zip(keys).collect();
+    let p = crate::paging::page(items, limit, total, |(g, key)| (key.clone(), g.id));
+    Ok(crate::paging::Page {
+        items: p.items.into_iter().map(|(g, _)| g).collect(),
+        total: p.total,
+        next: p.next,
+    })
+}
+
+fn groups_from(rows: &[mosaikit_db::Row]) -> Result<Vec<GroupInfo>> {
     rows.iter()
         .map(|r| {
             let members: Value = r.get(2);

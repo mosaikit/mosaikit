@@ -3,15 +3,16 @@
 
 use std::collections::HashMap;
 
+use chrono::{DateTime, Utc};
 use mosaikit_db::qi;
-use serde::Serialize;
-use serde_json::Value;
+use serde::{Deserialize, Serialize};
+use serde_json::{json, Value};
 use uuid::Uuid;
 
-use crate::tenancy::{list_tenants, require_admin, TenantInfo};
+use crate::tenancy::{require_admin, TenantInfo};
 use crate::{Caller, Kernel, Result, SessionUser};
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResourceStat {
     pub plugin_id: String,
     pub plugin: String,
@@ -44,7 +45,7 @@ pub struct CoreKpi {
     pub activity: Vec<DayStat>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PluginKpi {
     pub plugin_id: String,
     pub plugin: String,
@@ -77,7 +78,7 @@ pub struct TenantKpi {
     pub plugins: Vec<PluginKpi>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TenantSummary {
     #[serde(flatten)]
     pub info: TenantInfo,
@@ -86,12 +87,70 @@ pub struct TenantSummary {
     pub public_links: i64,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GlobalKpi {
     pub tenants: Vec<TenantSummary>,
     pub resources: Vec<ResourceStat>,
     pub plugins: Vec<PluginKpi>,
+    /// the figures of the whole installation the platform overview shows (snapshots before these had none)
+    #[serde(default)]
+    pub totals: Option<PlatformTotals>,
 }
+
+/// Figures of the whole installation that read every item or every event of the month.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub struct PlatformTotals {
+    pub resources: i64,
+    pub bytes: i64,
+    pub active_users_30d: i64,
+}
+
+async fn platform_totals(k: &Kernel) -> Result<PlatformTotals> {
+    let r = mosaikit_db::query(
+        "select (select count(*) from core.resources), (select coalesce(sum(size_bytes), 0)::bigint from core.resources),
+                (select count(distinct user_id) from core.events where ts > now() - interval '30 days' and user_id is not null)",
+    )
+    .fetch_one(&k.db)
+    .await?;
+    Ok(PlatformTotals { resources: r.get(0), bytes: r.get(1), active_users_30d: r.get(2) })
+}
+
+/// The totals the platform overview shows: from the last snapshot of the platform KPIs when computing
+/// them takes long (with its time), otherwise computed now (a small installation stays exact).
+pub(crate) async fn overview_totals(k: &Kernel) -> Result<(PlatformTotals, Option<DateTime<Utc>>)> {
+    let row =
+        mosaikit_db::query("select computed_at, took_ms, data from core.kpi_snapshots where scope = $1")
+            .bind(PLATFORM)
+            .fetch_optional(&k.db)
+            .await?;
+    if let Some(r) = row {
+        let took: i32 = r.get(1);
+        let data: Value = r.get(2);
+        if i64::from(took) >= LIVE_MS {
+            if let Some(t) =
+                data.get("totals").and_then(|t| serde_json::from_value::<PlatformTotals>(t.clone()).ok())
+            {
+                return Ok((t, Some(r.get(0))));
+            }
+        }
+    }
+    Ok((platform_totals(k).await?, None))
+}
+
+/// The platform KPIs as last computed by the background work (every ten minutes) or on request.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GlobalSnapshot {
+    pub computed_at: DateTime<Utc>,
+    /// how long the computation took
+    pub took_ms: i64,
+    #[serde(flatten)]
+    pub kpi: GlobalKpi,
+}
+
+const PLATFORM: &str = "platform";
+/// A snapshot that took less than this to compute is computed again at every request: on a small
+/// installation the figures stay exact, on a large one the page answers at once.
+const LIVE_MS: i64 = 300;
 
 fn plugin_label(k: &Kernel, id: &str) -> String {
     k.plugins.get(id).map(|p| p.manifest.contribution.label.clone()).unwrap_or_else(|| id.to_string())
@@ -258,9 +317,57 @@ pub async fn tenant(k: &Kernel, c: &Caller) -> Result<TenantKpi> {
     })
 }
 
-/// KPIs of every tenant (system administrator).
+/// KPIs of every tenant (system administrator), computed now (seconds on a large installation: the
+/// page reads `global_snapshot`).
 pub async fn global(k: &Kernel, admin: &SessionUser) -> Result<GlobalKpi> {
     require_admin(admin)?;
+    compute_global(k).await
+}
+
+/// The last snapshot of the platform KPIs; computed now when there is none yet or `refresh` asks for it.
+pub async fn global_snapshot(k: &Kernel, admin: &SessionUser, refresh: bool) -> Result<GlobalSnapshot> {
+    require_admin(admin)?;
+    if !refresh {
+        let row =
+            mosaikit_db::query("select computed_at, took_ms, data from core.kpi_snapshots where scope = $1")
+                .bind(PLATFORM)
+                .fetch_optional(&k.db)
+                .await?;
+        if let Some(r) = row {
+            let data: Value = r.get(2);
+            let took: i32 = r.get(1);
+            // a snapshot that was quick to compute is computed again: exact figures where they are cheap
+            if i64::from(took) >= LIVE_MS {
+                if let Ok(kpi) = serde_json::from_value::<GlobalKpi>(data) {
+                    return Ok(GlobalSnapshot { computed_at: r.get(0), took_ms: took.into(), kpi });
+                }
+            }
+        }
+    }
+    refresh_global(k).await
+}
+
+/// Computes the platform KPIs and keeps them as the snapshot (background work, every ten minutes).
+pub(crate) async fn refresh_global(k: &Kernel) -> Result<GlobalSnapshot> {
+    let start = std::time::Instant::now();
+    let kpi = compute_global(k).await?;
+    let took_ms = start.elapsed().as_millis() as i64;
+    let computed_at = Utc::now();
+    mosaikit_db::query(
+        "insert into core.kpi_snapshots (scope, computed_at, took_ms, data) values ($1, $2, $3, $4)
+         on conflict (scope) do update set computed_at = excluded.computed_at, took_ms = excluded.took_ms,
+           data = excluded.data",
+    )
+    .bind(PLATFORM)
+    .bind(computed_at)
+    .bind(took_ms.min(i32::MAX as i64) as i32)
+    .bind(json!(kpi))
+    .execute(&k.db)
+    .await?;
+    Ok(GlobalSnapshot { computed_at, took_ms, kpi })
+}
+
+async fn compute_global(k: &Kernel) -> Result<GlobalKpi> {
     let mut tenants = Vec::new();
     // PostgreSQL: the figures of every tenant in one query (one pass on the events, the shares and the
     // links), not three queries per tenant
@@ -285,7 +392,7 @@ pub async fn global(k: &Kernel, admin: &SessionUser) -> Result<GlobalKpi> {
             by_tenant.insert(r.get(0), (r.get(1), r.get(2), r.get(3)));
         }
     }
-    for t in list_tenants(k, admin).await? {
+    for t in crate::tenancy::all_tenants(k).await? {
         if let Some(&(active, shares, links)) = by_tenant.get(&t.id) {
             tenants.push(TenantSummary { info: t, active_users_30d: active, shares, public_links: links });
             continue;
@@ -308,5 +415,10 @@ pub async fn global(k: &Kernel, admin: &SessionUser) -> Result<GlobalKpi> {
             public_links: r.get(2),
         });
     }
-    Ok(GlobalKpi { tenants, resources: resource_stats(k, None).await?, plugins: plugin_kpis(k, None).await? })
+    Ok(GlobalKpi {
+        tenants,
+        resources: resource_stats(k, None).await?,
+        plugins: plugin_kpis(k, None).await?,
+        totals: Some(platform_totals(k).await?),
+    })
 }

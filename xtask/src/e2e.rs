@@ -35,6 +35,12 @@ pub(crate) fn psql(sql: &str) -> Result<String> {
 /// The database of this checkout: `mosaikit_e2e` for a folder called `mosaikit`, otherwise with the
 /// folder name (`mosaikit-phase8` → `mosaikit_e2e_phase8`).
 fn db_name() -> String {
+    checkout_db("mosaikit_e2e")
+}
+
+/// `base` for the checkout in a folder called `mosaikit`, otherwise `base` plus the folder name, so that
+/// several checkouts (worktrees) never share a test database.
+pub fn checkout_db(base: &str) -> String {
     let folder = root().file_name().map(|f| f.to_string_lossy().to_lowercase()).unwrap_or_default();
     let suffix: String = folder
         .strip_prefix("mosaikit")
@@ -44,9 +50,9 @@ fn db_name() -> String {
         .collect();
     let suffix = suffix.trim_matches('_');
     if suffix.is_empty() {
-        "mosaikit_e2e".into()
+        base.into()
     } else {
-        format!("mosaikit_e2e_{suffix}")
+        format!("{base}_{suffix}")
     }
 }
 

@@ -461,6 +461,27 @@ start of the development server with a wildcard `plugin_url` (below); the others
 | UX-13 | Help › **What is new**, in English and in Italian | The notes of the version in the language of the interface |
 | UX-14 | Help › **Guide of Mosaikit** as User, as Tenant Manager, as Administrator | A wide dialog with the guide of the role, tabs for the other two, in the language of the interface; links to another guide switch tab |
 | UX-15 | System › Identity and texts › **Guide** set to an address | Help › Guide of Mosaikit opens that address instead |
+## Performance follow-ups — Paging, KPI snapshot, Log search, SQLite writers
+
+Needs many rows: the data of the load test (`cargo xtask perf --scale probe`, then the server of
+`.dev/perf`), or create a few hundred notes and people with the API. Pages of 50 rows in the shell,
+100 in the plugin lists.
+
+| Id | Check | Expected |
+|---|---|---|
+| PERF-01 | As Administrator: People, with more than 50 people | 50 rows, «50 of N» and **Load more** under the list; Load more adds the next 50 without repeating rows; the counts of the filters (all, in several tenants, administrators) are those of everyone, not of the page |
+| PERF-02 | People: type part of a username in the search, then a tenant or role filter | The list is searched on the server (people not loaded yet are found); clearing the search brings back the first page |
+| PERF-03 | People: tick the box of the header (every shown row) | «Select all N» appears; click it: «N selected»; a bulk action (e.g. Disable, then Reactivate) applies to all N, the system administrators excluded; changing the search clears the selection |
+| PERF-04 | Administrator: Tenants, with more than 50 tenants | First 50 by name, Load more, the search and the status filters on the server |
+| PERF-05 | Administrator: Overview | The totals (items, space, active people) and below them «Figures of every tenant as of <time>» with **Refresh**; Refresh updates the time (on a small installation the time is always now: the figures are computed live) |
+| PERF-06 | Administrator: KPIs page | The same time and the same totals as the Overview |
+| PERF-07 | As Tenant Manager: Manage › People, with more than 50 members | Paged like PERF-01, searched on the server; the count of the tab is the number of every member; «Select all N» and a bulk role change apply to all; **Remove** a member still offers every member as the new owner of their items |
+| PERF-08 | Manage › Groups, with more than 50 groups | Search box above the cards; the groups are searched on the server and paged with Load more; editing the members of a group still lists every member |
+| PERF-09 | Manage › Shares (shared, public, all items) | Paged with Load more; the counts of the three views are those of the whole tenant; «Select all N» then Revoke removes the shares of all N items |
+| PERF-10 | Notes (any plugin list of `mountCrud`), with more than 100 rows | «100 of N items» and **Load more**; the filter box searches on the server a moment after typing (rows not loaded yet are found); creating or editing a row reloads the first page |
+| PERF-11 | Manage › Log: search a word of the details, an IP, a username | The matches as before (substring, any case); on PostgreSQL with `pg_trgm` the search answers in milliseconds on a large Log |
+| PERF-12 | Desktop (SQLite): two windows of the same person saving notes at the same time, while a third lists them | Every save succeeds (no «database is locked»), the list keeps answering while the others write |
+| PERF-13 | Share a folder with a group read only; as a member of the group: the notes of the folder, open one, try to edit it | Listed and readable, the edit refused (read access through the set rule, write checked per row); the same in the trash: not listed |
 
 ---
 

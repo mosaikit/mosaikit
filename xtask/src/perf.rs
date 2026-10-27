@@ -14,13 +14,13 @@ use std::process::{Command, Stdio};
 use anyhow::{bail, Context, Result};
 
 use crate::dev::kill_tree;
-use crate::e2e::{admin_url, psql, reset_db, wait_health};
+use crate::e2e::{admin_url, checkout_db, psql, reset_db, wait_health};
 use crate::plugins;
 use crate::util::{exe, pg_bin, root, run, which};
 
-const DB: &str = "mosaikit_perf";
 const ADMIN_PASSWORD: &str = "perf-admin-password";
-const PORT: u16 = 18400;
+// away from the ports of the development servers (the e2e and dev ones use 18xxx too)
+const PORT: u16 = 18470;
 
 pub fn perf(backend: &str, scale: &str, reuse: bool, no_build: bool) -> Result<()> {
     let sqlite = match backend {
@@ -28,11 +28,12 @@ pub fn perf(backend: &str, scale: &str, reuse: bool, no_build: bool) -> Result<(
         "sqlite" => true,
         other => bail!("unknown backend {other}: postgres or sqlite"),
     };
+    let db = checkout_db("mosaikit_perf");
     let dir = root().join(".dev").join("perf").join(backend);
-    let db_url = admin_url().replace("/postgres", &format!("/{DB}"));
+    let db_url = admin_url().replace("/postgres", &format!("/{db}"));
     if !reuse {
         if !sqlite {
-            reset_db(DB)?;
+            reset_db(&db)?;
         }
         if dir.exists() {
             std::fs::remove_dir_all(&dir)?;
@@ -97,7 +98,7 @@ pub fn perf(backend: &str, scale: &str, reuse: bool, no_build: bool) -> Result<(
     }
     if result.is_ok() {
         eprintln!(
-            "the data stay in {} (and {DB}): --reuse measures again, --clean drops them",
+            "the data stay in {} (and {db}): --reuse measures again, --clean drops them",
             dir.display()
         );
     }
@@ -106,8 +107,9 @@ pub fn perf(backend: &str, scale: &str, reuse: bool, no_build: bool) -> Result<(
 
 /// Drops the database and the data of the load test.
 pub fn clean() -> Result<()> {
-    psql(&format!("drop database if exists {DB} with (force)"))?;
-    for r in psql(&format!("select rolname from pg_roles where rolname like 'msk_{DB}%'"))?
+    let db = checkout_db("mosaikit_perf");
+    psql(&format!("drop database if exists {db} with (force)"))?;
+    for r in psql(&format!("select rolname from pg_roles where rolname like 'msk_{db}%'"))?
         .lines()
         .map(str::trim)
         .filter(|l| !l.is_empty())

@@ -138,11 +138,24 @@ async fn fetch(k: &Kernel, scope: Scope<'_>, f: &LogFilter, limit: i64) -> Resul
             f.tenant
         }
     };
+    // control characters out of the words: the trigram index joins the fields with chr(1)
     let like =
         f.q.as_deref()
-            .map(str::trim)
+            .map(|q| q.chars().filter(|c| !c.is_control()).collect::<String>())
+            .map(|q| q.trim().to_string())
             .filter(|q| !q.is_empty())
-            .map(|q| format!("%{}%", crate::util::like_escape(q)));
+            .map(|q| format!("%{}%", crate::util::like_escape(&q)));
+    // PostgreSQL: one expression per table, the same as the trigram indexes of migration 0016 (with
+    // pg_trgm an index answers it; without, the same rows as the condition per field); SQLite: per field
+    let search_sql = if k.db.is_sqlite() {
+        "(e.action ilike $9 escape '\\' or u.username ilike $9 escape '\\'
+          or u.display_name ilike $9 escape '\\' or e.detail::text ilike $9 escape '\\'
+          or e.ip ilike $9 escape '\\')"
+    } else {
+        "((e.action || chr(1) || coalesce(e.detail::text, '') || chr(1) || coalesce(e.ip, '')) ilike $9 escape '\\'
+          or e.user_id in (select su.id from core.users su
+                           where (su.username || chr(1) || coalesce(su.display_name, '')) ilike $9 escape '\\'))"
+    };
     let sql = format!(
         "select e.id, e.ts, e.tenant_id, t.slug, t.name, t.settings, e.user_id, u.username,
                 coalesce(nullif(u.display_name, ''), u.username), e.plugin_id, e.resource_id, r.title,
@@ -164,13 +177,7 @@ async fn fetch(k: &Kernel, scope: Scope<'_>, f: &LogFilter, limit: i64) -> Resul
         from = opt(f.from.is_some(), "e.ts >= $6", "$6::timestamptz is null"),
         to = opt(f.to.is_some(), "e.ts < $7", "$7::timestamptz is null"),
         failed = opt(f.failed, "(not e.ok and $8)", "not $8"),
-        search = opt(
-            like.is_some(),
-            "(e.action ilike $9 escape '\\' or u.username ilike $9 escape '\\'
-              or u.display_name ilike $9 escape '\\' or e.detail::text ilike $9 escape '\\'
-              or e.ip ilike $9 escape '\\')",
-            "$9::text is null"
-        ),
+        search = if like.is_some() { search_sql } else { "$9::text is null" },
         before = opt(f.before.is_some(), "e.id < $10", "$10::bigint is null"),
         what = what_sql(f.what.as_deref()),
     );

@@ -303,7 +303,16 @@ async fn decide(
 
 // ------------------------------------------------------------------ Administrator
 
-async fn a_people(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Json<Value>> {
+/// People of the installation: whole, or a page with `limit` (Administrator › People; the other lists
+/// of choices search with `q` and a small `limit`).
+async fn a_people(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Query(f): Query<tenancy::PeopleFilter>,
+) -> ApiResult<Json<Value>> {
+    if f.limit.is_some() || f.ids {
+        return Ok(Json(json!(tenancy::people_page(&s.k, &u, &f).await?)));
+    }
     Ok(Json(json!(tenancy::directory_of_people(&s.k, &u).await?)))
 }
 

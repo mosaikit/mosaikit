@@ -17,6 +17,8 @@ use crate::{events, Caller, Error, Kernel, Result};
 
 const MAX_TEXT: usize = 10 << 20;
 const MAX_ROWS: i64 = 5000;
+/// Largest page of a paged list.
+pub const MAX_PAGE: i64 = 500;
 
 pub type Values = Map<String, Value>;
 
@@ -25,6 +27,36 @@ pub struct ListResult {
     pub resource: String,
     pub fields: Vec<mosaikit_mskp::FieldDecl>,
     pub rows: Vec<Value>,
+    /// paged lists: the cursor of the next page (none on the last one)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next: Option<String>,
+    /// paged lists: how many rows the filter matches in all
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub total: Option<i64>,
+}
+
+/// A page of a list: the latest changed first; `cursor` is the `next` of the previous page.
+#[derive(Debug, Clone, Default)]
+pub struct Paging {
+    pub limit: i64,
+    pub cursor: Option<String>,
+}
+
+/// The cursor of the row after which the next page starts: `<updated_at>|<id>` (keyset on the order of
+/// the list, not an offset: a page costs the same however deep it is).
+fn cursor_of(row: &Value) -> Option<String> {
+    let at = row.get("updated_at")?.as_str()?;
+    let id = row.get("id")?.as_str()?;
+    Some(format!("{at}|{id}"))
+}
+
+fn parse_cursor(c: &str) -> Result<(String, Uuid)> {
+    let (at, id) = c.rsplit_once('|').ok_or_else(|| Error::bad("invalid cursor"))?;
+    let id = Uuid::parse_str(id).map_err(|_| Error::bad("invalid cursor"))?;
+    if at.is_empty() || at.len() > 64 {
+        return Err(Error::bad("invalid cursor"));
+    }
+    Ok((at.to_string(), id))
 }
 
 fn decl<'a>(p: &'a LoadedPlugin, resource: &str) -> Result<&'a ResourceDecl> {
@@ -33,18 +65,31 @@ fn decl<'a>(p: &'a LoadedPlugin, resource: &str) -> Result<&'a ResourceDecl> {
 
 /// SELECT of the visible rows with metadata, as JSON.
 fn select_sql(k: &Kernel, p: &LoadedPlugin, d: &ResourceDecl, cond: &str) -> String {
+    select_sql_limit(k, p, d, cond, MAX_ROWS, false)
+}
+
+/// `with_total` (SQLite only): the second column is how many rows match, counted in the same pass.
+fn select_sql_limit(
+    k: &Kernel,
+    p: &LoadedPlugin,
+    d: &ResourceDecl,
+    cond: &str,
+    limit: i64,
+    with_total: bool,
+) -> String {
     if k.db.is_sqlite() {
-        return select_sql_lite(p, d, cond);
+        return select_sql_lite(p, d, cond, limit, with_total);
     }
     let obj: Vec<String> = d.fields.iter().map(|f| format!("'{0}', t.{1}", f.key, qi(&f.key))).collect();
     format!(
-        "select coalesce(json_agg(x order by x.updated_at desc), '[]'::json) from (
+        "select coalesce(json_agg(x order by x.updated_at desc, x.id desc), '[]'::json) from (
            select t.resource_id as id, v.parent_id, v.owner_id, v.owner_name, v.shared, v.created_at, v.updated_at,
                   case v.my_level when 3 then 'manage' when 2 then 'write' else 'read' end as my_level,
                   json_build_object({obj}) as values
            from {schema}.{table} t join core.visible_resources v on v.id = t.resource_id
            where true {cond}
-           limit {MAX_ROWS}) x",
+           order by v.updated_at desc, t.resource_id desc
+           limit {limit}) x",
         obj = obj.join(", "),
         schema = qi(&p.schema()),
         table = qi(&d.name),
@@ -53,7 +98,7 @@ fn select_sql(k: &Kernel, p: &LoadedPlugin, d: &ResourceDecl, cond: &str) -> Str
 
 /// Like `select_sql` for SQLite: JSON objects built row by row (`json_agg(x)`
 /// does not exist) and booleans converted (SQLite stores them as 0/1).
-fn select_sql_lite(p: &LoadedPlugin, d: &ResourceDecl, cond: &str) -> String {
+fn select_sql_lite(p: &LoadedPlugin, d: &ResourceDecl, cond: &str, limit: i64, with_total: bool) -> String {
     let obj: Vec<String> = d
         .fields
         .iter()
@@ -67,18 +112,21 @@ fn select_sql_lite(p: &LoadedPlugin, d: &ResourceDecl, cond: &str) -> String {
         })
         .collect();
     format!(
-        "select coalesce(json_group_array(json(x.obj) order by x.updated_at desc), '[]') from (
+        "select coalesce(json_group_array(json(x.obj) order by x.updated_at desc, x.id desc), '[]'){total_col} from (
            select json_object('id', t.resource_id, 'parent_id', v.parent_id, 'owner_id', v.owner_id,
                   'owner_name', v.owner_name, 'shared', json(case when v.shared then 'true' else 'false' end),
                   'created_at', v.created_at, 'updated_at', v.updated_at,
                   'my_level', case v.my_level when 3 then 'manage' when 2 then 'write' else 'read' end,
-                  'values', json_object({obj})) as obj, v.updated_at
+                  'values', json_object({obj})) as obj, v.updated_at, t.resource_id as id{total_win}
            from {schema}.{table} t join core.visible_resources v on v.id = t.resource_id
            where true {cond}
-           limit {MAX_ROWS}) x",
+           order by v.updated_at desc, t.resource_id desc
+           limit {limit}) x",
         obj = obj.join(", "),
         schema = qi(&p.schema()),
         table = qi(&d.name),
+        total_col = if with_total { ", max(x.total)" } else { "" },
+        total_win = if with_total { ", count(*) over () as total" } else { "" },
     )
 }
 
@@ -95,6 +143,19 @@ pub async fn list_ctx(
     filter: Option<&str>,
     parent: Option<Uuid>,
 ) -> Result<ListResult> {
+    list_ctx_paged(k, ctx, p, resource, filter, parent, None).await
+}
+
+/// A list, whole (up to 5,000 rows) or one page at a time (`paging`): the latest changed first.
+pub async fn list_ctx_paged(
+    k: &Kernel,
+    ctx: &Ctx,
+    p: &LoadedPlugin,
+    resource: &str,
+    filter: Option<&str>,
+    parent: Option<Uuid>,
+    paging: Option<&Paging>,
+) -> Result<ListResult> {
     let d = decl(p, resource)?;
     let mut cond = String::new();
     let mut binds = Vec::new();
@@ -107,10 +168,61 @@ pub async fn list_ctx(
         binds.push(json!(par.to_string()));
         cond.push_str(&format!(" and v.parent_id = ${}::uuid", binds.len()));
     }
-    let mut tx = k.db.begin_plugin(&p.id, ctx).await?;
-    let rows = fetch_rows(&mut tx, &select_sql(k, p, d, &cond), &binds).await?;
+    // reading only: on SQLite it does not wait for the writers
+    let mut tx = k.db.begin_plugin_read(&p.id, ctx).await?;
+    let Some(pg) = paging else {
+        let rows = fetch_rows(&mut tx, &select_sql(k, p, d, &cond), &binds).await?;
+        tx.commit().await?;
+        return Ok(ListResult {
+            resource: d.name.clone(),
+            fields: d.fields.clone(),
+            rows,
+            next: None,
+            total: None,
+        });
+    };
+    let limit = pg.limit.clamp(1, MAX_PAGE);
+    let cursor = pg.cursor.as_deref().filter(|c| !c.is_empty());
+    // the total of the filter comes with the first page only (the following ones would count the same
+    // set again: the shell keeps the first total). SQLite counts in the same pass as the page: the
+    // visibility is most of the cost and a second pass doubled it.
+    let single = k.db.is_sqlite() && cursor.is_none();
+    let mut total: Option<i64> = None;
+    if cursor.is_none() && !single {
+        let sql = format!(
+            "select count(*) from {schema}.{table} t join core.visible_resources v on v.id = t.resource_id where true {cond}",
+            schema = qi(&p.schema()),
+            table = qi(&d.name),
+        );
+        total = Some(host::bind_json(mosaikit_db::query(sql), &binds).fetch_one(&mut *tx).await?.try_get(0)?);
+    }
+    if let Some(c) = cursor {
+        let (at, id) = parse_cursor(c)?;
+        binds.push(json!(at));
+        binds.push(json!(id.to_string()));
+        cond.push_str(&format!(
+            " and (v.updated_at, t.resource_id) < (${}::timestamptz, ${}::uuid)",
+            binds.len() - 1,
+            binds.len()
+        ));
+    }
+    let sql = select_sql_limit(k, p, d, &cond, limit + 1, single);
+    let mut rows = if single {
+        let r = host::bind_json(mosaikit_db::query(sql), &binds).fetch_one(&mut *tx).await?;
+        let v: Value = r.try_get(0)?;
+        total = Some(r.try_get::<Option<i64>, _>(1)?.unwrap_or(0));
+        v.as_array().cloned().unwrap_or_default()
+    } else {
+        fetch_rows(&mut tx, &sql, &binds).await?
+    };
     tx.commit().await?;
-    Ok(ListResult { resource: d.name.clone(), fields: d.fields.clone(), rows })
+    let next = if rows.len() as i64 > limit {
+        rows.truncate(limit as usize);
+        rows.last().and_then(cursor_of)
+    } else {
+        None
+    };
+    Ok(ListResult { resource: d.name.clone(), fields: d.fields.clone(), rows, next, total })
 }
 
 async fn get_in(
@@ -128,7 +240,7 @@ async fn get_in(
 
 pub async fn get_ctx(k: &Kernel, ctx: &Ctx, p: &LoadedPlugin, resource: &str, id: Uuid) -> Result<Value> {
     let d = decl(p, resource)?;
-    let mut tx = k.db.begin_plugin(&p.id, ctx).await?;
+    let mut tx = k.db.begin_plugin_read(&p.id, ctx).await?;
     let row = get_in(k, &mut tx, p, d, id).await?;
     tx.commit().await?;
     row.ok_or_else(|| Error::not_found("record not found"))
@@ -142,8 +254,21 @@ pub async fn list(
     filter: Option<&str>,
     parent: Option<Uuid>,
 ) -> Result<ListResult> {
+    list_paged(k, c, plugin, resource, filter, parent, None).await
+}
+
+/// `list`, one page at a time when `paging` is given.
+pub async fn list_paged(
+    k: &Kernel,
+    c: &Caller,
+    plugin: &str,
+    resource: &str,
+    filter: Option<&str>,
+    parent: Option<Uuid>,
+    paging: Option<&Paging>,
+) -> Result<ListResult> {
     let (p, _) = crate::access::require(k, c, plugin, crate::access::USE).await?;
-    list_ctx(k, &c.ctx(), &p, resource, filter, parent).await
+    list_ctx_paged(k, &c.ctx(), &p, resource, filter, parent, paging).await
 }
 
 pub async fn get(k: &Kernel, c: &Caller, plugin: &str, resource: &str, id: Uuid) -> Result<Value> {

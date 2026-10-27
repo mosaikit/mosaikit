@@ -414,3 +414,133 @@ async fn uninstall_removes_the_schema(b: B) {
     }
     let _ = (w.tenant_b, w.carol);
 }
+
+/// The ids of the plugin's rows the context reads (row-level security of the table).
+async fn rows_seen(w: &World, ctx: &Ctx) -> Vec<Uuid> {
+    let mut tx = w.db.begin_plugin(PLUGIN, ctx).await.unwrap();
+    let mut ids: Vec<Uuid> = query_scalar("select resource_id from notes").fetch_all(&mut *tx).await.unwrap();
+    ids.sort();
+    ids
+}
+
+/// The ids the per-item rule gives: `core.level_of()` of every item of the plugin in the tenant.
+async fn rows_by_rule(w: &World, ctx: &Ctx, tenant: Uuid) -> Vec<Uuid> {
+    let ids: Vec<Uuid> =
+        query_scalar("select id from core.resources where tenant_id = $1 and plugin_id = $2")
+            .bind(tenant)
+            .bind(PLUGIN)
+            .fetch_all(&w.db)
+            .await
+            .unwrap();
+    let mut tx = w.db.begin_plugin(PLUGIN, ctx).await.unwrap();
+    let mut out = Vec::new();
+    for id in ids {
+        let lvl: i32 = query_scalar("select core.level_of($1)").bind(id).fetch_one(&mut *tx).await.unwrap();
+        if lvl >= 1 {
+            out.push(id);
+        }
+    }
+    out.sort();
+    out
+}
+
+both!(reads_as_sets_follow_the_rules);
+/// The read policy of the plugin tables (a set per statement on PostgreSQL, migration 0016) gives the
+/// same rows as the per-item rule: owner and owned ancestors, shares to a person or to a group on the
+/// item or on an ancestor, the trash, public links, members of other tenants, no context.
+async fn reads_as_sets_follow_the_rules(b: B) {
+    let w = world(b).await;
+    let folder = note(&w, w.alice, w.tenant_a, "folder", None).await;
+    let child = note(&w, w.alice, w.tenant_a, "child", Some(folder)).await;
+    let deep = note(&w, w.alice, w.tenant_a, "deep", Some(child)).await;
+    let alone = note(&w, w.alice, w.tenant_a, "alone", None).await;
+    let trashed = note(&w, w.alice, w.tenant_a, "trashed folder", None).await;
+    let in_trash = note(&w, w.alice, w.tenant_a, "inside the trash", Some(trashed)).await;
+    let bobs = note(&w, w.bob, w.tenant_a, "bob's", None).await;
+    let carols = note(&w, w.carol, w.tenant_b, "carol's", None).await;
+
+    // a group of alfa with bob in it, shared the folder at level 1; bob also gets one item directly
+    let group: Uuid =
+        query_scalar("insert into core.groups (tenant_id, name) values ($1, 'team') returning id")
+            .bind(w.tenant_a)
+            .fetch_one(&w.db)
+            .await
+            .unwrap();
+    query("insert into core.group_members (group_id, user_id) values ($1, $2)")
+        .bind(group)
+        .bind(w.bob)
+        .execute(&w.db)
+        .await
+        .unwrap();
+    query("insert into core.grants (resource_id, principal_type, principal_id, level) values ($1, 'group', $2, 1)")
+        .bind(folder)
+        .bind(group)
+        .execute(&w.db)
+        .await
+        .unwrap();
+    grant(&w, alone, w.bob, 2).await;
+    grant(&w, trashed, w.bob, 3).await;
+    // the folder in the trash hides itself and what it contains
+    query("update core.resources set deleted_at = current_timestamp where id = $1")
+        .bind(trashed)
+        .execute(&w.db)
+        .await
+        .unwrap();
+
+    let cases: Vec<(&str, Ctx, Uuid, Vec<Uuid>)> = vec![
+        ("alice", Ctx::user(w.alice, w.tenant_a), w.tenant_a, vec![folder, child, deep, alone]),
+        ("bob", Ctx::user(w.bob, w.tenant_a), w.tenant_a, vec![folder, child, deep, alone, bobs]),
+        ("carol in her tenant", Ctx::user(w.carol, w.tenant_b), w.tenant_b, vec![carols]),
+        ("carol in alfa", Ctx::user(w.carol, w.tenant_a), w.tenant_a, vec![]),
+        ("no context", Ctx::default(), w.tenant_a, vec![]),
+        (
+            "public link on the child",
+            Ctx { tenant: Some(w.tenant_a), link: Some(child), ..Ctx::default() },
+            w.tenant_a,
+            vec![child, deep],
+        ),
+        (
+            "public link in the trash",
+            Ctx { tenant: Some(w.tenant_a), link: Some(in_trash), ..Ctx::default() },
+            w.tenant_a,
+            vec![],
+        ),
+    ];
+    for (name, ctx, tenant, expected) in cases {
+        let mut expected = expected;
+        expected.sort();
+        let seen = rows_seen(&w, &ctx).await;
+        assert_eq!(seen, expected, "{name}: rows read");
+        assert_eq!(rows_by_rule(&w, &ctx, tenant).await, expected, "{name}: per-item rule");
+    }
+
+    // writes keep the per-row check: bob reads the folder (group, level 1) but cannot change it
+    let mut tx = w.db.begin_plugin(PLUGIN, &Ctx::user(w.bob, w.tenant_a)).await.unwrap();
+    let u = query("update notes set title = 'x' where resource_id = $1")
+        .bind(child)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    assert_eq!(u.rows_affected(), 0, "level 1 does not write");
+    let u = query("update notes set title = 'y' where resource_id = $1")
+        .bind(alone)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    assert_eq!(u.rows_affected(), 1, "level 2 writes");
+    let d = query("delete from notes where resource_id = $1").bind(carols).execute(&mut *tx).await.unwrap();
+    assert_eq!(d.rows_affected(), 0, "nothing of another tenant");
+    drop(tx);
+
+    if b == B::Pg {
+        // the policy is the set, not the per-row function
+        let qual: String = query_scalar(
+            "select qual from pg_policies where schemaname = $1 and tablename = 'notes' and policyname = 'msk_select'",
+        )
+        .bind(SCHEMA)
+        .fetch_one(&w.db)
+        .await
+        .unwrap();
+        assert!(qual.contains("ctx_levels"), "{qual}");
+    }
+}

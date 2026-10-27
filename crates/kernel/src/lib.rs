@@ -26,6 +26,7 @@ pub mod notify;
 pub mod oidc;
 pub mod ops;
 pub mod overview;
+pub mod paging;
 pub mod personal;
 pub mod plugins;
 pub mod quotas;

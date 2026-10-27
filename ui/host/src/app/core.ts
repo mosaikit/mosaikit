@@ -1,6 +1,6 @@
 // Common hooks of the shell: session and data (TanStack Query), changes with their message.
 
-import { useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query'
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type QueryKey } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { api, ApiError, errText, isUnavailable, setCsrf } from '../api.ts'
 import { retryDelay } from '../brand.ts'
@@ -60,6 +60,40 @@ export function passwordMin(c: Config): number {
 
 export function useApi<T>(key: QueryKey, path: string | null) {
   return useQuery({ queryKey: key, queryFn: () => api<T>('GET', path!), enabled: !!path })
+}
+
+/** A page of a long list from the server: the rows, how many match in all, the cursor of the next one. */
+export interface PageOf<T> {
+  items: T[]
+  total: number
+  next: string | null
+}
+
+/** Pages of a long list (`?limit=…&cursor=…` plus the filters in `params`): the rows loaded so far, the
+ *  total of the filter and «load more». The first page also carries what the list adds (e.g. `counts`). */
+export function usePaged<T, P extends PageOf<T> = PageOf<T>>(key: QueryKey, path: string | null, params: Record<string, string | undefined> = {}, limit = 50) {
+  const qs = new URLSearchParams(Object.entries(params).filter((e): e is [string, string] => !!e[1]))
+  qs.set('limit', String(limit))
+  const q = useInfiniteQuery({
+    queryKey: [...key, qs.toString()],
+    queryFn: ({ pageParam }) => api<P>('GET', `${path}?${qs.toString()}${pageParam ? `&cursor=${encodeURIComponent(pageParam)}` : ''}`),
+    initialPageParam: '',
+    getNextPageParam: (last) => last.next ?? undefined,
+    enabled: !!path,
+  })
+  const pages = q.data?.pages ?? []
+  return {
+    items: pages.flatMap((p) => p.items),
+    total: pages[0]?.total ?? 0,
+    first: pages[0] as P | undefined,
+    more: q.hasNextPage,
+    loadMore: () => void q.fetchNextPage(),
+    loadingMore: q.isFetchingNextPage,
+    isLoading: q.isLoading,
+    error: q.error,
+    /** the ids of every row of the filter (for «select all»: up to 10,000), from `?ids=true` */
+    allIds: async () => (await api<{ ids?: string[] }>('GET', `${path}?${qs.toString()}&ids=true`)).ids ?? [],
+  }
 }
 
 /** A change: on success a message and the refresh of the given queries. */

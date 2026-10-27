@@ -328,11 +328,14 @@ pub struct PlatformQuotas {
 
 async fn tenants(k: &Kernel, platform: &PlatformLimits) -> Result<Vec<TenantSummary>> {
     let rows = mosaikit_db::query(
-        "select t.id, t.slug, t.name, t.status, t.settings,
-           (select coalesce(sum(size_bytes), 0)::bigint from core.resources r where r.tenant_id = t.id),
-           (select count(*) from core.memberships m where m.tenant_id = t.id and m.status = 'active'),
-           (select count(*) from core.resources r where r.tenant_id = t.id)
-         from core.tenants t where not t.is_system order by lower(t.name)",
+        // the usage of every tenant grouped once (one pass on the items), not three subqueries per tenant
+        "with r as (select tenant_id, coalesce(sum(size_bytes), 0) as bytes, count(*) as n
+                    from core.resources group by tenant_id),
+              m as (select tenant_id, count(*) as n from core.memberships where status = 'active' group by tenant_id)
+         select t.id, t.slug, t.name, t.status, t.settings, coalesce(r.bytes, 0)::bigint, coalesce(m.n, 0)::bigint,
+                coalesce(r.n, 0)::bigint
+         from core.tenants t left join r on r.tenant_id = t.id left join m on m.tenant_id = t.id
+         where not t.is_system order by lower(t.name)",
     )
     .fetch_all(&k.db)
     .await?;
@@ -467,6 +470,42 @@ pub async fn tenant(k: &Kernel, tenant: Uuid) -> Result<TenantQuotas> {
         })
         .collect();
     Ok(TenantQuotas { tenant_id: tenant, rows })
+}
+
+/// The quota nearest to its limit of every tenant (Monitoring › Tenants), with the usage of all the
+/// tenants grouped in one pass instead of the usage of each tenant asked one by one.
+pub(crate) async fn nearest_of_all(k: &Kernel) -> Result<std::collections::HashMap<Uuid, QuotaRow>> {
+    let platform = platform_of(&settings_of(k, None).await?);
+    let mut out = std::collections::HashMap::new();
+    for t in tenants(k, &platform).await? {
+        let mut best: Option<QuotaRow> = None;
+        let mut history_of = None;
+        for &m in METRICS {
+            let limit = t.limits.get(m);
+            let used = t.usage.get(m);
+            let Some(pct) = percent(used, limit) else { continue };
+            if best.as_ref().is_some_and(|b| b.percent.unwrap_or(0) >= pct) {
+                continue;
+            }
+            if history_of.is_none() {
+                history_of = Some(history(k, t.id, 31).await?);
+            }
+            let h = history_of.as_ref().expect("history");
+            best = Some(QuotaRow {
+                metric: m,
+                platform: platform.defaults.get(m),
+                customized: t.own.contains(&m),
+                limit,
+                used,
+                percent: Some(pct),
+                forecast_days: limit.and_then(|lim| forecast(h, m, used, lim)),
+            });
+        }
+        if let Some(b) = best {
+            out.insert(t.id, b);
+        }
+    }
+    Ok(out)
 }
 
 /// A change of the quotas of a tenant: `customized: false` goes back to the quota of the platform.

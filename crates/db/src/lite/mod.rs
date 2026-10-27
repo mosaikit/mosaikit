@@ -11,6 +11,13 @@
 //!
 //! rusqlite is synchronous: every operation runs in `spawn_blocking` with a
 //! connection of the pool (WAL, `busy_timeout`, foreign keys on).
+//!
+//! Writers: SQLite has one writer at a time. Transactions that may write start with `BEGIN IMMEDIATE`
+//! after taking the writer's turn in an async queue of this process (fair, without a time limit of
+//! SQLite's own), so concurrent writers wait in line instead of failing with "database is locked"
+//! when the busy timeout of SQLite runs out; `BEGIN IMMEDIATE` is retried on `SQLITE_BUSY` (another
+//! process, e.g. a backup). Statements outside a transaction that write take the same turn. Read
+//! transactions (`begin_read`) start with a plain `BEGIN` and do not wait for writers (WAL).
 
 pub mod plugin_schema;
 
@@ -47,6 +54,7 @@ const MIGRATIONS: &[(i64, &str, &str)] = &[
     (13, "performance", include_str!("0013_performance.sql")),
     (14, "session_id_token", include_str!("0014_session_id_token.sql")),
     (15, "profile", include_str!("0015_profile.sql")),
+    (16, "performance_sets", include_str!("0016_performance_sets.sql")),
 ];
 
 /// Context of the transaction on the connection (read by `core_ctx_*()`).
@@ -75,6 +83,10 @@ pub(crate) struct Inner {
     path: PathBuf,
     pool: Mutex<Vec<PConn>>,
     sem: Arc<Semaphore>,
+    /// the turn of the one writer (see the module documentation)
+    writer: Arc<Semaphore>,
+    /// busy timeout of the connections
+    busy: Duration,
     scopes: RwLock<HashMap<String, Arc<Scope>>>,
     generation: AtomicU64,
     cache: Mutex<HashMap<String, Arc<str>>>,
@@ -206,9 +218,42 @@ fn with_sql(e: DbError, sql: &str) -> DbError {
     }
 }
 
-fn open_conn(path: &Path) -> Result<PConn> {
+/// Busy timeout of the connections (SQLite waits this long for a lock held by another connection).
+const BUSY_TIMEOUT: Duration = Duration::from_secs(15);
+/// How long `BEGIN IMMEDIATE` is retried on `SQLITE_BUSY` (locks held outside this process).
+const BEGIN_RETRY: Duration = Duration::from_secs(60);
+
+fn is_busy(e: &rusqlite::Error) -> bool {
+    matches!(e, rusqlite::Error::SqliteFailure(f, _)
+        if f.code == rusqlite::ErrorCode::DatabaseBusy || f.code == rusqlite::ErrorCode::DatabaseLocked)
+}
+
+/// `BEGIN IMMEDIATE`, retried with a growing pause while the database is busy (up to `BEGIN_RETRY`).
+fn begin_immediate(c: &PConn) -> Result<()> {
+    let start = std::time::Instant::now();
+    let mut pause = Duration::from_millis(10);
+    loop {
+        match c.conn.execute_batch("begin immediate") {
+            Ok(()) => return Ok(()),
+            Err(e) if is_busy(&e) && start.elapsed() < BEGIN_RETRY => {
+                std::thread::sleep(pause);
+                pause = (pause * 2).min(Duration::from_millis(500));
+            }
+            Err(e) => return Err(map_err(e)),
+        }
+    }
+}
+
+/// The statement may write (outside a transaction it then takes the writer's turn).
+fn may_write(sql: &str) -> bool {
+    let t = sql.trim_start();
+    let head: String = t.chars().take(8).collect::<String>().to_ascii_lowercase();
+    !(head.starts_with("select") || head.starts_with("pragma") || head.starts_with("explain"))
+}
+
+fn open_conn(path: &Path, busy: Duration) -> Result<PConn> {
     let conn = rusqlite::Connection::open(path).map_err(map_err)?;
-    conn.busy_timeout(Duration::from_secs(15)).map_err(map_err)?;
+    conn.busy_timeout(busy).map_err(map_err)?;
     conn.execute_batch(
         "pragma journal_mode = wal; pragma synchronous = normal; pragma foreign_keys = on; \
          pragma trusted_schema = on; pragma recursive_triggers = off;",
@@ -339,7 +384,8 @@ impl Inner {
             Some(c) => c,
             None => {
                 let path = self.path.clone();
-                tokio::task::spawn_blocking(move || open_conn(&path))
+                let busy = self.busy;
+                tokio::task::spawn_blocking(move || open_conn(&path, busy))
                     .await
                     .map_err(|e| DbError::Invalid(e.to_string()))??
             }
@@ -350,6 +396,11 @@ impl Inner {
     fn release(&self, c: PConn) {
         c.set_ctx(CtxState::default());
         self.pool.lock().expect("pool").push(c);
+    }
+
+    /// The turn of the one writer of the database, in a fair queue.
+    async fn writer_turn(&self) -> Result<OwnedSemaphorePermit> {
+        self.writer.clone().acquire_owned().await.map_err(|_| DbError::Invalid("database closed".into()))
     }
 
     /// SQL for SQLite: explicit variant or translation (cached).
@@ -400,12 +451,17 @@ async fn blocking<R: Send + 'static>(
 
 impl LiteDb {
     pub async fn open(path: &Path, max_connections: u32) -> Result<LiteDb> {
+        Self::open_with_busy_timeout(path, max_connections, BUSY_TIMEOUT).await
+    }
+
+    /// Like `open`, with the busy timeout of the connections (tests of the writers' queue).
+    pub async fn open_with_busy_timeout(path: &Path, max_connections: u32, busy: Duration) -> Result<LiteDb> {
         if let Some(dir) = path.parent() {
             std::fs::create_dir_all(dir).map_err(|e| DbError::Invalid(format!("{}: {e}", dir.display())))?;
         }
         let p = path.to_path_buf();
         let first = tokio::task::spawn_blocking(move || -> Result<PConn> {
-            let c = open_conn(&p)?;
+            let c = open_conn(&p, busy)?;
             migrate(&c)?;
             Ok(c)
         })
@@ -415,6 +471,8 @@ impl LiteDb {
             path: path.to_path_buf(),
             pool: Mutex::new(vec![first]),
             sem: Arc::new(Semaphore::new(max_connections.max(2) as usize)),
+            writer: Arc::new(Semaphore::new(1)),
+            busy,
             scopes: RwLock::default(),
             generation: AtomicU64::new(1),
             cache: Mutex::default(),
@@ -424,6 +482,7 @@ impl LiteDb {
 
     pub fn close(&self) {
         self.inner.sem.close();
+        self.inner.writer.close();
         self.inner.pool.lock().expect("pool").clear();
     }
 
@@ -439,19 +498,23 @@ impl LiteDb {
         }
     }
 
-    /// Query on the pool (autocommit, no context).
+    /// Query on the pool (autocommit, no context); a statement that may write takes the writer's turn.
     pub(crate) async fn run(&self, q: Query, fetch: bool) -> Result<(Vec<Row>, u64)> {
         let sql = self.inner.sql_for(&q, None)?;
+        let turn = if may_write(&sql) { Some(self.inner.writer_turn().await?) } else { None };
         let (c, permit) = self.inner.acquire().await?;
         let (c, r) = blocking(c, move |c| exec(c, &sql, &q.params, fetch, true, false)).await;
         self.inner.release(c);
         drop(permit);
+        drop(turn);
         r
     }
 
-    /// Transaction (BEGIN IMMEDIATE: writes are serialized, no deadlocks
-    /// from lock promotion).
-    pub(crate) async fn begin(&self, ctx: Option<Ctx>, plugin: bool) -> Result<LiteTx> {
+    /// Transaction. `read`: a plain `BEGIN` that never waits for the writers (it must not write);
+    /// otherwise `BEGIN IMMEDIATE` after the writer's turn: writes are serialized, no deadlocks from
+    /// lock promotion, and waiting writers queue here instead of failing on SQLite's busy timeout.
+    pub(crate) async fn begin(&self, ctx: Option<Ctx>, plugin: bool, read: bool) -> Result<LiteTx> {
+        let turn = if read { None } else { Some(self.inner.writer_turn().await?) };
         let (c, permit) = self.inner.acquire().await?;
         let state = match &ctx {
             Some(x) => CtxState {
@@ -465,8 +528,16 @@ impl LiteDb {
         };
         c.set_ctx(state);
         let plugin_id = if plugin { ctx.as_ref().and_then(|x| x.plugin.clone()) } else { None };
-        let (c, r) = blocking(c, move |c| c.conn.execute_batch("begin immediate").map_err(map_err)).await;
-        let mut tx = LiteTx { db: self.inner.clone(), conn: Some(c), _permit: Some(permit), scope: None };
+        let (c, r) = blocking(c, move |c| {
+            if read {
+                c.conn.execute_batch("begin").map_err(map_err)
+            } else {
+                begin_immediate(c)
+            }
+        })
+        .await;
+        let mut tx =
+            LiteTx { db: self.inner.clone(), conn: Some(c), _permit: Some(permit), _turn: turn, scope: None };
         r?;
         if let Some(id) = plugin_id {
             tx.scope = Some(tx.scope_of(&id).await?);
@@ -479,6 +550,8 @@ pub struct LiteTx {
     db: Arc<Inner>,
     conn: Option<PConn>,
     _permit: Option<OwnedSemaphorePermit>,
+    /// the writer's turn (none for read transactions); released after the connection
+    _turn: Option<OwnedSemaphorePermit>,
     scope: Option<Arc<Scope>>,
 }
 

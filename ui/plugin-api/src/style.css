@@ -60,6 +60,8 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 .msk-toolbar .grow { flex: 1; }
 .msk-filter { max-width: 280px; }
 .msk-count { font-family: var(--font-mono); font-size: 12px; color: var(--dim); }
+.msk-morebar { display: flex; justify-content: center; margin: 10px 0; }
+.msk-morebar [hidden] { display: none; }
 .msk-tablewrap { border: 1px solid var(--line); border-radius: 12px; overflow: auto; background: var(--panel); }
 .msk-table { border-collapse: collapse; width: 100%; }
 .msk-table th, .msk-table td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); font-size: 13px; vertical-align: top; }
