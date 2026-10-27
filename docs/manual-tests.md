@@ -497,7 +497,7 @@ Needs many rows: the data of the load test (`cargo xtask perf --scale probe`, th
 | QA-08 | While a window is open as a user, turn on maintenance (System › Maintenance); act in that window | The sign-in page with the maintenance notice, not a bare sign-in |
 | QA-09 | Home as `s.greco` | Greeting by hour; «Pick up where you left off» (items she created or changed), «Due soon» (tasks with a due date within 7 days, late ones in red; done ones are not listed), «For you» (latest notifications, link to all) |
 | QA-10 | Manage › People › **Import from CSV**: a file with a header `username,name,email,role,profile,groups` and one wrong row | A preview shows the problem of the wrong row; only the good rows are created, each with a link to choose a password (emailed if there is an address); the report says «N done, M not done» |
-| QA-11 | Manage › Pending › **Invite several people**: `username@tenant` per line, one wrong | One outcome per line; the right ones become invitations |
+| QA-11 | Manage › People › **Invite several people**: `username@tenant` per line, one wrong | One outcome per line; the right ones become invitations |
 | QA-12 | System › Tenants › a tenant › Details | Contact person, email, phone and registration data, with the save bar only after a change |
 | QA-13 | Tenant Manager › Plugins › **Ask for a plugin**; the State filter | The Administrators get a notification with the text; the filter shows On or Off plugins |
 | QA-14 | Log: suspend and reactivate a person | «On what» names the person; the Activity tab of that person lists those events |

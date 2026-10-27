@@ -1635,6 +1635,8 @@ test.describe.serial('platform', () => {
     await page.evaluate(() => localStorage.setItem('msk_lang', 'en'))
     await page.reload()
 
+  })
+
   test('QA follow-ups: many people at once, suspended sign-in, Home, mail error, service detail, contact', async ({ page }) => {
     await login(page, 'Alfa Municipality', 'manager', PASSWORD)
     // Home: the sections of the mockup and the greeting
@@ -1655,7 +1657,6 @@ test.describe.serial('platform', () => {
     await expect(page.getByRole('row', { name: /carla/ })).toBeVisible()
 
     // several invitations: one outcome per line, nothing created for addresses that do not exist
-    await page.getByRole('navigation', { name: 'Sections' }).getByRole('link', { name: /^Pending/ }).click()
     await page.getByRole('button', { name: 'Invite several people' }).click()
     const inv = page.getByRole('dialog', { name: 'Invite several people' })
     await inv.getByLabel('People', { exact: true }).fill('nobody\nghost@alfa')
@@ -1664,11 +1665,10 @@ test.describe.serial('platform', () => {
     await inv.getByRole('button', { name: 'Close', exact: true }).first().click()
 
     // suspended in the only tenant: no sign-in, with its own code and never a raw error; then back
-    await page.getByRole('navigation', { name: 'Sections' }).getByRole('link', { name: /^People/ }).click()
     await page.getByRole('button', { name: 'Actions for anna' }).click()
     await page.getByRole('menuitem', { name: 'Suspend in the tenant' }).click()
     await expect(page.getByText('Suspended in the tenant').first()).toBeVisible()
-    const resp = await page.request.post(BASE + '/api/auth/login', { data: { tenant: 'alfa', username: 'anna', password: PASSWORD } })
+    const resp = await page.request.post(BASE + '/api/auth/login', { data: { tenant: 'alfa', username: 'anna', password: 'password-e2e-789' } })
     expect(resp.status()).toBe(403)
     expect((await resp.json()).code).toBe('membership_suspended')
     await page.getByRole('button', { name: 'Actions for anna' }).click()

@@ -389,7 +389,9 @@ async fn a_person_changes_their_own_name_and_picture() {
     assert_eq!(e.code, Some("profile_from_provider"));
     // the picture stays the person's own
     profile::set_my_picture(&t, &anna, &png).await.unwrap();
+}
 
+#[tokio::test]
 async fn suspended_everywhere_cannot_sign_in_suspended_at_home_lands_elsewhere() {
     let t = start().await;
     let admin = t.admin().await;
