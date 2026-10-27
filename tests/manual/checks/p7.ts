@@ -115,6 +115,7 @@ const checks: L.Check[] = [
       await d.getByRole('button', { name: 'Next' }).click()
       await p.waitForTimeout(500)
       await d.getByLabel('Username of the Tenant Manager').fill('boss')
+      await d.getByLabel('Email of the Tenant Manager').fill('boss@example.com')
       await d.getByLabel('Initial password').fill(L.PASSWORD)
       await d.getByRole('button', { name: 'Next' }).click()
       await p.waitForTimeout(500)

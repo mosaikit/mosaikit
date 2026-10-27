@@ -259,6 +259,7 @@ const checks: L.Check[] = [
         await d.getByRole('button', { name: 'Next' }).click()
         await d.getByRole('button', { name: 'Next' }).click()
         await d.getByLabel('Username of the Tenant Manager').fill('manager2')
+        await d.getByLabel('Email of the Tenant Manager').fill('manager2@example.com')
         await d.getByLabel('Initial password').fill(L.PASSWORD)
         await d.getByRole('button', { name: 'Next' }).click()
         await d.getByRole('button', { name: 'Create the tenant' }).click()
