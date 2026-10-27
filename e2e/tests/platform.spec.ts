@@ -1649,7 +1649,7 @@ test.describe.serial('platform', () => {
     await login(page, 'Alfa Municipality', 'manager', PASSWORD)
     // Home: the sections of the mockup and the greeting
     await nav(page, 'Tenant overview').click()
-    for (const name of ['Pick up where you left off', 'Due soon', 'For you']) await expect(page.getByRole('heading', { name })).toBeVisible()
+    for (const name of ['Pick up where you left off', 'Due soon', 'For you']) await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
     await accessible(page, 'home')
 
     // CSV: a preview with the problems, then only the good rows are created, with a link each
