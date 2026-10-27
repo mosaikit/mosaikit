@@ -67,8 +67,6 @@ const KNOWN: Record<string, string> = {
   'UX-03': 'M3: lists, quota and own-profile checks (owner: manual checks follow-up)',
   'UX-07': 'M3: lists, quota and own-profile checks (owner: manual checks follow-up)',
   'UX-10': 'M3: lists, quota and own-profile checks (owner: manual checks follow-up)',
-  'P0b-02': 'M4: language menu after the language plugins of R1-A, check not updated (owner: manual checks follow-up)',
-  'P0b-04': 'M4: language menu after the language plugins of R1-A, check not updated (owner: manual checks follow-up)',
   'P10-24': 'F2: contrast of the selected section in dark mode (owner: QA follow-ups)',
 }
 

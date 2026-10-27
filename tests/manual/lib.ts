@@ -184,7 +184,7 @@ export async function fresh(p: Page, hash = '', lang = 'en') {
 export async function login(p: Page, tenantName: string, user: string, password = PASSWORD, lang = 'en') {
   await fresh(p, '', lang)
   await p.getByLabel(lang === 'it' ? 'Utente' : 'Username').waitFor({ timeout: 20000 })
-  const sel = p.getByRole('combobox', { name: 'Tenant' })
+  const sel = p.getByRole('combobox', { name: /^(Tenant|Organizzazione)$/ })
   if (await sel.count()) {
     await sel.click()
     await p.getByRole('option', { name: tenantName }).click()

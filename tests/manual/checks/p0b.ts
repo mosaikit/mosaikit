@@ -33,7 +33,7 @@ const checks: L.Check[] = [
       await p.getByRole('option', { name: 'Italiano' }).click()
       await p.waitForTimeout(800)
       c.ok(await H.vis(p.getByRole('heading', { name: 'Accedi' })), 'sign-in in Italian at once')
-      await p.getByRole('combobox', { name: 'Tenant' }).click()
+      await p.getByRole('combobox', { name: /^(Tenant|Organizzazione)$/ }).click()
       await p.getByRole('option', { name: 'Comune di Roma' }).click()
       await p.getByLabel('Utente').fill('s.greco')
       await p.getByLabel('Password').fill(L.PASSWORD)
@@ -73,7 +73,7 @@ const checks: L.Check[] = [
         ['it-IT', 'Accedi', 'Utente'],
       ]) {
         const p = await clean(b, loc)
-        await p.getByRole('combobox', { name: 'Tenant' }).click()
+        await p.getByRole('combobox', { name: /^(Tenant|Organizzazione)$/ }).click()
         await p.getByRole('option', { name: 'Comune di Roma' }).click()
         await p.getByLabel(user).fill('l.bianchi')
         await p.getByLabel('Password').fill('wrong-password-123')
@@ -99,7 +99,7 @@ const checks: L.Check[] = [
       const t = await p.getByRole('main').innerText()
       c.ok(/Comune di Roma/.test(t), 'the tenant already chosen')
       // «already chosen»: preselected in the Tenant menu, which stays to choose another one
-      const menu = p.getByRole('combobox', { name: 'Tenant' })
+      const menu = p.getByRole('combobox', { name: /^(Tenant|Organizzazione)$/ })
       if (await H.vis(menu)) c.ok(/Comune di Roma/.test(await menu.innerText()), 'the tenant preselected in the menu')
       await L.shot(p, 'P0b-05')
       await ctx.close()
