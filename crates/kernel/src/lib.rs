@@ -38,6 +38,7 @@ pub mod testing;
 pub mod totp;
 pub mod transfer;
 pub mod trash;
+pub mod webfetch;
 mod util;
 
 use std::sync::Arc;

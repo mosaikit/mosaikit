@@ -141,6 +141,8 @@ export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unk
       return { method: 'POST', url: `${base}/ticket/${uuid(a.id)}`, json: { download: a.download === true } }
     case 'content.upload':
       return { method: 'POST', url: `${base}/content/${uuid(a.id)}`, raw: blob(a.file) }
+    case 'web.probe':
+      return { method: 'POST', url: `${base}/web/probe`, json: { url: str(a.url, 'url', 2000), image: a.image === true } }
     case 'resource.meta':
       return { method: 'GET', url: `/api/t/${enc(tenant)}/resources/${uuid(a.id)}` }
     case 'notify': {

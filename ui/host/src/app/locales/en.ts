@@ -127,4 +127,7 @@ export const EN: Record<string, string> = {
   '{count} tenants_one': '1 tenant',
   '{count} tenants_other': '{count} tenants',
   'errors.email_required': 'The email address is required',
+  'errors.web_url': 'Enter a valid http or https address (without a user name and password)',
+  'errors.web_blocked': 'This address is not allowed (only sites on the public Internet can be looked at)',
+  'errors.web_unreachable': 'The site cannot be reached',
 }

@@ -39,6 +39,9 @@ pub fn router() -> Router<AppState> {
         .route("/api/brand", get(brand))
         .route("/api/auth/login", post(login))
         .route("/api/auth/tenants", get(login_tenants))
+        // public: the languages the language plugins add, and the texts of one of them
+        .route("/api/languages", get(languages))
+        .route("/api/languages/{code}", get(language_texts))
         .route("/api/auth/tenants/{slug}/logo/{slot}", get(tenant_logo))
         // layouts: the list (signed in), the stylesheet and the images of a layout plugin (public, they
         // hold nothing of a tenant)
@@ -67,6 +70,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/me/notifications/delete", post(my_delete_notifications))
         .route("/api/me/notifications/prefs", get(my_note_prefs).put(my_set_note_prefs))
         .route("/api/t/{t}/p/{plugin}/notify", post(plugin_notify))
+        .route("/api/t/{t}/p/{plugin}/web/probe", post(plugin_web_probe))
         .route("/api/admin/email", get(a_email).put(a_set_email))
         .route("/api/admin/email/test", post(a_email_test))
         // tenant
@@ -345,6 +349,25 @@ async fn logged_in(s: &AppState, lr: identity::LoginResult, extra: Value) -> Api
 }
 
 /// Tenants of the sign-in page (public).
+/// The languages installed as plugins (the host has English and Italian built in).
+async fn languages(State(s): State<AppState>) -> Json<Value> {
+    Json(json!(s.k.plugins.languages().iter().map(|l| json!({ "code": l.code, "name": l.name })).collect::<Vec<_>>()))
+}
+
+/// The texts of the host in a language of a language plugin.
+async fn language_texts(State(s): State<AppState>, Path(code): Path<String>) -> ApiResult<Response> {
+    let pack = s
+        .k
+        .plugins
+        .languages()
+        .into_iter()
+        .find(|l| l.code == code)
+        .ok_or_else(|| Error::not_found("language not installed"))?;
+    let mut res = Json(json!({ "code": pack.code, "name": pack.name, "strings": pack.host })).into_response();
+    res.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
+    Ok(res)
+}
+
 async fn login_tenants(State(s): State<AppState>) -> ApiResult<Json<Value>> {
     Ok(Json(json!(tenancy::login_tenants(&s.k).await?)))
 }
@@ -577,6 +600,24 @@ async fn plugin_notify(
     Json(r): Json<notify::PluginNote>,
 ) -> ApiResult<Json<Value>> {
     Ok(Json(json!({ "sent": notify::from_plugin(&s.k, &c, &p.plugin, &r).await? })))
+}
+
+#[derive(Deserialize)]
+struct WebProbeReq {
+    url: String,
+    /// also bring the picture of the page
+    #[serde(default)]
+    image: bool,
+}
+
+/// A web page seen by the host for a plugin with the `web` permission: frame allowed, title, picture.
+async fn plugin_web_probe(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<PluginPath>,
+    Json(r): Json<WebProbeReq>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(mosaikit_kernel::webfetch::probe(&s.k, &c, &p.plugin, &r.url, r.image).await?)))
 }
 
 async fn a_email(State(s): State<AppState>, Auth(u): Auth) -> ApiResult<Json<Value>> {

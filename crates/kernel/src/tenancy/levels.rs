@@ -253,7 +253,11 @@ fn lang_default(v: &Value) -> Result<()> {
     if v.as_str() == Some("auto") {
         return Ok(());
     }
-    one_of(v, LANGUAGES, "a language")
+    // a language added by a language plugin is a code of two or three letters
+    match v.as_str() {
+        Some(s) if LANGUAGES.contains(&s) || mosaikit_mskp::language::check_code(s).is_ok() => Ok(()),
+        _ => Err(invalid("a language")),
+    }
 }
 
 fn locale(v: &Value) -> Result<()> {
@@ -264,7 +268,10 @@ fn languages(v: &Value) -> Result<()> {
     let list = v.as_array().ok_or_else(|| invalid("a list of languages"))?;
     let mut seen = Vec::new();
     for l in list {
-        let s = l.as_str().filter(|s| LANGUAGES.contains(s)).ok_or_else(|| invalid("a known language"))?;
+        let s = l
+            .as_str()
+            .filter(|s| LANGUAGES.contains(s) || mosaikit_mskp::language::check_code(s).is_ok())
+            .ok_or_else(|| invalid("a known language"))?;
         if seen.contains(&s) {
             return Err(invalid("a list without repetitions"));
         }
@@ -545,7 +552,9 @@ fn tenant_one(
 fn fix_default_language(list: &mut [Setting]) {
     let enabled = list.iter().find(|s| s.key == "lang.enabled").map(|s| s.value.clone());
     if let (Some(enabled), Some(d)) = (enabled, list.iter_mut().find(|s| s.key == "lang.default")) {
-        if d.value != "auto" && !enabled.as_array().is_some_and(|a| a.contains(&d.value)) {
+        // a language of a language plugin is offered as long as the plugin is installed: not in this list
+        let plugin_language = d.value.as_str().is_some_and(|s| !LANGUAGES.contains(&s));
+        if d.value != "auto" && !plugin_language && !enabled.as_array().is_some_and(|a| a.contains(&d.value)) {
             d.value = json!("auto");
         }
     }

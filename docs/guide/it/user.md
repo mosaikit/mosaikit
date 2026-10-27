@@ -21,9 +21,14 @@ Le etichette sono quelle dell'interfaccia italiana; quella inglese ha gli stessi
 tenant, passa dall'uno all'altro con il nome del tenant in alto a sinistra: il cambio non chiede un nuovo
 accesso.
 
-**Password dimenticata.** Chiedi al Tenant Manager del tuo tenant di appartenenza: ti manda un link per
-sceglierne una nuova. Il link vale una volta sola e per un tempo limitato (pagina **Scegli una nuova
-password**).
+**Password dimenticata.** Nella pagina di accesso scegli il tenant e clicca **Password dimenticata?**:
+scrivi il tuo utente o il tuo indirizzo email e **Invia il link**. Se esiste un account con quei dati, al suo
+indirizzo email arriva un messaggio con un link per scegliere una nuova password; il link vale una volta
+sola, per 48 ore, e una richiesta più recente annulla i link precedenti. La pagina risponde allo stesso modo
+qualunque cosa scriva (non dice mai se un account esiste). Se l'installazione non può inviare email, la
+pagina lo dice: chiedi invece un link al Tenant Manager del tuo tenant di appartenenza. Chi accede con un
+provider di identità non ha una password in Mosaikit: la pagina del suo tenant rimanda al recupero del
+provider.
 
 **Lingua e tonalità** si scelgono già nella pagina di accesso (in alto a destra).
 
@@ -61,7 +66,13 @@ pubblici attivi** e le app del tenant.
 
 ## App ed elementi
 
-Ogni app si apre nella shell (Note, Attività, Contatti, File, Mappe, Siti statici… secondo il tenant). Cosa
+Ogni app si apre nella shell (Note, Attività, Contatti, File, Mappe, Siti statici… secondo il tenant).
+**Siti statici** mostra i siti come **schede** (predefinito, con una miniatura) o come **elenco** (pulsanti a
+destra della barra). Un sito è un **archivio zip** o un **indirizzo web**: un indirizzo si mostra dentro
+Mosaikit in un riquadro e non viene mai scaricato; un sito che vieta di essere incorporato (X-Frame-Options o
+`frame-ancestors` di una CSP) viene riconosciuto e si apre in una nuova scheda. La miniatura la puoi caricare
+tu; altrimenti un sito indicato con un indirizzo mostra la propria immagine (`og:image`, o la prima immagine)
+e un sito zip un segnaposto. Cosa
 puoi fare in un'app dipende dal tuo **profilo di permesso**: alcune persone possono solo leggere, altre
 anche creare, eliminare o condividere. Quando qualcosa non è permesso, l'app lo dice.
 

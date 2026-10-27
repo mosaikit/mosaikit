@@ -135,6 +135,19 @@ export interface Listing {
   my_level: Level
 }
 
+/** What the host found out about a web page (`msk.web.probe`, permission `web`). */
+export interface WebProbe {
+  /** the address after the redirects */
+  url: string
+  /** the site accepts being shown in a frame */
+  embeddable: boolean
+  /** why not: `x_frame_options`, `frame_ancestors` or `unavailable` */
+  reason: string | null
+  title: string
+  /** the picture of the page as a `data:` address (only with `image: true`, if there is one) */
+  image: string | null
+}
+
 export interface SiteInfo {
   files: number
   size: number

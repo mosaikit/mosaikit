@@ -20,8 +20,13 @@ Labels are those of the English interface; the Italian one has the same places.
 **Guest in other tenants.** You always sign in to your *home* tenant. If you were invited to other
 tenants, switch from the name of the tenant at the top left: switching does not ask you to sign in again.
 
-**Forgot the password.** Ask the Tenant Manager of your home tenant: they send you a link to choose a new
-one. The link works once and for a limited time (**Choose a new password** page).
+**Forgot the password.** On the sign-in page choose your tenant and click **Forgot your password?**: type
+your username or your email address and **Send the link**. If an account with those details exists, a message
+goes to its email address with a link to choose a new password; the link works once, for 48 hours, and a
+newer request cancels the older links. The page answers the same whatever you type (it never tells whether an
+account exists). If the installation cannot send email the page says so: ask the Tenant Manager of your home
+tenant for a link instead. People who sign in through an identity provider have no password in Mosaikit:
+the page of their tenant points to the provider's own recovery.
 
 **Language and mode** can be chosen already on the sign-in page (top right).
 
@@ -60,6 +65,11 @@ links** and the apps of the tenant.
 ## Apps and items
 
 Each app opens in the shell (Notes, Tasks, Contacts, Files, Maps, Static sites… depending on the tenant).
+**Static sites** shows its sites as **cards** (default, with a thumbnail) or as a **list** (buttons at the
+right of the toolbar). A site is either a **zip archive** or a **web address**: an address is shown inside
+Mosaikit in a frame and is never downloaded; a site that forbids being framed (X-Frame-Options or a CSP
+`frame-ancestors`) is detected and opens in a new tab. The thumbnail can be uploaded by you; otherwise a site
+given by address shows its own picture (`og:image`, else its first image) and a zip site a placeholder.
 What you may do in an app depends on your **permission profile**: some people may only read, some may also
 create, delete or share. When something is not allowed, the app says so.
 

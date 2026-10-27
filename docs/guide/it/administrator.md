@@ -54,7 +54,7 @@ La ricerca (`Ctrl K`) trova, oltre alle pagine, i tenant e le persone.
    cambia); facoltativo un **Periodo di prova** con la sua **Fine della prova**.
 2. **Accesso**: **Account locali** oppure **Provider di identità (OIDC)** (issuer, client id, client secret;
    ruoli, gruppi e la verifica sono poi nella scheda **Accesso** del tenant).
-3. **Tenant Manager**: il primo Tenant Manager, un account locale con una **Password iniziale**; invita gli
+3. **Tenant Manager**: il primo Tenant Manager, un account locale con una **Email** (obbligatoria) e una **Password iniziale**; invita gli
    altri e sceglie le impostazioni del tenant.
 4. **Riepilogo**: cosa prepara da sola la piattaforma (il profilo di permesso *Standard*, i plugin
    disponibili per default, le impostazioni della piattaforma, il suo posto nei backup e nel Monitoraggio) →
@@ -98,7 +98,14 @@ archiviato) accanto al nome; **⋯** con **Sospendi il tenant** / **Riattiva il 
 - Un'esportazione torna solo sullo stesso tipo di database (PostgreSQL o SQLite), e i suoi segreti cifrati
   solo con la stessa chiave segreta del server.
 
-## Accesso di un tenant
+## Lingue
+
+Inglese e italiano sono incorporati. Un **plugin di lingua** (Plugin › tipo **Lingua**, per esempio
+*Spagnolo*) aggiunge una lingua: una volta installato e attivo viene proposto in ogni menu delle lingue
+(pagina di accesso, menu della persona) accanto a quelle incorporate, per tutta la piattaforma; spegni il
+plugin o disinstallalo per ritirare la lingua (chi l'aveva scelta torna all'inglese). Porta i testi della
+shell e i nomi e le etichette degli altri plugin; i testi dentro le schermate di un plugin restano quelli
+del plugin. Per gli autori di plugin: vedi il README di `mosaikit-plugins` (cartella `lang/`).
 
 Pagina del tenant › **Accesso**. Un metodo per tenant, mai entrambi:
 

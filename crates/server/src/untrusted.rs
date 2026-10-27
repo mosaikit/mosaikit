@@ -52,11 +52,17 @@ fn mime(path: &str) -> String {
 fn plugin_csp(s: &AppState, p: &mosaikit_kernel::plugins::LoadedPlugin) -> String {
     let net = p.manifest.permissions.network.join(" ");
     let frames = p.manifest.permissions.frame_src.join(" ");
+    let mut frame_src = frames.clone();
+    // a plugin with the `web` permission embeds sites by address: any http(s) origin (the site decides
+    // whether it accepts being framed; the host tells beforehand with `msk.web.probe`)
+    if p.manifest.permissions.web {
+        frame_src.push_str(" https: http:");
+    }
     let own = format!("{}/ui/{}/", s.k.cfg.plugin_url_for(&p.id).trim_end_matches('/'), p.id);
     format!(
         "default-src 'self'; script-src {own}; style-src 'self' 'unsafe-inline'; \
          img-src 'self' data: blob: {net} {frames}; font-src 'self' data:; media-src 'self' data: blob:; \
-         connect-src 'self' {net}; frame-src 'self' blob: {frames}; worker-src {own} blob:; \
+         connect-src 'self' {net}; frame-src 'self' blob: {frame_src}; worker-src {own} blob:; \
          frame-ancestors {} {}; object-src 'none'; base-uri 'self'; form-action 'self'",
         s.k.cfg.app_origins().join(" "),
         s.k.cfg.public_origin()

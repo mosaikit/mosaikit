@@ -110,6 +110,24 @@ impl Package {
             .collect()
     }
 
+    /// The files of `lang/` (paths relative to it).
+    pub fn lang_files(&self) -> BTreeMap<String, Vec<u8>> {
+        self.files
+            .iter()
+            .filter_map(|(k, v)| k.strip_prefix("lang/").map(|p| (p.to_string(), v.clone())))
+            .collect()
+    }
+
+    /// The language of a language plugin, checked.
+    pub fn language(&self) -> Result<crate::language::LanguagePack> {
+        let l = self
+            .manifest
+            .language
+            .as_ref()
+            .ok_or_else(|| crate::Error::Manifest("a language plugin needs [language]".into()))?;
+        crate::language::load_language(&l.code, &l.name, &self.lang_files())
+    }
+
     /// The layout of a layout plugin, checked.
     pub fn layout(&self) -> Result<crate::layout::Layout> {
         crate::layout::load_layout(&self.manifest.id, &self.layout_files())

@@ -159,7 +159,7 @@ function Guide({ start }: { start: GuideName }) {
         ))}
       </div>
       <div role="tabpanel">
-        <GuideText text={GUIDES[lang][name]} onGuide={(g) => (g === 'user' || g === 'tenant-manager' || g === 'administrator') && setName(g)} />
+        <GuideText text={(GUIDES[lang] ?? GUIDES.en)[name]} onGuide={(g) => (g === 'user' || g === 'tenant-manager' || g === 'administrator') && setName(g)} />
       </div>
     </div>
   )

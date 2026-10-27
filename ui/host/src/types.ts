@@ -117,7 +117,7 @@ export interface TenantSettings {
   managers_see_titles: boolean
 }
 
-export type PluginKind = 'app' | 'service' | 'extension' | 'layout'
+export type PluginKind = 'app' | 'service' | 'extension' | 'layout' | 'language'
 
 /** An entry of the navigation of an app (`[[nav]]` of its manifest). */
 export interface NavEntry {

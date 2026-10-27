@@ -84,6 +84,25 @@ fake address.
 **Fix.** The last entry counts (the one the trusted proxy added); `mosaikit.example.toml` says that
 exactly one proxy must sit in front. Test: `auth::tests::the_address_added_by_the_proxy_counts`.
 
+### Review round 1 — pages fetched by the server, password recovery, framing (added)
+
+- **Sites by address (static sites).** The host looks at a page for a plugin with the `web` permission
+  (`msk.web.probe`): `crates/kernel/src/webfetch.rs`. SSRF guards: http and https only, no credentials in
+  the address, every address the name resolves to must be on the public Internet (loopback, private,
+  link-local, shared 100.64/10, benchmarking, multicast, reserved and unique-local IPv6 are refused; IPv4
+  mapped in IPv6 too), the connection is pinned to the checked address, redirects are followed by hand (4
+  at most) and each hop is checked again, 512 KB for a page and 2 MB for a picture, 8 seconds, the picture is
+  accepted by its first bytes (PNG, JPEG, GIF, WebP; never SVG), 30 requests a minute per person. Tests
+  `crates/kernel/tests/review1.rs`. The plugin CSP of a plugin with `web` gets `frame-src https: http:`
+  (nothing else widens).
+- **Forgot your password.** Same answer for every username or address, existing or not; only the fact that
+  the installation cannot send email is told. Single-use token (hash stored), 48 hours, a new one cancels
+  the older ones; 3 requests per person and 20 per address in 15 minutes, silently dropped beyond. The link
+  goes only to the address of the account; accounts of an identity provider get a message that says where the
+  password is managed. Known residual: the time of the answer may differ slightly for an existing account.
+- **Frames of the plugins.** The app may be opened as `127.0.0.1` or `localhost`: the plugin UIs accept both
+  as ancestors only when the app itself is configured on the local computer.
+
 ### M3 — Script gadget on the untrusted origin (fixed)
 
 `crates/server/src/untrusted.rs` (`plugin_csp`). The plugin UIs had `script-src 'self'`. The same origin

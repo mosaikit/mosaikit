@@ -28,7 +28,10 @@ marked *guest*.
 
 - **To invite a person of another tenant**: **Invite people**, the main action of People (see below).
 - **To create a person** (tenant with local accounts): **New user** → **Username**, **Display name**,
-  **Initial password**, **Role** → **Create user**. With an identity provider (OIDC) there is no **New
+  **Email** (required: the person recovers the password there), **Initial password**, **Role** →
+  **Create user**. Every local account has an email address; in **Import from CSV** the `email` column is
+  required too. Accounts made before this rule may have none: they show «Email missing» and the next edit of
+  the person asks for it. With an identity provider (OIDC) there is no **New
   user**: people are created by the provider at their first sign-in.
 - People change their own name and picture in Account › Profile; you see the change here. Their email is
   yours to change, in the **Profile** tab.

@@ -1,5 +1,5 @@
 import { Bridge, BridgeError } from './bridge.ts'
-import type { ExtensionView, FileEntry, Hello, ListResult, Listing, Notify, PublicResource, Rect, Row, SiteInfo, TabInfo, UiContext, Values } from './protocol.ts'
+import type { ExtensionView, FileEntry, Hello, ListResult, Listing, Notify, PublicResource, Rect, Row, SiteInfo, TabInfo, UiContext, Values, WebProbe } from './protocol.ts'
 
 /** The extensions of the plugin on a resource (fields and actions other plugins add to its items). */
 export interface ExtensionsClient {
@@ -223,6 +223,11 @@ export class Msk {
   readonly content = {
     upload: (id: string, zip: Blob) => this.bridge.call<SiteInfo>('content.upload', { id, file: zip }),
     url: async (id: string) => (await this.bridge.call<{ url: string }>('ticket', { id })).url,
+  }
+
+  /** Web pages seen by the host (permission `web`): may the site be framed, its title and picture. */
+  readonly web = {
+    probe: (url: string, image = false) => this.bridge.call<WebProbe>('web.probe', { url, image }),
   }
 
   /** Metadata of a resource (owner, level, size...). */

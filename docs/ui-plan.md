@@ -61,8 +61,8 @@ Observations from the user's manual tests; ids as in the user's notes. Status is
 | B9 | Paging and infinite scroll for every table and list **Done** (R1-L). |
 | C1 | Italian: «Tenant» becomes «Organizzazione» **Done** (R1-L). |
 | C2 | English, Administrator: «Tenants» **Done** (R1-L). |
-| C3 | Sign-in: «Forgot your password?» (self-service by email) |
-| C4 | Files, Maps, Static sites, Tasks/Activities: connection refused — fix |
+| C3 | **Done.** Sign-in: «Forgot your password?» (self-service by email: single-use link, 48 hours, no user enumeration, rate limited; OIDC accounts are pointed to the provider; without a mail server the page says so) |
+| C4 | **Done.** Files, Maps, Static sites, Tasks/Activities: connection refused — fix (root cause: the plugin frames allowed only the exact origin of `url`; the app opened as `localhost` instead of `127.0.0.1` was refused. The local aliases are now allowed as ancestors) |
 | D1 | Tenants list with the tenant logo (default if none) — done |
 | D2 | Tenant detail: quotas in their own tab — done |
 | D3 | Tenant detail: name and identifier editable — done |
@@ -71,7 +71,7 @@ Observations from the user's manual tests; ids as in the user's notes. Status is
 | D6 | Tenant › Plugins: a status pill for unavailable plugins too — done |
 | D7 | Tenant › Plugins: link to the Plugins page after the availability sentence — done |
 | D8 | Quotas: explain «items» (items of the apps) — done |
-| D9 | Email required for local accounts (user decision); OIDC accounts take it from the provider |
+| D9 | **Done.** Email required for local accounts (user decision); OIDC accounts take it from the provider (create, import, edit and forms; accounts without one are flagged and need one at the next edit; Administrators' own address comes with D14) |
 | D10 | Plugin detail as a brochure: gallery, description, author, licence, links — done |
 | D11–D13 | Answers: monitoring refresh, mail server setup, keys of outside services (clarify in the UI and the guides) — done |
 | D14 | An Administrator edits their own data and other Administrators' data — done |
@@ -80,10 +80,10 @@ Observations from the user's manual tests; ids as in the user's notes. Status is
 | E3 | Plugins: «Access and permissions» becomes «Permissions» — done |
 | E4, F1 | Account › Profile editable (name and picture) |
 | G1–G4 | **Done.**  Docker compose: PostgreSQL configured, optional Keycloak (realm, Mosaikit-like sign-in theme, no registration), optional mail server, nginx reverse proxy; README sections | (`deploy/`, checks R1-G-nn, static check `xtask/src/deploy_check.rs`) |
-| H1 | Static sites: a site by URL, embedded in an iframe (not downloaded); sites that forbid framing are detected and opened in a new tab (user decision) |
-| H2 | Static sites: card view (default) with thumbnail, name and description; list view with thumbnail; the thumbnail can be uploaded, otherwise og:image, first image or a placeholder (user decision) |
-| I1 | Desktop and server distributions: the default user «utente» becomes «user» |
-| I2 | Languages: a new supported language is a plugin that extends the set of supported languages (kind of plugin, UI strings, manifest i18n, docs) |
+| H1 | **Done.** Static sites: a site by URL, embedded in an iframe (not downloaded); sites that forbid framing are detected and opened in a new tab (user decision) |
+| H2 | **Done.** Static sites: card view (default) with thumbnail, name and description; list view with thumbnail; the thumbnail can be uploaded, otherwise og:image, first image or a placeholder (user decision) |
+| I1 | **Done.** Desktop and server distributions: the default user «utente» becomes «user» (new installs; existing ones keep their account) |
+| I2 | **Done.** Languages: a new supported language is a plugin that extends the set of supported languages (`kind = "language"`: `[language]`, `lang/host.json` for the host, `lang/plugins/<id>.toml` for the manifests of other plugins; sample `com.mosaikit.lang-es`) |
 | I3 | Indent hierarchical lists (same as B8; example: the System sidebar of the Administrator) |
 | I4 | App sidebar: nested items can be indented when it is open; when it is collapsed, an icon with sub-items opens a menu with items and sub-items (works with the `[[nav]]` tree of the layouts) |
 | J1 | **Done.** Development tooling for parallel work: `cargo xtask worktree add\|remove\|list`, heavy-run slots for `e2e`/`test`/`ci`, `clean-temp`, shared build cache option (README, checks DEV-nn) |

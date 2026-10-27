@@ -22,7 +22,8 @@ in step).
   inherited, customized or managed by the platform.
 - People and permissions: permission profiles, groups, invitations of people of other tenants, and
   requests to see or edit an item, decided by its owner or a Tenant Manager.
-- A forgotten password is replaced with a link that works once.
+- A forgotten password is replaced with a link that works once. On the sign-in page, **Forgot your password?** sends that link to the email address of the account.
+- Every local account has an email address (required when it is created or imported).
 - Your own name and picture: you change them in Account › Profile (the name comes from the identity
   provider in the tenants that use one).
 - Sign-in through the identity provider of a tenant (OIDC), next to local accounts; the groups of the
@@ -35,6 +36,7 @@ in step).
 - Shares and public links of every item, the trash for 30 days and the log of what happened.
 - Plugins on and off per tenant, with extensions that add fields, actions and tabs to the apps.
 - Keys of outside services: the plugins say which services they use, and only those are listed.
+- Static sites can show a web address inside Mosaikit (a site that forbids framing opens in a new tab), as cards or as a list with thumbnails.
 
 ### For plugin authors
 
@@ -48,3 +50,4 @@ in step).
 - Backups every day, with the restore of a whole tenant or of one item.
 - Maintenance mode, also planned in advance, with a notice for everybody.
 - Monitoring of the services, the performance, the errors and the capacity, with alerts.
+- A new language is a plugin: once installed it appears in the language menus.

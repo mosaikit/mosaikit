@@ -21,7 +21,8 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
   ereditata, personalizzata o gestita dalla piattaforma.
 - Persone e permessi: profili di permesso, gruppi, inviti di persone di altri tenant e richieste di
   vedere o modificare un elemento, decise dal proprietario o da un Tenant Manager.
-- Una password dimenticata si sostituisce con un link che vale una volta sola.
+- Una password dimenticata si sostituisce con un link che vale una volta sola. Nella pagina di accesso, **Password dimenticata?** manda quel link all'indirizzo email dell'account.
+- Ogni account locale ha un indirizzo email (obbligatorio quando lo si crea o lo si importa).
 - Il tuo nome e la tua immagine: li cambi in Account › Profilo (il nome arriva dal provider di identità
   nei tenant che ne usano uno).
 - Accesso tramite il provider di identità di un tenant (OIDC), accanto agli account locali; i gruppi del
@@ -35,6 +36,7 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
   successo.
 - Plugin attivi o spenti per tenant, con estensioni che aggiungono campi, azioni e schede alle app.
 - Chiavi dei servizi esterni: i plugin dicono quali servizi usano, e solo quelli compaiono.
+- I siti statici possono mostrare un indirizzo web dentro Mosaikit (un sito che vieta l'incorporamento si apre in una nuova scheda), come schede o come elenco con miniature.
 
 ### Per chi scrive plugin
 
@@ -48,3 +50,4 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 - Backup ogni giorno, con il ripristino di un tenant intero o di un singolo elemento.
 - Modalità manutenzione, anche programmata, con un avviso per tutti.
 - Monitoraggio di servizi, prestazioni, errori e capacità, con avvisi.
+- Una nuova lingua è un plugin: una volta installato compare nei menu delle lingue.

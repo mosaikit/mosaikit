@@ -127,3 +127,140 @@ async fn forgot_password_by_email() {
     }
     assert!(outbox(&t).await.len() <= 2 + 3, "at most 3 per person in the window");
 }
+
+// ------------------------------------------------------------------ web pages for a plugin (H1, H2)
+
+/// A tiny web server: `/` answers with the page and headers of `routes`, anything else 404.
+async fn web(routes: Vec<(&'static str, String, Vec<u8>)>) -> u16 {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let l = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = l.local_addr().unwrap().port();
+    tokio::spawn(async move {
+        loop {
+            let Ok((mut s, _)) = l.accept().await else { return };
+            let routes = routes.clone();
+            tokio::spawn(async move {
+                let mut buf = vec![0u8; 4096];
+                let n = s.read(&mut buf).await.unwrap_or(0);
+                let req = String::from_utf8_lossy(&buf[..n]).to_string();
+                let path = req.split_whitespace().nth(1).unwrap_or("/").to_string();
+                let (head, body) = match routes.iter().find(|r| r.0 == path) {
+                    Some(r) if r.1.starts_with("Location:") => (format!("HTTP/1.1 302 Found\r\n{}", r.1), r.2.clone()),
+                    Some(r) => (format!("HTTP/1.1 200 OK\r\n{}", r.1), r.2.clone()),
+                    None => ("HTTP/1.1 404 Not Found\r\n".to_string(), b"no".to_vec()),
+                };
+                let _ = s.write_all(format!("{head}Content-Length: {}\r\nConnection: close\r\n\r\n", body.len()).as_bytes()).await;
+                let _ = s.write_all(&body).await;
+            });
+        }
+    });
+    port
+}
+
+const PNG: &[u8] = b"\x89PNG\r\n\x1a\n0000000000";
+
+#[tokio::test]
+async fn a_site_by_address_is_probed_safely() {
+    use mosaikit_kernel::webfetch::inspect;
+    // the guards: with the default configuration nothing on this computer or the local network is fetched
+    let t = start().await;
+    for bad in ["http://127.0.0.1:1/", "http://localhost/", "http://[::1]/", "http://10.1.2.3/", "http://169.254.169.254/latest/meta-data/", "file:///etc/passwd", "ftp://example.org/", "http://user:pw@example.org/"] {
+        let e = inspect(&t, bad, false).await.unwrap_err();
+        assert!(matches!(e.code(), "web_blocked" | "web_url"), "{bad}: {}", e.code());
+    }
+    drop(t);
+
+    let t = mosaikit_kernel::testing::start_with(|c| c.allow_private_fetch = true).await;
+    let page = |extra: &str, body: &str| (format!("Content-Type: text/html\r\n{extra}"), body.as_bytes().to_vec());
+    let (h_ok, b_ok) = page("", r#"<title>Free site</title><meta property="og:image" content="/pic.png">"#);
+    let (h_xfo, b_xfo) = page("X-Frame-Options: DENY\r\n", "<title>Closed</title><img src=\"/pic.png\">");
+    let (h_csp, b_csp) = page("Content-Security-Policy: frame-ancestors 'self'\r\n", "<title>Also closed</title>");
+    let (h_open, b_open) = page("Content-Security-Policy: frame-ancestors *\r\n", "<title>Open</title>");
+    let (h_redir, _) = ("Location: /go\r\n".to_string(), ());
+    let port = web(vec![
+        ("/", h_ok, b_ok),
+        ("/xfo", h_xfo, b_xfo),
+        ("/csp", h_csp, b_csp),
+        ("/open", h_open, b_open),
+        ("/pic.png", "Content-Type: image/png\r\n".into(), PNG.to_vec()),
+        ("/go", h_redir, vec![]),
+    ])
+    .await;
+    let at = |p: &str| format!("http://127.0.0.1:{port}{p}");
+    let ok = inspect(&t, &at("/"), true).await.unwrap();
+    assert_eq!((ok.embeddable, ok.reason.as_deref(), ok.title.as_str()), (true, None, "Free site"));
+    assert!(ok.image.as_deref().is_some_and(|i| i.starts_with("data:image/png;base64,")), "og:image");
+    // forbidden to frame: X-Frame-Options, then CSP frame-ancestors; the first image is the fallback
+    let x = inspect(&t, &at("/xfo"), true).await.unwrap();
+    assert_eq!((x.embeddable, x.reason.as_deref()), (false, Some("x_frame_options")));
+    assert!(x.image.is_some(), "first image of the page");
+    let c = inspect(&t, &at("/csp"), false).await.unwrap();
+    assert_eq!((c.embeddable, c.reason.as_deref(), c.image), (false, Some("frame_ancestors"), None));
+    assert!(inspect(&t, &at("/open"), false).await.unwrap().embeddable);
+    // missing page: not embeddable
+    assert!(!inspect(&t, &at("/missing"), false).await.unwrap().embeddable);
+    // an endless redirect stops
+    assert_eq!(inspect(&t, &at("/go"), false).await.unwrap_err().code(), "web_unreachable");
+}
+
+// ------------------------------------------------------------------ language plugins (I2)
+
+const LANG_MANIFEST: &str = r#"
+id = "com.example.lang-fr"
+name = "French"
+version = "0.1.0"
+kind = "language"
+[contribution]
+icon = "x"
+label = "Français"
+[language]
+code = "fr"
+name = "Français"
+"#;
+
+#[tokio::test]
+async fn a_language_plugin_adds_a_language() {
+    let t = start().await;
+    assert!(t.plugins.languages().is_empty());
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("plugin.toml"), LANG_MANIFEST).unwrap();
+    std::fs::create_dir_all(dir.path().join("lang/plugins")).unwrap();
+    std::fs::write(dir.path().join("lang/host.json"), r#"{"Sign in": "Se connecter"}"#).unwrap();
+    std::fs::write(dir.path().join("lang/plugins/com.example.notes.toml"), "name = \"Notes FR\"\nlabel = \"Notes\"").unwrap();
+    mosaikit_kernel::plugins::dev::load_one(&t, dir.path()).await.unwrap();
+
+    let langs = t.plugins.languages();
+    assert_eq!(langs.len(), 1);
+    assert_eq!((langs[0].code.as_str(), langs[0].name.as_str()), ("fr", "Français"));
+    assert_eq!(langs[0].host["Sign in"], "Se connecter");
+
+    // the manifest of another plugin is shown in French, unless it has its own French texts
+    let other = |extra: &str| {
+        mosaikit_mskp::Manifest::from_toml(&format!(
+            "id = \"com.example.notes\"\nname = \"Notes\"\nversion = \"1.0.0\"\nkind = \"service\"\n[contribution]\nicon = \"x\"\nlabel = \"Notes\"\n{extra}"
+        ))
+        .unwrap()
+    };
+    assert_eq!(other("").localized("fr-FR").name, "Notes FR");
+    assert_eq!(other("").localized("it").name, "Notes", "no texts for Italian");
+    assert_eq!(other("[i18n.fr]\nname = \"Mes notes\"").localized("fr").name, "Mes notes", "its own texts win");
+
+    // turned off: the language and its texts go away
+    mosaikit_kernel::plugins::set_active(&t, None, "com.example.lang-fr", false).await.unwrap();
+    assert!(t.plugins.languages().is_empty());
+    assert_eq!(other("").localized("fr").name, "Notes");
+    mosaikit_kernel::plugins::set_active(&t, None, "com.example.lang-fr", true).await.unwrap();
+    assert_eq!(other("").localized("fr").name, "Notes FR");
+}
+
+#[test]
+fn a_language_manifest_is_checked() {
+    use mosaikit_mskp::Manifest;
+    assert!(Manifest::from_toml(LANG_MANIFEST).is_ok());
+    // without [language], with a built-in code, with an app inside
+    assert!(Manifest::from_toml(&LANG_MANIFEST.replace("[language]\ncode = \"fr\"\nname = \"Français\"", "")).is_err());
+    assert!(Manifest::from_toml(&LANG_MANIFEST.replace("code = \"fr\"", "code = \"it\"")).is_err());
+    assert!(Manifest::from_toml(&format!("{LANG_MANIFEST}\n[ui]\nentry = \"index.html\"")).is_err());
+    // [language] on a plugin of another kind
+    assert!(Manifest::from_toml(&LANG_MANIFEST.replace("kind = \"language\"", "kind = \"service\"")).is_err());
+}

@@ -5,6 +5,7 @@
 //! `SIGNATURE` (ed25519 signature of `MANIFEST.sha256`). See `docs/architecture.md` §8.5.
 
 mod collect;
+pub mod language;
 pub mod layout;
 mod manifest;
 mod package;

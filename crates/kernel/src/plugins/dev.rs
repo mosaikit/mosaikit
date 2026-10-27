@@ -79,6 +79,9 @@ pub async fn load_one(k: &Kernel, dir: &Path) -> Result<String> {
     let layout = (manifest.effective_kind() == mosaikit_mskp::PluginKind::Layout)
         .then(|| super::load_layout_dir(dir, &id))
         .flatten();
+    let language = (manifest.effective_kind() == mosaikit_mskp::PluginKind::Language)
+        .then(|| super::load_language_dir(dir, &manifest))
+        .flatten();
     k.plugins.put(LoadedPlugin {
         id: id.clone(),
         manifest,
@@ -90,6 +93,7 @@ pub async fn load_one(k: &Kernel, dir: &Path) -> Result<String> {
         signed_by: None,
         installed_at: chrono::Utc::now(),
         layout,
+        language,
     });
     Ok(id)
 }

@@ -44,6 +44,10 @@ pub async fn install_package(
         Some(w) => Some(k.engine.compile(w)?),
         None => None,
     };
+    // a language that does not check out is not installed
+    let language = (m.effective_kind() == mosaikit_mskp::PluginKind::Language)
+        .then(|| pkg.language().map(std::sync::Arc::new))
+        .transpose()?;
 
     let existing = mosaikit_db::query("select version, sha256, dev, status from core.plugins where id = $1")
         .bind(&m.id)
@@ -132,6 +136,7 @@ pub async fn install_package(
         layout: (m.effective_kind() == mosaikit_mskp::PluginKind::Layout)
             .then(|| pkg.layout().ok().map(std::sync::Arc::new))
             .flatten(),
+        language,
     });
     events::record(
         k,

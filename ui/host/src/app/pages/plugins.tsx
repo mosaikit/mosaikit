@@ -25,10 +25,10 @@ import { t } from '../i18n.ts'
 
 const enc = encodeURIComponent
 
-const KINDS: PluginKind[] = ['app', 'service', 'extension', 'layout']
+const KINDS: PluginKind[] = ['app', 'service', 'extension', 'layout', 'language']
 
 function kindLabel(k: PluginKind | null | undefined): string {
-  return k === 'extension' ? t('Extension') : k === 'service' ? t('Service') : k === 'layout' ? t('Layout') : t('App')
+  return k === 'extension' ? t('Extension') : k === 'service' ? t('Service') : k === 'layout' ? t('Layout') : k === 'language' ? t('Language') : t('App')
 }
 
 function kindOf(p: { kind?: PluginKind | null; has_ui?: boolean }): PluginKind {
@@ -54,6 +54,7 @@ function KindPills({ value, onChange, counts }: { value: string; onChange: (k: s
         { id: 'service', label: t('Services'), count: counts.service },
         { id: 'extension', label: t('Extensions'), count: counts.extension },
         { id: 'layout', label: t('Layouts'), count: counts.layout },
+        { id: 'language', label: t('Languages'), count: counts.language },
       ]}
       value={value}
       onChange={onChange}
@@ -303,7 +304,9 @@ export function AdminPluginPage({ id, tab }: { id: string; tab?: string }) {
   const extensions = (installed.data ?? []).filter((x) => x.extends === id)
   // a layout belongs to the platform: what it contains, no tenants nor extensions
   const tabs =
-    kind === 'layout'
+    kind === 'language'
+      ? [{ id: 'overview', label: t('Overview') }]
+      : kind === 'layout'
       ? [
           { id: 'overview', label: t('Overview') },
           { id: 'contents', label: t('What it contains') },

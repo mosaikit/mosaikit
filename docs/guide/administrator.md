@@ -10,7 +10,8 @@ Manager does is in [tenant-manager.md](tenant-manager.md); the work of everybody
 At the first start Mosaikit creates the Administrator `admin`. Its password is the one given to the server
 (`MOSAIKIT_ADMIN_PASSWORD`) or, if none was given, a generated one written in the file
 `credenziali-iniziali.txt` of the data folder (the desktop version may also create a first work tenant and
-its Tenant Manager, listed in the same file). Change the password at the first sign-in and delete the file.
+its Tenant Manager `user`, listed in the same file; installs made before this change keep their account
+`utente`). Change the password at the first sign-in and delete the file.
 
 To sign in: on the sign-in page **Administrator access** (or the address of Mosaikit followed by `#/admin`).
 
@@ -49,7 +50,7 @@ Search (`Ctrl K`) finds tenants and people besides the pages.
    does not change); optional **Trial period** with its **End of the trial**.
 2. **Sign-in**: **Local accounts** or **Identity provider (OIDC)** (issuer, client id, client secret; roles,
    groups and the check are then on the **Sign-in** tab of the tenant).
-3. **Tenant Manager**: the first Tenant Manager, a local account with an **Initial password**; they invite the
+3. **Tenant Manager**: the first Tenant Manager, a local account with an **Email** (required) and an **Initial password**; they invite the
    others and choose the settings of the tenant.
 4. **Summary**: what the platform prepares by itself (the *Standard* permission profile, the plugins
    available by default, the settings of the platform, its place in backups and Monitoring) → **Create the
@@ -91,6 +92,15 @@ suspended, archived) next to the name; **⋯** with **Suspend the tenant** / **R
   other tenants that no longer exist are left out.
 - An export comes back only on the same kind of database (PostgreSQL or SQLite), and its encrypted secrets
   only with the same secret key of the server.
+
+## Languages
+
+English and Italian are built in. A **language plugin** (Plugins › kind **Language**, for example
+*Spanish*) adds a language: once installed and on, it is offered in every language menu (sign-in page,
+person menu) next to the built-in ones, for the whole platform; turn the plugin off or uninstall it to
+withdraw the language (the people who chose it go back to English). It brings the texts of the shell and
+the names and labels of other plugins; the texts inside the screens of a plugin stay those of that plugin.
+Plugin authors: see the README of `mosaikit-plugins` (folder `lang/`).
 
 ## Sign-in of a tenant
 

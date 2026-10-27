@@ -149,7 +149,7 @@ pub fn e2e(headed: bool, only: &[String]) -> Result<()> {
         format!(
             "# installation of the e2e tests (properties described in mosaikit.example.toml)\n\
              url = \"http://127.0.0.1:{port}/mosaikit\"\ndata_dir = \"data\"\n{extra}\
-             registry = \"registry/index.json\"\npreinstall = true\ntrusted_keys = [\"{}\"]\n\n[database]\nurl = \"{url}\"\n",
+             allow_private_fetch = true\nregistry = \"registry/index.json\"\npreinstall = true\ntrusted_keys = [\"{}\"]\n\n[database]\nurl = \"{url}\"\n",
             trusted.trim()
         ),
     )?;

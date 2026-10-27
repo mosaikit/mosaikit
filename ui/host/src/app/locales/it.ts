@@ -1872,4 +1872,7 @@ export const IT: Record<string, string> = {
   'Send the link': 'Invia il link',
   'Back to sign-in': 'Torna all’accesso',
   'One person per row, with a header: username, name, email (required), role, profile, groups (separated by «|»). Each person gets a link to choose a password.': 'Una persona per riga, con l’intestazione: utente, nome, email (obbligatoria), ruolo, profilo, gruppi (separati da «|»). Ogni persona riceve un link per scegliere la password.',
+  'errors.web_url': 'Inserisci un indirizzo http o https valido (senza utente e password)',
+  'errors.web_blocked': 'Questo indirizzo non è consentito (si possono guardare solo siti della rete Internet pubblica)',
+  'errors.web_unreachable': 'Il sito non è raggiungibile',
 }

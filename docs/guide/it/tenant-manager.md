@@ -30,7 +30,10 @@ sono segnati come *ospite*.
 - **Per invitare una persona di un altro tenant**: **Invita persone**, l'azione principale di Persone (vedi
   sotto).
 - **Per creare una persona** (tenant con account locali): **Nuovo utente** → **Utente**, **Nome
-  visualizzato**, **Password iniziale**, **Ruolo** → **Crea utente**. Con un provider di identità (OIDC)
+  visualizzato**, **Email** (obbligatoria: la persona recupera la password a quell'indirizzo), **Password
+  iniziale**, **Ruolo** → **Crea utente**. Ogni account locale ha un indirizzo email; anche nell'**Importa da
+  CSV** la colonna `email` è obbligatoria. Gli account creati prima di questa regola possono non averlo:
+  mostrano «Email mancante» e la prossima modifica della persona lo richiede. Con un provider di identità (OIDC)
   **Nuovo utente** non c'è: le persone le crea il provider al loro primo accesso.
 - Le persone cambiano da sé nome e immagine in Account › Profilo; tu vedi qui la modifica. L'email la cambi
   tu, nella scheda **Profilo**.

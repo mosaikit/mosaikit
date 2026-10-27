@@ -9,21 +9,26 @@
 import { useSyncExternalStore } from 'react'
 import i18next from 'i18next'
 import { initReactI18next } from 'react-i18next'
-import { setErrorTranslator, setRequestLanguage } from '../api.ts'
+import { api, setErrorTranslator, setRequestLanguage } from '../api.ts'
 import { EN } from './locales/en.ts'
 import { IT } from './locales/it.ts'
 
-export type Lang = 'it' | 'en'
+// A language is its code: `en` and `it` are built in; the others come from language plugins (see
+// refreshLanguages): their texts are fetched when the language is chosen.
+export type Lang = string
 export const LANGS: { id: Lang; name: string }[] = [
   { id: 'en', name: 'English' },
   { id: 'it', name: 'Italiano' },
 ]
+const BUILTIN = ['en', 'it']
+const CODE = /^[a-z]{2,3}$/
+const loaded = new Set<string>(BUILTIN)
 
 const KEY = 'msk_lang'
 function chosen(): Lang | null {
   try {
     const v = localStorage.getItem(KEY)
-    if (v === 'it' || v === 'en') return v
+    if (v && CODE.test(v)) return v
   } catch {
     /* storage not available */
   }
@@ -33,7 +38,9 @@ function browser(): Lang {
   return navigator.language.toLowerCase().startsWith('it') ? 'it' : 'en'
 }
 function initial(): Lang {
-  return chosen() ?? browser()
+  // the language of a plugin is not there yet at start: English until its texts arrive
+  const c = chosen() ?? browser()
+  return BUILTIN.includes(c) ? c : 'en'
 }
 
 void i18next.use(initReactI18next).init({
@@ -56,9 +63,31 @@ setErrorTranslator((code, message) => {
   return k && i18next.exists(k) ? i18next.t(k) : message
 })
 
-export function setLang(l: Lang) {
+/** The texts of a language of a plugin, fetched once. */
+async function loadLanguage(code: string): Promise<boolean> {
+  if (loaded.has(code)) return true
+  try {
+    const r = await api<{ strings: Record<string, string> }>('GET', `/api/languages/${encodeURIComponent(code)}`)
+    i18next.addResourceBundle(code, 'translation', r.strings, true, true)
+    loaded.add(code)
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function switchTo(l: Lang) {
+  if (!(await loadLanguage(l))) return
   void i18next.changeLanguage(l)
   document.documentElement.lang = l
+  ctxListeners.forEach((f) => f())
+}
+
+export function setLang(l: Lang) {
+  if (BUILTIN.includes(l)) {
+    void i18next.changeLanguage(l)
+    document.documentElement.lang = l
+  } else void switchTo(l)
   try {
     localStorage.setItem(KEY, l)
   } catch {
@@ -67,7 +96,7 @@ export function setLang(l: Lang) {
 }
 
 export function lang(): Lang {
-  return i18next.language === 'it' ? 'it' : 'en'
+  return LANGS.some((l) => l.id === i18next.language) ? i18next.language : 'en'
 }
 
 export function useLang(): Lang {
@@ -91,23 +120,45 @@ export interface LanguageContext {
 }
 
 let enabled: Lang[] = LANGS.map((l) => l.id)
+/** the languages of the plugins installed (always offered: turn the plugin off to withdraw one) */
+let installed: string[] = []
 let locale = 'auto'
 const ctxListeners = new Set<() => void>()
 
 /** The languages offered here, and the default language for new visitors. */
 export function setLanguageContext(c: LanguageContext) {
-  const list = (c.enabled ?? []).filter((x): x is Lang => x === 'it' || x === 'en')
-  enabled = list.length ? list : LANGS.map((l) => l.id)
+  const list = (c.enabled ?? []).filter((x): x is Lang => BUILTIN.includes(x))
+  enabled = list.length ? list : BUILTIN.slice()
   locale = c.locale && c.locale !== 'auto' ? c.locale : 'auto'
   const own = chosen()
-  const def: Lang = c.language === 'it' || c.language === 'en' ? c.language : enabled.includes(browser()) ? browser() : enabled[0]
-  const next = own && enabled.includes(own) ? own : enabled.includes(def) ? def : enabled[0]
+  const offered = [...enabled, ...installed]
+  const def: Lang = c.language && c.language !== 'auto' && offered.includes(c.language) ? c.language : enabled.includes(browser()) ? browser() : enabled[0]
+  const next = own && offered.includes(own) ? own : offered.includes(def) ? def : enabled[0]
   if (next !== lang()) {
-    void i18next.changeLanguage(next)
-    document.documentElement.lang = next
+    if (BUILTIN.includes(next)) {
+      void i18next.changeLanguage(next)
+      document.documentElement.lang = next
+    } else void switchTo(next)
   }
   ctxListeners.forEach((f) => f())
 }
+
+/** Asks which languages the language plugins add and offers them in the language menus. */
+export async function refreshLanguages() {
+  let list: { code: string; name: string }[] = []
+  try {
+    list = await api<{ code: string; name: string }[]>('GET', '/api/languages')
+  } catch {
+    return
+  }
+  installed = list.map((l) => l.code).filter((c) => CODE.test(c) && !BUILTIN.includes(c))
+  LANGS.splice(BUILTIN.length, LANGS.length, ...list.filter((l) => installed.includes(l.code)).map((l) => ({ id: l.code, name: l.name })))
+  // the one chosen before, whose plugin has just been found
+  const own = chosen()
+  if (own && installed.includes(own) && lang() !== own) await switchTo(own)
+  ctxListeners.forEach((f) => f())
+}
+void refreshLanguages()
 
 /** The languages offered where one is. */
 export function useLanguages(): typeof LANGS {
@@ -116,9 +167,9 @@ export function useLanguages(): typeof LANGS {
       ctxListeners.add(f)
       return () => ctxListeners.delete(f)
     },
-    () => enabled,
+    () => enabled.join() + "|" + installed.join(),
   )
-  return LANGS.filter((l) => enabled.includes(l.id))
+  return LANGS.filter((l) => enabled.includes(l.id) || installed.includes(l.id))
 }
 
 /** The format of dates and numbers: the one chosen in the settings, otherwise the language's. */

@@ -90,6 +90,17 @@ pub struct Manifest {
     /// entry opens the app at its `place` (`msk.at` in the UI).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub nav: Vec<NavDecl>,
+    /// The language a language plugin brings (`kind = "language"`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub language: Option<LanguageDecl>,
+}
+
+/// `[language]` of a language plugin: the code and the name of the language in that language.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct LanguageDecl {
+    pub code: String,
+    pub name: String,
 }
 
 /// A name of an image file of `media/` (no folders): letters, digits, `-`, `_`, `.` and an image extension.
@@ -146,6 +157,8 @@ pub enum PluginKind {
     Extension,
     /// how the shell arranges its slots (`layout/layout.toml`), with a style and images
     Layout,
+    /// a language of the interface (`lang/host.json`, `lang/plugins/*.toml`): texts only, never code
+    Language,
 }
 
 impl PluginKind {
@@ -155,6 +168,7 @@ impl PluginKind {
             PluginKind::Service => "service",
             PluginKind::Extension => "extension",
             PluginKind::Layout => "layout",
+            PluginKind::Language => "language",
         }
     }
 }
@@ -591,6 +605,11 @@ pub struct Permissions {
     /// Origins the UI may embed in an iframe.
     #[serde(default)]
     pub frame_src: Vec<String>,
+    /// The UI may embed any web site in a frame (`frame-src https: http:`) and ask the host to look at
+    /// a page (frame allowed? title, picture): `msk.web.probe`. The host fetches it, only from public
+    /// addresses.
+    #[serde(default)]
+    pub web: bool,
     /// Plugins whose commands the logic may call (`plugin.call`), with the current
     /// user: the called plugin applies its own rules.
     #[serde(default)]
@@ -883,6 +902,27 @@ impl Manifest {
         {
             return Err("a layout has no resources, [ui], KPIs or [search]: only layout/ files".into());
         }
+        let language = self.effective_kind() == PluginKind::Language;
+        match (&self.language, language) {
+            (Some(_), false) => return Err("[language] is only for kind = \"language\"".into()),
+            (None, true) => return Err("a language plugin needs [language] (code, name)".into()),
+            (Some(l), true) => {
+                crate::language::check_code(&l.code)?;
+                if l.name.trim().is_empty() || l.name.chars().count() > 60 {
+                    return Err("language.name: the name of the language, at most 60 characters".into());
+                }
+                if !self.resources.is_empty()
+                    || self.ui.is_some()
+                    || !self.kpi.is_empty()
+                    || self.search.is_some()
+                    || !self.nav.is_empty()
+                    || !self.extension.is_empty()
+                {
+                    return Err("a language has no resources, [ui], KPIs, [search], [[nav]] or [extension]: only lang/ files".into());
+                }
+            }
+            (None, false) => {}
+        }
         let extension = self.effective_kind() == PluginKind::Extension;
         match (&self.extends, extension) {
             (Some(_), false) => return Err("[extends] is only for kind = \"extension\"".into()),
@@ -1132,9 +1172,11 @@ impl Manifest {
     pub fn localized(&self, lang: &str) -> Manifest {
         let mut m = self.clone();
         let base = lang.split(['-', '_']).next().unwrap_or_default().to_ascii_lowercase();
-        let Some(tr) = self.i18n.get(&base) else {
+        // the texts of the manifest itself, else the ones a language plugin brings for this plugin
+        let Some(tr) = self.i18n.get(&base).cloned().or_else(|| crate::language::texts_for(&base, &self.id)) else {
             return m;
         };
+        let tr = &tr;
         let set = |target: &mut String, v: &Option<String>| {
             if let Some(v) = v {
                 *target = v.clone();

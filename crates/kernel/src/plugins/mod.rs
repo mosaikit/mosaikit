@@ -60,6 +60,8 @@ pub struct LoadedPlugin {
     pub installed_at: DateTime<Utc>,
     /// for a layout plugin: its arrangement, stylesheet (scoped) and images, checked
     pub layout: Option<Arc<mosaikit_mskp::layout::Layout>>,
+    /// for a language plugin: the texts of the host and of the manifests of other plugins, checked
+    pub language: Option<Arc<mosaikit_mskp::language::LanguagePack>>,
 }
 
 impl LoadedPlugin {
@@ -95,11 +97,29 @@ impl Plugins {
     pub(crate) fn put(&self, p: LoadedPlugin) -> Arc<LoadedPlugin> {
         let p = Arc::new(p);
         self.0.write().expect("lock plugin").insert(p.id.clone(), p.clone());
+        sync_language(&p);
         p
     }
 
     pub(crate) fn remove(&self, id: &str) {
-        self.0.write().expect("lock plugin").remove(id);
+        let old = self.0.write().expect("lock plugin").remove(id);
+        if let Some(l) = old.and_then(|p| p.language.clone()) {
+            mosaikit_mskp::language::clear_texts(&l.code);
+        }
+    }
+
+    /// The languages the active language plugins bring (code, name), by code.
+    pub fn languages(&self) -> Vec<Arc<mosaikit_mskp::language::LanguagePack>> {
+        let mut v: Vec<_> = self
+            .0
+            .read()
+            .expect("lock plugin")
+            .values()
+            .filter(|p| p.is_active())
+            .filter_map(|p| p.language.clone())
+            .collect();
+        v.sort_by(|a, b| a.code.cmp(&b.code));
+        v
     }
 
     pub(crate) fn set_status(&self, id: &str, status: Status) {
@@ -116,8 +136,11 @@ impl Plugins {
                 signed_by: p.signed_by.clone(),
                 installed_at: p.installed_at,
                 layout: p.layout.clone(),
+                language: p.language.clone(),
             };
-            map.insert(id.to_string(), Arc::new(p));
+            let p = Arc::new(p);
+            map.insert(id.to_string(), p.clone());
+            sync_language(&p);
         }
     }
 }
@@ -156,6 +179,9 @@ pub async fn load_installed(k: &Kernel) -> Result<()> {
                 } else {
                     None
                 };
+                let language = (manifest.effective_kind() == mosaikit_mskp::PluginKind::Language)
+                    .then(|| load_language_dir(&dir, &manifest))
+                    .flatten();
                 k.plugins.put(LoadedPlugin {
                     id: id.clone(),
                     manifest,
@@ -167,12 +193,60 @@ pub async fn load_installed(k: &Kernel) -> Result<()> {
                     signed_by: r.get(4),
                     installed_at: r.get(5),
                     layout,
+                    language,
                 });
             }
             Err(e) => tracing::error!("plugin {id} {version} cannot be loaded from {}: {e}", dir.display()),
         }
     }
     Ok(())
+}
+
+/// A language plugin on or off: its texts for the manifests of other plugins are in use only while it is
+/// active.
+fn sync_language(p: &LoadedPlugin) {
+    if let Some(l) = &p.language {
+        if p.is_active() {
+            mosaikit_mskp::language::set_texts(&l.code, l.plugins.clone());
+        } else {
+            mosaikit_mskp::language::clear_texts(&l.code);
+        }
+    }
+}
+
+/// The language of a language plugin from its folder (`lang/`), checked; errors are logged.
+pub(crate) fn load_language_dir(dir: &Path, m: &Manifest) -> Option<Arc<mosaikit_mskp::language::LanguagePack>> {
+    fn walk(
+        base: &Path,
+        d: &Path,
+        out: &mut std::collections::BTreeMap<String, Vec<u8>>,
+    ) -> std::io::Result<()> {
+        for e in std::fs::read_dir(d)? {
+            let p = e?.path();
+            if p.is_dir() {
+                walk(base, &p, out)?;
+            } else if let Ok(rel) = p.strip_prefix(base) {
+                out.insert(rel.to_string_lossy().replace('\\', "/"), std::fs::read(&p)?);
+            }
+        }
+        Ok(())
+    }
+    let decl = m.language.as_ref()?;
+    let base = dir.join("lang");
+    let mut files = std::collections::BTreeMap::new();
+    if base.is_dir() {
+        if let Err(e) = walk(&base, &base, &mut files) {
+            tracing::error!("language {}: {e}", m.id);
+            return None;
+        }
+    }
+    match mosaikit_mskp::language::load_language(&decl.code, &decl.name, &files) {
+        Ok(l) => Some(Arc::new(l)),
+        Err(e) => {
+            tracing::error!("language {}: {e}", m.id);
+            None
+        }
+    }
 }
 
 /// The layout of a layout plugin from its folder (`layout/`), checked; errors are logged.

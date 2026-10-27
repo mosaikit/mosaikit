@@ -38,6 +38,10 @@ pub struct Config {
     /// accepts unsigned packages (development only)
     #[serde(default)]
     pub allow_unsigned: bool,
+    /// pages of the Internet fetched for a plugin (`web` permission) may also be on private addresses
+    /// (loopback, local network): only for tests and development, never in production
+    #[serde(default)]
+    pub allow_private_fetch: bool,
     /// ed25519 public keys (base64) of the trusted publishers
     #[serde(default)]
     pub trusted_keys: Vec<String>,
@@ -345,6 +349,7 @@ impl Config {
                 "MOSAIKIT_DATABASE" => self.database.backend = Some(v),
                 "MOSAIKIT_DATABASE_URL" | "DATABASE_URL" => self.database.url = Some(v),
                 "MOSAIKIT_ALLOW_UNSIGNED" => self.allow_unsigned = truthy(&v),
+                "MOSAIKIT_ALLOW_PRIVATE_FETCH" => self.allow_private_fetch = truthy(&v),
                 "MOSAIKIT_PREINSTALL" => self.preinstall = truthy(&v),
                 "MOSAIKIT_TRUST_PROXY" => self.trust_proxy = truthy(&v),
                 "MOSAIKIT_OPEN_BROWSER" => self.open_browser = truthy(&v),
