@@ -29,7 +29,9 @@ tenant.
 
 Gli **Administrator** si gestiscono in **Sistema › Administrator**: **Nuovo Administrator** (registra il
 secondo fattore al primo accesso), **Reimposta la password**, **Reimposta il secondo fattore** (registra di
-nuovo l'app), **Disabilita** / **Riattiva**. Almeno un Administrator resta sempre attivo.
+nuovo l'app), **Disabilita** / **Riattiva**. **Modifica nome ed email** è nel menu di ogni riga, anche della
+tua: ogni Administrator può cambiare i propri dati e quelli degli altri Administrator. Almeno un
+Administrator resta sempre attivo.
 
 Mentre lavori la barra mostra **Piattaforma**: sei sulla piattaforma, non dentro un tenant.
 
@@ -60,17 +62,23 @@ La ricerca (`Ctrl K`) trova, oltre alle pagine, i tenant e le persone.
 
 ### La pagina di un tenant
 
-Schede **Dati**, **Persone**, **Accesso**, **Plugin**; il badge dello stato (attivo, in prova, sospeso,
+Schede **Dati**, **Persone**, **Accesso**, **Plugin**, **Quote**; il badge dello stato (attivo, in prova, sospeso,
 archiviato) accanto al nome; **⋯** con **Sospendi il tenant** / **Riattiva il tenant**.
 
-- **Dati**: nome e identificativo, le **Quote** del tenant, il **Periodo di prova** (**Aggiorna la prova**,
+- **Dati**: **Nome** e **Identificativo** (modificabili: l'identificativo è ciò che le persone scelgono
+  all'accesso e compare negli indirizzi, quindi cambiarlo cambia quelli), i dati di contatto e di
+  registrazione, il **Periodo di prova** (**Aggiorna la prova**,
   **Togli la prova**), il **Logo del tenant** (sola lettura: lo sceglie il suo Tenant Manager),
   **Esportazione** e l'area **Archivia o elimina**.
 - **Persone**: utenti e ruoli, mai i contenuti — per nominare o sostituire un Tenant Manager (**Nuovo Tenant
   Manager**, cambia un **Ruolo**) e per sbloccare un accesso (**Reimposta la password**).
 - **Accesso**: vedi *Accesso di un tenant* più sotto.
 - **Plugin**: quali plugin sono disponibili e attivi nel tenant (sola lettura; la disponibilità si decide
-  nella pagina di ogni plugin).
+  nella pagina di ogni plugin, e il link **Vai alla pagina Plugin** è accanto alla frase che lo dice). Ogni
+  riga ha una pillola: *attivo*, oppure il motivo per cui non lo è (*non disponibile*, *disattivato*, *spento
+  nella piattaforma*…).
+- **Quote**: le quote del tenant (**Personalizza**, **Ripristina**). Gli **Elementi** sono tutto ciò che le
+  persone creano nelle app (note, attività, file, mappe, siti): una nota o un file è un elemento.
 
 ### Prova, sospensione, archiviazione, eliminazione
 
@@ -155,7 +163,10 @@ provider.
 - **Aggiornamenti** elenca le versioni più recenti con le note di rilascio; **Catalogo** quello che offrono i
   registri fidati.
 - La pagina di un plugin, schede:
-  - **Panoramica**: versione, firma, stato, cosa porta l'aggiornamento.
+  - **Panoramica**: il plugin come una brochure: una galleria di immagini, la descrizione, l'**Autore**, la
+    **Licenza** e un link per saperne di più, poi i dettagli tecnici (versione, firma, stato) e cosa porta
+    l'aggiornamento. Un plugin dichiara autore, licenza, link, un testo più lungo e le sue immagini nel
+    manifest; ciò che non dichiara appare come *non dichiarato*.
   - **Cosa chiede**: logica sul server, hook, file, rete, altri plugin, database, e i **Permessi che porta**
     (oltre a usare, creare, eliminare e condividere).
   - **Tenant**: **Disponibile a tutti i tenant** (il valore per i nuovi tenant e per quelli senza una scelta
@@ -177,12 +188,12 @@ renderle più severe. **Salva** compare solo dopo una modifica.
 | Sezione | Cosa contiene |
 |---|---|
 | **Administrator** | Gli account della piattaforma (vedi *Primo avvio*). |
-| **Email** | **Server di posta** (**Server SMTP**, **Porta**, **Sicurezza**, **Utente**, **Password** conservata cifrata), **Mittente** e **Piè di pagina** con un'anteprima, **Invia una prova**. Senza un server non parte nessuna email. |
+| **Email** | **Server di posta** (**Server SMTP**, **Porta**, **Sicurezza**, **Utente**, **Password** conservata cifrata), **Mittente** e **Piè di pagina** con un'anteprima, **Invia una prova**. Mosaikit non invia email da solo: serve un server SMTP (quello della tua organizzazione o un servizio di posta). Senza un server non parte nessuna email. Per provare in locale il setup Docker ha un contenitore Mailpit facoltativo che intercetta ogni messaggio (SMTP `localhost:1025`, sicurezza **Nessuna**, nessun utente). |
 | **Notifiche** | Le impostazioni predefinite delle email (**Mai**, **Subito**, **Un riepilogo al giorno**) e l'ora del riepilogo giornaliero. |
 | **Conservazione** | Per quanto tempo cestino (predefinito 30 giorni), registro (predefinito 365 giorni) e notifiche (predefinito 90 giorni) conservano il loro contenuto. |
 | **Password e sessioni** | Lunghezza minima della password (mai sotto 10), tentativi prima del blocco, durata del blocco, durata della sessione, «Ricordami» in giorni (0: l'opzione non compare). |
 | **Quote** | **Quote dei nuovi tenant** (spazio, persone, elementi; vuote: nessun limite), **Capacità della piattaforma** con quanto è dato ai tenant e quanto usano (un avviso quando si dà più di quanto la piattaforma ha), i tenant con le loro quote. Le quote proprie di un tenant sono nella sua pagina (Dati › Quote: **Personalizza**, **Ripristina**). |
-| **Chiavi dei servizi esterni** | Le chiavi che paga la piattaforma, per i servizi che dichiarano i plugin installati (ognuna dice quali plugin la usano; nessun plugin, nessun servizio). Una chiave condivisa la usano tutti i tenant che non ne hanno una propria. Dopo il salvataggio si vedono solo le ultime quattro cifre. La chiave di un servizio che nessun plugin installato usa più è segnata come non usata: rimuovila. |
+| **Chiavi dei servizi esterni** | Le chiavi che paga la piattaforma, per i servizi che dichiarano i plugin installati (ognuna dice quali plugin la usano; nessun plugin, nessun servizio: sono i plugin a decidere quali chiavi esistono e non se ne possono aggiungere a mano). Una chiave condivisa la usano tutti i tenant che non ne hanno una propria. Dopo il salvataggio si vedono solo le ultime quattro cifre. La chiave di un servizio che nessun plugin installato usa più è segnata come non usata: rimuovila. |
 | **Incorporamento** | I siti che possono mostrare le pagine pubbliche (link pubblici) dentro le loro pagine. Senza siti, nessuno può. |
 | **Backup e ripristino** | Vedi *Backup* più sotto. |
 | **Manutenzione** | Vedi *Manutenzione* più sotto. |
@@ -253,6 +264,9 @@ renderle più severe. **Salva** compare solo dopo una modifica.
 ## Monitoraggio
 
 **Monitoraggio**, sezioni:
+
+Le cifre sono misure reali del server: raccolte ogni minuto e conservate per 8 giorni. La pagina dice quando
+è stata aggiornata l'ultima volta e si aggiorna da sola ogni minuto.
 
 | Sezione | Cosa |
 |---|---|

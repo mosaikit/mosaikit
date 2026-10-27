@@ -5,7 +5,7 @@
 
 import { useDeferredValue, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Copy, KeyRound, Link2, LogOut, Minus, MoreHorizontal, Plus, Puzzle, ShieldCheck, ShieldOff, Trash2, UserPlus, Users } from 'lucide-react'
+import { Check, Copy, KeyRound, Link2, LogOut, Minus, MoreHorizontal, Pencil, Plus, Puzzle, ShieldCheck, ShieldOff, Trash2, UserPlus, Users } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, errText, fmtDate, ApiError } from '../../api.ts'
 import { useBrand } from '../../brand.ts'
@@ -39,7 +39,7 @@ import { initials, useAction, useApi, useConfirm, usePaged, useTenantCtx, type P
 import { t } from '../i18n.ts'
 import { levelName } from '../levels.ts'
 import { PersonPicture } from '../picture.tsx'
-import { Empty, ErrorBox, Loading, MoreRows, PageHeader, Pills, SaveBar, SelectAllRows, StatusBadge, Tabs } from '../kit.tsx'
+import { Empty, ErrorBox, FormDialog, Loading, MoreRows, PageHeader, Pills, SaveBar, SelectAllRows, StatusBadge, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import AppIcon from '../AppIcon.tsx'
 import { AppMark } from '../Shell.tsx'
@@ -662,31 +662,32 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
 export function ProfilesSection({ slug }: { slug: string }) {
   const base = `/api/t/${enc(slug)}/manage/profiles`
   const q = useApi<Profile[]>(['profiles', slug], base)
-  const ctx = useTenantCtx(slug)
   const confirm = useConfirm()
   const [editing, setEditing] = useState<Profile | null>(null)
   const inval = [['profiles', slug], ['members', slug]]
   const copy = useAction((p: Profile) => api('POST', base, { name: t('Copy of {name}', { name: p.name }), description: p.description, copy_of: p.id }), { ok: t('Profile duplicated'), invalidate: inval })
   const makeDefault = useAction((p: Profile) => api('PUT', `${base}/${p.id}`, { make_default: true }), { ok: t('Default profile changed'), invalidate: inval })
   const del = useAction((p: Profile) => api('DELETE', `${base}/${p.id}`), { ok: t('Profile deleted'), invalidate: inval })
+  const rename = useAction(({ p, v }: { p: Profile; v: Record<string, string> }) => api('PUT', `${base}/${p.id}`, { name: v.name, description: v.description ?? '' }), { ok: t('Profile renamed'), invalidate: inval })
+  const [renaming, setRenaming] = useState<Profile | null>(null)
+  const catalog = useApi<PluginPerms[]>(['profile-catalog', slug], `${base}/catalog`)
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
-  const label = (pid: string) => ctx.data?.plugins.find((p) => p.id === pid)?.label ?? pid
   return (
     <div className="grid gap-3">
       <p className="max-w-3xl text-sm text-muted-foreground">
-        {t('A profile is where the permissions of a User in the plugins start; groups and personal grants add to it. The default profile goes to the members without one and to the new invitations. Tenant Managers have every permission.')}
+        {t('A permission profile is a named set of permissions in the plugins, for example «Reader» or «Editor». Give a profile to each person: it is what they may do in every plugin, and it is their starting point. Groups and personal grants can add to it, never take away. The default profile goes to people without one and to new invitations. Tenant Managers have every permission, whatever the profile.')}
       </p>
       <div className="grid gap-3 lg:grid-cols-2">
         {q.data!.map((p) => (
           <Card key={p.id}>
             <CardHeader>
               <CardTitle className="flex flex-wrap items-center gap-2 text-base">
-                {p.name}
+                {profileName(p)}
                 {p.is_default && <Badge>{t('Default')}</Badge>}
               </CardTitle>
               <CardDescription>
-                {p.description || '—'} · {t('{count} people', { count: p.members })}
+                {profileDescription(p) || '—'} · {t('{count} people', { count: p.members })}
               </CardDescription>
               <CardAction>
                 <DropdownMenu>
@@ -699,6 +700,10 @@ export function ProfilesSection({ slug }: { slug: string }) {
                     <DropdownMenuItem onSelect={() => setEditing(p)}>
                       <KeyRound />
                       {t('Edit the permissions')}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => setRenaming(p)}>
+                      <Pencil />
+                      {t('Rename')}
                     </DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => copy.mutate(p)}>
                       <Copy />
@@ -726,41 +731,110 @@ export function ProfilesSection({ slug }: { slug: string }) {
                 </DropdownMenu>
               </CardAction>
             </CardHeader>
-            <CardContent className="grid gap-1.5 text-sm">
-              {Object.entries(p.perms).map(([pid, keys]) => (
-                <div key={pid} className="flex flex-wrap items-baseline gap-x-2">
-                  <b className="font-medium">{label(pid)}</b>
-                  <span className="text-muted-foreground">{keys.length ? keys.map(keyLabel).join(' · ') : t('no access')}</span>
-                </div>
-              ))}
+            <CardContent>
+              <ProfileSummary p={p} catalog={catalog.data ?? []} />
             </CardContent>
           </Card>
         ))}
       </div>
-      <ProfileEditor slug={slug} profile={editing} onClose={() => setEditing(null)} />
+      <ProfileEditor slug={slug} profile={editing} catalog={catalog.data ?? []} onClose={() => setEditing(null)} />
+      <FormDialog
+        key={renaming?.id ?? 'none'}
+        open={!!renaming}
+        onOpenChange={(o) => !o && setRenaming(null)}
+        title={t('Rename the profile')}
+        fields={[
+          { name: 'name', label: t('Name'), required: true, initial: renaming ? profileName(renaming) : '' },
+          { name: 'description', label: t('Description'), initial: renaming ? profileDescription(renaming) : '', hint: t('What the profile is for, in a few words.') },
+        ]}
+        submit={t('Save')}
+        onSubmit={(v) => rename.mutateAsync({ p: renaming!, v })}
+      />
     </div>
   )
 }
 
-/** The permissions of a profile, plugin by plugin. */
-function ProfileEditor({ slug, profile, onClose }: { slug: string; profile: Profile | null; onClose: () => void }) {
+/** Permissions of the plugins as the catalog of the tenant gives them (texts in the language of the person). */
+interface PluginPerms {
+  plugin_id: string
+  label: string
+  permissions: PermDecl[]
+}
+
+/** The standard profile is stored in English: it is shown in the language of the person. */
+function profileName(p: Profile): string {
+  return p.name === 'Standard' ? t('Standard') : p.name
+}
+function profileDescription(p: Profile): string {
+  return p.description === 'The permissions every plugin gives by default.' ? t('The permissions every plugin gives by default.') : p.description
+}
+
+/** What a profile gives, compact: how many plugins, and the list on demand (open at once when it is short). */
+function ProfileSummary({ p, catalog }: { p: Profile; catalog: PluginPerms[] }) {
+  const rows = catalog.map((c) => ({ c, keys: p.perms[c.plugin_id] ?? [] }))
+  const withAccess = rows.filter((r) => r.keys.length > 0)
+  if (catalog.length === 0) return null
+  const keyText = (c: PluginPerms, k: string) => {
+    const d = c.permissions.find((x) => x.key === k)
+    return d ? permLabel(d) : k
+  }
+  return (
+    <details className="text-sm" open={catalog.length <= 4} data-testid="profile-summary">
+      <summary className="cursor-pointer text-muted-foreground">{t('Access to {n} of {total} plugins', { n: withAccess.length, total: catalog.length })}</summary>
+      <ul className="mt-2 grid max-h-64 gap-1 overflow-auto">
+        {rows.map(({ c, keys }) => (
+          <li key={c.plugin_id} className="flex flex-wrap items-baseline gap-x-2">
+            <b className="font-medium">{c.label}</b>
+            <span className="text-muted-foreground">{keys.length ? keys.map((k) => keyText(c, k)).join(' · ') : t('no access')}</span>
+          </li>
+        ))}
+      </ul>
+    </details>
+  )
+}
+
+/** The permissions of a profile: one compact row per plugin, with a filter when there are many. */
+function ProfileEditor({ slug, profile, catalog, onClose }: { slug: string; profile: Profile | null; catalog: PluginPerms[]; onClose: () => void }) {
   const [perms, setPerms] = useState<Record<string, string[]>>({})
-  useEffect(() => setPerms(profile?.perms ?? {}), [profile])
+  const [filter, setFilter] = useState('')
+  useEffect(() => {
+    setPerms(profile?.perms ?? {})
+    setFilter('')
+  }, [profile])
   const save = useAction((x: Record<string, string[]>) => api('PUT', `/api/t/${enc(slug)}/manage/profiles/${profile!.id}`, { plugins: x }), {
     ok: t('Profile saved'),
     invalidate: [['profiles', slug], ['access', slug], ['member', slug]],
   })
+  const rows = catalog.filter((c) => c.plugin_id in perms && c.label.toLowerCase().includes(filter.trim().toLowerCase()))
   return (
     <Dialog open={!!profile} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className="max-h-[85vh] overflow-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[85vh] overflow-auto sm:max-w-3xl">
         <DialogHeader>
-          <DialogTitle>{t('Permissions of the profile {name}', { name: profile?.name ?? '' })}</DialogTitle>
-          <DialogDescription>{t('What the members with this profile may do in each plugin.')}</DialogDescription>
+          <DialogTitle>{t('Permissions of the profile {name}', { name: profile ? profileName(profile) : '' })}</DialogTitle>
+          <DialogDescription>{t('What the people with this profile may do in each plugin.')}</DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4">
-          {Object.keys(perms).map((pid) => (
-            <PluginPermsChooser key={pid} slug={slug} plugin={pid} value={perms[pid]} onChange={(keys) => setPerms({ ...perms, [pid]: keys })} />
-          ))}
+        {catalog.length > 6 && <Input type="search" aria-label={t('Filter the plugins')} placeholder={t('Filter the plugins')} value={filter} onChange={(e) => setFilter(e.target.value)} />}
+        <div className="divide-y rounded-lg border" data-testid="profile-editor">
+          {rows.map((c) => {
+            const value = perms[c.plugin_id] ?? []
+            return (
+              <fieldset key={c.plugin_id} className="grid gap-1 px-3 py-2 sm:grid-cols-[10rem_1fr] sm:items-center">
+                <legend className="sr-only">{c.label}</legend>
+                <b className="text-sm font-medium" aria-hidden>
+                  {c.label}
+                </b>
+                <div className="flex flex-wrap gap-x-4 gap-y-1">
+                  {c.permissions.map((d) => (
+                    <label key={d.key} className="flex items-center gap-1.5 text-sm" title={permDescription(d)}>
+                      <Checkbox aria-label={`${c.label}: ${permLabel(d)}`} checked={value.includes(d.key)} onCheckedChange={(v) => setPerms({ ...perms, [c.plugin_id]: v ? [...value, d.key] : value.filter((x) => x !== d.key) })} />
+                      {permLabel(d)}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            )
+          })}
+          {rows.length === 0 && <p className="p-3 text-sm text-muted-foreground">{t('No plugin matches.')}</p>}
         </div>
         <DialogFooter>
           <Button variant="outline" onClick={onClose}>
@@ -772,24 +846,6 @@ function ProfileEditor({ slug, profile, onClose }: { slug: string; profile: Prof
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
-}
-
-function PluginPermsChooser({ slug, plugin, value, onChange }: { slug: string; plugin: string; value: string[]; onChange: (v: string[]) => void }) {
-  const q = useApi<PluginAccess>(['access', slug, plugin], `/api/t/${enc(slug)}/manage/plugins/${enc(plugin)}/access`)
-  if (!q.data) return null
-  return (
-    <fieldset className="grid gap-2 rounded-lg border p-3">
-      <legend className="px-1 text-sm font-medium">{q.data.label}</legend>
-      <div className="flex flex-wrap gap-x-5 gap-y-2">
-        {q.data.permissions.map((p) => (
-          <label key={p.key} className="flex items-center gap-2 text-sm">
-            <Checkbox checked={value.includes(p.key)} onCheckedChange={(v) => onChange(v ? [...value, p.key] : value.filter((x) => x !== p.key))} />
-            {permLabel(p)}
-          </label>
-        ))}
-      </div>
-    </fieldset>
   )
 }
 

@@ -699,6 +699,12 @@ export interface AdminPlugin extends PluginView {
   extends_min?: string | null
   extension?: { fields: { resource: string; key: string; label: string; kind: string }[]; actions: { resource: string; key: string; label: string }[] }
   has_config?: boolean
+  /** brochure (recent servers) */
+  author?: string | null
+  license?: string | null
+  homepage?: string | null
+  details?: string | null
+  screenshots?: string[]
   /** for a layout: what the package contains (recent servers) */
   layout?: { decl: import('./app/layouts.ts').LayoutDecl; css_bytes: number; images: [string, string][]; class: string } | null
 }
@@ -760,6 +766,7 @@ export interface AdminUser {
   user_id: string
   username: string
   display_name: string
+  email?: string | null
   status: string
   /** second factor registered */
   totp: boolean

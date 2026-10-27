@@ -45,6 +45,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/layouts", get(layouts_list))
         .route("/api/layouts/{id}/layout.css", get(layout_css))
         .route("/api/layouts/{id}/images/{name}", get(layout_image))
+        .route("/api/plugins/{id}/media/{name}", get(plugin_media))
         .route("/api/auth/admin/login", post(admin_login))
         .route("/api/auth/totp/setup", post(totp_setup))
         .route("/api/auth/totp/enable", post(totp_enable))
@@ -126,6 +127,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/admin/catalog/{id}/install", post(a_catalog_install))
         .route("/api/admin/kpi", get(a_kpi))
         .route("/api/admin/administrators", get(a_admins).post(a_create_admin))
+        .route("/api/admin/administrators/{id}", put(a_admin_update))
         .route("/api/admin/administrators/{id}/status", put(a_admin_status))
         .route("/api/admin/administrators/{id}/password", post(a_admin_password))
         .route("/api/admin/administrators/{id}/totp", delete(a_admin_totp))
@@ -236,6 +238,17 @@ async fn layout_image(
 ) -> ApiResult<Response> {
     let (data, mime) =
         tenancy::layouts::image(&s.k, &id, &name).ok_or_else(|| Error::not_found("no image"))?;
+    Ok(image_response(data, mime))
+}
+
+/// A picture of the brochure of a plugin (for whoever is signed in).
+async fn plugin_media(
+    State(s): State<AppState>,
+    Auth(_u): Auth,
+    Path((id, name)): Path<(String, String)>,
+) -> ApiResult<Response> {
+    let (data, mime) =
+        mosaikit_kernel::plugins::media(&s.k, &id, &name).ok_or_else(|| Error::not_found("no picture"))?;
     Ok(image_response(data, mime))
 }
 
@@ -1470,6 +1483,23 @@ async fn a_create_admin(
 #[derive(Deserialize)]
 struct ActiveReq {
     active: bool,
+}
+
+#[derive(Deserialize)]
+struct AdminUpdateReq {
+    display_name: String,
+    #[serde(default)]
+    email: String,
+}
+
+async fn a_admin_update(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Path(id): Path<String>,
+    Json(r): Json<AdminUpdateReq>,
+) -> ApiResult<Json<Value>> {
+    tenancy::update_administrator(&s.k, &u, uuid(&id)?, &r.display_name, &r.email).await?;
+    Ok(Json(json!(tenancy::administrators(&s.k, &u).await?)))
 }
 
 async fn a_admin_status(

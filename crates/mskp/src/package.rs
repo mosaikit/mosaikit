@@ -88,6 +88,11 @@ impl Package {
                 }
             }
         }
+        for n in &manifest.screenshots {
+            if !files.contains_key(&format!("media/{n}")) {
+                return Err(bad(format!("screenshot media/{n} is not in the package")));
+            }
+        }
         let pkg =
             Package { manifest, manifest_toml, files, signature, hashes, sha256: package_sha256(bytes) };
         // a layout is checked as a whole at install: arrangement, stylesheet and images

@@ -25,7 +25,9 @@ Administrators always sign in with their local password and the second factor, w
 
 **Administrators** are managed in **System › Administrators**: **New Administrator** (they register the
 second factor at their first sign-in), **Reset the password**, **Reset the second factor** (they register the
-app again), **Disable** / **Reactivate**. At least one Administrator always stays active.
+app again), **Disable** / **Reactivate**. **Edit name and email** is in the menu of every row, yours too:
+any Administrator may change their own data and those of the other Administrators. At least one
+Administrator always stays active.
 
 While you work, the band shows **Platform**: you are on the platform, not inside a tenant.
 
@@ -55,17 +57,21 @@ Search (`Ctrl K`) finds tenants and people besides the pages.
 
 ### The page of a tenant
 
-Tabs **Details**, **People**, **Sign-in**, **Plugins**; the status badge (active, on trial,
+Tabs **Details**, **People**, **Sign-in**, **Plugins**, **Quotas**; the status badge (active, on trial,
 suspended, archived) next to the name; **⋯** with **Suspend the tenant** / **Reactivate the tenant**.
 
-- **Details**: name and identifier, the **Quotas** of the tenant, the **Trial period** (**Update the trial**,
+- **Details**: **Name** and **Identifier** (both editable: the identifier is what people choose at sign-in and
+  it appears in addresses, so changing it changes those), the contact and registration data, the **Trial period** (**Update the trial**,
   **Remove the trial**), the **Logo of the tenant** (read only: its Tenant Manager chooses it), **Export**
   and the area **Archive or delete**.
 - **People**: users and roles, never the contents — to appoint or replace a Tenant Manager (**New
   Tenant Manager**, change a **Role**) and to unlock a sign-in (**Reset the password**).
 - **Sign-in**: see *Sign-in of a tenant* below.
 - **Plugins**: which plugins are available and on in the tenant (read only; availability is decided on the
-  page of each plugin).
+  page of each plugin, and the link **Go to the Plugins page** is next to the sentence that says so). Every
+  row has a pill: *active*, or why it is not (*not available*, *turned off*, *off in the platform*…).
+- **Quotas**: the quotas of the tenant (**Customize**, **Restore**). **Items** are everything the people
+  create in the apps (notes, tasks, files, maps, sites): one note or one file is one item.
 
 ### Trial, suspend, archive, delete
 
@@ -147,7 +153,10 @@ In tenants with an identity provider the password actions are not offered: the p
   every tenant; the confirmation says how many items, tenants and extensions are touched).
 - **Updates** lists newer versions with their release notes; **Catalog** what the trusted registries offer.
 - The page of a plugin, tabs:
-  - **Overview**: version, signature, status, what the update brings.
+  - **Overview**: the plugin as a brochure: a gallery of pictures, its description, the **Author**, the
+    **Licence** and a link for more information, then the technical details (version, signature, status)
+    and what the update brings. A plugin declares author, licence, link, a longer text and its pictures in
+    its manifest; what it does not declare shows as *not declared*.
   - **What it asks**: logic on the server, hooks, files, network, other plugins, database, and the
     **Permissions it brings** (besides use, create, delete and share).
   - **Tenants**: **Available to every tenant** (the default for new tenants and the ones without a choice of
@@ -169,12 +178,12 @@ change.
 | Section | What it holds |
 |---|---|
 | **Administrators** | Accounts of the platform (see *First start*). |
-| **Email** | **Mail server** (**SMTP server**, **Port**, **Security**, **User**, **Password** stored encrypted), **Sender** and **Footer** with a preview, **Send a test**. Without a server nothing is sent by email. |
+| **Email** | **Mail server** (**SMTP server**, **Port**, **Security**, **User**, **Password** stored encrypted), **Sender** and **Footer** with a preview, **Send a test**. Mosaikit sends no email by itself: it needs an SMTP server (the one of your organization or a mail service). Without a server nothing is sent. To try it locally the Docker setup has an optional Mailpit container that catches every message (SMTP `localhost:1025`, security **None**, no user). |
 | **Notifications** | The defaults of the emails (**Never**, **At once**, **One summary a day**) and the hour of the daily summary. |
 | **Retention** | How long the trash (default 30 days), the log (default 365 days) and the notifications (default 90 days) keep their content. |
 | **Passwords and sessions** | Minimum length of the password (never below 10), attempts before the lock, length of the lock, length of the session, «Remember me» in days (0: the option does not show). |
 | **Quotas** | **Quotas of new tenants** (storage, people, items; empty: no limit), **Capacity of the platform** with what is given to and used by the tenants (a warning when more is given than the platform has), the tenants with their quotas. A tenant's own quotas are on its page (Details › Quotas: **Customize**, **Restore**). |
-| **Keys of outside services** | Keys the platform pays for, for the services the installed plugins declare (each says which plugins use it; no plugin, no service). A shared key is used by every tenant without one of its own. Only the last four characters show after saving. A key of a service no installed plugin uses any more is marked as not used: remove it. |
+| **Keys of outside services** | Keys the platform pays for, for the services the installed plugins declare (each says which plugins use it; no plugin, no service: the plugins decide which keys exist, and none can be added by hand). A shared key is used by every tenant without one of its own. Only the last four characters show after saving. A key of a service no installed plugin uses any more is marked as not used: remove it. |
 | **Embedding** | Sites that may show the public pages (public links) inside their own pages. Without sites, nobody may. |
 | **Backup and restore** | See *Backups* below. |
 | **Maintenance** | See *Maintenance* below. |
@@ -240,6 +249,9 @@ change.
 ## Monitoring
 
 **Monitoring**, sections:
+
+The figures are real measures of the server: collected every minute and kept for 8 days. The page says
+when it was last updated and refreshes by itself every minute.
 
 | Section | What |
 |---|---|

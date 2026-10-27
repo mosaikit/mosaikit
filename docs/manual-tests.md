@@ -507,6 +507,26 @@ Needs many rows: the data of the load test (`cargo xtask perf --scale probe`, th
 
 ---
 
+## Review round 1 - tenant and people
+
+Automated twin of every check: the test «Review round 1, tenant and people» of `e2e/tests/platform.spec.ts`.
+
+| Id | Check | Expected |
+|---|---|---|
+| R1-T-01 | Administrator › Tenants › a tenant | Tabs Details, People, Sign-in, Plugins and **Quotas**; Details no longer holds the quotas; the Quotas tab has them (Customize, Restore, Used) |
+| R1-T-02 | Details of a tenant: change **Name** and **Identifier**, Save, reload; put them back | The new values stay after the reload and appear in the list and in the sign-in page; an identifier already taken or with capitals and spaces is refused with a readable message |
+| R1-T-03 | Quotas tab, and System › Quotas | Under **Items** a sentence says what is counted (what the people create in the apps: notes, tasks, files, maps, sites; one note, one item); Storage and People have theirs too |
+| R1-T-04 | Tenant › Plugins | Every row has a pill in the last column: *active*, or why not (*not available*, *turned off*, *off in the platform*), also for a plugin not available to the tenant |
+| R1-T-05 | Same page | After the sentence on availability the link **Go to the Plugins page** opens the list of the plugins |
+| R1-T-06 | Plugins › *Notes* | A brochure: gallery of two pictures (click the thumbnails), a description in two paragraphs, **Author**, **Licence**; a plugin without these fields says *not declared*; in Italian the description is in Italian; the technical details are in their own card |
+| R1-T-07 | Monitoring | A line says the figures are real, collected every minute and kept for 8 days, and **Last update** with the time; after a minute the time changes by itself |
+| R1-T-08 | System › Email | A paragraph says that Mosaikit needs an SMTP server and mentions the optional Mailpit container for local tests; **Send a test** is there |
+| R1-T-09 | System › Keys of outside services (and the same page in Tenant settings and Account) | A paragraph says that the plugins declare which keys exist; with no plugin that uses keys the page says so |
+| R1-T-10 | System › Administrators, menu of your row, then of another Administrator's row | **Edit name and email** is in both menus; the new name shows in the list (and in the person menu for your own); the other actions (password, second factor, disable) stay absent on your own row |
+| R1-T-11 | Tenant Manager › Manage › Permission profiles | A clear description of what a profile is; each card says «Access to N of M plugins» and lists them with plugin names and permission names in your language (never a plugin id like `com.mosaikit.notes`); **Rename** changes name and description; **Edit the permissions** is one compact row per plugin, with a filter when there are more than 6 |
+
+---
+
 Every phase of the plan has its section. New work adds its checks here when it is committed.
 
 ## Review round 1 - Docker

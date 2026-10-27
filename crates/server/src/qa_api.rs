@@ -3,7 +3,7 @@
 //! (Administrator).
 
 use axum::extract::{Path, State};
-use axum::routing::{get, post};
+use axum::routing::{get, post, put};
 use axum::{Json, Router};
 use mosaikit_kernel::tenancy::bulk::{self, ImportRow, TenantDetails};
 use mosaikit_kernel::Role;
@@ -21,6 +21,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/t/{t}/manage/invitations/many", post(m_invite_many))
         .route("/api/t/{t}/manage/plugins/ask", post(m_ask))
         .route("/api/admin/tenants/{id}/details", get(a_details).put(a_set_details))
+        .route("/api/admin/tenants/{id}/identity", put(a_rename))
 }
 
 #[derive(Deserialize)]
@@ -83,4 +84,20 @@ async fn a_set_details(
     let id = uuid(&id)?;
     bulk::set_tenant_details(&s.k, &u, id, &d).await?;
     Ok(Json(json!(bulk::tenant_details(&s.k, &u, id).await?)))
+}
+
+#[derive(Deserialize)]
+struct RenameReq {
+    name: String,
+    slug: String,
+}
+
+async fn a_rename(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Path(id): Path<String>,
+    Json(r): Json<RenameReq>,
+) -> ApiResult<Json<Value>> {
+    bulk::rename_tenant(&s.k, &u, uuid(&id)?, &r.name, &r.slug).await?;
+    Ok(Json(json!({ "ok": true })))
 }

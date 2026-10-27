@@ -18,6 +18,7 @@ pub struct AdminInfo {
     pub user_id: Uuid,
     pub username: String,
     pub display_name: String,
+    pub email: Option<String>,
     pub status: String,
     /// second factor registered
     pub totp: bool,
@@ -27,7 +28,7 @@ pub struct AdminInfo {
 pub async fn administrators(k: &Kernel, admin: &SessionUser) -> Result<Vec<AdminInfo>> {
     require_admin(admin)?;
     let rows = mosaikit_db::query(
-        "select u.id, u.username, u.display_name, u.status, u.totp_enabled, u.created_at
+        "select u.id, u.username, u.display_name, u.email, u.status, u.totp_enabled, u.created_at
          from core.users u join core.tenants t on t.id = u.home_tenant_id
          where t.is_system and u.is_system_admin order by u.username",
     )
@@ -39,9 +40,10 @@ pub async fn administrators(k: &Kernel, admin: &SessionUser) -> Result<Vec<Admin
             user_id: r.get(0),
             username: r.get(1),
             display_name: r.get(2),
-            status: r.get(3),
-            totp: r.get(4),
-            created_at: r.get(5),
+            email: r.get(3),
+            status: r.get(4),
+            totp: r.get(5),
+            created_at: r.get(6),
         })
         .collect())
 }
@@ -184,5 +186,37 @@ pub async fn reset_administrator_totp(k: &Kernel, admin: &SessionUser, user_id: 
         json!({ "user": user_id, "username": username }),
     )
     .await;
+    Ok(())
+}
+
+/// Name and email of an Administrator, changed by any Administrator (their own data included).
+pub async fn update_administrator(
+    k: &Kernel,
+    admin: &SessionUser,
+    user_id: Uuid,
+    name: &str,
+    email: &str,
+) -> Result<()> {
+    require_admin(admin)?;
+    let username = administrator(k, user_id).await?;
+    let name = name.trim();
+    let email = email.trim().to_lowercase();
+    if name.is_empty()
+        || name.chars().count() > super::profile::NAME_MAX
+        || name.chars().any(char::is_control)
+    {
+        return Err(Error::bad("a name of 1 to 120 characters").with_code("profile_name_invalid"));
+    }
+    if !email.is_empty() && !crate::notify::valid_email(&email) {
+        return Err(Error::bad("invalid email address").with_code("email_invalid"));
+    }
+    mosaikit_db::query("update core.users set display_name = $2, email = $3 where id = $1")
+        .bind(user_id)
+        .bind(name)
+        .bind((!email.is_empty()).then_some(&email))
+        .execute(&k.db)
+        .await?;
+    events::record(k, None, Some(admin.user_id), None, None, "admin.update", json!({ "username": username }))
+        .await;
     Ok(())
 }

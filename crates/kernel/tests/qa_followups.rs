@@ -185,4 +185,16 @@ async fn asking_for_a_plugin_and_the_details_of_a_tenant() {
     let bad = TenantDetails { contact_email: "nope".into(), ..d.clone() };
     assert!(bulk::set_tenant_details(&t, &admin, alfa, &bad).await.is_err());
     assert_eq!(bulk::tenant_details(&t, &g, alfa).await.unwrap_err().kind, Kind::Forbidden);
+
+    // name and identifier
+    bulk::rename_tenant(&t, &admin, alfa, " Alfa Two ", "Alfa-Two").await.unwrap();
+    let slug: String = mosaikit_db::query_scalar("select slug from core.tenants where id = $1")
+        .bind(alfa)
+        .fetch_one(&t.k.db)
+        .await
+        .unwrap();
+    assert_eq!(slug, "alfa-two");
+    assert!(bulk::rename_tenant(&t, &admin, alfa, "", "alfa-two").await.is_err());
+    assert!(bulk::rename_tenant(&t, &admin, alfa, "Alfa", "Not Valid").await.is_err());
+    assert_eq!(bulk::rename_tenant(&t, &g, alfa, "Alfa", "alfa").await.unwrap_err().kind, Kind::Forbidden);
 }

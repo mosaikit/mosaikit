@@ -9,7 +9,7 @@ use mosaikit_kernel::tenancy::{
     directory, invite, list_tenants, login_tenants, members, my_invitations, remove_member,
     reset_administrator_totp, reset_member_password, reset_tenant_password, respond_invitation,
     set_administrator_active, set_group_member, set_role, set_shell_band, set_tenant_role, set_tenant_status,
-    shell_band, tenant_members, ShellBand,
+    shell_band, tenant_members, update_administrator, ShellBand,
 };
 use mosaikit_kernel::testing::{start, start_with, ADMIN_PASSWORD, PASSWORD};
 use mosaikit_kernel::{totp, Kind, Role};
@@ -245,6 +245,16 @@ async fn administrator_account_of_the_system_tenant() {
         panic!("incomplete sign-in")
     };
     assert!(lr.user.is_system_admin && lr.user.user_id == id);
+    // any Administrator changes the name and the email of any Administrator, their own included
+    update_administrator(&t, &admin, id, " Anna A. ", "Anna@Example.org").await.unwrap();
+    update_administrator(&t, &admin, admin.user_id, "Root", "").await.unwrap();
+    let list = administrators(&t, &admin).await.unwrap();
+    assert_eq!(list[1].display_name, "Anna A.");
+    assert_eq!(list[1].email.as_deref(), Some("anna@example.org"));
+    assert_eq!((list[0].display_name.as_str(), list[0].email.clone()), ("Root", None));
+    assert!(update_administrator(&t, &admin, id, "", "").await.is_err());
+    assert!(update_administrator(&t, &admin, id, "Anna", "not an email").await.is_err());
+    assert_eq!(update_administrator(&t, &anna, id, "X", "").await.unwrap_err().kind, Kind::Forbidden);
     // anna's account in the tenant stays a plain User
     assert!(!login(&t, "alfa", "anna", PASSWORD, "t").await.unwrap().user.is_system_admin);
     assert_eq!(caller(&t, &anna, "alfa").await.unwrap().tenant.role, Role::User);

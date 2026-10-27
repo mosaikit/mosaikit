@@ -295,6 +295,12 @@ pub struct PluginAdminView {
     pub extension: mosaikit_mskp::ExtensionDecl,
     /// it has settings (`[[config]]`)
     pub has_config: bool,
+    /// brochure (optional in the manifest): author, licence, address, longer text and pictures
+    pub author: Option<String>,
+    pub license: Option<String>,
+    pub homepage: Option<String>,
+    pub details: Option<String>,
+    pub screenshots: Vec<String>,
     /// for a layout: what the package contains (arrangement, stylesheet, images)
     pub layout: Option<LayoutContents>,
 }
@@ -349,6 +355,11 @@ pub fn admin_views_in(k: &Kernel, admin: &SessionUser, lang: &str) -> Result<Vec
             extends_min: p.manifest.extends.as_ref().map(|e| e.min_version.clone()),
             extension: p.manifest.localized(lang).extension,
             has_config: !p.manifest.config.is_empty(),
+            author: p.manifest.author.clone(),
+            license: p.manifest.license.clone(),
+            homepage: p.manifest.homepage.clone(),
+            details: p.manifest.localized(lang).details,
+            screenshots: p.manifest.screenshots.clone(),
             layout: p.layout.as_ref().map(|l| LayoutContents {
                 decl: l.decl.clone(),
                 css_bytes: l.css.len(),
@@ -495,4 +506,21 @@ pub async fn uninstall(k: &Kernel, admin: &SessionUser, id: &str) -> Result<()> 
     }
     events::record(k, None, Some(admin.user_id), Some(id), None, "plugin.uninstall", json!({})).await;
     Ok(())
+}
+
+/// A picture of the brochure of an installed plugin (`media/<name>` of its package) and its type.
+pub fn media(k: &Kernel, id: &str, name: &str) -> Option<(Vec<u8>, &'static str)> {
+    let p = k.plugins.get(id)?;
+    if p.dev || !p.manifest.screenshots.iter().any(|s| s == name) || !mosaikit_mskp::is_media_name(name) {
+        return None;
+    }
+    let data = std::fs::read(install_dir(k, id, &p.manifest.version).join("media").join(name)).ok()?;
+    let mime = match name.rsplit('.').next()?.to_ascii_lowercase().as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "webp" => "image/webp",
+        "svg" => "image/svg+xml",
+        _ => return None,
+    };
+    Some((data, mime))
 }

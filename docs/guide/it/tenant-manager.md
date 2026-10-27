@@ -73,12 +73,16 @@ I gruppi servono a condividere con più persone insieme e a dare permessi a molt
 
 ### Profili di permesso
 
-Un profilo è il punto di partenza dei permessi di un User nei plugin; gruppi e permessi personali
-aggiungono, non tolgono mai. Ogni tenant ha il profilo *Standard*.
+Un profilo di permessi è un insieme di permessi nei plugin con un nome, per esempio *Lettore* o *Redattore*.
+Dai un profilo a ogni persona: è ciò che può fare in ogni plugin e il suo punto di partenza. Gruppi e
+permessi personali aggiungono, non tolgono mai. I Tenant Manager hanno ogni permesso, qualunque sia il
+profilo. Ogni tenant ha il profilo *Standard*. Ogni scheda dice in quanti plugin il profilo dà accesso e li
+elenca (aperta subito se sono pochi), con nomi e permessi dei plugin nella tua lingua.
 
 - **Nuovo profilo** → **Nome** e **Descrizione** → **Crea il profilo** (parte con i permessi predefiniti di
   ogni plugin).
-- Il menu di un profilo: **Modifica i permessi**, **Duplica**, **Usa per i nuovi inviti** (lo rende il
+- Il menu di un profilo: **Rinomina** (nome e descrizione), **Modifica i permessi** (una riga compatta per
+  plugin, con un filtro quando sono tanti), **Duplica**, **Usa per i nuovi inviti** (lo rende il
   **Profilo predefinito**), **Elimina** (i suoi membri prendono il profilo predefinito).
 - I permessi standard di ogni plugin sono **Usare l'app**, **Creare elementi**, **Eliminare elementi**,
   **Condividere elementi**; un plugin può dichiararne altri.

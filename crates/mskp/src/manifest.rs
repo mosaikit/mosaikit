@@ -24,6 +24,20 @@ pub struct Manifest {
     pub min_kernel: String,
     #[serde(default)]
     pub description: String,
+    /// Brochure of the plugin (optional): who made it, under which licence, where to read more, a longer
+    /// text (paragraphs separated by a blank line) and pictures of it (files of `media/` in the package).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub license: Option<String>,
+    /// address of a page about the plugin (`http://` or `https://`)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub homepage: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub details: Option<String>,
+    /// names of image files of `media/` (png, jpg, webp or svg), at most 8, shown as a gallery
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub screenshots: Vec<String>,
     /// `app` (pages of its own, in the sidebar), `service` (works behind the scenes) or `extension`
     /// (extends another plugin). Absent: `extension` with `[extends]`, `app` with `[ui]`, else `service`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -76,6 +90,15 @@ pub struct Manifest {
     /// entry opens the app at its `place` (`msk.at` in the UI).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub nav: Vec<NavDecl>,
+}
+
+/// A name of an image file of `media/` (no folders): letters, digits, `-`, `_`, `.` and an image extension.
+pub fn is_media_name(n: &str) -> bool {
+    let lower = n.to_ascii_lowercase();
+    n.len() <= 80
+        && !n.starts_with('.')
+        && n.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.'))
+        && ["png", "jpg", "jpeg", "webp", "svg"].iter().any(|e| lower.ends_with(&format!(".{e}")))
 }
 
 /// An entry of the navigation of an app (`[[nav]]`).
@@ -358,6 +381,8 @@ pub struct Translation {
     pub name: Option<String>,
     #[serde(default)]
     pub description: Option<String>,
+    #[serde(default)]
+    pub details: Option<String>,
     /// `contribution.label`
     #[serde(default)]
     pub label: Option<String>,
@@ -633,6 +658,9 @@ impl Manifest {
         if self.contribution.label.trim().is_empty() || self.contribution.icon.trim().is_empty() {
             return bad("contribution.icon and contribution.label required".into());
         }
+        if let Err(m) = self.validate_brochure() {
+            return bad(m);
+        }
         let mut names = std::collections::HashSet::new();
         for r in &self.resources {
             if !is_identifier(&r.name) || r.name.starts_with("kpi_") {
@@ -751,6 +779,30 @@ impl Manifest {
     }
 
     /// `[[nav]]`: only an app has pages; ids unique, two levels, places and permissions that exist.
+    fn validate_brochure(&self) -> std::result::Result<(), String> {
+        let long = |v: &Option<String>, max: usize| v.as_ref().is_some_and(|s| s.chars().count() > max);
+        if long(&self.author, 120) || long(&self.license, 80) || long(&self.details, 4000) {
+            return Err("author (120), license (80) or details (4000 characters) too long".into());
+        }
+        if let Some(h) = &self.homepage {
+            if !(h.starts_with("https://") || h.starts_with("http://"))
+                || h.len() > 300
+                || h.chars().any(char::is_whitespace)
+            {
+                return Err("homepage must be an http:// or https:// address".into());
+            }
+        }
+        if self.screenshots.len() > 8 {
+            return Err("at most 8 screenshots".into());
+        }
+        for n in &self.screenshots {
+            if !is_media_name(n) {
+                return Err(format!("screenshot '{n}': a file name of letters, digits, - _ . with the extension png, jpg, jpeg, webp or svg"));
+            }
+        }
+        Ok(())
+    }
+
     fn validate_nav(&self) -> std::result::Result<(), String> {
         if self.nav.is_empty() {
             return Ok(());
@@ -1086,6 +1138,9 @@ impl Manifest {
         };
         set(&mut m.name, &tr.name);
         set(&mut m.description, &tr.description);
+        if let Some(d) = &tr.details {
+            m.details = Some(d.clone());
+        }
         set(&mut m.contribution.label, &tr.label);
         for r in &mut m.resources {
             let Some(rt) = tr.resources.get(&r.name) else {
@@ -1214,6 +1269,35 @@ mod tests {
         view = "kpi_notes_by_tag"
         label = "Notes by tag"
     "#;
+
+    #[test]
+    fn brochure_is_optional_and_checked() {
+        let m = Manifest::from_toml(NOTES).unwrap();
+        assert!(m.author.is_none() && m.screenshots.is_empty());
+        // fields of the top level go before the first table: put them after `version`
+        let top = |extra: &str| {
+            Manifest::from_toml(&NOTES.replacen(
+                "[contribution]",
+                &format!(
+                    "{extra}
+[contribution]"
+                ),
+                1,
+            ))
+        };
+        let ok = top("author = \"Mosaikit\"
+license = \"MIT\"
+homepage = \"https://example.org/notes\"
+screenshots = [\"one.png\", \"two-2.webp\"]
+details = \"First paragraph.\"")
+        .unwrap();
+        assert_eq!(ok.license.as_deref(), Some("MIT"));
+        assert_eq!(ok.screenshots.len(), 2);
+        assert!(top("homepage = \"ftp://example.org\"").is_err());
+        assert!(top("screenshots = [\"../x.png\"]").is_err());
+        assert!(top("screenshots = [\"x.exe\"]").is_err());
+        assert!(top("screenshots = [\"1.png\",\"2.png\",\"3.png\",\"4.png\",\"5.png\",\"6.png\",\"7.png\",\"8.png\",\"9.png\"]").is_err());
+    }
 
     #[test]
     fn parse_valid() {

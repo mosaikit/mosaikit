@@ -28,6 +28,15 @@ function metricLabel(m: QuotaMetric): string {
   return { storage: t('Storage'), people: t('People'), items: t('Items') }[m]
 }
 
+/** What a quota counts, in one sentence (the «items» of the apps are not obvious). */
+function metricHint(m: QuotaMetric): string {
+  return {
+    storage: t('Space taken by the files of the tenant.'),
+    people: t('Members and guests of the tenant.'),
+    items: t('Everything the people create in the apps: notes, tasks, files, maps, sites. One note or one file counts as one item.'),
+  }[m]
+}
+
 /** A value of a quota as people read it: bytes for storage, a number for the others. */
 function fmtQuota(m: QuotaMetric, v: number | null): string {
   if (v === null) return t('no limit')
@@ -160,6 +169,7 @@ export function PlatformQuotasPanel() {
           {METRICS.map((m) => (
             <div key={m} className="grid gap-1.5">
               <Label className="text-sm font-semibold">{metricLabel(m)}</Label>
+              <span className="text-xs text-muted-foreground">{metricHint(m)}</span>
               <QuotaInput m={m} value={cur.defaults[m]} onChange={(v) => set('defaults', m, v)} label={t('Quota of new tenants: {quota}', { quota: metricLabel(m) })} />
             </div>
           ))}
@@ -310,6 +320,7 @@ export function TenantQuotasPanel({ id }: { id: string }) {
                     )}
                   </span>
                 </div>
+                <span className="text-xs text-muted-foreground">{metricHint(r.metric)}</span>
                 <QuotaInput m={r.metric} value={cur[r.metric].value} disabled={!own} onChange={(v) => set(r.metric, { value: v })} label={t('Quota of the tenant: {quota}', { quota: metricLabel(r.metric) })} />
                 <span className="text-xs text-muted-foreground">{t('Used: {used}', { used: usedText(r) })}</span>
               </div>
@@ -362,7 +373,7 @@ function TrendChart({ m, days, limit }: { m: QuotaMetric; days: QuotaDay[]; limi
     <Card>
       <CardHeader>
         <CardTitle>{metricLabel(m)}</CardTitle>
-        <CardDescription>{limit === null ? t('{now} today · no limit', { now: fmtQuota(m, last) }) : t('{now} today · limit {limit}', { now: fmtQuota(m, last), limit: fmtQuota(m, limit) })}</CardDescription>
+        <CardDescription>{metricHint(m)} {limit === null ? t('{now} today · no limit', { now: fmtQuota(m, last) }) : t('{now} today · limit {limit}', { now: fmtQuota(m, last), limit: fmtQuota(m, limit) })}</CardDescription>
       </CardHeader>
       <CardContent className="grid gap-3">
         <div

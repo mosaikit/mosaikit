@@ -68,11 +68,15 @@ Groups are for sharing with several people at once and for giving permissions to
 
 ### Permission profiles
 
-A profile is where the permissions of a User in the plugins start; groups and personal grants add to it,
-never take away. Every tenant has the profile *Standard*.
+A permission profile is a named set of permissions in the plugins, for example *Reader* or *Editor*. Give a
+profile to each person: it is what they may do in every plugin, and their starting point. Groups and personal
+grants add to it, never take away. Tenant Managers have every permission, whatever the profile. Every tenant
+has the profile *Standard*. Each card says in how many plugins the profile gives access and lists them (open
+at once when they are few), with the names and permissions of the plugins in your language.
 
 - **New profile** → **Name** and **Description** → **Create profile** (it starts with the default permissions of every plugin).
-- The menu of a profile: **Edit the permissions**, **Duplicate**, **Use for new invitations** (makes it the
+- The menu of a profile: **Rename** (name and description), **Edit the permissions** (one compact row per
+  plugin, with a filter when there are many), **Duplicate**, **Use for new invitations** (makes it the
   **Default profile**), **Delete** (its members get the default profile).
 - The standard permissions of every plugin are **Use the app**, **Create items**, **Delete items**,
   **Share items**; a plugin may declare more.

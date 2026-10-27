@@ -97,6 +97,9 @@ export function EmailPanel({ session }: { session: Session }) {
             <Badge variant="secondary" className={view.configured ? 'bg-ok/10 text-ok' : ''}>{view.configured ? t('Ready') : t('Not set')}</Badge>
           </CardTitle>
           <CardDescription>{t('Used for the notifications by email and their daily summary. Without a server nothing is sent.')}</CardDescription>
+          <p className="text-sm text-muted-foreground" data-testid="mail-explain">
+            {t('Mosaikit sends no email by itself: it needs an SMTP server (the one of your organization, or a mail service). Enter its address and credentials here, then use «Send a test». To try it locally, the optional Mailpit container of the Docker setup catches every message (SMTP localhost:1025, no security, no user).')}
+          </p>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
           <Field id="em-host" label={t('SMTP server')}>

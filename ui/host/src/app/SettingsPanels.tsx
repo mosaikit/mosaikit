@@ -626,6 +626,9 @@ export function KeysPanel({ level }: { level: KeyLevel }) {
       <CardHeader>
         <CardTitle>{t('Keys of outside services')}</CardTitle>
         <CardDescription>{intro}</CardDescription>
+        <p className="text-sm text-muted-foreground" data-testid="keys-explain">
+          {t('Which keys exist is decided by the plugins: each plugin declares the outside services it uses (a map provider, a translation service…) and the key it needs. Mosaikit lists here only those, and nothing else can be added. No plugin, no key.')}
+        </p>
       </CardHeader>
       <CardContent className="grid gap-5">
         {q.data!.length === 0 && <p className="text-sm text-muted-foreground">{t('No installed plugin uses keys of outside services.')}</p>}

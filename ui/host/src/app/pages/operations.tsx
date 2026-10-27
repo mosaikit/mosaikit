@@ -4,7 +4,7 @@
 // services and "To do" panels of the overview, and the notice of the maintenance for everybody.
 
 import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { useQueryClient } from '@tanstack/react-query'
+import { useIsFetching, useQueryClient } from '@tanstack/react-query'
 import { Activity, AlertTriangle, Archive, BellRing, Check, CircleAlert, Download, Gauge, HardDrive, Loader2, Play, Server, ShieldAlert, Trash2, Upload, Wrench } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, ApiError, appUrl, errText, fmtBytes } from '../../api.ts'
@@ -1224,6 +1224,7 @@ export function MonitoringPage({ section }: { section?: string }) {
   return (
     <>
       <PageHeader title={t('Monitoring')} sub={t('State, load and capacity of the platform')} />
+      <MonitoringNote />
       <Sections sections={sections} current={cur} href={(id) => to.admin('monitoring', id)}>
         {cur === 'status' && <StatusPanel />}
         {cur === 'performance' && <PerformancePanel />}
@@ -1233,6 +1234,28 @@ export function MonitoringPage({ section }: { section?: string }) {
         {cur === 'alerts' && <AlertsPanel />}
       </Sections>
     </>
+  )
+}
+
+/** The figures are real: measured by the server every minute and kept for 8 days. The note says when the page was
+ *  last refreshed; it refreshes by itself every minute. */
+function MonitoringNote() {
+  const qc = useQueryClient()
+  useIsFetching() // re-render when a fetch ends
+  const [, tick] = useState(0)
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      void qc.invalidateQueries({ queryKey: ['mon-'], predicate: (q) => String(q.queryKey[0]).startsWith('mon-') })
+      tick((n) => n + 1)
+    }, 60_000)
+    return () => window.clearInterval(id)
+  }, [qc])
+  const last = Math.max(0, ...qc.getQueryCache().findAll().filter((q) => String(q.queryKey[0]).startsWith('mon-')).map((q) => q.state.dataUpdatedAt))
+  return (
+    <p className="px-6 pt-3 text-xs text-muted-foreground max-[620px]:px-4" data-testid="monitoring-note">
+      {t('Real measures of this server: collected every minute and kept for 8 days; the page refreshes every minute.')}{' '}
+      {last > 0 && t('Last update: {time}', { time: new Date(last).toLocaleTimeString() })}
+    </p>
   )
 }
 

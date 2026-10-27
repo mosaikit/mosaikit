@@ -5,7 +5,7 @@
 
 import { Fragment, useRef, useState, type ReactNode } from 'react'
 import { ArrowUpCircle, ExternalLink, KeySquare, MessageSquarePlus, Power, Puzzle, RotateCcw, Trash2, Upload } from 'lucide-react'
-import { api, fmtDate } from '../../api.ts'
+import { api, appUrl, fmtDate } from '../../api.ts'
 import type { AdminPlugin, CatalogItem, ConfigDecl, PluginConfig, PluginKind, PluginTenant, TenantPlugin, UninstallImpact } from '../../types.ts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAction, useApi, useConfirm } from '../core.ts'
+import { cn } from '@/lib/utils'
 import AppIcon from '../AppIcon.tsx'
 import { Empty, ErrorBox, FormDialog, Loading, PageHeader, Pills, SaveBar, StatusBadge, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
@@ -381,17 +382,73 @@ export function AdminPluginPage({ id, tab }: { id: string; tab?: string }) {
   )
 }
 
+/** The plugin as a brochure: gallery, description, author, licence and link. Every part is optional in the manifest. */
+function Brochure({ p }: { p: AdminPlugin }) {
+  const shots = p.screenshots ?? []
+  const [shot, setShot] = useState(0)
+  const paragraphs = (p.details ?? '').split(/\n\s*\n/).map((x) => x.trim()).filter(Boolean)
+  return (
+    <Card data-testid="plugin-brochure">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2.5">
+          <AppIcon id={p.id} name={p.icon_name} className="size-6 text-primary" />
+          {p.label}
+        </CardTitle>
+        <CardDescription>{p.description}</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-4">
+        {shots.length > 0 && (
+          <div className="grid gap-2" data-testid="plugin-gallery">
+            <img
+              className="max-h-80 w-full rounded-lg border bg-muted object-contain"
+              src={appUrl(`/api/plugins/${enc(p.id)}/media/${enc(shots[shot] ?? shots[0])}`)}
+              alt={t('Picture {n} of {total} of {name}', { n: shot + 1, total: shots.length, name: p.label })}
+            />
+            {shots.length > 1 && (
+              <div className="flex flex-wrap gap-2">
+                {shots.map((n, i) => (
+                  <button key={n} type="button" aria-label={t('Show picture {n}', { n: i + 1 })} aria-current={i === shot} onClick={() => setShot(i)} className={cn('overflow-hidden rounded-md border', i === shot && 'ring-2 ring-primary')}>
+                    <img className="h-14 w-20 object-cover" src={appUrl(`/api/plugins/${enc(p.id)}/media/${enc(n)}`)} alt="" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+        {paragraphs.map((x, i) => (
+          <p key={i} className="text-sm whitespace-pre-line">
+            {x}
+          </p>
+        ))}
+        <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
+          <dt className="text-muted-foreground">{t('Author')}</dt>
+          <dd>{p.author ?? <span className="text-muted-foreground">{t('not declared')}</span>}</dd>
+          <dt className="text-muted-foreground">{t('Licence')}</dt>
+          <dd>{p.license ?? <span className="text-muted-foreground">{t('not declared')}</span>}</dd>
+          {p.homepage && (
+            <>
+              <dt className="text-muted-foreground">{t('More information')}</dt>
+              <dd>
+                <a className="underline underline-offset-4" href={p.homepage} target="_blank" rel="noopener noreferrer">
+                  {p.homepage}
+                </a>
+              </dd>
+            </>
+          )}
+        </dl>
+      </CardContent>
+    </Card>
+  )
+}
+
 function PluginOverview({ p, c, all }: { p: AdminPlugin; c?: CatalogItem; all: AdminPlugin[] }) {
   const base = p.extends ? all.find((x) => x.id === p.extends) : undefined
   return (
     <div className="grid max-w-3xl gap-6">
+      <Brochure p={p} />
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2.5">
-            <AppIcon id={p.id} name={p.icon_name} className="size-6 text-primary" />
-            {p.label}
-          </CardTitle>
-          <CardDescription>{p.description}</CardDescription>
+          <CardTitle>{t('Technical details')}</CardTitle>
         </CardHeader>
         <CardContent>
           <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
@@ -743,7 +800,9 @@ export function TenantPluginsOfAdmin({ id }: { id: string }) {
   if (q.error) return <ErrorBox error={q.error} />
   return (
     <div className="grid gap-3">
-      <p className="max-w-2xl text-sm text-muted-foreground">{t('Availability is decided in the page of each plugin; the Tenant Manager turns on the available ones.')}</p>
+      <p className="max-w-2xl text-sm text-muted-foreground">{t('Availability is decided in the page of each plugin; the Tenant Manager turns on the available ones.')}{' '}
+        <a className="underline underline-offset-4 hover:text-foreground" href={to.admin('plugins')} data-testid="to-plugins-page">{t('Go to the Plugins page')}</a>
+      </p>
       <div className="overflow-x-auto rounded-xl border bg-card">
         <Table>
           <TableHeader>
@@ -768,7 +827,7 @@ export function TenantPluginsOfAdmin({ id }: { id: string }) {
                   <KindBadge kind={p.kind} />
                 </TableCell>
                 <TableCell>{p.available ? t('yes') : t('no')}</TableCell>
-                <TableCell>{p.on ? <StatusBadge status="active" /> : <span className="text-sm text-muted-foreground">{offText(p)}</span>}</TableCell>
+                <TableCell>{p.on ? <StatusBadge status="active" /> : <Badge variant="secondary" className={p.off === 'unavailable' ? 'font-normal bg-warn/10 text-warn' : 'font-normal'} data-off={p.off}>{offText(p)}</Badge>}</TableCell>
               </TableRow>
             ))}
           </TableBody>

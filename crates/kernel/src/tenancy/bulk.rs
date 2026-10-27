@@ -292,3 +292,50 @@ pub async fn set_tenant_details(
     events::record(k, Some(tenant), Some(admin.user_id), None, None, "tenant.details", json!(d)).await;
     Ok(())
 }
+
+/// Renames a tenant and changes its identifier (the slug of the sign-in and of the addresses).
+pub async fn rename_tenant(
+    k: &Kernel,
+    admin: &SessionUser,
+    tenant: Uuid,
+    name: &str,
+    slug: &str,
+) -> Result<()> {
+    require_admin(admin)?;
+    let name = name.trim();
+    let slug = slug.trim().to_lowercase();
+    if name.is_empty() || name.chars().count() > 200 {
+        return Err(Error::bad("the name of the tenant is required (at most 200 characters)"));
+    }
+    if !super::valid_slug(&slug) {
+        return Err(Error::bad("invalid slug: 2-40 characters, lower case, digits and '-'"));
+    }
+    let n =
+        mosaikit_db::query("update core.tenants set name = $2, slug = $3 where id = $1 and not is_system")
+            .bind(tenant)
+            .bind(name)
+            .bind(&slug)
+            .execute(&k.db)
+            .await
+            .map_err(|e| match Error::from(e) {
+                err if err.kind == crate::Kind::Conflict => {
+                    Error::conflict(format!("a tenant '{slug}' already exists"))
+                }
+                err => err,
+            })?
+            .rows_affected();
+    if n == 0 {
+        return Err(Error::not_found("tenant does not exist"));
+    }
+    events::record(
+        k,
+        Some(tenant),
+        Some(admin.user_id),
+        None,
+        None,
+        "tenant.rename",
+        json!({ "name": name, "slug": slug }),
+    )
+    .await;
+    Ok(())
+}

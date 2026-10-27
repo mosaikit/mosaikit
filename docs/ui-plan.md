@@ -64,19 +64,19 @@ Observations from the user's manual tests; ids as in the user's notes. Status is
 | C3 | Sign-in: «Forgot your password?» (self-service by email) |
 | C4 | Files, Maps, Static sites, Tasks/Activities: connection refused — fix |
 | D1 | Tenants list with the tenant logo (default if none) |
-| D2 | Tenant detail: quotas in their own tab |
-| D3 | Tenant detail: name and identifier editable |
+| D2 | Tenant detail: quotas in their own tab — done |
+| D3 | Tenant detail: name and identifier editable — done |
 | D4 | Users and managers list with avatars |
 | D5 | Tenant detail: logo next to the name in the header |
-| D6 | Tenant › Plugins: a status pill for unavailable plugins too |
-| D7 | Tenant › Plugins: link to the Plugins page after the availability sentence |
-| D8 | Quotas: explain «items» (items of the apps) |
+| D6 | Tenant › Plugins: a status pill for unavailable plugins too — done |
+| D7 | Tenant › Plugins: link to the Plugins page after the availability sentence — done |
+| D8 | Quotas: explain «items» (items of the apps) — done |
 | D9 | Email required for local accounts (user decision); OIDC accounts take it from the provider |
-| D10 | Plugin detail as a brochure: gallery, description, author, licence, links |
-| D11–D13 | Answers: monitoring refresh, mail server setup, keys of outside services (clarify in the UI and the guides) |
-| D14 | An Administrator edits their own data and other Administrators' data |
+| D10 | Plugin detail as a brochure: gallery, description, author, licence, links — done |
+| D11–D13 | Answers: monitoring refresh, mail server setup, keys of outside services (clarify in the UI and the guides) — done |
+| D14 | An Administrator edits their own data and other Administrators' data — done |
 | E1 | Manage › People: click on a row opens the person |
-| E2 | Permission profiles: clearer description, rename, localized texts (no plugin ids), a compact layout for many plugins |
+| E2 | Permission profiles: clearer description, rename, localized texts (no plugin ids), a compact layout for many plugins — done |
 | E3 | Plugins: «Access and permissions» becomes «Permissions» |
 | E4, F1 | Account › Profile editable (name and picture) |
 | G1–G4 | **Done.**  Docker compose: PostgreSQL configured, optional Keycloak (realm, Mosaikit-like sign-in theme, no registration), optional mail server, nginx reverse proxy; README sections | (`deploy/`, checks R1-G-nn, static check `xtask/src/deploy_check.rs`) |

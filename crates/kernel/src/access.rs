@@ -693,6 +693,32 @@ async fn grants_of(k: &Kernel, tenant: Uuid, plugin: Option<&str>) -> Result<Vec
         .collect())
 }
 
+/// The permissions of an active plugin, with the texts in the language of the caller.
+#[derive(Debug, Clone, Serialize)]
+pub struct PluginPermissions {
+    pub plugin_id: String,
+    pub label: String,
+    pub permissions: Vec<PermDecl>,
+}
+
+/// Every active plugin with its permissions (for the permission profiles: names and texts, no identifiers).
+pub fn permission_catalog(k: &Kernel, c: &Caller, lang: &str) -> Result<Vec<PluginPermissions>> {
+    c.require_manager()?;
+    let mut v: Vec<PluginPermissions> = k
+        .plugins
+        .list()
+        .into_iter()
+        .filter(|p| p.is_active())
+        .map(|p| PluginPermissions {
+            plugin_id: p.id.clone(),
+            label: p.manifest.localized(lang).contribution.label,
+            permissions: declared(&p, lang),
+        })
+        .collect();
+    v.sort_by_key(|a| a.label.to_lowercase());
+    Ok(v)
+}
+
 /// Who may do what in a plugin: its permissions, the profiles, the grants to groups and people.
 pub async fn plugin_access(k: &Kernel, c: &Caller, plugin: &str, lang: &str) -> Result<PluginAccess> {
     c.require_manager()?;

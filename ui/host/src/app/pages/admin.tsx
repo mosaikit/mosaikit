@@ -3,7 +3,7 @@
 
 import { useDeferredValue, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Bell, Building2, CircleHelp, Contrast, Frame, Gauge, HardDrive, History, KeyRound, KeySquare, Mail, MoreHorizontal, Palette, PanelLeft, Plus, Power, RefreshCw, Search, ShieldCheck, Upload, Users, Wrench } from 'lucide-react'
+import { Bell, Building2, CircleHelp, Contrast, Frame, Gauge, HardDrive, History, KeyRound, KeySquare, Mail, MoreHorizontal, Palette, PanelLeft, Pencil, Plus, Power, RefreshCw, Search, ShieldCheck, Upload, Users, Wrench } from 'lucide-react'
 import { api, fmtBytes, fmtDate } from '../../api.ts'
 import { useBrand } from '../../brand.ts'
 import type { AdminUser, GlobalKpi, Member, Session, ShellBand, SystemOverview, TenantInfo } from '../../types.ts'
@@ -30,7 +30,7 @@ import { PlatformQuotasPanel, TenantQuotasPanel } from '../Quotas.tsx'
 import { BackupPanel, ImportTenantDialog, MaintenancePanel, NewTenantWizard, OverviewOps, TenantLifecycle, TenantState } from './operations.tsx'
 import { t } from '../i18n.ts'
 import { LayoutPanel, StylePanel } from '../LayoutSettings.tsx'
-import { TenantContact } from '../TenantContact.tsx'
+import { TenantContact, TenantIdentity } from '../TenantContact.tsx'
 
 
 /* ── Overview ────────────────────────────────────────────────────────── */
@@ -182,7 +182,7 @@ export function AdminTenant({ id, section }: { id: string; section?: string }) {
   const members = useApi<Member[]>(['admin-members', id], `/api/admin/tenants/${id}/members`)
   const confirm = useConfirm()
   const tn = tenants.data?.find((x) => x.id === id)
-  const cur = section === 'users' || section === 'sign-in' || section === 'plugins' ? section : 'details'
+  const cur = section === 'users' || section === 'sign-in' || section === 'plugins' || section === 'quotas' ? section : 'details'
   const signIn = useApi<{ enabled: boolean }>(['admin-sign-in', id], `/api/admin/tenants/${id}/sign-in`)
   const toggle = async () => {
     const next = tn!.status === 'active' && !tn!.archived_at ? 'suspended' : 'active'
@@ -214,6 +214,7 @@ export function AdminTenant({ id, section }: { id: string; section?: string }) {
           { id: 'users', label: t('People'), count: members.data?.length },
           { id: 'sign-in', label: t('Sign-in') },
           { id: 'plugins', label: t('Plugins') },
+          { id: 'quotas', label: t('Quotas') },
         ]}
         current={cur}
         href={(s) => to.adminTenant(id, s === 'details' ? undefined : s)}
@@ -228,11 +229,8 @@ export function AdminTenant({ id, section }: { id: string; section?: string }) {
               <CardDescription>{t('Name, identifier and contents of the tenant.')}</CardDescription>
             </CardHeader>
             <CardContent>
-              <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
-                <dt className="text-muted-foreground">{t('Name')}</dt>
-                <dd>{tn.name}</dd>
-                <dt className="text-muted-foreground">{t('Identifier')}</dt>
-                <dd className="font-mono">{tn.slug}</dd>
+              <TenantIdentity id={id} name={tn.name} slug={tn.slug} />
+              <dl className="mt-5 grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
                 <dt className="text-muted-foreground">{t('Sign-in')}</dt>
                 <dd>
                   <a className="underline-offset-4 hover:underline" href={to.adminTenant(id, 'sign-in')}>
@@ -249,13 +247,14 @@ export function AdminTenant({ id, section }: { id: string; section?: string }) {
             </CardContent>
           </Card>
           <TenantContact id={id} />
-          <TenantQuotasPanel id={id} />
           <TenantLifecycle tn={tn} />
           </div>
         ) : cur === 'sign-in' ? (
           <SignInSettings id={id} />
         ) : cur === 'plugins' ? (
           <TenantPluginsOfAdmin id={id} />
+        ) : cur === 'quotas' ? (
+          <TenantQuotasPanel id={id} />
         ) : (
           <TenantUsers id={id} q={members} />
         )}
@@ -524,6 +523,11 @@ function Admins({ me }: { me: string }) {
   const q = useApi<AdminUser[]>(['admins'], '/api/admin/administrators')
   const confirm = useConfirm()
   const [dlg, setDlg] = useState<null | 'new' | AdminUser>(null)
+  const [edit, setEdit] = useState<AdminUser | null>(null)
+  const update = useAction(({ id, display_name, email }: { id: string; display_name: string; email: string }) => api('PUT', `/api/admin/administrators/${id}`, { display_name, email }), {
+    ok: t('Data saved'),
+    invalidate: [['admins'], ['session']],
+  })
   const inval = [['admins'], ['admin-overview']]
   const create = useAction((v: Record<string, string>) => api('POST', '/api/admin/administrators', v), { ok: (v) => t('Administrator {username} created', { username: v.username }), invalidate: inval })
   const status = useAction(({ id, active }: { id: string; active: boolean }) => api('PUT', `/api/admin/administrators/${id}/status`, { active }), {
@@ -581,7 +585,7 @@ function Admins({ me }: { me: string }) {
                 <TableCell>{a.totp ? <Badge className="bg-ok/10 font-normal text-ok">{t('on')}</Badge> : <Badge variant="secondary" className="font-normal">{t('to register')}</Badge>}</TableCell>
                 <TableCell className="text-muted-foreground">{fmtDate(a.created_at)}</TableCell>
                 <TableCell>
-                  {a.user_id !== me && (
+                  {(
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" aria-label={t('Actions for {username}', { username: a.username })}>
@@ -589,16 +593,23 @@ function Admins({ me }: { me: string }) {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
+                        <DropdownMenuItem onSelect={() => setEdit(a)}>
+                          <Pencil />
+                          {t('Edit name and email')}
+                        </DropdownMenuItem>
+                        {a.user_id !== me && (
                         <DropdownMenuItem onSelect={() => setDlg(a)}>
                           <KeyRound />
                           {t('Reset the password')}
                         </DropdownMenuItem>
-                        {a.totp && (
+                        )}
+                        {a.user_id !== me && a.totp && (
                           <DropdownMenuItem onSelect={async () => (await confirm(t('Remove the second factor of {username}?', { username: a.username }), true)) && totp.mutate(a.user_id)}>
                             <ShieldCheck />
                             {t('Reset the second factor')}
                           </DropdownMenuItem>
                         )}
+                        {a.user_id !== me && (
                         <DropdownMenuItem
                           variant={a.status === 'active' ? 'destructive' : 'default'}
                           onSelect={async () => {
@@ -609,6 +620,7 @@ function Admins({ me }: { me: string }) {
                           <Users />
                           {a.status === 'active' ? t('Disable') : t('Reactivate')}
                         </DropdownMenuItem>
+                        )}
                       </DropdownMenuContent>
                     </DropdownMenu>
                   )}
@@ -630,6 +642,18 @@ function Admins({ me }: { me: string }) {
         ]}
         submit={t('Create')}
         onSubmit={(v) => create.mutateAsync(v)}
+      />
+      <FormDialog
+        key={edit?.user_id ?? 'none'}
+        open={!!edit}
+        onOpenChange={(o) => !o && setEdit(null)}
+        title={t('Data of {v}', { v: edit?.username ?? '' })}
+        fields={[
+          { name: 'display_name', label: t('Name'), required: true, initial: edit?.display_name ?? '' },
+          { name: 'email', label: t('Email'), initial: edit?.email ?? '' },
+        ]}
+        submit={t('Save')}
+        onSubmit={(v) => update.mutateAsync({ id: edit!.user_id, display_name: v.display_name, email: v.email ?? '' })}
       />
       <FormDialog
         open={!!dlg && dlg !== 'new'}

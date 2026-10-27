@@ -34,6 +34,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/t/{t}/manage/members/{uid}/reset-link", post(m_member_reset_link))
         .route("/api/t/{t}/manage/members/{uid}/why", get(m_member_why))
         .route("/api/t/{t}/manage/profiles", get(m_profiles).post(m_create_profile))
+        .route("/api/t/{t}/manage/profiles/catalog", get(m_profile_catalog))
         .route("/api/t/{t}/manage/profiles/{pid}", put(m_update_profile).delete(m_delete_profile))
         .route("/api/t/{t}/manage/plugins/{plugin}/access", get(m_plugin_access))
         .route("/api/t/{t}/manage/plugins/{plugin}/grants", put(m_plugin_grant))
@@ -218,6 +219,14 @@ async fn m_create_profile(
     Json(r): Json<NewProfileReq>,
 ) -> ApiResult<Json<Value>> {
     Ok(Json(json!(access::create_profile(&s.k, &c, &r.name, &r.description, r.copy_of).await?)))
+}
+
+async fn m_profile_catalog(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    h: HeaderMap,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(access::permission_catalog(&s.k, &c, &request_lang(&h))?)))
 }
 
 async fn m_update_profile(
