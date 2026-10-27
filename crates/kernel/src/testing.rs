@@ -64,9 +64,23 @@ pub fn build_wasm_plugins() -> PathBuf {
     root.join("target").join("wasm32-unknown-unknown").join("debug")
 }
 
+/// A plugin with a UI source folder must have its build: `cargo xtask e2e` (or a manual build) running in
+/// the same checkout empties `ui/dist` for a few seconds, and a package packed then would have no UI.
+fn wait_for_ui_build(dir: &Path) {
+    if !dir.join("ui").join("package.json").is_file() {
+        return;
+    }
+    let entry = dir.join("ui").join("dist").join("index.html");
+    let start = std::time::Instant::now();
+    while !entry.is_file() && start.elapsed() < std::time::Duration::from_secs(120) {
+        std::thread::sleep(std::time::Duration::from_millis(250));
+    }
+}
+
 /// Signed package of an official plugin (`mosaikit-plugins/<name>`).
 pub fn pack_plugin(name: &str) -> Vec<u8> {
     let dir = plugins_root().join(name);
+    wait_for_ui_build(&dir);
     let wasm = if dir.join("Cargo.toml").is_file() {
         Some(build_wasm_plugins().join(format!("{}.wasm", name.replace('-', "_"))))
     } else {

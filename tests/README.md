@@ -10,10 +10,10 @@ run of each suite are in [results/test-results.md](results/test-results.md), reg
 |---|---|
 | `results/test-results.md` | Report of the latest run of every suite (committed with every phase) |
 | `results/raw/` | Machine outputs of the suites (JUnit, libtest text, vitest and Playwright JSON); git-ignored |
-| `e2e/` | End-to-end tests in the browser (today still in `e2e/` at the root of the repository; it moves here) |
+| `e2e/` | End-to-end tests in the browser: `specs/NN-<area>.spec.ts` (run in order), `specs/support.ts` (shared helpers) |
 | `manual/` | Automated runs of the manual checks of [docs/manual-tests.md](../docs/manual-tests.md) |
-| `perf/` | Load test scripts (today in `xtask/perf/`, run by `cargo xtask perf`) |
-| `fixtures/` | Shared test data |
+| `perf/` | Load test scripts (`run.mjs`, SQL and SQLite seeds, RLS and visibility checks), run by `cargo xtask perf` |
+| `fixtures/<suite>/` | Test data, one folder per suite (`fixtures/manual` for the manual checks) |
 
 ## Suites
 
@@ -29,16 +29,20 @@ run of each suite are in [results/test-results.md](results/test-results.md), reg
 | Host UI tests | `ui/host/src/**/*.test.ts` | vitest | `cargo xtask test` |
 | Plugin API tests | `ui/plugin-api/src/**/*.test.ts` | vitest | `cargo xtask test` |
 | Plugin UI tests | `../mosaikit-plugins/*/ui/**/*.test.ts` | vitest | `cargo xtask test` |
-| End-to-end tests | `e2e/tests/*.spec.ts` (with axe) | Playwright | `cargo xtask e2e` |
+| End-to-end tests | `tests/e2e/specs/*.spec.ts` (with axe) | Playwright | `cargo xtask e2e` |
 | Manual checks, automated | `tests/manual` (one test per id of `docs/manual-tests.md`, fixtures in `tests/fixtures/manual`) | Playwright | `cargo xtask manual-tests` (`--area R1-L` or `-g P3-` for the checks whose id starts so; `-- --grep P3-12` for one; `--check` compares the ids; `ci` runs the check) |
-| Load test | `xtask/perf/` | `cargo xtask perf` | by hand, results in [docs/reports/performance.md](../docs/reports/performance.md) |
+| Load test | `tests/perf/` | `cargo xtask perf` | by hand, results in [docs/reports/performance.md](../docs/reports/performance.md) |
 
-Run a part of the end-to-end suite: `cargo xtask e2e -- tests/<file>.spec.ts -g "part of a test title"` (everything
+Run a part of the end-to-end suite: `cargo xtask e2e -- specs/<file>.spec.ts -g "part of a test title"` (everything
 after `--` goes to Playwright; a partial run does not replace the e2e results of the report). Heavy runs queue on
 machine-wide slots and each worktree has its own port and database: see "Working in parallel" in the
 [README](../README.md#working-in-parallel-worktrees-ports-heavy-run-slots).
 
 Unit tests stay next to the code they test; this folder holds the system-level suites and the results.
+
+### End-to-end suite: order and isolation
+
+The e2e specs share ONE installation (a new database, plugins and server per run) and build on each other: the files run in the order of their numbers, in one worker (`workers: 1`). Parallel workers on the same installation are not safe: the Administrator has one second factor whose code the server accepts once per 30-second step, and several tests change platform-wide settings (languages, maintenance, quotas, layouts, names of tenants). A file that fails can leave state the next ones need, so read the first failure first. Parallelism is across installations instead: every checkout (worktree) has its own database and ports, and heavy runs queue on slots. The second factor is kept in `tests/e2e/test-results/admin-state.json` (emptied by the global setup at every run).
 ## When to run what
 
 - While working: only the area you touch, e.g. `cargo xtask manual-tests --area R1-L` (ids that start with the prefix) or `cargo xtask e2e -- -g "<title>"`; never the whole manual suite.
