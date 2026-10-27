@@ -5,13 +5,14 @@
   "workspaces": [
     "ui/plugin-api",
     "ui/host",
-    "e2e"
+    "e2e",
+    "tests/manual"
   ],
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "lint": "oxlint ui e2e --deny-warnings"
+    "lint": "oxlint ui e2e tests --deny-warnings"
   },
   "devDependencies": {
     "@types/node": "^24.19.2",

@@ -1502,6 +1502,7 @@ mosaikit/
 | `cargo xtask plugin new <name>` | creates a plugin from the template |
 | `cargo xtask plugin pack <dir>` | builds and packs (signs with the development key) |
 | `cargo xtask test` | Rust tests on PostgreSQL and on SQLite, tests of the plugins and of the distribution, UI tests |
+| `cargo xtask manual-tests` | the checks of `docs/manual-tests.md`, automated (`tests/manual`), on a new seeded installation; `--check` only compares ids |
 | `cargo xtask ci` | fmt, clippy `-D warnings`, tests, lint and UI build |
 | `cargo xtask test-report` | [tests/results/test-results.md](../tests/results/test-results.md) from the latest results in `tests/results/raw` (`test`, `ci` and `e2e` run it at the end) |
 | `cargo xtask perf` | load test at scale (`--scale full`: 200 tenants, 1M items, 5M events; `--backend sqlite --scale desktop`), `--reuse`, `--no-build`, `--clean`; results in `.dev/perf/`, see [reports/performance.md](reports/performance.md) |
@@ -1530,6 +1531,16 @@ vitest for every npm workspace with a vitest `test` script, the JSON reporter of
 [tests/results/test-results.md](../tests/results/test-results.md): totals per suite, every test with its result and duration, the
 failures with their message, the commit of each run. Every phase, and every change that adds or changes
 tests, commits the regenerated file. [tests/README.md](../tests/README.md) lists every suite.
+
+**Manual checks, automated.** Every check of `docs/manual-tests.md` has an automated twin in
+`tests/manual` (Playwright, one test per id). `cargo xtask manual-tests` starts a new installation like
+the e2e one (database `mosaikit_manual` plus the folder of the checkout, free ports, the test identity
+provider), the suite seeds it like the development environment (accounts of the document, two tenants,
+a guest, a few notes) and runs the checks in the order of the document; arguments after `--` go to
+Playwright (`-- --grep P3-12`). `--check`, also run by `cargo xtask ci`, verifies that the document and
+the suite have the same ids. Raw outputs are git-ignored under `tests/results/raw` (`manual/results.json`,
+`manual-screens/<id>.png`); known defects are expected failures with their finding, so a fix shows up as
+"expected to fail" until the mark is removed. Definition of done: [ui-plan.md](ui-plan.md).
 
 **Build speed.** The repository configures what is the same for everybody; the rest is per machine:
 

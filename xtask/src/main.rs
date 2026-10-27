@@ -8,6 +8,7 @@ mod dev;
 mod dist;
 mod e2e;
 mod heavy;
+mod manual;
 mod perf;
 mod plugins;
 mod release;
@@ -66,6 +67,24 @@ enum Cmd {
         /// only these Playwright arguments, e.g. `-- tests/auth.spec.ts -g "sign in"` (report untouched)
         #[arg(last = true)]
         only: Vec<String>,
+    },
+    /// The checks of docs/manual-tests.md, automated (tests/manual), on a new seeded installation
+    ManualTests {
+        /// show the browser
+        #[arg(long)]
+        headed: bool,
+        /// only the consistency between docs/manual-tests.md and tests/manual (no installation)
+        #[arg(long)]
+        check: bool,
+        /// start the seeded installation and keep it running, for running single checks
+        #[arg(long)]
+        serve: bool,
+        /// only the checks whose id starts with this prefix (an area or a phase), e.g. `--area R1-L` or `-g P3-`
+        #[arg(long, short = 'g')]
+        area: Option<String>,
+        /// passed to Playwright, e.g. `-- --grep P3-12`
+        #[arg(last = true)]
+        args: Vec<String>,
     },
     /// Load test of a full installation at scale (docs/reports/performance.md)
     Perf {
@@ -252,6 +271,9 @@ fn main() -> Result<()> {
         Cmd::Ci => ci::ci(),
         Cmd::TestReport => report::generate().map(|_| ()),
         Cmd::E2e { headed, only } => e2e::e2e(headed, &only),
+        Cmd::ManualTests { check: true, .. } => manual::check(),
+        Cmd::ManualTests { serve: true, .. } => manual::serve(),
+        Cmd::ManualTests { headed, area, args, .. } => manual::manual_tests(headed, area, &args),
         Cmd::Perf { clean: true, .. } => perf::clean(),
         Cmd::Perf { backend, scale, reuse, no_build, .. } => perf::perf(&backend, &scale, reuse, no_build),
         Cmd::Worktree { cmd } => match cmd {

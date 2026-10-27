@@ -17,7 +17,7 @@ use crate::dev::kill_tree;
 use crate::util::{exe, npm, output, pg_bin, root, run, which};
 use crate::{plugins, report};
 
-const ADMIN_PASSWORD: &str = "e2e-admin-password";
+pub(crate) const ADMIN_PASSWORD: &str = "e2e-admin-password";
 
 /// Administrative role of the tests: `MOSAIKIT_TEST_DATABASE_URL` (CI) or the development cluster.
 pub(crate) fn admin_url() -> String {
@@ -30,13 +30,6 @@ pub(crate) fn psql(sql: &str) -> Result<String> {
         .or_else(|| which("psql"))
         .context("psql not found (MOSAIKIT_PG_BIN or PATH)")?;
     output(Command::new(psql).args(["-v", "ON_ERROR_STOP=1", "-d"]).arg(admin_url()).args(["-tAc", sql]))
-}
-
-/// The database of this checkout: `mosaikit_e2e` for a folder called `mosaikit`, otherwise with the
-/// folder name (`mosaikit-phase8` -> `mosaikit_e2e_phase8`); `MOSAIKIT_DB_SUFFIX` (set by the
-/// `.worktree.env` of `cargo xtask worktree add`) wins over the folder name.
-fn db_name() -> String {
-    checkout_db("mosaikit_e2e")
 }
 
 /// `base` for the checkout in a folder called `mosaikit`, otherwise `base` plus the suffix, so that
@@ -64,14 +57,16 @@ pub fn db_with_suffix(base: &str, folder: &str, explicit: Option<&str>) -> Strin
 
 /// The app port of this run (the plugins use the next one, the test identity provider the one after):
 /// `MOSAIKIT_E2E_PORT`, or the first three free on 127.0.0.1 among 18080, 18090, 18100…
-fn ports() -> Result<u16> {
+fn ports(skip: &[u16]) -> Result<u16> {
     if let Some(p) = std::env::var("MOSAIKIT_E2E_PORT").ok().and_then(|p| p.parse().ok()) {
-        return Ok(p);
+        if skip.is_empty() {
+            return Ok(p);
+        }
     }
     let free = |p: u16| std::net::TcpListener::bind(("127.0.0.1", p)).is_ok();
     (0..20)
         .map(|i| 18080 + i * 10)
-        .find(|&p| free(p) && free(p + 1) && free(p + 2))
+        .find(|&p| !skip.contains(&p) && free(p) && free(p + 1) && free(p + 2))
         .context("no three free ports from 18080 to 18272")
 }
 
@@ -113,110 +108,174 @@ pub(crate) fn wait_health(url: &str) -> Result<()> {
     bail!("the server does not answer on {url}")
 }
 
+/// A full installation for the browser tests: new database, plugins built, signed and preinstalled from
+/// the registry, the server and the test identity provider, on the first free ports.
+pub(crate) struct Instance {
+    pub port: u16,
+    pub idp_port: u16,
+    pub dir: std::path::PathBuf,
+    wildcard: bool,
+    server: std::process::Child,
+    idp: std::process::Child,
+}
+
+impl Instance {
+    /// `suite` names the database prefix and the folder under `.dev` (`e2e`, `manual`).
+    pub(crate) fn start(suite: &str) -> Result<Instance> {
+        Instance::start_with(suite, false)
+    }
+
+    /// `wildcard`: one origin per plugin (`http://<plugin>.localhost:<port>`, the browser resolves
+    /// `*.localhost` to the computer itself), for the scenario of tests/wildcard.spec.ts only.
+    pub(crate) fn start_with(suite: &str, wildcard: bool) -> Result<Instance> {
+        if std::env::var_os("MOSAIKIT_TEST_DATABASE_URL").is_none() {
+            crate::db::up()?;
+        }
+        let db = checkout_db(&format!("mosaikit_{suite}"));
+        reset_db(&db)?;
+        let dir = root().join(".dev").join(suite);
+        if dir.exists() {
+            std::fs::remove_dir_all(&dir)?;
+        }
+        std::fs::create_dir_all(&dir)?;
+
+        let all = plugins::discover()?;
+        plugins::ensure_npm()?;
+        run(npm().current_dir(root()).args(["run", "build"]))?;
+        plugins::build_ui(&all)?;
+        plugins::build_wasm(&all, false)?;
+        plugins::pack_all(&all, false, &dir.join("registry"))?;
+        let trusted = std::fs::read_to_string(dir.join("registry").join("trusted_key.txt"))?;
+        let url = admin_url().replace("/postgres", &format!("/{db}"));
+        run(Command::new("cargo").current_dir(root()).args(["build", "-p", "mosaikit-server"]))?;
+        // another checkout may take the ports between the check and the start of the server: then the
+        // server (or the provider) exits at once and the next free ports are tried
+        let mut taken = Vec::new();
+        for _ in 0..5 {
+            let port = ports(&taken)?;
+            taken.push(port);
+            eprintln!(
+                "== {suite} on http://127.0.0.1:{port}/mosaikit (plugins on {}), database {db}",
+                port + 1
+            );
+            let extra = if wildcard {
+                format!("plugin_url = \"http://*.localhost:{}/mosaikit\"\nadmin_totp = false\n", port + 1)
+            } else {
+                String::new()
+            };
+            std::fs::write(
+                dir.join("mosaikit.toml"),
+                format!(
+                    "# installation of the browser tests (properties described in mosaikit.example.toml)\n\
+                     url = \"http://127.0.0.1:{port}/mosaikit\"\ndata_dir = \"data\"\n{extra}allow_private_fetch = true\n\
+                     registry = \"registry/index.json\"\npreinstall = true\ntrusted_keys = [\"{}\"]\n\n\
+                     [database]\nurl = \"{url}\"\n",
+                    trusted.trim()
+                ),
+            )?;
+            let server = Command::new(plugins::target_dir().join("debug").join(exe("mosaikit-server")))
+                .args(["--config"])
+                .arg(dir.join("mosaikit.toml"))
+                .env("MOSAIKIT_ADMIN_PASSWORD", ADMIN_PASSWORD)
+                .stdout(Stdio::from(std::fs::File::create(dir.join("server.log"))?))
+                .stderr(Stdio::from(std::fs::File::create(dir.join("server.err.log"))?))
+                .spawn()?;
+            let idp_port = port + 2;
+            let idp = Command::new(plugins::target_dir().join("debug").join(exe("mosaikit-fake-idp")))
+                .args(["--port", &idp_port.to_string()])
+                .stdout(Stdio::from(std::fs::File::create(dir.join("idp.log"))?))
+                .stderr(Stdio::from(std::fs::File::create(dir.join("idp.err.log"))?))
+                .spawn()?;
+            let mut me = Instance { port, idp_port, dir: dir.clone(), wildcard, server, idp };
+            let health =
+                wait_health(&format!("http://127.0.0.1:{port}/mosaikit/api/health")).and_then(|_| {
+                    wait_health(&format!("http://127.0.0.1:{idp_port}/.well-known/openid-configuration"))
+                });
+            // answered, but by the server of another checkout? Ours must still be running
+            let ours = matches!(me.server.try_wait(), Ok(None)) && matches!(me.idp.try_wait(), Ok(None));
+            match (health, ours) {
+                (Ok(()), true) => return Ok(me),
+                (_, false) => {
+                    eprintln!("   ports {port}-{idp_port} taken by another process: trying the next ones");
+                    me.stop(false);
+                }
+                (Err(e), true) => {
+                    me.stop(true);
+                    return Err(e);
+                }
+            }
+        }
+        bail!("no free ports for the {suite} installation after 5 attempts")
+    }
+
+    /// The addresses for Playwright.
+    pub(crate) fn env(&self, cmd: &mut Command) {
+        cmd.env("E2E_ADMIN_PASSWORD", ADMIN_PASSWORD)
+            .env("E2E_BASE_URL", format!("http://127.0.0.1:{}/mosaikit/", self.port))
+            .env(
+                "E2E_PLUGIN_ORIGIN",
+                if self.wildcard {
+                    format!("http://localhost:{}", self.port + 1)
+                } else {
+                    format!("http://127.0.0.1:{}", self.port + 1)
+                },
+            )
+            .env("E2E_IDP_URL", format!("http://127.0.0.1:{}", self.idp_port));
+    }
+
+    pub(crate) fn stop(&mut self, failed: bool) {
+        kill_tree(&mut self.server);
+        kill_tree(&mut self.idp);
+        if failed {
+            eprintln!("server log: {}", self.dir.join("server.err.log").display());
+        }
+    }
+}
+
 pub fn e2e(headed: bool, only: &[String]) -> Result<()> {
     let _slot = crate::heavy::acquire("e2e", "xtask e2e")?;
-    if std::env::var_os("MOSAIKIT_TEST_DATABASE_URL").is_none() {
-        crate::db::up()?;
-    }
-    let db = db_name();
-    let port = ports()?;
-    eprintln!("== e2e on http://127.0.0.1:{port}/mosaikit (plugins on {}), database {db}", port + 1);
-    reset_db(&db)?;
-    let dir = root().join(".dev").join("e2e");
-    if dir.exists() {
-        std::fs::remove_dir_all(&dir)?;
-    }
-    std::fs::create_dir_all(&dir)?;
-
-    let all = plugins::discover()?;
-    plugins::ensure_npm()?;
-    run(npm().current_dir(root()).args(["run", "build"]))?;
-    plugins::build_ui(&all)?;
-    plugins::build_wasm(&all, false)?;
-    plugins::pack_all(&all, false, &dir.join("registry"))?;
-    let trusted = std::fs::read_to_string(dir.join("registry").join("trusted_key.txt"))?;
-    let url = admin_url().replace("/postgres", &format!("/{db}"));
-    // `MOSAIKIT_E2E_WILDCARD=1`: one origin per plugin (http://<plugin>.localhost:<port>, the browser
-    // resolves *.localhost to the computer itself), only the scenario of tests/wildcard.spec.ts
+    // `MOSAIKIT_E2E_WILDCARD=1`: only the scenario of tests/wildcard.spec.ts, with one origin per plugin
     let wildcard = std::env::var("MOSAIKIT_E2E_WILDCARD").is_ok_and(|v| v == "1");
-    let extra = if wildcard {
-        format!("plugin_url = \"http://*.localhost:{}/mosaikit\"\nadmin_totp = false\n", port + 1)
-    } else {
-        String::new()
-    };
-    std::fs::write(
-        dir.join("mosaikit.toml"),
-        format!(
-            "# installation of the e2e tests (properties described in mosaikit.example.toml)\n\
-             url = \"http://127.0.0.1:{port}/mosaikit\"\ndata_dir = \"data\"\n{extra}\
-             allow_private_fetch = true\nregistry = \"registry/index.json\"\npreinstall = true\ntrusted_keys = [\"{}\"]\n\n[database]\nurl = \"{url}\"\n",
-            trusted.trim()
-        ),
-    )?;
-    run(Command::new("cargo").current_dir(root()).args(["build", "-p", "mosaikit-server"]))?;
-    let mut server = Command::new(plugins::target_dir().join("debug").join(exe("mosaikit-server")))
-        .args(["--config"])
-        .arg(dir.join("mosaikit.toml"))
-        .env("MOSAIKIT_ADMIN_PASSWORD", ADMIN_PASSWORD)
-        .stdout(Stdio::from(std::fs::File::create(dir.join("server.log"))?))
-        .stderr(Stdio::from(std::fs::File::create(dir.join("server.err.log"))?))
-        .spawn()?;
-    let idp_port = port + 2;
-    let mut idp = Command::new(plugins::target_dir().join("debug").join(exe("mosaikit-fake-idp")))
-        .args(["--port", &idp_port.to_string()])
-        .stdout(Stdio::from(std::fs::File::create(dir.join("idp.log"))?))
-        .stderr(Stdio::from(std::fs::File::create(dir.join("idp.err.log"))?))
-        .spawn()?;
-    let result = (|| -> Result<()> {
-        wait_health(&format!("http://127.0.0.1:{port}/mosaikit/api/health"))?;
-        wait_health(&format!("http://127.0.0.1:{idp_port}/.well-known/openid-configuration"))?;
-        let mut cmd = npm();
-        cmd.current_dir(root())
-            .args(["run", "e2e", "-w", "e2e"])
-            .env("E2E_ADMIN_PASSWORD", ADMIN_PASSWORD)
-            .env("E2E_BASE_URL", format!("http://127.0.0.1:{port}/mosaikit/"))
-            .env("E2E_PLUGIN_ORIGIN", format!("http://127.0.0.1:{}", port + 1))
-            .env("E2E_IDP_URL", format!("http://127.0.0.1:{idp_port}"));
-        if headed {
-            cmd.env("E2E_HEADED", "1");
-        }
-        if wildcard {
-            // only the scenario of the wildcard: not the results of the whole suite
-            cmd.env("E2E_WILDCARD", "1")
-                .env("E2E_PLUGIN_ORIGIN", format!("http://localhost:{}", port + 1))
-                .args(["--", "tests/wildcard.spec.ts"]);
-            return run(&mut cmd);
-        }
-        if !only.is_empty() {
-            // a part of the suite (files, `-g` grep): run it directly, the report of the whole suite stays
-            cmd.arg("--").args(only);
-            return run(&mut cmd);
-        }
-        let json = report::dir().join("e2e.json");
-        std::fs::create_dir_all(report::dir())?;
-        let _ = std::fs::remove_file(&json);
-        cmd.env("E2E_JSON", &json);
-        let ok = report::run_suite(report::Suite {
-            id: "e2e".into(),
-            title: "End-to-end tests in the browser (Playwright)".into(),
-            order: 90,
-            format: report::Format::Playwright,
-            junit_from: None,
-            cmd: &mut cmd,
-        })?;
-        if !ok {
-            bail!("end-to-end tests failed");
-        }
-        Ok(())
-    })();
-    kill_tree(&mut server);
-    kill_tree(&mut idp);
-    if result.is_err() {
-        eprintln!("server log: {}", dir.join("server.err.log").display());
+    let mut inst = Instance::start_with("e2e", wildcard)?;
+    let mut cmd = npm();
+    cmd.current_dir(root()).args(["run", "e2e", "-w", "e2e"]);
+    inst.env(&mut cmd);
+    if headed {
+        cmd.env("E2E_HEADED", "1");
     }
+    if wildcard {
+        // not the results of the whole suite
+        cmd.env("E2E_WILDCARD", "1").args(["--", "tests/wildcard.spec.ts"]);
+        let result = run(&mut cmd);
+        inst.stop(result.is_err());
+        return result;
+    }
+    if !only.is_empty() {
+        // a part of the suite (files, `-g` grep): run it directly, the report of the whole suite stays
+        cmd.arg("--").args(only);
+        let result = run(&mut cmd);
+        inst.stop(result.is_err());
+        return result;
+    }
+    let json = report::dir().join("e2e.json");
+    std::fs::create_dir_all(report::dir())?;
+    let _ = std::fs::remove_file(&json);
+    cmd.env("E2E_JSON", &json);
+    let ok = report::run_suite(report::Suite {
+        id: "e2e".into(),
+        title: "End-to-end tests in the browser (Playwright)".into(),
+        order: 90,
+        format: report::Format::Playwright,
+        junit_from: None,
+        cmd: &mut cmd,
+    })?;
+    inst.stop(!ok);
     // the report also when the run failed (a missing result marks the suite)
     report::generate()?;
-    result
+    if !ok {
+        bail!("end-to-end tests failed");
+    }
+    Ok(())
 }
 
 #[cfg(test)]

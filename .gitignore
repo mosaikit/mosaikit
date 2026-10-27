@@ -19,3 +19,6 @@ e2e/playwright-report/
 
 # chiavi di firma
 *.key
+
+# raw outputs of the system tests (screenshots, JSON, downloads); the report is tests/results/test-results.md
+tests/results/raw/

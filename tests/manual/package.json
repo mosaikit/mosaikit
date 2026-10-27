@@ -1,0 +1,15 @@
+{
+  "name": "@mosaikit/manual-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The checks of docs/manual-tests.md, automated (started by cargo xtask manual-tests)",
+  "type": "module",
+  "scripts": {
+    "manual": "playwright test -c playwright.config.ts",
+    "check": "node catalog.mjs"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.14.0",
+    "@playwright/test": "^1.64.1"
+  }
+}

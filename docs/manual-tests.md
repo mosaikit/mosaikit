@@ -7,6 +7,20 @@ what the mockup ([docs/mockup](mockup/README.md)) promises.
 
 The document grows with the plan: every phase adds its section when it is committed.
 
+**Every check is automated too.** Each id has its twin in `tests/manual/checks` (one Playwright test per
+id, titled with the id), run on a new installation seeded like the development environment:
+
+- `cargo xtask manual-tests` runs them all; `cargo xtask manual-tests -- --grep P3-12` runs one;
+- `cargo xtask manual-tests --check` (also part of `cargo xtask ci`) fails if an id of this document has
+  no automated test or an automated test has no id here, so a new check needs both;
+- screenshots go to `tests/results/raw/manual-screens/<id>.png`, the results to the report of the
+  automated tests; a check that cannot run automatically (Docker, an outside crawler…) is reported as
+  skipped with the reason, and a known defect as an expected failure with its finding in
+  [reports/qa-walkthrough.md](reports/qa-walkthrough.md).
+
+Running them by hand stays useful: the automated checks see what can be measured, a person sees how it
+looks and reads.
+
 ## Setup
 
 1. From the `mosaikit` folder: `cargo xtask dev` (development PostgreSQL, plugins, server, Vite). Wait for
@@ -373,7 +387,7 @@ cannot sign in. At the end put it back to local accounts (P8-14).
 | P10-13 | System › Style: set Corners Round, Density Compact, Font Humanist, Tabs Pill, Buttons Outline | The page previews each change before Save; after Save the whole shell and the sign-in page follow |
 | P10-14 | Tenant settings › Style: customize Corners | Only the tenant changes; the other styles stay inherited |
 | P10-15 | Style › Band image: upload a dark PNG | It shows under the band, texts readable |
-| P10-16 | Upload a very bright PNG | Refused, with the message about the contrast (WCAG 4.5:1) |
+| P10-16 | Upload a very bright PNG | Refused with the message about the contrast (WCAG 4.5:1) when even the strongest darkening cannot make the band texts read; with the light texts of the default theme the band darkens any image and it is accepted |
 | P10-17 | Upload a medium bright PNG | Accepted, the band darkens it as needed |
 | P10-18 | In Project (image from the package) set a band image in Style | The image of the Style wins; remove it: the one of the layout returns |
 | P10-19 | Plugins › Layouts › open Tabs › What it contains | Arrangement of the slots, the package contents, what a layout may not do |
@@ -431,7 +445,7 @@ start of the development server with a wildcard `plugin_url` (below); the others
 
 | Id | Check | Expected |
 |---|---|---|
-| SEC-01 | As Administrator: System › Identity and appearance › Identity and texts: upload an SVG logo with `<script>`, with `onload=`, with `<image href="https://…">` or with `<style>` | Refused: «SVG not allowed: …»; a plain drawing (shapes, paths, text, gradients) is accepted |
+| SEC-01 | As Administrator: System › Identity and appearance › Identity and texts: upload an SVG logo with `<script>`, with `onload=`, with `<image href="https://…">` or with `<style>` | Refused: «SVG with scripts or external references: not accepted»; a plain drawing (shapes, paths, text, gradients) is accepted |
 | SEC-02 | Make a public link to a note and open `…/p/<token>/api` | Only the fields the plugin shows; fields a plugin declares `hidden = true` never appear (no official plugin has one on its own resources: covered by an automated test) |
 | SEC-03 | As Administrator: in `xtask/mosaikit.dev.toml` set `[archives] max_entries = 5`, restart, import the export of a tenant | Refused: «the archive unpacks to more than the limits of the installation»; remove the setting afterwards |
 | SEC-04 | Upload a static site whose zip has a file `con.txt`, `nul`, `a.` or `name ` | Refused: unsafe path |
