@@ -1885,6 +1885,7 @@ dependencies = [
  "mosaikit-runtime",
  "mosaikit-sql-guard",
  "notify",
+ "png",
  "qrcode",
  "rand 0.8.8",
  "reqwest",

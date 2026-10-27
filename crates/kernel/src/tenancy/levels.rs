@@ -96,6 +96,16 @@ const DEFS: &[Def] = &[
     def("theme", Kind::Custom, Scope::Both, theme),
     def("appearance.mode", Kind::Custom, Scope::Both, mode),
     Def { own_api: true, ..def("band", Kind::Managed, Scope::Platform, any) },
+    // layout and style (phase 10): the layout in use and the ones tenants may choose; the style variables
+    // (no value: the default of the layout) and the image under the band
+    def("layout", Kind::Custom, Scope::Both, layout_id),
+    def("layout.allowed", Kind::Managed, Scope::Platform, layout_list),
+    def("style.radius", Kind::Custom, Scope::Both, style_radius),
+    def("style.density", Kind::Custom, Scope::Both, style_density),
+    def("style.font", Kind::Custom, Scope::Both, style_font),
+    def("style.tabs", Kind::Custom, Scope::Both, style_tabs),
+    def("style.buttons", Kind::Custom, Scope::Both, style_buttons),
+    Def { inherit: true, ..upload("style.band_image", Scope::Both) },
     // languages and formats
     limit("lang.enabled", Rule::Subset, languages),
     def("lang.default", Kind::Custom, Scope::Both, lang_default),
@@ -177,6 +187,51 @@ fn landing(v: &Value) -> Result<()> {
     } else {
         Err(invalid("a page"))
     }
+}
+
+fn layout_id(v: &Value) -> Result<()> {
+    match v.as_str() {
+        Some(s)
+            if !s.is_empty()
+                && s.len() <= 64
+                && s.bytes()
+                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'.') =>
+        {
+            Ok(())
+        }
+        _ => Err(invalid("a layout")),
+    }
+}
+
+fn layout_list(v: &Value) -> Result<()> {
+    let list = v.as_array().ok_or_else(|| invalid("a list of layouts"))?;
+    if list.len() > 50 {
+        return Err(invalid("at most 50 layouts"));
+    }
+    list.iter().try_for_each(layout_id)
+}
+
+fn style_of(key: &str, v: &Value) -> Result<()> {
+    match v.as_str() {
+        Some(s) if mosaikit_mskp::layout::style_value_ok(key, s) => Ok(()),
+        _ => Err(invalid(&format!("a value of the style variable {key}"))),
+    }
+}
+
+fn style_radius(v: &Value) -> Result<()> {
+    style_of("radius", v)
+}
+fn style_density(v: &Value) -> Result<()> {
+    style_of("density", v)
+}
+fn style_font(v: &Value) -> Result<()> {
+    style_of("font", v)
+}
+fn style_tabs(v: &Value) -> Result<()> {
+    style_of("tabs", v)
+}
+fn style_buttons(v: &Value) -> Result<()> {
+    style_of("buttons", v)
 }
 
 fn theme(v: &Value) -> Result<()> {
@@ -339,6 +394,7 @@ impl Defaults {
             "notify.retention_days" => json!(90),
             "trash.retention_days" => json!(crate::trash::DEFAULT_RETENTION_DAYS),
             "log.retention_days" => json!(crate::log::DEFAULT_RETENTION_DAYS),
+            "layout" => json!(super::layouts::DEFAULT_LAYOUT),
             _ => Value::Null,
         }
     }
@@ -625,6 +681,11 @@ pub async fn set_platform(
         }
         if !v.is_null() {
             (d.check)(v)?;
+            match key.as_str() {
+                "layout" => super::layouts::check_choice(k, false, v).await?,
+                "layout.allowed" => super::layouts::check_allowed(k, v)?,
+                _ => {}
+            }
         }
         if d.own_api {
             remove_file(k, None, d.key);
@@ -680,6 +741,9 @@ pub async fn set_tenant(k: &Kernel, c: &Caller, values: &Map<String, Value>) -> 
             if let Some(rule) = d.rule {
                 let p = platform_one(d, &platform, &defaults).value;
                 check_limit(rule, &p, v)?;
+            }
+            if key == "layout" {
+                super::layouts::check_choice(k, true, v).await?;
             }
         }
         if d.own_api {
@@ -752,6 +816,7 @@ fn slot_key(slot: &str, platform: bool) -> Result<&'static str> {
         ("logo_light", _) => Ok("identity.logo_light"),
         ("logo_dark", _) => Ok("identity.logo_dark"),
         ("icon", true) => Ok("identity.icon"),
+        ("band", _) => Ok("style.band_image"),
         _ => Err(Error::not_found(format!("unknown image: {slot}"))),
     }
 }
@@ -797,6 +862,16 @@ pub async fn set_image(k: &Kernel, who: Who<'_>, slot: &str, data: &[u8]) -> Res
     let tenant = who.tenant()?;
     let key = slot_key(slot, tenant.is_none())?;
     let mime = sniff_image(data, key == "identity.icon")?;
+    // the image under the band: a PNG whose brightest region still lets the texts of the band read, with
+    // the scrim of the band colour it needs (WCAG 4.5:1)
+    let scrim = if key == "style.band_image" {
+        if mime != "image/png" {
+            return Err(Error::bad("the band image must be a PNG").with_code("image_type"));
+        }
+        Some(super::layouts::band_image_scrim(k, tenant, data).await?)
+    } else {
+        None
+    };
     if matches!(who, Who::Tenant(_)) {
         let platform = system_settings(k).await?;
         if !customizable(&platform, find(key)?) {
@@ -808,7 +883,10 @@ pub async fn set_image(k: &Kernel, who: Who<'_>, slot: &str, data: &[u8]) -> Res
     let tmp = path.with_extension("tmp");
     std::fs::write(&tmp, data)?;
     std::fs::rename(&tmp, &path)?;
-    let value = json!({ "type": mime, "v": crate::util::random_token(4) });
+    let mut value = json!({ "type": mime, "v": crate::util::random_token(4) });
+    if let Some(s) = scrim {
+        value["scrim"] = json!(s);
+    }
     let (mut s, user) = match who {
         Who::Platform(a) => (system_settings(k).await?, a.user_id),
         Who::Tenant(c) => (
@@ -845,16 +923,26 @@ pub async fn remove_image(k: &Kernel, who: Who<'_>, slot: &str) -> Result<()> {
 /// A logo or icon and its type, if set (public: the sign-in page shows them).
 pub async fn image(k: &Kernel, tenant: Option<Uuid>, slot: &str) -> Result<Option<(Vec<u8>, String)>> {
     let key = slot_key(slot, tenant.is_none())?;
-    let settings = match tenant {
+    let platform = system_settings(k).await?;
+    let (settings, owner) = match tenant {
         Some(t) => match tenant_row(k, t).await? {
-            Some((s, _, false)) => s,
+            Some((s, _, false)) => {
+                // an image that inherits (the band image) is the platform's when the tenant has none or
+                // may not customize it
+                let d = find(key)?;
+                if d.inherit && (raw(&s, key).is_none() || !customizable(&platform, d)) {
+                    (platform, None)
+                } else {
+                    (s, Some(t))
+                }
+            }
             _ => return Ok(None),
         },
-        None => system_settings(k).await?,
+        None => (platform, None),
     };
     let Some(v) = raw(&settings, key) else { return Ok(None) };
     let mime = v.get("type").and_then(Value::as_str).unwrap_or("application/octet-stream").to_string();
-    match std::fs::read(image_path(k, tenant, key)) {
+    match std::fs::read(image_path(k, owner, key)) {
         Ok(data) => Ok(Some((data, mime))),
         Err(_) => Ok(None),
     }

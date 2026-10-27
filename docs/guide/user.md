@@ -37,6 +37,12 @@ one. The link works once and for a limited time (**Choose a new password** page)
 | **Bell** | Your notifications (see below). |
 | **Person menu** (your name) | **Account**, **Notifications**, **Access requests**, **Trash**, **Sign out**. |
 
+The arrangement of these parts depends on the **layout** the Administrator or your Tenant Manager chose
+(rail of icons, sidebar, grid of apps, areas or tabs); the parts and the keyboard order are the same. The
+first Tab stop of every page is **Skip to the content**. An app with several pages shows them under its
+name in the navigation: open the arrow next to it. On a phone the menu button opens a drawer (or a grid of
+apps and pages) with all of them.
+
 Some of these may be missing: the Administrator decides what the top bar shows. When **Help** is not in
 the bar, its items are in the person menu.
 

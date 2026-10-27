@@ -40,6 +40,11 @@ pub fn router() -> Router<AppState> {
         .route("/api/auth/login", post(login))
         .route("/api/auth/tenants", get(login_tenants))
         .route("/api/auth/tenants/{slug}/logo/{slot}", get(tenant_logo))
+        // layouts: the list (signed in), the stylesheet and the images of a layout plugin (public, they
+        // hold nothing of a tenant)
+        .route("/api/layouts", get(layouts_list))
+        .route("/api/layouts/{id}/layout.css", get(layout_css))
+        .route("/api/layouts/{id}/images/{name}", get(layout_image))
         .route("/api/auth/admin/login", post(admin_login))
         .route("/api/auth/totp/setup", post(totp_setup))
         .route("/api/auth/totp/enable", post(totp_enable))
@@ -190,8 +195,47 @@ async fn brand(State(s): State<AppState>) -> ApiResult<Json<Value>> {
         o.insert("language".into(), text("lang.default"));
         o.insert("locale".into(), text("format.locale"));
         o.insert("mode".into(), text("appearance.mode"));
+        // the style of the platform (the sign-in page follows it) and its band image, with its scrim
+        let style: serde_json::Map<String, Value> = ["radius", "density", "font", "tabs", "buttons"]
+            .iter()
+            .map(|k| (k.to_string(), text(&format!("style.{k}"))))
+            .collect();
+        o.insert("style".into(), Value::Object(style));
+        o.insert("band_image".into(), text("style.band_image"));
+        o.insert("layout".into(), json!(tenancy::layouts::in_use(&s.k, None).await?));
     }
     Ok(Json(b))
+}
+
+/// The layouts of the installation, the ones tenants may choose and the one of the platform.
+async fn layouts_list(State(s): State<AppState>, Auth(_u): Auth, h: HeaderMap) -> ApiResult<Json<Value>> {
+    let platform = levels::effective(&s.k, None).await?;
+    Ok(Json(json!({
+        "layouts": tenancy::layouts::list(&s.k, &request_lang(&h)),
+        "allowed": tenancy::layouts::allowed_in(&platform),
+        "platform": tenancy::layouts::in_use(&s.k, None).await?,
+    })))
+}
+
+/// The checked stylesheet of a layout plugin (scoped under the class of the layout).
+async fn layout_css(State(s): State<AppState>, Path(id): Path<String>) -> ApiResult<Response> {
+    let css = tenancy::layouts::css(&s.k, &id).ok_or_else(|| Error::not_found("no stylesheet"))?;
+    let mut res = css.into_response();
+    let h = res.headers_mut();
+    h.insert(header::CONTENT_TYPE, HeaderValue::from_static("text/css; charset=utf-8"));
+    h.insert(header::CACHE_CONTROL, HeaderValue::from_static("public, max-age=300"));
+    h.insert(header::X_CONTENT_TYPE_OPTIONS, HeaderValue::from_static("nosniff"));
+    Ok(res)
+}
+
+/// An image of a layout plugin.
+async fn layout_image(
+    State(s): State<AppState>,
+    Path((id, name)): Path<(String, String)>,
+) -> ApiResult<Response> {
+    let (data, mime) =
+        tenancy::layouts::image(&s.k, &id, &name).ok_or_else(|| Error::not_found("no image"))?;
+    Ok(image_response(data, mime))
 }
 
 /// Logo of a tenant for its sign-in page (public, only active tenants).
@@ -582,8 +626,24 @@ async fn context(State(s): State<AppState>, Tenant(c): Tenant, h: HeaderMap) -> 
         mosaikit_kernel::access::effective_all(&s.k, c.tenant.tenant_id, c.user.user_id, c.tenant.role)
             .await?;
     let usable = |id: &str| perms.get(id).is_some_and(|p| p.contains(mosaikit_kernel::access::USE));
-    let views: Vec<_> =
+    let mut views: Vec<_> =
         plugins::active_views_in(&s.k, &request_lang(&h)).into_iter().filter(|v| usable(&v.id)).collect();
+    // the pages of the navigation the person may open (`permission` of an entry); a group whose
+    // children are all hidden goes too
+    for v in &mut views {
+        let mine = perms.get(&v.id);
+        let may =
+            |p: &Option<String>| p.as_ref().is_none_or(|p| mine.is_some_and(|ps| ps.contains(p.as_str())));
+        let kept: Vec<_> = v.nav.iter().filter(|n| may(&n.permission)).cloned().collect();
+        let had_children = |id: &str| v.nav.iter().any(|c| c.parent.as_deref() == Some(id));
+        let has_children = |id: &str| kept.iter().any(|c| c.parent.as_deref() == Some(id));
+        let nav: Vec<_> = kept
+            .iter()
+            .filter(|n| n.place.is_some() || !had_children(&n.id) || has_children(&n.id))
+            .cloned()
+            .collect();
+        v.nav = nav;
+    }
     Ok(Json(json!({
         "tenant": { "id": c.tenant.tenant_id, "slug": c.tenant.slug, "name": c.tenant.name,
                     "role": c.tenant.role, "settings": c.tenant.settings },
@@ -594,6 +654,7 @@ async fn context(State(s): State<AppState>, Tenant(c): Tenant, h: HeaderMap) -> 
         // themes of the theme editor the tenant can see: its own and the allowed ones of the platform
         "themes": tenancy::themes::for_tenant(&s.k, c.tenant.tenant_id).await?,
         "config": levels::effective(&s.k, Some(c.tenant.tenant_id)).await?,
+        "layout": tenancy::layouts::in_use(&s.k, Some(c.tenant.tenant_id)).await?,
     })))
 }
 

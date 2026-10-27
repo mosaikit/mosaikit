@@ -88,7 +88,7 @@
   --sidebar-primary: #7f85f5;
   --sidebar-primary-foreground: #141414;
   --sidebar-accent: #2b2b2b;
-  --sidebar-accent-foreground: #7f85f5;
+  --sidebar-accent-foreground: #8d92f9;
   --sidebar-border: #2b2b2b;
   --sidebar-ring: #7f85f5;
   --sidebar-hover: #2b2b2b;
@@ -337,6 +337,84 @@
     @apply bg-background text-foreground antialiased;
     font-family: var(--font-sans);
   }
+}
+
+/* ── Style (Identity and appearance › Style): shapes, density, font, tabs and main buttons ─────────
+   Data attributes on <html> (layouts.ts). The attribute is repeated to win over the variables of the
+   themes, in light and dark mode. */
+html[data-style-radius='square'][data-style-radius] {
+  --radius: 0.125rem;
+  --radius-xl: 2px;
+}
+html[data-style-radius='round'][data-style-radius] {
+  --radius: 0.75rem;
+  --radius-xl: 14px;
+}
+html[data-style-density='compact'] {
+  font-size: 14.5px;
+}
+html[data-style-font='humanist'] body {
+  font-family: 'Titillium Web', 'Segoe UI', 'Gill Sans', sans-serif;
+}
+html[data-style-font='serif'] body {
+  font-family: Georgia, Cambria, 'Times New Roman', serif;
+}
+html[data-style-tabs='pill'] .msk-tab[aria-current] {
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary-strong);
+}
+html[data-style-tabs='pill'] .msk-tab[aria-current]::after,
+html[data-style-tabs='boxed'] .msk-tab[aria-current]::after {
+  display: none;
+}
+html[data-style-tabs='boxed'] .msk-tab[aria-current] {
+  border: 1px solid var(--border);
+  border-bottom-color: var(--background);
+  border-radius: var(--radius) var(--radius) 0 0;
+  margin-bottom: -1px;
+  background: var(--background);
+}
+html[data-style-buttons='outline'] [data-slot='button'][data-variant='default'] {
+  background: transparent;
+  color: var(--primary-strong);
+  box-shadow: inset 0 0 0 1.5px var(--primary);
+}
+html[data-style-buttons='outline'] [data-slot='button'][data-variant='default']:hover {
+  background: color-mix(in srgb, var(--primary) 10%, transparent);
+}
+html[data-style-buttons='soft'] [data-slot='button'][data-variant='default'] {
+  background: color-mix(in srgb, var(--primary) 14%, var(--background));
+  color: var(--primary-strong);
+}
+html[data-style-buttons='soft'] [data-slot='button'][data-variant='default']:hover {
+  background: color-mix(in srgb, var(--primary) 22%, var(--background));
+}
+
+/* The image under the band: the colour of the band over it (the scrim measured for the theme in use)
+   keeps the texts of the band at 4.5:1 over its brightest region. */
+.band-surface[data-band-image] {
+  background-image: linear-gradient(color-mix(in srgb, var(--band) calc(var(--band-scrim, 0.6) * 100%), transparent), color-mix(in srgb, var(--band) calc(var(--band-scrim, 0.6) * 100%), transparent)), var(--band-image);
+  background-size: cover;
+  background-position: center;
+}
+
+/* The skip link: visible only when it has the focus (every layout). */
+.skip-link {
+  position: absolute;
+  left: 8px;
+  top: -100px;
+  z-index: 60;
+  border-radius: var(--radius);
+  background: var(--background);
+  color: var(--foreground);
+  padding: 8px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.2);
+}
+.skip-link:focus {
+  top: 8px;
 }
 
 /* Sign-in page: the tiles of the mosaic light up slowly, one after the other. */

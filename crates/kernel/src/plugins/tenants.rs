@@ -162,7 +162,11 @@ pub async fn of_tenant(
 async fn list(k: &Kernel, tenant: Uuid, lang: &str, only_available: bool) -> Result<Vec<TenantPlugin>> {
     let st = states(k, tenant).await?;
     let plugins = k.plugins.list();
-    let visible = |p: &LoadedPlugin| st.get(&p.id).is_some_and(|s| p.is_active() && (s.0 || !only_available));
+    // a layout belongs to the platform (System › Identity and appearance › Layout), not to the tenants
+    let visible = |p: &LoadedPlugin| {
+        p.manifest.effective_kind() != mosaikit_mskp::PluginKind::Layout
+            && st.get(&p.id).is_some_and(|s| p.is_active() && (s.0 || !only_available))
+    };
     Ok(plugins
         .iter()
         .filter(|p| visible(p))

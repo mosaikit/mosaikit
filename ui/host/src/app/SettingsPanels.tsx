@@ -29,11 +29,8 @@ import { QuotasLocked } from './Quotas.tsx'
 
 const enc = encodeURIComponent
 
-/** Where the settings are changed: the platform (Administrator) or a tenant (Tenant Manager). */
-export type Level = { kind: 'platform' } | { kind: 'tenant'; slug: string }
-
-const path = (l: Level) => (l.kind === 'platform' ? '/api/admin/settings' : `/api/t/${enc(l.slug)}/manage/config`)
-const queryKey = (l: Level) => ['levels', l.kind === 'platform' ? '' : l.slug]
+import { queryKey, useDraft, useLevelSettings, type Draft, type Level } from './settingsdraft.ts'
+export type { Level } from './settingsdraft.ts'
 
 /** Labels of the settings: name and description. */
 function labels(): Record<string, [string, string]> {
@@ -62,74 +59,20 @@ function labels(): Record<string, [string, string]> {
     'log.retention_days': [t('Log kept, in days'), t('Older events are deleted')],
     theme: [t('Theme'), ''],
     band: [t('Top bar'), ''],
+    layout: [t('Layout'), t('Where the navigation, the band, the tenant and the actions sit, for everybody')],
+    'layout.allowed': [t('Layouts the tenants may choose'), t('The layout of the platform is always allowed')],
+    'style.radius': [t('Corners'), t('Buttons, fields, panels and the items of the navigation')],
+    'style.density': [t('Density'), t('Height of rows, buttons and fields')],
+    'style.font': [t('Font'), t('Text of the whole shell')],
+    'style.tabs': [t('Tabs'), t('How the open tab shows')],
+    'style.buttons': [t('Main buttons'), t('The primary action of each page')],
+    'style.band_image': [t('Band image'), ''],
   }
 }
 
-function useLevelSettings(l: Level) {
-  return useApi<Setting[]>(queryKey(l), path(l))
-}
-
-/** Changes not saved yet: values (null = back to the platform, or to the default) and switches. */
-function useDraft(l: Level, list: Setting[] | undefined) {
-  const qc = useQueryClient()
-  const [values, setValues] = useState<Record<string, unknown>>({})
-  const [switches, setSwitches] = useState<Record<string, boolean>>({})
-  const [busy, setBusy] = useState(false)
-  const find = (key: string) => list?.find((s) => s.key === key)
-  const dirty = Object.keys(values).length > 0 || Object.keys(switches).length > 0
-  return {
-    find,
-    dirty,
-    busy,
-    /** the value shown: the change, otherwise the one in use */
-    value(key: string): unknown {
-      const s = find(key)
-      if (key in values) return values[key] === null ? (l.kind === 'tenant' ? s?.platform : null) : values[key]
-      return s?.value
-    },
-    /** the tenant has a value of its own (saved or being saved) */
-    own(key: string): boolean {
-      if (key in values) return values[key] !== null
-      const s = find(key)
-      return s?.tenant !== undefined && s?.tenant !== null
-    },
-    set(key: string, v: unknown) {
-      setValues((x) => ({ ...x, [key]: v }))
-    },
-    customizable(key: string): boolean {
-      return key in switches ? switches[key] : (find(key)?.customizable ?? true)
-    },
-    setCustomizable(key: string, on: boolean) {
-      setSwitches((x) => ({ ...x, [key]: on }))
-    },
-    cancel() {
-      setValues({})
-      setSwitches({})
-    },
-    async save() {
-      setBusy(true)
-      try {
-        const body = l.kind === 'platform' ? { values, customizable: switches } : { values }
-        const next = await api<Setting[]>('PUT', path(l), body)
-        qc.setQueryData(queryKey(l), next)
-        void qc.invalidateQueries({ queryKey: l.kind === 'platform' ? ['session'] : ['ctx', l.slug] })
-        if (l.kind === 'platform') reloadBrand()
-        setValues({})
-        setSwitches({})
-        toast.success(t('Settings saved'))
-      } catch (e) {
-        toast.error(errText(e))
-      } finally {
-        setBusy(false)
-      }
-    },
-  }
-}
-
-type Draft = ReturnType<typeof useDraft>
 
 /** A group of settings with its save bar (it appears only after a change). */
-function Panel({ level, keys, title, description, children }: { level: Level; keys: string[]; title: string; description?: string; children: (d: Draft, s: (key: string) => Setting | undefined) => ReactNode }) {
+export function Panel({ level, keys, title, description, children }: { level: Level; keys: string[]; title: string; description?: string; children: (d: Draft, s: (key: string) => Setting | undefined) => ReactNode }) {
   const q = useLevelSettings(level)
   const d = useDraft(level, q.data)
   if (q.isLoading) return <Loading />
@@ -168,7 +111,7 @@ function show(v: unknown): string {
 }
 
 /** A row: label, description, the control and, per level, what it inherits or allows. */
-function Row({ level, d, s, children, display }: { level: Level; d: Draft; s: Setting; children: ReactNode; display?: (v: unknown) => string }) {
+export function Row({ level, d, s, children, display }: { level: Level; d: Draft; s: Setting; children: ReactNode; display?: (v: unknown) => string }) {
   const [label, hint] = labels()[s.key] ?? [s.key, '']
   const id = `set-${s.key.replace(/\W/g, '-')}`
   if (level.kind === 'tenant' && s.locked) return <Locked label={label} value={(display ?? show)(s.value)} hint={hint} />
@@ -237,7 +180,7 @@ function NumberRow({ level, d, s }: { level: Level; d: Draft; s: Setting }) {
   )
 }
 
-function ChoiceRow({ level, d, s, options }: { level: Level; d: Draft; s: Setting; options: [string, string][] }) {
+export function ChoiceRow({ level, d, s, options }: { level: Level; d: Draft; s: Setting; options: [string, string][] }) {
   const id = `set-${s.key.replace(/\W/g, '-')}`
   const name = (v: unknown) => options.find((o) => o[0] === v)?.[1] ?? show(v)
   return (
@@ -295,7 +238,7 @@ export function IdentityPanel({ level }: { level: Level }) {
 function imageUrl(level: Level, slot: string, v: unknown): string {
   const ver = v && typeof v === 'object' && 'v' in v ? String((v as { v: unknown }).v) : ''
   if (level.kind === 'tenant') return `api/auth/tenants/${enc(level.slug)}/logo/${slot}?v=${ver}`
-  return `brand/${slot === 'logo_light' ? 'logo' : slot === 'logo_dark' ? 'logo-dark' : 'favicon'}?v=${ver}`
+  return `brand/${slot === 'logo_light' ? 'logo' : slot === 'logo_dark' ? 'logo-dark' : slot === 'band' ? 'band' : 'favicon'}?v=${ver}`
 }
 
 function Images({ level }: { level: Level }) {
@@ -321,7 +264,7 @@ function Images({ level }: { level: Level }) {
   )
 }
 
-function ImageSlot({ level, slot, label, hint, setting }: { level: Level; slot: string; label: string; hint: string; setting?: Setting }) {
+export function ImageSlot({ level, slot, label, hint, setting, accept = 'image/svg+xml,image/png,image/webp,.ico', wide }: { level: Level; slot: string; label: string; hint: string; setting?: Setting; accept?: string; wide?: boolean }) {
   const qc = useQueryClient()
   const input = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
@@ -346,13 +289,17 @@ function ImageSlot({ level, slot, label, hint, setting }: { level: Level; slot: 
       setBusy(false)
     }
   }
-  const dark = slot === 'logo_dark'
+  const dark = slot === 'logo_dark' || slot === 'band'
   return (
     <div className="grid gap-2 rounded-lg border p-3" data-image={slot}>
       <b className="text-sm">{label}</b>
       <span className="text-xs text-muted-foreground">{hint}</span>
       <div className={cn('flex h-20 items-center justify-center rounded-md border', dark ? 'bg-band' : 'bg-background')}>
-        {value ? <img src={imageUrl(level, slot, value)} alt={label} className="max-h-16 max-w-[80%] object-contain" /> : <span className={cn('text-xs', dark ? 'text-band-muted' : 'text-muted-foreground')}>{t('None')}</span>}
+        {value ? (
+          <img src={imageUrl(level, slot, value)} alt={label} className={wide ? 'h-full w-full rounded-md object-cover' : 'max-h-16 max-w-[80%] object-contain'} />
+        ) : (
+          <span className={cn('text-xs', dark ? 'text-band-muted' : 'text-muted-foreground')}>{t('None')}</span>
+        )}
       </div>
       {locked ? (
         <span className="flex items-center gap-1 text-xs text-muted-foreground">
@@ -364,7 +311,7 @@ function ImageSlot({ level, slot, label, hint, setting }: { level: Level; slot: 
           <input
             ref={input}
             type="file"
-            accept="image/svg+xml,image/png,image/webp,.ico"
+            accept={accept}
             className="sr-only"
             aria-label={t('Upload: {name}', { name: label })}
             onChange={(e) => {

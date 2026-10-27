@@ -34,6 +34,7 @@ import { LinkDialog, ProfilesSection, RequestsTable } from './people.tsx'
 import { EmbeddingPanel, IdentityPanel, KeysPanel, LanguagesPanel, ManagedPanel, ModePanel, NotificationsPanel, SecurityPanel } from '../SettingsPanels.tsx'
 import { UsageAlerts, UsageConsumers, UsagePanel, UsageQuotas, UsageTrend } from '../Quotas.tsx'
 import { totals, trashHint } from '../usage.ts'
+import { LayoutPanel, StylePanel } from '../LayoutSettings.tsx'
 
 const enc = encodeURIComponent
 const ROLE: Record<string, string> = { tenant_manager: 'Tenant Manager', user: 'User' }
@@ -1142,6 +1143,8 @@ export function TenantSettingsPage({ slug, section }: { slug: string; section?: 
   const tabs = [
     { id: 'identity', label: t('Identity and texts') },
     { id: 'theme', label: t('Theme and mode') },
+    { id: 'layout', label: t('Layout') },
+    { id: 'style', label: t('Style') },
     { id: 'languages', label: t('Languages and formats') },
   ]
   // before: Sign-in (now in Managed by the platform)
@@ -1168,6 +1171,8 @@ export function TenantSettingsPage({ slug, section }: { slug: string; section?: 
                 <ModePanel level={level} />
               </div>
             )}
+            {tab === 'layout' && <LayoutPanel level={level} />}
+            {tab === 'style' && <StylePanel level={level} />}
             {tab === 'languages' && <LanguagesPanel level={level} />}
           </div>
         )}

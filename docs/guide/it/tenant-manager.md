@@ -177,6 +177,14 @@ Valgono per tutti nel tenant. Ogni impostazione mostra da dove arriva il suo val
 Il nome e il logo del tenant compaiono nella barra in alto delle sue persone e nella sua pagina di accesso
 (`#/login/<tenant>`).
 
+### Layout e stile
+
+**Layout** e **Stile** (in Identità e aspetto) seguono le stesse regole delle altre impostazioni: ereditati
+dalla piattaforma, oppure personalizzati dal tenant. Ti vengono offerti i layout che l'Administrator ammette;
+la scelta vale per tutte le persone del tenant. **Stile** imposta angoli, densità, carattere, schede, pulsanti
+principali e un'immagine della barra (PNG, scurita quanto serve perché i testi si leggano; una troppo chiara
+viene rifiutata), con anteprima prima di **Salva**. **Ripristina** torna alla piattaforma.
+
 ### L'editor dei temi
 
 **Nuovo tema** (se la piattaforma lascia scegliere il tema ai tenant): un **Nome**, il **Colore principale**,

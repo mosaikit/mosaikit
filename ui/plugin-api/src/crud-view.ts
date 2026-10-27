@@ -15,6 +15,8 @@ export interface CrudOptions {
   columns?: string[]
   /** label for "new" (default "New") */
   newLabel?: string
+  /** only the rows that pass (a page of the navigation of the app: «Mine», a tag…) */
+  where?: (row: Row) => boolean
 }
 
 type State = {
@@ -169,7 +171,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     const xcols = extColumns()
     thead.replaceChildren(h('tr', {}, ...cols.map((f) => h('th', {}, f.label || f.key)), ...xcols.map((x) => h('th', {}, x.f.label || x.f.key)), h('th', {}, tr('owner'))))
     const q = st.filter.trim().toLowerCase()
-    const shown = st.rows.filter((r) => !q || Object.values(r.values).some((v) => String(v ?? '').toLowerCase().includes(q)))
+    const shown = st.rows.filter((r) => (!opts.where || opts.where(r)) && (!q || Object.values(r.values).some((v) => String(v ?? '').toLowerCase().includes(q))))
     count.textContent = shown.length === 1 ? tr('item') : tr('items', { n: shown.length })
     if (!shown.length) {
       tbody.replaceChildren(h('tr', {}, h('td', { class: 'empty', colspan: String(cols.length + xcols.length + 1) }, st.rows.length ? tr('noResult') : tr('noItem'))))

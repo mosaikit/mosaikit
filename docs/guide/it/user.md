@@ -39,6 +39,12 @@ password**).
 | **Campanella** | Le tue notifiche (vedi sotto). |
 | **Menu della persona** (il tuo nome) | **Account**, **Notifiche**, **Richieste di accesso**, **Cestino**, **Esci**. |
 
+La disposizione di queste parti dipende dal **layout** scelto dall'Administrator o dal Tenant Manager (barra di
+icone, sidebar, griglia di app, aree o schede); le parti e l'ordine della tastiera sono gli stessi. Il primo
+punto di sosta con Tab di ogni pagina è **Vai al contenuto**. Un'app con più pagine le mostra sotto il suo nome
+nella navigazione: apri la freccia accanto. Sul telefono il pulsante del menu apre un cassetto (o una griglia di
+app e pagine) con tutte.
+
 Alcuni di questi possono mancare: cosa mostra la barra in alto lo decide l'Administrator. Quando **Aiuto**
 non è nella barra, le sue voci sono nel menu della persona.
 

@@ -117,7 +117,18 @@ export interface TenantSettings {
   managers_see_titles: boolean
 }
 
-export type PluginKind = 'app' | 'service' | 'extension'
+export type PluginKind = 'app' | 'service' | 'extension' | 'layout'
+
+/** An entry of the navigation of an app (`[[nav]]` of its manifest). */
+export interface NavEntry {
+  id: string
+  label: string
+  icon?: string | null
+  /** the place inside the app it opens (`msk.at`); absent with children: a group */
+  place?: string | null
+  parent?: string | null
+  permission?: string | null
+}
 
 export interface PluginView {
   id: string
@@ -138,6 +149,8 @@ export interface PluginView {
   ui_url?: string
   dev: boolean
   permissions: { hooks: string[]; files: boolean; content: boolean; network: string[]; frame_src: string[]; calls?: string[] }
+  /** the pages of an app in the navigation of the shell (recent servers) */
+  nav?: NavEntry[]
 }
 
 /** A plugin available to a tenant, as its Tenant Manager sees it (or every plugin, for the Administrator). */
@@ -204,6 +217,8 @@ export interface TenantContext {
   themes?: CustomTheme[]
   /** settings in use in the tenant (recent servers) */
   config?: Config
+  /** the layout in use in the tenant (recent servers) */
+  layout?: string
 }
 
 export interface Principal {
@@ -679,6 +694,8 @@ export interface AdminPlugin extends PluginView {
   extends_min?: string | null
   extension?: { fields: { resource: string; key: string; label: string; kind: string }[]; actions: { resource: string; key: string; label: string }[] }
   has_config?: boolean
+  /** for a layout: what the package contains (recent servers) */
+  layout?: { decl: import('./app/layouts.ts').LayoutDecl; css_bytes: number; images: [string, string][]; class: string } | null
 }
 
 export interface CatalogItem {

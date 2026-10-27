@@ -88,7 +88,26 @@ impl Package {
                 }
             }
         }
-        Ok(Package { manifest, manifest_toml, files, signature, hashes, sha256: package_sha256(bytes) })
+        let pkg =
+            Package { manifest, manifest_toml, files, signature, hashes, sha256: package_sha256(bytes) };
+        // a layout is checked as a whole at install: arrangement, stylesheet and images
+        if pkg.manifest.effective_kind() == crate::PluginKind::Layout {
+            pkg.layout()?;
+        }
+        Ok(pkg)
+    }
+
+    /// The files of `layout/` (paths relative to it).
+    pub fn layout_files(&self) -> BTreeMap<String, Vec<u8>> {
+        self.files
+            .iter()
+            .filter_map(|(k, v)| k.strip_prefix("layout/").map(|p| (p.to_string(), v.clone())))
+            .collect()
+    }
+
+    /// The layout of a layout plugin, checked.
+    pub fn layout(&self) -> Result<crate::layout::Layout> {
+        crate::layout::load_layout(&self.manifest.id, &self.layout_files())
     }
 
     /// Checks the signature. Returns the key of the publisher (base64) if signed.

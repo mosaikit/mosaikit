@@ -121,6 +121,9 @@ pub async fn install_package(
         sha256: pkg.sha256.clone(),
         signed_by: signed_by.clone(),
         installed_at: chrono::Utc::now(),
+        layout: (m.effective_kind() == mosaikit_mskp::PluginKind::Layout)
+            .then(|| pkg.layout().ok().map(std::sync::Arc::new))
+            .flatten(),
     });
     events::record(
         k,

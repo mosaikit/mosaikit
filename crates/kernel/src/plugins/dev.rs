@@ -76,6 +76,9 @@ pub async fn load_one(k: &Kernel, dir: &Path) -> Result<String> {
     tx.commit().await?;
     let ui = dir.join("ui").join("dist");
     let id = manifest.id.clone();
+    let layout = (manifest.effective_kind() == mosaikit_mskp::PluginKind::Layout)
+        .then(|| super::load_layout_dir(dir, &id))
+        .flatten();
     k.plugins.put(LoadedPlugin {
         id: id.clone(),
         manifest,
@@ -86,6 +89,7 @@ pub async fn load_one(k: &Kernel, dir: &Path) -> Result<String> {
         sha256: "dev".into(),
         signed_by: None,
         installed_at: chrono::Utc::now(),
+        layout,
     });
     Ok(id)
 }

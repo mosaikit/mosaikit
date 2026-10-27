@@ -110,4 +110,8 @@ export const EN: Record<string, string> = {
   'errors.theme_unknown': 'Unknown theme',
   'errors.theme_in_use': 'It is the theme of the platform: choose another one before deleting it',
   'errors.group_from_idp': 'This group comes from the identity provider: it changes only there',
+  // layouts and style (phase 10)
+  'errors.layout_unknown': 'Unknown layout',
+  'errors.layout_not_allowed': 'The Administrator does not offer this layout to the tenants',
+  'errors.band_image_contrast': 'The texts of the band would not read over this image (WCAG 4.5:1), even darkened: choose a darker one',
 }

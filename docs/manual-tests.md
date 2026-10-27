@@ -354,6 +354,35 @@ cannot sign in. At the end put it back to local accounts (P8-14).
 | P9-27 | Italian and dark mode on the search, the help dialogs, the tour and the theme editor | Everything translated and readable |
 
 
+## Phase 10 — Layouts and style
+
+| Id | Check | Expected |
+|---|---|---|
+| P10-01 | As Administrator: System › Identity and appearance › Layout | Six cards: Teams, Console (built in), Workspace, Suite, Project, Tabs (plugins), each with a thumbnail |
+| P10-02 | Choose **Console**, Save | The whole platform changes at once: sidebar as a card, breadcrumb in the band, tenant switcher in the navigation |
+| P10-03 | Press Tab once on any page, then Enter | «Skip to the content» shows first; Enter moves the focus to the content |
+| P10-04 | Repeat P10-02 and P10-03 with Workspace, Suite, Project and Tabs | Each arranges the frame as its card shows; the skip link, header, navigation and content are always there |
+| P10-05 | In Suite open the grid button in the band | «All apps and pages» lists every app and page; a tile opens it |
+| P10-06 | Narrow the window to a phone (400 px) in each layout | A menu button opens a drawer with the full tree (the grid in Suite); no horizontal scroll |
+| P10-07 | Light, dark and High contrast in each layout | Everything reads |
+| P10-08 | As `e.ricci`: in the navigation, Notes shows its pages (All notes, Mine, Shared, Tags › Personal, Work, Urgent) | A page opens the app on it; the breadcrumb shows app and page; a person without the permission of a page does not see it |
+| P10-09 | With the rail closed (Teams) use the small arrow next to Notes | A flyout lists its pages |
+| P10-10 | System › Layout: tick only Console and Teams under «Layouts the tenants may choose» | Tenant Managers are offered only those two |
+| P10-11 | As Tenant Manager: Tenant settings › Layout | Inherited; **Customize**, choose another layout, Save: only that tenant changes; **Restore** goes back |
+| P10-12 | Look for a layout choice in Account or the person menu | There is none: the layout is not personal |
+| P10-13 | System › Style: set Corners Round, Density Compact, Font Humanist, Tabs Pill, Buttons Outline | The page previews each change before Save; after Save the whole shell and the sign-in page follow |
+| P10-14 | Tenant settings › Style: customize Corners | Only the tenant changes; the other styles stay inherited |
+| P10-15 | Style › Band image: upload a dark PNG | It shows under the band, texts readable |
+| P10-16 | Upload a very bright PNG | Refused, with the message about the contrast (WCAG 4.5:1) |
+| P10-17 | Upload a medium bright PNG | Accepted, the band darkens it as needed |
+| P10-18 | In Project (image from the package) set a band image in Style | The image of the Style wins; remove it: the one of the layout returns |
+| P10-19 | Plugins › Layouts › open Tabs › What it contains | Arrangement of the slots, the package contents, what a layout may not do |
+| P10-20 | Uninstall Tabs while it is the layout of the platform | The platform goes back to Teams |
+| P10-21 | Plugins › Install from file with the Tabs package | Installed; it can be chosen again |
+| P10-22 | Install a layout whose CSS has `position: fixed` or `url(https://…)` | Refused with the reason |
+| P10-23 | Look for layout plugins in the plugin list of a tenant | They do not appear: the tenant chooses them in Layout |
+| P10-24 | Italian and dark mode on the Layout and Style pages | Everything translated and readable |
+
 ## Follow-ups A — Docker backups, errors in the plugins, OIDC logout and groups
 
 The OIDC checks use the test identity provider and a tenant set up as in Phase 8 (P8-01 … P8-05).

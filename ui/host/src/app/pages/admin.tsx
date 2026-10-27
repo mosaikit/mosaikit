@@ -29,6 +29,7 @@ import { TenantPluginsOfAdmin } from './plugins.tsx'
 import { PlatformQuotasPanel, TenantQuotasPanel } from '../Quotas.tsx'
 import { BackupPanel, ImportTenantDialog, MaintenancePanel, NewTenantWizard, OverviewOps, TenantLifecycle, TenantState } from './operations.tsx'
 import { t } from '../i18n.ts'
+import { LayoutPanel, StylePanel } from '../LayoutSettings.tsx'
 
 
 /* ── Overview ────────────────────────────────────────────────────────── */
@@ -350,6 +351,8 @@ export function AdminSystem({ session, section }: { session: Session; section?: 
   const tabs = [
     { id: 'identity', label: t('Identity and texts') },
     { id: 'theme', label: t('Theme and mode') },
+    { id: 'layout', label: t('Layout') },
+    { id: 'style', label: t('Style') },
     { id: 'languages', label: t('Languages and formats') },
     { id: 'topbar', label: t('Top bar') },
   ]
@@ -380,6 +383,8 @@ export function AdminSystem({ session, section }: { session: Session; section?: 
                 <ModePanel level={PLATFORM} />
               </div>
             )}
+            {tab === 'layout' && <LayoutPanel level={PLATFORM} />}
+            {tab === 'style' && <StylePanel level={PLATFORM} />}
             {tab === 'languages' && <LanguagesPanel level={PLATFORM} />}
             {tab === 'topbar' && <BandSettings session={session} />}
           </div>

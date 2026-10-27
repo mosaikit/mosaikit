@@ -165,6 +165,14 @@ They apply to everybody in the tenant. Each setting shows where its value comes 
 The name and logo of the tenant show in the top bar of its people and on its sign-in page
 (`#/login/<tenant>`).
 
+### Layout and Style
+
+**Layout** and **Style** (in Identity and appearance) follow the same rules as the other settings:
+inherited from the platform, or customized by the tenant. You are offered the layouts the Administrator
+allows; the choice applies to everybody in the tenant. **Style** sets corners, density, font, tabs, main
+buttons and a band image (PNG, darkened as needed so the texts read; one too bright is refused), with a
+preview before **Save**. **Restore** goes back to the platform.
+
 ### The theme editor
 
 **New theme** (if the platform lets tenants choose their theme): a **Name**, the **Main colour**, the **Top

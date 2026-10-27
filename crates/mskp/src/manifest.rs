@@ -71,6 +71,40 @@ pub struct Manifest {
     /// search of the shell (titles and searchable fields are found without it).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub search: Option<SearchDecl>,
+    /// The pages of an app in the navigation of the shell (`[[nav]]`): entries at the top and, under
+    /// an entry, its children (two levels). Each layout draws the tree in its own way; opening an
+    /// entry opens the app at its `place` (`msk.at` in the UI).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub nav: Vec<NavDecl>,
+}
+
+/// An entry of the navigation of an app (`[[nav]]`).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct NavDecl {
+    /// identifier, unique in the plugin
+    pub id: String,
+    pub label: String,
+    /// name of an icon of the shell (Lucide)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub icon: Option<String>,
+    /// the place inside the app it opens (`msk.at`); absent: the id. An entry with children and no
+    /// place is only a group.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub place: Option<String>,
+    /// the entry it is under (an entry at the top)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parent: Option<String>,
+    /// shown only to whoever has this permission of the plugin (standard or `user_permissions`)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permission: Option<String>,
+}
+
+impl NavDecl {
+    /// The place it opens, if any: its own, or the id for an entry without children.
+    pub fn target(&self, has_children: bool) -> Option<String> {
+        self.place.clone().or_else(|| (!has_children).then(|| self.id.clone()))
+    }
 }
 
 /// `[search]` of a manifest.
@@ -87,6 +121,8 @@ pub enum PluginKind {
     App,
     Service,
     Extension,
+    /// how the shell arranges its slots (`layout/layout.toml`), with a style and images
+    Layout,
 }
 
 impl PluginKind {
@@ -95,6 +131,7 @@ impl PluginKind {
             PluginKind::App => "app",
             PluginKind::Service => "service",
             PluginKind::Extension => "extension",
+            PluginKind::Layout => "layout",
         }
     }
 }
@@ -342,6 +379,9 @@ pub struct Translation {
     /// by id of the service of `[[service_keys]]`
     #[serde(default)]
     pub service_keys: BTreeMap<String, PermissionTranslation>,
+    /// labels of the entries of the navigation, by id
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub nav: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -681,10 +721,71 @@ impl Manifest {
             }
         }
         self.validate_kind().map_err(Error::Manifest)?;
+        self.validate_nav().map_err(Error::Manifest)?;
         self.validate_config().map_err(Error::Manifest)?;
         self.validate_service_keys().map_err(Error::Manifest)?;
         for (lang, tr) in &self.i18n {
             self.validate_translation(lang, tr).map_err(|m| Error::Manifest(format!("i18n.{lang}: {m}")))?;
+        }
+        Ok(())
+    }
+
+    /// `[[nav]]`: only an app has pages; ids unique, two levels, places and permissions that exist.
+    fn validate_nav(&self) -> std::result::Result<(), String> {
+        if self.nav.is_empty() {
+            return Ok(());
+        }
+        if self.effective_kind() != PluginKind::App {
+            return Err("[[nav]] is only for kind = \"app\"".into());
+        }
+        if self.nav.len() > 40 {
+            return Err("at most 40 [[nav]] entries".into());
+        }
+        let mut ids = std::collections::HashSet::new();
+        for n in &self.nav {
+            if !is_identifier(&n.id) {
+                return Err(format!("nav: invalid id '{}'", n.id));
+            }
+            if !ids.insert(n.id.as_str()) {
+                return Err(format!("nav: duplicate id '{}'", n.id));
+            }
+            if n.label.trim().is_empty() || n.label.chars().count() > 60 {
+                return Err(format!("nav '{}': a label of 1 to 60 characters", n.id));
+            }
+            if let Some(icon) = &n.icon {
+                if icon.is_empty()
+                    || icon.len() > 48
+                    || !icon.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
+                {
+                    return Err(format!("nav '{}': icon '{icon}' is not the name of an icon", n.id));
+                }
+            }
+            if let Some(p) = &n.place {
+                if p.is_empty()
+                    || p.len() > 64
+                    || !p.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+                {
+                    return Err(format!("nav '{}': place '{p}' (letters, digits, - and _)", n.id));
+                }
+            }
+            if let Some(perm) = &n.permission {
+                if !STANDARD_PERMISSIONS.contains(&perm.as_str())
+                    && !self.user_permissions.iter().any(|u| &u.key == perm)
+                {
+                    return Err(format!("nav '{}': permission '{perm}' is not declared", n.id));
+                }
+            }
+        }
+        for n in &self.nav {
+            if let Some(parent) = &n.parent {
+                match self.nav.iter().find(|p| &p.id == parent) {
+                    None => return Err(format!("nav '{}': parent '{parent}' does not exist", n.id)),
+                    Some(p) if p.parent.is_some() => {
+                        return Err(format!("nav '{}': two levels at most ('{parent}' has a parent)", n.id));
+                    }
+                    Some(_) => {}
+                }
+            }
         }
         Ok(())
     }
@@ -697,6 +798,14 @@ impl Manifest {
             if !ok {
                 return Err(format!("icon '{icon}': the name of an icon (lower case, digits and -)"));
             }
+        }
+        if self.effective_kind() == PluginKind::Layout
+            && (!self.resources.is_empty()
+                || self.ui.is_some()
+                || !self.kpi.is_empty()
+                || self.search.is_some())
+        {
+            return Err("a layout has no resources, [ui], KPIs or [search]: only layout/ files".into());
         }
         let extension = self.effective_kind() == PluginKind::Extension;
         match (&self.extends, extension) {
@@ -916,6 +1025,12 @@ impl Manifest {
             }
             all.push(label);
         }
+        for (id, label) in &tr.nav {
+            if !self.nav.iter().any(|n| &n.id == id) {
+                return Err(format!("nav entry '{id}' is not declared"));
+            }
+            all.push(label);
+        }
         for (key, ct) in &tr.config {
             if !self.config.iter().any(|c| &c.key == key) {
                 return Err(format!("config '{key}' is not declared"));
@@ -993,6 +1108,11 @@ impl Manifest {
         for t in &mut m.extension.tabs {
             if let Some(label) = tr.extension.tabs.get(&t.key) {
                 t.label = label.clone();
+            }
+        }
+        for n in &mut m.nav {
+            if let Some(label) = tr.nav.get(&n.id) {
+                n.label = label.clone();
             }
         }
         for c in &mut m.config {
@@ -1409,5 +1529,86 @@ service_keys = { b = { label = \"y\" } }
         assert!(!is_plugin_id("Com.X"));
         assert!(!is_plugin_id("single"));
         assert!(!is_plugin_id("a..b"));
+    }
+
+    const NAV: &str = r#"
+        [ui]
+        [[nav]]
+        id = "all"
+        label = "All notes"
+        icon = "notebook"
+        [[nav]]
+        id = "mine"
+        label = "Mine"
+        place = "mine"
+        [[nav]]
+        id = "tags"
+        label = "By tag"
+        [[nav]]
+        id = "tag_a"
+        label = "Tag A"
+        parent = "tags"
+        permission = "use"
+        [i18n.it]
+        [i18n.it.nav]
+        all = "Tutte le note"
+    "#;
+
+    #[test]
+    fn navigation_tree() {
+        let m = Manifest::from_toml(&format!("{NOTES}{NAV}")).unwrap();
+        assert_eq!(m.nav.len(), 4);
+        let tags = m.nav.iter().find(|n| n.id == "tags").unwrap();
+        assert_eq!(tags.target(true), None, "a group without a place opens nothing");
+        assert_eq!(m.nav[0].target(false).as_deref(), Some("all"), "a leaf opens its id");
+        assert_eq!(m.localized("it").nav[0].label, "Tutte le note");
+        for bad in [
+            NAV.replace("parent = \"tags\"", "parent = \"missing\""),
+            NAV.replace("id = \"mine\"", "id = \"all\""),
+            NAV.replace("place = \"mine\"", "place = \"a/b\""),
+            NAV.replace("permission = \"use\"", "permission = \"fly\""),
+            NAV.replace("icon = \"notebook\"", "icon = \"Not An Icon\""),
+            NAV.replace("all = \"Tutte le note\"", "nope = \"x\""),
+            NAV.replace("[ui]", ""),
+            format!(
+                "{NAV}[[nav]]
+id = \"deep\"
+label = \"Deep\"
+parent = \"tag_a\"
+"
+            ),
+        ] {
+            assert!(Manifest::from_toml(&format!("{NOTES}{bad}")).is_err(), "accepted: {bad}");
+        }
+    }
+
+    #[test]
+    fn a_layout_has_only_layout_files() {
+        let layout = r#"
+            id = "com.example.layout-wide"
+            name = "Wide"
+            version = "1.0.0"
+            kind = "layout"
+            [contribution]
+            icon = "L"
+            label = "Wide"
+        "#;
+        let m = Manifest::from_toml(layout).unwrap();
+        assert_eq!(m.effective_kind(), PluginKind::Layout);
+        assert!(
+            Manifest::from_toml(&format!(
+                "{layout}[ui]
+"
+            ))
+            .is_err(),
+            "no [ui]"
+        );
+        assert!(Manifest::from_toml(&format!(
+            "{layout}[[resources]]
+name = \"x\"
+fields = [{{ key = \"a\", label = \"A\", kind = \"text\" }}]
+"
+        ))
+        .is_err());
     }
 }

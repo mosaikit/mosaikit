@@ -3,7 +3,7 @@
 // plugin). The Administrator installs, updates and configures them and makes them AVAILABLE to the
 // tenants; the Tenant Manager turns ON the available ones and decides their permissions.
 
-import { useRef, useState, type ReactNode } from 'react'
+import { Fragment, useRef, useState, type ReactNode } from 'react'
 import { ArrowUpCircle, ExternalLink, KeySquare, Power, Puzzle, RotateCcw, Trash2, Upload } from 'lucide-react'
 import { api, fmtDate } from '../../api.ts'
 import type { AdminPlugin, CatalogItem, ConfigDecl, PluginConfig, PluginKind, PluginTenant, TenantPlugin, UninstallImpact } from '../../types.ts'
@@ -24,10 +24,10 @@ import { t } from '../i18n.ts'
 
 const enc = encodeURIComponent
 
-const KINDS: PluginKind[] = ['app', 'service', 'extension']
+const KINDS: PluginKind[] = ['app', 'service', 'extension', 'layout']
 
 function kindLabel(k: PluginKind | null | undefined): string {
-  return k === 'extension' ? t('Extension') : k === 'service' ? t('Service') : t('App')
+  return k === 'extension' ? t('Extension') : k === 'service' ? t('Service') : k === 'layout' ? t('Layout') : t('App')
 }
 
 function kindOf(p: { kind?: PluginKind | null; has_ui?: boolean }): PluginKind {
@@ -52,6 +52,7 @@ function KindPills({ value, onChange, counts }: { value: string; onChange: (k: s
         { id: 'app', label: t('Apps'), count: counts.app },
         { id: 'service', label: t('Services'), count: counts.service },
         { id: 'extension', label: t('Extensions'), count: counts.extension },
+        { id: 'layout', label: t('Layouts'), count: counts.layout },
       ]}
       value={value}
       onChange={onChange}
@@ -299,13 +300,20 @@ export function AdminPluginPage({ id, tab }: { id: string; tab?: string }) {
   const c = catalog.data?.find((x) => x.id === id)
   const kind = kindOf(p)
   const extensions = (installed.data ?? []).filter((x) => x.extends === id)
-  const tabs = [
-    { id: 'overview', label: t('Overview') },
-    { id: 'requests', label: t('What it asks') },
-    { id: 'tenants', label: t('Tenants') },
-    ...(p.has_config ? [{ id: 'configuration', label: t('Configuration') }] : []),
-    ...(kind !== 'extension' ? [{ id: 'extensions', label: t('Extensions'), count: extensions.length }] : []),
-  ]
+  // a layout belongs to the platform: what it contains, no tenants nor extensions
+  const tabs =
+    kind === 'layout'
+      ? [
+          { id: 'overview', label: t('Overview') },
+          { id: 'contents', label: t('What it contains') },
+        ]
+      : [
+          { id: 'overview', label: t('Overview') },
+          { id: 'requests', label: t('What it asks') },
+          { id: 'tenants', label: t('Tenants') },
+          ...(p.has_config ? [{ id: 'configuration', label: t('Configuration') }] : []),
+          ...(kind !== 'extension' ? [{ id: 'extensions', label: t('Extensions'), count: extensions.length }] : []),
+        ]
   const cur = tabs.some((x) => x.id === tab) ? tab! : 'overview'
   async function remove() {
     const impact = await api<UninstallImpact>('GET', `/api/admin/plugins/${enc(id)}/impact`)
@@ -363,6 +371,7 @@ export function AdminPluginPage({ id, tab }: { id: string; tab?: string }) {
         {cur === 'requests' && <PluginAsks p={p} base={installed.data?.find((x) => x.id === p.extends)?.label} />}
         {cur === 'tenants' && <PluginTenants id={id} />}
         {cur === 'configuration' && <PluginConfiguration id={id} />}
+        {cur === 'contents' && <LayoutContents p={p} />}
         {cur === 'extensions' && <PluginExtensions name={p.label} installed={extensions} catalog={(catalog.data ?? []).filter((x) => x.extends === id && !x.installed)} />}
       </div>
     </>
@@ -876,4 +885,78 @@ export function TenantPlugins({ slug }: { slug: string }) {
       </div>
     </>
   )
+}
+
+/** What a layout plugin contains: the arrangement of the slots, the default style, the checked stylesheet
+ *  and the images; and what a layout may not do. */
+function LayoutContents({ p }: { p: AdminPlugin }) {
+  const l = p.layout
+  if (!l) return <Empty title={t('The layout could not be read: see the log of the server.')} />
+  const yes = (b: boolean) => (b ? t('Yes') : t('No'))
+  const rows: [string, string][] = [
+    [t('Navigation'), patternLabel(l.decl.pattern)],
+    [t('Logo and name in the band'), yes(l.decl.band.brand)],
+    [t('Breadcrumb in the band'), yes(l.decl.band.breadcrumb)],
+    [t('Search'), l.decl.band.search === 'wide' ? t('Wide') : t('In the middle')],
+    [t('Tenant switcher'), l.decl.band.tenant === 'nav' ? t('At the top of the navigation') : t('In the band')],
+    [t('Navigation as a card'), yes(l.decl.nav.card)],
+    [t('On the phone'), l.decl.phone.nav === 'launcher' ? t('A grid of the apps and pages') : t('A drawer with the whole tree')],
+  ]
+  return (
+    <div className="grid max-w-3xl gap-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('Arrangement of the slots')}</CardTitle>
+          <CardDescription>{t('From layout/layout.toml: a pattern of the vocabulary of the shell and its options.')}</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
+            {rows.map(([k, v]) => (
+              <Fragment key={k}>
+                <dt className="text-muted-foreground">{k}</dt>
+                <dd>{v}</dd>
+              </Fragment>
+            ))}
+          </dl>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('Package contents')}</CardTitle>
+        </CardHeader>
+        <CardContent className="grid gap-2 text-sm">
+          <p>{Object.keys(l.decl.style).length ? t('Style variables: {list}', { list: Object.entries(l.decl.style).map(([k, v]) => `${k} = ${v}`).join(', ') }) : t('No style variables: the ones of the platform or of the tenant.')}</p>
+          <p>{l.css_bytes ? t('Stylesheet checked at install and scoped under .{class}: {n} bytes.', { class: l.class, n: l.css_bytes }) : t('No stylesheet.')}</p>
+          <p>{l.images.length ? t('Images: {list}', { list: l.images.map(([n, ty]) => `${n} (${ty})`).join(', ') }) : t('No images.')}</p>
+          <p>{p.signed_by ? t('Signed by {key}', { key: p.signed_by }) : t('Not signed (development)')}</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('What a layout may not do')}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ul className="grid list-disc gap-1 pl-5 text-sm">
+            <li>{t('Run code in the shell: a layout has no JavaScript.')}</li>
+            <li>{t('Hide or cover the slots, or add texts: display, visibility, position and content are refused in its stylesheet.')}</li>
+            <li>{t('Load anything from outside: only the images of its own package.')}</li>
+            <li>{t('Change the colours of the theme or skip the contrast check: the band image is darkened as needed.')}</li>
+            <li>{t('Change the landmarks, the «Skip to the content» link and the order of the keyboard.')}</li>
+          </ul>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function patternLabel(pattern: string): string {
+  const names: Record<string, string> = {
+    rail: t('A rail of icons with their names'),
+    sidebar: t('A sidebar with groups that open'),
+    drawer: t('A drawer that opens and closes'),
+    launcher: t('A launcher grid and the pages of the area'),
+    areas: t('Global areas and the sidebar of the area'),
+    tabs: t('Apps and pages as tabs'),
+  }
+  return names[pattern] ?? pattern
 }

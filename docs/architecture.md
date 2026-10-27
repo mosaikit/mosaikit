@@ -1526,6 +1526,48 @@ The dependency goes one way only: the distribution refers to Mosaikit
 (SDK, `@mosaikit/plugin-api`, kernel for the tests, xtask for build and release),
 Mosaikit refers to no distribution.
 
+### 14.1 Layouts and style
+
+The look of the shell has three independent levels: the **theme** (colours), the **style** (shapes, density,
+font, tabs, buttons, band image) and the **layout** (where the slots sit). Each is a setting on the three
+levels of the platform (`tenancy/levels.rs`): `layout` and `style.*` are customizable by the tenants;
+`layout.allowed` (the layouts the tenants may choose, none ticked = all) is managed by the Administrator.
+There is no personal choice of layout.
+
+- **Slots.** The shell draws brand, tenant switcher, navigation, search, actions, breadcrumb and content
+  (`ui/host/src/app/slots.tsx`); a layout only arranges them (`frames.tsx`: sidebar, drawer, launcher,
+  areas, tabs; `Shell.tsx`: the rail of Teams). Landmarks (`header`, `nav`, `main#main`), the «Skip to the
+  content» link and the keyboard order are the shell's in every layout.
+- **Built-in layouts** (`tenancy/layouts.rs`): `teams` (rail, the default) and `console` (sidebar as a card,
+  breadcrumb, tenant switcher in the navigation). Other layouts come from plugins of kind `layout`.
+- **Navigation tree.** An app declares `[[nav]]` entries (`id`, `label`, `icon`, `place`, `parent`,
+  `permission`; two levels, at most 40, labels translated in `[i18n.<lang>.nav]`). The context endpoint
+  filters them by permission and drops groups whose children are all hidden. A page opens the app at
+  `#/t/<tenant>/p/<plugin>/<place>`; `msk.at` tells the plugin UI the place.
+- **Layout package** (kind `layout`, no resources, UI, KPIs or search): `layout/layout.toml` (pattern
+  `rail|sidebar|drawer|launcher|areas|tabs`; `band` brand, breadcrumb, search `center|wide`, tenant
+  `band|nav`; `nav.card`; `phone.nav` `drawer|launcher`; style defaults), `layout/layout.css`,
+  `layout/images/*.png`. No JavaScript.
+- **CSS check** (`mskp::layout::scope_css`). Only allowlisted properties; `display`, `visibility`,
+  `position`, `content`, `z-index`, `@import`, `@font-face`, escapes and `<` are refused; `url()` only to
+  the images of the package. Rules are scoped under `.mskl-<id>` (dots become dashes), so a layout styles
+  the classes of the slots (`msk-band`, `msk-nav`, `msk-nav-item`, `msk-tab-item`, `msk-launcher-tile`,
+  `msk-main`…) and nothing else.
+- **Style** reaches the page as `data-style-radius|density|font|tabs|buttons` on `<html>`; the Layout and
+  Style panels preview a change (`previewStyle`) before it is saved.
+- **Band image.** PNG, at most 512 KB, from the layout package or from the Style of the platform or the
+  tenant (the Style wins; the tenant inherits the platform's). The band colour is laid over it as a scrim
+  from 0.30 to 0.85 (step 0.05) until the brightest cell of a 16×4 grid gives 4.5:1 with the band text.
+  The kernel decodes the PNG (`png` crate) and refuses an image too bright even at 0.85
+  (`band_image_contrast`); the client measures the same with a canvas and applies the scrim at runtime.
+- **API.** `GET /api/layouts` (layouts, allowed, platform), `GET /api/layouts/{id}/layout.css`
+  (`nosniff`), `GET /api/layouts/{id}/images/{name}`; `brand` carries style, band image and layout;
+  `/brand/band` and `/api/auth/tenants/<slug>/logo/band` serve the image of the Style. A layout plugin
+  that is turned off or removed falls back to `teams`; tenants never see layout plugins in their plugin
+  lists. The sign-in page follows the style of the platform.
+- **Official layouts** (`mosaikit-plugins`): `layout-workspace` (sidebar that opens and closes),
+  `layout-suite` (launcher grid), `layout-project` (areas, with a band image), `layout-tabs` (tabs).
+
 ## 15. Known limits and next steps
 
 - **Subdomains per plugin** are optional (a wildcard `plugin_url`, §9): with a single `plugin_url` all

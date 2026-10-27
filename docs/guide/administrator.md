@@ -190,6 +190,16 @@ change.
   choose one), **New theme** (the theme editor: main colour, top band, greys, contrast checks, **Fix it for
   me**; **Save the theme** stays off while something does not read), **Themes tenants may use**, **Tenants
   may choose their theme**, the default mode.
+- **Layout**: where navigation, band, tenant switcher and actions sit, for everybody (there is no personal
+  choice). Built in: **Teams** (rail of icons, the default) and **Console**; more from layout plugins
+  (Workspace, Suite, Project, Tabs, in **Plugins** › Layouts). **Layouts the tenants may choose** limits what
+  Tenant Managers are offered (none ticked: all; the layout of the platform is always allowed). Every layout
+  keeps the landmarks, the «Skip to the content» link and the keyboard order. A layout plugin that is turned
+  off or removed: the platform goes back to Teams.
+- **Style**: **Corners**, **Density**, **Font**, **Tabs**, **Main buttons** and **Band image**, with every
+  layout and theme; no value means the default of the layout. The page previews the change before **Save**.
+  The band image is a PNG of at most 512 KB; the band colour darkens it as much as needed so the texts read
+  at 4.5:1, and an image too bright even then is refused. Tenants may customize the style too.
 - **Languages and formats**: **Languages offered** (with one language only, the language menu disappears),
   **Default language**, **Format of dates and numbers**.
 - **Top bar**, the same for every tenant, with a preview: **Logo and name of the application**, **Search**,

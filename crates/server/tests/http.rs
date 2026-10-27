@@ -2137,3 +2137,73 @@ async fn own_profile_name_and_picture_over_http() {
     let r = a.call(Some(&manager), Method::GET, &format!("/api/people/{id}/picture"), None).await;
     assert_eq!(r.status, StatusCode::NOT_FOUND);
 }
+
+#[tokio::test]
+async fn layouts_and_style_over_http() {
+    let a = App::new().await;
+    a.t.tenant("alfa").await;
+    let admin = a.admin().await;
+    let m = a.login("alfa", "alfa-manager", PASSWORD).await;
+
+    // the list needs a session; the built-in layouts, Teams for the platform
+    assert_eq!(a.call(None, Method::GET, "/api/layouts", None).await.status, StatusCode::UNAUTHORIZED);
+    let l = a.call(Some(&m), Method::GET, "/api/layouts", None).await.json();
+    let ids: Vec<&str> = l["layouts"].as_array().unwrap().iter().map(|x| x["id"].as_str().unwrap()).collect();
+    assert_eq!(ids, ["teams", "console"]);
+    assert_eq!((l["platform"].as_str(), l["allowed"].is_null()), (Some("teams"), true));
+    assert_eq!(l["layouts"][1]["decl"]["pattern"], "sidebar");
+
+    // the platform chooses Console and a style; the tenant context and the sign-in page follow
+    let r = a
+        .call(
+            Some(&admin),
+            Method::PUT,
+            "/api/admin/settings",
+            Some(json!({ "values": { "layout": "console", "style.radius": "round" } })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let ctx = a.call(Some(&m), Method::GET, "/api/t/alfa/context", None).await.json();
+    assert_eq!(
+        (ctx["layout"].as_str(), ctx["config"]["style.radius"].as_str()),
+        (Some("console"), Some("round"))
+    );
+    let brand = a.call(None, Method::GET, "/api/brand", None).await.json();
+    assert_eq!(
+        (brand["style"]["radius"].as_str(), brand["layout"].as_str()),
+        (Some("round"), Some("console"))
+    );
+    assert!(brand["band_image"].is_null());
+
+    // a layout not allowed to the tenants is refused with its code
+    let r = a
+        .call(
+            Some(&admin),
+            Method::PUT,
+            "/api/admin/settings",
+            Some(json!({ "values": { "layout.allowed": ["console"] } })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let r = a
+        .call(
+            Some(&m),
+            Method::PUT,
+            "/api/t/alfa/manage/config",
+            Some(json!({ "values": { "layout": "teams" } })),
+        )
+        .await;
+    assert_eq!((r.status, r.json()["code"].as_str()), (StatusCode::FORBIDDEN, Some("layout_not_allowed")));
+
+    // no stylesheet nor image for a built-in layout or one that does not exist
+    assert_eq!(
+        a.call(None, Method::GET, "/api/layouts/console/layout.css", None).await.status,
+        StatusCode::NOT_FOUND
+    );
+    assert_eq!(
+        a.call(None, Method::GET, "/api/layouts/x/images/band.png", None).await.status,
+        StatusCode::NOT_FOUND
+    );
+    // the band of the platform has no image yet
+    assert_eq!(a.call(None, Method::GET, "/brand/band", None).await.status, StatusCode::NOT_FOUND);
+}

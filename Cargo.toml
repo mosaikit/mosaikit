@@ -75,6 +75,8 @@ tempfile = "3"
 futures-util = "0.3"
 tokio-stream = { version = "0.1", features = ["sync"] }
 tokio-util = { version = "0.7", features = ["io"] }
+# decoding of the band image of a layout, for its contrast check (already in the tree)
+png = "0.17"
 
 mosaikit-mskp = { path = "crates/mskp" }
 mosaikit-sql-guard = { path = "crates/sql-guard" }

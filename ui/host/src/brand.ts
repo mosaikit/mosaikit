@@ -30,6 +30,11 @@ export interface Brand {
   locale?: string
   /** default mode (light, dark, auto) for whoever did not choose one */
   mode?: string
+  /** the style of the platform (`radius`, `density`... null: the default) and its band image (recent servers) */
+  style?: Record<string, string | null>
+  band_image?: { v?: string; scrim?: number } | null
+  /** the layout of the platform (recent servers) */
+  layout?: string
   /** maintenance mode and the planned one (recent servers) */
   maintenance?: { on: boolean; message: string; planned_at: string | null; planned_message: string }
 }

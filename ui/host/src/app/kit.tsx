@@ -82,7 +82,7 @@ export function Tabs({ tabs, current, href }: { tabs: { id: string; label: strin
           href={href(t.id)}
           aria-current={t.id === current ? 'page' : undefined}
           className={cn(
-            'relative flex h-10 shrink-0 items-center gap-1.5 px-3 text-sm text-muted-foreground hover:text-foreground',
+            'msk-tab relative flex h-10 shrink-0 items-center gap-1.5 px-3 text-sm text-muted-foreground hover:text-foreground',
             t.id === current && "font-medium text-foreground after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary after:content-['']",
           )}
         >
@@ -112,7 +112,7 @@ export function Pills({ items, value, onChange, label = t('Show') }: { items: { 
           )}
         >
           {it.label}
-          {it.count != null && <span className="ml-1.5 tabular-nums opacity-80">{it.count}</span>}
+          {it.count != null && <span className={cn("ml-1.5 tabular-nums", it.id !== value && "opacity-80")}>{it.count}</span>}
         </button>
       ))}
     </div>

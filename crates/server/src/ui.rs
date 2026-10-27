@@ -70,6 +70,7 @@ async fn brand_file(s: &AppState, which: &str) -> Response {
         "logo" => Some("logo_light"),
         "logo-dark" => Some("logo_dark"),
         "favicon" | "icon" => Some("icon"),
+        "band" => Some("band"),
         _ => None,
     };
     if let Some(slot) = slot {
@@ -77,7 +78,7 @@ async fn brand_file(s: &AppState, which: &str) -> Response {
             return crate::api::image_response(data, &mime);
         }
     }
-    if which == "logo-dark" {
+    if which == "logo-dark" || which == "band" {
         return StatusCode::NOT_FOUND.into_response();
     }
     let (data, name) = match s.k.brand.file(which).and_then(|p| std::fs::read(&p).ok().map(|d| (d, p))) {

@@ -11,7 +11,7 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 're
 import { useQueryClient } from '@tanstack/react-query'
 import { Check, Contrast, Globe, KeyRound, LifeBuoy, Loader2, LogIn, Moon, Sun } from 'lucide-react'
 import { api, ApiError, errText, isUnavailable, setCsrf } from '../api.ts'
-import { retryDelay, useBrandState } from '../brand.ts'
+import { retryDelay, useBrand, useBrandState } from '../brand.ts'
 import type { LoginTenant, PendingLogin, Session, TotpSetup } from '../types.ts'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -23,6 +23,8 @@ import { go, to } from './router.ts'
 import { AppMark } from './Shell.tsx'
 import { registerThemes, setDefaultMode, setPreset, setTheme, useTheme, type CustomTheme, type Mode } from './theme.ts'
 import { MaintenanceNotice } from './pages/operations.tsx'
+import { applyStyle, styleOf, TEAMS, useBandImage } from './layouts.ts'
+import { bandStyle } from './nav.tsx'
 
 const LAST = 'msk_last_login_tenant'
 
@@ -90,6 +92,13 @@ export default function Login({ door, tenant }: { door: 'tenant' | 'admin'; tena
     setLanguageContext({ enabled: (JSON.parse(langs) as string[] | null) ?? undefined, language, locale: brand.locale })
   }, [langs, language, brand.locale])
   useEffect(() => setDefaultMode(brand.mode), [brand.mode])
+  // the style of the platform (corners, density, font, tabs, buttons) on the sign-in page too
+  const styleKey = JSON.stringify(brand.style ?? {})
+  useEffect(() => {
+    const raw = JSON.parse(styleKey) as Record<string, string | null>
+    const config: Record<string, unknown> = Object.fromEntries(Object.entries(raw).map(([k, v]) => [`style.${k}`, v]))
+    applyStyle(styleOf(config, TEAMS), TEAMS)
+  }, [styleKey])
   const privacy = tn?.privacy_url || brand.privacy_url
   const legal = tn?.legal_url || brand.legal_url
   const footer = tn?.footer || brand.footer
@@ -172,13 +181,17 @@ function mosaic(seed: number) {
 /** The brand panel: colours of the band of the theme and a mosaic of tiles that moves slowly. */
 function Hero({ admin, name, product, tagline, welcome, version, logo }: { admin: boolean; name: string; product: string; tagline: string; welcome?: string; version: string; logo?: string }) {
   const tiles = useMemo(() => mosaic(admin ? 7 : 3), [admin])
+  // the band image of the platform under the panel, darkened as the band
+  const brand = useBrand()
+  const bandImage = useBandImage(brand.band_image ? `brand/band?v=${brand.band_image.v ?? ''}` : null)
   const features = admin
     ? ['Tenants, users and managers', 'Signed plugins, catalog and KPIs', 'Second factor at every sign-in']
     : ['The apps of the tenant, with everyone’s permissions', 'Shares, public links and activity in one place', 'Accessible according to WCAG 2.1 AA']
   return (
     <section
       aria-label={name}
-      className="relative overflow-hidden bg-band bg-[linear-gradient(160deg,var(--band)_0%,color-mix(in_srgb,var(--band)_78%,black)_100%)] text-band-foreground max-lg:hidden"
+      className="band-surface relative overflow-hidden bg-band bg-[linear-gradient(160deg,var(--band)_0%,color-mix(in_srgb,var(--band)_78%,black)_100%)] text-band-foreground max-lg:hidden"
+      {...bandStyle(bandImage)}
     >
       <div
         aria-hidden="true"

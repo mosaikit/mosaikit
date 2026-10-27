@@ -57,6 +57,8 @@ pub struct LoadedPlugin {
     pub sha256: String,
     pub signed_by: Option<String>,
     pub installed_at: DateTime<Utc>,
+    /// for a layout plugin: its arrangement, stylesheet (scoped) and images, checked
+    pub layout: Option<Arc<mosaikit_mskp::layout::Layout>>,
 }
 
 impl LoadedPlugin {
@@ -112,6 +114,7 @@ impl Plugins {
                 sha256: p.sha256.clone(),
                 signed_by: p.signed_by.clone(),
                 installed_at: p.installed_at,
+                layout: p.layout.clone(),
             };
             map.insert(id.to_string(), Arc::new(p));
         }
@@ -147,6 +150,11 @@ pub async fn load_installed(k: &Kernel) -> Result<()> {
                     tracing::warn!("plugin {id} {version} in the blocklist: blocked");
                 }
                 let ui = dir.join("ui");
+                let layout = if manifest.effective_kind() == mosaikit_mskp::PluginKind::Layout {
+                    load_layout_dir(&dir, &manifest.id)
+                } else {
+                    None
+                };
                 k.plugins.put(LoadedPlugin {
                     id: id.clone(),
                     manifest,
@@ -157,12 +165,45 @@ pub async fn load_installed(k: &Kernel) -> Result<()> {
                     sha256: sha,
                     signed_by: r.get(4),
                     installed_at: r.get(5),
+                    layout,
                 });
             }
             Err(e) => tracing::error!("plugin {id} {version} cannot be loaded from {}: {e}", dir.display()),
         }
     }
     Ok(())
+}
+
+/// The layout of a layout plugin from its folder (`layout/`), checked; errors are logged.
+pub(crate) fn load_layout_dir(dir: &Path, id: &str) -> Option<Arc<mosaikit_mskp::layout::Layout>> {
+    fn walk(
+        base: &Path,
+        d: &Path,
+        out: &mut std::collections::BTreeMap<String, Vec<u8>>,
+    ) -> std::io::Result<()> {
+        for e in std::fs::read_dir(d)? {
+            let p = e?.path();
+            if p.is_dir() {
+                walk(base, &p, out)?;
+            } else if let Ok(rel) = p.strip_prefix(base) {
+                out.insert(rel.to_string_lossy().replace('\\', "/"), std::fs::read(&p)?);
+            }
+        }
+        Ok(())
+    }
+    let base = dir.join("layout");
+    let mut files = std::collections::BTreeMap::new();
+    if let Err(e) = walk(&base, &base, &mut files) {
+        tracing::error!("layout {id}: {e}");
+        return None;
+    }
+    match mosaikit_mskp::layout::load_layout(id, &files) {
+        Ok(l) => Some(Arc::new(l)),
+        Err(e) => {
+            tracing::error!("layout {id}: {e}");
+            None
+        }
+    }
 }
 
 pub(crate) fn load_from_dir(k: &Kernel, dir: &Path) -> Result<(Manifest, Option<mosaikit_runtime::Module>)> {
@@ -197,6 +238,8 @@ pub struct PluginView {
     pub dev: bool,
     pub permissions: mosaikit_mskp::Permissions,
     pub resources: Vec<mosaikit_mskp::ResourceDecl>,
+    /// the pages of an app in the navigation of the shell (`[[nav]]`)
+    pub nav: Vec<mosaikit_mskp::NavDecl>,
 }
 
 impl PluginView {
@@ -225,6 +268,7 @@ impl PluginView {
             dev: p.dev,
             permissions: m.permissions.clone(),
             resources: m.resources.clone(),
+            nav: m.nav.clone(),
         }
     }
 }
@@ -250,6 +294,20 @@ pub struct PluginAdminView {
     pub extension: mosaikit_mskp::ExtensionDecl,
     /// it has settings (`[[config]]`)
     pub has_config: bool,
+    /// for a layout: what the package contains (arrangement, stylesheet, images)
+    pub layout: Option<LayoutContents>,
+}
+
+/// What a layout plugin contains, for the page "What it contains" of the Administrator.
+#[derive(Debug, Clone, Serialize)]
+pub struct LayoutContents {
+    pub decl: mosaikit_mskp::layout::LayoutDecl,
+    /// bytes of the checked stylesheet (0: none)
+    pub css_bytes: usize,
+    /// images by name, with their type
+    pub images: Vec<(String, &'static str)>,
+    /// the class that scopes the stylesheet
+    pub class: String,
 }
 
 pub fn active_views(k: &Kernel) -> Vec<PluginView> {
@@ -290,6 +348,12 @@ pub fn admin_views_in(k: &Kernel, admin: &SessionUser, lang: &str) -> Result<Vec
             extends_min: p.manifest.extends.as_ref().map(|e| e.min_version.clone()),
             extension: p.manifest.localized(lang).extension,
             has_config: !p.manifest.config.is_empty(),
+            layout: p.layout.as_ref().map(|l| LayoutContents {
+                decl: l.decl.clone(),
+                css_bytes: l.css.len(),
+                images: l.images.iter().map(|(n, (_, t))| (n.clone(), *t)).collect(),
+                class: mosaikit_mskp::layout::layout_class(&p.id),
+            }),
         })
         .collect())
 }

@@ -9,6 +9,7 @@ mod directory;
 mod groups;
 mod invitations;
 pub mod keys;
+pub mod layouts;
 pub mod levels;
 pub mod lifecycle;
 mod members;

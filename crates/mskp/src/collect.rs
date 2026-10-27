@@ -30,13 +30,17 @@ fn walk(base: &Path, dir: &Path, prefix: &str, out: &mut BTreeMap<String, Vec<u8
 }
 
 /// Files of a plugin ready for [`crate::pack`]:
-/// `plugin.toml`, `migrations/*.sql`, `ui/dist/**` (as `ui/**`) and, if given, the WASM.
+/// `plugin.toml`, `migrations/*.sql`, `layout/**`, `ui/dist/**` (as `ui/**`) and, if given, the WASM.
 pub fn collect_plugin_dir(dir: &Path, wasm: Option<&Path>) -> Result<BTreeMap<String, Vec<u8>>> {
     let mut files = BTreeMap::new();
     files.insert("plugin.toml".to_string(), read(&dir.join("plugin.toml"))?);
     let migrations = dir.join("migrations");
     if migrations.is_dir() {
         walk(&migrations, &migrations, "migrations/", &mut files)?;
+    }
+    let layout = dir.join("layout");
+    if layout.is_dir() {
+        walk(&layout, &layout, "layout/", &mut files)?;
     }
     let ui = dir.join("ui").join("dist");
     if ui.is_dir() {

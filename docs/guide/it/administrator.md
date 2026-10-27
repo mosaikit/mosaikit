@@ -199,6 +199,17 @@ renderle più severe. **Salva** compare solo dopo una modifica.
   scelgono uno), **Nuovo tema** (l'editor dei temi: colore principale, barra in alto, grigi, verifiche di
   contrasto, **Correggi per me**; **Salva il tema** resta spento finché qualcosa non si legge), **Temi che i
   tenant possono usare**, **I tenant possono scegliere il proprio tema**, la tonalità predefinita.
+- **Layout**: dove stanno navigazione, barra, selettore del tenant e azioni, per tutti (non c'è una scelta
+  personale). Integrati: **Teams** (barra di icone, il predefinito) e **Console**; altri dai plugin di layout
+  (Workspace, Suite, Project, Tabs, in **Plugin** › Layout). **Layout che i tenant possono scegliere** limita
+  ciò che si offre ai Tenant Manager (nessuno spuntato: tutti; il layout della piattaforma è sempre ammesso).
+  Ogni layout mantiene i punti di riferimento, il link «Vai al contenuto» e l'ordine della tastiera. Un plugin
+  di layout spento o rimosso: la piattaforma torna a Teams.
+- **Stile**: **Angoli**, **Densità**, **Carattere**, **Schede**, **Pulsanti principali** e **Immagine della
+  barra**, con ogni layout e tema; senza un valore vale il predefinito del layout. La pagina mostra la modifica
+  prima di **Salva**. L'immagine della barra è un PNG di al massimo 512 KB; il colore della barra la scurisce
+  quanto serve perché i testi si leggano a 4,5:1, e un'immagine troppo chiara anche così viene rifiutata. Anche
+  i tenant possono personalizzare lo stile.
 - **Lingue e formati**: **Lingue offerte** (con una sola lingua il menu della lingua sparisce), **Lingua
   predefinita**, **Formato di date e numeri**.
 - **Barra in alto**, uguale per tutti i tenant, con un'anteprima: **Logo e nome dell'applicazione**,

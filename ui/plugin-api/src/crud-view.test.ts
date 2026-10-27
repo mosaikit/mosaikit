@@ -39,6 +39,15 @@ const tick = () => new Promise((r) => setTimeout(r, 0))
 const it_ctx: UiContext = { lang: 'it', preset: 'mosaikit', mode: 'light', preference: 'light', theme: {} }
 
 describe('mountCrud', () => {
+  it('a page of the navigation shows only its rows (where)', async () => {
+    const el = document.createElement('div')
+    const { msk } = fakeMsk([row('1', 'mine', 'manage'), row('2', 'from bruno', 'read', 'bruno')])
+    mountCrud(el, msk, 'notes', { title: 'Shared with me', where: (r) => r.owner_name !== 'anna' })
+    await tick()
+    expect(el.querySelectorAll('tbody tr.row').length).toBe(1)
+    expect(el.textContent).toContain('bruno')
+  })
+
   it('shows rows and levels and hides the computed fields', async () => {
     const el = document.createElement('div')
     const { msk } = fakeMsk([row('1', 'mine', 'manage'), row('2', 'bruno\'s', 'read', 'bruno')])

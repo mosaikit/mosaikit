@@ -1,10 +1,11 @@
 //! Mosaikit plugin packages (`.mskp` v3).
 //!
 //! A package is a zip with `plugin.toml`, `logic.wasm` (optional),
-//! `ui/**`, `migrations/**`, plus `MANIFEST.sha256` (hash of every file) and
+//! `ui/**`, `migrations/**`, `layout/**` (layout plugins), plus `MANIFEST.sha256` (hash of every file) and
 //! `SIGNATURE` (ed25519 signature of `MANIFEST.sha256`). See `docs/architecture.md` §8.5.
 
 mod collect;
+pub mod layout;
 mod manifest;
 mod package;
 mod signing;
@@ -14,7 +15,7 @@ pub use collect::collect_plugin_dir;
 pub use manifest::{
     is_plugin_id, is_service_id, schema_name, ConfigDecl, ConfigKind, Contribution, ExtActionDecl,
     ExtFieldDecl, ExtTabDecl, Extends, ExtensionDecl, ExtensionTranslation, FieldDecl, FieldKind, KeyScope,
-    KpiDecl, KpiTranslation, Manifest, PermissionTranslation, Permissions, PluginKind, Requires,
+    KpiDecl, KpiTranslation, Manifest, NavDecl, PermissionTranslation, Permissions, PluginKind, Requires,
     ResourceDecl, ResourceTranslation, ServiceKeyDecl, Translation, UiDecl, UserPermission, ABI_VERSION,
     STANDARD_PERMISSIONS,
 };
