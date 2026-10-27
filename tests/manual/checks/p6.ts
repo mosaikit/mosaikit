@@ -254,7 +254,7 @@ const checks: L.Check[] = [
       await di.getByRole('button', { name: /Crea/ }).click()
       await it.waitForTimeout(1500)
       const mi = await H.toast(it)
-      c.ok(/Il tenant ha raggiunto una delle sue quote/.test(mi), `Italian («${mi}»)`)
+      c.ok(/(Il tenant|L’organizzazione) ha raggiunto una delle sue quote/.test(mi), `Italian («${mi}»)`)
       await it.keyboard.press('Escape')
       const lv = await L.as(ctx, 'l.verdi')
       await H.go(lv, '#/t/regione-lazio/manage/pending')
