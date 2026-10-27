@@ -82,3 +82,7 @@ Observations from the user's manual tests; ids as in the user's notes. Status is
 | G1–G4 | Docker compose: PostgreSQL configured, optional Keycloak (realm, Mosaikit-like sign-in theme, no registration), optional mail server, nginx reverse proxy; README sections |
 | H1 | Static sites: a site by URL, embedded in an iframe (not downloaded); sites that forbid framing are detected and opened in a new tab (user decision) |
 | H2 | Static sites: card view (default) with thumbnail, name and description; list view with thumbnail; the thumbnail can be uploaded, otherwise og:image, first image or a placeholder (user decision) |
+| I1 | Desktop and server distributions: the default user «utente» becomes «user» |
+| I2 | Languages: a new supported language is a plugin that extends the set of supported languages (kind of plugin, UI strings, manifest i18n, docs) |
+| I3 | Indent hierarchical lists (same as B8; example: the System sidebar of the Administrator) |
+| I4 | App sidebar: nested items can be indented when it is open; when it is collapsed, an icon with sub-items opens a menu with items and sub-items (works with the `[[nav]]` tree of the layouts) |
