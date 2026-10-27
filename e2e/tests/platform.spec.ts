@@ -1778,6 +1778,7 @@ test.describe.serial('platform', () => {
     await page.getByRole('button', { name: 'Mode' }).click()
     await page.getByRole('menuitemcheckbox', { name: 'High contrast' }).click()
     await page.keyboard.press('Escape')
+    await expect(page.getByRole('menuitemcheckbox', { name: 'High contrast' })).toBeHidden()
     await expect(page.locator('html')).toHaveAttribute('data-contrast', 'more')
     await accessible(page, 'Workspace, high contrast')
     await page.getByRole('button', { name: 'Mode' }).click()
