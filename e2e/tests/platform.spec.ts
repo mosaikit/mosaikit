@@ -1935,6 +1935,8 @@ test.describe.serial('platform', () => {
     await rename.getByLabel('Name').fill('Reader')
     await rename.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByText('Reader', { exact: true })).toBeVisible()
+  })
+
   test('review round 1, lists: sticky headers, thin scrollbars, sidebar, filter column, selection bar, infinite scroll, logos, avatars', async ({ page }) => {
     test.setTimeout(600_000)
     await adminLogin(page)
