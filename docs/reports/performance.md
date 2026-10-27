@@ -277,8 +277,6 @@ whole tenant; a desktop with 35,000 items is far past the target.
 - **Administrator: tenants (whole list, 0.8 s), quotas (0.3 s), monitoring tenants (0.7 s)**: the whole
   lists are still computed per tenant; only the paged tenant list is fast.
 - **SQLite, Tenant Manager Shares/All items first page** (above) and **the Log filtered by one person**.
-- **`metrics_monitoring_and_alerts_once_per_crossing`** counts alerts; with the disk of the machine nearly
-  full (under 5% free) the disk alert is raised too and the test fails: not a code problem.
 
 ## Final check
 
