@@ -1,16 +1,19 @@
 //! `cargo xtask <command>`: development, tests and release of Mosaikit without bash scripts.
 
 mod ci;
+mod clean;
 mod db;
 mod deploy_check;
 mod dev;
 mod dist;
 mod e2e;
+mod heavy;
 mod perf;
 mod plugins;
 mod release;
 mod report;
 mod util;
+mod worktree;
 
 use std::path::PathBuf;
 
@@ -60,6 +63,9 @@ enum Cmd {
         /// show the browser
         #[arg(long)]
         headed: bool,
+        /// only these Playwright arguments, e.g. `-- tests/auth.spec.ts -g "sign in"` (report untouched)
+        #[arg(last = true)]
+        only: Vec<String>,
     },
     /// Load test of a full installation at scale (docs/reports/performance.md)
     Perf {
@@ -79,11 +85,40 @@ enum Cmd {
         #[arg(long)]
         clean: bool,
     },
+    /// Parallel worktrees (kernel + plugins) with their own port and e2e database
+    Worktree {
+        #[command(subcommand)]
+        cmd: WorktreeCmd,
+    },
+    /// Disk usage of mosaikit-temp; deletes stale build folders with --yes
+    CleanTemp {
+        /// a build folder unchanged for this many days is stale
+        #[arg(long, default_value_t = 14)]
+        days: u64,
+        /// delete (default: only report)
+        #[arg(long)]
+        yes: bool,
+    },
     /// Release
     Release {
         #[command(subcommand)]
         cmd: ReleaseCmd,
     },
+}
+
+#[derive(Subcommand)]
+enum WorktreeCmd {
+    /// Creates <temp>/<name>/{mosaikit,mosaikit-plugins}, links node_modules, writes .worktree.env
+    Add {
+        name: String,
+        /// branch of the kernel to start from
+        #[arg(long, default_value = "prototipo-shell")]
+        base: String,
+    },
+    /// Unlinks junctions, removes both worktrees, merged branches, e2e database and the folder
+    Remove { name: String },
+    /// Lists the worktrees with port, database suffix and branch
+    List,
 }
 
 #[derive(Subcommand)]
@@ -178,6 +213,7 @@ enum ReleaseCmd {
 }
 
 fn main() -> Result<()> {
+    worktree::load_env();
     let cli = Cli::parse();
     dist::init(cli.dist)?;
     match cli.cmd {
@@ -215,9 +251,15 @@ fn main() -> Result<()> {
         Cmd::Test { skip_db } => ci::test(skip_db),
         Cmd::Ci => ci::ci(),
         Cmd::TestReport => report::generate().map(|_| ()),
-        Cmd::E2e { headed } => e2e::e2e(headed),
+        Cmd::E2e { headed, only } => e2e::e2e(headed, &only),
         Cmd::Perf { clean: true, .. } => perf::clean(),
         Cmd::Perf { backend, scale, reuse, no_build, .. } => perf::perf(&backend, &scale, reuse, no_build),
+        Cmd::Worktree { cmd } => match cmd {
+            WorktreeCmd::Add { name, base } => worktree::add(&name, &base),
+            WorktreeCmd::Remove { name } => worktree::remove(&name),
+            WorktreeCmd::List => worktree::list(),
+        },
+        Cmd::CleanTemp { days, yes } => clean::clean_temp(days, yes),
         Cmd::Release { cmd } => match cmd {
             ReleaseCmd::Bundle { out, skip_ui, flavor } => release::bundle(&out, skip_ui, flavor),
             ReleaseCmd::Desktop { pg_dir, no_pg } => release::desktop(pg_dir, no_pg),

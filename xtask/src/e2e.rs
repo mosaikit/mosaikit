@@ -33,21 +33,27 @@ pub(crate) fn psql(sql: &str) -> Result<String> {
 }
 
 /// The database of this checkout: `mosaikit_e2e` for a folder called `mosaikit`, otherwise with the
-/// folder name (`mosaikit-phase8` → `mosaikit_e2e_phase8`).
+/// folder name (`mosaikit-phase8` -> `mosaikit_e2e_phase8`); `MOSAIKIT_DB_SUFFIX` (set by the
+/// `.worktree.env` of `cargo xtask worktree add`) wins over the folder name.
 fn db_name() -> String {
     checkout_db("mosaikit_e2e")
 }
 
-/// `base` for the checkout in a folder called `mosaikit`, otherwise `base` plus the folder name, so that
+/// `base` for the checkout in a folder called `mosaikit`, otherwise `base` plus the suffix, so that
 /// several checkouts (worktrees) never share a test database.
 pub fn checkout_db(base: &str) -> String {
-    let folder = root().file_name().map(|f| f.to_string_lossy().to_lowercase()).unwrap_or_default();
-    let suffix: String = folder
-        .strip_prefix("mosaikit")
-        .unwrap_or(&folder)
-        .chars()
-        .map(|c| if c.is_ascii_alphanumeric() { c } else { '_' })
-        .collect();
+    let folder = root().file_name().map(|f| f.to_string_lossy().into_owned()).unwrap_or_default();
+    db_with_suffix(base, &folder, std::env::var("MOSAIKIT_DB_SUFFIX").ok().as_deref())
+}
+
+/// Pure part of [`checkout_db`]: the explicit suffix, else the folder name without `mosaikit`.
+pub fn db_with_suffix(base: &str, folder: &str, explicit: Option<&str>) -> String {
+    let folder = folder.to_lowercase();
+    let raw = match explicit.map(str::trim).filter(|s| !s.is_empty()) {
+        Some(s) => s.to_lowercase(),
+        None => folder.strip_prefix("mosaikit").unwrap_or(&folder).to_owned(),
+    };
+    let suffix: String = raw.chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect();
     let suffix = suffix.trim_matches('_');
     if suffix.is_empty() {
         base.into()
@@ -70,6 +76,13 @@ fn ports() -> Result<u16> {
 }
 
 pub(crate) fn reset_db(db: &str) -> Result<()> {
+    drop_db(db)?;
+    psql(&format!("create database {db}"))?;
+    Ok(())
+}
+
+/// Drops a database and its roles (`msk_<db>_*`).
+pub(crate) fn drop_db(db: &str) -> Result<()> {
     psql(&format!("drop database if exists {db} with (force)"))?;
     // the roles of this database only: `msk_mosaikit_e2e_%` also matches the roles of another
     // checkout's `mosaikit_e2e_phase8`, so the roles of longer database names are left out
@@ -81,7 +94,6 @@ pub(crate) fn reset_db(db: &str) -> Result<()> {
     for r in psql(&sql)?.lines().map(str::trim).filter(|l| !l.is_empty()) {
         psql(&format!("drop role if exists \"{r}\""))?;
     }
-    psql(&format!("create database {db}"))?;
     Ok(())
 }
 
@@ -101,7 +113,8 @@ pub(crate) fn wait_health(url: &str) -> Result<()> {
     bail!("the server does not answer on {url}")
 }
 
-pub fn e2e(headed: bool) -> Result<()> {
+pub fn e2e(headed: bool, only: &[String]) -> Result<()> {
+    let _slot = crate::heavy::acquire("e2e", "xtask e2e")?;
     if std::env::var_os("MOSAIKIT_TEST_DATABASE_URL").is_none() {
         crate::db::up()?;
     }
@@ -174,6 +187,11 @@ pub fn e2e(headed: bool) -> Result<()> {
                 .args(["--", "tests/wildcard.spec.ts"]);
             return run(&mut cmd);
         }
+        if !only.is_empty() {
+            // a part of the suite (files, `-g` grep): run it directly, the report of the whole suite stays
+            cmd.arg("--").args(only);
+            return run(&mut cmd);
+        }
         let json = report::dir().join("e2e.json");
         std::fs::create_dir_all(report::dir())?;
         let _ = std::fs::remove_file(&json);
@@ -199,4 +217,22 @@ pub fn e2e(headed: bool) -> Result<()> {
     // the report also when the run failed (a missing result marks the suite)
     report::generate()?;
     result
+}
+
+#[cfg(test)]
+mod tests {
+    use super::db_with_suffix;
+
+    #[test]
+    fn database_names() {
+        assert_eq!(db_with_suffix("mosaikit_e2e", "mosaikit", None), "mosaikit_e2e");
+        assert_eq!(db_with_suffix("mosaikit_e2e", "mosaikit-Phase8", None), "mosaikit_e2e_phase8");
+        // a worktree container holds a folder called `mosaikit`: the explicit suffix keeps databases apart
+        assert_eq!(
+            db_with_suffix("mosaikit_e2e", "mosaikit", Some("wt_devtools")),
+            "mosaikit_e2e_wt_devtools"
+        );
+        assert_eq!(db_with_suffix("mosaikit_perf", "mosaikit", Some("wt-x")), "mosaikit_perf_wt_x");
+        assert_eq!(db_with_suffix("mosaikit_e2e", "mosaikit", Some("  ")), "mosaikit_e2e");
+    }
 }

@@ -81,6 +81,7 @@ fn npm_suites(npm_root: &Path, prefix: &str, title: &str, order: u32) -> Result<
 /// Every suite runs even when an earlier one fails; the results go to tests/results/test-results.md
 /// (`cargo xtask test-report`), then the command fails if any suite failed.
 pub fn test(skip_db: bool) -> Result<()> {
+    let _slot = crate::heavy::acquire("test", "xtask test")?;
     if !skip_db && std::env::var_os("MOSAIKIT_TEST_DATABASE_URL").is_none() {
         crate::db::up()?;
     }
@@ -180,6 +181,7 @@ fn folder(p: &Path) -> String {
 
 /// fmt, clippy, tests, typecheck, lint and build of the UIs, cargo-deny if installed.
 pub fn ci() -> Result<()> {
+    let _slot = crate::heavy::acquire("test", "xtask ci")?;
     let all = plugins::discover()?;
     let cargo_roots = plugins::cargo_roots(&all);
     for ws in std::iter::once(root()).chain(cargo_roots.iter().cloned()) {

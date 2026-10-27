@@ -590,5 +590,37 @@ All of them accept `--dist <folder of the distribution>`.
 | `cargo xtask plugin pack [--release] [--out]` | signed packages + registry |
 | `cargo xtask plugin keygen [--out]` | signing keys of the publisher |
 | `cargo xtask plugin db-reset <id>` | resets the data of a plugin (development) |
-| `cargo xtask test` / `e2e` / `ci` | tests and checks |
+| `cargo xtask test` / `e2e [-- <playwright args>]` / `ci` | tests and checks (heavy runs wait for a free slot) |
+| `cargo xtask worktree add\|remove\|list <name>` | parallel checkout (kernel + plugins) with its own port and database |
+| `cargo xtask clean-temp [--days N] [--yes]` | disk usage of `mosaikit-temp`; deletes stale `target` folders |
 | `cargo xtask release bundle\|desktop\|docker\|k8s\|all` | releases of the distribution |
+
+### Working in parallel: worktrees, ports, heavy-run slots
+
+Several people or agents can work at once, each in a worktree under `C:/dev.Tests\mosaikit-temp`:
+
+```powershell
+cargo xtask worktree add <name>      # <temp>\<name>\mosaikit (branch work-<name>) + mosaikit-plugins (<name>-plugins)
+cd C:/dev.Tests\mosaikit-temp\<name>\mosaikit
+cargo xtask e2e                      # own port and database, no other setup
+cargo xtask worktree remove <name>   # when merged: junctions, worktrees, branches, database, folder
+```
+
+- **Layout.** The plugin build needs a real folder `mosaikit` beside `mosaikit-plugins`; `worktree add` makes both,
+  links every `node_modules` to the main checkout with junctions, and writes `<name>\.worktree.env`.
+  Never delete a worktree folder by hand or with `rm -rf`: a delete that follows a junction destroys the main
+  checkout's files. `worktree remove` unlinks the junctions first.
+- **Port and database.** `.worktree.env` is loaded by every xtask command (variables already in your environment win):
+  `MOSAIKIT_E2E_PORT` (a block of 10 ports from 18200: app, plugins, test identity provider) and
+  `MOSAIKIT_DB_SUFFIX` (the e2e database is `mosaikit_e2e_<suffix>`, e.g. `mosaikit_e2e_wt_<name>`). Without the
+  suffix the database comes from the checkout folder name.
+- **Heavy-run slots.** `xtask e2e` (1 at once), `xtask test` and `xtask ci` (2 at once) take a slot in
+  `mosaikit-temp\locks`, machine-wide; a waiting run prints who holds it. A slot of a killed or crashed run is taken
+  over (pid and start time are checked). Change the numbers with `MOSAIKIT_HEAVY_SLOTS=3` or `e2e=2,test=3`. Direct
+  `cargo test`/`cargo clippy` runs are not queued: prefer targeted ones (`-p <crate>`) while others are running.
+- **Disk.** Every worktree builds its own `target` (several GB). `cargo xtask clean-temp` reports the usage of
+  `mosaikit-temp` and `--yes` deletes `target` folders unchanged for `--days` (14) that no running heavy run uses.
+  `sccache` (`SCCACHE_DIR=C:/dev/.sccache`, already the `rustc-wrapper` of this computer) removes most of
+  the cost of compiling dependencies again. To share one build folder as well, uncomment `CARGO_TARGET_DIR` in
+  `.worktree.env` (`C:/dev/.cargo-target-shared`): less disk, but the crates of different checkouts
+  rebuild each other (same crate, other path) and cargo serializes builds on that folder; use it for read-mostly worktrees.

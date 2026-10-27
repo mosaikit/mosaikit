@@ -86,3 +86,4 @@ Observations from the user's manual tests; ids as in the user's notes. Status is
 | I2 | Languages: a new supported language is a plugin that extends the set of supported languages (kind of plugin, UI strings, manifest i18n, docs) |
 | I3 | Indent hierarchical lists (same as B8; example: the System sidebar of the Administrator) |
 | I4 | App sidebar: nested items can be indented when it is open; when it is collapsed, an icon with sub-items opens a menu with items and sub-items (works with the `[[nav]]` tree of the layouts) |
+| J1 | **Done.** Development tooling for parallel work: `cargo xtask worktree add\|remove\|list`, heavy-run slots for `e2e`/`test`/`ci`, `clean-temp`, shared build cache option (README, checks DEV-nn) |

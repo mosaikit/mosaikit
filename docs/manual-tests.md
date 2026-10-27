@@ -535,3 +535,21 @@ Use a copy of `.env` with new passwords. Never run them against a stack that hol
 | R1-G-14 | Wildcard: `MOSAIKIT_PLUGIN_URL=http://*.plugins.localhost`; open a plugin UI | Its URL is `http://<plugin>.plugins.localhost/...`; each plugin on its own host |
 | R1-G-15 | TLS: self-signed certificates in `nginx/certs`, enable `20-https.conf.template`, recreate; `curl -kI https://localhost` | 200 with `Strict-Transport-Security`; session cookie is `Secure` with https URLs; Notifications live update still works (websocket/stream) |
 | R1-G-16 | Upgrade drill: back up, change `MOSAIKIT_VERSION` to a newer image, `up -d` | Migrations apply (`logs app`), data intact; `docker compose down -v` of the test project cleans up |
+
+## Development tooling
+
+Run from any checkout of the kernel. The pure logic (names, ports, slots, staleness) runs in `cargo test -p xtask`.
+Use a throwaway name such as `devcheck`; never run these where a worktree with that name holds work.
+
+| Id | Steps | Expected |
+|---|---|---|
+| DEV-01 | `cargo xtask worktree add devcheck`, then `cargo xtask worktree list` | `mosaikit-temp\devcheck\mosaikit` and `mosaikit-plugins` exist, branches `work-devcheck` and `devcheck-plugins`; `.worktree.env` has a port from 18200 and `MOSAIKIT_DB_SUFFIX=wt_devcheck`; the list shows them |
+| DEV-02 | `cmd /c dir /AL mosaikit-temp\devcheck\mosaikit` and the same for `mosaikit-plugins` | `node_modules` (root, `ui\host`, `ui\plugin-api`, `e2e` where the main checkout has them) are `<JUNCTION>` to the main checkout |
+| DEV-03 | Add a second worktree `devcheck2` | Another port, another suffix |
+| DEV-04 | In `devcheck`: `cargo xtask e2e -- tests/auth.spec.ts` (any one file; add `-g "text"` for one test) | Only that file runs, on that worktree's port, in database `mosaikit_e2e_wt_devcheck` (`cargo xtask db url` + `psql -l`); `tests/results` untouched |
+| DEV-05 | Start `cargo xtask e2e` in `devcheck`; start another in `devcheck2` | The second prints `waiting for a heavy-run slot 'e2e' (1 at once); held by: xtask e2e (pid ..., ...)` and starts when the first ends |
+| DEV-06 | Kill the first run's `xtask.exe` from Task Manager while a second waits | The second prints `removing stale lock` and starts |
+| DEV-07 | `MOSAIKIT_HEAVY_SLOTS=e2e=2` with two runs | Both run at once |
+| DEV-08 | `cargo xtask clean-temp` | Sizes of every folder of `mosaikit-temp` and its `target` folders; nothing deleted |
+| DEV-09 | `cargo xtask clean-temp --days 0` while a run holds a slot | The `target` of the running worktree says `in use`, others `would delete`; nothing deleted. With `--yes` they are deleted, the worktrees stay |
+| DEV-10 | `cargo xtask worktree remove devcheck` and `devcheck2` | Folders gone, `git worktree list` and `git branch` do not show them (unmerged branches are reported and kept), main `node_modules` still full, database `mosaikit_e2e_wt_devcheck` gone |

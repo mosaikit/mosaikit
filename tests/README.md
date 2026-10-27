@@ -32,4 +32,9 @@ run of each suite are in [results/test-results.md](results/test-results.md), reg
 | End-to-end tests | `e2e/tests/*.spec.ts` (with axe) | Playwright | `cargo xtask e2e` |
 | Load test | `xtask/perf/` | `cargo xtask perf` | by hand, results in [docs/reports/performance.md](../docs/reports/performance.md) |
 
+Run a part of the end-to-end suite: `cargo xtask e2e -- tests/<file>.spec.ts -g "part of a test title"` (everything
+after `--` goes to Playwright; a partial run does not replace the e2e results of the report). Heavy runs queue on
+machine-wide slots and each worktree has its own port and database: see "Working in parallel" in the
+[README](../README.md#working-in-parallel-worktrees-ports-heavy-run-slots).
+
 Unit tests stay next to the code they test; this folder holds the system-level suites and the results.
