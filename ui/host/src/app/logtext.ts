@@ -113,3 +113,9 @@ export function describe(e: Pick<LogEvent, 'action'>): string {
   return e.action.replace(/[._]/g, ' ')
 }
 
+/** What the event is about, beyond the item: the person, the group, the username of a refused sign-in. */
+export function about(e: Pick<LogEvent, 'detail' | 'resource_title'>): string {
+  const d = e.detail ?? {}
+  const pick = (k: string) => (typeof d[k] === 'string' || typeof d[k] === 'number' ? String(d[k]) : '')
+  return e.resource_title || pick('name') || pick('username') || pick('title') || pick('email') || ''
+}

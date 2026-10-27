@@ -20,7 +20,7 @@ import { cn } from '@/lib/utils'
 import { useAction, useApi, useConfirm, usePaged, useTenantCtx } from '../core.ts'
 import { BulkBar, FilterColumn, ListPage } from '../listkit.tsx'
 import { t } from '../i18n.ts'
-import { describe } from '../logtext.ts'
+import { about, describe } from '../logtext.ts'
 import { Empty, ErrorBox, Loading, MoreRows, PageHeader, Pills } from '../kit.tsx'
 import { go } from '../router.ts'
 import ShareDialog from '../ShareDialog.tsx'
@@ -319,13 +319,6 @@ export function SharedByMeSection({ slug }: { slug: string }) {
 }
 
 /* ── Log ─────────────────────────────────────────────────────────────── */
-
-/** What the event is about, beyond the item: the person, the group, the username of a refused sign-in. */
-export function about(e: LogEvent): string {
-  const d = e.detail ?? {}
-  const pick = (k: string) => (typeof d[k] === 'string' || typeof d[k] === 'number' ? String(d[k]) : '')
-  return e.resource_title || pick('name') || pick('username') || pick('title') || pick('email') || ''
-}
 
 const WHAT = ['sign_in', 'items', 'sharing', 'people', 'plugins', 'settings'] as const
 const WHAT_LABEL: Record<(typeof WHAT)[number], string> = {
