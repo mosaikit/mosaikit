@@ -1,7 +1,7 @@
 import path from 'node:path'
 import fs from 'node:fs'
 import { expect, test } from '@playwright/test'
-import { PASSWORD, adminLogin, login, logout, appearanceTab, nav, accessible } from './support'
+import { colorsSettled, PASSWORD, adminLogin, login, logout, appearanceTab, nav, accessible } from './support'
 
 // Layouts, pages of an app, layout from a file. Runs in order after the previous file (the state of the installation is shared).
 
@@ -56,7 +56,7 @@ test.describe.serial('11-layouts', () => {
       await expect(page).toHaveURL(/#\/admin\/tenants/)
       // dark mode
       await page.emulateMedia({ colorScheme: 'dark' })
-      await page.waitForTimeout(600) // the colours transition
+      await colorsSettled(page)
       await accessible(page, `${id}, dark`)
       // the phone: the navigation in a drawer (or the launcher), no horizontal scroll
       await page.emulateMedia({ colorScheme: 'light' })

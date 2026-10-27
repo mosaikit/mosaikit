@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { PASSWORD, adminLogin, login, logout, nav, accessible } from './support'
+import { colorsSettled, PASSWORD, adminLogin, login, logout, nav, accessible } from './support'
 
 // Review round 1: tenant, people, lists, overview. Runs in order after the previous file (the state of the installation is shared).
 
@@ -295,7 +295,7 @@ test.describe.serial('12-review-round1-platform', () => {
       await page.emulateMedia({ colorScheme: 'light' })
       await accessible(page, `${where}, light`)
       await page.emulateMedia({ colorScheme: 'dark' })
-      await page.waitForTimeout(600)
+      await colorsSettled(page)
       await accessible(page, `${where}, dark`)
       await page.emulateMedia({ colorScheme: 'light' })
       await page.evaluate(() => document.documentElement.setAttribute('data-contrast', 'more'))

@@ -152,3 +152,26 @@ export async function accessible(page: Page, where: string) {
   const bad = r.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')
   expect(bad.map((v) => `${where}: ${v.id} ${v.nodes.map((n) => n.target.join(' ') + ' ' + n.html.slice(0, 300) + ' => ' + n.failureSummary).join(' | ')}`)).toEqual([])
 }
+
+/** Waits until the colours stopped changing (CSS transitions after a change of theme): 10 identical frames. */
+export async function colorsSettled(page: Page) {
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) => {
+        const sample = () =>
+          [document.body, document.querySelector('header'), document.querySelector('[data-sidebar="sidebar"]')]
+            .map((e) => (e ? getComputedStyle(e).backgroundColor + getComputedStyle(e).color : ''))
+            .join('|')
+        let last = sample()
+        let same = 0
+        const tick = () => {
+          const now = sample()
+          same = now === last ? same + 1 : 0
+          last = now
+          if (same >= 10) resolve()
+          else requestAnimationFrame(tick)
+        }
+        requestAnimationFrame(tick)
+      }),
+  )
+}
