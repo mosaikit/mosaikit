@@ -444,7 +444,8 @@ const checks: L.Check[] = [
       const p = await L.as(ctx, 'admin')
       await p.getByRole('button', { name: /Fix it for me/ }).click()
       await p.waitForTimeout(1000)
-      c.ok(/Everything reads/.test(await H.text(p)), '«Everything reads»')
+      // the editor is a dialog, outside the main region
+      c.ok(/Everything reads/.test(await p.getByRole('dialog').innerText()), '«Everything reads»')
       await p.getByRole('button', { name: /Save the theme/ }).click()
       await p.waitForTimeout(1500)
       c.ok(/Lagoon/.test(await H.text(p)), 'the card Lagoon')
@@ -490,7 +491,8 @@ const checks: L.Check[] = [
       if (await H.vis(every)) {
         if ((await every.getAttribute('aria-checked')) === 'true' || (await every.isChecked().catch(() => false))) await every.click()
         const lg = p.getByRole('checkbox', { name: /Lagoon/ })
-        if ((await lg.count()) && (await lg.isChecked())) await lg.uncheck()
+        await lg.waitFor({ timeout: 5000 }) // the list of themes appears when the switch is off
+        if (await lg.isChecked()) await lg.click()
         await saveRegion(p)
       } else c.ok(false, '«Themes tenants may use»')
       await L.shot(p, 'P9-24', { full: true })
