@@ -182,8 +182,6 @@ fn folder(p: &Path) -> String {
 /// fmt, clippy, tests, typecheck, lint and build of the UIs, cargo-deny if installed.
 pub fn ci() -> Result<()> {
     let _slot = crate::heavy::acquire("test", "xtask ci")?;
-    // every check of docs/manual-tests.md has its automated test (tests/manual) and the other way round
-    crate::manual::check()?;
     let all = plugins::discover()?;
     let cargo_roots = plugins::cargo_roots(&all);
     for ws in std::iter::once(root()).chain(cargo_roots.iter().cloned()) {

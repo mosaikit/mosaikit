@@ -56,7 +56,8 @@ fn area_args(area: &str) -> Vec<String> {
         .chars()
         .flat_map(|c| if c.is_ascii_alphanumeric() || c == '-' { vec![c] } else { vec!['\\', c] })
         .collect();
-    vec!["--grep".into(), format!("(^|\\s){escaped}")]
+    // `\b` first: the prefix at the start of a word (no `|` or parentheses: the argument goes through `cmd`)
+    vec!["--grep".into(), format!(r"\b{escaped}")]
 }
 
 pub fn manual_tests(headed: bool, area: Option<String>, args: &[String]) -> Result<()> {

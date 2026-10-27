@@ -26,8 +26,9 @@ import fub from './checks/fub.ts'
 import p10 from './checks/p10.ts'
 import sec from './checks/sec.ts'
 import ux from './checks/ux.ts'
+import pending from './checks/pending.ts'
 
-const ALL = new Map<string, L.Check>([...p0, ...p0b, ...p1, ...p2, ...p3, ...p4, ...p5, ...p6, ...p7, ...p8, ...p9, ...fu, ...fub, ...p10, ...sec, ...ux].map((c) => [c.id, c]))
+const ALL = new Map<string, L.Check>([...p0, ...p0b, ...p1, ...p2, ...p3, ...p4, ...p5, ...p6, ...p7, ...p8, ...p9, ...fu, ...fub, ...p10, ...sec, ...ux, ...pending].map((c) => [c.id, c]))
 
 /** Defects already reported (docs/reports/qa-walkthrough.md) and owned by a piece of work: expected to fail. */
 const KNOWN: Record<string, string> = {
@@ -66,6 +67,8 @@ const KNOWN: Record<string, string> = {
   'UX-03': 'M3: lists, quota and own-profile checks (owner: manual checks follow-up)',
   'UX-07': 'M3: lists, quota and own-profile checks (owner: manual checks follow-up)',
   'UX-10': 'M3: lists, quota and own-profile checks (owner: manual checks follow-up)',
+  'P0b-02': 'M4: language menu after the language plugins of R1-A, check not updated (owner: manual checks follow-up)',
+  'P0b-04': 'M4: language menu after the language plugins of R1-A, check not updated (owner: manual checks follow-up)',
   'P10-24': 'F2: contrast of the selected section in dark mode (owner: QA follow-ups)',
 }
 

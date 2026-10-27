@@ -10,8 +10,9 @@ The document grows with the plan: every phase adds its section when it is commit
 **Every check is automated too.** Each id has its twin in `tests/manual/checks` (one Playwright test per
 id, titled with the id), run on a new installation seeded like the development environment:
 
+- The automated suite runs only on an explicit release request (about one hour); while working run one area, e.g. `cargo xtask manual-tests --area P3-`.
 - `cargo xtask manual-tests` runs them all; `cargo xtask manual-tests -- --grep P3-12` runs one;
-- `cargo xtask manual-tests --check` (also part of `cargo xtask ci`) fails if an id of this document has
+- `cargo xtask manual-tests --check` (not part of `cargo xtask ci`; run it when you add checks) fails if an id of this document has
   no automated test or an automated test has no id here, so a new check needs both;
 - screenshots go to `tests/results/raw/manual-screens/<id>.png`, the results to the report of the
   automated tests; a check that cannot run automatically (Docker, an outside crawler…) is reported as

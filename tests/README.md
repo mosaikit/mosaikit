@@ -43,5 +43,5 @@ Unit tests stay next to the code they test; this folder holds the system-level s
 
 - While working: only the area you touch, e.g. `cargo xtask manual-tests --area R1-L` (ids that start with the prefix) or `cargo xtask e2e -- -g "<title>"`; never the whole manual suite.
 - Before a merge: the normal `cargo xtask e2e` (about 12-20 minutes) together with `cargo xtask ci`.
-- The full manual suite (`cargo xtask manual-tests`, about one hour): once per work round or before a hand-over to the user, not per commit.
+- The full manual suite (`cargo xtask manual-tests`, about one hour): only on an explicit release request; it is not part of `cargo xtask ci`, `test` or `e2e`. The last full run was not completed: the run of 2026-10-27 ended with 263 passed, 24 failed (findings M1-M3 in docs/reports/qa-walkthrough.md), 10 skipped on the first 296 ids; the 49 ids added later (PERF, QA, DEV, HOST: `tests/manual/checks/pending.ts`) were never executed, and the suite was not run again after upstream began requiring an email for local accounts (the seed has it now; checks that create people by hand may need one).
 - Heavy runs (`test`, `ci`, `e2e`, `manual-tests`) take a machine-wide slot (`xtask/src/heavy.rs`, `MOSAIKIT_HEAVY_SLOTS`), so runs of several checkouts wait for each other instead of colliding. The manual suite shares the `e2e` slots.

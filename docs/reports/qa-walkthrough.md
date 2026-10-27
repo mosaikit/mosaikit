@@ -518,3 +518,4 @@ The automated suite (`cargo xtask manual-tests`) ended with 263 passed, 10 skipp
 | M1 | P10-21, FU-B-01, FU-B-02, FU-B-03, FU-B-04, FU-B-05, FU-B-06, FU-B-07, FU-B-08, FU-B-11, FU-B-14, FU-A-07, FU-A-08, FU-A-09 | Tabs package installed from file (P10-21) does not leave the extension usable: the checks that need its tabs fail (cascade; may be the pinned plugins build, not the product) |
 | M2 | P9-22, P9-25, P9-26, P10-11, FU-A-12 | themes and layout settings of the tenant (P9-22, P9-25, P9-26, P10-11, FU-A-12): the check does not reach the expected state; product or check not yet told apart |
 | M3 | P5-21, P6-06, UX-03, UX-07, UX-10 | lists, quota and own-profile checks (P5-21 paging, P6-06 quota of items, UX-03/07/10): the check does not reach the expected state; product or check not yet told apart |
+| M4 | P0b-02, P0b-04 | Language menu / wrong password checks fail since the language plugins (R1-A); seen in a smoke run, not diagnosed (check or product) |
