@@ -86,7 +86,7 @@ test.describe.serial('11-layouts', () => {
     // a layout installed from a file: Tabs uninstalled, then installed again from its package
     expect(await call('DELETE', 'api/admin/plugins/com.mosaikit.layout-tabs')).toBe(200)
     await page.goto('./#/admin/plugins')
-    const dir = path.join(process.cwd(), '..', '.dev', 'e2e', 'registry', 'plugins')
+    const dir = path.join(import.meta.dirname, '..', '..', '..', '.dev', 'e2e', 'registry', 'plugins')
     const pkg = fs.readdirSync(dir).find((f) => f.includes('layout-tabs'))!
     await page.locator('input[type="file"]').first().setInputFiles(path.join(dir, pkg))
     await expect(page.getByRole('row', { name: /Tabs/ })).toBeVisible()
