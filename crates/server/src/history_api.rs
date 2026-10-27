@@ -102,7 +102,9 @@ async fn trash_list(
     if q.limit.is_some() {
         let p = mosaikit_kernel::paging::PageQuery { limit: q.limit, cursor: q.cursor, q: q.q };
         let page = trash::list_page(&s.k, &c, q.plugin.as_deref(), &p).await?;
-        return Ok(Json(json!({ "items": page.items, "total": page.total, "next": page.next, "retention_days": days })));
+        return Ok(Json(
+            json!({ "items": page.items, "total": page.total, "next": page.next, "retention_days": days }),
+        ));
     }
     let items = trash::list(&s.k, &c, q.plugin.as_deref(), q.q.as_deref()).await?;
     Ok(Json(json!({ "items": items, "retention_days": days })))

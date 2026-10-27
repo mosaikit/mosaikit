@@ -29,8 +29,8 @@ pub use administrators::{
 pub use directory::{directory, Principal};
 pub use groups::{create_group, delete_group, groups, groups_page, set_group_member, GroupInfo, GroupMember};
 pub use invitations::{
-    invite, invite_with, my_invitations, respond_invitation, revoke_invitation, tenant_invitations, tenant_invitations_page,
-    InvitationInfo,
+    invite, invite_with, my_invitations, respond_invitation, revoke_invitation, tenant_invitations,
+    tenant_invitations_page, InvitationInfo,
 };
 pub use members::{
     create_member, members, members_page, remove_member, reset_member_password, set_member_suspended,

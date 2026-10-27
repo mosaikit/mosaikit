@@ -171,11 +171,16 @@ async fn the_lists_of_the_overview_come_in_pages() {
         ids.push(rid);
     }
     // shared by me: two pages, the latest first, no row twice
-    let p1 = shared_by_me_page(t, &w.anna, &PageQuery { limit: Some(2), ..Default::default() }).await.unwrap();
+    let p1 =
+        shared_by_me_page(t, &w.anna, &PageQuery { limit: Some(2), ..Default::default() }).await.unwrap();
     assert_eq!((p1.items.len(), p1.total), (2, 3));
-    let p2 = shared_by_me_page(t, &w.anna, &PageQuery { limit: Some(2), cursor: p1.next.clone(), ..Default::default() })
-        .await
-        .unwrap();
+    let p2 = shared_by_me_page(
+        t,
+        &w.anna,
+        &PageQuery { limit: Some(2), cursor: p1.next.clone(), ..Default::default() },
+    )
+    .await
+    .unwrap();
     assert_eq!(p2.items.len(), 1);
     assert!(p2.next.is_none());
     assert!(p1.items.iter().all(|x| x.id != p2.items[0].id));
@@ -183,15 +188,24 @@ async fn the_lists_of_the_overview_come_in_pages() {
     for rid in &ids {
         crud::delete(t, &w.anna, NOTES, "notes", *rid).await.unwrap();
     }
-    let t1 = trash::list_page(t, &w.anna, None, &PageQuery { limit: Some(2), ..Default::default() }).await.unwrap();
-    assert_eq!((t1.items.len(), t1.total), (2, 3));
-    let t2 = trash::list_page(t, &w.anna, None, &PageQuery { limit: Some(2), cursor: t1.next.clone(), ..Default::default() })
+    let t1 = trash::list_page(t, &w.anna, None, &PageQuery { limit: Some(2), ..Default::default() })
         .await
         .unwrap();
+    assert_eq!((t1.items.len(), t1.total), (2, 3));
+    let t2 = trash::list_page(
+        t,
+        &w.anna,
+        None,
+        &PageQuery { limit: Some(2), cursor: t1.next.clone(), ..Default::default() },
+    )
+    .await
+    .unwrap();
     assert_eq!(t2.items.len(), 1);
     assert!(t1.items.iter().all(|x| x.id != t2.items[0].id));
     // the log of a widget: a short page
-    let short = log::page(t, Scope::Tenant(&w.mgr), &LogFilter { limit: Some(2), ..Default::default() }).await.unwrap();
+    let short = log::page(t, Scope::Tenant(&w.mgr), &LogFilter { limit: Some(2), ..Default::default() })
+        .await
+        .unwrap();
     assert_eq!(short.events.len(), 2);
 }
 

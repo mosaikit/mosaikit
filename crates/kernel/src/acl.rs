@@ -645,7 +645,11 @@ pub async fn shared_by_me(k: &Kernel, c: &Caller) -> Result<Vec<SharedByMe>> {
 }
 
 /// A page of the items the caller shared, the latest changed first (keyset on the change time).
-pub async fn shared_by_me_page(k: &Kernel, c: &Caller, p: &crate::paging::PageQuery) -> Result<crate::paging::Page<SharedByMe>> {
+pub async fn shared_by_me_page(
+    k: &Kernel,
+    c: &Caller,
+    p: &crate::paging::PageQuery,
+) -> Result<crate::paging::Page<SharedByMe>> {
     let shared = "(exists (select 1 from core.grants g where g.resource_id = r.id)
                 or exists (select 1 from core.public_links l where l.resource_id = r.id and l.revoked_at is null
                     and (l.expires_at is null or l.expires_at > now())))";
@@ -706,5 +710,9 @@ pub async fn shared_by_me_page(k: &Kernel, c: &Caller, p: &crate::paging::PageQu
         ));
     }
     let p = crate::paging::page(out, limit, total, |(x, key)| (key.clone(), x.id));
-    Ok(crate::paging::Page { items: p.items.into_iter().map(|(x, _)| x).collect(), total: p.total, next: p.next })
+    Ok(crate::paging::Page {
+        items: p.items.into_iter().map(|(x, _)| x).collect(),
+        total: p.total,
+        next: p.next,
+    })
 }

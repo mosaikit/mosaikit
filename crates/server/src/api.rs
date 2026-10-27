@@ -1214,7 +1214,9 @@ async fn m_invitations(
 ) -> ApiResult<Json<Value>> {
     if p.limit.is_some() {
         let (page, pending) = tenancy::tenant_invitations_page(&s.k, &c, &p).await?;
-        return Ok(Json(json!({ "items": page.items, "total": page.total, "next": page.next, "pending": pending })));
+        return Ok(Json(
+            json!({ "items": page.items, "total": page.total, "next": page.next, "pending": pending }),
+        ));
     }
     Ok(Json(json!(tenancy::tenant_invitations(&s.k, &c).await?)))
 }

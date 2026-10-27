@@ -160,7 +160,14 @@ pub async fn tenant_invitations_page(
         .map(|r| invitation(r).map(|x| (x, r.get::<String, _>(10))))
         .collect::<Result<Vec<_>>>()?;
     let pg = crate::paging::page(items, limit, total, |(x, key)| (key.clone(), x.id));
-    Ok((crate::paging::Page { items: pg.items.into_iter().map(|(x, _)| x).collect(), total: pg.total, next: pg.next }, pending))
+    Ok((
+        crate::paging::Page {
+            items: pg.items.into_iter().map(|(x, _)| x).collect(),
+            total: pg.total,
+            next: pg.next,
+        },
+        pending,
+    ))
 }
 
 pub async fn revoke_invitation(k: &Kernel, c: &Caller, id: Uuid) -> Result<()> {
