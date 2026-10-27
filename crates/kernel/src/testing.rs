@@ -213,7 +213,17 @@ impl TestKernel {
     /// Creates a member of the tenant of the manager and signs them in.
     pub async fn member(&self, manager: &SessionUser, username: &str) -> SessionUser {
         let c = self.caller(manager, &manager.home_tenant_slug).await;
-        create_member(&self.k, &c, username, username, &format!("{username}@example.org"), PASSWORD, Role::User).await.expect("member");
+        create_member(
+            &self.k,
+            &c,
+            username,
+            username,
+            &format!("{username}@example.org"),
+            PASSWORD,
+            Role::User,
+        )
+        .await
+        .expect("member");
         self.login(&manager.home_tenant_slug, username).await
     }
 

@@ -878,9 +878,17 @@ pub async fn create_person(
         // nobody knows it: the person chooses theirs with the link
         None => random_token(24),
     };
-    let user =
-        create_member_in(k, n.home_tenant, admin.user_id, &n.username, &n.display_name, &email, &password, n.role)
-            .await?;
+    let user = create_member_in(
+        k,
+        n.home_tenant,
+        admin.user_id,
+        &n.username,
+        &n.display_name,
+        &email,
+        &password,
+        n.role,
+    )
+    .await?;
     if n.profile.is_some() {
         access::set_member_profile_in(k, n.home_tenant, admin.user_id, user, n.profile).await?;
     }

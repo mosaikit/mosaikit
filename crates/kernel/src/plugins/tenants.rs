@@ -168,8 +168,7 @@ async fn list(k: &Kernel, tenant: Uuid, lang: &str, only_available: bool) -> Res
         !matches!(
             p.manifest.effective_kind(),
             mosaikit_mskp::PluginKind::Layout | mosaikit_mskp::PluginKind::Language
-        )
-            && st.get(&p.id).is_some_and(|s| p.is_active() && (s.0 || !only_available))
+        ) && st.get(&p.id).is_some_and(|s| p.is_active() && (s.0 || !only_available))
     };
     Ok(plugins
         .iter()

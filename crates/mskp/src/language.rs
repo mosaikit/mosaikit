@@ -79,7 +79,10 @@ pub fn load_language(code: &str, name: &str, files: &BTreeMap<String, Vec<u8>>) 
             }
             for (k, v) in &m {
                 if k.is_empty() || !text_ok(k) || !text_ok(v) {
-                    return Err(bad(format!("host.json: invalid text «{}»", k.chars().take(40).collect::<String>())));
+                    return Err(bad(format!(
+                        "host.json: invalid text «{}»",
+                        k.chars().take(40).collect::<String>()
+                    )));
                 }
             }
             m
@@ -153,7 +156,10 @@ mod tests {
         let p = load_language(
             "es",
             " Español ",
-            &files(r#"{"Sign in": "Iniciar sesión"}"#, Some(("com.mosaikit.notes", "name = \"Notas\"\n[resources.notes]\nlabel = \"Notas\""))),
+            &files(
+                r#"{"Sign in": "Iniciar sesión"}"#,
+                Some(("com.mosaikit.notes", "name = \"Notas\"\n[resources.notes]\nlabel = \"Notas\"")),
+            ),
         )
         .unwrap();
         assert_eq!((p.code.as_str(), p.name.as_str()), ("es", "Español"));
@@ -171,7 +177,10 @@ mod tests {
     #[test]
     fn texts_of_manifests_by_language() {
         let mut m = BTreeMap::new();
-        m.insert("com.example.a".to_string(), Translation { name: Some("A es".into()), ..Translation::default() });
+        m.insert(
+            "com.example.a".to_string(),
+            Translation { name: Some("A es".into()), ..Translation::default() },
+        );
         set_texts("zz", m);
         assert_eq!(texts_for("zz", "com.example.a").unwrap().name.as_deref(), Some("A es"));
         assert!(texts_for("zz", "com.example.b").is_none());

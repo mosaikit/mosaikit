@@ -351,18 +351,23 @@ async fn logged_in(s: &AppState, lr: identity::LoginResult, extra: Value) -> Api
 /// Tenants of the sign-in page (public).
 /// The languages installed as plugins (the host has English and Italian built in).
 async fn languages(State(s): State<AppState>) -> Json<Value> {
-    Json(json!(s.k.plugins.languages().iter().map(|l| json!({ "code": l.code, "name": l.name })).collect::<Vec<_>>()))
+    Json(json!(s
+        .k
+        .plugins
+        .languages()
+        .iter()
+        .map(|l| json!({ "code": l.code, "name": l.name }))
+        .collect::<Vec<_>>()))
 }
 
 /// The texts of the host in a language of a language plugin.
 async fn language_texts(State(s): State<AppState>, Path(code): Path<String>) -> ApiResult<Response> {
-    let pack = s
-        .k
-        .plugins
-        .languages()
-        .into_iter()
-        .find(|l| l.code == code)
-        .ok_or_else(|| Error::not_found("language not installed"))?;
+    let pack =
+        s.k.plugins
+            .languages()
+            .into_iter()
+            .find(|l| l.code == code)
+            .ok_or_else(|| Error::not_found("language not installed"))?;
     let mut res = Json(json!({ "code": pack.code, "name": pack.name, "strings": pack.host })).into_response();
     res.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
     Ok(res)
@@ -1148,9 +1153,16 @@ async fn m_create_member(
     Tenant(c): Tenant,
     Json(r): Json<NewMemberReq>,
 ) -> ApiResult<Json<Value>> {
-    let id =
-        tenancy::create_member(&s.k, &c, &r.username, &r.display_name, &r.email, &r.password, Role::parse(&r.role)?)
-            .await?;
+    let id = tenancy::create_member(
+        &s.k,
+        &c,
+        &r.username,
+        &r.display_name,
+        &r.email,
+        &r.password,
+        Role::parse(&r.role)?,
+    )
+    .await?;
     Ok(Json(json!({ "user_id": id })))
 }
 

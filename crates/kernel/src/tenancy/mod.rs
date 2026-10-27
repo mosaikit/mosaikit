@@ -37,11 +37,11 @@ pub use members::{
     set_role, MemberFilter, MemberInfo, MemberPage, RemoveReport,
 };
 pub use people::{
-    add_to_tenant, close_session, close_sessions, create_person, directory_of_people, group_detail,
-    member_detail, move_home, person, person_activity, person_sessions, remove_from_tenant, reset_info,
-    forgot_password, reset_link, reset_with_link, set_person_status, update_membership, update_person, why_not, By, EventInfo,
-    GroupDetail, MemberDetail, MembershipChange, NewMembership, NewPerson, PersonRow, PersonTenant,
-    ForgotAnswer, ResetInfo, ResetLink, SessionInfo, SharedItem, Step, WhyNot,
+    add_to_tenant, close_session, close_sessions, create_person, directory_of_people, forgot_password,
+    group_detail, member_detail, move_home, person, person_activity, person_sessions, remove_from_tenant,
+    reset_info, reset_link, reset_with_link, set_person_status, update_membership, update_person, why_not,
+    By, EventInfo, ForgotAnswer, GroupDetail, MemberDetail, MembershipChange, NewMembership, NewPerson,
+    PersonRow, PersonTenant, ResetInfo, ResetLink, SessionInfo, SharedItem, Step, WhyNot,
 };
 pub use people::{people_page, PeopleCounts, PeopleFilter, PeoplePage};
 pub use requests::{decide_request, request_access, requests, AccessRequest};

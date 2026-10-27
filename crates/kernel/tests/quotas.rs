@@ -142,15 +142,33 @@ async fn at_the_limit_additions_stop() {
 
     // people: the manager and anna; a third is refused, also by invitation; a suspension frees a place
     quotas::set_tenant(t, admin, tenant, &own("people", Some(2))).await.unwrap();
-    let err = create_member(t, &w.mgr, "carla", "Carla", "carla@example.org", mosaikit_kernel::testing::PASSWORD, Role::User)
-        .await
-        .unwrap_err();
+    let err = create_member(
+        t,
+        &w.mgr,
+        "carla",
+        "Carla",
+        "carla@example.org",
+        mosaikit_kernel::testing::PASSWORD,
+        Role::User,
+    )
+    .await
+    .unwrap_err();
     assert_eq!(err.code(), "quota_exceeded");
     let beta = t.tenant("beta").await;
     t.member(&beta, "dario").await;
     assert_eq!(invite(t, &w.mgr, "beta", "dario", Role::User).await.unwrap_err().code(), "quota_exceeded");
     set_member_suspended(t, &w.mgr, w.anna.user.user_id, true).await.unwrap();
-    create_member(t, &w.mgr, "carla", "Carla", "carla@example.org", mosaikit_kernel::testing::PASSWORD, Role::User).await.unwrap();
+    create_member(
+        t,
+        &w.mgr,
+        "carla",
+        "Carla",
+        "carla@example.org",
+        mosaikit_kernel::testing::PASSWORD,
+        Role::User,
+    )
+    .await
+    .unwrap();
     // anna cannot come back while the tenant is full
     assert_eq!(
         set_member_suspended(t, &w.mgr, w.anna.user.user_id, false).await.unwrap_err().code(),

@@ -215,7 +215,10 @@ fn sync_language(p: &LoadedPlugin) {
 }
 
 /// The language of a language plugin from its folder (`lang/`), checked; errors are logged.
-pub(crate) fn load_language_dir(dir: &Path, m: &Manifest) -> Option<Arc<mosaikit_mskp::language::LanguagePack>> {
+pub(crate) fn load_language_dir(
+    dir: &Path,
+    m: &Manifest,
+) -> Option<Arc<mosaikit_mskp::language::LanguagePack>> {
     fn walk(
         base: &Path,
         d: &Path,

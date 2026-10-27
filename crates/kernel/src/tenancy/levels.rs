@@ -554,7 +554,8 @@ fn fix_default_language(list: &mut [Setting]) {
     if let (Some(enabled), Some(d)) = (enabled, list.iter_mut().find(|s| s.key == "lang.default")) {
         // a language of a language plugin is offered as long as the plugin is installed: not in this list
         let plugin_language = d.value.as_str().is_some_and(|s| !LANGUAGES.contains(&s));
-        if d.value != "auto" && !plugin_language && !enabled.as_array().is_some_and(|a| a.contains(&d.value)) {
+        if d.value != "auto" && !plugin_language && !enabled.as_array().is_some_and(|a| a.contains(&d.value))
+        {
             d.value = json!("auto");
         }
     }

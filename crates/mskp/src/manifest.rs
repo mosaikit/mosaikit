@@ -1173,7 +1173,8 @@ impl Manifest {
         let mut m = self.clone();
         let base = lang.split(['-', '_']).next().unwrap_or_default().to_ascii_lowercase();
         // the texts of the manifest itself, else the ones a language plugin brings for this plugin
-        let Some(tr) = self.i18n.get(&base).cloned().or_else(|| crate::language::texts_for(&base, &self.id)) else {
+        let Some(tr) = self.i18n.get(&base).cloned().or_else(|| crate::language::texts_for(&base, &self.id))
+        else {
             return m;
         };
         let tr = &tr;

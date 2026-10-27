@@ -50,10 +50,12 @@ async fn email_is_required_for_local_accounts() {
         assert_eq!(e.kind, Kind::BadRequest, "{bad}");
         assert!(matches!(e.code(), "email_required" | "email_invalid"), "{bad}: {}", e.code());
     }
-    let carla = create_member(&t, &mgr, "carla", "Carla", " Carla@Example.org ", PASSWORD, Role::User).await.unwrap();
+    let carla =
+        create_member(&t, &mgr, "carla", "Carla", " Carla@Example.org ", PASSWORD, Role::User).await.unwrap();
     // the Administrator creates a person: same rule
     let admin = t.admin().await;
-    let alfa = tenancy::list_tenants(&t, &admin).await.unwrap().into_iter().find(|x| x.slug == "alfa").unwrap().id;
+    let alfa =
+        tenancy::list_tenants(&t, &admin).await.unwrap().into_iter().find(|x| x.slug == "alfa").unwrap().id;
     let n = |email: Option<&str>| NewPerson {
         username: "dino".into(),
         display_name: String::new(),
@@ -75,13 +77,22 @@ async fn email_is_required_for_local_accounts() {
         profile: String::new(),
         groups: vec![],
     };
-    let out = bulk::import_people(&t, &mgr, &[row("eva", None), row("fabio", Some("fabio@example.org"))]).await.unwrap();
+    let out = bulk::import_people(&t, &mgr, &[row("eva", None), row("fabio", Some("fabio@example.org"))])
+        .await
+        .unwrap();
     assert_eq!((out[0].ok, out[0].code), (false, Some("email_required")));
     assert!(out[1].ok);
     // edit: the address cannot be emptied; a name-only edit of an account without one asks for it
-    assert_eq!(update_person(&t, By::Admin(&admin), carla, None, Some("")).await.unwrap_err().code(), "email_required");
+    assert_eq!(
+        update_person(&t, By::Admin(&admin), carla, None, Some("")).await.unwrap_err().code(),
+        "email_required"
+    );
     update_person(&t, By::Admin(&admin), carla, Some("Carla B."), Some("carla.b@example.org")).await.unwrap();
-    mosaikit_db::query("update core.users set email = null where id = $1").bind(carla).execute(&t.db).await.unwrap();
+    mosaikit_db::query("update core.users set email = null where id = $1")
+        .bind(carla)
+        .execute(&t.db)
+        .await
+        .unwrap();
     assert_eq!(
         update_person(&t, By::Admin(&admin), carla, Some("Carla C."), None).await.unwrap_err().code(),
         "email_required",
@@ -145,11 +156,18 @@ async fn web(routes: Vec<(&'static str, String, Vec<u8>)>) -> u16 {
                 let req = String::from_utf8_lossy(&buf[..n]).to_string();
                 let path = req.split_whitespace().nth(1).unwrap_or("/").to_string();
                 let (head, body) = match routes.iter().find(|r| r.0 == path) {
-                    Some(r) if r.1.starts_with("Location:") => (format!("HTTP/1.1 302 Found\r\n{}", r.1), r.2.clone()),
+                    Some(r) if r.1.starts_with("Location:") => {
+                        (format!("HTTP/1.1 302 Found\r\n{}", r.1), r.2.clone())
+                    }
                     Some(r) => (format!("HTTP/1.1 200 OK\r\n{}", r.1), r.2.clone()),
                     None => ("HTTP/1.1 404 Not Found\r\n".to_string(), b"no".to_vec()),
                 };
-                let _ = s.write_all(format!("{head}Content-Length: {}\r\nConnection: close\r\n\r\n", body.len()).as_bytes()).await;
+                let _ = s
+                    .write_all(
+                        format!("{head}Content-Length: {}\r\nConnection: close\r\n\r\n", body.len())
+                            .as_bytes(),
+                    )
+                    .await;
                 let _ = s.write_all(&body).await;
             });
         }
@@ -164,17 +182,28 @@ async fn a_site_by_address_is_probed_safely() {
     use mosaikit_kernel::webfetch::inspect;
     // the guards: with the default configuration nothing on this computer or the local network is fetched
     let t = start().await;
-    for bad in ["http://127.0.0.1:1/", "http://localhost/", "http://[::1]/", "http://10.1.2.3/", "http://169.254.169.254/latest/meta-data/", "file:///etc/passwd", "ftp://example.org/", "http://user:pw@example.org/"] {
+    for bad in [
+        "http://127.0.0.1:1/",
+        "http://localhost/",
+        "http://[::1]/",
+        "http://10.1.2.3/",
+        "http://169.254.169.254/latest/meta-data/",
+        "file:///etc/passwd",
+        "ftp://example.org/",
+        "http://user:pw@example.org/",
+    ] {
         let e = inspect(&t, bad, false).await.unwrap_err();
         assert!(matches!(e.code(), "web_blocked" | "web_url"), "{bad}: {}", e.code());
     }
     drop(t);
 
     let t = mosaikit_kernel::testing::start_with(|c| c.allow_private_fetch = true).await;
-    let page = |extra: &str, body: &str| (format!("Content-Type: text/html\r\n{extra}"), body.as_bytes().to_vec());
+    let page =
+        |extra: &str, body: &str| (format!("Content-Type: text/html\r\n{extra}"), body.as_bytes().to_vec());
     let (h_ok, b_ok) = page("", r#"<title>Free site</title><meta property="og:image" content="/pic.png">"#);
     let (h_xfo, b_xfo) = page("X-Frame-Options: DENY\r\n", "<title>Closed</title><img src=\"/pic.png\">");
-    let (h_csp, b_csp) = page("Content-Security-Policy: frame-ancestors 'self'\r\n", "<title>Also closed</title>");
+    let (h_csp, b_csp) =
+        page("Content-Security-Policy: frame-ancestors 'self'\r\n", "<title>Also closed</title>");
     let (h_open, b_open) = page("Content-Security-Policy: frame-ancestors *\r\n", "<title>Open</title>");
     let (h_redir, _) = ("Location: /go\r\n".to_string(), ());
     let port = web(vec![
@@ -226,7 +255,11 @@ async fn a_language_plugin_adds_a_language() {
     std::fs::write(dir.path().join("plugin.toml"), LANG_MANIFEST).unwrap();
     std::fs::create_dir_all(dir.path().join("lang/plugins")).unwrap();
     std::fs::write(dir.path().join("lang/host.json"), r#"{"Sign in": "Se connecter"}"#).unwrap();
-    std::fs::write(dir.path().join("lang/plugins/com.example.notes.toml"), "name = \"Notes FR\"\nlabel = \"Notes\"").unwrap();
+    std::fs::write(
+        dir.path().join("lang/plugins/com.example.notes.toml"),
+        "name = \"Notes FR\"\nlabel = \"Notes\"",
+    )
+    .unwrap();
     mosaikit_kernel::plugins::dev::load_one(&t, dir.path()).await.unwrap();
 
     let langs = t.plugins.languages();
@@ -243,7 +276,11 @@ async fn a_language_plugin_adds_a_language() {
     };
     assert_eq!(other("").localized("fr-FR").name, "Notes FR");
     assert_eq!(other("").localized("it").name, "Notes", "no texts for Italian");
-    assert_eq!(other("[i18n.fr]\nname = \"Mes notes\"").localized("fr").name, "Mes notes", "its own texts win");
+    assert_eq!(
+        other("[i18n.fr]\nname = \"Mes notes\"").localized("fr").name,
+        "Mes notes",
+        "its own texts win"
+    );
 
     // turned off: the language and its texts go away
     mosaikit_kernel::plugins::set_active(&t, None, "com.example.lang-fr", false).await.unwrap();
@@ -258,7 +295,10 @@ fn a_language_manifest_is_checked() {
     use mosaikit_mskp::Manifest;
     assert!(Manifest::from_toml(LANG_MANIFEST).is_ok());
     // without [language], with a built-in code, with an app inside
-    assert!(Manifest::from_toml(&LANG_MANIFEST.replace("[language]\ncode = \"fr\"\nname = \"Français\"", "")).is_err());
+    assert!(Manifest::from_toml(
+        &LANG_MANIFEST.replace("[language]\ncode = \"fr\"\nname = \"Français\"", "")
+    )
+    .is_err());
     assert!(Manifest::from_toml(&LANG_MANIFEST.replace("code = \"fr\"", "code = \"it\"")).is_err());
     assert!(Manifest::from_toml(&format!("{LANG_MANIFEST}\n[ui]\nentry = \"index.html\"")).is_err());
     // [language] on a plugin of another kind

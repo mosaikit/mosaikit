@@ -81,7 +81,9 @@ struct Fetched {
 fn check_url(raw: &str) -> Result<Url> {
     let u = Url::parse(raw.trim()).map_err(|_| Error::bad("not a valid address").with_code("web_url"))?;
     if !matches!(u.scheme(), "http" | "https") || !u.username().is_empty() || u.password().is_some() {
-        return Err(Error::bad("an http or https address without credentials is required").with_code("web_url"));
+        return Err(
+            Error::bad("an http or https address without credentials is required").with_code("web_url")
+        );
     }
     if u.host_str().is_none() {
         return Err(Error::bad("not a valid address").with_code("web_url"));
@@ -101,7 +103,9 @@ async fn fetch(k: &Kernel, raw: &str, max: usize, accept: &str) -> Result<Fetche
         let port = url.port_or_known_default().unwrap_or(80);
         let addrs: Vec<SocketAddr> = match host.parse::<IpAddr>() {
             Ok(ip) => vec![SocketAddr::new(ip, port)],
-            Err(_) => tokio::net::lookup_host((host.as_str(), port)).await.map_err(|_| unreachable())?.collect(),
+            Err(_) => {
+                tokio::net::lookup_host((host.as_str(), port)).await.map_err(|_| unreachable())?.collect()
+            }
         };
         // every address the name resolves to must be public, and the connection is pinned to one of
         // them: the name cannot change its answer between the check and the connection
@@ -115,7 +119,8 @@ async fn fetch(k: &Kernel, raw: &str, max: usize, accept: &str) -> Result<Fetche
             .resolve(&host, addrs[0])
             .build()
             .map_err(|e| Error::internal(e.to_string()))?;
-        let mut resp = client.get(url.clone()).header("accept", accept).send().await.map_err(|_| unreachable())?;
+        let mut resp =
+            client.get(url.clone()).header("accept", accept).send().await.map_err(|_| unreachable())?;
         let status = resp.status();
         if status.is_redirection() {
             let next = resp
@@ -152,8 +157,8 @@ pub fn framing_refusal(h: &reqwest::header::HeaderMap) -> Option<&'static str> {
             let mut parts = d.split_whitespace();
             if parts.next().is_some_and(|n| n.eq_ignore_ascii_case("frame-ancestors")) {
                 // only a wildcard (or a whole scheme) lets any page frame it
-                let open =
-                    parts.any(|s| s == "*" || s.eq_ignore_ascii_case("https:") || s.eq_ignore_ascii_case("http:"));
+                let open = parts
+                    .any(|s| s == "*" || s.eq_ignore_ascii_case("https:") || s.eq_ignore_ascii_case("http:"));
                 if !open {
                     return Some("frame_ancestors");
                 }
@@ -215,7 +220,11 @@ fn attrs(tag: &str) -> Vec<(String, String)> {
 }
 
 fn unescape(s: &str) -> String {
-    s.replace("&amp;", "&").replace("&quot;", "\"").replace("&#39;", "'").replace("&lt;", "<").replace("&gt;", ">")
+    s.replace("&amp;", "&")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
 }
 
 /// The tags `<name …>` of the page: their attributes.
@@ -297,7 +306,13 @@ fn image_mime(b: &[u8]) -> Option<&'static str> {
 }
 
 /// Looks at a web page for a plugin that has the `web` permission.
-pub async fn probe(k: &Kernel, c: &Caller, plugin: &str, address: &str, want_image: bool) -> Result<WebProbe> {
+pub async fn probe(
+    k: &Kernel,
+    c: &Caller,
+    plugin: &str,
+    address: &str,
+    want_image: bool,
+) -> Result<WebProbe> {
     let (p, _) = crate::access::plugin_for(k, c, plugin).await?;
     if !p.manifest.permissions.web {
         return Err(Error::forbidden("the plugin does not declare the web permission"));
@@ -384,9 +399,14 @@ mod tests {
     #[test]
     fn addresses() {
         assert!(check_url("https://example.org/a?b=1").is_ok());
-        for bad in
-            ["file:///etc/passwd", "ftp://example.org", "javascript:alert(1)", "https://user:pw@example.org", "x", ""]
-        {
+        for bad in [
+            "file:///etc/passwd",
+            "ftp://example.org",
+            "javascript:alert(1)",
+            "https://user:pw@example.org",
+            "x",
+            "",
+        ] {
             assert!(check_url(bad).is_err(), "{bad}");
         }
     }

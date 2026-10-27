@@ -208,7 +208,8 @@ pub async fn create_member(
     role: Role,
 ) -> Result<Uuid> {
     c.require_manager()?;
-    create_member_in(k, c.tenant.tenant_id, c.user.user_id, username, display_name, email, password, role).await
+    create_member_in(k, c.tenant.tenant_id, c.user.user_id, username, display_name, email, password, role)
+        .await
 }
 
 /// Creates a local user of `tenant` (for the Administrator too, who appoints a manager).

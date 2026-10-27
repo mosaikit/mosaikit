@@ -229,10 +229,7 @@ async fn initial_tenant(k: &Kernel, slug: &str) -> Result<Option<String>> {
     .await?;
     crate::access::create_default_profile(&mut tx, tenant).await?;
     tx.commit().await?;
-    Ok(Some(format!(
-        "Work (sign-in page, tenant {})\nusername: user\npassword: {password}\n",
-        k.brand.name
-    )))
+    Ok(Some(format!("Work (sign-in page, tenant {})\nusername: user\npassword: {password}\n", k.brand.name)))
 }
 
 pub struct LoginResult {

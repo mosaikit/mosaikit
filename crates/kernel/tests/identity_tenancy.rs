@@ -284,7 +284,9 @@ async fn administrator_acts_on_the_tenants() {
     assert_eq!(m.iter().map(|x| x.username.as_str()).collect::<Vec<_>>(), vec!["alfa-manager", "anna"]);
 
     // appoints a new manager, promotes anna, unlocks the password of the manager
-    create_tenant_manager(&t, &admin, alfa, "newbie", "Newbie", "newbie@example.org", PASSWORD).await.unwrap();
+    create_tenant_manager(&t, &admin, alfa, "newbie", "Newbie", "newbie@example.org", PASSWORD)
+        .await
+        .unwrap();
     assert_eq!(
         caller(&t, &t.login("alfa", "newbie").await, "alfa").await.unwrap().tenant.role,
         Role::TenantManager
