@@ -259,7 +259,10 @@ async fn preferences_and_immediate_emails() {
 
     // the default of the platform: a daily digest; links not by email
     let p = notify::prefs(&t, &bruno).await.unwrap();
-    assert_eq!((p.mode.as_str(), p.own_mode.as_deref(), p.address.as_deref()), ("digest", None, Some("bruno@example.org")));
+    assert_eq!(
+        (p.mode.as_str(), p.own_mode.as_deref(), p.address.as_deref()),
+        ("digest", None, Some("bruno@example.org"))
+    );
     assert!(p.kinds.iter().any(|k| k.kind == NoteKind::Link && !k.email));
     assert!(!p.kinds.iter().any(|k| k.kind == NoteKind::System), "only for Administrators");
 
