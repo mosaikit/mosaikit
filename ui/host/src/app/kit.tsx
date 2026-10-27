@@ -3,7 +3,7 @@
 // object); save bar only with changes; settings managed by the platform; dialogs
 // with a form, empty and loading states.
 
-import { useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
 import { ChevronRight, Loader2, Lock, MoreHorizontal } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -25,9 +25,11 @@ export interface Crumb {
 
 /** Header of the page: breadcrumb, title with the status badge, a single primary action and,
  *  in the «⋯» menu, the other actions and the change of state (DropdownMenu items). */
-export function PageHeader({ title, sub, crumbs, badge, actions, more }: { title: string; sub?: ReactNode; crumbs?: Crumb[]; badge?: ReactNode; actions?: ReactNode; more?: ReactNode }) {
+export function PageHeader({ title, sub, crumbs, badge, lead, bar, actions, more }: { title: string; sub?: ReactNode; crumbs?: Crumb[]; badge?: ReactNode; lead?: ReactNode; bar?: ReactNode; actions?: ReactNode; more?: ReactNode }) {
   return (
-    <div data-tour="page-header" className="flex min-h-[57px] flex-wrap items-center gap-3 border-b px-6 py-2 max-[620px]:px-4">
+    // under the band, and it stays there while the page scrolls
+    <div data-tour="page-header" className="msk-page-header sticky top-(--msk-top) z-10 flex min-h-(--msk-head) flex-wrap items-center gap-3 border-b bg-background px-6 py-2 max-[620px]:px-4">
+      {lead}
       <div className="min-w-0 flex-1">
         {crumbs && crumbs.length > 0 && (
           <nav aria-label={t('Breadcrumb')} className="mb-0.5 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
@@ -51,6 +53,7 @@ export function PageHeader({ title, sub, crumbs, badge, actions, more }: { title
         </div>
         {sub && <p className="truncate text-xs text-muted-foreground">{sub}</p>}
       </div>
+      {bar}
       {(actions || more) && (
         <div data-tour="page-actions" className="flex flex-wrap items-center gap-2">
           {actions}
@@ -97,7 +100,7 @@ export function Tabs({ tabs, current, href }: { tabs: { id: string; label: strin
 /** Pill filters above a list («Show: All · Public»). */
 export function Pills({ items, value, onChange, label = t('Show') }: { items: { id: string; label: string; count?: number }[]; value: string; onChange: (id: string) => void; label?: string }) {
   return (
-    <div role="radiogroup" aria-label={label} className="flex flex-wrap items-center gap-1.5">
+    <div role="radiogroup" aria-label={label} className="msk-pills sticky top-[calc(var(--msk-top)+var(--msk-head))] z-[5] -mx-1 flex flex-wrap items-center gap-1.5 bg-background px-1 py-1.5">
       <span className="mr-1 text-xs text-muted-foreground">{label}</span>
       {items.map((it) => (
         <button
@@ -190,6 +193,8 @@ export function Sections({ sections, current, href, children }: { sections: Sect
                 aria-current={s.id === current ? 'page' : undefined}
                 className={cn(
                   'flex h-9 items-center gap-2.5 rounded-md px-3 text-sm text-foreground/85 hover:bg-accent [&>svg]:size-4 [&>svg]:shrink-0',
+                  // under a group heading the sections are indented
+                  sections.some((x) => x.group) && 'pl-5',
                   s.id === current && 'bg-primary/10 font-medium text-primary-strong hover:bg-primary/10',
                 )}
               >
@@ -206,11 +211,26 @@ export function Sections({ sections, current, href, children }: { sections: Sect
   )
 }
 
-/** The foot of a long list: how many rows are shown of how many, and «Load more». */
+/** The foot of a long list: how many rows are shown of how many. The next page loads by itself when
+ *  the foot comes into view (infinite scroll); «Load more» stays for the keyboard and for browsers
+ *  without IntersectionObserver. */
 export function MoreRows({ shown, total, more, loading, onMore }: { shown: number; total: number; more: boolean; loading?: boolean; onMore: () => void }) {
+  const foot = useRef<HTMLDivElement>(null)
+  const act = useRef(onMore)
+  useEffect(() => {
+    act.current = onMore
+  })
+  useEffect(() => {
+    const el = foot.current
+    if (!el || !more || loading || typeof IntersectionObserver === 'undefined') return
+    const io = new IntersectionObserver((e) => e.some((x) => x.isIntersecting) && act.current(), { rootMargin: '200px' })
+    io.observe(el)
+    return () => io.disconnect()
+    // a page that arrived and left the foot in view must ask for the next: observe again
+  }, [more, loading, shown])
   if (!total) return null
   return (
-    <div className="flex flex-wrap items-center justify-center gap-3 py-2 text-sm text-muted-foreground">
+    <div ref={foot} className="flex flex-wrap items-center justify-center gap-3 py-2 text-sm text-muted-foreground">
       <span className="tabular-nums">{t('{shown} of {total}', { shown: String(shown), total: String(total) })}</span>
       {more && (
         <Button variant="outline" size="sm" disabled={loading} onClick={onMore}>

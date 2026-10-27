@@ -9,14 +9,16 @@ import { useBrand } from '../../brand.ts'
 import type { AdminUser, GlobalKpi, Member, Session, ShellBand, SystemOverview, TenantInfo } from '../../types.ts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { initials, passwordMin, useAction, useApi, useConfig, useConfirm, usePaged } from '../core.ts'
+import { BulkBar, FilterColumn, ListPage } from '../listkit.tsx'
+import { TenantLogo } from '../picture.tsx'
 import { DataTable, Empty, ErrorBox, FormDialog, Kpi, Loading, MoreRows, PageHeader, PluginKpis, SaveBar, Sections, StatusBadge, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import { bandOf } from '../prefs.ts'
@@ -102,15 +104,58 @@ export function AdminTenants() {
   const [open, setOpen] = useState(false)
   const [importing, setImporting] = useState(false)
   const [search, setSearch] = useState('')
+  const [state, setState] = useState('all')
   const words = useDeferredValue(search.trim())
-  // a page at a time, searched on the server
-  const q = usePaged<TenantInfo>(['admin-tenants', 'page'], '/api/admin/tenants', { q: words || undefined })
+  // a page at a time (infinite scroll), searched and filtered on the server
+  const q = usePaged<TenantInfo>(['admin-tenants', 'page'], '/api/admin/tenants', { q: words || undefined, status: state === 'all' ? undefined : state })
   const rows = q.items
+  const [sel, setSel] = useState<Set<string>>(new Set())
+  // another filter, another selection
+  const filterKey = `${words}|${state}`
+  const [selKey, setSelKey] = useState(filterKey)
+  if (selKey !== filterKey) {
+    setSelKey(filterKey)
+    setSel(new Set())
+  }
+  const ids = [...sel].filter((id) => rows.some((r) => r.id === id))
+  const setStatus = useAction((v: { ids: string[]; status: 'active' | 'suspended' }) => Promise.all(v.ids.map((id) => api('PUT', `/api/admin/tenants/${id}/status`, { status: v.status }))), {
+    ok: (v) => (v.status === 'active' ? t('Tenants reactivated') : t('Tenants suspended')),
+    invalidate: [['admin-tenants'], ['admin-overview']],
+  })
+  const confirm = useConfirm()
+  const reset = () => {
+    setSearch('')
+    setState('all')
+  }
   return (
     <>
-      <PageHeader
+      <ListPage
         title={t('Tenants')}
         sub={q.isLoading ? undefined : t('{count} tenants', { count: q.total })}
+        bar={
+          <BulkBar
+            selected={ids.length}
+            total={rows.length}
+            all={rows.length > 0 && ids.length === rows.length}
+            onAll={(on) => setSel(on ? new Set(rows.map((r) => r.id)) : new Set())}
+            actions={
+              <>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={async () => {
+                    if (await confirm(t('Suspend {count} tenants? Their people will no longer be able to sign in.', { count: ids.length }), true)) setStatus.mutate({ ids, status: 'suspended' })
+                  }}
+                >
+                  {t('Suspend')}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setStatus.mutate({ ids, status: 'active' })}>
+                  {t('Reactivate')}
+                </Button>
+              </>
+            }
+          />
+        }
         actions={
           <Button onClick={() => setOpen(true)}>
             <Plus />
@@ -123,9 +168,30 @@ export function AdminTenants() {
             {t('Import a tenant')}
           </DropdownMenuItem>
         }
-      />
-      <div className="grid gap-3 p-6 max-[620px]:p-4">
-        <Input type="search" placeholder={t('Search a tenant')} aria-label={t('Search a tenant')} className="w-72 max-w-full" value={search} onChange={(e) => setSearch(e.target.value)} />
+        filters={
+          <FilterColumn
+            search={search}
+            onSearch={setSearch}
+            searchLabel={t('Search a tenant')}
+            onReset={reset}
+            groups={[
+              {
+                id: 'state',
+                label: t('Status'),
+                value: state,
+                onChange: setState,
+                options: [
+                  { id: 'all', label: t('All') },
+                  { id: 'active', label: t('Active') },
+                  { id: 'suspended', label: t('Suspended') },
+                  { id: 'trial', label: t('On trial') },
+                  { id: 'archived', label: t('Archived') },
+                ],
+              },
+            ]}
+          />
+        }
+      >
         {q.isLoading ? (
           <Loading />
         ) : q.error ? (
@@ -133,10 +199,11 @@ export function AdminTenants() {
         ) : rows.length === 0 ? (
           <Empty icon={<Building2 />} title={words ? t('No tenant found') : t('No tenants')} />
         ) : (
-          <div className="overflow-hidden rounded-xl border bg-card">
+          <div className="overflow-x-auto rounded-xl border bg-card">
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10" />
                   <TableHead>{t('Tenant')}</TableHead>
                   <TableHead className="text-right">{t('Members')}</TableHead>
                   <TableHead className="text-right">{t('Guests')}</TableHead>
@@ -148,12 +215,27 @@ export function AdminTenants() {
               </TableHeader>
               <TableBody>
                 {rows.map((tn) => (
-                  <TableRow key={tn.id} className="cursor-pointer" onClick={() => go(to.adminTenant(tn.id))}>
+                  <TableRow key={tn.id} className="cursor-pointer" data-state={sel.has(tn.id) ? 'selected' : undefined} onClick={() => go(to.adminTenant(tn.id))}>
+                    <TableCell onClick={(e) => e.stopPropagation()}>
+                      <Checkbox
+                        aria-label={t('Select {name}', { name: tn.name })}
+                        checked={sel.has(tn.id)}
+                        onCheckedChange={(v) => {
+                          const n = new Set(sel)
+                          if (v) n.add(tn.id)
+                          else n.delete(tn.id)
+                          setSel(n)
+                        }}
+                      />
+                    </TableCell>
                     <TableCell>
-                      <a href={to.adminTenant(tn.id)} className="font-medium hover:underline" onClick={(e) => e.stopPropagation()}>
-                        {tn.name}
+                      <a href={to.adminTenant(tn.id)} className="flex items-center gap-2.5" onClick={(e) => e.stopPropagation()}>
+                        <TenantLogo slug={tn.slug} name={tn.name} />
+                        <span>
+                          <span className="block font-medium hover:underline">{tn.name}</span>
+                          <span className="block font-mono text-xs text-muted-foreground">{tn.slug}</span>
+                        </span>
                       </a>
-                      <span className="ml-2 font-mono text-xs text-muted-foreground">{tn.slug}</span>
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{tn.members}</TableCell>
                     <TableCell className="text-right tabular-nums">{tn.guests}</TableCell>
@@ -170,7 +252,7 @@ export function AdminTenants() {
           </div>
         )}
         <MoreRows shown={rows.length} total={q.total} more={q.more} loading={q.loadingMore} onMore={q.loadMore} />
-      </div>
+      </ListPage>
       <NewTenantWizard open={open} onOpenChange={setOpen} />
       <ImportTenantDialog open={importing} onOpenChange={setImporting} />
     </>
@@ -199,6 +281,7 @@ export function AdminTenant({ id, section }: { id: string; section?: string }) {
       <PageHeader
         crumbs={[{ label: t('Tenants'), href: to.admin('tenants') }]}
         title={tn.name}
+        lead={<TenantLogo slug={tn.slug} name={tn.name} className="size-10" />}
         badge={<TenantState tn={tn} />}
         sub={t('{slug} · {members} members · {guests} guests', { slug: tn.slug, members: tn.members, guests: tn.guests })}
         more={

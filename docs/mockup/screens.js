@@ -181,9 +181,17 @@ function secHome(S) {
     return `<div class="page">${lhead(S, { compact: true, title: `Welcome, ${first}`, total: S.app.tnt.welcome })}
     ${launch}<div class="empty big">${ic('grid', 34)}<b>Your work will be here</b><span class="muted">You have no notes, activities or tasks yet. Start from one of the apps above.</span>
       <button type="button" class="lnk small" data-act="fresh">Back to the overview of someone who already works here</button></div></div>`;
+  // fast figures of the person (counted from indexes, never from the contents), then the lists to act on
+  const mine = kpis([
+    ['Open tasks', '7', '2 due this week', 'warn'],
+    ['Unread notifications', String(about.length), 'the latest below'],
+    ['Waiting for your answer', '2', 'an estimate to approve, an access to decide'],
+    ['My storage', '1.2 GB', 'of 5 GB · 24%'],
+  ]);
   return `<div class="page">
     ${lhead(S, { compact: true, title: `Good morning, ${first}`, total: `${S.app.tnt.welcome} · ${R.unit}`, create: { label: 'New', act: 'new' } })}
-    ${launch}
+    ${appsStrip(S, APPS)}
+    ${mine}
     <div class="grid-home">
       <section class="panel span2"><div class="panel-h"><h2>Pick up where you left off</h2><span class="row"><a data-act="fresh" class="small">How a newcomer sees it</a></span></div>
         <ul class="rows">${recent.map((x) => `<li><span class="ri">${ic(APP(x.app).ic, 16)}</span><div class="rt"><b>${x.t}</b><span>${APP(x.app).n} · ${x.d}</span></div>${btn('', { icon: 'share', act: 'share', v: x.id, al: 'Share ' + x.t })}${btn('Open', { act: 'appopen', v: x.app })}</li>`).join('')}</ul></section>
@@ -191,6 +199,7 @@ function secHome(S) {
         <ul class="alerts">${due.map((a) => `<li class="sev-${a[0]}"><div><b>${a[1]}</b><span>${a[2]}</span></div>${btn('Open', { act: 'appopen', v: a[3] })}</li>`).join('')}</ul></section>
       <section class="panel span2"><div class="panel-h"><h2>For you</h2><a data-go="inbox">All notifications</a></div>
         <ul class="rows">${about.map((x) => `<li><span class="ri">${ic(x[0], 16)}</span><div class="rt"><span class="rich">${x[1]}</span><span>${x[2]}</span></div>${btn('See', { go: 'inbox' })}</li>`).join('')}</ul></section>
+      ${trendPanel('My activity', '38', [3, 5, 2, 6, 4, 0, 1, 5, 7, 4, 6, 3, 8, 5], 'changes in the last 14 days', '', '<span class="muted small">Notes, Activities, Tasks</span>')}
       <section class="panel"><div class="panel-h"><h2>Shared by me</h2><span class="num muted">${mineShared.length}</span></div>
         <ul class="rows">${mineShared.map((x) => `<li><span class="ri">${ic(APP(x.app).ic, 15)}</span><div class="rt"><b>${x.t}</b><span>${accPill(x.acc)}</span></div>${btn('Manage', { icon: 'share', act: 'share', v: x.id, al: 'Manage the sharing of ' + x.t })}</li>`).join('')}</ul>
         <p class="small muted">Whoever owns an item decides who sees it; public items and links show first.</p></section>
@@ -537,6 +546,8 @@ function secSpace(S) {
       )
       .join('')}</ul></section>
     <section class="panel span2"><div class="panel-h"><h2>Recent activity</h2><a data-go="activity">Log</a></div><ul class="rows">${recent.map((e) => `<li><span class="ri">${ic(e.ok ? 'history' : 'alert', 15)}</span><div class="rt"><b>${e.act}</b><span>${e.who} · ${e.target} · ${logDate(e)} ${e.t}</span></div></li>`).join('')}</ul></section>
+    ${trendPanel('Active people', '97', [71, 80, 77, 85, 90, 88, 92, 95, 91, 97], 'signed in the last 7 days, of 128', '', '<a data-go="members">People</a>')}
+    <section class="panel span2"><div class="panel-h"><h2>Notifications for you</h2><a data-go="inbox">All</a></div><ul class="rows"><li><span class="ri">${ic('lock', 15)}</span><div class="rt"><span class="rich"><b>Sara Greco</b> asked access to <b>Estimate 2026-114</b></span><span>1 hour ago</span></div>${btn('Decide', { act: 'memreq' })}</li><li><span class="ri">${ic('alert', 15)}</span><div class="rt"><span class="rich">The quota of <b>Automation</b> is at 82%</span><span>Yesterday</span></div>${btn('See', { go: 'usage' })}</li></ul></section>
     <section class="panel"><div class="panel-h"><h2>Usage this month</h2><a data-go="usage">Details</a></div>${qMeter(S, 'space', 'Storage')}${qMeter(S, 'auto', 'Automation')}${qMeter(S, 'ai', 'AI credits')}</section></div>`,
   });
 }

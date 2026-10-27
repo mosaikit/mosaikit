@@ -505,6 +505,28 @@ Needs many rows: the data of the load test (`cargo xtask perf --scale probe`, th
 | QA-16 | Tab through System › Identity and texts › the logos | One tab stop per action (Upload, Remove), names tell the images apart |
 | QA-17 | Start the tour of a page; press the arrow keys without clicking the card | They move between the steps |
 
+## Review round 1 - lists
+
+| Id | Check | Expected |
+|---|---|---|
+| R1-L-01 | Administrator › Tenants (or People) with more than one page; scroll down | The page header (title, selection bar, actions) and the filter column stay in sight under the top bar |
+| R1-L-02 | Any page with a scrolling area | Scrollbars are thin |
+| R1-L-03 | Sidebar with more entries than fit | Its scrollbar shows only while the mouse is over the sidebar |
+| R1-L-04 | Look at the first and at the last icon of the sidebar | No extra empty space above the first and below the last |
+| R1-L-05 | Close the sidebar to icons | A visible gap separates the groups (Apps, Management…) |
+| R1-L-06 | Administrator › Tenants: use the filter column (search, Status, Reset) | The list follows the filters; Reset brings back all; the button of the header hides or shows the column |
+| R1-L-07 | Tenants: tick one row, then the box of the header | «1 selected» and the actions (Suspend, Reactivate) appear in the header; the header box selects every loaded row |
+| R1-L-08 | Administrator › System: the list of sections | The sections under a heading are indented |
+| R1-L-09 | A list with more than 50 rows (Tenants, People, Shares): scroll to the end | The next rows load by themselves; the count reads «N of N» at the end; Load more still works with the keyboard |
+| R1-L-10 | Manage › People: click on a row (not on the checkbox, the name link or the menu) | The person opens |
+| R1-L-11 | Tenant › Plugins | The button of the permissions says «Permissions» |
+| R1-L-12 | Tenants list | Every tenant has its logo, or its initials on the accent colour when it has none |
+| R1-L-13 | Administrator › People and Manage › People | Every person has an avatar (their picture, or the initials) |
+| R1-L-14 | Administrator › a tenant | The logo (or the initials) is next to the name in the header |
+| R1-L-15 | Language Italian, then English, as Administrator | Italian says «Organizzazione» / «Organizzazioni» (the role stays «Tenant Manager»); English says «Tenants» |
+| R1-L-16 | Sidebar of an app with pages (Notes › Mine), open, then closed to icons | Open: the pages are indented under the app. Closed: the small arrow on the icon opens a menu with the pages and their sub-pages |
+| R1-L-17 | Mockup `docs/mockup`, Home of the User, Overview of the Tenant Manager and of the Administrator | The overview is a set of widgets: fast figures, notifications, recent activity, due dates and problems, a trend; the apps are a compact strip (design to verify before it is built) |
+
 ---
 
 ## Review round 1 - tenant and people

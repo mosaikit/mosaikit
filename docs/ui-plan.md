@@ -49,25 +49,25 @@ Observations from the user's manual tests; ids as in the user's notes. Status is
 
 | Id | Item |
 |---|---|
-| A | Overview as a role-based dashboard of widgets (counters, charts, lists, gauges): the person's KPIs (fast to compute), notifications, recent activity to pick up, due dates and problems; app cards reconsidered. Designed in the mockup first |
-| B1 | Page headers and their filters never scroll |
-| B2 | Thin scrollbars |
-| B3 | Sidebar scrollbar only on hover |
-| B4 | No extra space above the first and below the last icon of the sidebar |
-| B5 | Collapsed icon bar: a gap between groups (Apps, Management…) |
-| B6 | Lists have the filter sidebar of the mockup (e.g. Tenants) |
-| B7 | Lists have selection and the header action bar of the mockup (e.g. Administrator › Tenants) |
-| B8 | Hierarchical lists indented (e.g. the System section list) |
-| B9 | Paging and infinite scroll for every table and list |
-| C1 | Italian: «Tenant» becomes «Organizzazione» |
-| C2 | English, Administrator: «Tenants» |
+| A | Overview as a role-based dashboard of widgets (counters, charts, lists, gauges): the person's KPIs (fast to compute), notifications, recent activity to pick up, due dates and problems; app cards reconsidered. Designed in the mockup first **Mockup designed** (Home, Tenant Manager and Administrator overviews, R1-L-17): to verify before implementation. |
+| B1 | Page headers and their filters never scroll **Done** (R1-L). |
+| B2 | Thin scrollbars **Done** (R1-L). |
+| B3 | Sidebar scrollbar only on hover **Done** (R1-L). |
+| B4 | No extra space above the first and below the last icon of the sidebar **Done** (R1-L). |
+| B5 | Collapsed icon bar: a gap between groups (Apps, Management…) **Done** (R1-L). |
+| B6 | Lists have the filter sidebar of the mockup (e.g. Tenants) **Done** (R1-L). |
+| B7 | Lists have selection and the header action bar of the mockup (e.g. Administrator › Tenants) **Done** (R1-L). |
+| B8 | Hierarchical lists indented (e.g. the System section list) **Done** (R1-L). |
+| B9 | Paging and infinite scroll for every table and list **Done** (R1-L). |
+| C1 | Italian: «Tenant» becomes «Organizzazione» **Done** (R1-L). |
+| C2 | English, Administrator: «Tenants» **Done** (R1-L). |
 | C3 | Sign-in: «Forgot your password?» (self-service by email) |
 | C4 | Files, Maps, Static sites, Tasks/Activities: connection refused — fix |
-| D1 | Tenants list with the tenant logo (default if none) |
+| D1 | Tenants list with the tenant logo (default if none) — done |
 | D2 | Tenant detail: quotas in their own tab — done |
 | D3 | Tenant detail: name and identifier editable — done |
-| D4 | Users and managers list with avatars |
-| D5 | Tenant detail: logo next to the name in the header |
+| D4 | Users and managers list with avatars — done |
+| D5 | Tenant detail: logo next to the name in the header — done |
 | D6 | Tenant › Plugins: a status pill for unavailable plugins too — done |
 | D7 | Tenant › Plugins: link to the Plugins page after the availability sentence — done |
 | D8 | Quotas: explain «items» (items of the apps) — done |
@@ -75,9 +75,9 @@ Observations from the user's manual tests; ids as in the user's notes. Status is
 | D10 | Plugin detail as a brochure: gallery, description, author, licence, links — done |
 | D11–D13 | Answers: monitoring refresh, mail server setup, keys of outside services (clarify in the UI and the guides) — done |
 | D14 | An Administrator edits their own data and other Administrators' data — done |
-| E1 | Manage › People: click on a row opens the person |
+| E1 | Manage › People: click on a row opens the person — done |
 | E2 | Permission profiles: clearer description, rename, localized texts (no plugin ids), a compact layout for many plugins — done |
-| E3 | Plugins: «Access and permissions» becomes «Permissions» |
+| E3 | Plugins: «Access and permissions» becomes «Permissions» — done |
 | E4, F1 | Account › Profile editable (name and picture) |
 | G1–G4 | **Done.**  Docker compose: PostgreSQL configured, optional Keycloak (realm, Mosaikit-like sign-in theme, no registration), optional mail server, nginx reverse proxy; README sections | (`deploy/`, checks R1-G-nn, static check `xtask/src/deploy_check.rs`) |
 | H1 | Static sites: a site by URL, embedded in an iframe (not downloaded); sites that forbid framing are detected and opened in a new tab (user decision) |

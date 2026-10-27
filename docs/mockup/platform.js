@@ -20,7 +20,7 @@ function secPlatform(S) {
   return detailPage(S, {
     title: 'Platform overview',
     sub: `Mosaikit (Platform) · ${TENANTS.length} tenants · 433 people · version 1.0`,
-    actions: btn('New tenant', { kind: 'pri', icon: 'plus', act: 'newten' }),
+    actions: moreMenu(S, 'plat', [['sliders', 'Customize the overview', 'data-act="toast" data-v="In the product the widgets can be chosen and moved."']]) + btn('New tenant', { kind: 'pri', icon: 'plus', act: 'newten' }),
     body: `
     ${kpis([
       [
@@ -52,6 +52,8 @@ function secPlatform(S) {
         return `<tr class="clk ${tenSt(S, t) === 'Suspended' ? 'dim' : ''}" data-res="ten:${t.slug}" data-go="tenant"><td><b>${t.n}</b>${tenSt(S, t) !== 'Active' ? ` ${stPillT(tenSt(S, t))}` : ''}</td><td class="sp-c">${meter(Math.min(u, q), q, `${fmtN(u)} of ${fmtN(q)} GB`)}</td><td class="num r">${t.users} people</td></tr>`;
       })
       .join('')}</tbody></table></div></section>
+    ${trendPanel('Requests', '1.2 M', [40, 52, 48, 61, 58, 66, 70, 64, 72, 80, 76, 84], 'in the last 24 hours, 99.7% answered', '', '<a data-go="monitoring">Monitoring</a>')}
+    <section class="panel span2"><div class="panel-h"><h2>Notifications for you</h2><a data-go="inbox">All</a></div><ul class="rows"><li><span class="ri">${ic('refresh', 15)}</span><div class="rt"><span class="rich">An update of <b>Estimates</b> is available</span><span>Today 08:00</span></div>${btn('Plugins', { go: 'marketplace' })}</li><li><span class="ri">${ic('key', 15)}</span><div class="rt"><span class="rich">The key of the mail service expires in <b>12 days</b></span><span>Yesterday</span></div>${btn('Keys', { go: 'system' })}</li></ul></section>
     <section class="panel"><div class="panel-h"><h2>Recent errors</h2><a data-go="monitoring">All</a></div><ul class="rows"><li><span class="ri">${ic('alert', 15)}</span><div class="rt"><b>Automation worker: time limit exceeded</b><span>Example City · Monthly report of open tasks · yesterday 16:12</span></div></li><li><span class="ri">${ic('alert', 15)}</span><div class="rt"><b>Identity provider: groups not synchronized</b><span>Example City · Field team · 6 Oct 08:02</span></div></li></ul></section></div>`,
   });
 }

@@ -59,7 +59,7 @@ const railButton = cn(
 /** The pages of an app under it, in the open sidebar and in the drawer of the phone. */
 function SubTree({ items, onPick, depth = 0 }: { items: NavItem[]; onPick: () => void; depth?: number }) {
   return (
-    <SidebarMenuSub className={cn(depth > 0 && 'mr-0 pr-0')}>
+    <SidebarMenuSub className={cn(depth > 0 ? 'mr-0 pr-0' : 'ml-[22px]')}>
       {items.map((c) => (
         <SidebarMenuSubItem key={c.label + (c.href ?? '')}>
           {c.href ? (
@@ -165,9 +165,9 @@ function AppSidebar({ session, route, band }: { session: Session; route: Route; 
           )}
         </SidebarHeader>
       )}
-      <SidebarContent className="border-r border-sidebar-border pt-2 group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:pt-[9px]">
+      <SidebarContent className="border-r border-sidebar-border pt-1 group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:pt-0">
         {nav.groups.map((g) => (
-          <SidebarGroup key={g.id} className="group-data-[collapsible=icon]:p-0">
+          <SidebarGroup key={g.id} className="py-1 first:pt-0 last:pb-0 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:not-first:mt-3 group-data-[collapsible=icon]:not-first:border-t group-data-[collapsible=icon]:not-first:border-sidebar-border group-data-[collapsible=icon]:not-first:pt-1">
             {g.id === 'apps' || g.id === 'manage' ? <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">{g.label}</SidebarGroupLabel> : null}
             <SidebarGroupContent>
               <NavList items={g.items} />
@@ -175,7 +175,7 @@ function AppSidebar({ session, route, band }: { session: Session; route: Route; 
           </SidebarGroup>
         ))}
       </SidebarContent>
-      <SidebarFooter className="border-r border-sidebar-border pb-3 group-data-[collapsible=icon]:px-0">
+      <SidebarFooter className="border-r border-sidebar-border pt-1 pb-1 group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-0">
         {/* only when a quota of the tenant passes 80 %: no fixed widget */}
         {route.area === 'tenant' && (
           <div className="px-2 group-data-[collapsible=icon]:px-2.5">

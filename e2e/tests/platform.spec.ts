@@ -472,7 +472,7 @@ test.describe.serial('platform', () => {
     await expect(page.getByRole('heading', { name: 'Accedi' })).toBeVisible()
     await expect(page.locator('html')).toHaveAttribute('lang', 'it')
     // the error arrives with its code and reads in the chosen language
-    await page.getByRole('combobox', { name: 'Tenant' }).click()
+    await page.getByRole('combobox', { name: 'Organizzazione' }).click()
     await page.getByRole('option', { name: 'City of Alfa' }).click()
     await page.getByLabel('Utente').fill('anna')
     await page.getByLabel('Password').fill('wrong-pass-123')
@@ -784,7 +784,7 @@ test.describe.serial('platform', () => {
     await expect(page.getByText('Reader', { exact: true })).toBeVisible()
     await accessible(page, 'permission profiles')
     await nav(page, 'Plugins').click()
-    await page.getByRole('row', { name: /^Notes/ }).getByRole('button', { name: 'Access and permissions' }).click()
+    await page.getByRole('row', { name: /^Notes/ }).getByRole('button', { name: 'Permissions', exact: true }).click()
     await expect(page.getByRole('heading', { name: 'Access and permissions · Notes' })).toBeVisible()
     for (const perm of ['Create items', 'Delete items', 'Share items']) await page.getByRole('checkbox', { name: `Reader: ${perm}` }).click()
     await page.getByRole('button', { name: 'Save' }).click()
@@ -1935,6 +1935,166 @@ test.describe.serial('platform', () => {
     await rename.getByLabel('Name').fill('Reader')
     await rename.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByText('Reader', { exact: true })).toBeVisible()
+  test('review round 1, lists: sticky headers, thin scrollbars, sidebar, filter column, selection bar, infinite scroll, logos, avatars', async ({ page }) => {
+    test.setTimeout(600_000)
+    await adminLogin(page)
+    /** A call of the API with the CSRF token of the session in the page. */
+    const call = (method: string, path: string, body?: unknown) =>
+      page.evaluate(
+        async ([method, path, body]) => {
+          const s = await (await fetch('api/session')).json()
+          const r = await fetch(path as string, { method: method as string, headers: { 'content-type': 'application/json', 'x-csrf-token': s.csrf }, body: body === undefined ? undefined : JSON.stringify(body) })
+          return { status: r.status, json: await r.json().catch(() => null) }
+        },
+        [method, path, body] as const,
+      )
+    // more than one page of tenants
+    const created: { id: string; slug: string }[] = []
+    for (let n = 1; n <= 55; n++) {
+      const slug = `rl-${String(n).padStart(2, '0')}`
+      const r = await call('POST', 'api/admin/tenants', { slug, name: `Rl ${String(n).padStart(2, '0')}`, manager_username: 'mgr', manager_password: PASSWORD })
+      expect(r.status, slug).toBe(200)
+      created.push({ id: r.json.id, slug })
+    }
+    const sidebar = page.locator('[data-sidebar="sidebar"]').first()
+    const header = page.locator('[data-tour="page-header"]')
+
+    await test.step('R1-L-02 thin scrollbars', async () => {
+      expect(await page.evaluate(() => getComputedStyle(document.documentElement).scrollbarWidth)).toBe('thin')
+    })
+    await test.step('R1-L-03/04 sidebar: scrollbar only on hover, no extra space above and below the icons', async () => {
+      const content = page.locator('[data-sidebar="content"]').first()
+      await page.mouse.move(700, 400)
+      const quiet = await content.evaluate((e) => getComputedStyle(e).scrollbarColor)
+      await content.hover()
+      const hover = await content.evaluate((e) => getComputedStyle(e).scrollbarColor)
+      expect(hover).not.toBe(quiet)
+      const first = await sidebar.locator('[data-sidebar="menu-button"]').first().boundingBox()
+      const top = await content.boundingBox()
+      expect(first!.y - top!.y).toBeLessThanOrEqual(6)
+      const last = await sidebar.locator('[data-sidebar="menu-button"]').last().boundingBox()
+      const bottom = await sidebar.boundingBox()
+      expect(bottom!.y + bottom!.height - (last!.y + last!.height)).toBeLessThanOrEqual(10)
+    })
+    await test.step('R1-L-05 collapsed bar: a gap between groups', async () => {
+      const toggle = page.getByRole('button', { name: 'Open or close the sidebar' }).first()
+      const rail = page.locator('[data-collapsible="icon"]')
+      const wasOpen = (await rail.count()) === 0
+      if (wasOpen) await toggle.click()
+      await expect(rail.first()).toBeAttached()
+      const groups = sidebar.locator('[data-sidebar="group"]')
+      // the Administrator has one group; the gap is checked with the Tenant Manager below
+      if ((await groups.count()) > 1) {
+        const a = await groups.nth(0).locator('[data-sidebar="menu-button"]').last().boundingBox()
+        const b = await groups.nth(1).locator('[data-sidebar="menu-button"]').first().boundingBox()
+        expect(b!.y - (a!.y + a!.height)).toBeGreaterThanOrEqual(8)
+      }
+      if (wasOpen) await toggle.click()
+    })
+
+    await page.goto('./#/admin/tenants')
+    await test.step('R1-L-06 Tenants: the filter column', async () => {
+      const filters = page.getByRole('complementary', { name: 'Filters' })
+      await expect(filters).toBeVisible()
+      await filters.getByRole('radio', { name: /Suspended/ }).click()
+      await expect(page.getByText('No tenants')).toBeVisible()
+      await filters.getByRole('radio', { name: /^All/ }).click()
+      await filters.getByRole('searchbox', { name: 'Search a tenant' }).fill('rl-07')
+      await expect(page.locator('tbody tr')).toHaveCount(1)
+      await filters.getByRole('button', { name: 'Reset' }).click()
+      await expect(page.locator('tbody tr').nth(2)).toBeVisible()
+    })
+    await test.step('R1-L-07 Tenants: selection and the action bar of the header', async () => {
+      await page.getByRole('checkbox', { name: 'Select Rl 01' }).check()
+      await expect(header.getByText('1 selected')).toBeVisible()
+      await expect(header.getByRole('button', { name: 'Suspend' })).toBeVisible()
+      await header.getByRole('checkbox', { name: 'Select all' }).click()
+      await expect(header.getByText(/^\d+ selected$/)).toBeVisible()
+      await header.getByRole('checkbox', { name: 'Select all' }).click()
+      await expect(header.getByText(/selected$/)).toHaveCount(0)
+    })
+    await test.step('R1-L-12 Tenants: logo of the tenant (initials by default)', async () => {
+      await expect(page.locator('tbody tr').first().locator('span.rounded-md').first()).toBeVisible()
+    })
+    await test.step('R1-L-09 infinite scroll', async () => {
+      await expect(page.getByText(/^50 of \d+$/)).toBeVisible()
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+      await expect(page.getByText(/^(\d+) of \1$/)).toBeVisible({ timeout: 15_000 })
+    })
+    await test.step('R1-L-01 headers and filters stay in sight while the page scrolls', async () => {
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+      const box = await header.boundingBox()
+      expect(box!.y).toBeGreaterThanOrEqual(45)
+      expect(box!.y).toBeLessThanOrEqual(56)
+      const aside = await page.getByRole('complementary', { name: 'Filters' }).boundingBox()
+      expect(aside!.y).toBeGreaterThanOrEqual(90)
+      expect(aside!.y).toBeLessThanOrEqual(140)
+    })
+    await test.step('R1-L-14 the logo (initials) next to the name in the tenant header', async () => {
+      await page.goto(`./#/admin/tenants/${created[0].id}`)
+      await expect(header.locator('span.size-10')).toBeVisible()
+    })
+    await test.step('R1-L-15 Italian: Organizzazioni; English: Tenants', async () => {
+      await expect(page.getByRole('link', { name: 'Tenants', exact: true }).first()).toBeVisible()
+      await page.evaluate(() => localStorage.setItem('msk_lang', 'it'))
+      await page.goto('./#/admin/tenants')
+      await page.reload()
+      await expect(page.getByRole('heading', { name: 'Organizzazioni' })).toBeVisible()
+      await expect(page.getByRole('link', { name: 'Organizzazioni', exact: true }).first()).toBeVisible()
+      await page.evaluate(() => localStorage.setItem('msk_lang', 'en'))
+      await page.reload()
+    })
+    await test.step('R1-L-08 hierarchical list indented (System)', async () => {
+      await page.goto('./#/admin/system')
+      const nav = page.getByRole('navigation', { name: 'Sections' })
+      const heading = await nav.getByText('Platform', { exact: true }).boundingBox()
+      const link = await nav.getByRole('link', { name: 'Administrators' }).locator('span').first().boundingBox()
+      expect(link!.x).toBeGreaterThan(heading!.x + 8)
+    })
+    await test.step('R1-L-13 avatars in the list of people', async () => {
+      await page.goto('./#/admin/people')
+      await expect(page.locator('tbody tr').first().locator('span.rounded-full').first()).toBeVisible()
+    })
+    // clean up: the tenants of this test
+    for (const c of created) expect((await call('POST', `api/admin/tenants/${c.id}/delete`, { confirm: c.slug })).status, c.slug).toBe(200)
+    await logout(page)
+
+    await login(page, 'Alfa', 'manager', PASSWORD)
+    await test.step('R1-L-10/13 Manage › People: a row opens the person; avatars', async () => {
+      await page.goto('./#/t/alfa/manage')
+      const row = page.locator('tbody tr').first()
+      await expect(row.locator('span.rounded-full').first()).toBeVisible()
+      await row.locator('td').nth(4).click()
+      await expect(page).toHaveURL(/#\/t\/alfa\/person\//)
+    })
+    await test.step('R1-L-11 Plugins: the button is called Permissions', async () => {
+      await page.goto('./#/t/alfa/plugins')
+      await expect(page.getByRole('button', { name: 'Permissions' }).first()).toBeVisible()
+      await expect(page.getByRole('button', { name: 'Access and permissions' })).toHaveCount(0)
+    })
+    await test.step('R1-L-16 sidebar tree: nested pages indented, flyout with the collapsed bar', async () => {
+      const nav = page.locator('[data-sidebar="sidebar"]').first()
+      const toggle = page.getByRole('button', { name: 'Open or close the sidebar' }).first()
+      // start from the open sidebar
+      if ((await page.locator('[data-collapsible="icon"]').count()) > 0) await toggle.click()
+      await expect(page.locator('[data-collapsible="icon"]')).toHaveCount(0)
+      await nav.getByRole('button', { name: 'Open the pages of Notes' }).click()
+      const parent = await nav.getByRole('link', { name: 'Notes', exact: true }).first().locator('span').first().boundingBox()
+      const child = await nav.getByRole('link', { name: 'Mine', exact: true }).locator('span').first().boundingBox()
+      expect(child!.x).toBeGreaterThanOrEqual(parent!.x)
+      await toggle.click()
+      await expect(page.locator('[data-collapsible="icon"]').first()).toBeAttached()
+      // R1-L-05 for the Tenant Manager: a gap between the groups of the collapsed bar
+      const groups = nav.locator('[data-sidebar="group"]')
+      expect(await groups.count()).toBeGreaterThan(1)
+      const g0 = await groups.nth(0).locator('[data-sidebar="menu-button"]').last().boundingBox()
+      const g1 = await groups.nth(1).locator('[data-sidebar="menu-button"]').first().boundingBox()
+      expect(g1!.y - (g0!.y + g0!.height)).toBeGreaterThanOrEqual(8)
+      await page.getByRole('button', { name: 'Open the pages of Notes' }).click()
+      await expect(page.getByRole('menuitem', { name: 'Mine' })).toBeVisible()
+      await page.keyboard.press('Escape')
+      await toggle.click()
+    })
     await logout(page)
   })
 })

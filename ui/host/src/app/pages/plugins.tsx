@@ -965,7 +965,7 @@ export function TenantPlugins({ slug }: { slug: string }) {
                         <TableCell className="text-right whitespace-nowrap">
                           <Button variant="outline" size="sm" onClick={() => go(to.tenant(slug, 'plugins', p.id))}>
                             <KeySquare />
-                            {t('Access and permissions')}
+                            {t('Permissions')}
                           </Button>
                           {p.has_ui && p.on && p.kind !== 'extension' && (
                             <Button variant="ghost" size="sm" onClick={() => go(to.plugin(slug, p.id))}>

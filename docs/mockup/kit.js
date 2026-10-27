@@ -202,6 +202,14 @@ function fld(label, value, o) {
   const x = o || {};
   return `<label class="lbl ${x.wide ? 'span2' : ''}">${label}<input type="${x.type || 'text'}" value="${value}" ${x.ro ? 'readonly' : ''} ${x.mono ? 'class="mono"' : ''}>${x.hint ? `<span class="hint">${x.hint}</span>` : ''}</label>`;
 }
+/* A widget with a trend: title, the figure, a small chart and a caption (overview of every role). */
+function trendPanel(title, figure, vals, caption, cls, link) {
+  return `<section class="panel widget"><div class="panel-h"><h2>${title}</h2>${link || ''}</div><div class="wd-f"><b class="num">${figure}</b><span class="muted small">${caption}</span></div>${spark(vals, cls)}</section>`;
+}
+/* The compact strip of apps of the Home: the sidebar already lists them, here only what is new in each. */
+function appsStrip(S, apps) {
+  return `<section class="apps-strip" aria-label="Your apps"><span class="muted small">Your apps</span>${apps.map((a) => `<button type="button" class="chip app-chip" data-act="appopen" data-v="${a.id}">${ic(a.ic, 15)}<b>${a.n}</b><span class="muted small">${a.cnt}</span></button>`).join('')}</section>`;
+}
 function kpis(list) {
   return `<div class="kpis">${list.map((k) => `<div class="kpi-t"><span class="muted small">${k[0]}</span><b class="num">${k[1]}</b><span class="small ${k[3] || 'muted'}">${k[2]}</span></div>`).join('')}</div>`;
 }

@@ -35,11 +35,12 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
-import { initials, useAction, useApi, useConfirm, usePaged, useTenantCtx, type PageOf } from '../core.ts'
+import { useAction, useApi, useConfirm, usePaged, useTenantCtx, type PageOf } from '../core.ts'
 import { t } from '../i18n.ts'
 import { levelName } from '../levels.ts'
 import { PersonPicture } from '../picture.tsx'
-import { Empty, ErrorBox, FormDialog, Loading, MoreRows, PageHeader, Pills, SaveBar, SelectAllRows, StatusBadge, Tabs } from '../kit.tsx'
+import { BulkBar, FilterColumn, ListPage } from '../listkit.tsx'
+import { Empty, ErrorBox, FormDialog, Loading, MoreRows, PageHeader, SaveBar, SelectAllRows, StatusBadge, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import AppIcon from '../AppIcon.tsx'
 import { AppMark } from '../Shell.tsx'
@@ -1438,110 +1439,114 @@ export function AdminPeople() {
   }
   return (
     <>
-      <PageHeader
+      <ListPage
         title={t('People')}
         sub={t('{count} people', { count: counts.all })}
+        bar={
+          <BulkBar
+            selected={ids.length}
+            total={selectable.length}
+            all={selectable.length > 0 && ids.length >= selectable.length}
+            onAll={(on) => {
+              setSel(on ? new Set(selectable.map((r) => r.user_id)) : new Set())
+              setEveryone(false)
+            }}
+            actions={
+              <>
+                {q.more && !everyone && ids.length >= selectable.length && (
+                  <SelectAllRows
+                    selected={ids.length}
+                    total={q.total}
+                    onAll={async () => {
+                      setSel(new Set(await q.allIds()))
+                      setEveryone(true)
+                    }}
+                  />
+                )}
+                <Button variant="outline" size="sm" onClick={() => status_.mutate({ ids, active: false })}>
+                  {t('Disable')}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => status_.mutate({ ids, active: true })}>
+                  {t('Reactivate')}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setDlg('add')}>
+                  {t('Add to a tenant')}
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => void sendLinks()}>
+                  {t('Send the password link')}
+                </Button>
+              </>
+            }
+          />
+        }
         actions={
           <Button onClick={() => setDlg('new')}>
             <Plus />
             {t('New person')}
           </Button>
         }
-      />
-      <div className="grid gap-3 p-6 max-[620px]:p-4">
-        <Pills
-          value={show}
-          onChange={setShow}
-          items={[
-            { id: 'all', label: t('All'), count: counts.all },
-            { id: 'several', label: t('In several tenants'), count: counts.several },
-            { id: 'admins', label: t('Administrators'), count: counts.admins },
-          ]}
-        />
-        <div className="flex flex-wrap items-center gap-2">
-          <Input type="search" placeholder={t('Search by name or username')} aria-label={t('Search by name or username')} className="w-64 max-w-full" value={search} onChange={(e) => setSearch(e.target.value)} />
-          <Select value={tenant} onValueChange={setTenant}>
-            <SelectTrigger className="w-48" aria-label={t('Tenant')}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="any">{t('Every tenant')}</SelectItem>
-              {clients.map((x) => (
-                <SelectItem key={x.id} value={x.id}>
-                  {x.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={role} onValueChange={setRole}>
-            <SelectTrigger className="w-44" aria-label={t('Role')}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="any">{t('Every role')}</SelectItem>
-              <SelectItem value="tenant_manager">Tenant Manager</SelectItem>
-              <SelectItem value="user">{t('User')}</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={status} onValueChange={setStatus}>
-            <SelectTrigger className="w-40" aria-label={t('Status')}>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="any">{t('Every status')}</SelectItem>
-              <SelectItem value="active">{t('Active')}</SelectItem>
-              <SelectItem value="disabled">{t('Disabled')}</SelectItem>
-            </SelectContent>
-          </Select>
-          {ids.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 rounded-lg bg-primary/10 py-1 pr-1 pl-3" role="group" aria-label={t('Actions on the selection')}>
-              <span className="text-sm font-medium tabular-nums">{t('{count} selected', { count: ids.length })}</span>
-              {q.more && !everyone && ids.length >= selectable.length && (
-                <SelectAllRows
-                  selected={ids.length}
-                  total={q.total}
-                  onAll={async () => {
-                    setSel(new Set(await q.allIds()))
-                    setEveryone(true)
-                  }}
-                />
-              )}
-              <Button variant="outline" size="sm" onClick={() => status_.mutate({ ids, active: false })}>
-                {t('Disable')}
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => status_.mutate({ ids, active: true })}>
-                {t('Reactivate')}
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => setDlg('add')}>
-                {t('Add to a tenant')}
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => void sendLinks()}>
-                {t('Send the password link')}
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setSel(new Set())
-                  setEveryone(false)
-                }}
-              >
-                {t('Deselect')}
-              </Button>
-            </div>
-          )}
-        </div>
+        filters={
+          <FilterColumn
+            search={search}
+            onSearch={setSearch}
+            searchLabel={t('Search by name or username')}
+            onReset={() => {
+              setSearch('')
+              setShow('all')
+              setTenant('any')
+              setRole('any')
+              setStatus('any')
+            }}
+            groups={[
+              {
+                id: 'show',
+                label: t('Show'),
+                value: show,
+                onChange: setShow,
+                options: [
+                  { id: 'all', label: t('All'), count: counts.all },
+                  { id: 'several', label: t('In several tenants'), count: counts.several },
+                  { id: 'admins', label: t('Administrators'), count: counts.admins },
+                ],
+              },
+              {
+                id: 'tenant',
+                label: t('Tenant'),
+                value: tenant,
+                onChange: setTenant,
+                options: [{ id: 'any', label: t('Every tenant') }, ...clients.map((x) => ({ id: x.id, label: x.name }))],
+              },
+              {
+                id: 'role',
+                label: t('Role'),
+                value: role,
+                onChange: setRole,
+                options: [
+                  { id: 'any', label: t('Every role') },
+                  { id: 'tenant_manager', label: 'Tenant Manager' },
+                  { id: 'user', label: t('User') },
+                ],
+              },
+              {
+                id: 'status',
+                label: t('Status'),
+                value: status,
+                onChange: setStatus,
+                options: [
+                  { id: 'any', label: t('Every status') },
+                  { id: 'active', label: t('Active') },
+                  { id: 'disabled', label: t('Disabled') },
+                ],
+              },
+            ]}
+          />
+        }
+      >
         <div className="overflow-x-auto rounded-xl border bg-card">
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="w-10">
-                  <Checkbox
-                    aria-label={t('Select all')}
-                    checked={selectable.length > 0 && ids.length >= selectable.length ? true : ids.length ? 'indeterminate' : false}
-                    onCheckedChange={(v) => setSel(v ? new Set(selectable.map((r) => r.user_id)) : new Set())}
-                  />
-                </TableHead>
+                <TableHead className="w-10" />
                 <TableHead>{t('Name')}</TableHead>
                 <TableHead>{t('Home tenant')}</TableHead>
                 <TableHead>{t('Tenants')}</TableHead>
@@ -1551,8 +1556,8 @@ export function AdminPeople() {
             </TableHeader>
             <TableBody>
               {rows.map((p) => (
-                <TableRow key={p.user_id} data-state={sel.has(p.user_id) ? 'selected' : undefined}>
-                  <TableCell>
+                <TableRow key={p.user_id} className="cursor-pointer" data-state={sel.has(p.user_id) ? 'selected' : undefined} onClick={() => go(p.is_admin ? to.admin('system', 'admins') : to.adminPerson(p.user_id))}>
+                  <TableCell onClick={(e) => e.stopPropagation()}>
                     {!p.is_admin && (
                       <Checkbox
                         aria-label={t('Select {name}', { name: p.username })}
@@ -1567,8 +1572,8 @@ export function AdminPeople() {
                     )}
                   </TableCell>
                   <TableCell>
-                    <a className="flex items-center gap-2.5" href={p.is_admin ? to.admin('system', 'admins') : to.adminPerson(p.user_id)}>
-                      <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary-strong">{initials(p.display_name || p.username)}</span>
+                    <a className="flex items-center gap-2.5" onClick={(e) => e.stopPropagation()} href={p.is_admin ? to.admin('system', 'admins') : to.adminPerson(p.user_id)}>
+                      <PersonPicture id={p.user_id} name={p.display_name || p.username} className="size-8 bg-primary/15 text-xs text-primary-strong" />
                       <span>
                         <span className="block font-medium hover:underline">{p.display_name || p.username}</span>
                         <span className="block text-xs text-muted-foreground">{p.username}</span>
@@ -1598,7 +1603,7 @@ export function AdminPeople() {
           {rows.length === 0 && <p className="p-6 text-center text-sm text-muted-foreground">{t('No person found.')}</p>}
         </div>
         <MoreRows shown={rows.length} total={q.total} more={q.more} loading={q.loadingMore} onMore={q.loadMore} />
-      </div>
+      </ListPage>
       <NewPersonDialog
         open={dlg === 'new'}
         onClose={() => setDlg(null)}

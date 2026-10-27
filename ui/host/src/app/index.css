@@ -472,3 +472,38 @@ html[data-style-buttons='soft'] [data-slot='button'][data-variant='default']:hov
   text-underline-offset: 3px;
 }
 
+
+/* ── Scrollbars: thin everywhere; the sidebar shows its own only under the mouse ── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--foreground) 28%, transparent) transparent;
+}
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+*::-webkit-scrollbar-thumb {
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--foreground) 28%, transparent);
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+.msk-nav [data-sidebar='content'] {
+  scrollbar-color: transparent transparent;
+}
+.msk-nav [data-sidebar='content']::-webkit-scrollbar-thumb {
+  background: transparent;
+}
+.msk-nav [data-sidebar='content']:hover {
+  scrollbar-color: color-mix(in srgb, var(--foreground) 28%, transparent) transparent;
+}
+.msk-nav [data-sidebar='content']:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--foreground) 28%, transparent);
+}
+
+/* The top of the page, under the band: the headers and the filters of a page stay in sight (--msk-top is the height of the band) */
+:root {
+  --msk-top: 50px;
+  --msk-head: 57px;
+}

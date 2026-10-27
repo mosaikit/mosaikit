@@ -22,7 +22,8 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { initials, isApp, passwordMin, useAction, useApi, useConfig, useConfirm, usePaged, useTenantCtx, type PageOf } from '../core.ts'
+import { PersonPicture } from '../picture.tsx'
+import { isApp, passwordMin, useAction, useApi, useConfig, useConfirm, usePaged, useTenantCtx, type PageOf } from '../core.ts'
 import { fmtDay, t, useLang } from '../i18n.ts'
 import { Empty, ErrorBox, FormDialog, Kpi, Loading, MoreRows, PageHeader, Pills, PluginKpis, SaveBar, SelectAllRows, Sections, StatusBadge, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
@@ -555,8 +556,8 @@ function People({ slug, profiles, groups }: { slug: string; profiles: Profile[];
           </TableHeader>
           <TableBody>
             {rows.map((m) => (
-              <TableRow key={m.user_id} data-state={sel.has(m.user_id) ? 'selected' : undefined}>
-                <TableCell>
+              <TableRow key={m.user_id} className="cursor-pointer" data-state={sel.has(m.user_id) ? 'selected' : undefined} onClick={() => go(to.person(slug, m.user_id))}>
+                <TableCell onClick={(e) => e.stopPropagation()}>
                   <Checkbox
                     aria-label={t('Select {name}', { name: m.username })}
                     checked={sel.has(m.user_id)}
@@ -570,9 +571,9 @@ function People({ slug, profiles, groups }: { slug: string; profiles: Profile[];
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-2.5">
-                    <span className="flex size-8 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary-strong">{initials(m.display_name || m.username)}</span>
+                    <PersonPicture id={m.user_id} name={m.display_name || m.username} className="size-8 bg-primary/15 text-xs text-primary-strong" />
                     <div>
-                      <a className="font-medium hover:underline" href={to.person(slug, m.user_id)}>
+                      <a className="font-medium hover:underline" onClick={(e) => e.stopPropagation()} href={to.person(slug, m.user_id)}>
                         {m.display_name || m.username}
                       </a>
                       <div className="contents">
@@ -600,7 +601,7 @@ function People({ slug, profiles, groups }: { slug: string; profiles: Profile[];
                 </TableCell>
                 <TableCell className="text-right tabular-nums">{m.owned_resources}</TableCell>
                 <TableCell className="text-muted-foreground">{m.last_sign_in_at ? fmtDate(m.last_sign_in_at) : t('Never')}</TableCell>
-                <TableCell>
+                <TableCell onClick={(e) => e.stopPropagation()}>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon" aria-label={t('Actions for {username}', { username: m.username })}>
