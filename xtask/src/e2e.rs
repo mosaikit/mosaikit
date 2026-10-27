@@ -126,7 +126,7 @@ impl Instance {
     }
 
     /// `wildcard`: one origin per plugin (`http://<plugin>.localhost:<port>`, the browser resolves
-    /// `*.localhost` to the computer itself), for the scenario of tests/wildcard.spec.ts only.
+    /// `*.localhost` to the computer itself), for the scenario of specs/wildcard.spec.ts only.
     pub(crate) fn start_with(suite: &str, wildcard: bool) -> Result<Instance> {
         if std::env::var_os("MOSAIKIT_TEST_DATABASE_URL").is_none() {
             crate::db::up()?;
@@ -234,18 +234,18 @@ impl Instance {
 
 pub fn e2e(headed: bool, only: &[String]) -> Result<()> {
     let _slot = crate::heavy::acquire("e2e", "xtask e2e")?;
-    // `MOSAIKIT_E2E_WILDCARD=1`: only the scenario of tests/wildcard.spec.ts, with one origin per plugin
+    // `MOSAIKIT_E2E_WILDCARD=1`: only the scenario of specs/wildcard.spec.ts, with one origin per plugin
     let wildcard = std::env::var("MOSAIKIT_E2E_WILDCARD").is_ok_and(|v| v == "1");
     let mut inst = Instance::start_with("e2e", wildcard)?;
     let mut cmd = npm();
-    cmd.current_dir(root()).args(["run", "e2e", "-w", "e2e"]);
+    cmd.current_dir(root()).args(["run", "e2e", "-w", "tests/e2e"]);
     inst.env(&mut cmd);
     if headed {
         cmd.env("E2E_HEADED", "1");
     }
     if wildcard {
         // not the results of the whole suite
-        cmd.env("E2E_WILDCARD", "1").args(["--", "tests/wildcard.spec.ts"]);
+        cmd.env("E2E_WILDCARD", "1").args(["--", "specs/wildcard.spec.ts"]);
         let result = run(&mut cmd);
         inst.stop(result.is_err());
         return result;

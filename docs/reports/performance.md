@@ -19,8 +19,8 @@ was changed and what is left. Run again with `cargo xtask perf` (below).
 | Database | 2.8 GB | — |
 
 `cargo xtask perf` builds the plugins (release, signed, preinstalled from the registry as in production)
-and the server (release), seeds the data with SQL (`xtask/perf/seed_pg.sql`, `seed_sqlite.mjs`: the
-API would take hours for millions of rows), then `xtask/perf/run.mjs` measures:
+and the server (release), seeds the data with SQL (`tests/perf/seed_pg.sql`, `seed_sqlite.mjs`: the
+API would take hours for millions of rows), then `tests/perf/run.mjs` measures:
 
 - **interactive calls**, sequential and warm, as a person, a Tenant Manager and the Administrator of a
   tenant in the middle of the platform, with sessions created by the seed;
@@ -180,7 +180,7 @@ Migrations: PostgreSQL `0015_performance.sql`, SQLite `0013_performance.sql`.
 
 ## Equivalence of the visibility
 
-`xtask/perf/check_visibility.sql` compares, on the data of the load test and inside a transaction that
+`tests/perf/check_visibility.sql` compares, on the data of the load test and inside a transaction that
 is rolled back, the rows and levels of the new view with the old rule (`level_of()` on every item of the
 tenant and the plugin). It adds the cases the seed lacks: folders shared with a group at levels 1 and 2,
 a shared folder in the trash, a share to a person on top of a group share. 8 people (2 Tenant Managers,
@@ -222,7 +222,7 @@ was shared with other builds, so read the ratios, not the absolute values.
    table is `resource_id in (select id from core.ctx_levels() where level >= 1)`: the person's visible set
    is computed once per statement, not `core.can_access()` per row. Writes keep the per-row check.
    The migration rewrites the policies of the installed plugins; new tables get it from the host.
-   *Equivalence*: `xtask/perf/check_rls.sql` compares both rules on every row of every plugin table for 8
+   *Equivalence*: `tests/perf/check_rls.sql` compares both rules on every row of every plugin table for 8
    callers (Tenant Managers, Users, a guest, a person of another tenant) plus a public link, with folders
    shared at levels 1 and 2, a shared item in the trash and a share on top of a group share: 0 differences in
    41 cases. Security tests: `reads_as_sets_follow_the_rules` (both backends: levels, groups, trash,

@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net'
 import { expect, test, type Page } from '@playwright/test'
 
 // Review round 1: auth and plugins (docs/manual-tests.md, section "Review round 1 - auth and plugins").
-// Runs after platform.spec.ts, which leaves the tenant "City of Beta" with its Tenant Manager `manager`.
+// Runs after 12-review-round1-platform.spec.ts and the files before it, which leave the tenant "City of Beta" with its Tenant Manager `manager`.
 
 const PASSWORD = 'password-e2e-123'
 const BASE_URL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:18080/mosaikit/'

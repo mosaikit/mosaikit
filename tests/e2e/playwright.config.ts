@@ -6,10 +6,11 @@ import { defineConfig } from '@playwright/test'
 const channel = process.env.E2E_CHANNEL ?? (process.platform === 'win32' ? 'msedge' : 'chromium')
 
 export default defineConfig({
-  testDir: './tests',
+  testDir: './specs',
   timeout: 90_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
+  globalSetup: './global-setup.ts',
   workers: 1,
   // `cargo xtask e2e` also asks for the JSON results, for tests/results/test-results.md
   reporter: process.env.E2E_JSON ? [['list'], ['json', { outputFile: process.env.E2E_JSON }]] : [['list']],

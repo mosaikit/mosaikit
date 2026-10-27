@@ -2,7 +2,7 @@
 //!
 //! A database of its own (`mosaikit_perf` on the development cluster, or a SQLite file), the plugins
 //! built in release, signed and preinstalled from the registry as in production, the server built in
-//! release. `xtask/perf/run.mjs` seeds the data at scale (SQL, not the API: millions of rows), then
+//! release. `tests/perf/run.mjs` seeds the data at scale (SQL, not the API: millions of rows), then
 //! measures the interactive calls and the queries of the background jobs and writes
 //! `.dev/perf/<backend>-<scale>.json`.
 //!
@@ -81,7 +81,7 @@ pub fn perf(backend: &str, scale: &str, reuse: bool, no_build: bool) -> Result<(
         wait_health(&format!("http://127.0.0.1:{PORT}/api/health"))?;
         run(Command::new("node")
             .current_dir(root())
-            .arg(root().join("xtask").join("perf").join("run.mjs"))
+            .arg(root().join("tests").join("perf").join("run.mjs"))
             .env("PERF_BASE", format!("http://127.0.0.1:{PORT}"))
             .env("PERF_BACKEND", backend)
             .env("PERF_SCALE", scale)

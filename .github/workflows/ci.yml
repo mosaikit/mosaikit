@@ -70,5 +70,5 @@ jobs:
         with:
           name: e2e-results
           path: |
-            mosaikit/e2e/test-results
+            mosaikit/tests/e2e/test-results
             mosaikit/.dev/e2e/*.log

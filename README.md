@@ -116,7 +116,7 @@ mosaikit/
     host/        host UI, the shell (React + Vite + Tailwind + shadcn/ui, i18next)
     plugin-api/  @mosaikit/plugin-api: bridge, generic CRUD, theme and language
   branding/      brand of Mosaikit (documented brand.toml)
-  e2e/           tests in the browser (Playwright)
+  tests/         e2e (Playwright), perf, manual checks, fixtures, results: see tests/README.md
   deploy/        Dockerfile, compose and Kubernetes templates
   xtask/         automation: cargo xtask <command>
     templates/plugin/    skeleton for `cargo xtask plugin new`

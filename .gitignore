@@ -14,8 +14,8 @@ initial-admin-password.txt
 # test end-to-end
 # machine outputs of the test suites (the report tests/results/test-results.md is committed)
 tests/results/raw/
-e2e/test-results/
-e2e/playwright-report/
+tests/e2e/test-results/
+tests/e2e/playwright-report/
 
 # chiavi di firma
 *.key

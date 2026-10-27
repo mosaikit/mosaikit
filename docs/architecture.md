@@ -772,7 +772,7 @@ plugin, public links included, the same rules as `can_access()`) is computed onc
 the rows are kept by key, instead of one `can_access()` call per row (a third of the time of a list).
 The writes keep the check per row: they touch one row, or few. The role of every plugin may execute
 `ctx_levels()` (the function reads only the context, it takes no argument). The equivalence of the two
-rules is checked on the data of the load test (`xtask/perf/check_rls.sql`) and by the tests of the
+rules is checked on the data of the load test (`tests/perf/check_rls.sql`) and by the tests of the
 database (`reads_as_sets_follow_the_rules`, on both backends). Worst case: a single-item read of a
 person who sees very many items pays for the whole set (a few ms on the data of the load test).
 
@@ -1290,7 +1290,7 @@ are limited to the path.
   plugin nor read its storage. It needs a wildcard DNS record and a wildcard certificate (Docker and
   Kubernetes notes in `deploy/`); the reverse proxy must keep the `Host` header. In development
   `http://*.localhost:<port>` works without DNS (browsers resolve `*.localhost` to the computer);
-  `MOSAIKIT_E2E_WILDCARD=1 cargo xtask e2e` runs `e2e/tests/wildcard.spec.ts` that way.
+  `MOSAIKIT_E2E_WILDCARD=1 cargo xtask e2e` runs `tests/e2e/specs/wildcard.spec.ts` that way.
 - **SVG images** (logos, browser icon) pass an allow-list check (`kernel::svg`: drawing elements and
   attributes only, references inside the document only, no DTD) and are served with
   `default-src 'none'; sandbox`.
@@ -1483,7 +1483,7 @@ mosaikit/
 ├── branding/                brand of Mosaikit (documented brand.toml)
 ├── distribution.toml        "Mosaikit" distribution (§14)
 ├── mosaikit.example.toml    every configuration property
-├── e2e/                     tests in the browser (Playwright)
+├── tests/                   every test suite beyond the unit tests: e2e/, perf/, manual/, fixtures/, results/ (README.md)
 ├── deploy/                  Dockerfile, compose.yml, compose.dev.yml, k8s/
 ├── xtask/                   dev, db, plugin, test, e2e, ci, release
 │   ├── templates/plugin/    skeleton for `cargo xtask plugin new`

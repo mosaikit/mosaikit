@@ -3,7 +3,7 @@ import { expect, test, type Page } from '@playwright/test'
 // One origin per plugin (plugin_url with a wildcard host). Runs only with `MOSAIKIT_E2E_WILDCARD=1 cargo
 // xtask e2e`, which serves the plugins on http://<plugin>.localhost:<port> and the public links on
 // http://public.localhost:<port> (the browser resolves *.localhost to the computer itself), without the
-// second factor of the Administrator (it has its own tests in platform.spec.ts).
+// second factor of the Administrator (it has its own tests in 01-admin-and-manager.spec.ts).
 
 test.skip(!process.env.E2E_WILDCARD, 'only with MOSAIKIT_E2E_WILDCARD=1')
 

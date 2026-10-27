@@ -546,7 +546,7 @@ Needs many rows: the data of the load test (`cargo xtask perf --scale probe`, th
 
 ## Review round 1 - overview
 
-Automated twin of every check: the test «Review round 1, overview» of `e2e/tests/platform.spec.ts` (the steps carry the ids). The figures come from cheap sources: counters of the overview, the snapshot of the platform figures, pages of five rows.
+Automated twin of every check: the test «Review round 1, overview» of `tests/e2e/specs/12-review-round1-platform.spec.ts` (the steps carry the ids). The figures come from cheap sources: counters of the overview, the snapshot of the platform figures, pages of five rows.
 
 | Id | Check | Expected |
 |---|---|---|
@@ -562,7 +562,7 @@ Automated twin of every check: the test «Review round 1, overview» of `e2e/tes
 
 ## Review round 1 - tenant and people
 
-Automated twin of every check: the test «Review round 1, tenant and people» of `e2e/tests/platform.spec.ts`.
+Automated twin of every check: the test «Review round 1, tenant and people» of `tests/e2e/specs/12-review-round1-platform.spec.ts`.
 
 | Id | Check | Expected |
 |---|---|---|
@@ -649,7 +649,7 @@ manifest has `[permissions] notify = true` and whose command calls `ctx.notify` 
 
 Sign-in, accounts, sites by address and languages (items C3, C4, D9, H1, H2, I1 and I2 of the
 [review round 1](ui-plan.md)). Each check has an automated twin: the ones of the type *e2e* are in
-`e2e/tests/review1.spec.ts` (same id), the ones of the type *Rust* in `crates/kernel/tests/review1.rs`.
+`tests/e2e/specs/13-review1-auth-plugins.spec.ts` (same id), the ones of the type *Rust* in `crates/kernel/tests/review1.rs`.
 
 | Id | Check | Expected | Twin |
 |---|---|---|---|
