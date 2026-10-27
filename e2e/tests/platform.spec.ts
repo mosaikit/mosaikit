@@ -483,7 +483,7 @@ test.describe.serial('platform', () => {
     await expect(page.getByRole('alert')).toHaveText('Utente o password non corretti')
     await page.getByLabel('Password').fill(NEW_PASSWORD)
     await page.getByRole('button', { name: 'Accedi' }).click()
-    await expect(page.getByText('Il tuo spazio')).toBeVisible()
+    await expect(page.getByText('Riprendi da dove eri rimasto')).toBeVisible()
     await expect(page.getByRole('button', { name: /menu della persona/ })).toBeVisible()
     // no English phrase of the frame left in the page
     const text = await page.locator('body').innerText()
