@@ -130,7 +130,7 @@ pub async fn list_page(
     p: &crate::paging::PageQuery,
 ) -> Result<crate::paging::Page<TrashItem>> {
     let mut all = list(k, c, plugin, p.q.as_deref()).await?;
-    all.sort_by(|a, b| (b.deleted_at, b.id).cmp(&(a.deleted_at, a.id)));
+    all.sort_by_key(|a| std::cmp::Reverse((a.deleted_at, a.id)));
     let total = all.len() as i64;
     let after = p
         .after()?
