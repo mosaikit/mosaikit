@@ -1352,7 +1352,7 @@ The structured data are all in the database. At the first start the
 `system` tenant and the Administrator `admin` are created: the password is `MOSAIKIT_ADMIN_PASSWORD`
 or it is generated and written in `credenziali-iniziali.txt`. With
 `initial_tenant` (desktop release: `"locale"`) the first start also creates a
-work tenant, with the name of the product, and its Tenant Manager `utente`
+work tenant, with the name of the product, and its Tenant Manager `user`
 (generated password, in the same file; with `initial_password`, desktop release:
 `"mosaikit"`, both accounts have that one, even if shorter than the
 policy, which holds again when it is changed): on the desktop one works at once, without

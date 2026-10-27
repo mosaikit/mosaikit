@@ -189,7 +189,7 @@ fn initial_password(k: &Kernel) -> String {
     k.cfg.initial_password.clone().filter(|p| !p.is_empty()).unwrap_or_else(|| random_token(9))
 }
 
-/// Work tenant of the first start (name of the product) with the Tenant Manager `utente`,
+/// Work tenant of the first start (name of the product) with the Tenant Manager `user`,
 /// if no tenant exists yet besides the system one. Returns the credentials.
 async fn initial_tenant(k: &Kernel, slug: &str) -> Result<Option<String>> {
     let any: bool =
@@ -214,7 +214,7 @@ async fn initial_tenant(k: &Kernel, slug: &str) -> Result<Option<String>> {
             .await?;
     let user: Uuid = mosaikit_db::query_scalar(
         "insert into core.users (home_tenant_id, username, display_name, password_hash)
-         values ($1, 'utente', 'User', $2) returning id",
+         values ($1, 'user', 'User', $2) returning id",
     )
     .bind(tenant)
     .bind(&hash)
@@ -230,7 +230,7 @@ async fn initial_tenant(k: &Kernel, slug: &str) -> Result<Option<String>> {
     crate::access::create_default_profile(&mut tx, tenant).await?;
     tx.commit().await?;
     Ok(Some(format!(
-        "Work (sign-in page, tenant {})\nusername: utente\npassword: {password}\n",
+        "Work (sign-in page, tenant {})\nusername: user\npassword: {password}\n",
         k.brand.name
     )))
 }

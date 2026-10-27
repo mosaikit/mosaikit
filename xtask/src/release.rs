@@ -44,7 +44,7 @@ fn config(flavor: Flavor, trusted: &str, brand: bool) -> String {
             push("admin_totp = false");
             push("# at the first start creates the work tenant with its user");
             push("initial_tenant = \"locale\"");
-            push("# initial password of admin and utente (to change from the Account page)");
+            push("# initial password of admin and user (to change from the Account page)");
             push("initial_password = \"mosaikit\"");
         }
         Flavor::Server => {
@@ -165,7 +165,7 @@ fn start_guide(postgres: bool) -> String {
          2. At the first start the browser opens on http://127.0.0.1:{port}; from then on\n   \
             a Windows notification with the address appears (click to open it).\n   \
             To open the app again: click on the icon.\n\
-         3. First sign-in: user \"utente\", ready to work. For the\n   \
+         3. First sign-in: user \"user\", ready to work. For the\n   \
             administration (plugins, other tenants and users): link \"Administrator\n   \
             access\", user \"admin\". Initial password of both:\n   \
             \"mosaikit\" (also in data\\credenziali-iniziali.txt, icon menu >\n   \

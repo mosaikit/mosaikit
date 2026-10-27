@@ -81,13 +81,13 @@ url = "http://127.0.0.1:8080/mosaikit"
 # admin_totp = true
 
 # At the first start also creates a work tenant with this slug (name: the one of the product)
-# and its Tenant Manager "utente", with a generated password. The Administrator has no
+# and its Tenant Manager "user", with a generated password. The Administrator has no
 # workspace: it is meant for local use (desktop version), where one works at once.
 # The credentials are in <data_dir>/credenziali-iniziali.txt.
 # Env: MOSAIKIT_INITIAL_TENANT
 # initial_tenant = "locale"
 
-# Password of the accounts created at the first start (admin and, with initial_tenant, utente)
+# Password of the accounts created at the first start (admin and, with initial_tenant, user)
 # instead of the generated ones. It holds even if shorter than the policy (10 characters): to change
 # at the first sign-in. For local use only (desktop); MOSAIKIT_ADMIN_PASSWORD takes precedence for admin.
 # Env: MOSAIKIT_INITIAL_PASSWORD

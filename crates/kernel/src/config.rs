@@ -53,10 +53,10 @@ pub struct Config {
     /// `secret.key` in `data_dir`, created at the first start
     #[serde(default)]
     pub secret_key: Option<String>,
-    /// at the first start also creates this work tenant with the Tenant Manager `utente` (desktop)
+    /// at the first start also creates this work tenant with the Tenant Manager `user` (desktop)
     #[serde(default)]
     pub initial_tenant: Option<String>,
-    /// password of `admin` and `utente` created at the first start (default: generated); desktop
+    /// password of `admin` and `user` created at the first start (default: generated); desktop
     #[serde(default)]
     pub initial_password: Option<String>,
     /// second factor (TOTP) required for Administrators

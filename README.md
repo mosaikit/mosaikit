@@ -422,7 +422,8 @@ in `data\pg`, with PostGIS if available.
    `open_browser = false` there is always and only the notification. To open the app again
    a click on the icon or a new double click is enough.
 4. The first start also creates the work tenant (`initial_tenant = "locale"`,
-   with the name of the product) and its user `utente`: one works at once.
+   with the name of the product) and its user `user`: one works at once. Installs made before
+   this change keep their account `utente`; nothing is renamed.
    The Administrator `admin` enters from *Administrator access*. The initial
    password of both is `mosaikit` (`initial_password`; also in
    `data\credenziali-iniziali.txt`, icon menu → *Initial credentials*):

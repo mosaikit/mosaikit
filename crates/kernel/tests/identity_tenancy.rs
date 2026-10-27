@@ -394,9 +394,9 @@ async fn work_tenant_at_the_first_start() {
     // credentials generated in the file of the data folder
     let file =
         std::fs::read_to_string(t.cfg.data_dir.join(mosaikit_kernel::identity::INITIAL_CREDENTIALS)).unwrap();
-    let section = &file[file.find("username: utente").expect("credentials of the user")..];
+    let section = &file[file.find("username: user").expect("credentials of the user")..];
     let password = section.lines().find_map(|l| l.strip_prefix("password: ")).unwrap();
-    let u = login(&t, "locale", "utente", password, "t").await.unwrap().user;
+    let u = login(&t, "locale", "user", password, "t").await.unwrap().user;
     assert_eq!(caller(&t, &u, "locale").await.unwrap().tenant.role, Role::TenantManager);
     // already created: a new start does not create it again
     mosaikit_kernel::identity::bootstrap(&t).await.unwrap();
@@ -411,7 +411,7 @@ async fn initial_password_of_the_distribution() {
     })
     .await;
     // even if shorter than the policy, for both accounts of the first start
-    let u = login(&t, "locale", "utente", "mosaikit", "t").await.unwrap().user;
+    let u = login(&t, "locale", "user", "mosaikit", "t").await.unwrap().user;
     let file =
         std::fs::read_to_string(t.cfg.data_dir.join(mosaikit_kernel::identity::INITIAL_CREDENTIALS)).unwrap();
     assert_eq!(file.matches("password: mosaikit").count(), 2, "{file}");

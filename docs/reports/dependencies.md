@@ -70,7 +70,7 @@ npm: everything at the latest major; only patch releases of `i18next` (26.5.6) a
 | `GET /api/health` | `200 {"ok":true,"dev":false,"version":"1.0.0"}` |
 | Host page | `200`, CSP without inline scripts |
 | Plugin UI (Notes) | `200`, `script-src` limited to `/ui/com.mosaikit.notes/` (fix M3 of the security review) |
-| Sign-in of the first-start account (`locale` / `utente`) | `200` |
+| Sign-in of the first-start account (`locale` / `user`) | `200` |
 
 The process was stopped and the release output deleted afterwards (`dist/` is not tracked).
 
