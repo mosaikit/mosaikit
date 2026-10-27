@@ -487,7 +487,7 @@ Needs many rows: the data of the load test (`cargo xtask perf --scale probe`, th
 
 | Id | Check | Expected |
 |---|---|---|
-| QA-01 | As Tenant Manager suspend `anna` in the only tenant she belongs to; try to sign in as `anna` | Refused with «Your access to this tenant is suspended: ask its Tenant Manager»; no shell, no raw server error. Reactivate her afterwards |
+| QA-01 | As Tenant Manager suspend a person who belongs to no other tenant; try to sign in as them | Refused with «Your access to this tenant is suspended: ask its Tenant Manager»; no shell, no raw server error. A person who is also a guest of another tenant signs in and lands there. Reactivate them afterwards |
 | QA-02 | `anna` open in a second window, then suspend her; reload that window | A page «Your access to the tenant is suspended» with Sign out |
 | QA-03 | Dark mode, Account (or any page with a list of sections at the left) | The selected section reads clearly (contrast at least 4.5:1) in every theme |
 | QA-04 | As `s.greco` search for a word of a note she cannot see: no results. As the owner share the note with her; search the same word again in her window | The note is found now, without reloading; the pill «Tenants» is not offered to a User |

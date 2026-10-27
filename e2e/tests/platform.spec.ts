@@ -1637,7 +1637,7 @@ test.describe.serial('platform', () => {
 
   })
 
-  test('QA follow-ups: many people at once, suspended sign-in, Home, mail error, service detail, contact', async ({ page }) => {
+  test('QA follow-ups: many people at once, suspended sign-in, Home, mail error, service detail, contact', async ({ page, request }) => {
     await login(page, 'Alfa Municipality', 'manager', PASSWORD)
     // Home: the sections of the mockup and the greeting
     await nav(page, 'Tenant overview').click()
@@ -1668,9 +1668,12 @@ test.describe.serial('platform', () => {
     await page.getByRole('button', { name: 'Actions for anna' }).click()
     await page.getByRole('menuitem', { name: 'Suspend in the tenant' }).click()
     await expect(page.getByText('Suspended in the tenant').first()).toBeVisible()
-    const resp = await page.request.post(BASE + '/api/auth/login', { data: { tenant: 'alfa', username: 'anna', password: 'password-e2e-789' } })
-    expect(resp.status()).toBe(403)
-    expect((await resp.json()).code).toBe('membership_suspended')
+    // anna is also a guest of another tenant: the session opens and holds only that one; the home tenant
+    // is not offered (a separate client, so the session of the manager stays)
+    const resp = await request.post(BASE + '/api/auth/login', { data: { tenant: 'alfa', username: 'anna', password: 'password-e2e-789' } })
+    expect(resp.status()).toBe(200)
+    const me = await (await request.get(BASE + '/api/session')).json()
+    expect(me.memberships.map((m: { slug: string }) => m.slug)).not.toContain('alfa')
     await page.getByRole('button', { name: 'Actions for anna' }).click()
     await page.getByRole('menuitem', { name: 'Reactivate in the tenant' }).click()
     await expect(page.getByText('Active again').first()).toBeVisible()
@@ -1686,8 +1689,8 @@ test.describe.serial('platform', () => {
     await page.keyboard.press('Escape')
 
     // details of a tenant: contact person and registration data
-    await nav(page, 'Tenant').click()
-    await page.getByRole('row', { name: /Alfa Municipality/ }).getByRole('link').first().click()
+    await nav(page, 'Tenants').click()
+    await page.getByRole('row', { name: /City of Alfa/ }).getByRole('link').first().click()
     await page.getByLabel('Contact person').fill('Maria Bianchi')
     await page.getByLabel('Registration data (VAT number, tax code)').fill('IT01234567890')
     await page.getByRole('button', { name: 'Save' }).click()
