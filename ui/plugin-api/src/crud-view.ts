@@ -23,6 +23,38 @@ export interface CrudOptions {
   /** a plugin's own tools in the detail of an existing item (a «Translate» button…): draws into `box`,
    *  which is emptied and drawn again whenever the detail is */
   detail?: (row: Row, box: HTMLElement) => void
+  /** items drawn by the plugin (list, cards, board) next to a detail panel, instead of the table; more than one adds a switch */
+  views?: CrudView[]
+  /** the read-only view of the open item (with «Edit» for the fields): used instead of the form until the person edits */
+  reader?: (ctx: ItemCtx) => HTMLElement
+}
+
+/** What a plugin draws an item with. */
+export interface ItemCtx {
+  row: Row
+  fields: FieldDecl[]
+  /** the value of a field as text (the label of a choice, ✓ for a flag) */
+  text(key: string): string
+  value(key: string): unknown
+  selected: boolean
+  /** the person may change this item */
+  canWrite: boolean
+  /** language of the host */
+  lang: 'en' | 'it' | 'es'
+  /** changes some fields of the item (a partial update) and shows the list again */
+  update(values: Values): Promise<void>
+}
+
+export interface CrudView {
+  key: string
+  /** name of the view in the switch */
+  label: string
+  /** a vertical list, a grid of cards, or columns (`columns`) */
+  kind: 'list' | 'cards' | 'board'
+  /** the content of an item; the view adds the box, selection and keyboard */
+  item: (ctx: ItemCtx) => HTMLElement
+  /** board only: the columns and which rows fall in each */
+  columns?: { key: string; label: (lang: 'en' | 'it' | 'es') => string; match: (row: Row) => boolean }[]
 }
 
 /** Rows asked at a time: the list grows with «Load more». */
@@ -43,9 +75,12 @@ type State = {
   extValues: Record<string, Record<string, Values>>
   /** the tab of an extension shown in the detail (null: the fields of the item) */
   tab: { ext: string; key: string } | null
+  /** the open item is being edited (with `reader`, the item opens for reading first) */
+  editing: boolean
+  view: string
 }
 
-function h<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string, string> = {}, ...children: (Node | string)[]) {
+export function h<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string, string> = {}, ...children: (Node | string)[]) {
   const el = document.createElement(tag)
   for (const [k, v] of Object.entries(attrs)) {
     if (k === 'class') el.className = v
@@ -91,6 +126,10 @@ const TEXTS = {
     read: 'read only',
     write: 'edit',
     manage: 'manage',
+    edit: 'Edit',
+    views: 'View',
+    pick: 'Select an item to read it, or create a new one.',
+    emptyCol: 'Nothing here',
   },
   it: {
     filter: 'Filtra…',
@@ -120,6 +159,43 @@ const TEXTS = {
     read: 'sola lettura',
     write: 'modifica',
     manage: 'gestione',
+    edit: 'Modifica',
+    views: 'Vista',
+    pick: 'Seleziona un elemento per leggerlo, oppure creane uno nuovo.',
+    emptyCol: 'Niente qui',
+  },
+  es: {
+    filter: 'Filtrar…',
+    filterLabel: 'Filtrar',
+    new: '＋ Nuevo',
+    save: 'Guardar',
+    cancel: 'Cancelar',
+    close: 'Cerrar',
+    share: 'Compartir…',
+    del: 'Eliminar',
+    owner: 'Propietario',
+    item: '1 elemento',
+    items: '{n} elementos',
+    shownOf: '{shown} de {total} elementos',
+    more: 'Cargar más',
+    noResult: 'sin resultados',
+    noItem: 'ningún elemento',
+    shared: 'compartida',
+    detail: 'Detalle',
+    sections: 'Secciones del elemento',
+    newItem: 'Nuevo elemento',
+    sharedReadOnly: 'Compartido contigo, solo lectura.',
+    ownerIs: 'Propietario: {name}',
+    saved: 'guardado',
+    deleted: 'eliminado',
+    confirmDelete: '¿Eliminar este elemento?',
+    read: 'solo lectura',
+    write: 'edición',
+    manage: 'gestión',
+    edit: 'Editar',
+    views: 'Vista',
+    pick: 'Selecciona un elemento para leerlo, o crea uno nuevo.',
+    emptyCol: 'Nada aquí',
   },
 }
 type Text = keyof (typeof TEXTS)['en']
@@ -127,12 +203,13 @@ type Text = keyof (typeof TEXTS)['en']
 export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: CrudOptions = {}): () => void {
   const api = msk.crud(resource)
   const extApi = msk.extensions(resource)
-  const st: State = { fields: [], rows: [], next: null, total: null, selected: null, filter: '', busy: false, ext: [], extValues: {}, tab: null }
+  const st: State = { fields: [], rows: [], next: null, total: null, selected: null, filter: '', busy: false, ext: [], extValues: {}, tab: null, editing: false, view: '' }
   let disposed = false
   /** the tab mounted now (row|extension|key) and the function that closes it */
   let mounted: { key: string; close: () => void } | null = null
+  const lang = (): 'en' | 'it' | 'es' => (msk.context?.lang === 'it' ? 'it' : msk.context?.lang === 'es' ? 'es' : 'en')
   const tr = (k: Text, vars: Record<string, string | number> = {}) =>
-    TEXTS[msk.context?.lang === 'it' ? 'it' : 'en'][k].replace(/\{(\w+)\}/g, (_, v: string) => String(vars[v] ?? ''))
+    TEXTS[lang()][k].replace(/\{(\w+)\}/g, (_, v: string) => String(vars[v] ?? ''))
 
   const filter = h('input', { type: 'search', class: 'msk-filter' })
   const btnNew = h('button', { type: 'button', class: 'msk-btn ghost' })
@@ -152,6 +229,19 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   const btnCancel = h('button', { type: 'button', class: 'msk-btn ghost' })
   const btnShare = h('button', { type: 'button', class: 'msk-btn ghost' })
   const btnDel = h('button', { type: 'button', class: 'msk-btn danger' })
+  const btnEdit = h('button', { type: 'button', class: 'msk-btn' })
+  const readerBox = h('div', { class: 'msk-reader' })
+  const views = opts.views ?? []
+  const switcher = h('div', { class: 'msk-switch', role: 'group' })
+  const items = h('div', { class: 'msk-items-box' })
+  st.view = views[0]?.key ?? ''
+  try {
+    const saved = localStorage.getItem(`msk-view-${resource}`)
+    if (saved && views.some((v) => v.key === saved)) st.view = saved
+  } catch {
+    // no storage: the first view
+  }
+  const activeView = () => views.find((v) => v.key === st.view) ?? views[0]
   /** The fixed texts, in the language of the host. */
   function renderTexts() {
     filter.placeholder = tr('filter')
@@ -161,21 +251,28 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     // what the profile of the person does not allow is not offered (the kernel refuses it anyway)
     btnNew.hidden = !msk.can('create')
     btnSave.textContent = tr('save')
+    btnEdit.textContent = tr('edit')
+    switcher.setAttribute('aria-label', tr('views'))
     btnShare.textContent = tr('share')
     btnDel.textContent = tr('del')
   }
   const msg = h('div', { class: 'msk-msg', role: 'status' })
-  const form = h('section', { class: 'msk-form' }, formTitle, tabsBar, readonly, fieldsBox, extBox, toolsBox, tabPanel, h('div', { class: 'msk-actions' }, btnSave, btnCancel, btnShare, btnDel), msg)
+  formTitle.tabIndex = -1
+  const form = h('section', { class: 'msk-form' }, formTitle, tabsBar, readonly, readerBox, fieldsBox, extBox, toolsBox, tabPanel, h('div', { class: 'msk-actions' }, btnEdit, btnSave, btnCancel, btnShare, btnDel), msg)
 
   const morebar = h('div', { class: 'msk-morebar' }, btnMore)
-  const body = pageBody(h('div', { class: 'msk-tablewrap' }, table), morebar, form)
+  // with views: the list (it scrolls) and the detail panel (it scrolls too) side by side, the panel over the list on a phone
+  const master = h('div', { class: 'msk-master' }, items, morebar)
+  const split = h('div', { class: 'msk-split' }, master, h('aside', { class: 'msk-detail', 'aria-label': tr('detail') }, form))
+  const body = views.length ? pageBody(split) : pageBody(h('div', { class: 'msk-tablewrap' }, table), morebar, form)
+  if (views.length) body.classList.add('msk-splitbody')
   root.replaceChildren(
     // the header and the filters never scroll: the table, the foot and the form do
-    pageHead({ title: opts.title ?? resource, section: opts.section, sub: count, actions: [btnNew], filters: [filter] }),
+    pageHead({ title: opts.title ?? resource, section: opts.section, sub: count, actions: [btnNew], filters: views.length > 1 ? [filter, switcher] : [filter] }),
     body,
   )
   // the rest of the rows come as the foot of the table comes into view
-  const foot = new IntersectionObserver((e) => e.some((x) => x.isIntersecting) && !btnMore.hidden && !btnMore.disabled && void loadMore(), { root: body, rootMargin: '200px' })
+  const foot = new IntersectionObserver((e) => e.some((x) => x.isIntersecting) && !btnMore.hidden && !btnMore.disabled && void loadMore(), { root: views.length ? master : body, rootMargin: '200px' })
   foot.observe(morebar)
 
   const setMsg = (t: string, err = false) => {
@@ -191,7 +288,132 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   /** the fields of the extensions shown as columns (at most 3) */
   const extColumns = () => st.ext.flatMap((e) => e.fields.filter((f) => !f.hidden).map((f) => ({ ext: e.id, f }))).slice(0, 3)
 
+  /** The list again: the table, or the views of the plugin. */
   function renderTable() {
+    if (views.length) renderItems()
+    else renderTableView()
+  }
+
+  /** Opens (or closes, when already open) the detail of an item. */
+  function pick(id: string | null) {
+    st.selected = st.selected === id ? null : id
+    st.tab = null
+    st.editing = false
+    split.dataset.open = st.selected ? 'true' : 'false'
+    renderTable()
+    renderForm()
+    if (st.selected && narrow()) formTitle.focus()
+  }
+  const narrow = () => window.matchMedia('(max-width: 900px)').matches
+
+  function itemCtx(r: Row): ItemCtx {
+    const fieldOf = (k: string) => st.fields.find((f) => f.key === k)
+    return {
+      row: r,
+      fields: st.fields,
+      text: (k) => {
+        const f = fieldOf(k)
+        return f ? display(f, r.values[k]) : String(r.values[k] ?? '')
+      },
+      value: (k) => r.values[k],
+      selected: r.id === st.selected,
+      canWrite: r.my_level === 'write' || r.my_level === 'manage',
+      lang: lang(),
+      update: async (values) => {
+        try {
+          await api.update(r.id, values)
+          await load()
+        } catch (e) {
+          setMsg(errText(e, msk.context?.lang), true)
+        }
+      },
+    }
+  }
+
+  function renderSwitch() {
+    switcher.className = 'msk-switch'
+    switcher.replaceChildren(
+      ...views.map((v) => {
+        const b = h('button', { type: 'button', class: 'msk-seg', 'aria-pressed': String(v.key === st.view) }, v.label)
+        b.addEventListener('click', () => {
+          st.view = v.key
+          try {
+            localStorage.setItem(`msk-view-${resource}`, v.key)
+          } catch {
+            // no storage: the choice is not kept
+          }
+          renderSwitch()
+          renderTable()
+        })
+        return b
+      }),
+    )
+  }
+
+  /** The items of the plugin's views: a box for each, with selection (click, Enter, Space) and the arrows. */
+  function renderItems() {
+    const view = activeView()!
+    const shown = opts.where ? st.rows.filter(opts.where) : st.rows
+    const total = opts.where ? shown.length : (st.total ?? shown.length)
+    count.textContent = total > shown.length ? tr('shownOf', { shown: shown.length, total }) : total === 1 ? tr('item') : tr('items', { n: total })
+    btnMore.hidden = !st.next
+    const box = (r: Row) => {
+      const ctx = itemCtx(r)
+      const el = h('div', { class: 'msk-item' + (ctx.selected ? ' sel' : ''), role: 'listitem', tabindex: '0', 'data-id': r.id })
+      if (ctx.selected) el.setAttribute('aria-current', 'true')
+      el.append(view.item(ctx))
+      // the fields of the extensions, as chips under the item
+      const marks = extColumns().flatMap((x) => {
+        const v = st.extValues[r.id]?.[x.ext]?.[x.f.key]
+        if (v === null || v === undefined || v === '' || v === false) return []
+        const label = x.f.label || x.f.key
+        return [h('span', { class: 'msk-chip' }, x.f.kind === 'bool' ? `${label} ✓` : `${label}: ${display(x.f, v)}`)]
+      })
+      // what the person may do with an item that is not theirs
+      if (r.my_level !== 'manage') marks.unshift(h('span', { class: 'msk-chip' }, r.my_level === 'read' || r.my_level === 'write' ? tr(r.my_level) : r.my_level))
+      if (marks.length) el.append(h('div', { class: 'msk-itemext' }, ...marks))
+      const onItem = (e: Event) => (e.target as HTMLElement).closest('button,input,select,a,textarea') && (e.target as HTMLElement).closest('.msk-item') === el
+      el.addEventListener('click', (e) => {
+        if (!onItem(e)) pick(r.id)
+      })
+      el.addEventListener('keydown', (e) => {
+        if (onItem(e)) return
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          pick(r.id)
+        } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+          e.preventDefault()
+          const all = [...items.querySelectorAll<HTMLElement>('.msk-item')]
+          all[all.indexOf(el) + (e.key === 'ArrowDown' ? 1 : -1)]?.focus()
+        }
+      })
+      return el
+    }
+    const list = (rows: Row[], kind: string) => h('div', { class: `msk-items ${kind}`, role: 'list' }, ...rows.map(box))
+    if (!shown.length) {
+      items.replaceChildren(h('div', { class: 'msk-empty' }, st.filter.trim() ? tr('noResult') : tr('noItem')))
+    } else if (view.kind === 'board' && view.columns) {
+      items.replaceChildren(
+        h(
+          'div',
+          { class: 'msk-board' },
+          ...view.columns.map((c) => {
+            const rows = shown.filter(c.match)
+            return h(
+              'section',
+              { class: 'msk-col', 'aria-label': c.label(lang()) },
+              h('h2', {}, c.label(lang()), h('span', { class: 'msk-colcount' }, String(rows.length))),
+              rows.length ? list(rows, 'list col') : h('div', { class: 'msk-colempty' }, tr('emptyCol')),
+            )
+          }),
+        ),
+      )
+    } else items.replaceChildren(list(shown, view.kind))
+    // a re-render drops the focus of the item that had it
+    if (document.activeElement === document.body && st.selected) items.querySelector<HTMLElement>(`[data-id="${CSS.escape(st.selected)}"]`)?.focus({ preventScroll: true })
+  }
+
+  function renderTableView() {
     const cols = columns()
     const xcols = extColumns()
     thead.replaceChildren(h('tr', {}, ...cols.map((f) => h('th', {}, f.label || f.key)), ...xcols.map((x) => h('th', {}, x.f.label || x.f.key)), h('th', {}, tr('owner'))))
@@ -221,15 +443,9 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
         })
         for (const x of xcols) line.append(h('td', {}, display(x.f, st.extValues[r.id]?.[x.ext]?.[x.f.key])))
         line.append(h('td', { class: 'msk-owner' }, r.owner_name))
-        const pick = () => {
-          st.selected = st.selected === r.id ? null : r.id
-          st.tab = null
-          renderTable()
-          renderForm()
-        }
-        line.addEventListener('click', pick)
+        line.addEventListener('click', () => pick(r.id))
         line.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') pick()
+          if (e.key === 'Enter') pick(r.id)
         })
         return line
       }),
@@ -308,15 +524,21 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     renderTabs(row)
     readonly.textContent = row && !canWrite ? tr('sharedReadOnly') : row ? tr('ownerIs', { name: row.owner_name }) : ''
     const inTab = !!(row && st.tab)
+    // with a reader, an existing item opens for reading and the fields come with «Edit»
+    const reading = !!(row && opts.reader && !st.editing && !inTab)
     fieldsBox.hidden = extBox.hidden = toolsBox.hidden = inTab
+    fieldsBox.hidden ||= reading
     toolsBox.replaceChildren()
     if (row && !inTab) opts.detail?.(row, toolsBox)
+    readerBox.hidden = !reading
+    readerBox.replaceChildren(...(reading ? [opts.reader!(itemCtx(row!))] : []))
     tabPanel.hidden = !inTab
     fieldsBox.replaceChildren(...visibleFields().map((f) => input(f, row?.values[f.key], !canWrite)))
-    btnSave.hidden = !canWrite || inTab
+    btnEdit.hidden = !reading || !canWrite
+    btnSave.hidden = !canWrite || inTab || reading
     btnDel.hidden = !row || !canManage || inTab || !msk.can('delete')
     btnShare.hidden = !row || !canManage || inTab || !msk.can('share')
-    btnCancel.textContent = row ? tr('close') : tr('cancel')
+    btnCancel.textContent = row && !(opts.reader && st.editing) ? tr('close') : tr('cancel')
     renderExtensions(row, canWrite)
     if (row && st.tab) {
       const key = `${row.id}|${st.tab.ext}|${st.tab.key}`
@@ -455,20 +677,37 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     typing = setTimeout(() => void load(), 250)
   })
   btnMore.addEventListener('click', () => void loadMore())
+  btnEdit.addEventListener('click', () => {
+    st.editing = true
+    renderForm()
+    fieldsBox.querySelector<HTMLElement>('input,select,textarea')?.focus()
+  })
   btnNew.addEventListener('click', () => {
     st.selected = null
     st.tab = null
+    st.editing = true
+    split.dataset.open = 'true'
     setMsg('')
     renderTable()
     renderForm()
     fieldsBox.querySelector<HTMLElement>('input,select,textarea')?.focus()
   })
   btnCancel.addEventListener('click', () => {
-    st.selected = null
+    // editing an item that opened for reading: back to reading it
+    const back = !!(opts.reader && st.editing && st.selected)
+    const was = st.selected
+    if (!back) st.selected = null
     st.tab = null
+    st.editing = false
+    split.dataset.open = back ? 'true' : 'false'
     setMsg('')
     renderTable()
     renderForm()
+    if (was && narrow()) items.querySelector<HTMLElement>(`[data-id="${CSS.escape(was)}"]`)?.focus()
+  })
+  // Escape closes the detail on a phone, where it covers the list
+  root.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && views.length && narrow() && split.dataset.open === 'true') btnCancel.click()
   })
   btnSave.addEventListener('click', () =>
     busy(async () => {
@@ -477,6 +716,8 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
       const saved = row ? await api.update(row.id, values) : await api.create(values)
       if (row) for (const [ext, v] of Object.entries(collectExt(row))) await extApi.set(row.id, ext, v)
       st.selected = saved.id
+      st.editing = false
+      split.dataset.open = 'true'
       setMsg(tr('saved'))
       await load()
     }),
@@ -488,6 +729,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
       if (!(await msk.confirm(tr('confirmDelete')))) return
       await api.remove(row.id)
       st.selected = null
+      split.dataset.open = 'false'
       setMsg(tr('deleted'))
       await load()
     }),
@@ -501,10 +743,13 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   })
 
   renderTexts()
+  split.dataset.open = 'false'
+  if (views.length > 1) renderSwitch()
   renderForm()
   // a new language of the host: the texts again, in the new language
   const off = msk.onContext(() => {
     renderTexts()
+    if (views.length > 1) renderSwitch()
     renderTable()
     renderForm()
   })

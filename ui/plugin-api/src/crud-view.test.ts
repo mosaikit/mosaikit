@@ -262,4 +262,48 @@ describe('mountCrud', () => {
     unmount()
     el.remove()
   })
+
+  it('views: items next to a detail panel, a board by column, reading before editing', async () => {
+    const el = document.createElement('div')
+    const { msk, calls } = fakeMsk([row('1', 'first', 'manage'), { ...row('2', 'second', 'manage'), values: { title: 'second', done: true } }])
+    const item = (c: any) => {
+      const d = document.createElement('b')
+      d.textContent = c.text('title')
+      return d
+    }
+    mountCrud(el, msk, 'notes', {
+      title: 'Notes',
+      views: [
+        { key: 'cards', label: 'Cards', kind: 'cards', item },
+        { key: 'board', label: 'Board', kind: 'board', item, columns: [{ key: 'o', label: () => 'Open', match: (r) => !r.values.done }, { key: 'd', label: () => 'Done', match: (r) => !!r.values.done }] },
+      ],
+      reader: (c) => {
+        const p = document.createElement('p')
+        p.className = 'read'
+        p.textContent = 'reading ' + c.text('title')
+        return p
+      },
+    })
+    await tick()
+    expect(el.querySelectorAll('.msk-item').length).toBe(2)
+    expect(el.querySelector('.msk-items.cards')).not.toBeNull()
+    expect(el.querySelector('.msk-count')!.textContent).toBe('2 items')
+    // the switch has two buttons; the board puts each row in its column
+    const seg = [...el.querySelectorAll<HTMLButtonElement>('.msk-seg')]
+    expect(seg.map((b) => b.getAttribute('aria-pressed'))).toEqual(['true', 'false'])
+    seg[1].click()
+    expect([...el.querySelectorAll('.msk-col')].map((c) => c.textContent)).toEqual(['Open1first', 'Done1second'])
+    // an item opens for reading; Edit shows the fields; Cancel goes back to reading
+    el.querySelector<HTMLElement>('.msk-item')!.click()
+    expect(el.querySelector('.read')!.textContent).toBe('reading first')
+    expect(el.querySelector<HTMLElement>('.msk-split')!.dataset.open).toBe('true')
+    const edit = [...el.querySelectorAll<HTMLButtonElement>('.msk-actions button')].find((b) => b.textContent === 'Edit')!
+    expect(edit.hidden).toBe(false)
+    edit.click()
+    expect(el.querySelector<HTMLInputElement>('[data-key="title"]')!.value).toBe('first')
+    expect(el.querySelector<HTMLElement>('.msk-reader')!.hidden).toBe(true)
+    ;[...el.querySelectorAll<HTMLButtonElement>('.msk-actions button')].find((b) => b.textContent === 'Cancel')!.click()
+    expect(el.querySelector('.read')).not.toBeNull()
+    expect(calls.some((c) => c.op === 'crud.update')).toBe(false)
+  })
 })
