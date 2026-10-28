@@ -17,5 +17,15 @@ services:
       timeout: 3s
       retries: 30
 
+  # Mailpit: catches every email the app sends (optional: `docker compose -f deploy/compose.dev.yml
+  # --profile mail up -d mail`). In System > Email: server localhost, port 1025, security None, no user.
+  # The inbox is at http://localhost:8025.
+  mail:
+    profiles: ["mail"]
+    image: axllent/mailpit:v1.21
+    ports:
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
+
 volumes:
   devpg:

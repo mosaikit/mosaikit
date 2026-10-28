@@ -3,7 +3,7 @@
 // encrypted by the kernel and never comes back: the page only knows whether there is one.
 
 import { useState } from 'react'
-import { Loader2, Mail } from 'lucide-react'
+import { Loader2, Mail, Settings2, Wand2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, ApiError, errText } from '../api.ts'
 import type { Session } from '../types.ts'
@@ -87,9 +87,40 @@ export function EmailPanel({ session }: { session: Session }) {
       setTesting(false)
     }
   }
+  // what still prevents the platform from sending: a server and a sender
+  const missing = [!d.host.trim() && t('the SMTP server'), !d.sender.trim() && t('the sender')].filter(Boolean) as string[]
   const hasPassword = d.password === null ? view.has_password : d.password !== ''
   return (
     <div className="grid max-w-3xl gap-6">
+      {!view.configured && (
+        <Card data-testid="mail-setup" className="border-warn/40 bg-warn/5">
+          <CardHeader>
+            <CardTitle>{t('Set up email')}</CardTitle>
+            <CardDescription>
+              {t('Nothing is sent yet. Missing: {what}.', { what: missing.length ? missing.join(', ') : t('save the settings') })}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap items-center gap-2">
+            <Button onClick={() => document.getElementById('em-host')?.focus()}>
+              <Settings2 />
+              {t('Set up')}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                set({ host: 'localhost', port: 1025, security: 'none', username: '', password: '', sender: d.sender || 'Mosaikit <noreply@example.test>' })
+                document.getElementById('em-host')?.focus()
+              }}
+            >
+              <Wand2 />
+              {t('Fill in for a local test server')}
+            </Button>
+            <p className="basis-full text-xs text-muted-foreground">
+              {t('Development: start Mailpit with «docker compose -f deploy/compose.dev.yml --profile mail up -d mail» (SMTP localhost:1025, inbox at http://localhost:8025), fill in, save and send a test.')}
+            </p>
+          </CardContent>
+        </Card>
+      )}
       <Card>
         <CardHeader>
           <CardTitle className="flex flex-wrap items-center gap-2">
@@ -98,7 +129,7 @@ export function EmailPanel({ session }: { session: Session }) {
           </CardTitle>
           <CardDescription>{t('Used for the notifications by email and their daily summary. Without a server nothing is sent.')}</CardDescription>
           <p className="text-sm text-muted-foreground" data-testid="mail-explain">
-            {t('Mosaikit sends no email by itself: it needs an SMTP server (the one of your organization, or a mail service). Enter its address and credentials here, then use «Send a test». To try it locally, the optional Mailpit container of the Docker setup catches every message (SMTP localhost:1025, no security, no user).')}
+            {t('Mosaikit sends no email by itself: it needs an SMTP server (the one of your organization, or a mail service). Enter its address and credentials here, then use «Send a test». To try it locally, the optional Mailpit container catches every message (SMTP localhost:1025, no security, no user).')}
           </p>
         </CardHeader>
         <CardContent className="grid gap-4 sm:grid-cols-2">
@@ -187,6 +218,7 @@ export function EmailPanel({ session }: { session: Session }) {
             {testing ? <Loader2 className="animate-spin" /> : <Mail />}
             {t('Send a test')}
           </Button>
+          {!view.configured && <p className="basis-full text-xs text-muted-foreground">{t('Available once the mail server is saved.')}</p>}
           {result && (
             <p role={result.ok ? 'status' : 'alert'} className={result.ok ? 'basis-full text-sm text-ok' : 'basis-full text-sm text-destructive'}>
               {result.text}
