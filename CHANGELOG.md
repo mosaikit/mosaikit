@@ -47,6 +47,7 @@ in step).
 
 - A plugin can call an outside service with the key an Administrator set: `http.fetch` takes a `key` (a service of `[[service_keys]]`) and the host adds it as a bearer token; the address may be the one set in Keys of outside services (`address = true`). Requests of plugins go through the same guard as the page probe (public addresses only). The SDK has `ctx.http().fetch_with_key(...)`.
 - Notes translates a note with a translation service (Translate note, under the note), as the example.
+- The destructive buttons of the plugins (Delete) keep a readable contrast in the dark mode, as in the shell. Notes 0.5.0 shows the page that is open in its header (Notes › Mine).
 - The manifest brochure (details, pictures, author, licence, link) shows as a full page in the plugin detail; the official plugins now come with pictures and texts.
 
 - `mountCrud` can draw the items itself (`views`: list, cards or board, with a switch) next to a detail panel and a reading pane (`reader`); `avatar`, `chip` and `el` are shared helpers.

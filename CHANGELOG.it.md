@@ -47,6 +47,7 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
 - Un plugin può chiamare un servizio esterno con la chiave impostata da un Administrator: `http.fetch` accetta una `key` (un servizio di `[[service_keys]]`) e l'host la aggiunge come bearer token; l'indirizzo può essere quello impostato in Chiavi dei servizi esterni (`address = true`). Le richieste dei plugin passano dalla stessa protezione dell'anteprima delle pagine (solo indirizzi pubblici). L'SDK ha `ctx.http().fetch_with_key(...)`.
 - Note traduce una nota con un servizio di traduzione (Traduci la nota, sotto la nota), come esempio.
+- I pulsanti distruttivi dei plugin (Elimina) restano ben leggibili in modalità scura, come nella shell. Note 0.5.0 mostra nell'intestazione la pagina aperta (Note › Le mie note).
 - La brochure del manifest (descrizione, immagini, autore, licenza, link) appare come pagina completa nel dettaglio del plugin; i plugin ufficiali ora hanno immagini e testi.
 
 - `mountCrud` può disegnare da sé gli elementi (`views`: elenco, schede o bacheca, con un selettore) accanto a un pannello di dettaglio e a un pannello di lettura (`reader`); `avatar`, `chip` ed `el` sono funzioni condivise.
