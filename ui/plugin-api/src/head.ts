@@ -2,7 +2,10 @@
  *  border): the title with a line under it at the left, the actions at the right, and under it, if there are any,
  *  the bar of the filters. The header never scrolls: the page below it (`.msk-body`) does. */
 export interface PageHead {
+  /** the page (the entry of the navigation of the shell) */
   title: string
+  /** the page of the navigation that is open inside it (a subsection): shown after the title, «Page › Subsection» */
+  section?: string
   /** the line under the title (a count, a path): a node the plugin updates, or a text */
   sub?: Node | string
   /** buttons and menus at the right of the title */
@@ -21,7 +24,12 @@ export function pageHead(o: PageHead): HTMLElement {
   // the page does not scroll as a whole: the header and the bar stay, `.msk-body` scrolls
   document.documentElement.classList.add('msk-fill')
   const h1 = el('h1', '', o.title)
-  const text = el('div', 'msk-ptitle', h1)
+  const line = el('div', 'msk-pline', h1)
+  if (o.section) {
+    h1.classList.add('parent')
+    line.append(el('span', 'msk-psep', '›'), el('span', 'msk-psection', o.section))
+  }
+  const text = el('div', 'msk-ptitle', line)
   if (o.sub !== undefined) text.append(typeof o.sub === 'string' ? el('div', 'msk-psub', o.sub) : o.sub)
   if (o.sub instanceof HTMLElement) o.sub.classList.add('msk-psub')
   const head = el('div', 'msk-pagehead', text)

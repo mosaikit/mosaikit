@@ -63,8 +63,12 @@ html.msk-fill #app { padding: 0; height: 100%; display: flex; flex-direction: co
 .msk-headwrap { flex: none; position: relative; z-index: 20; background: var(--bg); font-family: var(--msk-font, var(--font-ui)); }
 .msk-pagehead { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; min-height: 57px; padding: 8px 24px; border-bottom: 1px solid var(--line); }
 .msk-ptitle { min-width: 0; flex: 1; }
+.msk-pline { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.msk-pline h1.parent { font-weight: 500; color: var(--dim); flex: 0 1 auto; min-width: 0; }
+.msk-psep { color: var(--dim); flex: none; }
+.msk-psection { font-size: 16px; font-weight: 600; line-height: 24px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .msk-pagehead h1 { margin: 0; font-size: 16px; font-weight: 600; line-height: 24px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.msk-psub { font-size: 12px; line-height: 16px; color: var(--dim); font-family: inherit; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.msk-pagehead .msk-psub { font-size: 12px; line-height: 16px; color: var(--dim); font-family: inherit !important; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .msk-pagehead .msk-pacts { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .msk-filterbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 6px 24px; border-bottom: 1px solid var(--line); }
 .msk-filterbar .msk-filter { max-width: 280px; }

@@ -12,6 +12,8 @@ import type { ExtensionView, FieldDecl, Row, Values } from './protocol.ts'
 
 export interface CrudOptions {
   title?: string
+  /** the page of the navigation of the shell it is open at (a subsection): the header reads «title › section» */
+  section?: string
   /** fields to show in the table (default: the fields that are not hidden, at most 5) */
   columns?: string[]
   /** label for "new" (default "New") */
@@ -165,7 +167,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   const body = pageBody(h('div', { class: 'msk-tablewrap' }, table), morebar, form)
   root.replaceChildren(
     // the header and the filters never scroll: the table, the foot and the form do
-    pageHead({ title: opts.title ?? resource, sub: count, actions: [btnNew], filters: [filter] }),
+    pageHead({ title: opts.title ?? resource, section: opts.section, sub: count, actions: [btnNew], filters: [filter] }),
     body,
   )
   // the rest of the rows come as the foot of the table comes into view
