@@ -34,7 +34,7 @@ function Gallery({ p }: { p: AdminPlugin }) {
   })
   if (!shots.length) return null
   return (
-    <section className="grid gap-3" data-testid="plugin-gallery" aria-label={t('Pictures')}>
+    <section className="grid min-w-0 gap-3" data-testid="plugin-gallery" aria-label={t('Pictures')}>
       <div className="relative overflow-hidden rounded-xl border bg-muted">
         <button type="button" className="group block w-full cursor-zoom-in" aria-label={t('Enlarge the picture')} onClick={() => setOpen(true)}>
           <img className="mx-auto max-h-[26rem] w-full object-contain" src={src(shots[shot] ?? shots[0])} alt={alt(shot)} />
@@ -87,7 +87,7 @@ function Gallery({ p }: { p: AdminPlugin }) {
 }
 
 function Chip({ children }: { children: ReactNode }) {
-  return <span className="rounded-full border bg-muted/50 px-2.5 py-0.5 text-xs">{children}</span>
+  return <span className="max-w-full rounded-full border bg-muted/50 px-2.5 py-0.5 text-xs break-words">{children}</span>
 }
 
 /** What it needs and may do, in short (the full list is in the tab «What it asks»). */
@@ -117,7 +117,7 @@ export function Brochure({ p, kind, notes, aside }: { p: AdminPlugin; kind: stri
   const paragraphs = (p.details ?? '').split(/\n\s*\n/).map((x) => x.trim()).filter(Boolean)
   const nd = <span className="text-muted-foreground">{t('not declared')}</span>
   return (
-    <div className="grid gap-6" data-testid="plugin-brochure">
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6" data-testid="plugin-brochure">
       <header className="flex flex-wrap items-center gap-5 rounded-2xl border bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-6 max-[620px]:p-4">
         <span className="flex size-20 shrink-0 items-center justify-center rounded-2xl border bg-card shadow-sm max-[620px]:size-16">
           <AppIcon id={p.id} name={p.icon_name} className="size-10 text-primary max-[620px]:size-8" />
@@ -138,7 +138,7 @@ export function Brochure({ p, kind, notes, aside }: { p: AdminPlugin; kind: stri
           </div>
         </div>
         {p.homepage && (
-          <Button asChild variant="outline">
+          <Button asChild variant="outline" className="max-[620px]:w-full">
             <a href={p.homepage} target="_blank" rel="noopener noreferrer">
               <ExternalLink />
               {t('More information')}
@@ -147,8 +147,8 @@ export function Brochure({ p, kind, notes, aside }: { p: AdminPlugin; kind: stri
         )}
       </header>
       <Gallery p={p} />
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
-        <div className="grid gap-6">
+      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
+        <div className="grid min-w-0 gap-6">
           {paragraphs.length > 0 && (
             <section className="grid gap-2">
               <h3 className="text-sm font-semibold">{t('About')}</h3>
@@ -172,10 +172,10 @@ export function Brochure({ p, kind, notes, aside }: { p: AdminPlugin; kind: stri
             </section>
           )}
         </div>
-        <aside className="grid gap-4">
-          <div className="grid gap-3 rounded-xl border bg-card p-4">
+        <aside className="grid min-w-0 gap-4">
+          <div className="grid min-w-0 gap-3 rounded-xl border bg-card p-4">
             <h3 className="text-sm font-semibold">{t('Publisher')}</h3>
-            <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 text-sm">
+            <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm [&>dd]:min-w-0 [&>dd]:break-words">
               <dt className="text-muted-foreground">{t('Author')}</dt>
               <dd>{p.author ?? nd}</dd>
               <dt className="text-muted-foreground">{t('Licence')}</dt>

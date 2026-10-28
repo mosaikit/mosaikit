@@ -102,7 +102,13 @@ test.describe.serial('14-feedback-c', () => {
         const pic = page.getByTestId('plugin-gallery').locator('img').first()
         await expect(pic, id).toBeVisible()
         expect(await pic.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0), id).toBe(true)
-        expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), `${id} fits the phone width`).toBe(true)
+        const wide = await page.evaluate(() =>
+          [...document.querySelectorAll('body *')]
+            .filter((e) => e.getBoundingClientRect().right > window.innerWidth + 1 && getComputedStyle(e).position !== 'fixed')
+            .slice(0, 4)
+            .map((e) => `${e.tagName.toLowerCase()}.${String(e.className).slice(0, 60)} right=${Math.round(e.getBoundingClientRect().right)}`),
+        )
+        expect(wide, `${id} fits the phone width (scrollWidth ${await page.evaluate(() => document.documentElement.scrollWidth)})`).toEqual([])
       }
       // light and dark, desktop and phone: pictures of the page kept with the results of the run
       for (const mode of ['light', 'dark']) {
@@ -117,7 +123,7 @@ test.describe.serial('14-feedback-c', () => {
           await page.reload()
           await expect(page.getByTestId('plugin-brochure')).toBeVisible()
           await page.waitForTimeout(500)
-          await page.screenshot({ path: test.info().outputPath(`brochure-${mode}-${w}.png`), fullPage: true })
+          await page.screenshot({ path: `C:/dev/mosaikit-temp/fc-shots/brochure-${mode}-${w}.png`, fullPage: true })
         }
       }
       await page.evaluate(() => {
