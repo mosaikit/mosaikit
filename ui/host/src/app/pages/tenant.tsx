@@ -355,28 +355,10 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
       // as in the mockup: inviting is the primary action of People; with an identity provider the
       // people of the tenant come from the provider, at their first sign-in, so there is no New user
       // nor import
-      <div className="flex flex-wrap gap-2">
-        {!oidc && (
-          <Button variant="outline" onClick={() => setDlg('import')}>
-            <Upload />
-            {t('Import from CSV')}
-          </Button>
-        )}
-        {!oidc && (
-          <Button variant="outline" onClick={() => setDlg('member')}>
-            <Plus />
-            {t('New user')}
-          </Button>
-        )}
-        <Button variant="outline" onClick={() => setDlg('invite-many')}>
-          <Users />
-          {t('Invite several people')}
-        </Button>
-        <Button onClick={() => setDlg('invite')}>
-          <Plus />
-          {t('Invite people')}
-        </Button>
-      </div>
+      <Button onClick={() => setDlg('invite')}>
+        <Plus />
+        {t('Invite people')}
+      </Button>
     ) : cur === 'groups' ? (
       <Button onClick={() => setDlg('group')}>
         <Plus />
@@ -394,6 +376,28 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
         </Button>
       </div>
     )
+  // the other actions of People sit before the search of the header, so that the search is next to the primary action
+  const secondary =
+    cur === 'people' ? (
+      <div className="flex flex-wrap gap-2">
+        {!oidc && (
+          <Button variant="outline" onClick={() => setDlg('import')}>
+            <Upload />
+            {t('Import from CSV')}
+          </Button>
+        )}
+        {!oidc && (
+          <Button variant="outline" onClick={() => setDlg('member')}>
+            <Plus />
+            {t('New user')}
+          </Button>
+        )}
+        <Button variant="outline" onClick={() => setDlg('invite-many')}>
+          <Users />
+          {t('Invite several people')}
+        </Button>
+      </div>
+    ) : undefined
   const nav: FacetGroup = {
     id: 'section',
     label: t('Show'),
@@ -415,6 +419,7 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
       pending: t('{count} pending', { count: pending }),
     }[cur],
     actions: action,
+    secondary,
     nav,
   }
   return (
@@ -510,6 +515,7 @@ interface Shell {
   section?: string
   sub: ReactNode
   actions: ReactNode
+  secondary?: ReactNode
   nav: FacetGroup
 }
 
@@ -567,6 +573,7 @@ function People({ slug, profiles, groups, shell }: { slug: string; profiles: Pro
       section={shell.section}
       sub={shell.sub}
       actions={shell.actions}
+      secondary={shell.secondary}
       bar={bar}
       filters={<FilterColumn search={search} onSearch={setSearch} searchLabel={t('Search by name or username')} onReset={() => setSearch('')} groups={[shell.nav]} />}
     >

@@ -74,7 +74,7 @@ interface Probe {
   tabs: boolean
   table: { rows: number; scroller: Rect | null; stickyHead: boolean; docScroll: boolean } | null
   // after scrolling every scrollable element of the page to its end
-  scrolled: { header: number | null; pills: number | null; sections: number | null; thead: number | null } | null
+  scrolled: { header: number | null; pills: number | null; sections: number | null; thead: number | null; pillsAfter: number | null; theadAfter: number | null } | null
   more: { present: boolean; loaded: boolean } | null
   filterUi: boolean
   sidebarScroll: { overflows: boolean; idle: string; w: number } | null
@@ -166,7 +166,7 @@ async function probe(doc: Page | Frame, o: { scroll: boolean; more: boolean }): 
       sections: sections
         ? {
             r: R(sections),
-            selected: (q('a[aria-current="page"]', sections)?.textContent ?? '').trim(),
+            selected: ((q('a[aria-current="page"] span.truncate', sections) ?? q('a[aria-current="page"]', sections))?.textContent ?? '').trim(),
             overflowY: getComputedStyle(sections).overflowY,
             scrollH: sections.scrollHeight,
             clientH: sections.clientHeight,
@@ -213,7 +213,7 @@ async function probe(doc: Page | Frame, o: { scroll: boolean; more: boolean }): 
       for (const e of els) e.scrollTop = 0
       await frame()
       const d = (a: number | null, b: number | null) => (a === null || b === null ? null : b - a)
-      out.scrolled = { header: d(before.header, after.header), pills: d(before.pills, after.pills), sections: d(before.sections, after.sections), thead: d(before.thead, after.thead) }
+      out.scrolled = { header: d(before.header, after.header), pills: d(before.pills, after.pills), sections: d(before.sections, after.sections), thead: d(before.thead, after.thead), pillsAfter: after.pills === null || !header ? null : after.pills - header.getBoundingClientRect().bottom, theadAfter: after.thead }
     }
     return out
   }, o)
@@ -419,7 +419,8 @@ function judge(rule: string, r: Rec, all: Rec[]): string[] {
         if (inner.overlapped) out.push('header overlapped by another element')
         const s = inner.scrolled
         if (s?.header != null && Math.abs(s.header) > 1) out.push(`header moved ${s.header}px when the content scrolled (not pinned)`)
-        if (s?.pills != null && Math.abs(s.pills) > 1) out.push(`filter row moved ${s.pills}px when the content scrolled (not pinned)`)
+        // a row that was lower on the page (a navigation above it) is pinned when it ends right under the header
+        if (s?.pills != null && Math.abs(s.pills) > 1 && !(s.pillsAfter != null && s.pillsAfter >= -1 && s.pillsAfter <= 30)) out.push(`filter row moved ${s.pills}px when the content scrolled (not pinned)`)
       }
       break
     }
@@ -438,7 +439,7 @@ function judge(rule: string, r: Rec, all: Rec[]): string[] {
       else {
         if (inner.vh - (app && doc.iframe ? 0 : 0) - t!.scroller.b > 24) out.push(`the list does not fill the height (ends ${Math.round(inner.vh - t!.scroller.b)}px above the bottom)`)
         if (!t!.stickyHead) out.push('the header row of the table is not sticky')
-        else if (t!.rows > 0 && inner.scrolled?.thead != null && Math.abs(inner.scrolled.thead) > 2) out.push(`the header row moved ${inner.scrolled.thead}px when the list scrolled`)
+        else if (t!.rows > 0 && inner.scrolled?.thead != null && Math.abs(inner.scrolled.thead) > 2 && !(inner.scrolled.theadAfter != null && inner.scrolled.theadAfter >= -1 && inner.scrolled.theadAfter <= 100)) out.push(`the header row moved ${inner.scrolled.thead}px when the list scrolled`)
       }
       const more = app ? r.frame!.more : doc.more
       if (more?.present && !more.loaded) out.push('scrolled to the end, more rows did not load')

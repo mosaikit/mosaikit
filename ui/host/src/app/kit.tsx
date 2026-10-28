@@ -3,139 +3,72 @@
 // object); save bar only with changes; settings managed by the platform; dialogs
 // with a form, empty and loading states.
 
-import {
-  useEffect,
-  useRef,
-  useState,
-  useSyncExternalStore,
-  type FormEvent,
-  type ReactNode,
-} from "react";
-import { ChevronRight, Loader2, Lock, MoreHorizontal } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { cn } from "@/lib/utils";
-import type { PluginKpi } from "../types.ts";
-import { t } from "./i18n.ts";
-import { go } from "./router.ts";
+import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react'
+import { ChevronRight, Loader2, Lock, MoreHorizontal } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { cn } from '@/lib/utils'
+import type { PluginKpi } from '../types.ts'
+import { t } from './i18n.ts'
+import { go } from './router.ts'
 
 export interface Crumb {
-  label: string;
-  href?: string;
+  label: string
+  href?: string
 }
 
 /** The subsection selected in the page (the `Sections` of the page say it): the header shows it after the title,
  *  «Page › Subsection», so that both are always in sight. */
-let headerSection: string | null = null;
-const sectionListeners = new Set<() => void>();
+let headerSection: string | null = null
+const sectionListeners = new Set<() => void>()
 function setHeaderSection(v: string | null) {
-  if (headerSection === v) return;
-  headerSection = v;
-  sectionListeners.forEach((l) => l());
+  if (headerSection === v) return
+  headerSection = v
+  sectionListeners.forEach((l) => l())
 }
 const useHeaderSection = () =>
   useSyncExternalStore(
     (l) => (sectionListeners.add(l), () => void sectionListeners.delete(l)),
     () => headerSection,
-  );
+  )
 
 /** Header of the page: breadcrumb, title with the status badge, a single primary action and,
  *  in the «⋯» menu, the other actions and the change of state (DropdownMenu items). */
-export function PageHeader({
-  title,
-  section: own,
-  sub,
-  crumbs,
-  badge,
-  lead,
-  bar,
-  filter,
-  actions,
-  more,
-}: {
-  title: string;
-  section?: string;
-  sub?: ReactNode;
-  crumbs?: Crumb[];
-  badge?: ReactNode;
-  lead?: ReactNode;
-  bar?: ReactNode;
-  filter?: ReactNode;
-  actions?: ReactNode;
-  more?: ReactNode;
-}) {
-  const stored = useHeaderSection();
+export function PageHeader({ title, section: own, sub, crumbs, badge, lead, bar, filter, actions, more }: { title: string; section?: string; sub?: ReactNode; crumbs?: Crumb[]; badge?: ReactNode; lead?: ReactNode; bar?: ReactNode; filter?: ReactNode; actions?: ReactNode; more?: ReactNode }) {
+  const stored = useHeaderSection()
   // the subsection selected in the page (given, or announced by its `Sections`)
-  const section = own ?? stored;
+  const section = own ?? stored
   // the height of the header is the offset of what is pinned under it (--msk-head)
-  const box = useRef<HTMLDivElement>(null);
+  const box = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    const el = box.current;
-    if (!el || typeof ResizeObserver === "undefined") return;
-    const set = () =>
-      document.documentElement.style.setProperty(
-        "--msk-head",
-        `${Math.round(el.getBoundingClientRect().height)}px`,
-      );
-    set();
-    const ro = new ResizeObserver(set);
-    ro.observe(el);
+    const el = box.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const set = () => document.documentElement.style.setProperty('--msk-head', `${Math.round(el.getBoundingClientRect().height)}px`)
+    set()
+    const ro = new ResizeObserver(set)
+    ro.observe(el)
     return () => {
-      ro.disconnect();
-      document.documentElement.style.removeProperty("--msk-head");
-    };
-  }, []);
+      ro.disconnect()
+      document.documentElement.style.removeProperty('--msk-head')
+    }
+  }, [])
   return (
     // under the band, and it stays there while the page scrolls
-    <div
-      ref={box}
-      data-tour="page-header"
-      className="msk-page-header sticky top-(--msk-top) z-10 flex min-h-(--msk-head) flex-wrap items-center gap-3 border-b bg-background px-6 py-2 max-[620px]:px-4"
-    >
+    <div ref={box} data-tour="page-header" className="msk-page-header sticky top-(--msk-top) z-10 flex min-h-(--msk-head) flex-wrap items-center gap-3 border-b bg-background px-6 py-2 max-[620px]:px-4">
       {lead}
       <div className="min-w-0 flex-1">
         {crumbs && crumbs.length > 0 && (
-          <nav
-            aria-label={t("Breadcrumb")}
-            className="mb-0.5 flex min-w-0 items-center gap-1 text-xs text-muted-foreground"
-          >
+          <nav aria-label={t('Breadcrumb')} className="mb-0.5 flex min-w-0 items-center gap-1 text-xs text-muted-foreground">
             {crumbs.map((c, i) => (
               <span key={i} className="flex min-w-0 items-center gap-1">
                 {c.href ? (
-                  <a
-                    href={c.href}
-                    className="truncate hover:text-foreground hover:underline"
-                  >
+                  <a href={c.href} className="truncate hover:text-foreground hover:underline">
                     {c.label}
                   </a>
                 ) : (
@@ -147,26 +80,13 @@ export function PageHeader({
           </nav>
         )}
         <div className="flex min-w-0 items-center gap-2">
-          <h1
-            className={cn(
-              "truncate text-base font-semibold",
-              section && "min-w-0 shrink font-medium text-muted-foreground",
-            )}
-          >
-            {title}
-          </h1>
+          <h1 className={cn('truncate text-base font-semibold', section && 'min-w-0 shrink font-medium text-muted-foreground')}>{title}</h1>
           {section && (
             <>
-              <span
-                className="shrink-0 text-base text-muted-foreground"
-                aria-hidden="true"
-              >
+              <span className="shrink-0 text-base text-muted-foreground" aria-hidden="true">
                 ›
               </span>
-              <span
-                data-testid="header-section"
-                className="min-w-0 truncate text-base font-semibold"
-              >
+              <span data-testid="header-section" className="min-w-0 truncate text-base font-semibold">
                 {section}
               </span>
             </>
@@ -177,20 +97,13 @@ export function PageHeader({
       </div>
       {bar}
       {(filter || actions || more) && (
-        <div
-          data-tour="page-actions"
-          className="flex flex-wrap items-center gap-2"
-        >
+        <div data-tour="page-actions" className="flex flex-wrap items-center gap-2">
           {filter}
           {actions}
           {more && (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  aria-label={t("More actions")}
-                >
+                <Button variant="outline" size="icon" aria-label={t('More actions')}>
                   <MoreHorizontal />
                 </Button>
               </DropdownMenuTrigger>
@@ -202,69 +115,36 @@ export function PageHeader({
         </div>
       )}
     </div>
-  );
+  )
 }
 
 /** Horizontal tabs of the detail of an object (person, group, tenant, plugin). */
-export function Tabs({
-  tabs,
-  current,
-  href,
-}: {
-  tabs: { id: string; label: string; count?: number }[];
-  current: string;
-  href: (id: string) => string;
-}) {
+export function Tabs({ tabs, current, href }: { tabs: { id: string; label: string; count?: number }[]; current: string; href: (id: string) => string }) {
   return (
-    <nav
-      aria-label={t("Tabs")}
-      className="sticky top-[calc(var(--msk-top)+var(--msk-head))] z-[9] flex gap-1 overflow-x-auto border-b bg-background px-6 max-[620px]:px-4"
-    >
+    <nav aria-label={t('Tabs')} className="sticky top-[calc(var(--msk-top)+var(--msk-head))] z-[9] flex gap-1 overflow-x-auto border-b bg-background px-6 max-[620px]:px-4">
       {tabs.map((t) => (
         <a
           key={t.id}
           href={href(t.id)}
-          aria-current={t.id === current ? "page" : undefined}
+          aria-current={t.id === current ? 'page' : undefined}
           className={cn(
-            "msk-tab relative flex h-10 shrink-0 items-center gap-1.5 px-3 text-sm text-muted-foreground hover:text-foreground",
-            t.id === current &&
-              "font-medium text-foreground after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary after:content-['']",
+            'msk-tab relative flex h-10 shrink-0 items-center gap-1.5 px-3 text-sm text-muted-foreground hover:text-foreground',
+            t.id === current && "font-medium text-foreground after:absolute after:inset-x-2 after:bottom-0 after:h-0.5 after:rounded-full after:bg-primary after:content-['']",
           )}
         >
           {t.label}
-          {t.count != null && (
-            <span className="text-xs tabular-nums">{t.count}</span>
-          )}
+          {t.count != null && <span className="text-xs tabular-nums">{t.count}</span>}
         </a>
       ))}
     </nav>
-  );
+  )
 }
 
 /** Pill filters above a list («Show: All · Public»). */
 /** `first`: the row opens its page (first child of the padded content): it sits right under the header and stays there. */
-export function Pills({
-  items,
-  value,
-  onChange,
-  label = t("Show"),
-  first,
-}: {
-  items: { id: string; label: string; count?: number }[];
-  value: string;
-  onChange: (id: string) => void;
-  label?: string;
-  first?: boolean;
-}) {
+export function Pills({ items, value, onChange, label = t('Show'), first }: { items: { id: string; label: string; count?: number }[]; value: string; onChange: (id: string) => void; label?: string; first?: boolean }) {
   return (
-    <div
-      role="radiogroup"
-      aria-label={label}
-      className={cn(
-        "msk-pills sticky top-[calc(var(--msk-top)+var(--msk-head))] z-[5] -mx-1 flex flex-wrap items-center gap-1.5 bg-background px-1 py-1.5",
-        first && "msk-pills-top",
-      )}
-    >
+    <div role="radiogroup" aria-label={label} className={cn('msk-pills sticky top-[calc(var(--msk-top)+var(--msk-head))] z-[5] -mx-1 flex flex-wrap items-center gap-1.5 bg-background px-1 py-1.5', first && 'msk-pills-top')}>
       <span className="mr-1 text-xs text-muted-foreground">{label}</span>
       {items.map((it) => (
         <button
@@ -274,127 +154,80 @@ export function Pills({
           aria-checked={it.id === value}
           onClick={() => onChange(it.id)}
           className={cn(
-            "h-7 rounded-full border px-3 text-xs outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring",
-            it.id === value &&
-              "border-primary bg-primary text-primary-foreground hover:bg-primary",
+            'h-7 rounded-full border px-3 text-xs outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring',
+            it.id === value && 'border-primary bg-primary text-primary-foreground hover:bg-primary',
           )}
         >
           {it.label}
-          {it.count != null && (
-            <span
-              className={cn(
-                "ml-1.5 tabular-nums",
-                it.id !== value && "opacity-80",
-              )}
-            >
-              {it.count}
-            </span>
-          )}
+          {it.count != null && <span className={cn("ml-1.5 tabular-nums", it.id !== value && "opacity-80")}>{it.count}</span>}
         </button>
       ))}
     </div>
-  );
+  )
 }
 
 /** «Unsaved changes» bar: it appears only when something changed. */
-export function SaveBar({
-  dirty,
-  busy,
-  onSave,
-  onCancel,
-}: {
-  dirty: boolean;
-  busy?: boolean;
-  onSave: () => void;
-  onCancel: () => void;
-}) {
-  if (!dirty) return null;
+export function SaveBar({ dirty, busy, onSave, onCancel }: { dirty: boolean; busy?: boolean; onSave: () => void; onCancel: () => void }) {
+  if (!dirty) return null
   return (
-    <div
-      role="region"
-      aria-label={t("Unsaved changes")}
-      className="sticky bottom-0 z-10 -mx-6 mt-6 flex items-center gap-3 border-t bg-background/95 px-6 py-3 backdrop-blur max-[620px]:-mx-4 max-[620px]:px-4"
-    >
+    <div role="region" aria-label={t('Unsaved changes')} className="sticky bottom-0 z-10 -mx-6 mt-6 flex items-center gap-3 border-t bg-background/95 px-6 py-3 backdrop-blur max-[620px]:-mx-4 max-[620px]:px-4">
       {/* at the left: the messages (toasts) come at the bottom right and must not cover the buttons */}
-      <span className="text-sm font-medium">{t("Unsaved changes")}</span>
+      <span className="text-sm font-medium">{t('Unsaved changes')}</span>
       <Button variant="outline" onClick={onCancel} disabled={busy}>
-        {t("Cancel")}
+        {t('Cancel')}
       </Button>
       <Button onClick={onSave} disabled={busy}>
         {busy && <Loader2 className="animate-spin" />}
-        {t("Save")}
+        {t('Save')}
       </Button>
     </div>
-  );
+  )
 }
 
 /** A setting managed by the platform: the value read only, with the padlock. */
-export function Locked({
-  label,
-  value,
-  hint,
-}: {
-  label: string;
-  value: ReactNode;
-  hint?: ReactNode;
-}) {
+export function Locked({ label, value, hint }: { label: string; value: ReactNode; hint?: ReactNode }) {
   return (
     <div className="flex items-start justify-between gap-4 rounded-lg border bg-muted/40 p-3">
       <span className="min-w-0">
         <b className="block text-sm">{label}</b>
         <span className="text-sm">{value}</span>
-        {hint && (
-          <span className="block text-xs text-muted-foreground">{hint}</span>
-        )}
+        {hint && <span className="block text-xs text-muted-foreground">{hint}</span>}
       </span>
       <Badge variant="secondary" className="shrink-0 gap-1 font-normal">
         <Lock className="size-3" />
-        {t("Managed by the Administrator")}
+        {t('Managed by the Administrator')}
       </Badge>
     </div>
-  );
+  )
 }
 
 export interface Section {
-  id: string;
-  label: string;
-  icon: ReactNode;
-  count?: number;
+  id: string
+  label: string
+  icon: ReactNode
+  count?: number
   /** group heading before the section */
-  group?: string;
+  group?: string
 }
 
 /** A page with sections: the list on the left (a drop-down menu on the phone), one section at a time. */
-export function Sections({
-  sections,
-  current,
-  href,
-  children,
-}: {
-  sections: Section[];
-  current: string;
-  href: (id: string) => string;
-  children: ReactNode;
-}) {
-  const label = sections.find((x) => x.id === current)?.label ?? null;
+export function Sections({ sections, current, href, children }: { sections: Section[]; current: string; href: (id: string) => string; children: ReactNode }) {
+  const label = sections.find((x) => x.id === current)?.label ?? null
   useEffect(() => {
-    setHeaderSection(label);
-    return () => setHeaderSection(null);
-  }, [label]);
+    setHeaderSection(label)
+    return () => setHeaderSection(null)
+  }, [label])
   return (
     <div className="flex min-h-0 flex-1 max-[760px]:flex-col">
       <nav
         data-tour="sections"
-        aria-label={t("Sections")}
+        aria-label={t('Sections')}
         // the list of sections stays where it is while the page scrolls; if it does not fit it scrolls by itself
         className="msk-hoverscroll sticky top-[calc(var(--msk-top)+var(--msk-head))] h-[calc(100svh-var(--msk-top)-var(--msk-head))] w-60 shrink-0 self-start overflow-y-auto border-r bg-pane p-3 max-[760px]:static max-[760px]:self-stretch max-[760px]:h-auto max-[760px]:w-auto max-[760px]:border-r-0 max-[760px]:border-b"
       >
         <div className="hidden max-[760px]:block">
           <Select value={current} onValueChange={(v) => go(href(v))}>
-            <SelectTrigger
-              className="w-full bg-background"
-              aria-label={t("Section")}
-            >
+            <SelectTrigger className="w-full bg-background" aria-label={t('Section')}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -409,182 +242,106 @@ export function Sections({
         <ul className="grid gap-0.5 max-[760px]:hidden">
           {sections.map((s) => (
             <li key={s.id}>
-              {s.group && (
-                <div className="px-3 pt-3 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase first:pt-0">
-                  {s.group}
-                </div>
-              )}
+              {s.group && <div className="px-3 pt-3 pb-1 text-[11px] font-semibold tracking-wide text-muted-foreground uppercase first:pt-0">{s.group}</div>}
               <a
                 href={href(s.id)}
-                aria-current={s.id === current ? "page" : undefined}
+                aria-current={s.id === current ? 'page' : undefined}
                 className={cn(
-                  "flex h-9 items-center gap-2.5 rounded-md px-3 text-sm text-foreground/85 hover:bg-accent [&>svg]:size-4 [&>svg]:shrink-0",
+                  'flex h-9 items-center gap-2.5 rounded-md px-3 text-sm text-foreground/85 hover:bg-accent [&>svg]:size-4 [&>svg]:shrink-0',
                   // under a group heading the sections are indented
-                  sections.some((x) => x.group) && "pl-5",
-                  s.id === current &&
-                    "bg-primary/10 font-medium text-primary-strong hover:bg-primary/10",
+                  sections.some((x) => x.group) && 'pl-5',
+                  s.id === current && 'bg-primary/10 font-medium text-primary-strong hover:bg-primary/10',
                 )}
               >
                 {s.icon}
                 <span className="flex-1 truncate">{s.label}</span>
-                {s.count != null && (
-                  <span className="text-xs text-muted-foreground tabular-nums">
-                    {s.count}
-                  </span>
-                )}
+                {s.count != null && <span className="text-xs text-muted-foreground tabular-nums">{s.count}</span>}
               </a>
             </li>
           ))}
         </ul>
       </nav>
-      <div className="min-w-0 flex-1 overflow-x-clip p-6 max-[620px]:p-4">
-        {children}
-      </div>
+      <div className="min-w-0 flex-1 overflow-x-clip p-6 max-[620px]:p-4">{children}</div>
     </div>
-  );
+  )
 }
 
 /** The foot of a long list: how many rows are shown of how many. The next page loads by itself when
  *  the foot comes into view (infinite scroll); «Load more» stays for the keyboard and for browsers
  *  without IntersectionObserver. */
-export function MoreRows({
-  shown,
-  total,
-  more,
-  loading,
-  onMore,
-  label,
-}: {
-  shown: number;
-  total: number | null;
-  more: boolean;
-  loading?: boolean;
-  onMore: () => void;
-  label?: string;
-}) {
-  const foot = useRef<HTMLDivElement>(null);
-  const act = useRef(onMore);
+export function MoreRows({ shown, total, more, loading, onMore, label }: { shown: number; total: number | null; more: boolean; loading?: boolean; onMore: () => void; label?: string }) {
+  const foot = useRef<HTMLDivElement>(null)
+  const act = useRef(onMore)
   useEffect(() => {
-    act.current = onMore;
-  });
+    act.current = onMore
+  })
   useEffect(() => {
-    const el = foot.current;
-    if (!el || !more || loading || typeof IntersectionObserver === "undefined")
-      return;
+    const el = foot.current
+    if (!el || !more || loading || typeof IntersectionObserver === 'undefined') return
     // inside a page that scrolls its list, the list is the root (the window does not scroll)
-    const root = el.closest("[data-listscroll]");
-    const io = new IntersectionObserver(
-      (e) => e.some((x) => x.isIntersecting) && act.current(),
-      { root, rootMargin: "200px" },
-    );
-    io.observe(el);
-    return () => io.disconnect();
+    const root = el.closest('[data-listscroll]')
+    const io = new IntersectionObserver((e) => e.some((x) => x.isIntersecting) && act.current(), { root, rootMargin: '200px' })
+    io.observe(el)
+    return () => io.disconnect()
     // a page that arrived and left the foot in view must ask for the next: observe again
-  }, [more, loading, shown]);
-  if (total === 0) return null;
+  }, [more, loading, shown])
+  if (total === 0) return null
   return (
-    <div
-      ref={foot}
-      className="flex flex-wrap items-center justify-center gap-3 py-2 text-sm text-muted-foreground"
-    >
+    <div ref={foot} className="flex flex-wrap items-center justify-center gap-3 py-2 text-sm text-muted-foreground">
       <span className="tabular-nums">
-        {total === null
-          ? t("{shown} loaded", { shown: String(shown) })
-          : t("{shown} of {total}", {
-              shown: String(shown),
-              total: String(total),
-            })}
+        {total === null ? t('{shown} loaded', { shown: String(shown) }) : t('{shown} of {total}', { shown: String(shown), total: String(total) })}
       </span>
       {more && (
         <Button variant="outline" size="sm" disabled={loading} onClick={onMore}>
           {loading && <Loader2 className="animate-spin" />}
-          {label ?? t("Load more")}
+          {label ?? t('Load more')}
         </Button>
       )}
     </div>
-  );
+  )
 }
 
 /** A page whose main part is a list or a table: it never scrolls itself. The header (and the filters) stay on
  *  top, the list (`FillBody`) takes the rest of the height and scrolls inside. */
 export function FillPage({ children }: { children: ReactNode }) {
-  return (
-    <div className="msk-fill flex h-[calc(100svh-var(--msk-top))] min-h-0 flex-col overflow-hidden">
-      {children}
-    </div>
-  );
+  return <div className="msk-fill flex h-[calc(100svh-var(--msk-top))] min-h-0 flex-col overflow-hidden">{children}</div>
 }
 
 /** The scrolling part of a `FillPage`: the tables inside keep their header row in sight and the foot of a
  *  list (`MoreRows`) loads more when it comes into view here. */
-export function FillBody({
-  className,
-  children,
-}: {
-  className?: string;
-  children: ReactNode;
-}) {
+export function FillBody({ className, children }: { className?: string; children: ReactNode }) {
   return (
-    <div
-      data-listscroll
-      className={cn(
-        "msk-listscroll min-h-0 min-w-0 flex-1 overflow-auto",
-        className,
-      )}
-    >
+    <div data-listscroll className={cn('msk-listscroll min-h-0 min-w-0 flex-1 overflow-auto', className)}>
       {children}
     </div>
-  );
+  )
 }
 
 /** A list that is already whole in memory, shown a page at a time: the first `step` rows, then more as the foot comes
  *  into view (or by the button), with the count «shown of total». It starts again from the first page when the
  *  list changes (another filter). No foot when everything fits in the first page. */
-export function Sliced<T>({
-  items,
-  step = 50,
-  children,
-}: {
-  items: T[];
-  step?: number;
-  children: (rows: T[]) => ReactNode;
-}) {
-  const [n, setN] = useState(step);
-  const [prev, setPrev] = useState(items.length);
+export function Sliced<T>({ items, step = 50, children }: { items: T[]; step?: number; children: (rows: T[]) => ReactNode }) {
+  const [n, setN] = useState(step)
+  const [prev, setPrev] = useState(items.length)
   // the list shrank or grew by a filter: back to the first page
   if (prev !== items.length) {
-    setPrev(items.length);
-    if (items.length < n) setN(step);
+    setPrev(items.length)
+    if (items.length < n) setN(step)
   }
-  const rows = items.slice(0, n);
+  const rows = items.slice(0, n)
   return (
     <>
       {children(rows)}
-      {items.length > step && (
-        <MoreRows
-          shown={rows.length}
-          total={items.length}
-          more={rows.length < items.length}
-          onMore={() => setN((x) => x + step)}
-        />
-      )}
+      {items.length > step && <MoreRows shown={rows.length} total={items.length} more={rows.length < items.length} onMore={() => setN((x) => x + step)} />}
     </>
-  );
+  )
 }
 
 /** With a whole page selected and more rows matching: «Select all N». The selection then holds every
  *  row of the filter (up to 10,000), loaded or not; the actions apply to all of them. */
-export function SelectAllRows({
-  selected,
-  total,
-  onAll,
-}: {
-  selected: number;
-  total: number;
-  onAll: () => Promise<void>;
-}) {
-  const [busy, setBusy] = useState(false);
-  if (selected >= total) return null;
+export function SelectAllRows({ selected, total, onAll }: { selected: number; total: number; onAll: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false)
+  if (selected >= total) return null
   return (
     <Button
       variant="link"
@@ -592,13 +349,13 @@ export function SelectAllRows({
       className="h-auto p-0"
       disabled={busy}
       onClick={() => {
-        setBusy(true);
-        void onAll().finally(() => setBusy(false));
+        setBusy(true)
+        void onAll().finally(() => setBusy(false))
       }}
     >
-      {t("Select all {total}", { total: String(total) })}
+      {t('Select all {total}', { total: String(total) })}
     </Button>
-  );
+  )
 }
 
 export function Loading() {
@@ -606,69 +363,48 @@ export function Loading() {
     <div className="flex flex-1 items-center justify-center p-10 text-muted-foreground">
       <Loader2 className="size-5 animate-spin" />
     </div>
-  );
+  )
 }
 
-export function Empty({
-  icon,
-  title,
-  children,
-}: {
-  icon?: ReactNode;
-  title: string;
-  children?: ReactNode;
-}) {
+export function Empty({ icon, title, children }: { icon?: ReactNode; title: string; children?: ReactNode }) {
   return (
     <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground [&>svg]:size-7">
       {icon}
       <b className="text-foreground">{title}</b>
       {children}
     </div>
-  );
+  )
 }
 
 export function ErrorBox({ error }: { error: unknown }) {
-  return (
-    <p className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-      {error instanceof Error ? error.message : String(error)}
-    </p>
-  );
+  return <p className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{error instanceof Error ? error.message : String(error)}</p>
 }
 
 export function StatusBadge({ status }: { status: string }) {
   const map: Record<string, [string, string]> = {
-    active: [t("active"), "bg-ok/10 text-ok"],
-    suspended: [
-      t("suspended"),
-      "bg-destructive/10 text-destructive dark:text-red-300",
-    ],
-    disabled: [
-      t("disabled"),
-      "bg-destructive/10 text-destructive dark:text-red-300",
-    ],
-    pending: [t("pending"), "bg-warn/10 text-warn"],
-    installed: [t("installed"), "bg-warn/10 text-warn"],
-    blocked: [
-      t("blocked"),
-      "bg-destructive/10 text-destructive dark:text-red-300",
-    ],
-  };
-  const [label, cls] = map[status] ?? [status, ""];
+    active: [t('active'), 'bg-ok/10 text-ok'],
+    suspended: [t('suspended'), 'bg-destructive/10 text-destructive dark:text-red-300'],
+    disabled: [t('disabled'), 'bg-destructive/10 text-destructive dark:text-red-300'],
+    pending: [t('pending'), 'bg-warn/10 text-warn'],
+    installed: [t('installed'), 'bg-warn/10 text-warn'],
+    blocked: [t('blocked'), 'bg-destructive/10 text-destructive dark:text-red-300'],
+  }
+  const [label, cls] = map[status] ?? [status, '']
   return (
-    <Badge variant="secondary" className={cn("font-normal", cls)}>
+    <Badge variant="secondary" className={cn('font-normal', cls)}>
       {label}
     </Badge>
-  );
+  )
 }
 
 export interface FieldDef {
-  name: string;
-  label: string;
-  type?: "text" | "password" | "number" | "email";
-  required?: boolean;
-  hint?: string;
-  options?: [string, string][];
-  initial?: string;
+  name: string
+  label: string
+  type?: 'text' | 'password' | 'number' | 'email'
+  required?: boolean
+  hint?: string
+  options?: [string, string][]
+  initial?: string
 }
 
 /** A dialog with a form: the fields are text, password or a choice. */
@@ -681,60 +417,49 @@ export function FormDialog({
   submit,
   onSubmit,
 }: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  title: string;
-  description?: string;
-  fields: FieldDef[];
-  submit: string;
-  onSubmit: (v: Record<string, string>) => Promise<unknown>;
+  open: boolean
+  onOpenChange: (v: boolean) => void
+  title: string
+  description?: string
+  fields: FieldDef[]
+  submit: string
+  onSubmit: (v: Record<string, string>) => Promise<unknown>
 }) {
-  const init = () =>
-    Object.fromEntries(
-      fields.map((f) => [
-        f.name,
-        f.initial ?? (f.options ? f.options[0][0] : ""),
-      ]),
-    );
-  const [v, setV] = useState<Record<string, string>>(init);
-  const [busy, setBusy] = useState(false);
+  const init = () => Object.fromEntries(fields.map((f) => [f.name, f.initial ?? (f.options ? f.options[0][0] : '')]))
+  const [v, setV] = useState<Record<string, string>>(init)
+  const [busy, setBusy] = useState(false)
   async function send(e: FormEvent) {
-    e.preventDefault();
-    setBusy(true);
+    e.preventDefault()
+    setBusy(true)
     try {
-      await onSubmit(v);
-      onOpenChange(false);
-      setV(init());
+      await onSubmit(v)
+      onOpenChange(false)
+      setV(init())
     } catch {
       /* the caller shows the error message (toast) */
     } finally {
-      setBusy(false);
+      setBusy(false)
     }
   }
   return (
     <Dialog
       open={open}
       onOpenChange={(o) => {
-        if (o) setV(init());
-        onOpenChange(o);
+        if (o) setV(init())
+        onOpenChange(o)
       }}
     >
       <DialogContent>
         <form onSubmit={(e) => void send(e)} className="grid gap-4">
           <DialogHeader>
             <DialogTitle>{title}</DialogTitle>
-            {description && (
-              <DialogDescription>{description}</DialogDescription>
-            )}
+            {description && <DialogDescription>{description}</DialogDescription>}
           </DialogHeader>
           {fields.map((f) => (
             <div key={f.name} className="grid gap-1.5">
               <Label htmlFor={`f-${f.name}`}>{f.label}</Label>
               {f.options ? (
-                <Select
-                  value={v[f.name]}
-                  onValueChange={(x) => setV({ ...v, [f.name]: x })}
-                >
+                <Select value={v[f.name]} onValueChange={(x) => setV({ ...v, [f.name]: x })}>
                   <SelectTrigger id={`f-${f.name}`} className="w-full">
                     <SelectValue />
                   </SelectTrigger>
@@ -749,26 +474,20 @@ export function FormDialog({
               ) : (
                 <Input
                   id={`f-${f.name}`}
-                  type={f.type ?? "text"}
-                  autoComplete={f.type === "password" ? "new-password" : "off"}
-                  minLength={f.type === "password" ? 10 : undefined}
+                  type={f.type ?? 'text'}
+                  autoComplete={f.type === 'password' ? 'new-password' : 'off'}
+                  minLength={f.type === 'password' ? 10 : undefined}
                   required={f.required}
-                  value={v[f.name] ?? ""}
+                  value={v[f.name] ?? ''}
                   onChange={(e) => setV({ ...v, [f.name]: e.target.value })}
                 />
               )}
-              {f.hint && (
-                <p className="text-xs text-muted-foreground">{f.hint}</p>
-              )}
+              {f.hint && <p className="text-xs text-muted-foreground">{f.hint}</p>}
             </div>
           ))}
           <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-            >
-              {t("Cancel")}
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+              {t('Cancel')}
             </Button>
             <Button type="submit" disabled={busy}>
               {busy && <Loader2 className="animate-spin" />}
@@ -778,99 +497,66 @@ export function FormDialog({
         </form>
       </DialogContent>
     </Dialog>
-  );
+  )
 }
 
-export function Kpi({
-  label,
-  value,
-  hint,
-  onClick,
-}: {
-  label: string;
-  value: ReactNode;
-  hint?: ReactNode;
-  onClick?: () => void;
-}) {
+export function Kpi({ label, value, hint, onClick }: { label: string; value: ReactNode; hint?: ReactNode; onClick?: () => void }) {
   const body = (
     <>
       <span className="text-xs text-muted-foreground">{label}</span>
       <b className="text-2xl font-semibold tabular-nums">{value}</b>
       {hint && <span className="text-xs text-muted-foreground">{hint}</span>}
     </>
-  );
-  const cls = "flex flex-col gap-1 rounded-xl border bg-card p-4 text-left";
+  )
+  const cls = 'flex flex-col gap-1 rounded-xl border bg-card p-4 text-left'
   return onClick ? (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(cls, "hover:border-primary/50 hover:bg-accent/40")}
-    >
+    <button type="button" onClick={onClick} className={cn(cls, 'hover:border-primary/50 hover:bg-accent/40')}>
       {body}
     </button>
   ) : (
     <div className={cls}>{body}</div>
-  );
+  )
 }
 
 /** A table of any rows (the KPIs of the plugins): the columns are the keys of the first row. */
-export function DataTable({
-  rows,
-  label,
-  columns = {},
-}: {
-  rows: Record<string, unknown>[];
-  label?: string;
-  columns?: Record<string, string>;
-}) {
-  if (!rows.length)
-    return <p className="text-sm text-muted-foreground">{t("No data.")}</p>;
-  const cols = Object.keys(rows[0]);
+export function DataTable({ rows, label, columns = {} }: { rows: Record<string, unknown>[]; label?: string; columns?: Record<string, string> }) {
+  if (!rows.length) return <p className="text-sm text-muted-foreground">{t('No data.')}</p>
+  const cols = Object.keys(rows[0])
   return (
     <Sliced items={rows} step={25}>
       {(shown) => (
-        <div className="overflow-x-auto rounded-xl border bg-card">
-          <Table aria-label={label}>
-            <TableHeader>
-              <TableRow>
-                {cols.map((c) => (
-                  <TableHead
-                    key={c}
-                    className={columns[c] ? undefined : "capitalize"}
-                  >
-                    {columns[c] ?? c.replace(/_/g, " ")}
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {shown.map((r, i) => (
-                <TableRow key={i}>
-                  {cols.map((c) => (
-                    <TableCell
-                      key={c}
-                      className={
-                        typeof r[c] === "number"
-                          ? "text-right tabular-nums"
-                          : undefined
-                      }
-                    >
-                      {r[c] === null || r[c] === undefined ? "—" : String(r[c])}
-                    </TableCell>
-                  ))}
-                </TableRow>
+    <div className="overflow-x-auto rounded-xl border bg-card">
+      <Table aria-label={label}>
+        <TableHeader>
+          <TableRow>
+            {cols.map((c) => (
+              <TableHead key={c} className={columns[c] ? undefined : 'capitalize'}>
+                {columns[c] ?? c.replace(/_/g, ' ')}
+              </TableHead>
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {shown.map((r, i) => (
+            <TableRow key={i}>
+              {cols.map((c) => (
+                <TableCell key={c} className={typeof r[c] === 'number' ? 'text-right tabular-nums' : undefined}>
+                  {r[c] === null || r[c] === undefined ? '—' : String(r[c])}
+                </TableCell>
               ))}
-            </TableBody>
-          </Table>
-        </div>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
       )}
     </Sliced>
-  );
+  )
 }
 
 /** The KPIs declared by the plugins, one table each. */
 export function PluginKpis({ items }: { items: PluginKpi[] }) {
-  if (!items.length) return null;
+  if (!items.length) return null
   return (
     <>
       {items.map((p) => (
@@ -878,13 +564,9 @@ export function PluginKpis({ items }: { items: PluginKpi[] }) {
           <h2 className="text-sm font-semibold">
             {p.plugin} · {p.label}
           </h2>
-          <DataTable
-            rows={p.rows}
-            label={`${p.plugin} · ${p.label}`}
-            columns={p.columns}
-          />
+          <DataTable rows={p.rows} label={`${p.plugin} · ${p.label}`} columns={p.columns} />
         </section>
       ))}
     </>
-  );
+  )
 }
