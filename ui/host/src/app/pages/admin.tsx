@@ -658,6 +658,7 @@ function Admins({ me }: { me: string }) {
                         )}
                       </div>
                       <div className="font-mono text-xs text-muted-foreground">{a.username}</div>
+                      <div className="text-xs text-muted-foreground">{a.email || t('No email address')}</div>
                     </div>
                   </div>
                 </TableCell>
@@ -720,6 +721,7 @@ function Admins({ me }: { me: string }) {
         fields={[
           { name: 'username', label: t('Username'), required: true },
           { name: 'display_name', label: t('Name') },
+          { name: 'email', label: t('Email'), type: 'email', required: true },
           { name: 'password', label: t('Initial password'), type: 'password', required: true, hint: t('At least {n} characters', { n: pwMin }) },
         ]}
         submit={t('Create')}
@@ -730,9 +732,10 @@ function Admins({ me }: { me: string }) {
         open={!!edit}
         onOpenChange={(o) => !o && setEdit(null)}
         title={t('Data of {v}', { v: edit?.username ?? '' })}
+        description={edit?.user_id === me ? t('You change your own email from Account › Details, with your password.') : undefined}
         fields={[
           { name: 'display_name', label: t('Name'), required: true, initial: edit?.display_name ?? '' },
-          { name: 'email', label: t('Email'), initial: edit?.email ?? '' },
+          ...(edit?.user_id === me ? [] : [{ name: 'email', label: t('Email'), type: 'email' as const, required: true, initial: edit?.email ?? '' }]),
         ]}
         submit={t('Save')}
         onSubmit={(v) => update.mutateAsync({ id: edit!.user_id, display_name: v.display_name, email: v.email ?? '' })}

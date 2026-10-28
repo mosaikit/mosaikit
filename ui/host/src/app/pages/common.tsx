@@ -7,7 +7,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Bell, Building2, Gauge, KeyRound, KeySquare, Loader2, Palette, Trash2, Upload, UserRound } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, errText, fmtBytes } from '../../api.ts'
-import type { Overview, Session } from '../../types.ts'
+import type { AdminUser, Overview, Session } from '../../types.ts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -20,7 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils'
 import { isApp, passwordMin, useAction, useApi, useTenantCtx } from '../core.ts'
 import { setLang, t, useLang, useLanguages, type Lang } from '../i18n.ts'
-import { Empty, ErrorBox, Loading, Locked, PageHeader, SaveBar, Sections, type Section, Sliced } from '../kit.tsx'
+import { Empty, ErrorBox, FormDialog, Loading, Locked, PageHeader, SaveBar, Sections, type Section, Sliced } from '../kit.tsx'
 import { go, personal, to, type Route } from '../router.ts'
 import { SIDEBAR_PREF } from '../prefs.ts'
 import { TenantBadge } from '../Shell.tsx'
@@ -132,7 +132,7 @@ function Profile({ session }: { session: Session }) {
             {fromProvider
               ? t('Your name comes from the identity provider of your tenant. The email is changed by the Tenant Manager.')
               : u.is_system_admin
-                ? t('You change your name; the email is changed by another Administrator.')
+                ? t('You change your name and your email (the email needs your password and, if on, the second factor). Another Administrator can change them too.')
                 : t('You change your name; the email is changed by the Tenant Manager of your home tenant.')}
           </CardDescription>
         </CardHeader>
@@ -157,12 +157,48 @@ function Profile({ session }: { session: Session }) {
           <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
             <dt className="text-muted-foreground">{t('Username')}</dt>
             <dd className="font-mono">{u.username}</dd>
+            {u.is_system_admin && <AdminEmail me={u.user_id} />}
             <dt className="text-muted-foreground">{u.is_system_admin ? t('Role') : t('Home tenant')}</dt>
             <dd>{u.is_system_admin ? t('Administrator of the platform') : (home?.name ?? u.home_tenant_slug)}</dd>
           </dl>
         </CardContent>
       </Card>
     </div>
+  )
+}
+
+/** The Administrator changes their own email: current password and, if the second factor is on, a code. */
+function AdminEmail({ me }: { me: string }) {
+  const q = useApi<AdminUser[]>(['admins'], '/api/admin/administrators')
+  const [open, setOpen] = useState(false)
+  const self = q.data?.find((a) => a.user_id === me)
+  const save = useAction((v: Record<string, string>) => api('PUT', '/api/me/email', { email: v.email, password: v.password, code: v.code || undefined }), {
+    ok: t('Email saved'),
+    invalidate: [['admins']],
+  })
+  return (
+    <>
+      <dt className="text-muted-foreground">{t('Email')}</dt>
+      <dd className="flex flex-wrap items-center gap-2">
+        <span id="me-email">{self?.email || <span className="text-destructive">{t('No email address')}</span>}</span>
+        <Button variant="outline" size="sm" disabled={!self} onClick={() => setOpen(true)}>
+          {self?.email ? t('Change email') : t('Add the email')}
+        </Button>
+      </dd>
+      <FormDialog
+        open={open}
+        onOpenChange={setOpen}
+        title={t('Your email address')}
+        description={self?.totp ? t('Confirm with your current password and a code of the authenticator app.') : t('Confirm with your current password.')}
+        fields={[
+          { name: 'email', label: t('Email'), type: 'email', required: true, initial: self?.email ?? '' },
+          { name: 'password', label: t('Current password'), type: 'password', required: true },
+          ...(self?.totp ? [{ name: 'code', label: t('Code of the authenticator app'), required: true, hint: t('6 digits') }] : []),
+        ]}
+        submit={t('Save')}
+        onSubmit={(v) => save.mutateAsync(v)}
+      />
+    </>
   )
 }
 
