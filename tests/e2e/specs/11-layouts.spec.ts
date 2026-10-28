@@ -108,7 +108,7 @@ test.describe.serial('11-layouts', () => {
     await side.getByRole('button', { name: 'Open the pages of Notes' }).click()
     await side.getByRole('link', { name: 'Mine', exact: true }).click()
     await expect(page).toHaveURL(/#\/t\/alfa\/p\/com\.mosaikit\.notes\/mine/)
-    await expect(page.frameLocator('iframe.plugin-frame').getByRole('heading', { name: 'My notes' })).toBeVisible()
+    await expect(page.frameLocator('iframe.plugin-frame').locator('.msk-psection', { hasText: 'My notes' })).toBeVisible()
     await expect(page.getByRole('navigation', { name: 'Breadcrumb' })).toContainText('Mine')
     // Tenant settings › Layout: inherited; Tabs is not offered
     await side.getByRole('link', { name: 'Tenant settings', exact: true }).click()
