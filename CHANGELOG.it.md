@@ -41,6 +41,7 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 - Plugin attivi o spenti per tenant, con estensioni che aggiungono campi, azioni e schede alle app.
 - Chiavi dei servizi esterni: i plugin dicono quali servizi usano, e solo quelli compaiono.
 - I siti statici possono mostrare un indirizzo web dentro Mosaikit (un sito che vieta l'incorporamento si apre in una nuova scheda), come schede o come elenco con miniature.
+- I contatti sono schede con le iniziali di ogni persona e un pannello di lettura, le attività un elenco o una bacheca (in ritardo, aperte, fatte) con etichette di stato e una casella, le note schede che si aprono in un pannello di lettura prima di modificarle; su telefono il pannello copre l'elenco.
 
 ### Per chi scrive plugin
 
@@ -48,6 +49,7 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 - Note traduce una nota con un servizio di traduzione (Traduci la nota, sotto la nota), come esempio.
 - La brochure del manifest (descrizione, immagini, autore, licenza, link) appare come pagina completa nel dettaglio del plugin; i plugin ufficiali ora hanno immagini e testi.
 
+- `mountCrud` può disegnare da sé gli elementi (`views`: elenco, schede o bacheca, con un selettore) accanto a un pannello di dettaglio e a un pannello di lettura (`reader`); `avatar`, `chip` ed `el` sono funzioni condivise.
 - La logica di un plugin conosce i gruppi della persona che la chiama (`ctx.groups`).
 - La logica può notificare la persona che la chiama, o le persone che vedono uno dei suoi elementi,
   con la nuova operazione `notify` dell'host (`[permissions] notify = true`, `ctx.notify` nell'SDK).

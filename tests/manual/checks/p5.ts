@@ -102,7 +102,7 @@ const checks: L.Check[] = [
       await H.go(b, '#/t/comune-roma')
       await H.nav(b, 'Notes')
       const f = await L.pluginFrame(b, 'notes')
-      c.ok(!(await H.vis(f.getByRole('row', { name: /QA P5 note/ }))), 'Luca no longer sees the note')
+      c.ok(!(await H.vis(f.locator('.msk-item').filter({ hasText: /QA P5 note/ }))), 'Luca no longer sees the note')
       await L.shot(u, 'P5-03')
       return c.result()
     },
@@ -155,7 +155,7 @@ const checks: L.Check[] = [
       const before = await u.getByText(/Your items/).locator('..').innerText().catch(() => '')
       await del(u, 'QA P5 note')
       const f = await L.pluginFrame(u, 'notes')
-      c.ok(!(await H.vis(f.getByRole('row', { name: /QA P5 note/ }))), 'gone from Notes')
+      c.ok(!(await H.vis(f.locator('.msk-item').filter({ hasText: /QA P5 note/ }))), 'gone from Notes')
       await H.go(u, '#/t/comune-roma')
       const after = await u.getByText(/Your items/).locator('..').innerText().catch(() => '')
       c.ok(before !== after, `Home figures change («${before.replace(/\s+/g, ' ')}» → «${after.replace(/\s+/g, ' ')}»)`)

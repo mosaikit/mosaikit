@@ -693,6 +693,17 @@ Dense overviews, app cards with charts, pinned headers, the sidebar scrollbar an
 | R2-04 | Move the mouse over the sidebar when its items do not all fit, then away; move through it with Tab; open the app on a touch screen | The scrollbar shows only while the mouse is over the sidebar (or the focus is inside it, or on a touch screen); the sidebar scrolls with the keyboard and by touch | Playwright |
 | R2-05 | Open a table with more than 50 rows that is already whole in the page (backups, plugin figures, sessions, people of a group) and a list loaded from the server (Log, Trash, Tenants) | Only the first rows show, with «N of M» (or «N loaded» for the Log) below; the next rows come as the foot comes into view or with **Load more**; a visible count never lies | Playwright (the figures table), Vitest |
 
+## Review round 2 - layout of Contacts, Tasks and Notes
+
+The three apps follow the rules of the shell: header and filters pinned, the list scrolls inside the page, a detail panel next to it (over the list on a phone). Each check has an automated twin in `tests/manual/checks/pui.ts` (same id) and the scenario is also in e2e `15-plugin-layouts.spec.ts`.
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| PUI-01 | Open **Contacts**, add a contact with an email and a kind of company; click its card, then **Edit**, then **Cancel** | Cards with the initials of each person in a coloured circle, the kind as a chip; the reading panel shows the name, the address as a link and **Edit**; Edit shows the form, Cancel goes back to reading; the header stays at the top while the cards scroll | Playwright |
+| PUI-02 | Open **Tasks**, add an overdue task with high priority and one due next week; switch **List** / **Board**; tick the box of the overdue one | Status chips (priority), due dates (the overdue one in red); the board has Overdue, Open and Done; the ticked task moves to Done, struck through, without opening it; the view you chose is kept after a reload | Playwright |
+| PUI-03 | Open **Notes**, add a note with a tag and a text of several lines; open it, **Edit**, change the title, **Save**; try **Share…** | Note cards with the tag chip and the first lines; the open note is read in the panel before editing; Save shows it again; Share and the actions of the extensions still work | Playwright |
+| PUI-04 | At 390 px wide (phone), in light and in dark, open each of the three apps, then an item, then press Escape | Nothing scrolls sideways; the list alone, the detail covers it when an item is open, Escape (or Close) goes back to the list with the focus on the item; the colours follow the mode | Playwright |
+
 ## Spanish coverage
 
 The language plugin `com.mosaikit.lang-es` translates the whole shell (same keys as the Italian locale) and the manifests of the shipped plugins; the keys are compared by `ui/host/src/app/langpack.test.ts` and `crates/kernel/tests/lang_es_coverage.rs`. Texts inside the iframe of a plugin are not covered.

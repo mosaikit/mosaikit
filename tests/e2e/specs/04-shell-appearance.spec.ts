@@ -67,7 +67,7 @@ test.describe.serial('04-shell-appearance', () => {
     const frame = page.frameLocator('iframe.plugin-frame')
     await expect(frame.getByPlaceholder('Filtra…')).toBeVisible()
     await expect(frame.getByRole('heading', { name: 'Note' })).toBeVisible()
-    await expect(frame.locator('tbody tr.row', { hasText: 'Meeting minutes' })).toContainText('personale')
+    await expect(frame.locator('.msk-item', { hasText: 'Meeting minutes' })).toContainText('personale')
   })
 
   test('phone: the sidebar becomes a drawer', async ({ browser }) => {

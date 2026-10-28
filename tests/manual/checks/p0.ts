@@ -116,7 +116,7 @@ const checks: L.Check[] = [
       await f.getByRole('textbox', { name: 'Text' }).fill('Created by the QA walkthrough')
       await f.getByRole('button', { name: 'Save' }).click()
       await p.waitForTimeout(1500)
-      c.ok(await H.vis(f.getByRole('row', { name: /QA P0-06 note/ })), 'the new note in the list')
+      c.ok(await H.vis(f.locator('.msk-item').filter({ hasText: /QA P0-06 note/ })), 'the new note in the list')
       await L.shot(p, 'P0-06')
       return c.result()
     },
@@ -129,7 +129,7 @@ const checks: L.Check[] = [
       await H.go(p, '#/t/comune-roma')
       await H.nav(p, 'Notes')
       const f = await L.pluginFrame(p, 'notes')
-      await f.getByRole('row', { name: /QA P0-06 note/ }).click()
+      await f.locator('.msk-item').filter({ hasText: /QA P0-06 note/ }).click()
       await p.waitForTimeout(800)
       await f.getByRole('button', { name: 'Share…' }).click()
       await p.waitForTimeout(1000)

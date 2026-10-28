@@ -76,7 +76,7 @@ export async function openNote(p: Page, title: string): Promise<Frame> {
   await nav(p, p.url().includes('#/t/') && (await p.evaluate(() => document.documentElement.lang)) === 'it' ? 'Note' : 'Notes')
   const f = await L.pluginFrame(p, 'notes')
   for (let i = 0; i < 4; i++) {
-    await f.getByRole('row', { name: new RegExp(title) }).first().click()
+    await f.locator('.msk-item').filter({ hasText: new RegExp(title) }).first().click()
     await p.waitForTimeout(900)
     if (await vis(f.getByRole('button', { name: /Share…|Condividi…|^Close$|^Chiudi$/ }))) return f
   }

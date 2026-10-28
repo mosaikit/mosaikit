@@ -35,7 +35,7 @@ test.describe.serial('02-member-sharing', () => {
     await frame.locator('[data-key="title"]').fill('Meeting minutes')
     await frame.locator('[data-key="body"]').fill('<b>confidential content</b>')
     await frame.getByRole('button', { name: 'Save' }).click()
-    const row = frame.locator('tbody tr.row', { hasText: 'Meeting minutes' })
+    const row = frame.locator('.msk-item', { hasText: 'Meeting minutes' })
     await expect(row).toBeVisible()
     // WASM hook of the plugin: default tag
     await expect(row).toContainText('personal')
@@ -77,7 +77,7 @@ test.describe.serial('02-member-sharing', () => {
     await page.getByRole('menuitemradio', { name: 'Light' }).click()
     await nav(page, 'Notes').click()
     const frame = page.frameLocator('iframe.plugin-frame')
-    const row = frame.locator('tbody tr.row', { hasText: 'Meeting minutes' })
+    const row = frame.locator('.msk-item', { hasText: 'Meeting minutes' })
     await expect(row).toContainText('read only')
     await row.click()
     await expect(frame.locator('[data-key="title"]')).toBeDisabled()

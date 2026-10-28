@@ -51,10 +51,10 @@ test.describe.serial('08-shares-quotas', () => {
     // delete from the plugin: it goes to the trash
     await nav(page, 'Notes').click()
     const frame = page.frameLocator('iframe.plugin-frame')
-    await frame.locator('tbody tr.row', { hasText: 'Trash me' }).click()
+    await frame.locator('.msk-item', { hasText: 'Trash me' }).click()
     await frame.getByRole('button', { name: 'Delete' }).click()
     await page.getByRole('alertdialog').getByRole('button', { name: 'Confirm' }).click()
-    await expect(frame.locator('tbody tr.row', { hasText: 'Trash me' })).toBeHidden()
+    await expect(frame.locator('.msk-item', { hasText: 'Trash me' })).toBeHidden()
 
     // the Trash, from the person menu: restore with one click
     await page.getByRole('button', { name: /person menu/ }).click()

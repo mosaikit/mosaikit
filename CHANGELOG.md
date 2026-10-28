@@ -41,6 +41,7 @@ in step).
 - Plugins on and off per tenant, with extensions that add fields, actions and tabs to the apps.
 - Keys of outside services: the plugins say which services they use, and only those are listed.
 - Static sites can show a web address inside Mosaikit (a site that forbids framing opens in a new tab), as cards or as a list with thumbnails.
+- Contacts show as cards with the initials of each person and a reading panel, Tasks as a list or a board (overdue, open, done) with status chips and a checkbox, Notes as note cards that open in a reading pane before you edit them; on a phone the panel covers the list.
 
 ### For plugin authors
 
@@ -48,6 +49,7 @@ in step).
 - Notes translates a note with a translation service (Translate note, under the note), as the example.
 - The manifest brochure (details, pictures, author, licence, link) shows as a full page in the plugin detail; the official plugins now come with pictures and texts.
 
+- `mountCrud` can draw the items itself (`views`: list, cards or board, with a switch) next to a detail panel and a reading pane (`reader`); `avatar`, `chip` and `el` are shared helpers.
 - The logic of a plugin knows the groups of the person who calls it (`ctx.groups`).
 - The logic can notify the person who calls it, or the people who can see one of its items, with the
   new `notify` host operation (`[permissions] notify = true`, `ctx.notify` in the SDK).

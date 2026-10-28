@@ -204,7 +204,7 @@ test.describe.serial('06-people-oidc', () => {
     const frame = page.frameLocator('iframe.plugin-frame')
     await frame.locator('[data-key="title"]').fill('Plan of the staff')
     await frame.getByRole('button', { name: 'Save' }).click()
-    await expect(frame.locator('tbody tr.row', { hasText: 'Plan of the staff' })).toBeVisible()
+    await expect(frame.locator('.msk-item', { hasText: 'Plan of the staff' })).toBeVisible()
     await frame.getByRole('button', { name: 'Share…' }).click()
     const dialog = page.getByRole('dialog', { name: 'Sharing' })
     await dialog.getByLabel('Search people or groups').fill('staff')
@@ -219,7 +219,7 @@ test.describe.serial('06-people-oidc', () => {
     // Bruno sees it through the group
     await viaProvider('Bruno Neri')
     await nav(page, 'Notes').click()
-    await expect(page.frameLocator('iframe.plugin-frame').locator('tbody tr.row', { hasText: 'Plan of the staff' })).toBeVisible()
+    await expect(page.frameLocator('iframe.plugin-frame').locator('.msk-item', { hasText: 'Plan of the staff' })).toBeVisible()
 
     // front-channel logout: the provider ends its session and frames the address of Mosaikit
     const provider = await context.newPage()

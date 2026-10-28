@@ -32,14 +32,14 @@ const checks: L.Check[] = [
       await m.waitForTimeout(1500)
       await H.nav(m, 'Notes')
       const f = await L.pluginFrame(m, 'notes')
-      if (!(await H.vis(f.getByRole('row', { name: /Quarterly inspection/ })))) {
+      if (!(await H.vis(f.locator('.msk-item').filter({ hasText: /Quarterly inspection/ })))) {
         await f.getByRole('button', { name: /New note/ }).click()
         await f.getByRole('textbox', { name: 'Title *' }).fill('Quarterly inspection')
         await f.getByRole('textbox', { name: 'Text' }).fill('The pump of the north well needs a new seal')
         await f.getByRole('button', { name: 'Save' }).click()
         await m.waitForTimeout(1500)
       }
-      c.ok(await H.vis(f.getByRole('row', { name: /Quarterly inspection/ })), 'saved')
+      c.ok(await H.vis(f.locator('.msk-item').filter({ hasText: /Quarterly inspection/ })), 'saved')
       await L.shot(m, 'P9-01')
       return c.result()
     },

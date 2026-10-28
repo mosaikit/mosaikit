@@ -13,7 +13,7 @@ test.describe.serial('10-search-profile-qa', () => {
     await frame.locator('[data-key="title"]').fill('Quarterly inspection')
     await frame.locator('[data-key="body"]').fill('The pump of the north well needs a new seal')
     await frame.getByRole('button', { name: 'Save' }).click()
-    await expect(frame.locator('tbody tr.row', { hasText: 'Quarterly inspection' })).toBeVisible()
+    await expect(frame.locator('.msk-item', { hasText: 'Quarterly inspection' })).toBeVisible()
 
     // search with the keyboard ("/"), a word of the text, the pill of the app, arrows and Enter
     await nav(page, 'Tenant overview').click()

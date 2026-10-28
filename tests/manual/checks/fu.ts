@@ -212,7 +212,7 @@ const checks: L.Check[] = [
       await H.go(b, '#/t/prova-oidc')
       await H.nav(b, 'Notes')
       const fb = await L.pluginFrame(b, 'notes')
-      c.ok(await H.vis(fb.getByRole('row', { name: /QA note for staff/ })), 'Bruno sees the note')
+      c.ok(await H.vis(fb.locator('.msk-item').filter({ hasText: /QA note for staff/ })), 'Bruno sees the note')
       await L.shot(b, 'FU-A-09')
       await b.context().close()
       return c.result()

@@ -36,7 +36,7 @@ async function tryCreate(u: any, title: any) {
   await f.getByRole('button', { name: 'Save' }).click()
   await u.waitForTimeout(1500)
   const msg = ((await f.locator('[role=status], [role=alert], .error, .msk-error').allInnerTexts().catch(() => [])).join(' ') + ' ' + (await H.toast(u))).trim()
-  const created = await H.vis(f.getByRole('row', { name: new RegExp(title) }))
+  const created = await H.vis(f.locator('.msk-item').filter({ hasText: new RegExp(title) }))
   return { created, msg, f }
 }
 

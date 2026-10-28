@@ -39,7 +39,7 @@ async function newNote(p: any, title: any) {
   await f.getByRole('textbox', { name: 'Title *' }).fill(title)
   await f.getByRole('button', { name: 'Save' }).click()
   await p.waitForTimeout(1500)
-  const created = await H.vis(f.getByRole('row', { name: new RegExp(title) }))
+  const created = await H.vis(f.locator('.msk-item').filter({ hasText: new RegExp(title) }))
   const msg = ((await f.locator('[role=status],[role=alert]').allInnerTexts().catch(() => [])).join(' ') + ' ' + (await H.toast(p))).trim()
   return { created, msg, f }
 }

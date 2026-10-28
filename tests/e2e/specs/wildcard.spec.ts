@@ -45,7 +45,7 @@ test('every plugin UI has an origin of its own', async ({ page }) => {
   await expect(frame.getByRole('heading', { name: 'Notes' })).toBeVisible()
   await frame.locator('[data-key="title"]').fill('Wildcard note')
   await frame.getByRole('button', { name: 'Save' }).click()
-  await expect(frame.locator('tbody tr.row', { hasText: 'Wildcard note' })).toBeVisible()
+  await expect(frame.locator('.msk-item', { hasText: 'Wildcard note' })).toBeVisible()
 
   // from the page of Notes, the UI of Tasks is another origin: framed, it cannot be read nor scripted
   const notes = page.frames().find((f) => f.url().startsWith(notesUi))!
