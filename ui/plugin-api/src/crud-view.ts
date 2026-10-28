@@ -268,7 +268,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   if (views.length) body.classList.add('msk-splitbody')
   root.replaceChildren(
     // the header and the filters never scroll: the table, the foot and the form do
-    pageHead({ title: opts.title ?? resource, section: opts.section, sub: count, actions: [btnNew], filters: views.length > 1 ? [filter, switcher] : [filter] }),
+    pageHead({ title: opts.title ?? resource, section: opts.section, sub: count, actions: [btnNew], filters: views.length > 1 ? [switcher, filter] : [filter] }),
     body,
   )
   // the rest of the rows come as the foot of the table comes into view

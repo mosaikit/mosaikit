@@ -30,7 +30,7 @@ async function pinned(frame: FrameLocator) {
 
 test.describe.serial('15-plugin-layouts', () => {
   test('Contacts: cards with initials, a reading panel, then the form', async ({ page }) => {
-    await login(page, 'City of Alfa', 'manager', PASSWORD)
+    await login(page, 'Alfa', 'manager', PASSWORD)
     await nav(page, 'Contacts').click()
     const frame = frameOf(page)
     await add(frame, { name: 'Ada Lovelace', email: 'ada@example.org', company: 'Customer' })
@@ -55,7 +55,7 @@ test.describe.serial('15-plugin-layouts', () => {
   })
 
   test('Tasks: list with chips, tick to complete, board by status', async ({ page }) => {
-    await login(page, 'City of Alfa', 'manager', PASSWORD)
+    await login(page, 'Alfa', 'manager', PASSWORD)
     await nav(page, 'Tasks').click()
     const frame = frameOf(page)
     await add(frame, { title: 'Send the offer', due: day(-3), priority: 'high' })
@@ -84,7 +84,7 @@ test.describe.serial('15-plugin-layouts', () => {
   test('Notes: cards, reading pane, edit; the panel covers the list on a phone; dark mode', async ({ browser }) => {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } })
     const page = await ctx.newPage()
-    await login(page, 'City of Alfa', 'manager', PASSWORD)
+    await login(page, 'Alfa', 'manager', PASSWORD)
     await nav(page, 'Notes').click()
     const frame = frameOf(page)
     await add(frame, { title: 'Weekly plan', body: 'Monday: kickoff\nTuesday: review', tag: 'work' })

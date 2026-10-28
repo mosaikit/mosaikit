@@ -135,7 +135,7 @@ html.msk-fill #app { padding: 0; height: 100%; display: flex; flex-direction: co
 .msk-detail .msk-form h3 { font-size: 13px; text-transform: none; letter-spacing: 0; color: var(--fg); font-weight: 600; }
 .msk-detail .msk-form h3:focus { outline: none; }
 .msk-reader { margin-bottom: 4px; }
-.msk-switch { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; margin-left: auto; }
+.msk-switch { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
 .msk-seg { background: var(--panel2); color: var(--dim); border: 0; padding: 5px 12px; font-size: 12px; font-weight: 600; cursor: pointer; }
 .msk-seg + .msk-seg { border-left: 1px solid var(--line); }
 .msk-seg[aria-pressed='true'] { background: var(--acc-soft); color: var(--fg); box-shadow: inset 0 -2px 0 var(--acc); }
