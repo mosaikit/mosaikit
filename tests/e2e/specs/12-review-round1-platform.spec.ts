@@ -183,7 +183,7 @@ test.describe.serial('12-review-round1-platform', () => {
       await filters.getByRole('radio', { name: /Suspended/ }).click()
       await expect(page.getByText('No tenants')).toBeVisible()
       await filters.getByRole('radio', { name: /^All/ }).click()
-      await filters.getByRole('searchbox', { name: 'Search a tenant' }).fill('rl-07')
+      await page.getByRole('searchbox', { name: 'Search a tenant' }).fill('rl-07')
       await expect(page.locator('tbody tr')).toHaveCount(1)
       await filters.getByRole('button', { name: 'Reset' }).click()
       await expect(page.locator('tbody tr').nth(2)).toBeVisible()
