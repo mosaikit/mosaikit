@@ -21,7 +21,7 @@ import { useAction, useApi, useConfirm, usePaged, useTenantCtx } from '../core.t
 import { BulkBar, FilterColumn, ListPage } from '../listkit.tsx'
 import { t } from '../i18n.ts'
 import { about, describe } from '../logtext.ts'
-import { Empty, ErrorBox, Loading, MoreRows, PageHeader, Pills , Sliced } from '../kit.tsx'
+import { Empty, ErrorBox, Loading, MoreRows, PageHeader, Pills  } from '../kit.tsx'
 import { Widget } from '../Overview.tsx'
 import { go } from '../router.ts'
 import ShareDialog from '../ShareDialog.tsx'
@@ -519,7 +519,7 @@ export function LogView({ scope, fixed = {}, compact = false }: { scope: LogScop
         <Empty icon={<History />} title={compact ? t('No activity yet') : t('No event with these filters')} />
       ) : (
         <div className="overflow-x-auto rounded-xl border bg-card">
-          <Sliced items={events}>{(shown) => (<Table>
+          <Table>
             <TableHeader>
               <TableRow>
                 {!compact && (
@@ -536,7 +536,7 @@ export function LogView({ scope, fixed = {}, compact = false }: { scope: LogScop
               </TableRow>
             </TableHeader>
             <TableBody>
-              {shown.map((e) => (
+              {events.map((e) => (
                 <TableRow key={e.id} className="cursor-pointer" data-state={sel.has(e.id) ? 'selected' : undefined} onClick={() => setOpen(e)}>
                   {!compact && (
                     <TableCell onClick={(ev) => ev.stopPropagation()}>
@@ -579,16 +579,10 @@ export function LogView({ scope, fixed = {}, compact = false }: { scope: LogScop
                 </TableRow>
               ))}
             </TableBody>
-          </Table>)}</Sliced>
+          </Table>
         </div>
       )}
-      {pages.hasNextPage && (
-        <div className="flex justify-center">
-          <Button variant="outline" size="sm" disabled={pages.isFetchingNextPage} onClick={() => void pages.fetchNextPage()}>
-            {t('Older events')}
-          </Button>
-        </div>
-      )}
+      {events.length > 0 && <MoreRows shown={events.length} total={null} more={!!pages.hasNextPage} loading={pages.isFetchingNextPage} onMore={() => void pages.fetchNextPage()} label={t('Older events')} />}
       {!compact && events.length > 0 && (
         <p className="text-xs text-muted-foreground">
           <a className="underline-offset-4 hover:underline" href={csv()} download>

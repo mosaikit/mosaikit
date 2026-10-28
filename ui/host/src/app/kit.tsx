@@ -214,7 +214,7 @@ export function Sections({ sections, current, href, children }: { sections: Sect
 /** The foot of a long list: how many rows are shown of how many. The next page loads by itself when
  *  the foot comes into view (infinite scroll); «Load more» stays for the keyboard and for browsers
  *  without IntersectionObserver. */
-export function MoreRows({ shown, total, more, loading, onMore }: { shown: number; total: number; more: boolean; loading?: boolean; onMore: () => void }) {
+export function MoreRows({ shown, total, more, loading, onMore, label }: { shown: number; total: number | null; more: boolean; loading?: boolean; onMore: () => void; label?: string }) {
   const foot = useRef<HTMLDivElement>(null)
   const act = useRef(onMore)
   useEffect(() => {
@@ -228,14 +228,16 @@ export function MoreRows({ shown, total, more, loading, onMore }: { shown: numbe
     return () => io.disconnect()
     // a page that arrived and left the foot in view must ask for the next: observe again
   }, [more, loading, shown])
-  if (!total) return null
+  if (total === 0) return null
   return (
     <div ref={foot} className="flex flex-wrap items-center justify-center gap-3 py-2 text-sm text-muted-foreground">
-      <span className="tabular-nums">{t('{shown} of {total}', { shown: String(shown), total: String(total) })}</span>
+      <span className="tabular-nums">
+        {total === null ? t('{shown} loaded', { shown: String(shown) }) : t('{shown} of {total}', { shown: String(shown), total: String(total) })}
+      </span>
       {more && (
         <Button variant="outline" size="sm" disabled={loading} onClick={onMore}>
           {loading && <Loader2 className="animate-spin" />}
-          {t('Load more')}
+          {label ?? t('Load more')}
         </Button>
       )}
     </div>

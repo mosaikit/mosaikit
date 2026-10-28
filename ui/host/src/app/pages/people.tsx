@@ -40,7 +40,7 @@ import { t } from '../i18n.ts'
 import { levelName } from '../levels.ts'
 import { PersonPicture } from '../picture.tsx'
 import { BulkBar, FilterColumn, ListPage } from '../listkit.tsx'
-import { Empty, ErrorBox, FormDialog, Loading, MoreRows, PageHeader, SaveBar, SelectAllRows, StatusBadge, Tabs , Sliced } from '../kit.tsx'
+import { Empty, ErrorBox, FormDialog, Loading, MoreRows, PageHeader, SaveBar, SelectAllRows, StatusBadge, Sliced, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import AppIcon from '../AppIcon.tsx'
 import { AppMark } from '../Shell.tsx'
@@ -1649,14 +1649,14 @@ function LinksDialog({ links, onClose }: { links: { name: string; link: ResetLin
           <DialogTitle>{t('Links to choose a new password')}</DialogTitle>
           <DialogDescription>{t('Each link works once. Give each person theirs.')}</DialogDescription>
         </DialogHeader>
-        <ul className="grid gap-2 text-sm">
-          {links.map((l) => (
+        <Sliced items={links}>{(shown) => (<ul className="grid gap-2 text-sm">
+          {shown.map((l) => (
             <li key={l.link.url} className="grid gap-1">
               <b>{l.name}</b>
               <Input readOnly value={l.link.url} aria-label={t('Link of {name}', { name: l.name })} className="font-mono text-xs" onFocus={(e) => e.target.select()} />
             </li>
           ))}
-        </ul>
+        </ul>)}</Sliced>
         <DialogFooter>
           <Button
             variant="outline"

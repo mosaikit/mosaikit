@@ -20,7 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils'
 import { isApp, passwordMin, useAction, useApi, useTenantCtx } from '../core.ts'
 import { setLang, t, useLang, useLanguages, type Lang } from '../i18n.ts'
-import { Empty, ErrorBox, Loading, Locked, PageHeader, SaveBar, Sections, type Section , Sliced } from '../kit.tsx'
+import { Empty, ErrorBox, Loading, Locked, PageHeader, SaveBar, Sections, type Section, Sliced } from '../kit.tsx'
 import { go, personal, to, type Route } from '../router.ts'
 import { SIDEBAR_PREF } from '../prefs.ts'
 import { TenantBadge } from '../Shell.tsx'

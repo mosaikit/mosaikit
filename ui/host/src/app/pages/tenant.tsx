@@ -25,7 +25,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { PersonPicture } from '../picture.tsx'
 import { isApp, passwordMin, useAction, useApi, useConfig, useConfirm, usePaged, useTenantCtx, type PageOf } from '../core.ts'
 import { fmtDay, t, useLang } from '../i18n.ts'
-import { Empty, ErrorBox, FormDialog, Kpi, Loading, MoreRows, PageHeader, PluginKpis, SaveBar, SelectAllRows, Sections, StatusBadge, Tabs } from '../kit.tsx'
+import { Empty, ErrorBox, FormDialog, Kpi, Loading, MoreRows, PageHeader, PluginKpis, SaveBar, SelectAllRows, Sections, StatusBadge, Sliced, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import { useNoteList, useUnread } from '../notes.ts'
 import { NoteRow } from '../notifications.tsx'
@@ -1427,8 +1427,8 @@ function LinksDialog({ slug, row, onClose }: { slug: string; row: ResourceRow | 
         ) : q.error ? (
           <ErrorBox error={q.error} />
         ) : (
-          <ul className="grid gap-2">
-            {active.map((l) => (
+          <Sliced items={active}>{(shown) => (<ul className="grid gap-2">
+            {shown.map((l) => (
               <li key={l.id} className="flex items-center gap-3 rounded-lg border p-3 text-sm">
                 <span className="min-w-0 flex-1">
                   <span className="block">
@@ -1446,7 +1446,7 @@ function LinksDialog({ slug, row, onClose }: { slug: string; row: ResourceRow | 
               </li>
             ))}
             {active.length === 0 && <li className="text-sm text-muted-foreground">{t('No active link.')}</li>}
-          </ul>
+          </ul>)}</Sliced>
         )}
       </DialogContent>
     </Dialog>

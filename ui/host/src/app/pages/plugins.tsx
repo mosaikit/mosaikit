@@ -19,7 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useAction, useApi, useConfirm } from '../core.ts'
 import { cn } from '@/lib/utils'
 import AppIcon from '../AppIcon.tsx'
-import { Empty, ErrorBox, FormDialog, Loading, PageHeader, Pills, SaveBar, StatusBadge, Tabs , Sliced } from '../kit.tsx'
+import { Empty, ErrorBox, FormDialog, Loading, PageHeader, Pills, SaveBar, StatusBadge, Sliced, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import { t } from '../i18n.ts'
 

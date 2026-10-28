@@ -162,8 +162,8 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   const form = h('section', { class: 'msk-form' }, formTitle, tabsBar, readonly, fieldsBox, extBox, tabPanel, h('div', { class: 'msk-actions' }, btnSave, btnCancel, btnShare, btnDel), msg)
 
   root.replaceChildren(
-    title,
-    h('div', { class: 'msk-toolbar' }, filter, btnNew, h('span', { class: 'grow' }), count),
+    // the title and the filters stay in sight while the table scrolls
+    h('div', { class: 'msk-pagehead' }, title, h('div', { class: 'msk-toolbar' }, filter, btnNew, h('span', { class: 'grow' }), count)),
     h('div', { class: 'msk-tablewrap' }, table),
     h('div', { class: 'msk-morebar' }, btnMore),
     form,

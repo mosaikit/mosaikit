@@ -17,7 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils'
 import { useAction, useApi } from './core.ts'
 import { t } from './i18n.ts'
-import { Empty, ErrorBox, Loading, Locked, SaveBar , Sliced } from './kit.tsx'
+import { Empty, ErrorBox, Loading, Locked, SaveBar, Sliced } from './kit.tsx'
 import { to } from './router.ts'
 
 const enc = encodeURIComponent
@@ -549,8 +549,8 @@ export function UsageAlerts({ slug }: { slug: string }) {
 function Chips({ label, items, onRemove }: { label: string; items: { id: string; name: string }[]; onRemove: (id: string) => void }) {
   if (items.length === 0) return null
   return (
-    <ul className="flex flex-wrap gap-2" aria-label={label}>
-      {items.map((x) => (
+    <Sliced items={items}>{(shown) => (<ul className="flex flex-wrap gap-2" aria-label={label}>
+      {shown.map((x) => (
         <li key={x.id} className="flex items-center gap-1 rounded-full border bg-muted/40 py-0.5 pr-1 pl-3 text-sm">
           {x.name}
           <Button type="button" variant="ghost" size="icon" className="size-6" aria-label={t('Remove {name}', { name: x.name })} onClick={() => onRemove(x.id)}>
@@ -558,7 +558,7 @@ function Chips({ label, items, onRemove }: { label: string; items: { id: string;
           </Button>
         </li>
       ))}
-    </ul>
+    </ul>)}</Sliced>
   )
 }
 

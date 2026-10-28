@@ -43,7 +43,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { passwordMin, useAction, useApi, useConfig, useConfirm } from '../core.ts'
 import { fmtDay, fmtNumber, t } from '../i18n.ts'
-import { Empty, ErrorBox, Kpi, Loading, PageHeader, Pills, SaveBar, Sections , Sliced } from '../kit.tsx'
+import { Empty, ErrorBox, Kpi, Loading, PageHeader, Pills, SaveBar, Sections, Sliced } from '../kit.tsx'
 import { go, to } from '../router.ts'
 
 const enc = encodeURIComponent
@@ -1010,8 +1010,8 @@ function RestoreTenantDialog({ backup, onOpenChange }: { backup: BackupInfo; onO
         ) : inside.error ? (
           <ErrorBox error={inside.error} />
         ) : (
-          <ul className="grid gap-2">
-            {inside.data!.map((m) => (
+          <Sliced items={inside.data!}>{(shown) => (<ul className="grid gap-2">
+            {shown.map((m) => (
               <li key={m.tenant.slug} className="flex items-center justify-between gap-3 rounded-md border p-3">
                 <span>
                   <b className="block text-sm">{m.tenant.name}</b>
@@ -1023,7 +1023,7 @@ function RestoreTenantDialog({ backup, onOpenChange }: { backup: BackupInfo; onO
                 </Button>
               </li>
             ))}
-          </ul>
+          </ul>)}</Sliced>
         )}
       </DialogContent>
     </Dialog>
@@ -1582,8 +1582,8 @@ function AlertsPanel() {
               {t('No alert: every condition is within its threshold.')}
             </p>
           ) : (
-            <ul className="grid gap-2">
-              {active.map((a) => (
+            <Sliced items={active}>{(shown) => (<ul className="grid gap-2">
+              {shown.map((a) => (
                 <li key={a.key} className="flex gap-2 rounded-md border border-warn/40 bg-warn/10 p-3 text-sm">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0" />
                   <span>
@@ -1592,7 +1592,7 @@ function AlertsPanel() {
                   </span>
                 </li>
               ))}
-            </ul>
+            </ul>)}</Sliced>
           )}
         </CardContent>
       </Card>
