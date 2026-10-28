@@ -3,7 +3,7 @@
 // object); save bar only with changes; settings managed by the platform; dialogs
 // with a form, empty and loading states.
 
-import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react'
 import { ChevronRight, Loader2, Lock, MoreHorizontal } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -23,9 +23,25 @@ export interface Crumb {
   href?: string
 }
 
+/** The subsection selected in the page (the `Sections` of the page say it): the header shows it after the title,
+ *  «Page › Subsection», so that both are always in sight. */
+let headerSection: string | null = null
+const sectionListeners = new Set<() => void>()
+function setHeaderSection(v: string | null) {
+  if (headerSection === v) return
+  headerSection = v
+  sectionListeners.forEach((l) => l())
+}
+const useHeaderSection = () =>
+  useSyncExternalStore(
+    (l) => (sectionListeners.add(l), () => void sectionListeners.delete(l)),
+    () => headerSection,
+  )
+
 /** Header of the page: breadcrumb, title with the status badge, a single primary action and,
  *  in the «⋯» menu, the other actions and the change of state (DropdownMenu items). */
 export function PageHeader({ title, sub, crumbs, badge, lead, bar, actions, more }: { title: string; sub?: ReactNode; crumbs?: Crumb[]; badge?: ReactNode; lead?: ReactNode; bar?: ReactNode; actions?: ReactNode; more?: ReactNode }) {
+  const section = useHeaderSection()
   return (
     // under the band, and it stays there while the page scrolls
     <div data-tour="page-header" className="msk-page-header sticky top-(--msk-top) z-10 flex min-h-(--msk-head) flex-wrap items-center gap-3 border-b bg-background px-6 py-2 max-[620px]:px-4">
@@ -48,7 +64,15 @@ export function PageHeader({ title, sub, crumbs, badge, lead, bar, actions, more
           </nav>
         )}
         <div className="flex min-w-0 items-center gap-2">
-          <h1 className="truncate text-base font-semibold">{title}</h1>
+          <h1 className={cn('truncate text-base font-semibold', section && 'min-w-0 shrink font-medium text-muted-foreground')}>{title}</h1>
+          {section && (
+            <>
+              <ChevronRight className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <span data-testid="header-section" className="min-w-0 truncate text-base font-semibold">
+                {section}
+              </span>
+            </>
+          )}
           {badge}
         </div>
         {sub && <p className="truncate text-xs text-muted-foreground">{sub}</p>}
@@ -167,6 +191,11 @@ export interface Section {
 
 /** A page with sections: the list on the left (a drop-down menu on the phone), one section at a time. */
 export function Sections({ sections, current, href, children }: { sections: Section[]; current: string; href: (id: string) => string; children: ReactNode }) {
+  const label = sections.find((x) => x.id === current)?.label ?? null
+  useEffect(() => {
+    setHeaderSection(label)
+    return () => setHeaderSection(null)
+  }, [label])
   return (
     <div className="flex min-h-0 flex-1 max-[760px]:flex-col">
       <nav data-tour="sections" aria-label={t('Sections')} className="w-60 shrink-0 border-r bg-pane p-3 max-[760px]:w-auto max-[760px]:border-r-0 max-[760px]:border-b">

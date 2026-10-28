@@ -64,18 +64,22 @@ const checks: L.Check[] = [
     async run(ctx: any) {
       const c = H.checker()
       const p = await L.as(ctx, 'admin')
-      await p.setViewportSize({ width: 1440, height: 600 })
-      await H.go(p, '#/admin/tenants')
-      await p.evaluate(() => window.scrollTo(0, 300))
-      await p.waitForTimeout(300)
-      const top = await p.locator('.msk-page-header').first().evaluate((e: Element) => Math.round(e.getBoundingClientRect().top))
-      c.ok(top === 50, `the header stays under the band after scrolling (top ${top})`)
-      await H.go(p, '#/admin/plugins')
-      await p.getByRole('link', { name: /Notes/ }).first().click()
-      await p.waitForTimeout(900)
-      await p.evaluate(() => window.scrollTo(0, 300))
-      const tabs = await p.getByRole('navigation', { name: 'Tabs' }).evaluate((e: Element) => Math.round(e.getBoundingClientRect().top))
-      c.ok(tabs > 90 && tabs < 140, `the tabs stay under the header (top ${tabs})`)
+      for (const [w, h] of [[1440, 700], [390, 800]]) {
+        await p.setViewportSize({ width: w, height: h })
+        for (const hash of ['#/admin/tenants', '#/admin/people', '#/admin/log', '#/admin/plugins']) {
+          await H.go(p, hash)
+          await p.waitForTimeout(900)
+          const m = await p.evaluate(() => {
+            const ls = document.querySelector('[data-listscroll]')
+            const th = document.querySelector('thead th')
+            return { over: document.documentElement.scrollHeight - innerHeight, list: !!ls, sticky: th ? getComputedStyle(th).position : 'sticky' }
+          })
+          c.ok(m.list && m.over <= 1, `${hash} at ${w}px: the page does not scroll, the list does (page overflow ${m.over})`)
+          c.ok(m.sticky === 'sticky', `${hash} at ${w}px: the header row of the table is pinned`)
+        }
+      }
+      await H.go(p, '#/admin')
+      c.ok(await p.evaluate(() => !document.querySelector('[data-listscroll]')), 'the overview is not list-first: the page scrolls')
       await p.setViewportSize({ width: 1440, height: 900 })
       return c.result()
     },
@@ -84,16 +88,21 @@ const checks: L.Check[] = [
     id: 'R2-04',
     async run(ctx: any) {
       const c = H.checker()
-      const p = await L.as(ctx, 'e.ricci')
-      await p.setViewportSize({ width: 1440, height: 500 })
-      await H.go(p, '#/t/comune-roma')
+      const p = await L.as(ctx, 'admin')
+      await p.setViewportSize({ width: 1440, height: 330 })
+      await H.go(p, '#/admin')
       const bar = p.locator('[data-sidebar="content"]').first()
-      await p.mouse.move(700, 300)
+      const m = await bar.evaluate((e: Element) => ({ over: e.scrollHeight > e.clientHeight, ov: getComputedStyle(e).overflowY }))
+      c.ok(m.ov === 'auto' && m.over, `the sidebar overflows and can scroll (${m.ov})`)
+      await p.mouse.move(800, 200)
       const away = await bar.evaluate((e: Element) => getComputedStyle(e).scrollbarColor)
       await bar.hover()
       const over = await bar.evaluate((e: Element) => getComputedStyle(e).scrollbarColor)
-      c.ok(/transparent|rgba\(0, 0, 0, 0\)/.test(away.split(' ')[0] + away), `no scrollbar away from the sidebar (${away})`)
+      c.ok(/transparent|rgba\(0, 0, 0, 0\)/.test(away), `no scrollbar away from the sidebar (${away})`)
       c.ok(over !== away, `the scrollbar shows under the mouse (${over})`)
+      await p.mouse.wheel(0, 200)
+      await p.waitForTimeout(300)
+      c.ok((await bar.evaluate((e: Element) => e.scrollTop)) > 0, 'the wheel scrolls the sidebar')
       await p.setViewportSize({ width: 1440, height: 900 })
       return c.result()
     },
@@ -102,11 +111,61 @@ const checks: L.Check[] = [
     id: 'R2-05',
     async run(ctx: any) {
       const c = H.checker()
-      const p = await L.as(ctx, 'admin')
-      await H.go(p, '#/admin')
-      await p.getByText('Figures of the apps as tables').click()
-      c.ok(await H.vis(p.getByRole('table').first()), 'the figures of the apps are also available as a table')
-      c.note('lists of more than 50 rows page on the client (Sliced, vitest) or the server; see tests of kit.tsx')
+      const p = await L.as(ctx, 'e.ricci')
+      await p.setViewportSize({ width: 1440, height: 700 })
+      await H.go(p, '#/t/comune-roma/manage')
+      const host = await p.locator('.msk-page-header').first().evaluate((e: Element) => {
+        const r = e.getBoundingClientRect()
+        return { h: Math.round(r.height), border: getComputedStyle(e).borderBottomWidth, h1: getComputedStyle(e.querySelector('h1')!).fontSize }
+      })
+      for (const id of ['com.mosaikit.notes', 'com.mosaikit.maps', 'com.mosaikit.static-site', 'com.mosaikit.files']) {
+        await H.go(p, `#/t/comune-roma/p/${id}`)
+        const f = await L.pluginFrame(p)
+        await f.locator('.msk-pagehead').waitFor({ timeout: 15000 })
+        const m = await f.evaluate(() => {
+          const e = document.querySelector('.msk-pagehead')!
+          return { h: Math.round(e.getBoundingClientRect().height), border: getComputedStyle(e).borderBottomWidth, h1: getComputedStyle(e.querySelector('h1')!).fontSize, over: document.documentElement.scrollHeight - innerHeight }
+        })
+        c.ok(Math.abs(m.h - host.h) <= 1 && m.border === host.border && m.h1 === host.h1, `${id}: the header looks like the one of Mosaikit (${JSON.stringify(m)} vs ${JSON.stringify(host)})`)
+        c.ok(m.over <= 1, `${id}: the page does not scroll`)
+      }
+      return c.result()
+    },
+  },
+  {
+    id: 'R2-06',
+    async run(ctx: any) {
+      const c = H.checker()
+      const adm = await L.as(ctx, 'admin')
+      const mgr = await L.as(ctx, 'e.ricci')
+      const pages: [any, string, string][] = [
+        [adm, '#/admin/system', 'System'],
+        [adm, '#/admin/monitoring', 'Monitoring'],
+        [mgr, '#/t/comune-roma/settings', 'Settings'],
+        [mgr, '#/t/comune-roma/usage', 'Usage'],
+        [mgr, '#/t/comune-roma/account', 'Account'],
+      ]
+      for (const [w, h] of [[1440, 800], [390, 800]]) {
+        for (const [p, hash, name] of pages) {
+          await p.setViewportSize({ width: w, height: h })
+          await H.go(p, hash)
+          await p.waitForTimeout(700)
+          const sec = p.getByTestId('header-section')
+          c.ok(await H.vis(sec), `${name} at ${w}px: the header shows the subsection`)
+          const text = ((await sec.first().innerText().catch(() => '')) as string).trim()
+          c.ok(text.length > 0, `${name} at ${w}px: the subsection is written (${text})`)
+          if (w > 760) {
+            const cur = ((await p.getByRole('navigation', { name: 'Sections' }).locator('[aria-current="page"]').first().innerText().catch(() => '')) as string).trim()
+            c.ok(cur.startsWith(text), `${name}: the header (${text}) agrees with the list at the left (${cur})`)
+          }
+          c.ok(await H.vis(p.getByRole('heading', { name, level: 1 })), `${name}: the page title stays`)
+        }
+      }
+      await mgr.setViewportSize({ width: 1440, height: 800 })
+      await H.go(mgr, '#/t/comune-roma/p/com.mosaikit.notes/mine')
+      const f = await L.pluginFrame(mgr)
+      await f.locator('.msk-psection').waitFor({ timeout: 15000 })
+      c.ok((await f.locator('.msk-pline').innerText()).replace(/\s+/g, ' ').includes('Notes › Mine'), 'the page of Notes reads «Notes › Mine»')
       return c.result()
     },
   },

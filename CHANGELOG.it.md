@@ -16,7 +16,7 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 - Aiuto: un tour guidato delle pagine principali, la guida, le novità e le scorciatoie da tastiera.
 - Panoramiche a widget per ogni ruolo: le app in una striscia compatta, numeri rapidi, notifiche, attività recente, scadenze e, per l’Amministratore, le organizzazioni per spazio, le richieste e gli errori recenti.
 - Le panoramiche riempiono la pagina senza buchi (una griglia fitta a quattro, due o una colonna). L’Amministratore vede una scheda per ogni app, con piccoli grafici di elementi e spazio, e un grafico dello spazio per app.
-- Intestazioni, filtri e schede restano ferme mentre scorre il contenuto, in ogni pagina e nelle pagine dei plugin. La barra di scorrimento della barra laterale compare solo sotto il mouse.
+- Intestazioni, filtri e schede restano ferme. Le pagine che sono una lista o una tabella non scorrono per intero: la lista riempie la pagina e scorre al suo interno, con la riga di intestazione sempre visibile, e carica altri elementi scorrendo. Le pagine delle app hanno la stessa intestazione delle pagine di Mosaikit, e una pagina con sottosezioni (Sistema, Monitoraggio, Impostazioni, Utilizzo, Account, Note) mostra nell’intestazione sia la pagina sia la sottosezione scelta. La barra laterale scorre, chiusa o aperta, e mostra la barra di scorrimento solo sotto il mouse.
 - Le liste e le tabelle lunghe si caricano una pagina alla volta, con il conteggio e «Carica altri» (o scorrendo), anche il Registro.
 
 ### Persone e tenant
