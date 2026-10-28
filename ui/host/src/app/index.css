@@ -584,3 +584,9 @@ html[data-style-buttons='soft'] [data-slot='button'][data-variant='default']:hov
   position: relative;
   top: 0;
 }
+
+/* what is scrolled into view (a focused field, a target of a link) stops below the pinned band and header */
+html {
+  scroll-padding-top: calc(var(--msk-top) + var(--msk-head) + 8px);
+  scroll-padding-bottom: 72px;
+}
