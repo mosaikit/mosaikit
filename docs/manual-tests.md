@@ -201,7 +201,7 @@ The dev environment loads the plugins of `mosaikit-plugins` from their folders (
 | P4-17 | Switch to Italiano | «Revisionata», «Segna come revisionata»; kinds App / Servizio / Estensione in the pages of the plugins |
 | P4-18 | A public link to a note, then turn Notes off in the tenant | The link stops working; on again, it works again |
 | P4-19 | As Administrator: a plugin with settings (`[[config]]`), Configuration tab | A field per setting; secrets show «Saved: type to replace» and never their value; the save bar appears only after a change (none of the official plugins has settings yet: try with a package of your own) |
-| P4-20 | Uninstall *Note review* (⋯ › Uninstall) | The confirmation says how many items and tenants are touched; the extension disappears, Notes keeps working; reinstall it from Catalog (Install), then ⋯ › Turn on: until then it is installed but off |
+| P4-20 | Uninstall *Note review* (⋯ › Uninstall) | The confirmation says how many items and tenants are touched; the extension disappears, Notes keeps working; reinstall it from Catalog (Install): it comes back in the state it had before (on, with the tenants that had it), the platform remembers it |
 | P4-21 | Dark mode on the new pages | Readable; switches and badges visible |
 
 ## Phase 5 — Shares, Trash, Log

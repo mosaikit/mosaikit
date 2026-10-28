@@ -451,13 +451,15 @@ fn copy_sources(from: &Path, to: &Path) -> Result<()> {
     for e in std::fs::read_dir(from).with_context(|| format!("reading {}", from.display()))? {
         let e = e?;
         let name = e.file_name();
+        // by name, before the type: in a worktree node_modules is a junction, not a directory
+        if SKIP.contains(&name.to_string_lossy().as_ref()) {
+            continue;
+        }
         if e.file_type()?.is_dir() {
-            if !SKIP.contains(&name.to_string_lossy().as_ref()) {
-                copy_sources(&e.path(), &to.join(&name))?;
-            }
+            copy_sources(&e.path(), &to.join(&name))?;
         } else if !name.to_string_lossy().ends_with(".key") {
             std::fs::copy(e.path(), to.join(&name))
-                .with_context(|| format!("the_copy {}", e.path().display()))?;
+                .with_context(|| format!("copying {}", e.path().display()))?;
         }
     }
     Ok(())
