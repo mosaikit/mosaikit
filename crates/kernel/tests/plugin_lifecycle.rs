@@ -501,15 +501,24 @@ async fn a_plugin_calls_a_service_with_its_key_and_only_where_allowed() {
     // no address set by the Administrator: the origin is not declared
     let e = evil_with(&t, KEYED_TOML, call.clone()).await.unwrap_err();
     assert!(e.message.contains("permissions.network"), "{e}");
-    keys::set_key(&t, admin.user_id, Level::Platform, "translate-endpoint", Some(&format!("http://127.0.0.1:{port}")), Some(true))
-        .await
-        .unwrap();
+    keys::set_key(
+        &t,
+        admin.user_id,
+        Level::Platform,
+        "translate-endpoint",
+        Some(&format!("http://127.0.0.1:{port}")),
+        Some(true),
+    )
+    .await
+    .unwrap();
     // an address is set but there is no key: a clear error, nothing was sent
     let e = evil_with(&t, KEYED_TOML, call.clone()).await.unwrap_err();
     assert!(e.message.contains("no key of the service translate"), "{e}");
     assert!(seen.lock().unwrap().is_empty());
     // with the key: the host adds it, the plugin never sees it
-    keys::set_key(&t, admin.user_id, Level::Platform, "translate", Some("sk-secret-42"), Some(true)).await.unwrap();
+    keys::set_key(&t, admin.user_id, Level::Platform, "translate", Some("sk-secret-42"), Some(true))
+        .await
+        .unwrap();
     let out = evil_with(&t, KEYED_TOML, call.clone()).await.unwrap();
     assert_eq!(out["status"], 200);
     assert!(out["body"].as_str().unwrap().contains("Ciao mondo"));
@@ -536,10 +545,19 @@ async fn a_plugin_calls_a_service_with_its_key_and_only_where_allowed() {
     evil_with(&t, KEYED_TOML, json!({ "op": "db.query", "req": { "sql": "select 1 as n", "params": [] } }))
         .await
         .unwrap();
-    keys::set_key(&t, admin.user_id, Level::Platform, "translate-endpoint", Some(&format!("http://127.0.0.1:{port}")), Some(true))
+    keys::set_key(
+        &t,
+        admin.user_id,
+        Level::Platform,
+        "translate-endpoint",
+        Some(&format!("http://127.0.0.1:{port}")),
+        Some(true),
+    )
+    .await
+    .unwrap();
+    keys::set_key(&t, admin.user_id, Level::Platform, "translate", Some("sk-secret-42"), Some(true))
         .await
         .unwrap();
-    keys::set_key(&t, admin.user_id, Level::Platform, "translate", Some("sk-secret-42"), Some(true)).await.unwrap();
     let e = evil_with(&t, KEYED_TOML, call).await.unwrap_err();
     assert!(e.message.contains("not allowed"), "{e}");
     assert_eq!(seen.lock().unwrap().len(), 1, "nothing more reached the double");

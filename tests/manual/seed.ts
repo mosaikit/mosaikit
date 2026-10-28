@@ -26,7 +26,7 @@ export default async function seed() {
       name,
       manager_username: user,
       manager_display_name: disp,
-      manager_email: `${user}@example.org`,
+      manager_email: `${user}@example.test`,
       manager_password: L.PASSWORD,
     })
     tenants[slug] = t.id ?? t.tenant_id ?? t
@@ -40,7 +40,7 @@ export default async function seed() {
     ['d.conti', 'Davide Conti', 'user'],
     ['g.marini', 'Giulia Marini', 'user'],
   ]) {
-    const x = await m.call('POST', '/mosaikit/api/t/comune-roma/manage/members', { username: u, display_name: d, email: `${u}@example.org`, password: L.PASSWORD, role })
+    const x = await m.call('POST', '/mosaikit/api/t/comune-roma/manage/members', { username: u, display_name: d, email: `${u}@example.test`, password: L.PASSWORD, role })
     ids[u] = x.user_id
   }
   await a.call('POST', `/mosaikit/api/admin/people/${ids['d.conti']}/tenants`, { tenant: tenants['regione-lazio'], role: 'user' })

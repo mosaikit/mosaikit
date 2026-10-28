@@ -44,11 +44,18 @@ in step).
 
 ### For plugin authors
 
+- A plugin can call an outside service with the key an Administrator set: `http.fetch` takes a `key` (a service of `[[service_keys]]`) and the host adds it as a bearer token; the address may be the one set in Keys of outside services (`address = true`). Requests of plugins go through the same guard as the page probe (public addresses only). The SDK has `ctx.http().fetch_with_key(...)`.
+- Notes translates a note with a translation service (Translate note, under the note), as the example.
+- The manifest brochure (details, pictures, author, licence, link) shows as a full page in the plugin detail; the official plugins now come with pictures and texts.
+
 - The logic of a plugin knows the groups of the person who calls it (`ctx.groups`).
 - The logic can notify the person who calls it, or the people who can see one of its items, with the
   new `notify` host operation (`[permissions] notify = true`, `ctx.notify` in the SDK).
 
 ### The platform
+
+- Administrators have a required, unique email. They change their own from Account (current password and second factor) and the name and email of another Administrator from System › Administrators.
+- System › Email says what is missing and how to set it up, with a preset for a local test server (Mailpit in the development setup).
 
 - Tenants with a trial period, archived or deleted, exported and imported again.
 - Backups every day, with the restore of a whole tenant or of one item.

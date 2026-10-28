@@ -210,6 +210,34 @@ characters (the address of a self-hosted model shows whole). APIs: `/api/admin/k
 key in use with `keys::key_in_use`, the logic of a plugin with the host operation `key.get` (SDK:
 `ctx.service_key("id")`), only for the services its manifest declares. The key never reaches a UI.
 
+**Calling an outside service from a plugin** (example: Notes, command `notes.translate`, «Translate» in the
+detail of a note). The manifest declares the key and, for a self-hosted or configurable endpoint, a second
+service with `address = true` (`translate-endpoint`, scopes platform and tenant):
+
+```toml
+[[service_keys]]
+id = "translate"
+label = "Translation service"
+[[service_keys]]
+id = "translate-endpoint"
+label = "Translation service address"
+address = true
+scopes = ["platform", "tenant"]
+```
+
+The logic calls `ctx.http().fetch_with_key("POST", &url, Some(&body), "translate")`
+(`http.fetch` with `"key": "translate"`): the host adds `Authorization: Bearer <key in use>` itself, so the
+logic never holds the secret, and fails with «no key of the service … is set» when there is none. The
+address may be an origin of `permissions.network` or the one in use for an address service the plugin
+declares (so the Administrator, not the manifest, chooses the server). Every plugin request goes through
+`webfetch::request`, the same guard as the page probe: http and https only, public addresses only (a
+private or loopback address needs `allow_private_fetch`, development and tests only), the connection pinned
+to the address checked, redirects followed only for a GET, answer cut at 4 MB. A command answers a missing
+key or address with `{ ok: false, reason }` (`no_key`, `no_endpoint`, `key_rejected`, `service_error`,
+`unreachable`) so its UI says what to do. In tests a double server records the request (see
+`a_plugin_calls_a_service_with_its_key_and_only_where_allowed` in `crates/kernel/tests/plugin_lifecycle.rs`);
+no test calls a real service.
+
 **Own profile.** A person changes their display name (`PUT /api/me/profile`; not for the accounts of
 an identity provider, whose name comes from the provider: `profile_from_provider`) and picture (`PUT`
 raw / `DELETE /api/me/picture`, checked like the logos). The picture is kept in
@@ -1007,7 +1035,8 @@ files, network, clock except through the host).
 Messages: `{"abi":1,"kind":"command","name":…,"args":…,"ctx":…}` or
 `{"abi":1,"kind":"hook","hook":"before_create"|"before_update"|"after_delete",…}`;
 answer `{"ok":…}` or `{"err":"…"}`. Host operations: `db.query`, `db.exec`,
-`resource.create`, `resource.delete`, `http.fetch` (only towards `network`),
+`resource.create`, `resource.delete`, `http.fetch` (only towards `network` or the address of an address service
+of `[[service_keys]]`; with `"key"` the host adds the key of that service),
 `plugin.call` (only towards `calls`, §8.6), `key.get` (only for the `[[service_keys]]`) and `notify`
 (only with `[permissions] notify = true`).
 

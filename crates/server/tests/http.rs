@@ -2234,7 +2234,12 @@ async fn administrator_changes_own_email_over_http() {
     assert_eq!(r.status, StatusCode::FORBIDDEN);
     // the new Administrator needs an email
     let r = a
-        .call(Some(&admin), Method::POST, "/api/admin/administrators", Some(json!({ "username": "bis", "password": "long-enough-pass-1" })))
+        .call(
+            Some(&admin),
+            Method::POST,
+            "/api/admin/administrators",
+            Some(json!({ "username": "bis", "password": "long-enough-pass-1" })),
+        )
         .await;
     assert_eq!(r.json()["code"], "email_required");
 }

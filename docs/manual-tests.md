@@ -33,15 +33,19 @@ looks and reads.
 
 ### Accounts of the development environment
 
-| Who | Sign-in | Password | Role |
-|---|---|---|---|
-| Administrator | `#/admin`, user `admin` | `admin-sviluppo` | platform administrator (second factor at the first sign-in) |
-| Elena Ricci | tenant *Comune di Roma*, `e.ricci` | `password-prova-1` | Tenant Manager |
-| Marco Esposito | *Comune di Roma*, `m.esposito` | `password-prova-1` | Tenant Manager |
-| Sara Greco | *Comune di Roma*, `s.greco` | `password-prova-1` | User |
-| Luca Bianchi | *Comune di Roma*, `l.bianchi` | `password-prova-1` | User |
-| Davide Conti | *Comune di Roma*, `d.conti` | `password-prova-1` | User, guest in *Regione Lazio* |
-| Luca Verdi | *Regione Lazio*, `l.verdi` | `password-prova-1` | Tenant Manager |
+| Who | Sign-in | Password | Email | Role |
+|---|---|---|---|---|
+| Administrator | `#/admin`, user `admin` | `admin-sviluppo` | `admin@example.test` | platform administrator (second factor at the first sign-in) |
+| Elena Ricci | tenant *Comune di Roma*, `e.ricci` | `password-prova-1` | `e.ricci@example.test` | Tenant Manager |
+| Marco Esposito | *Comune di Roma*, `m.esposito` | `password-prova-1` | `m.esposito@example.test` | Tenant Manager |
+| Sara Greco | *Comune di Roma*, `s.greco` | `password-prova-1` | `s.greco@example.test` | User |
+| Luca Bianchi | *Comune di Roma*, `l.bianchi` | `password-prova-1` | `l.bianchi@example.test` | User |
+| Davide Conti | *Comune di Roma*, `d.conti` | `password-prova-1` | `d.conti@example.test` | User, guest in *Regione Lazio* |
+| Luca Verdi | *Regione Lazio*, `l.verdi` | `password-prova-1` | `l.verdi@example.test` | Tenant Manager |
+
+Every account has an email address (it is required). `cargo xtask dev` gives the first Administrator
+`admin@example.test` (`MOSAIKIT_ADMIN_EMAIL`); an Administrator created before this change adds it from
+Account › Profile. The other accounts are created by you or by the automated seed with the addresses above.
 
 On the sign-in page the **Username** field suggests these users and fills in the password (development
 only). The Administrator needs an authenticator app (Google or Microsoft Authenticator, FreeOTP…): the first
@@ -571,12 +575,26 @@ Automated twin of every check: the test «Review round 1, tenant and people» of
 | R1-T-03 | Quotas tab, and System › Quotas | Under **Items** a sentence says what is counted (what the people create in the apps: notes, tasks, files, maps, sites; one note, one item); Storage and People have theirs too |
 | R1-T-04 | Tenant › Plugins | Every row has a pill in the last column: *active*, or why not (*not available*, *turned off*, *off in the platform*), also for a plugin not available to the tenant |
 | R1-T-05 | Same page | After the sentence on availability the link **Go to the Plugins page** opens the list of the plugins |
-| R1-T-06 | Plugins › *Notes* | A brochure: gallery of two pictures (click the thumbnails), a description in two paragraphs, **Author**, **Licence**; a plugin without these fields says *not declared*; in Italian the description is in Italian; the technical details are in their own card |
+| R1-T-06 | Plugins › *Notes* | A brochure: gallery of pictures (click the thumbnails; click the picture to enlarge it), a description in paragraphs, **Publisher** with **Author** and **Licence**; a plugin without these fields says *not declared*; in Italian the description is in Italian; the technical details are in their own card (see FC-04 for the whole page) |
 | R1-T-07 | Monitoring | A line says the figures are real, collected every minute and kept for 8 days, and **Last update** with the time; after a minute the time changes by itself |
-| R1-T-08 | System › Email | A paragraph says that Mosaikit needs an SMTP server and mentions the optional Mailpit container for local tests; **Send a test** is there |
+| R1-T-08 | System › Email | A paragraph says that Mosaikit needs an SMTP server and mentions the optional Mailpit container for local tests; **Send a test** is there (FC-05 for the page with no server set) |
 | R1-T-09 | System › Keys of outside services (and the same page in Tenant settings and Account) | A paragraph says that the plugins declare which keys exist; with no plugin that uses keys the page says so |
-| R1-T-10 | System › Administrators, menu of your row, then of another Administrator's row | **Edit name and email** is in both menus; the new name shows in the list (and in the person menu for your own); the other actions (password, second factor, disable) stay absent on your own row |
+| R1-T-10 | System › Administrators, menu of your row, then of another Administrator's row | **Edit name and email** is in both menus; the new name shows in the list (and in the person menu for your own; your own email is changed in Account, FC-01); the other actions (password, second factor, disable) stay absent on your own row |
 | R1-T-11 | Tenant Manager › Manage › Permission profiles | A clear description of what a profile is; each card says «Access to N of M plugins» and lists them with plugin names and permission names in your language (never a plugin id like `com.mosaikit.notes`); **Rename** changes name and description; **Edit the permissions** is one compact row per plugin, with a filter when there are more than 6 |
+
+## Feedback C - accounts, brochure, email, translation
+
+Automated twin of every check: `tests/manual/checks/fc.ts` (and the test «14-feedback-c» of `tests/e2e/specs/14-feedback-c.spec.ts`).
+
+| Id | Check | Expected |
+|---|---|---|
+| FC-01 | As Administrator: Account › Profile | The email shows (`admin@example.test` in development); **Change email** opens a dialog asking the new address, the current password and, with the second factor on, a code of the app; a wrong password is refused with a readable message; with the right password and a fresh code the new address shows |
+| FC-02 | System › Administrators › **New Administrator** (name, **Email**, password), then the menu of the new row › **Edit name and email** | The email is required; one already used by another account is refused («already used by another account»); another Administrator's name and email change and the list shows them; the form does not send an empty email; in the menu of your own row the dialog has the name only and says the email is changed in Account |
+| FC-03 | Account of a Tenant Manager | The text under **Details** says that the Tenant Manager of the home tenant changes the email; no **Change email** button |
+| FC-04 | Plugins › each official plugin (Notes, Tasks, Maps, Static sites, Files, Contacts, Note review, the four layouts, Spanish) | A brochure: a header with icon, name, version and licence; a gallery with a picture that loads; the text under **About**; **Permissions and requirements**; **Publisher** with author, licence, version, signature and link. A click on the picture opens it large, the arrows or ← → show the next one, Esc closes. At 390 px wide nothing scrolls sideways; light and dark are both readable |
+| FC-05 | System › Email with no server saved | A card **Set up email** says what is missing («the SMTP server, the sender»); **Set up** puts the cursor in **SMTP server**; **Fill in for a local test server** fills `localhost`, port 1025, security None and a sender, with the line that starts Mailpit; **Send a test** is off with «Available once the mail server is saved.»; after saving the card is gone and the badge says *Ready* |
+| FC-06 | As a Tenant Manager: Notes › a note › **Translate note**; then, as Administrator, set the keys **Translation service** and **Translation service address** (shared) in System › Keys of outside services and try again | Without a key: «No translation key is set. Ask your Administrator…», nothing sent. With both: the translated title and text appear under the button; the service received the key as a bearer token; the key is never in the page. (A translation service of the test answers; no real service is called) |
+| FC-07 | The development accounts of the table in Setup | Every account has an email address (`<username>@example.test`) |
 
 ---
 

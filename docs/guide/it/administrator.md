@@ -29,8 +29,10 @@ organizzazione.
 
 Gli **Administrator** si gestiscono in **Sistema › Administrator**: **Nuovo Administrator** (registra il
 secondo fattore al primo accesso), **Reimposta la password**, **Reimposta il secondo fattore** (registra di
-nuovo l'app), **Disabilita** / **Riattiva**. **Modifica nome ed email** è nel menu di ogni riga, anche della
-tua: ogni Administrator può cambiare i propri dati e quelli degli altri Administrator. Almeno un
+nuovo l'app), **Disabilita** / **Riattiva**. **Modifica nome ed email** è nel menu di ogni riga: ogni
+Administrator cambia nome ed email di un altro Administrator. L'email è obbligatoria e unica (la chiede anche
+**Nuovo Administrator**). Il tuo nome lo cambi anche lì, ma la tua email da **Account › Profilo › Email ›
+Cambia email**: chiede la password attuale e, se il secondo fattore è attivo, un codice dell'app. Almeno un
 Administrator resta sempre attivo.
 
 Mentre lavori la barra mostra **Piattaforma**: sei sulla piattaforma, non dentro un'organizzazione.
@@ -173,10 +175,12 @@ provider.
 - **Aggiornamenti** elenca le versioni più recenti con le note di rilascio; **Catalogo** quello che offrono i
   registri fidati.
 - La pagina di un plugin, schede:
-  - **Panoramica**: il plugin come una brochure: una galleria di immagini, la descrizione, l'**Autore**, la
-    **Licenza** e un link per saperne di più, poi i dettagli tecnici (versione, firma, stato) e cosa porta
-    l'aggiornamento. Un plugin dichiara autore, licenza, link, un testo più lungo e le sue immagini nel
-    manifest; ciò che non dichiara appare come *non dichiarato*.
+  - **Panoramica**: il plugin come la brochure di un'applicazione: un'intestazione con icona, nome, versione e
+    licenza; una galleria di immagini (un clic per ingrandirla, frecce o tasti ← → per scorrere);
+    **Informazioni** (la descrizione); **Autorizzazioni e requisiti** in breve; la **Cronologia delle
+    versioni**; e di lato **Autore e licenza** (**Autore**, **Licenza**, versione, firma, link) e i dettagli
+    tecnici. Un plugin dichiara autore, licenza, link, un testo più lungo e le sue immagini nel manifest; ciò
+    che non dichiara appare come *non dichiarato*.
   - **Cosa chiede**: logica sul server, hook, file, rete, altri plugin, database, e i **Permessi che porta**
     (oltre a usare, creare, eliminare e condividere).
   - **Organizzazioni**: **Disponibile a tutte le organizzazioni** (il valore per le nuove organizzazioni e per quelle senza una scelta
@@ -198,7 +202,7 @@ renderle più severe. **Salva** compare solo dopo una modifica.
 | Sezione | Cosa contiene |
 |---|---|
 | **Administrator** | Gli account della piattaforma (vedi *Primo avvio*). |
-| **Email** | **Server di posta** (**Server SMTP**, **Porta**, **Sicurezza**, **Utente**, **Password** conservata cifrata), **Mittente** e **Piè di pagina** con un'anteprima, **Invia una prova**. Mosaikit non invia email da solo: serve un server SMTP (quello della tua organizzazione o un servizio di posta). Senza un server non parte nessuna email. Per provare in locale il setup Docker ha un contenitore Mailpit facoltativo che intercetta ogni messaggio (SMTP `localhost:1025`, sicurezza **Nessuna**, nessun utente). |
+| **Email** | **Server di posta** (**Server SMTP**, **Porta**, **Sicurezza**, **Utente**, **Password** conservata cifrata), **Mittente** e **Piè di pagina** con un'anteprima, **Invia una prova**. Mosaikit non invia email da solo: serve un server SMTP (quello della tua organizzazione o un servizio di posta). Finché non sono salvati un server e un mittente la pagina dice **Configura l'email** e che cosa manca, e **Configura** porta al modulo; non parte nulla e la prova non è disponibile. Per provare in locale avvia il contenitore Mailpit dell'ambiente di sviluppo (`docker compose -f deploy/compose.dev.yml --profile mail up -d mail`), premi **Compila per un server di prova locale** (server `localhost`, porta 1025, sicurezza **Nessuna**, nessun utente), scegli un mittente, **Salva**, **Invia una prova** e leggi il messaggio su `http://localhost:8025`. |
 | **Notifiche** | Le impostazioni predefinite delle email (**Mai**, **Subito**, **Un riepilogo al giorno**) e l'ora del riepilogo giornaliero. |
 | **Conservazione** | Per quanto tempo cestino (predefinito 30 giorni), registro (predefinito 365 giorni) e notifiche (predefinito 90 giorni) conservano il loro contenuto. |
 | **Password e sessioni** | Lunghezza minima della password (mai sotto 10), tentativi prima del blocco, durata del blocco, durata della sessione, «Ricordami» in giorni (0: l'opzione non compare). |

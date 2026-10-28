@@ -203,14 +203,19 @@ async fn ensure_email_free(k: &Kernel, email: &str, except: Option<Uuid>) -> Res
     .fetch_one(&k.db)
     .await?;
     if taken {
-        return Err(Error::conflict("this email address is already used by another account").with_code("email_taken"));
+        return Err(
+            Error::conflict("this email address is already used by another account").with_code("email_taken")
+        );
     }
     Ok(())
 }
 
 fn check_admin_name(name: &str) -> Result<&str> {
     let name = name.trim();
-    if name.is_empty() || name.chars().count() > super::profile::NAME_MAX || name.chars().any(char::is_control) {
+    if name.is_empty()
+        || name.chars().count() > super::profile::NAME_MAX
+        || name.chars().any(char::is_control)
+    {
         return Err(Error::bad("a name of 1 to 120 characters").with_code("profile_name_invalid"));
     }
     Ok(name)
@@ -235,8 +240,16 @@ pub async fn update_administrator(
             .bind(name)
             .execute(&k.db)
             .await?;
-        events::record(k, None, Some(admin.user_id), None, None, "admin.update", json!({ "username": username }))
-            .await;
+        events::record(
+            k,
+            None,
+            Some(admin.user_id),
+            None,
+            None,
+            "admin.update",
+            json!({ "username": username }),
+        )
+        .await;
         return Ok(());
     }
     let email = crate::notify::required_email(email)?.to_lowercase();
@@ -289,7 +302,15 @@ pub async fn change_my_email(
         .bind(&email)
         .execute(&k.db)
         .await?;
-    events::record(k, None, Some(admin.user_id), None, None, "admin.email_change", json!({ "user": admin.user_id }))
-        .await;
+    events::record(
+        k,
+        None,
+        Some(admin.user_id),
+        None,
+        None,
+        "admin.email_change",
+        json!({ "user": admin.user_id }),
+    )
+    .await;
     Ok(())
 }

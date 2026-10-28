@@ -484,7 +484,11 @@ struct MyEmailReq {
 }
 
 /// An Administrator changes their own email: current password and, if on, the second factor.
-async fn my_set_email(State(s): State<AppState>, Auth(u): Auth, Json(r): Json<MyEmailReq>) -> ApiResult<Json<Value>> {
+async fn my_set_email(
+    State(s): State<AppState>,
+    Auth(u): Auth,
+    Json(r): Json<MyEmailReq>,
+) -> ApiResult<Json<Value>> {
     tenancy::change_my_email(&s.k, &u, &r.email, &r.password, r.code.as_deref()).await?;
     Ok(ok())
 }

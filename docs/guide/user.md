@@ -140,7 +140,7 @@ Person menu › **Account**. Sections:
 
 | Section | What you find |
 |---|---|
-| **Profile** | Your **Picture** (SVG, PNG or WebP, at most 512 KB: the people of your tenants see it) and your **Display name**, which you change yourself; username and home tenant. The email is changed by the Tenant Manager of your home tenant. In a tenant that signs in through an identity provider the name comes from the provider. |
+| **Profile** | Your **Picture** (SVG, PNG or WebP, at most 512 KB: the people of your tenants see it) and your **Display name**, which you change yourself; username and home tenant. The email is changed by the Tenant Manager of your home tenant (an Administrator changes their own from here: **Email › Change email**, with the current password and, if on, a code of the authenticator app). In a tenant that signs in through an identity provider the name comes from the provider. |
 | **Sign-in and security** | **Change password** (current, new, repeat; the rule of the tenant is shown under the field). Changing it closes your other sessions. In a tenant that signs in through an identity provider there is no password here: it is managed by the provider. |
 | **Notifications** | **What I receive**: for each kind, in the app and by **Email** (**Never**, **At once**, **One summary a day**); your **Email address**. |
 | **Appearance and language** | **Mode** (**Light**, **Dark**, **Automatic (like the system)**), **High contrast**, **Language**, **Sidebar** (**Open at start**) and **Apps in the sidebar** (the ones turned off stay in Home and in the search). The theme is chosen by whoever manages the tenant. |

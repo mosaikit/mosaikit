@@ -145,7 +145,7 @@ Menu della persona › **Account**. Sezioni:
 
 | Sezione | Cosa trovi |
 |---|---|
-| **Profilo** | La tua **Immagine** (SVG, PNG o WebP, al massimo 512 KB: la vedono le persone delle tue organizzazioni) e il tuo **Nome visualizzato**, che cambi tu; utente e organizzazione di appartenenza. L'email la cambia il Tenant Manager della tua organizzazione di appartenenza. In un'organizzazione che accede con un provider di identità il nome arriva dal provider. |
+| **Profilo** | La tua **Immagine** (SVG, PNG o WebP, al massimo 512 KB: la vedono le persone delle tue organizzazioni) e il tuo **Nome visualizzato**, che cambi tu; utente e organizzazione di appartenenza. L'email la cambia il Tenant Manager della tua organizzazione di appartenenza (un Administrator cambia la propria da qui: **Email › Cambia email**, con la password attuale e, se attivo, un codice dell'app di autenticazione). In un'organizzazione che accede con un provider di identità il nome arriva dal provider. |
 | **Accesso e sicurezza** | **Cambia password** (attuale, nuova, ripeti; sotto il campo si vede la regola dell'organizzazione). Cambiarla chiude le altre sessioni. In un'organizzazione che accede con un provider di identità qui non c'è la password: la gestisce il provider. |
 | **Notifiche** | **Cosa ricevo**: per ogni tipo, nell'app e per **Email** (**Mai**, **Subito**, **Un riepilogo al giorno**); il tuo **Indirizzo email**. |
 | **Aspetto e lingua** | **Tonalità** (**Chiaro**, **Scuro**, **Automatico (come il sistema)**), **Alto contrasto**, **Lingua**, **Sidebar** (**Aperta all'avvio**) e **App nella sidebar** (quelle tolte restano nella Home e nella ricerca). Il tema lo sceglie chi gestisce l'organizzazione. |

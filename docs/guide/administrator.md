@@ -26,9 +26,11 @@ Administrators always sign in with their local password and the second factor, w
 
 **Administrators** are managed in **System › Administrators**: **New Administrator** (they register the
 second factor at their first sign-in), **Reset the password**, **Reset the second factor** (they register the
-app again), **Disable** / **Reactivate**. **Edit name and email** is in the menu of every row, yours too:
-any Administrator may change their own data and those of the other Administrators. At least one
-Administrator always stays active.
+app again), **Disable** / **Reactivate**. **Edit name and email** is in the menu of every row: any Administrator
+changes the name and the email of another Administrator. The email is required and unique (**New
+Administrator** asks for it too). You change your own name there as well, but your own email from **Account ›
+Profile › Email › Change email**: it asks for your current password and, if your second factor is on, a code of
+the app. At least one Administrator always stays active.
 
 While you work, the band shows **Platform**: you are on the platform, not inside a tenant.
 
@@ -164,10 +166,12 @@ In tenants with an identity provider the password actions are not offered: the p
   every tenant; the confirmation says how many items, tenants and extensions are touched).
 - **Updates** lists newer versions with their release notes; **Catalog** what the trusted registries offer.
 - The page of a plugin, tabs:
-  - **Overview**: the plugin as a brochure: a gallery of pictures, its description, the **Author**, the
-    **Licence** and a link for more information, then the technical details (version, signature, status)
-    and what the update brings. A plugin declares author, licence, link, a longer text and its pictures in
-    its manifest; what it does not declare shows as *not declared*.
+  - **Overview**: the plugin as the brochure of an application: a header with its icon, name, version and
+    licence; a gallery of pictures (click one to enlarge it, arrows or the keys ← → to move); **About** (its
+    description); **Permissions and requirements** in short; the **Version history**; and at the side
+    **Publisher** (**Author**, **Licence**, version, signature, link) and the technical details. A plugin
+    declares author, licence, link, a longer text and its pictures in its manifest; what it does not declare
+    shows as *not declared*.
   - **What it asks**: logic on the server, hooks, files, network, other plugins, database, and the
     **Permissions it brings** (besides use, create, delete and share).
   - **Tenants**: **Available to every tenant** (the default for new tenants and the ones without a choice of
@@ -189,12 +193,12 @@ change.
 | Section | What it holds |
 |---|---|
 | **Administrators** | Accounts of the platform (see *First start*). |
-| **Email** | **Mail server** (**SMTP server**, **Port**, **Security**, **User**, **Password** stored encrypted), **Sender** and **Footer** with a preview, **Send a test**. Mosaikit sends no email by itself: it needs an SMTP server (the one of your organization or a mail service). Without a server nothing is sent. To try it locally the Docker setup has an optional Mailpit container that catches every message (SMTP `localhost:1025`, security **None**, no user). |
+| **Email** | **Mail server** (**SMTP server**, **Port**, **Security**, **User**, **Password** stored encrypted), **Sender** and **Footer** with a preview, **Send a test**. Mosaikit sends no email by itself: it needs an SMTP server (the one of your organization or a mail service). Until a server and a sender are saved the page says **Set up email** and what is missing, and **Set up** takes you to the form; nothing is sent and the test is not available. To try it locally start the Mailpit container of the development setup (`docker compose -f deploy/compose.dev.yml --profile mail up -d mail`), press **Fill in for a local test server** (server `localhost`, port 1025, security **None**, no user), choose a sender, **Save**, **Send a test** and read the message at `http://localhost:8025`. |
 | **Notifications** | The defaults of the emails (**Never**, **At once**, **One summary a day**) and the hour of the daily summary. |
 | **Retention** | How long the trash (default 30 days), the log (default 365 days) and the notifications (default 90 days) keep their content. |
 | **Passwords and sessions** | Minimum length of the password (never below 10), attempts before the lock, length of the lock, length of the session, «Remember me» in days (0: the option does not show). |
 | **Quotas** | **Quotas of new tenants** (storage, people, items; empty: no limit), **Capacity of the platform** with what is given to and used by the tenants (a warning when more is given than the platform has), the tenants with their quotas. A tenant's own quotas are on its page (Details › Quotas: **Customize**, **Restore**). |
-| **Keys of outside services** | Keys the platform pays for, for the services the installed plugins declare (each says which plugins use it; no plugin, no service: the plugins decide which keys exist, and none can be added by hand). A shared key is used by every tenant without one of its own. Only the last four characters show after saving. A key of a service no installed plugin uses any more is marked as not used: remove it. |
+| **Keys of outside services** | Keys the platform pays for, for the services the installed plugins declare (each says which plugins use it; no plugin, no service: the plugins decide which keys exist, and none can be added by hand). A shared key is used by every tenant without one of its own. Only the last four characters show after saving. A key of a service no installed plugin uses any more is marked as not used: remove it. The keys are real: for example Notes declares the **Translation service** key and its **address**; with both set (and shared with the tenants) the **Translation** box of a note translates it with that service, sending the key itself with the request. |
 | **Embedding** | Sites that may show the public pages (public links) inside their own pages. Without sites, nobody may. |
 | **Backup and restore** | See *Backups* below. |
 | **Maintenance** | See *Maintenance* below. |

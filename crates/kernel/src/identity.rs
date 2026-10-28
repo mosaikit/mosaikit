@@ -160,11 +160,14 @@ pub async fn bootstrap(k: &Kernel) -> Result<()> {
         .await?;
         // optional address of the Administrator (development and test environments); otherwise it is
         // added from the Account page
-        if let Some(e) = std::env::var("MOSAIKIT_ADMIN_EMAIL").ok().filter(|e| crate::notify::valid_email(e)) {
-            mosaikit_db::query("update core.users set email = $1 where username = 'admin' and is_system_admin")
-                .bind(e.trim().to_lowercase())
-                .execute(&mut *tx)
-                .await?;
+        if let Some(e) = std::env::var("MOSAIKIT_ADMIN_EMAIL").ok().filter(|e| crate::notify::valid_email(e))
+        {
+            mosaikit_db::query(
+                "update core.users set email = $1 where username = 'admin' and is_system_admin",
+            )
+            .bind(e.trim().to_lowercase())
+            .execute(&mut *tx)
+            .await?;
         }
         tx.commit().await?;
         if generated {
@@ -796,7 +799,12 @@ pub async fn memberships(k: &Kernel, user: &SessionUser) -> Result<Vec<Membershi
 
 /// Confirms a sensitive change of the signed-in person: the current password and, if their second
 /// factor is on, a code of the authenticator app (a code used for the sign-in does not work twice).
-pub async fn confirm_sensitive(k: &Kernel, user: &SessionUser, password: &str, code: Option<&str>) -> Result<()> {
+pub async fn confirm_sensitive(
+    k: &Kernel,
+    user: &SessionUser,
+    password: &str,
+    code: Option<&str>,
+) -> Result<()> {
     let key = format!("reauth:{}", user.user_id);
     if k.limiter.blocked(&key) {
         return Err(too_many());
@@ -814,18 +822,22 @@ pub async fn confirm_sensitive(k: &Kernel, user: &SessionUser, password: &str, c
     if r.get::<bool, _>(1) {
         let code = code.map(str::trim).filter(|c| !c.is_empty());
         let Some(code) = code else {
-            return Err(Error::bad("the code of the authenticator app is required").with_code("code_required"));
+            return Err(
+                Error::bad("the code of the authenticator app is required").with_code("code_required")
+            );
         };
         let secret: String = r.get::<Option<String>, _>(2).unwrap_or_default();
         let last: i64 = r.get(3);
         let used = match totp::verify(&secret, code, totp::current_step(), last.max(0) as u64) {
             Some(step) => {
-                mosaikit_db::query("update core.users set totp_last_step = $2 where id = $1 and totp_last_step < $2")
-                    .bind(user.user_id)
-                    .bind(step as i64)
-                    .execute(&k.db)
-                    .await?
-                    .rows_affected()
+                mosaikit_db::query(
+                    "update core.users set totp_last_step = $2 where id = $1 and totp_last_step < $2",
+                )
+                .bind(user.user_id)
+                .bind(step as i64)
+                .execute(&k.db)
+                .await?
+                .rows_affected()
                     == 1
             }
             None => false,

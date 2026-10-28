@@ -75,7 +75,9 @@ test.describe.serial('12-review-round1-platform', () => {
     const dlg = page.getByRole('dialog', { name: /Data of/ })
     const mine = await dlg.getByLabel('Name').inputValue()
     await dlg.getByLabel('Name').fill(mine + ' Two')
-    await dlg.getByLabel('Email').fill('root@example.org')
+    // the own email is changed from the Account page, with the password: not here
+    await expect(dlg.getByLabel('Email')).toHaveCount(0)
+    await expect(dlg).toContainText('Account')
     await dlg.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByText('Data saved').first()).toBeVisible()
     await expect(page.getByText(mine + ' Two').first()).toBeVisible()

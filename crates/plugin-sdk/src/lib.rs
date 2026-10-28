@@ -256,7 +256,13 @@ impl Http {
     /// `[[service_keys]]`) in use for the caller as `Authorization: Bearer ...`: the logic never reads it.
     /// Fails if no key is set. The address is an origin of `permissions.network` or the one the
     /// Administrator set for an address service of `[[service_keys]]`.
-    pub fn fetch_with_key(&self, method: &str, url: &str, body: Option<&str>, service: &str) -> Result<HttpResponse> {
+    pub fn fetch_with_key(
+        &self,
+        method: &str,
+        url: &str,
+        body: Option<&str>,
+        service: &str,
+    ) -> Result<HttpResponse> {
         self.send(json!({ "method": method, "url": url, "body": body, "key": service }))
     }
 

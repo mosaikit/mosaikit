@@ -44,11 +44,18 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
 ### Per chi scrive plugin
 
+- Un plugin può chiamare un servizio esterno con la chiave impostata da un Administrator: `http.fetch` accetta una `key` (un servizio di `[[service_keys]]`) e l'host la aggiunge come bearer token; l'indirizzo può essere quello impostato in Chiavi dei servizi esterni (`address = true`). Le richieste dei plugin passano dalla stessa protezione dell'anteprima delle pagine (solo indirizzi pubblici). L'SDK ha `ctx.http().fetch_with_key(...)`.
+- Note traduce una nota con un servizio di traduzione (Traduci la nota, sotto la nota), come esempio.
+- La brochure del manifest (descrizione, immagini, autore, licenza, link) appare come pagina completa nel dettaglio del plugin; i plugin ufficiali ora hanno immagini e testi.
+
 - La logica di un plugin conosce i gruppi della persona che la chiama (`ctx.groups`).
 - La logica può notificare la persona che la chiama, o le persone che vedono uno dei suoi elementi,
   con la nuova operazione `notify` dell'host (`[permissions] notify = true`, `ctx.notify` nell'SDK).
 
 ### La piattaforma
+
+- Gli Administrator hanno un'email obbligatoria e unica. La cambiano da Account (password attuale e secondo fattore); nome ed email di un altro Administrator si cambiano da Sistema › Administrator.
+- Sistema › Email dice che cosa manca e come configurarla, con un'impostazione pronta per un server di prova locale (Mailpit nell'ambiente di sviluppo).
 
 - Tenant con un periodo di prova, archiviati o eliminati, esportati e importati di nuovo.
 - Backup ogni giorno, con il ripristino di un tenant intero o di un singolo elemento.

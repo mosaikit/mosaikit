@@ -34,7 +34,6 @@ pub(crate) struct KernelHost {
     service_keys: Vec<String>,
     /// the services of `service_keys` whose value is an address: its origin may be fetched
     address_services: Vec<String>,
-    http: reqwest::Client,
     /// `[permissions] notify`: the plugin may notify
     notify: bool,
     /// notifications asked by the logic: sent after the commit of the operation
@@ -282,8 +281,13 @@ pub(crate) async fn run(
         plugin_id: p.id.clone(),
         network: p.manifest.permissions.network.clone(),
         service_keys: p.manifest.service_keys.iter().map(|s| s.id.clone()).collect(),
-        address_services: p.manifest.service_keys.iter().filter(|s| s.address).map(|s| s.id.clone()).collect(),
-        http: k.http.clone(),
+        address_services: p
+            .manifest
+            .service_keys
+            .iter()
+            .filter(|s| s.address)
+            .map(|s| s.id.clone())
+            .collect(),
         notify: p.manifest.permissions.notify,
         notes: Vec::new(),
     };

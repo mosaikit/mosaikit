@@ -23,8 +23,8 @@ mod tenants;
 pub mod themes;
 
 pub use administrators::{
-    administrators, change_my_email, create_administrator, reset_administrator_password, reset_administrator_totp,
-    set_administrator_active, update_administrator, AdminInfo,
+    administrators, change_my_email, create_administrator, reset_administrator_password,
+    reset_administrator_totp, set_administrator_active, update_administrator, AdminInfo,
 };
 pub use directory::{directory, Principal};
 pub use groups::{create_group, delete_group, groups, groups_page, set_group_member, GroupInfo, GroupMember};
