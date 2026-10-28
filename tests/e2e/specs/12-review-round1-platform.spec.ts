@@ -355,7 +355,7 @@ test.describe.serial('12-review-round1-platform', () => {
       await page.goto('./#/t/ovw/manage')
       const facets = page.getByRole('complementary', { name: 'Filters' })
       await expect(facets.getByRole('radiogroup', { name: 'Show' })).toBeVisible()
-      await facets.getByRole('searchbox', { name: 'Search by name or username' }).fill('ov-user')
+      await page.getByRole('searchbox', { name: 'Search by name or username' }).fill('ov-user')
       await expect(page.locator('tbody tr')).toHaveCount(1)
       await page.locator('tbody tr').first().getByRole('checkbox').click()
       const bar = page.getByRole('group', { name: 'Actions on the selection' })
@@ -364,7 +364,7 @@ test.describe.serial('12-review-round1-platform', () => {
       await accessible(page, 'manage people with a selection')
       await facets.getByRole('radio', { name: /^Groups/ }).click()
       await expect(page).toHaveURL(/manage\/groups/)
-      await expect(facets.getByRole('searchbox', { name: 'Search a group' })).toBeVisible()
+      await expect(page.getByRole('searchbox', { name: 'Search a group' })).toBeVisible()
     })
     await test.step('R1-O-08 Shares and Trash: filter column and selection bar', async () => {
       await page.goto('./#/t/ovw/shares')
