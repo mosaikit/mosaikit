@@ -142,7 +142,7 @@ const checks: L.Check[] = [
       const pages: [any, string, string][] = [
         [adm, '#/admin/system', 'System'],
         [adm, '#/admin/monitoring', 'Monitoring'],
-        [mgr, '#/t/comune-roma/settings', 'Settings'],
+        [mgr, '#/t/comune-roma/settings', 'Tenant settings'],
         [mgr, '#/t/comune-roma/usage', 'Usage'],
         [mgr, '#/t/comune-roma/account', 'Account'],
       ]

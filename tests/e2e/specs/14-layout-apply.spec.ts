@@ -95,6 +95,6 @@ test.describe.serial('14-layout-apply', () => {
     await check('#/admin/account', 'Account')
     await logout(page)
     await login(page, 'Alfa Municipality', 'manager', PASSWORD)
-    for (const [hash, name] of [['settings', 'Settings'], ['usage', 'Usage'], ['account', 'Account'], ['manage', 'Manage'], ['manage/groups', 'Manage']]) await check('#/t/alfa/' + hash, name)
+    for (const [hash, name] of [['settings', 'Tenant settings'], ['usage', 'Usage'], ['account', 'Account'], ['manage', 'Manage'], ['manage/groups', 'Manage']]) await check('#/t/alfa/' + hash, name)
   })
 })
