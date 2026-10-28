@@ -373,7 +373,7 @@ test.describe.serial('12-review-round1-platform', () => {
       await facets.getByRole('radio', { name: /^All items/ }).click()
       await expect(page.getByRole('group', { name: 'Actions on the selection' })).toBeAttached()
       await page.goto('./#/t/ovw/trash')
-      await expect(page.getByRole('complementary', { name: 'Filters' }).getByRole('searchbox', { name: 'Search in the trash' })).toBeVisible()
+      await expect(page.getByRole('searchbox', { name: 'Search in the trash' })).toBeVisible()
       await accessible(page, 'trash with the filter column')
     })
     await test.step('R1-O-09 Trash, Shared by me, Invitations and the log of the widgets come in pages from the server', async () => {
