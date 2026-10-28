@@ -280,7 +280,7 @@ const checks: L.Check[] = [
     async run(ctx: any) {
       const c = H.checker()
       const p = await L.as(ctx, 'e.ricci', 'es')
-      const english = /(?<!p{L})(the|and|your|you|with|from|for|are|this|will|have|not|new|add|save|cancel)(?!p{L})/iu
+      const english = /(?<!\p{L})(the|and|your|you|with|from|for|are|this|will|have|not|new|add|save|cancel)(?!\p{L})/iu
       for (const hash of ['', '/overview', '/manage', '/plugins', '/shares', '/settings', '/account']) {
         await H.go(p, '#/t/comune-roma' + hash)
         await p.waitForTimeout(1200)
