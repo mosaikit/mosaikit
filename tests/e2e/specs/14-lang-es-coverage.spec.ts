@@ -13,6 +13,9 @@ const ENGLISH = /(?<!\p{L})(the|and|your|you|with|from|for|are|this|that|will|ha
 // Names of things the people typed or the seed made, brands and technical terms that stay as they are.
 const ALLOWED = /^(automatic message, do not reply.|mosaikit|plugins?|tenant|admin|manager|notes?|tasks?|ctrl k|oidc|smtp|pkce|csv|svg|png|webp|es|en|it|gb|ok)$/i
 
+// Data, not UI: the names of the tenants the other specs (and this one) made, wherever they show up.
+const DATA = /(City|Town) of [A-Z][a-z]+|Ciudad ES/g
+
 async function lines(page: Page): Promise<string[]> {
   return page.evaluate(() => {
     const out = new Set<string>()
@@ -43,7 +46,7 @@ async function scan(page: Page, name: string, found: string[]) {
   }
   fs.mkdirSync(OUT, { recursive: true })
   await page.screenshot({ path: new URL(`${name}.png`, OUT).pathname.replace(/^\/([A-Za-z]:)/, '$1') })
-  for (const l of await lines(page)) if (ENGLISH.test(l) && !ALLOWED.test(l)) found.push(`${name}: ${l}`)
+  for (const l of await lines(page)) if (ENGLISH.test(l.replace(DATA, '')) && !ALLOWED.test(l)) found.push(`${name}: ${l}`)
 }
 
 async function spanish(page: Page) {
