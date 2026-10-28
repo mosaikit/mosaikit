@@ -5,7 +5,7 @@
 
 import { Fragment, useRef, useState, type ReactNode } from 'react'
 import { ArrowUpCircle, ExternalLink, KeySquare, MessageSquarePlus, Power, Puzzle, RotateCcw, Trash2, Upload } from 'lucide-react'
-import { api, appUrl, fmtDate } from '../../api.ts'
+import { api, fmtDate } from '../../api.ts'
 import type { AdminPlugin, CatalogItem, ConfigDecl, PluginConfig, PluginKind, PluginTenant, TenantPlugin, UninstallImpact } from '../../types.ts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -17,8 +17,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAction, useApi, useConfirm } from '../core.ts'
-import { cn } from '@/lib/utils'
 import AppIcon from '../AppIcon.tsx'
+import { Brochure } from './brochure.tsx'
 import { Empty, ErrorBox, FormDialog, Loading, PageHeader, Pills, SaveBar, StatusBadge, Sliced, Tabs, FillBody, FillPage } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import { t } from '../i18n.ts'
@@ -385,122 +385,32 @@ export function AdminPluginPage({ id, tab }: { id: string; tab?: string }) {
   )
 }
 
-/** The plugin as a brochure: gallery, description, author, licence and link. Every part is optional in the manifest. */
-function Brochure({ p }: { p: AdminPlugin }) {
-  const shots = p.screenshots ?? []
-  const [shot, setShot] = useState(0)
-  const paragraphs = (p.details ?? '').split(/\n\s*\n/).map((x) => x.trim()).filter(Boolean)
-  return (
-    <Card data-testid="plugin-brochure">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2.5">
-          <AppIcon id={p.id} name={p.icon_name} className="size-6 text-primary" />
-          {p.label}
-        </CardTitle>
-        <CardDescription>{p.description}</CardDescription>
-      </CardHeader>
-      <CardContent className="grid gap-4">
-        {shots.length > 0 && (
-          <div className="grid gap-2" data-testid="plugin-gallery">
-            <img
-              className="max-h-80 w-full rounded-lg border bg-muted object-contain"
-              src={appUrl(`/api/plugins/${enc(p.id)}/media/${enc(shots[shot] ?? shots[0])}`)}
-              alt={t('Picture {n} of {total} of {name}', { n: shot + 1, total: shots.length, name: p.label })}
-            />
-            {shots.length > 1 && (
-              <div className="flex flex-wrap gap-2">
-                {shots.map((n, i) => (
-                  <button key={n} type="button" aria-label={t('Show picture {n}', { n: i + 1 })} aria-current={i === shot} onClick={() => setShot(i)} className={cn('overflow-hidden rounded-md border', i === shot && 'ring-2 ring-primary')}>
-                    <img className="h-14 w-20 object-cover" src={appUrl(`/api/plugins/${enc(p.id)}/media/${enc(n)}`)} alt="" />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-        {paragraphs.map((x, i) => (
-          <p key={i} className="text-sm whitespace-pre-line">
-            {x}
-          </p>
-        ))}
-        <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
-          <dt className="text-muted-foreground">{t('Author')}</dt>
-          <dd>{p.author ?? <span className="text-muted-foreground">{t('not declared')}</span>}</dd>
-          <dt className="text-muted-foreground">{t('Licence')}</dt>
-          <dd>{p.license ?? <span className="text-muted-foreground">{t('not declared')}</span>}</dd>
-          {p.homepage && (
-            <>
-              <dt className="text-muted-foreground">{t('More information')}</dt>
-              <dd>
-                <a className="underline underline-offset-4" href={p.homepage} target="_blank" rel="noopener noreferrer">
-                  {p.homepage}
-                </a>
-              </dd>
-            </>
-          )}
-        </dl>
-      </CardContent>
-    </Card>
-  )
-}
-
 function PluginOverview({ p, c, all }: { p: AdminPlugin; c?: CatalogItem; all: AdminPlugin[] }) {
   const base = p.extends ? all.find((x) => x.id === p.extends) : undefined
-  return (
-    <div className="grid max-w-3xl gap-6">
-      <Brochure p={p} />
-      <Card>
-        <CardHeader>
-          <CardTitle>{t('Technical details')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <dl className="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
-            <dt className="text-muted-foreground">{t('Kind')}</dt>
-            <dd>{kindLabel(kindOf(p))}</dd>
-            {p.extends && (
-              <>
-                <dt className="text-muted-foreground">{t('Extends')}</dt>
-                <dd>
-                  {base ? <a className="underline-offset-4 hover:underline" href={to.adminPlugin(base.id)}>{base.label}</a> : <span className="font-mono">{p.extends}</span>}
-                  {p.extends_min && p.extends_min !== '0.0.0' && <span className="text-muted-foreground"> · {t('from version {v}', { v: p.extends_min })}</span>}
-                  {!base && <span className="text-warn"> · {t('not installed')}</span>}
-                </dd>
-              </>
-            )}
-            <dt className="text-muted-foreground">{t('Version')}</dt>
-            <dd className="font-mono">{p.version}</dd>
-            <dt className="text-muted-foreground">{t('Signature')}</dt>
-            <dd>{p.signed_by ?? <span className="text-warn">{t('unsigned')}</span>}</dd>
-            <dt className="text-muted-foreground">sha256</dt>
-            <dd className="font-mono text-xs break-all">{p.sha256}</dd>
-            <dt className="text-muted-foreground">{t('Installed')}</dt>
-            <dd>{fmtDate(p.installed_at)}</dd>
-            {p.min_kernel && (
-              <>
-                <dt className="text-muted-foreground">{t('Needs Mosaikit')}</dt>
-                <dd className="font-mono">{p.min_kernel}</dd>
-              </>
-            )}
-          </dl>
-        </CardContent>
-      </Card>
-      {!!c?.notes?.length && (
-        <Card>
-          <CardHeader>
-            <CardTitle>{c.update_available ? t('What the update brings') : t('Release notes')}</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-3 text-sm">
-            {c.notes.map((n) => (
-              <div key={n.version}>
-                <b className="font-mono text-xs">{n.version}</b>
-                <p className="whitespace-pre-line text-muted-foreground">{n.notes}</p>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
+  const technical = (
+    <div className="grid gap-3 rounded-xl border bg-card p-4">
+      <h3 className="text-sm font-semibold">{t('Technical details')}</h3>
+      <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 text-sm">
+        <dt className="text-muted-foreground">{t('Kind')}</dt>
+        <dd>{kindLabel(kindOf(p))}</dd>
+        {p.extends && (
+          <>
+            <dt className="text-muted-foreground">{t('Extends')}</dt>
+            <dd>
+              {base ? <a className="underline-offset-4 hover:underline" href={to.adminPlugin(base.id)}>{base.label}</a> : <span className="font-mono">{p.extends}</span>}
+              {p.extends_min && p.extends_min !== '0.0.0' && <span className="text-muted-foreground"> · {t('from version {v}', { v: p.extends_min })}</span>}
+              {!base && <span className="text-warn"> · {t('not installed')}</span>}
+            </dd>
+          </>
+        )}
+        <dt className="text-muted-foreground">sha256</dt>
+        <dd className="font-mono text-xs break-all">{p.sha256}</dd>
+        <dt className="text-muted-foreground">{t('Installed')}</dt>
+        <dd>{fmtDate(p.installed_at)}</dd>
+      </dl>
     </div>
   )
+  return <Brochure p={p} kind={kindLabel(kindOf(p))} notes={c?.notes} aside={technical} />
 }
 
 function AskRow({ label, children }: { label: string; children: ReactNode }) {

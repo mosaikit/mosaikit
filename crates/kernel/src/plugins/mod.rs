@@ -588,10 +588,16 @@ pub async fn uninstall(k: &Kernel, admin: &SessionUser, id: &str) -> Result<()> 
 /// A picture of the brochure of an installed plugin (`media/<name>` of its package) and its type.
 pub fn media(k: &Kernel, id: &str, name: &str) -> Option<(Vec<u8>, &'static str)> {
     let p = k.plugins.get(id)?;
-    if p.dev || !p.manifest.screenshots.iter().any(|s| s == name) || !mosaikit_mskp::is_media_name(name) {
+    if !p.manifest.screenshots.iter().any(|s| s == name) || !mosaikit_mskp::is_media_name(name) {
         return None;
     }
-    let data = std::fs::read(install_dir(k, id, &p.manifest.version).join("media").join(name)).ok()?;
+    // a plugin loaded from a folder (development) has its pictures in `media/` of the folder
+    let dir = if p.dev {
+        p.ui_dir.as_ref()?.parent()?.parent()?.join("media")
+    } else {
+        install_dir(k, id, &p.manifest.version).join("media")
+    };
+    let data = std::fs::read(dir.join(name)).ok()?;
     let mime = match name.rsplit('.').next()?.to_ascii_lowercase().as_str() {
         "png" => "image/png",
         "jpg" | "jpeg" => "image/jpeg",
