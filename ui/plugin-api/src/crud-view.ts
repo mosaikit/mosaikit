@@ -20,6 +20,9 @@ export interface CrudOptions {
   newLabel?: string
   /** only the rows that pass (a page of the navigation of the app: «Mine», a tag…) */
   where?: (row: Row) => boolean
+  /** a plugin's own tools in the detail of an existing item (a «Translate» button…): draws into `box`,
+   *  which is emptied and drawn again whenever the detail is */
+  detail?: (row: Row, box: HTMLElement) => void
 }
 
 /** Rows asked at a time: the list grows with «Load more». */
@@ -142,6 +145,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   const readonly = h('div', { class: 'msk-readonly' })
   const fieldsBox = h('div')
   const extBox = h('div', { class: 'msk-ext' })
+  const toolsBox = h('div', { class: 'msk-tools' })
   const tabsBar = h('div', { class: 'msk-tabs', role: 'tablist' })
   const tabPanel = h('div', { class: 'msk-tabpanel', role: 'tabpanel', id: 'msk-tabpanel' })
   const btnSave = h('button', { type: 'button', class: 'msk-btn' })
@@ -161,7 +165,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     btnDel.textContent = tr('del')
   }
   const msg = h('div', { class: 'msk-msg', role: 'status' })
-  const form = h('section', { class: 'msk-form' }, formTitle, tabsBar, readonly, fieldsBox, extBox, tabPanel, h('div', { class: 'msk-actions' }, btnSave, btnCancel, btnShare, btnDel), msg)
+  const form = h('section', { class: 'msk-form' }, formTitle, tabsBar, readonly, fieldsBox, extBox, toolsBox, tabPanel, h('div', { class: 'msk-actions' }, btnSave, btnCancel, btnShare, btnDel), msg)
 
   const morebar = h('div', { class: 'msk-morebar' }, btnMore)
   const body = pageBody(h('div', { class: 'msk-tablewrap' }, table), morebar, form)
@@ -304,7 +308,9 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     renderTabs(row)
     readonly.textContent = row && !canWrite ? tr('sharedReadOnly') : row ? tr('ownerIs', { name: row.owner_name }) : ''
     const inTab = !!(row && st.tab)
-    fieldsBox.hidden = extBox.hidden = inTab
+    fieldsBox.hidden = extBox.hidden = toolsBox.hidden = inTab
+    toolsBox.replaceChildren()
+    if (row && !inTab) opts.detail?.(row, toolsBox)
     tabPanel.hidden = !inTab
     fieldsBox.replaceChildren(...visibleFields().map((f) => input(f, row?.values[f.key], !canWrite)))
     btnSave.hidden = !canWrite || inTab

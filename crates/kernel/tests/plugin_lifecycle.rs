@@ -321,8 +321,16 @@ fields = [{ key = "title", kind = "text" }]
 "#;
 
 async fn evil(t: &TestKernel, request: serde_json::Value) -> mosaikit_kernel::Result<serde_json::Value> {
+    evil_with(t, EVIL_TOML, request).await
+}
+
+async fn evil_with(
+    t: &TestKernel,
+    toml: &str,
+    request: serde_json::Value,
+) -> mosaikit_kernel::Result<serde_json::Value> {
     let mut files = BTreeMap::new();
-    files.insert("plugin.toml".to_string(), EVIL_TOML.as_bytes().to_vec());
+    files.insert("plugin.toml".to_string(), toml.as_bytes().to_vec());
     files.insert("logic.wasm".to_string(), evil_wasm(&request.to_string()));
     let pkg = mosaikit_mskp::pack(&files, Some(&test_key())).unwrap();
     if t.plugins.get("com.test.evil").is_some() {
@@ -422,4 +430,117 @@ async fn development_mode_loads_from_the_folder() {
     // a package cannot overwrite a development plugin
     let e = install_package(&t, None, &pack_plugin("notes"), InstallSource::Upload).await.err().unwrap();
     assert_eq!(e.kind, Kind::Conflict);
+}
+
+const KEYED_TOML: &str = r#"
+id = "com.test.evil"
+name = "Evil"
+version = "1.0.0"
+[contribution]
+icon = "x"
+label = "Evil"
+[[resources]]
+name = "items"
+fields = [{ key = "title", kind = "text" }]
+[[service_keys]]
+id = "translate"
+label = "Translation service"
+[[service_keys]]
+id = "translate-endpoint"
+label = "Address of the translation service"
+address = true
+scopes = ["platform"]
+"#;
+
+/// Test double of a translation service: records the head and the body of every request, answers JSON.
+async fn translation_double() -> (u16, std::sync::Arc<std::sync::Mutex<Vec<String>>>) {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    let l = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = l.local_addr().unwrap().port();
+    let seen = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let log = seen.clone();
+    tokio::spawn(async move {
+        loop {
+            let Ok((mut s, _)) = l.accept().await else { return };
+            let log = log.clone();
+            tokio::spawn(async move {
+                let mut buf = vec![0u8; 8192];
+                let n = s.read(&mut buf).await.unwrap_or(0);
+                log.lock().unwrap().push(String::from_utf8_lossy(&buf[..n]).to_string());
+                let body = r#"{"translatedText":"Ciao mondo"}"#;
+                let _ = s
+                    .write_all(
+                        format!(
+                            "HTTP/1.1 200 OK
+Content-Type: application/json
+Content-Length: {}
+Connection: close
+
+{body}",
+                            body.len()
+                        )
+                        .as_bytes(),
+                    )
+                    .await;
+            });
+        }
+    });
+    (port, seen)
+}
+
+#[tokio::test]
+async fn a_plugin_calls_a_service_with_its_key_and_only_where_allowed() {
+    use mosaikit_kernel::tenancy::keys::{self, Level};
+    let (port, seen) = translation_double().await;
+    let url = format!("http://127.0.0.1:{port}/translate");
+    let call = json!({ "op": "http.fetch", "req": { "method": "POST", "url": url, "key": "translate", "body": "{\"q\":\"Hello world\"}" } });
+
+    let t = start_with(|c| c.allow_private_fetch = true).await;
+    t.tenant("alfa").await;
+    let admin = t.admin().await;
+    // no address set by the Administrator: the origin is not declared
+    let e = evil_with(&t, KEYED_TOML, call.clone()).await.unwrap_err();
+    assert!(e.message.contains("permissions.network"), "{e}");
+    keys::set_key(&t, admin.user_id, Level::Platform, "translate-endpoint", Some(&format!("http://127.0.0.1:{port}")), Some(true))
+        .await
+        .unwrap();
+    // an address is set but there is no key: a clear error, nothing was sent
+    let e = evil_with(&t, KEYED_TOML, call.clone()).await.unwrap_err();
+    assert!(e.message.contains("no key of the service translate"), "{e}");
+    assert!(seen.lock().unwrap().is_empty());
+    // with the key: the host adds it, the plugin never sees it
+    keys::set_key(&t, admin.user_id, Level::Platform, "translate", Some("sk-secret-42"), Some(true)).await.unwrap();
+    let out = evil_with(&t, KEYED_TOML, call.clone()).await.unwrap();
+    assert_eq!(out["status"], 200);
+    assert!(out["body"].as_str().unwrap().contains("Ciao mondo"));
+    assert!(!out.to_string().contains("sk-secret-42"));
+    {
+        let reqs = seen.lock().unwrap();
+        assert_eq!(reqs.len(), 1);
+        let head = reqs[0].to_lowercase();
+        assert!(head.starts_with("post /translate"), "{head}");
+        assert!(head.contains("authorization: bearer sk-secret-42"), "{head}");
+        assert!(head.contains("hello world"), "{head}");
+    }
+    // another origin, or a service the plugin does not declare, is refused
+    let other = json!({ "op": "http.fetch", "req": { "url": "http://127.0.0.1:1/x", "key": "translate" } });
+    assert!(evil_with(&t, KEYED_TOML, other).await.unwrap_err().message.contains("permissions.network"));
+    let undeclared = json!({ "op": "http.fetch", "req": { "url": url, "key": "openai" } });
+    assert!(evil_with(&t, KEYED_TOML, undeclared).await.unwrap_err().message.contains("[[service_keys]]"));
+    drop(t);
+
+    // by default the address is on this computer: not allowed, whatever the Administrator wrote
+    let t = start().await;
+    t.tenant("alfa").await;
+    let admin = t.admin().await;
+    evil_with(&t, KEYED_TOML, json!({ "op": "db.query", "req": { "sql": "select 1 as n", "params": [] } }))
+        .await
+        .unwrap();
+    keys::set_key(&t, admin.user_id, Level::Platform, "translate-endpoint", Some(&format!("http://127.0.0.1:{port}")), Some(true))
+        .await
+        .unwrap();
+    keys::set_key(&t, admin.user_id, Level::Platform, "translate", Some("sk-secret-42"), Some(true)).await.unwrap();
+    let e = evil_with(&t, KEYED_TOML, call).await.unwrap_err();
+    assert!(e.message.contains("not allowed"), "{e}");
+    assert_eq!(seen.lock().unwrap().len(), 1, "nothing more reached the double");
 }

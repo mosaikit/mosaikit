@@ -227,7 +227,8 @@ impl Resources {
     }
 }
 
-/// HTTP towards the origins declared in `permissions.network` only.
+/// HTTP towards the origins declared in `permissions.network` (and the address of an address service of
+/// `[[service_keys]]`) only, through the host: public addresses only.
 pub struct Http(());
 
 #[derive(Debug, Clone, PartialEq)]
@@ -248,7 +249,19 @@ impl Http {
     }
 
     pub fn fetch(&self, method: &str, url: &str, body: Option<&str>) -> Result<HttpResponse> {
-        let v = host::call("http.fetch", json!({ "method": method, "url": url, "body": body }))?;
+        self.send(json!({ "method": method, "url": url, "body": body }))
+    }
+
+    /// Like [`Http::fetch`], and the host adds the key of the service `service` (declared in
+    /// `[[service_keys]]`) in use for the caller as `Authorization: Bearer ...`: the logic never reads it.
+    /// Fails if no key is set. The address is an origin of `permissions.network` or the one the
+    /// Administrator set for an address service of `[[service_keys]]`.
+    pub fn fetch_with_key(&self, method: &str, url: &str, body: Option<&str>, service: &str) -> Result<HttpResponse> {
+        self.send(json!({ "method": method, "url": url, "body": body, "key": service }))
+    }
+
+    fn send(&self, req: Value) -> Result<HttpResponse> {
+        let v = host::call("http.fetch", req)?;
         Ok(HttpResponse {
             status: v.get("status").and_then(Value::as_u64).unwrap_or(0) as u16,
             body: v.get("body").and_then(Value::as_str).unwrap_or_default().to_string(),

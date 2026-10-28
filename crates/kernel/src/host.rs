@@ -32,6 +32,8 @@ pub(crate) struct KernelHost {
     network: Vec<String>,
     /// the services of `[[service_keys]]` the plugin declares: the only keys it may read
     service_keys: Vec<String>,
+    /// the services of `service_keys` whose value is an address: its origin may be fetched
+    address_services: Vec<String>,
     http: reqwest::Client,
     /// `[permissions] notify`: the plugin may notify
     notify: bool,
@@ -133,11 +135,22 @@ impl KernelHost {
         })
     }
 
+    /// `http.fetch`: an origin declared in `permissions.network` (or the address an Administrator set for
+    /// an address service of `[[service_keys]]`). The request goes through the same checks as the page
+    /// probe (public addresses only, see `webfetch::request`). With `key` (a service of the plugin) the
+    /// host adds the key in use for the caller as `Authorization: Bearer ...`: the plugin never reads it.
     fn http(&mut self, req: &Value) -> std::result::Result<Value, String> {
-        let url = req.get("url").and_then(Value::as_str).ok_or("missing url")?;
-        let origin = crate::config::origin_of(url);
-        if !self.network.contains(&origin) {
-            return Err(format!("origin not declared in permissions.network: {origin}"));
+        let url = req.get("url").and_then(Value::as_str).ok_or("missing url")?.to_string();
+        let origin = crate::config::origin_of(&url);
+        let k = self.kernel.clone().ok_or("kernel not available")?;
+        let caller = self.caller.clone();
+        let allowed = self.network.contains(&origin);
+        let address_services = self.address_services.clone();
+        let key_service = req.get("key").and_then(Value::as_str).map(str::to_string);
+        if let Some(s) = &key_service {
+            if !self.service_keys.iter().any(|x| x == s) {
+                return Err(format!("the plugin does not declare the service {s} in [[service_keys]]"));
+            }
         }
         let method = match req.get("method").and_then(Value::as_str).unwrap_or("GET") {
             "GET" => reqwest::Method::GET,
@@ -146,18 +159,33 @@ impl KernelHost {
             "DELETE" => reqwest::Method::DELETE,
             m => return Err(format!("method not allowed: {m}")),
         };
-        let mut r = self.http.request(method, url);
-        if let Some(b) = req.get("body").and_then(Value::as_str) {
-            r = r.header("content-type", "application/json").body(b.to_string());
-        }
+        let body = req.get("body").and_then(Value::as_str).map(str::to_string);
         self.rt.block_on(async move {
-            let resp = r.send().await.map_err(|e| e.to_string())?;
-            let status = resp.status().as_u16();
-            let bytes = resp.bytes().await.map_err(|e| e.to_string())?;
-            if bytes.len() > MAX_HTTP_BODY {
+            if !allowed {
+                let mut by_address = false;
+                for s in &address_services {
+                    if let Ok(Some(a)) = crate::tenancy::keys::key_in_use(&k, &caller, s).await {
+                        by_address |= crate::config::origin_of(&a) == origin;
+                    }
+                }
+                if !by_address {
+                    return Err(format!("origin not declared in permissions.network: {origin}"));
+                }
+            }
+            let mut headers = Vec::new();
+            if let Some(s) = key_service {
+                match crate::tenancy::keys::key_in_use(&k, &caller, &s).await.map_err(|e| e.message)? {
+                    Some(key) => headers.push(("authorization".to_string(), format!("Bearer {key}"))),
+                    None => return Err(format!("no key of the service {s} is set")),
+                }
+            }
+            let r = crate::webfetch::request(&k, method, &url, &headers, body, MAX_HTTP_BODY + 1)
+                .await
+                .map_err(|e| e.message)?;
+            if r.body.len() > MAX_HTTP_BODY {
                 return Err("HTTP response over 4 MB".to_string());
             }
-            Ok(json!({ "status": status, "body": String::from_utf8_lossy(&bytes) }))
+            Ok(json!({ "status": r.status, "body": String::from_utf8_lossy(&r.body) }))
         })
     }
 }
@@ -254,6 +282,7 @@ pub(crate) async fn run(
         plugin_id: p.id.clone(),
         network: p.manifest.permissions.network.clone(),
         service_keys: p.manifest.service_keys.iter().map(|s| s.id.clone()).collect(),
+        address_services: p.manifest.service_keys.iter().filter(|s| s.address).map(|s| s.id.clone()).collect(),
         http: k.http.clone(),
         notify: p.manifest.permissions.notify,
         notes: Vec::new(),

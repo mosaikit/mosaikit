@@ -97,6 +97,41 @@ fn unreachable() -> Error {
 
 /// One GET, redirects followed by hand (each hop checked), the body cut at `max` bytes.
 async fn fetch(k: &Kernel, raw: &str, max: usize, accept: &str) -> Result<Fetched> {
+    send(k, reqwest::Method::GET, raw, max, accept, &[], None).await
+}
+
+/// What a plugin gets back from [`request`].
+#[derive(Debug)]
+pub struct Reply {
+    pub status: u16,
+    pub body: Vec<u8>,
+}
+
+/// A request of a plugin to an outside service, with the same protections as the page probe: http(s)
+/// only, public addresses only (unless `allow_private_fetch`), the connection pinned to the address that
+/// was checked, redirects followed only for a GET and checked at every hop, the body cut at `max` bytes.
+pub async fn request(
+    k: &Kernel,
+    method: reqwest::Method,
+    raw: &str,
+    headers: &[(String, String)],
+    body: Option<String>,
+    max: usize,
+) -> Result<Reply> {
+    let f = send(k, method, raw, max, "application/json, text/plain;q=0.8, */*;q=0.5", headers, body).await?;
+    Ok(Reply { status: f.status, body: f.body })
+}
+
+async fn send(
+    k: &Kernel,
+    method: reqwest::Method,
+    raw: &str,
+    max: usize,
+    accept: &str,
+    headers: &[(String, String)],
+    body: Option<String>,
+) -> Result<Fetched> {
+    let follow = method == reqwest::Method::GET;
     let mut url = check_url(raw)?;
     for _ in 0..=MAX_REDIRECTS {
         let host = url.host_str().unwrap_or_default().trim_matches(['[', ']']).to_string();
@@ -119,10 +154,16 @@ async fn fetch(k: &Kernel, raw: &str, max: usize, accept: &str) -> Result<Fetche
             .resolve(&host, addrs[0])
             .build()
             .map_err(|e| Error::internal(e.to_string()))?;
-        let mut resp =
-            client.get(url.clone()).header("accept", accept).send().await.map_err(|_| unreachable())?;
+        let mut req = client.request(method.clone(), url.clone()).header("accept", accept);
+        for (n, v) in headers {
+            req = req.header(n.as_str(), v.as_str());
+        }
+        if let Some(b) = &body {
+            req = req.header("content-type", "application/json").body(b.clone());
+        }
+        let mut resp = req.send().await.map_err(|_| unreachable())?;
         let status = resp.status();
-        if status.is_redirection() {
+        if follow && status.is_redirection() {
             let next = resp
                 .headers()
                 .get("location")
