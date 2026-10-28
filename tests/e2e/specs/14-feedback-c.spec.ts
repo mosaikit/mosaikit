@@ -178,7 +178,11 @@ test.describe.serial('14-feedback-c', () => {
         await frame.locator('[data-key="title"]').fill('Good news')
         await frame.locator('[data-key="body"]').fill('The park opens on Monday')
         await frame.getByRole('button', { name: 'Save' }).click()
-        await frame.locator('tbody tr.row', { hasText: 'Good news' }).click()
+        // the list is redrawn after the save: click again until the detail is open
+        await expect(async () => {
+          await frame.getByRole('row', { name: /Good news/ }).first().click()
+          await expect(frame.getByRole('button', { name: 'Translate note' })).toBeVisible({ timeout: 2000 })
+        }).toPass({ timeout: 20_000 })
         // no key yet: a clear message, and nothing was sent
         await frame.getByRole('button', { name: 'Translate note' }).click()
         await expect(frame.getByText('No translation key is set')).toBeVisible()
