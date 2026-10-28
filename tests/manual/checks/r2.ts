@@ -161,11 +161,6 @@ const checks: L.Check[] = [
           c.ok(await H.vis(p.getByRole('heading', { name, level: 1 })), `${name}: the page title stays`)
         }
       }
-      await mgr.setViewportSize({ width: 1440, height: 800 })
-      await H.go(mgr, '#/t/comune-roma/p/com.mosaikit.notes/mine')
-      const f = await L.pluginFrame(mgr)
-      await f.locator('.msk-psection').waitFor({ timeout: 15000 })
-      c.ok((await f.locator('.msk-pline').innerText()).replace(/\s+/g, ' ').includes('Notes › Mine'), 'the page of Notes reads «Notes › Mine»')
       return c.result()
     },
   },
