@@ -177,6 +177,7 @@ impl Instance {
                 .args(["--config"])
                 .arg(dir.join("mosaikit.toml"))
                 .env("MOSAIKIT_ADMIN_PASSWORD", ADMIN_PASSWORD)
+                .env("MOSAIKIT_ADMIN_EMAIL", "admin@example.test")
                 .stdout(Stdio::from(std::fs::File::create(dir.join("server.log"))?))
                 .stderr(Stdio::from(std::fs::File::create(dir.join("server.err.log"))?))
                 .spawn()?;

@@ -21,6 +21,8 @@ use crate::plugins::{self, Plugin};
 use crate::util::{npm, root, run};
 
 pub const DEV_ADMIN_PASSWORD: &str = "admin-sviluppo";
+/// Address of the development Administrator (the email is required for every account).
+pub const DEV_ADMIN_EMAIL: &str = "admin@example.test";
 
 /// Ends a process with all its children (npm/vite on Windows are chains of processes).
 pub fn kill_tree(child: &mut Child) {
@@ -41,6 +43,7 @@ fn server_cmd(plugins: &[Plugin]) -> Result<Command> {
             "MOSAIKIT_ADMIN_PASSWORD",
             std::env::var("MOSAIKIT_ADMIN_PASSWORD").unwrap_or_else(|_| DEV_ADMIN_PASSWORD.into()),
         )
+        .env("MOSAIKIT_ADMIN_EMAIL", std::env::var("MOSAIKIT_ADMIN_EMAIL").unwrap_or_else(|_| DEV_ADMIN_EMAIL.into()))
         .env(
             "MOSAIKIT_LOG",
             std::env::var("MOSAIKIT_LOG").unwrap_or_else(|_| "info,sqlx=warn,mosaikit=debug".into()),

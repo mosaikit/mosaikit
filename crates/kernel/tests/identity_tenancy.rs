@@ -5,7 +5,7 @@ use mosaikit_kernel::identity::{
     totp_setup, totp_verify, AdminLogin,
 };
 use mosaikit_kernel::tenancy::{
-    administrators, caller, create_administrator, create_group, create_member, create_tenant_manager,
+    administrators, caller, change_my_email, create_administrator, create_group, create_member, create_tenant_manager,
     directory, invite, list_tenants, login_tenants, members, my_invitations, remove_member,
     reset_administrator_totp, reset_member_password, reset_tenant_password, respond_invitation,
     set_administrator_active, set_group_member, set_role, set_shell_band, set_tenant_role, set_tenant_status,
@@ -212,7 +212,7 @@ async fn administrator_account_of_the_system_tenant() {
     assert_eq!(cg.tenant.role, Role::TenantManager);
     assert_eq!(caller(&t, &anna, "alfa").await.unwrap().tenant.role, Role::User);
     assert_eq!(administrators(&t, &mgr).await.unwrap_err().kind, Kind::Forbidden);
-    assert_eq!(create_administrator(&t, &mgr, "anna", "", PASSWORD).await.unwrap_err().kind, Kind::Forbidden);
+    assert_eq!(create_administrator(&t, &mgr, "anna", "", "anna@example.test", PASSWORD).await.unwrap_err().kind, Kind::Forbidden);
     assert_eq!(Role::parse("manager").unwrap_err().kind, Kind::BadRequest);
     assert_eq!(serde_json::to_value(Role::TenantManager).unwrap(), "tenant_manager");
 
@@ -233,10 +233,10 @@ async fn administrator_account_of_the_system_tenant() {
     );
     // a second Administrator: a new account of the system tenant, even with the same
     // name as a user of a tenant (they are distinct accounts)
-    let id = create_administrator(&t, &admin, "anna", "Anna Admin", PASSWORD).await.unwrap();
+    let id = create_administrator(&t, &admin, "anna", "Anna Admin", "anna@example.test", PASSWORD).await.unwrap();
     assert_ne!(id, anna.user_id);
     assert_eq!(
-        create_administrator(&t, &admin, "anna", "", PASSWORD).await.unwrap_err().kind,
+        create_administrator(&t, &admin, "anna", "", "other@example.test", PASSWORD).await.unwrap_err().kind,
         Kind::Conflict
     );
     let list = administrators(&t, &admin).await.unwrap();
@@ -246,13 +246,41 @@ async fn administrator_account_of_the_system_tenant() {
     };
     assert!(lr.user.is_system_admin && lr.user.user_id == id);
     // any Administrator changes the name and the email of any Administrator, their own included
-    update_administrator(&t, &admin, id, " Anna A. ", "Anna@Example.org").await.unwrap();
+    update_administrator(&t, &admin, id, " Anna A. ", "Anna.Admin@Example.org").await.unwrap();
+    // the own name changes here, the own email only with the password (Account page)
     update_administrator(&t, &admin, admin.user_id, "Root", "").await.unwrap();
     let list = administrators(&t, &admin).await.unwrap();
     assert_eq!(list[1].display_name, "Anna A.");
-    assert_eq!(list[1].email.as_deref(), Some("anna@example.org"));
+    assert_eq!(list[1].email.as_deref(), Some("anna.admin@example.org"));
     assert_eq!((list[0].display_name.as_str(), list[0].email.clone()), ("Root", None));
-    assert!(update_administrator(&t, &admin, id, "", "").await.is_err());
+    assert_eq!(
+        update_administrator(&t, &admin, admin.user_id, "Root", "root@example.test").await.unwrap_err().code(),
+        "own_email_reauth"
+    );
+    // required and unique
+    assert_eq!(update_administrator(&t, &admin, id, "Anna", "").await.unwrap_err().code(), "email_required");
+    assert_eq!(
+        update_administrator(&t, &admin, id, "Anna", "ANNA.admin@example.org").await.ok(),
+        Some(())
+    );
+    change_my_email(&t, &admin, "Root@Example.test", ADMIN_PASSWORD, None).await.unwrap();
+    assert_eq!(
+        change_my_email(&t, &admin, "root@example.test", "wrong-password", None).await.unwrap_err().code(),
+        "wrong_password"
+    );
+    assert_eq!(
+        change_my_email(&t, &admin, "anna.admin@example.org", ADMIN_PASSWORD, None).await.unwrap_err().code(),
+        "email_taken"
+    );
+    assert_eq!(
+        update_administrator(&t, &admin, id, "Anna", "root@example.test").await.unwrap_err().code(),
+        "email_taken"
+    );
+    assert_eq!(change_my_email(&t, &admin, "", ADMIN_PASSWORD, None).await.unwrap_err().code(), "email_required");
+    assert_eq!(change_my_email(&t, &anna, "x@y.test", PASSWORD, None).await.unwrap_err().kind, Kind::Forbidden);
+    let list = administrators(&t, &admin).await.unwrap();
+    assert_eq!(list[0].email.as_deref(), Some("root@example.test"));
+    assert!(update_administrator(&t, &admin, id, "", "anna.admin@example.org").await.is_err());
     assert!(update_administrator(&t, &admin, id, "Anna", "not an email").await.is_err());
     assert_eq!(update_administrator(&t, &anna, id, "X", "").await.unwrap_err().kind, Kind::Forbidden);
     // anna's account in the tenant stays a plain User
@@ -373,9 +401,19 @@ async fn second_factor_of_the_administrators() {
     let p = pending(&t).await;
     assert!(totp_verify(&t, &p, &codes[0], "t").await.is_err());
 
-    // another Administrator can reset it (lost phone): one registers again
+    // the own email needs the password and a fresh code of the app
     let admin = lr.user;
-    create_administrator(&t, &admin, "bis", "", PASSWORD).await.unwrap();
+    let own = |code: Option<String>| {
+        let k = t.k.clone();
+        let admin = admin.clone();
+        async move { change_my_email(&k, &admin, "me@example.test", ADMIN_PASSWORD, code.as_deref()).await }
+    };
+    assert_eq!(own(None).await.unwrap_err().code(), "code_required");
+    assert_eq!(own(Some("000000".into())).await.unwrap_err().code(), "wrong_code");
+    assert_eq!(own(Some(totp::code(&secret, now + 1))).await.unwrap_err().code(), "wrong_code", "already used");
+
+    // another Administrator can reset it (lost phone): one registers again
+    create_administrator(&t, &admin, "bis", "", "bis@example.test", PASSWORD).await.unwrap();
     let AdminLogin::Pending { step, .. } = admin_login(&t, "bis", PASSWORD, "t").await.unwrap() else {
         panic!("expected the second factor")
     };

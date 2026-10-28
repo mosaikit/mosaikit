@@ -54,9 +54,12 @@ pub async fn create_administrator(
     admin: &SessionUser,
     username: &str,
     display_name: &str,
+    email: &str,
     password: &str,
 ) -> Result<Uuid> {
     require_admin(admin)?;
+    let email = crate::notify::required_email(email)?.to_lowercase();
+    ensure_email_free(k, &email, None).await?;
     let username = username.trim().to_lowercase();
     if !valid_username(&username) {
         return Err(Error::bad("invalid username: lower case, digits, '.', '-', '_' (2-64)"));
@@ -64,12 +67,13 @@ pub async fn create_administrator(
     check_password_len(password, password_min(k, None).await?)?;
     let hash = hash_password(k, password).await?;
     let id: Uuid = mosaikit_db::query_scalar(
-        "insert into core.users (home_tenant_id, username, display_name, password_hash, is_system_admin)
-         select id, $1, $2, $3, true from core.tenants where is_system returning id",
+        "insert into core.users (home_tenant_id, username, display_name, password_hash, is_system_admin, email)
+         select id, $1, $2, $3, true, $4 from core.tenants where is_system returning id",
     )
     .bind(&username)
     .bind(display_name.trim())
     .bind(hash)
+    .bind(&email)
     .fetch_one(&k.db)
     .await
     .map_err(|e| match Error::from(e) {
@@ -189,7 +193,31 @@ pub async fn reset_administrator_totp(k: &Kernel, admin: &SessionUser, user_id: 
     Ok(())
 }
 
-/// Name and email of an Administrator, changed by any Administrator (their own data included).
+/// The email is unique among the accounts (the sign-in help finds the account by it).
+async fn ensure_email_free(k: &Kernel, email: &str, except: Option<Uuid>) -> Result<()> {
+    let taken: bool = mosaikit_db::query_scalar(
+        "select exists (select 1 from core.users where lower(email) = $1 and id <> $2)",
+    )
+    .bind(email)
+    .bind(except.unwrap_or_else(Uuid::nil))
+    .fetch_one(&k.db)
+    .await?;
+    if taken {
+        return Err(Error::conflict("this email address is already used by another account").with_code("email_taken"));
+    }
+    Ok(())
+}
+
+fn check_admin_name(name: &str) -> Result<&str> {
+    let name = name.trim();
+    if name.is_empty() || name.chars().count() > super::profile::NAME_MAX || name.chars().any(char::is_control) {
+        return Err(Error::bad("a name of 1 to 120 characters").with_code("profile_name_invalid"));
+    }
+    Ok(name)
+}
+
+/// Name and email of an Administrator, changed by another Administrator. The own email is changed
+/// with [`change_my_email`] (current password and second factor); the own name is free here too.
 pub async fn update_administrator(
     k: &Kernel,
     admin: &SessionUser,
@@ -199,24 +227,69 @@ pub async fn update_administrator(
 ) -> Result<()> {
     require_admin(admin)?;
     let username = administrator(k, user_id).await?;
-    let name = name.trim();
-    let email = email.trim().to_lowercase();
-    if name.is_empty()
-        || name.chars().count() > super::profile::NAME_MAX
-        || name.chars().any(char::is_control)
-    {
-        return Err(Error::bad("a name of 1 to 120 characters").with_code("profile_name_invalid"));
+    let name = check_admin_name(name)?;
+    // the own address stays as it is here: an empty text means "keep" (the name alone changes)
+    if user_id == admin.user_id && email.trim().is_empty() {
+        mosaikit_db::query("update core.users set display_name = $2 where id = $1")
+            .bind(user_id)
+            .bind(name)
+            .execute(&k.db)
+            .await?;
+        events::record(k, None, Some(admin.user_id), None, None, "admin.update", json!({ "username": username }))
+            .await;
+        return Ok(());
     }
-    if !email.is_empty() && !crate::notify::valid_email(&email) {
-        return Err(Error::bad("invalid email address").with_code("email_invalid"));
+    let email = crate::notify::required_email(email)?.to_lowercase();
+    let current: Option<String> = mosaikit_db::query_scalar("select email from core.users where id = $1")
+        .bind(user_id)
+        .fetch_one(&k.db)
+        .await?;
+    let changed = current.as_deref().map(str::to_lowercase).as_deref() != Some(email.as_str());
+    if changed {
+        if user_id == admin.user_id {
+            return Err(Error::forbidden("change your own email from the Account page, with your password")
+                .with_code("own_email_reauth"));
+        }
+        ensure_email_free(k, &email, Some(user_id)).await?;
     }
     mosaikit_db::query("update core.users set display_name = $2, email = $3 where id = $1")
         .bind(user_id)
         .bind(name)
-        .bind((!email.is_empty()).then_some(&email))
+        .bind(&email)
         .execute(&k.db)
         .await?;
-    events::record(k, None, Some(admin.user_id), None, None, "admin.update", json!({ "username": username }))
+    events::record(
+        k,
+        None,
+        Some(admin.user_id),
+        None,
+        None,
+        "admin.update",
+        json!({ "username": username, "user": user_id, "email_changed": changed }),
+    )
+    .await;
+    Ok(())
+}
+
+/// An Administrator changes their own email: needs the current password and, if the second
+/// factor is on, a code of the app. Required and unique.
+pub async fn change_my_email(
+    k: &Kernel,
+    admin: &SessionUser,
+    email: &str,
+    password: &str,
+    code: Option<&str>,
+) -> Result<()> {
+    require_admin(admin)?;
+    let email = crate::notify::required_email(email)?.to_lowercase();
+    crate::identity::confirm_sensitive(k, admin, password, code).await?;
+    ensure_email_free(k, &email, Some(admin.user_id)).await?;
+    mosaikit_db::query("update core.users set email = $2 where id = $1")
+        .bind(admin.user_id)
+        .bind(&email)
+        .execute(&k.db)
+        .await?;
+    events::record(k, None, Some(admin.user_id), None, None, "admin.email_change", json!({ "user": admin.user_id }))
         .await;
     Ok(())
 }

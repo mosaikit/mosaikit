@@ -57,6 +57,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/session", get(session))
         .route("/api/me/password", post(change_password))
         .route("/api/me/profile", put(my_set_profile))
+        .route("/api/me/email", put(my_set_email))
         .route("/api/me/picture", put(my_set_picture).delete(my_remove_picture))
         .route("/api/people/{id}/picture", get(person_picture))
         .route("/api/me/invitations", get(my_invitations))
@@ -471,6 +472,20 @@ async fn my_set_profile(
     Json(r): Json<ProfileReq>,
 ) -> ApiResult<Json<Value>> {
     tenancy::profile::set_my_name(&s.k, &u, &r.display_name).await?;
+    Ok(ok())
+}
+
+#[derive(Deserialize)]
+struct MyEmailReq {
+    email: String,
+    password: String,
+    #[serde(default)]
+    code: Option<String>,
+}
+
+/// An Administrator changes their own email: current password and, if on, the second factor.
+async fn my_set_email(State(s): State<AppState>, Auth(u): Auth, Json(r): Json<MyEmailReq>) -> ApiResult<Json<Value>> {
+    tenancy::change_my_email(&s.k, &u, &r.email, &r.password, r.code.as_deref()).await?;
     Ok(ok())
 }
 
@@ -1535,7 +1550,7 @@ struct NewAdminReq {
     username: String,
     #[serde(default)]
     display_name: String,
-    /// of the Tenant Manager of a tenant (required there); not used for an Administrator
+    /// required: of the Tenant Manager of a tenant or of the Administrator
     #[serde(default)]
     email: String,
     password: String,
@@ -1546,7 +1561,7 @@ async fn a_create_admin(
     Auth(u): Auth,
     Json(r): Json<NewAdminReq>,
 ) -> ApiResult<Json<Value>> {
-    tenancy::create_administrator(&s.k, &u, &r.username, &r.display_name, &r.password).await?;
+    tenancy::create_administrator(&s.k, &u, &r.username, &r.display_name, &r.email, &r.password).await?;
     Ok(Json(json!(tenancy::administrators(&s.k, &u).await?)))
 }
 

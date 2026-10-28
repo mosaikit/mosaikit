@@ -136,7 +136,7 @@ async fn password_rules_and_sign_in_lock_follow_the_settings() {
     .unwrap_err();
     assert_eq!(e.code(), "password_too_short");
     // the Administrators follow the platform (10)
-    mosaikit_kernel::tenancy::create_administrator(&t, &admin, "second", "Second", "ten-chars!")
+    mosaikit_kernel::tenancy::create_administrator(&t, &admin, "second", "Second", "second@example.test", "ten-chars!")
         .await
         .unwrap();
 

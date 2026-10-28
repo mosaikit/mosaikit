@@ -2207,3 +2207,34 @@ async fn layouts_and_style_over_http() {
     // the band of the platform has no image yet
     assert_eq!(a.call(None, Method::GET, "/brand/band", None).await.status, StatusCode::NOT_FOUND);
 }
+
+#[tokio::test]
+async fn administrator_changes_own_email_over_http() {
+    let a = App::new().await;
+    let admin = a.admin().await;
+    let g = {
+        a.t.tenant("alfa").await;
+        a.login("alfa", "alfa-manager", PASSWORD).await
+    };
+    let put = |s: &Session, body: Value| {
+        let s = s.clone();
+        let a = &a;
+        async move { a.call(Some(&s), Method::PUT, "/api/me/email", Some(body)).await }
+    };
+    let r = put(&admin, json!({ "email": "root@example.test", "password": "wrong" })).await;
+    assert_eq!(r.json()["code"], "wrong_password");
+    let r = put(&admin, json!({ "email": "", "password": ADMIN_PASSWORD })).await;
+    assert_eq!(r.json()["code"], "email_required");
+    let r = put(&admin, json!({ "email": "Root@Example.test", "password": ADMIN_PASSWORD })).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let list = a.call(Some(&admin), Method::GET, "/api/admin/administrators", None).await.json();
+    assert_eq!(list[0]["email"], "root@example.test");
+    // a Tenant Manager has no such endpoint
+    let r = put(&g, json!({ "email": "x@example.test", "password": PASSWORD })).await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN);
+    // the new Administrator needs an email
+    let r = a
+        .call(Some(&admin), Method::POST, "/api/admin/administrators", Some(json!({ "username": "bis", "password": "long-enough-pass-1" })))
+        .await;
+    assert_eq!(r.json()["code"], "email_required");
+}
