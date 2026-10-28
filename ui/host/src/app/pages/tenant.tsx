@@ -407,6 +407,7 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
   }
   const shell: Shell = {
     title: t('Manage'),
+    section: sections.find((x) => x.id === cur)?.label,
     sub: {
       people: t('{count} people', { count: people.total }),
       groups: t('{count} groups', { count: groups.data?.length ?? 0 }),
@@ -421,7 +422,7 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
       {cur === 'people' && <People slug={slug} profiles={profiles.data ?? []} groups={groups.data ?? []} shell={shell} />}
       {cur === 'groups' && <Groups slug={slug} members={members.data ?? []} shell={shell} />}
       {(cur === 'profiles' || cur === 'pending') && (
-        <ListPage title={shell.title} sub={shell.sub} actions={shell.actions} filters={<FilterColumn groups={[nav]} />}>
+        <ListPage title={shell.title} section={shell.section} sub={shell.sub} actions={shell.actions} filters={<FilterColumn groups={[nav]} />}>
           {cur === 'profiles' && <ProfilesSection slug={slug} />}
           {cur === 'pending' && (
             <div className="grid gap-6">
@@ -506,6 +507,7 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
 /** What Manage gives to each section: the header and the section list of the filter column. */
 interface Shell {
   title: string
+  section?: string
   sub: ReactNode
   actions: ReactNode
   nav: FacetGroup
@@ -562,6 +564,7 @@ function People({ slug, profiles, groups, shell }: { slug: string; profiles: Pro
   const frame = (bar: ReactNode, content: ReactNode) => (
     <ListPage
       title={shell.title}
+      section={shell.section}
       sub={shell.sub}
       actions={shell.actions}
       bar={bar}
@@ -917,6 +920,7 @@ function Groups({ slug, members, shell }: { slug: string; members: Member[]; she
   const frame = (content: ReactNode) => (
     <ListPage
       title={shell.title}
+      section={shell.section}
       sub={shell.sub}
       actions={shell.actions}
       filters={<FilterColumn search={search} onSearch={setSearch} searchLabel={t('Search a group')} onReset={() => setSearch('')} groups={[shell.nav]} />}

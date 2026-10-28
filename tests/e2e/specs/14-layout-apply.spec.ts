@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { adminLogin, appearanceTab, nav } from './support'
+import { PASSWORD, adminLogin, appearanceTab, login, logout, nav } from './support'
 
 // R2-07: a layout that is saved is in use at once, without a reload. Runs after the layouts file (any state will do).
 
@@ -38,5 +38,61 @@ test.describe.serial('14-layout-apply', () => {
     await side.hover()
     await page.mouse.wheel(0, 150)
     await expect.poll(() => side.evaluate((e) => e.scrollTop)).toBeGreaterThan(0)
+  })
+
+  test('R2-09 list pages: no gap under the band, the filters fully visible, no scroll of the page', async ({ page }) => {
+    await login(page, 'City of Alfa', 'manager', PASSWORD)
+    for (const [w, h] of [[2000, 1194], [390, 800]]) {
+      await page.setViewportSize({ width: w, height: h })
+      for (const hash of ['log', 'manage', 'trash', 'shares', 'plugins']) {
+        await page.goto('./#/t/alfa/' + hash)
+        await page.waitForTimeout(1200)
+        const m = await page.evaluate(() => {
+          const head = document.querySelector('.msk-page-header')!.getBoundingClientRect()
+          const bad: string[] = []
+          for (const e of document.querySelectorAll('[data-listscroll] .msk-pills, aside.msk-facets')) {
+            const r = e.getBoundingClientRect()
+            if (r.top < head.bottom - 1 || r.bottom > innerHeight + 1) bad.push(e.className.slice(0, 30) + ':' + Math.round(r.top) + '-' + Math.round(r.bottom))
+          }
+          return { headTop: Math.round(head.top), over: document.documentElement.scrollHeight - innerHeight, list: !!document.querySelector('[data-listscroll]'), bad }
+        })
+        const where = hash + ' at ' + w + 'px ' + JSON.stringify(m)
+        expect(m.list, where).toBe(true)
+        // right under the band (50 px), nothing pushed down
+        expect(m.headTop, where).toBe(50)
+        // only the list scrolls
+        expect(m.over, where).toBeLessThanOrEqual(1)
+        expect(m.bad, where).toEqual([])
+      }
+    }
+  })
+
+  test('R2-06 the header of a page with sections shows the page and the selected section', async ({ page }) => {
+    await adminLogin(page)
+    const check = async (hash: string, page_: string) => {
+      for (const [w, h] of [[2000, 1194], [390, 800]]) {
+        await page.setViewportSize({ width: w, height: h })
+        await page.goto('./' + hash)
+        await page.waitForTimeout(1000)
+        const head = page.locator('.msk-page-header').first()
+        await expect(head, hash + ' at ' + w).toContainText(page_)
+        const sec = head.getByTestId('header-section')
+        await expect(sec, hash + ' at ' + w).toBeVisible()
+        const label = ((await sec.innerText()) ?? '').trim()
+        expect(label.length).toBeGreaterThan(0)
+        if (w > 760) {
+          // the same as the selected entry of the list at the left
+          const sel = page.locator('nav[aria-label="Sections"] [aria-current="page"], [role="radio"][aria-checked="true"]').first()
+          expect(((await sel.innerText()) ?? '').trim().startsWith(label), hash + ': ' + label + ' vs list').toBe(true)
+        }
+      }
+    }
+    await check('#/admin/system', 'System')
+    await check('#/admin/system/theme', 'System')
+    await check('#/admin/monitoring', 'Monitoring')
+    await check('#/admin/account', 'Account')
+    await logout(page)
+    await login(page, 'City of Alfa', 'manager', PASSWORD)
+    for (const [hash, name] of [['settings', 'Settings'], ['usage', 'Usage'], ['account', 'Account'], ['manage', 'Manage'], ['manage/groups', 'Manage']]) await check('#/t/alfa/' + hash, name)
   })
 })

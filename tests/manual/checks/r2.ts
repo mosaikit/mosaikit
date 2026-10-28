@@ -214,6 +214,32 @@ const checks: L.Check[] = [
       return c.result()
     },
   },
+  {
+    id: 'R2-09',
+    async run(ctx: any) {
+      const c = H.checker()
+      const p = await L.as(ctx, 'e.ricci')
+      for (const [w, h] of [[2000, 1194], [390, 800]]) {
+        await p.setViewportSize({ width: w, height: h })
+        for (const page of ['log', 'manage', 'trash', 'shares', 'plugins']) {
+          await H.go(p, `#/t/comune-roma/${page}`)
+          await p.waitForTimeout(900)
+          const m = await p.evaluate(() => {
+            const head = document.querySelector('.msk-page-header')!.getBoundingClientRect()
+            const bad: string[] = []
+            for (const e of document.querySelectorAll('[data-listscroll] .msk-pills, aside.msk-facets')) {
+              const r = e.getBoundingClientRect()
+              if (r.top < head.bottom - 1 || r.bottom > innerHeight + 1) bad.push(Math.round(r.top) + '-' + Math.round(r.bottom))
+            }
+            return { headTop: Math.round(head.top), over: document.documentElement.scrollHeight - innerHeight, list: !!document.querySelector('[data-listscroll]'), bad }
+          })
+          c.ok(m.list && m.headTop === 50 && m.over <= 1 && m.bad.length === 0, `${page} at ${w}px: ${JSON.stringify(m)}`)
+        }
+      }
+      await p.setViewportSize({ width: 1440, height: 900 })
+      return c.result()
+    },
+  },
 ]
 
 export default checks

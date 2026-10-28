@@ -40,8 +40,10 @@ const useHeaderSection = () =>
 
 /** Header of the page: breadcrumb, title with the status badge, a single primary action and,
  *  in the «⋯» menu, the other actions and the change of state (DropdownMenu items). */
-export function PageHeader({ title, sub, crumbs, badge, lead, bar, actions, more }: { title: string; sub?: ReactNode; crumbs?: Crumb[]; badge?: ReactNode; lead?: ReactNode; bar?: ReactNode; actions?: ReactNode; more?: ReactNode }) {
-  const section = useHeaderSection()
+export function PageHeader({ title, section: own, sub, crumbs, badge, lead, bar, actions, more }: { title: string; section?: string; sub?: ReactNode; crumbs?: Crumb[]; badge?: ReactNode; lead?: ReactNode; bar?: ReactNode; actions?: ReactNode; more?: ReactNode }) {
+  const stored = useHeaderSection()
+  // the subsection selected in the page (given, or announced by its `Sections`)
+  const section = own ?? stored
   // the height of the header is the offset of what is pinned under it (--msk-head)
   const box = useRef<HTMLDivElement>(null)
   useEffect(() => {

@@ -85,7 +85,7 @@ function storedHidden(): boolean {
 /** A list page: the filter column at the left (a button of the header hides it) and the list at the
  *  right. Nothing scrolls but the list: the header (with the selection bar and the actions), the filters and the header
  *  row of the table stay where they are, and the foot of the list loads more as it comes into view. */
-export function ListPage({ title, sub, bar, actions, more, filters, children }: { title: string; sub?: ReactNode; bar?: ReactNode; actions?: ReactNode; more?: ReactNode; filters: ReactNode; children: ReactNode }) {
+export function ListPage({ title, section, sub, bar, actions, more, filters, children }: { title: string; section?: string; sub?: ReactNode; bar?: ReactNode; actions?: ReactNode; more?: ReactNode; filters: ReactNode; children: ReactNode }) {
   const [hidden, setHidden] = useState(storedHidden)
   const [open, setOpen] = useState(false)
   const narrow = () => window.matchMedia('(max-width: 760px)').matches
@@ -104,6 +104,7 @@ export function ListPage({ title, sub, bar, actions, more, filters, children }: 
     <FillPage>
       <PageHeader
         title={title}
+        section={section}
         sub={sub}
         bar={bar}
         actions={actions}

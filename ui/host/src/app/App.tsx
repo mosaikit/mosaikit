@@ -201,7 +201,7 @@ export default function App() {
           </Shell>
         )}
       </TooltipProvider>
-      <Toaster richColors closeButton position="bottom-right" containerAriaLabel={t('Notifications')} />
+      <Toaster richColors closeButton position="bottom-right" offset={{ bottom: 84, right: 16 }} mobileOffset={{ bottom: 84, right: 16, left: 16 }} containerAriaLabel={t('Notifications')} />
     </UiServices>
   )
 }
