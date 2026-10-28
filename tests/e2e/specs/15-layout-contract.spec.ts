@@ -223,7 +223,7 @@ async function probe(doc: Page | Frame, o: { scroll: boolean; more: boolean }): 
 async function sidebarProbe(page: Page) {
   return page.evaluate(() => {
     const c: any = document.querySelector('[data-sidebar="content"]')
-    return c ? { overflows: c.scrollHeight > c.clientHeight + 1, idle: getComputedStyle(c).scrollbarColor, w: c.getBoundingClientRect().width } : null
+    return c ? { overflows: c.scrollHeight > c.clientHeight + 1, idle: getComputedStyle(c, '::-webkit-scrollbar-thumb').backgroundColor, // the thumb is drawn with the webkit parts (scrollbar-color would switch them off) w: c.getBoundingClientRect().width } : null
   })
 }
 

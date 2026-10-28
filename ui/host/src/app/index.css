@@ -568,16 +568,36 @@ html[data-style-buttons='soft'] [data-slot='button'][data-variant='default']:hov
 .msk-listscroll :has(> [data-slot='table-container']) {
   overflow: visible;
 }
-.msk-listscroll thead th,
-.msk-listscroll [data-slot='table-head'] {
+.msk-listscroll thead {
   position: sticky;
   top: 0;
   z-index: 2;
+}
+.msk-listscroll thead th,
+.msk-listscroll [data-slot='table-head'] {
   background: var(--card);
   box-shadow: inset 0 -1px 0 var(--border);
 }
 .msk-listscroll .msk-pills {
   top: 0;
+}
+/* a row of pills that opens its page sits right under the header from the start (it cancels the padding above it), so
+   pinning it moves nothing; the header row of a table under it sticks below it */
+.msk-pills-top {
+  margin-top: -1.5rem;
+  padding-top: 1.5rem;
+}
+.msk-listscroll:has(.msk-pills-top) thead {
+  top: 4rem;
+}
+@media (max-width: 620px) {
+  .msk-pills-top {
+    margin-top: -1rem;
+    padding-top: 1rem;
+  }
+  .msk-listscroll:has(.msk-pills-top) thead {
+    top: 3.5rem;
+  }
 }
 /* in a page that does not scroll the header needs no sticky offset (it would be pushed down by it) */
 .msk-fill > .msk-page-header {
