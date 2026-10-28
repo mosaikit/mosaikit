@@ -6,6 +6,7 @@
 // Its texts are in English, or in Italian when the host is in Italian (the `context` of the bridge).
 
 import type { Msk } from './client.ts'
+import { pageBody, pageHead } from './head.ts'
 import { errorText } from './errors.ts'
 import type { ExtensionView, FieldDecl, Row, Values } from './protocol.ts'
 
@@ -128,7 +129,6 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   const tr = (k: Text, vars: Record<string, string | number> = {}) =>
     TEXTS[msk.context?.lang === 'it' ? 'it' : 'en'][k].replace(/\{(\w+)\}/g, (_, v: string) => String(vars[v] ?? ''))
 
-  const title = h('h2', { class: 'msk-h2' }, opts.title ?? resource)
   const filter = h('input', { type: 'search', class: 'msk-filter' })
   const btnNew = h('button', { type: 'button', class: 'msk-btn ghost' })
   const count = h('span', { class: 'msk-count' })
@@ -161,13 +161,16 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   const msg = h('div', { class: 'msk-msg', role: 'status' })
   const form = h('section', { class: 'msk-form' }, formTitle, tabsBar, readonly, fieldsBox, extBox, tabPanel, h('div', { class: 'msk-actions' }, btnSave, btnCancel, btnShare, btnDel), msg)
 
+  const morebar = h('div', { class: 'msk-morebar' }, btnMore)
+  const body = pageBody(h('div', { class: 'msk-tablewrap' }, table), morebar, form)
   root.replaceChildren(
-    // the title and the filters stay in sight while the table scrolls
-    h('div', { class: 'msk-pagehead' }, title, h('div', { class: 'msk-toolbar' }, filter, btnNew, h('span', { class: 'grow' }), count)),
-    h('div', { class: 'msk-tablewrap' }, table),
-    h('div', { class: 'msk-morebar' }, btnMore),
-    form,
+    // the header and the filters never scroll: the table, the foot and the form do
+    pageHead({ title: opts.title ?? resource, sub: count, actions: [btnNew], filters: [filter] }),
+    body,
   )
+  // the rest of the rows come as the foot of the table comes into view
+  const foot = new IntersectionObserver((e) => e.some((x) => x.isIntersecting) && !btnMore.hidden && !btnMore.disabled && void loadMore(), { root: body, rootMargin: '200px' })
+  foot.observe(morebar)
 
   const setMsg = (t: string, err = false) => {
     msg.textContent = t
@@ -515,6 +518,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     off()
     offExt()
     closeTab()
+    foot.disconnect()
     root.replaceChildren()
   }
 }

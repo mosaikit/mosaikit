@@ -190,5 +190,8 @@ export function themeVars(): Record<string, string> {
     const val = cs.getPropertyValue(v).trim()
     if (val) out[v] = val
   }
+  // the type of the pages of the host, for the header of the pages of the plugins
+  const font = document.body ? getComputedStyle(document.body).fontFamily : ''
+  if (font) out['--msk-font'] = font
   return out
 }

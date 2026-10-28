@@ -3,3 +3,4 @@ export { Msk, connect, applyTheme, applyContext, type CrudClient, type Extension
 export { mountCrud, errText, type CrudOptions } from './crud-view.ts'
 export { errorText } from './errors.ts'
 export type * from './protocol.ts'
+export { pageBody, pageHead, type PageHead } from './head.ts'
