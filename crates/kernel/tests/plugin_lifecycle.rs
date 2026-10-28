@@ -79,11 +79,11 @@ async fn update_with_migrations_keeps_the_data() {
     .await
     .unwrap();
 
-    let mut v2 = with_version(notes_files(), "0.5.0");
+    let mut v2 = with_version(notes_files(), "0.5.1");
     v2.insert("migrations/003_priority.sql".into(), b"alter table notes add column priority text".to_vec());
     install(&t, &v2).await.unwrap();
     let p = t.plugins.get("com.mosaikit.notes").unwrap();
-    assert_eq!(p.manifest.version, "0.5.0");
+    assert_eq!(p.manifest.version, "0.5.1");
     assert!(p.is_active(), "the active state is kept");
     let rows = crud::list(&t, &c, "com.mosaikit.notes", "notes", None, None).await.unwrap().rows;
     assert_eq!(rows.len(), 1);
