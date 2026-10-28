@@ -222,8 +222,9 @@ async function probe(doc: Page | Frame, o: { scroll: boolean; more: boolean }): 
 /** The main sidebar (host document only): does it overflow, and is its scrollbar transparent when idle. */
 async function sidebarProbe(page: Page) {
   return page.evaluate(() => {
+    // the thumb is drawn with the webkit parts (scrollbar-color would switch them off)
     const c: any = document.querySelector('[data-sidebar="content"]')
-    return c ? { overflows: c.scrollHeight > c.clientHeight + 1, idle: getComputedStyle(c, '::-webkit-scrollbar-thumb').backgroundColor, // the thumb is drawn with the webkit parts (scrollbar-color would switch them off) w: c.getBoundingClientRect().width } : null
+    return c ? { overflows: c.scrollHeight > c.clientHeight + 1, idle: getComputedStyle(c, '::-webkit-scrollbar-thumb').backgroundColor, w: c.getBoundingClientRect().width } : null
   })
 }
 
