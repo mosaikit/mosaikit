@@ -158,6 +158,9 @@ test.describe.serial('09-lifecycle', () => {
     await accessible(page, 'delete a tenant')
     await del.getByLabel('Type delta to confirm').fill('delta')
     await del.getByRole('button', { name: 'Delete for good' }).click()
+    // the page goes to the list of the tenants once the server has answered: wait for that, or the next goto races it
+    await expect(page.getByText('Tenant Town of Delta deleted').first()).toBeVisible()
+    await expect(page).toHaveURL(/#\/admin\/tenants$/)
     await expect(page.getByRole('row', { name: /Town of Delta/ })).toBeHidden()
     // the overview: services and to do
     await page.goto('./#/admin')
