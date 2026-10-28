@@ -149,3 +149,28 @@ screens get new ids, removed ones stay as retired.
 - Administrator: local password and second factor (TOTP), never through a tenant.
 - No reference to plans.
 - Permission profiles in Manage, not in Settings.
+
+## 12. Layout contract
+
+The rules below hold on every route, for the Administrator, a Tenant Manager and a User, and on the pages of every
+installed app. `tests/e2e/specs/15-layout-contract.spec.ts` checks them (the rule ids appear in the test titles);
+run it before delivering any change to the shell, the headers, the lists or the navigation:
+`cargo xtask e2e -- specs/15-layout-contract.spec.ts`. The routes come from the navigation itself (sidebar,
+section lists, `[[nav]]` of the apps), so a new page is covered without touching the spec.
+
+| Id | Rule |
+|---|---|
+| R-1 | The header (title row) and any filter row under it are fully visible, not clipped or overlapped, and pinned: they do not move when the content scrolls. |
+| R-2 | No empty band between the top bar and the header (the header starts right under the top bar). |
+| R-3 | A list or table page does not scroll as a whole: the list scrolls inside itself (`data-listscroll` in the host, `.msk-body` in an app), fills the remaining height, keeps its header row sticky, and loads more rows when scrolled to the end. |
+| R-4 | A side navigation (Sections) does not scroll with the page; if it overflows it scrolls by itself (checked at 1280x600). |
+| R-5 | The header shows the page and the open subsection: «Page › Subsection». |
+| R-6 | The filter and the primary «New …» action sit on the first header row, right-aligned, the filter immediately left of the button (on a phone they wrap under the title). |
+| R-7 | The header of an app page uses the same type and spacing as the header of the host (title size and weight, height, indent, border). |
+| R-8 | The scrollbar of the main sidebar is hidden unless the sidebar is hovered or focused. |
+| R-9 | No horizontal overflow at 390 px wide. |
+| R-10 | Contrast and ARIA stay with `accessible()` (axe) of the other specs; the contract does not repeat them. |
+
+Sizes: 1440x900, 1280x600 and 390x844, light theme (dark on a few routes). A rule that an unfinished piece of work
+still breaks is listed in `PENDING` at the top of the spec and runs as `test.fixme`; delete its row when the work has
+merged, so that the rule becomes a hard check again.
