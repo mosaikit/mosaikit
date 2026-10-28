@@ -41,8 +41,7 @@ const RULES: Record<string, string> = {
 const FAMILIES = ['host-admin', 'host-manager', 'host-user', 'log', 'app-files', 'app-maps', 'app-static-site', 'app-contacts', 'app-tasks', 'app-notes'] as const
 type Family = (typeof FAMILIES)[number]
 
-/** Work in flight: rule + family -> what is pending. Delete the row (and the test runs for real) when it has merged. */
-const WIP = 'work in flight: '
+/** Work in flight: rule + family -> what is pending. Delete the row (and the test runs for real) when it has merged; the `why` text starts with «work in flight: ». */
 const PENDING: { rule: string; family: Family; why: string }[] = [
 ]
 
