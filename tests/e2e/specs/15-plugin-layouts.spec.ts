@@ -45,6 +45,11 @@ test.describe.serial('15-plugin-layouts', () => {
     await expect(frame.locator('[data-key="name"]')).toHaveValue('Ada Lovelace')
     await frame.getByRole('button', { name: 'Cancel' }).click()
     await expect(frame.locator('.contact-read')).toBeVisible()
+    // the filter is on the first row of the header, just left of «New contact»
+    const box = async (sel: string) => frame.locator(sel).first().evaluate((e) => { const r = e.getBoundingClientRect(); return { top: Math.round(r.top), right: Math.round(r.right) } })
+    const f = await box('.msk-filter'), n = await box('.msk-pacts .msk-btn')
+    expect(Math.abs(f.top - n.top)).toBeLessThan(12)
+    expect(f.right).toBeLessThanOrEqual(n.right)
     await pinned(frame)
     await accessible(page, 'contacts')
   })
