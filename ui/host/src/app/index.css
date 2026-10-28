@@ -590,6 +590,10 @@ html[data-style-buttons='soft'] [data-slot='button'][data-variant='default']:hov
 .msk-listscroll:has(.msk-pills-top) thead {
   top: 4rem;
 }
+/* a row of filters pinned on top of the list: the header row of the table sticks below it */
+.msk-listscroll:has(.msk-pinrow) thead {
+  top: 3.25rem;
+}
 @media (max-width: 620px) {
   .msk-pills-top {
     margin-top: -1rem;

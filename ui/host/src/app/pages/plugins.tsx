@@ -821,7 +821,7 @@ export function TenantPlugins({ slug }: { slug: string }) {
           <Empty icon={<Puzzle />} title={t('No plugins available')} />
         ) : (
           <>
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="msk-pinrow sticky top-0 z-[5] -mx-1 flex flex-wrap items-center gap-3 bg-background px-1">
               <KindPills value={kind} onChange={setKind} counts={countKinds(all)} />
               <Pills
                 label={t('State')}

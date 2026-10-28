@@ -204,7 +204,11 @@ async function probe(doc: Page | Frame, o: { scroll: boolean; more: boolean }): 
     const scrollables = () => [doc, ...([...document.querySelectorAll('*')] as any[]).filter((e) => e !== doc && e.scrollHeight > e.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(e).overflowY))]
     if (o.scroll) {
       const sy = (e: any) => (e ? e.getBoundingClientRect().top : null)
-      const theadY = () => (thead && scroller ? thead.getBoundingClientRect().top - scroller.getBoundingClientRect().top : null)
+      // the list may be drawn again while more rows load: look the header row up each time
+      const theadY = () => {
+        const th: any = scroller && q('thead', scroller)
+        return th ? th.getBoundingClientRect().top - scroller.getBoundingClientRect().top : null
+      }
       const before = { header: sy(header), pills: sy(pills), sections: sy(sections), thead: theadY() }
       const els = scrollables()
       for (const e of els) e.scrollTop = e.scrollHeight
