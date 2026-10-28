@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const DOC = path.resolve(HERE, '../../docs/manual-tests.md')
 const CHECKS = path.join(HERE, 'checks')
-const ID = /^\| ((?:P\d+b?|FU-[A-Z]|[A-Z]{2,5})-\d+[a-z]?) \| (.*?) \| /
+const ID = /^\| ((?:P\d+b?|FU-[A-Z]|R2|[A-Z]{2,5})-\d+[a-z]?) \| (.*?) \| /
 
 /** Strip the markdown of a cell into plain text. */
 function plain(s) {
