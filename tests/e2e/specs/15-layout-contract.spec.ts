@@ -335,6 +335,9 @@ async function walk(page: Page, role: Role, home: string, account: string, dark:
     // a new load: the sidebar opens as at the start of a session (a phone before left it closed)
     await page.goto('./' + route)
     await page.locator('[data-sidebar="content"]').waitFor()
+    // the pointer of the previous measure may still rest on the sidebar
+    await page.mouse.move(900, 150)
+    await page.waitForTimeout(300)
     const idle = await sidebarProbe(page)
     await page.locator('[data-sidebar="content"]').hover()
     const hover = await sidebarProbe(page)
@@ -494,7 +497,9 @@ function judge(rule: string, r: Rec, all: Rec[]): string[] {
       const ref = all.find((x) => x.role === 'admin' && x.route === '#/admin' && x.vp === 'desk')?.host
       if (!ref?.h1 || !ref.header) break
       if (app.h1.fs !== ref.h1.fs) out.push(`title size ${app.h1.fs} vs ${ref.h1.fs} of the host`)
-      if (app.h1.fw !== ref.h1.fw) out.push(`title weight ${app.h1.fw} vs ${ref.h1.fw} of the host`)
+      // with a subsection the title is the parent page: medium weight, as in the host (kit.tsx)
+      const fw = app.headerText.includes('›') ? '500' : ref.h1.fw
+      if (app.h1.fw !== fw) out.push(`title weight ${app.h1.fw} vs ${fw} of the host`)
       if (!near(app.header.h, ref.header.h, 8)) out.push(`header height ${Math.round(app.header.h)} vs ${Math.round(ref.header.h)} of the host`)
       const left = app.h1.x - app.header.x
       const refLeft = ref.h1.x - ref.header.x
