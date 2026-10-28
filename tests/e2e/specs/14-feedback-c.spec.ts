@@ -123,7 +123,7 @@ test.describe.serial('14-feedback-c', () => {
           await page.reload()
           await expect(page.getByTestId('plugin-brochure')).toBeVisible()
           await page.waitForTimeout(500)
-          await page.screenshot({ path: `C:/dev/mosaikit-temp/fc-shots/brochure-${mode}-${w}.png`, fullPage: true })
+          await page.screenshot({ path: test.info().outputPath(`brochure-${mode}-${w}.png`), fullPage: true })
         }
       }
       await page.evaluate(() => {
