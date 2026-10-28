@@ -21,7 +21,8 @@ import { useAction, useApi, useConfirm, usePaged, useTenantCtx } from '../core.t
 import { BulkBar, FilterColumn, ListPage } from '../listkit.tsx'
 import { t } from '../i18n.ts'
 import { about, describe } from '../logtext.ts'
-import { Empty, ErrorBox, Loading, MoreRows, PageHeader, Pills } from '../kit.tsx'
+import { Empty, ErrorBox, Loading, MoreRows, PageHeader, Pills , Sliced } from '../kit.tsx'
+import { Widget } from '../Overview.tsx'
 import { go } from '../router.ts'
 import ShareDialog from '../ShareDialog.tsx'
 
@@ -242,7 +243,7 @@ export function TrashPage({ slug }: { slug: string }) {
 /* ── Shared by me (Home) ─────────────────────────────────────────────── */
 
 /** The items one shared, with whom and with how many links; revoke all or open the Share dialog. */
-export function SharedByMeSection({ slug }: { slug: string }) {
+export function SharedByMeSection({ slug, full }: { slug: string; full?: boolean }) {
   const ctx = useTenantCtx(slug)
   const label = useAppLabel(slug)
   const confirm = useConfirm()
@@ -255,11 +256,7 @@ export function SharedByMeSection({ slug }: { slug: string }) {
   })
   const rows = q.items
   return (
-    <section className="grid gap-3" aria-labelledby="shared-by-me">
-      <h2 id="shared-by-me" className="text-sm font-semibold">
-        {t('Shared by me')}
-        {q.total > 0 && <span className="ml-2 font-normal text-muted-foreground tabular-nums">{q.total}</span>}
-      </h2>
+    <Widget id="shared-by-me" title={q.total > 0 ? `${t('Shared by me')} · ${q.total}` : t('Shared by me')} span={!full} full={full}>
       {q.isLoading ? (
         <Loading />
       ) : q.error ? (
@@ -314,7 +311,7 @@ export function SharedByMeSection({ slug }: { slug: string }) {
           }}
         />
       )}
-    </section>
+    </Widget>
   )
 }
 
@@ -522,7 +519,7 @@ export function LogView({ scope, fixed = {}, compact = false }: { scope: LogScop
         <Empty icon={<History />} title={compact ? t('No activity yet') : t('No event with these filters')} />
       ) : (
         <div className="overflow-x-auto rounded-xl border bg-card">
-          <Table>
+          <Sliced items={events}>{(shown) => (<Table>
             <TableHeader>
               <TableRow>
                 {!compact && (
@@ -539,7 +536,7 @@ export function LogView({ scope, fixed = {}, compact = false }: { scope: LogScop
               </TableRow>
             </TableHeader>
             <TableBody>
-              {events.map((e) => (
+              {shown.map((e) => (
                 <TableRow key={e.id} className="cursor-pointer" data-state={sel.has(e.id) ? 'selected' : undefined} onClick={() => setOpen(e)}>
                   {!compact && (
                     <TableCell onClick={(ev) => ev.stopPropagation()}>
@@ -582,7 +579,7 @@ export function LogView({ scope, fixed = {}, compact = false }: { scope: LogScop
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+          </Table>)}</Sliced>
         </div>
       )}
       {pages.hasNextPage && (

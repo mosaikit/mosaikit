@@ -43,7 +43,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { passwordMin, useAction, useApi, useConfig, useConfirm } from '../core.ts'
 import { fmtDay, fmtNumber, t } from '../i18n.ts'
-import { Empty, ErrorBox, Kpi, Loading, PageHeader, Pills, SaveBar, Sections } from '../kit.tsx'
+import { Empty, ErrorBox, Kpi, Loading, PageHeader, Pills, SaveBar, Sections , Sliced } from '../kit.tsx'
 import { go, to } from '../router.ts'
 
 const enc = encodeURIComponent
@@ -683,7 +683,7 @@ export function BackupPanel() {
           {q.data!.backups.length === 0 ? (
             <Empty icon={<HardDrive />} title={t('No backups yet')} />
           ) : (
-            <Table>
+            <Sliced items={q.data!.backups}>{(shown) => (<Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>{t('Started')}</TableHead>
@@ -696,7 +696,7 @@ export function BackupPanel() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {q.data!.backups.map((b) => (
+                {shown.map((b) => (
                   <TableRow key={b.id}>
                     <TableCell>
                       {fmtDay(b.started_at, { dateStyle: 'medium', timeStyle: 'short' })}
@@ -755,7 +755,7 @@ export function BackupPanel() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </Table>)}</Sliced>
           )}
         </CardContent>
       </Card>
@@ -923,7 +923,7 @@ function RestoreItemDialog({ backup, onOpenChange }: { backup: BackupInfo; onOpe
               <p className="text-sm text-muted-foreground">{t('No item of the backup matches.')}</p>
             ) : (
               <div className="max-h-[50vh] overflow-auto">
-                <Table>
+                <Sliced items={items.data.items}>{(shown) => (<Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>{t('Title')}</TableHead>
@@ -936,7 +936,7 @@ function RestoreItemDialog({ backup, onOpenChange }: { backup: BackupInfo; onOpe
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {items.data.items.map((it) => (
+                    {shown.map((it) => (
                       <TableRow key={it.id}>
                         <TableCell>
                           {it.title || it.kind}
@@ -964,7 +964,7 @@ function RestoreItemDialog({ backup, onOpenChange }: { backup: BackupInfo; onOpe
                       </TableRow>
                     ))}
                   </TableBody>
-                </Table>
+                </Table>)}</Sliced>
                 {items.data.total > items.data.items.length && (
                   <p className="mt-2 text-xs text-muted-foreground">{t('The first {n} of {total}: narrow the search.', { n: String(items.data.items.length), total: String(items.data.total) })}</p>
                 )}
@@ -1429,7 +1429,7 @@ function ErrorsPanel() {
               <p className="text-sm text-muted-foreground">{t('None.')}</p>
             ) : (
               <div className="overflow-hidden rounded-xl border bg-card">
-                <Table>
+                <Sliced items={q.data!.latest}>{(shown) => (<Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>{t('When')}</TableHead>
@@ -1439,7 +1439,7 @@ function ErrorsPanel() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {q.data!.latest.map((f, i) => (
+                    {shown.map((f, i) => (
                       <TableRow key={i}>
                         <TableCell>{fmtDay(f.ts, { dateStyle: 'short', timeStyle: 'medium' })}</TableCell>
                         <TableCell className="font-mono text-xs">{f.action}</TableCell>
@@ -1448,7 +1448,7 @@ function ErrorsPanel() {
                       </TableRow>
                     ))}
                   </TableBody>
-                </Table>
+                </Table>)}</Sliced>
               </div>
             )}
           </section>
@@ -1464,7 +1464,7 @@ function TenantsLoadPanel() {
   if (q.error) return <ErrorBox error={q.error} />
   return (
     <div className="max-w-4xl overflow-hidden rounded-xl border bg-card">
-      <Table>
+      <Sliced items={q.data!}>{(shown) => (<Table>
         <TableHeader>
           <TableRow>
             <TableHead>{t('Tenant')}</TableHead>
@@ -1477,7 +1477,7 @@ function TenantsLoadPanel() {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {q.data!.map((x) => (
+          {shown.map((x) => (
             <TableRow key={x.id} className="cursor-pointer" onClick={() => go(to.adminTenant(x.id))}>
               <TableCell>
                 <a href={to.adminTenant(x.id)} className="font-medium hover:underline" onClick={(e) => e.stopPropagation()}>
@@ -1502,7 +1502,7 @@ function TenantsLoadPanel() {
             </TableRow>
           ))}
         </TableBody>
-      </Table>
+      </Table>)}</Sliced>
     </div>
   )
 }
@@ -1667,8 +1667,8 @@ export function OverviewOps() {
     return out
   }, [alerts.data, backups.data, tenants.data, catalog.data, now])
   return (
-    <div className="grid gap-4 lg:grid-cols-2">
-      <section className="grid content-start gap-2 rounded-xl border bg-card p-4">
+    <>
+      <section className="grid content-start gap-2 rounded-xl border bg-card p-4 @xl:col-span-2">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-semibold">{t('Services')}</h2>
           <a className="text-sm text-primary underline-offset-4 hover:underline" href={to.admin('monitoring')}>
@@ -1688,7 +1688,7 @@ export function OverviewOps() {
           </ul>
         )}
       </section>
-      <section className="grid content-start gap-2 rounded-xl border bg-card p-4">
+      <section className="grid content-start gap-2 rounded-xl border bg-card p-4 @xl:col-span-2">
         <h2 className="text-sm font-semibold">{t('To do')}</h2>
         {todo.length === 0 ? (
           <p className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -1708,6 +1708,6 @@ export function OverviewOps() {
           </ul>
         )}
       </section>
-    </div>
+    </>
   )
 }

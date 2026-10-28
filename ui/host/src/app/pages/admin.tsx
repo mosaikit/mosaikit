@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils'
 import { initials, passwordMin, useAction, useApi, useConfig, useConfirm, usePaged } from '../core.ts'
 import { BulkBar, FilterColumn, ListPage } from '../listkit.tsx'
 import { TenantLogo } from '../picture.tsx'
-import { DataTable, Empty, ErrorBox, FormDialog, Kpi, Loading, MoreRows, PageHeader, PluginKpis, SaveBar, Sections, StatusBadge, Tabs } from '../kit.tsx'
+import { DataTable, Empty, ErrorBox, FormDialog, Kpi, Loading, MoreRows, PageHeader, PluginKpis, SaveBar, Sections, StatusBadge, Tabs , Sliced } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import { bandOf } from '../prefs.ts'
 import { AppMark } from '../Shell.tsx'
@@ -31,7 +31,7 @@ import { TenantPluginsOfAdmin } from './plugins.tsx'
 import { PlatformQuotasPanel, TenantQuotasPanel } from '../Quotas.tsx'
 import { BackupPanel, ImportTenantDialog, MaintenancePanel, NewTenantWizard, OverviewOps, TenantLifecycle, TenantState } from './operations.tsx'
 import { t } from '../i18n.ts'
-import { AdminWidgets } from '../Overview.tsx'
+import { AdminWidgets, KpiRow } from '../Overview.tsx'
 import { LayoutPanel, StylePanel } from '../LayoutSettings.tsx'
 import { TenantContact, TenantIdentity } from '../TenantContact.tsx'
 
@@ -48,21 +48,27 @@ export function AdminOverview({ session }: { session: Session }) {
     <>
       <PageHeader title={t('Platform overview')} sub={t('Hello {name} · Administrator', { name: session.user.display_name || session.user.username })} />
       <div className="grid gap-6 p-6 max-[620px]:p-4">
-        {q.isLoading ? (
-          <Loading />
-        ) : q.error ? (
-          <ErrorBox error={q.error} />
-        ) : (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
-            <Kpi label={t('Active tenants')} value={`${q.data!.active_tenants}/${q.data!.tenants}`} onClick={() => go(to.admin('tenants'))} />
-            <Kpi label={t('Active users')} value={q.data!.users} hint={t('{n} in the last 30 days', { n: q.data!.active_users_30d })} />
-            <Kpi label={t('Administrators')} value={q.data!.administrators} onClick={() => go(to.admin('system', 'admins'))} />
-            <Kpi label={t('Items')} value={q.data!.resources} hint={fmtBytes(q.data!.bytes)} />
-            <Kpi label={t('Active plugins')} value={`${q.data!.plugins_active}/${q.data!.plugins_installed}`} onClick={() => go(to.admin('plugins'))} />
-          </div>
-        )}
-        <OverviewOps />
-        <AdminWidgets />
+        {q.error && <ErrorBox error={q.error} />}
+        <AdminWidgets
+          lead={
+            <>
+              {q.isLoading ? (
+                <Loading />
+              ) : (
+                q.data && (
+                  <KpiRow>
+                    <Kpi label={t('Active tenants')} value={`${q.data.active_tenants}/${q.data.tenants}`} onClick={() => go(to.admin('tenants'))} />
+                    <Kpi label={t('Active users')} value={q.data.users} hint={t('{n} in the last 30 days', { n: q.data.active_users_30d })} />
+                    <Kpi label={t('Administrators')} value={q.data.administrators} onClick={() => go(to.admin('system', 'admins'))} />
+                    <Kpi label={t('Items')} value={q.data.resources} hint={fmtBytes(q.data.bytes)} />
+                    <Kpi label={t('Active plugins')} value={`${q.data.plugins_active}/${q.data.plugins_installed}`} onClick={() => go(to.admin('plugins'))} />
+                  </KpiRow>
+                )
+              )}
+              <OverviewOps />
+            </>
+          }
+        />
         {q.data?.tenants === 0 && (
           <Empty icon={<Building2 />} title={t('No tenants')}>
             <Button className="mt-2" onClick={() => go(to.admin('tenants'))}>
@@ -85,16 +91,23 @@ export function AdminOverview({ session }: { session: Session }) {
             </Button>
           </p>
         )}
-        {kpi.data && kpi.data.resources.length > 0 && (
-          <section className="grid gap-3">
-            <h2 className="text-sm font-semibold">{t('Items by plugin, in every tenant')}</h2>
-            <DataTable
-              label={t('Items by plugin, in every tenant')}
-              rows={kpi.data.resources.map((r) => ({ [t('Plugins')]: r.plugin, [t('Kind')]: r.kind, [t('Items')]: r.count, [t('Space')]: fmtBytes(r.bytes) }))}
-            />
-          </section>
+        {kpi.data && (kpi.data.resources.length > 0 || kpi.data.plugins.length > 0) && (
+          <details className="text-sm">
+            <summary className="cursor-pointer text-sm font-semibold">{t('Figures of the apps as tables')}</summary>
+            <div className="mt-3 grid gap-4">
+              {kpi.data.resources.length > 0 && (
+                <section className="grid gap-3">
+                  <h2 className="text-sm font-semibold">{t('Items by plugin, in every tenant')}</h2>
+                  <DataTable
+                    label={t('Items by plugin, in every tenant')}
+                    rows={kpi.data.resources.map((r) => ({ [t('Plugins')]: r.plugin, [t('Kind')]: r.kind, [t('Items')]: r.count, [t('Space')]: fmtBytes(r.bytes) }))}
+                  />
+                </section>
+              )}
+              <PluginKpis items={kpi.data.plugins} />
+            </div>
+          </details>
         )}
-        {kpi.data && <PluginKpis items={kpi.data.plugins} />}
       </div>
     </>
   )
@@ -368,7 +381,7 @@ function TenantUsers({ id, q }: { id: string; q: { data?: Member[]; isLoading: b
         </Button>
       </div>
       <div className="overflow-hidden rounded-xl border bg-card">
-        <Table>
+        <Sliced items={(q.data ?? [])}>{(shown) => (<Table>
           <TableHeader>
             <TableRow>
               <TableHead>{t('Username')}</TableHead>
@@ -378,7 +391,7 @@ function TenantUsers({ id, q }: { id: string; q: { data?: Member[]; isLoading: b
             </TableRow>
           </TableHeader>
           <TableBody>
-            {(q.data ?? []).map((m) => (
+            {shown.map((m) => (
               <TableRow key={m.user_id}>
                 <TableCell>
                   <div className="font-medium">{m.display_name || m.username}</div>
@@ -411,7 +424,7 @@ function TenantUsers({ id, q }: { id: string; q: { data?: Member[]; isLoading: b
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </Table>)}</Sliced>
       </div>
       <FormDialog
         open={dlg === 'manager'}
@@ -636,7 +649,7 @@ function Admins({ me }: { me: string }) {
         </Button>
       </div>
       <div className="overflow-hidden rounded-xl border bg-card">
-        <Table>
+        <Sliced items={(q.data ?? [])}>{(shown) => (<Table>
           <TableHeader>
             <TableRow>
               <TableHead>{t('Administrators')}</TableHead>
@@ -647,7 +660,7 @@ function Admins({ me }: { me: string }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {(q.data ?? []).map((a) => (
+            {shown.map((a) => (
               <TableRow key={a.user_id}>
                 <TableCell>
                   <div className="flex items-center gap-2.5">
@@ -714,7 +727,7 @@ function Admins({ me }: { me: string }) {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </Table>)}</Sliced>
       </div>
       <FormDialog
         open={dlg === 'new'}

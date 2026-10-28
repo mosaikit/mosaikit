@@ -19,7 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useAction, useApi, useConfirm } from '../core.ts'
 import { cn } from '@/lib/utils'
 import AppIcon from '../AppIcon.tsx'
-import { Empty, ErrorBox, FormDialog, Loading, PageHeader, Pills, SaveBar, StatusBadge, Tabs } from '../kit.tsx'
+import { Empty, ErrorBox, FormDialog, Loading, PageHeader, Pills, SaveBar, StatusBadge, Tabs , Sliced } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import { t } from '../i18n.ts'
 
@@ -167,7 +167,7 @@ export function AdminPlugins({ section }: { section?: string }) {
                 )}
               </div>
               <div className="overflow-x-auto rounded-xl border bg-card">
-                <Table>
+                <Sliced items={rows}>{(shown) => (<Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-10">
@@ -185,7 +185,7 @@ export function AdminPlugins({ section }: { section?: string }) {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {rows.map((p) => {
+                    {shown.map((p) => {
                       const c = byId.get(p.id)
                       return (
                         <TableRow key={p.id} data-state={sel.has(p.id) ? 'selected' : undefined}>
@@ -230,7 +230,7 @@ export function AdminPlugins({ section }: { section?: string }) {
                       )
                     })}
                   </TableBody>
-                </Table>
+                </Table>)}</Sliced>
               </div>
             </>
           )
@@ -605,7 +605,7 @@ function PluginTenants({ id }: { id: string }) {
         <Empty title={t('No tenants')} />
       ) : (
         <div className="overflow-x-auto rounded-xl border bg-card">
-          <Table>
+          <Sliced items={d.tenants}>{(shown) => (<Table>
             <TableHeader>
               <TableRow>
                 <TableHead>{t('Tenant')}</TableHead>
@@ -615,7 +615,7 @@ function PluginTenants({ id }: { id: string }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {d.tenants.map((x) => (
+              {shown.map((x) => (
                 <TableRow key={x.tenant_id}>
                   <TableCell>
                     <a className="font-medium hover:underline" href={to.adminTenant(x.tenant_id, 'plugins')}>
@@ -639,7 +639,7 @@ function PluginTenants({ id }: { id: string }) {
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+          </Table>)}</Sliced>
         </div>
       )}
     </div>
@@ -756,9 +756,9 @@ function PluginExtensions({ name, installed, catalog }: { name: string; installe
         <Empty icon={<Puzzle />} title={t('No extensions')} />
       ) : (
         <div className="overflow-x-auto rounded-xl border bg-card">
-          <Table>
+          <Sliced items={installed}>{(shown) => (<Table>
             <TableBody>
-              {installed.map((e) => (
+              {shown.map((e) => (
                 <TableRow key={e.id}>
                   <TableCell>
                     <a href={to.adminPlugin(e.id)} className="flex items-center gap-2.5 hover:underline">
@@ -787,7 +787,7 @@ function PluginExtensions({ name, installed, catalog }: { name: string; installe
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+          </Table>)}</Sliced>
         </div>
       )}
     </div>
@@ -807,7 +807,7 @@ export function TenantPluginsOfAdmin({ id }: { id: string }) {
         <a className="underline underline-offset-4 hover:text-foreground" href={to.admin('plugins')} data-testid="to-plugins-page">{t('Go to the Plugins page')}</a>
       </p>
       <div className="overflow-x-auto rounded-xl border bg-card">
-        <Table>
+        <Sliced items={(q.data ?? [])}>{(shown) => (<Table>
           <TableHeader>
             <TableRow>
               <TableHead>{t('Plugins')}</TableHead>
@@ -817,7 +817,7 @@ export function TenantPluginsOfAdmin({ id }: { id: string }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {(q.data ?? []).map((p) => (
+            {shown.map((p) => (
               <TableRow key={p.id}>
                 <TableCell>
                   <a href={to.adminPlugin(p.id, 'tenants')} className="flex items-center gap-2.5 hover:underline">
@@ -834,7 +834,7 @@ export function TenantPluginsOfAdmin({ id }: { id: string }) {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </Table>)}</Sliced>
       </div>
     </div>
   )
@@ -924,7 +924,7 @@ export function TenantPlugins({ slug }: { slug: string }) {
               />
             </div>
             <div className="overflow-x-auto rounded-xl border bg-card">
-              <Table>
+              <Sliced items={rows}>{(shown) => (<Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>{t('Plugins')}</TableHead>
@@ -935,7 +935,7 @@ export function TenantPlugins({ slug }: { slug: string }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.map((p) => {
+                  {shown.map((p) => {
                     const base = p.extends ? all.find((b) => b.id === p.extends) : undefined
                     const blocked = !!p.extends && !base?.on
                     return (
@@ -980,7 +980,7 @@ export function TenantPlugins({ slug }: { slug: string }) {
                     )
                   })}
                 </TableBody>
-              </Table>
+              </Table>)}</Sliced>
             </div>
           </>
         )}

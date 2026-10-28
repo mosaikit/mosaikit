@@ -15,6 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { parseCsv, type ImportRow } from './csv.ts'
 import { t } from './i18n.ts'
+import { Sliced } from './kit.tsx'
 
 const enc = encodeURIComponent
 
@@ -36,7 +37,7 @@ function Report({ rows }: { rows: Outcome[] }) {
         {t('{ok} done, {ko} not done', { ok, ko: rows.length - ok })}
       </p>
       <div className="max-h-72 overflow-auto rounded-md border">
-        <Table>
+        <Sliced items={rows}>{(shown) => (<Table>
           <TableHeader>
             <TableRow>
               <TableHead>{t('Row')}</TableHead>
@@ -45,7 +46,7 @@ function Report({ rows }: { rows: Outcome[] }) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((r) => (
+            {shown.map((r) => (
               <TableRow key={r.row}>
                 <TableCell className="tabular-nums">{r.row}</TableCell>
                 <TableCell className="font-mono text-xs">{r.who}</TableCell>
@@ -56,7 +57,7 @@ function Report({ rows }: { rows: Outcome[] }) {
               </TableRow>
             ))}
           </TableBody>
-        </Table>
+        </Table>)}</Sliced>
       </div>
     </div>
   )
@@ -108,7 +109,7 @@ export function ImportDialog({ slug, open, onOpenChange }: { slug: string; open:
             </div>
             {rows && (
               <div className="max-h-72 overflow-auto rounded-md border">
-                <Table>
+                <Sliced items={rows}>{(shown) => (<Table>
                   <TableHeader>
                     <TableRow>
                       <TableHead>{t('Username')}</TableHead>
@@ -119,7 +120,7 @@ export function ImportDialog({ slug, open, onOpenChange }: { slug: string; open:
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {rows.map((r, i) => (
+                    {shown.map((r, i) => (
                       <TableRow key={i}>
                         <TableCell className="font-mono text-xs">{r.username}</TableCell>
                         <TableCell>{r.display_name}</TableCell>
@@ -129,7 +130,7 @@ export function ImportDialog({ slug, open, onOpenChange }: { slug: string; open:
                       </TableRow>
                     ))}
                   </TableBody>
-                </Table>
+                </Table>)}</Sliced>
               </div>
             )}
             {error && (

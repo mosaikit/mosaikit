@@ -20,7 +20,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils'
 import { isApp, passwordMin, useAction, useApi, useTenantCtx } from '../core.ts'
 import { setLang, t, useLang, useLanguages, type Lang } from '../i18n.ts'
-import { Empty, ErrorBox, Loading, Locked, PageHeader, SaveBar, Sections, type Section } from '../kit.tsx'
+import { Empty, ErrorBox, Loading, Locked, PageHeader, SaveBar, Sections, type Section , Sliced } from '../kit.tsx'
 import { go, personal, to, type Route } from '../router.ts'
 import { SIDEBAR_PREF } from '../prefs.ts'
 import { TenantBadge } from '../Shell.tsx'
@@ -535,7 +535,7 @@ function MyUsage({ slug }: { slug: string }) {
         <Empty icon={<Gauge />} title={t('No usage')} />
       ) : (
         <div className="overflow-hidden rounded-xl border bg-card">
-          <Table>
+          <Sliced items={res}>{(shown) => (<Table>
             <TableHeader>
               <TableRow>
                 <TableHead>{t('Apps')}</TableHead>
@@ -545,7 +545,7 @@ function MyUsage({ slug }: { slug: string }) {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {res.map((r) => (
+              {shown.map((r) => (
                 <TableRow key={r.plugin_id + r.kind}>
                   <TableCell className="font-medium">{r.plugin}</TableCell>
                   <TableCell className="text-muted-foreground">{r.kind}</TableCell>
@@ -554,7 +554,7 @@ function MyUsage({ slug }: { slug: string }) {
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+          </Table>)}</Sliced>
         </div>
       )}
       <TenantLeft slug={slug} />

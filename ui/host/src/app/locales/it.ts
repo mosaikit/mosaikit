@@ -1896,4 +1896,9 @@ export const IT: Record<string, string> = {
   '{count} invitations not accepted yet_other': '{count} inviti non ancora accettati',
   '{count} active public links_one': '1 link pubblico attivo',
   '{count} active public links_other': '{count} link pubblici attivi',
+  'Space by app': 'Spazio per app',
+  'Other apps': 'Altre app',
+  'Apps, in every tenant': 'App, in tutte le organizzazioni',
+  'Items by kind': 'Elementi per tipo',
+  'Figures of the apps as tables': 'Dati delle app in tabelle',
 }

@@ -78,7 +78,7 @@ export function PageHeader({ title, sub, crumbs, badge, lead, bar, actions, more
 /** Horizontal tabs of the detail of an object (person, group, tenant, plugin). */
 export function Tabs({ tabs, current, href }: { tabs: { id: string; label: string; count?: number }[]; current: string; href: (id: string) => string }) {
   return (
-    <nav aria-label={t('Tabs')} className="flex gap-1 overflow-x-auto border-b px-6 max-[620px]:px-4">
+    <nav aria-label={t('Tabs')} className="sticky top-[calc(var(--msk-top)+var(--msk-head))] z-[9] flex gap-1 overflow-x-auto border-b bg-background px-6 max-[620px]:px-4">
       {tabs.map((t) => (
         <a
           key={t.id}
@@ -239,6 +239,26 @@ export function MoreRows({ shown, total, more, loading, onMore }: { shown: numbe
         </Button>
       )}
     </div>
+  )
+}
+
+/** A list that is already whole in memory, shown a page at a time: the first `step` rows, then more as the foot comes
+ *  into view (or by the button), with the count «shown of total». It starts again from the first page when the
+ *  list changes (another filter). No foot when everything fits in the first page. */
+export function Sliced<T>({ items, step = 50, children }: { items: T[]; step?: number; children: (rows: T[]) => ReactNode }) {
+  const [n, setN] = useState(step)
+  const [prev, setPrev] = useState(items.length)
+  // the list shrank or grew by a filter: back to the first page
+  if (prev !== items.length) {
+    setPrev(items.length)
+    if (items.length < n) setN(step)
+  }
+  const rows = items.slice(0, n)
+  return (
+    <>
+      {children(rows)}
+      {items.length > step && <MoreRows shown={rows.length} total={items.length} more={rows.length < items.length} onMore={() => setN((x) => x + step)} />}
+    </>
   )
 }
 
@@ -428,6 +448,8 @@ export function DataTable({ rows, label, columns = {} }: { rows: Record<string, 
   if (!rows.length) return <p className="text-sm text-muted-foreground">{t('No data.')}</p>
   const cols = Object.keys(rows[0])
   return (
+    <Sliced items={rows} step={25}>
+      {(shown) => (
     <div className="overflow-x-auto rounded-xl border bg-card">
       <Table aria-label={label}>
         <TableHeader>
@@ -440,7 +462,7 @@ export function DataTable({ rows, label, columns = {} }: { rows: Record<string, 
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((r, i) => (
+          {shown.map((r, i) => (
             <TableRow key={i}>
               {cols.map((c) => (
                 <TableCell key={c} className={typeof r[c] === 'number' ? 'text-right tabular-nums' : undefined}>
@@ -452,6 +474,8 @@ export function DataTable({ rows, label, columns = {} }: { rows: Record<string, 
         </TableBody>
       </Table>
     </div>
+      )}
+    </Sliced>
   )
 }
 

@@ -40,7 +40,7 @@ import { t } from '../i18n.ts'
 import { levelName } from '../levels.ts'
 import { PersonPicture } from '../picture.tsx'
 import { BulkBar, FilterColumn, ListPage } from '../listkit.tsx'
-import { Empty, ErrorBox, FormDialog, Loading, MoreRows, PageHeader, SaveBar, SelectAllRows, StatusBadge, Tabs } from '../kit.tsx'
+import { Empty, ErrorBox, FormDialog, Loading, MoreRows, PageHeader, SaveBar, SelectAllRows, StatusBadge, Tabs , Sliced } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import AppIcon from '../AppIcon.tsx'
 import { AppMark } from '../Shell.tsx'
@@ -162,7 +162,7 @@ function SignInPanel({ base, qk, name }: { base: string; qk: string[]; name: str
           ) : !sessions.data?.length ? (
             <p className="text-sm text-muted-foreground">{t('No open session.')}</p>
           ) : (
-            <Table>
+            <Sliced items={sessions.data}>{(shown) => (<Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>{t('Started')}</TableHead>
@@ -172,7 +172,7 @@ function SignInPanel({ base, qk, name }: { base: string; qk: string[]; name: str
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sessions.data.map((s) => (
+                {shown.map((s) => (
                   <TableRow key={s.id}>
                     <TableCell>{fmtDate(s.created_at)}</TableCell>
                     <TableCell>{fmtDate(s.last_seen)}</TableCell>
@@ -185,7 +185,7 @@ function SignInPanel({ base, qk, name }: { base: string; qk: string[]; name: str
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </Table>)}</Sliced>
           )}
         </CardContent>
       </Card>
@@ -578,7 +578,7 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
             <Empty icon={<Users />} title={t('No members.')} />
           ) : (
             <div className="max-w-3xl overflow-hidden rounded-xl border bg-card">
-              <Table>
+              <Sliced items={g.members}>{(shown) => (<Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>{t('Name')}</TableHead>
@@ -586,7 +586,7 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {g.members.map((m) => (
+                  {shown.map((m) => (
                     <TableRow key={m.user_id}>
                       <TableCell>
                         <a className="font-medium hover:underline" href={to.person(slug, m.user_id)}>
@@ -604,7 +604,7 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+              </Table>)}</Sliced>
             </div>
           ))}
         {cur === 'shared' &&
@@ -612,7 +612,7 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
             <Empty title={t('Nothing shared with the group')} />
           ) : (
             <div className="max-w-3xl overflow-hidden rounded-xl border bg-card">
-              <Table>
+              <Sliced items={g.shared}>{(shown) => (<Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>{t('Item')}</TableHead>
@@ -621,7 +621,7 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {g.shared.map((s) => (
+                  {shown.map((s) => (
                     <TableRow key={s.resource_id}>
                       <TableCell>{s.title || <span className="text-muted-foreground">{t('Title not visible')}</span>}</TableCell>
                       <TableCell>{label(s.plugin_id)}</TableCell>
@@ -629,7 +629,7 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+              </Table>)}</Sliced>
             </div>
           ))}
         {cur === 'plugins' && (

@@ -11,7 +11,6 @@ import { UiContext, useUi, type Ui } from '../../ui-context.ts'
 import ShareDialog from '../ShareDialog.tsx'
 import { SharedByMeSection } from './history.tsx'
 import type { AccessRequest, Group, HomeItem, Invitation, LinkInfo, Member, Overview, Profile, ResetLink, ResourceRow, Revoked, Session, TenantContext, TenantKpi, TenantSettings } from '../../types.ts'
-import { cn } from '@/lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -36,7 +35,7 @@ import { ImportDialog, InviteManyDialog } from '../BulkPeople.tsx'
 import { TenantTheme } from '../ThemeSettings.tsx'
 import { useTenantSignIn } from '../signin.ts'
 import { LinkDialog, ProfilesSection, RequestsTable } from './people.tsx'
-import { ActivityWidget, AppsStrip, NotesWidget, TrendWidget, WaitingWidget, Widget, WidgetGrid } from '../Overview.tsx'
+import { ActivityWidget, AppsStrip, KpiRow, NotesWidget, TrendWidget, WaitingWidget, Widget, WidgetGrid } from '../Overview.tsx'
 import { describe } from '../logtext.ts'
 import { BulkBar, FilterColumn, ListPage, type FacetGroup } from '../listkit.tsx'
 import { EmbeddingPanel, IdentityPanel, KeysPanel, LanguagesPanel, ManagedPanel, ModePanel, NotificationsPanel, SecurityPanel } from '../SettingsPanels.tsx'
@@ -74,21 +73,21 @@ function HomeLists({ slug, pickUp, due, notifications = true }: { slug: string; 
       </a>
     </li>
   )
-  const box = (id: string, title: string, children: ReactNode, footer?: ReactNode) => (
-    <section aria-labelledby={id} className="grid content-start gap-2 rounded-xl border bg-card p-4">
-      <h2 id={id} className="text-sm font-semibold">
-        {title}
-      </h2>
+  const box = (id: string, title: string, children: ReactNode, footer?: ReactNode, span?: boolean) => (
+    <Widget id={id} title={title} span={span}>
       {children}
       {footer}
-    </section>
+    </Widget>
   )
+  // widgets of the grid of the page (the parent draws it)
   return (
-    <div className={cn('grid gap-4', notifications ? 'md:grid-cols-3' : 'md:grid-cols-2')}>
+    <>
       {box(
         'home-pick-up',
         t('Pick up where you left off'),
         pickUp.length ? <ul className="grid gap-0.5">{pickUp.map((x) => item(x, fmtDay(x.at)))}</ul> : <p className="text-sm text-muted-foreground">{t('The items you create or change show here.')}</p>,
+        undefined,
+        true,
       )}
       {box(
         'home-due',
@@ -118,7 +117,7 @@ function HomeLists({ slug, pickUp, due, notifications = true }: { slug: string; 
             {t('All notifications')}
           </a>,
         )}
-    </div>
+    </>
   )
 }
 
@@ -136,37 +135,33 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
   const personal = (
     <>
       {d && (
-        <section className="grid gap-3" aria-label={t('Your space')}>
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3">
-            <Kpi label={t('Your items')} value={me.count} hint={[fmtBytes(me.bytes), trashHint(me.trashCount, 'items')].filter(Boolean).join(' · ')} />
-            <Kpi label={t('Unread notifications')} value={unread} hint={t('the latest below')} onClick={() => go(to.tenant(slug, 'notifications'))} />
-            <Kpi label={t('Shared by me')} value={d.me.shared_by_me} />
-            <Kpi label={t('Shared with me')} value={d.me.shared_with_me} hint={`${t('My active public links')}: ${d.me.public_links} · ${t('{n} views', { n: d.me.link_views })}`} />
-          </div>
-        </section>
+        <KpiRow>
+          <Kpi label={t('Your items')} value={me.count} hint={[fmtBytes(me.bytes), trashHint(me.trashCount, 'items')].filter(Boolean).join(' · ')} />
+          <Kpi label={t('Unread notifications')} value={unread} hint={t('the latest below')} onClick={() => go(to.tenant(slug, 'notifications'))} />
+          <Kpi label={t('Shared by me')} value={d.me.shared_by_me} />
+          <Kpi label={t('Shared with me')} value={d.me.shared_with_me} hint={`${t('My active public links')}: ${d.me.public_links} · ${t('{n} views', { n: d.me.link_views })}`} />
+        </KpiRow>
       )}
       {d && <HomeLists slug={slug} pickUp={d.me.pick_up ?? []} due={d.me.due ?? []} notifications={!manager} />}
       {d && d.me.activity.length > 0 && (
-        <WidgetGrid>
-          <Widget id="ov-mine" title={t('My recent activity')} span>
-            <ul className="grid gap-0.5">
-              {d.me.activity.slice(0, 5).map((e, i) => (
-                <li key={i} className="flex items-baseline justify-between gap-3 py-0.5 text-sm">
-                  <span className="min-w-0 truncate">{[describe(e), e.title].filter(Boolean).join(' · ')}</span>
-                  <span className="shrink-0 text-xs text-muted-foreground">{fmtDate(e.ts)}</span>
-                </li>
-              ))}
-            </ul>
-          </Widget>
-        </WidgetGrid>
+        <Widget id="ov-mine" title={t('My recent activity')} span={!manager}>
+          <ul className="grid gap-0.5">
+            {d.me.activity.slice(0, 5).map((e, i) => (
+              <li key={i} className="flex items-baseline justify-between gap-3 py-0.5 text-sm">
+                <span className="min-w-0 truncate">{[describe(e), e.title].filter(Boolean).join(' · ')}</span>
+                <span className="shrink-0 text-xs text-muted-foreground">{fmtDate(e.ts)}</span>
+              </li>
+            ))}
+          </ul>
+        </Widget>
       )}
-      <SharedByMeSection slug={slug} />
+      <SharedByMeSection slug={slug} full={manager} />
     </>
   )
   return (
     <>
       <PageHeader title={manager ? t('Tenant overview') : t('Home')} sub={`${greeting()}, ${session.user.display_name || session.user.username} · ${ROLE[c.tenant.role]} in ${c.tenant.name}`} />
-      <div className="grid gap-6 p-6 max-[620px]:p-4">
+      <div className="grid gap-4 p-6 max-[620px]:p-4">
         {!c.plugins.some(isApp) ? (
           <Empty icon={<Grid2x2 />} title={t('No active apps')}>
             {t('An Administrator installs and turns them on.')}
@@ -174,41 +169,34 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
         ) : (
           <AppsStrip slug={slug} plugins={c.plugins} />
         )}
-        {manager && d?.tenant && (
-          <section className="grid gap-4" aria-label={t('The tenant {name}', { name: c.tenant.name })}>
-            <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3">
-              <Kpi label={t('Members')} value={d.tenant.members} hint={t('{count} guests', { count: d.tenant.guests })} onClick={() => go(to.tenant(slug, 'manage'))} />
-              <Kpi label={t('Active users (30 days)')} value={d.tenant.active_users_30d} />
-              <Kpi label={t('Items')} value={d.tenant.resources.reduce((s, r) => s + r.count, 0)} />
-              <Kpi
-                label={t('Shares')}
-                value={d.tenant.shares}
-                hint={t('{count} public links', {
-                  count: d.tenant.public_links,
-                })}
-                onClick={() => go(to.tenant(slug, 'shares'))}
-              />
-            </div>
-            <WidgetGrid>
+        <WidgetGrid>
+          {manager && d?.tenant && (
+            <>
+              <KpiRow>
+                <Kpi label={t('Members')} value={d.tenant.members} hint={t('{count} guests', { count: d.tenant.guests })} onClick={() => go(to.tenant(slug, 'manage'))} />
+                <Kpi label={t('Active users (30 days)')} value={d.tenant.active_users_30d} />
+                <Kpi label={t('Items')} value={d.tenant.resources.reduce((s, r) => s + r.count, 0)} />
+                <Kpi label={t('Shares')} value={d.tenant.shares} hint={t('{count} public links', { count: d.tenant.public_links })} onClick={() => go(to.tenant(slug, 'shares'))} />
+              </KpiRow>
               <WaitingWidget slug={slug} publicLinks={d.tenant.public_links} />
               <TrendWidget
                 id="ov-people"
                 title={t('Active people')}
                 figure={d.tenant.active_users_30d}
-                caption={t('signed in the last 30 days, of {n}', {
-                  n: d.tenant.members,
-                })}
+                caption={t('signed in the last 30 days, of {n}', { n: d.tenant.members })}
                 values={days.map((x) => x.users)}
                 link={{ href: to.tenant(slug, 'manage'), label: t('People') }}
               />
               <ActivityWidget slug={slug} />
               <NotesWidget href={to.tenant(slug, 'notifications')} />
-            </WidgetGrid>
-            <UsagePanel slug={slug} />
-          </section>
-        )}
-        {manager && <h2 className="-mb-3 text-sm font-semibold">{t('Your space')}</h2>}
-        {personal}
+              <div className="@xl:col-span-2 [&>section]:h-full">
+                <UsagePanel slug={slug} />
+              </div>
+              <h2 className="-mb-1 text-sm font-semibold @xl:col-span-2 @4xl:col-span-4">{t('Your space')}</h2>
+            </>
+          )}
+          {personal}
+        </WidgetGrid>
       </div>
     </>
   )

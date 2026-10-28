@@ -489,21 +489,56 @@ html[data-style-buttons='soft'] [data-slot='button'][data-variant='default']:hov
 *::-webkit-scrollbar-track {
   background: transparent;
 }
-.msk-nav [data-sidebar='content'] {
+.msk-nav,
+.msk-nav * {
   scrollbar-color: transparent transparent;
 }
-.msk-nav [data-sidebar='content']::-webkit-scrollbar-thumb {
+.msk-nav::-webkit-scrollbar-thumb,
+.msk-nav *::-webkit-scrollbar-thumb {
   background: transparent;
 }
-.msk-nav [data-sidebar='content']:hover {
+/* under the mouse, with the focus inside (keyboard) and on touch screens (no hover): visible */
+.msk-nav:hover,
+.msk-nav:hover *,
+.msk-nav:focus-within,
+.msk-nav:focus-within * {
   scrollbar-color: color-mix(in srgb, var(--foreground) 28%, transparent) transparent;
 }
-.msk-nav [data-sidebar='content']:hover::-webkit-scrollbar-thumb {
+.msk-nav:hover::-webkit-scrollbar-thumb,
+.msk-nav:hover *::-webkit-scrollbar-thumb,
+.msk-nav:focus-within::-webkit-scrollbar-thumb,
+.msk-nav:focus-within *::-webkit-scrollbar-thumb {
   background: color-mix(in srgb, var(--foreground) 28%, transparent);
+}
+@media (hover: none) {
+  .msk-nav,
+  .msk-nav * {
+    scrollbar-color: color-mix(in srgb, var(--foreground) 28%, transparent) transparent;
+  }
+  .msk-nav::-webkit-scrollbar-thumb,
+  .msk-nav *::-webkit-scrollbar-thumb {
+    background: color-mix(in srgb, var(--foreground) 28%, transparent);
+  }
 }
 
 /* The top of the page, under the band: the headers and the filters of a page stay in sight (--msk-top is the height of the band) */
 :root {
   --msk-top: 50px;
   --msk-head: 57px;
+}
+
+/* Colours of the small charts of the overviews: a fixed order (identity), own steps in the dark mode.
+   The first one follows the accent of the theme. Values are always written beside the marks. */
+:root {
+  --chart-1: var(--primary-strong);
+  --chart-2: #0b7a66;
+  --chart-3: #b25e12;
+  --chart-4: #a23b72;
+  --chart-5: #5a6472;
+}
+.dark {
+  --chart-2: #4cc9ad;
+  --chart-3: #e8a45c;
+  --chart-4: #ec8cc0;
+  --chart-5: #a7b0bd;
 }

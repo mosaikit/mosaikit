@@ -6,10 +6,11 @@
 import type { ReactNode } from 'react'
 import { CircleAlert, History, Lock, Mail, Share2 } from 'lucide-react'
 import { fmtBytes, fmtDate } from '../api.ts'
-import type { AccessRequest, GlobalKpi, Invitation, LogEvent, LogPage, PluginView, TenantInfo } from '../types.ts'
+import type { AccessRequest, GlobalKpi, Invitation, LogEvent, LogPage, PluginKpi, PluginView, ResourceStat, TenantInfo } from '../types.ts'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import AppIcon from './AppIcon.tsx'
+import { Donut, HBars } from './Charts.tsx'
 import { isApp, useApi, usePaged, type PageOf } from './core.ts'
 import { fmtNumber, t } from './i18n.ts'
 import { Loading } from './kit.tsx'
@@ -20,13 +21,31 @@ import { NoteRow } from './notifications.tsx'
 
 const enc = encodeURIComponent
 
-/** A panel of the overview: title, an optional link at the right and the content. `span` takes two columns. */
-export function Widget({ id, title, link, span, children }: { id: string; title: string; link?: { href: string; label: string }; span?: boolean; children: ReactNode }) {
+/** A panel of the overview: title, an optional link at the right and the content. `span` takes two columns
+ *  (from the width of a tablet), `full` the whole row. A panel fills the height of its row. */
+export function Widget({
+  id,
+  title,
+  link,
+  span,
+  full,
+  icon,
+  children,
+}: {
+  id: string
+  title: string
+  link?: { href: string; label: string }
+  span?: boolean
+  full?: boolean
+  icon?: ReactNode
+  children: ReactNode
+}) {
   return (
-    <section aria-labelledby={id} className={cn('grid content-start gap-2 rounded-xl border bg-card p-4', span && 'md:col-span-2')}>
+    <section aria-labelledby={id} className={cn('grid content-start gap-2 rounded-xl border bg-card p-4', span && '@xl:col-span-2', full && '@xl:col-span-2 @4xl:col-span-4')}>
       <div className="flex items-center justify-between gap-2">
-        <h2 id={id} className="text-sm font-semibold">
-          {title}
+        <h2 id={id} className="flex min-w-0 items-center gap-2 text-sm font-semibold">
+          {icon}
+          <span className="truncate">{title}</span>
         </h2>
         {link && (
           <a href={link.href} className="text-sm text-primary-strong underline-offset-4 hover:underline">
@@ -39,9 +58,20 @@ export function Widget({ id, title, link, span, children }: { id: string; title:
   )
 }
 
-/** The grid of the widgets: three columns, two on the tablet, one on the phone. */
+/** The grid of the widgets: four columns, two on the tablet, one on the phone (by the width of the page, not of
+ *  the window). The flow is dense, so a short widget fills the hole a wide one left, and the widgets of a
+ *  row have the same height. */
 export function WidgetGrid({ children }: { children: ReactNode }) {
-  return <div className="grid gap-4 md:grid-cols-3 max-[900px]:grid-cols-2 max-[620px]:grid-cols-1">{children}</div>
+  return (
+    <div className="@container">
+      <div className="grid grid-flow-dense grid-cols-1 gap-4 @xl:grid-cols-2 @4xl:grid-cols-4">{children}</div>
+    </div>
+  )
+}
+
+/** A row of counters that takes the whole row of the grid and fills it. */
+export function KpiRow({ children }: { children: ReactNode }) {
+  return <div className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-3 @xl:col-span-2 @4xl:col-span-4">{children}</div>
 }
 
 /** A small trend: the figure, its caption and a line (the caption says what the values are). */
@@ -161,14 +191,16 @@ export function WaitingWidget({ slug, publicLinks }: { slug: string; publicLinks
     </Button>
   )
   return (
-    <Widget id="ov-waiting" title={t('Waiting for you')} span>
+    <Widget id="ov-waiting" title={t('Waiting for you')}>
       {loading ? (
         <Loading />
       ) : nReq + nInv + publicLinks === 0 ? (
         <p className="text-sm text-muted-foreground">{t('Nothing waiting for you.')}</p>
       ) : (
         <ul className="grid">
-          {nReq > 0 && <Row icon={<Lock className="size-4" />} title={t('{count} access requests', { count: nReq })} sub={t('To decide')} action={open(to.tenant(slug, 'manage', 'pending'), t('Decide'))} />}
+          {nReq > 0 && (
+            <Row icon={<Lock className="size-4" />} title={t('{count} access requests', { count: nReq })} sub={t('To decide')} action={open(to.tenant(slug, 'manage', 'pending'), t('Decide'))} />
+          )}
           {nInv > 0 && <Row icon={<Mail className="size-4" />} title={t('{count} invitations not accepted yet', { count: nInv })} action={open(to.tenant(slug, 'manage', 'pending'), t('See'))} />}
           {publicLinks > 0 && <Row icon={<Share2 className="size-4" />} title={t('{count} active public links', { count: publicLinks })} action={open(to.tenant(slug, 'shares'), t('Review'))} />}
         </ul>
@@ -189,9 +221,84 @@ interface ErrorsData {
   }[]
 }
 
-/** The widgets of the Administrator beside the services and the to-do list: tenants by storage (from the
- *  snapshot of the figures), requests, notifications and recent errors. */
-export function AdminWidgets() {
+const colName = (k: PluginKpi, c: string) => k.columns?.[c] ?? c.replace(/_/g, ' ')
+
+/** What a view of KPIs of a plugin says best: rows with a name and a count are bars (the first ones), one row
+ *  of counts is a few figures. Anything else is left to the tables of the page. */
+function KpiChart({ k }: { k: PluginKpi }) {
+  const rows = k.rows
+  if (!rows.length) return null
+  const cols = Object.keys(rows[0])
+  const num = (c: string) => rows.every((r) => typeof r[c] === 'number')
+  const nums = cols.filter(num)
+  const name = cols.find((c) => !num(c))
+  if (name && nums.length) {
+    const data = rows.slice(0, 6).map((r) => ({
+      label: String(r[name] ?? '—'),
+      value: Number(r[nums[0]]),
+    }))
+    return (
+      <div className="grid gap-1">
+        <span className="text-xs text-muted-foreground">
+          {k.label} · {colName(k, nums[0])}
+        </span>
+        <HBars data={data} label={k.label} />
+      </div>
+    )
+  }
+  if (rows.length === 1 && nums.length) {
+    return (
+      <div className="grid gap-1">
+        <span className="text-xs text-muted-foreground">{k.label}</span>
+        <dl className="flex flex-wrap gap-x-5 gap-y-1">
+          {nums.map((c) => (
+            <div key={c} className="flex flex-col-reverse">
+              <dd className="text-lg leading-tight font-semibold tabular-nums">{c === 'bytes' ? fmtBytes(Number(rows[0][c])) : fmtNumber(Number(rows[0][c]))}</dd>
+              <dt className="text-xs text-muted-foreground">{colName(k, c)}</dt>
+            </div>
+          ))}
+        </dl>
+      </div>
+    )
+  }
+  return null
+}
+
+/** One card per app: its items and space in every tenant, the kinds of item as bars and what the plugin
+ *  declares as KPIs, as charts. */
+function AppCard({ plugin, stats, kpis }: { plugin: string; stats: ResourceStat[]; kpis: PluginKpi[] }) {
+  const items = stats.reduce((s, r) => s + r.count - (r.trash_count ?? 0), 0)
+  const bytes = stats.reduce((s, r) => s + r.bytes, 0)
+  const name = stats[0]?.plugin ?? kpis[0]?.plugin ?? plugin
+  const kinds = stats.filter((r) => r.count > 0).sort((a, b) => b.count - a.count)
+  const id = `ov-app-${plugin.replace(/[^a-z0-9]/gi, '-')}`
+  return (
+    <Widget id={id} title={name} icon={<AppIcon id={plugin} name={null} className="size-4 shrink-0 text-primary" />}>
+      <div className="flex items-baseline gap-2">
+        <b className="text-2xl font-semibold tabular-nums">{fmtNumber(items)}</b>
+        <span className="text-xs text-muted-foreground">
+          {t('items')} · {fmtBytes(bytes)}
+        </span>
+      </div>
+      {kinds.length > 1 && (
+        <HBars
+          data={kinds.map((r) => ({
+            label: r.kind,
+            value: r.count - (r.trash_count ?? 0),
+          }))}
+          label={t('Items by kind')}
+        />
+      )}
+      {kpis.map((k) => (
+        <KpiChart key={k.view} k={k} />
+      ))}
+    </Widget>
+  )
+}
+
+/** The widgets of the Administrator. `lead` (the counters, the services) comes first in the same grid; then the
+ *  storage of the tenants and of the apps, requests, notifications, recent errors and one card per app. */
+export function AdminWidgets({ lead }: { lead?: ReactNode }) {
   const errors = useApi<ErrorsData>(['mon-errors', '12h'], '/api/admin/monitoring/errors?period=12h')
   const kpi = useApi<GlobalKpi>(['admin-kpi'], '/api/admin/kpi')
   const top: TenantInfo[] = [...(kpi.data?.tenants ?? [])]
@@ -199,8 +306,21 @@ export function AdminWidgets() {
     .sort((a, b) => b.bytes - a.bytes)
     .slice(0, 5)
   const biggest = Math.max(1, ...top.map((x) => x.bytes))
+  // the space by app: the biggest four and the rest together
+  const byApp = new Map<string, { label: string; bytes: number }>()
+  for (const r of kpi.data?.resources ?? [])
+    byApp.set(r.plugin_id, {
+      label: r.plugin,
+      bytes: (byApp.get(r.plugin_id)?.bytes ?? 0) + r.bytes,
+    })
+  const sorted = [...byApp.values()].filter((x) => x.bytes > 0).sort((a, b) => b.bytes - a.bytes)
+  const donut = sorted.slice(0, 4).map((x) => ({ label: x.label, value: x.bytes, text: fmtBytes(x.bytes) }))
+  const rest = sorted.slice(4).reduce((s, x) => s + x.bytes, 0)
+  if (rest > 0) donut.push({ label: t('Other apps'), value: rest, text: fmtBytes(rest) })
+  const ids = [...new Set([...(kpi.data?.resources ?? []).map((r) => r.plugin_id), ...(kpi.data?.plugins ?? []).map((k) => k.plugin_id)])]
   return (
     <WidgetGrid>
+      {lead}
       <Widget id="ov-storage" title={t('Tenants by storage used')} link={{ href: to.admin('tenants'), label: t('All') }} span>
         {kpi.isLoading ? (
           <Loading />
@@ -211,9 +331,9 @@ export function AdminWidgets() {
                 <a href={to.adminTenant(x.id)} className="truncate font-medium hover:underline">
                   {x.name}
                 </a>
-                <span className="h-2 overflow-hidden rounded-full bg-muted" role="img" aria-label={fmtBytes(x.bytes)}>
+                <span className="h-2 overflow-hidden rounded-r-full bg-muted" role="img" aria-label={fmtBytes(x.bytes)}>
                   <span
-                    className="block h-full rounded-full bg-primary"
+                    className="block h-full rounded-r-[4px] bg-primary"
                     style={{
                       width: `${Math.max(2, (x.bytes / biggest) * 100)}%`,
                     }}
@@ -227,6 +347,9 @@ export function AdminWidgets() {
           <p className="text-sm text-muted-foreground">{t('No data.')}</p>
         )}
       </Widget>
+      <Widget id="ov-space-apps" title={t('Space by app')}>
+        {kpi.isLoading ? <Loading /> : donut.length ? <Donut data={donut} label={t('Space by app')} /> : <p className="text-sm text-muted-foreground">{t('No data.')}</p>}
+      </Widget>
       <TrendWidget
         id="ov-requests"
         title={t('Requests')}
@@ -238,7 +361,7 @@ export function AdminWidgets() {
         link={{ href: to.admin('monitoring'), label: t('Monitoring') }}
       />
       <NotesWidget href={to.admin('notifications')} />
-      <Widget id="ov-errors" title={t('Recent errors')} link={{ href: to.admin('log'), label: t('Log') }}>
+      <Widget id="ov-errors" title={t('Recent errors')} link={{ href: to.admin('log'), label: t('Log') }} span>
         {errors.isLoading ? (
           <Loading />
         ) : (errors.data?.latest ?? []).length ? (
@@ -251,6 +374,10 @@ export function AdminWidgets() {
           <p className="text-sm text-muted-foreground">{t('No errors.')}</p>
         )}
       </Widget>
+      {ids.length > 0 && <h2 className="-mb-1 text-sm font-semibold @xl:col-span-2 @4xl:col-span-4">{t('Apps, in every tenant')}</h2>}
+      {ids.map((id) => (
+        <AppCard key={id} plugin={id} stats={(kpi.data?.resources ?? []).filter((r) => r.plugin_id === id)} kpis={(kpi.data?.plugins ?? []).filter((k) => k.plugin_id === id)} />
+      ))}
     </WidgetGrid>
   )
 }

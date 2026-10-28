@@ -17,7 +17,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils'
 import { useAction, useApi } from './core.ts'
 import { t } from './i18n.ts'
-import { Empty, ErrorBox, Loading, Locked, SaveBar } from './kit.tsx'
+import { Empty, ErrorBox, Loading, Locked, SaveBar , Sliced } from './kit.tsx'
 import { to } from './router.ts'
 
 const enc = encodeURIComponent
@@ -230,7 +230,7 @@ export function PlatformQuotasPanel() {
             <Empty title={t('No tenant')} />
           ) : (
             <div className="overflow-x-auto rounded-xl border">
-              <Table>
+              <Sliced items={data.tenants}>{(shown) => (<Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>{t('Tenant')}</TableHead>
@@ -242,7 +242,7 @@ export function PlatformQuotasPanel() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.tenants.map((tn) => (
+                  {shown.map((tn) => (
                     <TableRow key={tn.id}>
                       <TableCell>
                         <a className="font-medium underline-offset-4 hover:underline" href={to.adminTenant(tn.id)}>
@@ -259,7 +259,7 @@ export function PlatformQuotasPanel() {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
+              </Table>)}</Sliced>
             </div>
           )}
         </CardContent>
@@ -440,7 +440,7 @@ function ConsumerTable({ title, rows, nameLabel }: { title: string; rows: QuotaC
           <p className="text-sm text-muted-foreground">{t('Nothing yet.')}</p>
         ) : (
           <div className="overflow-x-auto rounded-xl border">
-            <Table>
+            <Sliced items={rows}>{(shown) => (<Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>{nameLabel}</TableHead>
@@ -449,7 +449,7 @@ function ConsumerTable({ title, rows, nameLabel }: { title: string; rows: QuotaC
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {rows.map((r) => (
+                {shown.map((r) => (
                   <TableRow key={r.id}>
                     <TableCell className="font-medium">{r.name}</TableCell>
                     <TableCell className="text-right tabular-nums">{r.items}</TableCell>
@@ -457,7 +457,7 @@ function ConsumerTable({ title, rows, nameLabel }: { title: string; rows: QuotaC
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </Table>)}</Sliced>
           </div>
         )}
       </CardContent>
