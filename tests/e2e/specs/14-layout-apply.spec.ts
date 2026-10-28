@@ -52,6 +52,8 @@ test.describe.serial('14-layout-apply', () => {
           const bad: string[] = []
           for (const e of document.querySelectorAll('[data-listscroll] .msk-pills, aside.msk-facets')) {
             const r = e.getBoundingClientRect()
+            // a filter column that is closed (on a phone it opens from the button of the header) has no box
+            if (r.width === 0 || r.height === 0) continue
             if (r.top < head.bottom - 1 || r.bottom > innerHeight + 1) bad.push(e.className.slice(0, 30) + ':' + Math.round(r.top) + '-' + Math.round(r.bottom))
           }
           return { headTop: Math.round(head.top), over: document.documentElement.scrollHeight - innerHeight, list: !!document.querySelector('[data-listscroll]'), bad }

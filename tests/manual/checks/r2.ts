@@ -225,6 +225,7 @@ const checks: L.Check[] = [
             const bad: string[] = []
             for (const e of document.querySelectorAll('[data-listscroll] .msk-pills, aside.msk-facets')) {
               const r = e.getBoundingClientRect()
+              if (r.width === 0 || r.height === 0) continue
               if (r.top < head.bottom - 1 || r.bottom > innerHeight + 1) bad.push(Math.round(r.top) + '-' + Math.round(r.bottom))
             }
             return { headTop: Math.round(head.top), over: document.documentElement.scrollHeight - innerHeight, list: !!document.querySelector('[data-listscroll]'), bad }

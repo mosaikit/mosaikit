@@ -202,7 +202,11 @@ test.describe.serial('12-review-round1-platform', () => {
     })
     await test.step('R1-L-09 infinite scroll', async () => {
       await expect(page.getByText(/^50 of \d+$/)).toBeVisible()
-      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight))
+      // the page does not scroll: the list does, and its foot loads the next page as it comes into view
+      await page.evaluate(() => {
+        const l = document.querySelector('[data-listscroll]')!
+        l.scrollTop = l.scrollHeight
+      })
       await expect(page.getByText(/^(\d+) of \1$/)).toBeVisible({ timeout: 15_000 })
     })
     await test.step('R1-L-01 headers and filters stay in sight while the page scrolls', async () => {
