@@ -42,9 +42,23 @@ const useHeaderSection = () =>
  *  in the «⋯» menu, the other actions and the change of state (DropdownMenu items). */
 export function PageHeader({ title, sub, crumbs, badge, lead, bar, actions, more }: { title: string; sub?: ReactNode; crumbs?: Crumb[]; badge?: ReactNode; lead?: ReactNode; bar?: ReactNode; actions?: ReactNode; more?: ReactNode }) {
   const section = useHeaderSection()
+  // the height of the header is the offset of what is pinned under it (--msk-head)
+  const box = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = box.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const set = () => document.documentElement.style.setProperty('--msk-head', `${Math.round(el.getBoundingClientRect().height)}px`)
+    set()
+    const ro = new ResizeObserver(set)
+    ro.observe(el)
+    return () => {
+      ro.disconnect()
+      document.documentElement.style.removeProperty('--msk-head')
+    }
+  }, [])
   return (
     // under the band, and it stays there while the page scrolls
-    <div data-tour="page-header" className="msk-page-header sticky top-(--msk-top) z-10 flex min-h-(--msk-head) flex-wrap items-center gap-3 border-b bg-background px-6 py-2 max-[620px]:px-4">
+    <div ref={box} data-tour="page-header" className="msk-page-header sticky top-(--msk-top) z-10 flex min-h-(--msk-head) flex-wrap items-center gap-3 border-b bg-background px-6 py-2 max-[620px]:px-4">
       {lead}
       <div className="min-w-0 flex-1">
         {crumbs && crumbs.length > 0 && (
@@ -198,7 +212,12 @@ export function Sections({ sections, current, href, children }: { sections: Sect
   }, [label])
   return (
     <div className="flex min-h-0 flex-1 max-[760px]:flex-col">
-      <nav data-tour="sections" aria-label={t('Sections')} className="w-60 shrink-0 border-r bg-pane p-3 max-[760px]:w-auto max-[760px]:border-r-0 max-[760px]:border-b">
+      <nav
+        data-tour="sections"
+        aria-label={t('Sections')}
+        // the list of sections stays where it is while the page scrolls; if it does not fit it scrolls by itself
+        className="msk-hoverscroll sticky top-[calc(var(--msk-top)+var(--msk-head))] h-[calc(100svh-var(--msk-top)-var(--msk-head))] w-60 shrink-0 self-start overflow-y-auto border-r bg-pane p-3 max-[760px]:static max-[760px]:self-stretch max-[760px]:h-auto max-[760px]:w-auto max-[760px]:border-r-0 max-[760px]:border-b"
+      >
         <div className="hidden max-[760px]:block">
           <Select value={current} onValueChange={(v) => go(href(v))}>
             <SelectTrigger className="w-full bg-background" aria-label={t('Section')}>
@@ -235,7 +254,7 @@ export function Sections({ sections, current, href, children }: { sections: Sect
           ))}
         </ul>
       </nav>
-      <div className="min-w-0 flex-1 overflow-auto p-6 max-[620px]:p-4">{children}</div>
+      <div className="min-w-0 flex-1 overflow-x-clip p-6 max-[620px]:p-4">{children}</div>
     </div>
   )
 }

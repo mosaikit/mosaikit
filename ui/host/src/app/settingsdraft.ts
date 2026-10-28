@@ -66,6 +66,8 @@ export function useDraft(l: Level, list: Setting[] | undefined) {
         const next = await api<Setting[]>('PUT', path(l), body)
         qc.setQueryData(queryKey(l), next)
         void qc.invalidateQueries({ queryKey: l.kind === 'platform' ? ['session'] : ['ctx', l.slug] })
+        // the layout in use comes from these: the shell redraws at once, without a reload
+        void qc.invalidateQueries({ queryKey: ['layouts'] })
         if (l.kind === 'platform') reloadBrand()
         setValues({})
         setSwitches({})

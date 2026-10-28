@@ -146,7 +146,7 @@ function AppSidebar({ session, route, band }: { session: Session; route: Route; 
   const manager = route.area === 'tenant' && session.memberships.find((m) => m.slug === route.tenant)?.role === 'tenant_manager'
   return (
     // the right border is drawn by the parts: light on the top bar, grey below
-    <Sidebar collapsible="icon" className="msk-nav border-r-0!" data-tour="sidebar">
+    <Sidebar collapsible="icon" className="msk-nav msk-hoverscroll border-r-0!" data-tour="sidebar">
       {isMobile && !admin ? (
         // on the phone the drawer starts with the tenant switcher (manager and user)
         <SidebarHeader className="border-b p-2">

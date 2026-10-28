@@ -225,7 +225,7 @@ export default function Frame({ session, route, band, layout, bandImage, childre
             aria-label={t('Navigation')}
             data-tour="sidebar"
             className={cn(
-              'msk-nav sticky flex shrink-0 flex-col self-start overflow-hidden bg-sidebar text-sidebar-foreground',
+              'msk-nav msk-hoverscroll sticky flex shrink-0 flex-col self-start overflow-hidden bg-sidebar text-sidebar-foreground',
               card
                 ? 'top-[68px] m-3 mr-0 h-[calc(100svh-80px)] rounded-xl border border-sidebar-border shadow-sm'
                 : cn('border-r border-sidebar-border', pattern === 'sidebar' ? 'top-[56px] h-[calc(100svh-56px)]' : 'top-[50px] h-[calc(100svh-50px)]'),
@@ -266,7 +266,7 @@ export default function Frame({ session, route, band, layout, bandImage, childre
   } else if (pattern === 'areas') {
     body = (
       <div className="flex min-h-0 flex-1">
-        <nav id="msk-nav" aria-label={t('Navigation')} data-tour="sidebar" className="msk-nav msk-areas sticky top-[50px] flex h-[calc(100svh-50px)] shrink-0 self-start bg-sidebar text-sidebar-foreground">
+        <nav id="msk-nav" aria-label={t('Navigation')} data-tour="sidebar" className="msk-nav msk-hoverscroll msk-areas sticky top-[50px] flex h-[calc(100svh-50px)] shrink-0 self-start bg-sidebar text-sidebar-foreground">
           <div role="tablist" aria-label={t('Areas')} aria-orientation="vertical" className="flex w-[72px] flex-col items-center gap-1 border-r border-sidebar-border bg-band py-2 text-band-foreground">
             {[...nav.groups, ...(nav.bottom.length ? [{ id: 'bottom', label: t('Settings'), icon: nav.bottom[0].icon, items: nav.bottom }] : [])].map((g) => (
               <button

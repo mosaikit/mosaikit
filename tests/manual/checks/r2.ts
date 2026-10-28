@@ -169,6 +169,51 @@ const checks: L.Check[] = [
       return c.result()
     },
   },
+  {
+    id: 'R2-07',
+    async run(ctx: any) {
+      const c = H.checker()
+      const p = await L.as(ctx, 'admin')
+      for (const [w, h] of [[1440, 800], [390, 800]]) {
+        await p.setViewportSize({ width: w, height: h })
+        for (const tab of ['identity', 'theme', 'layout', 'style', 'languages', 'topbar']) {
+          await H.go(p, `#/admin/system/${tab}`)
+          await p.waitForTimeout(600)
+          const over = await p.evaluate(() => document.documentElement.scrollWidth - innerWidth)
+          c.ok(over <= 1, `${tab} at ${w}px: nothing sideways (${over})`)
+        }
+      }
+      await p.setViewportSize({ width: 1280, height: 800 })
+      await H.go(p, '#/admin/system/layout')
+      await p.locator('[data-layout-card="console"]').click()
+      await p.getByRole('button', { name: 'Save' }).click()
+      await p.locator('.msk-shell[data-layout="console"]').waitFor({ state: 'attached', timeout: 10000 })
+      await p.locator('[data-layout-card="teams"]').click()
+      await p.getByRole('button', { name: 'Save' }).click()
+      await p.locator('.msk-shell[data-layout="teams"]').waitFor({ state: 'attached', timeout: 10000 })
+      c.note('the layout was applied without a reload (also in tests/e2e/specs/14-layout-apply.spec.ts)')
+      return c.result()
+    },
+  },
+  {
+    id: 'R2-08',
+    async run(ctx: any) {
+      const c = H.checker()
+      const p = await L.as(ctx, 'admin')
+      await p.setViewportSize({ width: 1280, height: 360 })
+      await H.go(p, '#/admin/system')
+      await p.evaluate(() => window.scrollTo(0, 300))
+      const side = p.getByRole('navigation', { name: 'Sections' })
+      const box = await side.evaluate((e: Element) => ({ top: Math.round(e.getBoundingClientRect().top), over: e.scrollHeight > e.clientHeight, ov: getComputedStyle(e).overflowY }))
+      c.ok(box.top < 140 && box.ov === 'auto' && box.over, `the list of sections stays in place and scrolls by itself (${JSON.stringify(box)})`)
+      await side.hover()
+      await p.mouse.wheel(0, 150)
+      await p.waitForTimeout(300)
+      c.ok((await side.evaluate((e: Element) => e.scrollTop)) > 0, 'the wheel scrolls the list of sections')
+      await p.setViewportSize({ width: 1440, height: 900 })
+      return c.result()
+    },
+  },
 ]
 
 export default checks

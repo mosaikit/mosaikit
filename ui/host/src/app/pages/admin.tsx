@@ -518,7 +518,7 @@ function BandSettings({ session }: { session: Session }) {
   const save = useAction((x: ShellBand) => api('PUT', '/api/admin/band', x), { ok: t('Top bar updated for everybody'), invalidate: [['session']] })
   const dirty = !!v && JSON.stringify(v) !== JSON.stringify(saved)
   return (
-    <div className="grid max-w-3xl gap-6">
+    <div className="grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-6">
       <Card>
         <CardHeader>
           <CardTitle>{t('Preview')}</CardTitle>
@@ -536,7 +536,7 @@ function BandSettings({ session }: { session: Session }) {
         <CardContent className="grid gap-1">
           {bandItems().map((it) => (
             <label key={it.key} className="flex items-center justify-between gap-4 border-b py-3 last:border-0">
-              <span>
+              <span className="min-w-0">
                 <b className="block text-sm">{it.label}</b>
                 <span className="text-xs text-muted-foreground">{t('If it is off: {what}', { what: it.off })}</span>
               </span>

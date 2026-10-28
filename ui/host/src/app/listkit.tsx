@@ -25,7 +25,7 @@ export function FilterColumn({ search, onSearch, searchLabel, groups, onReset }:
   return (
     <aside
       aria-label={t('Filters')}
-      className="msk-facets w-60 shrink-0 overflow-y-auto border-r bg-pane p-3 max-[760px]:max-h-[45%] max-[760px]:w-auto max-[760px]:border-r-0 max-[760px]:border-b"
+      className="msk-facets msk-hoverscroll w-60 shrink-0 overflow-y-auto border-r bg-pane p-3 max-[760px]:max-h-[45%] max-[760px]:w-auto max-[760px]:border-r-0 max-[760px]:border-b"
     >
       <div className="mb-2 flex items-center justify-between">
         <b className="text-sm">{t('Filters')}</b>
