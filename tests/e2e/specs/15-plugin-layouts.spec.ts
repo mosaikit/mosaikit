@@ -16,6 +16,8 @@ async function add(frame: FrameLocator, values: Record<string, string | boolean>
     else await el.fill(v)
   }
   await frame.getByRole('button', { name: 'Save' }).click()
+  // saved: the item is in the list (the next one starts from a settled page)
+  await expect(frame.locator('.msk-item', { hasText: String(Object.values(values)[0]) }).first()).toBeVisible()
 }
 
 /** Nothing of the page scrolls sideways, and the header of the plugin stays at the top of the frame. */
