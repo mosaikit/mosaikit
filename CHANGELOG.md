@@ -16,6 +16,9 @@ in step).
 - Search everywhere: pages, apps and the items of the apps you can see (Ctrl K).
 - Help: a guided tour of the main pages, the guide, what is new and the keyboard shortcuts.
 - Overviews of widgets for every role: the apps as a compact strip, fast figures, notifications, recent activity, due dates and, for the Administrator, the tenants by storage, requests and recent errors.
+- The overviews fill the page without gaps (a dense grid of four, two or one columns). The Administrator sees one card per app, with small charts of items and space, and a chart of the space by app.
+- Headers, filters and tabs stay in place while the content scrolls, in every page and in the plugin pages. The sidebar scrollbar shows only under the mouse.
+- Long lists and tables load a page at a time, with a count and «Load more» (or as you scroll), including the Log.
 
 ### People and tenants
 

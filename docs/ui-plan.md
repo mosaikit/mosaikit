@@ -95,3 +95,13 @@ Observations from the user's manual tests; ids as in the user's notes. Status is
 | I3 | Indent hierarchical lists (same as B8; example: the System sidebar of the Administrator) |
 | I4 | App sidebar: nested items can be indented when it is open; when it is collapsed, an icon with sub-items opens a menu with items and sub-items (works with the `[[nav]]` tree of the layouts) |
 | J1 | **Done.** Development tooling for parallel work: `cargo xtask worktree add\|remove\|list`, heavy-run slots for `e2e`/`test`/`ci`, `clean-temp`, shared build cache option (README, checks DEV-nn) |
+
+## Review round 2 (user, 2026-10-28)
+
+| Id | Item |
+|---|---|
+| A1 | **Done.** Administrator overview: one card per app (items, space, bars by kind, the figures the plugin declares as bars or numbers), a donut of the space by app, bars of the tenants by space; the tables stay available under «Figures of the apps as tables». Charts in `app/Charts.tsx` (SVG, fixed colour order `--chart-1…`, own dark steps, values and legend always written). Checks R2-01 |
+| A2 | **Done.** Home, Tenant Manager and Administrator overviews use one dense grid (`WidgetGrid`: four columns, two on a tablet, one on a phone, by the width of the page; `grid-flow-dense`, equal height per row); `Widget`, `KpiRow`. Checks R2-01, R2-02 |
+| B1 | **Done.** Headers and filters stay in place: the page header and the pills were already pinned; the tabs (`Tabs`) are now pinned under the header; the plugin pages made with `mountCrud` pin the title and the filter row (`.msk-pagehead`). Plugin UIs that draw their own page (Maps, Static sites, Files) keep their own layout (see the plugins repository). Check R2-03 |
+| B2 | **Done.** The sidebar scrollbar shows only with the mouse over it, with the focus inside it, or on a touch screen (`.msk-nav`, every layout). Check R2-04 |
+| B3 | **Done.** Paging for every list. Server side (earlier): Trash, Shared by me, Invitations, Tenants, People, Manage › People, Groups, Resources. New: the Log loads on scroll with a count (`MoreRows` without a total). On the client (`Sliced` in `kit.tsx`, 50 rows at a time, the foot loads more as it comes into view, a count «N of M» under the table; `DataTable` pages by 25): the figures of the plugins and of the apps (`DataTable`), tenant sessions of a person, members and shares of a group, plugin tenants, installed plugins, plugin list, backups, backup items, errors, public links, usage tables, quotas of the tenants, the bulk import preview. Not converted on purpose: lists of at most a dozen rows by nature (services, profiles, steps, memberships of a person) and the Notifications page, which already pages on the server with «Show older ones». Check R2-05 |
