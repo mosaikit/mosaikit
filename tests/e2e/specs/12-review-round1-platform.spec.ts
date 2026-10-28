@@ -147,9 +147,11 @@ test.describe.serial('12-review-round1-platform', () => {
     await test.step('R1-L-03/04 sidebar: scrollbar only on hover, no extra space above and below the icons', async () => {
       const content = page.locator('[data-sidebar="content"]').first()
       await page.mouse.move(700, 400)
-      const quiet = await content.evaluate((e) => getComputedStyle(e).scrollbarColor)
+      // the thumb of the scrollbar (drawn with the webkit parts, which Edge shows as a real bar): transparent, then visible
+      const thumb = () => content.evaluate((e) => getComputedStyle(e, '::-webkit-scrollbar-thumb').backgroundColor)
+      const quiet = await thumb()
       await content.hover()
-      const hover = await content.evaluate((e) => getComputedStyle(e).scrollbarColor)
+      const hover = await thumb()
       expect(hover).not.toBe(quiet)
       const first = await sidebar.locator('[data-sidebar="menu-button"]').first().boundingBox()
       const top = await content.boundingBox()

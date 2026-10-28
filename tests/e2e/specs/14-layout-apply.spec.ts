@@ -41,7 +41,7 @@ test.describe.serial('14-layout-apply', () => {
   })
 
   test('R2-09 list pages: no gap under the band, the filters fully visible, no scroll of the page', async ({ page }) => {
-    await login(page, 'City of Alfa', 'manager', PASSWORD)
+    await login(page, 'Alfa Municipality', 'manager', PASSWORD)
     for (const [w, h] of [[2000, 1194], [390, 800]]) {
       await page.setViewportSize({ width: w, height: h })
       for (const hash of ['log', 'manage', 'trash', 'shares', 'plugins']) {
@@ -92,7 +92,7 @@ test.describe.serial('14-layout-apply', () => {
     await check('#/admin/monitoring', 'Monitoring')
     await check('#/admin/account', 'Account')
     await logout(page)
-    await login(page, 'City of Alfa', 'manager', PASSWORD)
+    await login(page, 'Alfa Municipality', 'manager', PASSWORD)
     for (const [hash, name] of [['settings', 'Settings'], ['usage', 'Usage'], ['account', 'Account'], ['manage', 'Manage'], ['manage/groups', 'Manage']]) await check('#/t/alfa/' + hash, name)
   })
 })

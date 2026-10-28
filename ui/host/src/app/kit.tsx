@@ -167,7 +167,8 @@ export function SaveBar({ dirty, busy, onSave, onCancel }: { dirty: boolean; bus
   if (!dirty) return null
   return (
     <div role="region" aria-label={t('Unsaved changes')} className="sticky bottom-0 z-10 -mx-6 mt-6 flex items-center gap-3 border-t bg-background/95 px-6 py-3 backdrop-blur max-[620px]:-mx-4 max-[620px]:px-4">
-      <span className="flex-1 text-sm font-medium">{t('Unsaved changes')}</span>
+      {/* at the left: the messages (toasts) come at the bottom right and must not cover the buttons */}
+      <span className="text-sm font-medium">{t('Unsaved changes')}</span>
       <Button variant="outline" onClick={onCancel} disabled={busy}>
         {t('Cancel')}
       </Button>
