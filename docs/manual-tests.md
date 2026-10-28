@@ -674,3 +674,11 @@ Dense overviews, app cards with charts, pinned headers, the sidebar scrollbar an
 | R2-03 | Open a long list (Tenants, Manage, Log) and scroll; open a tenant or plugin page with tabs and scroll; open a plugin page (Notes) with many rows and scroll | The header, the filters and the tabs stay in place; only the content scrolls. In a plugin page the title and the filter row stay at the top of the frame | Playwright |
 | R2-04 | Move the mouse over the sidebar when its items do not all fit, then away; move through it with Tab; open the app on a touch screen | The scrollbar shows only while the mouse is over the sidebar (or the focus is inside it, or on a touch screen); the sidebar scrolls with the keyboard and by touch | Playwright |
 | R2-05 | Open a table with more than 50 rows that is already whole in the page (backups, plugin figures, sessions, people of a group) and a list loaded from the server (Log, Trash, Tenants) | Only the first rows show, with «N of M» (or «N loaded» for the Log) below; the next rows come as the foot comes into view or with **Load more**; a visible count never lies | Playwright (the figures table), Vitest |
+
+## Spanish coverage
+
+The language plugin `com.mosaikit.lang-es` translates the whole shell (same keys as the Italian locale) and the manifests of the shipped plugins; the keys are compared by `ui/host/src/app/langpack.test.ts` and `crates/kernel/tests/lang_es_coverage.rs`. Texts inside the iframe of a plugin are not covered.
+
+| Id | Steps | Expected | Twin |
+|---|---|---|---|
+| LANG-01 | Choose **Español** in Account › Appearance and language, as Administrator and as Tenant Manager; visit Home, Overview, Manage, Plugins, Shares, Usage, Log, Settings, Account and, as Administrator, System | No English text is left in the shell (apart from names, brands and technical terms); the plugin names and the labels of the fields come in Spanish; the texts inside the iframe of a plugin may stay in English | e2e `14-lang-es-coverage.spec.ts` + manual |

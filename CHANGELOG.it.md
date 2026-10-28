@@ -54,4 +54,4 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 - Backup ogni giorno, con il ripristino di un tenant intero o di un singolo elemento.
 - Modalità manutenzione, anche programmata, con un avviso per tutti.
 - Monitoraggio di servizi, prestazioni, errori e capacità, con avvisi.
-- Una nuova lingua è un plugin: una volta installato compare nei menu delle lingue.
+- Una nuova lingua è un plugin: una volta installato compare nei menu delle lingue. Il plugin dello spagnolo ora traduce tutta l'interfaccia e i testi di ogni plugin ufficiale.

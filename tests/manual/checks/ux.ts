@@ -275,6 +275,24 @@ const checks: L.Check[] = [
       return c.result()
     },
   },
+  {
+    id: 'LANG-01',
+    async run(ctx: any) {
+      const c = H.checker()
+      const p = await L.as(ctx, 'e.ricci', 'es')
+      const english = /(the|and|your|you|with|from|for|are|this|will|has|have|not|new|add|all|save|cancel)/i
+      for (const hash of ['', '/overview', '/manage', '/plugins', '/shares', '/settings', '/account']) {
+        await H.go(p, '#/t/comune-roma' + hash)
+        await p.waitForTimeout(1200)
+        const text: string = await p.evaluate(() => document.body.innerText)
+        const left = text.split('
+').map((l) => l.trim()).filter((l) => english.test(l))
+        c.ok(left.length === 0, `no English left on ${hash || 'Home'}: ${left.slice(0, 3).join(' | ')}`)
+      }
+      await L.shot(p, 'LANG-01')
+      return c.result()
+    },
+  },
 ]
 
 export default checks

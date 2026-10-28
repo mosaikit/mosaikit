@@ -54,4 +54,4 @@ in step).
 - Backups every day, with the restore of a whole tenant or of one item.
 - Maintenance mode, also planned in advance, with a notice for everybody.
 - Monitoring of the services, the performance, the errors and the capacity, with alerts.
-- A new language is a plugin: once installed it appears in the language menus.
+- A new language is a plugin: once installed it appears in the language menus. The Spanish plugin now translates the whole interface and the texts of every official plugin.
