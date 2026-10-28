@@ -43,24 +43,8 @@ type Family = (typeof FAMILIES)[number]
 
 /** Work in flight: rule + family -> what is pending. Delete the row (and the test runs for real) when it has merged. */
 const WIP = 'work in flight: '
-const DEFECT = 'DEFECT, nobody assigned: '
-const NOHEAD = WIP + 'this app does not use pageHead/pageBody yet'
 const PENDING: { rule: string; family: Family; why: string }[] = [
-  { rule: 'R-1', family: 'log', why: WIP + 'Log page: filter row pinned' },
-  { rule: 'R-2', family: 'log', why: WIP + 'Log page: header starts under an empty band' },
-  { rule: 'R-3', family: 'log', why: WIP + 'Log page: the list scrolls inside with a sticky header row' },
-  ...(['R-5', 'R-6'] as const).flatMap((rule) => (['host-admin', 'host-manager'] as const).map((family) => ({ rule, family, why: WIP + 'host headers: «Page › Subsection», filter in the header row' }))),
-  { rule: 'R-5', family: 'host-user', why: WIP + 'host headers: «Page › Subsection»' },
   { rule: 'R-5', family: 'app-notes', why: WIP + 'Notes: pass the open subsection to pageHead' },
-  ...(['app-files', 'app-maps', 'app-static-site'] as const).flatMap((family) => ['R-1', 'R-7'].map((rule) => ({ rule, family, why: NOHEAD }))),
-  { rule: 'R-3', family: 'app-maps', why: NOHEAD },
-  { rule: 'R-2', family: 'host-admin', why: DEFECT + 'list pages: the header starts 50px under the top bar (sticky top inside the FillPage)' },
-  { rule: 'R-2', family: 'host-manager', why: DEFECT + 'list pages: the header starts 50px under the top bar (sticky top inside the FillPage)' },
-  { rule: 'R-3', family: 'host-admin', why: DEFECT + 'Tenants: the header row of the table is not sticky (it scrolls away inside the list)' },
-  { rule: 'R-3', family: 'host-manager', why: DEFECT + 'Plugins @1280x600: the header row of the table scrolls away' },
-  { rule: 'R-1', family: 'host-admin', why: DEFECT + 'Monitoring ▸ Performance: the filter row (pills) scrolls with the content' },
-  { rule: 'R-1', family: 'host-manager', why: DEFECT + 'Plugins @1280x600: the filter row (pills) scrolls with the content' },
-  ...(['host-admin', 'host-manager', 'host-user'] as const).map((family) => ({ rule: 'R-4', family, why: DEFECT + 'pages with Sections: the side navigation scrolls with the page and runs off a 600 px window' })),
 ]
 
 interface Rect {
