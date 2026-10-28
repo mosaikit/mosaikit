@@ -1204,6 +1204,11 @@ const STATE: Record<ServiceState['state'], [string, string]> = {
   off: ['off', 'bg-muted text-muted-foreground'],
 }
 
+/** The name of a service: the kernel sends it in English; the one of a tenant's identity provider carries the tenant. */
+function serviceName(s: ServiceState): string {
+  return s.key.startsWith('oidc:') ? t('Identity provider of {tenant}', { tenant: s.key.slice(5) }) : t(s.name)
+}
+
 function ServiceBadge({ state }: { state: ServiceState['state'] }) {
   const [label, cls] = STATE[state]
   return (
@@ -1308,7 +1313,7 @@ function StatusPanel() {
               <TableRow key={s.key} className="cursor-pointer" onClick={() => setOpen(s.key)}>
                 <TableCell>
                   <button type="button" className="text-left font-medium hover:underline" aria-haspopup="dialog" onClick={(e) => (e.stopPropagation(), setOpen(s.key))}>
-                    {s.name}
+                    {serviceName(s)}
                   </button>
                   {s.detail && <span className="mt-0.5 block text-xs text-muted-foreground">{s.detail}</span>}
                 </TableCell>
@@ -1336,7 +1341,7 @@ function ServiceDetail({ service: s, onClose }: { service: ServiceState | null; 
         {s && (
           <>
             <SheetHeader>
-              <SheetTitle>{t(s.name)}</SheetTitle>
+              <SheetTitle>{serviceName(s)}</SheetTitle>
               <SheetDescription>
                 <ServiceBadge state={s.state} />
               </SheetDescription>
@@ -1681,7 +1686,7 @@ export function OverviewOps() {
           <ul className="grid gap-1.5">
             {(status.data?.services ?? []).map((s) => (
               <li key={s.key} className="flex items-center justify-between gap-2 text-sm">
-                <span className="truncate">{s.name}</span>
+                <span className="truncate">{serviceName(s)}</span>
                 <ServiceBadge state={s.state} />
               </li>
             ))}

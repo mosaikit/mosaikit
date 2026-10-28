@@ -201,7 +201,7 @@ export default function App() {
           </Shell>
         )}
       </TooltipProvider>
-      <Toaster richColors closeButton position="bottom-right" />
+      <Toaster richColors closeButton position="bottom-right" containerAriaLabel={t('Notifications')} />
     </UiServices>
   )
 }

@@ -160,7 +160,7 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
   )
   return (
     <>
-      <PageHeader title={manager ? t('Tenant overview') : t('Home')} sub={`${greeting()}, ${session.user.display_name || session.user.username} · ${ROLE[c.tenant.role]} in ${c.tenant.name}`} />
+      <PageHeader title={manager ? t('Tenant overview') : t('Home')} sub={`${greeting()}, ${session.user.display_name || session.user.username} · ${t('{role} in {tenant}', { role: c.tenant.role === 'tenant_manager' ? ROLE.tenant_manager : t('User'), tenant: c.tenant.name })}`} />
       <div className="grid gap-4 p-6 max-[620px]:p-4">
         {!c.plugins.some(isApp) ? (
           <Empty icon={<Grid2x2 />} title={t('No active apps')}>
@@ -713,7 +713,7 @@ function People({ slug, profiles, groups, shell }: { slug: string; profiles: Pro
                 </TableCell>
                 <TableCell>
                   <Badge variant={m.role === 'tenant_manager' ? 'default' : 'secondary'} className="font-normal">
-                    {ROLE[m.role]}
+                    {t(ROLE[m.role])}
                   </Badge>
                   <div className="mt-1 text-xs text-muted-foreground">{m.role === 'tenant_manager' ? t('every permission') : m.profile}</div>
                 </TableCell>
@@ -1040,7 +1040,7 @@ function Invites({ slug, q }: { slug: string; q: ReturnType<typeof usePaged<Invi
           {q.items.map((i) => (
             <TableRow key={i.id}>
               <TableCell className="font-medium">{i.user}</TableCell>
-              <TableCell>{ROLE[i.role]}</TableCell>
+              <TableCell>{t(ROLE[i.role])}</TableCell>
               <TableCell>
                 <StatusBadge status={i.status} />
               </TableCell>
