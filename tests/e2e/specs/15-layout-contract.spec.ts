@@ -44,7 +44,6 @@ type Family = (typeof FAMILIES)[number]
 /** Work in flight: rule + family -> what is pending. Delete the row (and the test runs for real) when it has merged. */
 const WIP = 'work in flight: '
 const PENDING: { rule: string; family: Family; why: string }[] = [
-  { rule: 'R-5', family: 'app-notes', why: WIP + 'Notes: pass the open subsection to pageHead' },
 ]
 
 interface Rect {
@@ -91,7 +90,7 @@ interface Rec {
   expectSection: string | null
 }
 const recs: Rec[] = []
-const sidebar: { role: string; idle: any; hover: any }[] = []
+const sidebar: { role: string; family: Family; route: string; idle: any; hover: any }[] = []
 // the measures live on disk: a failed rule test restarts the worker, and the next rules must still find them
 const FILE = path.join(import.meta.dirname, '..', 'test-results', 'layout-contract.json')
 let loaded: { recs: Rec[]; sidebar: typeof sidebar } | null = null
@@ -327,6 +326,21 @@ async function walk(page: Page, role: Role, home: string, account: string, dark:
     if (process.env.LC_LOG) console.log(role, href, Math.round((Date.now() - t0) / 1000) + 's')
   }
   expect(n, `routes found for ${role}`).toBeGreaterThan(5)
+  // R-8: the main sidebar on a page of each family, at a height that makes it overflow, idle then hovered
+  // (a family already measured for another role is not measured again)
+  const routes = new Map<Family, string>()
+  for (const r of recs) if (r.role === role && !routes.has(r.family)) routes.set(r.family, r.route)
+  for (const [family, route] of routes) {
+    if (sidebar.some((x) => x.family === family)) continue
+    await page.setViewportSize({ width: 1280, height: 300 })
+    await page.evaluate((h) => (location.hash = h), route)
+    await page.waitForFunction((h) => location.hash === h, route)
+    await page.locator('[data-sidebar="content"]').waitFor()
+    const idle = await sidebarProbe(page)
+    await page.locator('[data-sidebar="content"]').hover()
+    const hover = await sidebarProbe(page)
+    sidebar.push({ role, family, route, idle, hover })
+  }
 }
 
 test.describe('15-layout-contract', () => {
@@ -355,18 +369,6 @@ test.describe('15-layout-contract', () => {
     for (let i = 0; i < 6; i++) await Promise.all(Array.from({ length: 10 }, (_, k) => i * 10 + k + 1).filter((n) => n < 60).map(tenant))
     await walk(page, 'admin', '#/admin', '#/admin/account', 5)
 
-    // R-8: the sidebar at a height that makes it overflow, idle then hovered
-    for (const [role, user] of [['admin', null], ['manager', 'mgr']] as const) {
-      await page.context().clearCookies()
-      if (user) await login(page, TENANT, user, PASSWORD)
-      else await adminLogin(page)
-      await page.setViewportSize({ width: 1280, height: 300 })
-      await page.locator('[data-sidebar="content"]').waitFor()
-      const idle = await sidebarProbe(page)
-      await page.locator('[data-sidebar="content"]').hover()
-      const hover = await sidebarProbe(page)
-      sidebar.push({ role, idle, hover })
-    }
     fs.mkdirSync(path.dirname(FILE), { recursive: true })
     fs.writeFileSync(FILE, JSON.stringify({ recs, sidebar }))
     expect(recs.length).toBeGreaterThan(60)
@@ -380,8 +382,8 @@ test.describe('15-layout-contract', () => {
         const { recs: all, sidebar } = load()
         const mine = all.filter((r) => r.family === family)
         if (rule === 'R-8') {
-          test.skip(family !== 'host-admin' && family !== 'host-manager', 'sidebar: checked once per role')
-          const s = sidebar.find((x) => x.role === (family === 'host-admin' ? 'admin' : 'manager'))!
+          const s = sidebar.find((x) => x.family === family)!
+          expect(s, `no route of the family ${family} measured`).toBeTruthy()
           const bad: string[] = []
           if (!s.idle?.overflows) bad.push('the sidebar does not overflow at 1280x300: cannot judge')
           else {
@@ -389,7 +391,7 @@ test.describe('15-layout-contract', () => {
             if (!clear(s.idle.idle)) bad.push(`scrollbar visible when idle (${s.idle.idle})`)
             if (clear(s.hover.idle)) bad.push(`scrollbar still hidden when hovered (${s.hover.idle})`)
           }
-          expect(bad, `${rule} sidebar of the ${s.role}`).toEqual([])
+          expect(bad, `${rule} sidebar of the ${s.role} on ${s.route}`).toEqual([])
           return
         }
         test.skip(mine.length === 0, 'no route in this family for this run')
