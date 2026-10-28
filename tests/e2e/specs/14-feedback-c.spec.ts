@@ -169,6 +169,9 @@ test.describe.serial('14-feedback-c', () => {
       })
       await new Promise<void>((ok) => server.listen(0, '127.0.0.1', ok))
       const port = (server.address() as AddressInfo).port
+      // earlier files may have left keys of the platform (the keys page tests): start without
+      await api(page, 'DELETE', 'api/admin/keys/translate')
+      await api(page, 'DELETE', 'api/admin/keys/translate-endpoint')
       try {
         const mgr = await browser.newPage({ baseURL: process.env.E2E_BASE_URL ?? 'http://127.0.0.1:18080/mosaikit/' })
         await login(mgr, 'City of Beta', 'manager', PASSWORD)
