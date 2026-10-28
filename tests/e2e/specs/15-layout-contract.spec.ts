@@ -332,8 +332,8 @@ async function walk(page: Page, role: Role, home: string, account: string, dark:
   for (const [family, route] of routes) {
     if (sidebar.some((x) => x.family === family)) continue
     await page.setViewportSize({ width: 1280, height: 300 })
-    await page.evaluate((h) => (location.hash = h), route)
-    await page.waitForFunction((h) => location.hash === h, route)
+    // a new load: the sidebar opens as at the start of a session (a phone before left it closed)
+    await page.goto('./' + route)
     await page.locator('[data-sidebar="content"]').waitFor()
     const idle = await sidebarProbe(page)
     await page.locator('[data-sidebar="content"]').hover()
