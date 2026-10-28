@@ -212,7 +212,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     TEXTS[lang()][k].replace(/\{(\w+)\}/g, (_, v: string) => String(vars[v] ?? ''))
 
   const filter = h('input', { type: 'search', class: 'msk-filter' })
-  const btnNew = h('button', { type: 'button', class: 'msk-btn ghost' })
+  const btnNew = h('button', { type: 'button', class: 'msk-btn' })
   const count = h('span', { class: 'msk-count' })
   const btnMore = h('button', { type: 'button', class: 'msk-btn ghost msk-more' })
   const thead = h('thead')
