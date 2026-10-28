@@ -1558,6 +1558,11 @@ const ALERT_LABEL: Record<string, string> = {
   service: 'Service not answering',
 }
 
+/** The kernel words the detail in English; the services it lists are translated here. */
+function alertDetail(a: AlertState): string {
+  return a.key === 'service' ? a.detail.replace(/^not answering: /, '').split(', ').map((n) => t(n)).join(', ') : a.detail
+}
+
 function AlertsPanel() {
   const q = useApi<{ settings: AlertSettings; states: AlertState[] }>(['mon-alerts'], '/api/admin/monitoring/alerts')
   const admins = useApi<AdminUser[]>(['admins'], '/api/admin/administrators')
@@ -1593,7 +1598,7 @@ function AlertsPanel() {
                   <AlertTriangle className="mt-0.5 size-4 shrink-0" />
                   <span>
                     <b className="block">{t(ALERT_LABEL[a.key] ?? a.key)}</b>
-                    {a.detail} · {t('since {date}', { date: fmtDay(a.since, { dateStyle: 'short', timeStyle: 'short' }) })}
+                    {alertDetail(a)} · {t('since {date}', { date: fmtDay(a.since, { dateStyle: 'short', timeStyle: 'short' }) })}
                   </span>
                 </li>
               ))}
@@ -1659,7 +1664,7 @@ export function OverviewOps() {
   const now = useNow()
   const todo = useMemo(() => {
     const out: { key: string; text: string; href: string; tone: 'bad' | 'warn' }[] = []
-    for (const a of alerts.data?.states.filter((x) => x.active) ?? []) out.push({ key: `a-${a.key}`, text: `${t(ALERT_LABEL[a.key] ?? a.key)}: ${a.detail}`, href: to.admin('monitoring', 'alerts'), tone: 'bad' })
+    for (const a of alerts.data?.states.filter((x) => x.active) ?? []) out.push({ key: `a-${a.key}`, text: `${t(ALERT_LABEL[a.key] ?? a.key)}: ${alertDetail(a)}`, href: to.admin('monitoring', 'alerts'), tone: 'bad' })
     const last = backups.data?.backups.find((b) => b.status !== 'running')
     if (last?.status === 'failed') out.push({ key: 'backup', text: t('The last backup failed: {error}', { error: last.error }), href: to.admin('system', 'backup'), tone: 'bad' })
     const soon = now + 7 * 86400000
