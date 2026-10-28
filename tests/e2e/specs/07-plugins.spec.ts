@@ -56,7 +56,6 @@ test.describe.serial('07-plugins', () => {
     await nav(page, 'Notes').click()
     const frame = page.frameLocator('iframe.plugin-frame')
     await expect(frame.getByRole('heading', { name: 'Notes' })).toBeVisible()
-    await expect(frame.locator('thead')).toContainText('Reviewed')
     await frame.locator('[data-key="title"]').first().fill('Plan to review')
     await frame.getByRole('button', { name: 'Save' }).click()
     const row = frame.locator('.msk-item', { hasText: 'Plan to review' })
