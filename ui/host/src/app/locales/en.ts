@@ -136,4 +136,7 @@ export const EN: Record<string, string> = {
   '{count} invitations not accepted yet_other': '{count} invitations not accepted yet',
   '{count} active public links_one': '1 active public link',
   '{count} active public links_other': '{count} active public links',
+  'errors.code_required': 'The code of the authenticator app is required',
+  'errors.email_taken': 'This email address is already used by another account',
+  'errors.own_email_reauth': 'Change your own email from the Account page, with your password',
 }
