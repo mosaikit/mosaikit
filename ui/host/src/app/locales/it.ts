@@ -1907,6 +1907,5 @@ export const IT: Record<string, string> = {
   'Other apps': 'Altre app',
   'Apps, in every tenant': 'App, in tutte le organizzazioni',
   'Items by kind': 'Elementi per tipo',
-  'Figures of the apps as tables': 'Dati delle app in tabelle',
   '{shown} loaded': '{shown} caricati',
 }

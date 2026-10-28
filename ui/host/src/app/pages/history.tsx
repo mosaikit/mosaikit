@@ -16,12 +16,11 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { cn } from '@/lib/utils'
 import { useAction, useApi, useConfirm, usePaged, useTenantCtx } from '../core.ts'
 import { BulkBar, FilterColumn, ListPage } from '../listkit.tsx'
 import { t } from '../i18n.ts'
 import { about, describe } from '../logtext.ts'
-import { Empty, ErrorBox, Loading, MoreRows, PageHeader, Pills  } from '../kit.tsx'
+import { Empty, ErrorBox, FillBody, FillPage, Loading, MoreRows, PageHeader, Pills } from '../kit.tsx'
 import { Widget } from '../Overview.tsx'
 import { go } from '../router.ts'
 import ShareDialog from '../ShareDialog.tsx'
@@ -710,7 +709,7 @@ export function LogPage({ slug }: { slug?: string }) {
   if (slug && ctx.data?.tenant.role !== 'tenant_manager') return <Empty title={t('Reserved to Tenant Managers')} />
   const scope: LogScope = slug ? { api: `/api/t/${enc(slug)}/manage/log`, slug } : { api: '/api/admin/log', admin: true }
   return (
-    <>
+    <FillPage>
       <PageHeader
         title={t('Log')}
         crumbs={[{ label: slug ? t('Tenant management') : t('Platform') }]}
@@ -722,10 +721,10 @@ export function LogPage({ slug }: { slug?: string }) {
             : t('What happened on the platform, in every tenant')
         }
       />
-      <div className={cn('p-6 max-[620px]:p-4')}>
+      <FillBody className="p-6 max-[620px]:p-4">
         <LogView scope={scope} />
-      </div>
-    </>
+      </FillBody>
+    </FillPage>
   )
 }
 

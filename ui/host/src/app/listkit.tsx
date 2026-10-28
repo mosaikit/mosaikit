@@ -8,7 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { cn } from '@/lib/utils'
 import { t } from './i18n.ts'
-import { PageHeader } from './kit.tsx'
+import { FillBody, FillPage, PageHeader } from './kit.tsx'
 
 /** One group of the filter column: a heading and the options (one chosen), each with its count. */
 export interface FacetGroup {
@@ -25,7 +25,7 @@ export function FilterColumn({ search, onSearch, searchLabel, groups, onReset }:
   return (
     <aside
       aria-label={t('Filters')}
-      className="msk-facets sticky top-[calc(var(--msk-top)+var(--msk-head))] h-[calc(100svh-var(--msk-top)-var(--msk-head))] w-60 shrink-0 self-start overflow-y-auto border-r bg-pane p-3 max-[760px]:static max-[760px]:h-auto max-[760px]:w-auto max-[760px]:border-r-0 max-[760px]:border-b"
+      className="msk-facets w-60 shrink-0 overflow-y-auto border-r bg-pane p-3 max-[760px]:max-h-[45%] max-[760px]:w-auto max-[760px]:border-r-0 max-[760px]:border-b"
     >
       <div className="mb-2 flex items-center justify-between">
         <b className="text-sm">{t('Filters')}</b>
@@ -82,8 +82,9 @@ function storedHidden(): boolean {
   }
 }
 
-/** A list page: the filter column at the left (a button of the header hides it) and the content at the
- *  right. The header, with the selection bar and the actions, never scrolls. */
+/** A list page: the filter column at the left (a button of the header hides it) and the list at the
+ *  right. Nothing scrolls but the list: the header (with the selection bar and the actions), the filters and the header
+ *  row of the table stay where they are, and the foot of the list loads more as it comes into view. */
 export function ListPage({ title, sub, bar, actions, more, filters, children }: { title: string; sub?: ReactNode; bar?: ReactNode; actions?: ReactNode; more?: ReactNode; filters: ReactNode; children: ReactNode }) {
   const [hidden, setHidden] = useState(storedHidden)
   const [open, setOpen] = useState(false)
@@ -100,7 +101,7 @@ export function ListPage({ title, sub, bar, actions, more, filters, children }: 
     }
   }
   return (
-    <>
+    <FillPage>
       <PageHeader
         title={title}
         sub={sub}
@@ -115,8 +116,10 @@ export function ListPage({ title, sub, bar, actions, more, filters, children }: 
       />
       <div className="msk-list flex min-h-0 flex-1 max-[760px]:flex-col">
         <div className={cn('contents', hidden && 'min-[761px]:[&>aside]:hidden', !open && 'max-[760px]:[&>aside]:hidden')}>{filters}</div>
-        <div className="grid min-w-0 flex-1 content-start gap-3 p-6 max-[620px]:p-4">{children}</div>
+        <FillBody>
+          <div className="grid content-start gap-3 p-6 max-[620px]:p-4">{children}</div>
+        </FillBody>
       </div>
-    </>
+    </FillPage>
   )
 }

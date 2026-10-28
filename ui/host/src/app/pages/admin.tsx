@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils'
 import { initials, passwordMin, useAction, useApi, useConfig, useConfirm, usePaged } from '../core.ts'
 import { BulkBar, FilterColumn, ListPage } from '../listkit.tsx'
 import { TenantLogo } from '../picture.tsx'
-import { DataTable, Empty, ErrorBox, FormDialog, Kpi, Loading, MoreRows, PageHeader, PluginKpis, SaveBar, Sections, StatusBadge, Sliced, Tabs } from '../kit.tsx'
+import { Empty, ErrorBox, FormDialog, Kpi, Loading, MoreRows, PageHeader, SaveBar, Sections, StatusBadge, Sliced, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import { bandOf } from '../prefs.ts'
 import { AppMark } from '../Shell.tsx'
@@ -90,23 +90,6 @@ export function AdminOverview({ session }: { session: Session }) {
               {t('Refresh')}
             </Button>
           </p>
-        )}
-        {kpi.data && (kpi.data.resources.length > 0 || kpi.data.plugins.length > 0) && (
-          <details className="text-sm">
-            <summary className="cursor-pointer text-sm font-semibold">{t('Figures of the apps as tables')}</summary>
-            <div className="mt-3 grid gap-4">
-              {kpi.data.resources.length > 0 && (
-                <section className="grid gap-3">
-                  <h2 className="text-sm font-semibold">{t('Items by plugin, in every tenant')}</h2>
-                  <DataTable
-                    label={t('Items by plugin, in every tenant')}
-                    rows={kpi.data.resources.map((r) => ({ [t('Plugins')]: r.plugin, [t('Kind')]: r.kind, [t('Items')]: r.count, [t('Space')]: fmtBytes(r.bytes) }))}
-                  />
-                </section>
-              )}
-              <PluginKpis items={kpi.data.plugins} />
-            </div>
-          </details>
         )}
       </div>
     </>

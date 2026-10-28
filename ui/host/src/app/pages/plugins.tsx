@@ -19,7 +19,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useAction, useApi, useConfirm } from '../core.ts'
 import { cn } from '@/lib/utils'
 import AppIcon from '../AppIcon.tsx'
-import { Empty, ErrorBox, FormDialog, Loading, PageHeader, Pills, SaveBar, StatusBadge, Sliced, Tabs } from '../kit.tsx'
+import { Empty, ErrorBox, FormDialog, Loading, PageHeader, Pills, SaveBar, StatusBadge, Sliced, Tabs, FillBody, FillPage } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import { t } from '../i18n.ts'
 
@@ -103,7 +103,7 @@ export function AdminPlugins({ section }: { section?: string }) {
     setSel(new Set())
   }
   return (
-    <>
+    <FillPage>
       <PageHeader
         title={t('Plugins')}
         sub={t('Installed on the platform and available in the trusted registries')}
@@ -127,7 +127,7 @@ export function AdminPlugins({ section }: { section?: string }) {
           </>
         }
       />
-      <div className="grid gap-3 p-6 max-[620px]:p-4">
+      <FillBody className="grid content-start gap-3 p-6 max-[620px]:p-4">
         <Pills
           items={[
             { id: 'installed', label: t('Installed'), count: installed.data?.length },
@@ -277,8 +277,8 @@ export function AdminPlugins({ section }: { section?: string }) {
             ))}
           </div>
         )}
-      </div>
-    </>
+      </FillBody>
+    </FillPage>
   )
 }
 
@@ -881,7 +881,7 @@ export function TenantPlugins({ slug }: { slug: string }) {
     set.mutate({ id: p.id, on })
   }
   return (
-    <>
+    <FillPage>
       <PageHeader
         title={t('Plugins')}
         crumbs={[{ label: t('Tenant management') }]}
@@ -902,7 +902,7 @@ export function TenantPlugins({ slug }: { slug: string }) {
         submit={t('Send the request')}
         onSubmit={(v) => ask.mutateAsync(v)}
       />
-      <div className="grid gap-3 p-6 max-[620px]:p-4">
+      <FillBody className="grid content-start gap-3 p-6 max-[620px]:p-4">
         <p className="max-w-2xl text-sm text-muted-foreground">
           {t('The Administrator makes them available; here you turn them on for the people of the tenant and decide their permissions. Apps appear in the sidebar, services work behind the scenes, extensions add to another plugin.')}
         </p>
@@ -984,8 +984,8 @@ export function TenantPlugins({ slug }: { slug: string }) {
             </div>
           </>
         )}
-      </div>
-    </>
+      </FillBody>
+    </FillPage>
   )
 }
 

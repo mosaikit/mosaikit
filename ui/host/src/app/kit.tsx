@@ -223,7 +223,9 @@ export function MoreRows({ shown, total, more, loading, onMore, label }: { shown
   useEffect(() => {
     const el = foot.current
     if (!el || !more || loading || typeof IntersectionObserver === 'undefined') return
-    const io = new IntersectionObserver((e) => e.some((x) => x.isIntersecting) && act.current(), { rootMargin: '200px' })
+    // inside a page that scrolls its list, the list is the root (the window does not scroll)
+    const root = el.closest('[data-listscroll]')
+    const io = new IntersectionObserver((e) => e.some((x) => x.isIntersecting) && act.current(), { root, rootMargin: '200px' })
     io.observe(el)
     return () => io.disconnect()
     // a page that arrived and left the foot in view must ask for the next: observe again
@@ -240,6 +242,22 @@ export function MoreRows({ shown, total, more, loading, onMore, label }: { shown
           {label ?? t('Load more')}
         </Button>
       )}
+    </div>
+  )
+}
+
+/** A page whose main part is a list or a table: it never scrolls itself. The header (and the filters) stay on
+ *  top, the list (`FillBody`) takes the rest of the height and scrolls inside. */
+export function FillPage({ children }: { children: ReactNode }) {
+  return <div className="msk-fill flex h-[calc(100svh-var(--msk-top))] min-h-0 flex-col overflow-hidden">{children}</div>
+}
+
+/** The scrolling part of a `FillPage`: the tables inside keep their header row in sight and the foot of a
+ *  list (`MoreRows`) loads more when it comes into view here. */
+export function FillBody({ className, children }: { className?: string; children: ReactNode }) {
+  return (
+    <div data-listscroll className={cn('msk-listscroll min-h-0 min-w-0 flex-1 overflow-auto', className)}>
+      {children}
     </div>
   )
 }
