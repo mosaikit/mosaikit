@@ -1,6 +1,5 @@
 /** The header of a page of a plugin, the same as the one of the pages of Mosaikit (same height, spacing, type and
- *  border): the title with a line under it at the left, the actions at the right, and under it, if there are any,
- *  the bar of the filters. The header never scrolls: the page below it (`.msk-body`) does. */
+ *  border): the title with a line under it at the left; at the right, in the same row, the filters and the actions. The header never scrolls: the page below it (`.msk-body`) does. */
 export interface PageHead {
   /** the page (the entry of the navigation of the shell) */
   title: string
@@ -8,9 +7,10 @@ export interface PageHead {
   section?: string
   /** the line under the title (a count, a path): a node the plugin updates, or a text */
   sub?: Node | string
-  /** buttons and menus at the right of the title */
+  /** buttons and menus at the right of the title, after the filters (the primary action last) */
   actions?: Node[]
-  /** search and filters, in a bar under the title */
+  /** the search and the filters: in the first row of the header, at the right, just before the actions (they wrap
+   *  under the title on a phone) */
   filters?: Node[]
 }
 
@@ -33,10 +33,9 @@ export function pageHead(o: PageHead): HTMLElement {
   if (o.sub !== undefined) text.append(typeof o.sub === 'string' ? el('div', 'msk-psub', o.sub) : o.sub)
   if (o.sub instanceof HTMLElement) o.sub.classList.add('msk-psub')
   const head = el('div', 'msk-pagehead', text)
-  if (o.actions?.length) head.append(el('div', 'msk-pacts msk-toolbar', ...o.actions))
-  const wrap = el('div', 'msk-headwrap', head)
-  if (o.filters?.length) wrap.append(el('div', 'msk-filterbar', ...o.filters))
-  return wrap
+  // one row: title at the left; filters and actions at the right, the filter just left of the primary action
+  if (o.filters?.length || o.actions?.length) head.append(el('div', 'msk-pacts msk-toolbar', ...(o.filters ?? []), ...(o.actions ?? [])))
+  return el('div', 'msk-headwrap', head)
 }
 
 /** The scrolling part under a `pageHead`. */
