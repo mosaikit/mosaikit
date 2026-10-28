@@ -51,7 +51,7 @@ input:focus, select:focus, textarea:focus { outline: none; border-color: var(--a
 }
 .msk-btn.ghost { background: var(--panel2); border-color: var(--line); color: var(--fg); }
 .msk-btn.ghost:hover:not(:disabled) { border-color: var(--acc-line); color: var(--acc); }
-.msk-btn.danger { background: var(--err); border-color: var(--err); color: var(--on-err, #2b0f0e); }
+.msk-btn.danger { background: var(--err-fill, var(--err)); border-color: var(--err-fill, var(--err)); color: var(--on-err, #2b0f0e); }
 .msk-btn.mini { padding: 5px 9px; font-size: 12px; border-radius: 7px; }
 .msk-btn:disabled { opacity: 0.5; cursor: default; }
 

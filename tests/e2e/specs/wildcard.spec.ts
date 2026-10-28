@@ -1,11 +1,9 @@
 import { expect, test, type Page } from '@playwright/test'
 
-// One origin per plugin (plugin_url with a wildcard host). Runs only with `MOSAIKIT_E2E_WILDCARD=1 cargo
-// xtask e2e`, which serves the plugins on http://<plugin>.localhost:<port> and the public links on
+// One origin per plugin (plugin_url with a wildcard host). `cargo xtask e2e` runs it on a second installation
+// (also alone: `cargo xtask e2e --wildcard`), which serves the plugins on http://<plugin>.localhost:<port> and the public links on
 // http://public.localhost:<port> (the browser resolves *.localhost to the computer itself), without the
 // second factor of the Administrator (it has its own tests in 01-admin-and-manager.spec.ts).
-
-test.skip(!process.env.E2E_WILDCARD, 'only with MOSAIKIT_E2E_WILDCARD=1')
 
 const ADMIN_PASSWORD = process.env.E2E_ADMIN_PASSWORD ?? 'e2e-admin-password'
 const PASSWORD = 'password-e2e-123'
@@ -62,7 +60,8 @@ test('every plugin UI has an origin of its own', async ({ page }) => {
   }, `${host('com-mosaikit-tasks')}${BASE}/ui/com.mosaikit.tasks/`)
   expect(reach).toBe('blocked')
   // and the server does not serve the UI of Tasks on the host of Notes
-  const wrong = await page.request.get(`${host('com-mosaikit-notes')}${BASE}/ui/com.mosaikit.tasks/`)
+  // (the request goes out of Node, which does not resolve *.localhost: the host name is sent as a header)
+  const wrong = await page.request.get(`http://127.0.0.1:${PORT}${BASE}/ui/com.mosaikit.tasks/`, { headers: { host: `com-mosaikit-notes.localhost:${PORT}` } })
   expect(wrong.status()).toBe(404)
 
   // a public link opens on the public host
@@ -75,5 +74,5 @@ test('every plugin UI has an origin of its own', async ({ page }) => {
   expect(url.startsWith(`${host('public')}${BASE}/p/`)).toBeTruthy()
   const pub = await page.context().newPage()
   await pub.goto(url)
-  await expect(pub.getByText('Wildcard note')).toBeVisible()
+  await expect(pub.getByText('Wildcard note').first()).toBeVisible()
 })

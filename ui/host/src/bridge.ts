@@ -180,7 +180,7 @@ export async function execute(call: RestCall): Promise<unknown> {
 
 /** Variables of the theme of the host passed to the UIs of the plugins. */
 export const THEME_VARS = [
-  '--bg', '--panel', '--panel2', '--line', '--fg', '--dim', '--acc', '--acc-soft', '--acc-line', '--ok', '--err', '--on-acc', '--on-err',
+  '--bg', '--panel', '--panel2', '--line', '--fg', '--dim', '--acc', '--acc-soft', '--acc-line', '--ok', '--err', '--on-acc', '--on-err', '--err-fill',
 ]
 
 export function themeVars(): Record<string, string> {

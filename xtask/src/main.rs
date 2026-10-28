@@ -64,6 +64,9 @@ enum Cmd {
         /// show the browser
         #[arg(long)]
         headed: bool,
+        /// only the scenario with one origin per plugin (a wildcard plugin_url); the full run does it after the suite
+        #[arg(long)]
+        wildcard: bool,
         /// only these Playwright arguments, e.g. `-- tests/auth.spec.ts -g "sign in"` (report untouched)
         #[arg(last = true)]
         only: Vec<String>,
@@ -270,7 +273,7 @@ fn main() -> Result<()> {
         Cmd::Test { skip_db } => ci::test(skip_db),
         Cmd::Ci => ci::ci(),
         Cmd::TestReport => report::generate().map(|_| ()),
-        Cmd::E2e { headed, only } => e2e::e2e(headed, &only),
+        Cmd::E2e { headed, wildcard, only } => e2e::e2e(headed, wildcard, &only),
         Cmd::ManualTests { check: true, .. } => manual::check(),
         Cmd::ManualTests { serve: true, .. } => manual::serve(),
         Cmd::ManualTests { headed, area, args, .. } => manual::manual_tests(headed, area, &args),

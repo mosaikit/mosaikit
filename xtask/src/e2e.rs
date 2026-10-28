@@ -233,23 +233,52 @@ impl Instance {
     }
 }
 
-pub fn e2e(headed: bool, only: &[String]) -> Result<()> {
-    let _slot = crate::heavy::acquire("e2e", "xtask e2e")?;
-    // `MOSAIKIT_E2E_WILDCARD=1`: only the scenario of specs/wildcard.spec.ts, with one origin per plugin
-    let wildcard = std::env::var("MOSAIKIT_E2E_WILDCARD").is_ok_and(|v| v == "1");
-    let mut inst = Instance::start_with("e2e", wildcard)?;
+/// The scenario of specs/wildcard.spec.ts on an installation with one origin per plugin
+/// (`http://<plugin>.localhost:<port>`). `json`: the results for the report (the full run) or nothing.
+fn wildcard_run(headed: bool, json: Option<&std::path::Path>) -> Result<bool> {
+    let mut inst = Instance::start_with("e2e", true)?;
     let mut cmd = npm();
     cmd.current_dir(root()).args(["run", "e2e", "-w", "tests/e2e"]);
     inst.env(&mut cmd);
     if headed {
         cmd.env("E2E_HEADED", "1");
     }
-    if wildcard {
-        // not the results of the whole suite
-        cmd.env("E2E_WILDCARD", "1").args(["--", "specs/wildcard.spec.ts"]);
-        let result = run(&mut cmd);
-        inst.stop(result.is_err());
-        return result;
+    cmd.env("E2E_WILDCARD", "1");
+    cmd.args(["--", "specs/wildcard.spec.ts"]);
+    let ok = match json {
+        Some(json) => {
+            let _ = std::fs::remove_file(json);
+            cmd.env("E2E_JSON", json);
+            report::run_suite(report::Suite {
+                id: "e2e-wildcard".into(),
+                title: "End-to-end tests with one origin per plugin (Playwright)".into(),
+                order: 91,
+                format: report::Format::Playwright,
+                junit_from: None,
+                cmd: &mut cmd,
+            })?
+        }
+        None => run(&mut cmd).is_ok(),
+    };
+    inst.stop(!ok);
+    Ok(ok)
+}
+
+pub fn e2e(headed: bool, wildcard: bool, only: &[String]) -> Result<()> {
+    let _slot = crate::heavy::acquire("e2e", "xtask e2e")?;
+    // `--wildcard` (or `MOSAIKIT_E2E_WILDCARD=1`): only the scenario with one origin per plugin, report untouched
+    if wildcard || std::env::var("MOSAIKIT_E2E_WILDCARD").is_ok_and(|v| v == "1") {
+        if !wildcard_run(headed, None)? {
+            bail!("end-to-end tests (wildcard) failed");
+        }
+        return Ok(());
+    }
+    let mut inst = Instance::start("e2e")?;
+    let mut cmd = npm();
+    cmd.current_dir(root()).args(["run", "e2e", "-w", "tests/e2e"]);
+    inst.env(&mut cmd);
+    if headed {
+        cmd.env("E2E_HEADED", "1");
     }
     if !only.is_empty() {
         // a part of the suite (files, `-g` grep): run it directly, the report of the whole suite stays
@@ -271,9 +300,11 @@ pub fn e2e(headed: bool, only: &[String]) -> Result<()> {
         cmd: &mut cmd,
     })?;
     inst.stop(!ok);
+    // the second installation, with one origin per plugin
+    let wild = wildcard_run(headed, Some(&report::dir().join("e2e-wildcard.json")))?;
     // the report also when the run failed (a missing result marks the suite)
     report::generate()?;
-    if !ok {
+    if !ok || !wild {
         bail!("end-to-end tests failed");
     }
     Ok(())

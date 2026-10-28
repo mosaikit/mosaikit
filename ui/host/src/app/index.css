@@ -275,6 +275,11 @@
   /* text on the accent and on the colour of errors (the buttons of the plugins), as in the shell */
   --on-acc: var(--primary-foreground);
   --on-err: #ffffff;
+  /* the fill of a destructive button: as the shell draws it (in the dark mode the pale red is toned down, white text stays readable) */
+  --err-fill: var(--destructive);
+}
+.dark {
+  --err-fill: color-mix(in srgb, var(--destructive) 60%, var(--background));
 }
 
 @theme inline {

@@ -9,6 +9,8 @@ export default defineConfig({
   testDir: './specs',
   timeout: 90_000,
   expect: { timeout: 15_000 },
+  // the scenario with one origin per plugin needs another installation: `cargo xtask e2e` runs it apart (E2E_WILDCARD=1)
+  testIgnore: process.env.E2E_WILDCARD ? undefined : /wildcard\.spec\.ts$/,
   fullyParallel: false,
   globalSetup: './global-setup.ts',
   workers: 1,
