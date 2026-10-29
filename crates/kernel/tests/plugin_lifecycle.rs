@@ -79,11 +79,11 @@ async fn update_with_migrations_keeps_the_data() {
     .await
     .unwrap();
 
-    let mut v2 = with_version(notes_files(), "0.5.1");
+    let mut v2 = with_version(notes_files(), "0.6.1");
     v2.insert("migrations/003_priority.sql".into(), b"alter table notes add column priority text".to_vec());
     install(&t, &v2).await.unwrap();
     let p = t.plugins.get("com.mosaikit.notes").unwrap();
-    assert_eq!(p.manifest.version, "0.5.1");
+    assert_eq!(p.manifest.version, "0.6.1");
     assert!(p.is_active(), "the active state is kept");
     let rows = crud::list(&t, &c, "com.mosaikit.notes", "notes", None, None).await.unwrap().rows;
     assert_eq!(rows.len(), 1);
@@ -202,9 +202,9 @@ async fn catalog_and_blocklist() {
     let index = |blocked: bool, sha: &str| {
         json!({
             "plugins": [{ "id": "com.mosaikit.notes", "name": "Notes", "versions": [
-                { "version": "0.5.0", "file": "plugins/notes.mskp", "sha256": sha }
+                { "version": "0.6.0", "file": "plugins/notes.mskp", "sha256": sha }
             ]}],
-            "blocklist": if blocked { json!([{ "id": "com.mosaikit.notes", "version": "0.5.0", "reason": "test" }]) } else { json!([]) }
+            "blocklist": if blocked { json!([{ "id": "com.mosaikit.notes", "version": "0.6.0", "reason": "test" }]) } else { json!([]) }
         })
     };
     std::fs::write(dir.join("index.json"), index(false, "0000").to_string()).unwrap();
@@ -218,7 +218,7 @@ async fn catalog_and_blocklist() {
     assert_eq!(e.kind, Kind::Forbidden);
     std::fs::write(t.cfg.registry.as_ref().unwrap(), index(false, &sha).to_string()).unwrap();
     plugins::registry::install_from_catalog(&t, &admin, "com.mosaikit.notes").await.unwrap();
-    assert_eq!(plugins::registry::catalog(&t, &admin).unwrap()[0].installed.as_deref(), Some("0.5.0"));
+    assert_eq!(plugins::registry::catalog(&t, &admin).unwrap()[0].installed.as_deref(), Some("0.6.0"));
     // blocklist: it is not turned on and not reinstalled
     std::fs::write(t.cfg.registry.as_ref().unwrap(), index(true, &sha).to_string()).unwrap();
     plugins::uninstall(&t, &admin, "com.mosaikit.notes").await.unwrap();

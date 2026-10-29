@@ -171,7 +171,9 @@ section lists, `[[nav]]` of the apps), so a new page is covered without touching
 | R-9 | No horizontal overflow at 390 px wide. |
 | R-11 | Every table (host and plugins) has a fixed header row, only its rows scroll with their scrollbar under the header row, a filter box and sortable column titles (`aria-sort`), and loads more rows only when the end of the rows comes into view; a table that is not a scrolling list is on `TABLE_EXEMPT` of the spec with its reason (small matrices edited in place). |
 | R-12 | No row is painted over or above the header row of a table, wherever the list is scrolled (sampled with `elementFromPoint` above the header row, on it and just under it, scrolled to the middle and to the end). |
-| R-10 | Contrast and ARIA stay with `accessible()` (axe) of the other specs; the contract does not repeat them. |
+| R-10 | A page or list with nothing in it shows the shared illustrated empty state (`Empty` with `art`, `emptyState` in the plugins), centred in the content area, with a title, a text and the primary action of the page repeated as a button; a filter that matches nothing shows the small plain message with «Clear filters» instead. Checked on a fresh tenant: the pages that can be empty and every app. |
+
+Contrast and ARIA stay with `accessible()` (axe) of the other specs; the contract does not repeat them.
 
 Sizes: 1440x900, 1280x600 and 390x844, light theme (dark on a few routes). A rule that an unfinished piece of work
 still breaks is listed in `PENDING` at the top of the spec and runs as `test.fixme`; delete its row when the work has
@@ -196,3 +198,24 @@ of a bulk run, the list of extensions of a plugin (no header) and the key tables
 The installed plugins also have a card view (the default), `PluginSummary` of the brochure drawn small, with the same
 filter, a sort menu (`SortMenu`), selection, and infinite scroll (`CardGrid`); the choice is kept in the browser
 (`msk_plugins_view`, `useView`/`ViewSwitch`). Updates and Catalog offer both views too.
+
+### Empty states (rule)
+
+Nothing in a page or a list is never a bare line («No items»). It is the illustrated empty state, the same in the host
+(`Empty` with `art` in `ui/host/src/app/kit.tsx`, pictures in `EmptyArt.tsx`) and in the plugins (`emptyState` of the
+plugin API, `ui/plugin-api/src/empty-state.ts`): soft rounded tiles of the colours of the theme, tilted and overlapping,
+with a white symbol on the big one (`documents`, `maps`, `notes`, `tasks`, `contacts`, `apps`, `people`, `plugins`,
+`inbox`, `trash`, `shares`, `usage`, `generic`); a bold title; one short grey line; and the buttons of what to do, among
+them the primary action of the page (the header keeps its own). It is centred in the content area and never makes it
+scroll. When the list is empty only because of a filter it is not an empty state: `Empty filtered` /
+`filteredEmpty` show a small plain message with «Clear filters». Errors and pages that are reserved to a role keep the
+plain box. `mountCrud` shows it by default (option `empty: { art, title, text, actions }`; the defaults are a generic
+picture, «Nothing here yet», «Create the first one to get started.» and the «new» button). Every text is translatable
+(English, Italian and Spanish: host `it.ts` and `lang-es`, the plugins their own `it.ts`/`TEXTS`). The layout
+contract checks it (R-10).
+
+Converted: Tenants (Administrator), Trash, Log (activity of an item), Backups, group members, group shares, Home (no
+active apps), Groups, Pending invitations, Shares, Notifications, Installed plugins, Updates and Catalog, Plugins of a
+tenant, and the apps Documents (Files), Maps, Apps (static sites), Contacts, Tasks and Notes. Left plain on purpose:
+errors and reserved pages (`Empty` without `art`), sections inside a detail page or a card (no extensions, no permission
+added by a group, no open session, no usage chart, no history yet) and the tables that show «No result» for a filter.

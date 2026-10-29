@@ -162,7 +162,7 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
       <PageHeader title={manager ? t('Tenant overview') : t('Home')} sub={`${greeting()}, ${session.user.display_name || session.user.username} · ${t('{role} in {tenant}', { role: c.tenant.role === 'tenant_manager' ? t(ROLE.tenant_manager) : t('User'), tenant: c.tenant.name })}`} />
       <div className="grid gap-4 p-6 max-[620px]:p-4">
         {!c.plugins.some(isApp) ? (
-          <Empty icon={<Grid2x2 />} title={t('No active apps')}>
+          <Empty art="apps" title={t('No active apps')}>
             {t('An Administrator installs and turns them on.')}
           </Empty>
         ) : (
@@ -927,7 +927,7 @@ function Groups({ slug, members, shell }: { slug: string; members: Member[]; she
   if (q.error) return frame(<ErrorBox error={q.error} />)
   if (!q.items.length && !words)
     return frame(
-      <Empty icon={<Grid2x2 />} title={t('No groups')}>
+      <Empty art="people" title={t('No groups')}>
         {t('Groups are for sharing with several people at once.')}
       </Empty>,
     )
@@ -1018,7 +1018,7 @@ function Invites({ slug, q }: { slug: string; q: ReturnType<typeof usePaged<Invi
   if (q.error) return <ErrorBox error={q.error} />
   if (!q.items.length)
     return (
-      <Empty icon={<Mail />} title={t('Nothing pending')}>
+      <Empty art="inbox" title={t('Nothing pending')}>
         {t('Invitations to people of other tenants stay here until they answer.')}
       </Empty>
     )
@@ -1221,7 +1221,9 @@ export function Shares({ slug }: { slug: string }) {
         ) : q.error ? (
           <ErrorBox error={q.error} />
         ) : rows.length === 0 ? (
-          <Empty icon={<Share2 />} title={show === 'public' ? t('No active public link') : show === 'items' ? t('No items') : t('No shares')} />
+          <Empty art="shares" title={show === 'public' ? t('No active public link') : show === 'items' ? t('No items') : t('No shares')}>
+            {t('What is shared by the people of the tenant shows here.')}
+          </Empty>
         ) : (
           <ListTable
             label={t('Shared items')}

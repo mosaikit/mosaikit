@@ -192,3 +192,19 @@ html.msk-fill #app { padding: 0; height: 100%; display: flex; flex-direction: co
 .msk-body.msk-tablebody > .msk-gridwrap { flex: 1 0 14rem; }
 .msk-body.msk-tablebody > .msk-form { flex: none; }
 .msk-body.msk-tablebody > :not(.msk-gridwrap):not(.msk-form):empty { display: none; }
+
+/* The empty state (empty-state.ts): centred in the content area, picture, title, text, buttons. */
+.msk-emptystate { display: flex; flex: 1; min-height: 16rem; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding: 24px; text-align: center; }
+.msk-emptystate .msk-emptyart { width: 192px; height: 128px; color: var(--fg); }
+.msk-emptystate h2 { margin: 0; font-size: 18px; font-weight: 700; }
+.msk-emptystate p { margin: 0; max-width: 28rem; color: var(--dim); font-size: 14px; }
+.msk-emptyacts { margin-top: 8px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; }
+.msk-emptyfiltered { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; padding: 32px 16px; color: var(--dim); font-size: 13px; text-align: center; }
+.msk-link { all: unset; cursor: pointer; color: var(--acc); text-decoration: underline; text-underline-offset: 3px; }
+.msk-link:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+.msk-emptybox { display: flex; flex: 1 0 auto; flex-direction: column; min-height: 0; }
+.msk-emptybox[hidden] { display: none; }
+.msk-gridwrap[hidden] { display: none; }
+.msk-splitbody .msk-master { display: flex; flex-direction: column; }
+.msk-splitbody .msk-items-box { flex: 1; display: flex; flex-direction: column; }
+.msk-splitbody .msk-items-box > .msk-items, .msk-splitbody .msk-items-box > .msk-board { flex: none; }

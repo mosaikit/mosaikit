@@ -35,6 +35,7 @@ const RULES: Record<string, string> = {
   'R-7': 'the headers of the apps use the same type and spacing as the headers of the host',
   'R-8': 'the scrollbar of the main sidebar is hidden unless hovered or focused',
   'R-9': 'no horizontal overflow on a phone',
+  'R-10': 'a page or list with nothing in it shows the shared illustrated empty state, centred in the content area, with a title, a text and the primary action (a filter that matches nothing shows the small plain message with «Clear filters» instead)',
   'R-11': 'every table: the header row is fixed, only the rows scroll with the scrollbar under the header row, a filter and sortable column titles are offered (or the table is on the exemption list with a reason), and more rows load progressively',
   'R-12': 'no row is painted over or above the header row of a table, wherever the list is scrolled',
 }
@@ -416,7 +417,67 @@ test.describe('15-layout-contract', () => {
     expect(recs.length).toBeGreaterThan(60)
   })
 
-  for (const rule of Object.keys(RULES)) {
+  // R-10: a fresh tenant has nothing in any list: every page and app that can be empty uses the shared empty state
+  test('R-10 pages and apps with nothing in them show the illustrated empty state, centred, with the primary action', async ({ page }) => {
+    test.setTimeout(300_000)
+    await adminLogin(page)
+    const made = await API(page, 'POST', 'api/admin/tenants', { slug: 'emptyco', name: 'Empty Co', manager_username: 'mgr', manager_email: 'mgr@emptyco.example.org', manager_password: PASSWORD })
+    expect(made.status).toBeLessThan(410)
+    await page.context().clearCookies()
+    await login(page, 'Empty Co', 'mgr', PASSWORD)
+    const routes: { route: string; app: boolean; action: RegExp | null }[] = [
+      { route: '#/t/emptyco/p/com.mosaikit.files', app: true, action: /Upload files/ },
+      { route: '#/t/emptyco/p/com.mosaikit.maps', app: true, action: /New map/ },
+      { route: '#/t/emptyco/p/com.mosaikit.static-site', app: true, action: /New app/ },
+      { route: '#/t/emptyco/p/com.mosaikit.contacts', app: true, action: /New contact/ },
+      { route: '#/t/emptyco/p/com.mosaikit.tasks', app: true, action: /New task/ },
+      { route: '#/t/emptyco/p/com.mosaikit.notes', app: true, action: /New note/ },
+      { route: '#/t/emptyco/trash', app: false, action: null },
+      { route: '#/t/emptyco/shares', app: false, action: null },
+      { route: '#/t/emptyco/notifications', app: false, action: null },
+    ]
+    const bad: string[] = []
+    for (const vp of [VP.desk, VP.short]) {
+      await page.setViewportSize(vp)
+      for (const r of routes) {
+        await page.evaluate((h) => (location.hash = h), r.route)
+        await page.waitForTimeout(1200)
+        const scope: Page | Frame = r.app ? ((await (await page.locator('#main iframe.plugin-frame').elementHandle({ timeout: 8000 }))!.contentFrame()) as Frame) : page
+        const m = await scope.evaluate(() => {
+          const e: any = document.querySelector('[data-testid="empty-state"]')
+          if (!e) return null
+          const b = e.getBoundingClientRect()
+          // the area it is centred in: the nearest scrolling or clipping ancestor
+          let a: any = e.parentElement
+          while (a && a !== document.body && !/(auto|scroll|hidden)/.test(getComputedStyle(a).overflowY)) a = a.parentElement
+          const area = (a && a !== document.body ? a : document.documentElement).getBoundingClientRect()
+          const sc: any = a && a !== document.body ? a : document.scrollingElement
+          return {
+            title: (e.querySelector('h2')?.textContent ?? '').trim(),
+            text: (e.querySelector('p, div.text-sm')?.textContent ?? '').trim(),
+            art: !!e.querySelector('svg[aria-hidden="true"]'),
+            dx: Math.abs(b.left + b.width / 2 - (area.left + area.width / 2)),
+            dy: Math.abs(b.top + b.height / 2 - (area.top + Math.min(area.height, innerHeight - area.top) / 2)),
+            scrolls: sc.scrollHeight > sc.clientHeight + 1,
+            buttons: [...e.querySelectorAll('button, a.msk-btn, a[role="button"], a')].map((x: any) => (x.textContent ?? '').trim()),
+          }
+        })
+        const where = `${r.route} @${vp.width}x${vp.height}`
+        if (!m) bad.push(`${where}: no illustrated empty state`)
+        else {
+          if (!m.title) bad.push(`${where}: no title`)
+          if (!m.art) bad.push(`${where}: no picture`)
+          if (m.dx > 24) bad.push(`${where}: not centred horizontally (${Math.round(m.dx)}px off)`)
+          if (m.dy > 90) bad.push(`${where}: not centred in the content area (${Math.round(m.dy)}px off)`)
+          if (m.scrolls) bad.push(`${where}: the empty state makes the content area scroll`)
+          if (r.action && !m.buttons.some((b: string) => r.action!.test(b))) bad.push(`${where}: the primary action is not repeated in the empty state (${m.buttons.join(' | ')})`)
+        }
+      }
+    }
+    expect(bad, `R-10: ${RULES['R-10']}`).toEqual([])
+  })
+
+  for (const rule of Object.keys(RULES).filter((x) => x !== 'R-10')) {
     for (const family of FAMILIES) {
       test(`${rule} ${RULES[rule]} [${family}]`, () => {
         const pending = PENDING.find((p) => p.rule === rule && p.family === family)

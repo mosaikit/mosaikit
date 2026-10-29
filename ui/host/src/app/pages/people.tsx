@@ -5,7 +5,7 @@
 
 import { useDeferredValue, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Copy, KeyRound, Link2, LogOut, Minus, MoreHorizontal, Pencil, Plus, Puzzle, ShieldCheck, ShieldOff, Trash2, UserPlus, Users } from 'lucide-react'
+import { Check, Copy, KeyRound, Link2, LogOut, Minus, MoreHorizontal, Pencil, Plus, Puzzle, ShieldCheck, ShieldOff, Trash2, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, errText, fmtDate, ApiError } from '../../api.ts'
 import { useBrand } from '../../brand.ts'
@@ -575,7 +575,9 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
       <div className="p-6 max-[620px]:p-4">
         {cur === 'members' &&
           (g.members.length === 0 ? (
-            <Empty icon={<Users />} title={t('No members.')} />
+            <Empty art="people" title={t('No members.')}>
+              {t('Add people to the group to share with all of them at once.')}
+            </Empty>
           ) : (
             <div>
 <ListTable
@@ -619,7 +621,9 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
           ))}
         {cur === 'shared' &&
           (g.shared.length === 0 ? (
-            <Empty title={t('Nothing shared with the group')} />
+            <Empty art="shares" title={t('Nothing shared with the group')}>
+              {t('What the people share with this group shows here.')}
+            </Empty>
           ) : (
             <div>
 <ListTable

@@ -314,6 +314,8 @@ import { connect, mountCrud } from '@mosaikit/plugin-api'
 
 const msk = await connect()                       // handshake with the host: language, theme, mode
 mountCrud(document.getElementById('app')!, msk, 'registry', { title: 'Registry' })
+// mountCrud draws the illustrated empty state by itself (option `empty`); a page of your own uses
+// emptyState({ art: 'documents', title, text, actions }) from the plugin API, never a bare «no items» line
 // or custom: msk.crud('registry').list(), msk.call('registry.summary'),
 // msk.share(id), msk.files.*, msk.content.*, msk.onContext(...)
 ```

@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils'
 import type { PluginKpi } from '../types.ts'
 import { t } from './i18n.ts'
 import { go } from './router.ts'
+import { EmptyArt, type ArtName } from './EmptyArt.tsx'
 import { ListTable } from './ListTable.tsx'
 
 export interface Crumb {
@@ -400,7 +401,31 @@ export function Loading() {
   )
 }
 
-export function Empty({ icon, title, children }: { icon?: ReactNode; title: string; children?: ReactNode }) {
+/** A page or list with nothing in it. With `art` it is the illustrated empty state of Mosaikit (rule «Empty states»):
+ *  centred in the content area, a picture, a bold title, a short grey text and the buttons of what to do (the primary
+ *  action of the page is repeated here). With `filtered` it is the small plain message of a filter that matches nothing,
+ *  with «Clear filters» when `onClear` is given. Without either it is the plain box (errors, reserved pages). */
+export function Empty({ icon, art, title, children, actions, filtered, onClear }: { icon?: ReactNode; art?: ArtName; title: string; children?: ReactNode; actions?: ReactNode; filtered?: boolean; onClear?: () => void }) {
+  if (filtered)
+    return (
+      <div role="status" data-testid="empty-filtered" className="flex flex-wrap items-center justify-center gap-2 p-8 text-center text-sm text-muted-foreground">
+        <span>{title}</span>
+        {onClear && (
+          <Button variant="link" size="sm" onClick={onClear}>
+            {t('Clear filters')}
+          </Button>
+        )}
+      </div>
+    )
+  if (art)
+    return (
+      <section data-testid="empty-state" className="flex min-h-64 flex-1 flex-col items-center justify-center gap-2 px-6 py-8 text-center">
+        <EmptyArt name={art} />
+        <h2 className="text-lg font-semibold">{title}</h2>
+        {children && <div className="max-w-md text-sm text-muted-foreground">{children}</div>}
+        {actions && <div className="mt-2 flex flex-wrap items-center justify-center gap-2">{actions}</div>}
+      </section>
+    )
   return (
     <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed p-10 text-center text-sm text-muted-foreground [&>svg]:size-7">
       {icon}

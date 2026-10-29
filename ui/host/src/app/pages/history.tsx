@@ -5,7 +5,7 @@
 
 import { useDeferredValue, useMemo, useState, type ReactNode } from 'react'
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
-import { CircleAlert, Download, History, RotateCcw, Share2, Trash2, X } from 'lucide-react'
+import { CircleAlert, Download, RotateCcw, Share2, Trash2, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, appUrl, fmtBytes, fmtDate } from '../../api.ts'
 import type { LogEvent, LogPage as LogPageData, Member, PersonRow, Revoked, SharedByMe, TenantInfo, TrashItem, TrashList } from '../../types.ts'
@@ -160,7 +160,7 @@ export function TrashPage({ slug }: { slug: string }) {
         ) : q.error ? (
           <ErrorBox error={q.error} />
         ) : rows.length === 0 ? (
-          <Empty icon={<Trash2 />} title={t('The trash is empty')}>
+          <Empty art="trash" title={t('The trash is empty')}>
             {t('What you delete stays here {days} days, then it is deleted for good.', { days })}
           </Empty>
         ) : (
@@ -511,7 +511,7 @@ export function LogView({ scope, fixed = {}, compact = false }: { scope: LogScop
       ) : pages.error ? (
         <ErrorBox error={pages.error} />
       ) : events.length === 0 ? (
-        <Empty icon={<History />} title={compact ? t('No activity yet') : t('No event with these filters')} />
+        compact ? <Empty art="inbox" title={t('No activity yet')}>{t('What happens here will be listed in this place.')}</Empty> : <Empty filtered title={t('No event with these filters')} onClear={() => setF({ ...NO_FILTERS, ...fixed })} />
       ) : (
         <ListTable
           label={t('Activity')}

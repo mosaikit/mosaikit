@@ -128,6 +128,25 @@ const checks: L.Check[] = [
       return c.result()
     },
   },
+  {
+    id: 'TBL-06',
+    async run(ctx: any) {
+      const c = H.checker()
+      const p = await L.as(ctx, 'admin')
+      await p.setViewportSize({ width: 1440, height: 900 })
+      await H.go(p, '#/admin/plugins/updates')
+      await p.waitForTimeout(1200)
+      c.ok((await p.locator('[data-testid="empty-state"] svg[aria-hidden="true"]').count()) === 1, 'Plugins › Updates (nothing to update) shows the illustrated empty state')
+      c.ok((await p.locator('[data-testid="empty-state"] h2').innerText()).length > 0, 'with a title')
+      await H.go(p, '#/admin/tenants')
+      await p.waitForTimeout(1200)
+      await p.getByRole('searchbox', { name: 'Search a tenant' }).fill('zzzz-no-such-tenant')
+      await p.waitForTimeout(1200)
+      c.ok((await p.locator('[data-testid="empty-filtered"]').count()) === 1 && (await p.getByRole('button', { name: 'Clear filters' }).count()) === 1, 'a filter that matches nothing shows the small message and Clear filters')
+      await p.getByRole('button', { name: 'Clear filters' }).click()
+      return c.result()
+    },
+  },
 ]
 
 export default checks

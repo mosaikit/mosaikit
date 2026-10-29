@@ -5,6 +5,7 @@
 // the detail of an item (the host draws the page of the extension over the tab: `mountTab`).
 // Its texts are in English, or in Italian when the host is in Italian (the `context` of the bridge).
 
+import { emptyState, filteredEmpty, type ArtName } from './empty-state.ts'
 import { gridTable, type GridCol } from './grid.ts'
 import type { Msk } from './client.ts'
 import { pageBody, pageHead } from './head.ts'
@@ -26,6 +27,9 @@ export interface CrudOptions {
   detail?: (row: Row, box: HTMLElement) => void
   /** items drawn by the plugin (list, cards, board) next to a detail panel, instead of the table; more than one adds a switch */
   views?: CrudView[]
+  /** the empty state shown while there is nothing (an illustrated one, never a bare line): the picture, the title and the text
+   *  default to a generic one; `actions` default to the «new» button of the page */
+  empty?: { art?: ArtName; title?: string; text?: string; actions?: HTMLElement[] }
   /** the read-only view of the open item (with «Edit» for the fields): used instead of the form until the person edits */
   reader?: (ctx: ItemCtx) => HTMLElement
 }
@@ -115,6 +119,9 @@ const TEXTS = {
     more: 'Load more',
     noResult: 'no result',
     noItem: 'no item',
+    emptyTitle: 'Nothing here yet',
+    emptyText: 'Create the first one to get started.',
+    clearFilters: 'Clear filters',
     shared: 'shared',
     detail: 'Detail',
     sections: 'Sections of the item',
@@ -148,6 +155,9 @@ const TEXTS = {
     more: 'Carica altri',
     noResult: 'nessun risultato',
     noItem: 'nessun elemento',
+    emptyTitle: 'Ancora niente qui',
+    emptyText: 'Crea il primo per iniziare.',
+    clearFilters: 'Azzera i filtri',
     shared: 'condivisa',
     detail: 'Dettaglio',
     sections: 'Sezioni dell’elemento',
@@ -181,6 +191,9 @@ const TEXTS = {
     more: 'Cargar más',
     noResult: 'sin resultados',
     noItem: 'ningún elemento',
+    emptyTitle: 'Todavía no hay nada',
+    emptyText: 'Crea el primero para empezar.',
+    clearFilters: 'Borrar los filtros',
     shared: 'compartida',
     detail: 'Detalle',
     sections: 'Secciones del elemento',
@@ -270,11 +283,13 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   formTitle.tabIndex = -1
   const form = h('section', { class: 'msk-form' }, formTitle, tabsBar, readonly, readerBox, fieldsBox, extBox, toolsBox, tabPanel, h('div', { class: 'msk-actions' }, btnEdit, btnSave, btnCancel, btnShare, btnDel), msg)
 
+  const emptyBox = h('div', { class: 'msk-emptybox' })
+  emptyBox.hidden = true
   const morebar = h('div', { class: 'msk-morebar' }, btnMore)
   // with views: the list (it scrolls) and the detail panel (it scrolls too) side by side, the panel over the list on a phone
   const master = h('div', { class: 'msk-master' }, items, morebar)
   const split = h('div', { class: 'msk-split' }, master, h('aside', { class: 'msk-detail', 'aria-label': tr('detail') }, form))
-  const body = views.length ? pageBody(split) : pageBody(grid.el, form)
+  const body = views.length ? pageBody(split) : pageBody(grid.el, emptyBox, form)
   body.classList.add(views.length ? 'msk-splitbody' : 'msk-tablebody')
   root.replaceChildren(
     // the header and the filters never scroll: the table, the foot and the form do
@@ -401,7 +416,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     }
     const list = (rows: Row[], kind: string) => h('div', { class: `msk-items ${kind}`, role: 'list' }, ...rows.map(box))
     if (!shown.length) {
-      items.replaceChildren(h('div', { class: 'msk-empty' }, st.filter.trim() ? tr('noResult') : tr('noItem')))
+      items.replaceChildren(emptyNode())
     } else if (view.kind === 'board' && view.columns) {
       items.replaceChildren(
         h(
@@ -421,6 +436,23 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     } else items.replaceChildren(list(shown, view.kind))
     // a re-render drops the focus of the item that had it
     if (document.activeElement === document.body && st.selected) items.querySelector<HTMLElement>(`[data-id="${CSS.escape(st.selected)}"]`)?.focus({ preventScroll: true })
+  }
+
+  /** What takes the place of the list while it is empty: the illustrated state, or the plain message of a filter that matches nothing. */
+  function emptyNode(): HTMLElement {
+    if (st.filter.trim())
+      return filteredEmpty(tr('noResult'), tr('clearFilters'), () => {
+        filter.value = ''
+        filter.dispatchEvent(new Event('input'))
+      })
+    const e = opts.empty ?? {}
+    let actions = e.actions
+    if (!actions && msk.can('create')) {
+      const b = h('button', { type: 'button', class: 'msk-btn ghost' }, opts.newLabel ?? tr('new'))
+      b.addEventListener('click', () => btnNew.click())
+      actions = [b]
+    }
+    return emptyState({ art: e.art, title: e.title ?? tr('emptyTitle'), text: e.text ?? tr('emptyText'), actions })
   }
 
   function renderTableView() {
@@ -460,6 +492,10 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     count.textContent = total > shown.length ? tr('shownOf', { shown: shown.length, total }) : total === 1 ? tr('item') : tr('items', { n: total })
     btnMore.hidden = !st.next
     // the button that loads more is the last row of the rows that scroll: it comes into view only at their end
+    const none = shown.length === 0
+    grid.el.hidden = none
+    emptyBox.hidden = !none
+    if (none) emptyBox.replaceChildren(emptyNode())
     grid.set(shown, st.next ? morebar : null, st.filter.trim() ? tr('noResult') : tr('noItem'))
     foot.unobserve(morebar)
     foot.observe(morebar)

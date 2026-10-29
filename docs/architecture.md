@@ -1132,6 +1132,11 @@ msk.context?.lang                          // at start
 msk.onContext((c) => render(c.lang))       // at every change
 ```
 
+**Tables and empty states.** A list of your own draws its rows with `gridTable` (fixed header row, only the rows scroll,
+sortable titles, the foot as the last row; `.msk-grid` in `style.css`), and a page or list with nothing in it with
+`emptyState({ art, title, text, actions })`, never a bare «no items» line (`filteredEmpty` for a filter that matches
+nothing). `mountCrud` does both by itself (option `empty` for the picture, title, text and buttons).
+
 The plugin receives them even when the Administrator hides the language or
 mode buttons from the top bar. `mountCrud` speaks English, or Italian when the host is in Italian,
 and follows the changes.

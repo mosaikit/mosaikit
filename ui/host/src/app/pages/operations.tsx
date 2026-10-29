@@ -683,7 +683,18 @@ export function BackupPanel() {
         </CardHeader>
         <CardContent>
           {q.data!.backups.length === 0 ? (
-            <Empty icon={<HardDrive />} title={t('No backups yet')} />
+            <Empty
+              art="generic"
+              title={t('No backups yet')}
+              actions={
+                <Button variant="outline" disabled={running || run.isPending} onClick={() => run.mutate(undefined as never)}>
+                  <Play />
+                  {t('Run now')}
+                </Button>
+              }
+            >
+              {t('A backup keeps the database, the contents and the plugins in one file.')}
+            </Empty>
           ) : (
             <ListTable
               label={t('Backups')}

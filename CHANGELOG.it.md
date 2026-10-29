@@ -19,6 +19,7 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 - Intestazioni, filtri e schede restano ferme. Le pagine che sono una lista o una tabella non scorrono per intero: la lista riempie la pagina e scorre al suo interno, con la riga di intestazione sempre visibile, e carica altri elementi scorrendo. Le pagine delle app hanno la stessa intestazione delle pagine di Mosaikit, e una pagina con sottosezioni (Sistema, Monitoraggio, Impostazioni, Utilizzo, Account, Gestione) mostra nell’intestazione sia la pagina sia la sottosezione scelta. L’elenco delle sezioni di una pagina resta fermo e scorre da solo. Un layout salvato è usato subito, senza ricaricare la pagina. La barra laterale scorre, chiusa o aperta, e mostra la barra di scorrimento solo sotto il mouse.
 - Le liste e le tabelle lunghe si caricano una pagina alla volta, con il conteggio e «Carica altri» (o scorrendo), anche il Registro.
 - Ogni tabella funziona allo stesso modo, nella shell e nelle app: la riga delle intestazioni resta ferma e scorrono solo le righe, i titoli delle colonne ordinano, un campo di filtro nell'intestazione cerca in ogni campo e altre righe si caricano quando si arriva in fondo. I plugin installati si vedono anche come schede (predefinito) o come tabella.
+- Le pagine e gli elenchi vuoti mostrano un’illustrazione con un titolo, una riga di spiegazione e i pulsanti di cosa fare, uguali nella shell e nelle app; un filtro senza risultati mostra un piccolo messaggio con il link per azzerarlo.
 
 ### Persone e tenant
 
