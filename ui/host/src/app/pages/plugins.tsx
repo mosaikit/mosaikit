@@ -710,6 +710,10 @@ function PluginExtensions({ name, installed, catalog }: { name: string; installe
 /** The plugins of the platform in a tenant: available or not, turned on or not (read-only here). */
 export function TenantPluginsOfAdmin({ id }: { id: string }) {
   const q = useApi<TenantPlugin[]>(['admin-tenant-plugins', id], `/api/admin/tenants/${id}/plugins`)
+  const setAvailable = useAction(({ pid, available }: { pid: string; available: boolean }) => api('PUT', `/api/admin/plugins/${enc(pid)}/tenants/${id}`, { available }), {
+    ok: t('Availability updated'),
+    invalidate: [['admin-tenant-plugins', id], ['plugin-tenants']],
+  })
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
   return (
@@ -740,7 +744,9 @@ export function TenantPluginsOfAdmin({ id }: { id: string }) {
                 <TableCell>
                   <KindBadge kind={p.kind} />
                 </TableCell>
-                <TableCell>{p.available ? t('yes') : t('no')}</TableCell>
+                <TableCell>
+                  <Switch checked={p.available} onCheckedChange={(v) => setAvailable.mutate({ pid: p.id, available: v })} aria-label={t('Available to {name}', { name: p.label })} />
+                </TableCell>
                 <TableCell>{p.on ? <StatusBadge status="active" /> : <Badge variant="secondary" className={p.off === 'unavailable' ? 'font-normal bg-warn/10 text-warn' : 'font-normal'} data-off={p.off}>{offText(p)}</Badge>}</TableCell>
               </TableRow>
             ))}
