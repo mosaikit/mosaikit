@@ -934,7 +934,7 @@ export function TenantPlugins({ slug }: { slug: string }) {
         onSubmit={(v) => ask.mutateAsync(v)}
       />
       <FillBody className="flex flex-col gap-3 overflow-hidden p-6 max-[620px]:p-4">
-        <p className="max-w-2xl text-sm text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           {t('The Administrator makes them available; here you turn them on for the people of the tenant and decide their permissions. Apps appear in the sidebar, services work behind the scenes, extensions add to another plugin.')}
         </p>
         {all.length === 0 ? (
