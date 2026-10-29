@@ -370,6 +370,8 @@ export function LogView({ scope, fixed = {}, compact = false }: { scope: LogScop
   const [f, setF] = useState<Filters>({ ...NO_FILTERS, ...fixed })
   const deferredQ = useDeferredValue(f.q)
   const active = { ...f, q: deferredQ, ...fixed }
+  // the instant is fixed while the period stays (a clock in the query key would reset the list every second)
+  // oxlint-disable-next-line react/purity, react-hooks/exhaustive-deps
   const now = useMemo(() => Date.now(), [f.period])
   const qs = query(active, now)
   const pages = useInfiniteQuery({
