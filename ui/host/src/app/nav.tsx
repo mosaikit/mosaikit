@@ -66,11 +66,16 @@ export function useNav(session: Session, route: Route): Nav {
     return {
       groups: [
         {
+          id: 'start',
+          label: t('Platform'),
+          icon: <ShieldCheck />,
+          items: [{ label: t('Platform overview'), short: t('Overview'), icon: <LayoutDashboard />, href: to.admin(), active: page === 'overview' }],
+        },
+        {
           id: 'platform',
           label: t('Platform'),
           icon: <ShieldCheck />,
           items: [
-            { label: t('Platform overview'), short: t('Overview'), icon: <LayoutDashboard />, href: to.admin(), active: page === 'overview' },
             { label: t('Tenants'), icon: <Building2 />, href: to.admin('tenants'), active: page === 'tenants' || page === 'tenant' },
             { label: t('People'), icon: <Users />, href: to.admin('people'), active: page === 'people' || page === 'person' },
             { label: t('Plugins'), icon: <Puzzle />, href: to.admin('plugins'), active: page === 'plugins' || page === 'plugin' },
