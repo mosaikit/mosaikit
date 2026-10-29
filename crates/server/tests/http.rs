@@ -397,7 +397,7 @@ async fn plugin_uis_only_on_the_untrusted_origin() {
     // minimal UI in the folder of the installed plugin
     a.t.install("maps").await;
     let p = a.t.plugins.get("com.mosaikit.maps").unwrap();
-    let ui_dir = a.t.cfg.data_dir.join("plugins/com.mosaikit.maps/0.5.1/ui");
+    let ui_dir = a.t.cfg.data_dir.join("plugins/com.mosaikit.maps/0.6.0/ui");
     std::fs::create_dir_all(&ui_dir).unwrap();
     std::fs::write(ui_dir.join("index.html"), "<h1>mappe</h1>").unwrap();
     drop(p);

@@ -35,7 +35,15 @@ const RULES: Record<string, string> = {
   'R-7': 'the headers of the apps use the same type and spacing as the headers of the host',
   'R-8': 'the scrollbar of the main sidebar is hidden unless hovered or focused',
   'R-9': 'no horizontal overflow on a phone',
+  'R-11': 'every table: the header row is fixed, only the rows scroll with the scrollbar under the header row, a filter and sortable column titles are offered (or the table is on the exemption list with a reason), and more rows load progressively',
+  'R-12': 'no row is painted over or above the header row of a table, wherever the list is scrolled',
 }
+
+/** Tables that are deliberately NOT drawn as a scrolling list (route pattern -> why): small matrices that are edited in place. */
+const TABLE_EXEMPT: { route: RegExp; why: string }[] = [
+  { route: /\/permissions|\/profiles/, why: 'permission matrix: a fixed set of rows with a checkbox per permission, edited in place' },
+  { route: /\/account\/notifications|\/notifications\/settings/, why: 'notification matrix: a fixed set of kinds with two switches' },
+]
 
 /** Families of routes: the unit of a `test.fixme`. */
 const FAMILIES = ['host-admin', 'host-manager', 'host-user', 'log', 'app-files', 'app-maps', 'app-static-site', 'app-contacts', 'app-tasks', 'app-notes'] as const
@@ -70,7 +78,7 @@ interface Probe {
   ctrls: { tag: string; type: string; text: string; primary: boolean; r: Rect }[]
   sections: { r: Rect; selected: string; overflowY: string; scrollH: number; clientH: number } | null
   tabs: boolean
-  table: { rows: number; scroller: Rect | null; stickyHead: boolean; docScroll: boolean } | null
+  table: { rows: number; scroller: Rect | null; stickyHead: boolean; docScroll: boolean; grid: boolean; headB: number | null; bodyT: number | null; sortable: number; search: boolean; overlap: string[]; footInside: boolean } | null
   // after scrolling every scrollable element of the page to its end
   scrolled: { header: number | null; pills: number | null; sections: number | null; thead: number | null; pillsAfter: number | null; theadAfter: number | null } | null
   more: { present: boolean; loaded: boolean } | null
@@ -116,7 +124,10 @@ async function probe(doc: Page | Frame, o: { scroll: boolean; more: boolean }): 
     const sections: any = q('nav[aria-label="Sections"]')
     const pills: any = q('.msk-pills')
     const tableEl: any = [...document.querySelectorAll('table')].find(vis)
-    const scroller: any = tableEl && tableEl.closest('[data-listscroll], .msk-body')
+    const bodyEl: any = tableEl && q('tbody', tableEl)
+    // the pattern of the tables: the rows (tbody) scroll by themselves under a fixed header row
+    const gridScroll = !!bodyEl && /(auto|scroll)/.test(getComputedStyle(bodyEl).overflowY) && getComputedStyle(bodyEl).display === 'grid'
+    const scroller: any = gridScroll ? bodyEl : tableEl && tableEl.closest('[data-listscroll], .msk-body')
     const thead: any = tableEl && q('thead', tableEl)
     const th: any = thead && q('th', thead)
     const rows = tableEl ? [...tableEl.querySelectorAll('tbody tr')].filter((r: any) => !r.querySelector('td.empty')).length : 0
@@ -177,6 +188,13 @@ async function probe(doc: Page | Frame, o: { scroll: boolean; more: boolean }): 
             scroller: R(scroller),
             stickyHead: !!th && (getComputedStyle(th).position === 'sticky' || getComputedStyle(thead).position === 'sticky'),
             docScroll: doc.scrollHeight > doc.clientHeight + 1,
+            grid: gridScroll,
+            headB: thead ? thead.getBoundingClientRect().bottom : null,
+            bodyT: bodyEl ? bodyEl.getBoundingClientRect().top : null,
+            sortable: tableEl.querySelectorAll('thead th[aria-sort]').length,
+            search: !!q('#main input[type="search"], .msk-headwrap input[type="search"], .msk-filter'),
+            overlap: [] as string[],
+            footInside: !bodyEl || !q('[data-foot], .msk-morebar', tableEl) || !!bodyEl.querySelector('[data-foot], .msk-morebar'),
           }
         : null,
       scrolled: null,
@@ -198,6 +216,27 @@ async function probe(doc: Page | Frame, o: { scroll: boolean; more: boolean }): 
         scroller.scrollTop = 0
         out.more = { present: true, loaded }
       }
+    }
+    // R-12: scrolled to the middle and to the end, what is painted just above the header row, on it and just under it
+    if (o.scroll && tableEl && thead && bodyEl) {
+      const bad: string[] = []
+      const inBody = (e: any) => !!e && !!e.closest && !!e.closest('tbody')
+      const sc: any = scroller
+      for (const f of [0.5, 1]) {
+        sc.scrollTop = (sc.scrollHeight - sc.clientHeight) * f
+        await frame()
+        const hb = thead.getBoundingClientRect()
+        const x = hb.left + Math.min(24, hb.width / 2)
+        const above = document.elementFromPoint(x, Math.max(0, hb.top - 2))
+        const on = document.elementFromPoint(x, hb.top + hb.height / 2)
+        const under = hb.bottom + 1 < innerHeight ? document.elementFromPoint(x, hb.bottom + 1) : null
+        if (inBody(above)) bad.push(`a row is painted above the header row (scrolled to ${f * 100}%)`)
+        if (inBody(on)) bad.push(`a row is painted over the header row (scrolled to ${f * 100}%)`)
+        if (under && sc.scrollHeight > sc.clientHeight + 1 && !inBody(under) && !under.closest('thead')) bad.push(`nothing of the rows is painted just under the header row (scrolled to ${f * 100}%)`)
+      }
+      sc.scrollTop = 0
+      await frame()
+      out.table!.overlap = bad
     }
     const scrollables = () => [doc, ...([...document.querySelectorAll('*')] as any[]).filter((e) => e !== doc && e.scrollHeight > e.clientHeight + 1 && /(auto|scroll)/.test(getComputedStyle(e).overflowY))]
     if (o.scroll) {
@@ -446,7 +485,7 @@ function judge(rule: string, r: Rec, all: Rec[]): string[] {
       if (!t!.scroller) out.push('the list is not inside its own scroller (data-listscroll / .msk-body)')
       else {
         if (inner.vh - (app && doc.iframe ? 0 : 0) - t!.scroller.b > 24) out.push(`the list does not fill the height (ends ${Math.round(inner.vh - t!.scroller.b)}px above the bottom)`)
-        if (!t!.stickyHead) out.push('the header row of the table is not sticky')
+        if (!t!.stickyHead && !t!.grid) out.push('the header row of the table is not sticky')
         else if (t!.rows > 0 && inner.scrolled?.thead != null && Math.abs(inner.scrolled.thead) > 2 && !(inner.scrolled.theadAfter != null && inner.scrolled.theadAfter >= -1 && inner.scrolled.theadAfter <= 100)) out.push(`the header row moved ${inner.scrolled.thead}px when the list scrolled`)
       }
       const more = app ? r.frame!.more : doc.more
@@ -505,6 +544,29 @@ function judge(rule: string, r: Rec, all: Rec[]): string[] {
       const refLeft = ref.h1.x - ref.header.x
       if (!near(left, refLeft, 3)) out.push(`title indent ${Math.round(left)} vs ${Math.round(refLeft)} of the host`)
       if (app.headerBorder !== ref.headerBorder) out.push(`header border ${app.headerBorder} vs ${ref.headerBorder} of the host`)
+      break
+    }
+    case 'R-11': {
+      if (r.vp !== 'desk') break
+      const t = inner.table
+      if (!t) break
+      const ex = TABLE_EXEMPT.find((e) => e.route.test(r.route))
+      if (ex) break
+      if (!t.grid) out.push('the rows do not scroll by themselves under a fixed header row (not the grid table pattern)')
+      else {
+        if (t.headB != null && t.bodyT != null && t.bodyT < t.headB - 1) out.push(`the scrollbar of the rows starts above the end of the header row (${Math.round(t.bodyT)} < ${Math.round(t.headB)})`)
+        if (!t.footInside) out.push('the foot of the list is outside the rows that scroll (it would always be in view and load everything at once)')
+      }
+      if (!t.search && !inner.filterUi) out.push('no filter box')
+      if (t.sortable === 0) out.push('the column titles do not sort (no aria-sort)')
+      const more = app ? r.frame!.more : doc.more
+      if (more?.present && !more.loaded) out.push('scrolled to the end, more rows did not load')
+      break
+    }
+    case 'R-12': {
+      if (r.vp === 'phone') break
+      const t = inner.table
+      if (t?.overlap?.length) out.push(...t.overlap)
       break
     }
     case 'R-9': {

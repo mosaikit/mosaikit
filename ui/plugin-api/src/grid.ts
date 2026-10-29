@@ -21,6 +21,8 @@ export interface GridOptions<T> {
   label: string
   /** called for every row drawn: classes, listeners, tabindex */
   decorate?: (r: T, tr: HTMLTableRowElement) => void
+  /** a list that is whole in memory is shown a page at a time: the next page comes as the foot comes into view (or by the button) */
+  local?: { step: number; more: string; of: (shown: number, total: number) => string }
 }
 
 export interface Grid<T> {
@@ -53,6 +55,8 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', role?: stri
 
 export function gridTable<T>(o: GridOptions<T>): Grid<T> {
   let cols = o.columns
+  let n = o.local?.step ?? 0
+  let io: IntersectionObserver | null = null
   let sort: { key: string; dir: 1 | -1 } | null = null
   let rows: T[] = []
   let foot: HTMLElement | null = null
@@ -94,7 +98,8 @@ export function gridTable<T>(o: GridOptions<T>): Grid<T> {
   function body() {
     const col = sort ? cols.find((c) => c.key === sort!.key) : undefined
     const list = col?.sort && sort ? [...rows].sort((a, b) => sort!.dir * compare(col.sort!(a), col.sort!(b))) : rows
-    const trs = list.map((r) => {
+    const shown = o.local ? list.slice(0, n) : list
+    const trs = shown.map((r) => {
       const tr = el('tr', '', 'row')
       for (const c of cols) {
         const td = el('td', [c.align === 'right' ? 'right' : '', c.className ?? ''].join(' ').trim(), 'cell')
@@ -105,8 +110,24 @@ export function gridTable<T>(o: GridOptions<T>): Grid<T> {
       return tr
     })
     if (!trs.length) trs.push(el('tr', '', 'row', el('td', 'empty', 'cell', empty)))
-    if (foot) {
-      const tr = el('tr', '', 'row', el('td', 'foot', 'cell', foot))
+    let last: HTMLElement | null = foot
+    io?.disconnect()
+    if (o.local && list.length > shown.length) {
+      const btn = el('button', 'msk-btn ghost msk-more', undefined, o.local.more)
+      btn.type = 'button'
+      const next = () => {
+        n += o.local!.step
+        body()
+      }
+      btn.addEventListener('click', next)
+      last = el('div', 'msk-morebar', undefined, el('span', 'msk-count', undefined, o.local.of(shown.length, list.length)), btn)
+      if (typeof IntersectionObserver !== 'undefined') {
+        io = new IntersectionObserver((e) => e.some((x) => x.isIntersecting) && next(), { root: tbody, rootMargin: '200px' })
+        io.observe(last)
+      }
+    }
+    if (last) {
+      const tr = el('tr', '', 'row', el('td', 'foot', 'cell', last))
       tr.dataset.foot = ''
       trs.push(tr)
     }
@@ -124,6 +145,7 @@ export function gridTable<T>(o: GridOptions<T>): Grid<T> {
       head()
     },
     set(r, f = null, e = '') {
+      if (o.local && r.length !== rows.length) n = o.local.step
       rows = r
       foot = f
       empty = e
