@@ -35,7 +35,7 @@ const RULES: Record<string, string> = {
   'R-7': 'the headers of the apps use the same type and spacing as the headers of the host',
   'R-8': 'the scrollbar of the main sidebar is hidden unless hovered or focused',
   'R-9': 'no horizontal overflow on a phone',
-  'R-10': 'a page or list with nothing in it shows the shared illustrated empty state, centred in the content area, with a title, a text and the primary action (a filter that matches nothing shows the small plain message with «Clear filters» instead)',
+  'R-10': 'a page or list with nothing in it shows the shared illustrated empty state, centred in the content area, with a title, a text and the primary action (a filter that matches nothing shows the small plain message with «Clear filters» instead; a widget, a card or a section of a page with other things in it shows the compact variant: small picture, title, one line, the action)',
   'R-11': 'every table: the header row is fixed, only the rows scroll with the scrollbar under the header row, a filter and sortable column titles are offered (or the table is on the exemption list with a reason), and more rows load progressively',
   'R-12': 'no row is painted over or above the header row of a table, wherever the list is scrolled',
 }
@@ -483,6 +483,16 @@ test.describe('15-layout-contract', () => {
         }
       }
     }
+    // the sections of a page that has more in it (Manage › Pending) show the compact variant under their heading
+    await page.setViewportSize(VP.desk)
+    await page.evaluate(() => (location.hash = '#/t/emptyco/manage/pending'))
+    await page.waitForTimeout(1200)
+    const compact = await page.evaluate(() =>
+      [...document.querySelectorAll('[data-testid="empty-compact"]')].map((e: any) => ({ art: !!e.querySelector('svg[aria-hidden="true"]'), title: (e.querySelector('h3')?.textContent ?? '').trim(), head: (e.closest('section[aria-label]')?.querySelector('h2')?.textContent ?? '').trim(), buttons: [...e.querySelectorAll('button')].map((b: any) => (b.textContent ?? '').trim()) })),
+    )
+    if (compact.length !== 2) bad.push(`pending: expected 2 compact empty states, found ${compact.length}`)
+    for (const c of compact) if (!c.art || !c.title || !c.head) bad.push(`pending: compact empty state without picture, title or heading (${JSON.stringify(c)})`)
+    if (!compact.some((c) => c.head === 'Invitations' && c.buttons.includes('Invite people'))) bad.push('pending: the Invitations section does not offer «Invite people»')
     expect(bad, `R-10: ${RULES['R-10']}`).toEqual([])
   })
 

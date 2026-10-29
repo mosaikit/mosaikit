@@ -231,8 +231,11 @@ Converted: the apps Documents (Files), Maps, Apps (static sites), Contacts, Task
 pages) and the pages of the host: Tenants, Plugins (installed, updates, catalog; administrator and tenant), Groups, Access requests, Shares, Trash and Notifications. The tenants, shares, trash and log lists show the small
 plain message with «Clear filters» when a filter is the reason. The layout contract checks the host pages a fresh tenant leaves
 empty together with the apps (R-10). Where the header and the empty state both carry the primary action the specs name the
-first one (`.first()`). Left plain on purpose: errors and reserved pages (`Empty` without `art`), sections inside a detail page
-or a card (overview widgets, usage, backups, members of a group, the two lists of Manage › Pending) and the tables that show «No result» for a filter.
+first one (`.first()`). Left plain on purpose: errors and reserved pages (`Empty` without `art`) and the tables that show «No result» for a filter.
+The sections inside a page, a card or a widget (the two lists of Manage › Pending under their headings, the Home «No active
+apps», overview, usage, backup and log widgets, the permissions of a member and of a group, the plugin extensions) use the
+compact variant, `Empty compact art=…`: a small picture, a smaller title, one line and the action, not centred in the area.
+The members and the shared items of a group, standing lists of a page, use the big one.
 
 ### Panel next to a list
 

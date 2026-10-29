@@ -3,7 +3,7 @@
 // alerts, every member sees their own usage in Account › Usage and an alert in the sidebar above 80 %.
 
 import { useState } from 'react'
-import { AlertTriangle, Gauge, Pencil, RotateCcw, X } from 'lucide-react'
+import { AlertTriangle, Pencil, RotateCcw, X } from 'lucide-react'
 import { api, fmtBytes } from '../api.ts'
 import type { Group, Member, MyUsage, PlatformQuotas, QuotaAlerts, QuotaConsumer, QuotaConsumers, QuotaDay, QuotaLimits, QuotaMetric, QuotaRow, TenantQuotas } from '../types.ts'
 import { Badge } from '@/components/ui/badge'
@@ -228,7 +228,7 @@ export function PlatformQuotasPanel() {
         </CardHeader>
         <CardContent>
           {data.tenants.length === 0 ? (
-            <Empty title={t('No tenant')} />
+            <Empty compact art="generic" title={t('No tenant')} />
           ) : (
             <ListTable
               label={t('Tenants')}
@@ -419,7 +419,7 @@ export function UsageTrend({ slug }: { slug: string }) {
   if (trend.isLoading || q.isLoading) return <Loading />
   if (trend.error) return <ErrorBox error={trend.error} />
   const days = trend.data!
-  if (days.length === 0) return <Empty icon={<Gauge />} title={t('No history yet')} />
+  if (days.length === 0) return <Empty compact art="usage" title={t('No history yet')} />
   return (
     <div className="grid gap-4">
       <p className="text-sm text-muted-foreground">{t('The usage at the end of each day; the history grows by one day a day.')}</p>

@@ -3,7 +3,7 @@
 
 import { useDeferredValue, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Bell, Building2, CircleHelp, Contrast, Frame, Gauge, HardDrive, History, KeyRound, KeySquare, Mail, MoreHorizontal, Palette, PanelLeft, Pencil, Plus, Power, RefreshCw, Search, ShieldCheck, Upload, Users, Wrench } from 'lucide-react'
+import { Bell, CircleHelp, Contrast, Frame, Gauge, HardDrive, History, KeyRound, KeySquare, Mail, MoreHorizontal, Palette, PanelLeft, Pencil, Plus, Power, RefreshCw, Search, ShieldCheck, Upload, Users, Wrench } from 'lucide-react'
 import { api, fmtBytes, fmtDate } from '../../api.ts'
 import { useBrand } from '../../brand.ts'
 import type { AdminUser, GlobalKpi, Member, Session, ShellBand, SystemOverview, TenantInfo } from '../../types.ts'
@@ -70,7 +70,7 @@ export function AdminOverview({ session }: { session: Session }) {
           }
         />
         {q.data?.tenants === 0 && (
-          <Empty icon={<Building2 />} title={t('No tenants')}>
+          <Empty compact art="generic" title={t('No tenants')}>
             <Button className="mt-2" onClick={() => go(to.admin('tenants'))}>
               {t('Create the first tenant')}
             </Button>

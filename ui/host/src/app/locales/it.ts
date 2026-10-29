@@ -2000,4 +2000,10 @@ export const IT: Record<string, string> = {
   'Items of the backup': 'Elementi del backup',
   'Rows of the file': 'Righe del file',
   'Result of every row': 'Esito di ogni riga',
+  'Items shared with the group by its members appear here.': 'Gli elementi condivisi con il gruppo dai suoi membri compaiono qui.',
+  'The members of this group come from the identity provider.': 'I membri di questo gruppo arrivano dal provider di identità.',
+  'Add the people of the tenant who belong to this group.': 'Aggiungi le persone del tenant che fanno parte di questo gruppo.',
+  'The events of the last days appear here.': 'Gli eventi degli ultimi giorni compaiono qui.',
+  'What the tenant stores appears here.': 'Ciò che il tenant archivia compare qui.',
+  'Use «Run now» to make the first one.': 'Usa «Esegui ora» per fare il primo.',
 }

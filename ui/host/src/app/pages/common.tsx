@@ -578,7 +578,7 @@ function MyUsage({ slug }: { slug: string }) {
         </div>
       </div>
       {res.length === 0 ? (
-        <Empty icon={<Gauge />} title={t('No usage')} />
+        <Empty compact art="usage" title={t('No usage')}>{t('What the tenant stores appears here.')}</Empty>
       ) : (
         <ListTable
           label={t('Usage')}

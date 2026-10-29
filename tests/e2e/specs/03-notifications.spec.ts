@@ -33,7 +33,7 @@ test.describe.serial('03-notifications', () => {
     await expect(mgr.getByTestId('bell-badge')).toBeHidden()
     await nav(mgr, 'Manage').click()
     await mgr.getByRole('radio', { name: /Pending/ }).click()
-    await mgr.getByRole('button', { name: 'Invite people' }).click()
+    await mgr.getByRole('button', { name: 'Invite people' }).first().click()
     const inv = mgr.getByRole('dialog', { name: 'Invite a person of another tenant' })
     await inv.getByLabel('Home tenant').fill('alfa')
     await inv.getByLabel('Username').fill('bruno')

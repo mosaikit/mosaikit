@@ -682,7 +682,7 @@ export function BackupPanel() {
         </CardHeader>
         <CardContent>
           {q.data!.backups.length === 0 ? (
-            <Empty icon={<HardDrive />} title={t('No backups yet')} />
+            <Empty compact art="documents" title={t('No backups yet')}>{t('Use «Run now» to make the first one.')}</Empty>
           ) : (
             <ListTable
               label={t('Backups')}

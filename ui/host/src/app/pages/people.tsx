@@ -5,7 +5,7 @@
 
 import { useDeferredValue, useEffect, useMemo, useState, type FormEvent, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Check, Users, Copy, KeyRound, Link2, LogOut, Minus, MoreHorizontal, Pencil, Plus, Puzzle, ShieldCheck, ShieldOff, Trash2, UserPlus } from 'lucide-react'
+import { Check, Copy, KeyRound, Link2, LogOut, Minus, MoreHorizontal, Pencil, Plus, ShieldCheck, ShieldOff, Trash2, UserPlus } from 'lucide-react'
 import { toast } from 'sonner'
 import { api, errText, fmtDate, ApiError } from '../../api.ts'
 import { useBrand } from '../../brand.ts'
@@ -405,7 +405,7 @@ function sourceLabel(s: { kind: string; name: string }): string {
 function PermissionsSummary({ slug, detail }: { slug: string; detail: MemberDetail }) {
   return (
     <div className="grid gap-6">
-      {detail.permissions.length === 0 && <Empty icon={<Puzzle />} title={t('No active plugins')} />}
+      {detail.permissions.length === 0 && <Empty compact art="plugins" title={t('No active plugins')} />}
       {detail.permissions.map((p) => (
         <Card key={p.plugin_id}>
           <CardHeader>
@@ -522,6 +522,23 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
   const others = (members.data ?? []).filter((m) => !g.members.some((x) => x.user_id === m.user_id))
   const label = (pid: string) => ctx.data?.plugins.find((p) => p.id === pid)?.label ?? pid
   const idp = g.source === 'idp'
+  const addMenu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button disabled={!others.length}>
+          <UserPlus />
+          {t('Add a member')}
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="max-h-72 overflow-auto">
+        {others.map((m) => (
+          <DropdownMenuItem key={m.user_id} onSelect={() => add.mutate(m.user_id)}>
+            {m.display_name || m.username}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
   return (
     <>
       <PageHeader
@@ -532,21 +549,7 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
         actions={
           cur === 'members' &&
           !idp && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button disabled={!others.length}>
-                  <UserPlus />
-                  {t('Add a member')}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="max-h-72 overflow-auto">
-                {others.map((m) => (
-                  <DropdownMenuItem key={m.user_id} onSelect={() => add.mutate(m.user_id)}>
-                    {m.display_name || m.username}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            addMenu
           )
         }
         more={
@@ -576,7 +579,9 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
       <div className="p-6 max-[620px]:p-4">
         {cur === 'members' &&
           (g.members.length === 0 ? (
-            <Empty icon={<Users />} title={t('No members.')} />
+            <Empty art="people" title={t('No members.')} actions={idp ? undefined : addMenu}>
+              {idp ? t('The members of this group come from the identity provider.') : t('Add the people of the tenant who belong to this group.')}
+            </Empty>
           ) : (
             <div>
 <ListTable
@@ -620,7 +625,9 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
           ))}
         {cur === 'shared' &&
           (g.shared.length === 0 ? (
-            <Empty title={t('Nothing shared with the group')} />
+            <Empty art="shares" title={t('Nothing shared with the group')}>
+              {t('Items shared with the group by its members appear here.')}
+            </Empty>
           ) : (
             <div>
 <ListTable
@@ -640,7 +647,7 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
         {cur === 'plugins' && (
           <div className="grid gap-3">
             <p className="text-sm text-muted-foreground">{t('What the group adds to the profile of its members, plugin by plugin. It is changed in the permissions of each plugin.')}</p>
-            {g.plugins.length === 0 && <Empty icon={<Puzzle />} title={t('The group adds no permission')} />}
+            {g.plugins.length === 0 && <Empty compact art="plugins" title={t('The group adds no permission')} />}
             {g.plugins.map(([pid, keys]) => (
               <Card key={pid}>
                 <CardHeader>
@@ -1068,7 +1075,12 @@ export function RequestsTable({ slug, manager, page }: { slug: string; manager: 
   if (q.error) return <ErrorBox error={q.error} />
   const rows = q.data ?? []
   if (!rows.length && page) return <Empty art="inbox" title={t('No access request.')}>{t('Requests to see or edit an item wait here until they are answered.')}</Empty>
-  if (!rows.length) return <p className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">{t('No access request.')}</p>
+  if (!rows.length)
+    return (
+      <Empty compact art="inbox" title={t('No access request.')}>
+        {t('Requests to see or edit an item wait here until they are answered.')}
+      </Empty>
+    )
   const label = (pid: string) => ctx.data?.plugins.find((p) => p.id === pid)?.label ?? pid
   return (
     <ListTable

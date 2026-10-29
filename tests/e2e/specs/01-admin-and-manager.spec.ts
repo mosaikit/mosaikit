@@ -90,7 +90,7 @@ test.describe.serial('01-admin-and-manager', () => {
     await login(page, 'City of Beta', 'manager', PASSWORD)
     await nav(page, 'Manage').click()
     await page.getByRole('radio', { name: /Pending/ }).click()
-    await page.getByRole('button', { name: 'Invite people' }).click()
+    await page.getByRole('button', { name: 'Invite people' }).first().click()
     const inv = page.getByRole('dialog', { name: 'Invite a person of another tenant' })
     await inv.getByLabel('Home tenant').fill('alfa')
     await inv.getByLabel('Username').fill('anna')

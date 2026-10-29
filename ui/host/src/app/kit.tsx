@@ -404,8 +404,10 @@ export function Loading() {
 /** A page or list with nothing in it. With `art` it is the illustrated empty state of Mosaikit (rule «Empty states»):
  *  centred in the content area, a picture, a bold title, a short grey text and the buttons of what to do (the primary
  *  action of the page is repeated here). With `filtered` it is the small plain message of a filter that matches nothing,
- *  with «Clear filters» when `onClear` is given. Without either it is the plain box (errors, reserved pages). */
-export function Empty({ icon, art, title, children, actions, filtered, onClear }: { icon?: ReactNode; art?: ArtName; title: string; children?: ReactNode; actions?: ReactNode; filtered?: boolean; onClear?: () => void }) {
+ *  with «Clear filters» when `onClear` is given. `compact` (with `art`) is the small variant for a widget, a card or a
+ *  section of a page that has other things in it: small picture, title, one line of text, the action; not centred in the
+ *  area. Without either it is the plain box (errors, reserved pages). */
+export function Empty({ icon, art, title, children, actions, filtered, onClear, compact }: { icon?: ReactNode; art?: ArtName; title: string; children?: ReactNode; actions?: ReactNode; filtered?: boolean; onClear?: () => void; compact?: boolean }) {
   if (filtered)
     return (
       <div role="status" data-testid="empty-filtered" className="flex flex-wrap items-center justify-center gap-2 p-8 text-center text-sm text-muted-foreground">
@@ -416,6 +418,15 @@ export function Empty({ icon, art, title, children, actions, filtered, onClear }
           </Button>
         )}
       </div>
+    )
+  if (art && compact)
+    return (
+      <section data-testid="empty-compact" className="flex flex-col items-center justify-center gap-1 px-4 py-5 text-center">
+        <EmptyArt name={art} className="h-16 w-24" />
+        <h3 className="text-sm font-semibold">{title}</h3>
+        {children && <div className="max-w-md text-xs text-muted-foreground">{children}</div>}
+        {actions && <div className="mt-1 flex flex-wrap items-center justify-center gap-2">{actions}</div>}
+      </section>
     )
   if (art)
     return (

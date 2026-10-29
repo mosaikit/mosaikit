@@ -163,7 +163,7 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
       <PageHeader title={manager ? t('Tenant overview') : t('Home')} sub={`${greeting()}, ${session.user.display_name || session.user.username} · ${t('{role} in {tenant}', { role: c.tenant.role === 'tenant_manager' ? t(ROLE.tenant_manager) : t('User'), tenant: c.tenant.name })}`} />
       <div className="grid gap-4 p-6 max-[620px]:p-4">
         {!c.plugins.some(isApp) ? (
-          <Empty icon={<Grid2x2 />} title={t('No active apps')}>
+          <Empty compact art="apps" title={t('No active apps')}>
             {t('An Administrator installs and turns them on.')}
           </Empty>
         ) : (
@@ -438,7 +438,7 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
               </section>
               <section className="grid gap-2" aria-label={t('Invitations')}>
                 <h2 className="text-sm font-semibold">{t('Invitations')}</h2>
-                <Invites slug={slug} q={invites} sort={inviteSort} onSort={setInviteSort} />
+                <Invites slug={slug} q={invites} sort={inviteSort} onSort={setInviteSort} onInvite={() => setDlg('invite')} />
               </section>
             </div>
           )}
@@ -1017,7 +1017,7 @@ function Groups({ slug, members, shell }: { slug: string; members: Member[]; she
   )
 }
 
-function Invites({ slug, q, sort, onSort }: { slug: string; q: ReturnType<typeof usePaged<Invitation, PageOf<Invitation> & { pending: number }>>; sort: Sort; onSort: (s: Sort) => void }) {
+function Invites({ slug, q, sort, onSort, onInvite }: { slug: string; onInvite: () => void; q: ReturnType<typeof usePaged<Invitation, PageOf<Invitation> & { pending: number }>>; sort: Sort; onSort: (s: Sort) => void }) {
   const revoke = useAction((id: string) => api('DELETE', `/api/t/${enc(slug)}/manage/invitations/${id}`), {
     ok: t('Invitation revoked'),
     invalidate: [['invites', slug]],
@@ -1026,7 +1026,17 @@ function Invites({ slug, q, sort, onSort }: { slug: string; q: ReturnType<typeof
   if (q.error) return <ErrorBox error={q.error} />
   if (!q.items.length)
     return (
-      <Empty icon={<Mail />} title={t('Nothing pending')}>
+      <Empty
+        compact
+        art="people"
+        title={t('Nothing pending')}
+        actions={
+          <Button size="sm" onClick={onInvite}>
+            <Plus />
+            {t('Invite people')}
+          </Button>
+        }
+      >
         {t('Invitations to people of other tenants stay here until they answer.')}
       </Empty>
     )
@@ -1530,7 +1540,7 @@ function UsageActivity({ slug }: { slug: string }) {
       <section className="grid gap-3">
         <h2 className="text-sm font-semibold">{t('Activity of the last days')}</h2>
         {k.activity.length === 0 ? (
-          <Empty icon={<Gauge />} title={t('No activity')} />
+          <Empty compact art="usage" title={t('No activity')}>{t('The events of the last days appear here.')}</Empty>
         ) : (
           <div className="flex h-36 items-end gap-1 rounded-xl border bg-card p-4" role="img" aria-label={t('Events per day')}>
             {k.activity.map((d) => (

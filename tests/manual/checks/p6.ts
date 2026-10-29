@@ -260,7 +260,7 @@ const checks: L.Check[] = [
       await H.go(lv, '#/t/regione-lazio/manage/pending')
       // invitation from Regione Lazio to a person of Comune di Roma is not limited by Comune di Roma; the check means the reverse
       await H.go(m, '#/t/comune-roma/manage/pending')
-      await m.getByRole('button', { name: 'Invite people', exact: true }).click()
+      await m.getByRole('button', { name: 'Invite people', exact: true }).first().click()
       const dd = m.getByRole('dialog', { name: 'Invite a person of another tenant' })
       await dd.getByRole('textbox', { name: 'Home tenant' }).fill('regione-lazio')
       await dd.getByRole('textbox', { name: 'Username' }).fill('l.verdi')

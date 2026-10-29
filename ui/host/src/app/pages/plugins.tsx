@@ -619,7 +619,7 @@ function PluginTenants({ id }: { id: string }) {
         <Switch checked={d.default} onCheckedChange={(v) => setDefault.mutate(v)} aria-label={t('Available to every tenant')} />
       </label>
       {d.tenants.length === 0 ? (
-        <Empty title={t('No tenants')} />
+        <Empty compact art="generic" title={t('No tenants')} />
       ) : (
         <ListTable
           label={t('Tenants')}
@@ -794,7 +794,7 @@ function PluginExtensions({ name, installed, catalog }: { name: string; installe
     <div className="grid gap-4">
       <p className="text-sm text-muted-foreground">{t('Extensions add fields and actions to {name}. They work in a tenant only where {name} is on.', { name })}</p>
       {installed.length === 0 && catalog.length === 0 ? (
-        <Empty icon={<Puzzle />} title={t('No extensions')} />
+        <Empty compact art="plugins" title={t('No extensions')} />
       ) : (
         <ListTable
           fit="inline"

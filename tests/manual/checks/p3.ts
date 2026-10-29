@@ -312,7 +312,7 @@ const checks: L.Check[] = [
       await p.waitForTimeout(1200)
       const tabs = (await p.getByRole('navigation', { name: 'Tabs' }).getByRole('link').allInnerTexts()).map((s) => s.trim())
       for (const n of ['Members', 'Shared items', 'Plugins']) c.ok(tabs.some((t: string) => t.startsWith(n)), n) // the tabs carry their counts
-      const add = p.getByRole('button', { name: 'Add a member' })
+      const add = p.getByRole('button', { name: 'Add a member' }).first()
       c.ok(await H.vis(add), 'add a member')
       if (!/Davide Conti/.test(await H.text(p))) {
         await add.click()
