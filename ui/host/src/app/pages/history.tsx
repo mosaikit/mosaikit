@@ -363,12 +363,13 @@ const NO_FILTERS: Filters = {
   group: '',
 }
 
-function query(f: Filters, extra: Record<string, string> = {}): string {
+/** `now` is the instant the period counts back from: it stays the same while the filters do, or the key of the query would change every second and the list would start again. */
+function query(f: Filters, now: number, extra: Record<string, string> = {}): string {
   const p = new URLSearchParams()
   if (f.failed) p.set('failed', 'true')
   for (const k of ['q', 'user', 'what', 'plugin', 'tenant', 'resource', 'group'] as const) if (f[k].trim()) p.set(k, f[k].trim())
   const hours = PERIODS.find((x) => x.id === f.period)?.hours ?? 0
-  if (hours) p.set('from', new Date(Date.now() - hours * 3600_000).toISOString().replace(/\.\d+Z$/, 'Z'))
+  if (hours) p.set('from', new Date(now - hours * 3600_000).toISOString().replace(/\.\d+Z$/, 'Z'))
   for (const [k, v] of Object.entries(extra)) p.set(k, v)
   return p.toString()
 }
@@ -381,7 +382,8 @@ export function LogView({ scope, fixed = {}, compact = false }: { scope: LogScop
   const [f, setF] = useState<Filters>({ ...NO_FILTERS, ...fixed })
   const deferredQ = useDeferredValue(f.q)
   const active = { ...f, q: deferredQ, ...fixed }
-  const qs = query(active)
+  const now = useMemo(() => Date.now(), [f.period])
+  const qs = query(active, now)
   const pages = useInfiniteQuery({
     queryKey: ['log', scope.api, qs],
     queryFn: ({ pageParam }) => api<LogPageData>('GET', `${scope.api}?${qs}${pageParam ? `&before=${pageParam}` : ''}`),
@@ -399,7 +401,7 @@ export function LogView({ scope, fixed = {}, compact = false }: { scope: LogScop
     setF({ ...f, ...patch })
     setSel(new Set())
   }
-  const csv = (extra: Record<string, string> = {}) => appUrl(`${scope.api}.csv?${query(active, extra)}`)
+  const csv = (extra: Record<string, string> = {}) => appUrl(`${scope.api}.csv?${query(active, now, extra)}`)
   const chip = (text: string, clear: () => void) => (
     <Badge variant="secondary" className="gap-1 py-1 pr-1 font-normal">
       {text}
