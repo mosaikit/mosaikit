@@ -47,7 +47,7 @@ describe('mountCrud', () => {
     extra.textContent = 'Tags'
     mountCrud(el, msk, 'notes', {
       views: [{ key: 'flow', label: 'Flow', kind: 'flow', item: (c) => Object.assign(document.createElement('span'), { textContent: c.text('title') }), box: (c, box) => box.classList.add('mine', `n-${c.row.id}`) }],
-      headFilters: [extra],
+      bar: [extra],
       onLoad: (rows) => loaded.push(rows.length),
       editor: (ctx, box) => {
         const b = document.createElement('button')
@@ -61,7 +61,7 @@ describe('mountCrud', () => {
     await tick()
     expect(loaded).toEqual([1])
     expect(el.querySelector('.msk-items.flow .msk-item.mine.n-1')).not.toBeNull()
-    expect(el.querySelector('.msk-pagehead')!.textContent).toContain('Tags')
+    expect(el.querySelector('.msk-subbar')!.textContent).toContain('Tags')
     el.querySelector<HTMLElement>('.msk-item')!.click()
     await tick()
     el.querySelector<HTMLButtonElement>('.msk-editor .ed')!.click()

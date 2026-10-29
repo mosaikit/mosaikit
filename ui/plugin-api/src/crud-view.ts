@@ -35,9 +35,8 @@ export interface CrudOptions {
   panel?: 'selected' | 'always'
   /** the read-only view of the open item (with «Edit» for the fields): used instead of the form until the person edits */
   reader?: (ctx: ItemCtx) => HTMLElement
-  /** extra controls in the header, before the views switch and the filter (a «Tags» button, a menu of tags…); the filter stays
-   *  next to the primary action. On a phone they wrap onto a second row */
-  headFilters?: HTMLElement[]
+  /** a bar of the plugin above the list, under the header (a «Tags» button, a menu of tags…); it stays in sight while the list scrolls */
+  bar?: HTMLElement[]
   /** the plugin's own part of the form (a colour picker, a tag chooser…): draws into `box` after the fields, for a new and for an open
    *  item, and sets values of fields the form does not show (hidden ones) with `ctx.set`; they are saved with the form */
   editor?: (ctx: EditorCtx, box: HTMLElement) => void
@@ -314,13 +313,15 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   emptyBox.hidden = true
   const morebar = h('div', { class: 'msk-morebar' }, btnMore)
   // with views: the list (it scrolls) and the detail panel (it scrolls too) side by side, the panel over the list on a phone
-  const master = h('div', { class: 'msk-master' }, items, morebar)
+  const subbar = h('div', { class: 'msk-subbar' }, ...(opts.bar ?? []))
+  subbar.hidden = !opts.bar?.length
+  const master = h('div', { class: 'msk-master' }, subbar, items, morebar)
   const split = h('div', { class: 'msk-split' }, master, h('aside', { class: 'msk-detail', 'aria-label': tr('detail'), id: 'msk-detail' }, form))
   const body = views.length ? pageBody(split) : pageBody(grid.el, emptyBox, form)
   body.classList.add(views.length ? 'msk-splitbody' : 'msk-tablebody')
   root.replaceChildren(
     // the header and the filters never scroll: the table, the foot and the form do
-    pageHead({ title: opts.title ?? resource, section: opts.section, sub: count, actions: [btnNew], filters: [...(opts.headFilters ?? []).map((e) => (e.classList.add('msk-extra'), e)), ...(views.length > 1 ? [switcher, filter] : [filter])] }),
+    pageHead({ title: opts.title ?? resource, section: opts.section, sub: count, actions: [btnNew], filters: views.length > 1 ? [switcher, filter] : [filter] }),
     body,
   )
   // the rest of the rows come as the foot of the table comes into view
