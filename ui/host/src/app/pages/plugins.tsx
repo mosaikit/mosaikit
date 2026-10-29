@@ -4,7 +4,7 @@
 // tenants; the Tenant Manager turns ON the available ones and decides their permissions.
 
 import { Fragment, useRef, useState, type ReactNode } from 'react'
-import { ArrowUpCircle, ExternalLink, KeySquare, MessageSquarePlus, Power, Puzzle, RotateCcw, Trash2, Upload } from 'lucide-react'
+import { ArrowDown, ArrowUp, ArrowUpCircle, ChevronsUpDown, ExternalLink, KeySquare, MessageSquarePlus, Power, Puzzle, RotateCcw, Trash2, Upload } from 'lucide-react'
 import { api, fmtDate } from '../../api.ts'
 import type { AdminPlugin, CatalogItem, ConfigDecl, PluginConfig, PluginKind, PluginTenant, TenantPlugin, UninstallImpact } from '../../types.ts'
 import { Badge } from '@/components/ui/badge'
@@ -63,6 +63,28 @@ function KindPills({ value, onChange, counts }: { value: string; onChange: (k: s
   )
 }
 
+type SortKey = 'label' | 'kind' | 'version' | 'signed' | 'status'
+const SORTS: Record<SortKey, (p: AdminPlugin) => string> = {
+  label: (p) => p.label,
+  kind: (p) => kindOf(p) ?? '',
+  version: (p) => p.version,
+  signed: (p) => p.signed_by ?? '',
+  status: (p) => p.status,
+}
+
+/** A column title that sorts the rows: the first click ascending, the second descending, the third back to the order of the server. */
+function SortHead({ id, sort, onSort, children }: { id: SortKey; sort: { key: SortKey; dir: 1 | -1 } | null; onSort: (k: SortKey) => void; children: string }) {
+  const on = sort?.key === id
+  return (
+    <TableHead aria-sort={on ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none'}>
+      <button type="button" onClick={() => onSort(id)} className="-ml-1 inline-flex items-center gap-1 rounded px-1 font-medium outline-none hover:text-primary-strong focus-visible:ring-2 focus-visible:ring-ring">
+        {children}
+        {on ? sort.dir === 1 ? <ArrowUp className="size-3.5" /> : <ArrowDown className="size-3.5" /> : <ChevronsUpDown className="size-3.5 text-muted-foreground" />}
+      </button>
+    </TableHead>
+  )
+}
+
 function countKinds<T extends { kind?: PluginKind | null; has_ui?: boolean }>(rows: T[]): Record<string, number> {
   const c: Record<string, number> = { all: rows.length }
   for (const k of KINDS) c[k] = rows.filter((r) => kindOf(r) === k).length
@@ -78,6 +100,8 @@ export function AdminPlugins({ section }: { section?: string }) {
   const confirm = useConfirm()
   const file = useRef<HTMLInputElement>(null)
   const [kind, setKind] = useState('all')
+  const [q, setQ] = useState('')
+  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 } | null>(null)
   const [sel, setSel] = useState<Set<string>>(new Set())
   const cur = section === 'updates' || section === 'catalog' ? section : 'installed'
   const inval = [['admin-plugins'], ['admin-catalog'], ['admin-overview']]
@@ -88,7 +112,16 @@ export function AdminPlugins({ section }: { section?: string }) {
   const updates = (catalog.data ?? []).filter((c) => c.update_available)
   const available = (catalog.data ?? []).filter((c) => !c.installed)
   const byId = new Map((catalog.data ?? []).map((c) => [c.id, c]))
-  const rows = (installed.data ?? []).filter((p) => kind === 'all' || kindOf(p) === kind)
+  // full text: every word must be in the name, the id, the description, the author, the version, the signer, the status or the kind
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean)
+  const rows = (installed.data ?? [])
+    .filter((p) => kind === 'all' || kindOf(p) === kind)
+    .filter((p) => {
+      const hay = [p.label, p.id, p.description, p.author, p.version, p.signed_by, p.status, kindOf(p)].join(' ').toLowerCase()
+      return words.every((w) => hay.includes(w))
+    })
+    .sort((a, b) => (sort ? sort.dir * SORTS[sort.key](a).localeCompare(SORTS[sort.key](b), undefined, { numeric: true }) : 0))
+  const onSort = (key: SortKey) => setSort(sort?.key !== key ? { key, dir: 1 } : sort.dir === 1 ? { key, dir: -1 } : null)
   const ids = [...sel].filter((id) => rows.some((r) => r.id === id))
   const picked = rows.filter((r) => ids.includes(r.id))
   async function bulk(what: 'update' | 'off' | 'uninstall') {
@@ -108,6 +141,7 @@ export function AdminPlugins({ section }: { section?: string }) {
       <PageHeader
         title={t('Plugins')}
         sub={t('Installed on the platform and available in the trusted registries')}
+        filter={cur === 'installed' ? <Input type="search" className="h-9 w-56 max-w-full" placeholder={t('Filter the plugins')} aria-label={t('Filter the plugins')} value={q} onChange={(e) => setQ(e.target.value)} /> : undefined}
         actions={
           <>
             <input
@@ -178,11 +212,11 @@ export function AdminPlugins({ section }: { section?: string }) {
                           onCheckedChange={(v) => setSel(v ? new Set(rows.map((r) => r.id)) : new Set())}
                         />
                       </TableHead>
-                      <TableHead>{t('Plugins')}</TableHead>
-                      <TableHead>{t('Kind')}</TableHead>
-                      <TableHead>{t('Version')}</TableHead>
-                      <TableHead>{t('Signature')}</TableHead>
-                      <TableHead>{t('Status')}</TableHead>
+                      <SortHead id="label" sort={sort} onSort={onSort}>{t('Plugins')}</SortHead>
+                      <SortHead id="kind" sort={sort} onSort={onSort}>{t('Kind')}</SortHead>
+                      <SortHead id="version" sort={sort} onSort={onSort}>{t('Version')}</SortHead>
+                      <SortHead id="signed" sort={sort} onSort={onSort}>{t('Signature')}</SortHead>
+                      <SortHead id="status" sort={sort} onSort={onSort}>{t('Status')}</SortHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
