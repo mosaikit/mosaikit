@@ -307,7 +307,7 @@ const checks: L.Check[] = [
       await customize(p, 'Storage', '0.001')
       const u = await L.as(ctx, 's.greco')
       await H.go(u, '#/t/comune-roma')
-      await H.nav(u, 'Files')
+      await H.nav(u, 'Documents')
       const f = await L.pluginFrame(u, 'files')
       const big = L.fixture('big3mb.bin')
       if (!fs.existsSync(big)) fs.writeFileSync(big, Buffer.alloc(3 * 1024 * 1024, 7))

@@ -80,7 +80,7 @@ const checks: L.Check[] = [
       const c = H.checker()
       const u = await L.as(ctx, 's.greco')
       await H.go(u, '#/t/comune-roma')
-      await H.nav(u, 'Static sites')
+      await H.nav(u, 'Tools')
       const f = await L.pluginFrame(u, 'static-site')
       // a zip with unsafe paths, written by hand (stored entries): con.txt, nul, a. and "name "
       const zip = L.out('unsafe-sites.zip')

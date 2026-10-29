@@ -302,7 +302,7 @@ const checks: L.Check[] = [
       const c = H.checker()
       const u = await L.as(ctx, 's.greco')
       await H.go(u, '#/t/comune-roma')
-      await H.nav(u, 'Files')
+      await H.nav(u, 'Documents')
       let f = await L.pluginFrame(u, 'files')
       if (!(await H.vis(f.getByText('QA folder').first()))) {
         await f.getByRole('button', { name: 'New folder' }).first().click()
@@ -339,7 +339,7 @@ const checks: L.Check[] = [
       await u.getByRole('row', { name: /QA folder/ }).getByRole('button', { name: /Restore/ }).click()
       await u.waitForTimeout(1500)
       await H.go(u, '#/t/comune-roma')
-      await H.nav(u, 'Files')
+      await H.nav(u, 'Documents')
       f = await L.pluginFrame(u, 'files')
       await f.getByText('QA folder').first().dblclick()
       await u.waitForTimeout(1500)

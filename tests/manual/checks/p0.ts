@@ -76,7 +76,7 @@ const checks: L.Check[] = [
       c.ok(await H.vis(p.getByRole('heading', { name: 'Home', level: 1 })), 'Home')
       c.ok(await H.vis(p.getByText('Comune di Roma').first()), 'tenant Comune di Roma')
       const side = p.locator('[data-sidebar="sidebar"]')
-      for (const n of ['Home', 'Notes', 'Tasks', 'Files']) c.ok(await H.vis(side.getByRole('link', { name: n, exact: true })), `sidebar ${n}`)
+      for (const n of ['Home', 'Notes', 'Tasks', 'Documents']) c.ok(await H.vis(side.getByRole('link', { name: n, exact: true })), `sidebar ${n}`)
       for (const [n, re] of [
         ['sidebar button', /Open or close the sidebar/],
         ['search', /Search everywhere/],

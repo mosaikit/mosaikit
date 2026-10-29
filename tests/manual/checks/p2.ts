@@ -18,7 +18,7 @@ const checks: L.Check[] = [
       const p = await L.as(ctx, 's.greco')
       await H.go(p, '#/t/comune-roma')
       const side = (await p.locator('[data-sidebar="sidebar"]').getByRole('link').allInnerTexts()).map((s) => s.trim())
-      for (const n of ['Notes', 'Tasks', 'Contacts', 'Files', 'Maps', 'Static sites']) c.ok(side.includes(n), n)
+      for (const n of ['Notes', 'Tasks', 'Contacts', 'Documents', 'Maps', 'Tools']) c.ok(side.includes(n), n)
       await H.nav(p, 'Tasks')
       const f = await L.pluginFrame(p, 'tasks')
       const t = await f.locator('body').innerText()

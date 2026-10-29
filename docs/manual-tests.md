@@ -125,7 +125,7 @@ As Administrator (`#/admin`) unless said otherwise.
 
 | Id | Check | Expected |
 |---|---|---|
-| P1b-01 | As `s.greco`, English | Sidebar and pages of the apps in English (Notes, Tasks, Contacts, Files, Maps, Static sites) |
+| P1b-01 | As `s.greco`, English | Sidebar and pages of the apps in English (Notes, Tasks, Contacts, Documents, Maps, Tools) |
 | P1b-02 | Switch to Italiano | Names in the sidebar ("Note", "Attività"…), fields and choice values ("personale", "lavoro") in Italian, without signing in again |
 | P1b-03 | Notes: create a note with a tag, switch language | The same note, the tag shown in the language of the moment |
 
@@ -228,7 +228,7 @@ enough as items.
 | P5-11 | Empty the trash (with something inside) | Confirmation; what Sara owns or deleted is deleted for good |
 | P5-12 | As `e.ricci`: Trash | The whole trash of the tenant, with the column Owner; Restore works on the items of others too |
 | P5-13 | As `l.bianchi`: Trash, while Sara's note is in the trash | Not shown: only what one owns or deleted |
-| P5-14 | In the Files app: delete a folder with files, then Trash | One row for the folder (its size counts the files); Restore brings back the folder and its files |
+| P5-14 | In the Documents app: delete a folder with files, then Trash | One row for the folder (its size counts the files); Restore brings back the folder and its files |
 | P5-15 | Sign out, sign in as `s.greco` with a wrong password, then as `e.ricci`: **Log** (sidebar, Tenant management) | The events of the tenant, the latest first: when, who, what (in words), on what, result |
 | P5-16 | Pill **Only failures** | «Sign-in refused» for Sara Greco, result Failed |
 | P5-17 | Filters Who = Sara Greco, What = Items, period Last 24 hours, search «note» | Only her events on items: Created, Moved to the trash, Restored from the trash, Deleted for good |
@@ -260,7 +260,7 @@ or empty fields in System › Quotas). Storage is in GB (1 GB = 1024 MB).
 | P6-08 | Delete two notes, create one | Still refused: the notes in the trash count until they are deleted for good (Usage › Activity shows «of which in the trash»); restoring one works; empty the trash, then a new note is created; the 80 % alert comes again only after the usage went below 80 % and back above |
 | P6-09 | As Administrator: Comune di Roma › People quota equal to its people today | As `e.ricci`: Manage › New user → «The tenant has reached one of its quotas…» (Italian: «Il tenant ha raggiunto una delle sue quote…»); an invitation to a person of Regione Lazio is refused the same way |
 | P6-10 | Suspend a person, then create the user again | Works (a suspended membership does not count); reactivating the suspended person is refused while the tenant is full |
-| P6-11 | As Administrator: Storage quota 0.001 GB (about 1 MB) for Comune di Roma | As `s.greco`: upload a file of a few MB in Files → refused; a smaller file replaces a bigger one without problems |
+| P6-11 | As Administrator: Storage quota 0.001 GB (about 1 MB) for Comune di Roma | As `s.greco`: upload a file of a few MB in Documents → refused; a smaller file replaces a bigger one without problems |
 | P6-12 | As `e.ricci`: Usage › Trend | A chart per quota with the line of the limit and «Show as a table»; the history grows by one day a day (on a new installation only today) |
 | P6-13 | Usage › Who uses the most | By person, by group (a person in two groups counts in both), by app: items and storage |
 | P6-14 | Usage › Alerts | Switches at 80 %, at 100 %, Forecast; recipients: the Tenant Managers and chosen people and groups; save; only the chosen recipients get the next alert |
@@ -439,7 +439,7 @@ The sample extension *Note review* (`com.mosaikit.note-review`) adds a **Review*
 | FU-B-10 | As Administrator: **Restore an item** on that backup; tenant *Comune di Roma*, title of the note, Search | The note, its owner, «No longer in the tenant» |
 | FU-B-11 | Restore, then Restore | ««title» restored»; the state becomes «In the tenant»; `e.ricci` gets a notification and finds the note with its review history |
 | FU-B-12 | Restore it again | It is still in the tenant: choose **As a copy** (a second note next to the current one) or **In place of the current one** (red button: the current version is deleted for good) |
-| FU-B-13 | A folder of Files restored the same way | The folder comes back with the files in it, contents included; a file whose folder no longer exists comes back at the top |
+| FU-B-13 | A folder of Documents restored the same way | The folder comes back with the files in it, contents included; a file whose folder no longer exists comes back at the top |
 | FU-B-14 | With «Also its shares…» ticked | The shares come back for the people and groups that still exist; public links never come back |
 
 
@@ -591,7 +591,7 @@ Automated twin of every check: `tests/manual/checks/fc.ts` (and the test «14-fe
 | FC-01 | As Administrator: Account › Profile | The email shows (`admin@example.test` in development); **Change email** opens a dialog asking the new address, the current password and, with the second factor on, a code of the app; a wrong password is refused with a readable message; with the right password and a fresh code the new address shows |
 | FC-02 | System › Administrators › **New Administrator** (name, **Email**, password), then the menu of the new row › **Edit name and email** | The email is required; one already used by another account is refused («already used by another account»); another Administrator's name and email change and the list shows them; the form does not send an empty email; in the menu of your own row the dialog has the name only and says the email is changed in Account |
 | FC-03 | Account of a Tenant Manager | The text under **Details** says that the Tenant Manager of the home tenant changes the email; no **Change email** button |
-| FC-04 | Plugins › each official plugin (Notes, Tasks, Maps, Static sites, Files, Contacts, Note review, the four layouts, Spanish) | A brochure: a header with icon, name, version and licence; a gallery with a picture that loads; the text under **About**; **Permissions and requirements**; **Publisher** with author, licence, version, signature and link. A click on the picture opens it large, the arrows or ← → show the next one, Esc closes. At 390 px wide nothing scrolls sideways; light and dark are both readable |
+| FC-04 | Plugins › each official plugin (Notes, Tasks, Maps, Tools, Documents, Contacts, Note review, the four layouts, Spanish) | A brochure: a header with icon, name, version and licence; a gallery with a picture that loads; the text under **About**; **Permissions and requirements**; **Publisher** with author, licence, version, signature and link. A click on the picture opens it large, the arrows or ← → show the next one, Esc closes. At 390 px wide nothing scrolls sideways; light and dark are both readable |
 | FC-05 | System › Email with no server saved | A card **Set up email** says what is missing («the SMTP server, the sender»); **Set up** puts the cursor in **SMTP server**; **Fill in for a local test server** fills `localhost`, port 1025, security None and a sender, with the line that starts Mailpit; **Send a test** is off with «Available once the mail server is saved.»; after saving the card is gone and the badge says *Ready* |
 | FC-06 | As a Tenant Manager: Notes › a note › **Translate note**; then, as Administrator, set the keys **Translation service** and **Translation service address** (shared) in System › Keys of outside services and try again | Without a key: «No translation key is set. Ask your Administrator…», nothing sent. With both: the translated title and text appear under the button; the service received the key as a bearer token; the key is never in the page. (A translation service of the test answers; no real service is called) |
 | FC-07 | The development accounts of the table in Setup | Every account has an email address (`<username>@example.test`) |
