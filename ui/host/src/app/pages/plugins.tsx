@@ -127,9 +127,8 @@ export function AdminPlugins({ section }: { section?: string }) {
           </>
         }
       />
-      <FillBody className="grid content-start gap-3 p-6 max-[620px]:p-4">
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-1 border-b px-6 py-1 max-[620px]:px-4">
         <Pills
-          first
           items={[
             { id: 'installed', label: t('Installed'), count: installed.data?.length },
             { id: 'updates', label: t('Updates'), count: updates.length },
@@ -138,6 +137,26 @@ export function AdminPlugins({ section }: { section?: string }) {
           value={cur}
           onChange={(id) => go(to.admin('plugins', id === 'installed' ? undefined : id))}
         />
+        {cur === 'installed' && !!installed.data?.length && <KindPills value={kind} onChange={setKind} counts={countKinds(installed.data)} />}
+        {ids.length > 0 && (
+          <div className="flex flex-wrap items-center gap-2 rounded-lg bg-primary/10 py-1 pr-1 pl-3" role="group" aria-label={t('Actions on the selection')}>
+            <span className="text-sm font-medium tabular-nums">{t('{count} selected', { count: ids.length })}</span>
+            <Button variant="outline" size="sm" disabled={!picked.some((p) => byId.get(p.id)?.update_available)} onClick={() => void bulk('update')}>
+              {t('Update')}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => void bulk('off')}>
+              {t('Turn off')}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => void bulk('uninstall')}>
+              {t('Uninstall')}
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setSel(new Set())}>
+              {t('Deselect')}
+            </Button>
+          </div>
+        )}
+    </div>
+      <FillBody className="grid content-start gap-3 p-6 max-[620px]:p-4">
         {cur === 'installed' ? (
           installed.isLoading ? (
             <Loading />
@@ -147,26 +166,6 @@ export function AdminPlugins({ section }: { section?: string }) {
             <Empty icon={<Puzzle />} title={t('No plugin installed')} />
           ) : (
             <>
-              <div className="flex flex-wrap items-center gap-3">
-                <KindPills value={kind} onChange={setKind} counts={countKinds(installed.data)} />
-                {ids.length > 0 && (
-                  <div className="flex flex-wrap items-center gap-2 rounded-lg bg-primary/10 py-1 pr-1 pl-3" role="group" aria-label={t('Actions on the selection')}>
-                    <span className="text-sm font-medium tabular-nums">{t('{count} selected', { count: ids.length })}</span>
-                    <Button variant="outline" size="sm" disabled={!picked.some((p) => byId.get(p.id)?.update_available)} onClick={() => void bulk('update')}>
-                      {t('Update')}
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => void bulk('off')}>
-                      {t('Turn off')}
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => void bulk('uninstall')}>
-                      {t('Uninstall')}
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setSel(new Set())}>
-                      {t('Deselect')}
-                    </Button>
-                  </div>
-                )}
-              </div>
               <div className="overflow-x-auto rounded-xl border bg-card">
                 <Sliced items={rows}>{(shown) => (<Table>
                   <TableHeader>
