@@ -481,6 +481,11 @@ export function LogView({ scope, fixed = {}, compact = false }: { scope: LogScop
             </SelectContent>
           </Select>
           {f.resource && chip(t('Only this item'), () => set({ resource: '' }))}
+          {events.length > 0 && (
+            <a className="ml-auto text-xs text-muted-foreground underline-offset-4 hover:underline" href={csv()} download>
+              {t('Export everything as CSV')}
+            </a>
+          )}
           {ids.length > 0 && (
             <div className="flex flex-wrap items-center gap-2 rounded-lg bg-primary/10 py-1 pr-1 pl-3" role="group" aria-label={t('Actions on the selection')}>
               <span className="text-sm font-medium tabular-nums">{t('{count} selected', { count: ids.length })}</span>
@@ -562,13 +567,6 @@ export function LogView({ scope, fixed = {}, compact = false }: { scope: LogScop
             },
           ]}
         />
-      )}
-      {!compact && events.length > 0 && (
-        <p className="text-xs text-muted-foreground">
-          <a className="underline-offset-4 hover:underline" href={csv()} download>
-            {t('Export everything as CSV')}
-          </a>
-        </p>
       )}
       <EventSheet
         e={open}

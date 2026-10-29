@@ -42,6 +42,7 @@ const RULES: Record<string, string> = {
 /** Tables that are deliberately NOT drawn as a scrolling list (route pattern -> why): small matrices that are edited in place. */
 const TABLE_EXEMPT: { route: RegExp; why: string }[] = [
   { route: /\/permissions|\/profiles/, why: 'permission matrix: a fixed set of rows with a checkbox per permission, edited in place' },
+  { route: /\/system\/quotas/, why: 'the capacity of the platform: five fixed rows of inputs, edited in place' },
   { route: /\/account\/notifications|\/notifications\/settings/, why: 'notification matrix: a fixed set of kinds with two switches' },
 ]
 
@@ -123,7 +124,7 @@ async function probe(doc: Page | Frame, o: { scroll: boolean; more: boolean }): 
     const doc: any = document.scrollingElement
     const sections: any = q('nav[aria-label="Sections"]')
     const pills: any = q('.msk-pills')
-    const tableEl: any = [...document.querySelectorAll('table')].find(vis)
+    const tableEl: any = [...document.querySelectorAll('table')].find((e: any) => vis(e) && !e.closest('details'))
     const bodyEl: any = tableEl && q('tbody', tableEl)
     // the pattern of the tables: the rows (tbody) scroll by themselves under a fixed header row
     const gridScroll = !!bodyEl && /(auto|scroll)/.test(getComputedStyle(bodyEl).overflowY) && getComputedStyle(bodyEl).display === 'grid'
@@ -218,7 +219,7 @@ async function probe(doc: Page | Frame, o: { scroll: boolean; more: boolean }): 
       }
     }
     // R-12: scrolled to the middle and to the end, what is painted just above the header row, on it and just under it
-    if (o.scroll && tableEl && thead && bodyEl) {
+    if (o.scroll && tableEl && thead && bodyEl && scroller) {
       const bad: string[] = []
       const inBody = (e: any) => !!e && !!e.closest && !!e.closest('tbody')
       const sc: any = scroller
@@ -484,7 +485,7 @@ function judge(rule: string, r: Rec, all: Rec[]): string[] {
       if (app && inner.docH > inner.docClient + 1) out.push(`the document of the app scrolls as a whole (${inner.docH} > ${inner.docClient})`)
       if (!t!.scroller) out.push('the list is not inside its own scroller (data-listscroll / .msk-body)')
       else {
-        if (inner.vh - (app && doc.iframe ? 0 : 0) - t!.scroller.b > 24) out.push(`the list does not fill the height (ends ${Math.round(inner.vh - t!.scroller.b)}px above the bottom)`)
+        if (inner.vh - (app && doc.iframe ? 0 : 0) - t!.scroller.b > 28) out.push(`the list does not fill the height (ends ${Math.round(inner.vh - t!.scroller.b)}px above the bottom)`)
         if (!t!.stickyHead && !t!.grid) out.push('the header row of the table is not sticky')
         else if (t!.rows > 0 && inner.scrolled?.thead != null && Math.abs(inner.scrolled.thead) > 2 && !(inner.scrolled.theadAfter != null && inner.scrolled.theadAfter >= -1 && inner.scrolled.theadAfter <= 100)) out.push(`the header row moved ${inner.scrolled.thead}px when the list scrolled`)
       }

@@ -191,8 +191,8 @@ export function AdminPlugins({ section }: { section?: string }) {
         sub={t('Installed on the platform and available in the trusted registries')}
         filter={
           <>
-            <FilterBox value={q} onChange={setQ} label={t('Filter the plugins')} />
             <ViewSwitch view={view} onChange={setView} />
+            <FilterBox value={q} onChange={setQ} label={t('Filter the plugins')} />
           </>
         }
         actions={

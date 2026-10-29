@@ -510,6 +510,7 @@ function MyTenants({ session }: { session: Session }) {
       <ListTable
         label={t('My tenants')}
         fit="inline"
+        searchLabel={t('Filter the tenants')}
         rows={session.memberships}
         rowKey={(m) => m.slug}
         columns={[

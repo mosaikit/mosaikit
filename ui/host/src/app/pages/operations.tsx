@@ -1318,6 +1318,7 @@ function StatusPanel() {
       <ListTable
         label={t('Services')}
         fit="inline"
+        searchLabel={t('Filter the services')}
         rows={d.services}
         rowKey={(s) => s.key}
         rowProps={(s) => ({ className: 'cursor-pointer', onClick: () => setOpen(s.key) })}

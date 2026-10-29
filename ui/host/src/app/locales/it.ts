@@ -1869,6 +1869,7 @@ export const IT: Record<string, string> = {
   'Filter the requests': 'Filtra le richieste',
   'Filter the rows': 'Filtra le righe',
   'Filter the tenants': 'Filtra le organizzazioni',
+  'Filter the services': 'Filtra i servizi',
   'No result': 'Nessun risultato',
   'Open sessions': 'Sessioni aperte',
   'Order of the server': 'Ordine del server',
