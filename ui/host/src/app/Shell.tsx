@@ -167,7 +167,7 @@ function AppSidebar({ session, route, band }: { session: Session; route: Route; 
       )}
       <SidebarContent className="msk-hoverscroll border-r border-sidebar-border pt-1 group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:pt-0">
         {nav.groups.map((g) => (
-          <SidebarGroup key={g.id} className="py-1 first:pt-0 last:pb-0 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:not-first:mt-3 group-data-[collapsible=icon]:not-first:border-t group-data-[collapsible=icon]:not-first:border-sidebar-border group-data-[collapsible=icon]:not-first:pt-1">
+          <SidebarGroup key={g.id} className="py-1 first:pt-0 last:pb-0 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:not-first:mt-3 group-data-[collapsible=icon]:not-first:relative group-data-[collapsible=icon]:not-first:pt-1 group-data-[collapsible=icon]:not-first:before:absolute group-data-[collapsible=icon]:not-first:before:top-0 group-data-[collapsible=icon]:not-first:before:left-1/2 group-data-[collapsible=icon]:not-first:before:h-px group-data-[collapsible=icon]:not-first:before:w-7 group-data-[collapsible=icon]:not-first:before:-translate-x-1/2 group-data-[collapsible=icon]:not-first:before:bg-sidebar-border group-data-[collapsible=icon]:not-first:before:content-['']">
             {g.id === 'apps' || g.id === 'manage' ? <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">{g.label}</SidebarGroupLabel> : null}
             <SidebarGroupContent>
               <NavList items={g.items} />
