@@ -270,7 +270,7 @@ export function Sections({ sections, current, href, children }: { sections: Sect
                 className={cn(
                   'flex h-9 items-center gap-2.5 rounded-md px-3 text-sm text-foreground/85 hover:bg-accent [&>svg]:size-4 [&>svg]:shrink-0',
                   // under a group heading the sections are indented
-                  sections.some((x) => x.group) && 'pl-5',
+                  sections.some((x) => x.group) && 'pl-7',
                   s.id === current && 'bg-primary/10 font-medium text-primary-strong hover:bg-primary/10',
                 )}
               >
