@@ -35,7 +35,7 @@ test.describe.serial('review round 1: auth and plugins', () => {
     // Config::app_origins (unit test) and by the manual check; here the frame of every plugin must load
     const alias = BASE_URL
     await login(page, alias, 'City of Beta', 'manager', PASSWORD)
-    for (const [name, heading] of [['Notes', 'Notes'], ['Tasks', 'Tasks'], ['Documents', 'Documents'], ['Tools', 'Tools'], ['Maps', 'Maps']]) {
+    for (const [name, heading] of [['Notes', 'Notes'], ['Tasks', 'Tasks'], ['Documents', 'Documents'], ['Apps', 'Apps'], ['Maps', 'Maps']]) {
       await nav(page, name).click()
       await expect(page.frameLocator('iframe.plugin-frame').getByRole('heading', { name: heading }).first()).toBeVisible()
     }
@@ -115,9 +115,9 @@ test.describe.serial('review round 1: auth and plugins', () => {
     const addr = (s: http.Server) => `http://127.0.0.1:${(s.address() as AddressInfo).port}/`
     try {
       await login(page, BASE_URL, 'City of Beta', 'manager', PASSWORD)
-      await nav(page, 'Tools').click()
+      await nav(page, 'Apps').click()
       const frame = page.frameLocator('iframe.plugin-frame')
-      await expect(frame.getByRole('heading', { name: 'Tools' })).toBeVisible()
+      await expect(frame.getByRole('heading', { name: 'Apps' })).toBeVisible()
       // cards are the default view
       await expect(frame.locator('.cards')).toBeVisible()
 
@@ -210,7 +210,7 @@ test.describe.serial('review round 1: auth and plugins', () => {
 
     const zipName = `Zip ${Date.now().toString(36)}`
     await login(page, BASE_URL, 'City of Beta', 'manager', PASSWORD)
-    await nav(page, 'Tools').click()
+    await nav(page, 'Apps').click()
     const frame = page.frameLocator('iframe.plugin-frame')
     await frame.getByRole('button', { name: '＋ New site' }).click()
     await frame.locator('#msks-name').fill(zipName)

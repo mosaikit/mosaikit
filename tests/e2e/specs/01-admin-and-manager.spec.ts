@@ -15,7 +15,7 @@ test.describe.serial('01-admin-and-manager', () => {
 
     // plugins preinstalled from the registry
     await nav(page, 'Plugins').click()
-    for (const name of ['Notes', 'Tasks', 'Contacts', 'Maps', 'Tools', 'Documents']) {
+    for (const name of ['Notes', 'Tasks', 'Contacts', 'Maps', 'Apps', 'Documents']) {
       await expect(page.getByRole('row', { name: new RegExp(name) }).first()).toContainText('active')
     }
     await accessible(page, 'plugins of the platform')
