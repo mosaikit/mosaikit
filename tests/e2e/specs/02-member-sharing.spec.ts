@@ -31,7 +31,7 @@ test.describe.serial('02-member-sharing', () => {
     // a note in the plugin, in the iframe (the plugin labels come from its manifest)
     await nav(page, 'Notes').click()
     const frame = page.frameLocator('iframe.plugin-frame')
-    await expect(frame.getByRole('heading', { name: 'Notes' })).toBeVisible()
+    await expect(frame.getByRole('heading', { name: 'Notes', exact: true })).toBeVisible()
     await frame.getByRole('button', { name: /New/ }).first().click()
     await frame.locator('[data-key="title"]').fill('Meeting minutes')
     await frame.locator('[data-key="body"]').fill('<b>confidential content</b>')

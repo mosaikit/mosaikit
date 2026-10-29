@@ -177,7 +177,7 @@ test.describe.serial('14-feedback-c', () => {
         await login(mgr, 'City of Beta', 'manager', PASSWORD)
         await nav(mgr, 'Notes').click()
         const frame = mgr.frameLocator('iframe.plugin-frame')
-        await expect(frame.getByRole('heading', { name: 'Notes' })).toBeVisible()
+        await expect(frame.getByRole('heading', { name: 'Notes', exact: true })).toBeVisible()
         await frame.getByRole('button', { name: /New/ }).first().click()
         await frame.locator('[data-key="title"]').fill('Good news')
         await frame.locator('[data-key="body"]').fill('The park opens on Monday')

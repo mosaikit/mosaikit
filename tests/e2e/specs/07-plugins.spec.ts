@@ -60,7 +60,7 @@ test.describe.serial('07-plugins', () => {
     // the extension in Notes: its field as a column and in the detail, its action
     await nav(page, 'Notes').click()
     const frame = page.frameLocator('iframe.plugin-frame')
-    await expect(frame.getByRole('heading', { name: 'Notes' })).toBeVisible()
+    await expect(frame.getByRole('heading', { name: 'Notes', exact: true })).toBeVisible()
     await frame.getByRole('button', { name: /New/ }).first().click()
     await frame.locator('[data-key="title"]').first().fill('Plan to review')
     await frame.getByRole('button', { name: 'Save' }).click()

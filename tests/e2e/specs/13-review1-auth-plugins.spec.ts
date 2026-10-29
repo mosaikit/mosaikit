@@ -117,12 +117,12 @@ test.describe.serial('review round 1: auth and plugins', () => {
       await login(page, BASE_URL, 'City of Beta', 'manager', PASSWORD)
       await nav(page, 'Apps').click()
       const frame = page.frameLocator('iframe.plugin-frame')
-      await expect(frame.getByRole('heading', { name: 'Apps' })).toBeVisible()
+      await expect(frame.getByRole('heading', { name: 'Apps', exact: true })).toBeVisible()
       // cards are the default view
       await expect(frame.locator('.cards')).toBeVisible()
 
       const create = async (name: string, address: string) => {
-        await frame.getByRole('button', { name: '＋ New app' }).click()
+        await frame.getByRole('button', { name: '＋ New app' }).first().click()
         await frame.getByLabel('Web address').check()
         await frame.locator('#msks-name').fill(name)
         await frame.locator('#msks-url').fill(address)
@@ -212,7 +212,7 @@ test.describe.serial('review round 1: auth and plugins', () => {
     await login(page, BASE_URL, 'City of Beta', 'manager', PASSWORD)
     await nav(page, 'Apps').click()
     const frame = page.frameLocator('iframe.plugin-frame')
-    await frame.getByRole('button', { name: '＋ New app' }).click()
+    await frame.getByRole('button', { name: '＋ New app' }).first().click()
     await frame.locator('#msks-name').fill(zipName)
     await frame.locator('input[type=file][accept*=zip]').setInputFiles({ name: 'site.zip', mimeType: 'application/zip', buffer: zip })
     await frame.getByRole('button', { name: '💾 Save' }).click()

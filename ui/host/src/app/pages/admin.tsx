@@ -3,7 +3,7 @@
 
 import { useDeferredValue, useState } from 'react'
 import { useQueryClient } from '@tanstack/react-query'
-import { Bell, CircleHelp, Contrast, Frame, Gauge, HardDrive, History, KeyRound, KeySquare, Mail, MoreHorizontal, Palette, PanelLeft, Pencil, Plus, Power, RefreshCw, Search, ShieldCheck, Upload, Users, Wrench } from 'lucide-react'
+import { Bell, Building2, CircleHelp, Contrast, Frame, Gauge, HardDrive, History, KeyRound, KeySquare, Mail, MoreHorizontal, Palette, PanelLeft, Pencil, Plus, Power, RefreshCw, Search, ShieldCheck, Upload, Users, Wrench } from 'lucide-react'
 import { api, fmtBytes, fmtDate } from '../../api.ts'
 import { useBrand } from '../../brand.ts'
 import type { AdminUser, GlobalKpi, Member, Session, ShellBand, SystemOverview, TenantInfo } from '../../types.ts'
@@ -69,16 +69,10 @@ export function AdminOverview({ session }: { session: Session }) {
           }
         />
         {q.data?.tenants === 0 && (
-          <Empty
-            art="people"
-            title={t('No tenants')}
-            actions={
-              <Button variant="outline" onClick={() => go(to.admin('tenants'))}>
-                {t('Create the first tenant')}
-              </Button>
-            }
-          >
-            {t('A tenant is an organization with its own people, apps and data.')}
+          <Empty icon={<Building2 />} title={t('No tenants')}>
+            <Button className="mt-2" onClick={() => go(to.admin('tenants'))}>
+              {t('Create the first tenant')}
+            </Button>
           </Empty>
         )}
         {kpi.data?.computed_at && (
@@ -200,22 +194,7 @@ export function AdminTenants() {
         ) : q.error ? (
           <ErrorBox error={q.error} />
         ) : rows.length === 0 ? (
-          words ? (
-            <Empty filtered title={t('No tenant found')} onClear={reset} />
-          ) : (
-            <Empty
-              art="people"
-              title={t('No tenants')}
-              actions={
-                <Button variant="outline" onClick={() => setOpen(true)}>
-                  <Plus />
-                  {t('New tenant')}
-                </Button>
-              }
-            >
-              {t('A tenant is an organization with its own people, apps and data.')}
-            </Empty>
-          )
+          <Empty icon={<Building2 />} title={words ? t('No tenant found') : t('No tenants')} />
         ) : (
           <ListTable
             label={t('Tenants')}

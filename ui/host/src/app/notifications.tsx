@@ -314,16 +314,10 @@ function ListPage({
   const rows = q.data!.items
   if (first && rows.length === 0)
     return (
-      <Empty
-        art="inbox"
-        title={filter.unread ? t('Nothing to read') : t('No notifications')}
-        actions={
-          <Button variant="outline" asChild>
-            <a href={home}>{t('Back to the overview')}</a>
-          </Button>
-        }
-      >
-        {t('Requests, invitations and news for you arrive here.')}
+      <Empty icon={<BellOff />} title={filter.unread ? t('Nothing to read') : t('No notifications')}>
+        <a href={home} className="text-primary hover:underline">
+          {t('Back to the overview')}
+        </a>
       </Empty>
     )
   return (

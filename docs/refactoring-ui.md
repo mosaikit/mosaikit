@@ -214,11 +214,11 @@ picture, «Nothing here yet», «Create the first one to get started.» and the 
 (English, Italian and Spanish: host `it.ts` and `lang-es`, the plugins their own `it.ts`/`TEXTS`). The layout
 contract checks it (R-10).
 
-Converted: Tenants (Administrator), Trash, Log (activity of an item), Backups, group members, group shares, Home (no
-active apps), Groups, Pending invitations, Shares, Notifications, Installed plugins, Updates and Catalog, Plugins of a
-tenant, and the apps Documents (Files), Maps, Apps (static sites), Contacts, Tasks and Notes. Left plain on purpose:
-errors and reserved pages (`Empty` without `art`), sections inside a detail page or a card (no extensions, no permission
-added by a group, no open session, no usage chart, no history yet) and the tables that show «No result» for a filter.
+Converted: the apps Documents (Files), Maps, Apps (static sites), Contacts, Tasks and Notes (`mountCrud` and the plugins' own
+pages). The pages of the host (Tenants, People, Plugins, Shares, Trash, Notifications, Log, Requests…) keep their plain boxes
+for now: converting them is postponed, and the layout contract exempts them (R-10 runs on the apps); the component itself
+(`Empty` with `art`, `actions`, `filtered`) is ready for them. Left plain on purpose: errors and reserved pages (`Empty` without
+`art`), sections inside a detail page or a card and the tables that show «No result» for a filter.
 
 ### Panel next to a list
 
