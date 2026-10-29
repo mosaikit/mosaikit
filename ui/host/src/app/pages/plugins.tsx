@@ -167,9 +167,8 @@ export function AdminPlugins({ section }: { section?: string }) {
             <Empty icon={<Puzzle />} title={t('No plugin installed')} />
           ) : (
             <>
-              <div className="min-h-0 flex-1 overflow-hidden rounded-xl border bg-card">
-                <div data-listscroll className="msk-listscroll msk-tablecard h-full overflow-auto">
-                <Sliced items={rows}>{(shown) => (<Table>
+              <div className="msk-gridcard flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">
+                <Sliced items={rows}>{(shown) => (<Table className="msk-gridtable" style={{ '--cols': '2.5rem minmax(0,2.2fr) minmax(0,1.4fr) minmax(0,.9fr) minmax(0,1fr) minmax(0,.9fr)' } as React.CSSProperties}>
                   <TableHeader>
                     <TableRow>
                       <TableHead className="w-10">
@@ -233,7 +232,6 @@ export function AdminPlugins({ section }: { section?: string }) {
                     })}
                   </TableBody>
                 </Table>)}</Sliced>
-                </div>
               </div>
             </>
           )
