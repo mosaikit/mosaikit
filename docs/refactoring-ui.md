@@ -169,8 +169,30 @@ section lists, `[[nav]]` of the apps), so a new page is covered without touching
 | R-7 | The header of an app page uses the same type and spacing as the header of the host (title size and weight, height, indent, border). |
 | R-8 | The scrollbar of the main sidebar is hidden unless the sidebar is hovered or focused. |
 | R-9 | No horizontal overflow at 390 px wide. |
+| R-11 | Every table (host and plugins) has a fixed header row, only its rows scroll with their scrollbar under the header row, a filter box and sortable column titles (`aria-sort`), and loads more rows only when the end of the rows comes into view; a table that is not a scrolling list is on `TABLE_EXEMPT` of the spec with its reason (small matrices edited in place). |
+| R-12 | No row is painted over or above the header row of a table, wherever the list is scrolled (sampled with `elementFromPoint` above the header row, on it and just under it, scrolled to the middle and to the end). |
 | R-10 | Contrast and ARIA stay with `accessible()` (axe) of the other specs; the contract does not repeat them. |
 
 Sizes: 1440x900, 1280x600 and 390x844, light theme (dark on a few routes). A rule that an unfinished piece of work
 still breaks is listed in `PENDING` at the top of the spec and runs as `test.fixme`; delete its row when the work has
 merged, so that the rule becomes a hard check again.
+
+### Tables (one pattern)
+
+Every list of the host is a `ListTable` (`ui/host/src/app/ListTable.tsx`); the plugins draw the same table with
+`gridTable` (`ui/plugin-api/src/grid.ts`, CSS `.msk-grid`). The page does not scroll: the header row is fixed and only the
+rows scroll (the `tbody` is the scroller, with its 10 px scrollbar under the header row; `thead`, `tbody` and `tr` share the
+columns of `--cols` by subgrid, and explicit table roles keep the semantics). A table wider than its card scrolls
+sideways inside the card. The filter box lives in the header of the page next to the primary action (`FilterBox`; a table
+that is not the whole page draws its own above it, `searchLabel`) and searches every visible field; the column titles
+sort (ascending, descending, the order of the server, numbers as numbers). More rows load as the foot, the last row of the
+scrolling rows, comes into view (`IntersectionObserver` rooted in the `tbody`); the button «Load more» stays for the
+keyboard. Lists paged by the server keep their cursor: the filters stay on the server and the sort applies to the rows
+loaded. A table among other content (a tab, a card) uses `fit="inline"`: as high as its rows up to 30 rem, then it scrolls.
+Left as plain tables on purpose: the permission matrices (checkbox per permission), the matrix of notification kinds,
+the capacity table of the quotas (inputs), the daily series «Show as a table», the previews of the CSV import, the results
+of a bulk run, the list of extensions of a plugin (no header) and the key tables of the guide and of the help.
+
+The installed plugins also have a card view (the default), `PluginSummary` of the brochure drawn small, with the same
+filter, a sort menu (`SortMenu`), selection, and infinite scroll (`CardGrid`); the choice is kept in the browser
+(`msk_plugins_view`, `useView`/`ViewSwitch`). Updates and Catalog offer both views too.

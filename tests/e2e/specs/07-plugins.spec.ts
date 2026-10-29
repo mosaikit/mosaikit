@@ -9,6 +9,11 @@ test.describe.serial('07-plugins', () => {
     // the Administrator: kinds, the page of a plugin, what it asks, its tenants and extensions
     await adminLogin(page)
     await nav(page, 'Plugins').click()
+    // the cards are the default view of the installed plugins; the table is one click away
+    await expect(page.getByRole('radio', { name: 'Cards' })).toHaveAttribute('aria-checked', 'true')
+    await expect(page.getByTestId('plugin-card').filter({ hasText: 'Note review' })).toContainText('Extension')
+    await accessible(page, 'plugins as cards')
+    await page.getByRole('radio', { name: 'Table' }).click()
     await expect(page.getByRole('row', { name: /Note review/ })).toContainText('Extension')
     await page.getByRole('radio', { name: /Extensions/ }).click()
     await expect(page.getByRole('row', { name: /Notes/ })).toHaveCount(0)

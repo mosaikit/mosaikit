@@ -29,9 +29,10 @@ import sec from './checks/sec.ts'
 import ux from './checks/ux.ts'
 import r2 from './checks/r2.ts'
 import pui from './checks/pui.ts'
+import tbl from './checks/tbl.ts'
 import pending from './checks/pending.ts'
 
-const ALL = new Map<string, L.Check>([...p0, ...p0b, ...p1, ...p2, ...p3, ...p4, ...p5, ...p6, ...p7, ...p8, ...p9, ...fu, ...fub, ...fc, ...p10, ...sec, ...ux, ...r2, ...pui, ...pending].map((c) => [c.id, c]))
+const ALL = new Map<string, L.Check>([...p0, ...p0b, ...p1, ...p2, ...p3, ...p4, ...p5, ...p6, ...p7, ...p8, ...p9, ...fu, ...fub, ...fc, ...p10, ...sec, ...ux, ...r2, ...pui, ...tbl, ...pending].map((c) => [c.id, c]))
 
 /** Defects already reported (docs/reports/qa-walkthrough.md) and owned by a piece of work: expected to fail. */
 const KNOWN: Record<string, string> = {
