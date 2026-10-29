@@ -44,6 +44,8 @@ export function PageHeader({ title, section: own, sub, crumbs, badge, lead, bar,
   const stored = useHeaderSection()
   // the subsection selected in the page (given, or announced by its `Sections`)
   const section = own ?? stored
+  // a page with a list of sections (`Sections`): the header is split like the page, the name of the page over the list and the section over the content
+  const split = own === undefined && !!stored
   // the height of the header is the offset of what is pinned under it (--msk-head)
   const box = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -60,7 +62,14 @@ export function PageHeader({ title, section: own, sub, crumbs, badge, lead, bar,
   }, [])
   return (
     // under the band, and it stays there while the page scrolls
-    <div ref={box} data-tour="page-header" className="msk-page-header sticky top-(--msk-top) z-10 flex min-h-(--msk-head) flex-wrap items-center gap-3 border-b bg-background px-6 py-2 max-[620px]:px-4">
+    <div ref={box} data-tour="page-header" className={cn('msk-page-header sticky top-(--msk-top) z-10 flex min-h-(--msk-head) flex-wrap items-center border-b bg-background', split ? 'items-stretch' : 'gap-3 px-6 py-2 max-[620px]:px-4')}>
+      {split && (
+        <div className="flex w-60 shrink-0 items-center gap-2 border-r bg-pane px-6 py-2 max-[760px]:w-auto max-[760px]:border-r-0 max-[760px]:bg-transparent max-[760px]:pr-0 max-[620px]:px-4">
+          <h1 className="truncate text-base font-semibold max-[760px]:font-medium max-[760px]:text-muted-foreground">{title}</h1>
+          {badge}
+        </div>
+      )}
+      <div className={split ? 'flex min-w-0 flex-1 flex-wrap items-center gap-3 px-6 py-2 max-[760px]:pl-2 max-[620px]:px-4' : 'contents'}>
       {lead}
       <div className="min-w-0 flex-1">
         {crumbs && crumbs.length > 0 && (
@@ -80,8 +89,19 @@ export function PageHeader({ title, section: own, sub, crumbs, badge, lead, bar,
           </nav>
         )}
         <div className="flex min-w-0 items-center gap-2">
-          <h1 className={cn('truncate text-base font-semibold', section && 'min-w-0 shrink font-medium text-muted-foreground')}>{title}</h1>
-          {section && (
+          {split ? (
+            <>
+              <span className="hidden shrink-0 text-base text-muted-foreground max-[760px]:inline" aria-hidden="true">
+                ›
+              </span>
+              <span data-testid="header-section" className="min-w-0 truncate text-base font-semibold">
+                {section}
+              </span>
+            </>
+          ) : (
+            <h1 className={cn('truncate text-base font-semibold', section && 'min-w-0 shrink font-medium text-muted-foreground')}>{title}</h1>
+          )}
+          {section && !split && (
             <>
               <span className="shrink-0 text-base text-muted-foreground" aria-hidden="true">
                 ›
@@ -91,7 +111,7 @@ export function PageHeader({ title, section: own, sub, crumbs, badge, lead, bar,
               </span>
             </>
           )}
-          {badge}
+          {!split && badge}
         </div>
         {sub && <p className="truncate text-xs text-muted-foreground">{sub}</p>}
       </div>
@@ -114,6 +134,7 @@ export function PageHeader({ title, section: own, sub, crumbs, badge, lead, bar,
           )}
         </div>
       )}
+      </div>
     </div>
   )
 }
