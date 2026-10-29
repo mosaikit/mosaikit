@@ -170,7 +170,7 @@ export function noteBody(n: Note): string {
   const d = n.data as Record<string, string>
   switch (d.code) {
     case 'invitation.received':
-      return t('You can work in {tenant} as {role}: accept or decline.', { tenant: d.tenant, role: d.role === 'tenant_manager' ? 'Tenant Manager' : t('User') })
+      return t('You can work in {tenant} as {role}: accept or decline.', { tenant: d.tenant, role: d.role === 'tenant_manager' ? t('Tenant Manager') : t('User') })
     case 'share.received':
       // the tenant is already shown next to every notification
       return ''

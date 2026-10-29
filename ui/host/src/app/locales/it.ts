@@ -677,6 +677,7 @@ export const IT: Record<string, string> = {
   '{by} created a public link to «{item}»': '{by} ha creato un link pubblico a «{item}»',
   'You can work in {tenant} as {role}: accept or decline.': 'Puoi lavorare in {tenant} come {role}: accetta o rifiuta.',
   'User': 'Utente',
+  'Tenant Manager': 'Gestore',
   'In {tenant}.': 'In {tenant}.',
   'Whoever has the link can open the item without signing in.': 'Chi ha il link può aprire l’elemento senza accedere.',
   'Select: {what}': 'Seleziona: {what}',

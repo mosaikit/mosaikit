@@ -38,12 +38,12 @@ interface TestUser {
 }
 const TEST_USERS: TestUser[] = import.meta.env.DEV
   ? [
-      { tenant: 'comune-roma', username: 'e.ricci', password: 'password-prova-1', who: 'Elena Ricci · Tenant Manager' },
-      { tenant: 'comune-roma', username: 'm.esposito', password: 'password-prova-1', who: 'Marco Esposito · Tenant Manager' },
+      { tenant: 'comune-roma', username: 'e.ricci', password: 'password-prova-1', who: `Elena Ricci · ${t('Tenant Manager')}` },
+      { tenant: 'comune-roma', username: 'm.esposito', password: 'password-prova-1', who: `Marco Esposito · ${t('Tenant Manager')}` },
       { tenant: 'comune-roma', username: 'd.conti', password: 'password-prova-1', who: 'Davide Conti · User, guest in Regione Lazio' },
       { tenant: 'comune-roma', username: 's.greco', password: 'password-prova-1', who: 'Sara Greco · User' },
       { tenant: 'comune-roma', username: 'l.bianchi', password: 'password-prova-1', who: 'Luca Bianchi · User' },
-      { tenant: 'regione-lazio', username: 'l.verdi', password: 'password-prova-1', who: 'Luca Verdi · Tenant Manager' },
+      { tenant: 'regione-lazio', username: 'l.verdi', password: 'password-prova-1', who: `Luca Verdi · ${t('Tenant Manager')}` },
     ]
   : []
 const TEST_ADMINS: TestUser[] = import.meta.env.DEV ? [{ tenant: '', username: 'admin', password: 'admin-sviluppo', who: 'Administrator' }] : []

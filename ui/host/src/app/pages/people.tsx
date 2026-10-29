@@ -51,7 +51,7 @@ import { ActivityLog } from './history.tsx'
 const enc = encodeURIComponent
 
 function roleLabel(r: string): string {
-  return r === 'tenant_manager' ? 'Tenant Manager' : t('User')
+  return r === 'tenant_manager' ? t('Tenant Manager') : t('User')
 }
 
 /** Texts of the standard permissions come from the kernel in English; the others in the language of the request. */
@@ -317,7 +317,7 @@ export function PersonPage({ slug, id, tab }: { slug: string; id: string; tab?: 
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="user">{t('User')}</SelectItem>
-                      <SelectItem value="tenant_manager">Tenant Manager</SelectItem>
+                      <SelectItem value="tenant_manager">{t('Tenant Manager')}</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1273,7 +1273,7 @@ function MembershipFields({ tenants, value, onChange, prefix }: { tenants: Tenan
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="user">{t('User')}</SelectItem>
-              <SelectItem value="tenant_manager">Tenant Manager</SelectItem>
+              <SelectItem value="tenant_manager">{t('Tenant Manager')}</SelectItem>
             </SelectContent>
           </Select>
         </div>

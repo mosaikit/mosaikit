@@ -452,7 +452,7 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
           { name: 'display_name', label: t('Display name') },
           { name: 'email', label: t('Email'), type: 'email', required: true, hint: t('Required: the password is recovered at this address.') },
           { name: 'password', label: t('Initial password'), type: 'password', required: true, hint: t('At least {n} characters', { n: pwMin }) },
-          { name: 'role', label: t('Role'), options: [['user', 'User'], ['tenant_manager', 'Tenant Manager']] },
+          { name: 'role', label: t('Role'), options: [['user', 'User'], ['tenant_manager', t('Tenant Manager')]] },
         ]}
         submit={t('Create user')}
         onSubmit={(v) => create.mutateAsync(v)}

@@ -124,7 +124,7 @@ export function ImportDialog({ slug, open, onOpenChange }: { slug: string; open:
                       <TableRow key={i}>
                         <TableCell className="font-mono text-xs">{r.username}</TableCell>
                         <TableCell>{r.display_name}</TableCell>
-                        <TableCell>{r.role === 'tenant_manager' ? 'Tenant Manager' : t('User')}</TableCell>
+                        <TableCell>{r.role === 'tenant_manager' ? t('Tenant Manager') : t('User')}</TableCell>
                         <TableCell className="text-xs">{r.groups.join(', ')}</TableCell>
                         <TableCell className={r.problem ? 'text-destructive' : 'text-ok'}>{r.problem ?? t('OK')}</TableCell>
                       </TableRow>
@@ -205,7 +205,7 @@ export function InviteManyDialog({ slug, profiles, open, onOpenChange }: { slug:
                 <Label htmlFor="inv-role">{t('Role')}</Label>
                 <select id="inv-role" className="h-9 rounded-md border bg-background px-2 text-sm" value={role} onChange={(e) => setRole(e.target.value as 'user' | 'tenant_manager')}>
                   <option value="user">{t('User')}</option>
-                  <option value="tenant_manager">Tenant Manager</option>
+                  <option value="tenant_manager">{t('Tenant Manager')}</option>
                 </select>
               </div>
               <div className="grid gap-1.5">
