@@ -604,7 +604,15 @@ html[data-style-buttons='soft'] [data-slot='button'][data-variant='default']:hov
   background: color-mix(in srgb, var(--foreground) 28%, transparent);
 }
 .msk-gridtable tr {
+  align-items: stretch;
+}
+.msk-gridtable th {
+  display: flex;
   align-items: center;
+  height: 2.5rem;
+}
+.msk-gridtable td {
+  align-self: center;
 }
 .msk-gridtable th,
 .msk-gridtable td {
