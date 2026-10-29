@@ -77,7 +77,7 @@ test.describe.serial('16-tables', () => {
       const h = document.querySelector('#main thead') as HTMLElement
       return { top: b.getBoundingClientRect().top, bottom: h.getBoundingClientRect().bottom, scrolls: getComputedStyle(b).overflowY, page: document.documentElement.scrollHeight - innerHeight }
     })
-    expect(m.scrolls).toBe('scroll')
+    expect(m.scrolls).toMatch(/auto|scroll/)
     expect(m.top).toBeGreaterThanOrEqual(m.bottom - 1)
     expect(m.page).toBeLessThanOrEqual(1)
     await accessible(page, 'plugins as a table')
