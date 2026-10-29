@@ -167,7 +167,8 @@ export function AdminPlugins({ section }: { section?: string }) {
             <Empty icon={<Puzzle />} title={t('No plugin installed')} />
           ) : (
             <>
-              <div data-listscroll className="msk-listscroll msk-tablecard min-h-0 flex-1 overflow-auto rounded-xl border bg-card">
+              <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border bg-card">
+                <div data-listscroll className="msk-listscroll msk-tablecard h-full overflow-auto">
                 <Sliced items={rows}>{(shown) => (<Table>
                   <TableHeader>
                     <TableRow>
@@ -232,6 +233,9 @@ export function AdminPlugins({ section }: { section?: string }) {
                     })}
                   </TableBody>
                 </Table>)}</Sliced>
+                </div>
+                {/* the scrollbar of the rows starts under the header row: this covers its top */}
+                <span aria-hidden className="pointer-events-none absolute top-0 right-0 h-10 w-2.5 border-b bg-card" />
               </div>
             </>
           )
