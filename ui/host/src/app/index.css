@@ -570,7 +570,7 @@ html[data-style-buttons='soft'] [data-slot='button'][data-variant='default']:hov
 /* A page whose main part is a list (FillPage): the list scrolls inside, its tables keep the header row in sight.
    The wrappers of a table must not scroll themselves, or the sticky row would stick to them. */
 .msk-listscroll [data-slot='table-container'],
-.msk-listscroll :has(> [data-slot='table-container']):not([data-listscroll]) {
+.msk-listscroll :has(> [data-slot='table-container']):not([data-listscroll]):not(.msk-gridcard) {
   overflow: visible;
 }
 /* a table whose rows scroll under its header row: header and rows share the columns (subgrid), the scrollbar is the rows' */
@@ -618,9 +618,24 @@ html[data-style-buttons='soft'] [data-slot='button'][data-variant='default']:hov
 .msk-gridtable td {
   min-width: 0;
 }
-.msk-gridcard [data-slot='table-container'] {
+.msk-gridcard [data-slot='table-container'],
+.msk-listscroll .msk-gridcard [data-slot='table-container'] {
   min-height: 0;
   flex: 1;
+  /* a table wider than the card (a phone) scrolls sideways inside the card, never the page */
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+/* a table among other content: as high as its rows, up to a limit; then the rows scroll */
+.msk-gridcard[data-fit='inline'] [data-slot='table-container'] {
+  flex: none;
+}
+.msk-gridcard[data-fit='inline'] .msk-gridtable {
+  height: auto;
+  max-height: min(30rem, 65svh);
+}
+.msk-gridtable tr[data-foot] > td {
+  grid-column: 1 / -1;
 }
 .msk-listscroll thead {
   position: sticky;

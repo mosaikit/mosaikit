@@ -4,13 +4,12 @@
 // tenants; the Tenant Manager turns ON the available ones and decides their permissions.
 
 import { Fragment, useRef, useState, type ReactNode } from 'react'
-import { ArrowDown, ArrowUp, ArrowUpCircle, ChevronsUpDown, ExternalLink, KeySquare, MessageSquarePlus, Power, Puzzle, RotateCcw, Trash2, Upload } from 'lucide-react'
+import { ArrowUpCircle, ExternalLink, KeySquare, MessageSquarePlus, Power, Puzzle, RotateCcw, Trash2, Upload } from 'lucide-react'
 import { api, fmtDate } from '../../api.ts'
 import type { AdminPlugin, CatalogItem, ConfigDecl, PluginConfig, PluginKind, PluginTenant, TenantPlugin, UninstallImpact } from '../../types.ts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Checkbox } from '@/components/ui/checkbox'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -20,6 +19,7 @@ import { useAction, useApi, useConfirm } from '../core.ts'
 import AppIcon from '../AppIcon.tsx'
 import { Brochure } from './brochure.tsx'
 import { Empty, ErrorBox, FormDialog, Loading, PageHeader, Pills, SaveBar, StatusBadge, Sliced, Tabs, FillBody, FillPage } from '../kit.tsx'
+import { FilterBox, ListTable } from '../ListTable.tsx'
 import { cn } from '@/lib/utils'
 import { go, to } from '../router.ts'
 import { t } from '../i18n.ts'
@@ -63,28 +63,6 @@ function KindPills({ value, onChange, counts }: { value: string; onChange: (k: s
   )
 }
 
-type SortKey = 'label' | 'kind' | 'version' | 'signed' | 'status'
-const SORTS: Record<SortKey, (p: AdminPlugin) => string> = {
-  label: (p) => p.label,
-  kind: (p) => kindOf(p) ?? '',
-  version: (p) => p.version,
-  signed: (p) => p.signed_by ?? '',
-  status: (p) => p.status,
-}
-
-/** A column title that sorts the rows: the first click ascending, the second descending, the third back to the order of the server. */
-function SortHead({ id, sort, onSort, children }: { id: SortKey; sort: { key: SortKey; dir: 1 | -1 } | null; onSort: (k: SortKey) => void; children: string }) {
-  const on = sort?.key === id
-  return (
-    <TableHead aria-sort={on ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none'}>
-      <button type="button" onClick={() => onSort(id)} className="-ml-1 inline-flex items-center gap-1 rounded px-1 font-medium outline-none hover:text-primary-strong focus-visible:ring-2 focus-visible:ring-ring">
-        {children}
-        {on ? sort.dir === 1 ? <ArrowUp className="size-3.5" /> : <ArrowDown className="size-3.5" /> : <ChevronsUpDown className="size-3.5 text-muted-foreground" />}
-      </button>
-    </TableHead>
-  )
-}
-
 function countKinds<T extends { kind?: PluginKind | null; has_ui?: boolean }>(rows: T[]): Record<string, number> {
   const c: Record<string, number> = { all: rows.length }
   for (const k of KINDS) c[k] = rows.filter((r) => kindOf(r) === k).length
@@ -101,7 +79,6 @@ export function AdminPlugins({ section }: { section?: string }) {
   const file = useRef<HTMLInputElement>(null)
   const [kind, setKind] = useState('all')
   const [q, setQ] = useState('')
-  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 } | null>(null)
   const [sel, setSel] = useState<Set<string>>(new Set())
   const cur = section === 'updates' || section === 'catalog' ? section : 'installed'
   const inval = [['admin-plugins'], ['admin-catalog'], ['admin-overview']]
@@ -112,16 +89,7 @@ export function AdminPlugins({ section }: { section?: string }) {
   const updates = (catalog.data ?? []).filter((c) => c.update_available)
   const available = (catalog.data ?? []).filter((c) => !c.installed)
   const byId = new Map((catalog.data ?? []).map((c) => [c.id, c]))
-  // full text: every word must be in the name, the id, the description, the author, the version, the signer, the status or the kind
-  const words = q.toLowerCase().split(/\s+/).filter(Boolean)
-  const rows = (installed.data ?? [])
-    .filter((p) => kind === 'all' || kindOf(p) === kind)
-    .filter((p) => {
-      const hay = [p.label, p.id, p.description, p.author, p.version, p.signed_by, p.status, kindOf(p)].join(' ').toLowerCase()
-      return words.every((w) => hay.includes(w))
-    })
-    .sort((a, b) => (sort ? sort.dir * SORTS[sort.key](a).localeCompare(SORTS[sort.key](b), undefined, { numeric: true }) : 0))
-  const onSort = (key: SortKey) => setSort(sort?.key !== key ? { key, dir: 1 } : sort.dir === 1 ? { key, dir: -1 } : null)
+  const rows = (installed.data ?? []).filter((p) => kind === 'all' || kindOf(p) === kind)
   const ids = [...sel].filter((id) => rows.some((r) => r.id === id))
   const picked = rows.filter((r) => ids.includes(r.id))
   async function bulk(what: 'update' | 'off' | 'uninstall') {
@@ -141,7 +109,7 @@ export function AdminPlugins({ section }: { section?: string }) {
       <PageHeader
         title={t('Plugins')}
         sub={t('Installed on the platform and available in the trusted registries')}
-        filter={cur === 'installed' ? <Input type="search" className="h-9 w-56 max-w-full" placeholder={t('Filter the plugins')} aria-label={t('Filter the plugins')} value={q} onChange={(e) => setQ(e.target.value)} /> : undefined}
+        filter={cur === 'installed' ? <FilterBox value={q} onChange={setQ} label={t('Filter the plugins')} /> : undefined}
         actions={
           <>
             <input
@@ -201,72 +169,69 @@ export function AdminPlugins({ section }: { section?: string }) {
             <Empty icon={<Puzzle />} title={t('No plugin installed')} />
           ) : (
             <>
-              <div className="msk-gridcard flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl border bg-card">
-                <Sliced items={rows}>{(shown) => (<Table className="msk-gridtable" style={{ '--cols': '2.5rem minmax(0,2.2fr) minmax(0,1.4fr) minmax(0,.9fr) minmax(0,1fr) minmax(0,.9fr)' } as React.CSSProperties}>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-10">
-                        <Checkbox
-                          aria-label={t('Select all')}
-                          checked={rows.length > 0 && ids.length === rows.length ? true : ids.length ? 'indeterminate' : false}
-                          onCheckedChange={(v) => setSel(v ? new Set(rows.map((r) => r.id)) : new Set())}
-                        />
-                      </TableHead>
-                      <SortHead id="label" sort={sort} onSort={onSort}>{t('Plugins')}</SortHead>
-                      <SortHead id="kind" sort={sort} onSort={onSort}>{t('Kind')}</SortHead>
-                      <SortHead id="version" sort={sort} onSort={onSort}>{t('Version')}</SortHead>
-                      <SortHead id="signed" sort={sort} onSort={onSort}>{t('Signature')}</SortHead>
-                      <SortHead id="status" sort={sort} onSort={onSort}>{t('Status')}</SortHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {shown.map((p) => {
-                      const c = byId.get(p.id)
-                      return (
-                        <TableRow key={p.id} data-state={sel.has(p.id) ? 'selected' : undefined}>
-                          <TableCell>
-                            <Checkbox
-                              aria-label={t('Select {name}', { name: p.label })}
-                              checked={sel.has(p.id)}
-                              onCheckedChange={(v) => {
-                                const n = new Set(sel)
-                                if (v) n.add(p.id)
-                                else n.delete(p.id)
-                                setSel(n)
-                              }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <a href={to.adminPlugin(p.id)} className="flex items-center gap-2.5 hover:underline">
-                              <AppIcon id={p.id} name={p.icon_name} className="size-5 text-primary" />
-                              <span>
-                                <b className="block font-medium">{p.label}</b>
-                                <span className="font-mono text-xs text-muted-foreground">{p.id}</span>
-                              </span>
-                            </a>
-                          </TableCell>
-                          <TableCell>
-                            <KindBadge kind={kindOf(p)} />
-                            {p.dev && (
-                              <Badge variant="outline" className="ml-1.5 font-normal">
-                                {t('development')}
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell className="font-mono text-xs">
-                            {p.version}
-                            {c?.update_available && <span className="ml-1.5 text-primary-strong">→ {c.latest}</span>}
-                          </TableCell>
-                          <TableCell className="text-sm">{p.signed_by ? <SignedBy value={p.signed_by} /> : <span className="text-warn">{t('unsigned')}</span>}</TableCell>
-                          <TableCell>
-                            <StatusBadge status={p.status} />
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>)}</Sliced>
-              </div>
+              <ListTable
+                label={t('Plugins')}
+                rows={rows}
+                rowKey={(p) => p.id}
+                filter={q}
+                selection={{ ids: sel, onChange: setSel, label: (p) => t('Select {name}', { name: p.label }) }}
+                columns={[
+                  {
+                    key: 'label',
+                    title: t('Plugins'),
+                    width: 'minmax(12rem,2.2fr)',
+                    sort: (p) => p.label,
+                    text: (p) => [p.label, p.id, p.description, p.author].join(' '),
+                    cell: (p) => (
+                      <a href={to.adminPlugin(p.id)} className="flex items-center gap-2.5 hover:underline">
+                        <AppIcon id={p.id} name={p.icon_name} className="size-5 text-primary" />
+                        <span>
+                          <b className="block font-medium">{p.label}</b>
+                          <span className="font-mono text-xs text-muted-foreground">{p.id}</span>
+                        </span>
+                      </a>
+                    ),
+                  },
+                  {
+                    key: 'kind',
+                    title: t('Kind'),
+                    width: 'minmax(9rem,1.4fr)',
+                    sort: (p) => kindLabel(kindOf(p)),
+                    cell: (p) => (
+                      <>
+                        <KindBadge kind={kindOf(p)} />
+                        {p.dev && (
+                          <Badge variant="outline" className="ml-1.5 font-normal">
+                            {t('development')}
+                          </Badge>
+                        )}
+                      </>
+                    ),
+                  },
+                  {
+                    key: 'version',
+                    title: t('Version'),
+                    width: 'minmax(7rem,.9fr)',
+                    sort: (p) => p.version,
+                    className: 'font-mono text-xs',
+                    cell: (p) => (
+                      <>
+                        {p.version}
+                        {byId.get(p.id)?.update_available && <span className="ml-1.5 text-primary-strong">→ {byId.get(p.id)?.latest}</span>}
+                      </>
+                    ),
+                  },
+                  {
+                    key: 'signed',
+                    title: t('Signature'),
+                    width: 'minmax(8rem,1fr)',
+                    sort: (p) => p.signed_by ?? '',
+                    className: 'text-sm',
+                    cell: (p) => (p.signed_by ? <SignedBy value={p.signed_by} /> : <span className="text-warn">{t('unsigned')}</span>),
+                  },
+                  { key: 'status', title: t('Status'), width: 'minmax(7rem,.9fr)', sort: (p) => p.status, cell: (p) => <StatusBadge status={p.status} /> },
+                ]}
+              />
             </>
           )
         ) : catalog.isLoading ? (

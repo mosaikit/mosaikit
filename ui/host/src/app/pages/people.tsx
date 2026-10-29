@@ -40,7 +40,8 @@ import { t } from '../i18n.ts'
 import { levelName } from '../levels.ts'
 import { PersonPicture } from '../picture.tsx'
 import { BulkBar, FilterColumn, ListPage } from '../listkit.tsx'
-import { Empty, ErrorBox, FormDialog, Loading, MoreRows, PageHeader, SaveBar, SelectAllRows, StatusBadge, Sliced, Tabs } from '../kit.tsx'
+import { ListTable } from '../ListTable.tsx'
+import { Empty, ErrorBox, FormDialog, Loading, PageHeader, SaveBar, SelectAllRows, StatusBadge, Sliced, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import AppIcon from '../AppIcon.tsx'
 import { AppMark } from '../Shell.tsx'
@@ -162,30 +163,29 @@ function SignInPanel({ base, qk, name }: { base: string; qk: string[]; name: str
           ) : !sessions.data?.length ? (
             <p className="text-sm text-muted-foreground">{t('No open session.')}</p>
           ) : (
-            <Sliced items={sessions.data}>{(shown) => (<Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('Started')}</TableHead>
-                  <TableHead>{t('Last seen')}</TableHead>
-                  <TableHead>{t('Expires')}</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {shown.map((s) => (
-                  <TableRow key={s.id}>
-                    <TableCell>{fmtDate(s.created_at)}</TableCell>
-                    <TableCell>{fmtDate(s.last_seen)}</TableCell>
-                    <TableCell className="text-muted-foreground">{fmtDate(s.expires_at)}</TableCell>
-                    <TableCell className="text-right">
-                      <Button variant="ghost" size="sm" onClick={() => closeOne.mutate(s.id)}>
-                        {t('Close')}
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>)}</Sliced>
+            <ListTable
+              label={t('Open sessions')}
+              fit="inline"
+              rows={sessions.data}
+              rowKey={(s) => s.id}
+              columns={[
+                { key: 'started', title: t('Started'), sort: (s) => s.created_at, cell: (s) => fmtDate(s.created_at) },
+                { key: 'seen', title: t('Last seen'), sort: (s) => s.last_seen, cell: (s) => fmtDate(s.last_seen) },
+                { key: 'expires', title: t('Expires'), sort: (s) => s.expires_at, className: 'text-muted-foreground', cell: (s) => fmtDate(s.expires_at) },
+                {
+                  key: 'actions',
+                  title: t('Actions'),
+                  hideTitle: true,
+                  width: '6rem',
+                  className: 'justify-self-end',
+                  cell: (s) => (
+                    <Button variant="ghost" size="sm" onClick={() => closeOne.mutate(s.id)}>
+                      {t('Close')}
+                    </Button>
+                  ),
+                },
+              ]}
+            />
           )}
         </CardContent>
       </Card>
@@ -577,59 +577,63 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
           (g.members.length === 0 ? (
             <Empty icon={<Users />} title={t('No members.')} />
           ) : (
-            <div className=" overflow-hidden rounded-xl border bg-card">
-              <Sliced items={g.members}>{(shown) => (<Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('Name')}</TableHead>
-                    <TableHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {shown.map((m) => (
-                    <TableRow key={m.user_id}>
-                      <TableCell>
+            <div>
+<ListTable
+                label={t('Members')}
+                fit="inline"
+                searchLabel={t('Filter the members')}
+                rows={g.members}
+                rowKey={(m) => m.user_id}
+                columns={[
+                  {
+                    key: 'name',
+                    title: t('Name'),
+                    width: 'minmax(12rem,1fr)',
+                    sort: (m) => m.display_name || m.username,
+                    text: (m) => `${m.display_name} ${m.username}`,
+                    cell: (m) => (
+                      <>
                         <a className="font-medium hover:underline" href={to.person(slug, m.user_id)}>
                           {m.display_name || m.username}
                         </a>
                         <span className="ml-2 text-xs text-muted-foreground">{m.username}</span>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        {!idp && (
-                          <Button variant="ghost" size="sm" aria-label={t('Remove {username} from the group', { username: m.username })} onClick={() => rm.mutate(m.user_id)}>
-                            {t('Remove')}
-                          </Button>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>)}</Sliced>
+                      </>
+                    ),
+                  },
+                  {
+                    key: 'actions',
+                    title: t('Actions'),
+                    hideTitle: true,
+                    width: '7rem',
+                    className: 'justify-self-end',
+                    cell: (m) =>
+                      !idp && (
+                        <Button variant="ghost" size="sm" aria-label={t('Remove {username} from the group', { username: m.username })} onClick={() => rm.mutate(m.user_id)}>
+                          {t('Remove')}
+                        </Button>
+                      ),
+                  },
+                ]}
+              />
             </div>
           ))}
         {cur === 'shared' &&
           (g.shared.length === 0 ? (
             <Empty title={t('Nothing shared with the group')} />
           ) : (
-            <div className=" overflow-hidden rounded-xl border bg-card">
-              <Sliced items={g.shared}>{(shown) => (<Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('Item')}</TableHead>
-                    <TableHead>{t('App')}</TableHead>
-                    <TableHead>{t('Access')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {shown.map((s) => (
-                    <TableRow key={s.resource_id}>
-                      <TableCell>{s.title || <span className="text-muted-foreground">{t('Title not visible')}</span>}</TableCell>
-                      <TableCell>{label(s.plugin_id)}</TableCell>
-                      <TableCell>{levelLabel(s.level)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>)}</Sliced>
+            <div>
+<ListTable
+                label={t('Shared with the group')}
+                fit="inline"
+                searchLabel={t('Filter the items')}
+                rows={g.shared}
+                rowKey={(s) => s.resource_id}
+                columns={[
+                  { key: 'item', title: t('Item'), width: 'minmax(10rem,2fr)', sort: (s) => s.title, cell: (s) => s.title || <span className="text-muted-foreground">{t('Title not visible')}</span> },
+                  { key: 'app', title: t('App'), sort: (s) => label(s.plugin_id), cell: (s) => label(s.plugin_id) },
+                  { key: 'access', title: t('Access'), sort: (s) => levelLabel(s.level), cell: (s) => levelLabel(s.level) },
+                ]}
+              />
             </div>
           ))}
         {cur === 'plugins' && (
@@ -1065,58 +1069,76 @@ export function RequestsTable({ slug, manager }: { slug: string; manager: boolea
   if (!rows.length) return <p className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">{t('No access request.')}</p>
   const label = (pid: string) => ctx.data?.plugins.find((p) => p.id === pid)?.label ?? pid
   return (
-    <div className="overflow-x-auto rounded-xl border bg-card">
-      <Table aria-label={t('Access requests')}>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('Item')}</TableHead>
-            <TableHead>{t('Asked by')}</TableHead>
-            <TableHead>{t('Access')}</TableHead>
-            <TableHead>{t('Message')}</TableHead>
-            <TableHead>{t('Status')}</TableHead>
-            <TableHead />
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((r) => (
-            <TableRow key={r.id}>
-              <TableCell>
-                <div className="font-medium">{r.title || t('An item of {owner}', { owner: r.owner_name })}</div>
-                <div className="text-xs text-muted-foreground">
-                  {label(r.plugin_id)} · {t('owner {name}', { name: r.owner_name })}
-                </div>
-              </TableCell>
-              <TableCell>
-                {r.requester_name}
-                <div className="text-xs text-muted-foreground">{fmtDate(r.created_at)}</div>
-              </TableCell>
-              <TableCell>{levelName(r.level)}</TableCell>
-              <TableCell className="max-w-64 text-sm text-muted-foreground">{r.message || '—'}</TableCell>
-              <TableCell>{r.status === 'forwarded' ? <Badge variant="secondary">{t('Forwarded to the owner')}</Badge> : <StatusBadge status={r.status} />}</TableCell>
-              <TableCell>
-                <div className="flex justify-end gap-1">
-                  {(r.mine || manager) && (
-                    <>
-                      <Button size="sm" onClick={() => decide.mutate({ id: r.id, action: 'approve' })}>
-                        {t('Approve')}
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => decide.mutate({ id: r.id, action: 'refuse' })}>
-                        {t('Refuse')}
-                      </Button>
-                    </>
-                  )}
-                  {manager && !r.mine && r.status === 'pending' && (
-                    <Button size="sm" variant="ghost" onClick={() => decide.mutate({ id: r.id, action: 'forward' })}>
-                      {t('Forward to the owner')}
-                    </Button>
-                  )}
-                </div>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
+    <ListTable
+      label={t('Access requests')}
+      fit="inline"
+      searchLabel={t('Filter the requests')}
+      rows={rows}
+      rowKey={(r) => r.id}
+      columns={[
+        {
+          key: 'item',
+          title: t('Item'),
+          width: 'minmax(12rem,2fr)',
+          sort: (r) => r.title || r.owner_name,
+          text: (r) => `${r.title} ${r.owner_name} ${label(r.plugin_id)}`,
+          cell: (r) => (
+            <>
+              <div className="font-medium">{r.title || t('An item of {owner}', { owner: r.owner_name })}</div>
+              <div className="text-xs text-muted-foreground">
+                {label(r.plugin_id)} · {t('owner {name}', { name: r.owner_name })}
+              </div>
+            </>
+          ),
+        },
+        {
+          key: 'by',
+          title: t('Asked by'),
+          width: 'minmax(9rem,1fr)',
+          sort: (r) => r.requester_name,
+          cell: (r) => (
+            <>
+              {r.requester_name}
+              <div className="text-xs text-muted-foreground">{fmtDate(r.created_at)}</div>
+            </>
+          ),
+        },
+        { key: 'access', title: t('Access'), sort: (r) => levelName(r.level), cell: (r) => levelName(r.level) },
+        { key: 'message', title: t('Message'), width: 'minmax(10rem,1.4fr)', sort: (r) => r.message ?? '', className: 'text-sm text-muted-foreground', cell: (r) => r.message || '—' },
+        {
+          key: 'status',
+          title: t('Status'),
+          width: 'minmax(8rem,1fr)',
+          sort: (r) => r.status,
+          cell: (r) => (r.status === 'forwarded' ? <Badge variant="secondary">{t('Forwarded to the owner')}</Badge> : <StatusBadge status={r.status} />),
+        },
+        {
+          key: 'actions',
+          title: t('Actions'),
+          hideTitle: true,
+          width: 'minmax(12rem,auto)',
+          cell: (r) => (
+            <div className="flex flex-wrap justify-end gap-1">
+              {(r.mine || manager) && (
+                <>
+                  <Button size="sm" onClick={() => decide.mutate({ id: r.id, action: 'approve' })}>
+                    {t('Approve')}
+                  </Button>
+                  <Button size="sm" variant="outline" onClick={() => decide.mutate({ id: r.id, action: 'refuse' })}>
+                    {t('Refuse')}
+                  </Button>
+                </>
+              )}
+              {manager && !r.mine && r.status === 'pending' && (
+                <Button size="sm" variant="ghost" onClick={() => decide.mutate({ id: r.id, action: 'forward' })}>
+                  {t('Forward to the owner')}
+                </Button>
+              )}
+            </div>
+          ),
+        },
+      ]}
+    />
   )
 }
 
@@ -1547,67 +1569,52 @@ export function AdminPeople() {
           />
         }
       >
-        <div className="overflow-x-auto rounded-xl border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-10" />
-                <TableHead>{t('Name')}</TableHead>
-                <TableHead>{t('Home tenant')}</TableHead>
-                <TableHead>{t('Tenants')}</TableHead>
-                <TableHead>{t('Status')}</TableHead>
-                <TableHead>{t('Last sign-in')}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((p) => (
-                <TableRow key={p.user_id} className="cursor-pointer" data-state={sel.has(p.user_id) ? 'selected' : undefined} onClick={() => go(p.is_admin ? to.admin('system', 'admins') : to.adminPerson(p.user_id))}>
-                  <TableCell onClick={(e) => e.stopPropagation()}>
-                    {!p.is_admin && (
-                      <Checkbox
-                        aria-label={t('Select {name}', { name: p.username })}
-                        checked={sel.has(p.user_id)}
-                        onCheckedChange={(v) => {
-                          const n = new Set(sel)
-                          if (v) n.add(p.user_id)
-                          else n.delete(p.user_id)
-                          setSel(n)
-                        }}
-                      />
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <a className="flex items-center gap-2.5" onClick={(e) => e.stopPropagation()} href={p.is_admin ? to.admin('system', 'admins') : to.adminPerson(p.user_id)}>
-                      <PersonPicture id={p.user_id} name={p.display_name || p.username} className="size-8 bg-primary/15 text-xs text-primary-strong" />
-                      <span>
-                        <span className="block font-medium hover:underline">{p.display_name || p.username}</span>
-                        <span className="block text-xs text-muted-foreground">{p.username}</span>
-                      </span>
-                    </a>
-                  </TableCell>
-                  <TableCell>{p.is_admin ? <Badge>{t('Administrator')}</Badge> : p.home_tenant}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap gap-1">
-                      {p.tenants.map((x) => (
-                        <Badge key={x.tenant_id} variant={x.is_home ? 'default' : 'secondary'} className="font-normal" title={roleLabel(x.role)}>
-                          {x.slug}
-                          {x.role === 'tenant_manager' ? ' · TM' : ''}
-                          {x.status === 'suspended' ? ` · ${t('suspended')}` : ''}
-                        </Badge>
-                      ))}
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge status={p.status} />
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{p.last_sign_in_at ? fmtDate(p.last_sign_in_at) : t('Never')}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-          {rows.length === 0 && <p className="p-6 text-center text-sm text-muted-foreground">{t('No person found.')}</p>}
-        </div>
-        <MoreRows shown={rows.length} total={q.total} more={q.more} loading={q.loadingMore} onMore={q.loadMore} />
+        <ListTable
+          label={t('People')}
+          rows={rows}
+          rowKey={(p) => p.user_id}
+          server={{ total: q.total, more: !!q.more, loading: q.loadingMore, onMore: q.loadMore }}
+          selection={{ ids: sel, onChange: setSel, label: (p) => t('Select {name}', { name: p.username }), skip: (p) => p.is_admin }}
+          rowProps={(p) => ({ className: 'cursor-pointer', onClick: () => go(p.is_admin ? to.admin('system', 'admins') : to.adminPerson(p.user_id)) })}
+          empty={<p className="rounded-xl border bg-card p-6 text-center text-sm text-muted-foreground">{t('No person found.')}</p>}
+          columns={[
+            {
+              key: 'name',
+              title: t('Name'),
+              width: 'minmax(12rem,2fr)',
+              sort: (p) => p.display_name || p.username,
+              cell: (p) => (
+                <a className="flex items-center gap-2.5" onClick={(e) => e.stopPropagation()} href={p.is_admin ? to.admin('system', 'admins') : to.adminPerson(p.user_id)}>
+                  <PersonPicture id={p.user_id} name={p.display_name || p.username} className="size-8 bg-primary/15 text-xs text-primary-strong" />
+                  <span>
+                    <span className="block font-medium hover:underline">{p.display_name || p.username}</span>
+                    <span className="block text-xs text-muted-foreground">{p.username}</span>
+                  </span>
+                </a>
+              ),
+            },
+            { key: 'home', title: t('Home tenant'), width: 'minmax(8rem,1fr)', sort: (p) => (p.is_admin ? '' : p.home_tenant), cell: (p) => (p.is_admin ? <Badge>{t('Administrator')}</Badge> : p.home_tenant) },
+            {
+              key: 'tenants',
+              title: t('Tenants'),
+              width: 'minmax(10rem,1.6fr)',
+              sort: (p) => p.tenants.length,
+              cell: (p) => (
+                <div className="flex flex-wrap gap-1">
+                  {p.tenants.map((x) => (
+                    <Badge key={x.tenant_id} variant={x.is_home ? 'default' : 'secondary'} className="font-normal" title={roleLabel(x.role)}>
+                      {x.slug}
+                      {x.role === 'tenant_manager' ? ' · TM' : ''}
+                      {x.status === 'suspended' ? ` · ${t('suspended')}` : ''}
+                    </Badge>
+                  ))}
+                </div>
+              ),
+            },
+            { key: 'status', title: t('Status'), width: 'minmax(7rem,.8fr)', sort: (p) => p.status, cell: (p) => <StatusBadge status={p.status} /> },
+            { key: 'last', title: t('Last sign-in'), width: 'minmax(8rem,1fr)', sort: (p) => p.last_sign_in_at ?? '', className: 'text-muted-foreground', cell: (p) => (p.last_sign_in_at ? fmtDate(p.last_sign_in_at) : t('Never')) },
+          ]}
+        />
       </ListPage>
       <NewPersonDialog
         open={dlg === 'new'}
@@ -1748,74 +1755,85 @@ export function AdminPersonPage({ id, tab }: { id: string; tab?: string }) {
                 {t('Move the home tenant')}
               </Button>
             </div>
-            <div className="overflow-x-auto rounded-xl border bg-card">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('Tenant')}</TableHead>
-                    <TableHead>{t('Role')}</TableHead>
-                    <TableHead>{t('Permission profile')}</TableHead>
-                    <TableHead>{t('Status')}</TableHead>
-                    <TableHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {p.tenants.map((m) => (
-                    <TableRow key={m.tenant_id}>
-                      <TableCell className="font-medium">
-                        {m.name}
-                        {m.is_home && (
-                          <Badge variant="secondary" className="ml-2 font-normal">
-                            {t('home')}
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Select value={m.role} onValueChange={(role) => update.mutate({ tenant: m.tenant_id, body: { role } })}>
-                          <SelectTrigger className="w-44" aria-label={t('Role in {tenant}', { tenant: m.name })}>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="user">{t('User')}</SelectItem>
-                            <SelectItem value="tenant_manager">Tenant Manager</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </TableCell>
-                      <TableCell className="min-w-52">
-                        <TenantProfiles tenant={m.tenant_id} value={m.profile_id ?? DEFAULT} onChange={(v) => update.mutate({ tenant: m.tenant_id, body: { profile: v === DEFAULT ? null : v } })} />
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge status={m.status} />
-                      </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" aria-label={t('Actions in {tenant}', { tenant: m.name })}>
-                              <MoreHorizontal />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onSelect={() => update.mutate({ tenant: m.tenant_id, body: { suspended: m.status !== 'suspended' } })}>
-                              {m.status === 'suspended' ? <ShieldCheck /> : <ShieldOff />}
-                              {m.status === 'suspended' ? t('Reactivate in the tenant') : t('Suspend in the tenant')}
-                            </DropdownMenuItem>
-                            {!m.is_home && (
-                              <DropdownMenuItem
-                                variant="destructive"
-                                onSelect={async () => (await confirm(t('Remove {name} from {tenant}?', { name, tenant: m.name }), true)) && remove.mutate(m.tenant_id)}
-                              >
-                                <Trash2 />
-                                {t('Remove from the tenant')}
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            <ListTable
+              label={t('Tenants')}
+              fit="inline"
+              rows={p.tenants}
+              rowKey={(m) => m.tenant_id}
+              columns={[
+                {
+                  key: 'tenant',
+                  title: t('Tenant'),
+                  width: 'minmax(10rem,1.4fr)',
+                  sort: (m) => m.name,
+                  className: 'font-medium',
+                  cell: (m) => (
+                    <>
+                      {m.name}
+                      {m.is_home && (
+                        <Badge variant="secondary" className="ml-2 font-normal">
+                          {t('home')}
+                        </Badge>
+                      )}
+                    </>
+                  ),
+                },
+                {
+                  key: 'role',
+                  title: t('Role'),
+                  width: 'minmax(11rem,12rem)',
+                  sort: (m) => m.role,
+                  cell: (m) => (
+                    <Select value={m.role} onValueChange={(role) => update.mutate({ tenant: m.tenant_id, body: { role } })}>
+                      <SelectTrigger className="w-44" aria-label={t('Role in {tenant}', { tenant: m.name })}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="user">{t('User')}</SelectItem>
+                        <SelectItem value="tenant_manager">Tenant Manager</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ),
+                },
+                {
+                  key: 'profile',
+                  title: t('Permission profile'),
+                  width: 'minmax(13rem,1.2fr)',
+                  cell: (m) => <TenantProfiles tenant={m.tenant_id} value={m.profile_id ?? DEFAULT} onChange={(v) => update.mutate({ tenant: m.tenant_id, body: { profile: v === DEFAULT ? null : v } })} />,
+                },
+                { key: 'status', title: t('Status'), width: 'minmax(7rem,.8fr)', sort: (m) => m.status, cell: (m) => <StatusBadge status={m.status} /> },
+                {
+                  key: 'actions',
+                  title: t('Actions'),
+                  hideTitle: true,
+                  width: '3rem',
+                  cell: (m) => (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" aria-label={t('Actions in {tenant}', { tenant: m.name })}>
+                  <MoreHorizontal />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onSelect={() => update.mutate({ tenant: m.tenant_id, body: { suspended: m.status !== 'suspended' } })}>
+                  {m.status === 'suspended' ? <ShieldCheck /> : <ShieldOff />}
+                  {m.status === 'suspended' ? t('Reactivate in the tenant') : t('Suspend in the tenant')}
+                </DropdownMenuItem>
+                {!m.is_home && (
+                  <DropdownMenuItem
+                    variant="destructive"
+                    onSelect={async () => (await confirm(t('Remove {name} from {tenant}?', { name, tenant: m.name }), true)) && remove.mutate(m.tenant_id)}
+                  >
+                    <Trash2 />
+                    {t('Remove from the tenant')}
+                  </DropdownMenuItem>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
+                  ),
+                },
+              ]}
+            />
           </div>
         )}
         {cur === 'sign-in' && <SignInPanel base={base} qk={['person', id]} name={name} />}

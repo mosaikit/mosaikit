@@ -9,17 +9,16 @@ import { useBrand } from '../../brand.ts'
 import type { AdminUser, GlobalKpi, Member, Session, ShellBand, SystemOverview, TenantInfo } from '../../types.ts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import { initials, passwordMin, useAction, useApi, useConfig, useConfirm, usePaged } from '../core.ts'
 import { BulkBar, FilterColumn, ListPage } from '../listkit.tsx'
+import { ListTable } from '../ListTable.tsx'
 import { TenantLogo } from '../picture.tsx'
-import { Empty, ErrorBox, FormDialog, Kpi, Loading, MoreRows, PageHeader, SaveBar, Sections, StatusBadge, Sliced, Tabs } from '../kit.tsx'
+import { Empty, ErrorBox, FormDialog, Kpi, Loading, PageHeader, SaveBar, Sections, StatusBadge, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import { bandOf } from '../prefs.ts'
 import { AppMark } from '../Shell.tsx'
@@ -197,59 +196,38 @@ export function AdminTenants() {
         ) : rows.length === 0 ? (
           <Empty icon={<Building2 />} title={words ? t('No tenant found') : t('No tenants')} />
         ) : (
-          <div className="overflow-x-auto rounded-xl border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10" />
-                  <TableHead>{t('Tenant')}</TableHead>
-                  <TableHead className="text-right">{t('Members')}</TableHead>
-                  <TableHead className="text-right">{t('Guests')}</TableHead>
-                  <TableHead className="text-right">{t('Items')}</TableHead>
-                  <TableHead className="text-right">{t('Space')}</TableHead>
-                  <TableHead>{t('Status')}</TableHead>
-                  <TableHead>{t('Created')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((tn) => (
-                  <TableRow key={tn.id} className="cursor-pointer" data-state={sel.has(tn.id) ? 'selected' : undefined} onClick={() => go(to.adminTenant(tn.id))}>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        aria-label={t('Select {name}', { name: tn.name })}
-                        checked={sel.has(tn.id)}
-                        onCheckedChange={(v) => {
-                          const n = new Set(sel)
-                          if (v) n.add(tn.id)
-                          else n.delete(tn.id)
-                          setSel(n)
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <a href={to.adminTenant(tn.id)} className="flex items-center gap-2.5" onClick={(e) => e.stopPropagation()}>
-                        <TenantLogo slug={tn.slug} name={tn.name} />
-                        <span>
-                          <span className="block font-medium hover:underline">{tn.name}</span>
-                          <span className="block font-mono text-xs text-muted-foreground">{tn.slug}</span>
-                        </span>
-                      </a>
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{tn.members}</TableCell>
-                    <TableCell className="text-right tabular-nums">{tn.guests}</TableCell>
-                    <TableCell className="text-right tabular-nums">{tn.resources}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtBytes(tn.bytes)}</TableCell>
-                    <TableCell>
-                      <TenantState tn={tn} />
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{fmtDate(tn.created_at)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <ListTable
+            label={t('Tenants')}
+            rows={rows}
+            rowKey={(tn) => tn.id}
+            server={{ total: q.total, more: !!q.more, loading: q.loadingMore, onMore: q.loadMore }}
+            selection={{ ids: sel, onChange: setSel, label: (tn) => t('Select {name}', { name: tn.name }) }}
+            rowProps={(tn) => ({ className: 'cursor-pointer', onClick: () => go(to.adminTenant(tn.id)) })}
+            columns={[
+              {
+                key: 'name',
+                title: t('Tenant'),
+                width: 'minmax(12rem,2fr)',
+                sort: (tn) => tn.name,
+                cell: (tn) => (
+                  <a href={to.adminTenant(tn.id)} className="flex items-center gap-2.5" onClick={(e) => e.stopPropagation()}>
+                    <TenantLogo slug={tn.slug} name={tn.name} />
+                    <span>
+                      <span className="block font-medium hover:underline">{tn.name}</span>
+                      <span className="block font-mono text-xs text-muted-foreground">{tn.slug}</span>
+                    </span>
+                  </a>
+                ),
+              },
+              { key: 'members', title: t('Members'), width: 'minmax(6rem,.7fr)', align: 'right', sort: (tn) => tn.members, cell: (tn) => tn.members },
+              { key: 'guests', title: t('Guests'), width: 'minmax(6rem,.7fr)', align: 'right', sort: (tn) => tn.guests, cell: (tn) => tn.guests },
+              { key: 'items', title: t('Items'), width: 'minmax(6rem,.7fr)', align: 'right', sort: (tn) => tn.resources, cell: (tn) => tn.resources },
+              { key: 'space', title: t('Space'), width: 'minmax(6rem,.8fr)', align: 'right', sort: (tn) => tn.bytes, cell: (tn) => fmtBytes(tn.bytes) },
+              { key: 'status', title: t('Status'), width: 'minmax(7rem,1fr)', sort: (tn) => tn.status, cell: (tn) => <TenantState tn={tn} /> },
+              { key: 'created', title: t('Created'), width: 'minmax(7rem,1fr)', sort: (tn) => tn.created_at, className: 'text-muted-foreground', cell: (tn) => fmtDate(tn.created_at) },
+            ]}
+          />
         )}
-        <MoreRows shown={rows.length} total={q.total} more={q.more} loading={q.loadingMore} onMore={q.loadMore} />
       </ListPage>
       <NewTenantWizard open={open} onOpenChange={setOpen} />
       <ImportTenantDialog open={importing} onOpenChange={setImporting} />
@@ -363,52 +341,62 @@ function TenantUsers({ id, q }: { id: string; q: { data?: Member[]; isLoading: b
           {t('New Tenant Manager')}
         </Button>
       </div>
-      <div className="overflow-hidden rounded-xl border bg-card">
-        <Sliced items={(q.data ?? [])}>{(shown) => (<Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('Username')}</TableHead>
-              <TableHead className="w-48">{t('Role')}</TableHead>
-              <TableHead>{t('Status')}</TableHead>
-              <TableHead className="w-10" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {shown.map((m) => (
-              <TableRow key={m.user_id}>
-                <TableCell>
-                  <div className="font-medium">{m.display_name || m.username}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {m.username}@{m.home_tenant}
-                    {m.is_guest && ' · ospite'}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Select value={m.role} onValueChange={(role) => setRole.mutate({ uid: m.user_id, role })}>
-                    <SelectTrigger size="sm" aria-label={t('Role of {username}', { username: m.username })}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="tenant_manager">{t('Tenant Manager')}</SelectItem>
-                      <SelectItem value="user">{t('User')}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </TableCell>
-                <TableCell>
-                  <StatusBadge status={m.status} />
-                </TableCell>
-                <TableCell>
-                  {!m.is_guest && (
-                    <Button variant="ghost" size="icon" aria-label={t('Reset the password of {username}', { username: m.username })} onClick={() => setDlg(m)}>
-                      <KeyRound />
-                    </Button>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>)}</Sliced>
-      </div>
+      <ListTable
+        label={t('Members')}
+        fit="inline"
+        searchLabel={t('Filter the members')}
+        rows={q.data ?? []}
+        rowKey={(m) => m.user_id}
+        columns={[
+          {
+            key: 'user',
+            title: t('Username'),
+            width: 'minmax(12rem,2fr)',
+            sort: (m) => m.display_name || m.username,
+            text: (m) => `${m.display_name} ${m.username} ${m.home_tenant}`,
+            cell: (m) => (
+              <>
+                <div className="font-medium">{m.display_name || m.username}</div>
+                <div className="text-xs text-muted-foreground">
+                  {m.username}@{m.home_tenant}
+                  {m.is_guest && ' · ospite'}
+                </div>
+              </>
+            ),
+          },
+          {
+            key: 'role',
+            title: t('Role'),
+            width: 'minmax(11rem,12rem)',
+            sort: (m) => m.role,
+            text: (m) => (m.role === 'tenant_manager' ? t('Tenant Manager') : t('User')),
+            cell: (m) => (
+              <Select value={m.role} onValueChange={(role) => setRole.mutate({ uid: m.user_id, role })}>
+                <SelectTrigger size="sm" aria-label={t('Role of {username}', { username: m.username })}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="tenant_manager">{t('Tenant Manager')}</SelectItem>
+                  <SelectItem value="user">{t('User')}</SelectItem>
+                </SelectContent>
+              </Select>
+            ),
+          },
+          { key: 'status', title: t('Status'), width: 'minmax(7rem,1fr)', sort: (m) => m.status, cell: (m) => <StatusBadge status={m.status} /> },
+          {
+            key: 'actions',
+            title: t('Actions'),
+            hideTitle: true,
+            width: '3rem',
+            cell: (m) =>
+              !m.is_guest && (
+                <Button variant="ghost" size="icon" aria-label={t('Reset the password of {username}', { username: m.username })} onClick={() => setDlg(m)}>
+                  <KeyRound />
+                </Button>
+              ),
+          },
+        ]}
+      />
       <FormDialog
         open={dlg === 'manager'}
         onOpenChange={(o) => !o && setDlg(null)}
@@ -631,88 +619,94 @@ function Admins({ me }: { me: string }) {
           {t('New Administrator')}
         </Button>
       </div>
-      <div className="overflow-hidden rounded-xl border bg-card">
-        <Sliced items={(q.data ?? [])}>{(shown) => (<Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('Administrators')}</TableHead>
-              <TableHead>{t('Status')}</TableHead>
-              <TableHead>{t('Second factor')}</TableHead>
-              <TableHead>{t('Created')}</TableHead>
-              <TableHead className="w-10" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {shown.map((a) => (
-              <TableRow key={a.user_id}>
-                <TableCell>
-                  <div className="flex items-center gap-2.5">
-                    <span className="flex size-8 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary-strong">{initials(a.display_name || a.username)}</span>
-                    <div>
-                      <div className="font-medium">
-                        {a.display_name || a.username}
-                        {a.user_id === me && (
-                          <Badge variant="secondary" className="ml-2 font-normal">
-                            {t('you')}
-                          </Badge>
-                        )}
-                      </div>
-                      <div className="font-mono text-xs text-muted-foreground">{a.username}</div>
-                      <div className="text-xs text-muted-foreground">{a.email || t('No email address')}</div>
-                    </div>
+      <ListTable
+        label={t('Administrators')}
+        fit="inline"
+        searchLabel={t('Filter the administrators')}
+        rows={q.data ?? []}
+        rowKey={(a) => a.user_id}
+        columns={[
+          {
+            key: 'name',
+            title: t('Administrators'),
+            width: 'minmax(14rem,2.4fr)',
+            sort: (a) => a.display_name || a.username,
+            text: (a) => `${a.display_name} ${a.username} ${a.email ?? ''}`,
+            cell: (a) => (
+              <div className="flex items-center gap-2.5">
+                <span className="flex size-8 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary-strong">{initials(a.display_name || a.username)}</span>
+                <div>
+                  <div className="font-medium">
+                    {a.display_name || a.username}
+                    {a.user_id === me && (
+                      <Badge variant="secondary" className="ml-2 font-normal">
+                        {t('you')}
+                      </Badge>
+                    )}
                   </div>
-                </TableCell>
-                <TableCell>
-                  <StatusBadge status={a.status} />
-                </TableCell>
-                <TableCell>{a.totp ? <Badge className="bg-ok/10 font-normal text-ok">{t('on')}</Badge> : <Badge variant="secondary" className="font-normal">{t('to register')}</Badge>}</TableCell>
-                <TableCell className="text-muted-foreground">{fmtDate(a.created_at)}</TableCell>
-                <TableCell>
-                  {(
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" aria-label={t('Actions for {username}', { username: a.username })}>
-                          <MoreHorizontal />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onSelect={() => setEdit(a)}>
-                          <Pencil />
-                          {t('Edit name and email')}
-                        </DropdownMenuItem>
-                        {a.user_id !== me && (
-                        <DropdownMenuItem onSelect={() => setDlg(a)}>
-                          <KeyRound />
-                          {t('Reset the password')}
-                        </DropdownMenuItem>
-                        )}
-                        {a.user_id !== me && a.totp && (
-                          <DropdownMenuItem onSelect={async () => (await confirm(t('Remove the second factor of {username}?', { username: a.username }), true)) && totp.mutate(a.user_id)}>
-                            <ShieldCheck />
-                            {t('Reset the second factor')}
-                          </DropdownMenuItem>
-                        )}
-                        {a.user_id !== me && (
-                        <DropdownMenuItem
-                          variant={a.status === 'active' ? 'destructive' : 'default'}
-                          onSelect={async () => {
-                            const active = a.status !== 'active'
-                            if (active || (await confirm(t('Disable {username}? Their sessions are closed.', { username: a.username }), true))) status.mutate({ id: a.user_id, active })
-                          }}
-                        >
-                          <Users />
-                          {a.status === 'active' ? t('Disable') : t('Reactivate')}
-                        </DropdownMenuItem>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  )}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>)}</Sliced>
-      </div>
+                  <div className="font-mono text-xs text-muted-foreground">{a.username}</div>
+                  <div className="text-xs text-muted-foreground">{a.email || t('No email address')}</div>
+                </div>
+              </div>
+            ),
+          },
+          { key: 'status', title: t('Status'), width: 'minmax(7rem,1fr)', sort: (a) => a.status, cell: (a) => <StatusBadge status={a.status} /> },
+          {
+            key: 'totp',
+            title: t('Second factor'),
+            width: 'minmax(8rem,1fr)',
+            sort: (a) => (a.totp ? 1 : 0),
+            text: (a) => (a.totp ? t('on') : t('to register')),
+            cell: (a) => (a.totp ? <Badge className="bg-ok/10 font-normal text-ok">{t('on')}</Badge> : <Badge variant="secondary" className="font-normal">{t('to register')}</Badge>),
+          },
+          { key: 'created', title: t('Created'), width: 'minmax(7rem,1fr)', sort: (a) => a.created_at, className: 'text-muted-foreground', cell: (a) => fmtDate(a.created_at) },
+          {
+            key: 'actions',
+            title: t('Actions'),
+            hideTitle: true,
+            width: '3rem',
+            cell: (a) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon" aria-label={t('Actions for {username}', { username: a.username })}>
+          <MoreHorizontal />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onSelect={() => setEdit(a)}>
+          <Pencil />
+          {t('Edit name and email')}
+        </DropdownMenuItem>
+        {a.user_id !== me && (
+        <DropdownMenuItem onSelect={() => setDlg(a)}>
+          <KeyRound />
+          {t('Reset the password')}
+        </DropdownMenuItem>
+        )}
+        {a.user_id !== me && a.totp && (
+          <DropdownMenuItem onSelect={async () => (await confirm(t('Remove the second factor of {username}?', { username: a.username }), true)) && totp.mutate(a.user_id)}>
+            <ShieldCheck />
+            {t('Reset the second factor')}
+          </DropdownMenuItem>
+        )}
+        {a.user_id !== me && (
+        <DropdownMenuItem
+          variant={a.status === 'active' ? 'destructive' : 'default'}
+          onSelect={async () => {
+            const active = a.status !== 'active'
+            if (active || (await confirm(t('Disable {username}? Their sessions are closed.', { username: a.username }), true))) status.mutate({ id: a.user_id, active })
+          }}
+        >
+          <Users />
+          {a.status === 'active' ? t('Disable') : t('Reactivate')}
+        </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+            ),
+          },
+        ]}
+      />
       <FormDialog
         open={dlg === 'new'}
         onOpenChange={(o) => !o && setDlg(null)}

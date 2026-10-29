@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils'
 import { useAction, useApi } from './core.ts'
 import { t } from './i18n.ts'
 import { Empty, ErrorBox, Loading, Locked, SaveBar, Sliced } from './kit.tsx'
+import { ListTable } from './ListTable.tsx'
 import { to } from './router.ts'
 
 const enc = encodeURIComponent
@@ -229,38 +230,43 @@ export function PlatformQuotasPanel() {
           {data.tenants.length === 0 ? (
             <Empty title={t('No tenant')} />
           ) : (
-            <div className="overflow-x-auto rounded-xl border">
-              <Sliced items={data.tenants}>{(shown) => (<Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('Tenant')}</TableHead>
-                    {METRICS.map((m) => (
-                      <TableHead key={m} className="text-right">
-                        {metricLabel(m)}
-                      </TableHead>
-                    ))}
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {shown.map((tn) => (
-                    <TableRow key={tn.id}>
-                      <TableCell>
-                        <a className="font-medium underline-offset-4 hover:underline" href={to.adminTenant(tn.id)}>
-                          {tn.name}
-                        </a>
-                        {tn.status === 'suspended' && <span className="block text-xs text-muted-foreground">{t('Suspended')}</span>}
-                      </TableCell>
-                      {METRICS.map((m) => (
-                        <TableCell key={m} className="text-right tabular-nums">
-                          {fmtQuota(m, tn.usage[m])} / {fmtQuota(m, tn.limits[m])}
-                          {tn.own.includes(m) && <span className="block text-xs text-muted-foreground">{t('of this tenant')}</span>}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>)}</Sliced>
-            </div>
+            <ListTable
+              label={t('Tenants')}
+              fit="inline"
+              searchLabel={t('Filter the tenants')}
+              rows={data.tenants}
+              rowKey={(tn) => tn.id}
+              columns={[
+                {
+                  key: 'tenant',
+                  title: t('Tenant'),
+                  width: 'minmax(11rem,1.4fr)',
+                  sort: (tn) => tn.name,
+                  cell: (tn) => (
+                    <>
+                      <a className="font-medium underline-offset-4 hover:underline" href={to.adminTenant(tn.id)}>
+                        {tn.name}
+                      </a>
+                      {tn.status === 'suspended' && <span className="block text-xs text-muted-foreground">{t('Suspended')}</span>}
+                    </>
+                  ),
+                },
+                ...METRICS.map((m) => ({
+                  key: m,
+                  title: metricLabel(m),
+                  width: 'minmax(9rem,1fr)',
+                  align: 'right' as const,
+                  sort: (tn: (typeof data.tenants)[number]) => tn.usage[m],
+                  text: (tn: (typeof data.tenants)[number]) => `${fmtQuota(m, tn.usage[m])} ${fmtQuota(m, tn.limits[m])}`,
+                  cell: (tn: (typeof data.tenants)[number]) => (
+                    <>
+                      {fmtQuota(m, tn.usage[m])} / {fmtQuota(m, tn.limits[m])}
+                      {tn.own.includes(m) && <span className="block text-xs text-muted-foreground">{t('of this tenant')}</span>}
+                    </>
+                  ),
+                })),
+              ]}
+            />
           )}
         </CardContent>
       </Card>
@@ -439,26 +445,18 @@ function ConsumerTable({ title, rows, nameLabel }: { title: string; rows: QuotaC
         {rows.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t('Nothing yet.')}</p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border">
-            <Sliced items={rows}>{(shown) => (<Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{nameLabel}</TableHead>
-                  <TableHead className="text-right">{t('Items')}</TableHead>
-                  <TableHead className="text-right">{t('Storage')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {shown.map((r) => (
-                  <TableRow key={r.id}>
-                    <TableCell className="font-medium">{r.name}</TableCell>
-                    <TableCell className="text-right tabular-nums">{r.items}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtBytes(r.bytes)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>)}</Sliced>
-          </div>
+          <ListTable
+            label={title}
+            fit="inline"
+            searchLabel={t('Filter the list')}
+            rows={rows}
+            rowKey={(r) => r.id}
+            columns={[
+              { key: 'name', title: nameLabel, width: 'minmax(10rem,2fr)', sort: (r) => r.name, className: 'font-medium', cell: (r) => r.name },
+              { key: 'items', title: t('Items'), align: 'right', sort: (r) => r.items, cell: (r) => r.items },
+              { key: 'bytes', title: t('Storage'), align: 'right', sort: (r) => r.bytes, cell: (r) => fmtBytes(r.bytes) },
+            ]}
+          />
         )}
       </CardContent>
     </Card>

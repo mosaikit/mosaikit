@@ -20,7 +20,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils'
 import { isApp, passwordMin, useAction, useApi, useTenantCtx } from '../core.ts'
 import { setLang, t, useLang, useLanguages, type Lang } from '../i18n.ts'
-import { Empty, ErrorBox, FormDialog, Loading, Locked, PageHeader, SaveBar, Sections, type Section, Sliced } from '../kit.tsx'
+import { Empty, ErrorBox, FormDialog, Loading, Locked, PageHeader, SaveBar, Sections, type Section } from '../kit.tsx'
+import { ListTable } from '../ListTable.tsx'
 import { go, personal, to, type Route } from '../router.ts'
 import { SIDEBAR_PREF } from '../prefs.ts'
 import { TenantBadge } from '../Shell.tsx'
@@ -506,41 +507,49 @@ function MyTenants({ session }: { session: Session }) {
   return (
     <div className="grid gap-3">
       <p className="text-sm text-muted-foreground">{t('You always sign in to your home tenant; you enter the ones where you are a guest from the switcher at the top.')}</p>
-      <div className="overflow-hidden rounded-xl border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('Tenant')}</TableHead>
-              <TableHead>{t('As')}</TableHead>
-              <TableHead>{t('Role')}</TableHead>
-              <TableHead />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {session.memberships.map((m) => (
-              <TableRow key={m.slug}>
-                <TableCell>
-                  <span className="flex items-center gap-2.5 font-medium">
-                    <TenantBadge name={m.name} />
-                    {m.name}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={m.is_home ? 'default' : 'secondary'} className="font-normal">
-                    {m.is_home ? t('home') : t('guest')}
-                  </Badge>
-                </TableCell>
-                <TableCell>{m.role === 'tenant_manager' ? t('Tenant Manager') : t('User')}</TableCell>
-                <TableCell className="text-right">
-                  <Button variant="ghost" size="sm" onClick={() => go(to.tenant(m.slug))}>
-                    {t('Open')}
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <ListTable
+        label={t('My tenants')}
+        fit="inline"
+        rows={session.memberships}
+        rowKey={(m) => m.slug}
+        columns={[
+          {
+            key: 'tenant',
+            title: t('Tenant'),
+            width: 'minmax(10rem,2fr)',
+            sort: (m) => m.name,
+            cell: (m) => (
+              <span className="flex items-center gap-2.5 font-medium">
+                <TenantBadge name={m.name} />
+                {m.name}
+              </span>
+            ),
+          },
+          {
+            key: 'as',
+            title: t('As'),
+            sort: (m) => (m.is_home ? t('home') : t('guest')),
+            cell: (m) => (
+              <Badge variant={m.is_home ? 'default' : 'secondary'} className="font-normal">
+                {m.is_home ? t('home') : t('guest')}
+              </Badge>
+            ),
+          },
+          { key: 'role', title: t('Role'), sort: (m) => m.role, cell: (m) => (m.role === 'tenant_manager' ? t('Tenant Manager') : t('User')) },
+          {
+            key: 'actions',
+            title: t('Actions'),
+            hideTitle: true,
+            width: '5rem',
+            className: 'justify-self-end',
+            cell: (m) => (
+              <Button variant="ghost" size="sm" onClick={() => go(to.tenant(m.slug))}>
+                {t('Open')}
+              </Button>
+            ),
+          },
+        ]}
+      />
     </div>
   )
 }
@@ -570,28 +579,19 @@ function MyUsage({ slug }: { slug: string }) {
       {res.length === 0 ? (
         <Empty icon={<Gauge />} title={t('No usage')} />
       ) : (
-        <div className="overflow-hidden rounded-xl border bg-card">
-          <Sliced items={res}>{(shown) => (<Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('Apps')}</TableHead>
-                <TableHead>{t('Kind')}</TableHead>
-                <TableHead className="text-right">{t('Items')}</TableHead>
-                <TableHead className="text-right">{t('Space')}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {shown.map((r) => (
-                <TableRow key={r.plugin_id + r.kind}>
-                  <TableCell className="font-medium">{r.plugin}</TableCell>
-                  <TableCell className="text-muted-foreground">{r.kind}</TableCell>
-                  <TableCell className="text-right tabular-nums">{r.count}</TableCell>
-                  <TableCell className="text-right tabular-nums">{fmtBytes(r.bytes)}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>)}</Sliced>
-        </div>
+        <ListTable
+          label={t('Usage')}
+          fit="inline"
+          searchLabel={t('Filter the apps')}
+          rows={res}
+          rowKey={(r) => r.plugin_id + r.kind}
+          columns={[
+            { key: 'app', title: t('Apps'), width: 'minmax(10rem,2fr)', sort: (r) => r.plugin, className: 'font-medium', cell: (r) => r.plugin },
+            { key: 'kind', title: t('Kind'), sort: (r) => r.kind, className: 'text-muted-foreground', cell: (r) => r.kind },
+            { key: 'count', title: t('Items'), align: 'right', sort: (r) => r.count, cell: (r) => r.count },
+            { key: 'bytes', title: t('Space'), align: 'right', sort: (r) => r.bytes, cell: (r) => fmtBytes(r.bytes) },
+          ]}
+        />
       )}
       <TenantLeft slug={slug} />
     </div>

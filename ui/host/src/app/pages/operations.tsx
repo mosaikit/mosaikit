@@ -44,6 +44,7 @@ import { cn } from '@/lib/utils'
 import { passwordMin, useAction, useApi, useConfig, useConfirm } from '../core.ts'
 import { fmtDay, fmtNumber, t } from '../i18n.ts'
 import { Empty, ErrorBox, Kpi, Loading, PageHeader, Pills, SaveBar, Sections, Sliced } from '../kit.tsx'
+import { ListTable } from '../ListTable.tsx'
 import { go, to } from '../router.ts'
 import { alertDetailText } from '../notes.ts'
 
@@ -684,79 +685,94 @@ export function BackupPanel() {
           {q.data!.backups.length === 0 ? (
             <Empty icon={<HardDrive />} title={t('No backups yet')} />
           ) : (
-            <Sliced items={q.data!.backups}>{(shown) => (<Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('Started')}</TableHead>
-                  <TableHead>{t('Result')}</TableHead>
-                  <TableHead className="text-right">{t('Size')}</TableHead>
-                  <TableHead className="text-right">{t('Tenants')}</TableHead>
-                  <TableHead>
-                    <span className="sr-only">{t('Actions')}</span>
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {shown.map((b) => (
-                  <TableRow key={b.id}>
-                    <TableCell>
+            <ListTable
+              label={t('Backups')}
+              fit="inline"
+              searchLabel={t('Filter the backups')}
+              rows={q.data!.backups}
+              rowKey={(b) => b.id}
+              columns={[
+                {
+                  key: 'started',
+                  title: t('Started'),
+                  width: 'minmax(10rem,1.2fr)',
+                  sort: (b) => b.started_at,
+                  text: (b) => `${fmtDay(b.started_at, { dateStyle: 'medium', timeStyle: 'short' })} ${b.manual ? (b.by ?? '') : t('scheduled')}`,
+                  cell: (b) => (
+                    <>
                       {fmtDay(b.started_at, { dateStyle: 'medium', timeStyle: 'short' })}
                       <span className="block text-xs text-muted-foreground">{b.manual ? t('by {who}', { who: b.by ?? '—' }) : t('scheduled')}</span>
-                    </TableCell>
-                    <TableCell>
-                      {b.status === 'running' ? (
-                        <span className="inline-flex items-center gap-1.5 text-muted-foreground">
-                          <Loader2 className="size-3.5 animate-spin" />
-                          {t('running')}
-                        </span>
-                      ) : b.status === 'failed' ? (
-                        <span className="text-destructive">{t('failed')}: {b.error}</span>
-                      ) : (
-                        <span className="inline-flex flex-col">
-                          <span className="inline-flex items-center gap-1.5 text-ok">
-                            <Check className="size-3.5" />
-                            {b.whole ? t('complete') : t('tenants only')}
-                          </span>
-                          {b.error && <span className="text-xs text-muted-foreground">{b.error}</span>}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{b.status === 'ok' ? fmtBytes(b.size_bytes) : '—'}</TableCell>
-                    <TableCell className="text-right tabular-nums">{b.status === 'ok' ? b.tenants : '—'}</TableCell>
-                    <TableCell className="text-right">
-                      {b.status === 'ok' && (
-                        <span className="inline-flex gap-1">
-                          <Button variant="ghost" size="sm" asChild>
-                            <a href={downloadUrl(`/api/admin/backups/${b.id}/file`)} download aria-label={t('Download the backup of {date}', { date: fmtDay(b.started_at, { dateStyle: 'medium', timeStyle: 'short' }) })}>
-                              <Download />
-                              {t('Download')}
-                            </a>
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => setRestore(b)}>
-                            {t('Restore a tenant')}
-                          </Button>
-                          <Button variant="ghost" size="sm" onClick={() => setRestoreItem(b)}>
-                            {t('Restore an item')}
-                          </Button>
-                        </span>
-                      )}
-                      {b.status !== 'running' && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          aria-label={t('Delete the backup')}
-                          onClick={async () => {
-                            if (await confirm(t('Delete this backup and its file?'), true)) del.mutate(b.id)
-                          }}
-                        >
-                          <Trash2 />
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>)}</Sliced>
+                    </>
+                  ),
+                },
+                {
+                  key: 'result',
+                  title: t('Result'),
+                  width: 'minmax(9rem,1.2fr)',
+                  sort: (b) => b.status,
+                  text: (b) => `${b.status} ${b.error ?? ''}`,
+                  cell: (b) => (
+        b.status === 'running' ? (
+          <span className="inline-flex items-center gap-1.5 text-muted-foreground">
+            <Loader2 className="size-3.5 animate-spin" />
+            {t('running')}
+          </span>
+        ) : b.status === 'failed' ? (
+          <span className="text-destructive">{t('failed')}: {b.error}</span>
+        ) : (
+          <span className="inline-flex flex-col">
+            <span className="inline-flex items-center gap-1.5 text-ok">
+              <Check className="size-3.5" />
+              {b.whole ? t('complete') : t('tenants only')}
+            </span>
+            {b.error && <span className="text-xs text-muted-foreground">{b.error}</span>}
+          </span>
+        )
+                  ),
+                },
+                { key: 'size', title: t('Size'), width: 'minmax(6rem,.6fr)', align: 'right', sort: (b) => (b.status === 'ok' ? b.size_bytes : null), cell: (b) => (b.status === 'ok' ? fmtBytes(b.size_bytes) : '—') },
+                { key: 'tenants', title: t('Tenants'), width: 'minmax(6rem,.6fr)', align: 'right', sort: (b) => (b.status === 'ok' ? b.tenants : null), cell: (b) => (b.status === 'ok' ? b.tenants : '—') },
+                {
+                  key: 'actions',
+                  title: t('Actions'),
+                  hideTitle: true,
+                  width: 'minmax(22rem,auto)',
+                  className: 'justify-self-end',
+                  cell: (b) => (
+                    <>
+      {b.status === 'ok' && (
+        <span className="inline-flex gap-1">
+          <Button variant="ghost" size="sm" asChild>
+            <a href={downloadUrl(`/api/admin/backups/${b.id}/file`)} download aria-label={t('Download the backup of {date}', { date: fmtDay(b.started_at, { dateStyle: 'medium', timeStyle: 'short' }) })}>
+              <Download />
+              {t('Download')}
+            </a>
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setRestore(b)}>
+            {t('Restore a tenant')}
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setRestoreItem(b)}>
+            {t('Restore an item')}
+          </Button>
+        </span>
+      )}
+      {b.status !== 'running' && (
+        <Button
+          variant="ghost"
+          size="sm"
+          aria-label={t('Delete the backup')}
+          onClick={async () => {
+            if (await confirm(t('Delete this backup and its file?'), true)) del.mutate(b.id)
+          }}
+        >
+          <Trash2 />
+        </Button>
+      )}
+                    </>
+                  ),
+                },
+              ]}
+            />
           )}
         </CardContent>
       </Card>
@@ -1299,35 +1315,32 @@ function StatusPanel() {
         <Kpi label={t('Version')} value={d.kernel} />
         <Kpi label={t('Up since')} value={uptime(d.uptime_s)} />
       </div>
-      <div className="overflow-hidden rounded-xl border bg-card">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('Service')}</TableHead>
-              <TableHead>{t('State')}</TableHead>
-              <TableHead>{t('Version')}</TableHead>
-              <TableHead className="text-right">{t('Response')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {d.services.map((s) => (
-              <TableRow key={s.key} className="cursor-pointer" onClick={() => setOpen(s.key)}>
-                <TableCell>
-                  <button type="button" className="text-left font-medium hover:underline" aria-haspopup="dialog" onClick={(e) => (e.stopPropagation(), setOpen(s.key))}>
-                    {serviceName(s)}
-                  </button>
-                  {s.detail && <span className="mt-0.5 block text-xs text-muted-foreground">{s.detail}</span>}
-                </TableCell>
-                <TableCell>
-                  <ServiceBadge state={s.state} />
-                </TableCell>
-                <TableCell className="text-muted-foreground">{s.version || '—'}</TableCell>
-                <TableCell className="text-right tabular-nums">{s.ms === null ? '—' : `${fmtNumber(s.ms, { maximumFractionDigits: 1 })} ms`}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      <ListTable
+        label={t('Services')}
+        fit="inline"
+        rows={d.services}
+        rowKey={(s) => s.key}
+        rowProps={(s) => ({ className: 'cursor-pointer', onClick: () => setOpen(s.key) })}
+        columns={[
+          {
+            key: 'service',
+            title: t('Service'),
+            width: 'minmax(12rem,2fr)',
+            sort: (s) => serviceName(s),
+            cell: (s) => (
+              <>
+                <button type="button" className="text-left font-medium hover:underline" aria-haspopup="dialog" onClick={(e) => (e.stopPropagation(), setOpen(s.key))}>
+                  {serviceName(s)}
+                </button>
+                {s.detail && <span className="mt-0.5 block text-xs text-muted-foreground">{s.detail}</span>}
+              </>
+            ),
+          },
+          { key: 'state', title: t('State'), sort: (s) => s.state, cell: (s) => <ServiceBadge state={s.state} /> },
+          { key: 'version', title: t('Version'), sort: (s) => s.version ?? '', className: 'text-muted-foreground', cell: (s) => s.version || '—' },
+          { key: 'ms', title: t('Response'), align: 'right', sort: (s) => s.ms, cell: (s) => (s.ms === null ? '—' : `${fmtNumber(s.ms, { maximumFractionDigits: 1 })} ms`) },
+        ]}
+      />
       <ServiceDetail service={d.services.find((s) => s.key === open) ?? null} onClose={() => setOpen(null)} />
     </div>
   )
@@ -1434,28 +1447,19 @@ function ErrorsPanel() {
             {q.data!.latest.length === 0 ? (
               <p className="text-sm text-muted-foreground">{t('None.')}</p>
             ) : (
-              <div className="overflow-hidden rounded-xl border bg-card">
-                <Sliced items={q.data!.latest}>{(shown) => (<Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t('When')}</TableHead>
-                      <TableHead>{t('What')}</TableHead>
-                      <TableHead>{t('Who')}</TableHead>
-                      <TableHead>{t('Tenant')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {shown.map((f, i) => (
-                      <TableRow key={i}>
-                        <TableCell>{fmtDay(f.ts, { dateStyle: 'short', timeStyle: 'medium' })}</TableCell>
-                        <TableCell className="font-mono text-xs">{f.action}</TableCell>
-                        <TableCell>{f.user ?? f.ip ?? '—'}</TableCell>
-                        <TableCell>{f.tenant ?? t('Platform')}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>)}</Sliced>
-              </div>
+              <ListTable
+                label={t('Latest refused operations')}
+                fit="inline"
+                searchLabel={t('Filter the operations')}
+                rows={q.data!.latest}
+                rowKey={(f) => `${f.ts}${f.action}${f.user ?? ''}${f.ip ?? ''}`}
+                columns={[
+                  { key: 'when', title: t('When'), width: 'minmax(10rem,1fr)', sort: (f) => f.ts, text: (f) => fmtDay(f.ts, { dateStyle: 'short', timeStyle: 'medium' }), cell: (f) => fmtDay(f.ts, { dateStyle: 'short', timeStyle: 'medium' }) },
+                  { key: 'what', title: t('What'), width: 'minmax(10rem,1.4fr)', sort: (f) => f.action, className: 'font-mono text-xs', cell: (f) => f.action },
+                  { key: 'who', title: t('Who'), sort: (f) => f.user ?? f.ip ?? '', cell: (f) => f.user ?? f.ip ?? '—' },
+                  { key: 'tenant', title: t('Tenant'), sort: (f) => f.tenant ?? t('Platform'), cell: (f) => f.tenant ?? t('Platform') },
+                ]}
+              />
             )}
           </section>
         </>
@@ -1469,46 +1473,50 @@ function TenantsLoadPanel() {
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
   return (
-    <div className=" overflow-hidden rounded-xl border bg-card">
-      <Sliced items={q.data!}>{(shown) => (<Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('Tenant')}</TableHead>
-            <TableHead className="text-right">{t('Requests, 1 hour')}</TableHead>
-            <TableHead className="text-right">{t('Requests, 24 hours')}</TableHead>
-            <TableHead className="text-right">{t('People')}</TableHead>
-            <TableHead className="text-right">{t('Items')}</TableHead>
-            <TableHead className="text-right">{t('Space')}</TableHead>
-            <TableHead>{t('Nearest quota')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {shown.map((x) => (
-            <TableRow key={x.id} className="cursor-pointer" onClick={() => go(to.adminTenant(x.id))}>
-              <TableCell>
+    <div>
+<ListTable
+        label={t('Tenants')}
+        fit="inline"
+        searchLabel={t('Filter the tenants')}
+        rows={q.data!}
+        rowKey={(x) => x.id}
+        rowProps={(x) => ({ className: 'cursor-pointer', onClick: () => go(to.adminTenant(x.id)) })}
+        columns={[
+          {
+            key: 'tenant',
+            title: t('Tenant'),
+            width: 'minmax(10rem,1.6fr)',
+            sort: (x) => x.name,
+            cell: (x) => (
+              <>
                 <a href={to.adminTenant(x.id)} className="font-medium hover:underline" onClick={(e) => e.stopPropagation()}>
                   {x.name}
                 </a>
                 {x.archived ? <span className="ml-2 text-xs text-muted-foreground">{t('archived')}</span> : x.status !== 'active' ? <span className="ml-2 text-xs text-destructive">{t('suspended')}</span> : null}
-              </TableCell>
-              <TableCell className="text-right tabular-nums">{fmtNumber(x.requests_1h)}</TableCell>
-              <TableCell className="text-right tabular-nums">{fmtNumber(x.requests_24h)}</TableCell>
-              <TableCell className="text-right tabular-nums">{x.people}</TableCell>
-              <TableCell className="text-right tabular-nums">{x.items}</TableCell>
-              <TableCell className="text-right tabular-nums">{fmtBytes(x.bytes)}</TableCell>
-              <TableCell>
-                {x.nearest_quota && x.nearest_quota.percent !== null ? (
-                  <span className={cn('tabular-nums', x.nearest_quota.percent >= 100 ? 'text-destructive' : x.nearest_quota.percent >= 80 ? 'text-warn' : '')}>
-                    {({ storage: t('Storage'), people: t('People'), items: t('Items') } as Record<string, string>)[x.nearest_quota.metric]} · {x.nearest_quota.percent}%
-                  </span>
-                ) : (
-                  <span className="text-muted-foreground">{t('no limit')}</span>
-                )}
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>)}</Sliced>
+              </>
+            ),
+          },
+          { key: 'r1', title: t('Requests, 1 hour'), width: 'minmax(7rem,.8fr)', align: 'right', sort: (x) => x.requests_1h, cell: (x) => fmtNumber(x.requests_1h) },
+          { key: 'r24', title: t('Requests, 24 hours'), width: 'minmax(7rem,.8fr)', align: 'right', sort: (x) => x.requests_24h, cell: (x) => fmtNumber(x.requests_24h) },
+          { key: 'people', title: t('People'), width: 'minmax(5rem,.6fr)', align: 'right', sort: (x) => x.people, cell: (x) => x.people },
+          { key: 'items', title: t('Items'), width: 'minmax(5rem,.6fr)', align: 'right', sort: (x) => x.items, cell: (x) => x.items },
+          { key: 'space', title: t('Space'), width: 'minmax(6rem,.7fr)', align: 'right', sort: (x) => x.bytes, cell: (x) => fmtBytes(x.bytes) },
+          {
+            key: 'quota',
+            title: t('Nearest quota'),
+            width: 'minmax(9rem,1fr)',
+            sort: (x) => x.nearest_quota?.percent ?? null,
+            cell: (x) =>
+              x.nearest_quota && x.nearest_quota.percent !== null ? (
+                <span className={cn('tabular-nums', x.nearest_quota.percent >= 100 ? 'text-destructive' : x.nearest_quota.percent >= 80 ? 'text-warn' : '')}>
+                  {({ storage: t('Storage'), people: t('People'), items: t('Items') } as Record<string, string>)[x.nearest_quota.metric]} · {x.nearest_quota.percent}%
+                </span>
+              ) : (
+                <span className="text-muted-foreground">{t('no limit')}</span>
+              ),
+          },
+        ]}
+      />
     </div>
   )
 }

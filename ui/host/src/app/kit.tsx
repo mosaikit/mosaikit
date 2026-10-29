@@ -3,7 +3,7 @@
 // object); save bar only with changes; settings managed by the platform; dialogs
 // with a form, empty and loading states.
 
-import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode, type RefObject } from 'react'
 import { ChevronRight, Loader2, Lock, MoreHorizontal } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -290,8 +290,8 @@ export function Sections({ sections, current, href, children }: { sections: Sect
 /** The foot of a long list: how many rows are shown of how many. The next page loads by itself when
  *  the foot comes into view (infinite scroll); «Load more» stays for the keyboard and for browsers
  *  without IntersectionObserver. */
-export function MoreRows({ shown, total, more, loading, onMore, label }: { shown: number; total: number | null; more: boolean; loading?: boolean; onMore: () => void; label?: string }) {
-  const foot = useRef<HTMLDivElement>(null)
+export function MoreRows({ shown, total, more, loading, onMore, label, inTable }: { shown: number; total: number | null; more: boolean; loading?: boolean; onMore: () => void; label?: string; inTable?: boolean }) {
+  const foot = useRef<HTMLElement>(null)
   const act = useRef(onMore)
   useEffect(() => {
     act.current = onMore
@@ -307,8 +307,8 @@ export function MoreRows({ shown, total, more, loading, onMore, label }: { shown
     // a page that arrived and left the foot in view must ask for the next: observe again
   }, [more, loading, shown])
   if (total === 0) return null
-  return (
-    <div ref={foot} className="flex flex-wrap items-center justify-center gap-3 py-2 text-sm text-muted-foreground">
+  const body = (
+    <>
       <span className="tabular-nums">
         {total === null ? t('{shown} loaded', { shown: String(shown) }) : t('{shown} of {total}', { shown: String(shown), total: String(total) })}
       </span>
@@ -318,6 +318,19 @@ export function MoreRows({ shown, total, more, loading, onMore, label }: { shown
           {label ?? t('Load more')}
         </Button>
       )}
+    </>
+  )
+  const cls = 'flex flex-wrap items-center justify-center gap-3 py-2 text-sm text-muted-foreground'
+  // in a table the foot is the last row of the rows that scroll: it comes into view only at their end
+  return inTable ? (
+    <tr ref={foot as RefObject<HTMLTableRowElement>} role="row" data-foot style={{ gridColumn: '1 / -1' }}>
+      <td role="cell" className={cls} style={{ gridColumn: '1 / -1' }}>
+        {body}
+      </td>
+    </tr>
+  ) : (
+    <div ref={foot as RefObject<HTMLDivElement>} className={cls}>
+      {body}
     </div>
   )
 }

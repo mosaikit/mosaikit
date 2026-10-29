@@ -11,13 +11,12 @@ import { api, appUrl, fmtBytes, fmtDate } from '../../api.ts'
 import type { LogEvent, LogPage as LogPageData, Member, PersonRow, Revoked, SharedByMe, TenantInfo, TrashItem, TrashList } from '../../types.ts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useAction, useApi, useConfirm, usePaged, useTenantCtx } from '../core.ts'
 import { BulkBar, FilterColumn, ListPage } from '../listkit.tsx'
+import { ListTable } from '../ListTable.tsx'
 import { t } from '../i18n.ts'
 import { about, describe } from '../logtext.ts'
 import { Empty, ErrorBox, FillBody, FillPage, Loading, MoreRows, PageHeader, Pills } from '../kit.tsx'
@@ -165,75 +164,64 @@ export function TrashPage({ slug }: { slug: string }) {
             {t('What you delete stays here {days} days, then it is deleted for good.', { days })}
           </Empty>
         ) : (
-          <div className="overflow-x-auto rounded-xl border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-10">
-                    <Checkbox aria-label={t('Select all')} checked={all ? true : ids.length ? 'indeterminate' : false} onCheckedChange={(v) => setSel(v ? new Set(rows.map((r) => r.id)) : new Set())} />
-                  </TableHead>
-                  <TableHead>{t('Item')}</TableHead>
-                  {manager && <TableHead>{t('Owner')}</TableHead>}
-                  <TableHead>{t('Deleted')}</TableHead>
-                  <TableHead className="text-right">{t('Size')}</TableHead>
-                  <TableHead>{t('Deleted for good on')}</TableHead>
-                  <TableHead />
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {rows.map((r) => (
-                  <TableRow key={r.id} data-state={sel.has(r.id) ? 'selected' : undefined}>
-                    <TableCell>
-                      <Checkbox
-                        aria-label={t('Select {name}', {
-                          name: r.title || r.kind,
-                        })}
-                        checked={sel.has(r.id)}
-                        onCheckedChange={(v) => {
-                          const n = new Set(sel)
-                          if (v) n.add(r.id)
-                          else n.delete(r.id)
-                          setSel(n)
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell>
-                      <b className="block font-medium">{r.title || <span className="font-normal text-muted-foreground italic">{t('title hidden')}</span>}</b>
-                      <span className="text-xs text-muted-foreground">
-                        {label(r.plugin_id)} · {r.kind}
-                        {r.inside_deleted && ` · ${t('inside another deleted item')}`}
-                      </span>
-                    </TableCell>
-                    {manager && <TableCell>{r.owner_name}</TableCell>}
-                    <TableCell>
-                      <span className="block">{fmtDate(r.deleted_at)}</span>
-                      {r.deleted_by_name && <span className="text-xs text-muted-foreground">{t('by {name}', { name: r.deleted_by_name })}</span>}
-                    </TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtBytes(r.size_bytes)}</TableCell>
-                    <TableCell className="text-muted-foreground">{fmtDate(r.purge_at)}</TableCell>
-                    <TableCell className="text-right whitespace-nowrap">
-                      <Button variant="ghost" size="sm" disabled={r.inside_deleted} title={r.inside_deleted ? t('Restore the item that contains it') : undefined} onClick={() => restore.mutate([r.id])}>
-                        <RotateCcw />
-                        {t('Restore')}
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        aria-label={t('Delete {name} for good', {
-                          name: r.title || r.kind,
-                        })}
-                        onClick={() => void askPurge([r.id])}
-                      >
-                        <Trash2 />
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+          <ListTable
+            label={t('Trash')}
+            rows={rows}
+            rowKey={(r) => r.id}
+            server={{ total: q.total, more: !!q.more, loading: q.loadingMore, onMore: q.loadMore }}
+            selection={{ ids: sel, onChange: setSel, label: (r) => t('Select {name}', { name: r.title || r.kind }) }}
+            columns={[
+              {
+                key: 'item',
+                title: t('Item'),
+                width: 'minmax(12rem,2fr)',
+                sort: (r) => r.title,
+                cell: (r) => (
+                  <>
+                    <b className="block font-medium">{r.title || <span className="font-normal text-muted-foreground italic">{t('title hidden')}</span>}</b>
+                    <span className="text-xs text-muted-foreground">
+                      {label(r.plugin_id)} · {r.kind}
+                      {r.inside_deleted && ` · ${t('inside another deleted item')}`}
+                    </span>
+                  </>
+                ),
+              },
+              ...(manager ? [{ key: 'owner', title: t('Owner'), width: 'minmax(8rem,1fr)', sort: (r: TrashItem) => r.owner_name, cell: (r: TrashItem) => r.owner_name }] : []),
+              {
+                key: 'deleted',
+                title: t('Deleted'),
+                width: 'minmax(9rem,1.2fr)',
+                sort: (r) => r.deleted_at,
+                cell: (r) => (
+                  <>
+                    <span className="block">{fmtDate(r.deleted_at)}</span>
+                    {r.deleted_by_name && <span className="text-xs text-muted-foreground">{t('by {name}', { name: r.deleted_by_name })}</span>}
+                  </>
+                ),
+              },
+              { key: 'size', title: t('Size'), width: 'minmax(6rem,.7fr)', align: 'right', sort: (r) => r.size_bytes, cell: (r) => fmtBytes(r.size_bytes) },
+              { key: 'purge', title: t('Deleted for good on'), width: 'minmax(8rem,1fr)', sort: (r) => r.purge_at, className: 'text-muted-foreground', cell: (r) => fmtDate(r.purge_at) },
+              {
+                key: 'actions',
+                title: t('Actions'),
+                hideTitle: true,
+                width: 'minmax(9rem,auto)',
+                className: 'justify-self-end whitespace-nowrap',
+                cell: (r) => (
+                  <>
+                    <Button variant="ghost" size="sm" disabled={r.inside_deleted} title={r.inside_deleted ? t('Restore the item that contains it') : undefined} onClick={() => restore.mutate([r.id])}>
+                      <RotateCcw />
+                      {t('Restore')}
+                    </Button>
+                    <Button variant="ghost" size="sm" aria-label={t('Delete {name} for good', { name: r.title || r.kind })} onClick={() => void askPurge([r.id])}>
+                      <Trash2 />
+                    </Button>
+                  </>
+                ),
+              },
+            ]}
+          />
         )}
-        <MoreRows shown={rows.length} total={q.total} more={q.more} loading={q.loadingMore} onMore={q.loadMore} />
       </ListPage>
     </>
   )
@@ -396,7 +384,6 @@ export function LogView({ scope, fixed = {}, compact = false }: { scope: LogScop
   const people = useApi<(Member | PersonRow)[]>(['log-people', scope.api], compact ? null : scope.admin ? '/api/admin/people' : `/api/t/${enc(scope.slug ?? '')}/manage/members`)
   const tenants = useApi<TenantInfo[]>(['tenants'], scope.admin && !compact ? '/api/admin/tenants' : null)
   const ids = [...sel].filter((id) => events.some((e) => e.id === id))
-  const all = events.length > 0 && ids.length === events.length
   const set = (patch: Partial<Filters>) => {
     setF({ ...f, ...patch })
     setSel(new Set())
@@ -519,71 +506,63 @@ export function LogView({ scope, fixed = {}, compact = false }: { scope: LogScop
       ) : events.length === 0 ? (
         <Empty icon={<History />} title={compact ? t('No activity yet') : t('No event with these filters')} />
       ) : (
-        <div className="overflow-x-auto rounded-xl border bg-card">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                {!compact && (
-                  <TableHead className="w-10">
-                    <Checkbox aria-label={t('Select all')} checked={all ? true : ids.length ? 'indeterminate' : false} onCheckedChange={(v) => setSel(v ? new Set(events.map((e) => e.id)) : new Set())} />
-                  </TableHead>
-                )}
-                <TableHead>{t('When')}</TableHead>
-                {!compact && <TableHead>{t('Who')}</TableHead>}
-                <TableHead>{t('What')}</TableHead>
-                <TableHead>{t('On what')}</TableHead>
-                {scope.admin && <TableHead>{t('Tenant')}</TableHead>}
-                <TableHead>{t('Result')}</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {events.map((e) => (
-                <TableRow key={e.id} className="cursor-pointer" data-state={sel.has(e.id) ? 'selected' : undefined} onClick={() => setOpen(e)}>
-                  {!compact && (
-                    <TableCell onClick={(ev) => ev.stopPropagation()}>
-                      <Checkbox
-                        aria-label={t('Select the event of {when}', {
-                          when: fmtDate(e.ts),
-                        })}
-                        checked={sel.has(e.id)}
-                        onCheckedChange={(v) => {
-                          const n = new Set(sel)
-                          if (v) n.add(e.id)
-                          else n.delete(e.id)
-                          setSel(n)
-                        }}
-                      />
-                    </TableCell>
-                  )}
-                  <TableCell className="whitespace-nowrap text-muted-foreground">{fmtDate(e.ts)}</TableCell>
-                  {!compact && <TableCell>{e.user_name ?? <span className="text-muted-foreground">{t('nobody (system)')}</span>}</TableCell>}
-                  <TableCell>
-                    <button type="button" className="text-left font-medium hover:underline" onClick={(ev) => (ev.stopPropagation(), setOpen(e))}>
-                      {describe(e)}
-                    </button>
-                  </TableCell>
-                  <TableCell className="max-w-72 truncate">
-                    {about(e)}
-                    {e.plugin_id && <span className="text-xs text-muted-foreground">{about(e) ? ' · ' : ''}{label(e.plugin_id)}</span>}
-                  </TableCell>
-                  {scope.admin && <TableCell>{e.tenant_name ?? '—'}</TableCell>}
-                  <TableCell>
-                    {e.ok ? (
-                      <span className="text-sm text-muted-foreground">{t('Done')}</span>
-                    ) : (
-                      <Badge variant="secondary" className="gap-1 bg-destructive/10 font-normal text-destructive dark:text-red-300">
-                        <CircleAlert className="size-3" />
-                        {t('Failed')}
-                      </Badge>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+        <ListTable
+          label={t('Activity')}
+          fit={compact ? 'inline' : 'fill'}
+          searchLabel={compact ? t('Filter the activity') : undefined}
+          rows={events}
+          rowKey={(e) => e.id}
+          server={{ total: null, more: !!pages.hasNextPage, loading: pages.isFetchingNextPage, onMore: () => void pages.fetchNextPage(), label: t('Older events') }}
+          selection={compact ? undefined : { ids: sel, onChange: setSel, label: (e) => t('Select the event of {when}', { when: fmtDate(e.ts) }) }}
+          rowProps={(e) => ({ className: 'cursor-pointer', onClick: () => setOpen(e) })}
+          columns={[
+            { key: 'when', title: t('When'), width: 'minmax(9rem,1fr)', sort: (e) => e.ts, className: 'whitespace-nowrap text-muted-foreground', cell: (e) => fmtDate(e.ts) },
+            ...(compact ? [] : [{ key: 'who', title: t('Who'), width: 'minmax(8rem,1fr)', sort: (e: LogEvent) => e.user_name ?? '', cell: (e: LogEvent) => e.user_name ?? <span className="text-muted-foreground">{t('nobody (system)')}</span> }]),
+            {
+              key: 'what',
+              title: t('What'),
+              width: 'minmax(12rem,1.6fr)',
+              sort: (e) => describe(e),
+              cell: (e) => (
+                <button type="button" className="text-left font-medium hover:underline" onClick={(ev) => (ev.stopPropagation(), setOpen(e))}>
+                  {describe(e)}
+                </button>
+              ),
+            },
+            {
+              key: 'about',
+              title: t('On what'),
+              width: 'minmax(10rem,1.4fr)',
+              sort: (e) => about(e),
+              text: (e) => `${about(e)} ${e.plugin_id ? label(e.plugin_id) : ''}`,
+              className: 'truncate',
+              cell: (e) => (
+                <>
+                  {about(e)}
+                  {e.plugin_id && <span className="text-xs text-muted-foreground">{about(e) ? ' · ' : ''}{label(e.plugin_id)}</span>}
+                </>
+              ),
+            },
+            ...(scope.admin ? [{ key: 'tenant', title: t('Tenant'), width: 'minmax(8rem,1fr)', sort: (e: LogEvent) => e.tenant_name ?? '', cell: (e: LogEvent) => e.tenant_name ?? '—' }] : []),
+            {
+              key: 'result',
+              title: t('Result'),
+              width: 'minmax(7rem,.8fr)',
+              sort: (e) => (e.ok ? 0 : 1),
+              text: (e) => (e.ok ? t('Done') : t('Failed')),
+              cell: (e) =>
+                e.ok ? (
+                  <span className="text-sm text-muted-foreground">{t('Done')}</span>
+                ) : (
+                  <Badge variant="secondary" className="gap-1 bg-destructive/10 font-normal text-destructive dark:text-red-300">
+                    <CircleAlert className="size-3" />
+                    {t('Failed')}
+                  </Badge>
+                ),
+            },
+          ]}
+        />
       )}
-      {events.length > 0 && <MoreRows shown={events.length} total={null} more={!!pages.hasNextPage} loading={pages.isFetchingNextPage} onMore={() => void pages.fetchNextPage()} label={t('Older events')} />}
       {!compact && events.length > 0 && (
         <p className="text-xs text-muted-foreground">
           <a className="underline-offset-4 hover:underline" href={csv()} download>

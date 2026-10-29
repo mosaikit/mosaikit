@@ -131,8 +131,8 @@ export function ListPage({ title, section, sub, bar, actions, secondary, more, f
       />
       <div className="msk-list flex min-h-0 flex-1 max-[760px]:flex-col">
         <div className={cn('contents', hidden && 'min-[761px]:[&>aside]:hidden', !open && 'max-[760px]:[&>aside]:hidden')}>{filters}</div>
-        <FillBody>
-          <div className="grid content-start gap-3 p-6 max-[620px]:p-4">{children}</div>
+        <FillBody className="flex flex-col">
+          <div className="flex min-h-0 flex-1 flex-col gap-3 p-6 max-[620px]:p-4">{children}</div>
         </FillBody>
       </div>
     </FillPage>
