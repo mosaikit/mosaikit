@@ -600,7 +600,7 @@ export function LogView({ scope, fixed = {}, compact = false }: { scope: LogScop
     return (
       <>
         <div className="shrink-0 border-b px-6 py-3 max-[620px]:px-4">{bar}</div>
-        <FillBody className="grid content-start gap-3 p-6 max-[620px]:p-4">{list}</FillBody>
+        <FillBody className="flex flex-col gap-3 overflow-hidden p-6 max-[620px]:p-4">{list}</FillBody>
       </>
     )
   return <div className="grid gap-3">{list}</div>

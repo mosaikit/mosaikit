@@ -12,11 +12,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
 import type { PluginKpi } from '../types.ts'
 import { t } from './i18n.ts'
 import { go } from './router.ts'
+import { ListTable } from './ListTable.tsx'
 
 export interface Crumb {
   label: string
@@ -556,35 +556,22 @@ export function Kpi({ label, value, hint, onClick }: { label: string; value: Rea
 export function DataTable({ rows, label, columns = {} }: { rows: Record<string, unknown>[]; label?: string; columns?: Record<string, string> }) {
   if (!rows.length) return <p className="text-sm text-muted-foreground">{t('No data.')}</p>
   const cols = Object.keys(rows[0])
+  const val = (r: Record<string, unknown>, c: string) => (r[c] === null || r[c] === undefined ? null : typeof r[c] === 'number' ? (r[c] as number) : String(r[c]))
   return (
-    <Sliced items={rows} step={25}>
-      {(shown) => (
-    <div className="overflow-x-auto rounded-xl border bg-card">
-      <Table aria-label={label}>
-        <TableHeader>
-          <TableRow>
-            {cols.map((c) => (
-              <TableHead key={c} className={columns[c] ? undefined : 'capitalize'}>
-                {columns[c] ?? c.replace(/_/g, ' ')}
-              </TableHead>
-            ))}
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {shown.map((r, i) => (
-            <TableRow key={i}>
-              {cols.map((c) => (
-                <TableCell key={c} className={typeof r[c] === 'number' ? 'text-right tabular-nums' : undefined}>
-                  {r[c] === null || r[c] === undefined ? '—' : String(r[c])}
-                </TableCell>
-              ))}
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-      )}
-    </Sliced>
+    <ListTable
+      label={label ?? t('Data')}
+      fit="inline"
+      searchLabel={t('Filter the rows')}
+      rows={rows}
+      rowKey={(_r) => String(rows.indexOf(_r))}
+      columns={cols.map((c) => ({
+        key: c,
+        title: columns[c] ?? c.replace(/_/g, ' '),
+        align: typeof rows[0][c] === 'number' ? ('right' as const) : undefined,
+        sort: (r: Record<string, unknown>) => val(r, c),
+        cell: (r: Record<string, unknown>) => (val(r, c) === null ? '—' : String(r[c])),
+      }))}
+    />
   )
 }
 

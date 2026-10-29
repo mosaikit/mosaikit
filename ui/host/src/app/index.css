@@ -637,11 +637,6 @@ html[data-style-buttons='soft'] [data-slot='button'][data-variant='default']:hov
 .msk-gridtable tr[data-foot] > td {
   grid-column: 1 / -1;
 }
-.msk-listscroll thead {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-}
 .msk-listscroll thead th,
 .msk-listscroll [data-slot='table-head'] {
   background: var(--card);
@@ -656,20 +651,10 @@ html[data-style-buttons='soft'] [data-slot='button'][data-variant='default']:hov
   margin-top: -1.5rem;
   padding-top: 1.5rem;
 }
-.msk-listscroll:has(.msk-pills-top) thead {
-  top: 4rem;
-}
-/* a row of filters pinned on top of the list: the header row of the table sticks below it */
-.msk-listscroll:has(.msk-pinrow) thead {
-  top: 3.25rem;
-}
 @media (max-width: 620px) {
   .msk-pills-top {
     margin-top: -1rem;
     padding-top: 1rem;
-  }
-  .msk-listscroll:has(.msk-pills-top) thead {
-    top: 3.5rem;
   }
 }
 /* in a page that does not scroll the header needs no sticky offset (it would be pushed down by it) */

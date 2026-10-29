@@ -9,18 +9,18 @@ import { api, fmtDate } from '../../api.ts'
 import type { AdminPlugin, CatalogItem, ConfigDecl, PluginConfig, PluginKind, PluginTenant, TenantPlugin, UninstallImpact } from '../../types.ts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table'
 import { useAction, useApi, useConfirm } from '../core.ts'
 import AppIcon from '../AppIcon.tsx'
-import { Brochure } from './brochure.tsx'
+import { Brochure, PluginSummary } from './brochure.tsx'
 import { Empty, ErrorBox, FormDialog, Loading, PageHeader, Pills, SaveBar, StatusBadge, Sliced, Tabs, FillBody, FillPage } from '../kit.tsx'
-import { FilterBox, ListTable } from '../ListTable.tsx'
-import { cn } from '@/lib/utils'
+import { applyView, CardGrid, FilterBox, ListTable, SortMenu, useView, ViewSwitch, type Col, type Sort } from '../ListTable.tsx'
 import { go, to } from '../router.ts'
 import { t } from '../i18n.ts'
 
@@ -79,6 +79,8 @@ export function AdminPlugins({ section }: { section?: string }) {
   const file = useRef<HTMLInputElement>(null)
   const [kind, setKind] = useState('all')
   const [q, setQ] = useState('')
+  const [view, setView] = useView('msk_plugins_view')
+  const [sort, setSort] = useState<Sort>(null)
   const [sel, setSel] = useState<Set<string>>(new Set())
   const cur = section === 'updates' || section === 'catalog' ? section : 'installed'
   const inval = [['admin-plugins'], ['admin-catalog'], ['admin-overview']]
@@ -90,6 +92,84 @@ export function AdminPlugins({ section }: { section?: string }) {
   const available = (catalog.data ?? []).filter((c) => !c.installed)
   const byId = new Map((catalog.data ?? []).map((c) => [c.id, c]))
   const rows = (installed.data ?? []).filter((p) => kind === 'all' || kindOf(p) === kind)
+  const installedCols: Col<AdminPlugin>[] = [
+      {
+        key: 'label',
+        title: t('Plugins'),
+        width: 'minmax(12rem,2.2fr)',
+        sort: (p) => p.label,
+        text: (p) => [p.label, p.id, p.description, p.author].join(' '),
+        cell: (p) => (
+          <a href={to.adminPlugin(p.id)} className="flex items-center gap-2.5 hover:underline">
+            <AppIcon id={p.id} name={p.icon_name} className="size-5 text-primary" />
+            <span>
+              <b className="block font-medium">{p.label}</b>
+              <span className="font-mono text-xs text-muted-foreground">{p.id}</span>
+            </span>
+          </a>
+        ),
+      },
+      {
+        key: 'kind',
+        title: t('Kind'),
+        width: 'minmax(9rem,1.4fr)',
+        sort: (p) => kindLabel(kindOf(p)),
+        cell: (p) => (
+          <>
+            <KindBadge kind={kindOf(p)} />
+            {p.dev && (
+              <Badge variant="outline" className="ml-1.5 font-normal">
+                {t('development')}
+              </Badge>
+            )}
+          </>
+        ),
+      },
+      {
+        key: 'version',
+        title: t('Version'),
+        width: 'minmax(7rem,.9fr)',
+        sort: (p) => p.version,
+        className: 'font-mono text-xs',
+        cell: (p) => (
+          <>
+            {p.version}
+            {byId.get(p.id)?.update_available && <span className="ml-1.5 text-primary-strong">→ {byId.get(p.id)?.latest}</span>}
+          </>
+        ),
+      },
+      {
+        key: 'signed',
+        title: t('Signature'),
+        width: 'minmax(8rem,1fr)',
+        sort: (p) => p.signed_by ?? '',
+        className: 'text-sm',
+        cell: (p) => (p.signed_by ? <SignedBy value={p.signed_by} /> : <span className="text-warn">{t('unsigned')}</span>),
+      },
+      { key: 'status', title: t('Status'), width: 'minmax(7rem,.9fr)', sort: (p) => p.status, cell: (p) => <StatusBadge status={p.status} /> },
+    ]
+  const catalogCols: Col<CatalogItem>[] = [
+    { key: 'name', title: t('Plugins'), width: 'minmax(12rem,1.6fr)', sort: (c) => c.name, text: (c) => `${c.name} ${c.id} ${c.description}`, cell: (c) => <b className="font-medium">{c.name}</b> },
+    { key: 'kind', title: t('Kind'), width: 'minmax(8rem,.8fr)', sort: (c) => kindLabel(c.kind ?? 'app'), cell: (c) => <KindBadge kind={c.kind ?? 'app'} /> },
+    { key: 'version', title: t('Version'), width: 'minmax(8rem,.8fr)', sort: (c) => c.latest, className: 'font-mono text-xs', cell: (c) => (c.installed ? `${c.installed} → ${c.latest}` : c.latest) },
+    { key: 'description', title: t('Description'), width: 'minmax(14rem,2.4fr)', sort: (c) => c.description, className: 'text-sm text-muted-foreground', cell: (c) => c.description },
+    {
+      key: 'actions',
+      title: t('Actions'),
+      hideTitle: true,
+      width: 'minmax(9rem,auto)',
+      className: 'justify-self-end',
+      cell: (c) => (
+        <Button size="sm" disabled={install.isPending} onClick={() => install.mutate(c.id)}>
+          {c.installed ? <ArrowUpCircle /> : null}
+          {c.installed ? t('Update to {v}', { v: c.latest }) : t('Install')}
+        </Button>
+      ),
+    },
+  ]
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean)
+  const prepared = applyView(rows, installedCols, words, sort)
+  const preparedCatalog = applyView(cur === 'updates' ? updates : available, catalogCols, words, sort)
   const ids = [...sel].filter((id) => rows.some((r) => r.id === id))
   const picked = rows.filter((r) => ids.includes(r.id))
   async function bulk(what: 'update' | 'off' | 'uninstall') {
@@ -109,7 +189,12 @@ export function AdminPlugins({ section }: { section?: string }) {
       <PageHeader
         title={t('Plugins')}
         sub={t('Installed on the platform and available in the trusted registries')}
-        filter={cur === 'installed' ? <FilterBox value={q} onChange={setQ} label={t('Filter the plugins')} /> : undefined}
+        filter={
+          <>
+            <FilterBox value={q} onChange={setQ} label={t('Filter the plugins')} />
+            <ViewSwitch view={view} onChange={setView} />
+          </>
+        }
         actions={
           <>
             <input
@@ -159,7 +244,7 @@ export function AdminPlugins({ section }: { section?: string }) {
           </div>
         )}
     </div>
-      <FillBody className={cn('grid content-start gap-3 p-6 max-[620px]:p-4', cur === 'installed' && 'flex flex-col overflow-hidden')}>
+      <FillBody className="flex flex-col gap-3 overflow-hidden p-6 max-[620px]:p-4">
         {cur === 'installed' ? (
           installed.isLoading ? (
             <Loading />
@@ -167,70 +252,38 @@ export function AdminPlugins({ section }: { section?: string }) {
             <ErrorBox error={installed.error} />
           ) : !installed.data?.length ? (
             <Empty icon={<Puzzle />} title={t('No plugin installed')} />
+          ) : view === 'table' ? (
+            <ListTable label={t('Plugins')} rows={rows} rowKey={(p) => p.id} filter={q} sort={sort} onSort={setSort} selection={{ ids: sel, onChange: setSel, label: (p) => t('Select {name}', { name: p.label }) }} columns={installedCols} />
           ) : (
             <>
-              <ListTable
+              <div className="flex flex-wrap items-center gap-3">
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox
+                    aria-label={t('Select all')}
+                    checked={prepared.length > 0 && prepared.every((p) => sel.has(p.id)) ? true : prepared.some((p) => sel.has(p.id)) ? 'indeterminate' : false}
+                    onCheckedChange={(v) => setSel(v ? new Set(prepared.map((p) => p.id)) : new Set())}
+                  />
+                  {t('Select all')}
+                </label>
+                <SortMenu columns={installedCols} sort={sort} onSort={setSort} />
+              </div>
+              <CardGrid
                 label={t('Plugins')}
-                rows={rows}
+                rows={prepared}
                 rowKey={(p) => p.id}
-                filter={q}
-                selection={{ ids: sel, onChange: setSel, label: (p) => t('Select {name}', { name: p.label }) }}
-                columns={[
-                  {
-                    key: 'label',
-                    title: t('Plugins'),
-                    width: 'minmax(12rem,2.2fr)',
-                    sort: (p) => p.label,
-                    text: (p) => [p.label, p.id, p.description, p.author].join(' '),
-                    cell: (p) => (
-                      <a href={to.adminPlugin(p.id)} className="flex items-center gap-2.5 hover:underline">
-                        <AppIcon id={p.id} name={p.icon_name} className="size-5 text-primary" />
-                        <span>
-                          <b className="block font-medium">{p.label}</b>
-                          <span className="font-mono text-xs text-muted-foreground">{p.id}</span>
-                        </span>
-                      </a>
-                    ),
-                  },
-                  {
-                    key: 'kind',
-                    title: t('Kind'),
-                    width: 'minmax(9rem,1.4fr)',
-                    sort: (p) => kindLabel(kindOf(p)),
-                    cell: (p) => (
-                      <>
-                        <KindBadge kind={kindOf(p)} />
-                        {p.dev && (
-                          <Badge variant="outline" className="ml-1.5 font-normal">
-                            {t('development')}
-                          </Badge>
-                        )}
-                      </>
-                    ),
-                  },
-                  {
-                    key: 'version',
-                    title: t('Version'),
-                    width: 'minmax(7rem,.9fr)',
-                    sort: (p) => p.version,
-                    className: 'font-mono text-xs',
-                    cell: (p) => (
-                      <>
-                        {p.version}
-                        {byId.get(p.id)?.update_available && <span className="ml-1.5 text-primary-strong">→ {byId.get(p.id)?.latest}</span>}
-                      </>
-                    ),
-                  },
-                  {
-                    key: 'signed',
-                    title: t('Signature'),
-                    width: 'minmax(8rem,1fr)',
-                    sort: (p) => p.signed_by ?? '',
-                    className: 'text-sm',
-                    cell: (p) => (p.signed_by ? <SignedBy value={p.signed_by} /> : <span className="text-warn">{t('unsigned')}</span>),
-                  },
-                  { key: 'status', title: t('Status'), width: 'minmax(7rem,.9fr)', sort: (p) => p.status, cell: (p) => <StatusBadge status={p.status} /> },
-                ]}
+                card={(p) => (
+                  <PluginCard
+                    p={p}
+                    update={byId.get(p.id)?.update_available ? byId.get(p.id)?.latest : undefined}
+                    selected={sel.has(p.id)}
+                    onSelect={(on) => {
+                      const n = new Set(sel)
+                      if (on) n.add(p.id)
+                      else n.delete(p.id)
+                      setSel(n)
+                    }}
+                  />
+                )}
               />
             </>
           )
@@ -240,45 +293,82 @@ export function AdminPlugins({ section }: { section?: string }) {
           <ErrorBox error={catalog.error} />
         ) : (cur === 'updates' ? updates : available).length === 0 ? (
           <Empty icon={<Puzzle />} title={cur === 'updates' ? t('No updates') : t('Nothing to install in the catalog')} />
+        ) : view === 'table' ? (
+          <ListTable label={cur === 'updates' ? t('Updates') : t('Catalog')} rows={cur === 'updates' ? updates : available} rowKey={(c) => c.id} filter={q} sort={sort} onSort={setSort} columns={catalogCols} />
         ) : (
-          <div className="grid gap-3">
-            {(cur === 'updates' ? updates : available).map((c) => (
-              <Card key={c.id}>
-                <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
-                  <div className="grid gap-1">
-                    <CardTitle className="flex flex-wrap items-center gap-2">
-                      {c.name}
-                      <KindBadge kind={c.kind ?? 'app'} />
-                    </CardTitle>
-                    <CardDescription>
-                      {c.description}
-                      {c.extends && <> · {t('Extends {name}', { name: installed.data?.find((x) => x.id === c.extends)?.label ?? c.extends })}</>}
-                    </CardDescription>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="font-mono text-xs">{c.installed ? `${c.installed} → ${c.latest}` : c.latest}</span>
-                    <Button size="sm" disabled={install.isPending} onClick={() => install.mutate(c.id)}>
-                      {c.installed ? <ArrowUpCircle /> : null}
-                      {c.installed ? t('Update to {v}', { v: c.latest }) : t('Install')}
-                    </Button>
-                  </div>
-                </CardHeader>
-                {!!c.notes?.length && (
-                  <CardContent className="grid gap-2 text-sm">
-                    {c.notes.map((n) => (
-                      <div key={n.version}>
-                        <b className="font-mono text-xs">{n.version}</b>
-                        <p className="whitespace-pre-line text-muted-foreground">{n.notes}</p>
-                      </div>
-                    ))}
-                  </CardContent>
-                )}
-              </Card>
-            ))}
-          </div>
+          <>
+            <div className="flex flex-wrap items-center gap-3">
+              <SortMenu columns={catalogCols} sort={sort} onSort={setSort} />
+            </div>
+            <CardGrid
+              label={cur === 'updates' ? t('Updates') : t('Catalog')}
+              rows={preparedCatalog}
+              rowKey={(c) => c.id}
+              min="22rem"
+              card={(c) => (
+<Card className="h-full">
+  <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
+    <div className="grid gap-1">
+      <CardTitle className="flex flex-wrap items-center gap-2">
+        {c.name}
+        <KindBadge kind={c.kind ?? 'app'} />
+      </CardTitle>
+      <CardDescription>
+        {c.description}
+        {c.extends && <> · {t('Extends {name}', { name: installed.data?.find((x) => x.id === c.extends)?.label ?? c.extends })}</>}
+      </CardDescription>
+    </div>
+    <div className="flex items-center gap-3">
+      <span className="font-mono text-xs">{c.installed ? `${c.installed} → ${c.latest}` : c.latest}</span>
+      <Button size="sm" disabled={install.isPending} onClick={() => install.mutate(c.id)}>
+        {c.installed ? <ArrowUpCircle /> : null}
+        {c.installed ? t('Update to {v}', { v: c.latest }) : t('Install')}
+      </Button>
+    </div>
+  </CardHeader>
+  {!!c.notes?.length && (
+    <CardContent className="grid gap-2 text-sm">
+      {c.notes.map((n) => (
+        <div key={n.version}>
+          <b className="font-mono text-xs">{n.version}</b>
+          <p className="whitespace-pre-line text-muted-foreground">{n.notes}</p>
+        </div>
+      ))}
+    </CardContent>
+  )}
+</Card>
+              )}
+            />
+          </>
         )}
       </FillBody>
     </FillPage>
+  )
+}
+
+/** A plugin of the installed list as a card: the identity of the brochure (icon, name, description, badges), who made it
+ *  and whether it is signed, its status; the whole card opens the plugin, the box selects it. */
+function PluginCard({ p, update, selected, onSelect }: { p: AdminPlugin; update?: string; selected: boolean; onSelect: (on: boolean) => void }) {
+  return (
+    <div data-testid="plugin-card" data-state={selected ? 'selected' : undefined} className="relative flex h-full flex-col gap-3 rounded-xl border bg-card p-4 transition-colors hover:border-primary/50 data-[state=selected]:border-primary data-[state=selected]:bg-primary/5">
+      <Checkbox className="absolute top-3 right-3 z-10" aria-label={t('Select {name}', { name: p.label })} checked={selected} onCheckedChange={(v) => onSelect(!!v)} />
+      <PluginSummary card p={p} kind={kindLabel(kindOf(p))} href={to.adminPlugin(p.id)} className="pr-7" />
+      <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs [&>dd]:min-w-0 [&>dd]:break-words">
+        <dt className="text-muted-foreground">{t('Author')}</dt>
+        <dd>{p.author ?? <span className="text-muted-foreground">{t('not declared')}</span>}</dd>
+        <dt className="text-muted-foreground">{t('Signature')}</dt>
+        <dd>{p.signed_by ? <SignedBy value={p.signed_by} /> : <span className="text-warn">{t('unsigned')}</span>}</dd>
+      </dl>
+      <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
+        <StatusBadge status={p.status} />
+        {p.dev && (
+          <Badge variant="outline" className="font-normal">
+            {t('development')}
+          </Badge>
+        )}
+        {update && <span className="font-mono text-xs text-primary-strong">→ {update}</span>}
+      </div>
+    </div>
   )
 }
 
@@ -514,43 +604,63 @@ function PluginTenants({ id }: { id: string }) {
       {d.tenants.length === 0 ? (
         <Empty title={t('No tenants')} />
       ) : (
-        <div className="overflow-x-auto rounded-xl border bg-card">
-          <Sliced items={d.tenants}>{(shown) => (<Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>{t('Tenant')}</TableHead>
-                <TableHead>{t('Available')}</TableHead>
-                <TableHead>{t('In the tenant')}</TableHead>
-                <TableHead />
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {shown.map((x) => (
-                <TableRow key={x.tenant_id}>
-                  <TableCell>
-                    <a className="font-medium hover:underline" href={to.adminTenant(x.tenant_id, 'plugins')}>
-                      {x.name}
-                    </a>
-                    <span className="ml-2 font-mono text-xs text-muted-foreground">{x.slug}</span>
-                  </TableCell>
-                  <TableCell>
-                    <Switch checked={x.available} onCheckedChange={(v) => setOne.mutate({ tid: x.tenant_id, available: v })} aria-label={t('Available to {name}', { name: x.name })} />
-                    {x.own_choice === null && <span className="ml-2 text-xs text-muted-foreground">{t('default')}</span>}
-                  </TableCell>
-                  <TableCell>{x.on ? <StatusBadge status="active" /> : !x.available ? <span className="text-sm text-muted-foreground">—</span> : <Badge variant="outline" className="font-normal">{x.enabled ? t('off: needs its plugin') : t('turned off')}</Badge>}</TableCell>
-                  <TableCell className="text-right">
-                    {x.own_choice !== null && (
-                      <Button variant="ghost" size="sm" onClick={() => setOne.mutate({ tid: x.tenant_id, available: null })}>
-                        <RotateCcw />
-                        {t('Restore')}
-                      </Button>
-                    )}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>)}</Sliced>
-        </div>
+        <ListTable
+          label={t('Tenants')}
+          fit="inline"
+          searchLabel={t('Filter the tenants')}
+          rows={d.tenants}
+          rowKey={(x) => x.tenant_id}
+          columns={[
+            {
+              key: 'tenant',
+              title: t('Tenant'),
+              width: 'minmax(12rem,2fr)',
+              sort: (x) => x.name,
+              text: (x) => `${x.name} ${x.slug}`,
+              cell: (x) => (
+                <>
+                  <a className="font-medium hover:underline" href={to.adminTenant(x.tenant_id, 'plugins')}>
+                    {x.name}
+                  </a>
+                  <span className="ml-2 font-mono text-xs text-muted-foreground">{x.slug}</span>
+                </>
+              ),
+            },
+            {
+              key: 'available',
+              title: t('Available'),
+              width: 'minmax(9rem,1fr)',
+              sort: (x) => (x.available ? 1 : 0),
+              cell: (x) => (
+                <>
+                  <Switch checked={x.available} onCheckedChange={(v) => setOne.mutate({ tid: x.tenant_id, available: v })} aria-label={t('Available to {name}', { name: x.name })} />
+                  {x.own_choice === null && <span className="ml-2 text-xs text-muted-foreground">{t('default')}</span>}
+                </>
+              ),
+            },
+            {
+              key: 'on',
+              title: t('In the tenant'),
+              width: 'minmax(10rem,1.2fr)',
+              sort: (x) => (x.on ? 1 : 0),
+              cell: (x) => (x.on ? <StatusBadge status="active" /> : !x.available ? <span className="text-sm text-muted-foreground">—</span> : <Badge variant="outline" className="font-normal">{x.enabled ? t('off: needs its plugin') : t('turned off')}</Badge>),
+            },
+            {
+              key: 'actions',
+              title: t('Actions'),
+              hideTitle: true,
+              width: '7rem',
+              className: 'justify-self-end',
+              cell: (x) =>
+                x.own_choice !== null && (
+                  <Button variant="ghost" size="sm" onClick={() => setOne.mutate({ tid: x.tenant_id, available: null })}>
+                    <RotateCcw />
+                    {t('Restore')}
+                  </Button>
+                ),
+            },
+          ]}
+        />
       )}
     </div>
   )
@@ -717,38 +827,43 @@ export function TenantPluginsOfAdmin({ id }: { id: string }) {
   if (q.error) return <ErrorBox error={q.error} />
   return (
     <div className="grid gap-3">
-      <div className="overflow-x-auto rounded-xl border bg-card">
-        <Sliced items={(q.data ?? [])}>{(shown) => (<Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('Plugins')}</TableHead>
-              <TableHead>{t('Kind')}</TableHead>
-              <TableHead>{t('Available')}</TableHead>
-              <TableHead>{t('In the tenant')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {shown.map((p) => (
-              <TableRow key={p.id}>
-                <TableCell>
-                  <a href={to.adminPlugin(p.id, 'tenants')} className="flex items-center gap-2.5 hover:underline">
-                    <AppIcon id={p.id} name={p.icon} className="size-5 text-primary" />
-                    <b className="font-medium">{p.label}</b>
-                    <ExternalLink className="size-3.5 text-muted-foreground" />
-                  </a>
-                </TableCell>
-                <TableCell>
-                  <KindBadge kind={p.kind} />
-                </TableCell>
-                <TableCell>
-                  <Switch checked={p.available} onCheckedChange={(v) => setAvailable.mutate({ pid: p.id, available: v })} aria-label={t('Available to {name}', { name: p.label })} />
-                </TableCell>
-                <TableCell>{p.on ? <StatusBadge status="active" /> : <Badge variant="secondary" className={p.off === 'unavailable' ? 'font-normal bg-warn/10 text-warn' : 'font-normal'} data-off={p.off}>{offText(p)}</Badge>}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>)}</Sliced>
-      </div>
+      <ListTable
+        label={t('Plugins')}
+        fit="inline"
+        searchLabel={t('Filter the plugins')}
+        rows={q.data ?? []}
+        rowKey={(p) => p.id}
+        columns={[
+          {
+            key: 'plugin',
+            title: t('Plugins'),
+            width: 'minmax(12rem,2fr)',
+            sort: (p) => p.label,
+            cell: (p) => (
+              <a href={to.adminPlugin(p.id, 'tenants')} className="flex items-center gap-2.5 hover:underline">
+                <AppIcon id={p.id} name={p.icon} className="size-5 text-primary" />
+                <b className="font-medium">{p.label}</b>
+                <ExternalLink className="size-3.5 text-muted-foreground" />
+              </a>
+            ),
+          },
+          { key: 'kind', title: t('Kind'), sort: (p) => kindLabel(p.kind), cell: (p) => <KindBadge kind={p.kind} /> },
+          {
+            key: 'available',
+            title: t('Available'),
+            sort: (p) => (p.available ? 1 : 0),
+            cell: (p) => <Switch checked={p.available} onCheckedChange={(v) => setAvailable.mutate({ pid: p.id, available: v })} aria-label={t('Available to {name}', { name: p.label })} />,
+          },
+          {
+            key: 'on',
+            title: t('In the tenant'),
+            width: 'minmax(10rem,1.2fr)',
+            sort: (p) => (p.on ? 1 : 0),
+            text: (p) => (p.on ? t('On') : offText(p)),
+            cell: (p) => (p.on ? <StatusBadge status="active" /> : <Badge variant="secondary" className={p.off === 'unavailable' ? 'font-normal bg-warn/10 text-warn' : 'font-normal'} data-off={p.off}>{offText(p)}</Badge>),
+          },
+        ]}
+      />
     </div>
   )
 }
@@ -778,6 +893,7 @@ export function TenantPlugins({ slug }: { slug: string }) {
   const [kind, setKind] = useState('all')
   const [state, setState] = useState('all')
   const [asking, setAsking] = useState(false)
+  const [q2, setQ2] = useState('')
   const ask = useAction((v: Record<string, string>) => api('POST', `${path}/ask`, { text: v.text }), { ok: t('Request sent to the Administrators') })
   const set = useAction(({ id, on }: { id: string; on: boolean }) => api('PUT', `${path}/${enc(id)}/on`, { on }), {
     ok: ({ on }) => (on ? t('Turned on for the tenant') : t('Turned off for the tenant')),
@@ -799,6 +915,7 @@ export function TenantPlugins({ slug }: { slug: string }) {
         title={t('Plugins')}
         crumbs={[{ label: t('Tenant management') }]}
         sub={t('{n} available to the tenant', { n: all.length })}
+        filter={<FilterBox value={q2} onChange={setQ2} label={t('Filter the plugins')} />}
         actions={
           <Button variant="outline" onClick={() => setAsking(true)}>
             <MessageSquarePlus />
@@ -815,7 +932,7 @@ export function TenantPlugins({ slug }: { slug: string }) {
         submit={t('Send the request')}
         onSubmit={(v) => ask.mutateAsync(v)}
       />
-      <FillBody className="grid content-start gap-3 p-6 max-[620px]:p-4">
+      <FillBody className="flex flex-col gap-3 overflow-hidden p-6 max-[620px]:p-4">
         <p className="max-w-2xl text-sm text-muted-foreground">
           {t('The Administrator makes them available; here you turn them on for the people of the tenant and decide their permissions. Apps appear in the sidebar, services work behind the scenes, extensions add to another plugin.')}
         </p>
@@ -823,7 +940,7 @@ export function TenantPlugins({ slug }: { slug: string }) {
           <Empty icon={<Puzzle />} title={t('No plugins available')} />
         ) : (
           <>
-            <div className="msk-pinrow sticky top-0 z-[5] -mx-1 flex flex-wrap items-center gap-3 bg-background px-1">
+            <div className="-mx-1 flex flex-wrap items-center gap-3 px-1">
               <KindPills value={kind} onChange={setKind} counts={countKinds(all)} />
               <Pills
                 label={t('State')}
@@ -836,65 +953,80 @@ export function TenantPlugins({ slug }: { slug: string }) {
                 ]}
               />
             </div>
-            <div className="overflow-x-auto rounded-xl border bg-card">
-              <Sliced items={rows}>{(shown) => (<Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('Plugins')}</TableHead>
-                    <TableHead>{t('Kind')}</TableHead>
-                    <TableHead>{t('Version')}</TableHead>
-                    <TableHead>{t('On')}</TableHead>
-                    <TableHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {shown.map((p) => {
+            <ListTable
+              label={t('Plugins')}
+              rows={rows}
+              rowKey={(p) => p.id}
+              filter={q2}
+              columns={[
+                {
+                  key: 'plugin',
+                  title: t('Plugins'),
+                  width: 'minmax(12rem,2.2fr)',
+                  sort: (p) => p.label,
+                  text: (p) => `${p.label} ${p.id} ${p.description}`,
+                  cell: (p) => (
+                    <span className="flex items-center gap-2.5">
+                      <AppIcon id={p.id} name={p.icon} className="size-5 text-primary" />
+                      <span>
+                        <b className="block font-medium">{p.label}</b>
+                        <span className="line-clamp-1 text-xs text-muted-foreground">{p.description}</span>
+                      </span>
+                    </span>
+                  ),
+                },
+                {
+                  key: 'kind',
+                  title: t('Kind'),
+                  width: 'minmax(9rem,1.4fr)',
+                  sort: (p) => kindLabel(p.kind),
+                  cell: (p) => (
+                    <>
+                      <KindBadge kind={p.kind} />
+                      {p.extends && <span className="ml-1.5 text-xs text-muted-foreground">{t('Extends {name}', { name: label(p.extends) })}</span>}
+                    </>
+                  ),
+                },
+                { key: 'version', title: t('Version'), width: 'minmax(6rem,.8fr)', sort: (p) => p.version, className: 'font-mono text-xs', cell: (p) => p.version },
+                {
+                  key: 'on',
+                  title: t('On'),
+                  width: 'minmax(10rem,1.2fr)',
+                  sort: (p) => (p.enabled ? 1 : 0),
+                  text: (p) => (p.enabled ? t('On') : t('Off')),
+                  cell: (p) => {
                     const base = p.extends ? all.find((b) => b.id === p.extends) : undefined
                     const blocked = !!p.extends && !base?.on
                     return (
-                      <TableRow key={p.id}>
-                        <TableCell>
-                          <span className="flex items-center gap-2.5">
-                            <AppIcon id={p.id} name={p.icon} className="size-5 text-primary" />
-                            <span>
-                              <b className="block font-medium">{p.label}</b>
-                              <span className="line-clamp-1 text-xs text-muted-foreground">{p.description}</span>
-                            </span>
-                          </span>
-                        </TableCell>
-                        <TableCell>
-                          <KindBadge kind={p.kind} />
-                          {p.extends && <span className="ml-1.5 text-xs text-muted-foreground">{t('Extends {name}', { name: label(p.extends) })}</span>}
-                        </TableCell>
-                        <TableCell className="font-mono text-xs">{p.version}</TableCell>
-                        <TableCell>
-                          <span className="flex items-center gap-2">
-                            <Switch
-                              checked={p.enabled && !blocked}
-                              disabled={set.isPending || blocked}
-                              onCheckedChange={(v) => void toggle(p, v)}
-                              aria-label={t('{label} on in the tenant', { label: p.label })}
-                            />
-                            {blocked && <span className="text-xs text-muted-foreground">{t('Turn on {name} first', { name: label(p.extends!) })}</span>}
-                          </span>
-                        </TableCell>
-                        <TableCell className="text-right whitespace-nowrap">
-                          <Button variant="outline" size="sm" onClick={() => go(to.tenant(slug, 'plugins', p.id))}>
-                            <KeySquare />
-                            {t('Permissions')}
-                          </Button>
-                          {p.has_ui && p.on && p.kind !== 'extension' && (
-                            <Button variant="ghost" size="sm" onClick={() => go(to.plugin(slug, p.id))}>
-                              {t('Open')}
-                            </Button>
-                          )}
-                        </TableCell>
-                      </TableRow>
+                      <span className="flex items-center gap-2">
+                        <Switch checked={p.enabled && !blocked} disabled={set.isPending || blocked} onCheckedChange={(v) => void toggle(p, v)} aria-label={t('{label} on in the tenant', { label: p.label })} />
+                        {blocked && <span className="text-xs text-muted-foreground">{t('Turn on {name} first', { name: label(p.extends!) })}</span>}
+                      </span>
                     )
-                  })}
-                </TableBody>
-              </Table>)}</Sliced>
-            </div>
+                  },
+                },
+                {
+                  key: 'actions',
+                  title: t('Actions'),
+                  hideTitle: true,
+                  width: 'minmax(13rem,auto)',
+                  className: 'justify-self-end whitespace-nowrap',
+                  cell: (p) => (
+                    <>
+                      <Button variant="outline" size="sm" onClick={() => go(to.tenant(slug, 'plugins', p.id))}>
+                        <KeySquare />
+                        {t('Permissions')}
+                      </Button>
+                      {p.has_ui && p.on && p.kind !== 'extension' && (
+                        <Button variant="ghost" size="sm" onClick={() => go(to.plugin(slug, p.id))}>
+                          {t('Open')}
+                        </Button>
+                      )}
+                    </>
+                  ),
+                },
+              ]}
+            />
           </>
         )}
       </FillBody>

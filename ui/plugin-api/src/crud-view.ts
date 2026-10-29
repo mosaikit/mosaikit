@@ -5,6 +5,7 @@
 // the detail of an item (the host draws the page of the extension over the tab: `mountTab`).
 // Its texts are in English, or in Italian when the host is in Italian (the `context` of the bridge).
 
+import { gridTable, type GridCol } from './grid.ts'
 import type { Msk } from './client.ts'
 import { pageBody, pageHead } from './head.ts'
 import { errorText } from './errors.ts'
@@ -215,9 +216,18 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   const btnNew = h('button', { type: 'button', class: 'msk-btn' })
   const count = h('span', { class: 'msk-count' })
   const btnMore = h('button', { type: 'button', class: 'msk-btn ghost msk-more' })
-  const thead = h('thead')
-  const tbody = h('tbody')
-  const table = h('table', { class: 'msk-table' }, thead, tbody)
+  const grid = gridTable<Row>({
+    columns: [],
+    label: opts.title ?? resource,
+    decorate: (r, line) => {
+      line.className = 'row' + (r.id === st.selected ? ' sel' : '')
+      line.tabIndex = 0
+      line.addEventListener('click', () => pick(r.id))
+      line.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') pick(r.id)
+      })
+    },
+  })
   const formTitle = h('h3')
   const readonly = h('div', { class: 'msk-readonly' })
   const fieldsBox = h('div')
@@ -264,15 +274,15 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   // with views: the list (it scrolls) and the detail panel (it scrolls too) side by side, the panel over the list on a phone
   const master = h('div', { class: 'msk-master' }, items, morebar)
   const split = h('div', { class: 'msk-split' }, master, h('aside', { class: 'msk-detail', 'aria-label': tr('detail') }, form))
-  const body = views.length ? pageBody(split) : pageBody(h('div', { class: 'msk-tablewrap' }, table), morebar, form)
-  if (views.length) body.classList.add('msk-splitbody')
+  const body = views.length ? pageBody(split) : pageBody(grid.el, form)
+  body.classList.add(views.length ? 'msk-splitbody' : 'msk-tablebody')
   root.replaceChildren(
     // the header and the filters never scroll: the table, the foot and the form do
     pageHead({ title: opts.title ?? resource, section: opts.section, sub: count, actions: [btnNew], filters: views.length > 1 ? [switcher, filter] : [filter] }),
     body,
   )
   // the rest of the rows come as the foot of the table comes into view
-  const foot = new IntersectionObserver((e) => e.some((x) => x.isIntersecting) && !btnMore.hidden && !btnMore.disabled && void loadMore(), { root: views.length ? master : body, rootMargin: '200px' })
+  const foot = new IntersectionObserver((e) => e.some((x) => x.isIntersecting) && !btnMore.hidden && !btnMore.disabled && void loadMore(), { root: views.length ? master : grid.scroller, rootMargin: '200px' })
   foot.observe(morebar)
 
   const setMsg = (t: string, err = false) => {
@@ -416,40 +426,43 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   function renderTableView() {
     const cols = columns()
     const xcols = extColumns()
-    thead.replaceChildren(h('tr', {}, ...cols.map((f) => h('th', {}, f.label || f.key)), ...xcols.map((x) => h('th', {}, x.f.label || x.f.key)), h('th', {}, tr('owner'))))
+    const text = (f: FieldDecl, v: unknown) => (f.kind === 'number' && typeof v === 'number' ? v : display(f, v))
+    grid.columns([
+      ...cols.map((f, i): GridCol<Row> => ({
+        key: f.key,
+        title: f.label || f.key,
+        width: i === 0 ? 'minmax(10rem,2fr)' : undefined,
+        sort: (r) => text(f, r.values[f.key]),
+        cell: (r) => {
+          const box = h('span', {}, display(f, r.values[f.key]))
+          if (i === 0) {
+            if (r.shared) box.append(h('span', { class: 'msk-badge acc' }, tr('shared')))
+            if (r.my_level !== 'manage') {
+              const level = r.my_level === 'read' || r.my_level === 'write' ? tr(r.my_level) : r.my_level
+              box.append(h('span', { class: 'msk-badge' }, level))
+            }
+          }
+          return box
+        },
+      })),
+      ...xcols.map((x): GridCol<Row> => ({
+        key: `${x.ext}.${x.f.key}`,
+        title: x.f.label || x.f.key,
+        sort: (r) => display(x.f, st.extValues[r.id]?.[x.ext]?.[x.f.key]),
+        cell: (r) => display(x.f, st.extValues[r.id]?.[x.ext]?.[x.f.key]),
+      })),
+      { key: '_owner', title: tr('owner'), sort: (r) => r.owner_name, className: 'msk-owner', cell: (r) => r.owner_name },
+    ])
     // the filter is applied by the server, a page at a time; a page of the navigation (`where`) is
     // chosen here, so it loads every row (see load)
     const shown = opts.where ? st.rows.filter(opts.where) : st.rows
     const total = opts.where ? shown.length : (st.total ?? shown.length)
     count.textContent = total > shown.length ? tr('shownOf', { shown: shown.length, total }) : total === 1 ? tr('item') : tr('items', { n: total })
     btnMore.hidden = !st.next
-    if (!shown.length) {
-      tbody.replaceChildren(h('tr', {}, h('td', { class: 'empty', colspan: String(cols.length + xcols.length + 1) }, st.filter.trim() ? tr('noResult') : tr('noItem'))))
-      return
-    }
-    tbody.replaceChildren(
-      ...shown.map((r) => {
-        const line = h('tr', { class: 'row' + (r.id === st.selected ? ' sel' : ''), tabindex: '0' })
-        cols.forEach((f, i) => {
-          const td = h('td', {}, display(f, r.values[f.key]))
-          if (i === 0) {
-            if (r.shared) td.append(h('span', { class: 'msk-badge acc' }, tr('shared')))
-            if (r.my_level !== 'manage') {
-              const level = r.my_level === 'read' || r.my_level === 'write' ? tr(r.my_level) : r.my_level
-              td.append(h('span', { class: 'msk-badge' }, level))
-            }
-          }
-          line.append(td)
-        })
-        for (const x of xcols) line.append(h('td', {}, display(x.f, st.extValues[r.id]?.[x.ext]?.[x.f.key])))
-        line.append(h('td', { class: 'msk-owner' }, r.owner_name))
-        line.addEventListener('click', () => pick(r.id))
-        line.addEventListener('keydown', (e) => {
-          if (e.key === 'Enter') pick(r.id)
-        })
-        return line
-      }),
-    )
+    // the button that loads more is the last row of the rows that scroll: it comes into view only at their end
+    grid.set(shown, st.next ? morebar : null, st.filter.trim() ? tr('noResult') : tr('noItem'))
+    foot.unobserve(morebar)
+    foot.observe(morebar)
   }
 
   function input(f: FieldDecl, v: unknown, disabled: boolean, prefix = 'f'): HTMLElement {

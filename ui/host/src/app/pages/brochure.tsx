@@ -113,30 +113,45 @@ function Requirements({ p }: { p: AdminPlugin }) {
   )
 }
 
+/** The identity of a plugin: its icon, name, description and the badges of kind, version, licence and signature.
+ *  The hero of the brochure draws it large, the cards of the list of plugins draw it small (`card`). */
+export function PluginSummary({ p, kind, card, href, className }: { p: AdminPlugin; kind: string; card?: boolean; href?: string; className?: string }) {
+  const name = card ? (
+    <h3 className="text-base font-semibold">{href ? <a href={href} className="after:absolute after:inset-0 hover:underline focus-visible:outline-none">{p.label}</a> : p.label}</h3>
+  ) : (
+    <h2 className="text-2xl font-semibold tracking-tight max-[620px]:text-xl">{p.label}</h2>
+  )
+  return (
+    <div className={cn('flex items-center gap-5', card && 'items-start gap-3', className)}>
+      <span className={cn('flex shrink-0 items-center justify-center rounded-2xl border bg-card shadow-sm', card ? 'size-12 rounded-xl' : 'size-20 max-[620px]:size-16')}>
+        <AppIcon id={p.id} name={p.icon_name} className={cn('text-primary', card ? 'size-6' : 'size-10 max-[620px]:size-8')} />
+      </span>
+      <div className="grid min-w-0 flex-1 gap-1.5">
+        {name}
+        <p className={cn('text-sm text-muted-foreground', card && 'line-clamp-3')}>{p.description}</p>
+        <div className="flex flex-wrap items-center gap-1.5 pt-1">
+          <Badge variant="secondary" className="font-normal">{kind}</Badge>
+          <Badge variant="outline" className="font-mono font-normal">v{p.version}</Badge>
+          {p.license && <Badge variant="outline" className="font-normal">{p.license}</Badge>}
+          {p.signed_by && (
+            <Badge variant="outline" className="gap-1 font-normal text-ok">
+              <ShieldCheck className="size-3" />
+              {t('Signed')}
+            </Badge>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export function Brochure({ p, kind, notes, aside }: { p: AdminPlugin; kind: string; notes?: { version: string; notes: string }[]; aside?: ReactNode }) {
   const paragraphs = (p.details ?? '').split(/\n\s*\n/).map((x) => x.trim()).filter(Boolean)
   const nd = <span className="text-muted-foreground">{t('not declared')}</span>
   return (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6" data-testid="plugin-brochure">
       <header className="flex flex-wrap items-center gap-5 rounded-2xl border bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-6 max-[620px]:p-4">
-        <span className="flex size-20 shrink-0 items-center justify-center rounded-2xl border bg-card shadow-sm max-[620px]:size-16">
-          <AppIcon id={p.id} name={p.icon_name} className="size-10 text-primary max-[620px]:size-8" />
-        </span>
-        <div className="grid min-w-0 flex-1 gap-1.5">
-          <h2 className="text-2xl font-semibold tracking-tight max-[620px]:text-xl">{p.label}</h2>
-          <p className="text-sm text-muted-foreground">{p.description}</p>
-          <div className="flex flex-wrap items-center gap-1.5 pt-1">
-            <Badge variant="secondary" className="font-normal">{kind}</Badge>
-            <Badge variant="outline" className="font-mono font-normal">v{p.version}</Badge>
-            {p.license && <Badge variant="outline" className="font-normal">{p.license}</Badge>}
-            {p.signed_by && (
-              <Badge variant="outline" className="gap-1 font-normal text-ok">
-                <ShieldCheck className="size-3" />
-                {t('Signed')}
-              </Badge>
-            )}
-          </div>
-        </div>
+        <PluginSummary p={p} kind={kind} className="min-w-0 flex-1" />
         {p.homepage && (
           <Button asChild variant="outline" className="max-[620px]:w-full">
             <a href={p.homepage} target="_blank" rel="noopener noreferrer">
