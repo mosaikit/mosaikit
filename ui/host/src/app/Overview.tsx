@@ -41,7 +41,7 @@ export function Widget({
   children: ReactNode
 }) {
   return (
-    <section aria-labelledby={id} className={cn('grid content-start gap-2 rounded-xl border bg-card p-4', span && '@xl:col-span-2', full && '@xl:col-span-2 @4xl:col-span-4')}>
+    <section aria-labelledby={id} className={cn('grid min-w-0 grid-cols-[minmax(0,1fr)] content-start gap-2 rounded-xl border bg-card p-4', span && '@xl:col-span-2', full && '@xl:col-span-2 @4xl:col-span-4')}>
       <div className="flex items-center justify-between gap-2">
         <h2 id={id} className="flex min-w-0 items-center gap-2 text-sm font-semibold">
           {icon}

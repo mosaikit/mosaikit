@@ -165,7 +165,7 @@ function AppSidebar({ session, route, band }: { session: Session; route: Route; 
           )}
         </SidebarHeader>
       )}
-      <SidebarContent className="border-r border-sidebar-border pt-1 group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:pt-0">
+      <SidebarContent className="msk-hoverscroll border-r border-sidebar-border pt-1 group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:pt-0">
         {nav.groups.map((g) => (
           <SidebarGroup key={g.id} className="py-1 first:pt-0 last:pb-0 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:not-first:mt-3 group-data-[collapsible=icon]:not-first:border-t group-data-[collapsible=icon]:not-first:border-sidebar-border group-data-[collapsible=icon]:not-first:pt-1">
             {g.id === 'apps' || g.id === 'manage' ? <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">{g.label}</SidebarGroupLabel> : null}
