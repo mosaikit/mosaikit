@@ -145,9 +145,11 @@ export function PluginSummary({ p, kind, card, href, className }: { p: AdminPlug
       <div className={cn('grid gap-3', className)}>
         <div className="flex items-center gap-3">
           {tile}
-          <div className="min-w-0 flex-1">{name}</div>
+          <div className="grid min-w-0 flex-1 gap-1.5">
+            {name}
+            {badges}
+          </div>
         </div>
-        {badges}
         <p className="line-clamp-3 text-sm text-muted-foreground">{p.description}</p>
       </div>
     )
