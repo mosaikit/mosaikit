@@ -122,7 +122,7 @@ export function PluginSummary({ p, kind, card, href, className }: { p: AdminPlug
     <h2 className="text-2xl font-semibold tracking-tight max-[620px]:text-xl">{p.label}</h2>
   )
   const badges = (
-    <div className={cn('flex items-center gap-1.5', card ? 'min-w-0 flex-nowrap overflow-hidden p-px' : 'flex-wrap pt-1')}>
+    <div className={cn('flex items-center gap-1.5', card ? 'min-w-0 flex-nowrap gap-1 p-px [&_[data-slot=badge]]:px-1.5 [&_[data-slot=badge]]:text-[11px]' : 'flex-wrap pt-1')}>
       <Badge variant="secondary" className="border-foreground/25 bg-card font-normal">{kind}</Badge>
       <Badge variant="outline" className="border-foreground/25 bg-card font-mono font-normal">v{p.version}</Badge>
       {p.license && <Badge variant="outline" className="border-foreground/25 bg-card font-normal">{p.license}</Badge>}
