@@ -354,10 +354,10 @@ function PluginCard({ p, update, selected, onSelect }: { p: AdminPlugin; update?
     <div data-testid="plugin-card" data-state={selected ? 'selected' : undefined} className="relative flex h-full flex-col gap-3 rounded-2xl border bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-4 transition-colors hover:border-primary/50 data-[state=selected]:border-primary data-[state=selected]:from-primary/25">
       <Checkbox className="absolute top-3 right-3 z-10" aria-label={t('Select {name}', { name: p.label })} checked={selected} onCheckedChange={(v) => onSelect(!!v)} />
       <PluginSummary card p={p} kind={kindLabel(kindOf(p))} href={to.adminPlugin(p.id)} className="pr-7" />
-      <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs [&>dd]:min-w-0 [&>dd]:break-words">
-        <dt className="text-muted-foreground">{t('Author')}</dt>
+      <dl className="flex items-baseline gap-x-4 text-xs [&>dd]:min-w-0 [&>dd]:truncate">
+        <dt className="shrink-0 text-muted-foreground">{t('Author')}</dt>
         <dd>{p.author ?? <span className="text-muted-foreground">{t('not declared')}</span>}</dd>
-        <dt className="text-muted-foreground">{t('Signature')}</dt>
+        <dt className="shrink-0 text-muted-foreground">{t('Signature')}</dt>
         <dd>{p.signed_by ? <SignedBy value={p.signed_by} /> : <span className="text-warn">{t('unsigned')}</span>}</dd>
       </dl>
       <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
