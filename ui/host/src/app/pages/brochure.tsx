@@ -37,7 +37,7 @@ function Gallery({ p }: { p: AdminPlugin }) {
     <section className="grid min-w-0 gap-3" data-testid="plugin-gallery" aria-label={t('Pictures')}>
       <div className="relative overflow-hidden rounded-xl border bg-muted">
         <button type="button" className="group block w-full cursor-zoom-in" aria-label={t('Enlarge the picture')} onClick={() => setOpen(true)}>
-          <img className="mx-auto max-h-[26rem] w-full object-contain" src={src(shots[shot] ?? shots[0])} alt={alt(shot)} />
+          <img className="mx-auto max-h-[26rem] w-full object-contain min-[901px]:max-h-[calc(100svh-27.5rem)]" src={src(shots[shot] ?? shots[0])} alt={alt(shot)} />
           <span className="absolute right-3 bottom-3 flex items-center gap-1 rounded-md bg-background/85 px-2 py-1 text-xs opacity-0 shadow transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
             <Maximize2 className="size-3.5" />
             {t('Enlarge')}
@@ -58,7 +58,7 @@ function Gallery({ p }: { p: AdminPlugin }) {
         <div className="flex flex-wrap gap-2">
           {shots.map((n, i) => (
             <button key={n} type="button" aria-label={t('Show picture {n}', { n: i + 1 })} aria-current={i === shot} onClick={() => setShot(i)} className={cn('overflow-hidden rounded-md border bg-muted opacity-70 transition-opacity hover:opacity-100', i === shot && 'opacity-100 ring-2 ring-primary')}>
-              <img className="h-14 w-24 object-cover" src={src(n)} alt="" />
+              <img className="h-12 w-20 object-cover" src={src(n)} alt="" />
             </button>
           ))}
         </div>
@@ -135,8 +135,8 @@ export function PluginSummary({ p, kind, card, href, className }: { p: AdminPlug
     </div>
   )
   const tile = (
-    <span className={cn('flex shrink-0 items-center justify-center rounded-2xl border bg-card shadow-sm', card ? 'size-14' : 'size-20 max-[620px]:size-16')}>
-      <AppIcon id={p.id} name={p.icon_name} className={cn('text-primary', card ? 'size-7' : 'size-10 max-[620px]:size-8')} />
+    <span className={cn('flex shrink-0 items-center justify-center rounded-2xl border bg-card shadow-sm', card ? 'size-14' : 'size-16 max-[620px]:size-14')}>
+      <AppIcon id={p.id} name={p.icon_name} className={cn('text-primary', card ? 'size-7' : 'size-8 max-[620px]:size-7')} />
     </span>
   )
   // the card: icon, name and badges on one row, the description under them across the whole width
@@ -167,10 +167,11 @@ export function PluginSummary({ p, kind, card, href, className }: { p: AdminPlug
 
 export function Brochure({ p, kind, notes, aside }: { p: AdminPlugin; kind: string; notes?: { version: string; notes: string }[]; aside?: ReactNode }) {
   const paragraphs = (p.details ?? '').split(/\n\s*\n/).map((x) => x.trim()).filter(Boolean)
+  const hasShots = !!p.screenshots?.length
   const nd = <span className="text-muted-foreground">{t('not declared')}</span>
   return (
-    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-6" data-testid="plugin-brochure">
-      <header className="flex flex-wrap items-center gap-5 rounded-2xl border bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-6 max-[620px]:p-4">
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] gap-4" data-testid="plugin-brochure">
+      <header className="flex flex-wrap items-center gap-5 rounded-2xl border bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-4 max-[620px]:p-4">
         <PluginSummary p={p} kind={kind} className="min-w-0 flex-1" />
         {p.homepage && (
           <Button asChild variant="outline" className="max-[620px]:w-full">
@@ -181,9 +182,12 @@ export function Brochure({ p, kind, notes, aside }: { p: AdminPlugin; kind: stri
           </Button>
         )}
       </header>
-      <Gallery p={p} />
-      <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_19rem]">
-        <div className="grid min-w-0 gap-6">
+      {/* desktop: the gallery at the left, the information in a column at the right that scrolls by itself if it is
+          taller than the screen, so the page does not scroll; under 900px one column */}
+      <div className={cn('grid grid-cols-[minmax(0,1fr)] items-start gap-6', hasShots ? 'min-[901px]:grid-cols-[minmax(0,1.35fr)_minmax(0,1fr)]' : 'lg:grid-cols-[minmax(0,1fr)_19rem]')}>
+        {hasShots && <Gallery p={p} />}
+        <div className={cn('grid min-w-0 gap-4', hasShots ? 'min-[901px]:max-h-[calc(100svh-22.5rem)] min-[901px]:overflow-y-auto min-[901px]:pr-1' : 'lg:grid-cols-[minmax(0,1fr)_19rem] lg:items-start')} data-testid="plugin-info">
+        <div className="grid min-w-0 gap-4">
           {paragraphs.length > 0 && (
             <section className="grid gap-2">
               <h3 className="text-sm font-semibold">{t('About')}</h3>
@@ -207,10 +211,10 @@ export function Brochure({ p, kind, notes, aside }: { p: AdminPlugin; kind: stri
             </section>
           )}
         </div>
-        <aside className="grid min-w-0 gap-4">
-          <div className="grid min-w-0 gap-3 rounded-xl border bg-card p-4">
+        <aside className="grid min-w-0 gap-3">
+          <div className="grid min-w-0 gap-2 rounded-xl border bg-card p-3">
             <h3 className="text-sm font-semibold">{t('Publisher')}</h3>
-            <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm [&>dd]:min-w-0 [&>dd]:break-words">
+            <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-sm [&>dd]:min-w-0 [&>dd]:break-words">
               <dt className="text-muted-foreground">{t('Author')}</dt>
               <dd>{p.author ?? nd}</dd>
               <dt className="text-muted-foreground">{t('Licence')}</dt>
@@ -233,6 +237,7 @@ export function Brochure({ p, kind, notes, aside }: { p: AdminPlugin; kind: stri
           </div>
           {aside}
         </aside>
+        </div>
       </div>
     </div>
   )

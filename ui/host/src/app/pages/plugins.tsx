@@ -496,9 +496,9 @@ export function AdminPluginPage({ id, tab }: { id: string; tab?: string }) {
 function PluginOverview({ p, c, all }: { p: AdminPlugin; c?: CatalogItem; all: AdminPlugin[] }) {
   const base = p.extends ? all.find((x) => x.id === p.extends) : undefined
   const technical = (
-    <div className="grid min-w-0 gap-3 rounded-xl border bg-card p-4">
+    <div className="grid min-w-0 gap-2 rounded-xl border bg-card p-3">
       <h3 className="text-sm font-semibold">{t('Technical details')}</h3>
-      <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm [&>dd]:min-w-0 [&>dd]:break-words">
+      <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-4 gap-y-1.5 text-sm [&>dd]:min-w-0 [&>dd]:break-words">
         <dt className="text-muted-foreground">{t('Kind')}</dt>
         <dd>{kindLabel(kindOf(p))}</dd>
         {p.extends && (

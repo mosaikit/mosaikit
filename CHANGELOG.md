@@ -9,6 +9,7 @@ in step).
 
 ### The shell
 
+- The Overview tab of a plugin fits the screen: the pictures at the left, the information at the right (it scrolls by itself only if it is longer than the screen). Every official plugin now ships two realistic pictures.
 - A new interface for every role, in English and Italian, with light, dark and automatic mode.
 - The top bar is decided by the Administrator: logo and name, search, language, help and mode.
 - Themes: Mosaikit, Italia and Tessera, plus the themes made with the theme editor, checked for

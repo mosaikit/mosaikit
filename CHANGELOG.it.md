@@ -8,6 +8,7 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
 ### La shell
 
+- La scheda Panoramica di un plugin sta nello schermo: le immagini a sinistra, le informazioni a destra (scorrono da sole solo se sono più lunghe dello schermo). Ogni plugin ufficiale ha ora due immagini realistiche.
 - Una nuova interfaccia per ogni ruolo, in italiano e in inglese, con modo chiaro, scuro e automatico.
 - La barra in alto la decide l'Administrator: logo e nome, ricerca, lingua, aiuto e modo.
 - Temi: Mosaikit, Italia e Tessera, più i temi creati con l'editor dei temi, verificati per il contrasto

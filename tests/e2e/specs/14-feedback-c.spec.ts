@@ -89,11 +89,32 @@ test.describe.serial('14-feedback-c', () => {
       await page.getByRole('button', { name: 'Enlarge the picture' }).click()
       const box = page.getByTestId('plugin-lightbox')
       await expect(box.locator('img')).toBeVisible()
-      await expect(box).toContainText('Picture 1 of 3')
+      await expect(box).toContainText('Picture 1 of 2')
       await page.keyboard.press('ArrowRight')
-      await expect(box).toContainText('Picture 2 of 3')
+      await expect(box).toContainText('Picture 2 of 2')
       await page.keyboard.press('Escape')
       await expect(box).toHaveCount(0)
+      // the Overview tab fits the screen on a desktop: neither the page nor its content area scrolls, gallery at the left
+      for (const vp of [{ width: 1340, height: 900 }, { width: 1280, height: 720 }]) {
+        await page.setViewportSize(vp)
+        await page.goto('./#/admin/plugin/com.mosaikit.maps')
+        await page.reload()
+        await expect(page.getByTestId('plugin-gallery').locator('img').first()).toBeVisible()
+        await page.waitForTimeout(400)
+        const m = await page.evaluate(() => {
+          const b = document.querySelector('[data-testid="plugin-brochure"]') as HTMLElement
+          const g = document.querySelector('[data-testid="plugin-gallery"]')!.getBoundingClientRect()
+          const i = document.querySelector('[data-testid="plugin-info"]')!.getBoundingClientRect()
+          const over: string[] = []
+          for (let e: HTMLElement | null = b; e; e = e.parentElement) if (e.scrollHeight > e.clientHeight + 1 && getComputedStyle(e).overflowY !== 'visible') over.push(`${e.tagName}.${String(e.className).slice(0, 40)} ${e.scrollHeight}>${e.clientHeight}`)
+          return { doc: document.documentElement.scrollHeight - window.innerHeight, over, side: g.right <= i.left + 1, bottom: Math.max(g.bottom, i.bottom) - window.innerHeight }
+        })
+        await page.screenshot({ path: test.info().outputPath(`overview-${vp.width}x${vp.height}.png`) })
+        expect(m.doc, `document scrolls at ${vp.width}x${vp.height}`).toBeLessThanOrEqual(1)
+        expect(m.over, `a container scrolls at ${vp.width}x${vp.height}`).toEqual([])
+        expect(m.side, 'gallery at the left of the information').toBe(true)
+        expect(m.bottom, 'content ends inside the screen').toBeLessThanOrEqual(0)
+      }
       // every official plugin: pictures that load, and nothing wider than the screen at phone width
       await page.setViewportSize({ width: 390, height: 844 })
       for (const id of PLUGINS) {
