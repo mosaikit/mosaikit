@@ -354,13 +354,7 @@ function PluginCard({ p, update, selected, onSelect }: { p: AdminPlugin; update?
     <div data-testid="plugin-card" data-state={selected ? 'selected' : undefined} className="relative flex h-full flex-col gap-3 rounded-2xl border bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-4 transition-colors hover:border-primary/50 data-[state=selected]:border-primary data-[state=selected]:from-primary/25">
       <Checkbox className="absolute top-3 right-3 z-10" aria-label={t('Select {name}', { name: p.label })} checked={selected} onCheckedChange={(v) => onSelect(!!v)} />
       <PluginSummary card p={p} kind={kindLabel(kindOf(p))} href={to.adminPlugin(p.id)} className="pr-7" />
-      <dl className="flex items-baseline gap-x-4 text-xs [&>dd]:min-w-0 [&>dd]:truncate">
-        <dt className="shrink-0 text-muted-foreground">{t('Author')}</dt>
-        <dd>{p.author ?? <span className="text-muted-foreground">{t('not declared')}</span>}</dd>
-        <dt className="shrink-0 text-muted-foreground">{t('Signature')}</dt>
-        <dd>{p.signed_by ? <SignedBy value={p.signed_by} /> : <span className="text-warn">{t('unsigned')}</span>}</dd>
-      </dl>
-      <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
+      <div className="flex flex-wrap items-center gap-2 pt-1">
         <StatusBadge status={p.status} />
         {p.dev && (
           <Badge variant="outline" className="font-normal">
@@ -369,6 +363,16 @@ function PluginCard({ p, update, selected, onSelect }: { p: AdminPlugin; update?
         )}
         {update && <span className="font-mono text-xs text-primary-strong">→ {update}</span>}
       </div>
+      <dl className="mt-auto flex items-baseline justify-between gap-x-4 text-xs">
+        <div className="flex min-w-0 items-baseline gap-1.5">
+          <dt className="shrink-0 text-muted-foreground">{t('Author')}</dt>
+          <dd className="min-w-0 truncate">{p.author ?? <span className="text-muted-foreground">{t('not declared')}</span>}</dd>
+        </div>
+        <div className="flex min-w-0 items-baseline gap-1.5">
+          <dt className="shrink-0 text-muted-foreground">{t('Signature')}</dt>
+          <dd className="min-w-0 truncate">{p.signed_by ? <SignedBy value={p.signed_by} /> : <span className="text-warn">{t('unsigned')}</span>}</dd>
+        </div>
+      </dl>
     </div>
   )
 }
