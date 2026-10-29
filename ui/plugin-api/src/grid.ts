@@ -2,6 +2,7 @@
 // stays where it is and ONLY the rows scroll (the scrollbar starts under the header row); the titles of the columns sort the
 // rows (ascending, descending, the order of the source); the foot of the list (the button «Load more») is the last row
 // of the rows that scroll, so more rows load only when the end comes into view.
+import { watchTableScroll } from './scrollwatch.ts'
 
 export interface GridCol<T> {
   key: string
@@ -54,6 +55,7 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls = '', role?: stri
 }
 
 export function gridTable<T>(o: GridOptions<T>): Grid<T> {
+  watchTableScroll()
   let cols = o.columns
   let n = o.local?.step ?? 0
   let io: IntersectionObserver | null = null
