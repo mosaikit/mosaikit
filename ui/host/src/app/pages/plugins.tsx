@@ -167,7 +167,7 @@ export function AdminPlugins({ section }: { section?: string }) {
             <Empty icon={<Puzzle />} title={t('No plugin installed')} />
           ) : (
             <>
-              <div data-listscroll className="msk-listscroll min-h-0 flex-1 overflow-auto rounded-xl border bg-card">
+              <div data-listscroll className="msk-listscroll msk-tablecard min-h-0 flex-1 overflow-auto rounded-xl border bg-card">
                 <Sliced items={rows}>{(shown) => (<Table>
                   <TableHeader>
                     <TableRow>

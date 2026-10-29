@@ -573,6 +573,23 @@ html[data-style-buttons='soft'] [data-slot='button'][data-variant='default']:hov
 .msk-listscroll :has(> [data-slot='table-container']):not([data-listscroll]) {
   overflow: visible;
 }
+/* a table card that scrolls its rows: the scrollbar starts under the header row (the height of a header cell) */
+.msk-tablecard::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.msk-tablecard::-webkit-scrollbar-track {
+  margin-top: 40px;
+  background: transparent;
+}
+.msk-tablecard::-webkit-scrollbar-corner {
+  background: transparent;
+}
+.msk-tablecard::-webkit-scrollbar-thumb {
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background: color-mix(in srgb, var(--foreground) 28%, transparent) padding-box;
+}
 .msk-listscroll thead {
   position: sticky;
   top: 0;
