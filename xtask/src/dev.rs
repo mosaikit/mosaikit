@@ -43,6 +43,7 @@ fn server_cmd(plugins: &[Plugin]) -> Result<Command> {
             "MOSAIKIT_ADMIN_PASSWORD",
             std::env::var("MOSAIKIT_ADMIN_PASSWORD").unwrap_or_else(|_| DEV_ADMIN_PASSWORD.into()),
         )
+        .env("MOSAIKIT_DEV_EMAILS", "1")
         .env(
             "MOSAIKIT_ADMIN_EMAIL",
             std::env::var("MOSAIKIT_ADMIN_EMAIL").unwrap_or_else(|_| DEV_ADMIN_EMAIL.into()),

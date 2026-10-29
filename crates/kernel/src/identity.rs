@@ -192,6 +192,19 @@ pub async fn bootstrap(k: &Kernel) -> Result<()> {
         let _ = std::fs::write(&file, &text);
         eprintln!("\n{text}(saved in {})\n", file.display());
     }
+    // development environments: every account without an address gets one (`<user>@example.test` for the
+    // Administrators, `<user>@<tenant>.example.test` for the others), so that the lists have no "email missing"
+    if std::env::var("MOSAIKIT_DEV_EMAILS").is_ok_and(|v| v == "1") {
+        let mut tx = k.db.begin_app().await?;
+        mosaikit_db::query(
+            "update core.users u set email = u.username || '@' || case when u.is_system_admin then '' else t.slug || '.' end || 'example.test'
+             from core.tenants t where t.id = u.home_tenant_id and (u.email is null or btrim(u.email) = '')
+               and not exists (select 1 from core.users x where x.id <> u.id and lower(x.email) = lower(u.username || '@' || case when u.is_system_admin then '' else t.slug || '.' end || 'example.test'))",
+        )
+        .execute(&mut *tx)
+        .await?;
+        tx.commit().await?;
+    }
     Ok(())
 }
 
