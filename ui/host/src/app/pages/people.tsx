@@ -41,7 +41,7 @@ import { levelName } from '../levels.ts'
 import { PersonPicture } from '../picture.tsx'
 import { BulkBar, FilterColumn, ListPage } from '../listkit.tsx'
 import { ListTable } from '../ListTable.tsx'
-import { Empty, ErrorBox, FormDialog, Loading, PageHeader, SaveBar, SelectAllRows, StatusBadge, Sliced, Tabs } from '../kit.tsx'
+import { Empty, ErrorBox, FillBody, FillPage, FormDialog, Loading, PageHeader, SaveBar, SelectAllRows, StatusBadge, Sliced, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import AppIcon from '../AppIcon.tsx'
 import { AppMark } from '../Shell.tsx'
@@ -1148,12 +1148,12 @@ export function RequestsPage({ slug }: { slug: string }) {
   const ctx = useTenantCtx(slug)
   const manager = ctx.data?.tenant.role === 'tenant_manager'
   return (
-    <>
+    <FillPage>
       <PageHeader title={t('Access requests')} sub={manager ? t('Every open request of the tenant') : t('Requests to see or edit your items')} />
-      <div className="grid gap-3 p-6 max-[620px]:p-4">
+      <FillBody className="flex flex-col gap-3 p-6 max-[620px]:p-4">
         <RequestsTable slug={slug} manager={!!manager} page />
-      </div>
-    </>
+      </FillBody>
+    </FillPage>
   )
 }
 

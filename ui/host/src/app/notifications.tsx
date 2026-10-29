@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { cn } from '@/lib/utils'
 import { KINDS, kindLabel, noteBody, noteTitle, pendingInvitation, useNoteActions, useNoteList, useUnread, type Note, type NoteFilter } from './notes.ts'
 import { t } from './i18n.ts'
-import { Empty, ErrorBox, Loading, PageHeader, Pills } from './kit.tsx'
+import { Empty, ErrorBox, FillBody, FillPage, Loading, PageHeader, Pills } from './kit.tsx'
 import { go, personal, to, type Route } from './router.ts'
 
 function KindIcon({ n }: { n: Note }) {
@@ -181,7 +181,7 @@ export function NotificationsPage({ session, route }: { session: Session; route:
   const admin = session.user.is_system_admin
   const kinds = KINDS.filter((k) => admin || k !== 'system')
   return (
-    <>
+    <FillPage>
       <PageHeader
         title={t('Notifications')}
         crumbs={[{ label: t('Account'), href: personal(route, 'account') }]}
@@ -197,7 +197,7 @@ export function NotificationsPage({ session, route }: { session: Session; route:
           </button>
         }
       />
-      <div className="grid gap-3 p-6 max-[620px]:p-4">
+      <FillBody className="flex flex-col gap-3 p-6 max-[620px]:p-4">
         <div className="flex flex-wrap items-center gap-2">
           <Pills
             items={[
@@ -284,8 +284,8 @@ export function NotificationsPage({ session, route }: { session: Session; route:
         {pages.map((p, i) => (
           <ListPage key={p} filter={filter} before={p} sel={sel} setSel={setSel} home={home} onMore={(next) => setPages((x) => [...x, next])} more={i === pages.length - 1} />
         ))}
-      </div>
-    </>
+      </FillBody>
+    </FillPage>
   )
 }
 
