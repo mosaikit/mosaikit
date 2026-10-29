@@ -80,7 +80,7 @@ const checks: L.Check[] = [
       const f = await open(p)
       await f.getByRole('button', { name: 'Tags', exact: true }).click()
       const d = f.getByRole('dialog', { name: 'Tags' })
-      await d.getByRole('textbox', { name: 'Name of the tag' }).fill('npi-two')
+      await d.getByRole('textbox', { name: 'Name of the tag', exact: true }).fill('npi-two')
       await d.getByLabel('Colour', { exact: true }).selectOption('teal')
       await d.getByRole('button', { name: 'Add', exact: true }).click()
       await p.waitForTimeout(800)

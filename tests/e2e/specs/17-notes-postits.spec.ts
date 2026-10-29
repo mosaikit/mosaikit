@@ -93,7 +93,7 @@ test.describe.serial('Notes: post-its', () => {
     await frame.getByRole('button', { name: 'Tags', exact: true }).click()
     const dlg = frame.getByRole('dialog', { name: 'Tags' })
     await expect(dlg).toBeVisible()
-    await dlg.getByRole('textbox', { name: 'Name of the tag' }).fill('later')
+    await dlg.getByRole('textbox', { name: 'Name of the tag', exact: true }).fill('later')
     await dlg.getByLabel('Colour', { exact: true }).selectOption('teal')
     await dlg.getByRole('button', { name: 'Add', exact: true }).click()
     await expect(dlg.getByRole('textbox', { name: 'Name of the tag later' })).toBeVisible()

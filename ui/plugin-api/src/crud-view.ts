@@ -35,9 +35,8 @@ export interface CrudOptions {
   panel?: 'selected' | 'always'
   /** the read-only view of the open item (with «Edit» for the fields): used instead of the form until the person edits */
   reader?: (ctx: ItemCtx) => HTMLElement
-  /** extra controls in the header, next to the «new» button (a «Tags» button…) */
-  headActions?: HTMLElement[]
-  /** extra controls with the filter of the header (a row of tag chips…) */
+  /** extra controls in the header, before the views switch and the filter (a «Tags» button, a menu of tags…); the filter stays
+   *  next to the primary action. On a phone they wrap onto a second row */
   headFilters?: HTMLElement[]
   /** the plugin's own part of the form (a colour picker, a tag chooser…): draws into `box` after the fields, for a new and for an open
    *  item, and sets values of fields the form does not show (hidden ones) with `ctx.set`; they are saved with the form */
@@ -321,7 +320,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   body.classList.add(views.length ? 'msk-splitbody' : 'msk-tablebody')
   root.replaceChildren(
     // the header and the filters never scroll: the table, the foot and the form do
-    pageHead({ title: opts.title ?? resource, section: opts.section, sub: count, actions: [btnNew, ...(opts.headActions ?? [])], filters: [...(views.length > 1 ? [switcher, filter] : [filter]), ...(opts.headFilters ?? [])] }),
+    pageHead({ title: opts.title ?? resource, section: opts.section, sub: count, actions: [btnNew], filters: [...(opts.headFilters ?? []).map((e) => (e.classList.add('msk-extra'), e)), ...(views.length > 1 ? [switcher, filter] : [filter])] }),
     body,
   )
   // the rest of the rows come as the foot of the table comes into view

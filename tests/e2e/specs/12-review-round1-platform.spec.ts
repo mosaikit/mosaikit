@@ -44,7 +44,7 @@ test.describe.serial('12-review-round1-platform', () => {
     const brochure = page.getByTestId('plugin-brochure')
     await expect(brochure).toContainText('Mosaikit')
     await expect(brochure).toContainText('Apache-2.0')
-    await expect(brochure).toContainText('Write notes with a title')
+    await expect(brochure).toContainText('Write notes as coloured post-its')
     const pic = page.getByTestId('plugin-gallery').locator('img').first()
     await expect(pic).toBeVisible()
     expect(await pic.evaluate((i: HTMLImageElement) => i.complete && i.naturalWidth > 0)).toBe(true)

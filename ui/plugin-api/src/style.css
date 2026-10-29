@@ -140,6 +140,7 @@ html.msk-fill #app { padding: 0; height: 100%; display: flex; flex-direction: co
 .msk-empty, .msk-colempty { color: var(--dim); text-align: center; padding: 36px 12px; border: 1px dashed var(--line); border-radius: 12px; font-size: 13px; }
 .msk-colempty { padding: 14px 10px; font-size: 12px; }
 .msk-items.list { display: flex; flex-direction: column; gap: 6px; }
+.msk-pagehead .msk-pacts:has(.msk-extra) { flex-wrap: wrap !important; }
 .msk-items.flow { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 18px; padding: 6px 4px 12px; }
 .msk-items.cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 12px; }
 .msk-item { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; cursor: pointer; min-width: 0; transition: border-color 0.12s, background 0.12s; }
