@@ -163,7 +163,7 @@ test.describe.serial('review round 1: auth and plugins', () => {
 
       // list view with thumbnails
       await frame.getByRole('button', { name: 'List', exact: true }).click()
-      await expect(frame.locator('table.msk-table img.thumbsm').first()).toBeVisible()
+      await expect(frame.locator('table.msk-grid img.thumbsm').first()).toBeVisible()
       await expect(frame.locator('.cards')).toBeHidden()
       await frame.getByRole('button', { name: 'Cards', exact: true }).click()
       await expect(frame.locator('.cards')).toBeVisible()

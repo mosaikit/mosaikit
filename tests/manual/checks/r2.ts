@@ -70,7 +70,7 @@ const checks: L.Check[] = [
           await H.go(p, hash)
           await p.waitForTimeout(900)
           const m = await p.evaluate(() => {
-            const ls = document.querySelector('[data-listscroll]')
+            const ls = (document.querySelector('tbody[data-listscroll]') ?? document.querySelector('[data-listscroll]'))
             const th = document.querySelector('thead th')
             return { over: document.documentElement.scrollHeight - innerHeight, list: !!ls, sticky: th ? getComputedStyle(th).position : 'sticky' }
           })

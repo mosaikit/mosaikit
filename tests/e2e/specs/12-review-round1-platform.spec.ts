@@ -202,7 +202,7 @@ test.describe.serial('12-review-round1-platform', () => {
       await expect(page.getByText(/^50 of \d+$/)).toBeVisible()
       // the page does not scroll: the list does, and its foot loads the next page as it comes into view
       await page.evaluate(() => {
-        const l = document.querySelector('[data-listscroll]')!
+        const l = document.querySelector('tbody[data-listscroll]')!
         l.scrollTop = l.scrollHeight
       })
       await expect(page.getByText(/^(\d+) of \1$/)).toBeVisible({ timeout: 15_000 })
