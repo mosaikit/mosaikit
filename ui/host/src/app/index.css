@@ -570,7 +570,7 @@ html[data-style-buttons='soft'] [data-slot='button'][data-variant='default']:hov
 /* A page whose main part is a list (FillPage): the list scrolls inside, its tables keep the header row in sight.
    The wrappers of a table must not scroll themselves, or the sticky row would stick to them. */
 .msk-listscroll [data-slot='table-container'],
-.msk-listscroll :has(> [data-slot='table-container']) {
+.msk-listscroll :has(> [data-slot='table-container']):not([data-listscroll]) {
   overflow: visible;
 }
 .msk-listscroll thead {
