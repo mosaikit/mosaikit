@@ -313,23 +313,23 @@ function NotificationPrefs() {
   const dirty = !!v && JSON.stringify(v) !== JSON.stringify(saved)
   const modeName = (m: string) => ({ off: t('Never'), immediate: t('At once'), digest: t('One summary a day, at {h}:00 (UTC)', { h: String(p.digest_hour) }) })[m] ?? m
   return (
-    <div className="grid max-w-2xl gap-6">
+    <div className="grid w-full gap-6">
       <Card>
         <CardHeader>
           <CardTitle>{t('What I receive')}</CardTitle>
           <CardDescription>{t('In the app every notification arrives in the bell; by email only what you choose.')}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="grid gap-1.5">
+          <div className="grid gap-4 sm:grid-cols-[repeat(2,minmax(0,1fr))]">
+            <div className="grid min-w-0 gap-1.5">
               <Label htmlFor="np-address">{t('Email address')}</Label>
               <Input id="np-address" type="email" autoComplete="email" placeholder="name@example.org" value={d.address} onChange={(e) => setV({ ...d, address: e.target.value })} />
               {!d.address.trim() && <span className="text-xs text-muted-foreground">{t('Without an address nothing arrives by email.')}</span>}
             </div>
-            <div className="grid gap-1.5">
+            <div className="grid min-w-0 gap-1.5">
               <Label htmlFor="np-mode">{t('Emails')}</Label>
               <Select value={d.mode} onValueChange={(m) => setV({ ...d, mode: m })}>
-                <SelectTrigger id="np-mode" className="w-full">
+                <SelectTrigger id="np-mode" className="w-full min-w-0">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
