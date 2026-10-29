@@ -79,11 +79,11 @@ async fn update_with_migrations_keeps_the_data() {
     .await
     .unwrap();
 
-    let mut v2 = with_version(notes_files(), "0.6.1");
-    v2.insert("migrations/003_priority.sql".into(), b"alter table notes add column priority text".to_vec());
+    let mut v2 = with_version(notes_files(), "0.7.1");
+    v2.insert("migrations/004_priority.sql".into(), b"alter table notes add column priority text".to_vec());
     install(&t, &v2).await.unwrap();
     let p = t.plugins.get("com.mosaikit.notes").unwrap();
-    assert_eq!(p.manifest.version, "0.6.1");
+    assert_eq!(p.manifest.version, "0.7.1");
     assert!(p.is_active(), "the active state is kept");
     let rows = crud::list(&t, &c, "com.mosaikit.notes", "notes", None, None).await.unwrap().rows;
     assert_eq!(rows.len(), 1);
@@ -96,12 +96,12 @@ async fn update_with_migrations_keeps_the_data() {
     // downgrade and the same version with a different content refused
     assert!(install(&t, &notes_files()).await.unwrap_err().message.contains("downgrade"));
     let mut same = v2.clone();
-    same.insert("migrations/004_x.sql".into(), b"alter table notes add column x text".to_vec());
+    same.insert("migrations/005_x.sql".into(), b"alter table notes add column x text".to_vec());
     assert_eq!(install(&t, &same).await.unwrap_err().kind, Kind::Conflict);
     // migration already applied and then changed
-    let mut changed = with_version(notes_files(), "0.7.0");
+    let mut changed = with_version(notes_files(), "0.7.2");
     changed.insert(
-        "migrations/003_priority.sql".into(),
+        "migrations/004_priority.sql".into(),
         b"alter table notes add column priority2 text".to_vec(),
     );
     let e = install(&t, &changed).await.unwrap_err();
@@ -155,8 +155,8 @@ async fn texts_in_the_language_of_the_request() {
     assert_eq!(view("it-IT").label, "Note");
     assert_eq!(view("fr").label, "Notes", "no translation: English");
     let fields = plugins::localized_fields(&t, "com.mosaikit.notes", "notes", "it").unwrap();
-    let tag = fields.iter().find(|f| f.key == "tag").unwrap();
-    assert_eq!(tag.option_labels.get("work").map(String::as_str), Some("lavoro"));
+    let color = fields.iter().find(|f| f.key == "color").unwrap();
+    assert_eq!(color.option_labels.get("yellow").map(String::as_str), Some("giallo"));
     assert_eq!(fields.iter().find(|f| f.key == "title").unwrap().label, "Titolo");
     let mut k = mosaikit_kernel::kpi::tenant(&t, &c).await.unwrap();
     mosaikit_kernel::kpi::localize(&t, &mut k.plugins, "it");
@@ -175,7 +175,7 @@ async fn refused_migration_rolls_back_everything() {
         ("create view kpi_theft as select tenant_id, username from core.users join core.memberships on user_id = id", "not accessible"),
     ] {
         let mut f = notes_files();
-        f.insert("migrations/003_bad.sql".into(), sql.as_bytes().to_vec());
+        f.insert("migrations/004_bad.sql".into(), sql.as_bytes().to_vec());
         let e = install(&t, &f).await.unwrap_err();
         assert!(e.message.contains(expect), "{sql}: {e}");
         let rows: i64 = mosaikit_db::query_scalar("select count(*) from core.plugins").fetch_one(&t.db).await.unwrap();

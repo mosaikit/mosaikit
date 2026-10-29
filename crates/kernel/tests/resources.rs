@@ -207,7 +207,7 @@ async fn validation_and_refusing_hooks() {
         .await
         .unwrap_err();
     assert!(e.message.contains("required"), "{e}");
-    let e = crud::create(t, c, NOTES, "notes", &vals(json!({ "title": "x", "tag": "nonexistent" })), None)
+    let e = crud::create(t, c, NOTES, "notes", &vals(json!({ "title": "x", "color": "nonexistent" })), None)
         .await
         .unwrap_err();
     assert!(e.message.contains("options"), "{e}");
