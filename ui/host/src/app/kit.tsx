@@ -282,7 +282,7 @@ export function Sections({ sections, current, href, children }: { sections: Sect
           ))}
         </ul>
       </nav>
-      <div className="min-w-0 flex-1 overflow-x-clip p-6 max-[620px]:p-4">{children}</div>
+      <div className="min-w-0 flex-1 overflow-x-clip p-6 max-[620px]:p-4 [&>.grid]:grid-cols-[minmax(0,1fr)] [&_[data-slot=card]]:min-w-0">{children}</div>
     </div>
   )
 }
