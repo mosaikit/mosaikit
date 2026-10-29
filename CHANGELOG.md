@@ -24,6 +24,7 @@ in step).
 - Notes are coloured post-its: eight colours (readable in light and dark mode), chosen in the editor or from a small menu on the note, slightly turned, straight under the pointer. Drag the folded corner, or press Alt and the arrow keys, to resize a post-it; its size is kept. The List view is still there.
 - Notes have tags of your own, each with its own colour: create, rename, recolour and delete them from the Tags button (deleting a tag removes it from your notes), and filter the notes by tag.
 - Pages and lists with nothing in them show an illustration with a title, a short line and the buttons of what to do, the same in the shell and in the apps; a filter that matches nothing shows a small message with a link to clear it.
+- Documents: the list and the details panel are one flat block; the bar of the selected files shows only icons (the name appears as a tooltip); the panel no longer scrolls sideways; PDF files are shown in the panel and in the viewer by the app itself, so they work in every browser. Scrollbars are as thin as those of Mosaikit in every app.
 
 ### People and tenants
 

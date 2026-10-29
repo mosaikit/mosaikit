@@ -23,6 +23,7 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 - Le note sono post-it colorati: otto colori (leggibili in modo chiaro e scuro), scelti nell’editor o da un piccolo menu sulla nota, leggermente inclinati e dritti sotto il puntatore. Trascina l’angolo piegato, oppure premi Alt e i tasti freccia, per ridimensionare un post-it; la dimensione viene ricordata. La vista Elenco resta disponibile.
 - Le note hanno tag tuoi, ciascuno con il proprio colore: creali, rinominali, cambia il colore ed eliminali dal pulsante Tag (eliminare un tag lo toglie dalle tue note), e filtra le note per tag.
 - Le pagine e gli elenchi vuoti mostrano un’illustrazione con un titolo, una riga di spiegazione e i pulsanti di cosa fare, uguali nella shell e nelle app; un filtro senza risultati mostra un piccolo messaggio con il link per azzerarlo.
+- Documenti: l'elenco e il pannello dei dettagli sono un unico blocco piatto; la barra dei file selezionati mostra solo le icone (il nome compare come tooltip); il pannello non scorre più in orizzontale; i PDF si vedono nel pannello e nel visualizzatore grazie all'app stessa, quindi funzionano in ogni browser. Le barre di scorrimento sono sottili come quelle di Mosaikit in tutte le app.
 
 ### Persone e tenant
 

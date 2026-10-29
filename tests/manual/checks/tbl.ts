@@ -165,6 +165,31 @@ const checks: L.Check[] = [
       return c.result()
     },
   },
+  {
+    id: 'TBL-08',
+    async run(ctx: any) {
+      const c = H.checker()
+      const p = await L.as(ctx, 'e.ricci')
+      await p.setViewportSize({ width: 1440, height: 900 })
+      await H.go(p, '#/t/comune-roma/p/com.mosaikit.files')
+      await p.waitForTimeout(1500)
+      const f = p.frameLocator('iframe.plugin-frame')
+      const pdf = '%PDF-1.4
+1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj
+2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj
+3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj
+trailer<</Root 1 0 R/Size 4>>
+%%EOF
+'
+      await f.locator('input[type="file"]').setInputFiles({ name: 'tbl08.pdf', mimeType: 'application/pdf', buffer: Buffer.from(pdf) })
+      await f.locator('.fm-main').getByText('tbl08.pdf', { exact: true }).first().click()
+      c.ok(await f.locator('.fm-side .pv canvas').isVisible({ timeout: 15000 }).catch(() => false), 'the PDF is drawn in the panel')
+      c.ok(await f.locator('.fm-bar button[data-tip]').first().isVisible(), 'icon-only buttons in the bar')
+      const over = await f.locator('.fm-side').evaluate((e: HTMLElement) => e.scrollWidth <= e.clientWidth)
+      c.ok(over, 'the panel does not scroll sideways')
+      return c.result()
+    },
+  },
 ]
 
 export default checks
