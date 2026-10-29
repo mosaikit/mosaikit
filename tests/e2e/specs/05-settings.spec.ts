@@ -144,7 +144,10 @@ test.describe.serial('05-settings', () => {
     await adminLogin(page)
     await nav(page, 'System').click()
     await appearanceTab(page, 'Languages and formats')
+    const spanish = page.getByRole('checkbox', { name: 'Español' })
     await page.getByRole('checkbox', { name: 'Italiano' }).click()
+    // the language plugin of Spanish is on the list too (the e2e names it once at the first sign-in)
+    if (await spanish.count()) await spanish.click()
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByText('Settings saved').last()).toBeVisible()
     // one language: nothing to choose in the bar
@@ -161,6 +164,7 @@ test.describe.serial('05-settings', () => {
     await nav(page, 'System').click()
     await appearanceTab(page, 'Languages and formats')
     await page.getByRole('checkbox', { name: 'Italiano' }).click()
+    if (await page.getByRole('checkbox', { name: 'Español' }).count()) await page.getByRole('checkbox', { name: 'Español' }).click()
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByText('Settings saved').last()).toBeVisible()
     await expect(page.getByRole('button', { name: /Language:/ })).toBeVisible()

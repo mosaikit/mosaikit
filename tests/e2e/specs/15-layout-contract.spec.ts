@@ -569,7 +569,9 @@ function judge(rule: string, r: Rec, all: Rec[]): string[] {
       if (!desk) break
       const sel = inner.sections?.selected ?? (r.expectSection ? r.expectSection : '')
       if (!inner.sections && !r.expectSection) break
-      if (!inner.headerText.includes('›')) out.push(`header «${inner.headerText.slice(0, 60)}» has no «Page › Subsection»`)
+      // the header of a page with sections is split: the page on the left, the open section over the content (no «›» on a wide window)
+      const split = !!inner.sections && !!sel && inner.headerText.includes(sel)
+      if (!inner.headerText.includes('›') && !split) out.push(`header «${inner.headerText.slice(0, 60)}» has no «Page › Subsection»`)
       else if (inner.sections && sel && !inner.headerText.includes(sel)) out.push(`header «${inner.headerText.slice(0, 60)}» does not show the open section «${sel}»`)
       break
     }

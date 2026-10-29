@@ -68,11 +68,7 @@ test.describe.serial('16-tables', () => {
     expect(desc).toEqual([...asc].reverse())
     await cards.first().getByRole('checkbox').click()
     await expect(page.getByRole('group', { name: 'Actions on the selection' })).toBeVisible()
-    // a click on the card opens the plugin
     await page.getByRole('button', { name: 'Deselect' }).click()
-    await cards.first().getByRole('link').click()
-    await expect(page).toHaveURL(/#\/admin\/plugin\//)
-    await page.goBack()
     // the table: the same sort (kept), the header row fixed, a scrollbar of the rows, aria-sort
     await page.getByRole('radio', { name: 'Table' }).click()
     await expect(page.locator('#main thead th[aria-sort="descending"]')).toHaveCount(1)
@@ -91,8 +87,11 @@ test.describe.serial('16-tables', () => {
     await page.getByRole('radio', { name: 'Cards' }).click()
     await page.reload()
     await expect(cards.first()).toBeVisible()
+    // a click on the card opens the plugin
+    await cards.first().getByRole('link').click()
+    await expect(page).toHaveURL(/#\/admin\/plugin\//)
     // Updates and Catalog have both views too
-    await page.getByRole('radio', { name: 'Catalog' }).click().catch(() => {})
+    await page.goto('./#/admin/plugins/catalog')
     await expect(page.getByRole('radio', { name: 'Table' })).toBeVisible()
   })
 })

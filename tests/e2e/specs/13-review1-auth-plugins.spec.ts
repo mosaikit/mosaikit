@@ -118,8 +118,8 @@ test.describe.serial('review round 1: auth and plugins', () => {
       await nav(page, 'Apps').click()
       const frame = page.frameLocator('iframe.plugin-frame')
       await expect(frame.getByRole('heading', { name: 'Apps', exact: true })).toBeVisible()
-      // cards are the default view
-      await expect(frame.locator('.cards')).toBeVisible()
+      // nothing yet: the illustrated empty state (the cards are the default view once there is an app)
+      await expect(frame.getByTestId('empty-state')).toBeVisible()
 
       const create = async (name: string, address: string) => {
         await frame.getByRole('button', { name: '＋ New app' }).first().click()
@@ -131,6 +131,7 @@ test.describe.serial('review round 1: auth and plugins', () => {
 
       // a site by address: kept as an address (nothing uploaded), with the og:image as its thumbnail
       await create(freeName, addr(free))
+      await expect(frame.locator('.cards')).toBeVisible()
       const card = frame.locator('article.card', { hasText: freeName })
       await expect(card.locator('img.thumb')).toBeVisible()
       await expect(card.locator('.cardmeta')).toContainText('127.0.0.1')

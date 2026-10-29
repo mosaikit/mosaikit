@@ -150,9 +150,9 @@ export function ListTable<T, K extends string | number = string>({
             </TableRow>
           )}
           {server ? (
-            <MoreRows inTable shown={shown.length} total={server.total} more={server.more} loading={server.loading} onMore={server.onMore} label={server.label} />
+            server.more && <MoreRows inTable shown={shown.length} total={server.total} more loading={server.loading} onMore={server.onMore} label={server.label} />
           ) : (
-            local && <MoreRows inTable shown={shown.length} total={shownAll.length} more={shown.length < shownAll.length} onMore={() => setN((x) => x + step)} />
+            local && shown.length < shownAll.length && <MoreRows inTable shown={shown.length} total={shownAll.length} more onMore={() => setN((x) => x + step)} />
           )}
         </TableBody>
       </Table>
