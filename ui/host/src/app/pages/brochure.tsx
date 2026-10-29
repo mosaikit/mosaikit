@@ -121,25 +121,45 @@ export function PluginSummary({ p, kind, card, href, className }: { p: AdminPlug
   ) : (
     <h2 className="text-2xl font-semibold tracking-tight max-[620px]:text-xl">{p.label}</h2>
   )
+  const badges = (
+    <div className={cn('flex flex-wrap items-center gap-1.5', !card && 'pt-1')}>
+      <Badge variant="secondary" className="font-normal">{kind}</Badge>
+      <Badge variant="outline" className="font-mono font-normal">v{p.version}</Badge>
+      {p.license && <Badge variant="outline" className="font-normal">{p.license}</Badge>}
+      {p.signed_by && (
+        <Badge variant="outline" className="gap-1 font-normal text-ok">
+          <ShieldCheck className="size-3" />
+          {t('Signed')}
+        </Badge>
+      )}
+    </div>
+  )
+  const tile = (
+    <span className={cn('flex shrink-0 items-center justify-center rounded-2xl border bg-card shadow-sm', card ? 'size-14' : 'size-20 max-[620px]:size-16')}>
+      <AppIcon id={p.id} name={p.icon_name} className={cn('text-primary', card ? 'size-7' : 'size-10 max-[620px]:size-8')} />
+    </span>
+  )
+  // the card: icon, name and badges on one row, the description under them across the whole width
+  if (card)
+    return (
+      <div className={cn('grid gap-3', className)}>
+        <div className="flex items-center gap-3">
+          {tile}
+          <div className="grid min-w-0 flex-1 gap-1.5">
+            {name}
+            {badges}
+          </div>
+        </div>
+        <p className="line-clamp-3 text-sm text-muted-foreground">{p.description}</p>
+      </div>
+    )
   return (
-    <div className={cn('flex items-center gap-5', card && 'items-start gap-3', className)}>
-      <span className={cn('flex shrink-0 items-center justify-center rounded-2xl border bg-card shadow-sm', card ? 'size-14 rounded-2xl' : 'size-20 max-[620px]:size-16')}>
-        <AppIcon id={p.id} name={p.icon_name} className={cn('text-primary', card ? 'size-7' : 'size-10 max-[620px]:size-8')} />
-      </span>
+    <div className={cn('flex items-center gap-5', className)}>
+      {tile}
       <div className="grid min-w-0 flex-1 gap-1.5">
         {name}
-        <p className={cn('text-sm text-muted-foreground', card && 'line-clamp-3')}>{p.description}</p>
-        <div className="flex flex-wrap items-center gap-1.5 pt-1">
-          <Badge variant="secondary" className="font-normal">{kind}</Badge>
-          <Badge variant="outline" className="font-mono font-normal">v{p.version}</Badge>
-          {p.license && <Badge variant="outline" className="font-normal">{p.license}</Badge>}
-          {p.signed_by && (
-            <Badge variant="outline" className="gap-1 font-normal text-ok">
-              <ShieldCheck className="size-3" />
-              {t('Signed')}
-            </Badge>
-          )}
-        </div>
+        <p className="text-sm text-muted-foreground">{p.description}</p>
+        {badges}
       </div>
     </div>
   )
