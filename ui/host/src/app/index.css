@@ -593,6 +593,7 @@ html[data-style-buttons='soft'] [data-slot='button'][data-variant='default']:hov
   box-shadow: inset 0 -1px 0 var(--border);
 }
 .msk-gridtable > tbody {
+  overflow-x: hidden;
   overflow-y: scroll;
   align-content: start;
 }
