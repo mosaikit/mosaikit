@@ -51,6 +51,8 @@ test.describe.serial('11-layouts', () => {
         await page.getByRole('button', { name: 'All apps and pages' }).click()
         await page.getByRole('dialog', { name: 'All apps and pages' }).getByRole('link', { name: 'Tenants', exact: true }).click()
       } else {
+        // the areas of the Workspace layout: the overview is an area of its own, the other pages are in the next one
+        if (await page.locator('.msk-areas').count()) await page.locator('.msk-areas [role="tab"]', { hasText: 'Platform' }).last().click()
         await page.locator('.msk-nav').getByRole('link', { name: 'Tenants', exact: true }).click()
       }
       await expect(page).toHaveURL(/#\/admin\/tenants/)
