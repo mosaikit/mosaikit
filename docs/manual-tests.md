@@ -701,8 +701,19 @@ The three apps follow the rules of the shell: header and filters pinned, the lis
 |---|---|---|---|
 | PUI-01 | Open **Contacts**, add a contact with an email and a kind of company; click its card, then **Edit**, then **Cancel** | Cards with the initials of each person in a coloured circle, the kind as a chip; the reading panel shows the name, the address as a link and **Edit**; Edit shows the form, Cancel goes back to reading; the header stays at the top while the cards scroll | Playwright |
 | PUI-02 | Open **Tasks**, add an overdue task with high priority and one due next week; switch **List** / **Board**; tick the box of the overdue one | Status chips (priority), due dates (the overdue one in red); the board has Overdue, Open and Done; the ticked task moves to Done, struck through, without opening it; the view you chose is kept after a reload | Playwright |
-| PUI-03 | Open **Notes**, add a note with a tag and a text of several lines; open it, **Edit**, change the title, **Save**; try **Share…** | Note cards with the tag chip and the first lines; the open note is read in the panel before editing; Save shows it again; Share and the actions of the extensions still work | Playwright |
+| PUI-03 | Open **Notes**, add a note (it starts with the tag personal) and a text of several lines; open it, **Edit**, change the title, **Save**; try **Share…** | Post-its with the tag chip and the first lines; the open note is read in the panel before editing; Save shows it again; Share and the actions of the extensions still work | Playwright |
 | PUI-04 | At 390 px wide (phone), in light and in dark, open each of the three apps, then an item, then press Escape | Nothing scrolls sideways; the list alone, the detail covers it when an item is open, Escape (or Close) goes back to the list with the focus on the item; the colours follow the mode | Playwright |
+
+## Notes as post-its
+
+Notes are coloured, slightly turned post-its with a soft shadow and a folded corner (the corner is the grip to resize). Each tag has its own colour. Twins in `tests/manual/checks/npi.ts` (and `tests/e2e/specs/17-notes-postits.spec.ts`).
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| NPI-01 | Open **Notes**, **New note**, write a title and a text, pick a colour, add a tag, **Save**; then open the round button of the post-it and pick another colour | Post-it in the chosen colour with the title, the first lines and the tag chip in the colour of the tag; the quick menu changes the colour at once and the choice is still there after a reload; the post-it is straight under the pointer and when it has the focus | Playwright |
+| NPI-02 | Drag the folded corner of a post-it; focus another post-it and press Alt and the arrow keys (Shift for bigger steps); reload the page | The post-it follows the pointer and the keys, never goes below or above the limits (160 x 120 and 480 x 480 pixels), the new size is there after the reload, the others wrap around it, nothing scrolls sideways | Playwright |
+| NPI-03 | Press **Tags**: add a tag with a colour, rename a tag, change its colour, delete a tag and confirm | The tag appears in the editor of the notes with its own colour (not the colour of the note); renaming and colour show in all the notes at once; deleting asks first and removes the tag from every note; the filter by tag lists the tags that exist | Playwright |
+| NPI-04 | In light and in dark mode, and at 390 px wide, look at the post-its of every colour; switch **Post-its** / **List** | Text readable on every colour in both modes (contrast of at least 4.5 to 1), the list view shows the same notes with their tags, the layout wraps on a phone | Playwright |
 
 ## Spanish coverage
 

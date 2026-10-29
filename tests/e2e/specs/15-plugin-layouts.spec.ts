@@ -81,16 +81,16 @@ test.describe.serial('15-plugin-layouts', () => {
     await frame.getByRole('button', { name: 'List' }).click()
   })
 
-  test('Notes: cards, reading pane, edit; the panel covers the list on a phone; dark mode', async ({ browser }) => {
+  test('Notes: post-its, reading pane, edit; the panel covers the list on a phone; dark mode', async ({ browser }) => {
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } })
     const page = await ctx.newPage()
     await login(page, 'Alfa', 'manager', PASSWORD)
     await nav(page, 'Notes').click()
     const frame = frameOf(page)
-    await add(frame, { title: 'Weekly plan', body: 'Monday: kickoff\nTuesday: review', tag: 'work' })
+    await add(frame, { title: 'Weekly plan', body: 'Monday: kickoff\nTuesday: review' })
     const card = frame.locator('.msk-item', { hasText: 'Weekly plan' })
-    await expect(card.locator('.msk-chip', { hasText: 'work' })).toBeVisible()
-    await expect(card.locator('.nbody')).toContainText('Monday: kickoff')
+    await expect(card.locator('.pi-tag', { hasText: 'personal' })).toBeVisible()
+    await expect(card.locator('.pi-body')).toContainText('Monday: kickoff')
     await expect(frame.locator('.note-read h2')).toHaveText('Weekly plan')
     await expect(frame.locator('.nread')).toContainText('Tuesday: review')
     await frame.getByRole('button', { name: 'Edit' }).click()

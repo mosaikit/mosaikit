@@ -39,6 +39,38 @@ const tick = () => new Promise((r) => setTimeout(r, 0))
 const it_ctx: UiContext = { lang: 'it', preset: 'mosaikit', mode: 'light', preference: 'light', theme: {} }
 
 describe('mountCrud', () => {
+  it('a plugin adds its own parts: box of the item, editor with hidden values, header controls, onLoad', async () => {
+    const el = document.createElement('div')
+    const { msk, calls } = fakeMsk([row('1', 'one', 'manage')])
+    const loaded: number[] = []
+    const extra = document.createElement('button')
+    extra.textContent = 'Tags'
+    mountCrud(el, msk, 'notes', {
+      views: [{ key: 'flow', label: 'Flow', kind: 'flow', item: (c) => Object.assign(document.createElement('span'), { textContent: c.text('title') }), box: (c, box) => box.classList.add('mine', `n-${c.row.id}`) }],
+      headActions: [extra],
+      onLoad: (rows) => loaded.push(rows.length),
+      editor: (ctx, box) => {
+        const b = document.createElement('button')
+        b.type = 'button'
+        b.className = 'ed'
+        b.textContent = String(ctx.value('secret'))
+        b.addEventListener('click', () => ctx.set('secret', 7))
+        box.append(b)
+      },
+    })
+    await tick()
+    expect(loaded).toEqual([1])
+    expect(el.querySelector('.msk-items.flow .msk-item.mine.n-1')).not.toBeNull()
+    expect(el.querySelector('.msk-pagehead')!.textContent).toContain('Tags')
+    el.querySelector<HTMLElement>('.msk-item')!.click()
+    await tick()
+    el.querySelector<HTMLButtonElement>('.msk-editor .ed')!.click()
+    el.querySelector<HTMLButtonElement>('.msk-actions .msk-btn:not(.ghost):not(.danger)')?.click()
+    el.querySelectorAll<HTMLButtonElement>('.msk-actions button').forEach((b) => b.textContent === 'Save' && b.click())
+    await tick()
+    expect(calls.find((c) => c.op === 'crud.update')?.args.values.secret).toBe(7)
+  })
+
   it('a page of the navigation shows only its rows (where)', async () => {
     const el = document.createElement('div')
     const { msk } = fakeMsk([row('1', 'mine', 'manage'), row('2', 'from bruno', 'read', 'bruno')])

@@ -20,6 +20,8 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 - Le liste e le tabelle lunghe si caricano una pagina alla volta, con il conteggio e «Carica altri» (o scorrendo), anche il Registro.
 - Ogni tabella funziona allo stesso modo, nella shell e nelle app: la riga delle intestazioni resta ferma e scorrono solo le righe, i titoli delle colonne ordinano, un campo di filtro nell'intestazione cerca in ogni campo e altre righe si caricano quando si arriva in fondo. I plugin installati si vedono anche come schede (predefinito) o come tabella.
 - In Contatti, Attività e Note il pannello con i dettagli compare solo quando apri un elemento o ne crei uno nuovo; altrimenti l’elenco usa tutta la larghezza.
+- Le note sono post-it colorati: otto colori (leggibili in modo chiaro e scuro), scelti nell’editor o da un piccolo menu sulla nota, leggermente inclinati e dritti sotto il puntatore. Trascina l’angolo piegato, oppure premi Alt e i tasti freccia, per ridimensionare un post-it; la dimensione viene ricordata. La vista Elenco resta disponibile.
+- Le note hanno tag tuoi, ciascuno con il proprio colore: creali, rinominali, cambia il colore ed eliminali dal pulsante Tag (eliminare un tag lo toglie dalle tue note), e filtra le note per tag.
 - Le pagine e gli elenchi vuoti mostrano un’illustrazione con un titolo, una riga di spiegazione e i pulsanti di cosa fare, uguali nella shell e nelle app; un filtro senza risultati mostra un piccolo messaggio con il link per azzerarlo.
 
 ### Persone e tenant

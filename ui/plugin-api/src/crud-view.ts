@@ -35,6 +35,27 @@ export interface CrudOptions {
   panel?: 'selected' | 'always'
   /** the read-only view of the open item (with «Edit» for the fields): used instead of the form until the person edits */
   reader?: (ctx: ItemCtx) => HTMLElement
+  /** extra controls in the header, next to the «new» button (a «Tags» button…) */
+  headActions?: HTMLElement[]
+  /** extra controls with the filter of the header (a row of tag chips…) */
+  headFilters?: HTMLElement[]
+  /** the plugin's own part of the form (a colour picker, a tag chooser…): draws into `box` after the fields, for a new and for an open
+   *  item, and sets values of fields the form does not show (hidden ones) with `ctx.set`; they are saved with the form */
+  editor?: (ctx: EditorCtx, box: HTMLElement) => void
+  /** called with the rows every time the list is loaded (all the rows, when the plugin filters with `where`) */
+  onLoad?: (rows: Row[]) => void
+}
+
+/** What the `editor` of a plugin works with. */
+export interface EditorCtx {
+  /** the open item, null for a new one */
+  row: Row | null
+  /** the value of a field: what the editor set, else the one of the item */
+  value(key: string): unknown
+  /** sets the value of a field, saved with the form */
+  set(key: string, value: string | number | boolean | null): void
+  canWrite: boolean
+  lang: 'en' | 'it' | 'es'
 }
 
 /** What a plugin draws an item with. */
@@ -57,8 +78,10 @@ export interface CrudView {
   key: string
   /** name of the view in the switch */
   label: string
-  /** a vertical list, a grid of cards, or columns (`columns`) */
-  kind: 'list' | 'cards' | 'board'
+  /** a vertical list, a grid of cards, items that flow and wrap each with its own size (`flow`), or columns (`columns`) */
+  kind: 'list' | 'cards' | 'flow' | 'board'
+  /** the box of each item (the element with the selection and the keyboard): the plugin may style it or add listeners */
+  box?: (ctx: ItemCtx, el: HTMLElement) => void
   /** the content of an item; the view adds the box, selection and keyboard */
   item: (ctx: ItemCtx) => HTMLElement
   /** board only: the columns and which rows fall in each */
@@ -86,6 +109,8 @@ type State = {
   /** the open item is being edited (with `reader`, the item opens for reading first) */
   editing: boolean
   view: string
+  /** values set by the `editor` of the plugin since the form was opened */
+  editorVals: Values
 }
 
 export function h<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string, string> = {}, ...children: (Node | string)[]) {
@@ -220,7 +245,7 @@ type Text = keyof (typeof TEXTS)['en']
 export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: CrudOptions = {}): () => void {
   const api = msk.crud(resource)
   const extApi = msk.extensions(resource)
-  const st: State = { fields: [], rows: [], next: null, total: null, selected: null, filter: '', busy: false, ext: [], extValues: {}, tab: null, editing: false, view: '' }
+  const st: State = { fields: [], rows: [], next: null, total: null, selected: null, filter: '', busy: false, ext: [], extValues: {}, tab: null, editing: false, view: '', editorVals: {} }
   let disposed = false
   /** the tab mounted now (row|extension|key) and the function that closes it */
   let mounted: { key: string; close: () => void } | null = null
@@ -296,7 +321,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   body.classList.add(views.length ? 'msk-splitbody' : 'msk-tablebody')
   root.replaceChildren(
     // the header and the filters never scroll: the table, the foot and the form do
-    pageHead({ title: opts.title ?? resource, section: opts.section, sub: count, actions: [btnNew], filters: views.length > 1 ? [switcher, filter] : [filter] }),
+    pageHead({ title: opts.title ?? resource, section: opts.section, sub: count, actions: [btnNew, ...(opts.headActions ?? [])], filters: [...(views.length > 1 ? [switcher, filter] : [filter]), ...(opts.headFilters ?? [])] }),
     body,
   )
   // the rest of the rows come as the foot of the table comes into view
@@ -327,6 +352,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     st.selected = st.selected === id ? null : id
     st.tab = null
     st.editing = false
+    st.editorVals = {}
     split.dataset.open = st.selected ? 'true' : 'false'
     renderTable()
     renderForm()
@@ -390,6 +416,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
       const el = h('div', { class: 'msk-item' + (ctx.selected ? ' sel' : ''), role: 'listitem', tabindex: '0', 'data-id': r.id })
       if (ctx.selected) el.setAttribute('aria-current', 'true')
       el.append(view.item(ctx))
+      view.box?.(ctx, el)
       // the fields of the extensions, as chips under the item
       const marks = extColumns().flatMap((x) => {
         const v = st.extValues[r.id]?.[x.ext]?.[x.f.key]
@@ -409,7 +436,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault()
           pick(r.id)
-        } else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+        } else if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && !e.altKey) {
           e.preventDefault()
           const all = [...items.querySelectorAll<HTMLElement>('.msk-item')]
           all[all.indexOf(el) + (e.key === 'ArrowDown' ? 1 : -1)]?.focus()
@@ -586,6 +613,22 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     readerBox.replaceChildren(...(reading ? [opts.reader!(itemCtx(row!))] : []))
     tabPanel.hidden = !inTab
     fieldsBox.replaceChildren(...visibleFields().map((f) => input(f, row?.values[f.key], !canWrite)))
+    if (opts.editor && !reading) {
+      const box = h('div', { class: 'msk-editor' })
+      opts.editor(
+        {
+          row,
+          value: (k) => (k in st.editorVals ? st.editorVals[k] : row?.values[k]),
+          set: (k, v) => {
+            st.editorVals[k] = v
+          },
+          canWrite,
+          lang: lang(),
+        },
+        box,
+      )
+      fieldsBox.append(box)
+    }
     btnEdit.hidden = !reading || !canWrite
     btnSave.hidden = !canWrite || inTab || reading
     btnDel.hidden = !row || !canManage || inTab || !msk.can('delete')
@@ -663,7 +706,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
       else if (f.kind === 'number') out[key] = el.value === '' ? null : Number(el.value)
       else out[key] = el.value === '' ? null : el.value
     }
-    return out
+    return { ...out, ...st.editorVals }
   }
 
   /** The first page again (after a change, with another filter). */
@@ -676,6 +719,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
       st.rows = r.rows
       st.next = r.next ?? null
       st.total = r.total ?? null
+      opts.onLoad?.(st.rows)
       st.ext = await extApi.list()
       st.extValues = st.ext.some((e) => e.fields.length) ? await extApi.values(r.rows.map((x) => x.id)) : {}
       if (disposed) return
@@ -736,6 +780,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   })
   btnNew.addEventListener('click', () => {
     st.selected = null
+    st.editorVals = {}
     st.tab = null
     st.editing = true
     split.dataset.open = 'true'
@@ -749,6 +794,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     const back = !!(opts.reader && st.editing && st.selected)
     const was = st.selected
     if (!back) st.selected = null
+    st.editorVals = {}
     st.tab = null
     st.editing = false
     split.dataset.open = back ? 'true' : 'false'
@@ -770,6 +816,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
       // saving closes the panel (the list takes the whole width again) unless the plugin reads the item in it: then it shows the saved item
       st.selected = views.length && !opts.reader && opts.panel !== 'always' ? null : saved.id
       st.editing = false
+      st.editorVals = {}
       split.dataset.open = st.selected ? 'true' : 'false'
       setMsg(tr('saved'))
       if (!st.selected && views.length) msk.toast(tr('saved'))

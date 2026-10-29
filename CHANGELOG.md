@@ -21,6 +21,8 @@ in step).
 - Long lists and tables load a page at a time, with a count and «Load more» (or as you scroll), including the Log.
 - Every table works the same way, in the shell and in the apps: the header row stays in place and only the rows scroll, the titles of the columns sort, a filter box in the header searches every field, and more rows load as you reach the end. The installed plugins also show as cards (the default) or as a table.
 - In Contacts, Tasks and Notes the panel with the details appears only when you open an item or create a new one; otherwise the list uses the whole width.
+- Notes are coloured post-its: eight colours (readable in light and dark mode), chosen in the editor or from a small menu on the note, slightly turned, straight under the pointer. Drag the folded corner, or press Alt and the arrow keys, to resize a post-it; its size is kept. The List view is still there.
+- Notes have tags of your own, each with its own colour: create, rename, recolour and delete them from the Tags button (deleting a tag removes it from your notes), and filter the notes by tag.
 - Pages and lists with nothing in them show an illustration with a title, a short line and the buttons of what to do, the same in the shell and in the apps; a filter that matches nothing shows a small message with a link to clear it.
 
 ### People and tenants
