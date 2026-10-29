@@ -175,7 +175,7 @@ function AppSidebar({ session, route, band }: { session: Session; route: Route; 
           </SidebarGroup>
         ))}
       </SidebarContent>
-      <SidebarFooter className="border-r border-sidebar-border pt-1 pb-1 group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-0">
+      <SidebarFooter className="border-r border-sidebar-border pt-1 pb-1 group-data-[collapsible=icon]:relative group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-0 group-data-[collapsible=icon]:before:absolute group-data-[collapsible=icon]:before:top-0 group-data-[collapsible=icon]:before:left-1/2 group-data-[collapsible=icon]:before:h-px group-data-[collapsible=icon]:before:w-7 group-data-[collapsible=icon]:before:-translate-x-1/2 group-data-[collapsible=icon]:before:bg-sidebar-border group-data-[collapsible=icon]:before:content-['']">
         {/* only when a quota of the tenant passes 80 %: no fixed widget */}
         {route.area === 'tenant' && (
           <div className="px-2 group-data-[collapsible=icon]:px-2.5">
