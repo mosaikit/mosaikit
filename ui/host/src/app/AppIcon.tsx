@@ -6,7 +6,7 @@
 import {
   Archive, BadgeCheck, BarChart3, Bell, Book, BookOpen, BookUser, Bot, Briefcase, Building2, Calendar, Camera,
   ChartPie, ClipboardList, Clock, Cloud, Code, Database, FileText, Files, Folder, Gauge, Globe, Image, Inbox,
-  Kanban, Landmark, Layers, LayoutDashboard, Link, List, ListChecks, Mail, Map, MapPin, MessageSquare,
+  Kanban, Landmark, Layers, LayoutDashboard, LayoutGrid, Link, List, ListChecks, Mail, Map, MapPin, MessageSquare,
   NotebookPen, Package, PenTool, Puzzle, Receipt, Route, Server, Settings, Share2, ShieldCheck, ShoppingCart,
   SquareCheckBig, Star, Table, Tag, Truck, Users, Wallet, Wrench, type LucideIcon,
 } from 'lucide-react'
@@ -36,6 +36,7 @@ const ICONS: Record<string, LucideIcon> = {
   folder: Folder,
   gauge: Gauge,
   globe: Globe,
+  grid: LayoutGrid,
   image: Image,
   inbox: Inbox,
   kanban: Kanban,
@@ -77,7 +78,7 @@ const BY_APP: Record<string, LucideIcon> = {
   files: Folder,
   maps: Map,
   notes: NotebookPen,
-  'static-site': Wrench,
+  'static-site': LayoutGrid,
 }
 
 export default function AppIcon({ id, name, className }: { id: string; name?: string | null; className?: string }) {
