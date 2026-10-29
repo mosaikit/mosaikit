@@ -189,7 +189,7 @@ export function SignInSettings({ id }: { id: string }) {
 
   const oidc = cur.enabled
   return (
-    <div className="grid max-w-3xl gap-6">
+    <div className="grid gap-6">
       <Card>
         <CardHeader>
           <CardTitle>{t('How people sign in')}</CardTitle>

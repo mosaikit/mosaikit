@@ -91,7 +91,7 @@ export function EmailPanel({ session }: { session: Session }) {
   const missing = [!d.host.trim() && t('the SMTP server'), !d.sender.trim() && t('the sender')].filter(Boolean) as string[]
   const hasPassword = d.password === null ? view.has_password : d.password !== ''
   return (
-    <div className="grid max-w-3xl gap-6">
+    <div className="grid gap-6">
       {!view.configured && (
         <Card data-testid="mail-setup" className="border-warn/40 bg-warn/5">
           <CardHeader>

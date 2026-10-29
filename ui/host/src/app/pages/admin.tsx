@@ -304,7 +304,7 @@ export function AdminTenant({ id, section }: { id: string; section?: string }) {
 
         {cur === 'details' ? (
           <div className="grid gap-6">
-          <Card className="max-w-2xl">
+          <Card>
             <CardHeader>
               <CardTitle>{t('Tenant')}</CardTitle>
               <CardDescription>{t('Name, identifier and contents of the tenant.')}</CardDescription>
@@ -518,7 +518,7 @@ function BandSettings({ session }: { session: Session }) {
   const save = useAction((x: ShellBand) => api('PUT', '/api/admin/band', x), { ok: t('Top bar updated for everybody'), invalidate: [['session']] })
   const dirty = !!v && JSON.stringify(v) !== JSON.stringify(saved)
   return (
-    <div className="grid max-w-3xl grid-cols-[minmax(0,1fr)] gap-6">
+    <div className="grid grid-cols-[minmax(0,1fr)] gap-6">
       <Card>
         <CardHeader>
           <CardTitle>{t('Preview')}</CardTitle>
@@ -621,7 +621,7 @@ function Admins({ me }: { me: string }) {
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
   return (
-    <div className="grid max-w-4xl gap-3">
+    <div className="grid gap-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-xl text-sm text-muted-foreground">
           {t('Accounts of the platform, separate from those of the tenants: they sign in from «Administrator access» with a local password and a second factor. At least one always stays active.')}

@@ -91,7 +91,7 @@ function Profile({ session }: { session: Session }) {
     }
   }
   return (
-    <div className="grid max-w-2xl gap-6">
+    <div className="grid gap-6">
       <Card>
         <CardHeader>
           <CardTitle>{t('Picture')}</CardTitle>
@@ -225,7 +225,7 @@ function Security({ session }: { session: Session }) {
   const short = pw.new.length > 0 && pw.new.length < min
   const differ = pw.again.length > 0 && pw.again !== pw.new
   return (
-    <div className="grid max-w-2xl gap-6">
+    <div className="grid gap-6">
       {!session.external && (
         <Card>
           <CardHeader>
@@ -392,7 +392,7 @@ function Appearance({ route }: { route: Route }) {
     }
   })
   return (
-    <div className="grid max-w-3xl gap-6">
+    <div className="grid gap-6">
       <Card>
         <CardHeader>
           <CardTitle>{t('Mode')}</CardTitle>
@@ -504,7 +504,7 @@ function AppsInSidebar({ slug }: { slug: string }) {
 
 function MyTenants({ session }: { session: Session }) {
   return (
-    <div className="grid max-w-3xl gap-3">
+    <div className="grid gap-3">
       <p className="text-sm text-muted-foreground">{t('You always sign in to your home tenant; you enter the ones where you are a guest from the switcher at the top.')}</p>
       <div className="overflow-hidden rounded-xl border bg-card">
         <Table>
@@ -554,7 +554,7 @@ function MyUsage({ slug }: { slug: string }) {
   const res = q.data!.me.resources
   const all = totals(res)
   return (
-    <div className="grid max-w-3xl gap-4">
+    <div className="grid gap-4">
       <div className="grid grid-cols-[repeat(auto-fill,minmax(170px,1fr))] gap-3">
         <div className="rounded-xl border bg-card p-4">
           <span className="text-xs text-muted-foreground">{t('Space you use')}</span>

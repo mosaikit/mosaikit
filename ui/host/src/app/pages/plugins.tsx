@@ -463,7 +463,7 @@ function PluginAsks({ p, base }: { p: AdminPlugin; base?: string }) {
   const none = <span className="text-muted-foreground">{t('nothing')}</span>
   const list = (v?: string[]) => (v?.length ? <span className="font-mono text-xs">{v.join(', ')}</span> : none)
   return (
-    <div className="grid max-w-3xl gap-6">
+    <div className="grid gap-6">
       <Card>
         <CardHeader>
           <CardTitle>{t('What it asks')}</CardTitle>
@@ -539,7 +539,7 @@ function PluginTenants({ id }: { id: string }) {
   const d = q.data!
   return (
     <div className="grid gap-4">
-      <label className="flex max-w-3xl items-center justify-between gap-4 rounded-xl border bg-card p-4">
+      <label className="flex items-center justify-between gap-4 rounded-xl border bg-card p-4">
         <span>
           <b className="block text-sm">{t('Available to every tenant')}</b>
           <span className="text-xs text-muted-foreground">{t('The default, for the new tenants and the ones without a choice of their own.')}</span>
@@ -634,7 +634,7 @@ function PluginConfiguration({ id }: { id: string }) {
   const v = values ?? c.values
   const dirty = (!!values && JSON.stringify(values) !== JSON.stringify(c.values)) || Object.keys(secrets).length > 0
   return (
-    <div className="grid max-w-3xl gap-4">
+    <div className="grid gap-4">
       <Card>
         <CardHeader>
           <CardTitle>{t('Configuration')}</CardTitle>
@@ -695,7 +695,7 @@ function PluginExtensions({ name, installed, catalog }: { name: string; installe
     invalidate: [['admin-plugins'], ['admin-catalog']],
   })
   return (
-    <div className="grid max-w-3xl gap-4">
+    <div className="grid gap-4">
       <p className="text-sm text-muted-foreground">{t('Extensions add fields and actions to {name}. They work in a tenant only where {name} is on.', { name })}</p>
       {installed.length === 0 && catalog.length === 0 ? (
         <Empty icon={<Puzzle />} title={t('No extensions')} />
@@ -953,7 +953,7 @@ function LayoutContents({ p }: { p: AdminPlugin }) {
     [t('On the phone'), l.decl.phone.nav === 'launcher' ? t('A grid of the apps and pages') : t('A drawer with the whole tree')],
   ]
   return (
-    <div className="grid max-w-3xl gap-6">
+    <div className="grid gap-6">
       <Card>
         <CardHeader>
           <CardTitle>{t('Arrangement of the slots')}</CardTitle>

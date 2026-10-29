@@ -159,7 +159,7 @@ export function PlatformQuotasPanel() {
   const over = data.rows.filter((r) => r.over)
   const set = (part: 'defaults' | 'capacity', m: QuotaMetric, v: string) => setD({ ...cur, [part]: { ...cur[part], [m]: v } })
   return (
-    <div className="grid max-w-4xl gap-6">
+    <div className="grid gap-6">
       <Card>
         <CardHeader>
           <CardTitle>{t('Quotas of new tenants')}</CardTitle>
@@ -292,7 +292,7 @@ export function TenantQuotasPanel({ id }: { id: string }) {
   const dirty = !!d && JSON.stringify(d) !== JSON.stringify(saved)
   const set = (m: QuotaMetric, v: Partial<OwnDraft[QuotaMetric]>) => setD({ ...cur, [m]: { ...cur[m], ...v } })
   return (
-    <div className="max-w-3xl">
+    <div>
       <Card>
         <CardHeader>
           <CardTitle>{t('Quotas')}</CardTitle>
@@ -503,7 +503,7 @@ export function UsageAlerts({ slug }: { slug: string }) {
     ['forecast', t('Forecast'), t('If at the current pace the limit arrives within 30 days')],
   ]
   return (
-    <div className="grid max-w-3xl gap-6">
+    <div className="grid gap-6">
       <Card>
         <CardHeader>
           <CardTitle>{t('When to warn')}</CardTitle>

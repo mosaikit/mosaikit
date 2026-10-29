@@ -237,7 +237,7 @@ export function StylePanel({ level }: { level: Level }) {
           </>
         )}
       </Panel>
-      <Card className="max-w-3xl">
+      <Card>
         <CardHeader>
           <CardTitle>{t('Band image')}</CardTitle>
           <CardDescription>

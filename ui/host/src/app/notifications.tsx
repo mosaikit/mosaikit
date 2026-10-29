@@ -197,7 +197,7 @@ export function NotificationsPage({ session, route }: { session: Session; route:
           </button>
         }
       />
-      <div className="grid max-w-3xl gap-3 p-6 max-[620px]:p-4">
+      <div className="grid gap-3 p-6 max-[620px]:p-4">
         <div className="flex flex-wrap items-center gap-2">
           <Pills
             items={[

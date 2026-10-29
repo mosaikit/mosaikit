@@ -1481,7 +1481,7 @@ export function Usage({ slug, section }: { slug: string; section?: string }) {
     <>
       <PageHeader title={t('Usage')} crumbs={[{ label: t('Tenant management') }]} sub={t('Quotas set by the Administrator of the platform')} />
       <Sections sections={sections} current={cur} href={(id) => to.tenant(slug, 'usage', id === 'quotas' ? undefined : id)}>
-        <div className="grid max-w-4xl gap-6">
+        <div className="grid gap-6">
           {cur === 'quotas' && <UsageQuotas slug={slug} />}
           {cur === 'trend' && <UsageTrend slug={slug} />}
           {cur === 'consumers' && <UsageConsumers slug={slug} />}
@@ -1638,7 +1638,7 @@ function Policy({ slug }: { slug: string }) {
   const s = v ?? q.data!
   const dirty = !!v && JSON.stringify(v) !== JSON.stringify(q.data)
   return (
-    <div className="max-w-2xl">
+    <div>
       <Card>
         <CardHeader>
           <CardTitle>{t('Sharing')}</CardTitle>

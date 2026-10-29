@@ -35,7 +35,7 @@ export function TenantContact({ id }: { id: string }) {
   const d = v ?? q.data
   const dirty = !!v && JSON.stringify(v) !== JSON.stringify(q.data)
   return (
-    <Card className="max-w-2xl">
+    <Card>
       <CardHeader>
         <CardTitle>{t('Contact and registration')}</CardTitle>
         <CardDescription>{t('Who to call about the tenant, and its registration data.')}</CardDescription>

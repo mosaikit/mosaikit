@@ -159,7 +159,7 @@ export function PlatformTheme({ session }: { session: Session }) {
   const current = session.theme ?? 'mosaikit'
   const all = [...PRESETS.map((p) => ({ id: p.id, name: p.name })), ...themes.map((c) => ({ id: c.id, name: c.name }))]
   return (
-    <div className="grid max-w-3xl gap-6">
+    <div className="grid gap-6">
       <Card>
         <CardHeader>
           <CardTitle>{t('Default theme')}</CardTitle>
@@ -246,7 +246,7 @@ export function TenantTheme({ slug }: { slug: string }) {
   const allowed = allowedQ.data?.allowed ?? null
   const builtInAllowed = allowed ? [...allowed, th.platform] : null
   return (
-    <Card className="max-w-3xl">
+    <Card>
       <CardHeader>
         <CardTitle className="flex flex-wrap items-center gap-2">
           {t('Theme of the tenant')}

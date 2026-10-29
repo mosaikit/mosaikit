@@ -79,7 +79,7 @@ export function Panel({ level, keys, title, description, children }: { level: Le
   if (q.error) return <ErrorBox error={q.error} />
   const shown = keys.filter((k) => d.find(k))
   return (
-    <div className="max-w-3xl">
+    <div>
       <Card>
         <CardHeader>
           <CardTitle>{title}</CardTitle>
@@ -250,7 +250,7 @@ function Images({ level }: { level: Level }) {
   ]
   if (!q.data) return null
   return (
-    <Card className="max-w-3xl">
+    <Card>
       <CardHeader>
         <CardTitle>{t('Logos')}</CardTitle>
         <CardDescription>{t('SVG, PNG or WebP, at most 512 KB. An SVG with scripts or external references is refused.')}</CardDescription>
@@ -554,7 +554,7 @@ export function ManagedPanel({ slug }: { slug: string }) {
   const bandOn = band ? Object.entries(band).filter(([, on]) => on).length : 5
   const locked = q.data!.filter((s) => s.locked && s.kind === 'custom')
   return (
-    <Card className="max-w-3xl">
+    <Card>
       <CardHeader>
         <CardTitle>{t('Managed by the platform')}</CardTitle>
         <CardDescription>{t('The Administrator decides these for the tenant.')}</CardDescription>
@@ -622,7 +622,7 @@ export function KeysPanel({ level }: { level: KeyLevel }) {
         : t('Your keys apply only to you and nobody else sees them. Where you have none, you use the one of the tenant or of the platform, if shared.')
   const shareLabel = level.kind === 'platform' ? t('Shared with every tenant') : t('Shared with the people of the tenant')
   return (
-    <Card className="max-w-3xl">
+    <Card>
       <CardHeader>
         <CardTitle>{t('Keys of outside services')}</CardTitle>
         <CardDescription>{intro}</CardDescription>

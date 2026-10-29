@@ -485,7 +485,7 @@ export function TenantLifecycle({ tn }: { tn: TenantInfo }) {
     : ''
   const archived = !!tn.archived_at
   return (
-    <div className="grid max-w-2xl gap-6">
+    <div className="grid gap-6">
       <Card>
         <CardHeader>
           <CardTitle>{t('Trial period')}</CardTitle>
@@ -668,7 +668,7 @@ export function BackupPanel() {
   const s = v ?? saved
   const dirty = !!v && JSON.stringify(v) !== JSON.stringify(saved)
   return (
-    <div className="grid max-w-4xl gap-6">
+    <div className="grid gap-6">
       <Card>
         <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
           <div>
@@ -1058,7 +1058,7 @@ export function MaintenancePanel() {
     save.mutate(m, { onSuccess: () => setV(null) })
   }
   return (
-    <div className="grid max-w-3xl gap-6">
+    <div className="grid gap-6">
       <Card>
         <CardHeader>
           <CardTitle>{t('Maintenance mode')}</CardTitle>
@@ -1293,7 +1293,7 @@ function StatusPanel() {
   const d = q.data!
   const down = d.services.filter((s) => s.state === 'down').length
   return (
-    <div className="grid max-w-4xl gap-4">
+    <div className="grid gap-4">
       <div className="grid grid-cols-[repeat(auto-fill,minmax(180px,1fr))] gap-3">
         <Kpi label={t('Services')} value={`${d.services.filter((s) => s.state === 'ok').length}/${d.services.length}`} hint={down ? t('{n} not answering', { n: down }) : t('all answering')} />
         <Kpi label={t('Version')} value={d.kernel} />
@@ -1372,7 +1372,7 @@ function PerformancePanel() {
   const [period, setPeriod] = useState('1h')
   const q = useApi<{ points: MetricPoint[] }>(['mon-perf', period], `/api/admin/monitoring/performance?period=${period}`)
   return (
-    <div className="grid max-w-4xl gap-6">
+    <div className="grid gap-6">
       <Period value={period} onChange={setPeriod} />
       {q.isLoading ? (
         <Loading />
@@ -1410,7 +1410,7 @@ function ErrorsPanel() {
   const [period, setPeriod] = useState('1h')
   const q = useApi<ErrorsData>(['mon-errors', period], `/api/admin/monitoring/errors?period=${period}`)
   return (
-    <div className="grid max-w-4xl gap-6">
+    <div className="grid gap-6">
       <Period value={period} onChange={setPeriod} />
       {q.isLoading ? (
         <Loading />
@@ -1469,7 +1469,7 @@ function TenantsLoadPanel() {
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
   return (
-    <div className="max-w-4xl overflow-hidden rounded-xl border bg-card">
+    <div className=" overflow-hidden rounded-xl border bg-card">
       <Sliced items={q.data!}>{(shown) => (<Table>
         <TableHeader>
           <TableRow>
@@ -1534,7 +1534,7 @@ function CapacityPanel() {
   if (q.error) return <ErrorBox error={q.error} />
   const c = q.data!
   return (
-    <div className="grid max-w-3xl gap-6">
+    <div className="grid gap-6">
       <Card>
         <CardContent className="grid gap-5 pt-6">
           <Meter label={t('Disk of the data')} used={c.disk_total - c.disk_free} total={c.disk_total} detail={t('{free} free of {total}', { free: fmtBytes(c.disk_free), total: fmtBytes(c.disk_total) })} />
@@ -1576,7 +1576,7 @@ function AlertsPanel() {
     </Field>
   )
   return (
-    <div className="grid max-w-3xl gap-6">
+    <div className="grid gap-6">
       <Card>
         <CardHeader>
           <CardTitle>{t('Alerts now')}</CardTitle>

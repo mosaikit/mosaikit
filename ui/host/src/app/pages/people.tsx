@@ -128,7 +128,7 @@ function SignInPanel({ base, qk, name }: { base: string; qk: string[]; name: str
   const closeOne = useAction((id: string) => api('DELETE', `${base}/sessions/${enc(id)}`), { ok: t('Session closed'), invalidate: inval })
   const closeAll = useAction(() => api('DELETE', `${base}/sessions`), { ok: t('Every session closed'), invalidate: inval })
   return (
-    <div className="grid max-w-3xl gap-6">
+    <div className="grid gap-6">
       <Card>
         <CardHeader>
           <CardTitle>{t('Password')}</CardTitle>
@@ -300,7 +300,7 @@ export function PersonPage({ slug, id, tab }: { slug: string; id: string; tab?: 
       />
       <div className="p-6 max-[620px]:p-4">
         {cur === 'profile' && (
-          <div className="grid max-w-3xl gap-6">
+          <div className="grid gap-6">
             <PersonPicture id={id} name={name} />
             <PersonForm base={`${base}/person`} name={m.display_name} email={m.email} invalidate={inval} editable={d.home_here} />
             <Card>
@@ -364,7 +364,7 @@ export function PersonPage({ slug, id, tab }: { slug: string; id: string; tab?: 
           (d.home_here ? (
             <SignInPanel base={base} qk={['member', slug, id]} name={name} />
           ) : (
-            <Card className="max-w-3xl">
+            <Card>
               <CardHeader>
                 <CardTitle>{t('Sign-in')}</CardTitle>
                 <CardDescription>{t('{name} signs in from the home tenant {tenant}: its Tenant Manager handles password and sessions.', { name, tenant: m.home_tenant })}</CardDescription>
@@ -403,7 +403,7 @@ function sourceLabel(s: { kind: string; name: string }): string {
 /** What a member may do in every plugin, and where it comes from (read only). */
 function PermissionsSummary({ slug, detail }: { slug: string; detail: MemberDetail }) {
   return (
-    <div className="grid max-w-4xl gap-6">
+    <div className="grid gap-6">
       {detail.permissions.length === 0 && <Empty icon={<Puzzle />} title={t('No active plugins')} />}
       {detail.permissions.map((p) => (
         <Card key={p.plugin_id}>
@@ -577,7 +577,7 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
           (g.members.length === 0 ? (
             <Empty icon={<Users />} title={t('No members.')} />
           ) : (
-            <div className="max-w-3xl overflow-hidden rounded-xl border bg-card">
+            <div className=" overflow-hidden rounded-xl border bg-card">
               <Sliced items={g.members}>{(shown) => (<Table>
                 <TableHeader>
                   <TableRow>
@@ -611,7 +611,7 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
           (g.shared.length === 0 ? (
             <Empty title={t('Nothing shared with the group')} />
           ) : (
-            <div className="max-w-3xl overflow-hidden rounded-xl border bg-card">
+            <div className=" overflow-hidden rounded-xl border bg-card">
               <Sliced items={g.shared}>{(shown) => (<Table>
                 <TableHeader>
                   <TableRow>
@@ -633,7 +633,7 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
             </div>
           ))}
         {cur === 'plugins' && (
-          <div className="grid max-w-3xl gap-3">
+          <div className="grid gap-3">
             <p className="text-sm text-muted-foreground">{t('What the group adds to the profile of its members, plugin by plugin. It is changed in the permissions of each plugin.')}</p>
             {g.plugins.length === 0 && <Empty icon={<Puzzle />} title={t('The group adds no permission')} />}
             {g.plugins.map(([pid, keys]) => (
@@ -932,7 +932,7 @@ export function PluginAccessPage({ slug, plugin }: { slug: string; plugin: strin
     <>
       <PageHeader title={t('Access and permissions · {plugin}', { plugin: d.label })} crumbs={[{ label: t('Tenant management') }, { label: t('Plugins'), href: to.tenant(slug, 'plugins') }]} sub={t('Tenant Managers have every permission.')} />
       <div className="grid gap-6 p-6 max-[620px]:p-4">
-        <Card className="max-w-4xl">
+        <Card>
           <CardHeader>
             <CardTitle>{t('What each permission means')}</CardTitle>
           </CardHeader>
@@ -954,7 +954,7 @@ export function PluginAccessPage({ slug, plugin }: { slug: string; plugin: strin
             </dl>
           </CardContent>
         </Card>
-        <section className="grid max-w-5xl gap-2" aria-label={t('Profiles')}>
+        <section className="grid gap-2" aria-label={t('Profiles')}>
           <h2 className="text-sm font-semibold">{t('Profiles')}</h2>
           <div className="overflow-x-auto rounded-xl border bg-card">
             <Table>
@@ -978,7 +978,7 @@ export function PluginAccessPage({ slug, plugin }: { slug: string; plugin: strin
             </Table>
           </div>
         </section>
-        <section className="grid max-w-5xl gap-2" aria-label={t('Groups and people')}>
+        <section className="grid gap-2" aria-label={t('Groups and people')}>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div>
               <h2 className="text-sm font-semibold">{t('Groups and people')}</h2>
@@ -1155,7 +1155,7 @@ export function ItemPage({ slug, id }: { slug: string; id: string }) {
     <>
       <PageHeader title={t('You cannot see this item')} />
       <div className="p-6 max-[620px]:p-4">
-        <Card className="max-w-xl">
+        <Card>
           <CardHeader>
             <CardTitle>{t('Ask for access')}</CardTitle>
             <CardDescription>{t('The owner of the item, or a Tenant Manager, decides. You get a notification with the answer.')}</CardDescription>
@@ -1720,7 +1720,7 @@ export function AdminPersonPage({ id, tab }: { id: string; tab?: string }) {
       />
       <div className="p-6 max-[620px]:p-4">
         {cur === 'profile' && (
-          <div className="grid max-w-3xl gap-6">
+          <div className="grid gap-6">
             <PersonPicture id={id} name={name} />
             <PersonForm base={base} name={p.display_name} email={p.email} invalidate={inval} editable />
             <Card>
@@ -1738,7 +1738,7 @@ export function AdminPersonPage({ id, tab }: { id: string; tab?: string }) {
           </div>
         )}
         {cur === 'tenants' && (
-          <div className="grid max-w-5xl gap-3">
+          <div className="grid gap-3">
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => setDlg('add')}>
                 <Plus />
