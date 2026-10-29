@@ -506,8 +506,8 @@ html[data-style-buttons='soft'] [data-slot='button'][data-variant='default']:hov
   }
   .msk-hoverscroll::-webkit-scrollbar,
   .msk-hoverscroll ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 5px;
+    height: 5px;
     background: transparent;
   }
   .msk-hoverscroll::-webkit-scrollbar-track,
@@ -516,7 +516,7 @@ html[data-style-buttons='soft'] [data-slot='button'][data-variant='default']:hov
   }
   .msk-hoverscroll::-webkit-scrollbar-thumb,
   .msk-hoverscroll ::-webkit-scrollbar-thumb {
-    border-radius: 8px;
+    border-radius: 5px;
     background: transparent;
   }
   .msk-hoverscroll:hover::-webkit-scrollbar-thumb,
