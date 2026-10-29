@@ -718,9 +718,6 @@ export function TenantPluginsOfAdmin({ id }: { id: string }) {
   if (q.error) return <ErrorBox error={q.error} />
   return (
     <div className="grid gap-3">
-      <p className="max-w-2xl text-sm text-muted-foreground">{t('Availability is decided in the page of each plugin; the Tenant Manager turns on the available ones.')}{' '}
-        <a className="underline underline-offset-4 hover:text-foreground" href={to.admin('plugins')} data-testid="to-plugins-page">{t('Go to the Plugins page')}</a>
-      </p>
       <div className="overflow-x-auto rounded-xl border bg-card">
         <Sliced items={(q.data ?? [])}>{(shown) => (<Table>
           <TableHeader>
