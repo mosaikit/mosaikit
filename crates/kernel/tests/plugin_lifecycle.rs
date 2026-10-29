@@ -99,7 +99,7 @@ async fn update_with_migrations_keeps_the_data() {
     same.insert("migrations/004_x.sql".into(), b"alter table notes add column x text".to_vec());
     assert_eq!(install(&t, &same).await.unwrap_err().kind, Kind::Conflict);
     // migration already applied and then changed
-    let mut changed = with_version(notes_files(), "0.6.0");
+    let mut changed = with_version(notes_files(), "0.7.0");
     changed.insert(
         "migrations/003_priority.sql".into(),
         b"alter table notes add column priority2 text".to_vec(),
