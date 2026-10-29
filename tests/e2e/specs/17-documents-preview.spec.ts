@@ -59,7 +59,7 @@ test.describe.serial('17-documents-preview', () => {
     await expect(bar.getByRole('button', { name: 'Open in tab' })).toBeVisible()
     // flat surfaces, list and panel are one block with one border
     const geo = await frame.locator('.fm-body').evaluate((b) => {
-      const g = (q: string) => getComputedStyle(b.querySelector(q)!)
+      const g = (q: string) => getComputedStyle(document.querySelector(q)!)
       const bs = getComputedStyle(b)
       return { radius: [bs.borderRadius, g('.fm-main').borderRadius, g('.fm-side').borderRadius, g('.fm-bar').borderRadius, g('.fm-crumbs').borderRadius], gap: bs.columnGap, mainBorder: g('.fm-main').borderLeftWidth + g('.fm-main').borderRightWidth, sideLeft: g('.fm-side').borderLeftWidth, sideRight: g('.fm-side').borderRightWidth, hMain: b.querySelector('.fm-main')!.getBoundingClientRect().height, hSide: b.querySelector('.fm-side')!.getBoundingClientRect().height }
     })
