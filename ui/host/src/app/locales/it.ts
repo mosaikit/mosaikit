@@ -257,7 +257,7 @@ export const IT: Record<string, string> = {
   'Restore the theme of the platform': 'Ripristina il tema della piattaforma',
   'Active tenants': 'Organizzazioni attive',
   'Active users': 'Utenti attivi',
-  Administrators: 'Administrator',
+  Administrators: 'Amministratori',
   'Active plugins': 'Plugin attivi',
   'No tenants': 'Nessuna i',
   'Create the first tenant': 'Crea la prima organizzazione',
