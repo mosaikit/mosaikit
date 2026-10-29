@@ -351,7 +351,7 @@ export function AdminPlugins({ section }: { section?: string }) {
  *  and whether it is signed, its status; the whole card opens the plugin, the box selects it. */
 function PluginCard({ p, update, selected, onSelect }: { p: AdminPlugin; update?: string; selected: boolean; onSelect: (on: boolean) => void }) {
   return (
-    <div data-testid="plugin-card" data-state={selected ? 'selected' : undefined} className="relative flex h-full flex-col gap-3 rounded-xl border bg-card p-4 transition-colors hover:border-primary/50 data-[state=selected]:border-primary data-[state=selected]:bg-primary/5">
+    <div data-testid="plugin-card" data-state={selected ? 'selected' : undefined} className="relative flex h-full flex-col gap-3 rounded-2xl border bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-4 transition-colors hover:border-primary/50 data-[state=selected]:border-primary data-[state=selected]:from-primary/25">
       <Checkbox className="absolute top-3 right-3 z-10" aria-label={t('Select {name}', { name: p.label })} checked={selected} onCheckedChange={(v) => onSelect(!!v)} />
       <PluginSummary card p={p} kind={kindLabel(kindOf(p))} href={to.adminPlugin(p.id)} className="pr-7" />
       <dl className="grid grid-cols-[max-content_minmax(0,1fr)] gap-x-3 gap-y-1 text-xs [&>dd]:min-w-0 [&>dd]:break-words">

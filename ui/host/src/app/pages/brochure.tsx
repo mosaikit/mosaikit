@@ -123,8 +123,8 @@ export function PluginSummary({ p, kind, card, href, className }: { p: AdminPlug
   )
   return (
     <div className={cn('flex items-center gap-5', card && 'items-start gap-3', className)}>
-      <span className={cn('flex shrink-0 items-center justify-center rounded-2xl border bg-card shadow-sm', card ? 'size-12 rounded-xl' : 'size-20 max-[620px]:size-16')}>
-        <AppIcon id={p.id} name={p.icon_name} className={cn('text-primary', card ? 'size-6' : 'size-10 max-[620px]:size-8')} />
+      <span className={cn('flex shrink-0 items-center justify-center rounded-2xl border bg-card shadow-sm', card ? 'size-14 rounded-2xl' : 'size-20 max-[620px]:size-16')}>
+        <AppIcon id={p.id} name={p.icon_name} className={cn('text-primary', card ? 'size-7' : 'size-10 max-[620px]:size-8')} />
       </span>
       <div className="grid min-w-0 flex-1 gap-1.5">
         {name}
