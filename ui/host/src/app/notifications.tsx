@@ -314,7 +314,7 @@ function ListPage({
   const rows = q.data!.items
   if (first && rows.length === 0)
     return (
-      <Empty icon={<BellOff />} title={filter.unread ? t('Nothing to read') : t('No notifications')}>
+      <Empty art="inbox" title={filter.unread ? t('Nothing to read') : t('No notifications')}>
         <a href={home} className="text-primary hover:underline">
           {t('Back to the overview')}
         </a>

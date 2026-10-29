@@ -215,10 +215,11 @@ picture, «Nothing here yet», «Create the first one to get started.» and the 
 contract checks it (R-10).
 
 Converted: the apps Documents (Files), Maps, Apps (static sites), Contacts, Tasks and Notes (`mountCrud` and the plugins' own
-pages). The pages of the host (Tenants, People, Plugins, Shares, Trash, Notifications, Log, Requests…) keep their plain boxes
-for now: converting them is postponed, and the layout contract exempts them (R-10 runs on the apps); the component itself
-(`Empty` with `art`, `actions`, `filtered`) is ready for them. Left plain on purpose: errors and reserved pages (`Empty` without
-`art`), sections inside a detail page or a card and the tables that show «No result» for a filter.
+pages) and the pages of the host: Tenants, Plugins (installed, updates, catalog; administrator and tenant), Groups, Access requests, Shares, Trash and Notifications. The tenants, shares, trash and log lists show the small
+plain message with «Clear filters» when a filter is the reason. The layout contract checks the host pages a fresh tenant leaves
+empty together with the apps (R-10). Where the header and the empty state both carry the primary action the specs name the
+first one (`.first()`). Left plain on purpose: errors and reserved pages (`Empty` without `art`), sections inside a detail page
+or a card (overview widgets, usage, backups, members of a group, the two lists of Manage › Pending) and the tables that show «No result» for a filter.
 
 ### Panel next to a list
 

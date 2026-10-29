@@ -1056,7 +1056,7 @@ export function PluginAccessPage({ slug, plugin }: { slug: string; plugin: strin
 
 /* ── Access requests ─────────────────────────────────────────────────── */
 
-export function RequestsTable({ slug, manager }: { slug: string; manager: boolean }) {
+export function RequestsTable({ slug, manager, page }: { slug: string; manager: boolean; page?: boolean }) {
   const q = useApi<AccessRequest[]>(['requests', slug], `/api/t/${enc(slug)}/requests`)
   const ctx = useTenantCtx(slug)
   const decide = useAction(({ id, action }: { id: string; action: string }) => api('POST', `/api/t/${enc(slug)}/requests/${id}/${action}`), {
@@ -1066,6 +1066,7 @@ export function RequestsTable({ slug, manager }: { slug: string; manager: boolea
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
   const rows = q.data ?? []
+  if (!rows.length && page) return <Empty art="inbox" title={t('No access request.')}>{t('Requests to see or edit an item wait here until they are answered.')}</Empty>
   if (!rows.length) return <p className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">{t('No access request.')}</p>
   const label = (pid: string) => ctx.data?.plugins.find((p) => p.id === pid)?.label ?? pid
   return (
@@ -1150,7 +1151,7 @@ export function RequestsPage({ slug }: { slug: string }) {
     <>
       <PageHeader title={t('Access requests')} sub={manager ? t('Every open request of the tenant') : t('Requests to see or edit your items')} />
       <div className="grid gap-3 p-6 max-[620px]:p-4">
-        <RequestsTable slug={slug} manager={!!manager} />
+        <RequestsTable slug={slug} manager={!!manager} page />
       </div>
     </>
   )

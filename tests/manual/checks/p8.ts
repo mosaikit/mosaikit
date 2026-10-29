@@ -45,7 +45,7 @@ const checks: L.Check[] = [
       const p = await L.as(ctx, 'admin')
       await H.go(p, '#/admin/tenants')
       if (!/Prova OIDC/.test(await H.text(p))) {
-        await p.getByRole('button', { name: 'New tenant' }).click()
+        await p.getByRole('button', { name: 'New tenant' }).first().click()
         const d = p.getByRole('dialog', { name: 'New tenant' })
         await d.getByLabel('Name', { exact: true }).fill('Prova OIDC')
         await d.getByLabel('Identifier').fill('prova-oidc')

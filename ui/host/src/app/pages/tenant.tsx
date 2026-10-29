@@ -927,7 +927,7 @@ function Groups({ slug, members, shell }: { slug: string; members: Member[]; she
   if (q.error) return frame(<ErrorBox error={q.error} />)
   if (!q.items.length && !words)
     return frame(
-      <Empty icon={<Grid2x2 />} title={t('No groups')}>
+      <Empty art="people" title={t('No groups')} actions={shell.actions}>
         {t('Groups are for sharing with several people at once.')}
       </Empty>,
     )
@@ -1221,7 +1221,20 @@ export function Shares({ slug }: { slug: string }) {
         ) : q.error ? (
           <ErrorBox error={q.error} />
         ) : rows.length === 0 ? (
-          <Empty icon={<Share2 />} title={show === 'public' ? t('No active public link') : show === 'items' ? t('No items') : t('No shares')} />
+          show === 'all' && !filter.plugin && !filter.owner && !words ? (
+            <Empty art="shares" title={t('Nothing shared yet')}>
+              {t('Items you share with people, groups or a public link appear here.')}
+            </Empty>
+          ) : (
+            <Empty
+              filtered
+              title={show === 'public' ? t('No active public link') : show === 'items' ? t('No items') : t('No shares')}
+              onClear={() => {
+                setShow('all')
+                setFilter({ owner: '', plugin: '', q: '' })
+              }}
+            />
+          )
         ) : (
           <ListTable
             label={t('Shared items')}

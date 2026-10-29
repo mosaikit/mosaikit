@@ -179,7 +179,7 @@ test.describe.serial('12-review-round1-platform', () => {
       const filters = page.getByRole('complementary', { name: 'Filters' })
       await expect(filters).toBeVisible()
       await filters.getByRole('radio', { name: /Suspended/ }).click()
-      await expect(page.getByText('No tenants')).toBeVisible()
+      await expect(page.getByText('No tenant found')).toBeVisible()
       await filters.getByRole('radio', { name: /^All/ }).click()
       await page.getByRole('searchbox', { name: 'Search a tenant' }).fill('rl-07')
       await expect(page.locator('tbody tr')).toHaveCount(1)

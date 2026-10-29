@@ -137,7 +137,7 @@ export const nav = (page: Page, name: string) => page.locator('[data-sidebar="si
 
 /** "New tenant" in its four steps (local sign-in, no trial); back on the list of the tenants. */
 export async function createTenant(page: Page, slug: string, name: string) {
-  await page.getByRole('button', { name: 'New tenant' }).click()
+  await page.getByRole('button', { name: 'New tenant' }).first().click()
   const d = page.getByRole('dialog', { name: 'New tenant' })
   await d.getByLabel('Name', { exact: true }).fill(name)
   await d.getByLabel('Identifier').fill(slug)

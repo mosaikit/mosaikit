@@ -194,7 +194,28 @@ export function AdminTenants() {
         ) : q.error ? (
           <ErrorBox error={q.error} />
         ) : rows.length === 0 ? (
-          <Empty icon={<Building2 />} title={words ? t('No tenant found') : t('No tenants')} />
+          words || state !== 'all' ? (
+            <Empty filtered title={t('No tenant found')} onClear={reset} />
+          ) : (
+            <Empty
+              art="people"
+              title={t('No tenants yet')}
+              actions={
+                <>
+                  <Button onClick={() => setOpen(true)}>
+                    <Plus />
+                    {t('New tenant')}
+                  </Button>
+                  <Button variant="outline" onClick={() => setImporting(true)}>
+                    <Upload />
+                    {t('Import a tenant')}
+                  </Button>
+                </>
+              }
+            >
+              {t('A tenant is the space of an organisation: its people, apps and items.')}
+            </Empty>
+          )
         ) : (
           <ListTable
             label={t('Tenants')}

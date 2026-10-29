@@ -302,7 +302,7 @@ const checks: L.Check[] = [
       const p = await L.as(ctx, 'e.ricci')
       await H.go(p, '#/t/comune-roma/manage/groups')
       if (!/QA team/.test(await H.text(p))) {
-        await p.getByRole('button', { name: /New group/ }).click()
+        await p.getByRole('button', { name: /New group/ }).first().click()
         await p.getByRole('dialog').getByRole('textbox').first().fill('QA team')
         await p.getByRole('dialog').getByRole('button', { name: /Create/ }).click()
         await p.waitForTimeout(1200)

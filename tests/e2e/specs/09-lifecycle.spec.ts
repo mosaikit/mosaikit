@@ -10,7 +10,7 @@ test.describe.serial('09-lifecycle', () => {
     await nav(page, 'Tenants').click()
 
     // new tenant in four steps, with a trial period
-    await page.getByRole('button', { name: 'New tenant' }).click()
+    await page.getByRole('button', { name: 'New tenant' }).first().click()
     const d = page.getByRole('dialog', { name: 'New tenant' })
     await d.getByLabel('Name', { exact: true }).fill('Town of Delta')
     await expect(d.getByLabel('Identifier')).toHaveValue('town-of-delta')

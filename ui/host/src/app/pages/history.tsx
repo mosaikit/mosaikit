@@ -160,9 +160,20 @@ export function TrashPage({ slug }: { slug: string }) {
         ) : q.error ? (
           <ErrorBox error={q.error} />
         ) : rows.length === 0 ? (
-          <Empty icon={<Trash2 />} title={t('The trash is empty')}>
-            {t('What you delete stays here {days} days, then it is deleted for good.', { days })}
-          </Empty>
+          search.trim() || plugin ? (
+            <Empty
+              filtered
+              title={t('Nothing found in the trash')}
+              onClear={() => {
+                setSearch('')
+                setPlugin('')
+              }}
+            />
+          ) : (
+            <Empty art="trash" title={t('The trash is empty')}>
+              {t('What you delete stays here {days} days, then it is deleted for good.', { days })}
+            </Empty>
+          )
         ) : (
           <ListTable
             label={t('Trash')}
@@ -511,7 +522,18 @@ export function LogView({ scope, fixed = {}, compact = false }: { scope: LogScop
       ) : pages.error ? (
         <ErrorBox error={pages.error} />
       ) : events.length === 0 ? (
-        <Empty icon={<History />} title={compact ? t('No activity yet') : t('No event with these filters')} />
+        compact ? (
+          <Empty icon={<History />} title={t('No activity yet')} />
+        ) : (
+          <Empty
+            filtered
+            title={t('No event with these filters')}
+            onClear={() => {
+              setF({ ...NO_FILTERS, ...fixed })
+              setSel(new Set())
+            }}
+          />
+        )
       ) : (
         <ListTable
           label={t('Activity')}

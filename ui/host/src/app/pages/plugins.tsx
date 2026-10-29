@@ -252,7 +252,18 @@ export function AdminPlugins({ section }: { section?: string }) {
           ) : installed.error ? (
             <ErrorBox error={installed.error} />
           ) : !installed.data?.length ? (
-            <Empty icon={<Puzzle />} title={t('No plugin installed')} />
+            <Empty
+              art="plugins"
+              title={t('No plugin installed')}
+              actions={
+                <Button onClick={() => file.current?.click()}>
+                  <Upload />
+                  {t('Install from file')}
+                </Button>
+              }
+            >
+              {t('Install a plugin from a .mskp file or from the catalog.')}
+            </Empty>
           ) : view === 'table' ? (
             <ListTable label={t('Plugins')} rows={rows} rowKey={(p) => p.id} filter={q} sort={sort} onSort={setSort} selection={{ ids: sel, onChange: setSel, label: (p) => t('Select {name}', { name: p.label }) }} columns={installedCols} />
           ) : (
@@ -293,7 +304,9 @@ export function AdminPlugins({ section }: { section?: string }) {
         ) : catalog.error ? (
           <ErrorBox error={catalog.error} />
         ) : (cur === 'updates' ? updates : available).length === 0 ? (
-          <Empty icon={<Puzzle />} title={cur === 'updates' ? t('No updates') : t('Nothing to install in the catalog')} />
+          <Empty art="plugins" title={cur === 'updates' ? t('No updates') : t('Nothing to install in the catalog')}>
+            {cur === 'updates' ? t('Every installed plugin is up to date.') : t('Every plugin of the catalog is already installed.')}
+          </Empty>
         ) : view === 'table' ? (
           <ListTable label={cur === 'updates' ? t('Updates') : t('Catalog')} rows={cur === 'updates' ? updates : available} rowKey={(c) => c.id} filter={q} sort={sort} onSort={setSort} columns={catalogCols} />
         ) : (
@@ -942,7 +955,9 @@ export function TenantPlugins({ slug }: { slug: string }) {
           {t('The Administrator makes them available; here you turn them on for the people of the tenant and decide their permissions. Apps appear in the sidebar, services work behind the scenes, extensions add to another plugin.')}
         </p>
         {all.length === 0 ? (
-          <Empty icon={<Puzzle />} title={t('No plugins available')} />
+          <Empty art="plugins" title={t('No plugins available')}>
+            {t('An Administrator makes plugins available to the tenant.')}
+          </Empty>
         ) : (
           <>
             <div className="-mx-1 flex flex-wrap items-center gap-3 px-1">
