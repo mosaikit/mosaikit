@@ -77,7 +77,7 @@ const BY_APP: Record<string, LucideIcon> = {
   files: Folder,
   maps: Map,
   notes: NotebookPen,
-  'static-site': Globe,
+  'static-site': Wrench,
 }
 
 export default function AppIcon({ id, name, className }: { id: string; name?: string | null; className?: string }) {
