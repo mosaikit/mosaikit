@@ -20,6 +20,7 @@ import { useAction, useApi, useConfirm } from '../core.ts'
 import AppIcon from '../AppIcon.tsx'
 import { Brochure } from './brochure.tsx'
 import { Empty, ErrorBox, FormDialog, Loading, PageHeader, Pills, SaveBar, StatusBadge, Sliced, Tabs, FillBody, FillPage } from '../kit.tsx'
+import { cn } from '@/lib/utils'
 import { go, to } from '../router.ts'
 import { t } from '../i18n.ts'
 
@@ -156,7 +157,7 @@ export function AdminPlugins({ section }: { section?: string }) {
           </div>
         )}
     </div>
-      <FillBody className="grid content-start gap-3 p-6 max-[620px]:p-4">
+      <FillBody className={cn('grid content-start gap-3 p-6 max-[620px]:p-4', cur === 'installed' && 'flex flex-col overflow-hidden')}>
         {cur === 'installed' ? (
           installed.isLoading ? (
             <Loading />
@@ -166,7 +167,7 @@ export function AdminPlugins({ section }: { section?: string }) {
             <Empty icon={<Puzzle />} title={t('No plugin installed')} />
           ) : (
             <>
-              <div className="overflow-x-auto rounded-xl border bg-card">
+              <div data-listscroll className="msk-listscroll min-h-0 flex-1 overflow-auto rounded-xl border bg-card">
                 <Sliced items={rows}>{(shown) => (<Table>
                   <TableHeader>
                     <TableRow>
