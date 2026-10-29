@@ -1794,7 +1794,7 @@ export function AdminPersonPage({ id, tab }: { id: string; tab?: string }) {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="user">{t('User')}</SelectItem>
-                        <SelectItem value="tenant_manager">Tenant Manager</SelectItem>
+                        <SelectItem value="tenant_manager">{t('Tenant Manager')}</SelectItem>
                       </SelectContent>
                     </Select>
                   ),
