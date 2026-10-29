@@ -167,7 +167,7 @@ function AppSidebar({ session, route, band }: { session: Session; route: Route; 
       )}
       <SidebarContent className="msk-hoverscroll border-r border-sidebar-border pt-1 group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:pt-0">
         {nav.groups.map((g) => (
-          <SidebarGroup key={g.id} className="py-1 first:pt-0 last:pb-0 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:not-first:mt-3 group-data-[collapsible=icon]:not-first:relative group-data-[collapsible=icon]:not-first:pt-1 group-data-[collapsible=icon]:not-first:before:absolute group-data-[collapsible=icon]:not-first:before:top-0 group-data-[collapsible=icon]:not-first:before:left-1/2 group-data-[collapsible=icon]:not-first:before:h-px group-data-[collapsible=icon]:not-first:before:w-7 group-data-[collapsible=icon]:not-first:before:-translate-x-1/2 group-data-[collapsible=icon]:not-first:before:bg-rail-foreground/45 group-data-[collapsible=icon]:not-first:before:content-['']">
+          <SidebarGroup key={g.id} className="py-1 first:pt-0 last:pb-0 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:not-first:mt-3 group-data-[collapsible=icon]:not-first:relative group-data-[collapsible=icon]:not-first:pt-1 group-data-[collapsible=icon]:not-first:before:absolute group-data-[collapsible=icon]:not-first:before:top-0 group-data-[collapsible=icon]:not-first:before:left-1/2 group-data-[collapsible=icon]:not-first:before:h-px group-data-[collapsible=icon]:not-first:before:w-10 group-data-[collapsible=icon]:not-first:before:-translate-x-1/2 group-data-[collapsible=icon]:not-first:before:bg-rail-foreground/45 group-data-[collapsible=icon]:not-first:before:content-['']">
             {g.id === 'apps' || g.id === 'manage' ? <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">{g.label}</SidebarGroupLabel> : null}
             <SidebarGroupContent>
               <NavList items={g.items} />
@@ -175,7 +175,7 @@ function AppSidebar({ session, route, band }: { session: Session; route: Route; 
           </SidebarGroup>
         ))}
       </SidebarContent>
-      <SidebarFooter className="border-r border-sidebar-border pt-1 pb-1 group-data-[collapsible=icon]:relative group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-0 group-data-[collapsible=icon]:before:absolute group-data-[collapsible=icon]:before:top-0 group-data-[collapsible=icon]:before:left-1/2 group-data-[collapsible=icon]:before:h-px group-data-[collapsible=icon]:before:w-7 group-data-[collapsible=icon]:before:-translate-x-1/2 group-data-[collapsible=icon]:before:bg-rail-foreground/45 group-data-[collapsible=icon]:before:content-['']">
+      <SidebarFooter className="border-r border-sidebar-border pt-1 pb-1 group-data-[collapsible=icon]:relative group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-0 group-data-[collapsible=icon]:before:absolute group-data-[collapsible=icon]:before:top-0 group-data-[collapsible=icon]:before:left-1/2 group-data-[collapsible=icon]:before:h-px group-data-[collapsible=icon]:before:w-10 group-data-[collapsible=icon]:before:-translate-x-1/2 group-data-[collapsible=icon]:before:bg-rail-foreground/45 group-data-[collapsible=icon]:before:content-['']">
         {/* only when a quota of the tenant passes 80 %: no fixed widget */}
         {route.area === 'tenant' && (
           <div className="px-2 group-data-[collapsible=icon]:px-2.5">
