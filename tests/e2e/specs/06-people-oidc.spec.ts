@@ -202,6 +202,7 @@ test.describe.serial('06-people-oidc', () => {
     // a note shared with the group of the provider
     await nav(page, 'Notes').click()
     const frame = page.frameLocator('iframe.plugin-frame')
+    await frame.getByRole('button', { name: /New/ }).first().click()
     await frame.locator('[data-key="title"]').fill('Plan of the staff')
     await frame.getByRole('button', { name: 'Save' }).click()
     await expect(frame.locator('.msk-item', { hasText: 'Plan of the staff' })).toBeVisible()

@@ -219,3 +219,13 @@ active apps), Groups, Pending invitations, Shares, Notifications, Installed plug
 tenant, and the apps Documents (Files), Maps, Apps (static sites), Contacts, Tasks and Notes. Left plain on purpose:
 errors and reserved pages (`Empty` without `art`), sections inside a detail page or a card (no extensions, no permission
 added by a group, no open session, no usage chart, no history yet) and the tables that show «No result» for a filter.
+
+### Panel next to a list
+
+A page made with `mountCrud` and `views` (Contacts, Tasks, Notes) shows the detail panel only while an item is open or a new
+one is being written (`panel: 'selected'`, the default; `'always'` keeps it): otherwise the list has the whole width.
+Clicking another item switches the panel; Cancel, Escape and the delete close it (Save too, except where the plugin reads
+the item in the panel with `reader`: then the saved item stays open for reading). The panel is a named region, the focus
+goes into it when it opens and back on the item when it closes; on a phone it is a sheet over the list. The inspector of
+Files (details of the selection) is a preview, not an editor, and stays as it is. Layout contract R-3 checks that the list
+takes the whole width while no panel is open.

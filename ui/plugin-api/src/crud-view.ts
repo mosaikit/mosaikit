@@ -30,6 +30,9 @@ export interface CrudOptions {
   /** the empty state shown while there is nothing (an illustrated one, never a bare line): the picture, the title and the text
    *  default to a generic one; `actions` default to the «new» button of the page */
   empty?: { art?: ArtName; title?: string; text?: string; actions?: HTMLElement[] }
+  /** the panel next to the list: `selected` (default) shows it only while an item is open or a new one is being written, so the
+   *  list has the whole width otherwise; `always` keeps it in sight (an empty panel when nothing is open) */
+  panel?: 'selected' | 'always'
   /** the read-only view of the open item (with «Edit» for the fields): used instead of the form until the person edits */
   reader?: (ctx: ItemCtx) => HTMLElement
 }
@@ -288,7 +291,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   const morebar = h('div', { class: 'msk-morebar' }, btnMore)
   // with views: the list (it scrolls) and the detail panel (it scrolls too) side by side, the panel over the list on a phone
   const master = h('div', { class: 'msk-master' }, items, morebar)
-  const split = h('div', { class: 'msk-split' }, master, h('aside', { class: 'msk-detail', 'aria-label': tr('detail') }, form))
+  const split = h('div', { class: 'msk-split' }, master, h('aside', { class: 'msk-detail', 'aria-label': tr('detail'), id: 'msk-detail' }, form))
   const body = views.length ? pageBody(split) : pageBody(grid.el, emptyBox, form)
   body.classList.add(views.length ? 'msk-splitbody' : 'msk-tablebody')
   root.replaceChildren(
@@ -327,9 +330,9 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     split.dataset.open = st.selected ? 'true' : 'false'
     renderTable()
     renderForm()
-    if (st.selected && narrow()) formTitle.focus()
+    // the panel opens: the focus goes into it
+    if (st.selected) formTitle.focus()
   }
-  const narrow = () => window.matchMedia('(max-width: 900px)').matches
 
   function itemCtx(r: Row): ItemCtx {
     const fieldOf = (k: string) => st.fields.find((f) => f.key === k)
@@ -752,11 +755,11 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     setMsg('')
     renderTable()
     renderForm()
-    if (was && narrow()) items.querySelector<HTMLElement>(`[data-id="${CSS.escape(was)}"]`)?.focus()
+    if (was) items.querySelector<HTMLElement>(`[data-id="${CSS.escape(was)}"]`)?.focus()
   })
-  // Escape closes the detail on a phone, where it covers the list
+  // Escape closes the panel (on a phone it covers the list)
   root.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && views.length && narrow() && split.dataset.open === 'true') btnCancel.click()
+    if (e.key === 'Escape' && views.length && split.dataset.open === 'true' && !(e.target as HTMLElement | null)?.closest?.('select, dialog, [role="dialog"]')) btnCancel.click()
   })
   btnSave.addEventListener('click', () =>
     busy(async () => {
@@ -764,11 +767,14 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
       const row = selectedRow()
       const saved = row ? await api.update(row.id, values) : await api.create(values)
       if (row) for (const [ext, v] of Object.entries(collectExt(row))) await extApi.set(row.id, ext, v)
-      st.selected = saved.id
+      // saving closes the panel (the list takes the whole width again) unless the plugin reads the item in it: then it shows the saved item
+      st.selected = views.length && !opts.reader && opts.panel !== 'always' ? null : saved.id
       st.editing = false
-      split.dataset.open = 'true'
+      split.dataset.open = st.selected ? 'true' : 'false'
       setMsg(tr('saved'))
+      if (!st.selected && views.length) msk.toast(tr('saved'))
       await load()
+      if (!st.selected && views.length) items.querySelector<HTMLElement>(`[data-id="${CSS.escape(saved.id)}"]`)?.focus()
     }),
   )
   btnDel.addEventListener('click', () =>
@@ -793,6 +799,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
 
   renderTexts()
   split.dataset.open = 'false'
+  if (opts.panel === 'always') split.dataset.panel = 'always'
   if (views.length > 1) renderSwitch()
   renderForm()
   // a new language of the host: the texts again, in the new language

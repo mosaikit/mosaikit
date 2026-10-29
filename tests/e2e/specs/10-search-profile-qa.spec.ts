@@ -10,6 +10,7 @@ test.describe.serial('10-search-profile-qa', () => {
     await nav(page, 'Notes').click()
     const frame = page.frameLocator('iframe.plugin-frame')
     await expect(frame.getByRole('heading', { name: 'Notes' })).toBeVisible()
+    await frame.getByRole('button', { name: /New/ }).first().click()
     await frame.locator('[data-key="title"]').fill('Quarterly inspection')
     await frame.locator('[data-key="body"]').fill('The pump of the north well needs a new seal')
     await frame.getByRole('button', { name: 'Save' }).click()

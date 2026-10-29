@@ -147,6 +147,24 @@ const checks: L.Check[] = [
       return c.result()
     },
   },
+  {
+    id: 'TBL-07',
+    async run(ctx: any) {
+      const c = H.checker()
+      const p = await L.as(ctx, 'e.ricci')
+      await p.setViewportSize({ width: 1440, height: 900 })
+      await H.go(p, '#/t/comune-roma/p/com.mosaikit.tasks')
+      await p.waitForTimeout(1500)
+      const f = p.frameLocator('iframe.plugin-frame')
+      const shown = () => f.locator('.msk-detail').evaluate((e: HTMLElement) => getComputedStyle(e).display !== 'none')
+      c.ok(!(await shown()), 'no panel while nothing is open')
+      await f.getByRole('button', { name: /New/ }).first().click()
+      c.ok(await shown(), 'the panel opens for a new item')
+      await f.getByRole('button', { name: 'Cancel' }).click()
+      c.ok(!(await shown()), 'Cancel gives the width back')
+      return c.result()
+    },
+  },
 ]
 
 export default checks

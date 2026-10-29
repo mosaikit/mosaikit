@@ -41,6 +41,7 @@ test('every plugin UI has an origin of its own', async ({ page }) => {
   await expect(page.locator('iframe.plugin-frame')).toHaveAttribute('src', new RegExp(`^${notesUi.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`))
   const frame = page.frameLocator('iframe.plugin-frame')
   await expect(frame.getByRole('heading', { name: 'Notes' })).toBeVisible()
+  await frame.getByRole('button', { name: /New/ }).first().click()
   await frame.locator('[data-key="title"]').fill('Wildcard note')
   await frame.getByRole('button', { name: 'Save' }).click()
   await expect(frame.locator('.msk-item', { hasText: 'Wildcard note' })).toBeVisible()

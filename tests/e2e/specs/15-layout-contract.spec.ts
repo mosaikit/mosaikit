@@ -87,6 +87,8 @@ interface Probe {
   filterUi: boolean
   sidebarScroll: { overflows: boolean; idle: string; w: number } | null
   iframe: Rect | null
+  /** an app with a panel next to its list: the list, the split that holds both, and whether the panel is shown */
+  split: { master: Rect; whole: Rect; panelShown: boolean } | null
 }
 interface Rec {
   role: Role
@@ -204,6 +206,7 @@ async function probe(doc: Page | Frame, o: { scroll: boolean; more: boolean }): 
       filterUi: !!q('[aria-label="Show or hide the filters"]') || !!q('#main input[type="search"], #main [role="searchbox"]'),
       sidebarScroll: null,
       iframe: R(q('iframe.plugin-frame')),
+      split: q('.msk-split') ? { master: R(q('.msk-master')), whole: R(q('.msk-split')), panelShown: getComputedStyle(q('.msk-detail')).display !== 'none' } : null,
     }
     if (o.more && scroller) {
       const btn: any = [...scroller.querySelectorAll('button')].find((b: any) => /^(Load more|Carica altri)/.test(b.textContent.trim()) && vis(b) && !b.disabled && !b.hidden)
@@ -550,6 +553,7 @@ function judge(rule: string, r: Rec, all: Rec[]): string[] {
         if (!t!.stickyHead && !t!.grid) out.push('the header row of the table is not sticky')
         else if (t!.rows > 0 && inner.scrolled?.thead != null && Math.abs(inner.scrolled.thead) > 2 && !(inner.scrolled.theadAfter != null && inner.scrolled.theadAfter >= -1 && inner.scrolled.theadAfter <= 100)) out.push(`the header row moved ${inner.scrolled.thead}px when the list scrolled`)
       }
+      if (inner.split && !inner.split.panelShown && r.vp !== 'phone' && inner.split.master.w < inner.split.whole.w - 4) out.push(`no panel is open but the list takes ${Math.round(inner.split.master.w)} of ${Math.round(inner.split.whole.w)}px (it must have the whole width)`)
       const more = app ? r.frame!.more : doc.more
       if (more?.present && !more.loaded) out.push('scrolled to the end, more rows did not load')
       break

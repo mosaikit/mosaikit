@@ -15,6 +15,8 @@ test.describe.serial('01-admin-and-manager', () => {
 
     // plugins preinstalled from the registry
     await nav(page, 'Plugins').click()
+    // the installed plugins show as cards first; the table has the rows
+    await page.getByRole('radio', { name: 'Table' }).click()
     for (const name of ['Notes', 'Tasks', 'Contacts', 'Maps', 'Apps', 'Documents']) {
       await expect(page.getByRole('row', { name: new RegExp(name) }).first()).toContainText('active')
     }

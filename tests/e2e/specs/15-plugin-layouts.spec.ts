@@ -8,7 +8,7 @@ const day = (n: number) => new Date(Date.now() + n * 864e5).toISOString().slice(
 const frameOf = (page: Page) => page.frameLocator('iframe.plugin-frame')
 
 async function add(frame: FrameLocator, values: Record<string, string | boolean>) {
-  await frame.getByRole('button', { name: /^＋ New/ }).click()
+  await frame.getByRole('button', { name: /^＋ New/ }).first().click()
   for (const [k, v] of Object.entries(values)) {
     const el = frame.locator(`[data-key="${k}"]`).first()
     if (typeof v === 'boolean') await (v ? el.check() : el.uncheck())

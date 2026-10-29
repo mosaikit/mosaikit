@@ -20,6 +20,7 @@ in step).
 - Headers, filters and tabs stay in place. Pages that are a list or a table do not scroll as a whole: the list fills the page and scrolls inside, with its header row in sight, and loads more as you scroll. The pages of the apps have the same header as the pages of Mosaikit, and a page with subsections (System, Monitoring, Settings, Usage, Account, Manage) shows both the page and the selected subsection in its header. The list of sections of a page stays in place and scrolls by itself. A layout you save is used at once, without reloading the page. The sidebar scrolls, closed or open, and shows its scrollbar only under the mouse.
 - Long lists and tables load a page at a time, with a count and «Load more» (or as you scroll), including the Log.
 - Every table works the same way, in the shell and in the apps: the header row stays in place and only the rows scroll, the titles of the columns sort, a filter box in the header searches every field, and more rows load as you reach the end. The installed plugins also show as cards (the default) or as a table.
+- In Contacts, Tasks and Notes the panel with the details appears only when you open an item or create a new one; otherwise the list uses the whole width.
 - Pages and lists with nothing in them show an illustration with a title, a short line and the buttons of what to do, the same in the shell and in the apps; a filter that matches nothing shows a small message with a link to clear it.
 
 ### People and tenants

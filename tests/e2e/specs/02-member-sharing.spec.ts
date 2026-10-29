@@ -32,6 +32,7 @@ test.describe.serial('02-member-sharing', () => {
     await nav(page, 'Notes').click()
     const frame = page.frameLocator('iframe.plugin-frame')
     await expect(frame.getByRole('heading', { name: 'Notes' })).toBeVisible()
+    await frame.getByRole('button', { name: /New/ }).first().click()
     await frame.locator('[data-key="title"]').fill('Meeting minutes')
     await frame.locator('[data-key="body"]').fill('<b>confidential content</b>')
     await frame.getByRole('button', { name: 'Save' }).click()
