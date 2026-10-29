@@ -85,7 +85,7 @@ const checks: L.Check[] = [
       // a zip with unsafe paths, written by hand (stored entries): con.txt, nul, a. and "name "
       const zip = L.out('unsafe-sites.zip')
       fs.writeFileSync(zip, storedZip({ 'index.html': '<h1>x</h1>', 'con.txt': 'x', nul: 'x', 'a.': 'x', 'name ': 'x' }))
-      await f.getByRole('button', { name: /New site/ }).first().click()
+      await f.getByRole('button', { name: /New app/ }).first().click()
       await u.waitForTimeout(800)
       const d = f.getByRole('dialog').first()
       const name = d.getByRole('textbox').first()

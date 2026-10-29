@@ -122,7 +122,7 @@ test.describe.serial('review round 1: auth and plugins', () => {
       await expect(frame.locator('.cards')).toBeVisible()
 
       const create = async (name: string, address: string) => {
-        await frame.getByRole('button', { name: '＋ New site' }).click()
+        await frame.getByRole('button', { name: '＋ New app' }).click()
         await frame.getByLabel('Web address').check()
         await frame.locator('#msks-name').fill(name)
         await frame.locator('#msks-url').fill(address)
@@ -138,7 +138,7 @@ test.describe.serial('review round 1: auth and plugins', () => {
       await card.getByRole('button', { name: /Open$/ }).click()
       await expect(frame.locator('iframe.sframe').nth(1)).toHaveAttribute('src', addr(free))
       await expect(frame.frameLocator('iframe.sframe').nth(1).getByRole('heading', { name: 'Hello from the free site' })).toBeVisible()
-      await frame.getByRole('button', { name: '⬅ List of sites' }).click()
+      await frame.getByRole('button', { name: '⬅ List of apps' }).click()
 
       // a site that forbids framing: created with a warning, opened in a new tab, thumbnail = its first image
       await create(closedName, addr(closed))
@@ -150,7 +150,7 @@ test.describe.serial('review round 1: auth and plugins', () => {
       await closedCard.getByRole('button', { name: /Open$/ }).click()
       expect((await popup).url()).toBe(addr(closed))
       await expect(frame.getByText('does not allow being shown inside Mosaikit')).toBeVisible()
-      await frame.getByRole('button', { name: '⬅ List of sites' }).click()
+      await frame.getByRole('button', { name: '⬅ List of apps' }).click()
 
       // the thumbnail uploaded by the person wins over the one of the site
       await frame.locator('article.card', { hasText: freeName }).getByRole('button', { name: /Edit/ }).click()
@@ -212,7 +212,7 @@ test.describe.serial('review round 1: auth and plugins', () => {
     await login(page, BASE_URL, 'City of Beta', 'manager', PASSWORD)
     await nav(page, 'Apps').click()
     const frame = page.frameLocator('iframe.plugin-frame')
-    await frame.getByRole('button', { name: '＋ New site' }).click()
+    await frame.getByRole('button', { name: '＋ New app' }).click()
     await frame.locator('#msks-name').fill(zipName)
     await frame.locator('input[type=file][accept*=zip]').setInputFiles({ name: 'site.zip', mimeType: 'application/zip', buffer: zip })
     await frame.getByRole('button', { name: '💾 Save' }).click()
