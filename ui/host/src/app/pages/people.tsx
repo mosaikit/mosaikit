@@ -394,7 +394,7 @@ export function PersonPage({ slug, id, tab }: { slug: string; id: string; tab?: 
 }
 
 function sourceLabel(s: { kind: string; name: string }): string {
-  if (s.kind === 'manager') return 'Tenant Manager'
+  if (s.kind === 'manager') return t('Tenant Manager')
   if (s.kind === 'profile') return t('Profile {name}', { name: s.name })
   if (s.kind === 'group') return t('Group {name}', { name: s.name })
   return t('Personal')
@@ -1528,7 +1528,7 @@ export function AdminPeople() {
                 onChange: setRole,
                 options: [
                   { id: 'any', label: t('Every role') },
-                  { id: 'tenant_manager', label: 'Tenant Manager' },
+                  { id: 'tenant_manager', label: t('Tenant Manager') },
                   { id: 'user', label: t('User') },
                 ],
               },

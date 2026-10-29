@@ -530,7 +530,7 @@ function MyTenants({ session }: { session: Session }) {
                     {m.is_home ? t('home') : t('guest')}
                   </Badge>
                 </TableCell>
-                <TableCell>{m.role === 'tenant_manager' ? 'Tenant Manager' : 'User'}</TableCell>
+                <TableCell>{m.role === 'tenant_manager' ? t('Tenant Manager') : t('User')}</TableCell>
                 <TableCell className="text-right">
                   <Button variant="ghost" size="sm" onClick={() => go(to.tenant(m.slug))}>
                     {t('Open')}

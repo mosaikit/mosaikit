@@ -267,7 +267,7 @@ export function TenantSwitcher({ session, route, variant = 'band' }: { session: 
       <TenantBadge name={m.name} />
       <span className="flex-1">
         <span className="block font-medium">{m.name}</span>
-        <span className="block text-xs text-muted-foreground">{m.role === 'tenant_manager' ? 'Tenant Manager' : 'User'}</span>
+        <span className="block text-xs text-muted-foreground">{m.role === 'tenant_manager' ? t('Tenant Manager') : t('User')}</span>
       </span>
       {m.slug === slug && <Check className="size-4" />}
     </DropdownMenuItem>
@@ -405,7 +405,7 @@ function HelpMenu({ session, route }: { session: Session; route: Route }) {
 
 function roleOf(session: Session, route: Route): string {
   const slug = route.area === 'tenant' ? route.tenant : ''
-  return session.memberships.find((m) => m.slug === slug)?.role === 'tenant_manager' ? 'Tenant Manager' : 'User'
+  return session.memberships.find((m) => m.slug === slug)?.role === 'tenant_manager' ? t('Tenant Manager') : t('User')
 }
 
 /** The menu of the person: Account, Notifications, Sign out (and the help, if the bar does not show it). */
@@ -428,7 +428,7 @@ function UserMenu({ session, route, band }: { session: Session; route: Route; ba
     if (endSession) window.location.assign(endSession)
     else go(u.is_system_admin ? '#/admin' : '#/')
   }
-  const role = u.is_system_admin ? 'Administrator' : roleOf(session, route)
+  const role = u.is_system_admin ? t('Administrator') : roleOf(session, route)
   const tenant = route.area === 'tenant' ? session.memberships.find((m) => m.slug === route.tenant)?.name : t('Platform')
   return (
     <DropdownMenu>
