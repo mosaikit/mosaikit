@@ -132,14 +132,13 @@ export function setLanguageContext(c: LanguageContext) {
   applyContext()
 }
 
-/** What is offered: the list of the settings; the languages of the plugins installed come with it, unless
- *  the list leaves out a built-in language (a restriction: then only what it names is offered). */
+/** What is offered: exactly the list of the settings (a language of a plugin is offered once the list names it and
+ *  its plugin is installed); without a list, everything there is. */
 function applyContext() {
   const c = lastContext
   const known = [...BUILTIN, ...installed]
   const given = (c.enabled ?? []).filter((x) => known.includes(x))
-  const restricted = BUILTIN.some((b) => !given.includes(b)) && given.length > 0
-  enabled = restricted ? given : [...BUILTIN, ...installed]
+  enabled = given.length > 0 ? given : known
   locale = c.locale && c.locale !== 'auto' ? c.locale : 'auto'
   const own = chosen()
   const def: Lang = c.language && c.language !== 'auto' && enabled.includes(c.language) ? c.language : enabled.includes(browser()) ? browser() : enabled[0]

@@ -90,7 +90,8 @@ export async function adminLogin(page: Page) {
   await page.getByLabel('Username').fill('admin')
   await page.getByLabel('Password').fill(ADMIN_PASSWORD)
   await page.getByRole('button', { name: 'Sign in' }).click()
-  if (!adminSecret) {
+  const first = !adminSecret
+  if (first) {
     await expect(page.getByRole('img', { name: 'QR code to scan with the app' })).toBeVisible()
     adminSecret = ((await page.locator('code').first().textContent()) ?? '').replace(/\s/g, '')
     saveAdmin(adminSecret, lastStep)
@@ -103,6 +104,15 @@ export async function adminLogin(page: Page) {
     await page.getByRole('button', { name: 'Confirm' }).click()
   }
   await expect(page.getByRole('heading', { name: 'Platform overview' })).toBeVisible()
+  // the platform offers exactly the languages it names: the one of the language plugin is named once for the whole run
+  if (first) {
+    const status = await page.evaluate(async () => {
+      const s = await (await fetch('api/session')).json()
+      const r = await fetch('api/admin/settings', { method: 'PUT', headers: { 'content-type': 'application/json', 'x-csrf-token': s.csrf }, body: JSON.stringify({ values: { 'lang.enabled': ['en', 'it', 'es'] } }) })
+      return r.status
+    })
+    expect(status).toBe(200)
+  }
 }
 
 export async function logout(page: Page) {
