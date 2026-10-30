@@ -36,6 +36,7 @@ default, with Italian available. Guides for the people who use it, one per role:
 - [Desktop release](#desktop-release)
 - [Server release with Docker](#server-release-with-docker)
 - [Kubernetes release](#kubernetes-release)
+- [Publishing and releasing](#publishing-and-releasing)
 - [Configuration](#configuration)
 - [Administration](#administration)
 - [xtask commands](#xtask-commands)
@@ -521,6 +522,32 @@ mosaikit/dist/mosaikit-1.0.0-k8s/
 Installation: image in the registry of the cluster, hostnames and passwords to
 edit, then `kubectl apply -k .`. If `kubectl` is installed, the release
 checks the manifests with `kubectl kustomize` (no cluster is needed).
+
+## Publishing and releasing
+
+The code lives in two repositories of the `mosaikit` organisation that must be checked out side by side
+(`mosaikit/` and `mosaikit-plugins/`, as locally): both workflows below check out `mosaikit-plugins` next to
+`mosaikit`. Distributions are separate projects and are not published here.
+
+- **`ci`** (`.github/workflows/ci.yml`): on every pull request and push to `main`. It starts a PostGIS service
+  and runs `cargo-deny`, `cargo xtask ci` (format, clippy, typecheck, lint, build, tests on PostgreSQL and
+  SQLite) and `cargo xtask e2e` (Playwright, Chromium). `mosaikit-plugins` has its own `ci` workflow
+  (logic tests, typecheck, lint, UI tests and build against the `mosaikit` it is checked out with).
+- **`main` is protected** by repository rules: changes go through a pull request, with linear history, the
+  required checks and the merge queue; no force-push.
+- **`release`** (`.github/workflows/release.yml`): pushing a tag `v*` (or running it by hand) builds the
+  signed desktop bundle on Windows and attaches `*.zip` and `SHA256SUMS` to the GitHub release, and builds and
+  pushes the Docker image to `ghcr.io/<owner>/mosaikit` (tags `<version>` and `latest`).
+
+To release: update `CHANGELOG.md` and the versions, merge into `main` with green checks, then
+`git tag vX.Y.Z && git push origin vX.Y.Z`.
+
+Settings kept on GitHub, not in the repository:
+
+| Secret | Used by | What |
+|---|---|---|
+| `MOSAIKIT_SIGNING_KEY` | `release` (desktop and Docker) | private key that signs the plugin packages; keep a copy outside GitHub |
+| `GITHUB_TOKEN` | `release` | automatic; publishes the release and the image (`contents: write`, `packages: write`) |
 
 ## Configuration
 
