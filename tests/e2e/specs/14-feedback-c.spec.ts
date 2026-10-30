@@ -126,6 +126,13 @@ test.describe.serial('14-feedback-c', () => {
         const wide = await page.evaluate(() =>
           [...document.querySelectorAll('body *')]
             .filter((e) => e.getBoundingClientRect().right > window.innerWidth + 1 && getComputedStyle(e).position !== 'fixed')
+            // a bar of tabs that scrolls on its own is made for this (the fallback font of Linux is wider than Segoe UI)
+            .filter((e) => {
+              for (let p = e.parentElement; p && p !== document.body; p = p.parentElement) {
+                if (/auto|scroll/.test(getComputedStyle(p).overflowX) && p.getBoundingClientRect().right <= window.innerWidth + 1) return false
+              }
+              return true
+            })
             .slice(0, 4)
             .map((e) => `${e.tagName.toLowerCase()}.${String(e.className).slice(0, 60)} right=${Math.round(e.getBoundingClientRect().right)}`),
         )
