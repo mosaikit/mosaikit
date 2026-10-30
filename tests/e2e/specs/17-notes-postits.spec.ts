@@ -55,6 +55,9 @@ test.describe.serial('Notes: post-its', () => {
     await expect(postit(frame, 'Postit A')).toBeFocused()
     for (let i = 0; i < 20; i++) await page.keyboard.press('Alt+ArrowUp')
     await expect.poll(async () => (await size(frame, 'Postit A')).h).toBe(120)
+    // the keys save their size 500 ms after the last one; a drag that ends before that is overwritten by it
+    // (fixed in the Notes plugin, mosaikit-plugins: the drag cancels the pending save)
+    await page.waitForTimeout(800)
     const grip = postit(frame, 'Postit A').locator('.pi-grip')
     await expect(grip).toBeVisible()
     const g = (await grip.boundingBox())!
@@ -63,8 +66,6 @@ test.describe.serial('Notes: post-its', () => {
     await page.mouse.move(g.x + g.width / 2 + 60, g.y + g.height / 2 + 120, { steps: 5 })
     await page.mouse.up()
     await expect.poll(async () => size(frame, 'Postit A')).toEqual({ w: 360, h: 240 })
-    // the plugin saves the size 500 ms after the last change: a reload before that (a slow runner) loses it
-    await page.waitForTimeout(1500)
     await page.reload()
     frame = await openNotes(page)
     await expect.poll(async () => size(frame, 'Postit A')).toEqual({ w: 360, h: 240 })

@@ -48,6 +48,7 @@ function KindBadge({ kind }: { kind: PluginKind }) {
 function KindPills({ value, onChange, counts }: { value: string; onChange: (k: string) => void; counts: Record<string, number> }) {
   return (
     <Pills
+      plain
       label={t('Kind')}
       items={[
         { id: 'all', label: t('All'), count: counts.all },
@@ -217,6 +218,7 @@ export function AdminPlugins({ section }: { section?: string }) {
       />
       <div className="flex flex-wrap items-center gap-x-6 gap-y-1 border-b px-6 py-1 max-[620px]:px-4">
         <Pills
+          plain
           items={[
             { id: 'installed', label: t('Installed'), count: installed.data?.length },
             { id: 'updates', label: t('Updates'), count: updates.length },
