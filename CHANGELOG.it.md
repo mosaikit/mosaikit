@@ -55,6 +55,7 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
 ### Per chi scrive plugin
 
+- Nuovo permesso del manifest `[permissions] script_eval = true` (predefinito false): solo la UI di quel plugin riceve `'unsafe-eval'` e `'wasm-unsafe-eval'` in `script-src` e `worker-src`, per i motori che compilano codice a runtime. La shell, i contenuti, i link pubblici e ogni plugin che non lo dichiara mantengono la policy rigida; l'Administrator lo vede in «Cosa richiede» del plugin come permesso sensibile.
 - Un plugin può chiamare un servizio esterno con la chiave impostata da un Administrator: `http.fetch` accetta una `key` (un servizio di `[[service_keys]]`) e l'host la aggiunge come bearer token; l'indirizzo può essere quello impostato in Chiavi dei servizi esterni (`address = true`). Le richieste dei plugin passano dalla stessa protezione dell'anteprima delle pagine (solo indirizzi pubblici). L'SDK ha `ctx.http().fetch_with_key(...)`.
 - Note traduce una nota con un servizio di traduzione (Traduci la nota, sotto la nota), come esempio.
 - I pulsanti distruttivi dei plugin (Elimina) restano ben leggibili in modalità scura, come nella shell. Note 0.5.0 mostra nell'intestazione la pagina aperta (Note › Le mie note).

@@ -460,6 +460,7 @@ start of the development server with a wildcard `plugin_url` (below); the others
 | SEC-08 | Start a second server with `MOSAIKIT_PLUGIN_URL=http://*.localhost:47081/mosaikit cargo xtask dev` (or the same line in `xtask/mosaikit.dev.toml`); open Notes | The frame of Notes comes from `http://com-mosaikit-notes.localhost:47081/…`; the plugin works as usual |
 | SEC-09 | In the browser, open `http://com-mosaikit-notes.localhost:47081/mosaikit/ui/com.mosaikit.tasks/` | 404: the UI of Tasks is served only on its own host |
 | SEC-10 | Make a public link | Its address starts with `http://public.localhost:47081/…` and opens there |
+| SEC-11 | As Administrator open Plugins › Notes › What it asks; then fetch the UI of Notes (`…/mosaikit/ui/com.mosaikit.notes/`) and look at its `Content-Security-Policy`. With a test plugin that declares `[permissions] script_eval = true`, open its What it asks and fetch its UI | Notes shows «Runs code compiled at run time: nothing» and its CSP has no `unsafe-eval` or `wasm-unsafe-eval`; the test plugin shows the permission in bold (sensitive) and only its own CSP has `'unsafe-eval' 'wasm-unsafe-eval'` in `script-src` and `worker-src`; the host page and the other plugins keep the strict policy |
 
 ## UX follow-ups — labels, keys of the plugins, own profile, guides
 

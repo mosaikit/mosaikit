@@ -549,6 +549,9 @@ function PluginAsks({ p, base }: { p: AdminPlugin; base?: string }) {
             <AskRow label={t('Folders from zip archives')}>{perm.content ? t('yes') : none}</AskRow>
             <AskRow label={t('Network addresses')}>{list(perm.network)}</AskRow>
             <AskRow label={t('Embeds pages of')}>{list(perm.frame_src)}</AskRow>
+            <AskRow label={t('Runs code compiled at run time')}>
+              {perm.script_eval ? <b className="text-destructive">{t('yes (sensitive: its page may use eval and WebAssembly compilation)')}</b> : none}
+            </AskRow>
             <AskRow label={t('Calls the plugins')}>{list(perm.calls)}</AskRow>
             <AskRow label={t('Database')}>{p.requires?.database ? <span className="font-mono text-xs">{[p.requires.database, ...(p.requires.extensions ?? [])].join(', ')}</span> : t('any')}</AskRow>
           </dl>

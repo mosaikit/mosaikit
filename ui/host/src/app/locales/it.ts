@@ -1036,6 +1036,8 @@ export const IT: Record<string, string> = {
   'Folders from zip archives': 'Cartelle da archivi zip',
   'Network addresses': 'Indirizzi di rete',
   'Embeds pages of': 'Incorpora pagine di',
+  'Runs code compiled at run time': 'Esegue codice compilato a runtime',
+  'yes (sensitive: its page may use eval and WebAssembly compilation)': 'sì (sensibile: la sua pagina può usare eval e la compilazione WebAssembly)',
   'Calls the plugins': 'Chiama i plugin',
   'Database': 'Database',
   'any': 'qualunque',

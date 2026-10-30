@@ -50,22 +50,28 @@ fn mime(path: &str) -> String {
 /// origin also serves the contents of the users (`/c/…`) and the public links (`/p/…`), and a file
 /// uploaded there must never run as a script of a plugin.
 fn plugin_csp(s: &AppState, p: &mosaikit_kernel::plugins::LoadedPlugin) -> String {
-    let net = p.manifest.permissions.network.join(" ");
-    let frames = p.manifest.permissions.frame_src.join(" ");
+    let own = format!("{}/ui/{}/", s.k.cfg.plugin_url_for(&p.id).trim_end_matches('/'), p.id);
+    csp_for(&p.manifest, &own, &s.k.cfg.app_origins().join(" "), &s.k.cfg.public_origin())
+}
+
+/// The policy itself. Only a plugin that declares `permissions.script_eval` may compile code at run
+/// time (`'unsafe-eval'`, `'wasm-unsafe-eval'`); it applies to the UI of that plugin and nothing else.
+fn csp_for(m: &mosaikit_mskp::Manifest, own: &str, app_origins: &str, public_origin: &str) -> String {
+    let net = m.permissions.network.join(" ");
+    let frames = m.permissions.frame_src.join(" ");
     let mut frame_src = frames.clone();
     // a plugin with the `web` permission embeds sites by address: any http(s) origin (the site decides
     // whether it accepts being framed; the host tells beforehand with `msk.web.probe`)
-    if p.manifest.permissions.web {
+    if m.permissions.web {
         frame_src.push_str(" https: http:");
     }
-    let own = format!("{}/ui/{}/", s.k.cfg.plugin_url_for(&p.id).trim_end_matches('/'), p.id);
+    let eval = if m.permissions.script_eval { " 'unsafe-eval' 'wasm-unsafe-eval'" } else { "" };
     format!(
-        "default-src 'self'; script-src {own}; style-src 'self' 'unsafe-inline'; \
+        "default-src 'self'; script-src {own}{eval}; style-src 'self' 'unsafe-inline'; \
          img-src 'self' data: blob: {net} {frames}; font-src 'self' data:; media-src 'self' data: blob:; \
-         connect-src 'self' {net}; frame-src 'self' blob: {frame_src}; worker-src {own} blob:; \
+         connect-src 'self' {net}; frame-src 'self' blob: {frame_src}; worker-src {own} blob:{eval}; \
          frame-ancestors {} {}; object-src 'none'; base-uri 'self'; form-action 'self'",
-        s.k.cfg.app_origins().join(" "),
-        s.k.cfg.public_origin()
+        app_origins, public_origin
     )
 }
 
@@ -527,6 +533,39 @@ fn with_ancestors(mut res: Response, ancestors: &str) -> Response {
 #[cfg(test)]
 mod tests {
     use serde_json::json;
+
+    fn manifest(perms: &str) -> mosaikit_mskp::Manifest {
+        mosaikit_mskp::Manifest::from_toml(&format!(
+            "id = \"com.x.p\"
+name = \"P\"
+version = \"0.1.0\"
+[contribution]
+icon = \"x\"
+label = \"P\"
+[permissions]
+{perms}"
+        ))
+        .unwrap()
+    }
+
+    #[test]
+    fn script_eval_only_for_the_plugin_that_declares_it() {
+        let csp = |m| super::csp_for(&m, "http://p/ui/x/", "http://app", "http://pub");
+        let strict = csp(manifest(""));
+        assert!(strict.contains("script-src http://p/ui/x/;"));
+        assert!(!strict.contains("unsafe-eval") && !strict.contains("wasm-unsafe-eval"));
+        assert!(!csp(manifest(
+            "script_eval = false
+"
+        ))
+        .contains("eval"));
+        let open = csp(manifest(
+            "script_eval = true
+",
+        ));
+        assert!(open.contains("script-src http://p/ui/x/ 'unsafe-eval' 'wasm-unsafe-eval';"));
+        assert!(open.contains("worker-src http://p/ui/x/ blob: 'unsafe-eval' 'wasm-unsafe-eval';"));
+    }
 
     #[test]
     fn public_links_leave_hidden_fields_out() {

@@ -967,6 +967,7 @@ network = []             # origins reachable by http.fetch
 frame_src = []           # origins the UI may embed
 calls = []               # plugins whose commands the logic calls (§8.6)
 notify = false           # the logic may send notifications (host operation `notify`, §8.3)
+script_eval = false      # the UI may compile code at run time (CSP 'unsafe-eval', §9); sensitive
 
 [requires]               # optional
 database = "postgres"    # uses PostgreSQL functions: it does not install on SQLite
@@ -1325,6 +1326,12 @@ are limited to the path.
 - **Passwords**: argon2id, at least 10 characters (the platform and the tenants may ask for more,
   §3.1). Sign-in with a limit of failed attempts per account and per address (default 8 in 15
   minutes, settings of the platform and of the tenant).
+- **`script_eval` (opt-in, sensitive)**: the CSP of a plugin UI never allows run-time code
+  compilation, unless the manifest declares `[permissions] script_eval = true`: then `'unsafe-eval'`
+  and `'wasm-unsafe-eval'` are appended to `script-src` and `worker-src` of THAT plugin's UI only
+  (`csp_for` in `crates/server/src/untrusted.rs`). The host UI, user contents, public links and the other
+  plugins keep the strict policy. The Administrator sees the permission in the plugin's «What it asks».
+  A plugin that declares it can run injected strings as code: grant it only to code you trust.
 - **Embedding**: the host UI is never embedded (`frame-ancestors 'none'`); the public pages of a
   tenant (public links) may be embedded only by the sites in `embed.sites` of the tenant, a subset
   of the platform's (`frame-ancestors <sites>`, otherwise `'none'`).
