@@ -1759,6 +1759,8 @@ A value is a literal, `env:NAME` (an environment variable of the server) or `fil
 file, relative to the folder of the seed file, a final line break dropped). **Secrets must be referenced, not
 written**: `distribution.toml` lives in a repository. A literal secret works but the server warns at start.
 Numbers and booleans may be written as TOML values.
+Set `shared = true` when a plugin command that any member of a tenant can run uses the key: with the default
+(`false`) a member of a tenant that has no key of its own gets «no key of the service … is set».
 
 How the server gets them: one mechanism, the property `plugin_settings_file` of `mosaikit.toml` (env
 `MOSAIKIT_PLUGIN_SETTINGS_FILE`), a TOML file with these two tables (other tables are ignored, so it may be the
