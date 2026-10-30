@@ -78,6 +78,8 @@ pub const CHECKS: &[(&str, &str, f64)] = &[
     ("--sidebar-foreground", "--sidebar", 4.5),
     ("--sidebar-accent-foreground", "--sidebar-accent", 4.5),
     ("--rail-foreground", "--sidebar", 4.5),
+    // the active label of the icon bar sits on the sidebar itself, not on the white of the open sidebar
+    ("--sidebar-accent-foreground", "--sidebar", 4.5),
 ];
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
