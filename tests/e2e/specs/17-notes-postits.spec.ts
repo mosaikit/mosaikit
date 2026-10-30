@@ -63,6 +63,8 @@ test.describe.serial('Notes: post-its', () => {
     await page.mouse.move(g.x + g.width / 2 + 60, g.y + g.height / 2 + 120, { steps: 5 })
     await page.mouse.up()
     await expect.poll(async () => size(frame, 'Postit A')).toEqual({ w: 360, h: 240 })
+    // the plugin saves the size 500 ms after the last change: a reload before that (a slow runner) loses it
+    await page.waitForTimeout(1500)
     await page.reload()
     frame = await openNotes(page)
     await expect.poll(async () => size(frame, 'Postit A')).toEqual({ w: 360, h: 240 })

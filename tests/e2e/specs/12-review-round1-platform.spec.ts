@@ -36,6 +36,7 @@ test.describe.serial('12-review-round1-platform', () => {
     // R1-T-04 and R1-T-05: the Plugins tab, a pill in every row
     await tabs.getByRole('link', { name: 'Plugins' }).click()
     const rows = page.locator('tbody tr')
+    await expect(rows.first()).toBeVisible()
     expect(await rows.count()).toBeGreaterThan(0)
     expect(await rows.locator('td:last-child [data-slot="badge"]').count()).toBe(await rows.count())
 
