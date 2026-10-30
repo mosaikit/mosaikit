@@ -55,6 +55,10 @@ test.describe.serial('Notes: post-its', () => {
     await expect(postit(frame, 'Postit A')).toBeFocused()
     for (let i = 0; i < 20; i++) await page.keyboard.press('Alt+ArrowUp')
     await expect.poll(async () => (await size(frame, 'Postit A')).h).toBe(120)
+    // the keys save their size 500 ms after the last one; a drag that ends before that is overwritten by it
+    // (the list is also drawn again when the save lands, which would drop the grip: wait for both; the plugin
+    // itself should cancel the pending save on a drag, see mosaikit-plugins)
+    await page.waitForTimeout(2500)
     const grip = postit(frame, 'Postit A').locator('.pi-grip')
     await expect(grip).toBeVisible()
     const g = (await grip.boundingBox())!
@@ -63,6 +67,8 @@ test.describe.serial('Notes: post-its', () => {
     await page.mouse.move(g.x + g.width / 2 + 60, g.y + g.height / 2 + 120, { steps: 5 })
     await page.mouse.up()
     await expect.poll(async () => size(frame, 'Postit A')).toEqual({ w: 360, h: 240 })
+    // the drag is saved on release: give the request time before the reload (slow runner)
+    await page.waitForTimeout(1500)
     await page.reload()
     frame = await openNotes(page)
     await expect.poll(async () => size(frame, 'Postit A')).toEqual({ w: 360, h: 240 })

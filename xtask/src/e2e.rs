@@ -133,7 +133,9 @@ impl Instance {
         }
         let db = checkout_db(&format!("mosaikit_{suite}"));
         reset_db(&db)?;
-        let dir = root().join(".dev").join(suite);
+        // the wildcard run keeps its own folder: it must not wipe the logs of the run before
+        let dir =
+            root().join(".dev").join(if wildcard { format!("{suite}-wildcard") } else { suite.to_string() });
         if dir.exists() {
             std::fs::remove_dir_all(&dir)?;
         }
@@ -244,6 +246,8 @@ fn wildcard_run(headed: bool, json: Option<&std::path::Path>) -> Result<bool> {
         cmd.env("E2E_HEADED", "1");
     }
     cmd.env("E2E_WILDCARD", "1");
+    // Playwright empties its output folder at the start: keep the results of the first run
+    cmd.env("E2E_OUTPUT_DIR", "test-results-wildcard");
     cmd.args(["--", "specs/wildcard.spec.ts"]);
     let ok = match json {
         Some(json) => {

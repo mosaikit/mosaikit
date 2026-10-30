@@ -163,10 +163,11 @@ export function Tabs({ tabs, current, href }: { tabs: { id: string; label: strin
 }
 
 /** Pill filters above a list («Show: All · Public»). */
-/** `first`: the row opens its page (first child of the padded content): it sits right under the header and stays there. */
-export function Pills({ items, value, onChange, label = t('Show'), first }: { items: { id: string; label: string; count?: number }[]; value: string; onChange: (id: string) => void; label?: string; first?: boolean }) {
+/** `first`: the row opens its page (first child of the padded content): it sits right under the header and stays there.
+ *  `plain`: a row inside a bar with other things (a selection bar beside it): it is not pinned, so it never covers them. */
+export function Pills({ items, value, onChange, label = t('Show'), first, plain }: { items: { id: string; label: string; count?: number }[]; value: string; onChange: (id: string) => void; label?: string; first?: boolean; plain?: boolean }) {
   return (
-    <div role="radiogroup" aria-label={label} className={cn('msk-pills sticky top-[calc(var(--msk-top)+var(--msk-head))] z-[5] -mx-1 flex flex-wrap items-center gap-1.5 bg-background px-1 py-1.5', first && 'msk-pills-top')}>
+    <div role="radiogroup" aria-label={label} className={cn('msk-pills -mx-1 flex flex-wrap items-center gap-1.5 px-1 py-1.5', plain ? 'bg-transparent' : 'sticky top-[calc(var(--msk-top)+var(--msk-head))] z-[5] bg-background', first && 'msk-pills-top')}>
       <span className="mr-1 text-xs text-muted-foreground">{label}</span>
       {items.map((it) => (
         <button
