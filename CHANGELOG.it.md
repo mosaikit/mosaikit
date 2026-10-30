@@ -25,6 +25,7 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 - Le note hanno tag tuoi, ciascuno con il proprio colore: creali, rinominali, cambia il colore ed eliminali dal pulsante Tag (eliminare un tag lo toglie dalle tue note), e filtra le note per tag.
 - Le pagine e gli elenchi vuoti mostrano un’illustrazione con un titolo, una riga di spiegazione e i pulsanti di cosa fare, uguali nella shell (Tenant, Plugin, Gruppi, Richieste di accesso, Condivisioni, Cestino, Notifiche) e nelle app; un filtro senza risultati mostra un piccolo messaggio con il link per azzerarlo.
 - Documenti: l'elenco e il pannello dei dettagli sono un unico blocco piatto; la barra dei file selezionati mostra solo le icone (il nome compare come tooltip); il pannello non scorre più in orizzontale; i PDF si vedono nel pannello e nel visualizzatore grazie all'app stessa, quindi funzionano in ogni browser. Le barre di scorrimento sono sottili come quelle di Mosaikit in tutte le app.
+- Documenti: una cartella con molti file si apre subito: l'elenco e la griglia mostrano 100 elementi alla volta e gli altri arrivano scorrendo (in fondo il piè di lista dice «N di N elementi»). Ctrl+A, la selezione con Maiusc e i tasti freccia valgono per tutta la cartella.
 
 ### Persone e tenant
 

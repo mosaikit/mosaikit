@@ -100,4 +100,36 @@ test.describe.serial('17-documents-preview', () => {
     expect(over.sw).toBeLessThanOrEqual(over.cw)
     expect(over.btn).toBe(0)
   })
+
+  test('a folder with more than 100 files is drawn a page at a time (infinite scroll), the selection keeps to all of it', async ({ page }) => {
+    test.setTimeout(180_000)
+    await login(page, 'Docs Co', 'mgr', PASSWORD)
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.goto('./#/t/docsco/p/com.mosaikit.files')
+    const frame = page.frameLocator('iframe.plugin-frame')
+    await frame.locator('input[type="file"]').setInputFiles(Array.from({ length: 110 }, (_, i) => ({ name: `page-${String(i).padStart(3, '0')}.txt`, mimeType: 'text/plain', buffer: Buffer.from('x') })))
+    const rows = frame.locator('.fm-table tbody tr.it')
+    const count = frame.locator('.fm-foot .msk-count')
+    // the first page only, with its foot
+    await expect(count).toHaveText(/^100 of \d+ items$/)
+    const total = Number(/of (\d+) items/.exec((await count.textContent())!)![1])
+    expect(total).toBeGreaterThan(110)
+    await expect(rows).toHaveCount(100)
+    // scrolling to the end brings the next page, then «N of N» and no more button
+    await frame.locator('.fm-table tbody').evaluate((e) => (e.scrollTop = e.scrollHeight))
+    await expect(rows).toHaveCount(total)
+    await expect(count).toHaveText(`${total} of ${total} items`)
+    await expect(frame.locator('.fm-foot button')).toHaveCount(0)
+    // Ctrl+A selects the whole folder, also after a page that was not drawn
+    await rows.first().click()
+    await page.keyboard.press('Control+a')
+    await expect(frame.locator('.fm-bar .count')).toHaveText(`${total} items selected`)
+    // the grid view draws pages too
+    await page.keyboard.press('Escape')
+    await frame.getByRole('button', { name: /Grid/ }).first().click()
+    await expect(frame.locator('.fm-card')).toHaveCount(100)
+    await expect(frame.locator('.fm-foot .msk-count')).toHaveText(`100 of ${total} items`)
+    await frame.locator('.fm-main').evaluate((e) => (e.scrollTop = e.scrollHeight))
+    await expect(frame.locator('.fm-card')).toHaveCount(total)
+  })
 })

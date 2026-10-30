@@ -196,6 +196,31 @@ const checks: L.Check[] = [
       return c.result()
     },
   },
+  {
+    id: 'TBL-09',
+    async run(ctx: any) {
+      const c = H.checker()
+      const p = await L.as(ctx, 'e.ricci')
+      await p.setViewportSize({ width: 1440, height: 900 })
+      await H.go(p, '#/t/comune-roma/p/com.mosaikit.files')
+      await p.waitForTimeout(1500)
+      const f = p.frameLocator('iframe.plugin-frame')
+      await f.locator('input[type="file"]').setInputFiles(Array.from({ length: 120 }, (_, i) => ({ name: `tbl09-${String(i).padStart(3, '0')}.txt`, mimeType: 'text/plain', buffer: Buffer.from('x') })))
+      const rows = f.locator('.fm-table tbody tr.it')
+      const count = f.locator('.fm-foot .msk-count')
+      await count.waitFor({ timeout: 20000 })
+      c.ok(/^100 of \d+ items$/.test((await count.textContent()) ?? ''), 'only the first page of 100 rows is drawn, with «100 of N items»')
+      c.ok((await rows.count()) === 100, 'a hundred rows in the table')
+      await f.locator('.fm-table tbody').evaluate((e: HTMLElement) => (e.scrollTop = e.scrollHeight))
+      await p.waitForTimeout(800)
+      const total = await rows.count()
+      c.ok(total > 100 && (await f.locator('.fm-foot button').count()) === 0, 'scrolling to the end draws the rest, and the foot is only «N of N»')
+      await rows.first().click()
+      await p.keyboard.press('Control+a')
+      c.ok(((await f.locator('.fm-bar .count').textContent()) ?? '').startsWith(`${total} `), 'Ctrl+A selects every file of the folder')
+      return c.result()
+    },
+  },
 ]
 
 export default checks

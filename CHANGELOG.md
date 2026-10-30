@@ -26,6 +26,7 @@ in step).
 - Notes have tags of your own, each with its own colour: create, rename, recolour and delete them from the Tags button (deleting a tag removes it from your notes), and filter the notes by tag.
 - Pages and lists with nothing in them show an illustration with a title, a short line and the buttons of what to do, the same in the shell (Tenants, Plugins, Groups, Access requests, Shares, Trash, Notifications) and in the apps; a filter that matches nothing shows a small message with a link to clear it.
 - Documents: the list and the details panel are one flat block; the bar of the selected files shows only icons (the name appears as a tooltip); the panel no longer scrolls sideways; PDF files are shown in the panel and in the viewer by the app itself, so they work in every browser. Scrollbars are as thin as those of Mosaikit in every app.
+- Documents: a folder with many files opens at once: the list and the grid draw 100 items at a time and the next ones come as you scroll (the foot reads «N of N items» at the end). Ctrl+A, Shift selection and the arrow keys work on the whole folder.
 
 ### People and tenants
 
