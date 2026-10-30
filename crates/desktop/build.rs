@@ -30,6 +30,9 @@ fn main() {
     };
     let name = std::env::var("MOSAIKIT_PRODUCT_NAME").unwrap_or_else(|_| "Mosaikit".into());
     let version = std::env::var("MOSAIKIT_PRODUCT_VERSION").ok();
+    // only the Windows resource compiler uses them (cross-compiling from another host skips it)
+    #[cfg(not(windows))]
+    let _ = (&path, &name, &version);
     #[cfg(windows)]
     {
         let mut res = winresource::WindowsResource::new();
