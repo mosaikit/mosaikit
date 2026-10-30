@@ -7,6 +7,10 @@ in step).
 
 ## 1.0.0
 
+### Distributions
+
+- A distribution can ship sidecars (`[[sidecars]]` in `distribution.toml`): extra processes next to the app. The desktop app starts them before the kernel (with a progress message, a timeout and a clear error if one cannot start), restarts them according to their policy, logs their output and stops them after the kernel; the Docker and Kubernetes releases add a service for each. Their addresses are allowed for the plugins' fetches automatically.
+
 ### The shell
 
 - The lists and cards that were left with a bare line when empty (the two lists of Manage › Pending, Home without apps, usage, backups, log and overview widgets, members of a group) now show an illustration with a title and the action, in a small version inside a widget or a section.

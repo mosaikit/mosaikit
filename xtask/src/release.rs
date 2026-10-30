@@ -132,9 +132,40 @@ pub fn bundle(out: &Path, skip_ui: bool, flavor: Flavor) -> Result<()> {
     let trusted = std::fs::read_to_string(out.join("registry").join("trusted_key.txt"))?;
     std::fs::write(out.join("mosaikit.toml"), config(flavor, trusted.trim(), brand.is_some()))?;
     std::fs::copy(root().join("mosaikit.example.toml"), out.join("mosaikit.example.toml"))?;
+    // --- sidecars ---
+    if flavor == Flavor::Desktop {
+        bundle_sidecars(out)?;
+    }
+    // --- end sidecars ---
     eprintln!("bundle ready in {}", out.display());
     Ok(())
 }
+
+// --- sidecars ---
+/// Desktop bundle: executables of the sidecars in `sidecars/<name>/` and `sidecars.toml` for the launcher.
+fn bundle_sidecars(out: &Path) -> Result<()> {
+    let d = crate::dist::current();
+    if d.sidecars.is_empty() {
+        return Ok(());
+    }
+    crate::sidecars::check_desktop(&d.sidecars, &d.dir)?;
+    for s in &d.sidecars {
+        let Some(c) = &s.command else { continue };
+        let src = d.dir.join(crate::sidecars::bundle_source(c));
+        let dest = out.join("sidecars").join(&s.name);
+        std::fs::create_dir_all(&dest)?;
+        if src.is_dir() {
+            copy_dir(&src, &dest)?;
+        } else {
+            let file = crate::sidecars::resolve_command(&d.dir, c).context("sidecar executable")?;
+            std::fs::copy(&file, dest.join(file.file_name().context("file name")?))?;
+        }
+    }
+    std::fs::write(out.join("sidecars.toml"), crate::sidecars::desktop_toml(&d.sidecars)?)?;
+    eprintln!("{} sidecar(s) copied", d.sidecars.len());
+    Ok(())
+}
+// --- end sidecars ---
 
 /// .ico file of the brand of the distribution (property `icon` of brand.toml).
 fn brand_icon(d: &crate::dist::Distribution) -> Option<PathBuf> {
@@ -282,6 +313,7 @@ pub fn docker(tag: Option<String>) -> Result<()> {
         bail!("docker not found");
     }
     let d = crate::dist::current();
+    crate::sidecars::check_containers(&d.sidecars)?;
     // build context: mosaikit, the plugin folders and the distribution, copied
     // (without builds, dependencies and data) into a temporary folder with the same
     // relative layout they have locally
@@ -345,7 +377,14 @@ pub fn docker(tag: Option<String>) -> Result<()> {
     for d in ["keycloak", "nginx"] {
         copy_dir(&root().join("deploy").join(d), &out.join(d))?;
     }
-    std::fs::write(out.join(".env"), docker_env(img, ver, &pg))?;
+    let mut env_text = docker_env(img, ver, &pg);
+    // --- sidecars ---
+    if !d.sidecars.is_empty() {
+        std::fs::write(out.join("compose.sidecars.yml"), crate::sidecars::compose(&d.sidecars))?;
+        env_text.push_str(&crate::sidecars::compose_env(&d.sidecars));
+    }
+    // --- end sidecars ---
+    std::fs::write(out.join(".env"), env_text)?;
     let tar = format!("{}-{}-image.tar", d.product.id, d.product.version);
     eprintln!("saving the image in {}", out.join(&tar).display());
     run(Command::new("docker").args(["save", "-o"]).arg(out.join(&tar)).arg(&tag))?;
@@ -401,7 +440,8 @@ fn k8s_dir(image: &str, version: &str) -> Result<PathBuf> {
         std::fs::write(&dest, render(&std::fs::read_to_string(&path)?, &vars))?;
     }
     copy_dir(&root().join("deploy").join("initdb"), &out.join("initdb"))?;
-    // check of the manifests, if kubectl is there (kustomize included, no cluster required)
+    crate::sidecars::apply_k8s(&out, &d.sidecars, &d.product.id)?; // sidecars
+                                                                   // check of the manifests, if kubectl is there (kustomize included, no cluster required)
     if which("kubectl").is_some() {
         let o = Command::new("kubectl").arg("kustomize").arg(&out).output()?;
         if !o.status.success() {

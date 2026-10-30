@@ -24,6 +24,10 @@ pub struct Distribution {
     pub docker: Docker,
     #[serde(default)]
     pub tests: Tests,
+    // --- sidecars: see sidecars.rs ---
+    #[serde(default)]
+    pub sidecars: Vec<crate::sidecars::Sidecar>,
+    // --- end sidecars ---
     /// folder of the file (to resolve relative paths)
     #[serde(skip)]
     pub dir: PathBuf,
@@ -124,6 +128,10 @@ impl Distribution {
         d.plugins.roots = d.plugins.roots.iter().map(abs).collect();
         d.brand.dir = d.brand.dir.as_ref().map(abs);
         d.tests.cargo = d.tests.cargo.iter().map(abs).collect();
+        // --- sidecars ---
+        crate::sidecars::validate(&d.sidecars, d.desktop.port)
+            .with_context(|| format!("{}", file.display()))?;
+        // --- end sidecars ---
         Ok(d)
     }
 

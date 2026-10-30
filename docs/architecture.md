@@ -1639,7 +1639,8 @@ A **distribution** is a product based on Mosaikit, described by
 - `[plugins]`: plugin folders (`roots`) and included plugins (`include`);
 - `[desktop]`: database and port;
 - `[docker]`: image of the app and PostgreSQL image;
-- `[tests] cargo`: integration tests of its own.
+- `[tests] cargo`: integration tests of its own;
+- `[[sidecars]]`: extra processes or services shipped next to the kernel (see 14.0 below).
 
 Mosaikit itself is the default distribution. `cargo xtask --dist <folder>`
 uses it for development, tests and release. The kernel does not change: brand and
@@ -1658,6 +1659,36 @@ theme (`#rrggbb` only, turned into CSS variables). How it applies:
 The dependency goes one way only: the distribution refers to Mosaikit
 (SDK, `@mosaikit/plugin-api`, kernel for the tests, xtask for build and release),
 Mosaikit refers to no distribution.
+
+### 14.0 Sidecars
+
+A sidecar is a process or service a distribution ships next to the kernel (for example a native service
+the plugins call over HTTP). Keys of `[[sidecars]]`: `name` (unique, lower case, `-`), `command`
+(executable relative to the distribution; desktop), `args`, `env` (a value `env:NAME` is read from the
+variable NAME: environment of the launcher, `.env` of Compose, secret of Kubernetes), `health` (`"tcp"` or
+an HTTP path, needs `port`), `port` (1024-65535, not the ports of the app), `image`, `volumes`
+(`name:/path[:ro]`), `depends_on` (other sidecars, no cycles), `restart` (`never`, `on-failure` default,
+`always`) and `start_timeout_secs` (default 30). Every entry needs `command` and/or `image`; the release
+of a target checks the one it needs. The section is validated whenever the distribution is loaded
+(so `cargo xtask ci` and every command check it); `cargo xtask sidecars` prints what each target gets.
+
+- **Desktop**: `release desktop` copies the executables (the first folder of `command`, or the file) into
+  `sidecars/<name>/` and writes `sidecars.toml` next to the executable. The launcher
+  (`crates/desktop/src/sidecar.rs`) starts the sidecars in dependency order BEFORE the kernel, waits for
+  each health check (progress in the splash window; clear errors for a missing executable, an unset
+  `env:` variable, an exit before ready and a timeout), supervises them with the restart policy (pause
+  that grows, gives up after 5 restarts in a minute), writes their output to
+  `<data_dir>/logs/sidecar-<name>.log` and stops them AFTER the kernel, in reverse order (a hard kill: a
+  sidecar must tolerate it). They also receive `MOSAIKIT_SIDECAR_NAME` and `MOSAIKIT_SIDECAR_PORT`.
+- **Docker**: `release docker` writes `compose.sidecars.yml` (a service per sidecar with image, env,
+  volumes, healthcheck; the `app` service depends on them) and sets `COMPOSE_FILE` in `.env` to merge it
+  with `compose.yml`. Healthchecks use `wget`, `curl` or `nc` of the image.
+- **Kubernetes**: `release k8s` adds `sidecars.yaml` (a Deployment and a Service per sidecar, a PVC per
+  named volume, probes from `health`) to the kustomization; `env:NAME` becomes a key of the secret.
+- **Addresses for the plugins**: a sidecar with a `port` is added to
+  `MOSAIKIT_ALLOW_PRIVATE_FETCH_HOSTS` (the exact `host:port` list of private hosts the plugins may
+  fetch, comma separated): `127.0.0.1:<port>` set by the launcher before the configuration is read,
+  `<name>:<port>` in `compose.sidecars.yml` (overridable from `.env`) and in `config.env` of Kubernetes.
 
 ### 14.1 Layouts and style
 

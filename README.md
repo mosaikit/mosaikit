@@ -214,7 +214,23 @@ postgres_image = "postgis/postgis:17-3.5-alpine"
 
 [tests]
 cargo = ["tests"]           # integration tests of the distribution
+
+[[sidecars]]                # optional: extra processes next to the kernel
+name = "geo"
+command = "bin/geo-service"             # desktop: copied into the bundle, started before the kernel
+args = ["--listen", "127.0.0.1:9100"]
+env = { TOKEN = "env:GEO_TOKEN" }       # env:NAME = read from the environment
+health = "/health"                      # or "tcp"
+port = 9100                             # also added to MOSAIKIT_ALLOW_PRIVATE_FETCH_HOSTS
+image = "registry.example.com/geo:1"    # Docker and Kubernetes releases
+volumes = ["geodata:/data"]
+restart = "on-failure"                  # never | on-failure | always
 ```
+
+Sidecars: the desktop launcher starts them before the kernel and stops them after it (output in
+`data\logs\sidecar-<name>.log`), `release docker` adds a Compose service each (`compose.sidecars.yml`),
+`release k8s` a Deployment and a Service. `cargo xtask sidecars` validates the section and shows the result;
+details in [architecture 14](docs/architecture.md).
 
 Every xtask command accepts `--dist <folder>` (or `MOSAIKIT_DIST`); without it,
 it uses the distribution of Mosaikit (`distribution.toml` here).

@@ -6,6 +6,10 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
 ## 1.0.0
 
+### Le distribuzioni
+
+- Una distribuzione può includere dei sidecar (`[[sidecars]]` in `distribution.toml`): processi aggiuntivi accanto all'app. L'app desktop li avvia prima del kernel (con un messaggio di avanzamento, un tempo massimo e un errore chiaro se uno non parte), li riavvia secondo la loro politica, ne registra l'output e li ferma dopo il kernel; le release Docker e Kubernetes aggiungono un servizio per ciascuno. I loro indirizzi sono consentiti automaticamente per le richieste dei plugin.
+
 ### La shell
 
 - Le liste e le schede rimaste con una riga spoglia quando sono vuote (le due liste di Gestione › In attesa, Home senza app, consumi, backup, log e widget della panoramica, membri di un gruppo) ora mostrano un'illustrazione con titolo e azione, in versione piccola dentro un widget o una sezione.
