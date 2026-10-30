@@ -71,4 +71,5 @@ jobs:
           name: e2e-results
           path: |
             mosaikit/tests/e2e/test-results
-            mosaikit/.dev/e2e/*.log
+            mosaikit/tests/e2e/test-results-wildcard
+            mosaikit/.dev/e2e*/*.log

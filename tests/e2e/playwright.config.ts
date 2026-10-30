@@ -7,6 +7,7 @@ const channel = process.env.E2E_CHANNEL ?? (process.platform === 'win32' ? 'msed
 
 export default defineConfig({
   testDir: './specs',
+  outputDir: process.env.E2E_OUTPUT_DIR ?? 'test-results',
   timeout: 90_000,
   expect: { timeout: 15_000 },
   // the scenario with one origin per plugin needs another installation: `cargo xtask e2e` runs it apart (E2E_WILDCARD=1)
