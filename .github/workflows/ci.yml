@@ -12,8 +12,33 @@ concurrency:
 
 # mosaikit and mosaikit-plugins stay side by side as locally:
 #   $GITHUB_WORKSPACE/mosaikit, $GITHUB_WORKSPACE/mosaikit-plugins
+#
+# Jobs run in parallel and can be re-run one by one ("Re-run failed jobs"). The last job, `ci`,
+# is the one the branch protection requires: it passes when every other job passed or was skipped.
 jobs:
-  ci:
+  changes:
+    # a change of documentation only skips the heavy jobs
+    runs-on: ubuntu-latest
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: diff
+        run: |
+          code=true
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            if ! git diff --name-only "${{ github.event.pull_request.base.sha }}" HEAD | grep -qvE '^(docs/|CHANGELOG(\.it)?\.md$|README(\.it)?\.md$|LICENSE$)'; then
+              code=false
+            fi
+          fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+
+  backend:
+    # fmt, clippy, typecheck, lint, build, test (PostgreSQL and SQLite), cargo-deny
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     services:
       postgres:
@@ -44,6 +69,7 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
+          shared-key: backend
           workspaces: |
             mosaikit
             mosaikit-plugins
@@ -61,6 +87,55 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - name: fmt, clippy, typecheck, lint, build, test (PostgreSQL and SQLite)
         run: cargo xtask ci
+
+  e2e:
+    # the browser suite in four shards; a failed shard is re-run alone
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      MOSAIKIT_TEST_DATABASE_URL: postgres://mosaikit_dev:mosaikit_dev@127.0.0.1:5432/postgres
+      CARGO_TERM_COLOR: always
+    defaults:
+      run:
+        working-directory: mosaikit
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: mosaikit
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/mosaikit-plugins
+          path: mosaikit-plugins
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: e2e
+          workspaces: |
+            mosaikit
+            mosaikit-plugins
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: test role (CREATEDB, CREATEROLE) and PostGIS in the template
+        run: |
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -c "create role mosaikit_dev login createdb createrole password 'mosaikit_dev'"
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d template1 -c "create extension if not exists postgis"
+      - run: npm ci --no-audit --no-fund
       - name: browser and PostgreSQL 17 client
         run: |
           npx playwright install --with-deps chromium
@@ -69,15 +144,86 @@ jobs:
           sudo apt-get install -y postgresql-client-17
           # pg_dump of the backups must match the server (PostGIS 17 above): the wrapper of the runner picks 16
           echo /usr/lib/postgresql/17/bin >> "$GITHUB_PATH"
-      - name: test end-to-end (Playwright)
+      - name: test end-to-end (Playwright), shard ${{ matrix.shard }}/4
         run: |
           pg_dump --version
-          E2E_CHANNEL=chromium cargo xtask e2e
+          E2E_CHANNEL=chromium cargo xtask e2e -- --shard=${{ matrix.shard }}/4
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: e2e-results
+          name: e2e-results-${{ matrix.shard }}
           path: |
             mosaikit/tests/e2e/test-results
+            mosaikit/.dev/e2e*/*.log
+
+  e2e-wildcard:
+    # the installation with one origin per plugin
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:17-3.5
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      MOSAIKIT_TEST_DATABASE_URL: postgres://mosaikit_dev:mosaikit_dev@127.0.0.1:5432/postgres
+      CARGO_TERM_COLOR: always
+    defaults:
+      run:
+        working-directory: mosaikit
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: mosaikit
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ github.repository_owner }}/mosaikit-plugins
+          path: mosaikit-plugins
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: e2e
+          workspaces: |
+            mosaikit
+            mosaikit-plugins
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: test role (CREATEDB, CREATEROLE) and PostGIS in the template
+        run: |
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -c "create role mosaikit_dev login createdb createrole password 'mosaikit_dev'"
+          PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d template1 -c "create extension if not exists postgis"
+      - run: npm ci --no-audit --no-fund
+      - name: browser and PostgreSQL 17 client
+        run: |
+          npx playwright install --with-deps chromium
+          sudo apt-get install -y postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y postgresql-client-17
+          echo /usr/lib/postgresql/17/bin >> "$GITHUB_PATH"
+      - name: test end-to-end (Playwright), one origin per plugin
+        run: E2E_CHANNEL=chromium cargo xtask e2e --wildcard
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: e2e-results-wildcard
+          path: |
             mosaikit/tests/e2e/test-results-wildcard
             mosaikit/.dev/e2e*/*.log
+
+  ci:
+    # the check the branch protection requires
+    needs: [changes, backend, e2e, e2e-wildcard]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: every job passed or was skipped
+        run: |
+          echo '${{ toJSON(needs) }}' | grep -E '"result": "(failure|cancelled)"' && exit 1
+          exit 0
