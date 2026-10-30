@@ -960,7 +960,7 @@ export function PluginAccessPage({ slug, plugin }: { slug: string; plugin: strin
         </Card>
         <section className="grid gap-2" aria-label={t('Profiles')}>
           <h2 className="text-sm font-semibold">{t('Profiles')}</h2>
-          <div className="overflow-x-auto rounded-xl border bg-card">
+          <div className="msk-matrix rounded-xl border bg-card">
             <Table>
               {head}
               <TableBody>
@@ -1007,7 +1007,7 @@ export function PluginAccessPage({ slug, plugin }: { slug: string; plugin: strin
           {Object.keys(G).length === 0 ? (
             <p className="rounded-xl border bg-card p-4 text-sm text-muted-foreground">{t('No group or person has more than their profile.')}</p>
           ) : (
-            <div className="overflow-x-auto rounded-xl border bg-card">
+            <div className="msk-matrix rounded-xl border bg-card">
               <Table>
                 {head}
                 <TableBody>

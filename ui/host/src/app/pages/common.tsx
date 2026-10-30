@@ -344,7 +344,7 @@ function NotificationPrefs() {
               </Select>
             </div>
           </div>
-          <div className="overflow-hidden rounded-lg border">
+          <div className="msk-matrix rounded-lg border">
             <Table>
               <TableHeader>
                 <TableRow>

@@ -1996,4 +1996,7 @@ export const IT: Record<string, string> = {
   'Items you share with people, groups or a public link appear here.': 'Gli elementi che condividi con persone, gruppi o con un link pubblico compaiono qui.',
   'Requests to see or edit an item wait here until they are answered.': 'Le richieste di vedere o modificare un elemento restano qui finché non ricevono risposta.',
   'Nothing found in the trash': 'Nulla trovato nel cestino',
+  'Items of the backup': 'Elementi del backup',
+  'Rows of the file': 'Righe del file',
+  'Result of every row': 'Esito di ogni riga',
 }

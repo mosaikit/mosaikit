@@ -240,18 +240,20 @@ export function HelpLayer({ route, search }: { route: Route; search: boolean }) 
         <WhatsNew version={brand.version} />
       </HelpDialog>
       <HelpDialog open={open === 'shortcuts'} title={t('Keyboard shortcuts')} description={t('Outside the fields where you type.')}>
+        <div className="overflow-x-auto rounded-xl border bg-card" data-static-table>
         <table className="w-full text-sm">
           <tbody>
             {SHORTCUTS.filter((s) => search || s.action !== 'search').map((s) => (
               <tr key={s.keys.join('+')} className="border-b last:border-0">
-                <td className="py-2 pr-4">
+                <td className="px-3 py-2">
                   <Keys keys={s.keys} />
                 </td>
-                <td className="py-2">{t(s.label)}</td>
+                <td className="px-3 py-2">{t(s.label)}</td>
               </tr>
             ))}
           </tbody>
         </table>
+        </div>
       </HelpDialog>
     </>
   )

@@ -40,10 +40,12 @@ const RULES: Record<string, string> = {
   'R-12': 'no row is painted over or above the header row of a table, wherever the list is scrolled',
 }
 
-/** Tables that are deliberately NOT drawn as a scrolling list (route pattern -> why): small matrices that are edited in place. */
+/** Tables that are deliberately NOT drawn as a scrolling list (route pattern -> why): small matrices and input grids edited in
+ *  place. They are not lists of records (no filter, no sort, no infinite scroll) but they speak the same visual language: the
+ *  table sits in `.msk-matrix` (same header style and border, sticky header row and first column, scrollbars only when needed). */
 const TABLE_EXEMPT: { route: RegExp; why: string }[] = [
   { route: /\/permissions|\/profiles/, why: 'permission matrix: a fixed set of rows with a checkbox per permission, edited in place' },
-  { route: /\/system\/quotas/, why: 'the capacity of the platform: five fixed rows of inputs, edited in place' },
+  { route: /\/system\/quotas/, why: 'the capacity of the platform: five fixed rows of inputs, edited in place (an input grid, not a list)' },
   { route: /\/account\/notifications|\/notifications\/settings/, why: 'notification matrix: a fixed set of kinds with two switches' },
 ]
 
@@ -80,7 +82,7 @@ interface Probe {
   ctrls: { tag: string; type: string; text: string; primary: boolean; r: Rect }[]
   sections: { r: Rect; selected: string; overflowY: string; scrollH: number; clientH: number } | null
   tabs: boolean
-  table: { rows: number; scroller: Rect | null; stickyHead: boolean; docScroll: boolean; grid: boolean; headB: number | null; bodyT: number | null; sortable: number; search: boolean; overlap: string[]; footInside: boolean } | null
+  table: { rows: number; scroller: Rect | null; stickyHead: boolean; docScroll: boolean; grid: boolean; headB: number | null; bodyT: number | null; sortable: number; search: boolean; overlap: string[]; footInside: boolean; matrix: boolean } | null
   // after scrolling every scrollable element of the page to its end
   scrolled: { header: number | null; pills: number | null; sections: number | null; thead: number | null; pillsAfter: number | null; theadAfter: number | null } | null
   more: { present: boolean; loaded: boolean } | null
@@ -198,6 +200,7 @@ async function probe(doc: Page | Frame, o: { scroll: boolean; more: boolean }): 
             sortable: tableEl.querySelectorAll('thead th[aria-sort]').length,
             search: !!q('#main input[type="search"], .msk-headwrap input[type="search"], .msk-filter'),
             overlap: [] as string[],
+            matrix: !!tableEl.closest('.msk-matrix'),
             footInside: !bodyEl || !q('[data-foot], .msk-morebar', tableEl) || !!bodyEl.querySelector('[data-foot], .msk-morebar'),
           }
         : null,
@@ -622,7 +625,12 @@ function judge(rule: string, r: Rec, all: Rec[]): string[] {
       const t = inner.table
       if (!t) break
       const ex = TABLE_EXEMPT.find((e) => e.route.test(r.route))
-      if (ex) break
+      if (ex) {
+        // an exempt matrix still wears the look of the list tables
+        if (!t.matrix) out.push(`the exempt table (${ex.why}) is not drawn as a matrix (.msk-matrix)`)
+        else if (!t.stickyHead) out.push('the header row of the matrix is not sticky')
+        break
+      }
       if (!t.grid) out.push('the rows do not scroll by themselves under a fixed header row (not the grid table pattern)')
       else {
         if (t.headB != null && t.bodyT != null && t.bodyT < t.headB - 1) out.push(`the scrollbar of the rows starts above the end of the header row (${Math.round(t.bodyT)} < ${Math.round(t.headB)})`)

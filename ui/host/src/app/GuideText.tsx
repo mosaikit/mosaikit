@@ -78,12 +78,13 @@ function render(blocks: Block[], onGuide?: (name: string) => void): ReactNode[] 
       )
     }
     return (
-      <div key={i} className="mt-3 overflow-x-auto">
+      // a small static table of the text of a guide (not a list of records): plain, in the look of the list tables
+      <div key={i} className="mt-3 overflow-x-auto rounded-xl border bg-card" data-static-table>
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr>
               {b.head.map((c, j) => (
-                <th key={j} className="border-b px-2 py-1.5 text-left font-semibold">
+                <th key={j} className="h-10 border-b px-3 text-left font-medium">
                   {inline(c, onGuide)}
                 </th>
               ))}
@@ -93,7 +94,7 @@ function render(blocks: Block[], onGuide?: (name: string) => void): ReactNode[] 
             {b.rows.map((r, j) => (
               <tr key={j} className="align-top">
                 {r.map((c, k) => (
-                  <td key={k} className="border-b px-2 py-1.5">
+                  <td key={k} className="border-b px-3 py-2 [tr:last-child>&]:border-0">
                     {inline(c, onGuide)}
                   </td>
                 ))}

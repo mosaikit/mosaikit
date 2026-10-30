@@ -190,7 +190,7 @@ export function PlatformQuotasPanel() {
               </span>
             </div>
           )}
-          <div className="overflow-x-auto rounded-xl border">
+          <div className="msk-matrix rounded-xl border">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -394,23 +394,18 @@ function TrendChart({ m, days, limit }: { m: QuotaMetric; days: QuotaDay[]; limi
         </div>
         <details>
           <summary className="cursor-pointer text-xs text-muted-foreground">{t('Show as a table')}</summary>
-          <div className="mt-2 max-h-56 overflow-auto rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('Day')}</TableHead>
-                  <TableHead className="text-right">{metricLabel(m)}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {days.map((d) => (
-                  <TableRow key={d.day}>
-                    <TableCell className="tabular-nums">{d.day}</TableCell>
-                    <TableCell className="text-right tabular-nums">{fmtQuota(m, d[m])}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <div className="mt-2">
+            <ListTable
+              fit="inline"
+              rows={days}
+              rowKey={(d) => d.day}
+              label={t('Show as a table')}
+              initialSort={{ key: 'day', dir: -1 }}
+              columns={[
+                { key: 'day', title: t('Day'), sort: (d) => d.day, cell: (d) => <span className="tabular-nums">{d.day}</span> },
+                { key: 'value', title: metricLabel(m), align: 'right', sort: (d) => d[m], text: (d) => fmtQuota(m, d[m]), cell: (d) => fmtQuota(m, d[m]) },
+              ]}
+            />
           </div>
         </details>
       </CardContent>

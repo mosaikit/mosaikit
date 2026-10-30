@@ -47,6 +47,18 @@ const checks: L.Check[] = [
           }
         }
       }
+      // the matrices keep their grid but wear the look of the tables: sticky header row and first column
+      await p.setViewportSize({ width: 1440, height: 900 })
+      await H.go(p, '#/admin/system/quotas')
+      await p.waitForTimeout(1200)
+      const mx = await p.evaluate(() => {
+        const t = document.querySelector('#main .msk-matrix table') as HTMLElement | null
+        if (!t) return null
+        const th = t.querySelector('thead th') as HTMLElement
+        const td = t.querySelector('tbody td') as HTMLElement
+        return { head: getComputedStyle(th).position, first: getComputedStyle(td).position }
+      })
+      c.ok(mx?.head === 'sticky' && mx.first === 'sticky', `the quota capacity grid is a matrix with sticky header row and first column: ${JSON.stringify(mx)}`)
       await p.setViewportSize({ width: 1440, height: 900 })
       return c.result()
     },

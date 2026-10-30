@@ -15,11 +15,10 @@ import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { Table, TableBody, TableCell, TableRow } from '@/components/ui/table'
 import { useAction, useApi, useConfirm } from '../core.ts'
 import AppIcon from '../AppIcon.tsx'
 import { Brochure, PluginSummary } from './brochure.tsx'
-import { Empty, ErrorBox, FormDialog, Loading, PageHeader, Pills, SaveBar, StatusBadge, Sliced, Tabs, FillBody, FillPage } from '../kit.tsx'
+import { Empty, ErrorBox, FormDialog, Loading, PageHeader, Pills, SaveBar, StatusBadge, Tabs, FillBody, FillPage } from '../kit.tsx'
 import { CardGrid, FilterBox, ListTable, SortMenu, ViewSwitch } from '../ListTable.tsx'
 import { applyView, useView, type Col, type Sort } from '../tableutil.ts'
 import { go, to } from '../router.ts'
@@ -787,46 +786,60 @@ function PluginExtensions({ name, installed, catalog }: { name: string; installe
     ok: t('Plugin installed'),
     invalidate: [['admin-plugins'], ['admin-catalog']],
   })
+  const rows = [
+    ...installed.map((e) => ({ id: e.id, name: e.label, description: '', version: e.version, e })),
+    ...catalog.map((e) => ({ id: e.id, name: e.name, description: e.description, version: e.latest, e: undefined as AdminPlugin | undefined })),
+  ]
   return (
     <div className="grid gap-4">
       <p className="text-sm text-muted-foreground">{t('Extensions add fields and actions to {name}. They work in a tenant only where {name} is on.', { name })}</p>
       {installed.length === 0 && catalog.length === 0 ? (
         <Empty icon={<Puzzle />} title={t('No extensions')} />
       ) : (
-        <div className="overflow-x-auto rounded-xl border bg-card">
-          <Sliced items={installed}>{(shown) => (<Table>
-            <TableBody>
-              {shown.map((e) => (
-                <TableRow key={e.id}>
-                  <TableCell>
-                    <a href={to.adminPlugin(e.id)} className="flex items-center gap-2.5 hover:underline">
-                      <AppIcon id={e.id} name={e.icon_name} className="size-5 text-primary" />
-                      <b className="font-medium">{e.label}</b>
-                    </a>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">{e.version}</TableCell>
-                  <TableCell>
-                    <StatusBadge status={e.status} />
-                  </TableCell>
-                </TableRow>
-              ))}
-              {catalog.map((e) => (
-                <TableRow key={e.id}>
-                  <TableCell>
-                    <b className="font-medium">{e.name}</b>
-                    <span className="block text-xs text-muted-foreground">{e.description}</span>
-                  </TableCell>
-                  <TableCell className="font-mono text-xs">{e.latest}</TableCell>
-                  <TableCell className="text-right">
-                    <Button size="sm" variant="outline" disabled={install.isPending} onClick={() => install.mutate(e.id)}>
-                      {t('Install')}
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>)}</Sliced>
-        </div>
+        <ListTable
+          fit="inline"
+          rows={rows}
+          rowKey={(r) => r.id}
+          label={t('Extensions')}
+          searchLabel={t('Filter the list')}
+          columns={[
+            {
+              key: 'name',
+              title: t('Extension'),
+              width: 'minmax(10rem,3fr)',
+              sort: (r) => r.name,
+              text: (r) => `${r.name} ${r.description}`,
+              cell: (r) =>
+                r.e ? (
+                  <a href={to.adminPlugin(r.e.id)} className="flex items-center gap-2.5 hover:underline">
+                    <AppIcon id={r.e.id} name={r.e.icon_name} className="size-5 text-primary" />
+                    <b className="font-medium">{r.name}</b>
+                  </a>
+                ) : (
+                  <span>
+                    <b className="font-medium">{r.name}</b>
+                    <span className="block text-xs text-muted-foreground">{r.description}</span>
+                  </span>
+                ),
+            },
+            { key: 'version', title: t('Version'), width: '7rem', sort: (r) => r.version, cell: (r) => <span className="font-mono text-xs">{r.version}</span> },
+            {
+              key: 'state',
+              title: t('State'),
+              width: '9rem',
+              sort: (r) => (r.e ? r.e.status : 'available'),
+              text: (r) => (r.e ? r.e.status : ''),
+              cell: (r) =>
+                r.e ? (
+                  <StatusBadge status={r.e.status} />
+                ) : (
+                  <Button size="sm" variant="outline" disabled={install.isPending} onClick={() => install.mutate(r.id)}>
+                    {t('Install')}
+                  </Button>
+                ),
+            },
+          ]}
+        />
       )}
     </div>
   )

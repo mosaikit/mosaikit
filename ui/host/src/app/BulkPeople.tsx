@@ -11,11 +11,10 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { parseCsv, type ImportRow } from './csv.ts'
 import { t } from './i18n.ts'
-import { Sliced } from './kit.tsx'
+import { ListTable } from './ListTable.tsx'
 
 const enc = encodeURIComponent
 
@@ -36,29 +35,30 @@ function Report({ rows }: { rows: Outcome[] }) {
       <p role="status" className="text-sm">
         {t('{ok} done, {ko} not done', { ok, ko: rows.length - ok })}
       </p>
-      <div className="max-h-72 overflow-auto rounded-md border">
-        <Sliced items={rows}>{(shown) => (<Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('Row')}</TableHead>
-              <TableHead>{t('Person')}</TableHead>
-              <TableHead>{t('Result')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {shown.map((r) => (
-              <TableRow key={r.row}>
-                <TableCell className="tabular-nums">{r.row}</TableCell>
-                <TableCell className="font-mono text-xs">{r.who}</TableCell>
-                <TableCell className={r.ok ? 'text-ok' : 'text-destructive'}>
-                  {r.ok ? (r.link ? (r.emailed ? t('Created: the link to choose a password was emailed') : t('Created: give the person the link to choose a password')) : t('Done')) : errText(new ApiError(r.message, 400, r.code ?? undefined))}
-                  {r.ok && r.link && !r.emailed && <span className="block break-all font-mono text-[11px] text-muted-foreground">{r.link}</span>}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>)}</Sliced>
-      </div>
+      <ListTable
+        fit="inline"
+        rows={rows}
+        rowKey={(r) => r.row}
+        label={t('Result of every row')}
+        searchLabel={t('Filter the list')}
+        columns={[
+          { key: 'row', title: t('Row'), width: '4rem', sort: (r) => r.row, cell: (r) => <span className="tabular-nums">{r.row}</span> },
+          { key: 'who', title: t('Person'), width: 'minmax(8rem,1fr)', sort: (r) => r.who, cell: (r) => <span className="font-mono text-xs">{r.who}</span> },
+          {
+            key: 'result',
+            title: t('Result'),
+            width: 'minmax(12rem,2fr)',
+            sort: (r) => (r.ok ? 0 : 1),
+            text: (r) => (r.ok ? '' : errText(new ApiError(r.message, 400, r.code ?? undefined))),
+            cell: (r) => (
+              <span className={r.ok ? 'text-ok' : 'text-destructive'}>
+                {r.ok ? (r.link ? (r.emailed ? t('Created: the link to choose a password was emailed') : t('Created: give the person the link to choose a password')) : t('Done')) : errText(new ApiError(r.message, 400, r.code ?? undefined))}
+                {r.ok && r.link && !r.emailed && <span className="block break-all font-mono text-[11px] text-muted-foreground">{r.link}</span>}
+              </span>
+            ),
+          },
+        ]}
+      />
     </div>
   )
 }
@@ -108,30 +108,20 @@ export function ImportDialog({ slug, open, onOpenChange }: { slug: string; open:
               <Input id="csv-file" type="file" accept=".csv,text/csv" onChange={(e) => void e.target.files?.[0]?.text().then((x) => setRows(parseCsv(x)))} />
             </div>
             {rows && (
-              <div className="max-h-72 overflow-auto rounded-md border">
-                <Sliced items={rows}>{(shown) => (<Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t('Username')}</TableHead>
-                      <TableHead>{t('Name')}</TableHead>
-                      <TableHead>{t('Role')}</TableHead>
-                      <TableHead>{t('Groups')}</TableHead>
-                      <TableHead>{t('Check')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {shown.map((r, i) => (
-                      <TableRow key={i}>
-                        <TableCell className="font-mono text-xs">{r.username}</TableCell>
-                        <TableCell>{r.display_name}</TableCell>
-                        <TableCell>{r.role === 'tenant_manager' ? t('Tenant Manager') : t('User')}</TableCell>
-                        <TableCell className="text-xs">{r.groups.join(', ')}</TableCell>
-                        <TableCell className={r.problem ? 'text-destructive' : 'text-ok'}>{r.problem ?? t('OK')}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>)}</Sliced>
-              </div>
+              <ListTable
+                fit="inline"
+                rows={rows}
+                rowKey={(r) => rows.indexOf(r)}
+                label={t('Rows of the file')}
+                searchLabel={t('Filter the list')}
+                columns={[
+                  { key: 'username', title: t('Username'), sort: (r) => r.username, cell: (r) => <span className="font-mono text-xs">{r.username}</span> },
+                  { key: 'name', title: t('Name'), sort: (r) => r.display_name, cell: (r) => r.display_name },
+                  { key: 'role', title: t('Role'), sort: (r) => r.role, text: (r) => (r.role === 'tenant_manager' ? t('Tenant Manager') : t('User')), cell: (r) => (r.role === 'tenant_manager' ? t('Tenant Manager') : t('User')) },
+                  { key: 'groups', title: t('Groups'), sort: (r) => r.groups.join(', '), cell: (r) => <span className="text-xs">{r.groups.join(', ')}</span> },
+                  { key: 'check', title: t('Check'), sort: (r) => r.problem ?? '', text: (r) => r.problem ?? t('OK'), cell: (r) => <span className={r.problem ? 'text-destructive' : 'text-ok'}>{r.problem ?? t('OK')}</span> },
+                ]}
+              />
             )}
             {error && (
               <p role="alert" className="text-sm text-destructive">

@@ -38,7 +38,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Switch } from '@/components/ui/switch'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { passwordMin, useAction, useApi, useConfig, useConfirm } from '../core.ts'
@@ -940,48 +939,56 @@ function RestoreItemDialog({ backup, onOpenChange }: { backup: BackupInfo; onOpe
               <p className="text-sm text-muted-foreground">{t('No item of the backup matches.')}</p>
             ) : (
               <div className="max-h-[50vh] overflow-auto">
-                <Sliced items={items.data.items}>{(shown) => (<Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t('Title')}</TableHead>
-                      <TableHead>{t('App')}</TableHead>
-                      <TableHead>{t('Owner')}</TableHead>
-                      <TableHead>{t('State')}</TableHead>
-                      <TableHead className="text-right">
-                        <span className="sr-only">{t('Actions')}</span>
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {shown.map((it) => (
-                      <TableRow key={it.id}>
-                        <TableCell>
+                <ListTable
+                  fit="inline"
+                  rows={items.data.items}
+                  rowKey={(it) => it.id}
+                  label={t('Items of the backup')}
+                  searchLabel={t('Filter the items')}
+                  columns={[
+                    {
+                      key: 'title',
+                      title: t('Title'),
+                      width: 'minmax(10rem,2fr)',
+                      sort: (it) => it.title || it.kind,
+                      cell: (it) => (
+                        <>
                           {it.title || it.kind}
                           {it.children > 0 && <span className="text-xs text-muted-foreground"> · {t('{n} items inside', { n: String(it.children) })}</span>}
-                        </TableCell>
-                        <TableCell>{label(it.plugin_id)}</TableCell>
-                        <TableCell>{it.owner_name}</TableCell>
-                        <TableCell>
-                          <Badge variant={it.state === 'missing' ? 'secondary' : 'outline'}>{t(ITEM_STATE[it.state])}</Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            aria-label={t('Restore «{title}»', { title: it.title || it.kind })}
-                            onClick={() => {
-                              setMode('copy')
-                              setShares(false)
-                              setPending(it)
-                            }}
-                          >
-                            {t('Restore')}
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>)}</Sliced>
+                        </>
+                      ),
+                    },
+                    { key: 'app', title: t('App'), sort: (it) => label(it.plugin_id), cell: (it) => label(it.plugin_id) },
+                    { key: 'owner', title: t('Owner'), sort: (it) => it.owner_name, cell: (it) => it.owner_name },
+                    {
+                      key: 'state',
+                      title: t('State'),
+                      sort: (it) => t(ITEM_STATE[it.state]),
+                      cell: (it) => <Badge variant={it.state === 'missing' ? 'secondary' : 'outline'}>{t(ITEM_STATE[it.state])}</Badge>,
+                    },
+                    {
+                      key: 'actions',
+                      title: t('Actions'),
+                      hideTitle: true,
+                      width: '7rem',
+                      align: 'right',
+                      cell: (it) => (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          aria-label={t('Restore «{title}»', { title: it.title || it.kind })}
+                          onClick={() => {
+                            setMode('copy')
+                            setShares(false)
+                            setPending(it)
+                          }}
+                        >
+                          {t('Restore')}
+                        </Button>
+                      ),
+                    },
+                  ]}
+                />
                 {items.data.total > items.data.items.length && (
                   <p className="mt-2 text-xs text-muted-foreground">{t('The first {n} of {total}: narrow the search.', { n: String(items.data.items.length), total: String(items.data.total) })}</p>
                 )}
@@ -1173,31 +1180,23 @@ function LineChart({ points, series, unit, label }: { points: MetricPoint[]; ser
       {points.length > 0 && (
         <details className="text-sm">
           <summary className="cursor-pointer text-xs text-muted-foreground">{t('Show as a table')}</summary>
-          <div className="max-h-64 overflow-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('Time')}</TableHead>
-                  {series.map((s) => (
-                    <TableHead key={String(s.key)} className="text-right">
-                      {s.label}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {points.map((p) => (
-                  <TableRow key={p.ts}>
-                    <TableCell>{fmtDay(p.ts, { dateStyle: 'short', timeStyle: 'short' })}</TableCell>
-                    {series.map((s) => (
-                      <TableCell key={String(s.key)} className="text-right tabular-nums">
-                        {fmt(Number(p[s.key]) || 0)}
-                      </TableCell>
-                    ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+          <div className="mt-2">
+            <ListTable
+              fit="inline"
+              rows={points}
+              rowKey={(p) => p.ts}
+              label={t('Show as a table')}
+              columns={[
+                { key: 'time', title: t('Time'), width: 'minmax(9rem,1.5fr)', sort: (p) => p.ts, text: (p) => fmtDay(p.ts, { dateStyle: 'short', timeStyle: 'short' }), cell: (p) => fmtDay(p.ts, { dateStyle: 'short', timeStyle: 'short' }) },
+                ...series.map((s) => ({
+                  key: String(s.key),
+                  title: s.label,
+                  align: 'right' as const,
+                  sort: (p: (typeof points)[number]) => Number(p[s.key]) || 0,
+                  cell: (p: (typeof points)[number]) => fmt(Number(p[s.key]) || 0),
+                })),
+              ]}
+            />
           </div>
         </details>
       )}
