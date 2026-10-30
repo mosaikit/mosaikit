@@ -105,6 +105,7 @@ fn select_sql(k: &Kernel, p: &LoadedPlugin, d: &ResourceDecl, cond: &str) -> Str
 }
 
 /// `with_total` (SQLite only): the second column is how many rows match, counted in the same pass.
+#[allow(clippy::too_many_arguments)]
 fn select_sql_limit(
     k: &Kernel,
     p: &LoadedPlugin,
