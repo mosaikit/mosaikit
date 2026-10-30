@@ -9,6 +9,7 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 ### Le distribuzioni
 
 - Una distribuzione può includere dei sidecar (`[[sidecars]]` in `distribution.toml`): processi aggiuntivi accanto all'app. L'app desktop li avvia prima del kernel (con un messaggio di avanzamento, un tempo massimo e un errore chiaro se uno non parte), li riavvia secondo la loro politica, ne registra l'output e li ferma dopo il kernel; le release Docker e Kubernetes aggiungono un servizio per ciascuno. I loro indirizzi sono consentiti automaticamente per le richieste dei plugin.
+- Un sidecar può essere un'attività una tantum (`kind = "oneshot"`, per esempio l'inizializzazione di un database): viene eseguita fino al termine prima che partano i sidecar che ne dipendono, e un errore o un tempo scaduto interrompono l'avvio mostrando la fine del suo log. Un sidecar può anche ricevere file della distribuzione (`files`, per esempio una configurazione) dove li aspetta, su desktop, in Docker e in Kubernetes.
 
 ### La shell
 

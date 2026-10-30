@@ -27,11 +27,47 @@ pub enum Restart {
     Always,
 }
 
+/// `service` (default): a long-running process, supervised and health-checked. `oneshot`: runs to
+/// completion before its dependants start (exit code 0 = success); it must be idempotent because it
+/// runs once at every start.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
+pub enum Kind {
+    #[default]
+    #[serde(rename = "service")]
+    Service,
+    #[serde(rename = "oneshot")]
+    Oneshot,
+}
+
+/// A file of the distribution placed where the sidecar expects it.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(deny_unknown_fields)]
+pub struct FileSpec {
+    /// file relative to the distribution folder
+    pub source: String,
+    /// desktop: relative to `sidecars/<name>/`; Docker and Kubernetes: absolute path in the container
+    pub target: String,
+    /// octal permissions, e.g. "0644" (Kubernetes always; desktop on Unix; ignored by Docker bind mounts)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<String>,
+}
+
+/// Image of the initContainers that wait for a oneshot Job.
+const KUBECTL_IMAGE: &str = "registry.k8s.io/kubectl:v1.31.0";
+
+/// Largest total size of the files of one sidecar in a Kubernetes ConfigMap (the hard limit is 1 MiB).
+pub const MAX_K8S_FILES_BYTES: u64 = 512 * 1024;
+
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Sidecar {
     /// unique identifier: lower case, digits, '-' (service name in containers)
     pub name: String,
+    #[serde(default, skip_serializing_if = "is_service")]
+    pub kind: Kind,
+    /// files of the distribution placed where the sidecar expects them
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub files: Vec<FileSpec>,
     /// executable, relative to the distribution folder (desktop and bundle)
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub command: Option<PathBuf>,
@@ -65,7 +101,15 @@ fn default_timeout() -> u64 {
     30
 }
 
+fn is_service(k: &Kind) -> bool {
+    *k == Kind::Service
+}
+
 impl Sidecar {
+    fn oneshot(&self) -> bool {
+        self.kind == Kind::Oneshot
+    }
+
     fn http_path(&self) -> Option<&str> {
         self.health.as_deref().filter(|h| h.starts_with('/'))
     }
@@ -121,6 +165,10 @@ pub fn validate(list: &[Sidecar], desktop_port: u16) -> Result<()> {
         if s.health.is_some() && s.port.is_none() {
             bail!("sidecar \"{n}\": `health` needs `port`");
         }
+        if s.oneshot() && (s.port.is_some() || s.health.is_some()) {
+            bail!("sidecar \"{n}\": a oneshot sidecar runs to completion: `port` and `health` make no sense");
+        }
+        validate_files(s)?;
         if s.start_timeout_secs == 0 || s.start_timeout_secs > 3600 {
             bail!("sidecar \"{n}\": start_timeout_secs must be between 1 and 3600");
         }
@@ -175,12 +223,93 @@ pub fn validate(list: &[Sidecar], desktop_port: u16) -> Result<()> {
     Ok(())
 }
 
+fn has_parent_dir(p: &str) -> bool {
+    p.split(['/', '\\']).any(|c| c == "..")
+}
+
+fn is_absolute_like(p: &str) -> bool {
+    p.starts_with('/') || p.starts_with('\\') || p.as_bytes().get(1) == Some(&b':')
+}
+
+fn validate_files(s: &Sidecar) -> Result<()> {
+    let n = &s.name;
+    let mut targets = BTreeSet::new();
+    for f in &s.files {
+        let (src, dst) = (f.source.as_str(), f.target.as_str());
+        if src.is_empty() || is_absolute_like(src) || has_parent_dir(src) {
+            bail!("sidecar \"{n}\": file source \"{src}\" must be relative to the distribution and stay inside it");
+        }
+        if dst.is_empty() || has_parent_dir(dst) {
+            bail!("sidecar \"{n}\": file target \"{dst}\" must not be empty or contain `..`");
+        }
+        let key = dst.replace('\\', "/");
+        let key = key.trim_start_matches("./").trim_end_matches('/').to_string();
+        if !targets.insert(key) {
+            bail!("sidecar \"{n}\": duplicate file target \"{dst}\"");
+        }
+        if let Some(m) = &f.mode {
+            if !(3..=4).contains(&m.len()) || !m.chars().all(|c| ('0'..='7').contains(&c)) {
+                bail!("sidecar \"{n}\": file mode \"{m}\" must be octal such as \"0644\"");
+            }
+        }
+    }
+    Ok(())
+}
+
+/// The sources of the files exist (regular files) in the distribution folder.
+pub fn check_file_sources(list: &[Sidecar], dir: &Path) -> Result<()> {
+    for s in list {
+        for f in &s.files {
+            if !dir.join(&f.source).is_file() {
+                bail!(
+                    "sidecar \"{}\": file source {} not found (it must be a file of the distribution)",
+                    s.name,
+                    dir.join(&f.source).display()
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Copies the files of a sidecar to `dest/<source>` (the layout the bundles refer to).
+pub fn copy_file_sources(s: &Sidecar, dir: &Path, dest: &Path) -> Result<()> {
+    for f in &s.files {
+        let to = dest.join(&f.source);
+        if let Some(p) = to.parent() {
+            std::fs::create_dir_all(p)?;
+        }
+        std::fs::copy(dir.join(&f.source), &to)?;
+    }
+    Ok(())
+}
+
+/// Folder of the desktop bundle (relative to `sidecars.toml`) with the overlay sources of a sidecar.
+pub fn bundle_files_dir(name: &str) -> String {
+    format!("sidecars/{name}/_files")
+}
+
+/// Host folder (relative to the Compose project) with the files of a sidecar.
+pub fn docker_files_dir(name: &str) -> String {
+    format!("sidecar-files/{name}")
+}
+
 /// Desktop release: every sidecar needs an executable that exists.
 pub fn check_desktop(list: &[Sidecar], dir: &Path) -> Result<()> {
     for s in list {
         let Some(c) = &s.command else {
             bail!("sidecar \"{}\": the desktop release needs `command`", s.name);
         };
+        for f in &s.files {
+            if is_absolute_like(&f.target) {
+                bail!(
+                    "sidecar \"{}\": file target \"{}\" must be relative to sidecars/{}/ on the desktop",
+                    s.name,
+                    f.target,
+                    s.name
+                );
+            }
+        }
         if resolve_command(dir, c).is_none() {
             bail!("sidecar \"{}\": executable {} not found", s.name, dir.join(c).display());
         }
@@ -193,6 +322,15 @@ pub fn check_containers(list: &[Sidecar]) -> Result<()> {
     for s in list {
         if s.image.is_none() {
             bail!("sidecar \"{}\": the Docker and Kubernetes releases need `image`", s.name);
+        }
+        for f in &s.files {
+            if !f.target.starts_with('/') {
+                bail!(
+                    "sidecar \"{}\": file target \"{}\" must be an absolute path in the container (Docker and Kubernetes)",
+                    s.name,
+                    f.target
+                );
+            }
         }
     }
     Ok(())
@@ -216,6 +354,7 @@ pub fn resolve_command(dir: &Path, command: &Path) -> Option<PathBuf> {
 /// Entries to add to MOSAIKIT_ALLOW_PRIVATE_FETCH_HOSTS: `127.0.0.1:<port>` (desktop) or `<name>:<port>`.
 pub fn fetch_hosts(list: &[Sidecar], containers: bool) -> Vec<String> {
     list.iter()
+        .filter(|s| !s.oneshot())
         .filter_map(|s| {
             s.port.map(|p| if containers { format!("{}:{p}", s.name) } else { format!("127.0.0.1:{p}") })
         })
@@ -237,6 +376,10 @@ pub fn desktop_toml(list: &[Sidecar]) -> Result<String> {
         }
         s.image = None;
         s.volumes.clear();
+        // the overlay sources travel in `sidecars/<name>/_files/` of the bundle
+        for f in &mut s.files {
+            f.source = format!("{}/{}", bundle_files_dir(&s.name), f.source.replace('\\', "/"));
+        }
     }
     let body = toml::to_string(&File { sidecars: &v })?;
     Ok(format!(
@@ -274,6 +417,26 @@ fn q(s: &str) -> String {
     format!("\"{}\"", s.replace('\\', "\\\\").replace('"', "\\\""))
 }
 
+/// A YAML double-quoted scalar holding `s` verbatim (JSON escapes are valid YAML).
+fn yaml_text(s: &str) -> String {
+    let mut o = String::from("\"");
+    for c in s.chars() {
+        match c {
+            '\\' => o.push_str("\\\\"),
+            '"' => o.push_str("\\\""),
+            '\n' => o.push_str("\\n"),
+            '\r' => o.push_str("\\r"),
+            '\t' => o.push_str("\\t"),
+            c if (c as u32) < 0x20 => {
+                let _ = write!(o, "\\u{:04x}", c as u32);
+            }
+            c => o.push(c),
+        }
+    }
+    o.push('"');
+    o
+}
+
 /// `${NAME:-}` for an `env:NAME` reference (Compose), otherwise the literal value (`$` doubled).
 fn compose_value(v: &str) -> String {
     match v.strip_prefix("env:") {
@@ -296,7 +459,15 @@ pub fn env_refs(list: &[Sidecar]) -> Vec<String> {
 /// depends on them and learns their addresses).
 pub fn compose(list: &[Sidecar]) -> String {
     let by_name: BTreeMap<&str, &Sidecar> = list.iter().map(|s| (s.name.as_str(), s)).collect();
-    let cond = |s: &Sidecar| if s.health.is_some() { "service_healthy" } else { "service_started" };
+    let cond = |s: &Sidecar| {
+        if s.oneshot() {
+            "service_completed_successfully"
+        } else if s.health.is_some() {
+            "service_healthy"
+        } else {
+            "service_started"
+        }
+    };
     let mut o = String::from(
         "# Sidecars of the distribution (generated). Merged with compose.yml through COMPOSE_FILE in .env.\n\nservices:\n  app:\n    depends_on:\n",
     );
@@ -315,6 +486,7 @@ pub fn compose(list: &[Sidecar]) -> String {
     for s in list {
         let _ = writeln!(o, "\n  {}:\n    image: {}", s.name, s.image.as_deref().unwrap_or_default());
         let restart = match s.restart {
+            _ if s.oneshot() => "\"no\"",
             Restart::Never => "\"no\"",
             Restart::OnFailure => "on-failure",
             Restart::Always => "unless-stopped",
@@ -333,7 +505,7 @@ pub fn compose(list: &[Sidecar]) -> String {
         if let Some(p) = s.port {
             let _ = writeln!(o, "    expose:\n      - \"{p}\"");
         }
-        if !s.volumes.is_empty() {
+        if !s.volumes.is_empty() || !s.files.is_empty() {
             let _ = writeln!(o, "    volumes:");
             for v in &s.volumes {
                 let src = v.split(':').next().unwrap_or_default();
@@ -341,6 +513,11 @@ pub fn compose(list: &[Sidecar]) -> String {
                     volumes.insert(src.to_string());
                 }
                 let _ = writeln!(o, "      - {}", q(v));
+            }
+            // files of the distribution: read-only bind mounts from the bundle folder
+            for f in &s.files {
+                let host = format!("./{}/{}", docker_files_dir(&s.name), f.source.replace('\\', "/"));
+                let _ = writeln!(o, "      - {}", q(&format!("{host}:{}:ro", f.target)));
             }
         }
         if !s.depends_on.is_empty() {
@@ -388,13 +565,63 @@ pub fn compose_env(list: &[Sidecar]) -> String {
 
 /// `sidecars.yaml` of the Kubernetes release: PVCs, a Deployment and a Service per sidecar.
 /// Volumes with a path as a source are not supported (a volume name becomes a PVC).
-pub fn k8s(list: &[Sidecar], id: &str) -> Result<String> {
-    let mut o =
-        String::from("# Sidecars of the distribution (generated): a Deployment and a Service per sidecar.\n");
+pub fn k8s(list: &[Sidecar], id: &str, dir: &Path) -> Result<String> {
+    let mut o = String::from(
+        "# Sidecars of the distribution (generated): a Deployment and a Service per service sidecar, a Job per oneshot.\n",
+    );
+    let by_name: BTreeMap<&str, &Sidecar> = list.iter().map(|s| (s.name.as_str(), s)).collect();
+    // a pod that depends on a oneshot waits for its Job in an initContainer (kubectl wait)
+    let waits = list
+        .iter()
+        .any(|s| s.depends_on.iter().any(|d| by_name.get(d.as_str()).is_some_and(|x| x.oneshot())));
+    if waits {
+        let _ = write!(
+            o,
+            "---\napiVersion: v1\nkind: ServiceAccount\nmetadata:\n  name: {id}-sidecar-wait\n---\napiVersion: rbac.authorization.k8s.io/v1\nkind: Role\nmetadata:\n  name: {id}-sidecar-wait\nrules:\n  - apiGroups: [\"batch\"]\n    resources: [\"jobs\"]\n    verbs: [\"get\", \"list\", \"watch\"]\n---\napiVersion: rbac.authorization.k8s.io/v1\nkind: RoleBinding\nmetadata:\n  name: {id}-sidecar-wait\nroleRef:\n  apiGroup: rbac.authorization.k8s.io\n  kind: Role\n  name: {id}-sidecar-wait\nsubjects:\n  - kind: ServiceAccount\n    name: {id}-sidecar-wait\n"
+        );
+    }
     for s in list {
         let n = &s.name;
         let mut mounts = String::new();
         let mut vols = String::new();
+        if !s.files.is_empty() {
+            let mut total = 0u64;
+            let mut data = String::new();
+            let mut items = String::new();
+            for (i, f) in s.files.iter().enumerate() {
+                let path = dir.join(&f.source);
+                total += std::fs::metadata(&path)
+                    .map_err(|e| anyhow::anyhow!("sidecar \"{n}\": file {}: {e}", path.display()))?
+                    .len();
+                if total > MAX_K8S_FILES_BYTES {
+                    bail!(
+                        "sidecar \"{n}\": the files exceed {} KiB, too large for a Kubernetes ConfigMap (use an image, a volume or fewer files)",
+                        MAX_K8S_FILES_BYTES / 1024
+                    );
+                }
+                let text = std::fs::read_to_string(&path).map_err(|_| {
+                    anyhow::anyhow!(
+                        "sidecar \"{n}\": file {} must be UTF-8 text for a Kubernetes ConfigMap",
+                        path.display()
+                    )
+                })?;
+                let _ =
+                    write!(data, "  # f{i}: {}\n  f{i}: {}\n", f.source.replace('\\', "/"), yaml_text(&text));
+                let mode = f.mode.as_deref().map(|m| u32::from_str_radix(m, 8).unwrap_or(0o644));
+                let mode = mode.map_or(String::new(), |m| format!("\n              mode: {m}"));
+                let _ = write!(items, "            - key: f{i}\n              path: f{i}{mode}\n");
+                let _ = write!(
+                    mounts,
+                    "            - name: files\n              mountPath: {}\n              subPath: f{i}\n              readOnly: true\n",
+                    q(&f.target)
+                );
+            }
+            let _ = write!(
+                o,
+                "---\napiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: {n}-files\n  labels:\n    app.kubernetes.io/name: {n}\ndata:\n{data}"
+            );
+            let _ = write!(vols, "        - name: files\n          configMap:\n            name: {n}-files\n            items:\n{items}");
+        }
         for (i, v) in s.volumes.iter().enumerate() {
             let mut p = v.splitn(3, ':');
             let (src, dst, mode) = (p.next().unwrap_or(""), p.next().unwrap_or(""), p.next());
@@ -413,11 +640,21 @@ pub fn k8s(list: &[Sidecar], id: &str) -> Result<String> {
                 "---\napiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: {n}-{src}\nspec:\n  accessModes: [\"ReadWriteOnce\"]\n  resources:\n    requests:\n      storage: 1Gi\n"
             );
         }
-        let _ = write!(
-            o,
-            "---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: {n}\n  labels:\n    app.kubernetes.io/name: {n}\n    app.kubernetes.io/component: sidecar\nspec:\n  replicas: 1\n  strategy:\n    type: Recreate\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: {n}\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: {n}\n        app.kubernetes.io/component: sidecar\n    spec:\n      containers:\n        - name: {n}\n          image: {}\n",
-            s.image.as_deref().unwrap_or_default()
-        );
+        if s.oneshot() {
+            // runs once per apply; a Job is immutable, delete it before applying a new version
+            let _ = write!(
+                o,
+                "---\napiVersion: batch/v1\nkind: Job\nmetadata:\n  name: {n}\n  labels:\n    app.kubernetes.io/name: {n}\n    app.kubernetes.io/component: sidecar-oneshot\nspec:\n  backoffLimit: 0\n  activeDeadlineSeconds: {}\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: {n}\n        app.kubernetes.io/component: sidecar-oneshot\n    spec:\n      restartPolicy: Never\n      containers:\n        - name: {n}\n          image: {}\n",
+                s.start_timeout_secs,
+                s.image.as_deref().unwrap_or_default()
+            );
+        } else {
+            let _ = write!(
+                o,
+                "---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: {n}\n  labels:\n    app.kubernetes.io/name: {n}\n    app.kubernetes.io/component: sidecar\nspec:\n  replicas: 1\n  strategy:\n    type: Recreate\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: {n}\n  template:\n    metadata:\n      labels:\n        app.kubernetes.io/name: {n}\n        app.kubernetes.io/component: sidecar\n    spec:\n      containers:\n        - name: {n}\n          image: {}\n",
+                s.image.as_deref().unwrap_or_default()
+            );
+        }
         if !s.args.is_empty() {
             let a: Vec<String> = s.args.iter().map(|a| q(a)).collect();
             let _ = writeln!(o, "          args: [{}]", a.join(", "));
@@ -459,6 +696,22 @@ pub fn k8s(list: &[Sidecar], id: &str) -> Result<String> {
         if !vols.is_empty() {
             let _ = write!(o, "      volumes:\n{vols}");
         }
+        let waited: Vec<&Sidecar> = s
+            .depends_on
+            .iter()
+            .filter_map(|d| by_name.get(d.as_str()).copied())
+            .filter(|x| x.oneshot())
+            .collect();
+        if !waited.is_empty() {
+            let _ = writeln!(o, "      serviceAccountName: {id}-sidecar-wait\n      initContainers:");
+            for w in waited {
+                let _ = write!(
+                    o,
+                    "        - name: wait-{}\n          image: {KUBECTL_IMAGE}\n          args: [\"wait\", \"--for=condition=complete\", \"job/{}\", \"--timeout={}s\"]\n",
+                    w.name, w.name, w.start_timeout_secs
+                );
+            }
+        }
         if let Some(p) = s.port {
             let _ = write!(
                 o,
@@ -471,12 +724,12 @@ pub fn k8s(list: &[Sidecar], id: &str) -> Result<String> {
 
 /// Adds the sidecars to the rendered Kubernetes templates: `sidecars.yaml`, the resource in the
 /// kustomization, the allowed hosts in `config.env` and the secret variables in `secret.env`.
-pub fn apply_k8s(out: &Path, list: &[Sidecar], id: &str) -> Result<()> {
+pub fn apply_k8s(out: &Path, list: &[Sidecar], id: &str, dir: &Path) -> Result<()> {
     if list.is_empty() {
         return Ok(());
     }
     check_containers(list)?;
-    std::fs::write(out.join("sidecars.yaml"), k8s(list, id)?)?;
+    std::fs::write(out.join("sidecars.yaml"), k8s(list, id, dir)?)?;
     let kz = out.join("kustomization.yaml");
     let text = std::fs::read_to_string(&kz)?;
     if !text.contains("  - app.yaml\n") {
@@ -510,8 +763,10 @@ pub fn show() -> Result<()> {
     println!("{} sidecar(s) in {}", list.len(), d.dir.display());
     for s in list {
         println!(
-            "- {}: command={} image={} port={} health={} restart={:?} depends_on={:?}",
+            "- {}: kind={:?} files={} command={} image={} port={} health={} restart={:?} depends_on={:?}",
             s.name,
+            s.kind,
+            s.files.len(),
             s.command.as_ref().map_or("-".into(), |c| c.display().to_string()),
             s.image.as_deref().unwrap_or("-"),
             s.port.map_or("-".into(), |p| p.to_string()),
@@ -723,7 +978,7 @@ volumes:
 
     #[test]
     fn k8s_snapshot() {
-        let got = k8s(&parse(FULL), "prod").unwrap();
+        let got = k8s(&parse(FULL), "prod", Path::new(".")).unwrap();
         for needle in [
             "kind: PersistentVolumeClaim\nmetadata:\n  name: geo-geodata",
             "kind: Deployment\nmetadata:\n  name: geo\n",
@@ -740,7 +995,7 @@ volumes:
         }
         let mut l = parse(FULL);
         l[0].volumes = vec!["./data:/d".into()];
-        assert!(k8s(&l, "prod").unwrap_err().to_string().contains("volume names"));
+        assert!(k8s(&l, "prod", Path::new(".")).unwrap_err().to_string().contains("volume names"));
     }
 
     #[test]
@@ -752,7 +1007,7 @@ volumes:
             .unwrap();
         std::fs::write(tmp.join("config.env"), "A=1\n").unwrap();
         std::fs::write(tmp.join("secret.env"), "B=2\n").unwrap();
-        apply_k8s(&tmp, &parse(FULL), "prod").unwrap();
+        apply_k8s(&tmp, &parse(FULL), "prod", &tmp).unwrap();
         let k = std::fs::read_to_string(tmp.join("kustomization.yaml")).unwrap();
         assert!(k.contains("  - app.yaml\n  - sidecars.yaml\n  - ingress.yaml"));
         assert!(std::fs::read_to_string(tmp.join("config.env"))
@@ -760,5 +1015,196 @@ volumes:
             .contains("MOSAIKIT_ALLOW_PRIVATE_FETCH_HOSTS=geo:9100,cache:9200"));
         assert!(std::fs::read_to_string(tmp.join("secret.env")).unwrap().contains("GEO_TOKEN="));
         let _ = std::fs::remove_dir_all(&tmp);
+    }
+
+    const ONESHOT: &str = r#"
+[[sidecars]]
+name = "init-db"
+kind = "oneshot"
+command = "bin/init-db"
+image = "registry.example.com/geo-init:1"
+args = ["--migrate"]
+env = { PGPASSWORD = "env:DB_PASSWORD" }
+start_timeout_secs = 90
+files = [{ source = "conf/init.sql", target = "/etc/geo/init.sql", mode = "0640" }]
+
+[[sidecars]]
+name = "geoserver"
+command = "bin/geoserver"
+image = "registry.example.com/geo:2"
+port = 9300
+health = "/health"
+depends_on = ["init-db"]
+files = [
+  { source = "conf/server.xml", target = "/etc/geo/server.xml" },
+  { source = "conf/layers/a.json", target = "/etc/geo/layers/a.json" },
+]
+"#;
+
+    fn files_dir(name: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!("mosaikit-sidecar-files-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(d.join("conf/layers")).unwrap();
+        std::fs::write(d.join("conf/init.sql"), "SELECT 1;\n").unwrap();
+        std::fs::write(d.join("conf/server.xml"), "<a b=\"1\"/>\n").unwrap();
+        std::fs::write(d.join("conf/layers/a.json"), "{}").unwrap();
+        d
+    }
+
+    #[test]
+    fn oneshot_and_files_validation() {
+        let base = parse(ONESHOT);
+        validate(&base, 48080).expect("valid");
+        assert_eq!(base[0].kind, Kind::Oneshot);
+        assert_eq!(base[1].kind, Kind::Service);
+        assert!(err(base.clone(), |l| l[0].port = Some(9400)).contains("oneshot"));
+        assert!(err(base.clone(), |l| {
+            l[0].port = Some(9400);
+            l[0].health = Some("tcp".into());
+        })
+        .contains("oneshot"));
+        assert!(err(base.clone(), |l| l[1].files[0].source = "../x".into()).contains("source"));
+        assert!(err(base.clone(), |l| l[1].files[0].source = "/etc/passwd".into()).contains("source"));
+        assert!(err(base.clone(), |l| l[1].files[0].target = "/etc/../x".into()).contains("target"));
+        assert!(err(base.clone(), |l| l[1].files[1].target = "/etc/geo/server.xml".into())
+            .contains("duplicate file target"));
+        assert!(err(base.clone(), |l| l[1].files[0].mode = Some("rw".into())).contains("mode"));
+        // the kind is part of the toml: a typo is rejected
+        #[derive(Deserialize)]
+        struct F {
+            #[allow(dead_code)]
+            sidecars: Vec<Sidecar>,
+        }
+        assert!(toml::from_str::<F>("[[sidecars]]\nname='a'\ncommand='a'\nkind='daemon'\n").is_err());
+        assert!(toml::from_str::<F>("[[sidecars]]\nname='a'\ncommand='a'\nfiles=[{source='a'}]\n").is_err());
+    }
+
+    #[test]
+    fn file_sources_and_target_rules() {
+        let dir = files_dir("rules");
+        let mut l = parse(ONESHOT);
+        check_file_sources(&l, &dir).expect("sources exist");
+        l[1].files[0].source = "conf/missing.xml".into();
+        assert!(check_file_sources(&l, &dir).unwrap_err().to_string().contains("not found"));
+        // containers need absolute targets, the desktop relative ones
+        let l = parse(ONESHOT);
+        assert!(check_containers(&l).is_ok());
+        assert!(check_desktop(&l, &dir).unwrap_err().to_string().contains("relative to sidecars/init-db/"));
+        let mut r = parse(ONESHOT);
+        for s in &mut r {
+            for f in &mut s.files {
+                f.target = f.target.trim_start_matches('/').to_string();
+            }
+        }
+        assert!(check_containers(&r).unwrap_err().to_string().contains("absolute"));
+        std::fs::create_dir_all(dir.join("bin")).unwrap();
+        std::fs::write(dir.join("bin/init-db"), "").unwrap();
+        std::fs::write(dir.join("bin/geoserver"), "").unwrap();
+        assert!(check_desktop(&r, &dir).is_ok());
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn oneshot_is_not_a_fetch_host() {
+        let mut l = parse(ONESHOT);
+        assert_eq!(fetch_hosts(&l, true), ["geoserver:9300"]);
+        l.remove(1);
+        assert!(fetch_hosts(&l, false).is_empty());
+    }
+
+    #[test]
+    fn desktop_toml_has_kind_and_overlay() {
+        let t = desktop_toml(&parse(ONESHOT)).unwrap();
+        assert!(t.contains("kind = \"oneshot\""), "{t}");
+        assert!(t.contains("source = \"sidecars/geoserver/_files/conf/layers/a.json\""), "{t}");
+        let back = parse(&t);
+        assert_eq!(back[0].kind, Kind::Oneshot);
+        assert_eq!(back[1].files.len(), 2);
+        // a plain service does not get a kind line
+        assert!(!desktop_toml(&parse(FULL)).unwrap().contains("kind"));
+    }
+
+    #[test]
+    fn compose_oneshot_snapshot() {
+        let got = compose(&parse(ONESHOT));
+        let want = r#"# Sidecars of the distribution (generated). Merged with compose.yml through COMPOSE_FILE in .env.
+
+services:
+  app:
+    depends_on:
+      init-db:
+        condition: service_completed_successfully
+      geoserver:
+        condition: service_healthy
+    environment:
+      # private hosts the plugins may reach (exact host:port list)
+      MOSAIKIT_ALLOW_PRIVATE_FETCH_HOSTS: ${MOSAIKIT_ALLOW_PRIVATE_FETCH_HOSTS:-geoserver:9300}
+
+  init-db:
+    image: registry.example.com/geo-init:1
+    restart: "no"
+    command: ["--migrate"]
+    environment:
+      PGPASSWORD: "${DB_PASSWORD:-}"
+    volumes:
+      - "./sidecar-files/init-db/conf/init.sql:/etc/geo/init.sql:ro"
+
+  geoserver:
+    image: registry.example.com/geo:2
+    restart: on-failure
+    expose:
+      - "9300"
+    volumes:
+      - "./sidecar-files/geoserver/conf/server.xml:/etc/geo/server.xml:ro"
+      - "./sidecar-files/geoserver/conf/layers/a.json:/etc/geo/layers/a.json:ro"
+    depends_on:
+      init-db:
+        condition: service_completed_successfully
+    healthcheck:
+      # needs wget, curl or nc in the image
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:9300/health || curl -fsS -o /dev/null http://127.0.0.1:9300/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 6
+      start_period: 5s
+"#;
+        assert_eq!(got, want, "\n{got}");
+    }
+
+    #[test]
+    fn k8s_oneshot_job_waiters_and_configmap() {
+        let dir = files_dir("k8s");
+        let got = k8s(&parse(ONESHOT), "prod", &dir).unwrap();
+        for needle in [
+            "kind: Job\nmetadata:\n  name: init-db\n",
+            "backoffLimit: 0\n  activeDeadlineSeconds: 90\n",
+            "restartPolicy: Never\n",
+            "kind: ConfigMap\nmetadata:\n  name: init-db-files\n",
+            "f0: \"SELECT 1;\\n\"",
+            "f0: \"<a b=\\\"1\\\"/>\\n\"",
+            "mountPath: \"/etc/geo/layers/a.json\"\n              subPath: f1\n",
+            "path: f0\n              mode: 416\n",
+            "kind: ServiceAccount\nmetadata:\n  name: prod-sidecar-wait\n",
+            "serviceAccountName: prod-sidecar-wait\n      initContainers:\n        - name: wait-init-db\n",
+            "args: [\"wait\", \"--for=condition=complete\", \"job/init-db\", \"--timeout=90s\"]",
+            "kind: Deployment\nmetadata:\n  name: geoserver\n",
+        ] {
+            assert!(got.contains(needle), "missing {needle:?} in\n{got}");
+        }
+        // no oneshot, no waiters
+        let plain = k8s(&parse(FULL), "prod", &dir).unwrap();
+        assert!(!plain.contains("initContainers") && !plain.contains("ServiceAccount"));
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn k8s_files_size_limit_and_text() {
+        let dir = files_dir("big");
+        std::fs::write(dir.join("conf/server.xml"), vec![b'a'; 600 * 1024]).unwrap();
+        let e = k8s(&parse(ONESHOT), "prod", &dir).unwrap_err().to_string();
+        assert!(e.contains("512 KiB") && e.contains("geoserver"), "{e}");
+        std::fs::write(dir.join("conf/server.xml"), [0xff, 0xfe, 0x00]).unwrap();
+        assert!(k8s(&parse(ONESHOT), "prod", &dir).unwrap_err().to_string().contains("UTF-8"));
+        let _ = std::fs::remove_dir_all(&dir);
     }
 }

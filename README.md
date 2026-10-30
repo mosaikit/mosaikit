@@ -225,12 +225,14 @@ port = 9100                             # also added to MOSAIKIT_ALLOW_PRIVATE_F
 image = "registry.example.com/geo:1"    # Docker and Kubernetes releases
 volumes = ["geodata:/data"]
 restart = "on-failure"                  # never | on-failure | always
+kind = "service"                        # or "oneshot": runs to completion before its dependants (idempotent)
+files = [{ source = "conf/server.xml", target = "/etc/geo/server.xml" }]   # overlay of files of the distribution
 ```
 
 Sidecars: the desktop launcher starts them before the kernel and stops them after it (output in
 `data\logs\sidecar-<name>.log`), `release docker` adds a Compose service each (`compose.sidecars.yml`),
-`release k8s` a Deployment and a Service. `cargo xtask sidecars` validates the section and shows the result;
-details in [architecture 14](docs/architecture.md).
+`release k8s` a Deployment and a Service. `cargo xtask sidecars` validates the section and shows the result.
+`kind = "oneshot"` runs a task to completion (for example a database initialisation) before the sidecars that depend on it start; it must be idempotent because it runs at every start. `files` places files of the distribution where the sidecar expects them (copied at each start on the desktop, read-only bind mounts on Docker, a ConfigMap of at most 512 KiB on Kubernetes). Details in [architecture 14.0](docs/architecture.md).
 
 A distribution can also seed the settings of plugins and the platform keys of outside services, with
 `env:NAME` or `file:PATH` references so that secrets are never written in the file:

@@ -1703,6 +1703,40 @@ of a target checks the one it needs. The section is validated whenever the distr
   fetch, comma separated): `127.0.0.1:<port>` set by the launcher before the configuration is read,
   `<name>:<port>` in `compose.sidecars.yml` (overridable from `.env`) and in `config.env` of Kubernetes.
 
+**Kind `oneshot`.** `kind = "service"` (default) or `"oneshot"`: a oneshot runs to completion (exit code 0
+= success) and the sidecars that `depends_on` it start only after it succeeded. It never restarts, is not
+health-checked (`port` and `health` are refused), is not added to `MOSAIKIT_ALLOW_PRIVATE_FETCH_HOSTS`
+and runs once per start of the app (every start of the launcher, every `compose up`, every new Job), so it
+must be idempotent (for example a database initialisation that checks what is already there). Any other
+exit code, or running longer than `start_timeout_secs`, fails the start with an error that names the
+sidecar and shows the tail of its log.
+
+- Desktop: the launcher runs it in dependency order (splash «Running <name> (n/m)»), output in
+  `logs/sidecar-<name>.log`; a failure stops the start and what was already started.
+- Docker: a Compose service with `restart: "no"`; the dependants (and `app`) use
+  `depends_on: condition: service_completed_successfully`. Compose does not enforce `start_timeout_secs`.
+- Kubernetes: a Job (`backoffLimit: 0`, `activeDeadlineSeconds` = `start_timeout_secs`). A pod that depends
+  on a oneshot gets an initContainer that runs `kubectl wait --for=condition=complete job/<name>` (image
+  `registry.k8s.io/kubectl`, a ServiceAccount, Role and RoleBinding that may read Jobs are generated). If
+  the Job failed the wait times out and the pod keeps restarting until the Job is deleted and recreated.
+  A Job is immutable: delete it (`kubectl delete job <name>`) before applying a new version of the release.
+
+**Overlay `files`.** `files = [{ source, target, mode }]` places files of the distribution where the
+sidecar expects them (for example the configuration of a server). `source` is a file relative to the
+distribution, inside it (no `..`), checked when the distribution is loaded; `target` must be unique per
+sidecar and without `..`; `mode` is an optional octal string such as `"0644"`.
+
+- Desktop: the release copies the sources to `sidecars/<name>/_files/`; the launcher copies them at EVERY
+  start (replacing what is there) to `sidecars/<name>/<target>`. The target must be relative.
+  `mode` is applied on Unix only.
+- Docker: read-only bind mounts from `sidecar-files/<name>/<source>` of the bundle to the absolute
+  `target`. The mode is the one of the host file.
+- Kubernetes: one ConfigMap `<name>-files` mounted with `subPath` at the absolute `target`, `mode` applied.
+  The files must be UTF-8 text and at most 512 KiB in total per sidecar (a clear error otherwise).
+
+A target is relative on the desktop and absolute in containers: a sidecar with `files` is therefore for
+one kind of target (the release of the other kind refuses it with a clear message).
+
 ### 14.2 Seeding settings and platform keys
 
 A manifest default works for text and number settings only; a `secret` of `[[config]]` and the platform key of

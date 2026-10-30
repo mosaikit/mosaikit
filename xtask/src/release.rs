@@ -164,6 +164,7 @@ fn bundle_sidecars(out: &Path) -> Result<()> {
         let Some(c) = &s.command else { continue };
         let src = d.dir.join(crate::sidecars::bundle_source(c));
         let dest = out.join("sidecars").join(&s.name);
+        crate::sidecars::copy_file_sources(s, &d.dir, &dest.join("_files"))?;
         std::fs::create_dir_all(&dest)?;
         if src.is_dir() {
             copy_dir(&src, &dest)?;
@@ -391,6 +392,13 @@ pub fn docker(tag: Option<String>) -> Result<()> {
     let mut env_text = docker_env(img, ver, &pg);
     // --- sidecars ---
     if !d.sidecars.is_empty() {
+        for s in &d.sidecars {
+            crate::sidecars::copy_file_sources(
+                s,
+                &d.dir,
+                &out.join(crate::sidecars::docker_files_dir(&s.name)),
+            )?;
+        }
         std::fs::write(out.join("compose.sidecars.yml"), crate::sidecars::compose(&d.sidecars))?;
         env_text.push_str(&crate::sidecars::compose_env(&d.sidecars));
     }
@@ -451,8 +459,8 @@ fn k8s_dir(image: &str, version: &str) -> Result<PathBuf> {
         std::fs::write(&dest, render(&std::fs::read_to_string(&path)?, &vars))?;
     }
     copy_dir(&root().join("deploy").join("initdb"), &out.join("initdb"))?;
-    crate::sidecars::apply_k8s(&out, &d.sidecars, &d.product.id)?; // sidecars
-                                                                   // check of the manifests, if kubectl is there (kustomize included, no cluster required)
+    crate::sidecars::apply_k8s(&out, &d.sidecars, &d.product.id, &d.dir)?; // sidecars
+                                                                           // check of the manifests, if kubectl is there (kustomize included, no cluster required)
     if which("kubectl").is_some() {
         let o = Command::new("kubectl").arg("kustomize").arg(&out).output()?;
         if !o.status.success() {

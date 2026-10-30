@@ -201,6 +201,8 @@ impl Distribution {
         // --- sidecars ---
         crate::sidecars::validate(&d.sidecars, d.desktop.port)
             .with_context(|| format!("{}", file.display()))?;
+        crate::sidecars::check_file_sources(&d.sidecars, &d.dir)
+            .with_context(|| format!("{}", file.display()))?;
         // --- end sidecars ---
         d.check_seeds().with_context(|| format!("{}", file.display()))?;
         Ok(d)

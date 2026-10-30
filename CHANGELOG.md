@@ -10,6 +10,7 @@ in step).
 ### Distributions
 
 - A distribution can ship sidecars (`[[sidecars]]` in `distribution.toml`): extra processes next to the app. The desktop app starts them before the kernel (with a progress message, a timeout and a clear error if one cannot start), restarts them according to their policy, logs their output and stops them after the kernel; the Docker and Kubernetes releases add a service for each. Their addresses are allowed for the plugins' fetches automatically.
+- A sidecar can be a one-time task (`kind = "oneshot"`, for example a database initialisation): it runs to completion before the sidecars that depend on it start, and a failure or a timeout stops the start with the end of its log. A sidecar can also receive files of the distribution (`files`, for example a configuration) where it expects them, on the desktop, in Docker and in Kubernetes.
 
 ### The shell
 
