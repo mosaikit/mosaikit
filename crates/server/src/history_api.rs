@@ -102,7 +102,13 @@ async fn trash_list(
 ) -> ApiResult<Json<Value>> {
     let days = trash::retention_days(&s.k).await;
     if q.limit.is_some() {
-        let p = mosaikit_kernel::paging::PageQuery { limit: q.limit, cursor: q.cursor, q: q.q, sort: q.sort, dir: q.dir };
+        let p = mosaikit_kernel::paging::PageQuery {
+            limit: q.limit,
+            cursor: q.cursor,
+            q: q.q,
+            sort: q.sort,
+            dir: q.dir,
+        };
         let page = trash::list_page(&s.k, &c, q.plugin.as_deref(), &p).await?;
         return Ok(Json(
             json!({ "items": page.items, "total": page.total, "next": page.next, "retention_days": days }),

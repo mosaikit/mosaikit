@@ -6,7 +6,8 @@ use mosaikit_kernel::acl::{manager_resources_page, ResourcePageFilter};
 use mosaikit_kernel::log::{self, LogFilter, Scope};
 use mosaikit_kernel::paging::PageQuery;
 use mosaikit_kernel::tenancy::{
-    members_page, people_page, tenant_invitations_page, tenants_page, MemberFilter, PeopleFilter, TenantFilter,
+    members_page, people_page, tenant_invitations_page, tenants_page, MemberFilter, PeopleFilter,
+    TenantFilter,
 };
 use mosaikit_kernel::testing::{start, TestKernel};
 use mosaikit_kernel::{crud, trash, Caller, Kind};
@@ -67,7 +68,8 @@ async fn tenants_sort_across_pages_and_refuse_unknown_fields() {
     // the filter still applies, the default order is kept without a sort
     let f = TenantFilter { q: Some("tb".into()), sort: Some("name".into()), ..Default::default() };
     assert_eq!(tenants_page(&t, &admin, &f).await.unwrap().total, 1);
-    let plain = tenants_page(&t, &admin, &TenantFilter { limit: Some(10), ..Default::default() }).await.unwrap();
+    let plain =
+        tenants_page(&t, &admin, &TenantFilter { limit: Some(10), ..Default::default() }).await.unwrap();
     let names: Vec<String> = plain.items.iter().map(|x| x.name.to_lowercase()).collect();
     assert_eq!(names, sorted(&names, false));
     for bad in [("slug; drop table x", "asc"), ("members", "asc"), ("name", "sideways")] {
@@ -77,7 +79,9 @@ async fn tenants_sort_across_pages_and_refuse_unknown_fields() {
     }
     // a Tenant Manager is not an Administrator: the sort does not open the list
     let mgr = t.login("ta", "ta-manager").await;
-    assert!(tenants_page(&t, &mgr, &TenantFilter { sort: Some("name".into()), ..Default::default() }).await.is_err());
+    assert!(tenants_page(&t, &mgr, &TenantFilter { sort: Some("name".into()), ..Default::default() })
+        .await
+        .is_err());
 }
 
 #[tokio::test]
@@ -143,7 +147,9 @@ async fn members_and_people_sort_across_pages() {
     // an ordinary member cannot list the members, with or without a sort
     let anna = t.login("alfa", "anna").await;
     let ca = t.home(&anna).await;
-    assert!(members_page(&t, &ca, &MemberFilter { sort: Some("name".into()), ..Default::default() }).await.is_err());
+    assert!(members_page(&t, &ca, &MemberFilter { sort: Some("name".into()), ..Default::default() })
+        .await
+        .is_err());
     // invitations: the sort is checked even when the list is empty
     let e = tenant_invitations_page(&t, &c, &PageQuery { sort: Some("nope".into()), ..Default::default() })
         .await
@@ -174,7 +180,8 @@ async fn items_trash_log_and_plugin_lists_sort_across_pages() {
         let mut got = Vec::new();
         let mut cursor = None;
         loop {
-            let pg = crud::Paging { limit: 2, cursor: cursor.clone(), sort: Some("title".into()), dir: dir(desc) };
+            let pg =
+                crud::Paging { limit: 2, cursor: cursor.clone(), sort: Some("title".into()), dir: dir(desc) };
             let r = crud::list_paged(&t, &ca, NOTES, "notes", None, None, Some(&pg)).await.unwrap();
             got.extend(r.rows.iter().map(|x| x["values"]["title"].as_str().unwrap().to_string()));
             cursor = r.next;
@@ -258,7 +265,13 @@ async fn items_trash_log_and_plugin_lists_sort_across_pages() {
     let mut got = Vec::new();
     let mut offset = None;
     loop {
-        let f = LogFilter { limit: Some(4), sort: Some("when".into()), dir: dir(false), offset, ..Default::default() };
+        let f = LogFilter {
+            limit: Some(4),
+            sort: Some("when".into()),
+            dir: dir(false),
+            offset,
+            ..Default::default()
+        };
         let p = log::page(&t, Scope::Tenant(&mgr), &f).await.unwrap();
         got.extend(p.events.iter().map(|e| (e.ts, e.id)));
         offset = p.next;

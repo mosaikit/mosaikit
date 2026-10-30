@@ -581,9 +581,17 @@ async fn plugin_lists_are_paged_by_key_with_the_filter_on_the_server() {
     let page = |limit: i64, cursor: Option<String>, filter: Option<&'static str>| {
         let (t, c) = (&t, &c);
         async move {
-            crud::list_paged(t, c, NOTES, "notes", filter, None, Some(&crud::Paging { limit, cursor, ..Default::default() }))
-                .await
-                .unwrap()
+            crud::list_paged(
+                t,
+                c,
+                NOTES,
+                "notes",
+                filter,
+                None,
+                Some(&crud::Paging { limit, cursor, ..Default::default() }),
+            )
+            .await
+            .unwrap()
         }
     };
     // three pages of 3, 3 and 2 rows: no row twice, none missing, the total only on the first
@@ -622,9 +630,16 @@ async fn plugin_lists_are_paged_by_key_with_the_filter_on_the_server() {
     assert_eq!(bad.kind, Kind::BadRequest);
     let bob = t.member(&g, "bob").await;
     let cb = t.home(&bob).await;
-    let none =
-        crud::list_paged(&t, &cb, NOTES, "notes", None, None, Some(&crud::Paging { limit: 3, ..Default::default() }))
-            .await
-            .unwrap();
+    let none = crud::list_paged(
+        &t,
+        &cb,
+        NOTES,
+        "notes",
+        None,
+        None,
+        Some(&crud::Paging { limit: 3, ..Default::default() }),
+    )
+    .await
+    .unwrap();
     assert_eq!((none.rows.len(), none.total, none.next), (0, Some(0), None));
 }

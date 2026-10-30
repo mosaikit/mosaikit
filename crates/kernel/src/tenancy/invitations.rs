@@ -161,7 +161,7 @@ pub async fn tenant_invitations_page(
         None => format!("order by i.created_at desc, i.id desc limit {}", limit + 1),
     };
     let mut q = mosaikit_db::query(format!("{INVITE_SQL} where i.tenant_id = $1 {cursor} {tail}"))
-    .bind(c.tenant.tenant_id);
+        .bind(c.tenant.tenant_id);
     if let Some((text, id)) = &after {
         q = q.bind(text.clone()).bind(*id);
     }

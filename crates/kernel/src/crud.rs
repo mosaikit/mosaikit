@@ -59,7 +59,9 @@ fn order_of(d: &ResourceDecl, pg: &Paging) -> Result<Option<Order>> {
     let unknown = || Error::bad(format!("cannot sort by {field}")).with_code("sort_unknown");
     let expr = match d.fields.iter().find(|f| f.key == field) {
         Some(f) if f.hidden => return Err(unknown()),
-        Some(f) if matches!(f.kind, FieldKind::Text | FieldKind::Choice) => format!("lower(t.{})", qi(&f.key)),
+        Some(f) if matches!(f.kind, FieldKind::Text | FieldKind::Choice) => {
+            format!("lower(t.{})", qi(&f.key))
+        }
         Some(f) => format!("t.{}", qi(&f.key)),
         None => match field {
             "created_at" => "v.created_at".to_string(),
@@ -119,7 +121,10 @@ fn select_sql_limit(
     // sorted: the key of the sort travels in the subquery and is removed from the rows
     let (agg, inner, extra) = match order {
         Some(o) => (
-            format!("(jsonb_agg(to_jsonb(x) - 'sort_key' order by x.sort_key {dir} nulls last, x.id))::json", dir = o.dir),
+            format!(
+                "(jsonb_agg(to_jsonb(x) - 'sort_key' order by x.sort_key {dir} nulls last, x.id))::json",
+                dir = o.dir
+            ),
             format!("{} {} nulls last, t.resource_id", o.expr, o.dir),
             format!(", {} as sort_key", o.expr),
         ),

@@ -163,7 +163,8 @@ const TENANT_SORTS: &[(&str, &str)] = &[
 /// The `order by` of the page on `t` and on `tp`, and where a sorted page starts (None: the usual order).
 fn tenant_order(p: &crate::paging::PageQuery) -> Result<(String, String, Option<crate::paging::Sorted>)> {
     let on = |alias: &str| -> Result<Option<crate::paging::Sorted>> {
-        let own: Vec<(&str, String)> = TENANT_SORTS.iter().map(|(f, e)| (*f, e.replace('@', alias))).collect();
+        let own: Vec<(&str, String)> =
+            TENANT_SORTS.iter().map(|(f, e)| (*f, e.replace('@', alias))).collect();
         let refs: Vec<(&str, &str)> = own.iter().map(|(f, e)| (*f, e.as_str())).collect();
         p.sorted(&refs, &format!("{alias}.id"))
     };
@@ -180,7 +181,13 @@ pub async fn list_tenants(k: &Kernel, admin: &SessionUser) -> Result<Vec<TenantI
 
 /// Every tenant but the system one, with its figures (no check: for the kernel itself).
 pub(crate) async fn all_tenants(k: &Kernel) -> Result<Vec<TenantInfo>> {
-    let rows = mosaikit_db::query(tenant_list_sql("true", "", &("lower(t.name), t.id".into(), "lower(tp.name), tp.id".into()))).fetch_all(&k.db).await?;
+    let rows = mosaikit_db::query(tenant_list_sql(
+        "true",
+        "",
+        &("lower(t.name), t.id".into(), "lower(tp.name), tp.id".into()),
+    ))
+    .fetch_all(&k.db)
+    .await?;
     Ok(rows.iter().map(tenant_info).collect())
 }
 
@@ -258,7 +265,8 @@ pub async fn tenants_page(
     let (ord_in, ord_out, sorted) = tenant_order(&f.page())?;
     let after = f.page().after()?;
     let offset = sorted.as_ref().map(|s| format!(" offset {}", s.offset)).unwrap_or_default();
-    let sql = tenant_list_sql(&cond(after.is_some()), &format!("limit {}{offset}", limit + 1), &(ord_in, ord_out));
+    let sql =
+        tenant_list_sql(&cond(after.is_some()), &format!("limit {}{offset}", limit + 1), &(ord_in, ord_out));
     let mut q = mosaikit_db::query(sql).bind(like.as_deref()).bind(status);
     if let Some((text, id)) = &after {
         q = q.bind(text.clone()).bind(*id);
