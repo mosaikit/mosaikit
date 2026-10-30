@@ -1,8 +1,13 @@
-# Mosaikit — Plan for the plugin development kit
+# Mosaikit — Plan for the development kit (plugins and applications)
 
-A third party must be able to write, test, sign and ship a plugin **without the source code of Mosaikit**
-and without cloning any of its repositories. This plan builds the kit that makes that possible: a compiled
-Mosaikit to develop against, the tools, the packages the plugin imports, and the documentation.
+A third party must be able to write, test, sign and ship a plugin, and to build a whole **application** on
+top of Mosaikit (a *distribution*: its own brand, its choice of plugins and its own plugins, as the first
+derived product does), **without the source code of Mosaikit** and without cloning any of its repositories.
+This plan builds the kit that makes that possible: a compiled Mosaikit to develop against, the tools, the
+packages the code imports, and the documentation.
+
+The plan has two tracks that share the same base: **Track A, plugins** (phases 0–8) and **Track B,
+applications** (phases 9–14).
 
 Status: proposal, 2026-10-29. Estimates are working days of one developer with the existing code base
 (agent-assisted work shortens the coding, not the decisions, the reviews or the pilot).
@@ -17,6 +22,7 @@ What already exists and is reused:
 | Development mode | `MOSAIKIT_DEV_PLUGINS` and `[plugins] dev` load plugins from their source folders with hot reload; `allow_unsigned` accepts unsigned packages (development only). |
 | SDK of the logic | Crate `mosaikit-plugin-sdk` (`abi`, `host`, `values`, and `testing::MockHost` for native tests of the logic). Version taken from the Cargo workspace of `mosaikit`. |
 | SDK of the UI | npm package `@mosaikit/plugin-api` 1.0.0 (`mountCrud`, `gridTable`, `emptyState`, `Msk` client, styles). Plugins reference it by the path `file:../../../mosaikit/ui/plugin-api`. |
+| Distributions | `distribution.toml` (product, brand, plugin folders and selection, desktop database and port, Docker image, own tests), `brand.toml`, `cargo xtask --dist <folder> dev / test / release desktop|docker|k8s` (architecture §14). The kernel does not change; the product adds a brand, a choice of plugins and its own plugins. It works only from a checkout of `mosaikit` (it builds the server and the UI from source). |
 | Compiled Mosaikit | Windows desktop release (`dist/`, SQLite), Docker image and compose files (`deploy/`, PostgreSQL), both built by `cargo xtask`. |
 | Official plugins | Repository `mosaikit-plugins`: a Cargo workspace and an npm workspace at the root, one folder per plugin. |
 | Compatibility | The manifest carries `abi` (kernel supports one value). No range of Mosaikit versions, no version of the UI API. |
@@ -30,6 +36,8 @@ What stops an outside developer today:
 3. No way to start a ready server to try the plugin that does not need a build of the platform.
 4. The plugin API is not declared stable, and the manifest cannot say which Mosaikit versions it supports.
 5. No guide, no reference of the host operations, no complete example outside the official plugins.
+6. A distribution is built with `xtask --dist` from the source of Mosaikit: a third party cannot make a product
+   from a compiled Mosaikit, and nothing describes what a product may change and what it may not.
 
 ## 2. Target
 
@@ -47,6 +55,20 @@ mosaikit-plugin pack --sign key.pem   # .mskp ready to install
 The plugin folder is self-contained: it depends only on published versions of `mosaikit-plugin-sdk` and
 `@mosaikit/plugin-api`. The official plugins are rebuilt on the same basis, so there is a single path.
 
+For an application (a product based on Mosaikit):
+
+```
+mosaikit-product new acme-portal       # a standalone folder: distribution.toml, branding, plugins/, tests, CI
+cd acme-portal
+mosaikit-product dev                   # the bundled Mosaikit with the brand, the plugins of the product and a test tenant
+mosaikit-product test                  # smoke and conformance tests of the whole product
+mosaikit-product build desktop|docker  # release from the compiled Mosaikit of the kit, no source needed
+```
+
+A product is built **from compiled artifacts** (the base desktop archive and the base Docker image of the
+kit), adding its brand, its plugins (official and its own), its default settings and its database extensions.
+The kernel is never modified: what a product can change is a defined, documented list (phase 9).
+
 ## 3. Decisions to take before phase 1
 
 | # | Decision | Options | Proposal |
@@ -57,6 +79,9 @@ The plugin folder is self-contained: it depends only on published versions of `m
 | D4 | Third-party signing | one key per publisher, the Administrator trusts keys | Keep the current model (trusted keys in the configuration); the kit generates a development key. |
 | D5 | Which compiled Mosaikit | desktop only; Docker only; both | Both: the desktop archive (SQLite, nothing to install) for the daily loop; the Docker image (PostgreSQL) for the check against the real database. |
 | D6 | Support channel and versioning of the kit | | One version number for the kit; releases on the same cadence as the platform; a compatibility table in the documents. |
+| D7 | What a product may change | brand and plugins only; plus default settings, locked settings, languages, bootstrap data, database extensions | The list of phase 9: brand, plugin selection, own plugins, default and locked settings, languages, first-run bootstrap, extensions of PostgreSQL, ports and data folder. Never the kernel, the isolation of the origins or the signature rules. |
+| D8 | How a product is built from a compiled Mosaikit | repack the base archive; derive from the base image; rebuild from source | Repack the base desktop archive and derive from the base Docker image; keep `xtask --dist` for builds from source. |
+| D9 | Rights and responsibilities of a product's publisher | | Licence terms for redistributing the compiled base, the product's own name and brand, who supports what, what happens on a platform upgrade. |
 
 ## 4. Phases
 
@@ -195,10 +220,114 @@ Output: a reproducible release of the kit with one command.
 
 Output: the kit is declared ready (v1.0).
 
-## 5. Summary
+## 5. Track B — Applications based on Mosaikit (distributions)
+
+An application is a distribution: a product with its own name, brand, plugins and defaults on top of the
+unchanged kernel. Track B starts when phases 1, 2 and 4 of Track A are done (it reuses the stable API, the
+command-line tool and the base servers) and adds what only a product needs.
+
+### Phase 9 — What a product may change, and the contract of the base (3 days)
+
+- Audit the distribution mechanism (architecture §14, `distribution.toml`, `brand.toml`, `xtask --dist`) and
+  write what a product may change (D7) and what is fixed: kernel, security rules, origins, the signature model.
+- Define the **contract of the base artifacts** a product builds on: the desktop archive and the Docker image of
+  the kit, their folders (`plugins/`, `brand/`, configuration, data), the environment variables, the ports, the
+  data folder, the extension points (brand, defaults, bootstrap, plugin registry), the versioning rule (a base
+  version range per product release).
+- Write it down in `docs/reports/distribution-audit.md` and fix in the kernel and the server what the audit
+  marks as a gap, as phase 1 does for the plugin API.
+
+Output: a documented, versioned contract between the base and a product.
+
+### Phase 10 — The product builder `mosaikit-product` (8 days)
+
+- A command-line tool (same family and installation as `mosaikit-plugin`; a crate `mosaikit-product-cli`):
+  - `new`: standalone folder with `distribution.toml`, `branding/` (brand.toml, logo, favicon, icon),
+    `plugins/` (its own plugins, standalone as in phase 3), `shared/` for code used by several plugins,
+    tests, a CI file, a README;
+  - `dev`: starts the bundled Mosaikit with the brand and the plugins of the product loaded from their folders
+    (hot reload), a test tenant and the four test users;
+  - `build desktop`: takes the base desktop archive, adds the signed plugins and the registry, applies the brand
+    (name, icon and version of the executable through a resource edit, colours, texts), writes the commented
+    configuration; no compilation of the kernel;
+  - `build docker`: `FROM` the base image, adds plugins, brand and configuration; optional database image with
+    extensions (for example PostGIS) and the compose file;
+  - `build k8s`: the kustomize manifests for the product;
+  - `sign`, `validate`, `doctor` as in phase 2.
+- Keep `cargo xtask --dist` for builds from source; both paths read the same `distribution.toml`.
+- A product can keep several plugin folders (`roots`) and the official plugins by id and version, taken from the
+  registry of the kit (offline) or from the one of D1.
+- Tests: from a clean folder, `new` → `build desktop` → start → sign in → the brand and the plugins are there;
+  the same with Docker; in CI on the supported platforms.
+
+Output: a product is built from the compiled kit with one command, with no Mosaikit source.
+
+### Phase 11 — Defaults, bootstrap and database extensions of a product (6 days)
+
+- `distribution.toml` grows the sections that make a product behave as one, all optional:
+  - `[defaults]` values of the settings on the three levels, and `[locked]` the ones the Administrator and the
+    tenants cannot change (the *managed* kind of the settings, set from the product);
+  - `[languages]` enabled and default languages, language packs included;
+  - `[bootstrap]` first start: first Administrator, first tenant, trial and quotas, and a hook for seed data
+    of a plugin (an idempotent command run once);
+  - `[database]` required extensions (PostGIS, others) checked at start with a clear message, embedded
+    PostgreSQL with extensions for the desktop product, SQLite or PostgreSQL by product;
+  - `[ports]`, data folder, backup folder;
+  - `[about]` the product name, version, licence and the version of the base shown in the About dialog and the log.
+- Kernel and server read them at start from the configuration file the builder writes (no code change per product).
+- The upgrade rule: the base checks that the version of the product's base range includes it and says why when
+  not; the migrations of the base and of the plugins run as today.
+- Tests: kernel tests for defaults and locked settings; a bootstrap test (first start creates tenant and
+  Administrator once); the missing-extension message.
+
+Output: a product sets its identity, defaults and first start in `distribution.toml`.
+
+### Phase 12 — Tests and conformance of a product (4 days)
+
+- `mosaikit-product test`: smoke test (start, sign in as each test user, open each plugin page, the brand, the
+  About dialog), the checks of every included plugin (`validate --strict` of phase 5), the layout contract of the
+  shell with the product's brand, the accessibility smoke test, an upgrade test (the product built on the base
+  version N runs on N+1).
+- Playwright helpers of phase 5 extended to start a product's server and sign in as the product's roles.
+- Tests: the suite passes on the reference product and fails on deliberately broken fixtures (a plugin outside
+  the base range, a missing extension, an unsigned plugin in a production build).
+
+Output: a product publisher can prove their build is sound before shipping it.
+
+### Phase 13 — Documentation for building applications (5 days, in parallel with phases 10–12)
+
+Written in English with the Italian translation, in `docs/devkit/` next to the plugin documents:
+
+| Document | Content |
+|---|---|
+| Building an application | What a product is, what the base gives, what a product adds, what it cannot change; the structure of a product folder |
+| Brand and identity | `brand.toml`, logo and icons, colours and the contrast check, texts of the sign-in page, executable name and icon, the About dialog |
+| Choosing and writing plugins | Official plugins by id and version, own plugins, shared code between plugins, nothing to fork |
+| Settings, languages and first start | `[defaults]`, `[locked]`, `[languages]`, `[bootstrap]`, seed data, trial and quotas |
+| Data and extensions | PostgreSQL and SQLite, required extensions (PostGIS), migrations, backup and restore of a product |
+| Build and release | `mosaikit-product build`, signing, the registry of the product, desktop, Docker and Kubernetes, checksums |
+| Upgrades | The base version range, how to move a product to a new base, deprecations, the compatibility table |
+| Operations | Monitoring, maintenance mode, backups, the log, support information to collect |
+| Licensing and responsibilities | D9: what can be redistributed, names and brands, who supports what |
+| Reference product | A small but complete example product (a brand, three official plugins, one own plugin with logic and UI, its defaults and first start), walked through step by step |
+
+Output: someone who has never seen the code builds the reference product from the documents alone (checked in
+phase 14).
+
+### Phase 14 — Pilot with an outside product (5 days, mostly waiting)
+
+- One team outside the project builds a product from the documents alone (brand, plugins, defaults,
+  a desktop and a Docker release); every question is logged and answered in the documents.
+- Exit criteria: first product running in under one working day; `mosaikit-product test` passes; the Docker
+  release is installed on a clean machine and survives an upgrade of the base.
+
+Output: the kit is declared ready for applications (v1.0 of Track B).
+
+## 6. Summary
 
 | Phase | Days | Depends on |
 |---|---|---|
+| **Track A — plugins** | | |
 | 0 Decisions and audit | 2 | — |
 | 1 Stable, versioned API | 5 | 0 |
 | 2 Command-line tool | 6 | 1 |
@@ -208,11 +337,21 @@ Output: the kit is declared ready (v1.0).
 | 6 Documentation | 8 | in parallel with 2–5 |
 | 7 Packaging and distribution | 4 | 2–6 |
 | 8 Pilot | 5 | 7 |
-| **Total** | **47 days** (about 10 weeks of one developer; about 7 weeks with two, phases 3–6 in parallel) | |
+| *Subtotal Track A* | *47* | |
+| **Track B — applications** | | |
+| 9 What a product may change, contract of the base | 3 | 1 |
+| 10 The product builder | 8 | 2, 4, 9 |
+| 11 Defaults, bootstrap, database extensions | 6 | 9 |
+| 12 Tests and conformance of a product | 4 | 5, 10, 11 |
+| 13 Documentation for applications | 5 | in parallel with 10–12 |
+| 14 Pilot with an outside product | 5 | 12, 13 |
+| *Subtotal Track B* | *31* | |
+| **Total** | **78 days** (about 16 weeks of one developer; about 11 weeks with two: Track B phases 9–13 run beside phases 5–8 of Track A, and the two pilots can be one) | |
 
-Critical path: 0 → 1 → 2 → 4 → 5 → 7 → 8.
+Critical path: 0 → 1 → 2 → 4 → 5 → 7 → 8 for plugins; 1 → 9 → 10 → 12 → 14 for applications (after phases 2 and 4).
+Track A alone (plugins) is 47 days and can be released first.
 
-## 6. Risks
+## 7. Risks
 
 | Risk | Effect | Answer |
 |---|---|---|
@@ -222,11 +361,17 @@ Critical path: 0 → 1 → 2 → 4 → 5 → 7 → 8.
 | The desktop kit differs from the real server (SQLite and PostgreSQL) | Bugs found only in production | The Docker kit and the SQL guard checks for both databases |
 | Support load | Questions block the team | Troubleshooting document, an issue template, a pilot first |
 | Licence limits on the binary | Third parties cannot use the kit | Decide D2 in phase 0 |
+| A product changes more than the contract allows | Updates of the base break it | The list of phase 9, the base version range in the product, `mosaikit-product test` with the upgrade test |
+| Repackaging the base desktop archive (resource edit of the executable) is fragile | Brand not applied on some systems | Test on the supported platforms in CI; fall back to the brand in the configuration and the shell when the executable cannot be edited |
+| Database extensions (PostGIS) differ between the embedded and the server database | A product works on one and not on the other | `[database]` checks at start with a clear message; the Docker kit with the product's database image |
+| Two separate pilots delay the release | Longer path | Release Track A first; run the pilot of Track B on the first product made with the kit |
 
-## 7. What is not included
+## 8. What is not included
 
 - A public marketplace or a review process for third-party plugins.
 - Paid distribution, billing or telemetry of plugins.
-- A graphical builder for plugins.
+- A graphical builder for plugins or products.
+- Changes to the kernel for a single product (a product needing one asks for a change in the base, for all).
+- Hosting, billing or tenancy management of a product's customers.
 - Support for logic written in languages other than Rust (the ABI allows it; templates for other languages can
   follow once the kit is stable).
