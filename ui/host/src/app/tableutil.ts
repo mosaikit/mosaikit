@@ -13,6 +13,10 @@ export interface Col<T> {
   align?: 'right'
   /** the value the column sorts by (numbers sort as numbers); without it the title is not a button */
   sort?: (r: T) => string | number | null | undefined
+  /** the server that pages the rows can sort by this column: its field is the `key` of the column (`?sort=key`). In a
+   *  server list only such a column sorts, because the server sorts the WHOLE list; a computed or joined column
+   *  has no server sort and its title is plain text */
+  serverSort?: boolean
   /** the text of the cell for the full-text filter, when it is not the sort value */
   text?: (r: T) => string | number | null | undefined
   cell: (r: T) => ReactNode
@@ -58,6 +62,16 @@ export function applyView<T>(rows: T[], columns: Col<T>[], words: string[], sort
   const col = sort ? columns.find((c) => c.key === sort.key) : undefined
   if (col?.sort && sort) out = [...out].sort((a, b) => sort.dir * compareValues(col.sort!(a), col.sort!(b)))
   return out
+}
+
+/** Whether the title of a column is a sort button: a local list sorts by `sort`, a server list by `serverSort`. */
+export function sortable<T>(col: Col<T>, server: boolean): boolean {
+  return server ? !!col.serverSort : !!col.sort
+}
+
+/** The query parameters of a sort for a server list: `sort` (the key of the column) and `dir`. */
+export function sortParams(sort: Sort): { sort?: string; dir?: string } {
+  return sort ? { sort: sort.key, dir: sort.dir === 1 ? 'asc' : 'desc' } : {}
 }
 
 /** The next state of a sort when a title is clicked: ascending, descending, the order of the server. */

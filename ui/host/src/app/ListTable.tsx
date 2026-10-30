@@ -3,7 +3,7 @@
 // full-text filter (a box in the header of the page, see `FilterBox`) searches every visible field; more rows load
 // as the end of the scrolling rows comes into view. The plugins draw the same table (`ui/plugin-api`, `msk-grid`).
 
-import { useState, type CSSProperties, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { ArrowDown, ArrowUp, ChevronsUpDown, LayoutGrid, List } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -13,7 +13,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { cn } from '@/lib/utils'
 import { t } from './i18n.ts'
 import { MoreRows } from './kit.tsx'
-import { applyView, nextSort, type Col, type Selection, type ServerPaging, type Sort } from './tableutil.ts'
+import { applyView, nextSort, sortable, type Col, type Selection, type ServerPaging, type Sort } from './tableutil.ts'
 
 
 /** The full-text filter of a list: a search box for the `filter` slot of the page header. */
@@ -22,12 +22,13 @@ export function FilterBox({ value, onChange, label }: { value: string; onChange:
 }
 
 /** A column title that sorts the rows: the first click ascending, the second descending, the third back to the order of the server. */
-function SortHead({ col, sort, onSort }: { col: Col<never>; sort: Sort; onSort: (k: string) => void }) {
+function SortHead({ col, sort, onSort, server }: { col: Col<never>; sort: Sort; onSort: (k: string) => void; server: boolean }) {
+  const can = sortable(col, server)
   const on = sort?.key === col.key
   const title = col.hideTitle ? <span className="sr-only">{col.title}</span> : col.title
   return (
-    <TableHead role="columnheader" aria-sort={col.sort ? (on ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none') : undefined} className={cn(col.align === 'right' && 'justify-end text-right')}>
-      {col.sort ? (
+    <TableHead role="columnheader" aria-sort={can ? (on ? (sort.dir === 1 ? 'ascending' : 'descending') : 'none') : undefined} className={cn(col.align === 'right' && 'justify-end text-right')}>
+      {can ? (
         <button type="button" onClick={() => onSort(col.key)} className="-ml-1 inline-flex items-center gap-1 rounded px-1 font-medium outline-none hover:text-primary-strong focus-visible:ring-2 focus-visible:ring-ring">
           {title}
           {on ? sort.dir === 1 ? <ArrowUp className="size-3.5" /> : <ArrowDown className="size-3.5" /> : <ChevronsUpDown className="size-3.5 text-muted-foreground" />}
@@ -91,7 +92,15 @@ export function ListTable<T, K extends string | number = string>({
     setSig(wanted)
     setN(step)
   }
-  const shownAll = applyView(rows, columns, words, sort)
+  // a server that pages the rows sorts the whole list itself (the page sends `sort` and `dir`): the rows come in order
+  const shownAll = applyView(rows, columns, words, server ? null : sort)
+  const scroller = useRef<HTMLDivElement>(null)
+  const sortSig = `${sort?.key}${sort?.dir}`
+  useEffect(() => {
+    // another sort of a server list is another list from its first page: back to the top
+    if (server) scroller.current?.querySelector('[data-slot="table-container"]')?.scrollTo({ top: 0 })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortSig])
   if (!rows.length && empty) return <>{empty}</>
   const shown = server ? shownAll : shownAll.slice(0, n)
   const onSort = (key: string) => setSort(nextSort(sort, key))
@@ -101,7 +110,7 @@ export function ListTable<T, K extends string | number = string>({
   const some = selection && shownAll.some((r) => selection.ids.has(rowKey(r)))
   const local = !server && shownAll.length > step
   const card = (
-    <div className={cn('msk-gridcard flex min-h-0 flex-col overflow-hidden rounded-xl border bg-card', fit === 'fill' && 'min-h-48 flex-1')} data-fit={fit} data-testid="list-table">
+    <div ref={scroller} className={cn('msk-gridcard flex min-h-0 flex-col overflow-hidden rounded-xl border bg-card', fit === 'fill' && 'min-h-48 flex-1')} data-fit={fit} data-testid="list-table">
       <Table role="table" aria-label={label} aria-rowcount={server?.total ?? shownAll.length} className="msk-gridtable" style={{ '--cols': tracks } as CSSProperties}>
         <TableHeader role="rowgroup">
           <TableRow role="row">
@@ -111,7 +120,7 @@ export function ListTable<T, K extends string | number = string>({
               </TableHead>
             )}
             {columns.map((c) => (
-              <SortHead key={c.key} col={c as Col<never>} sort={sort} onSort={onSort} />
+              <SortHead key={c.key} col={c as Col<never>} sort={sort} onSort={onSort} server={!!server} />
             ))}
           </TableRow>
         </TableHeader>

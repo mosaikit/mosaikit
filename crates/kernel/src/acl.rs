@@ -409,7 +409,7 @@ pub struct ResourcePageFilter {
 /// The columns of Manage › Items that sort on the server (shares and links are counted per page). The title sorts
 /// only when the Tenant Manager may see titles: otherwise it is empty for everybody and the order would leak.
 const RESOURCE_SORTS: &[(&str, &str)] = &[
-    ("title", "(case when $2 then lower(r.title) else '' end)"),
+    ("item", "(case when $2 then lower(r.title) else '' end)"),
     ("app", "r.plugin_id"),
     ("owner", "lower(coalesce(nullif(u.display_name, ''), u.username))"),
     ("size", "r.size_bytes"),

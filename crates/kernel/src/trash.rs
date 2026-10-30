@@ -157,13 +157,13 @@ pub async fn list_page(
 /// by the column asked for (ties by id) and returns where the page starts; None when no sort was asked.
 fn sort_order(p: &crate::paging::PageQuery, all: &mut [TrashItem]) -> Result<Option<i64>> {
     const FIELDS: &[(&str, &str)] =
-        &[("title", ""), ("app", ""), ("owner", ""), ("size", ""), ("deleted", ""), ("purge", "")];
+        &[("item", ""), ("app", ""), ("owner", ""), ("size", ""), ("deleted", ""), ("purge", "")];
     let Some(s) = p.sorted(FIELDS, "id")? else { return Ok(None) };
     let desc = p.dir.as_deref() == Some("desc");
     let field = p.sort.as_deref().unwrap_or_default();
     let key = |x: &TrashItem| -> (i64, String) {
         match field {
-            "title" => (0, x.title.to_lowercase()),
+            "item" => (0, x.title.to_lowercase()),
             "app" => (0, x.plugin_id.to_lowercase()),
             "owner" => (0, x.owner_name.to_lowercase()),
             "size" => (x.size_bytes, String::new()),

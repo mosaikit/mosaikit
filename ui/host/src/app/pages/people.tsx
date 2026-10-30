@@ -41,6 +41,7 @@ import { levelName } from '../levels.ts'
 import { PersonPicture } from '../picture.tsx'
 import { BulkBar, FilterColumn, ListPage } from '../listkit.tsx'
 import { ListTable } from '../ListTable.tsx'
+import { sortParams, type Sort } from '../tableutil.ts'
 import { Empty, ErrorBox, FillBody, FillPage, FormDialog, Loading, PageHeader, SaveBar, SelectAllRows, StatusBadge, Sliced, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
 import AppIcon from '../AppIcon.tsx'
@@ -1417,12 +1418,14 @@ export function AdminPeople() {
   const [search, setSearch] = useState('')
   const words = useDeferredValue(search.trim())
   // filtered and paged on the server: 20,000 people are 11 MB at once
+  const [sort, setSort] = useState<Sort>(null)
   const q = usePaged<PersonRow, PeoplePageData>(['people', 'page'], '/api/admin/people', {
     q: words || undefined,
     show: show === 'all' ? undefined : show,
     tenant: tenant === 'any' ? undefined : tenant,
     role: role === 'any' ? undefined : role,
     status: status === 'any' ? undefined : status,
+    ...sortParams(sort),
   })
   const [sel, setSel] = useState<Set<string>>(new Set())
   // every person of the filter selected, loaded or not
@@ -1575,6 +1578,8 @@ export function AdminPeople() {
           rows={rows}
           rowKey={(p) => p.user_id}
           server={{ total: q.total, more: !!q.more, loading: q.loadingMore, onMore: q.loadMore }}
+          sort={sort}
+          onSort={setSort}
           selection={{ ids: sel, onChange: setSel, label: (p) => t('Select {name}', { name: p.username }), skip: (p) => p.is_admin }}
           rowProps={(p) => ({ className: 'cursor-pointer', onClick: () => go(p.is_admin ? to.admin('system', 'admins') : to.adminPerson(p.user_id)) })}
           empty={<p className="rounded-xl border bg-card p-6 text-center text-sm text-muted-foreground">{t('No person found.')}</p>}
@@ -1584,6 +1589,7 @@ export function AdminPeople() {
               title: t('Name'),
               width: 'minmax(12rem,2fr)',
               sort: (p) => p.display_name || p.username,
+              serverSort: true,
               cell: (p) => (
                 <a className="flex items-center gap-2.5" onClick={(e) => e.stopPropagation()} href={p.is_admin ? to.admin('system', 'admins') : to.adminPerson(p.user_id)}>
                   <PersonPicture id={p.user_id} name={p.display_name || p.username} className="size-8 bg-primary/15 text-xs text-primary-strong" />
@@ -1594,7 +1600,7 @@ export function AdminPeople() {
                 </a>
               ),
             },
-            { key: 'home', title: t('Home tenant'), width: 'minmax(8rem,1fr)', sort: (p) => (p.is_admin ? '' : p.home_tenant), cell: (p) => (p.is_admin ? <Badge>{t('Administrator')}</Badge> : p.home_tenant) },
+            { key: 'home', title: t('Home tenant'), width: 'minmax(8rem,1fr)', sort: (p) => (p.is_admin ? '' : p.home_tenant), serverSort: true, cell: (p) => (p.is_admin ? <Badge>{t('Administrator')}</Badge> : p.home_tenant) },
             {
               key: 'tenants',
               title: t('Tenants'),
@@ -1612,8 +1618,8 @@ export function AdminPeople() {
                 </div>
               ),
             },
-            { key: 'status', title: t('Status'), width: 'minmax(7rem,.8fr)', sort: (p) => p.status, cell: (p) => <StatusBadge status={p.status} /> },
-            { key: 'last', title: t('Last sign-in'), width: 'minmax(8rem,1fr)', sort: (p) => p.last_sign_in_at ?? '', className: 'text-muted-foreground', cell: (p) => (p.last_sign_in_at ? fmtDate(p.last_sign_in_at) : t('Never')) },
+            { key: 'status', title: t('Status'), width: 'minmax(7rem,.8fr)', sort: (p) => p.status, serverSort: true, cell: (p) => <StatusBadge status={p.status} /> },
+            { key: 'last', title: t('Last sign-in'), width: 'minmax(8rem,1fr)', sort: (p) => p.last_sign_in_at ?? '', serverSort: true, className: 'text-muted-foreground', cell: (p) => (p.last_sign_in_at ? fmtDate(p.last_sign_in_at) : t('Never')) },
           ]}
         />
       </ListPage>

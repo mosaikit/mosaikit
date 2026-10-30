@@ -155,7 +155,7 @@ const TENANT_SORTS: &[(&str, &str)] = &[
     ("name", "lower(@.name)"),
     ("slug", "@.slug"),
     ("status", "@.status"),
-    ("created_at", "@.created_at"),
+    ("created", "@.created_at"),
     ("trial_until", "@.trial_until"),
     ("archived_at", "@.archived_at"),
 ];

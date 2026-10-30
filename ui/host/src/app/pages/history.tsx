@@ -17,6 +17,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '
 import { useAction, useApi, useConfirm, usePaged, useTenantCtx } from '../core.ts'
 import { BulkBar, FilterColumn, ListPage } from '../listkit.tsx'
 import { ListTable } from '../ListTable.tsx'
+import { sortParams, type Sort } from '../tableutil.ts'
 import { t } from '../i18n.ts'
 import { about, describe } from '../logtext.ts'
 import { Empty, ErrorBox, FillBody, FillPage, Loading, MoreRows, PageHeader, Pills } from '../kit.tsx'
@@ -48,7 +49,8 @@ export function TrashPage({ slug }: { slug: string }) {
   const [sel, setSel] = useState<Set<string>>(new Set())
   const words = useDeferredValue(search.trim())
   // a page at a time, filtered on the server
-  const q = usePaged<TrashItem, TrashList>(['trash', slug, 'page'], `/api/t/${enc(slug)}/trash`, { plugin: plugin || undefined, q: words || undefined })
+  const [sort, setSort] = useState<Sort>(null)
+  const q = usePaged<TrashItem, TrashList>(['trash', slug, 'page'], `/api/t/${enc(slug)}/trash`, { plugin: plugin || undefined, q: words || undefined, ...sortParams(sort) })
   const inval = [
     ['trash', slug],
     ['overview', slug],
@@ -180,6 +182,8 @@ export function TrashPage({ slug }: { slug: string }) {
             rows={rows}
             rowKey={(r) => r.id}
             server={{ total: q.total, more: !!q.more, loading: q.loadingMore, onMore: q.loadMore }}
+            sort={sort}
+            onSort={setSort}
             selection={{ ids: sel, onChange: setSel, label: (r) => t('Select {name}', { name: r.title || r.kind }) }}
             columns={[
               {
@@ -187,6 +191,7 @@ export function TrashPage({ slug }: { slug: string }) {
                 title: t('Item'),
                 width: 'minmax(12rem,2fr)',
                 sort: (r) => r.title,
+                serverSort: true,
                 cell: (r) => (
                   <>
                     <b className="block font-medium">{r.title || <span className="font-normal text-muted-foreground italic">{t('title hidden')}</span>}</b>
@@ -197,12 +202,13 @@ export function TrashPage({ slug }: { slug: string }) {
                   </>
                 ),
               },
-              ...(manager ? [{ key: 'owner', title: t('Owner'), width: 'minmax(8rem,1fr)', sort: (r: TrashItem) => r.owner_name, cell: (r: TrashItem) => r.owner_name }] : []),
+              ...(manager ? [{ key: 'owner', title: t('Owner'), width: 'minmax(8rem,1fr)', sort: (r: TrashItem) => r.owner_name, serverSort: true, cell: (r: TrashItem) => r.owner_name }] : []),
               {
                 key: 'deleted',
                 title: t('Deleted'),
                 width: 'minmax(9rem,1.2fr)',
                 sort: (r) => r.deleted_at,
+                serverSort: true,
                 cell: (r) => (
                   <>
                     <span className="block">{fmtDate(r.deleted_at)}</span>
@@ -210,8 +216,8 @@ export function TrashPage({ slug }: { slug: string }) {
                   </>
                 ),
               },
-              { key: 'size', title: t('Size'), width: 'minmax(6rem,.7fr)', align: 'right', sort: (r) => r.size_bytes, cell: (r) => fmtBytes(r.size_bytes) },
-              { key: 'purge', title: t('Deleted for good on'), width: 'minmax(8rem,1fr)', sort: (r) => r.purge_at, className: 'text-muted-foreground', cell: (r) => fmtDate(r.purge_at) },
+              { key: 'size', title: t('Size'), width: 'minmax(6rem,.7fr)', align: 'right', sort: (r) => r.size_bytes, serverSort: true, cell: (r) => fmtBytes(r.size_bytes) },
+              { key: 'purge', title: t('Deleted for good on'), width: 'minmax(8rem,1fr)', sort: (r) => r.purge_at, serverSort: true, className: 'text-muted-foreground', cell: (r) => fmtDate(r.purge_at) },
               {
                 key: 'actions',
                 title: t('Actions'),
@@ -384,10 +390,13 @@ export function LogView({ scope, fixed = {}, compact = false }: { scope: LogScop
   // the instant is fixed while the period stays (a clock in the query key would reset the list every second)
   // oxlint-disable-next-line react/purity, react-hooks/exhaustive-deps
   const now = useMemo(() => Date.now(), [f.period])
+  const [sort, setSort] = useState<Sort>(null)
   const qs = query(active, now)
+  // sorted, the server pages by offset (`next` is the offset of the next page), else by the id of the last event
+  const sortQs = new URLSearchParams(sortParams(sort)).toString()
   const pages = useInfiniteQuery({
-    queryKey: ['log', scope.api, qs],
-    queryFn: ({ pageParam }) => api<LogPageData>('GET', `${scope.api}?${qs}${pageParam ? `&before=${pageParam}` : ''}`),
+    queryKey: ['log', scope.api, qs, sortQs],
+    queryFn: ({ pageParam }) => api<LogPageData>('GET', `${scope.api}?${qs}${sortQs ? `&${sortQs}${pageParam ? `&offset=${pageParam}` : ''}` : pageParam ? `&before=${pageParam}` : ''}`),
     initialPageParam: 0,
     getNextPageParam: (last) => last.next ?? undefined,
   })
@@ -542,16 +551,19 @@ export function LogView({ scope, fixed = {}, compact = false }: { scope: LogScop
           rows={events}
           rowKey={(e) => e.id}
           server={{ total: null, more: !!pages.hasNextPage, loading: pages.isFetchingNextPage, onMore: () => void pages.fetchNextPage(), label: t('Older events') }}
+          sort={sort}
+          onSort={setSort}
           selection={compact ? undefined : { ids: sel, onChange: setSel, label: (e) => t('Select the event of {when}', { when: fmtDate(e.ts) }) }}
           rowProps={(e) => ({ className: 'cursor-pointer', onClick: () => setOpen(e) })}
           columns={[
-            { key: 'when', title: t('When'), width: 'minmax(9rem,1fr)', sort: (e) => e.ts, className: 'whitespace-nowrap text-muted-foreground', cell: (e) => fmtDate(e.ts) },
-            ...(compact ? [] : [{ key: 'who', title: t('Who'), width: 'minmax(8rem,1fr)', sort: (e: LogEvent) => e.user_name ?? '', cell: (e: LogEvent) => e.user_name ?? <span className="text-muted-foreground">{t('nobody (system)')}</span> }]),
+            { key: 'when', title: t('When'), width: 'minmax(9rem,1fr)', sort: (e) => e.ts, serverSort: true, className: 'whitespace-nowrap text-muted-foreground', cell: (e) => fmtDate(e.ts) },
+            ...(compact ? [] : [{ key: 'who', title: t('Who'), width: 'minmax(8rem,1fr)', sort: (e: LogEvent) => e.user_name ?? '', serverSort: true, cell: (e: LogEvent) => e.user_name ?? <span className="text-muted-foreground">{t('nobody (system)')}</span> }]),
             {
               key: 'what',
               title: t('What'),
               width: 'minmax(12rem,1.6fr)',
               sort: (e) => describe(e),
+              serverSort: true,
               cell: (e) => (
                 <button type="button" className="text-left font-medium hover:underline" onClick={(ev) => (ev.stopPropagation(), setOpen(e))}>
                   {describe(e)}
@@ -572,12 +584,13 @@ export function LogView({ scope, fixed = {}, compact = false }: { scope: LogScop
                 </>
               ),
             },
-            ...(scope.admin ? [{ key: 'tenant', title: t('Tenant'), width: 'minmax(8rem,1fr)', sort: (e: LogEvent) => e.tenant_name ?? '', cell: (e: LogEvent) => e.tenant_name ?? '—' }] : []),
+            ...(scope.admin ? [{ key: 'tenant', title: t('Tenant'), width: 'minmax(8rem,1fr)', sort: (e: LogEvent) => e.tenant_name ?? '', serverSort: true, cell: (e: LogEvent) => e.tenant_name ?? '—' }] : []),
             {
               key: 'result',
               title: t('Result'),
               width: 'minmax(7rem,.8fr)',
               sort: (e) => (e.ok ? 0 : 1),
+              serverSort: true,
               text: (e) => (e.ok ? t('Done') : t('Failed')),
               cell: (e) =>
                 e.ok ? (

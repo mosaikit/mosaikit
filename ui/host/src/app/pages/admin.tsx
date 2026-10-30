@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils'
 import { initials, passwordMin, useAction, useApi, useConfig, useConfirm, usePaged } from '../core.ts'
 import { BulkBar, FilterColumn, ListPage } from '../listkit.tsx'
 import { ListTable } from '../ListTable.tsx'
+import { sortParams, type Sort } from '../tableutil.ts'
 import { TenantLogo } from '../picture.tsx'
 import { Empty, ErrorBox, FormDialog, Kpi, Loading, PageHeader, SaveBar, Sections, StatusBadge, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
@@ -104,7 +105,8 @@ export function AdminTenants() {
   const [state, setState] = useState('all')
   const words = useDeferredValue(search.trim())
   // a page at a time (infinite scroll), searched and filtered on the server
-  const q = usePaged<TenantInfo>(['admin-tenants', 'page'], '/api/admin/tenants', { q: words || undefined, status: state === 'all' ? undefined : state })
+  const [sort, setSort] = useState<Sort>(null)
+  const q = usePaged<TenantInfo>(['admin-tenants', 'page'], '/api/admin/tenants', { q: words || undefined, status: state === 'all' ? undefined : state, ...sortParams(sort) })
   const rows = q.items
   const [sel, setSel] = useState<Set<string>>(new Set())
   // another filter, another selection
@@ -222,6 +224,8 @@ export function AdminTenants() {
             rows={rows}
             rowKey={(tn) => tn.id}
             server={{ total: q.total, more: !!q.more, loading: q.loadingMore, onMore: q.loadMore }}
+            sort={sort}
+            onSort={setSort}
             selection={{ ids: sel, onChange: setSel, label: (tn) => t('Select {name}', { name: tn.name }) }}
             rowProps={(tn) => ({ className: 'cursor-pointer', onClick: () => go(to.adminTenant(tn.id)) })}
             columns={[
@@ -230,6 +234,7 @@ export function AdminTenants() {
                 title: t('Tenant'),
                 width: 'minmax(12rem,2fr)',
                 sort: (tn) => tn.name,
+                serverSort: true,
                 cell: (tn) => (
                   <a href={to.adminTenant(tn.id)} className="flex items-center gap-2.5" onClick={(e) => e.stopPropagation()}>
                     <TenantLogo slug={tn.slug} name={tn.name} />
@@ -244,8 +249,8 @@ export function AdminTenants() {
               { key: 'guests', title: t('Guests'), width: 'minmax(6rem,.7fr)', align: 'right', sort: (tn) => tn.guests, cell: (tn) => tn.guests },
               { key: 'items', title: t('Items'), width: 'minmax(6rem,.7fr)', align: 'right', sort: (tn) => tn.resources, cell: (tn) => tn.resources },
               { key: 'space', title: t('Space'), width: 'minmax(6rem,.8fr)', align: 'right', sort: (tn) => tn.bytes, cell: (tn) => fmtBytes(tn.bytes) },
-              { key: 'status', title: t('Status'), width: 'minmax(7rem,1fr)', sort: (tn) => tn.status, cell: (tn) => <TenantState tn={tn} /> },
-              { key: 'created', title: t('Created'), width: 'minmax(7rem,1fr)', sort: (tn) => tn.created_at, className: 'text-muted-foreground', cell: (tn) => fmtDate(tn.created_at) },
+              { key: 'status', title: t('Status'), width: 'minmax(7rem,1fr)', sort: (tn) => tn.status, serverSort: true, cell: (tn) => <TenantState tn={tn} /> },
+              { key: 'created', title: t('Created'), width: 'minmax(7rem,1fr)', sort: (tn) => tn.created_at, serverSort: true, className: 'text-muted-foreground', cell: (tn) => fmtDate(tn.created_at) },
             ]}
           />
         )}

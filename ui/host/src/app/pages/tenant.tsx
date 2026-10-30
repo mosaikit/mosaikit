@@ -37,6 +37,7 @@ import { ActivityWidget, AppsStrip, KpiRow, NotesWidget, TrendWidget, WaitingWid
 import { describe } from '../logtext.ts'
 import { BulkBar, FilterColumn, ListPage, type FacetGroup } from '../listkit.tsx'
 import { ListTable } from '../ListTable.tsx'
+import { sortParams, type Sort } from '../tableutil.ts'
 import { EmbeddingPanel, IdentityPanel, KeysPanel, LanguagesPanel, ManagedPanel, ModePanel, NotificationsPanel, SecurityPanel } from '../SettingsPanels.tsx'
 import { UsageAlerts, UsageConsumers, UsagePanel, UsageQuotas, UsageTrend } from '../Quotas.tsx'
 import { totals, trashHint } from '../usage.ts'
@@ -289,7 +290,8 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
   const people = usePaged<Member>(['members', slug, 'count'], `${base}/members`, {}, 1)
   const groups = useApi<Group[]>(['groups', slug], `${base}/groups`)
   // a page at a time; the first one also says how many are pending
-  const invites = usePaged<Invitation, PageOf<Invitation> & { pending: number }>(['invites', slug], `${base}/invitations`, {}, 20)
+  const [inviteSort, setInviteSort] = useState<Sort>(null)
+  const invites = usePaged<Invitation, PageOf<Invitation> & { pending: number }>(['invites', slug], `${base}/invitations`, { ...sortParams(inviteSort) }, 20)
   const profiles = useApi<Profile[]>(['profiles', slug], `${base}/profiles`)
   const requests = useApi<AccessRequest[]>(['requests', slug], `/api/t/${enc(slug)}/requests`)
   const cur = ['people', 'groups', 'profiles', 'pending'].includes(section ?? '') ? section! : 'people'
@@ -436,7 +438,7 @@ export function Manage({ slug, section }: { slug: string; section?: string }) {
               </section>
               <section className="grid gap-2" aria-label={t('Invitations')}>
                 <h2 className="text-sm font-semibold">{t('Invitations')}</h2>
-                <Invites slug={slug} q={invites} />
+                <Invites slug={slug} q={invites} sort={inviteSort} onSort={setInviteSort} />
               </section>
             </div>
           )}
@@ -526,8 +528,10 @@ function People({ slug, profiles, groups, shell }: { slug: string; profiles: Pro
   const [search, setSearch] = useState('')
   const words = useDeferredValue(search.trim())
   // a page at a time, searched on the server
+  const [sort, setSort] = useState<Sort>(null)
   const q = usePaged<Member>(['members', slug, 'page'], base, {
     q: words || undefined,
+    ...sortParams(sort),
   })
   const [everyone, setEveryone] = useState(false)
   const [selKey, setSelKey] = useState(words)
@@ -670,6 +674,8 @@ function People({ slug, profiles, groups, shell }: { slug: string; profiles: Pro
         rows={rows}
         rowKey={(m) => m.user_id}
         server={{ total: q.total, more: !!q.more, loading: q.loadingMore, onMore: q.loadMore }}
+        sort={sort}
+        onSort={setSort}
         selection={{ ids: sel, onChange: setSel, label: (m) => t('Select {name}', { name: m.username }) }}
         rowProps={(m) => ({ className: 'cursor-pointer', onClick: () => go(to.person(slug, m.user_id)) })}
         empty={<p className="rounded-xl border bg-card p-6 text-center text-sm text-muted-foreground">{t('No person found.')}</p>}
@@ -679,6 +685,7 @@ function People({ slug, profiles, groups, shell }: { slug: string; profiles: Pro
             title: t('Name'),
             width: 'minmax(13rem,2fr)',
             sort: (m) => m.display_name || m.username,
+            serverSort: true,
             cell: (m) => (
               <div className="flex items-center gap-2.5">
                 <PersonPicture id={m.user_id} name={m.display_name || m.username} className="size-8 bg-primary/15 text-xs text-primary-strong" />
@@ -705,6 +712,7 @@ function People({ slug, profiles, groups, shell }: { slug: string; profiles: Pro
             title: t('Role and profile'),
             width: 'minmax(11rem,1.4fr)',
             sort: (m) => m.role,
+            serverSort: true,
             cell: (m) => (
               <>
                 <Badge variant={m.role === 'tenant_manager' ? 'default' : 'secondary'} className="font-normal">
@@ -715,9 +723,9 @@ function People({ slug, profiles, groups, shell }: { slug: string; profiles: Pro
             ),
           },
           { key: 'groups', title: t('Groups'), width: 'minmax(8rem,1fr)', sort: (m) => m.groups.join(', '), className: 'text-sm text-muted-foreground', cell: (m) => m.groups.join(', ') || '—' },
-          { key: 'status', title: t('Status'), width: 'minmax(7rem,.8fr)', sort: (m) => (m.status !== 'active' ? m.status : m.membership), cell: (m) => <StatusBadge status={m.status !== 'active' ? m.status : m.membership} /> },
+          { key: 'status', title: t('Status'), width: 'minmax(7rem,.8fr)', sort: (m) => (m.status !== 'active' ? m.status : m.membership), serverSort: true, cell: (m) => <StatusBadge status={m.status !== 'active' ? m.status : m.membership} /> },
           { key: 'items', title: t('Items'), width: 'minmax(5rem,.6fr)', align: 'right', sort: (m) => m.owned_resources, cell: (m) => m.owned_resources },
-          { key: 'last', title: t('Last sign-in'), width: 'minmax(8rem,1fr)', sort: (m) => m.last_sign_in_at ?? '', className: 'text-muted-foreground', cell: (m) => (m.last_sign_in_at ? fmtDate(m.last_sign_in_at) : t('Never')) },
+          { key: 'last', title: t('Last sign-in'), width: 'minmax(8rem,1fr)', sort: (m) => m.last_sign_in_at ?? '', serverSort: true, className: 'text-muted-foreground', cell: (m) => (m.last_sign_in_at ? fmtDate(m.last_sign_in_at) : t('Never')) },
           {
             key: 'actions',
             title: t('Actions'),
@@ -1009,7 +1017,7 @@ function Groups({ slug, members, shell }: { slug: string; members: Member[]; she
   )
 }
 
-function Invites({ slug, q }: { slug: string; q: ReturnType<typeof usePaged<Invitation, PageOf<Invitation> & { pending: number }>> }) {
+function Invites({ slug, q, sort, onSort }: { slug: string; q: ReturnType<typeof usePaged<Invitation, PageOf<Invitation> & { pending: number }>>; sort: Sort; onSort: (s: Sort) => void }) {
   const revoke = useAction((id: string) => api('DELETE', `/api/t/${enc(slug)}/manage/invitations/${id}`), {
     ok: t('Invitation revoked'),
     invalidate: [['invites', slug]],
@@ -1028,11 +1036,13 @@ function Invites({ slug, q }: { slug: string; q: ReturnType<typeof usePaged<Invi
       rows={q.items}
       rowKey={(i) => i.id}
       server={{ total: q.total, more: !!q.more, loading: q.loadingMore, onMore: q.loadMore }}
+      sort={sort}
+      onSort={onSort}
       columns={[
-        { key: 'person', title: t('Person'), width: 'minmax(10rem,2fr)', sort: (i) => i.user, className: 'font-medium', cell: (i) => i.user },
-        { key: 'role', title: t('Role'), sort: (i) => t(ROLE[i.role]), cell: (i) => t(ROLE[i.role]) },
-        { key: 'status', title: t('Status'), sort: (i) => i.status, cell: (i) => <StatusBadge status={i.status} /> },
-        { key: 'expires', title: t('Expires'), sort: (i) => i.expires_at, className: 'text-muted-foreground', cell: (i) => fmtDate(i.expires_at) },
+        { key: 'person', title: t('Person'), width: 'minmax(10rem,2fr)', sort: (i) => i.user, serverSort: true, className: 'font-medium', cell: (i) => i.user },
+        { key: 'role', title: t('Role'), sort: (i) => t(ROLE[i.role]), serverSort: true, cell: (i) => t(ROLE[i.role]) },
+        { key: 'status', title: t('Status'), sort: (i) => i.status, serverSort: true, cell: (i) => <StatusBadge status={i.status} /> },
+        { key: 'expires', title: t('Expires'), sort: (i) => i.expires_at, serverSort: true, className: 'text-muted-foreground', cell: (i) => fmtDate(i.expires_at) },
         {
           key: 'actions',
           title: t('Actions'),
@@ -1068,11 +1078,13 @@ export function Shares({ slug }: { slug: string }) {
   const [filter, setFilter] = useState({ owner: '', plugin: '', q: '' })
   const words = useDeferredValue(filter.q.trim())
   // filtered and paged on the server (a tenant may have hundreds of thousands of items)
+  const [sort, setSort] = useState<Sort>(null)
   const q = usePaged<ResourceRow, ResourcePageData>(['m-resources', slug, 'page'], `/api/t/${enc(slug)}/manage/resources`, {
     show: show === 'all' ? 'shared' : show,
     owner: filter.owner || undefined,
     plugin: filter.plugin || undefined,
     q: words || undefined,
+    ...sortParams(sort),
   })
   const [links, setLinks] = useState<ResourceRow | null>(null)
   const [sharing, setSharing] = useState<string | null>(null)
@@ -1241,6 +1253,8 @@ export function Shares({ slug }: { slug: string }) {
             rows={rows}
             rowKey={(r) => r.id}
             server={{ total: q.total, more: !!q.more, loading: q.loadingMore, onMore: q.loadMore }}
+            sort={sort}
+            onSort={setSort}
             selection={{ ids: sel, onChange: setSel, label: (r) => t('Select {name}', { name: r.title || r.kind }), skip: (r) => !(r.shares > 0 || r.public_links > 0) }}
             columns={[
               {
@@ -1248,6 +1262,7 @@ export function Shares({ slug }: { slug: string }) {
                 title: t('Item'),
                 width: 'minmax(12rem,2fr)',
                 sort: (r) => r.title,
+                serverSort: true,
                 cell: (r) => (
                   <>
                     <b className="block font-medium">{r.title || <span className="font-normal text-muted-foreground italic">{t('title hidden')}</span>}</b>
@@ -1262,6 +1277,7 @@ export function Shares({ slug }: { slug: string }) {
                 title: t('Owner'),
                 width: 'minmax(8rem,1fr)',
                 sort: (r) => r.owner_name,
+                serverSort: true,
                 cell: (r) => (
                   <>
                     {r.owner_name}
@@ -1273,7 +1289,7 @@ export function Shares({ slug }: { slug: string }) {
                   </>
                 ),
               },
-              { key: 'size', title: t('Size'), width: 'minmax(5rem,.6fr)', align: 'right', sort: (r) => r.size_bytes, cell: (r) => fmtBytes(r.size_bytes) },
+              { key: 'size', title: t('Size'), width: 'minmax(5rem,.6fr)', align: 'right', sort: (r) => r.size_bytes, serverSort: true, cell: (r) => fmtBytes(r.size_bytes) },
               { key: 'shares', title: t('Shares'), width: 'minmax(5rem,.6fr)', align: 'right', sort: (r) => r.shares, cell: (r) => r.shares },
               {
                 key: 'links',
@@ -1290,7 +1306,7 @@ export function Shares({ slug }: { slug: string }) {
                     0
                   ),
               },
-              { key: 'updated', title: t('Modified'), width: 'minmax(8rem,1fr)', sort: (r) => r.updated_at, className: 'text-muted-foreground', cell: (r) => fmtDate(r.updated_at) },
+              { key: 'updated', title: t('Modified'), width: 'minmax(8rem,1fr)', sort: (r) => r.updated_at, serverSort: true, className: 'text-muted-foreground', cell: (r) => fmtDate(r.updated_at) },
               {
                 key: 'actions',
                 title: t('Actions'),

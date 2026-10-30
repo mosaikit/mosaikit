@@ -205,7 +205,7 @@ async fn items_trash_log_and_plugin_lists_sort_across_pages() {
         let f = ResourcePageFilter {
             limit: Some(2),
             cursor: cursor.clone(),
-            sort: Some("title".into()),
+            sort: Some("item".into()),
             dir: dir(true),
             ..Default::default()
         };
@@ -231,7 +231,7 @@ async fn items_trash_log_and_plugin_lists_sort_across_pages() {
         let p = PageQuery {
             limit: Some(2),
             cursor: cursor.clone(),
-            sort: Some("title".into()),
+            sort: Some("item".into()),
             dir: dir(false),
             ..Default::default()
         };
@@ -246,7 +246,7 @@ async fn items_trash_log_and_plugin_lists_sort_across_pages() {
     assert_eq!(got, sorted(&titles, false));
     let p = PageQuery { sort: Some("bogus".into()), ..Default::default() };
     assert_eq!(trash::list_page(&t, &ca, None, &p).await.unwrap_err().code(), "sort_unknown");
-    let p = PageQuery { sort: Some("title".into()), ..Default::default() };
+    let p = PageQuery { sort: Some("item".into()), ..Default::default() };
     assert_eq!(trash::list_page(&t, &cbob, None, &p).await.unwrap().total, 0);
 
     // Log of the tenant: sorted by time ascending the order continues across pages

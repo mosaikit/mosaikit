@@ -135,7 +135,7 @@ const MEMBER_SORTS: &[(&str, &str)] = &[
     ("role", "m.role"),
     ("status", "(case when u.status <> 'active' then u.status else m.status end)"),
     ("home", "h.slug"),
-    ("last_sign_in", "u.last_sign_in_at"),
+    ("last", "u.last_sign_in_at"),
     ("joined", "m.joined_at"),
 ];
 

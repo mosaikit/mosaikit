@@ -681,7 +681,7 @@ const PEOPLE_SORTS: &[(&str, &str)] = &[
     ("username", "lower(u.username)"),
     ("home", "(case when u.is_system_admin then '' else h.slug end)"),
     ("status", "u.status"),
-    ("last_sign_in", "u.last_sign_in_at"),
+    ("last", "u.last_sign_in_at"),
 ];
 
 impl PeopleFilter {
