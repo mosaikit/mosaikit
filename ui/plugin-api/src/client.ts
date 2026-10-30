@@ -84,8 +84,10 @@ function mountTab(b: Bridge, el: HTMLElement, resource: string, id: string, exte
 
 export interface CrudClient {
   /** the rows, the latest changed first: all of them (up to 5,000), or a page with `limit` (the next with
-   *  `cursor`, the `next` of the previous page) */
-  list(opts?: { filter?: string; parent?: string; limit?: number; cursor?: string }): Promise<ListResult>
+   *  `cursor`, the `next` of the previous page). `sort` (a declared field that is not hidden, or `created_at`,
+   *  `updated_at`, `owner_name`) and `dir` (`asc` by default, or `desc`) sort the WHOLE list, not the page: with `limit`
+   *  the pages follow that order. A field that cannot be sorted is a 400 (`sort_unknown`). */
+  list(opts?: { filter?: string; parent?: string; limit?: number; cursor?: string; sort?: string; dir?: 'asc' | 'desc' }): Promise<ListResult>
   get(id: string): Promise<Row>
   create(values: Values, parent?: string): Promise<Row>
   update(id: string, values: Values): Promise<Row>

@@ -96,6 +96,11 @@ export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unk
       if (parent) q.set('parent', parent)
       if (typeof a.limit === 'number' && Number.isInteger(a.limit) && a.limit > 0) q.set('limit', String(Math.min(a.limit, 500)))
       if (typeof a.cursor === 'string' && a.cursor) q.set('cursor', a.cursor.slice(0, 200))
+      // the sort of the whole list: a field name (the server checks it against the manifest) and a direction
+      if (typeof a.sort === 'string' && /^[A-Za-z0-9_]{1,64}$/.test(a.sort)) {
+        q.set('sort', a.sort)
+        if (a.dir === 'asc' || a.dir === 'desc') q.set('dir', a.dir)
+      }
       const qs = q.toString()
       return { method: 'GET', url: `${base}/r/${ident(a.resource, 'resource')}${qs ? '?' + qs : ''}` }
     }

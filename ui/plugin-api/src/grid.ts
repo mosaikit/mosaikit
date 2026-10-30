@@ -12,6 +12,9 @@ export interface GridCol<T> {
   align?: 'right'
   /** the value the column sorts by; without it the title is not a button */
   sort?: (r: T) => string | number | null | undefined
+  /** in a table whose rows come from a server that pages them (`server`): the field the server sorts the WHOLE list by
+   *  (`?sort=`). Only a column with it is a sort button there; a computed or joined column is plain text */
+  serverSort?: string
   cell: (r: T) => Node | string
   className?: string
 }
@@ -24,6 +27,9 @@ export interface GridOptions<T> {
   decorate?: (r: T, tr: HTMLTableRowElement) => void
   /** a list that is whole in memory is shown a page at a time: the next page comes as the foot comes into view (or by the button) */
   local?: { step: number; more: string; of: (shown: number, total: number) => string }
+  /** the rows are paged by a server: it sorts them (the table does not); the title of a column with `serverSort` calls
+   *  `onSort` with the field and the direction (null: the order of the server) and the table goes back to its top. */
+  server?: { onSort: (s: { field: string; dir: 'asc' | 'desc' } | null) => void }
 }
 
 export interface Grid<T> {
@@ -75,7 +81,7 @@ export function gridTable<T>(o: GridOptions<T>): Grid<T> {
     const tr = el('tr', '', 'row')
     for (const c of cols) {
       const th = el('th', c.align === 'right' ? 'right' : '', 'columnheader')
-      if (c.sort) {
+      if (o.server ? c.serverSort : c.sort) {
         const on = sort?.key === c.key
         th.setAttribute('aria-sort', on ? (sort!.dir === 1 ? 'ascending' : 'descending') : 'none')
         const b = el('button', 'msk-sorthead')
@@ -85,10 +91,15 @@ export function gridTable<T>(o: GridOptions<T>): Grid<T> {
         b.append(c.title)
         b.addEventListener('click', () => {
           sort = sort?.key !== c.key ? { key: c.key, dir: 1 } : sort.dir === 1 ? { key: c.key, dir: -1 } : null
+          if (o.server) {
+            // another list from its first page: the page loads it and sets the rows again
+            tbody.scrollTop = 0
+            o.server.onSort(sort && c.serverSort ? { field: c.serverSort, dir: sort.dir === 1 ? 'asc' : 'desc' } : null)
+          }
           head()
           body()
           // the focus stays on the title that was clicked
-          thead.querySelectorAll<HTMLElement>('button.msk-sorthead')[cols.filter((x) => x.sort).findIndex((x) => x.key === c.key)]?.focus()
+          thead.querySelectorAll<HTMLElement>('button.msk-sorthead')[cols.filter((x) => (o.server ? x.serverSort : x.sort)).findIndex((x) => x.key === c.key)]?.focus()
         })
         th.append(b)
       } else th.append(c.title)
@@ -98,7 +109,7 @@ export function gridTable<T>(o: GridOptions<T>): Grid<T> {
   }
 
   function body() {
-    const col = sort ? cols.find((c) => c.key === sort!.key) : undefined
+    const col = sort && !o.server ? cols.find((c) => c.key === sort!.key) : undefined
     const list = col?.sort && sort ? [...rows].sort((a, b) => sort!.dir * compare(col.sort!(a), col.sort!(b))) : rows
     const shown = o.local ? list.slice(0, n) : list
     const trs = shown.map((r) => {

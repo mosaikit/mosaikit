@@ -19,6 +19,10 @@ describe('routeOp', () => {
     // at most 500 rows a page; a limit that is not a positive integer is ignored
     expect(routeOp('alfa', 'p.x', 'crud.list', { resource: 'notes', limit: 9999 }).url).toBe('/api/t/alfa/p/p.x/r/notes?limit=500')
     expect(routeOp('alfa', 'p.x', 'crud.list', { resource: 'notes', limit: -1 }).url).toBe('/api/t/alfa/p/p.x/r/notes')
+    // the sort of the whole list: a plain field name and a direction, nothing else reaches the server
+    expect(routeOp('alfa', 'p.x', 'crud.list', { resource: 'notes', limit: 5, sort: 'title', dir: 'desc' }).url).toBe('/api/t/alfa/p/p.x/r/notes?limit=5&sort=title&dir=desc')
+    expect(routeOp('alfa', 'p.x', 'crud.list', { resource: 'notes', sort: 'title; drop', dir: 'desc' }).url).toBe('/api/t/alfa/p/p.x/r/notes')
+    expect(routeOp('alfa', 'p.x', 'crud.list', { resource: 'notes', sort: 'title', dir: 'up' }).url).toBe('/api/t/alfa/p/p.x/r/notes?sort=title')
   })
 
   it('refuses identifiers that would change the path', () => {

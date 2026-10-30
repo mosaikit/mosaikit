@@ -94,6 +94,8 @@ type State = {
   rows: Row[]
   /** cursor of the next page (null: everything is loaded) */
   next: string | null
+  /** the sort of the whole list chosen by a title of the table (a server-paged list); null: the order of the server */
+  sort: { field: string; dir: 'asc' | 'desc' } | null
   /** rows matching the filter in all (from the server) */
   total: number | null
   selected: string | null
@@ -243,7 +245,7 @@ type Text = keyof (typeof TEXTS)['en']
 export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: CrudOptions = {}): () => void {
   const api = msk.crud(resource)
   const extApi = msk.extensions(resource)
-  const st: State = { fields: [], rows: [], next: null, total: null, selected: null, filter: '', busy: false, ext: [], extValues: {}, tab: null, editing: false, view: '', editorVals: {} }
+  const st: State = { fields: [], rows: [], next: null, sort: null, total: null, selected: null, filter: '', busy: false, ext: [], extValues: {}, tab: null, editing: false, view: '', editorVals: {} }
   let disposed = false
   /** the tab mounted now (row|extension|key) and the function that closes it */
   let mounted: { key: string; close: () => void } | null = null
@@ -258,6 +260,15 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   const grid = gridTable<Row>({
     columns: [],
     label: opts.title ?? resource,
+    // a list that pages (no `where`) is sorted by the server, the whole of it; a navigation page sorts the rows it loaded
+    server: opts.where
+      ? undefined
+      : {
+          onSort: (s) => {
+            st.sort = s
+            void load()
+          },
+        },
     decorate: (r, line) => {
       line.className = 'row' + (r.id === st.selected ? ' sel' : '')
       line.tabIndex = 0
@@ -495,6 +506,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
         title: f.label || f.key,
         width: i === 0 ? 'minmax(10rem,2fr)' : undefined,
         sort: (r) => text(f, r.values[f.key]),
+        serverSort: f.key,
         cell: (r) => {
           const box = h('span', {}, display(f, r.values[f.key]))
           if (i === 0) {
@@ -513,7 +525,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
         sort: (r) => display(x.f, st.extValues[r.id]?.[x.ext]?.[x.f.key]),
         cell: (r) => display(x.f, st.extValues[r.id]?.[x.ext]?.[x.f.key]),
       })),
-      { key: '_owner', title: tr('owner'), sort: (r) => r.owner_name, className: 'msk-owner', cell: (r) => r.owner_name },
+      { key: '_owner', title: tr('owner'), sort: (r) => r.owner_name, serverSort: 'owner_name', className: 'msk-owner', cell: (r) => r.owner_name },
     ])
     // the filter is applied by the server, a page at a time; a page of the navigation (`where`) is
     // chosen here, so it loads every row (see load)
@@ -713,8 +725,9 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   async function load() {
     try {
       const filter = st.filter.trim() || undefined
-      const r = await api.list(opts.where ? { filter } : { filter, limit: PAGE })
-      if (disposed || filter !== (st.filter.trim() || undefined)) return
+      const sort = st.sort
+      const r = await api.list(opts.where ? { filter } : { filter, limit: PAGE, ...(sort ? { sort: sort.field, dir: sort.dir } : {}) })
+      if (disposed || filter !== (st.filter.trim() || undefined) || sort !== st.sort) return
       st.fields = r.fields
       st.rows = r.rows
       st.next = r.next ?? null
@@ -736,8 +749,10 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     if (!st.next) return
     try {
       btnMore.disabled = true
-      const r = await api.list({ filter: st.filter.trim() || undefined, limit: PAGE, cursor: st.next })
-      if (disposed) return
+      const sort = st.sort
+      const r = await api.list({ filter: st.filter.trim() || undefined, limit: PAGE, cursor: st.next, ...(sort ? { sort: sort.field, dir: sort.dir } : {}) })
+      // another sort meanwhile: these rows belong to the old list
+      if (disposed || sort !== st.sort) return
       st.rows = [...st.rows, ...r.rows]
       st.next = r.next ?? null
       st.total = r.total ?? st.total

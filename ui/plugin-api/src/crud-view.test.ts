@@ -118,6 +118,47 @@ describe('mountCrud', () => {
     expect(el.querySelectorAll('tbody tr.row').length).toBe(1)
   })
 
+  it('sorts the whole list on the server: the title sends sort and dir and the list restarts from the first page', async () => {
+    const el = document.createElement('div')
+    const calls: { op: string; args: any }[] = []
+    const bridge = {
+      call: async (op: string, args: any) => {
+        calls.push({ op, args })
+        if (op === 'crud.list') {
+          const desc = args.dir === 'desc'
+          return { resource: 'notes', fields, rows: [row(desc ? '2' : '1', desc ? 'b' : 'a', 'manage')], next: 'c2', total: 3 }
+        }
+        if (op === 'ext.list') return []
+        return {}
+      },
+      onEvent: () => () => {},
+    } as unknown as Bridge
+    mountCrud(el, new Msk(bridge, { public: false }), 'notes')
+    await tick()
+    const lists = () => calls.filter((c) => c.op === 'crud.list')
+    expect(lists()[0].args.sort).toBeUndefined()
+    const head = () => el.querySelector<HTMLElement>('th button.msk-sorthead')!
+    // the computed (hidden) field has no sort button
+    expect([...el.querySelectorAll('th')].some((th) => th.textContent === 'Computed' && th.querySelector('button'))).toBe(false)
+    head().click()
+    await tick()
+    expect(lists().at(-1)!.args).toMatchObject({ sort: 'title', dir: 'asc', limit: 100 })
+    expect(lists().at(-1)!.args.cursor).toBeUndefined()
+    expect(el.querySelector('th')!.getAttribute('aria-sort')).toBe('ascending')
+    head().click()
+    await tick()
+    expect(lists().at(-1)!.args).toMatchObject({ sort: 'title', dir: 'desc' })
+    expect(el.querySelector('th')!.getAttribute('aria-sort')).toBe('descending')
+    // the next page keeps the sort, with the cursor of the sorted list
+    el.querySelector<HTMLButtonElement>('.msk-more')!.click()
+    await tick()
+    expect(lists().at(-1)!.args).toMatchObject({ sort: 'title', dir: 'desc', cursor: 'c2' })
+    // the third click: back to the order of the server
+    head().click()
+    await tick()
+    expect(lists().at(-1)!.args.sort).toBeUndefined()
+  })
+
   it('shows rows and levels and hides the computed fields', async () => {
     const el = document.createElement('div')
     const { msk } = fakeMsk([row('1', 'mine', 'manage'), row('2', 'bruno\'s', 'read', 'bruno')])
