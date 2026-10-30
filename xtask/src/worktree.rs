@@ -31,9 +31,9 @@ const PORT_STEP: u16 = 10;
 const PORT_COUNT: u16 = 40;
 /// Folder of the build caches: `MOSAIKIT_DEV_ROOT`, else the parent of the folder that holds the checkouts.
 fn dev_root() -> PathBuf {
-    std::env::var_os("MOSAIKIT_DEV_ROOT").map(PathBuf::from).unwrap_or_else(|| {
-        root().parent().and_then(Path::parent).map(Path::to_path_buf).unwrap_or_else(root)
-    })
+    std::env::var_os("MOSAIKIT_DEV_ROOT")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| root().parent().and_then(Path::parent).map(Path::to_path_buf).unwrap_or_else(root))
 }
 
 /// Loads the `.worktree.env` of the container of this checkout (the folder that contains `mosaikit/`),
