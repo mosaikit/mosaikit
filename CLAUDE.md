@@ -14,7 +14,7 @@ Architecture: [docs/architecture.md](docs/architecture.md).
 
 ## Sibling repositories
 
-Three projects sit side by side in `C:/dev/` and must stay there:
+Three projects sit side by side in one workspace folder and must stay there:
 
 | Repo | What |
 |---|---|
@@ -51,13 +51,12 @@ docs/     architecture, ui-plan, refactoring-ui, manual-tests, plugin-devkit-pla
 - **Parallel work**: worktrees only through `cargo xtask worktree add|remove`; never delete junction
   targets (`node_modules`) by hand. At most 2-3 heavy runs at once.
 - **Temp files** (worktrees, scratch targets, logs, screenshots): under `C:\tmp\mosaikit`, with
-  `MOSAIKIT_TEMP='C:\tmp\mosaikit'` exported before xtask; delete when done. No temp folder in `4.Tests`.
-- Build output and worktrees belong under `C:/dev` (excluded from the antivirus), not in
+  `MOSAIKIT_TEMP='C:\tmp\mosaikit'` exported before xtask; delete when done. No temp folder next to the repos.
+- Build output and worktrees belong under the development root, the parent of the workspace folder (excluded from the antivirus), not in
   `AppData\Local\Temp`. Disk is tight.
 - Token economy: short replies, few parallel agents, no re-reading of large files.
 
 ## Memory
 
-Standing decisions of the user are in the auto-memory of this project
-(`the auto-memory folder of this project`). The Geoportal
+Standing decisions of the user are in the auto-memory of this project. The Geoportal
 project has its own copy of the shared preferences. When a decision applies to both, save it in both.

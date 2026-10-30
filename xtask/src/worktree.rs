@@ -29,9 +29,12 @@ const ENV_FILE: &str = ".worktree.env";
 const PORT_BASE: u16 = 18200;
 const PORT_STEP: u16 = 10;
 const PORT_COUNT: u16 = 40;
-/// Shared build cache to opt in with (`CARGO_TARGET_DIR` in `.worktree.env`).
-const SHARED_TARGET: &str = r"C:/dev/.cargo-target-shared";
-const SCCACHE_DIR: &str = r"C:/dev/.sccache";
+/// Folder of the build caches: `MOSAIKIT_DEV_ROOT`, else the parent of the folder that holds the checkouts.
+fn dev_root() -> PathBuf {
+    std::env::var_os("MOSAIKIT_DEV_ROOT").map(PathBuf::from).unwrap_or_else(|| {
+        root().parent().and_then(Path::parent).map(Path::to_path_buf).unwrap_or_else(root)
+    })
+}
 
 /// Loads the `.worktree.env` of the container of this checkout (the folder that contains `mosaikit/`),
 /// or the one in the root of the checkout, into the process environment. Variables already set win.
@@ -203,11 +206,13 @@ pub fn add(name: &str, base: &str) -> Result<()> {
         "# worktree '{name}': loaded by cargo xtask (variables already set win)\n\
          MOSAIKIT_E2E_PORT={port}\n\
          MOSAIKIT_DB_SUFFIX={suffix}\n\
-         SCCACHE_DIR={SCCACHE_DIR}\n\
+         SCCACHE_DIR={sccache}\n\
          # shared build cache for every worktree that opts in (less disk, more cache hits; builds of\n\
          # different checkouts then queue on the same target folder lock):\n\
-         # CARGO_TARGET_DIR={SHARED_TARGET}\n",
-        suffix = db_suffix(name)
+         # CARGO_TARGET_DIR={shared}\n",
+        suffix = db_suffix(name),
+        sccache = dev_root().join(".sccache").display(),
+        shared = dev_root().join(".cargo-target-shared").display()
     );
     std::fs::write(container.join(ENV_FILE), &env)?;
     let branch = format!("work-{name}");

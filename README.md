@@ -600,11 +600,11 @@ All of them accept `--dist <folder of the distribution>`.
 
 ### Working in parallel: worktrees, ports, heavy-run slots
 
-Several people or agents can work at once, each in a worktree under `C:/dev.Tests\mosaikit-temp`:
+Several people or agents can work at once, each in a worktree under the temp folder (`MOSAIKIT_TEMP`):
 
 ```powershell
 cargo xtask worktree add <name>      # <temp>\<name>\mosaikit (branch work-<name>) + mosaikit-plugins (<name>-plugins)
-cd C:/dev.Tests\mosaikit-temp\<name>\mosaikit
+cd $env:MOSAIKIT_TEMP\<name>\mosaikit
 cargo xtask e2e                      # own port and database, no other setup
 cargo xtask worktree remove <name>   # when merged: junctions, worktrees, branches, database, folder
 ```
@@ -623,7 +623,7 @@ cargo xtask worktree remove <name>   # when merged: junctions, worktrees, branch
   `cargo test`/`cargo clippy` runs are not queued: prefer targeted ones (`-p <crate>`) while others are running.
 - **Disk.** Every worktree builds its own `target` (several GB). `cargo xtask clean-temp` reports the usage of
   `mosaikit-temp` and `--yes` deletes `target` folders unchanged for `--days` (14) that no running heavy run uses.
-  `sccache` (`SCCACHE_DIR=C:/dev/.sccache`, already the `rustc-wrapper` of this computer) removes most of
+  `sccache` (`SCCACHE_DIR=<dev root>/.sccache`, set in `.worktree.env`) removes most of
   the cost of compiling dependencies again. To share one build folder as well, uncomment `CARGO_TARGET_DIR` in
-  `.worktree.env` (`C:/dev/.cargo-target-shared`): less disk, but the crates of different checkouts
+  `.worktree.env` (`<dev root>/.cargo-target-shared`; the dev root is `MOSAIKIT_DEV_ROOT`, else two folders above the checkout): less disk, but the crates of different checkouts
   rebuild each other (same crate, other path) and cargo serializes builds on that folder; use it for read-mostly worktrees.
