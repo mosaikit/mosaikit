@@ -49,8 +49,8 @@ const checks: L.Check[] = [
               const all = await p.evaluate(async () => (await (await fetch('api/admin/tenants?limit=500')).json()).items.map((x: any) => x.name as string))
               const last = [...all].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))[all.length - 1]
               await p.waitForTimeout(800)
-              const top = (await p.locator('#main tbody tr').first().locator('td').nth(1).innerText()).split('
-')[0].trim()
+              const cell = await p.locator('#main tbody tr').first().locator('td').nth(1).innerText()
+              const top = cell.split('\n').map((l: string) => l.trim()).find((l: string) => all.includes(l)) ?? ''
               c.ok(top === last, `${route}: sorted descending the first row is «${last}», the last of all the tenants (got «${top}»)`)
             }
           }

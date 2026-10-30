@@ -50,12 +50,16 @@ test.describe.serial('16-tables', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
     // the global order, from the API (all tenants in one page)
     const all = (await (await page.request.get('api/admin/tenants?limit=500')).json()) as { items: { name: string }[]; total: number }
+    // the layout contract leaves enough tenants for a second page; on an empty installation there is no table
+    test.skip(all.items.length < 3, 'needs tenants')
     const key = (x: string) => x.toLowerCase()
     const names = all.items.map((x) => x.name).sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0))
     await page.goto('./#/admin/tenants')
     await expect(rows(page).first()).toBeVisible()
-    const firstCell = async () => (await rows(page).first().locator('td').nth(1).innerText()).split('
-')[0].trim()
+    // the cell of a tenant holds its initials, its name and its slug: the line that is a name
+    const known = new Set(names)
+    const nameOf = (cell: string) => cell.split('\n').map((l) => l.trim()).find((l) => known.has(l)) ?? ''
+    const firstCell = async () => nameOf(await rows(page).first().locator('td').nth(1).innerText())
     const head = page.locator('#main thead th[aria-sort]').filter({ hasText: /^Tenant$/ })
     // a computed column (the count of members) is not a sort button on a server list
     await expect(page.locator('#main thead th', { hasText: /^Members$/ }).locator('button')).toHaveCount(0)
@@ -65,8 +69,7 @@ test.describe.serial('16-tables', () => {
     // more than one page: the rows after scrolling continue the same order
     await scroller(page).evaluate((e) => (e.scrollTop = e.scrollHeight))
     await expect.poll(() => rows(page).count(), { timeout: 15_000 }).toBeGreaterThan(Math.min(50, names.length - 1))
-    const shown = async () => (await rows(page).locator('td:nth-child(2)').allInnerTexts()).map((x) => x.split('
-')[0].trim())
+    const shown = async () => (await rows(page).locator('td:nth-child(2)').allInnerTexts()).map(nameOf)
     const asc = await shown()
     expect(asc).toEqual(names.slice(0, asc.length))
     // descending: the first row is the global maximum and the scroll goes back to the top
