@@ -15,7 +15,7 @@
 
 ARG DIST=mosaikit
 
-FROM node:24-bookworm-slim AS node
+FROM node:25-bookworm-slim AS node
 
 # ---------------------------------------------------------------- build (Rust + Node)
 FROM rust:1-bookworm AS build
