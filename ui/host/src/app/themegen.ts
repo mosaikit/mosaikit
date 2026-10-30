@@ -210,7 +210,7 @@ export const CHECKS: [string, string, string][] = [
   ['--sidebar-accent-foreground', '--sidebar-accent', 'Active item in the sidebar'],
   ['--rail-foreground', '--sidebar', 'Labels of the icon bar'],
   // the active label of the icon bar sits on the sidebar itself, not on the white of the open sidebar
-  ['--sidebar-accent-foreground', '--sidebar', 'Active label of the icon bar'],
+  ['--sidebar-accent-foreground', '--sidebar', 'Labels of the icon bar'],
 ]
 
 export interface Check {
