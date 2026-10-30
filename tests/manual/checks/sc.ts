@@ -123,8 +123,7 @@ depends_on = ["init-db"]
 `
       const [ok, text] = xtask(dist('oneshot', body('')))
       c.ok(ok, 'a oneshot sidecar without port is accepted')
-      c.ok(text.includes('container MOSAIKIT_ALLOW_PRIVATE_FETCH_HOSTS=geo:9100
-'), 'the oneshot is not an allowed fetch host')
+      c.ok(text.includes('container MOSAIKIT_ALLOW_PRIVATE_FETCH_HOSTS=geo:9100\n'), 'the oneshot is not an allowed fetch host')
       c.ok(/init-db:\n {8}condition: service_completed_successfully/.test(text), 'the app waits for the oneshot to complete')
       c.ok(/init-db:\n {4}image: [^\n]+\n {4}restart: "no"/.test(text), 'the oneshot service never restarts')
       c.ok(/geo:\n {4}image[\s\S]*depends_on:\n {6}init-db:\n {8}condition: service_completed_successfully/.test(text), 'the dependant waits for the oneshot')
