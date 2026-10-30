@@ -131,10 +131,11 @@ fn tenant_info(r: &mosaikit_db::Row) -> TenantInfo {
 /// The tenants of a page (or all) with their figures, counted per tenant of the page through the
 /// indexes: with the filters as parameters the planner cannot tell how few tenants a page has, and
 /// grouping read every item (0.5 s for 1,000,000 items).
-fn tenant_list_sql(cond: &str, limit: &str) -> String {
+fn tenant_list_sql(cond: &str, limit: &str, order: &(String, String)) -> String {
+    let (inner, outer) = order;
     format!(
         "with tp as (select t.* from core.tenants t where not t.is_system and {cond}
-                     order by lower(t.name), t.id {limit})
+                     order by {inner} {limit})
          select tp.id, tp.slug, tp.name, tp.status, tp.is_system,
                 (select count(*) from core.memberships mm join core.users u on u.id = mm.user_id
                   where mm.tenant_id = tp.id and u.home_tenant_id = tp.id),
@@ -144,8 +145,32 @@ fn tenant_list_sql(cond: &str, limit: &str) -> String {
                 (select coalesce(sum(r.size_bytes), 0)::bigint from core.resources r where r.tenant_id = tp.id),
                 tp.created_at, tp.trial_until, tp.archived_at, lower(tp.name)
          from tp
-         order by lower(tp.name), tp.id"
+         order by {outer}"
     )
+}
+
+/// The columns of the list of tenants that sort on the server, as (field, expression with `@` for the alias of the
+/// table); the figures are counted per page, so they cannot.
+const TENANT_SORTS: &[(&str, &str)] = &[
+    ("name", "lower(@.name)"),
+    ("slug", "@.slug"),
+    ("status", "@.status"),
+    ("created_at", "@.created_at"),
+    ("trial_until", "@.trial_until"),
+    ("archived_at", "@.archived_at"),
+];
+
+/// The `order by` of the page on `t` and on `tp`, and where a sorted page starts (None: the usual order).
+fn tenant_order(p: &crate::paging::PageQuery) -> Result<(String, String, Option<crate::paging::Sorted>)> {
+    let on = |alias: &str| -> Result<Option<crate::paging::Sorted>> {
+        let own: Vec<(&str, String)> = TENANT_SORTS.iter().map(|(f, e)| (*f, e.replace('@', alias))).collect();
+        let refs: Vec<(&str, &str)> = own.iter().map(|(f, e)| (*f, e.as_str())).collect();
+        p.sorted(&refs, &format!("{alias}.id"))
+    };
+    Ok(match (on("t")?, on("tp")?) {
+        (Some(i), Some(o)) => (i.order.clone(), o.order, Some(i)),
+        _ => ("lower(t.name), t.id".into(), "lower(tp.name), tp.id".into(), None),
+    })
 }
 
 pub async fn list_tenants(k: &Kernel, admin: &SessionUser) -> Result<Vec<TenantInfo>> {
@@ -155,7 +180,7 @@ pub async fn list_tenants(k: &Kernel, admin: &SessionUser) -> Result<Vec<TenantI
 
 /// Every tenant but the system one, with its figures (no check: for the kernel itself).
 pub(crate) async fn all_tenants(k: &Kernel) -> Result<Vec<TenantInfo>> {
-    let rows = mosaikit_db::query(tenant_list_sql("true", "")).fetch_all(&k.db).await?;
+    let rows = mosaikit_db::query(tenant_list_sql("true", "", &("lower(t.name), t.id".into(), "lower(tp.name), tp.id".into()))).fetch_all(&k.db).await?;
     Ok(rows.iter().map(tenant_info).collect())
 }
 
@@ -171,11 +196,21 @@ pub struct TenantFilter {
     /// active, trial, suspended, archived
     #[serde(default)]
     pub status: Option<String>,
+    #[serde(default)]
+    pub sort: Option<String>,
+    #[serde(default)]
+    pub dir: Option<String>,
 }
 
 impl TenantFilter {
     pub fn page(&self) -> crate::paging::PageQuery {
-        crate::paging::PageQuery { limit: self.limit, cursor: self.cursor.clone(), q: self.q.clone() }
+        crate::paging::PageQuery {
+            limit: self.limit,
+            cursor: self.cursor.clone(),
+            q: self.q.clone(),
+            sort: self.sort.clone(),
+            dir: self.dir.clone(),
+        }
     }
 }
 
@@ -220,8 +255,10 @@ pub async fn tenants_page(
     .fetch_one(&k.db)
     .await?;
     let limit = f.page().limit();
+    let (ord_in, ord_out, sorted) = tenant_order(&f.page())?;
     let after = f.page().after()?;
-    let sql = tenant_list_sql(&cond(after.is_some()), &format!("limit {}", limit + 1));
+    let offset = sorted.as_ref().map(|s| format!(" offset {}", s.offset)).unwrap_or_default();
+    let sql = tenant_list_sql(&cond(after.is_some()), &format!("limit {}{offset}", limit + 1), &(ord_in, ord_out));
     let mut q = mosaikit_db::query(sql).bind(like.as_deref()).bind(status);
     if let Some((text, id)) = &after {
         q = q.bind(text.clone()).bind(*id);
@@ -229,7 +266,10 @@ pub async fn tenants_page(
     let rows = q.fetch_all(&k.db).await?;
     // the key of the order as the database computed it (lower() of the database, not of Rust)
     let items: Vec<(TenantInfo, String)> = rows.iter().map(|r| (tenant_info(r), r.get(12))).collect();
-    let p = crate::paging::page(items, limit, total, |(t, key)| (key.clone(), t.id));
+    let p = match &sorted {
+        Some(s) => crate::paging::page_sorted(items, limit, total, s.offset),
+        None => crate::paging::page(items, limit, total, |(t, key)| (key.clone(), t.id)),
+    };
     Ok(crate::paging::Page {
         items: p.items.into_iter().map(|(t, _)| t).collect(),
         total: p.total,

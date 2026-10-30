@@ -122,11 +122,32 @@ pub struct MemberFilter {
     /// only the ids of every match (for "select all"), up to 10,000
     #[serde(default)]
     pub ids: bool,
+    #[serde(default)]
+    pub sort: Option<String>,
+    #[serde(default)]
+    pub dir: Option<String>,
 }
+
+/// The columns of Manage › People that sort on the server (the groups and the count of items are computed per page).
+const MEMBER_SORTS: &[(&str, &str)] = &[
+    ("name", "lower(coalesce(nullif(u.display_name, ''), u.username))"),
+    ("username", "lower(u.username)"),
+    ("role", "m.role"),
+    ("status", "(case when u.status <> 'active' then u.status else m.status end)"),
+    ("home", "h.slug"),
+    ("last_sign_in", "u.last_sign_in_at"),
+    ("joined", "m.joined_at"),
+];
 
 impl MemberFilter {
     pub fn page(&self) -> crate::paging::PageQuery {
-        crate::paging::PageQuery { limit: self.limit, cursor: self.cursor.clone(), q: self.q.clone() }
+        crate::paging::PageQuery {
+            limit: self.limit,
+            cursor: self.cursor.clone(),
+            q: self.q.clone(),
+            sort: self.sort.clone(),
+            dir: self.dir.clone(),
+        }
     }
 }
 
@@ -175,6 +196,7 @@ pub async fn members_page(k: &Kernel, c: &Caller, f: &MemberFilter) -> Result<Me
         None
     };
     let limit = f.page().limit();
+    let sorted = f.page().sorted(MEMBER_SORTS, "u.id")?;
     let mut extra = base();
     let mut cond = cond;
     if let Some((text, id)) = f.page().after()? {
@@ -187,12 +209,18 @@ pub async fn members_page(k: &Kernel, c: &Caller, f: &MemberFilter) -> Result<Me
         tenant,
         &cond,
         &extra,
-        &format!("order by lower(u.username), u.id limit {}", limit + 1),
+        &match &sorted {
+            Some(s) => format!("order by {} limit {} offset {}", s.order, limit + 1, s.offset),
+            None => format!("order by lower(u.username), u.id limit {}", limit + 1),
+        },
     )
     .await?;
     // usernames are lower case (valid_username), so the key of the order is the username itself
     Ok(MemberPage {
-        page: crate::paging::page(items, limit, total, |m| (m.username.to_lowercase(), m.user_id)),
+        page: match &sorted {
+            Some(s) => crate::paging::page_sorted(items, limit, total, s.offset),
+            None => crate::paging::page(items, limit, total, |m| (m.username.to_lowercase(), m.user_id)),
+        },
         ids,
     })
 }

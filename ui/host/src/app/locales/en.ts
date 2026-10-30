@@ -93,6 +93,7 @@ export const EN: Record<string, string> = {
   'Revoke every share and public link of {count} items? The owners keep their items._one': 'Revoke every share and public link of 1 item? The owner keeps it.',
   'Revoke every share and public link of {count} items? The owners keep their items._other': 'Revoke every share and public link of {count} items? The owners keep their items.',
   'errors.trash_not_found': 'Item not found in the trash',
+  'errors.sort_unknown': 'This list cannot be sorted by that column',
   'errors.trash_parent_deleted': 'The item is inside another item of the trash: restore that one first',
   'errors.trash_plugin_missing': 'The app of the item is not installed any more',
   'errors.confirm_mismatch': 'Type the address of the tenant to confirm',

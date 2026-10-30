@@ -40,6 +40,40 @@ pub struct ListResult {
 pub struct Paging {
     pub limit: i64,
     pub cursor: Option<String>,
+    /// a declared field (not hidden) or `created_at`, `updated_at`, `owner_name`: sorts the WHOLE list by it
+    pub sort: Option<String>,
+    /// `asc` (default) or `desc`
+    pub dir: Option<String>,
+}
+
+/// A sort of the list by a column: its SQL expression (built from the manifest, never from the request) and
+/// the direction.
+struct Order {
+    expr: String,
+    dir: &'static str,
+}
+
+/// The sort asked for, checked against the fields the manifest declares: a hidden (computed) field cannot be sorted.
+fn order_of(d: &ResourceDecl, pg: &Paging) -> Result<Option<Order>> {
+    let Some(field) = pg.sort.as_deref().filter(|f| !f.is_empty()) else { return Ok(None) };
+    let unknown = || Error::bad(format!("cannot sort by {field}")).with_code("sort_unknown");
+    let expr = match d.fields.iter().find(|f| f.key == field) {
+        Some(f) if f.hidden => return Err(unknown()),
+        Some(f) if matches!(f.kind, FieldKind::Text | FieldKind::Choice) => format!("lower(t.{})", qi(&f.key)),
+        Some(f) => format!("t.{}", qi(&f.key)),
+        None => match field {
+            "created_at" => "v.created_at".to_string(),
+            "updated_at" => "v.updated_at".to_string(),
+            "owner_name" => "lower(v.owner_name)".to_string(),
+            _ => return Err(unknown()),
+        },
+    };
+    let dir = match pg.dir.as_deref().unwrap_or("asc") {
+        "asc" | "" => "asc",
+        "desc" => "desc",
+        _ => return Err(unknown()),
+    };
+    Ok(Some(Order { expr, dir }))
 }
 
 /// The cursor of the row after which the next page starts: `<updated_at>|<id>` (keyset on the order of
@@ -65,7 +99,7 @@ fn decl<'a>(p: &'a LoadedPlugin, resource: &str) -> Result<&'a ResourceDecl> {
 
 /// SELECT of the visible rows with metadata, as JSON.
 fn select_sql(k: &Kernel, p: &LoadedPlugin, d: &ResourceDecl, cond: &str) -> String {
-    select_sql_limit(k, p, d, cond, MAX_ROWS, false)
+    select_sql_limit(k, p, d, cond, MAX_ROWS, false, None, 0)
 }
 
 /// `with_total` (SQLite only): the second column is how many rows match, counted in the same pass.
@@ -76,20 +110,35 @@ fn select_sql_limit(
     cond: &str,
     limit: i64,
     with_total: bool,
+    order: Option<&Order>,
+    offset: i64,
 ) -> String {
     if k.db.is_sqlite() {
-        return select_sql_lite(p, d, cond, limit, with_total);
+        return select_sql_lite(p, d, cond, limit, with_total, order, offset);
     }
+    // sorted: the key of the sort travels in the subquery and is removed from the rows
+    let (agg, inner, extra) = match order {
+        Some(o) => (
+            format!("(jsonb_agg(to_jsonb(x) - 'sort_key' order by x.sort_key {dir} nulls last, x.id))::json", dir = o.dir),
+            format!("{} {} nulls last, t.resource_id", o.expr, o.dir),
+            format!(", {} as sort_key", o.expr),
+        ),
+        None => (
+            "json_agg(x order by x.updated_at desc, x.id desc)".to_string(),
+            "v.updated_at desc, t.resource_id desc".to_string(),
+            String::new(),
+        ),
+    };
     let obj: Vec<String> = d.fields.iter().map(|f| format!("'{0}', t.{1}", f.key, qi(&f.key))).collect();
     format!(
-        "select coalesce(json_agg(x order by x.updated_at desc, x.id desc), '[]'::json) from (
+        "select coalesce({agg}, '[]'::json) from (
            select t.resource_id as id, v.parent_id, v.owner_id, v.owner_name, v.shared, v.created_at, v.updated_at,
                   case v.my_level when 3 then 'manage' when 2 then 'write' else 'read' end as my_level,
-                  json_build_object({obj}) as values
+                  json_build_object({obj}) as values{extra}
            from {schema}.{table} t join core.visible_resources v on v.id = t.resource_id
            where true {cond}
-           order by v.updated_at desc, t.resource_id desc
-           limit {limit}) x",
+           order by {inner}
+           limit {limit} offset {offset}) x",
         obj = obj.join(", "),
         schema = qi(&p.schema()),
         table = qi(&d.name),
@@ -98,7 +147,27 @@ fn select_sql_limit(
 
 /// Like `select_sql` for SQLite: JSON objects built row by row (`json_agg(x)`
 /// does not exist) and booleans converted (SQLite stores them as 0/1).
-fn select_sql_lite(p: &LoadedPlugin, d: &ResourceDecl, cond: &str, limit: i64, with_total: bool) -> String {
+fn select_sql_lite(
+    p: &LoadedPlugin,
+    d: &ResourceDecl,
+    cond: &str,
+    limit: i64,
+    with_total: bool,
+    order: Option<&Order>,
+    offset: i64,
+) -> String {
+    let (outer, inner, extra) = match order {
+        Some(o) => (
+            format!("x.sort_key {dir} nulls last, x.id", dir = o.dir),
+            format!("{} {} nulls last, t.resource_id", o.expr, o.dir),
+            format!(", {} as sort_key", o.expr),
+        ),
+        None => (
+            "x.updated_at desc, x.id desc".to_string(),
+            "v.updated_at desc, t.resource_id desc".to_string(),
+            String::new(),
+        ),
+    };
     let obj: Vec<String> = d
         .fields
         .iter()
@@ -112,16 +181,16 @@ fn select_sql_lite(p: &LoadedPlugin, d: &ResourceDecl, cond: &str, limit: i64, w
         })
         .collect();
     format!(
-        "select coalesce(json_group_array(json(x.obj) order by x.updated_at desc, x.id desc), '[]'){total_col} from (
+        "select coalesce(json_group_array(json(x.obj) order by {outer}), '[]'){total_col} from (
            select json_object('id', t.resource_id, 'parent_id', v.parent_id, 'owner_id', v.owner_id,
                   'owner_name', v.owner_name, 'shared', json(case when v.shared then 'true' else 'false' end),
                   'created_at', v.created_at, 'updated_at', v.updated_at,
                   'my_level', case v.my_level when 3 then 'manage' when 2 then 'write' else 'read' end,
-                  'values', json_object({obj})) as obj, v.updated_at, t.resource_id as id{total_win}
+                  'values', json_object({obj})) as obj, v.updated_at, t.resource_id as id{total_win}{extra}
            from {schema}.{table} t join core.visible_resources v on v.id = t.resource_id
            where true {cond}
-           order by v.updated_at desc, t.resource_id desc
-           limit {limit}) x",
+           order by {inner}
+           limit {limit} offset {offset}) x",
         obj = obj.join(", "),
         schema = qi(&p.schema()),
         table = qi(&d.name),
@@ -182,7 +251,17 @@ pub async fn list_ctx_paged(
         });
     };
     let limit = pg.limit.clamp(1, MAX_PAGE);
+    let order = order_of(d, pg)?;
     let cursor = pg.cursor.as_deref().filter(|c| !c.is_empty());
+    // a sorted list pages by offset (`~<n>`): the sort key is neither unique nor always set
+    let offset = match (&order, cursor) {
+        (Some(_), Some(c)) => c
+            .strip_prefix('~')
+            .and_then(|n| n.parse::<i64>().ok())
+            .filter(|n| *n >= 0)
+            .ok_or_else(|| Error::bad("invalid cursor"))?,
+        _ => 0,
+    };
     // the total of the filter comes with the first page only (the following ones would count the same
     // set again: the shell keeps the first total). SQLite counts in the same pass as the page: the
     // visibility is most of the cost and a second pass doubled it.
@@ -196,7 +275,7 @@ pub async fn list_ctx_paged(
         );
         total = Some(host::bind_json(mosaikit_db::query(sql), &binds).fetch_one(&mut *tx).await?.try_get(0)?);
     }
-    if let Some(c) = cursor {
+    if let Some(c) = cursor.filter(|_| order.is_none()) {
         let (at, id) = parse_cursor(c)?;
         binds.push(json!(at));
         binds.push(json!(id.to_string()));
@@ -206,7 +285,7 @@ pub async fn list_ctx_paged(
             binds.len()
         ));
     }
-    let sql = select_sql_limit(k, p, d, &cond, limit + 1, single);
+    let sql = select_sql_limit(k, p, d, &cond, limit + 1, single, order.as_ref(), offset);
     let mut rows = if single {
         let r = host::bind_json(mosaikit_db::query(sql), &binds).fetch_one(&mut *tx).await?;
         let v: Value = r.try_get(0)?;
@@ -218,7 +297,11 @@ pub async fn list_ctx_paged(
     tx.commit().await?;
     let next = if rows.len() as i64 > limit {
         rows.truncate(limit as usize);
-        rows.last().and_then(cursor_of)
+        if order.is_some() {
+            Some(format!("~{}", offset + limit))
+        } else {
+            rows.last().and_then(cursor_of)
+        }
     } else {
         None
     };

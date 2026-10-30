@@ -118,6 +118,15 @@ pub async fn invite_with(
     invitation(&row)
 }
 
+/// The columns of the list of invitations that sort on the server.
+const INVITE_SORTS: &[(&str, &str)] = &[
+    ("person", "lower(u.username || '@' || h.slug)"),
+    ("role", "i.role"),
+    ("status", "(case when i.status = 'pending' and i.expires_at < now() then 'expired' else i.status end)"),
+    ("created", "i.created_at"),
+    ("expires", "i.expires_at"),
+];
+
 pub async fn tenant_invitations(k: &Kernel, c: &Caller) -> Result<Vec<InvitationInfo>> {
     c.require_manager()?;
     let rows = mosaikit_db::query(format!("{INVITE_SQL} where i.tenant_id = $1 order by i.created_at desc"))
@@ -144,12 +153,14 @@ pub async fn tenant_invitations_page(
     .await?;
     let (total, pending): (i64, i64) = (counts.get(0), counts.get(1));
     let limit = p.limit();
+    let sorted = p.sorted(INVITE_SORTS, "i.id")?;
     let after = p.after()?;
     let cursor = if after.is_some() { "and (i.created_at, i.id) < ($2::timestamptz, $3::uuid)" } else { "" };
-    let mut q = mosaikit_db::query(format!(
-        "{INVITE_SQL} where i.tenant_id = $1 {cursor} order by i.created_at desc, i.id desc limit {}",
-        limit + 1
-    ))
+    let tail = match &sorted {
+        Some(s) => format!("order by {} limit {} offset {}", s.order, limit + 1, s.offset),
+        None => format!("order by i.created_at desc, i.id desc limit {}", limit + 1),
+    };
+    let mut q = mosaikit_db::query(format!("{INVITE_SQL} where i.tenant_id = $1 {cursor} {tail}"))
     .bind(c.tenant.tenant_id);
     if let Some((text, id)) = &after {
         q = q.bind(text.clone()).bind(*id);
@@ -159,7 +170,10 @@ pub async fn tenant_invitations_page(
         .iter()
         .map(|r| invitation(r).map(|x| (x, r.get::<String, _>(10))))
         .collect::<Result<Vec<_>>>()?;
-    let pg = crate::paging::page(items, limit, total, |(x, key)| (key.clone(), x.id));
+    let pg = match &sorted {
+        Some(s) => crate::paging::page_sorted(items, limit, total, s.offset),
+        None => crate::paging::page(items, limit, total, |(x, key)| (key.clone(), x.id)),
+    };
     Ok((
         crate::paging::Page {
             items: pg.items.into_iter().map(|(x, _)| x).collect(),

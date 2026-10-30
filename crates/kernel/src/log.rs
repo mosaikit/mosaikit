@@ -50,6 +50,34 @@ pub struct LogFilter {
     pub limit: Option<i64>,
     /// CSV of a selection: ids separated by commas
     pub ids: Option<String>,
+    /// the column to sort by (`LOG_SORTS`); the latest first without it
+    pub sort: Option<String>,
+    /// `asc` (default) or `desc`
+    pub dir: Option<String>,
+    /// with a sort: the rows to skip (the `next` of the previous page)
+    pub offset: Option<i64>,
+}
+
+/// The columns of the Log that sort on the server (what an event is about is computed from the details).
+const LOG_SORTS: &[(&str, &str)] = &[
+    ("when", "e.ts"),
+    ("who", "lower(coalesce(nullif(u.display_name, ''), u.username))"),
+    ("what", "e.action"),
+    ("tenant", "lower(t.name)"),
+    ("result", "e.ok"),
+];
+
+impl LogFilter {
+    /// The `order by` and the first row of a sorted page; None for the usual order.
+    fn sorted(&self) -> Result<Option<crate::paging::Sorted>> {
+        let q = crate::paging::PageQuery {
+            sort: self.sort.clone(),
+            dir: self.dir.clone(),
+            cursor: self.offset.map(|o| format!("~{}", o.max(0))),
+            ..Default::default()
+        };
+        q.sorted(LOG_SORTS, "e.id")
+    }
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -76,7 +104,7 @@ pub struct LogEvent {
 #[derive(Debug, Clone, Serialize)]
 pub struct LogPage {
     pub events: Vec<LogEvent>,
-    /// cursor of the next page (`before`), when there is one
+    /// cursor of the next page, when there is one: the `before` of the usual order, the `offset` of a sorted one
     pub next: Option<i64>,
 }
 
@@ -158,6 +186,7 @@ async fn fetch(k: &Kernel, scope: Scope<'_>, f: &LogFilter, limit: i64) -> Resul
           or e.user_id in (select su.id from core.users su
                            where (su.username || chr(1) || coalesce(su.display_name, '')) ilike $9 escape '\\'))"
     };
+    let sorted = f.sorted()?;
     let sql = format!(
         "select e.id, e.ts, e.tenant_id, t.slug, t.name, t.settings, e.user_id, u.username,
                 coalesce(nullif(u.display_name, ''), u.username), e.plugin_id, e.resource_id, r.title,
@@ -168,7 +197,7 @@ async fn fetch(k: &Kernel, scope: Scope<'_>, f: &LogFilter, limit: i64) -> Resul
          left join core.resources r on r.id = e.resource_id
          where {tenant} and {user} and {plugin} and {resource} and {group} and {from} and {to} and {failed}
            and {search} and {before} and {what}
-         order by e.id desc limit $11",
+         order by {order} limit $11 offset {offset}",
         // only the filters in use become conditions (an unused one is `$n is null`, true): with
         // `($n is null or column = $n)` the plan prepared once cannot use the indexes of the column
         tenant = opt(tenant.is_some(), "e.tenant_id = $1", "$1::uuid is null"),
@@ -180,8 +209,10 @@ async fn fetch(k: &Kernel, scope: Scope<'_>, f: &LogFilter, limit: i64) -> Resul
         to = opt(f.to.is_some(), "e.ts < $7", "$7::timestamptz is null"),
         failed = opt(f.failed, "(not e.ok and $8)", "not $8"),
         search = if like.is_some() { search_sql } else { "$9::text is null" },
-        before = opt(f.before.is_some(), "e.id < $10", "$10::bigint is null"),
+        before = opt(f.before.is_some() && sorted.is_none(), "e.id < $10", "$10::bigint is null"),
         what = what_sql(f.what.as_deref()),
+        order = sorted.as_ref().map_or("e.id desc", |s| s.order.as_str()),
+        offset = sorted.as_ref().map_or(0, |s| s.offset),
     );
     let rows = mosaikit_db::query(sql)
         .bind(tenant)
@@ -193,7 +224,7 @@ async fn fetch(k: &Kernel, scope: Scope<'_>, f: &LogFilter, limit: i64) -> Resul
         .bind(f.to)
         .bind(f.failed)
         .bind(like)
-        .bind(f.before)
+        .bind(if sorted.is_some() { None } else { f.before })
         .bind(limit)
         .fetch_all(&k.db)
         .await?;
@@ -268,7 +299,10 @@ pub async fn page(k: &Kernel, scope: Scope<'_>, f: &LogFilter) -> Result<LogPage
     let mut events = fetch(k, scope, f, size + 1).await?;
     let next = if events.len() as i64 > size {
         events.truncate(size as usize);
-        events.last().map(|e| e.id)
+        match f.sorted()? {
+            Some(s) => Some(s.offset + size),
+            None => events.last().map(|e| e.id),
+        }
     } else {
         None
     };

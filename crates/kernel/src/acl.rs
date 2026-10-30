@@ -400,11 +400,32 @@ pub struct ResourcePageFilter {
     /// only the ids of every match (for "select all"), up to 10,000
     #[serde(default)]
     pub ids: bool,
+    #[serde(default)]
+    pub sort: Option<String>,
+    #[serde(default)]
+    pub dir: Option<String>,
 }
+
+/// The columns of Manage › Items that sort on the server (shares and links are counted per page). The title sorts
+/// only when the Tenant Manager may see titles: otherwise it is empty for everybody and the order would leak.
+const RESOURCE_SORTS: &[(&str, &str)] = &[
+    ("title", "(case when $2 then lower(r.title) else '' end)"),
+    ("app", "r.plugin_id"),
+    ("owner", "lower(coalesce(nullif(u.display_name, ''), u.username))"),
+    ("size", "r.size_bytes"),
+    ("created", "r.created_at"),
+    ("updated", "r.updated_at"),
+];
 
 impl ResourcePageFilter {
     pub fn page(&self) -> crate::paging::PageQuery {
-        crate::paging::PageQuery { limit: self.limit, cursor: self.cursor.clone(), q: self.q.clone() }
+        crate::paging::PageQuery {
+            limit: self.limit,
+            cursor: self.cursor.clone(),
+            q: self.q.clone(),
+            sort: self.sort.clone(),
+            dir: self.dir.clone(),
+        }
     }
 }
 
@@ -482,8 +503,13 @@ pub async fn manager_resources_page(k: &Kernel, c: &Caller, f: &ResourcePageFilt
         None
     };
     let limit = f.page().limit();
+    let sorted = f.page().sorted(RESOURCE_SORTS, "r.id")?;
     let after = f.page().after()?;
     let cursor = if after.is_some() { "and (r.updated_at, r.id) < ($6::timestamptz, $7::uuid)" } else { "" };
+    let tail = match &sorted {
+        Some(s) => format!("order by {} limit {} offset {}", s.order, limit + 1, s.offset),
+        None => format!("order by r.updated_at desc, r.id desc limit {}", limit + 1),
+    };
     let mut q = bind(mosaikit_db::query(format!(
         "select r.id, r.plugin_id, r.kind, case when $2 then r.title else '' end, r.owner_id,
                 coalesce(nullif(u.display_name, ''), u.username), u.status = 'active'
@@ -495,8 +521,7 @@ pub async fn manager_resources_page(k: &Kernel, c: &Caller, f: &ResourcePageFilt
                 r.updated_at::text
          from core.resources r join core.users u on u.id = r.owner_id
          where {base} and {show} {cursor}
-         order by r.updated_at desc, r.id desc limit {}",
-        limit + 1
+         {tail}"
     )));
     if let Some((text, id)) = &after {
         q = q.bind(text.clone()).bind(*id);
@@ -524,7 +549,10 @@ pub async fn manager_resources_page(k: &Kernel, c: &Caller, f: &ResourcePageFilt
             )
         })
         .collect();
-    let p = crate::paging::page(items, limit, total, |(row, key)| (key.clone(), row.id));
+    let p = match &sorted {
+        Some(s) => crate::paging::page_sorted(items, limit, total, s.offset),
+        None => crate::paging::page(items, limit, total, |(row, key)| (key.clone(), row.id)),
+    };
     Ok(ResourcePage {
         page: crate::paging::Page {
             items: p.items.into_iter().map(|(x, _)| x).collect(),

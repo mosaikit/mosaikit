@@ -877,6 +877,8 @@ async fn crud_list(
         Some(l) => Some(crud::Paging {
             limit: l.parse().map_err(|_| bad("invalid limit"))?,
             cursor: q.get("cursor").cloned(),
+            sort: q.get("sort").cloned(),
+            dir: q.get("dir").cloned(),
         }),
         None => None,
     };

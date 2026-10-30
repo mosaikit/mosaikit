@@ -669,11 +669,30 @@ pub struct PeopleFilter {
     /// only the ids of every match (for "select all"), up to 10,000
     #[serde(default)]
     pub ids: bool,
+    #[serde(default)]
+    pub sort: Option<String>,
+    #[serde(default)]
+    pub dir: Option<String>,
 }
+
+/// The columns of the people list that sort on the server (the tenants of a person are computed per page).
+const PEOPLE_SORTS: &[(&str, &str)] = &[
+    ("name", "lower(coalesce(nullif(u.display_name, ''), u.username))"),
+    ("username", "lower(u.username)"),
+    ("home", "(case when u.is_system_admin then '' else h.slug end)"),
+    ("status", "u.status"),
+    ("last_sign_in", "u.last_sign_in_at"),
+];
 
 impl PeopleFilter {
     pub fn page(&self) -> crate::paging::PageQuery {
-        crate::paging::PageQuery { limit: self.limit, cursor: self.cursor.clone(), q: self.q.clone() }
+        crate::paging::PageQuery {
+            limit: self.limit,
+            cursor: self.cursor.clone(),
+            q: self.q.clone(),
+            sort: self.sort.clone(),
+            dir: self.dir.clone(),
+        }
     }
 }
 
@@ -764,15 +783,16 @@ pub async fn people_page(k: &Kernel, admin: &SessionUser, f: &PeopleFilter) -> R
         None
     };
     let limit = f.page().limit();
+    let sorted = f.page().sorted(PEOPLE_SORTS, "u.id")?;
     let after = f.page().after()?;
     if after.is_some() {
         conds.push(format!("({key}, u.id) > ($5, $6::uuid)"));
     }
-    let sql = format!(
-        "select {PERSON_COLUMNS}, {key} {from} where {} order by {key}, u.id limit {}",
-        conds.join(" and "),
-        limit + 1
-    );
+    let tail = match &sorted {
+        Some(s) => format!("order by {} limit {} offset {}", s.order, limit + 1, s.offset),
+        None => format!("order by {key}, u.id limit {}", limit + 1),
+    };
+    let sql = format!("select {PERSON_COLUMNS}, {key} {from} where {} {tail}", conds.join(" and "));
     let mut q = mosaikit_db::query(sql).bind(like.as_deref()).bind(f.tenant).bind(role).bind(status);
     if let Some((text, id)) = &after {
         q = q.bind(text.clone()).bind(*id);
@@ -802,7 +822,10 @@ pub async fn people_page(k: &Kernel, admin: &SessionUser, f: &PeopleFilter) -> R
     let keys: Vec<String> = rows.iter().map(|r| r.get::<String, _>(11)).collect();
     let people = person_rows_with(&rows, &ms)?;
     let items: Vec<(PersonRow, String)> = people.into_iter().zip(keys).collect();
-    let p = crate::paging::page(items, limit, total, |(person, key)| (key.clone(), person.user_id));
+    let p = match &sorted {
+        Some(s) => crate::paging::page_sorted(items, limit, total, s.offset),
+        None => crate::paging::page(items, limit, total, |(person, key)| (key.clone(), person.user_id)),
+    };
     // grouped, not a subquery per person: 20,000 people took a second
     let counts = mosaikit_db::query(
         "select (select count(*) from core.users),

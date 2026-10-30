@@ -1219,6 +1219,7 @@ export const IT: Record<string, string> = {
   'Log kept, in days': 'Giorni di conservazione del registro',
   'Older events are deleted': 'Gli eventi più vecchi vengono eliminati',
   'errors.trash_not_found': 'Elemento non trovato nel cestino',
+  'errors.sort_unknown': 'Questa lista non può essere ordinata per quella colonna',
   'errors.trash_parent_deleted': 'L’elemento è dentro un altro elemento del cestino: ripristina prima quello',
   'errors.trash_plugin_missing': 'L’app dell’elemento non è più installata',
   // trash, log and shares (phase 5)

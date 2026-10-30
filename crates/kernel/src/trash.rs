@@ -132,6 +132,11 @@ pub async fn list_page(
     let mut all = list(k, c, plugin, p.q.as_deref()).await?;
     all.sort_by_key(|a| std::cmp::Reverse((a.deleted_at, a.id)));
     let total = all.len() as i64;
+    if let Some(s) = sort_order(p, &mut all)? {
+        let limit = p.limit();
+        let rows: Vec<TrashItem> = all.into_iter().skip(s as usize).take(limit as usize + 1).collect();
+        return Ok(crate::paging::page_sorted(rows, limit, total, s));
+    }
     let after = p
         .after()?
         .map(|(t, id)| DateTime::parse_from_rfc3339(&t).map(|d| (d.with_timezone(&Utc), id)))
@@ -146,6 +151,31 @@ pub async fn list_page(
     Ok(crate::paging::page(rows, limit, total, |x| {
         (x.deleted_at.to_rfc3339_opts(chrono::SecondsFormat::Micros, true), x.id)
     }))
+}
+
+/// The sortable columns of the trash (the list is cut in memory, so any column of the row sorts). Sorts `all`
+/// by the column asked for (ties by id) and returns where the page starts; None when no sort was asked.
+fn sort_order(p: &crate::paging::PageQuery, all: &mut [TrashItem]) -> Result<Option<i64>> {
+    const FIELDS: &[(&str, &str)] =
+        &[("title", ""), ("app", ""), ("owner", ""), ("size", ""), ("deleted", ""), ("purge", "")];
+    let Some(s) = p.sorted(FIELDS, "id")? else { return Ok(None) };
+    let desc = p.dir.as_deref() == Some("desc");
+    let field = p.sort.as_deref().unwrap_or_default();
+    let key = |x: &TrashItem| -> (i64, String) {
+        match field {
+            "title" => (0, x.title.to_lowercase()),
+            "app" => (0, x.plugin_id.to_lowercase()),
+            "owner" => (0, x.owner_name.to_lowercase()),
+            "size" => (x.size_bytes, String::new()),
+            "deleted" => (x.deleted_at.timestamp_micros(), String::new()),
+            _ => (x.purge_at.timestamp_micros(), String::new()),
+        }
+    };
+    all.sort_by(|a, b| {
+        let o = key(a).cmp(&key(b));
+        (if desc { o.reverse() } else { o }).then(a.id.cmp(&b.id))
+    });
+    Ok(Some(s.offset))
 }
 
 struct Entry {
