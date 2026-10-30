@@ -134,7 +134,8 @@ impl Instance {
         let db = checkout_db(&format!("mosaikit_{suite}"));
         reset_db(&db)?;
         // the wildcard run keeps its own folder: it must not wipe the logs of the run before
-        let dir = root().join(".dev").join(if wildcard { format!("{suite}-wildcard") } else { suite.to_string() });
+        let dir =
+            root().join(".dev").join(if wildcard { format!("{suite}-wildcard") } else { suite.to_string() });
         if dir.exists() {
             std::fs::remove_dir_all(&dir)?;
         }
