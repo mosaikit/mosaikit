@@ -60,13 +60,17 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - name: fmt, clippy, typecheck, lint, build, test (PostgreSQL and SQLite)
         run: cargo xtask ci
-      - name: test end-to-end (Playwright)
+      - name: browser and PostgreSQL 17 client
         run: |
           npx playwright install --with-deps chromium
-          # pg_dump of the backups must match the server (PostGIS 17 above): the client of the runner is older
           sudo apt-get install -y postgresql-common
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
           sudo apt-get install -y postgresql-client-17
+          # pg_dump of the backups must match the server (PostGIS 17 above): the wrapper of the runner picks 16
+          echo /usr/lib/postgresql/17/bin >> "$GITHUB_PATH"
+      - name: test end-to-end (Playwright)
+        run: |
+          pg_dump --version
           E2E_CHANNEL=chromium cargo xtask e2e
       - uses: actions/upload-artifact@v4
         if: failure()
