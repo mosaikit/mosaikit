@@ -72,6 +72,9 @@ in step).
 
 ### The platform
 
+- A deployer can open a service on the private network to the plugins that declare it: `allow_private_fetch_hosts = ["host:port"]` in `mosaikit.toml` (exact entries only). Everything else stays guarded.
+- A distribution can seed the settings of plugins (secrets included) and the platform keys of outside services with `[[plugin_settings]]` and `[[service_key_values]]`, from `env:NAME` or `file:PATH`. They are applied once, only while unset, and never overwrite what an Administrator chose.
+
 - Administrators have a required, unique email. They change their own from Account (current password and second factor) and the name and email of another Administrator from System › Administrators.
 - System › Email says what is missing and how to set it up, with a preset for a local test server (Mailpit in the development setup).
 

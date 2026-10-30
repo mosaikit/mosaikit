@@ -231,12 +231,23 @@ logic never holds the secret, and fails with «no key of the service … is set�
 address may be an origin of `permissions.network` or the one in use for an address service the plugin
 declares (so the Administrator, not the manifest, chooses the server). Every plugin request goes through
 `webfetch::request`, the same guard as the page probe: http and https only, public addresses only (a
-private or loopback address needs `allow_private_fetch`, development and tests only), the connection pinned
+private or loopback address needs `allow_private_fetch`, development and tests only, or an exact `host:port` in
+`allow_private_fetch_hosts`, see below), the connection pinned
 to the address checked, redirects followed only for a GET, answer cut at 4 MB. A command answers a missing
 key or address with `{ ok: false, reason }` (`no_key`, `no_endpoint`, `key_rejected`, `service_error`,
 `unreachable`) so its UI says what to do. In tests a double server records the request (see
 `a_plugin_calls_a_service_with_its_key_and_only_where_allowed` in `crates/kernel/tests/plugin_lifecycle.rs`);
 no test calls a real service.
+
+**Internal services (`allow_private_fetch_hosts`).** A deployer who runs a service on the private network (a
+translation engine, say) lists it in `mosaikit.toml`: `allow_private_fetch_hosts = ["translate.internal:5000"]`
+(env `MOSAIKIT_ALLOW_PRIVATE_FETCH_HOSTS`, comma separated). Only exact `host:port` entries are accepted (no
+wildcards, no CIDR ranges, no scheme or path): a malformed entry stops the start with a clear error. An entry
+lifts the public-address rule only for a plugin whose manifest lists that origin in `[permissions] network`
+(the permission check runs first, so another plugin, another port or another host stays refused); the name is
+resolved and the connection pinned to the address as for any other destination, and every redirect hop is
+checked again. `allow_private_fetch` (everything, development and tests only) is unchanged. Test:
+`deployer_allow_list_of_private_destinations` in `crates/kernel/tests/plugin_lifecycle.rs`.
 
 **Own profile.** A person changes their display name (`PUT /api/me/profile`; not for the accounts of
 an identity provider, whose name comes from the provider: `profile_from_provider`) and picture (`PUT`
@@ -1642,6 +1653,8 @@ A **distribution** is a product based on Mosaikit, described by
 - `[tests] cargo`: integration tests of its own;
 - `[[sidecars]]`: extra processes or services shipped next to the kernel (see 14.0 below).
 
+- `[[plugin_settings]]` and `[[service_key_values]]`: values to seed (14.2).
+
 Mosaikit itself is the default distribution. `cargo xtask --dist <folder>`
 uses it for development, tests and release. The kernel does not change: brand and
 plugins change.
@@ -1689,6 +1702,49 @@ of a target checks the one it needs. The section is validated whenever the distr
   `MOSAIKIT_ALLOW_PRIVATE_FETCH_HOSTS` (the exact `host:port` list of private hosts the plugins may
   fetch, comma separated): `127.0.0.1:<port>` set by the launcher before the configuration is read,
   `<name>:<port>` in `compose.sidecars.yml` (overridable from `.env`) and in `config.env` of Kubernetes.
+
+### 14.2 Seeding settings and platform keys
+
+A manifest default works for text and number settings only; a `secret` of `[[config]]` and the platform key of
+a `[[service_keys]]` service could only be typed by the Administrator. A distribution (or any deployment) can
+seed them. In `distribution.toml`:
+
+```toml
+[[plugin_settings]]                  # a [[config]] setting of a plugin (any kind, secrets too)
+plugin = "com.example.translate"
+key = "api_token"
+value = "env:TRANSLATE_TOKEN"        # or "file:/run/secrets/token"; a literal is allowed, not advised
+
+[[service_key_values]]               # the platform key of a [[service_keys]] service
+service = "translate"
+value = "file:/run/secrets/translate"
+shared = true                        # optional (default false): tenants without a key may use it
+```
+
+A value is a literal, `env:NAME` (an environment variable of the server) or `file:PATH` (the content of a
+file, relative to the folder of the seed file, a final line break dropped). **Secrets must be referenced, not
+written**: `distribution.toml` lives in a repository. A literal secret works but the server warns at start.
+Numbers and booleans may be written as TOML values.
+
+How the server gets them: one mechanism, the property `plugin_settings_file` of `mosaikit.toml` (env
+`MOSAIKIT_PLUGIN_SETTINGS_FILE`), a TOML file with these two tables (other tables are ignored, so it may be the
+`distribution.toml` itself). `cargo xtask dev` sets it from the distribution; `release` copies
+`distribution.toml` into the bundle and sets the property. A deployment without a distribution writes a small
+file of its own with the same two tables. Code: `crates/kernel/src/seed.rs`, applied at every start after the
+plugins are loaded.
+
+Rules. An entry is applied **once**, only while the setting or key is unset, and never overwrites an
+Administrator choice: a setting or key that already has a value is left alone, and a marker (an empty row
+`plugin:<id>:seeded:<key>` or `seed:service:<id>` in `core.secrets`, with no value in it) keeps a later removal
+by the Administrator from being undone at the next start. Uninstalling a plugin drops its markers. Secrets are
+stored as the Administrator path stores them (encrypted with the secret key, `core.secrets` /
+`core.service_keys`); values never go to the log or to the events. A plugin or key that does not exist (yet), a
+value of the wrong kind or a reference that cannot be resolved gives a warning at start and is retried at the
+next one; a file that is not valid TOML or an entry without plugin, key or service stops the start. `cargo xtask`
+validates the two tables whenever it loads the distribution (unknown fields refused, empty names, a key with
+`:`, an entry listed twice, `env:` and `file:` without a name), so `ci` fails on a bad section. Tests:
+`a_deployment_seeds_settings_and_keys_without_overwriting_the_administrator` and
+`a_seed_never_overwrites_a_value_set_before_it` (`crates/kernel/tests/plugin_lifecycle.rs`), `dist::tests`.
 
 ### 14.1 Layouts and style
 

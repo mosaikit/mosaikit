@@ -72,6 +72,9 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
 ### La piattaforma
 
+- Chi installa può aprire ai plugin che lo dichiarano un servizio della rete privata: `allow_private_fetch_hosts = ["host:porta"]` in `mosaikit.toml` (solo voci esatte). Tutto il resto resta protetto.
+- Una distribuzione può precompilare le impostazioni dei plugin (segreti compresi) e le chiavi di piattaforma dei servizi esterni con `[[plugin_settings]]` e `[[service_key_values]]`, da `env:NOME` o `file:PERCORSO`. Si applicano una sola volta, solo se non ancora impostate, e non sovrascrivono mai la scelta di un Amministratore.
+
 - Gli Administrator hanno un'email obbligatoria e unica. La cambiano da Account (password attuale e secondo fattore); nome ed email di un altro Administrator si cambiano da Sistema › Administrator.
 - Sistema › Email dice che cosa manca e come configurarla, con un'impostazione pronta per un server di prova locale (Mailpit nell'ambiente di sviluppo).
 

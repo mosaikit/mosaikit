@@ -232,6 +232,24 @@ Sidecars: the desktop launcher starts them before the kernel and stops them afte
 `release k8s` a Deployment and a Service. `cargo xtask sidecars` validates the section and shows the result;
 details in [architecture 14](docs/architecture.md).
 
+A distribution can also seed the settings of plugins and the platform keys of outside services, with
+`env:NAME` or `file:PATH` references so that secrets are never written in the file:
+
+```toml
+[[plugin_settings]]
+plugin = "com.example.translate"
+key = "api_token"                     # a secret of the plugin [[config]]
+value = "env:TRANSLATE_TOKEN"
+
+[[service_key_values]]
+service = "translate"                 # a [[service_keys]] service
+value = "file:/run/secrets/translate"
+shared = true
+```
+
+They are applied at the start of the server only while unset and never overwrite what an Administrator
+chose (architecture 14.2).
+
 Every xtask command accepts `--dist <folder>` (or `MOSAIKIT_DIST`); without it,
 it uses the distribution of Mosaikit (`distribution.toml` here).
 
@@ -583,6 +601,13 @@ From `url` are derived:
   for the plugin UIs;
 - the listening ports (`listen`, `plugin_listen`): local only if the host is
   local.
+
+Two properties for deployers (full description in `mosaikit.example.toml`):
+
+| Property | Env | What |
+|---|---|---|
+| `allow_private_fetch_hosts` | `MOSAIKIT_ALLOW_PRIVATE_FETCH_HOSTS` (comma separated) | exact `host:port` destinations on the private network that `http.fetch` may reach, only for a plugin that lists that origin in its manifest `network` permission. No wildcards or ranges |
+| `plugin_settings_file` | `MOSAIKIT_PLUGIN_SETTINGS_FILE` | file with `[[plugin_settings]]` and `[[service_key_values]]` to seed at the start (never over an Administrator choice); a `distribution.toml` works |
 
 Behind a reverse proxy set `plugin_url` (a second hostname) and the
 internal ports. To check the resolved configuration: `mosaikit-server config`

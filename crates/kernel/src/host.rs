@@ -144,6 +144,8 @@ impl KernelHost {
         let k = self.kernel.clone().ok_or("kernel not available")?;
         let caller = self.caller.clone();
         let allowed = self.network.contains(&origin);
+        // the deployer's private destinations, only for the origins this plugin declares
+        let exempt = crate::webfetch::private_exemptions(&k, &self.network);
         let address_services = self.address_services.clone();
         let key_service = req.get("key").and_then(Value::as_str).map(str::to_string);
         if let Some(s) = &key_service {
@@ -178,7 +180,7 @@ impl KernelHost {
                     None => return Err(format!("no key of the service {s} is set")),
                 }
             }
-            let r = crate::webfetch::request(&k, method, &url, &headers, body, MAX_HTTP_BODY + 1)
+            let r = crate::webfetch::request(&k, method, &url, &headers, body, MAX_HTTP_BODY + 1, &exempt)
                 .await
                 .map_err(|e| e.message)?;
             if r.body.len() > MAX_HTTP_BODY {

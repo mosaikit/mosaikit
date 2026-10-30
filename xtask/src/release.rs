@@ -71,6 +71,12 @@ fn config(flavor: Flavor, trusted: &str, brand: bool) -> String {
         push("# brand folder (name, logo, colours, texts)");
         push("brand = \"branding\"");
     }
+    if d.has_seeds() {
+        push(
+            "# settings and keys the distribution seeds at the first start (never over the Administrator's)",
+        );
+        push("plugin_settings_file = \"distribution.toml\"");
+    }
     if flavor == Flavor::Desktop {
         push("");
         push("[database]");
@@ -128,6 +134,11 @@ pub fn bundle(out: &Path, skip_ui: bool, flavor: Flavor) -> Result<()> {
     let brand = crate::dist::current().brand.dir.clone().filter(|b| b.is_dir());
     if let Some(b) = &brand {
         copy_dir(b, &out.join("branding"))?;
+    }
+    if crate::dist::current().has_seeds() {
+        let d = crate::dist::current();
+        std::fs::copy(d.dir.join("distribution.toml"), out.join("distribution.toml"))
+            .context("copying distribution.toml")?;
     }
     let trusted = std::fs::read_to_string(out.join("registry").join("trusted_key.txt"))?;
     std::fs::write(out.join("mosaikit.toml"), config(flavor, trusted.trim(), brand.is_some()))?;
