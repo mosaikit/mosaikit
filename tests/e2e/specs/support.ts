@@ -162,6 +162,21 @@ export async function accessible(page: Page, where: string) {
   // toasts fade in and out: measured half-transparent they would fail colour contrast by chance
   const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).exclude('[data-sonner-toaster]').analyze()
   const bad = r.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')
+  // what axe saw, for a failure that only shows on another machine (computed colours, geometry, the element on top)
+  const probe = (sel: string[]) =>
+    page.evaluate((s) => {
+      const el = document.querySelector(s[s.length - 1]) as HTMLElement | null
+      if (!el) return 'gone'
+      const r = el.getBoundingClientRect()
+      const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)
+      const chain: string[] = []
+      for (let e: HTMLElement | null = el; e && chain.length < 8; e = e.parentElement) {
+        const c = getComputedStyle(e)
+        chain.push(`${e.tagName.toLowerCase()}[${(e.className?.toString() ?? '').slice(0, 40)}] bg=${c.backgroundColor} fg=${c.color} op=${c.opacity}`)
+      }
+      return JSON.stringify({ rect: [r.x, r.y, r.width, r.height], viewport: [innerWidth, innerHeight], font: getComputedStyle(el).fontFamily, top: top?.outerHTML.slice(0, 120), chain })
+    }, sel)
+  for (const v of bad) for (const n of v.nodes.slice(0, 2)) n.failureSummary += ' | probe: ' + (await probe(n.target.map(String)).catch((e) => String(e)))
   expect(bad.map((v) => `${where}: ${v.id} ${v.nodes.map((n) => n.target.join(' ') + ' ' + n.html.slice(0, 300) + ' => ' + n.failureSummary).join(' | ')}`)).toEqual([])
 }
 
