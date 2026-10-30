@@ -157,6 +157,8 @@ export async function createTenant(page: Page, slug: string, name: string) {
 export async function accessible(page: Page, where: string) {
   // a menu or a list that is closing hides the page for a moment (aria-hidden): measure after it is gone
   await page.waitForFunction(() => !document.querySelector('[data-aria-hidden="true"]'), undefined, { timeout: 3000 }).catch(() => {})
+  // colours still fading (slow runner): axe would measure a blend of the old and the new colour
+  await colorsSettled(page)
   // toasts fade in and out: measured half-transparent they would fail colour contrast by chance
   const r = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).exclude('[data-sonner-toaster]').analyze()
   const bad = r.violations.filter((v) => v.impact === 'serious' || v.impact === 'critical')
