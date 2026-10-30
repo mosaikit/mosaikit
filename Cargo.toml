@@ -45,7 +45,7 @@ hex = "0.4"
 base64 = "0.22"
 rand = "0.8"
 ed25519-dalek = { version = "2", features = ["rand_core"] }
-argon2 = "0.5"
+argon2 = "0.6"
 # authenticated encryption of the keys of outside services (already in the tree through rustls)
 ring = "0.17"
 # XML parser of the SVG allow-list check (no dependencies, no DTD)
