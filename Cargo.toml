@@ -54,7 +54,7 @@ zip = { version = "9", default-features = false, features = ["deflate"] }
 sqlparser = { version = "=0.52.0", features = ["visitor"] }
 # SQLite included in the executable (desktop version): no external dependency
 rusqlite = { version = "0.32", features = ["bundled", "hooks", "functions", "column_decltype"] }
-wasmi = "0.40"
+wasmi = "2.0"
 axum = { version = "0.8", features = ["macros"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["set-header"] }
