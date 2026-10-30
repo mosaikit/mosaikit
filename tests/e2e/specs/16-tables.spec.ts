@@ -44,6 +44,52 @@ test.describe.serial('16-tables', () => {
     expect(Math.abs(after.top - before.top), 'the scroll position stays').toBeLessThanOrEqual(2)
   })
 
+  test('the sort of a server-paged list acts on the whole list, not on the rows loaded', async ({ page }) => {
+    test.setTimeout(180_000)
+    await adminLogin(page)
+    await page.setViewportSize({ width: 1440, height: 900 })
+    // the global order, from the API (all tenants in one page)
+    const all = (await (await page.request.get('api/admin/tenants?limit=500')).json()) as { items: { name: string }[]; total: number }
+    const key = (x: string) => x.toLowerCase()
+    const names = all.items.map((x) => x.name).sort((a, b) => (key(a) < key(b) ? -1 : key(a) > key(b) ? 1 : 0))
+    await page.goto('./#/admin/tenants')
+    await expect(rows(page).first()).toBeVisible()
+    const firstCell = async () => (await rows(page).first().locator('td').nth(1).innerText()).split('
+')[0].trim()
+    const head = page.locator('#main thead th[aria-sort]').filter({ hasText: /^Tenant$/ })
+    // a computed column (the count of members) is not a sort button on a server list
+    await expect(page.locator('#main thead th', { hasText: /^Members$/ }).locator('button')).toHaveCount(0)
+    await head.getByRole('button').click()
+    await expect(head).toHaveAttribute('aria-sort', 'ascending')
+    await expect.poll(firstCell).toBe(names[0])
+    // more than one page: the rows after scrolling continue the same order
+    await scroller(page).evaluate((e) => (e.scrollTop = e.scrollHeight))
+    await expect.poll(() => rows(page).count(), { timeout: 15_000 }).toBeGreaterThan(Math.min(50, names.length - 1))
+    const shown = async () => (await rows(page).locator('td:nth-child(2)').allInnerTexts()).map((x) => x.split('
+')[0].trim())
+    const asc = await shown()
+    expect(asc).toEqual(names.slice(0, asc.length))
+    // descending: the first row is the global maximum and the scroll goes back to the top
+    await head.getByRole('button').click()
+    await expect(head).toHaveAttribute('aria-sort', 'descending')
+    await expect.poll(firstCell).toBe(names[names.length - 1])
+    expect(await scroller(page).evaluate((e) => e.scrollTop)).toBe(0)
+    // the Log: sorted by Tenant (a platform Log), the loaded rows are in order and more rows continue it
+    await page.goto('./#/admin/log')
+    await expect(rows(page).first()).toBeVisible()
+    const col = page.locator('#main thead th[aria-sort]').filter({ hasText: /^Tenant$/ })
+    await col.getByRole('button').click()
+    await expect(col).toHaveAttribute('aria-sort', 'ascending')
+    const idx = (await page.locator('#main thead th').allInnerTexts()).findIndex((x) => x.trim() === 'Tenant') + 1
+    const tenants = async () => (await rows(page).locator(`td:nth-child(${idx})`).allInnerTexts()).map((x) => x.trim().toLowerCase())
+    await expect.poll(() => rows(page).count()).toBeGreaterThan(0)
+    const inOrder = (v: string[]) => v.every((x, i) => i === 0 || v[i - 1] <= x || x === '—')
+    expect(inOrder(await tenants())).toBe(true)
+    await scroller(page).evaluate((e) => (e.scrollTop = e.scrollHeight))
+    await page.waitForTimeout(1500)
+    expect(inOrder(await tenants())).toBe(true)
+  })
+
   test('a table sorts, filters and keeps its header row; the plugins have cards and a table', async ({ page }) => {
     test.setTimeout(180_000)
     await adminLogin(page)

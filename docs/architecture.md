@@ -812,7 +812,24 @@ the search are applied by the server (`q`, and the filters of each list). Paged:
 (`crud.list` with `limit`/`cursor`, `mountCrud` asks 100 rows at a time), the Administrator's tenants and
 people, the Tenant Manager's people, groups and items/shares; the notifications and the Log were
 already paged. Without `limit` the old answers are unchanged (whole lists, for the dialogs that choose
-among all the members). **Select all**: on a page where every shown row is selected the shell offers
+among all the members). **Sort of the whole list**: `&sort=<field>&dir=asc|desc` sorts the WHOLE
+filtered list, not the rows already loaded. Every paged endpoint has an allow-list of sortable fields, each mapped
+to a fixed SQL expression (the request never reaches the SQL); an unknown field or direction is a 400 with the
+translatable code `sort_unknown`. The order is total (the sort key, then the id), so pages are deterministic; a
+sorted list pages by offset (`next` is `~<offset>`) because the key is not unique and may be null (nulls last).
+The visibility rules (tenant, owner, RLS, ACL, policy of titles) are applied before the sort and do not change; a
+column whose value is computed per page or joined (counts, groups, what an event is about) has no server sort and its
+title is plain text. Sortable: Tenants (`name`, `slug`, `status`, `created`, `trial_until`, `archived_at`), People
+(`name`, `username`, `home`, `status`, `last`), Manage › People (`name`, `username`, `role`, `status`, `home`, `last`,
+`joined`), Manage › Items (`item`, `app`, `owner`, `size`, `created`, `updated`; `item` only means something when the
+manager may see titles), invitations (`person`, `role`, `status`, `created`, `expires`), Trash (`item`, `app`, `owner`,
+`size`, `deleted`, `purge`), Log (`when`, `who`, `what`, `tenant`, `result`; `offset` instead of `before`). In the UI the
+`key` of a column is the field (`Col.serverSort` marks the columns the server sorts; `ListTable` then sends
+`sort`/`dir`, the query key includes them so the list reloads from the first page and scrolls to the top; local lists
+keep sorting in the browser, `aria-sort` stays). **Plugin lists** (`crud.list` with `limit`, `sort`, `dir`; the
+`msk.crud(...).list` options and the `gridTable` option `server`/column `serverSort` of the plugin API): `sort` is a
+declared field of the manifest that is not `hidden` (computed), or `created_at`, `updated_at`, `owner_name`;
+`mountCrud` sorts by the declared fields and the owner, not by extension fields. **Select all**: on a page where every shown row is selected the shell offers
 "Select all N"; it asks `?ids=true` (the ids of every row matching the filters, at most 10,000, in the
 order of the list) and the bulk action then applies to all of them; changing the filters clears the
 selection.

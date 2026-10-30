@@ -44,6 +44,15 @@ const checks: L.Check[] = [
             await p.locator('#main thead th[aria-sort] button').first().click()
             const desc = await p.locator('#main thead th[aria-sort="descending"]').count()
             c.ok(asc === 1 && desc === 1, `${route}: the first click sorts ascending, the second descending (${asc}/${desc}, first row «${first.slice(0, 20)}»)`)
+            if (route === '#/admin/tenants') {
+              // the sort acts on the whole list: the first row after the descending sort is the last name of ALL the tenants
+              const all = await p.evaluate(async () => (await (await fetch('api/admin/tenants?limit=500')).json()).items.map((x: any) => x.name as string))
+              const last = [...all].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()))[all.length - 1]
+              await p.waitForTimeout(800)
+              const top = (await p.locator('#main tbody tr').first().locator('td').nth(1).innerText()).split('
+')[0].trim()
+              c.ok(top === last, `${route}: sorted descending the first row is «${last}», the last of all the tenants (got «${top}»)`)
+            }
           }
         }
       }
@@ -120,6 +129,12 @@ const checks: L.Check[] = [
       await p.waitForTimeout(1500)
       const n1 = (await table(p))?.rows ?? 0
       c.ok(n1 >= n0, `after scrolling to the end ${n1} rows (before ${n0})`)
+      // another sort: the list restarts from the first page, scrolled to the top
+      await p.locator('#main thead th[aria-sort] button').first().click()
+      await p.waitForTimeout(1500)
+      const top = await p.locator('#main tbody').evaluate((e: HTMLElement) => e.scrollTop)
+      const n2 = (await table(p))?.rows ?? 0
+      c.ok(top === 0 && n2 > 0 && n2 < 60, `after sorting the list restarts: scrollTop ${top}, ${n2} rows`)
       return c.result()
     },
   },
