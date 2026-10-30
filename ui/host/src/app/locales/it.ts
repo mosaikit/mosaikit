@@ -1606,6 +1606,7 @@ export const IT: Record<string, string> = {
   'Text of the sidebar': 'Testo della sidebar',
   'Active item in the sidebar': 'Voce attiva nella sidebar',
   'Labels of the icon bar': 'Etichette della barra delle icone',
+  'Active label of the icon bar': 'Etichetta attiva della barra delle icone',
   'Go to the Home': 'Vai alla Home',
   'Go to the notifications': 'Vai alle notifiche',
   'Go to your account': 'Vai al tuo account',
