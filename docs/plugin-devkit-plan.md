@@ -83,6 +83,10 @@ The kernel is never modified: what a product can change is a defined, documented
 | D8 | How a product is built from a compiled Mosaikit | repack the base archive; derive from the base image; rebuild from source | Repack the base desktop archive and derive from the base Docker image; keep `xtask --dist` for builds from source. |
 | D9 | Rights and responsibilities of a product's publisher | | Licence terms for redistributing the compiled base, the product's own name and brand, who supports what, what happens on a platform upgrade. |
 
+**Decided (2026-10-31).** D1: archives in the kit and a private registry first, public registries later. D2: Apache-2.0 for the SDK, templates, examples and documents. D3: declare plugin API 1 after the audit of phase 1. D4: keep the current signing model (trusted keys in the configuration), the kit generates a development key. D5 and D6 keep the proposals above until the owner says otherwise. The audit of phase 0 is in [reports/plugin-api-audit.md](reports/plugin-api-audit.md); its list of changes opens phase 1.
+
+**Baseline already in the code** (phases 9 to 11): `[[sidecars]]` (long-running and `kind = "oneshot"`, with the `files` overlay), seeding of plugin settings and service keys (`[[plugin_settings]]`, `[[service_key_values]]`), `[permissions] script_eval` and `allow_private_fetch_hosts`; see architecture §14.
+
 ## 4. Phases
 
 Each phase ends with its tests green (`cargo xtask ci`, the e2e tests that apply), its documents written and a
