@@ -112,6 +112,7 @@ fn manifest_checks(m: &Manifest, r: &mut Report) {
         (p.script_eval, "script_eval"),
         (p.web, "web"),
         (p.files, "files"),
+        (p.files_read, "files_read"),
         (p.content, "content"),
         (p.notify, "notify"),
         (!p.network.is_empty(), "network"),
