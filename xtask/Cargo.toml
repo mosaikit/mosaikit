@@ -17,6 +17,7 @@ sha2.workspace = true
 hex.workspace = true
 zip.workspace = true
 mosaikit-mskp.workspace = true
+mosaikit-plugin-cli.workspace = true
 ed25519-dalek.workspace = true
 ctrlc = "3"
 # tests/results/test-results.md: date and machine of the run

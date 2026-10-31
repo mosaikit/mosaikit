@@ -1,14 +1,12 @@
 [package]
 name = "{{name}}"
 version = "0.1.0"
-edition.workspace = true
+{{cargo_edition}}
 publish = false
 
 [lib]
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-mosaikit-plugin-sdk.workspace = true
-
-[lints]
-workspace = true
+{{cargo_sdk}}
+{{cargo_tail}}

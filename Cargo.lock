@@ -1930,6 +1930,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "mosaikit-plugin-cli"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "ed25519-dalek",
+ "hex",
+ "mosaikit-mskp",
+ "mosaikit-sql-guard",
+ "reqwest",
+ "serde_json",
+ "sha2 0.10.9",
+ "tempfile",
+ "toml 0.8.2",
+]
+
+[[package]]
 name = "mosaikit-plugin-sdk"
 version = "1.0.0"
 dependencies = [
@@ -2577,7 +2594,9 @@ checksum = "eddd3ca559203180a307f12d114c268abf583f59b03cb906fd0b3ff8646c1147"
 dependencies = [
  "base64 0.22.1",
  "bytes",
+ "futures-channel",
  "futures-core",
+ "futures-util",
  "http",
  "http-body",
  "http-body-util",
@@ -4557,6 +4576,7 @@ dependencies = [
  "ed25519-dalek",
  "hex",
  "mosaikit-mskp",
+ "mosaikit-plugin-cli",
  "notify",
  "serde",
  "serde_json",

@@ -119,8 +119,8 @@ mosaikit/
   branding/      brand of Mosaikit (documented brand.toml)
   tests/         e2e (Playwright), perf, manual checks, fixtures, results: see tests/README.md
   deploy/        Dockerfile, compose and Kubernetes templates
+  crates/plugin-cli/  mosaikit-plugin: the tool of plugin developers (and the skeleton of a new plugin)
   xtask/         automation: cargo xtask <command>
-    templates/plugin/    skeleton for `cargo xtask plugin new`
     mosaikit.dev.toml    configuration of `cargo xtask dev`
   docs/          architecture, mockup, interface rules and plan, logo
   distribution.toml        the "Mosaikit" distribution
@@ -663,6 +663,7 @@ All of them accept `--dist <folder of the distribution>`.
 | `cargo xtask plugin pack [--release] [--out]` | signed packages + registry |
 | `cargo xtask plugin keygen [--out]` | signing keys of the publisher |
 | `cargo xtask plugin db-reset <id>` | resets the data of a plugin (development) |
+| `mosaikit-plugin new\|build\|pack\|test\|sign\|keygen\|validate\|install\|doctor` | the tool of plugin developers, for any plugin folder: [crates/plugin-cli](crates/plugin-cli/README.md) |
 | `cargo xtask test` / `e2e [-- <playwright args>]` / `ci` | tests and checks (heavy runs wait for a free slot) |
 | `cargo xtask worktree add\|remove\|list <name>` | parallel checkout (kernel + plugins) with its own port and database |
 | `cargo xtask clean-temp [--days N] [--yes]` | disk usage of `mosaikit-temp`; deletes stale `target` folders |

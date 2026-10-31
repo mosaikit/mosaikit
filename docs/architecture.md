@@ -1644,8 +1644,8 @@ mosaikit/
 ├── mosaikit.example.toml    every configuration property
 ├── tests/                   every test suite beyond the unit tests: e2e/, perf/, manual/, fixtures/, results/ (README.md)
 ├── deploy/                  Dockerfile, compose.yml, compose.dev.yml, k8s/
-├── xtask/                   dev, db, plugin, test, e2e, ci, release
-│   ├── templates/plugin/    skeleton for `cargo xtask plugin new`
+├── crates/plugin-cli/       `mosaikit-plugin`: the tool of plugin developers (templates/plugin: skeleton of `new`)
+├── xtask/                   dev, db, plugin (calls plugin-cli), test, e2e, ci, release
 │   └── mosaikit.dev.toml    configuration of `cargo xtask dev`
 ├── docs/                    architecture, mockup, refactoring-ui.md, ui-plan.md, logo
 ../mosaikit-plugins/         official plugins (notes, tasks, contacts, maps, static-site, files)
@@ -1658,8 +1658,9 @@ mosaikit/
 |---|---|
 | `cargo xtask db up` | starts a development PostgreSQL (local binaries or Docker) |
 | `cargo xtask dev` | DB + plugin build + server in dev mode + Vite of the host, with hot reload |
-| `cargo xtask plugin new <name>` | creates a plugin from the template |
-| `cargo xtask plugin pack <dir>` | builds and packs (signs with the development key) |
+| `cargo xtask plugin new <name>` | creates a plugin from the template (in the plugin folder of the distribution) |
+| `cargo xtask plugin pack` | builds and packs the plugins of the distribution (signs with the development key) |
+| `mosaikit-plugin new / build / pack / test / sign / keygen / validate / install / doctor` | the same loop for any plugin folder, without `xtask` nor this repository (crate `crates/plugin-cli`, [its README](../crates/plugin-cli/README.md)); `cargo xtask plugin` calls its library |
 | `cargo xtask test` | Rust tests on PostgreSQL and on SQLite, tests of the plugins and of the distribution, UI tests |
 | `cargo xtask manual-tests` | the checks of `docs/manual-tests.md`, automated (`tests/manual`), on a new seeded installation; `--check` only compares ids |
 | `cargo xtask ci` | fmt, clippy `-D warnings`, tests, lint and UI build |

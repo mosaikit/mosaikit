@@ -1,0 +1,39 @@
+[package]
+name = "mosaikit-plugin-cli"
+description = "mosaikit-plugin: the command-line tool of Mosaikit plugin developers (new, build, pack, test, sign, validate, install)"
+# one version for the whole kit, on the cadence of the platform (docs/plugin-devkit-plan.md, D6)
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+readme = "README.md"
+keywords = ["mosaikit", "plugin", "cli"]
+categories = ["command-line-utilities", "development-tools"]
+include = ["src/**", "templates/**", "README.md"]
+
+[lib]
+name = "mosaikit_plugin_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "mosaikit-plugin"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+serde_json = { workspace = true, features = ["preserve_order"] }
+toml.workspace = true
+sha2.workspace = true
+hex.workspace = true
+ed25519-dalek.workspace = true
+mosaikit-mskp.workspace = true
+mosaikit-sql-guard.workspace = true
+# blocking client of `install` (the CLI has no async runtime)
+reqwest = { workspace = true, features = ["blocking"] }
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true
