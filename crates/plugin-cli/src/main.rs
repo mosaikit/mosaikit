@@ -22,6 +22,15 @@ enum Cmd {
         /// id of the plugin (default com.example.<name>)
         #[arg(long)]
         id: Option<String>,
+        /// what the plugin is: app (logic and UI, the default), ui, service, extension, language, layout
+        #[arg(long, value_parser = parse_variant)]
+        variant: Option<scaffold::Variant>,
+        /// a complete commented example with a walkthrough: todo, insights, note-priority
+        #[arg(long, value_parser = parse_example)]
+        example: Option<scaffold::Example>,
+        /// language code of a language plugin (default: the part of the name after `lang-`)
+        #[arg(long)]
+        lang: Option<String>,
         /// without WASM logic (manifest, migrations and UI only)
         #[arg(long)]
         no_logic: bool,
@@ -32,11 +41,14 @@ enum Cmd {
         #[arg(long)]
         into: Option<PathBuf>,
         /// use the plugin SDK from this folder instead of the published one
-        #[arg(long)]
+        #[arg(long, env = "MOSAIKIT_SDK_PATH")]
         sdk_path: Option<PathBuf>,
         /// use @mosaikit/plugin-api from this folder instead of the published one
-        #[arg(long)]
+        #[arg(long, env = "MOSAIKIT_PLUGIN_API_PATH")]
         plugin_api_path: Option<PathBuf>,
+        /// folder of an unpacked Mosaikit kit: its sdk/ and plugin-api/ stand for the two paths above
+        #[arg(long, env = "MOSAIKIT_KIT")]
+        kit: Option<PathBuf>,
         /// run `npm install` after adding the UI to an npm workspace
         #[arg(long)]
         install: bool,
@@ -113,21 +125,46 @@ enum Cmd {
     Dev,
 }
 
+fn parse_variant(s: &str) -> Result<scaffold::Variant, String> {
+    scaffold::Variant::parse(s).map_err(|e| e.to_string())
+}
+
+fn parse_example(s: &str) -> Result<scaffold::Example, String> {
+    scaffold::Example::parse(s).map_err(|e| e.to_string())
+}
+
 fn plugin(dir: &Path) -> Result<Plugin> {
     Plugin::load(dir)
 }
 
 fn run(cli: Cli) -> Result<ExitCode> {
     match cli.cmd {
-        Cmd::New { name, id, no_logic, no_ui, into, sdk_path, plugin_api_path, install } => {
+        Cmd::New {
+            name,
+            id,
+            variant,
+            example,
+            lang,
+            no_logic,
+            no_ui,
+            into,
+            sdk_path,
+            plugin_api_path,
+            kit,
+            install,
+        } => {
             let dir = scaffold::new_plugin(&scaffold::NewOptions {
                 name,
                 id,
+                variant,
+                example,
+                lang,
                 no_logic,
                 no_ui,
                 into: into.unwrap_or_else(|| PathBuf::from(".")),
                 sdk_path,
                 plugin_api_path,
+                kit,
                 install,
             })?;
             println!("plugin created in {}", dir.display());

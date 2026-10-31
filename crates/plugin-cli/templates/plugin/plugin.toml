@@ -37,3 +37,29 @@ frame_src = []
 [[kpi]]
 view = "kpi_{{table}}_by_status"
 label = "{{label}} by status"
+
+# Translations of the texts above (a text that is missing falls back to English).
+# The names of the fields and of the options are the keys of the manifest, not the labels.
+[i18n.it]
+description = "Descrivi qui il plugin {{label}}"
+label = "{{label}}"
+
+[i18n.it.resources.{{table}}]
+label = "{{label}}"
+fields = { title = "Titolo", notes = "Note", status = "Stato" }
+options.status = { draft = "bozza", active = "attivo", closed = "chiuso" }
+
+[i18n.it.kpi.kpi_{{table}}_by_status]
+label = "{{label}} per stato"
+
+[i18n.es]
+description = "Describe aquí el plugin {{label}}"
+label = "{{label}}"
+
+[i18n.es.resources.{{table}}]
+label = "{{label}}"
+fields = { title = "Título", notes = "Notas", status = "Estado" }
+options.status = { draft = "borrador", active = "activo", closed = "cerrado" }
+
+[i18n.es.kpi.kpi_{{table}}_by_status]
+label = "{{label}} por estado"

@@ -1,0 +1,13 @@
+# every page and app as a tab under the band; an app with pages opens a menu
+pattern = "tabs"
+
+[band]
+brand = true
+search = "center"
+tenant = "band"
+
+[phone]
+nav = "drawer"
+
+[style]
+tabs = "underline"

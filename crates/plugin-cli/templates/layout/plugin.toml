@@ -1,0 +1,24 @@
+# A layout plugin: how the shell arranges its slots. It is declarative (layout/layout.toml, a style in
+# layout/layout.css that is checked at install and scoped to the layout): no code runs in the shell.
+# A layout has no resources, [ui], KPIs or [search].
+id = "{{id}}"
+name = "{{label}}"
+version = "0.1.0"
+kind = "layout"
+description = "Apps and pages as tabs under the band"
+
+[requires]
+mosaikit = ">=1.0, <2"
+api = 1
+
+[contribution]
+icon = "▦"
+label = "{{label}}"
+
+[i18n.it]
+description = "App e pagine come schede sotto la banda"
+label = "{{label}}"
+
+[i18n.es]
+description = "Apps y páginas como pestañas bajo la banda"
+label = "{{label}}"

@@ -1,0 +1,13 @@
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: Swatinem/rust-cache@v2
+      - name: Use the SDK of the kit
+        if: env.MOSAIKIT_KIT != ''
+        run: |
+          mkdir -p .cargo
+          printf '[patch.crates-io]\nmosaikit-plugin-sdk = { path = "%s/sdk" }\n' "$MOSAIKIT_KIT" > .cargo/config.toml
+      - name: Tests of the logic
+        run: cargo test
+      - name: Build the logic
+        run: mosaikit-plugin build --release

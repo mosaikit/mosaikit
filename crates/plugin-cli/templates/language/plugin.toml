@@ -1,0 +1,29 @@
+# A language plugin: texts only, never code. `lang/host.json` translates the shell (sign-in page, navigation,
+# settings...), `lang/plugins/<plugin id>.toml` translates an app (the same keys as `[i18n.<lang>]` of its manifest).
+# What is not translated stays in English.
+id = "{{id}}"
+name = "{{label}}"
+version = "0.1.0"
+kind = "language"
+description = "{{label}} interface: a starter set of texts"
+
+[requires]
+mosaikit = ">=1.0, <2"
+api = 1
+
+[contribution]
+icon = "🌐"
+label = "{{label}}"
+
+# the language this plugin adds: the code (two or three lower case letters) and its name in that language
+[language]
+code = "{{lang}}"
+name = "{{lang_name}}"
+
+[i18n.it]
+description = "Interfaccia {{label}}: un primo insieme di testi"
+label = "{{label}}"
+
+[i18n.es]
+description = "Interfaz {{label}}: un primer conjunto de textos"
+label = "{{label}}"

@@ -20,7 +20,7 @@ use anyhow::{bail, Result};
 pub use project::Plugin;
 
 /// `test`: validates the plugin, runs the tests of its logic (native, with the SDK's mock host) and the
-/// type check of its UI.
+/// type check, lint and unit tests of its UI.
 pub fn test(p: &Plugin) -> Result<()> {
     let report = validate::validate(&p.dir)?;
     report.print();
@@ -32,9 +32,14 @@ pub fn test(p: &Plugin) -> Result<()> {
             Command::new("cargo").current_dir(ws).env_remove("CARGO_TARGET_DIR").args(["test", "-p", c]),
         )?;
     }
-    if p.has_ui && project::ui_has_script(p, "typecheck") {
-        project::ensure_npm_in(&project::ui_workspace(p).0)?;
-        util::run(&mut project::npm_ui(p, "typecheck"))?;
+    if p.has_ui {
+        // the type check, the lint (a standalone UI has its own) and the unit tests of the UI, where it defines them
+        for script in ["typecheck", "lint", "test"] {
+            if project::ui_has_script(p, script) {
+                project::ensure_npm_in(&project::ui_workspace(p).0)?;
+                util::run(&mut project::npm_ui(p, script))?;
+            }
+        }
     }
     Ok(())
 }

@@ -16,3 +16,8 @@ First version: the executable `mosaikit-plugin`.
   `.mskp` integrity and signature), `install --server`, `doctor`, and `keygen` that never overwrites a key.
 - `build` installs the `wasm32-unknown-unknown` target with rustup when it is missing.
 - `dev` is a stub that points at phase 4.
+- `new` (phase 3): `--variant` (app, ui, service, extension, language, layout), `--example` (todo, insights,
+  note-priority, each with a walkthrough), `--lang`, `--kit` / `MOSAIKIT_KIT` and the environment variables
+  `MOSAIKIT_SDK_PATH`, `MOSAIKIT_PLUGIN_API_PATH`. A standalone folder has its own lint, `.gitignore`, README, CI file,
+  tests and texts in English, Italian and Spanish; the build tools are `typescript ~7.0.2`, `vite ^8.3.4`, `vitest ^5.0.5`, `oxlint ^1.89.0`.
+- `test` also runs the `lint` and `test` scripts of the UI.

@@ -106,3 +106,98 @@ fn new_build_pack_validate_with_logic() {
     // the tests of the logic run natively with the mock host of the SDK
     ok(&plugin, &["test"]);
 }
+
+/// The kit as the release builds it (phase 7): the SDK as the unpacked crate that `cargo package` makes, the UI package
+/// as the unpacked tarball of `npm pack`. Nothing of the checkout is used by the plugins below except these two folders.
+fn kit(root: &Path) -> PathBuf {
+    let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("..");
+    let kit = root.join("kit");
+    let packed = root.join("packed");
+    std::fs::create_dir_all(&packed).unwrap();
+    let st = Command::new("cargo")
+        .current_dir(&repo)
+        .env("CARGO_TARGET_DIR", root.join("pkg-target"))
+        .args(["package", "-p", "mosaikit-plugin-sdk", "--allow-dirty", "--no-verify", "--offline", "-q"])
+        .status()
+        .expect("cargo package");
+    assert!(st.success(), "cargo package");
+    let krate = root.join("pkg-target").join("package").join("mosaikit-plugin-sdk-1.0.0.crate");
+    untar(&krate, &kit);
+    std::fs::rename(kit.join("mosaikit-plugin-sdk-1.0.0"), kit.join("sdk")).unwrap();
+
+    let npm = if cfg!(windows) { "npm.cmd" } else { "npm" };
+    let out = Command::new(npm)
+        .current_dir(&packed)
+        .args([
+            "pack",
+            repo.join("ui").join("plugin-api").to_str().unwrap(),
+            "--pack-destination",
+            ".",
+            "--silent",
+        ])
+        .output()
+        .expect("npm pack");
+    assert!(out.status.success(), "npm pack: {}", String::from_utf8_lossy(&out.stderr));
+    let tgz = std::fs::read_dir(&packed)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .find(|p| p.extension().is_some_and(|e| e == "tgz"))
+        .expect("the tarball of @mosaikit/plugin-api");
+    untar(&tgz, &kit);
+    std::fs::rename(kit.join("package"), kit.join("plugin-api")).unwrap();
+    kit
+}
+
+fn untar(archive: &Path, into: &Path) {
+    std::fs::create_dir_all(into).unwrap();
+    let st = Command::new("tar")
+        .args(["-xzf", archive.to_str().unwrap(), "-C", into.to_str().unwrap()])
+        .status()
+        .expect("tar");
+    assert!(st.success(), "tar {}", archive.display());
+}
+
+/// Every variant and the three examples, made from the archives of the kit, then built, tested, packed and validated
+/// (about two minutes: it installs the UI packages and builds the logic of four plugins). No Mosaikit checkout is read.
+#[test]
+fn every_variant_builds_and_packs_from_the_kit() {
+    let d = temp();
+    let w = d.path();
+    let kit = kit(w);
+    let kit_s = kit.to_str().unwrap().to_string();
+    ok(w, &["keygen", "--out", "k.key"]);
+
+    // (name, args of `new`, has something to build)
+    let cases: [(&str, &[&str], bool); 8] = [
+        ("e-todo", &["--example", "todo"], true),
+        ("e-insights", &["--example", "insights"], true),
+        ("v-ui", &["--variant", "ui"], true),
+        ("v-service", &["--variant", "service"], true),
+        ("e-priority", &["--example", "note-priority"], false),
+        ("v-extension", &["--variant", "extension"], false),
+        ("lang-fr", &["--variant", "language"], false),
+        ("v-layout", &["--variant", "layout"], false),
+    ];
+    for (name, extra, build) in cases {
+        let mut args = vec!["new", name, "--kit", kit_s.as_str()];
+        args.extend_from_slice(extra);
+        ok(w, &args);
+        let plugin = w.join(name);
+        let id = format!("com.example.{name}");
+        if build {
+            ok(&plugin, &["test"]);
+            ok(&plugin, &["pack", "--release", "--key", "../k.key"]);
+        } else {
+            assert!(ok(&plugin, &["validate"]).contains("0 error(s), 0 warning(s)"), "{name}");
+            ok(&plugin, &["pack", "--no-build", "--key", "../k.key"]);
+        }
+        let mskp = plugin.join("dist").join(format!("{id}-0.1.0.mskp"));
+        let report = ok(w, &["validate", mskp.to_str().unwrap()]);
+        assert!(report.contains("0 error(s)") && report.contains("signature valid"), "{name}: {report}");
+    }
+    // the UI of the examples is in the package, built from the vendored @mosaikit/plugin-api
+    assert!(
+        w.join("e-todo/ui/dist/index.html").is_file() && w.join("e-insights/ui/dist/index.html").is_file()
+    );
+    assert!(w.join("e-todo/target/wasm32-unknown-unknown/release/e_todo.wasm").is_file());
+}

@@ -1,0 +1,47 @@
+# An extension adds to another plugin (here Notes): fields in its items, actions in their detail. It has
+# no logic and no tables: the kernel keeps the values and the app that is extended shows them.
+# Install it where Notes is installed; it works only there.
+id = "{{id}}"
+name = "{{label}}"
+version = "0.1.0"
+description = "Adds a priority to the notes"
+kind = "extension"
+
+[requires]
+mosaikit = ">=1.0, <2"
+api = 1
+
+[contribution]
+icon = "🧩"
+label = "{{label}}"
+
+# the plugin that is extended, from which version of it
+[extends]
+plugin = "com.mosaikit.notes"
+min_version = "0.4.0"
+
+# a field the notes get; `resource` is a resource of the plugin that is extended
+[[extension.fields]]
+resource = "notes"
+key = "priority"
+label = "Priority"
+kind = "choice"
+options = ["low", "normal", "high"]
+
+# a button in the detail of a note: it sets values (or calls a command of another plugin)
+[[extension.actions]]
+resource = "notes"
+key = "mark_urgent"
+label = "Mark as urgent"
+set = { priority = "high" }
+
+# Translations of the texts above (a text that is missing falls back to English).
+[i18n.it]
+description = "Aggiunge una priorità alle note"
+label = "{{label}}"
+extension = { fields = { priority = "Priorità" }, actions = { mark_urgent = "Segna come urgente" } }
+
+[i18n.es]
+description = "Añade una prioridad a las notas"
+label = "{{label}}"
+extension = { fields = { priority = "Prioridad" }, actions = { mark_urgent = "Marcar como urgente" } }
