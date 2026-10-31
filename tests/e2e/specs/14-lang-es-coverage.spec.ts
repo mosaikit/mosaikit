@@ -46,7 +46,14 @@ async function scan(page: Page, name: string, found: string[]) {
   }
   fs.mkdirSync(OUT, { recursive: true })
   await page.screenshot({ path: new URL(`${name}.png`, OUT).pathname.replace(/^\/([A-Za-z]:)/, '$1') })
-  for (const l of await lines(page)) if (ENGLISH.test(l.replace(DATA, '')) && !ALLOWED.test(l)) found.push(`${name}: ${l}`)
+  // the labels that come from the plugins' language packs can arrive after the page: look again before counting
+  const english = async () => (await lines(page)).filter((l) => ENGLISH.test(l.replace(DATA, '')) && !ALLOWED.test(l))
+  let left = await english()
+  for (let i = 0; i < 6 && left.length; i++) {
+    await page.waitForTimeout(700)
+    left = await english()
+  }
+  for (const l of left) found.push(`${name}: ${l}`)
 }
 
 async function spanish(page: Page) {
