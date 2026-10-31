@@ -51,7 +51,7 @@ ring = "0.17"
 # XML parser of the SVG allow-list check (no dependencies, no DTD)
 roxmltree = "0.20"
 zip = { version = "9", default-features = false, features = ["deflate"] }
-sqlparser = { version = "=0.52.0", features = ["visitor"] }
+sqlparser = { version = "=0.63.0", features = ["visitor"] }
 # SQLite included in the executable (desktop version): no external dependency
 rusqlite = { version = "0.32", features = ["bundled", "hooks", "functions", "column_decltype"] }
 wasmi = "0.40"
