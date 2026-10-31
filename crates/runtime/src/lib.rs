@@ -46,6 +46,11 @@ impl Default for Limits {
 pub trait Host {
     /// Operation requested by the guest (e.g. `db.query`). The error becomes `{"err": ...}`.
     fn call(&mut self, op: &str, req: &Value) -> std::result::Result<Value, String>;
+    /// Stable code (`[a-z][a-z0-9_]*`) of the error the last `call` returned, if the host gives one:
+    /// the answer becomes `{"err": ..., "code": ...}`.
+    fn error_code(&mut self) -> Option<String> {
+        None
+    }
     fn log(&mut self, msg: &str);
 }
 
@@ -209,7 +214,10 @@ fn link<H: Host + 'static>(linker: &mut Linker<State<H>>) -> std::result::Result
                     let body = req.get("req").cloned().unwrap_or(Value::Null);
                     match caller.data_mut().host.call(&op, &body) {
                         Ok(v) => json!({ "ok": v }),
-                        Err(e) => json!({ "err": e }),
+                        Err(e) => match caller.data_mut().host.error_code() {
+                            Some(code) => json!({ "err": e, "code": code }),
+                            None => json!({ "err": e }),
+                        },
                     }
                 }
                 Err(e) => json!({ "err": format!("invalid request: {e}") }),

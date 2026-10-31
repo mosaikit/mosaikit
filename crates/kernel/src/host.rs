@@ -36,6 +36,10 @@ pub(crate) struct KernelHost {
     address_services: Vec<String>,
     /// `[permissions] notify`: the plugin may notify
     notify: bool,
+    /// `[permissions] files_read`: the logic may read the Files area as the caller
+    files_read: bool,
+    /// code of the last error given to the logic (`Host::error_code`)
+    last_code: Option<String>,
     /// notifications asked by the logic: sent after the commit of the operation
     notes: Vec<crate::notify::PluginNote>,
 }
@@ -229,9 +233,100 @@ impl KernelHost {
     }
 }
 
-impl Host for KernelHost {
-    fn call(&mut self, op: &str, req: &Value) -> std::result::Result<Value, String> {
+/// An error of a host operation with the stable code the logic receives.
+struct Coded(&'static str, String);
+
+fn coded_of(e: Error) -> Coded {
+    use crate::Kind;
+    let code = match e.kind {
+        Kind::Forbidden | Kind::Unauthorized => "permission_denied",
+        Kind::NotFound => "not_found",
+        Kind::BadRequest => "invalid_argument",
+        _ => "internal",
+    };
+    // a file the caller does not see and a file that does not exist look the same
+    Coded(code, e.message)
+}
+
+impl KernelHost {
+    /// `files.list`, `files.describe`, `files.read`: the Files area with the permissions of the caller
+    /// (the rules of the Files UI, run on a read transaction of the plugin that owns the files). Needs
+    /// `[permissions] files_read`. The answer has no storage path and no key. Errors carry a code:
+    /// `permission_denied`, `not_found`, `invalid_argument`.
+    fn files(&mut self, op: &str, req: &Value) -> std::result::Result<Value, Coded> {
+        if !self.files_read {
+            return Err(Coded(
+                "permission_denied",
+                "the plugin does not declare `files_read` in [permissions]".into(),
+            ));
+        }
+        let k = self.kernel.clone().ok_or_else(|| Coded("internal", "kernel not available".into()))?;
+        let c = self.caller.clone();
+        let uuid = |key: &str| -> std::result::Result<Option<uuid::Uuid>, Coded> {
+            match req.get(key) {
+                None | Some(Value::Null) => Ok(None),
+                Some(Value::String(s)) => {
+                    s.parse().map(Some).map_err(|_| Coded("invalid_argument", format!("invalid {key}")))
+                }
+                Some(_) => Err(Coded("invalid_argument", format!("invalid {key}"))),
+            }
+        };
+        let source = match req.get("plugin") {
+            None | Some(Value::Null) => crate::files::DEFAULT_SOURCE.to_string(),
+            Some(Value::String(s)) => s.clone(),
+            Some(_) => return Err(Coded("invalid_argument", "invalid plugin".into())),
+        };
+        let json_of = |e: &crate::files::Entry| serde_json::to_value(e).unwrap_or(Value::Null);
         match op {
+            "files.list" => {
+                let parent = uuid("parent")?;
+                let (rows, truncated) =
+                    self.rt.block_on(crate::files::host_list(&k, &c, &source, parent)).map_err(coded_of)?;
+                Ok(json!({ "entries": rows.iter().map(json_of).collect::<Vec<_>>(), "truncated": truncated }))
+            }
+            "files.describe" => {
+                let id = uuid("id")?.ok_or(Coded("invalid_argument", "missing id".into()))?;
+                let e =
+                    self.rt.block_on(crate::files::host_describe(&k, &c, &source, id)).map_err(coded_of)?;
+                Ok(json_of(&e))
+            }
+            _ => {
+                let id = uuid("id")?.ok_or(Coded("invalid_argument", "missing id".into()))?;
+                let max = match req.get("max_bytes") {
+                    Some(v) => v
+                        .as_u64()
+                        .ok_or(Coded("invalid_argument", "max_bytes must be a positive integer".into()))?
+                        as usize,
+                    None => crate::files::HOST_READ_CEILING,
+                };
+                let (e, data, truncated) =
+                    self.rt.block_on(crate::files::host_read(&k, &c, &source, id, max)).map_err(coded_of)?;
+                use base64::Engine as _;
+                Ok(json!({
+                    "entry": json_of(&e),
+                    "base64": base64::engine::general_purpose::STANDARD.encode(&data),
+                    "size": data.len(),
+                    "truncated": truncated,
+                }))
+            }
+        }
+    }
+}
+
+impl Host for KernelHost {
+    fn error_code(&mut self) -> Option<String> {
+        self.last_code.take()
+    }
+
+    fn call(&mut self, op: &str, req: &Value) -> std::result::Result<Value, String> {
+        self.last_code = None;
+        match op {
+            "files.list" | "files.describe" | "files.read" => {
+                self.files(op, req).map_err(|Coded(code, m)| {
+                    self.last_code = Some(code.to_string());
+                    m
+                })
+            }
             "db.query" => self.db(true, req),
             "db.exec" => self.db(false, req),
             "resource.create" | "resource.delete" => self.resource(op, req),
@@ -291,6 +386,8 @@ pub(crate) async fn run(
             .map(|s| s.id.clone())
             .collect(),
         notify: p.manifest.permissions.notify,
+        files_read: p.manifest.permissions.files_read,
+        last_code: None,
         notes: Vec::new(),
     };
     let engine = k.engine.clone();

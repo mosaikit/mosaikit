@@ -57,6 +57,18 @@ impl Blobs {
         })
     }
 
+    /// The first `max` bytes of a file, and its whole size (the rest is never read into memory).
+    pub fn read_file_head(&self, tenant: Uuid, rid: Uuid, max: usize) -> Result<(Vec<u8>, u64)> {
+        let f = std::fs::File::open(self.file_path(tenant, rid)).map_err(|e| match e.kind() {
+            std::io::ErrorKind::NotFound => Error::not_found("content of the file missing"),
+            _ => e.into(),
+        })?;
+        let total = f.metadata()?.len();
+        let mut buf = Vec::new();
+        f.take(max as u64).read_to_end(&mut buf)?;
+        Ok((buf, total))
+    }
+
     pub fn copy_file(&self, tenant: Uuid, from: Uuid, to: Uuid) -> Result<()> {
         let src = self.file_path(tenant, from);
         if src.is_file() {

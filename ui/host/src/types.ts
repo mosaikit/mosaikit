@@ -148,7 +148,7 @@ export interface PluginView {
   /** where its UI is served: the address of the plugins, or its own host with a wildcard plugin_url (recent servers) */
   ui_url?: string
   dev: boolean
-  permissions: { hooks: string[]; files: boolean; content: boolean; network: string[]; frame_src: string[]; calls?: string[]; script_eval?: boolean }
+  permissions: { hooks: string[]; files: boolean; content: boolean; network: string[]; frame_src: string[]; calls?: string[]; script_eval?: boolean; files_read?: boolean }
   /** the pages of an app in the navigation of the shell (recent servers) */
   nav?: NavEntry[]
 }

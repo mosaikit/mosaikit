@@ -176,6 +176,10 @@ impl Ctx {
     pub fn http(&self) -> Http {
         Http(())
     }
+    /// The Files area, read with the permissions of the caller (needs `[permissions] files_read = true`).
+    pub fn files(&self) -> Files {
+        Files(())
+    }
     pub fn log(&self, msg: &str) {
         host::log(msg);
     }
@@ -244,6 +248,30 @@ impl Resources {
     pub fn delete(&self, id: &str) -> Result<()> {
         host::call("resource.delete", json!({ "id": id }))?;
         Ok(())
+    }
+}
+
+/// Read access to the Files area as the caller sees it (host operations `files.list`, `files.describe`,
+/// `files.read`). A file the caller does not see is `not_found`, the same as one that does not exist.
+/// Errors carry a code: `permission_denied` (no `files_read` in the manifest), `not_found`,
+/// `invalid_argument`. Rows have `id`, `name`, `is_dir`, `size`, `mime`, `created`, `modified`,
+/// `owner_id`, `owner_name`, `my_level`, `shared` and `parent_id`; never a storage path.
+pub struct Files(());
+
+impl Files {
+    /// Rows the caller sees in a folder (the root if `None`): `{ "entries": [...], "truncated": bool }`
+    /// (at most 1000 rows).
+    pub fn list(&self, parent: Option<&str>) -> Result<Value> {
+        host::call("files.list", json!({ "parent": parent }))
+    }
+    /// Metadata of one file or folder.
+    pub fn describe(&self, id: &str) -> Result<Value> {
+        host::call("files.describe", json!({ "id": id }))
+    }
+    /// The first `max_bytes` of a file (at most 4 MiB, whatever is asked):
+    /// `{ "entry": {...}, "base64": "...", "size": <bytes returned>, "truncated": bool }`.
+    pub fn read(&self, id: &str, max_bytes: usize) -> Result<Value> {
+        host::call("files.read", json!({ "id": id, "max_bytes": max_bytes }))
     }
 }
 

@@ -568,6 +568,9 @@ function PluginAsks({ p, base }: { p: AdminPlugin; base?: string }) {
             <AskRow label={t('Runs code compiled at run time')}>
               {perm.script_eval ? <b className="text-destructive">{t('yes (sensitive: its page may use eval and WebAssembly compilation)')}</b> : none}
             </AskRow>
+            <AskRow label={t('Reads the files of the person who uses it')}>
+              {perm.files_read ? <b className="text-destructive">{t('yes (sensitive: its logic reads the Files area with the permissions of the caller)')}</b> : none}
+            </AskRow>
             <AskRow label={t('Calls the plugins')}>{list(perm.calls)}</AskRow>
             <AskRow label={t('Database')}>{p.requires?.database ? <span className="font-mono text-xs">{[p.requires.database, ...(p.requires.extensions ?? [])].join(', ')}</span> : t('any')}</AskRow>
           </dl>
