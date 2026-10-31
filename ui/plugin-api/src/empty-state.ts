@@ -3,7 +3,8 @@
 // grey text and the buttons of what to do (the primary action of the page is repeated). Never a bare «no items» line.
 // A filter that matches nothing is NOT an empty state: `filtered` gives the small plain message with «Clear filters».
 
-export type ArtName = 'documents' | 'maps' | 'notes' | 'tasks' | 'contacts' | 'apps' | 'people' | 'plugins' | 'inbox' | 'trash' | 'shares' | 'usage' | 'generic'
+/** The pictures of the plugins (the pages of the host have their own). */
+export type ArtName = 'documents' | 'maps' | 'notes' | 'tasks' | 'contacts' | 'apps' | 'generic'
 
 /** The symbol of each picture: paths on a 24x24 grid, drawn in white on the big tile. */
 const GLYPHS: Record<ArtName, string[]> = {
@@ -13,12 +14,6 @@ const GLYPHS: Record<ArtName, string[]> = {
   tasks: ['M4 12.5l4.5 4.5L20 6.5'],
   contacts: ['M12 5.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z', 'M5 20c1-4 4-5.5 7-5.5s6 1.5 7 5.5'],
   apps: ['M4 4h6.5v6.5H4z', 'M13.5 4H20v6.5h-6.5z', 'M4 13.5h6.5V20H4z', 'M13.5 13.5H20V20h-6.5z'],
-  people: ['M9 6a3 3 0 1 0 0 6 3 3 0 0 0 0-6z', 'M3 19c.8-3.4 3.2-5 6-5s5.2 1.6 6 5', 'M16 6.5a2.6 2.6 0 1 1 0 5', 'M17 14.2c2.2.4 3.5 2 4 4.8'],
-  plugins: ['M4 8l8-4 8 4v8l-8 4-8-4z', 'M4 8l8 4 8-4', 'M12 12v8'],
-  inbox: ['M4 13l2-8h12l2 8v6H4z', 'M4 13h5l1 2h4l1-2h5'],
-  trash: ['M5 7h14', 'M9 7V4h6v3', 'M7 7l1 13h8l1-13'],
-  shares: ['M6 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z', 'M18 3.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z', 'M18 15.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z', 'M8.2 10.8l7.6-4', 'M8.2 13.2l7.6 4'],
-  usage: ['M5 20v-6', 'M10 20V8', 'M15 20v-9', 'M20 20V5'],
   generic: ['M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z'],
 }
 

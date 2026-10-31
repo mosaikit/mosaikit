@@ -115,6 +115,16 @@ Output: decisions recorded, audit report, the list of changes of phase 1.
 
 Output: plugin API 1 declared, compatible/incompatible handled end to end.
 
+Delivered (2026-10-31), following section 8 of the audit: `[requires] mosaikit` and `api` with `abi` and `min_kernel` as
+deprecated aliases, the refusal `plugin_incompatible` and its reason in Plugins › Updates, the UI handshake
+(`API_VERSION`, `Hello.api`, `incompatible_api`), error `code` from the logic to `BridgeReply.code` (`ErrorCode`),
+the hygiene of the SDK and of the UI package, own version, changelog and README for both, the deprecation rule and
+the experimental list (architecture §8.11), manual checks `API-01..05`. Left for the owner: audit item 5
+(`Resources::create/delete` and `resource.create` values: they are listed as experimental), `CrudOptions.panel`
+(kept, experimental), making `kind` mandatory (it would reject old manifests), the name `web`, and a sample plugin
+per experimental feature (phase 3). The crates and the npm package still sit in the workspaces of `mosaikit` for
+lints and dependencies; they publish with their own metadata.
+
 ### Phase 2 — The command-line tool `mosaikit-plugin` (6 days)
 
 - Extract `plugin new / build / pack` from `xtask` into a crate `mosaikit-plugin-cli` (a binary of its own),

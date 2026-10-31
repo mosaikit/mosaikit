@@ -95,6 +95,22 @@ impl MockHost {
         }
     }
 
+    /// Runs a command as the kernel would and keeps the whole error (message and `code`).
+    pub fn command_err(&self, reg: &Registry, name: &str, args: Value) -> Result<Value, crate::Error> {
+        let msg = json!({ "abi": 1, "kind": "command", "name": name, "args": args, "ctx": self.ctx });
+        let reply = self.with(|| reg.dispatch(&msg));
+        match reply.get("err") {
+            Some(e) => {
+                let mut err = crate::Error::msg(e.as_str().unwrap_or_default());
+                if let Some(c) = reply.get("code").and_then(Value::as_str) {
+                    err = err.with_code(c);
+                }
+                Err(err)
+            }
+            None => Ok(reply.get("ok").cloned().unwrap_or(Value::Null)),
+        }
+    }
+
     /// Runs a command as the kernel would.
     pub fn command(&self, reg: &Registry, name: &str, args: Value) -> Result<Value, String> {
         let msg = json!({ "abi": 1, "kind": "command", "name": name, "args": args, "ctx": self.ctx });
@@ -179,13 +195,31 @@ mod tests {
         Err(Error::msg("forbidden"))
     }
 
+    fn locked(_: &Ctx, _args: Value) -> Result<Value> {
+        Err(Error::coded("item_locked", "the item is closed"))
+    }
+
     fn count(ctx: &Ctx, _args: Value) -> Result<Value> {
         Ok(Value::Array(ctx.db().query("select count(*) n from notes", &[])?))
     }
 
     crate::plugin! {
         hooks: { "notes.before_create" => default_tag, "notes.before_update" => reject },
-        commands: { "notes.count" => count, "t.greet" => greet },
+        commands: { "notes.count" => count, "t.greet" => greet, "t.locked" => locked },
+    }
+
+    #[test]
+    fn the_error_carries_its_code() {
+        let host = MockHost::new();
+        let reg = __msk_registry();
+        // the wire answer has `err` and `code`; without a code, only `err`
+        let reply =
+            reg.dispatch(&json!({ "kind": "command", "name": "t.locked", "args": {}, "ctx": host.ctx }));
+        assert_eq!(reply, json!({ "err": "the item is closed", "code": "item_locked" }));
+        let e = host.command_err(&reg, "t.locked", json!({})).unwrap_err();
+        assert_eq!((e.message.as_str(), e.code.as_deref()), ("the item is closed", Some("item_locked")));
+        assert_eq!(host.command_err(&reg, "t.nope", json!({})).unwrap_err().code, None);
+        assert_eq!(host.command(&reg, "t.locked", json!({})), Err("the item is closed".into()));
     }
 
     #[test]

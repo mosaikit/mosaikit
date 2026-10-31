@@ -695,7 +695,10 @@ export interface AdminPlugin extends PluginView {
   /** recent servers */
   requires?: { database: string | null; extensions: string[] }
   user_permissions?: { key: string; label: string; description: string; default: boolean }[]
-  min_kernel?: string
+  /** range of Mosaikit versions it works with (`>=1.2, <2`; `*` = any) */
+  requires_mosaikit?: string
+  /** plugin API it was built for */
+  api?: number
   extends_min?: string | null
   extension?: { fields: { resource: string; key: string; label: string; kind: string }[]; actions: { resource: string; key: string; label: string }[] }
   has_config?: boolean
@@ -717,6 +720,8 @@ export interface CatalogItem {
   latest: string
   installed: string | null
   update_available: boolean
+  /** the latest version does not fit this Mosaikit (range or plugin API) */
+  incompatible?: { reason: 'mosaikit' | 'api'; wanted: string; have: string } | null
   /** recent servers */
   kind?: PluginKind | null
   extends?: string | null

@@ -35,17 +35,28 @@ pub struct Error {
     pub message: String,
     /// specific code (`password_too_short`, `wrong_credentials`, ...); absent: the one of the category
     pub code: Option<&'static str>,
+    /// code chosen by the logic of a plugin (`{"err": "...", "code": "..."}`), given to the UI of the plugin as
+    /// it is; the interface of the host keeps using `code` (`plugin_error`)
+    pub plugin_code: Option<String>,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
 
 impl Error {
     pub fn new(kind: Kind, m: impl Into<String>) -> Error {
-        Error { kind, message: m.into(), code: None }
+        Error { kind, message: m.into(), code: None, plugin_code: None }
     }
     /// The same error with a specific code, stable across versions.
     pub fn with_code(mut self, code: &'static str) -> Error {
         self.code = Some(code);
+        self
+    }
+    /// The error with the code the logic of a plugin gave it (ignored unless it is `[a-z][a-z0-9_]{0,47}`).
+    pub fn with_plugin_code(mut self, code: &str) -> Error {
+        let ok = code.len() <= 48
+            && code.starts_with(|c: char| c.is_ascii_lowercase())
+            && code.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_');
+        self.plugin_code = ok.then(|| code.to_string());
         self
     }
     /// The code to send to the interface.
@@ -171,5 +182,21 @@ impl From<serde_json::Error> for Error {
 impl From<tokio::task::JoinError> for Error {
     fn from(e: tokio::task::JoinError) -> Error {
         Error::internal(e.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn plugin_code_must_be_a_plain_name() {
+        let e = |c: &str| Error::bad("x").with_plugin_code(c).plugin_code;
+        assert_eq!(e("invoice_locked").as_deref(), Some("invoice_locked"));
+        assert_eq!(e("Bad"), None);
+        assert_eq!(e("1abc"), None);
+        assert_eq!(e("a-b"), None);
+        assert_eq!(e(&"a".repeat(49)), None);
+        assert_eq!(e(""), None);
     }
 }

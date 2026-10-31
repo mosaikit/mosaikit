@@ -109,11 +109,12 @@ pub fn viewer(title: &str, frame_src: &str, plugin_origin: &str, nonce: &str) ->
            if(ev.source!==f.contentWindow||ev.origin!==PO)return;var m=ev.data;if(!m||m.msk!==1||!m.id)return;\
            function reply(x){{x.msk=1;x.id=m.id;f.contentWindow.postMessage(x,PO);}}\
            if(m.op==='hello'||m.op==='public.get'){{fetch('api',{{cache:'no-store'}}).then(function(r){{return r.json();}})\
-             .then(function(j){{reply({{ok:m.op==='hello'?{{public:true,resource:j}}:j}});}},function(e){{reply({{err:String(e)}});}});return;}}\
+             .then(function(j){{reply({{ok:m.op==='hello'?{{api:{api},public:true,resource:j}}:j}});}},function(e){{reply({{err:String(e)}});}});return;}}\
            reply({{err:'operation not available in a public link'}});\
          }});}})();</script></body></html>",
         t = esc(title),
         src = esc(frame_src),
         po = serde_json::to_string(plugin_origin).unwrap_or_default(),
+        api = mosaikit_mskp::API_VERSION,
     )
 }

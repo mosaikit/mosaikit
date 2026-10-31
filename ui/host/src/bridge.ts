@@ -14,13 +14,39 @@ export interface RestCall {
   blob?: boolean
 }
 
-export class OpError extends Error {}
+export class OpError extends Error {
+  constructor(
+    message: string,
+    /** stable code the plugin may react to (`incompatible_api`) */
+    readonly code?: string,
+  ) {
+    super(message)
+  }
+}
+
+/** The plugin API the shell speaks: the `API_VERSION` of `@mosaikit/plugin-api` (a test keeps them equal). */
+export const SHELL_API = 1
+
+/**
+ * The handshake, host side: `hello` carries the plugin API the plugin UI was built for. A plugin that
+ * announces nothing predates the handshake and speaks API 1. One built for a newer API than this shell
+ * speaks is refused with `incompatible_api`; the shell speaks every API up to its own.
+ */
+export function checkPluginApi(args: unknown): void {
+  const a = args && typeof args === 'object' ? (args as { api?: unknown }).api : undefined
+  if (a === undefined) return
+  if (typeof a !== 'number' || !Number.isInteger(a) || a < 1) throw new OpError('invalid plugin API', 'incompatible_api')
+  if (a > SHELL_API) throw new OpError(`this plugin needs plugin API ${a}, this Mosaikit speaks API ${SHELL_API}`, 'incompatible_api')
+}
 
 /** The answer to a request that failed: the text in the language of the host and, for the errors of the
  *  server, the stable code, the HTTP status and the untranslated message (the plugin may translate the
  *  code itself, or react to it). */
 export function errorReply(e: unknown): { err: string; code?: string; status?: number; message?: string } {
-  return e instanceof ApiError ? { err: errText(e), code: e.code, status: e.status, message: e.message } : { err: errText(e) }
+  // an error the logic of the plugin gave a code of its own reaches the plugin UI with that code
+  if (e instanceof ApiError) return { err: errText(e), code: e.pluginCode ?? e.code, status: e.status, message: e.message }
+  if (e instanceof OpError && e.code) return { err: errText(e), code: e.code }
+  return { err: errText(e) }
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

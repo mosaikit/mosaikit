@@ -107,7 +107,7 @@ function Requirements({ p }: { p: AdminPlugin }) {
       <h3 className="text-sm font-semibold">{t('Permissions and requirements')}</h3>
       <div className="flex flex-wrap gap-1.5">
         {chips.length ? chips.map((c) => <Chip key={c}>{c}</Chip>) : <span className="text-sm text-muted-foreground">{t('It asks nothing special of the platform.')}</span>}
-        {p.min_kernel && <Chip>{t('Needs Mosaikit {v}', { v: p.min_kernel })}</Chip>}
+        {p.requires_mosaikit && p.requires_mosaikit !== '*' && <Chip>{t('Needs Mosaikit {v}', { v: p.requires_mosaikit })}</Chip>}
       </div>
     </section>
   )

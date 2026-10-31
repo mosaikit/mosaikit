@@ -1,9 +1,16 @@
 [package]
 name = "mosaikit-plugin-sdk"
-description = "SDK to write the logic of Mosaikit plugins (WASM, ABI v1)"
-version.workspace = true
-edition.workspace = true
-license.workspace = true
+description = "SDK to write the logic of Mosaikit plugins (WASM, plugin API 1)"
+# its own version, not the one of the kernel: see CHANGELOG.md (a release of Mosaikit that changes the plugin API raises it)
+version = "1.0.0"
+edition = "2021"
+rust-version = "1.85"
+license = "Apache-2.0"
+readme = "README.md"
+keywords = ["mosaikit", "plugin", "wasm"]
+categories = ["wasm", "api-bindings"]
+publish = true
+include = ["src/**", "README.md", "CHANGELOG.md"]
 
 [dependencies]
 serde.workspace = true

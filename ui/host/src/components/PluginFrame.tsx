@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { errorReply, execute, OpError, routeOp, safePage, themeVars, uuid } from '../bridge.ts'
+import { checkPluginApi, errorReply, execute, OpError, routeOp, safePage, SHELL_API, themeVars, uuid } from '../bridge.ts'
 import type { PluginView, Session, TenantContext } from '../types.ts'
 import { useUi } from '../ui-context.ts'
 import { t } from '../app/i18n.ts'
@@ -95,8 +95,10 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
       try {
         switch (m.op) {
           case 'hello':
+            checkPluginApi(m.args)
             reply({
               ok: {
+                api: SHELL_API,
                 public: false,
                 user: { id: session.user.user_id, username: session.user.username, name: session.user.display_name || session.user.username },
                 tenant: { slug: ctx.tenant.slug, name: ctx.tenant.name, role: ctx.tenant.role },
@@ -171,6 +173,8 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
             reply({ ok: await execute(routeOp(tenant, plugin.id, m.op, m.args)) })
         }
       } catch (e) {
+        // a plugin built for a newer API than the shell speaks: the person is told (the plugin may also react)
+        if (e instanceof OpError && e.code === 'incompatible_api') ui.toast(t('This plugin was built for a newer plugin API than this Mosaikit speaks. Ask the Administrator to update Mosaikit.'), true)
         reply(errorReply(e))
       }
     }

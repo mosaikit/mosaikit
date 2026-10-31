@@ -16,9 +16,9 @@ pub use collect::collect_plugin_dir;
 pub use manifest::{
     is_media_name, is_plugin_id, is_service_id, schema_name, ConfigDecl, ConfigKind, Contribution,
     ExtActionDecl, ExtFieldDecl, ExtTabDecl, Extends, ExtensionDecl, ExtensionTranslation, FieldDecl,
-    FieldKind, KeyScope, KpiDecl, KpiTranslation, Manifest, NavDecl, PermissionTranslation, Permissions,
-    PluginKind, Requires, ResourceDecl, ResourceTranslation, ServiceKeyDecl, Translation, UiDecl,
-    UserPermission, ABI_VERSION, STANDARD_PERMISSIONS,
+    FieldKind, Incompatible, KeyScope, KpiDecl, KpiTranslation, Manifest, NavDecl, PermissionTranslation,
+    Permissions, PluginKind, Requires, ResourceDecl, ResourceTranslation, ServiceKeyDecl, Translation,
+    UiDecl, UserPermission, ABI_VERSION, API_VERSION, STANDARD_PERMISSIONS,
 };
 pub use package::{
     pack, package_sha256, parse_migration_name, Package, MAX_FILE_BYTES, MAX_PACKAGE_BYTES, WASM_FILE,
@@ -26,7 +26,7 @@ pub use package::{
 pub use signing::{
     generate_key, public_key_b64, signing_key_from_b64, signing_key_to_b64, Signature, TrustedKeys,
 };
-pub use version::Version;
+pub use version::{Version, VersionReq};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

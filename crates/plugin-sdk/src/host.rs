@@ -48,7 +48,7 @@ pub fn call(op: &str, req: Value) -> Result<Value> {
     let raw = imp::call(&msg).ok_or_else(|| Error::msg("call to the host failed"))?;
     let reply: Value = serde_json::from_slice(&raw)?;
     if let Some(e) = reply.get("err") {
-        return Err(Error(e.as_str().map(str::to_string).unwrap_or_else(|| e.to_string())));
+        return Err(Error::msg(e.as_str().map(str::to_string).unwrap_or_else(|| e.to_string())));
     }
     Ok(reply.get("ok").cloned().unwrap_or(Value::Null))
 }

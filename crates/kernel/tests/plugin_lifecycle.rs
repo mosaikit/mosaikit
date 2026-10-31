@@ -777,3 +777,85 @@ async fn a_seed_never_overwrites_a_value_set_before_it() {
     assert_eq!(logic["endpoint"], "https://admin.example");
     assert_eq!(logic["token"], "admin-token");
 }
+
+/// A bare service plugin: `top` = keys of the top level, `requires` = the `[requires]` table.
+fn bare_service(version: &str, top: &str, requires: &str) -> BTreeMap<String, Vec<u8>> {
+    let toml = format!(
+        "id = \"com.example.bare\"
+name = \"Bare\"
+version = \"{version}\"
+kind = \"service\"
+{top}
+[contribution]
+icon = \"B\"
+label = \"Bare\"
+{requires}
+"
+    );
+    BTreeMap::from([("plugin.toml".to_string(), toml.into_bytes())])
+}
+
+#[tokio::test]
+async fn range_and_api_of_the_plugin_are_checked() {
+    let t = start().await;
+    let kernel = mosaikit_mskp::Version::parse_lenient(mosaikit_kernel::KERNEL_VERSION).unwrap();
+    // the deprecated keys still install
+    install(
+        &t,
+        &bare_service(
+            "1.0.0",
+            "abi = 1
+min_kernel = \"1.0.0\"",
+            "",
+        ),
+    )
+    .await
+    .expect("deprecated keys");
+    // a range that includes this Mosaikit
+    let fits = format!(
+        "[requires]
+mosaikit = \">={}.{}, <{}\"
+api = 1",
+        kernel.0,
+        kernel.1,
+        kernel.0 + 1
+    );
+    install(&t, &bare_service("1.0.1", "", &fits)).await.expect("range that fits");
+
+    // outside the range: one error with its own code, naming the range and the version of the kernel
+    let next = format!(
+        "[requires]
+mosaikit = \">={}\"",
+        kernel.0 + 1
+    );
+    let e = install(&t, &bare_service("1.0.2", "", &next)).await.unwrap_err();
+    assert_eq!(e.code(), "plugin_incompatible");
+    assert!(
+        e.message.contains(&format!(">={}", kernel.0 + 1)) && e.message.contains(&kernel.to_string()),
+        "{e}"
+    );
+    let upper = format!(
+        "[requires]
+mosaikit = \"<{}.{}\"",
+        kernel.0, kernel.1
+    );
+    assert_eq!(
+        install(&t, &bare_service("1.0.2", "", &upper)).await.unwrap_err().code(),
+        "plugin_incompatible"
+    );
+
+    // another plugin API
+    let e = install(
+        &t,
+        &bare_service(
+            "1.0.2",
+            "",
+            "[requires]
+api = 2",
+        ),
+    )
+    .await
+    .unwrap_err();
+    assert_eq!(e.code(), "plugin_incompatible");
+    assert!(e.message.contains("API 2"), "{e}");
+}

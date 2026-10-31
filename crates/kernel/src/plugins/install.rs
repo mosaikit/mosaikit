@@ -18,6 +18,13 @@ pub enum InstallSource {
     Preinstall,
 }
 
+/// The error of a plugin that does not fit this Mosaikit: one code (`plugin_incompatible`), translated by the
+/// interface; the message is the fallback with the range of the plugin and the version of the kernel.
+pub fn check_compatible(m: &Manifest) -> Result<()> {
+    let kernel = Version::parse_lenient(crate::KERNEL_VERSION).unwrap_or(Version(0, 0, 0));
+    m.check_compatible(kernel).map_err(|e| Error::bad(e.to_string()).with_code("plugin_incompatible"))
+}
+
 /// Installs or updates a plugin from a `.mskp` package. The state (on or off)
 /// of a plugin already installed is kept.
 pub async fn install_package(
@@ -35,11 +42,7 @@ pub async fn install_package(
     if registry::is_blocked(k, &m.id, &m.version, &pkg.sha256) {
         return Err(Error::forbidden(format!("{} {} is in the blocklist of the registry", m.id, m.version)));
     }
-    let min = Version::parse(&m.min_kernel).unwrap_or(Version(0, 0, 0));
-    let kernel = Version::parse(crate::KERNEL_VERSION).unwrap_or(Version(0, 0, 0));
-    if min > kernel {
-        return Err(Error::bad(format!("the plugin requires kernel {min} (this one is {kernel})")));
-    }
+    check_compatible(m)?;
     let module = match pkg.wasm() {
         Some(w) => Some(k.engine.compile(w)?),
         None => None,

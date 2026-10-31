@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react'
-import { errorReply, execute, OpError, routeOp, safePage, themeVars } from '../bridge.ts'
+import { checkPluginApi, errorReply, execute, OpError, routeOp, safePage, SHELL_API, themeVars } from '../bridge.ts'
 import type { Session, TenantContext } from '../types.ts'
 import { useUi } from '../ui-context.ts'
 
@@ -72,9 +72,11 @@ export default function ExtensionTab({ tab, session, ctx, reloadKey, context, ui
       try {
         switch (m.op) {
           case 'hello': {
+            checkPluginApi(m.args)
             const p = ctx.plugins.find((x) => x.id === tab.ext)
             reply({
               ok: {
+                api: SHELL_API,
                 public: false,
                 user: { id: session.user.user_id, username: session.user.username, name: session.user.display_name || session.user.username },
                 tenant: { slug: ctx.tenant.slug, name: ctx.tenant.name, role: ctx.tenant.role },

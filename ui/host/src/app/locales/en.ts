@@ -20,6 +20,7 @@ export const EN: Record<string, string> = {
   'errors.profile_name_invalid': 'A name of 1 to 120 characters',
   'errors.server_unavailable': 'The server is not responding. Trying again…',
   'errors.unexpected': 'Something went wrong. Try again.',
+  'errors.plugin_incompatible': 'This plugin does not work with this version of Mosaikit. Plugins > Updates shows the versions it accepts.',
   'errors.quota_exceeded': 'The tenant has reached one of its quotas: nothing more can be added. The Tenant Manager sees the usage in Usage.',
   'errors.plugin_off': 'This plugin is not turned on in the tenant',
   'errors.quota_invalid': 'A quota cannot be negative',

@@ -4,10 +4,13 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{is_identifier, is_safe_path, Error, Result, Version};
+use crate::{is_identifier, is_safe_path, Error, Result, Version, VersionReq};
 
-/// Version of the WASM ABI supported by the kernel.
-pub const ABI_VERSION: u32 = 1;
+/// Version of the plugin API (logic ABI, SDK, UI package) supported by the kernel: what a plugin declares
+/// with `[requires] api`.
+pub const API_VERSION: u32 = 1;
+/// Old name of [`API_VERSION`] (the manifest key `abi`).
+pub const ABI_VERSION: u32 = API_VERSION;
 
 /// Columns the host adds to every table of a plugin.
 const RESERVED_FIELDS: &[&str] = &["resource_id", "tenant_id", "id", "owner", "my_level"];
@@ -18,10 +21,12 @@ pub struct Manifest {
     pub id: String,
     pub name: String,
     pub version: String,
-    #[serde(default = "default_abi")]
-    pub abi: u32,
-    #[serde(default = "default_min_kernel")]
-    pub min_kernel: String,
+    /// Deprecated: use `[requires] api`. Kept for one major version.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub abi: Option<u32>,
+    /// Deprecated: use `[requires] mosaikit`. Kept for one major version.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_kernel: Option<String>,
     #[serde(default)]
     pub description: String,
     /// Brochure of the plugin (optional): who made it, under which licence, where to read more, a longer
@@ -46,6 +51,8 @@ pub struct Manifest {
     /// default icon for names it does not know. `contribution.icon` stays for older hosts.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub icon: Option<String>,
+    /// Deprecated, optional: emoji icon and label for older hosts. Absent: the label is `name` and the icon a default.
+    #[serde(default)]
     pub contribution: Contribution,
     #[serde(default)]
     pub resources: Vec<ResourceDecl>,
@@ -470,6 +477,12 @@ pub struct KpiTranslation {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(deny_unknown_fields)]
 pub struct Requires {
+    /// Versions of Mosaikit the plugin works with, as a range (`">=1.2, <2"`); absent: any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mosaikit: Option<String>,
+    /// Version of the plugin API the plugin was built for (an integer); absent: the current one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub api: Option<u32>,
     /// "postgres" if the plugin uses PostgreSQL functions (e.g. PostGIS); empty = any
     #[serde(default)]
     pub database: Option<String>,
@@ -478,17 +491,34 @@ pub struct Requires {
     pub extensions: Vec<String>,
 }
 
-fn default_abi() -> u32 {
-    ABI_VERSION
-}
-fn default_min_kernel() -> String {
-    "1.0.0".into()
+/// Why a plugin does not fit this installation (shown to the Administrator, translated by the interface).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Incompatible {
+    /// the version of Mosaikit is outside the range the plugin declares
+    Mosaikit { range: String, kernel: String },
+    /// the plugin was built for another version of the plugin API
+    Api { wanted: u32, supported: u32 },
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+impl std::fmt::Display for Incompatible {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Incompatible::Mosaikit { range, kernel } => {
+                write!(f, "the plugin works with Mosaikit {range} (this is {kernel})")
+            }
+            Incompatible::Api { wanted, supported } => {
+                write!(f, "the plugin uses plugin API {wanted} (this Mosaikit supports {supported})")
+            }
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Contribution {
+    #[serde(default)]
     pub icon: String,
+    #[serde(default)]
     pub label: String,
 }
 
@@ -637,7 +667,14 @@ pub struct KpiDecl {
 
 impl Manifest {
     pub fn from_toml(s: &str) -> Result<Manifest> {
-        let m: Manifest = toml::from_str(s).map_err(|e| Error::Manifest(e.to_string()))?;
+        let mut m: Manifest = toml::from_str(s).map_err(|e| Error::Manifest(e.to_string()))?;
+        // `[contribution]` is optional: the name labels the plugin where older hosts showed the label
+        if m.contribution.label.trim().is_empty() {
+            m.contribution.label = m.name.clone();
+        }
+        if m.contribution.icon.trim().is_empty() {
+            m.contribution.icon = "🧩".into();
+        }
         m.validate()?;
         Ok(m)
     }
@@ -666,6 +703,48 @@ impl Manifest {
         })
     }
 
+    /// The range of Mosaikit versions the plugin accepts: `[requires] mosaikit`, else the deprecated
+    /// `min_kernel` as a lower bound, else any.
+    pub fn mosaikit_range(&self) -> VersionReq {
+        if let Some(r) = self.requires.mosaikit.as_deref().and_then(VersionReq::parse) {
+            return r;
+        }
+        match self.min_kernel.as_deref().and_then(Version::parse) {
+            Some(v) => VersionReq::at_least(v),
+            None => VersionReq::parse("*").expect("any"),
+        }
+    }
+
+    /// The plugin API the plugin was built for: `[requires] api`, else the deprecated `abi`, else the
+    /// current one.
+    pub fn api(&self) -> u32 {
+        self.requires.api.or(self.abi).unwrap_or(API_VERSION)
+    }
+
+    /// Checks the plugin against a version of Mosaikit and the plugin API of this build.
+    pub fn check_compatible(&self, kernel: Version) -> std::result::Result<(), Incompatible> {
+        if self.api() != API_VERSION {
+            return Err(Incompatible::Api { wanted: self.api(), supported: API_VERSION });
+        }
+        let range = self.mosaikit_range();
+        if !range.matches(kernel) {
+            return Err(Incompatible::Mosaikit { range: range.to_string(), kernel: kernel.to_string() });
+        }
+        Ok(())
+    }
+
+    /// Deprecated manifest keys in use (the kernel logs them as warnings in development).
+    pub fn deprecations(&self) -> Vec<String> {
+        let mut v = Vec::new();
+        if self.abi.is_some() {
+            v.push("`abi` is deprecated: use `[requires] api`".to_string());
+        }
+        if self.min_kernel.is_some() {
+            v.push("`min_kernel` is deprecated: use `[requires] mosaikit = \">=1.2, <2\"`".to_string());
+        }
+        v
+    }
+
     pub fn validate(&self) -> Result<()> {
         let bad = |m: String| Err(Error::Manifest(m));
         if !is_plugin_id(&self.id) {
@@ -677,11 +756,20 @@ impl Manifest {
         if Version::parse(&self.version).is_none() {
             return bad(format!("version '{}' is not MAJOR.MINOR.PATCH", self.version));
         }
-        if Version::parse(&self.min_kernel).is_none() {
-            return bad(format!("min_kernel '{}' is not MAJOR.MINOR.PATCH", self.min_kernel));
+        if let Some(m) = &self.min_kernel {
+            if Version::parse(m).is_none() {
+                return bad(format!("min_kernel '{m}' is not MAJOR.MINOR.PATCH"));
+            }
         }
-        if self.abi != ABI_VERSION {
-            return bad(format!("abi {} not supported (the kernel supports {ABI_VERSION})", self.abi));
+        if let Some(r) = &self.requires.mosaikit {
+            if VersionReq::parse(r).is_none() {
+                return bad(format!("requires.mosaikit '{r}' is not a version range (e.g. \">=1.2, <2\")"));
+            }
+        }
+        // an API this kernel does not know is not a manifest error: the kernel refuses the plugin with its
+        // own message (`check_compatible`), so the Administrator sees why in Plugins
+        if self.api() == 0 {
+            return bad("requires.api must be 1 or more".into());
         }
         if self.contribution.label.trim().is_empty() || self.contribution.icon.trim().is_empty() {
             return bad("contribution.icon and contribution.label required".into());
@@ -1380,7 +1468,58 @@ details = \"First paragraph.\"")
         let m = Manifest::from_toml(NOTES).unwrap();
         assert_eq!(m.schema_name(), "plg_com_mosaikit_notes");
         assert_eq!(m.resources[0].title_key(), Some("title"));
-        assert_eq!(m.abi, ABI_VERSION);
+        assert_eq!(m.api(), API_VERSION);
+        assert!(m.deprecations().is_empty());
+    }
+
+    #[test]
+    fn contribution_is_optional() {
+        let toml = "id = \"com.example.bare\"
+name = \"Bare\"
+version = \"1.0.0\"
+kind = \"service\"
+";
+        let m = Manifest::from_toml(toml).unwrap();
+        assert_eq!(m.contribution.label, "Bare");
+        assert!(!m.contribution.icon.is_empty());
+        let m = Manifest::from_toml(&format!(
+            "{toml}[contribution]
+label = \"Mine\"
+"
+        ))
+        .unwrap();
+        assert_eq!(m.contribution.label, "Mine");
+    }
+
+    #[test]
+    fn requires_range_and_api() {
+        let with = |req: &str| Manifest::from_toml(&format!("{NOTES}\n[requires]\n{req}\n")).unwrap();
+        let m = with("mosaikit = \">=1.2, <2\"\napi = 1");
+        assert!(m.check_compatible(Version(1, 2, 0)).is_ok());
+        assert!(m.check_compatible(Version(1, 9, 3)).is_ok());
+        assert_eq!(
+            m.check_compatible(Version(1, 1, 0)),
+            Err(Incompatible::Mosaikit { range: ">=1.2, <2".into(), kernel: "1.1.0".into() })
+        );
+        assert!(m.check_compatible(Version(2, 0, 0)).is_err());
+        // another API is refused by the kernel, not by the parser
+        assert_eq!(
+            with("api = 2").check_compatible(Version(1, 2, 0)),
+            Err(Incompatible::Api { wanted: 2, supported: API_VERSION })
+        );
+        assert!(Manifest::from_toml(&format!("{NOTES}\n[requires]\nmosaikit = \"soon\"\n")).is_err());
+        assert!(Manifest::from_toml(&format!("{NOTES}\n[requires]\napi = 0\n")).is_err());
+    }
+
+    #[test]
+    fn deprecated_keys_still_work() {
+        let m = Manifest::from_toml(&format!("abi = 1\nmin_kernel = \"1.3.0\"\n{NOTES}")).unwrap();
+        assert_eq!(m.deprecations().len(), 2);
+        assert!(m.check_compatible(Version(1, 3, 0)).is_ok());
+        assert!(m.check_compatible(Version(1, 2, 9)).is_err());
+        // `[requires]` wins over the old keys
+        let both = format!("min_kernel = \"1.3.0\"\n{NOTES}\n[requires]\nmosaikit = \">=1.0\"\n");
+        assert!(Manifest::from_toml(&both).unwrap().check_compatible(Version(1, 0, 0)).is_ok());
     }
 
     #[test]
@@ -1389,8 +1528,6 @@ details = \"First paragraph.\"")
         assert!(Manifest::from_toml(&bad_id).is_err());
         let bad_version = NOTES.replace(r#"version = "0.3.0""#, r#"version = "1.0""#);
         assert!(Manifest::from_toml(&bad_version).is_err());
-        let bad_abi = format!("abi = 2\n{NOTES}");
-        assert!(Manifest::from_toml(&bad_abi).is_err());
         let reserved = NOTES.replace(r#"key = "tag""#, r#"key = "tenant_id""#);
         assert!(Manifest::from_toml(&reserved).is_err());
         let bad_origin = NOTES.replace("https://web.geolibre.app", "javascript:alert(1)");

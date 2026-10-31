@@ -280,6 +280,8 @@ pub fn pack_all(plugins: &[Plugin], release: bool, out: &Path) -> Result<PathBuf
                 "notes": notes,
                 "kind": manifest.effective_kind().as_str(),
                 "extends": manifest.extends.as_ref().map(|e| e.plugin.clone()),
+                "mosaikit": manifest.requires.mosaikit,
+                "api": manifest.requires.api,
             }],
         }));
     }

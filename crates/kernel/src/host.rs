@@ -302,8 +302,12 @@ pub(crate) async fn run(
     if let Some(e) = reply.get("err") {
         // the message of the plugin itself: its own code, so the interface shows it instead of the
         // generic text of `bad_request`
-        return Err(Error::bad(e.as_str().map(str::to_string).unwrap_or_else(|| e.to_string()))
-            .with_code("plugin_error"));
+        let err = Error::bad(e.as_str().map(str::to_string).unwrap_or_else(|| e.to_string()))
+            .with_code("plugin_error");
+        return Err(match reply.get("code").and_then(Value::as_str) {
+            Some(c) => err.with_plugin_code(c),
+            None => err,
+        });
     }
     notes.extend(asked);
     Ok((reply.get("ok").cloned().unwrap_or(Value::Null), tx))

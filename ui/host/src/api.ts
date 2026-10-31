@@ -36,6 +36,8 @@ export class ApiError extends Error {
     readonly status: number,
     /** stable code of the server (`wrong_credentials`, `forbidden`…), or one of the client */
     readonly code?: string,
+    /** code the logic of a plugin gave to its own error (`Error::coded` of the SDK); only with `code` `plugin_error` */
+    readonly pluginCode?: string,
   ) {
     super(message)
   }
@@ -96,7 +98,7 @@ export async function api<T = unknown>(method: string, path: string, body?: unkn
   if (!r.ok) {
     // a gateway between browser and server (Vite, a reverse proxy) answers for a server that is not there
     if (r.status === 502 || r.status === 503 || r.status === 504) throw unavailable()
-    let j: { error?: unknown; code?: unknown } | null = null
+    let j: { error?: unknown; code?: unknown; plugin_code?: unknown } | null = null
     try {
       j = await r.json()
     } catch {
@@ -107,7 +109,7 @@ export async function api<T = unknown>(method: string, path: string, body?: unkn
     const code = j && typeof j.code === 'string' ? j.code : j && typeof j.error === 'string' ? undefined : UNEXPECTED
     // maintenance: only the Administrators work, the others go back to the sign-in page with the notice
     if (code === MAINTENANCE && onUnauthorized && !path.startsWith('/api/auth/')) onUnauthorized()
-    throw new ApiError(msg, r.status, code)
+    throw new ApiError(msg, r.status, code, j && typeof j.plugin_code === 'string' ? j.plugin_code : undefined)
   }
   if (opts.blob) return (await r.blob()) as T
   const text = await r.text()
