@@ -231,12 +231,23 @@ logic never holds the secret, and fails with «no key of the service … is set�
 address may be an origin of `permissions.network` or the one in use for an address service the plugin
 declares (so the Administrator, not the manifest, chooses the server). Every plugin request goes through
 `webfetch::request`, the same guard as the page probe: http and https only, public addresses only (a
-private or loopback address needs `allow_private_fetch`, development and tests only), the connection pinned
+private or loopback address needs `allow_private_fetch`, development and tests only, or an exact `host:port` in
+`allow_private_fetch_hosts`, see below), the connection pinned
 to the address checked, redirects followed only for a GET, answer cut at 4 MB. A command answers a missing
 key or address with `{ ok: false, reason }` (`no_key`, `no_endpoint`, `key_rejected`, `service_error`,
 `unreachable`) so its UI says what to do. In tests a double server records the request (see
 `a_plugin_calls_a_service_with_its_key_and_only_where_allowed` in `crates/kernel/tests/plugin_lifecycle.rs`);
 no test calls a real service.
+
+**Internal services (`allow_private_fetch_hosts`).** A deployer who runs a service on the private network (a
+translation engine, say) lists it in `mosaikit.toml`: `allow_private_fetch_hosts = ["translate.internal:5000"]`
+(env `MOSAIKIT_ALLOW_PRIVATE_FETCH_HOSTS`, comma separated). Only exact `host:port` entries are accepted (no
+wildcards, no CIDR ranges, no scheme or path): a malformed entry stops the start with a clear error. An entry
+lifts the public-address rule only for a plugin whose manifest lists that origin in `[permissions] network`
+(the permission check runs first, so another plugin, another port or another host stays refused); the name is
+resolved and the connection pinned to the address as for any other destination, and every redirect hop is
+checked again. `allow_private_fetch` (everything, development and tests only) is unchanged. Test:
+`deployer_allow_list_of_private_destinations` in `crates/kernel/tests/plugin_lifecycle.rs`.
 
 **Own profile.** A person changes their display name (`PUT /api/me/profile`; not for the accounts of
 an identity provider, whose name comes from the provider: `profile_from_provider`) and picture (`PUT`
@@ -967,6 +978,7 @@ network = []             # origins reachable by http.fetch
 frame_src = []           # origins the UI may embed
 calls = []               # plugins whose commands the logic calls (§8.6)
 notify = false           # the logic may send notifications (host operation `notify`, §8.3)
+script_eval = false      # the UI may compile code at run time (CSP 'unsafe-eval', §9); sensitive
 
 [requires]               # optional
 database = "postgres"    # uses PostgreSQL functions: it does not install on SQLite
@@ -1325,6 +1337,12 @@ are limited to the path.
 - **Passwords**: argon2id, at least 10 characters (the platform and the tenants may ask for more,
   §3.1). Sign-in with a limit of failed attempts per account and per address (default 8 in 15
   minutes, settings of the platform and of the tenant).
+- **`script_eval` (opt-in, sensitive)**: the CSP of a plugin UI never allows run-time code
+  compilation, unless the manifest declares `[permissions] script_eval = true`: then `'unsafe-eval'`
+  and `'wasm-unsafe-eval'` are appended to `script-src` and `worker-src` of THAT plugin's UI only
+  (`csp_for` in `crates/server/src/untrusted.rs`). The host UI, user contents, public links and the other
+  plugins keep the strict policy. The Administrator sees the permission in the plugin's «What it asks».
+  A plugin that declares it can run injected strings as code: grant it only to code you trust.
 - **Embedding**: the host UI is never embedded (`frame-ancestors 'none'`); the public pages of a
   tenant (public links) may be embedded only by the sites in `embed.sites` of the tenant, a subset
   of the platform's (`frame-ancestors <sites>`, otherwise `'none'`).
@@ -1632,7 +1650,10 @@ A **distribution** is a product based on Mosaikit, described by
 - `[plugins]`: plugin folders (`roots`) and included plugins (`include`);
 - `[desktop]`: database and port;
 - `[docker]`: image of the app and PostgreSQL image;
-- `[tests] cargo`: integration tests of its own.
+- `[tests] cargo`: integration tests of its own;
+- `[[sidecars]]`: extra processes or services shipped next to the kernel (see 14.0 below).
+
+- `[[plugin_settings]]` and `[[service_key_values]]`: values to seed (14.2).
 
 Mosaikit itself is the default distribution. `cargo xtask --dist <folder>`
 uses it for development, tests and release. The kernel does not change: brand and
@@ -1651,6 +1672,115 @@ theme (`#rrggbb` only, turned into CSS variables). How it applies:
 The dependency goes one way only: the distribution refers to Mosaikit
 (SDK, `@mosaikit/plugin-api`, kernel for the tests, xtask for build and release),
 Mosaikit refers to no distribution.
+
+### 14.0 Sidecars
+
+A sidecar is a process or service a distribution ships next to the kernel (for example a native service
+the plugins call over HTTP). Keys of `[[sidecars]]`: `name` (unique, lower case, `-`), `command`
+(executable relative to the distribution; desktop), `args`, `env` (a value `env:NAME` is read from the
+variable NAME: environment of the launcher, `.env` of Compose, secret of Kubernetes), `health` (`"tcp"` or
+an HTTP path, needs `port`), `port` (1024-65535, not the ports of the app), `image`, `volumes`
+(`name:/path[:ro]`), `depends_on` (other sidecars, no cycles), `restart` (`never`, `on-failure` default,
+`always`) and `start_timeout_secs` (default 30). Every entry needs `command` and/or `image`; the release
+of a target checks the one it needs. The section is validated whenever the distribution is loaded
+(so `cargo xtask ci` and every command check it); `cargo xtask sidecars` prints what each target gets.
+
+- **Desktop**: `release desktop` copies the executables (the first folder of `command`, or the file) into
+  `sidecars/<name>/` and writes `sidecars.toml` next to the executable. The launcher
+  (`crates/desktop/src/sidecar.rs`) starts the sidecars in dependency order BEFORE the kernel, waits for
+  each health check (progress in the splash window; clear errors for a missing executable, an unset
+  `env:` variable, an exit before ready and a timeout), supervises them with the restart policy (pause
+  that grows, gives up after 5 restarts in a minute), writes their output to
+  `<data_dir>/logs/sidecar-<name>.log` and stops them AFTER the kernel, in reverse order (a hard kill: a
+  sidecar must tolerate it). They also receive `MOSAIKIT_SIDECAR_NAME` and `MOSAIKIT_SIDECAR_PORT`.
+- **Docker**: `release docker` writes `compose.sidecars.yml` (a service per sidecar with image, env,
+  volumes, healthcheck; the `app` service depends on them) and sets `COMPOSE_FILE` in `.env` to merge it
+  with `compose.yml`. Healthchecks use `wget`, `curl` or `nc` of the image.
+- **Kubernetes**: `release k8s` adds `sidecars.yaml` (a Deployment and a Service per sidecar, a PVC per
+  named volume, probes from `health`) to the kustomization; `env:NAME` becomes a key of the secret.
+- **Addresses for the plugins**: a sidecar with a `port` is added to
+  `MOSAIKIT_ALLOW_PRIVATE_FETCH_HOSTS` (the exact `host:port` list of private hosts the plugins may
+  fetch, comma separated): `127.0.0.1:<port>` set by the launcher before the configuration is read,
+  `<name>:<port>` in `compose.sidecars.yml` (overridable from `.env`) and in `config.env` of Kubernetes.
+
+**Kind `oneshot`.** `kind = "service"` (default) or `"oneshot"`: a oneshot runs to completion (exit code 0
+= success) and the sidecars that `depends_on` it start only after it succeeded. It never restarts, is not
+health-checked (`port` and `health` are refused), is not added to `MOSAIKIT_ALLOW_PRIVATE_FETCH_HOSTS`
+and runs once per start of the app (every start of the launcher, every `compose up`, every new Job), so it
+must be idempotent (for example a database initialisation that checks what is already there). Any other
+exit code, or running longer than `start_timeout_secs`, fails the start with an error that names the
+sidecar and shows the tail of its log.
+
+- Desktop: the launcher runs it in dependency order (splash «Running <name> (n/m)»), output in
+  `logs/sidecar-<name>.log`; a failure stops the start and what was already started.
+- Docker: a Compose service with `restart: "no"`; the dependants (and `app`) use
+  `depends_on: condition: service_completed_successfully`. Compose does not enforce `start_timeout_secs`.
+- Kubernetes: a Job (`backoffLimit: 0`, `activeDeadlineSeconds` = `start_timeout_secs`). A pod that depends
+  on a oneshot gets an initContainer that runs `kubectl wait --for=condition=complete job/<name>` (image
+  `registry.k8s.io/kubectl`, a ServiceAccount, Role and RoleBinding that may read Jobs are generated). If
+  the Job failed the wait times out and the pod keeps restarting until the Job is deleted and recreated.
+  A Job is immutable: delete it (`kubectl delete job <name>`) before applying a new version of the release.
+
+**Overlay `files`.** `files = [{ source, target, mode }]` places files of the distribution where the
+sidecar expects them (for example the configuration of a server). `source` is a file relative to the
+distribution, inside it (no `..`), checked when the distribution is loaded; `target` must be unique per
+sidecar and without `..`; `mode` is an optional octal string such as `"0644"`.
+
+- Desktop: the release copies the sources to `sidecars/<name>/_files/`; the launcher copies them at EVERY
+  start (replacing what is there) to `sidecars/<name>/<target>`. The target must be relative.
+  `mode` is applied on Unix only.
+- Docker: read-only bind mounts from `sidecar-files/<name>/<source>` of the bundle to the absolute
+  `target`. The mode is the one of the host file.
+- Kubernetes: one ConfigMap `<name>-files` mounted with `subPath` at the absolute `target`, `mode` applied.
+  The files must be UTF-8 text and at most 512 KiB in total per sidecar (a clear error otherwise).
+
+A target is relative on the desktop and absolute in containers: a sidecar with `files` is therefore for
+one kind of target (the release of the other kind refuses it with a clear message).
+
+### 14.2 Seeding settings and platform keys
+
+A manifest default works for text and number settings only; a `secret` of `[[config]]` and the platform key of
+a `[[service_keys]]` service could only be typed by the Administrator. A distribution (or any deployment) can
+seed them. In `distribution.toml`:
+
+```toml
+[[plugin_settings]]                  # a [[config]] setting of a plugin (any kind, secrets too)
+plugin = "com.example.translate"
+key = "api_token"
+value = "env:TRANSLATE_TOKEN"        # or "file:/run/secrets/token"; a literal is allowed, not advised
+
+[[service_key_values]]               # the platform key of a [[service_keys]] service
+service = "translate"
+value = "file:/run/secrets/translate"
+shared = true                        # optional (default false): tenants without a key may use it
+```
+
+A value is a literal, `env:NAME` (an environment variable of the server) or `file:PATH` (the content of a
+file, relative to the folder of the seed file, a final line break dropped). **Secrets must be referenced, not
+written**: `distribution.toml` lives in a repository. A literal secret works but the server warns at start.
+Numbers and booleans may be written as TOML values.
+Set `shared = true` when a plugin command that any member of a tenant can run uses the key: with the default
+(`false`) a member of a tenant that has no key of its own gets «no key of the service … is set».
+
+How the server gets them: one mechanism, the property `plugin_settings_file` of `mosaikit.toml` (env
+`MOSAIKIT_PLUGIN_SETTINGS_FILE`), a TOML file with these two tables (other tables are ignored, so it may be the
+`distribution.toml` itself). `cargo xtask dev` sets it from the distribution; `release` copies
+`distribution.toml` into the bundle and sets the property. A deployment without a distribution writes a small
+file of its own with the same two tables. Code: `crates/kernel/src/seed.rs`, applied at every start after the
+plugins are loaded.
+
+Rules. An entry is applied **once**, only while the setting or key is unset, and never overwrites an
+Administrator choice: a setting or key that already has a value is left alone, and a marker (an empty row
+`plugin:<id>:seeded:<key>` or `seed:service:<id>` in `core.secrets`, with no value in it) keeps a later removal
+by the Administrator from being undone at the next start. Uninstalling a plugin drops its markers. Secrets are
+stored as the Administrator path stores them (encrypted with the secret key, `core.secrets` /
+`core.service_keys`); values never go to the log or to the events. A plugin or key that does not exist (yet), a
+value of the wrong kind or a reference that cannot be resolved gives a warning at start and is retried at the
+next one; a file that is not valid TOML or an entry without plugin, key or service stops the start. `cargo xtask`
+validates the two tables whenever it loads the distribution (unknown fields refused, empty names, a key with
+`:`, an entry listed twice, `env:` and `file:` without a name), so `ci` fails on a bad section. Tests:
+`a_deployment_seeds_settings_and_keys_without_overwriting_the_administrator` and
+`a_seed_never_overwrites_a_value_set_before_it` (`crates/kernel/tests/plugin_lifecycle.rs`), `dist::tests`.
 
 ### 14.1 Layouts and style
 

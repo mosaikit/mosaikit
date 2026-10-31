@@ -56,6 +56,9 @@ fn server_cmd(plugins: &[Plugin]) -> Result<Command> {
     if let Some(b) = crate::dist::current().brand.dir.as_ref().filter(|b| b.is_dir()) {
         c.env("MOSAIKIT_BRAND", b);
     }
+    if crate::dist::current().has_seeds() {
+        c.env("MOSAIKIT_PLUGIN_SETTINGS_FILE", crate::dist::current().dir.join("distribution.toml"));
+    }
     Ok(c)
 }
 

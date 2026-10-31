@@ -42,6 +42,15 @@ pub struct Config {
     /// (loopback, local network): only for tests and development, never in production
     #[serde(default)]
     pub allow_private_fetch: bool,
+    /// exact `host:port` destinations (private or loopback) that `http.fetch` may reach, only for a plugin
+    /// whose manifest lists that origin in `permissions.network`. No wildcards, no ranges. A deployer's
+    /// choice for an internal service (a translation engine on the same network)
+    #[serde(default)]
+    pub allow_private_fetch_hosts: Vec<String>,
+    /// file with the settings of plugins and the platform keys of outside services to seed at the start
+    /// (`[[plugin_settings]]`, `[[service_key_values]]`; see `seed.rs`); a `distribution.toml` works too
+    #[serde(default)]
+    pub plugin_settings_file: Option<PathBuf>,
     /// ed25519 public keys (base64) of the trusted publishers
     #[serde(default)]
     pub trusted_keys: Vec<String>,
@@ -316,6 +325,23 @@ impl UrlParts {
     }
 }
 
+/// `host:port` as written by a deployer, in the form used to compare it with a destination
+/// (lower case, an IPv6 host in brackets); `None` if it is anything else than a host and a port.
+pub fn normalize_host_port(raw: &str) -> Option<String> {
+    let raw = raw.trim();
+    if raw.is_empty() || raw.contains(['*', '/', '@', '?', '#', ' ']) || raw.contains("://") {
+        return None;
+    }
+    let (host, port) = raw.rsplit_once(':')?;
+    let port: u16 = port.parse().ok().filter(|p| *p != 0)?;
+    // the host alone must be a valid host (a name, an IPv4 or a bracketed IPv6 address)
+    let u = url::Url::parse(&format!("http://{host}")).ok()?;
+    if u.path() != "/" || u.port().is_some() {
+        return None;
+    }
+    Some(format!("{}:{port}", u.host_str()?))
+}
+
 impl Config {
     /// Reads the file (if it exists), applies the environment, resolves relative paths
     /// against the folder of the file (or `base` if the file is missing) and derives the addresses.
@@ -350,6 +376,12 @@ impl Config {
                 "MOSAIKIT_DATABASE_URL" | "DATABASE_URL" => self.database.url = Some(v),
                 "MOSAIKIT_ALLOW_UNSIGNED" => self.allow_unsigned = truthy(&v),
                 "MOSAIKIT_ALLOW_PRIVATE_FETCH" => self.allow_private_fetch = truthy(&v),
+                "MOSAIKIT_ALLOW_PRIVATE_FETCH_HOSTS" => self
+                    .allow_private_fetch_hosts
+                    .extend(v.split(',').map(str::trim).filter(|s| !s.is_empty()).map(String::from)),
+                "MOSAIKIT_PLUGIN_SETTINGS_FILE" => {
+                    self.plugin_settings_file = Some(PathBuf::from(v)).filter(|p| !p.as_os_str().is_empty())
+                }
                 "MOSAIKIT_PREINSTALL" => self.preinstall = truthy(&v),
                 "MOSAIKIT_TRUST_PROXY" => self.trust_proxy = truthy(&v),
                 "MOSAIKIT_OPEN_BROWSER" => self.open_browser = truthy(&v),
@@ -377,9 +409,15 @@ impl Config {
             }
         };
         abs(&mut self.data_dir);
-        for p in [&mut self.registry, &mut self.brand, &mut self.database.pg_bin, &mut self.database.file]
-            .into_iter()
-            .flatten()
+        for p in [
+            &mut self.registry,
+            &mut self.brand,
+            &mut self.plugin_settings_file,
+            &mut self.database.pg_bin,
+            &mut self.database.file,
+        ]
+        .into_iter()
+        .flatten()
         {
             abs(p);
         }
@@ -391,6 +429,18 @@ impl Config {
 
     /// Derives addresses, base paths and database backend; validates.
     pub fn derive(&mut self) -> Result<()> {
+        let mut hosts = Vec::new();
+        for h in &self.allow_private_fetch_hosts {
+            let n = normalize_host_port(h).ok_or_else(|| {
+                Error::bad(format!(
+                    "allow_private_fetch_hosts: \"{h}\" is not an exact host:port (no scheme, path, wildcard or range)"
+                ))
+            })?;
+            if !hosts.contains(&n) {
+                hosts.push(n);
+            }
+        }
+        self.allow_private_fetch_hosts = hosts;
         let app = parse_url(self.url.trim())?;
         let plugin = match &self.plugin_url_setting {
             Some(u) => parse_url(u.trim())?,
@@ -556,6 +606,27 @@ pub fn origin_of(url: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    #[allow(clippy::field_reassign_with_default)]
+    fn private_fetch_hosts_are_exact() {
+        let mut c = Config::default();
+        c.allow_private_fetch_hosts =
+            vec!["Translate.Internal:5000".into(), "10.0.0.7:80".into(), "[::1]:8080".into()];
+        c.derive().unwrap();
+        assert_eq!(c.allow_private_fetch_hosts, ["translate.internal:5000", "10.0.0.7:80", "[::1]:8080"]);
+        for bad in
+            ["10.0.0.0/8:80", "*.internal:80", "host", "host:0", "host:99999", "http://h:80", "h:80/x", ""]
+        {
+            let mut c = Config::default();
+            c.allow_private_fetch_hosts = vec![bad.into()];
+            let e = c.derive().unwrap_err();
+            assert!(e.message.contains("allow_private_fetch_hosts"), "{bad}: {e}");
+        }
+        let mut c = Config::default();
+        c.apply_env([("MOSAIKIT_ALLOW_PRIVATE_FETCH_HOSTS".to_string(), "a:1, b:2".to_string())].into_iter());
+        assert_eq!(c.allow_private_fetch_hosts, ["a:1", "b:2"]);
+    }
 
     fn cfg(toml: &str) -> Result<Config> {
         let mut c: Config = toml::from_str(toml).map_err(|e| Error::bad(e.to_string()))?;

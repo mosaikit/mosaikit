@@ -6,6 +6,11 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
 ## 1.0.0
 
+### Le distribuzioni
+
+- Una distribuzione può includere dei sidecar (`[[sidecars]]` in `distribution.toml`): processi aggiuntivi accanto all'app. L'app desktop li avvia prima del kernel (con un messaggio di avanzamento, un tempo massimo e un errore chiaro se uno non parte), li riavvia secondo la loro politica, ne registra l'output e li ferma dopo il kernel; le release Docker e Kubernetes aggiungono un servizio per ciascuno. I loro indirizzi sono consentiti automaticamente per le richieste dei plugin.
+- Un sidecar può essere un'attività una tantum (`kind = "oneshot"`, per esempio l'inizializzazione di un database): viene eseguita fino al termine prima che partano i sidecar che ne dipendono, e un errore o un tempo scaduto interrompono l'avvio mostrando la fine del suo log. Un sidecar può anche ricevere file della distribuzione (`files`, per esempio una configurazione) dove li aspetta, su desktop, in Docker e in Kubernetes.
+
 ### La shell
 
 - Le liste e le schede rimaste con una riga spoglia quando sono vuote (le due liste di Gestione › In attesa, Home senza app, consumi, backup, log e widget della panoramica, membri di un gruppo) ora mostrano un'illustrazione con titolo e azione, in versione piccola dentro un widget o una sezione.
@@ -55,6 +60,7 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
 ### Per chi scrive plugin
 
+- Nuovo permesso del manifest `[permissions] script_eval = true` (predefinito false): solo la UI di quel plugin riceve `'unsafe-eval'` e `'wasm-unsafe-eval'` in `script-src` e `worker-src`, per i motori che compilano codice a runtime. La shell, i contenuti, i link pubblici e ogni plugin che non lo dichiara mantengono la policy rigida; l'Administrator lo vede in «Cosa richiede» del plugin come permesso sensibile.
 - Un plugin può chiamare un servizio esterno con la chiave impostata da un Administrator: `http.fetch` accetta una `key` (un servizio di `[[service_keys]]`) e l'host la aggiunge come bearer token; l'indirizzo può essere quello impostato in Chiavi dei servizi esterni (`address = true`). Le richieste dei plugin passano dalla stessa protezione dell'anteprima delle pagine (solo indirizzi pubblici). L'SDK ha `ctx.http().fetch_with_key(...)`.
 - Note traduce una nota con un servizio di traduzione (Traduci la nota, sotto la nota), come esempio.
 - I pulsanti distruttivi dei plugin (Elimina) restano ben leggibili in modalità scura, come nella shell. Note 0.5.0 mostra nell'intestazione la pagina aperta (Note › Le mie note).
@@ -66,6 +72,9 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
   con la nuova operazione `notify` dell'host (`[permissions] notify = true`, `ctx.notify` nell'SDK).
 
 ### La piattaforma
+
+- Chi installa può aprire ai plugin che lo dichiarano un servizio della rete privata: `allow_private_fetch_hosts = ["host:porta"]` in `mosaikit.toml` (solo voci esatte). Tutto il resto resta protetto.
+- Una distribuzione può precompilare le impostazioni dei plugin (segreti compresi) e le chiavi di piattaforma dei servizi esterni con `[[plugin_settings]]` e `[[service_key_values]]`, da `env:NOME` o `file:PERCORSO`. Si applicano una sola volta, solo se non ancora impostate, e non sovrascrivono mai la scelta di un Amministratore.
 
 - Gli Administrator hanno un'email obbligatoria e unica. La cambiano da Account (password attuale e secondo fattore); nome ed email di un altro Administrator si cambiano da Sistema › Administrator.
 - Sistema › Email dice che cosa manca e come configurarla, con un'impostazione pronta per un server di prova locale (Mailpit nell'ambiente di sviluppo).

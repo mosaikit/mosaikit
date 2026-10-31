@@ -13,6 +13,7 @@ mod perf;
 mod plugins;
 mod release;
 mod report;
+mod sidecars;
 mod util;
 mod worktree;
 
@@ -59,6 +60,8 @@ enum Cmd {
     Ci,
     /// tests/results/test-results.md from the latest results of every suite (tests/results/raw)
     TestReport,
+    /// Validate the [[sidecars]] of the distribution and print what each target gets
+    Sidecars,
     /// End-to-end tests in the browser (Playwright) on a full installation
     E2e {
         /// show the browser
@@ -273,6 +276,7 @@ fn main() -> Result<()> {
         Cmd::Test { skip_db } => ci::test(skip_db),
         Cmd::Ci => ci::ci(),
         Cmd::TestReport => report::generate().map(|_| ()),
+        Cmd::Sidecars => sidecars::show(),
         Cmd::E2e { headed, wildcard, only } => e2e::e2e(headed, wildcard, &only),
         Cmd::ManualTests { check: true, .. } => manual::check(),
         Cmd::ManualTests { serve: true, .. } => manual::serve(),

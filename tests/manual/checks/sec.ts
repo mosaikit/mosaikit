@@ -180,6 +180,20 @@ const checks: L.Check[] = [
     },
   },
   {
+    id: 'SEC-11',
+    async run() {
+      // the opt-in half needs a plugin that declares script_eval: here the strict half only
+      const c = H.checker()
+      const r = await fetch(`${L.PLUGIN_ORIGIN}/mosaikit/ui/com.mosaikit.notes/`)
+      const csp = r.headers.get('content-security-policy') ?? ''
+      c.ok(csp.includes('script-src') && !/unsafe-eval/.test(csp), `Notes keeps the strict policy («${csp.slice(0, 80)}»)`)
+      const host = await fetch(L.BASE)
+      c.ok(!/unsafe-eval/.test(host.headers.get('content-security-policy') ?? ''), 'the host page has no unsafe-eval')
+      const res = c.result()
+      return { ...res, note: `${res.note ?? ''} (the plugin that declares script_eval: unit test csp_for)`.trim() }
+    },
+  },
+  {
     id: 'SEC-10',
     async run() {
       return { status: 'NOT VERIFIABLE', note: 'needs the wildcard installation: run by `MOSAIKIT_E2E_WILDCARD=1 cargo xtask e2e` (tests/wildcard.spec.ts)' }

@@ -32,6 +32,7 @@ pub mod plugins;
 pub mod quotas;
 pub mod search;
 pub mod secret;
+pub mod seed;
 pub mod svg;
 pub mod tenancy;
 pub mod testing;
@@ -286,6 +287,7 @@ impl Kernel {
             progress("Installing the plugins");
             plugins::registry::preinstall(&kernel).await?;
         }
+        seed::apply(&kernel).await?;
         blobs::gc(&kernel).await;
         if !kernel.cfg.no_background {
             mail::spawn_worker(&kernel);

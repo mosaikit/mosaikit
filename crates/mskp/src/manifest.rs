@@ -618,6 +618,11 @@ pub struct Permissions {
     /// people who see one of its items.
     #[serde(default)]
     pub notify: bool,
+    /// The UI may compile code at run time: its CSP gets `'unsafe-eval'` and `'wasm-unsafe-eval'` in
+    /// `script-src` and `worker-src` (e.g. an engine that runs scripts or WebAssembly of its own).
+    /// Sensitive: the Administrator sees it when the plugin is installed. Default: false.
+    #[serde(default)]
+    pub script_eval: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -1295,6 +1300,30 @@ fn is_origin(o: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn script_eval_defaults_to_false_and_must_be_a_bool() {
+        let base = "id = \"com.x.p\"
+name = \"P\"
+version = \"0.1.0\"
+[contribution]
+icon = \"x\"
+label = \"P\"
+";
+        assert!(!Manifest::from_toml(base).unwrap().permissions.script_eval);
+        let on = format!(
+            "{base}[permissions]
+script_eval = true
+"
+        );
+        assert!(Manifest::from_toml(&on).unwrap().permissions.script_eval);
+        let bad = format!(
+            "{base}[permissions]
+script_eval = \"yes\"
+"
+        );
+        assert!(Manifest::from_toml(&bad).is_err());
+    }
 
     const NOTES: &str = r#"
         id = "com.mosaikit.notes"

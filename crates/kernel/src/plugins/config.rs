@@ -111,17 +111,7 @@ pub async fn set_config(
                     .execute(&k.db)
                     .await?;
             }
-            Value::String(s) if !s.is_empty() && s.len() <= 4000 => {
-                let sealed = k.secrets.seal(name.as_bytes(), s.as_bytes());
-                mosaikit_db::query(
-                    "insert into core.secrets (name, value) values ($1, $2)
-                     on conflict (name) do update set value = excluded.value",
-                )
-                .bind(&name)
-                .bind(sealed)
-                .execute(&k.db)
-                .await?;
-            }
+            Value::String(s) if !s.is_empty() && s.len() <= 4000 => put_secret(k, plugin, key, s).await?,
             _ => return Err(Error::bad(format!("{}: value not valid", d.label))),
         }
     }
@@ -142,6 +132,41 @@ pub async fn set_config(
     )
     .await;
     config(k, admin, plugin, "en").await
+}
+
+/// Stores a secret of a plugin, encrypted (the Administrator's path and the seeding of a deployment).
+pub(crate) async fn put_secret(k: &Kernel, plugin: &str, key: &str, value: &str) -> Result<()> {
+    let name = secret_name(plugin, key);
+    let sealed = k.secrets.seal(name.as_bytes(), value.as_bytes());
+    mosaikit_db::query(
+        "insert into core.secrets (name, value) values ($1, $2)
+         on conflict (name) do update set value = excluded.value",
+    )
+    .bind(&name)
+    .bind(sealed)
+    .execute(&k.db)
+    .await?;
+    Ok(())
+}
+
+pub(crate) async fn has_secret(k: &Kernel, plugin: &str, key: &str) -> Result<bool> {
+    Ok(secret(k, plugin, key).await?.is_some())
+}
+
+/// The value the Administrator stored for a setting (not the manifest default).
+pub(crate) async fn stored_value(k: &Kernel, plugin: &str, key: &str) -> Result<Option<Value>> {
+    Ok(stored(k, plugin).await?.get(key).cloned().filter(|v| !v.is_null()))
+}
+
+pub(crate) async fn put_value(k: &Kernel, plugin: &str, key: &str, value: Value) -> Result<()> {
+    let mut values = stored(k, plugin).await?;
+    values.insert(key.to_string(), value);
+    mosaikit_db::query("update core.plugins set config = $2 where id = $1")
+        .bind(plugin)
+        .bind(Value::Object(values))
+        .execute(&k.db)
+        .await?;
+    Ok(())
 }
 
 /// What the logic of the plugin receives in `ctx.config`: values and secrets, by key.

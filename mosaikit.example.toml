@@ -49,6 +49,19 @@ url = "http://127.0.0.1:8080/mosaikit"
 # Env: MOSAIKIT_ALLOW_UNSIGNED
 # allow_unsigned = false
 
+# Private destinations that plugins may call with http.fetch: exact "host:port" entries (no wildcards,
+# no ranges). Only for a plugin whose manifest lists that origin in its network permission. A malformed
+# entry stops the start. Not needed for public services.
+# Env: MOSAIKIT_ALLOW_PRIVATE_FETCH_HOSTS (comma separated, added to the ones of the file)
+# allow_private_fetch_hosts = ["translate.internal:5000"]
+
+# TOML file with [[plugin_settings]] (plugin, key, value) and [[service_key_values]] (service, value,
+# shared) seeded at the start, only while unset, never over an Administrator choice. A value is
+# "env:NAME", "file:PATH" (relative to this file folder) or a literal; reference secrets, do not write
+# them. A distribution.toml works as it is.
+# Env: MOSAIKIT_PLUGIN_SETTINGS_FILE
+# plugin_settings_file = "distribution.toml"
+
 # ed25519 public keys (base64) of the trusted plugin publishers: only packages
 # signed by one of these keys are installed.
 # Env: MOSAIKIT_TRUSTED_KEYS (comma separated, added to the ones of the file)
