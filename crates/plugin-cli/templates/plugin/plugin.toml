@@ -3,6 +3,11 @@ name = "{{label}}"
 version = "0.1.0"
 description = "Describe the plugin {{label}} here"
 
+# the versions of Mosaikit and of the plugin API this plugin works with
+[requires]
+mosaikit = ">=1.0, <2"
+api = 1
+
 [contribution]
 icon = "🧱"
 label = "{{label}}"

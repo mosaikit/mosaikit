@@ -18,7 +18,7 @@ What already exists and is reused:
 
 | Piece | State today |
 |---|---|
-| `cargo xtask plugin new / build / pack` | Scaffold (`xtask/templates/plugin`), build of logic (WASM) and UI, `.mskp` v3 package with `MANIFEST.sha256` and ed25519 signature. Lives in `xtask`, inside the `mosaikit` repository. |
+| `cargo xtask plugin new / build / pack` | Scaffold, build of logic (WASM) and UI, `.mskp` v3 package with `MANIFEST.sha256` and ed25519 signature. Since phase 2 the work is in the crate `mosaikit-plugin-cli` (`crates/plugin-cli`, executable `mosaikit-plugin`) and `xtask` calls it. |
 | Development mode | `MOSAIKIT_DEV_PLUGINS` and `[plugins] dev` load plugins from their source folders with hot reload; `allow_unsigned` accepts unsigned packages (development only). |
 | SDK of the logic | Crate `mosaikit-plugin-sdk` (`abi`, `host`, `values`, and `testing::MockHost` for native tests of the logic). Version taken from the Cargo workspace of `mosaikit`. |
 | SDK of the UI | npm package `@mosaikit/plugin-api` 1.0.0 (`mountCrud`, `gridTable`, `emptyState`, `Msk` client, styles). Plugins reference it by the path `file:../../../mosaikit/ui/plugin-api`. |
@@ -125,7 +125,7 @@ the experimental list (architecture §8.11), manual checks `API-01..05`. Left fo
 per experimental feature (phase 3). The crates and the npm package still sit in the workspaces of `mosaikit` for
 lints and dependencies; they publish with their own metadata.
 
-### Phase 2 — The command-line tool `mosaikit-plugin` (6 days)
+### Phase 2 — The command-line tool `mosaikit-plugin` (6 days) — done 2026-10-31, except `dev` and the release of the archives
 
 - Extract `plugin new / build / pack` from `xtask` into a crate `mosaikit-plugin-cli` (a binary of its own),
   keeping `xtask` as a thin wrapper so the repository workflows do not change.
@@ -138,6 +138,28 @@ lints and dependencies; they publish with their own metadata.
 - Tests: the CLI against a temporary folder (new → build → pack → validate) in CI on the three platforms.
 
 Output: one executable that does the whole loop, usable without `xtask`.
+
+Delivered (2026-10-31): crate `crates/plugin-cli` (library `mosaikit_plugin_cli` and executable `mosaikit-plugin`, the
+version of the workspace as D6 says, own README and changelog). `xtask/src/plugins.rs` keeps only what needs a
+distribution (`discover`, `db_reset`, the development key of `.dev/`) and calls the library for build, packages, registry
+index, keys and scaffolding; the template moved to `crates/plugin-cli/templates/plugin` and is embedded in the executable.
+Subcommands: `new` (a standalone project, or a member of the Cargo and npm workspaces of the folder it is made in;
+`--no-logic`, `--no-ui`, `--sdk-path`, `--plugin-api-path`), `build` (installs the `wasm32` target on demand), `pack`
+(validates, builds, signs, validates the package), `test`, `sign`, `keygen` (never overwrites a key), `validate` (manifest,
+migrations against the sql-guard allow-list of the server, permissions, `.mskp` integrity and signature, entry pages),
+`install --server` (signs in as Administrator, with the second factor if needed, and posts the package to
+`POST /api/admin/plugins`, the route of Install from a file), `doctor`, and `dev` as a stub that exits with 2 and points
+at phase 4. The default signing key of the tool is per user (`%APPDATA%\mosaikit\signing.key`,
+`~/.config/mosaikit/signing.key`), not in a repository. Tests: unit tests of each module (`install` against a local fake
+server) and `tests/cli.rs` (new, validate, pack, sign without a build; new, build, pack, validate, test with logic, about
+35 s); manual checks `DK-01..07` with their Playwright twin `tests/manual/checks/dk.ts`.
+
+Left open: the release workflow with archives and `SHA256SUMS` per platform, and the CI matrix on Windows, Linux and
+macOS (phase 7 and the CI of the published repository; the commands for the archives are in the crate README);
+`cargo install` from a registry needs `mosaikit-mskp` and `mosaikit-sql-guard` published first and a `version` on their
+path dependencies; a standalone `new` points at the published SDK and `@mosaikit/plugin-api` (`1`, `^1.0.0`), which are
+not in a registry yet, so until D1 is carried out it is used with `--sdk-path` and `--plugin-api-path`; the templates
+themselves (lint, CI, examples) are phase 3.
 
 ### Phase 3 — Standalone templates and examples (5 days)
 

@@ -6,6 +6,7 @@ members = [
     "crates/db",
     "crates/runtime",
     "crates/plugin-sdk",
+    "crates/plugin-cli",
     "crates/kernel",
     "crates/server",
     "crates/desktop",
@@ -83,6 +84,7 @@ mosaikit-sql-guard = { path = "crates/sql-guard" }
 mosaikit-db = { path = "crates/db" }
 mosaikit-runtime = { path = "crates/runtime" }
 mosaikit-plugin-sdk = { path = "crates/plugin-sdk" }
+mosaikit-plugin-cli = { path = "crates/plugin-cli" }
 mosaikit-kernel = { path = "crates/kernel" }
 
 # in debug the cryptographic dependencies and the WASM interpreter are very slow:

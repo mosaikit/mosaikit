@@ -9,6 +9,6 @@
     "typecheck": "tsc --noEmit -p ."
   },
   "dependencies": {
-    "@mosaikit/plugin-api": "file:{{plugin_api}}"
-  }
+    "@mosaikit/plugin-api": "{{plugin_api_dep}}"
+  }{{ui_dev_deps}}
 }

@@ -174,7 +174,7 @@ enum PluginCmd {
         #[arg(long, default_value = "dist/registry")]
         out: PathBuf,
     },
-    /// New plugin from the template (xtask/templates/plugin)
+    /// New plugin from the template (crates/plugin-cli/templates/plugin)
     New {
         name: String,
         /// id of the plugin (default com.example.<name>)
