@@ -35,7 +35,7 @@ tokio = { version = "1", features = ["full"] }
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio", "postgres", "uuid", "chrono", "json", "migrate", "macros"] }
 uuid = { version = "1", features = ["v4", "serde"] }
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde", "std"] }
-sysinfo = { version = "0.33", default-features = false, features = ["disk", "system"] }
+sysinfo = { version = "0.39", default-features = false, features = ["disk", "system"] }
 sha2 = "0.10"
 hmac = "0.12"
 sha1 = "0.10"
