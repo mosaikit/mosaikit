@@ -1,0 +1,102 @@
+# EXAMPLE 1 - a to-do list: the shortest complete plugin with logic, a CRUD UI and a KPI.
+# Read WALKTHROUGH.md first; this file is step 1.
+id = "{{id}}"
+name = "{{label}}"
+version = "0.1.0"
+description = "A to-do list: tasks with a due date and a priority, shareable with colleagues"
+
+# the versions of Mosaikit and of the plugin API this plugin works with
+[requires]
+mosaikit = ">=1.0, <2"
+api = 1
+
+[contribution]
+icon = "✅"
+label = "{{label}}"
+
+# STEP 1 - the data. Declaring a resource is all the server needs to create the table `{{table}}`, with
+# the columns of the fields, the owner of every row, sharing, trash and the row-level security. Every row
+# is a kernel resource: it can be shared with people and groups, found by the search, put in the trash.
+[[resources]]
+name = "{{table}}"
+label = "Tasks"
+title_field = "title"
+# the kernel reads these two to list what is due soon in the Home of a person, and stops listing it when done
+due_field = "due"
+done_field = "done"
+fields = [
+  { key = "title", label = "Title", kind = "text", required = true },
+  { key = "done", label = "Done", kind = "bool" },
+  { key = "due", label = "Due", kind = "date" },
+  { key = "priority", label = "Priority", kind = "choice", options = ["low", "medium", "high"] },
+  { key = "notes", label = "Notes", kind = "text", multiline = true },
+]
+
+# STEP 2 - the pages of the app in the navigation of the shell. The UI reads `msk.at` to know which one is open.
+[[nav]]
+id = "open"
+label = "Open"
+icon = "circle-dashed"
+
+[[nav]]
+id = "done"
+label = "Done"
+icon = "circle-check"
+
+[[nav]]
+id = "all"
+label = "All tasks"
+icon = "list-todo"
+
+[ui]
+entry = "index.html"
+
+# STEP 3 - the logic is WASM: it may only touch the hooks of the resources it lists here.
+[permissions]
+hooks = ["{{table}}"]
+files = false
+content = false
+network = []
+frame_src = []
+
+# STEP 4 - a KPI: a view of the migration. The managers and the Administrator see it in the KPI pages.
+[[kpi]]
+view = "kpi_{{table}}_status"
+label = "Tasks"
+
+# Translations of the texts above. The UI texts are in ui/src/i18n.ts.
+[i18n.it]
+description = "Un elenco di cose da fare: attività con scadenza e priorità, condivisibili con i colleghi"
+label = "Cose da fare"
+
+[i18n.it.resources.{{table}}]
+label = "Attività"
+fields = { title = "Titolo", done = "Fatta", due = "Scadenza", priority = "Priorità", notes = "Note" }
+options.priority = { low = "bassa", medium = "media", high = "alta" }
+
+[i18n.it.nav]
+open = "Aperte"
+done = "Fatte"
+all = "Tutte le attività"
+
+[i18n.it.kpi.kpi_{{table}}_status]
+label = "Attività"
+columns = { open = "Aperte", completed = "Fatte", overdue = "In ritardo" }
+
+[i18n.es]
+description = "Una lista de cosas por hacer: tareas con fecha límite y prioridad, que se pueden compartir con colegas"
+label = "Tareas"
+
+[i18n.es.resources.{{table}}]
+label = "Tareas"
+fields = { title = "Título", done = "Hecha", due = "Vence", priority = "Prioridad", notes = "Notas" }
+options.priority = { low = "baja", medium = "media", high = "alta" }
+
+[i18n.es.nav]
+open = "Abiertas"
+done = "Hechas"
+all = "Todas las tareas"
+
+[i18n.es.kpi.kpi_{{table}}_status]
+label = "Tareas"
+columns = { open = "Abiertas", completed = "Hechas", overdue = "Atrasadas" }

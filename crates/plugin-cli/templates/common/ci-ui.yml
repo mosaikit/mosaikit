@@ -1,0 +1,13 @@
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install the UI
+        working-directory: ui
+        run: |
+          if [ -n "$MOSAIKIT_KIT" ]; then npm pkg set "dependencies.@mosaikit/plugin-api=file:$MOSAIKIT_KIT/plugin-api"; fi
+          npm install --no-audit --no-fund
+      - name: Check the UI
+        working-directory: ui
+        run: npm run typecheck && npm run lint && npm test
+      - name: Build the UI
+        run: mosaikit-plugin build --release

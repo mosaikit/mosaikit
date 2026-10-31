@@ -1,0 +1,65 @@
+# EXAMPLE 3 - an extension of Notes: a priority, a follow-up date and two actions.
+# Read WALKTHROUGH.md first. An extension has no logic, no tables and (here) no UI: it is only this manifest.
+# The kernel keeps the values, Notes shows the fields in the form of a note and the actions in its detail, and the
+# Administrator decides with the permissions of the plugin who may use them.
+id = "{{id}}"
+name = "{{label}}"
+version = "0.1.0"
+description = "Adds a priority, a follow-up date and quick actions to the notes"
+kind = "extension"
+
+[requires]
+mosaikit = ">=1.0, <2"
+api = 1
+
+[contribution]
+icon = "🚩"
+label = "{{label}}"
+
+# STEP 1 - what is extended: Notes, from the version that has the extension points (0.4.0).
+# The extension works only where Notes is installed.
+[extends]
+plugin = "com.mosaikit.notes"
+min_version = "0.4.0"
+
+# STEP 2 - the fields the notes get. `resource` is a resource of Notes (`notes`). The kinds are the ones of the
+# fields of any resource: text, number, bool, date, choice. `option_labels` gives a choice readable labels;
+# a field with `hidden = true` is kept but not drawn in the form (a plugin of your own may use it).
+[[extension.fields]]
+resource = "notes"
+key = "priority"
+label = "Priority"
+kind = "choice"
+options = ["low", "normal", "high", "urgent"]
+option_labels = { low = "Low", normal = "Normal", high = "High", urgent = "Urgent" }
+
+[[extension.fields]]
+resource = "notes"
+key = "follow_up"
+label = "Follow up on"
+kind = "date"
+
+# STEP 3 - the actions: buttons in the detail of a note. An action sets values in one click (`set`; the word
+# `$user` stands for the name of the person who clicks, `$today` for the date) or calls a command of a plugin (`command`).
+[[extension.actions]]
+resource = "notes"
+key = "mark_urgent"
+label = "Mark as urgent, follow up today"
+set = { priority = "urgent", follow_up = "$today" }
+
+[[extension.actions]]
+resource = "notes"
+key = "clear_priority"
+label = "Clear the priority"
+set = { priority = "normal" }
+
+# STEP 4 - translations. For an extension the fields and the actions are under `extension`, by key.
+[i18n.it]
+description = "Aggiunge alle note una priorità, una data di ripresa e azioni rapide"
+label = "Priorità delle note"
+extension = { fields = { priority = "Priorità", follow_up = "Riprendere il" }, actions = { mark_urgent = "Urgente, riprendere oggi", clear_priority = "Azzera la priorità" } }
+
+[i18n.es]
+description = "Añade a las notas una prioridad, una fecha de seguimiento y acciones rápidas"
+label = "Prioridad de las notas"
+extension = { fields = { priority = "Prioridad", follow_up = "Retomar el" }, actions = { mark_urgent = "Urgente, retomar hoy", clear_priority = "Quitar la prioridad" } }

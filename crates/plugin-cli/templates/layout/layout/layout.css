@@ -1,0 +1,6 @@
+/* A little more air in the tabs */
+.msk-tab-item {
+  height: 44px;
+  padding-left: 14px;
+  padding-right: 14px;
+}

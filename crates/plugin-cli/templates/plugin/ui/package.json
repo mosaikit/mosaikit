@@ -6,9 +6,10 @@
   "scripts": {
     "build": "vite build",
     "watch": "vite build --watch --mode development",
-    "typecheck": "tsc --noEmit -p ."
+    "typecheck": "tsc --noEmit -p .",
+    "test": "vitest run"{{ui_lint_script}}
   },
   "dependencies": {
-    "@mosaikit/plugin-api": "{{plugin_api_dep}}"
+    "@mosaikit/plugin-api": "{{plugin_api_dep}}"{{ui_fonts}}
   }{{ui_dev_deps}}
 }

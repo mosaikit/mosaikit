@@ -6,9 +6,9 @@ whole loop, with no dependency on the layout of the `mosaikit` repository: a plu
 
 ```text
 mosaikit-plugin doctor                       toolchain: Rust, the wasm32 target, Node
-mosaikit-plugin new acme-reports             a standalone plugin folder (--no-logic, --no-ui, --id, --into)
+mosaikit-plugin new acme-reports             a standalone plugin folder (--variant, --example, --lang, --kit, --id, --into)
 mosaikit-plugin build [dir] [--release]      logic (WASM) and UI; installs the wasm32 target if it is missing
-mosaikit-plugin test [dir]                   validate, tests of the logic (native, mock host), type check of the UI
+mosaikit-plugin test [dir]                   validate, tests of the logic (native, mock host), type check, lint and tests of the UI
 mosaikit-plugin pack [dir] [--key file]      build, validate, sign: dist/<id>-<version>.mskp
 mosaikit-plugin validate [dir|file.mskp]     manifest, migrations (SQL allow-list), permissions, package integrity
 mosaikit-plugin keygen --out publisher.key   a signing key pair (the public key goes in the server's trusted_keys)
@@ -16,6 +16,15 @@ mosaikit-plugin sign file.mskp --key k       sign a package again with another k
 mosaikit-plugin install file.mskp --server <url> --user admin --password ... [--totp code]
 mosaikit-plugin dev                          arrives with phase 4 (the bundled development server)
 ```
+
+**Variants and examples.** `new --variant app|ui|service|extension|language|layout` (`app` is the default; a
+language needs `--lang fr` or a name like `lang-fr`) and `new --example todo|insights|note-priority`, a complete commented
+plugin with a `WALKTHROUGH.md`. The folder is standalone: own `Cargo.toml`, `ui/package.json`, `tsconfig.json`, `.oxlintrc.json`,
+`.gitignore`, README, CI file, sample migration, tests and texts in English, Italian and Spanish.
+
+**SDK and UI package.** Until a registry has them, `new` takes them from `--sdk-path` / `--plugin-api-path`
+(`MOSAIKIT_SDK_PATH`, `MOSAIKIT_PLUGIN_API_PATH`), else from the folders `sdk/` and `plugin-api/` of the kit
+(`--kit <folder>`, `MOSAIKIT_KIT`), else it asks for the published versions.
 
 `validate` exits with 1 when it finds an error; warnings (old keys, no `[requires]`, an unsigned package) do not
 change the exit code.

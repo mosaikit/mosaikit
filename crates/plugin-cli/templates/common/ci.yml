@@ -1,0 +1,24 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# The plugin builds on its own: no checkout of Mosaikit. It needs `mosaikit-plugin` and, for the logic and the
+# UI, the two packages of the kit (the SDK crate and @mosaikit/plugin-api). Until they are in a public registry,
+# set the repository variable MOSAIKIT_KIT to the folder where the runner finds the unpacked kit (it has `bin/`,
+# `sdk/` and `plugin-api/`): the first steps put the tool on the PATH and point Cargo and npm at the kit.
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    env:
+      CARGO_TERM_COLOR: always
+      MOSAIKIT_KIT: ${{ vars.MOSAIKIT_KIT }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Put mosaikit-plugin on the PATH
+        if: env.MOSAIKIT_KIT != ''
+        run: echo "$MOSAIKIT_KIT/bin" >> "$GITHUB_PATH"
+{{ci_steps}}      - name: Validate the plugin
+        run: mosaikit-plugin validate

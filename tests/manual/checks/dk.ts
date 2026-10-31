@@ -173,6 +173,96 @@ const checks: L.Check[] = [
       }
     },
   },
+  {
+    id: 'DK-08',
+    async run() {
+      const c = H.checker()
+      const d = temp()
+      try {
+        const kit = path.join(d, 'kit')
+        const want: Record<string, string[]> = {
+          app: ['Cargo.toml', 'src/lib.rs', 'ui/src/i18n.ts', 'ui/src/i18n.test.ts', '.oxlintrc.json', '.github/workflows/ci.yml', 'README.md'],
+          ui: ['ui/package.json', '.oxlintrc.json'],
+          service: ['Cargo.toml', 'src/lib.rs'],
+          extension: ['plugin.toml'],
+          language: ['lang/host.json', 'lang/plugins/com.mosaikit.notes.toml'],
+          layout: ['layout/layout.toml', 'layout/layout.css'],
+        }
+        for (const [variant, files] of Object.entries(want)) {
+          const name = variant === 'language' ? 'lang-fr' : `v-${variant}`
+          const made = tool(d, ['new', name, '--variant', variant, '--kit', kit])
+          const dir = path.join(d, name)
+          c.ok(made.code === 0, `new --variant ${variant} makes the folder (${made.out.trim().slice(0, 100)})`)
+          c.ok(files.every((f) => fs.existsSync(path.join(dir, f))), `${variant} has ${files.join(', ')}`)
+          c.ok(fs.existsSync(path.join(dir, '.gitignore')) && !fs.existsSync(path.join(dir, 'Cargo.lock')), `${variant} is a folder of its own`)
+          if (variant !== 'app' && variant !== 'ui' && variant !== 'service') {
+            const v = tool(dir, ['validate'])
+            c.ok(v.code === 0 && v.out.includes('0 error(s), 0 warning(s)'), `${variant} validates clean`)
+          }
+        }
+        c.ok(tool(d, ['new', 'french', '--variant', 'language']).code !== 0, 'a language needs its code')
+        const ui = JSON.parse(fs.readFileSync(path.join(d, 'v-ui', 'ui', 'package.json'), 'utf8'))
+        c.ok(ui.devDependencies.typescript === '~7.0.2' && ui.devDependencies.vite === '^8.3.4', 'the build tools have the versions of this repository')
+      } finally {
+        cleanup(d)
+      }
+      return c.result()
+    },
+  },
+  {
+    id: 'DK-09',
+    async run() {
+      const c = H.checker()
+      const d = temp()
+      try {
+        for (const ex of ['todo', 'insights', 'note-priority']) {
+          const made = tool(d, ['new', `e-${ex}`, '--example', ex, '--kit', path.join(d, 'kit')])
+          const dir = path.join(d, `e-${ex}`)
+          c.ok(made.code === 0 && fs.existsSync(path.join(dir, 'WALKTHROUGH.md')), `example ${ex} comes with its walkthrough`)
+          const v = tool(dir, ['validate'])
+          c.ok(v.code === 0 && v.out.includes('0 error(s)'), `example ${ex} validates`)
+          const toml = fs.readFileSync(path.join(dir, 'plugin.toml'), 'utf8')
+          c.ok(toml.includes('[i18n.it') && toml.includes('[i18n.es'), `example ${ex} has its texts in Italian and Spanish`)
+        }
+        c.ok(tool(d, ['new', 'bad', '--example', 'nothing']).code !== 0, 'an unknown example is refused')
+      } finally {
+        cleanup(d)
+      }
+      return c.result()
+    },
+  },
+  {
+    id: 'DK-10',
+    async run() {
+      const c = H.checker()
+      const d = temp()
+      try {
+        const kit = path.join(d, 'kit')
+        tool(d, ['new', 'from-kit', '--kit', kit])
+        tool(d, ['new', 'published'])
+        tool(d, ['new', 'own', '--kit', kit, '--sdk-path', path.join(d, 'my-sdk')])
+        const slash = (t: string) => t.split(String.fromCharCode(92)).join('/')
+        const cargo = (n: string) => fs.readFileSync(path.join(d, n, 'Cargo.toml'), 'utf8')
+        const pkg = (n: string) => fs.readFileSync(path.join(d, n, 'ui', 'package.json'), 'utf8')
+        c.ok(slash(cargo('from-kit')).includes(`${slash(kit)}/sdk`) && pkg('from-kit').includes('file:'), '--kit points the SDK and the UI package at the folders of the kit')
+        c.ok(cargo('published').includes('mosaikit-plugin-sdk = "1"') && pkg('published').includes('^1.0.0'), 'without a kit the published versions are asked for')
+        c.ok(cargo('own').includes('my-sdk'), 'an explicit path wins over the kit')
+        c.ok(pkg('published').includes('@fontsource-variable/bricolage-grotesque'), 'the fonts of the UI package are in the dependencies of the plugin')
+      } finally {
+        cleanup(d)
+      }
+      return c.result()
+    },
+  },
+  {
+    id: 'DK-11',
+    async run() {
+      return {
+        status: 'NOT VERIFIABLE',
+        note: 'builds the logic for wasm32 and installs the UI packages of eight plugins (about two minutes); covered by the crate test cli.rs: every_variant_builds_and_packs_from_the_kit',
+      }
+    },
+  },
 ]
 
 export default checks

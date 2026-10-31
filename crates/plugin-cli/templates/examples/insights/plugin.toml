@@ -1,0 +1,92 @@
+# EXAMPLE 2 - expenses with an overview page: a chart, a search of the plugin and a KPI.
+# Read WALKTHROUGH.md first; this file is steps 1 to 4.
+id = "{{id}}"
+name = "{{label}}"
+version = "0.1.0"
+description = "Expenses by category, with an overview page and a chart"
+
+[requires]
+mosaikit = ">=1.0, <2"
+api = 1
+
+[contribution]
+icon = "📊"
+label = "{{label}}"
+
+# STEP 1 - the data: the expenses. A field with `search = false` is not looked into by the search of the platform.
+[[resources]]
+name = "{{table}}"
+label = "Expenses"
+title_field = "title"
+fields = [
+  { key = "title", label = "What", kind = "text", required = true },
+  { key = "amount", label = "Amount", kind = "number", required = true, search = false },
+  { key = "category", label = "Category", kind = "choice", options = ["food", "travel", "home", "other"] },
+  { key = "spent_on", label = "Date", kind = "date" },
+]
+
+# STEP 2 - two pages: the list of the expenses (a CRUD) and the overview (a page of our own, with the chart).
+[[nav]]
+id = "list"
+label = "Expenses"
+icon = "receipt"
+
+[[nav]]
+id = "overview"
+label = "Overview"
+icon = "chart-column"
+
+[ui]
+entry = "index.html"
+
+[permissions]
+hooks = ["{{table}}"]
+files = false
+content = false
+network = []
+frame_src = []
+
+# STEP 3 - the search of the plugin. The search box of the shell already finds the expenses by title; this command
+# adds results of its own (here: the category too). The kernel calls it as the person searching and shows
+# only rows the person may see.
+[search]
+command = "find"
+
+# STEP 4 - the KPI: total and number of expenses by category (the view is in migrations/001_kpi.sql).
+[[kpi]]
+view = "kpi_{{table}}_by_category"
+label = "Expenses by category"
+
+[i18n.it]
+description = "Spese per categoria, con una pagina di riepilogo e un grafico"
+label = "Spese"
+
+[i18n.it.resources.{{table}}]
+label = "Spese"
+fields = { title = "Cosa", amount = "Importo", category = "Categoria", spent_on = "Data" }
+options.category = { food = "cibo", travel = "viaggi", home = "casa", other = "altro" }
+
+[i18n.it.nav]
+list = "Spese"
+overview = "Riepilogo"
+
+[i18n.it.kpi.kpi_{{table}}_by_category]
+label = "Spese per categoria"
+columns = { total = "Totale", items = "Spese" }
+
+[i18n.es]
+description = "Gastos por categoría, con una página de resumen y un gráfico"
+label = "Gastos"
+
+[i18n.es.resources.{{table}}]
+label = "Gastos"
+fields = { title = "Qué", amount = "Importe", category = "Categoría", spent_on = "Fecha" }
+options.category = { food = "comida", travel = "viajes", home = "casa", other = "otros" }
+
+[i18n.es.nav]
+list = "Gastos"
+overview = "Resumen"
+
+[i18n.es.kpi.kpi_{{table}}_by_category]
+label = "Gastos por categoría"
+columns = { total = "Total", items = "Gastos" }

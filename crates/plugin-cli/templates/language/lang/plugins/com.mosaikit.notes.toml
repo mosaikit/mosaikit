@@ -1,0 +1,8 @@
+# Notes in this language: the keys are the ones of the manifest of Notes (`[i18n.it]` there is the model).
+name = "Notes"
+description = "Personal notes"
+label = "Notes"
+
+[resources.notes]
+label = "Notes"
+fields = { title = "Title", body = "Text" }

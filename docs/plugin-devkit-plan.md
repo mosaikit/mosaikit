@@ -159,9 +159,9 @@ macOS (phase 7 and the CI of the published repository; the commands for the arch
 `cargo install` from a registry needs `mosaikit-mskp` and `mosaikit-sql-guard` published first and a `version` on their
 path dependencies; a standalone `new` points at the published SDK and `@mosaikit/plugin-api` (`1`, `^1.0.0`), which are
 not in a registry yet, so until D1 is carried out it is used with `--sdk-path` and `--plugin-api-path`; the templates
-themselves (lint, CI, examples) are phase 3.
+themselves (lint, CI, examples) are phase 3 (done).
 
-### Phase 3 — Standalone templates and examples (5 days)
+### Phase 3 — Standalone templates and examples (5 days) — done 2026-10-31, except the conversion of `mosaikit-plugins`
 
 - Template that creates a **self-contained folder**: own `Cargo.toml` (versions pinned to the published SDK),
   `package.json`, `tsconfig.json`, `.oxlintrc.json`, `.gitignore`, `README.md`, CI file, sample migration,
@@ -176,6 +176,51 @@ themselves (lint, CI, examples) are phase 3.
 - Tests: the generated folder builds on a clean machine in CI with no `mosaikit` checkout present.
 
 Output: `mosaikit-plugin new` yields a project that builds alone; the official plugins build the same way.
+
+Delivered (2026-10-31): `mosaikit-plugin new <name> [--variant app|ui|service|extension|language|layout] [--example
+todo|insights|note-priority] [--lang fr] [--kit <folder>]`, from templates inside the executable
+(`crates/plugin-cli/templates`).
+
+- **Standalone folder.** Own `Cargo.toml` (its own `[workspace]`), `ui/package.json`, `ui/tsconfig.json`,
+  `.oxlintrc.json`, `.gitignore`, `README.md` (what is in the folder, the commands, where the SDK comes from),
+  `.github/workflows/ci.yml` (logic and UI steps only where the variant has them), the sample migration (a KPI view),
+  tests (Rust with `MockHost`, `vitest` for the UI) and the texts in `en`, `it` and `es` (the manifest `[i18n.it]` and
+  `[i18n.es]`, and `ui/src/i18n.ts`). Inside a plugin folder that has a Cargo and an npm workspace the plugin still joins them (as
+  `cargo xtask plugin new` needs) and gets none of the standalone files.
+- **Variants.** `app` (logic and UI), `ui`, `service` (the older `--no-logic` and `--no-ui` stay), `extension` (a
+  manifest of fields and an action, for Notes), `language` (`lang/host.json` and a sample `lang/plugins/<id>.toml`),
+  `layout` (`layout/layout.toml` and `layout.css`).
+- **Examples**, each with a `WALKTHROUGH.md` that follows the numbered steps in its files: `todo` (CRUD with hooks, three
+  pages, views, `empty`, KPI), `insights` (an own page with an SVG chart and `pageHead`/`emptyState`, a `[search]` command, a KPI), `note-priority`
+  (an extension of Notes: two fields, two actions, translations). The three build, test and pack from the kit.
+- **How the SDK and the UI package are found while no registry has them (D1).** In order: `--sdk-path` and
+  `--plugin-api-path` (or `MOSAIKIT_SDK_PATH`, `MOSAIKIT_PLUGIN_API_PATH`), then `--kit <folder>` (or `MOSAIKIT_KIT`: the
+  folders `sdk/` and `plugin-api/` of an unpacked kit), then the published versions (`mosaikit-plugin-sdk = "1"`,
+  `^1.0.0`). The kit holds the SDK as the unpacked `.crate` that `cargo package` makes (the folder of the repository
+  cannot be copied: it inherits from the workspace) and the UI package as the unpacked tarball of `npm pack`; phase 7 makes both. The generated
+  CI file points Cargo and npm at the kit with the repository variable `MOSAIKIT_KIT` (`[patch.crates-io]` in
+  `.cargo/config.toml`, `npm pkg set`), so the folder committed to Git keeps the published form.
+- **Versions of the build tools** taken from `mosaikit` and `mosaikit-plugins`: `typescript ~7.0.2`, `vite ^8.3.4`, `vitest
+  ^5.0.5`, `oxlint ^1.89.0` (the first guesses, `^5.9` and `^7`, were wrong). A finding of the build test: npm does not
+  install the dependencies of a package linked with `file:`, so the standalone UI lists the two `@fontsource-variable`
+  packages of `@mosaikit/plugin-api` itself (when the package is published npm installs them with it; the entries do no harm).
+- `mosaikit-plugin test` now also runs the `lint` and `test` scripts of the UI where they exist.
+- **Tests.** Unit tests of `scaffold` generate every variant and example into a temporary folder and validate them (no
+  placeholder is left, the files of each kind are there, the SDK path, the kit and the published form are resolved). The crate
+  test `every_variant_builds_and_packs_from_the_kit` (about 2 minutes) builds the kit as above in a temporary folder, then
+  makes eight plugins from it, builds, tests and packs the four that build, validates and packs the rest, and validates every package: no
+  checkout of Mosaikit is read. Manual checks `DK-08..11`, twin `tests/manual/checks/dk.ts` (DK-11 is the crate test).
+
+Left for the owner: **the conversion of `mosaikit-plugins`** (last item of the phase, not done on purpose). The repository
+keeps `"@mosaikit/plugin-api": "file:../mosaikit/ui/plugin-api"` in its root `package.json` and `mosaikit-plugin-sdk = { path =
+"../mosaikit/crates/plugin-sdk" }` in its root `Cargo.toml`, as the decision "no change to that repository now" says. When a
+registry (D1) has the two packages the conversion is: (1) point both root dependencies at the published versions
+(`^1.0.0`, `"1"`); (2) give each plugin folder the standalone files of `new` (own `[workspace]` or the root `[patch]`, `.oxlintrc.json`,
+`ui/package.json` with the build tools and the `lint` script, its own CI), keeping a light root (`Cargo.toml` and `package.json`
+workspaces) only for building everything at once; (3) change the CI of `mosaikit-plugins` so it no longer checks out
+`mosaikit` (and `cargo xtask` for a distribution so it no longer passes `plugin_api_path`); (4) check a plugin alone with
+`cargo xtask plugin build`/`mosaikit-plugin test` outside the monorepo. Until then the official plugins build as before, and the
+standalone path is proved by the kit test above.
 
 ### Phase 4 — Development servers (7 days)
 
