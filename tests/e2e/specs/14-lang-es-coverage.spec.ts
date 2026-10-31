@@ -13,8 +13,9 @@ const ENGLISH = /(?<!\p{L})(the|and|your|you|with|from|for|are|this|that|will|ha
 // Names of things the people typed or the seed made, brands and technical terms that stay as they are.
 const ALLOWED = /^(automatic message, do not reply.|mosaikit|plugins?|tenant|admin|manager|notes?|tasks?|ctrl k|oidc|smtp|pkce|csv|svg|png|webp|es|en|it|gb|ok)$/i
 
-// Data, not UI: the names of the tenants the other specs (and this one) made, wherever they show up.
-const DATA = /(City|Town) of [A-Z][a-z]+|Ciudad ES/g
+// Data, not UI: the names of the tenants the other specs (and this one) made, wherever they show up, and keys
+// (long base64 strings, different on every run) whose random letters can spell an English word.
+const DATA = /(City|Town) of [A-Z][a-z]+|Ciudad ES|[A-Za-z0-9+/_-]{20,}={0,2}/g
 
 async function lines(page: Page): Promise<string[]> {
   return page.evaluate(() => {
