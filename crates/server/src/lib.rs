@@ -56,7 +56,10 @@ impl IntoResponse for ApiError {
             Kind::TooMany => StatusCode::TOO_MANY_REQUESTS,
             Kind::Internal => StatusCode::INTERNAL_SERVER_ERROR,
         };
-        let body = serde_json::json!({ "error": self.0.message, "code": self.0.code() });
+        let mut body = serde_json::json!({ "error": self.0.message, "code": self.0.code() });
+        if let Some(c) = &self.0.plugin_code {
+            body["plugin_code"] = serde_json::json!(c);
+        }
         (status, axum::Json(body)).into_response()
     }
 }

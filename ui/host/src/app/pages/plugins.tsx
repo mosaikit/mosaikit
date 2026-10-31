@@ -72,6 +72,13 @@ function countKinds<T extends { kind?: PluginKind | null; has_ui?: boolean }>(ro
 
 /* ── Administrator › Plugins ─────────────────────────────────────────── */
 
+/** Why a version of the catalog cannot run here, in the language of the interface. */
+function incompatText(i: NonNullable<CatalogItem['incompatible']>): string {
+  return i.reason === 'api'
+    ? t('Built for plugin API {wanted}; this Mosaikit speaks API {have}.', { wanted: i.wanted, have: i.have })
+    : t('Works with Mosaikit {wanted}; this is {have}.', { wanted: i.wanted, have: i.have })
+}
+
 /** The plugins of the platform: installed, updates and the catalog of the trusted registries. */
 export function AdminPlugins({ section }: { section?: string }) {
   const installed = useApi<AdminPlugin[]>(['admin-plugins'], '/api/admin/plugins')
@@ -153,7 +160,14 @@ export function AdminPlugins({ section }: { section?: string }) {
     { key: 'name', title: t('Plugins'), width: 'minmax(12rem,1.6fr)', sort: (c) => c.name, text: (c) => `${c.name} ${c.id} ${c.description}`, cell: (c) => <b className="font-medium">{c.name}</b> },
     { key: 'kind', title: t('Kind'), width: 'minmax(8rem,.8fr)', sort: (c) => kindLabel(c.kind ?? 'app'), cell: (c) => <KindBadge kind={c.kind ?? 'app'} /> },
     { key: 'version', title: t('Version'), width: 'minmax(8rem,.8fr)', sort: (c) => c.latest, className: 'font-mono text-xs', cell: (c) => (c.installed ? `${c.installed} → ${c.latest}` : c.latest) },
-    { key: 'description', title: t('Description'), width: 'minmax(14rem,2.4fr)', sort: (c) => c.description, className: 'text-sm text-muted-foreground', cell: (c) => c.description },
+    { key: 'description', title: t('Description'), width: 'minmax(14rem,2.4fr)', sort: (c) => c.description, className: 'text-sm text-muted-foreground',
+      cell: (c) => (
+        <span>
+          {c.description}
+          {c.incompatible && <span className="block text-destructive" data-testid="plugin-incompatible">{incompatText(c.incompatible)}</span>}
+        </span>
+      ),
+    },
     {
       key: 'actions',
       title: t('Actions'),
@@ -161,7 +175,7 @@ export function AdminPlugins({ section }: { section?: string }) {
       width: 'minmax(9rem,auto)',
       className: 'justify-self-end',
       cell: (c) => (
-        <Button size="sm" disabled={install.isPending} onClick={() => install.mutate(c.id)}>
+        <Button size="sm" disabled={install.isPending || !!c.incompatible} onClick={() => install.mutate(c.id)}>
           {c.installed ? <ArrowUpCircle /> : null}
           {c.installed ? t('Update to {v}', { v: c.latest }) : t('Install')}
         </Button>

@@ -51,6 +51,12 @@ pub struct EntryVersion {
     /// for an extension: the plugin it extends
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extends: Option<String>,
+    /// range of versions of Mosaikit it works with (`[requires] mosaikit`), to show why it cannot be installed
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mosaikit: Option<String>,
+    /// plugin API it was built for (`[requires] api`)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub api: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -106,6 +112,33 @@ pub struct CatalogItem {
     pub extends: Option<String>,
     /// the notes of the versions newer than the installed one (or of the latest), newest first
     pub notes: Vec<VersionNotes>,
+    /// the latest version does not fit this Mosaikit: why (the interface translates it in Plugins > Updates)
+    pub incompatible: Option<Incompat>,
+}
+
+/// What stops a version of the catalog from running here; the interface builds one translated text from it.
+#[derive(Debug, Clone, Serialize)]
+pub struct Incompat {
+    /// `mosaikit` (outside the range) or `api` (another plugin API)
+    pub reason: &'static str,
+    /// the range or API the plugin declares
+    pub wanted: String,
+    /// the version of Mosaikit, or the API this Mosaikit supports
+    pub have: String,
+}
+
+fn incompat(v: &EntryVersion) -> Option<Incompat> {
+    use mosaikit_mskp::{VersionReq, API_VERSION};
+    if let Some(a) = v.api.filter(|a| *a != API_VERSION) {
+        return Some(Incompat { reason: "api", wanted: a.to_string(), have: API_VERSION.to_string() });
+    }
+    let range = v.mosaikit.as_deref()?;
+    let kernel = Version::parse_lenient(crate::KERNEL_VERSION)?;
+    (!VersionReq::parse(range)?.matches(kernel)).then(|| Incompat {
+        reason: "mosaikit",
+        wanted: range.to_string(),
+        have: kernel.to_string(),
+    })
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -148,6 +181,7 @@ pub fn catalog(k: &Kernel, admin: &SessionUser) -> Result<Vec<CatalogItem>> {
                 latest: latest.version.clone(),
                 installed,
                 update_available,
+                incompatible: incompat(latest),
                 kind: latest.kind.clone(),
                 extends: latest.extends.clone(),
                 notes: notes

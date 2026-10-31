@@ -34,8 +34,9 @@ import tbl from './checks/tbl.ts'
 import seed from './checks/seed.ts'
 import pending from './checks/pending.ts'
 import sc from './checks/sc.ts'
+import api from './checks/api.ts'
 
-const ALL = new Map<string, L.Check>([...p0, ...p0b, ...p1, ...p2, ...p3, ...p4, ...p5, ...p6, ...p7, ...p8, ...p9, ...fu, ...fub, ...fc, ...p10, ...sec, ...ux, ...r2, ...pui, ...npi, ...tbl, ...sc, ...seed, ...pending].map((c) => [c.id, c]))
+const ALL = new Map<string, L.Check>([...p0, ...p0b, ...p1, ...p2, ...p3, ...p4, ...p5, ...p6, ...p7, ...p8, ...p9, ...fu, ...fub, ...fc, ...p10, ...sec, ...ux, ...r2, ...pui, ...npi, ...tbl, ...sc, ...seed, ...pending, ...api].map((c) => [c.id, c]))
 
 /** Defects already reported (docs/reports/qa-walkthrough.md) and owned by a piece of work: expected to fail. */
 const KNOWN: Record<string, string> = {

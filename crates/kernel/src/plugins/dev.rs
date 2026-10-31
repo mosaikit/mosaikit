@@ -47,6 +47,11 @@ fn migrations(dir: &Path) -> Result<Vec<(u32, String, String)>> {
 /// Loads (or reloads) a plugin from its source folder.
 pub async fn load_one(k: &Kernel, dir: &Path) -> Result<String> {
     let manifest = Manifest::from_toml(&std::fs::read_to_string(dir.join("plugin.toml"))?)?;
+    // development: deprecated keys are a warning, an incompatible plugin is refused
+    for d in manifest.deprecations() {
+        tracing::warn!("plugin {}: {d}", manifest.id);
+    }
+    super::install::check_compatible(&manifest)?;
     let installed_as_package: bool =
         mosaikit_db::query_scalar("select exists (select 1 from core.plugins where id = $1 and not dev)")
             .bind(&manifest.id)

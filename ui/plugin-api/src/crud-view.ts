@@ -9,6 +9,7 @@ import { emptyState, filteredEmpty, type ArtName } from './empty-state.ts'
 import { gridTable, type GridCol } from './grid.ts'
 import type { Msk } from './client.ts'
 import { pageBody, pageHead } from './head.ts'
+import { h } from './dom.ts'
 import { errorText } from './errors.ts'
 import type { ExtensionView, FieldDecl, Row, Values } from './protocol.ts'
 
@@ -53,7 +54,8 @@ export interface EditorCtx {
   /** sets the value of a field, saved with the form */
   set(key: string, value: string | number | boolean | null): void
   canWrite: boolean
-  lang: 'en' | 'it' | 'es'
+  /** language of the host (`en`, `it`, or the code of a language plugin) */
+  lang: string
 }
 
 /** What a plugin draws an item with. */
@@ -66,8 +68,8 @@ export interface ItemCtx {
   selected: boolean
   /** the person may change this item */
   canWrite: boolean
-  /** language of the host */
-  lang: 'en' | 'it' | 'es'
+  /** language of the host (`en`, `it`, or the code of a language plugin) */
+  lang: string
   /** changes some fields of the item (a partial update) and shows the list again */
   update(values: Values): Promise<void>
 }
@@ -83,7 +85,7 @@ export interface CrudView {
   /** the content of an item; the view adds the box, selection and keyboard */
   item: (ctx: ItemCtx) => HTMLElement
   /** board only: the columns and which rows fall in each */
-  columns?: { key: string; label: (lang: 'en' | 'it' | 'es') => string; match: (row: Row) => boolean }[]
+  columns?: { key: string; label: (lang: string) => string; match: (row: Row) => boolean }[]
 }
 
 /** Rows asked at a time: the list grows with «Load more». */
@@ -113,15 +115,6 @@ type State = {
   editorVals: Values
 }
 
-export function h<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<string, string> = {}, ...children: (Node | string)[]) {
-  const el = document.createElement(tag)
-  for (const [k, v] of Object.entries(attrs)) {
-    if (k === 'class') el.className = v
-    else el.setAttribute(k, v)
-  }
-  for (const c of children) el.append(c)
-  return el
-}
 
 function display(f: FieldDecl, v: unknown): string {
   if (v === null || v === undefined) return ''
@@ -249,7 +242,9 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   let disposed = false
   /** the tab mounted now (row|extension|key) and the function that closes it */
   let mounted: { key: string; close: () => void } | null = null
+  // the texts of the view exist in three languages; the plugin gets the real code of the host
   const lang = (): 'en' | 'it' | 'es' => (msk.context?.lang === 'it' ? 'it' : msk.context?.lang === 'es' ? 'es' : 'en')
+  const hostLang = () => msk.context?.lang ?? 'en'
   const tr = (k: Text, vars: Record<string, string | number> = {}) =>
     TEXTS[lang()][k].replace(/\{(\w+)\}/g, (_, v: string) => String(vars[v] ?? ''))
 
@@ -383,7 +378,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
       value: (k) => r.values[k],
       selected: r.id === st.selected,
       canWrite: r.my_level === 'write' || r.my_level === 'manage',
-      lang: lang(),
+      lang: hostLang(),
       update: async (values) => {
         try {
           await api.update(r.id, values)
@@ -467,8 +462,8 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
             const rows = shown.filter(c.match)
             return h(
               'section',
-              { class: 'msk-col', 'aria-label': c.label(lang()) },
-              h('h2', {}, c.label(lang()), h('span', { class: 'msk-colcount' }, String(rows.length))),
+              { class: 'msk-col', 'aria-label': c.label(hostLang()) },
+              h('h2', {}, c.label(hostLang()), h('span', { class: 'msk-colcount' }, String(rows.length))),
               rows.length ? list(rows, 'list col') : h('div', { class: 'msk-colempty' }, tr('emptyCol')),
             )
           }),
@@ -635,7 +630,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
             st.editorVals[k] = v
           },
           canWrite,
-          lang: lang(),
+          lang: hostLang(),
         },
         box,
       )

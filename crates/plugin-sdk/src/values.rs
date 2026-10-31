@@ -31,7 +31,7 @@ impl Values {
     pub fn bool(&self, key: &str) -> bool {
         match self.get(key) {
             Some(Value::Bool(b)) => *b,
-            Some(Value::String(s)) => matches!(s.as_str(), "true" | "1" | "yes" | "si" | "sì"),
+            Some(Value::String(s)) => matches!(s.as_str(), "true" | "1" | "yes"),
             _ => false,
         }
     }

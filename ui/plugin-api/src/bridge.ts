@@ -1,4 +1,4 @@
-import { isEvent, isReply, type BridgeRequest } from './protocol.ts'
+import { isEvent, isReply, type BridgeRequest, type ErrorCode } from './protocol.ts'
 
 type Pending = { resolve: (v: unknown) => void; reject: (e: Error) => void; timer: ReturnType<typeof setTimeout> }
 
@@ -6,7 +6,7 @@ type Pending = { resolve: (v: unknown) => void; reject: (e: Error) => void; time
 export class BridgeError extends Error {
   constructor(
     message: string,
-    readonly code?: string,
+    readonly code?: ErrorCode,
     readonly status?: number,
     /** the message of the server, untranslated */
     readonly serverMessage?: string,

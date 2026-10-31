@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError } from './api.ts'
-import { errorReply, OpError, routeOp, safePage } from './bridge.ts'
+import { checkPluginApi, errorReply, OpError, routeOp, safePage, SHELL_API } from './bridge.ts'
 
 const ID = '8b0f6f3e-2d6a-4c7e-9a51-0c6a3d2b1f10'
 
@@ -95,5 +95,38 @@ describe('safePage', () => {
     for (const bad of ['../notes/index.html', '/tab.html', 'tab.js', 'a/./b.html', 'https://evil.x/a.html', 'tab.html?x=1', 'a\\b.html', '']) {
       expect(() => safePage(bad), bad).toThrow(OpError)
     }
+  })
+})
+
+describe('error codes', () => {
+  it('gives the plugin the code its logic chose, else the code of the server', () => {
+    expect(errorReply(new ApiError('the invoice is closed', 400, 'plugin_error', 'invoice_locked'))).toMatchObject({ code: 'invoice_locked', status: 400 })
+    expect(errorReply(new ApiError('nope', 403, 'forbidden'))).toMatchObject({ code: 'forbidden' })
+  })
+})
+
+describe('plugin API handshake (host side)', () => {
+  it('speaks the API the package exports', async () => {
+    const { API_VERSION } = await import('../../plugin-api/src/version.ts')
+    expect(SHELL_API).toBe(API_VERSION)
+  })
+
+  it('accepts a plugin of this API, or one that announces nothing (before the handshake)', () => {
+    expect(() => checkPluginApi({ api: SHELL_API })).not.toThrow()
+    expect(() => checkPluginApi(undefined)).not.toThrow()
+    expect(() => checkPluginApi({})).not.toThrow()
+  })
+
+  it('refuses a plugin built for a newer API, with a code the plugin can read', () => {
+    let err: unknown
+    try {
+      checkPluginApi({ api: SHELL_API + 1 })
+    } catch (e) {
+      err = e
+    }
+    expect(err).toBeInstanceOf(OpError)
+    expect(errorReply(err)).toMatchObject({ code: 'incompatible_api' })
+    expect(() => checkPluginApi({ api: 0 })).toThrow(OpError)
+    expect(() => checkPluginApi({ api: 'one' })).toThrow(OpError)
   })
 })

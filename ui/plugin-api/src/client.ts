@@ -1,5 +1,6 @@
 import { Bridge, BridgeError } from './bridge.ts'
-import type { ExtensionView, FileEntry, Hello, ListResult, Listing, Notify, PublicResource, Rect, Row, SiteInfo, TabInfo, UiContext, Values, WebProbe } from './protocol.ts'
+import { API_VERSION, checkHostApi } from './version.ts'
+import type { ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, UiContext, Values, WebProbe } from './protocol.ts'
 
 /** The extensions of the plugin on a resource (fields and actions other plugins add to its items). */
 export interface ExtensionsClient {
@@ -96,6 +97,8 @@ export interface CrudClient {
 
 /** API of a plugin UI. Every call goes through the host, which limits it to the plugin. */
 export class Msk {
+  /** the plugin API the host speaks (the handshake already checked that this plugin can use it) */
+  readonly api: number
   readonly isPublic: boolean
   readonly user: Hello['user']
   readonly tenant: Hello['tenant']
@@ -114,6 +117,7 @@ export class Msk {
     readonly bridge: Bridge,
     hello: Hello,
   ) {
+    this.api = checkHostApi(hello.api)
     this.isPublic = !!hello.public
     this.user = hello.user
     this.tenant = hello.tenant
@@ -233,8 +237,8 @@ export class Msk {
   }
 
   /** Metadata of a resource (owner, level, size...). */
-  resource(id: string) {
-    return this.bridge.call<Record<string, unknown>>('resource.meta', { id })
+  resource(id: string): Promise<ResourceMeta> {
+    return this.bridge.call<ResourceMeta>('resource.meta', { id })
   }
 
   /** Sends a notification: to the person using the plugin or, with `resource`, to the people who can see
@@ -264,12 +268,14 @@ export class Msk {
     return this.bridge.call<PublicResource>('public.get')
   }
 
-  onEvent(fn: (event: string, data: unknown) => void) {
-    return this.bridge.onEvent(fn)
+  /** Every event of the host (see `HostEvents` for what each carries); returns the function that stops listening. */
+  onEvent(fn: (event: HostEventName, data: unknown) => void) {
+    return this.bridge.onEvent((event, data) => fn(event as HostEventName, data))
   }
 }
 
 /** Applies language, mode and theme of the host to `<html>`: `lang`, `data-mode`, `data-preset`, `color-scheme`. */
+/** @internal */
 export function applyContext(ctx: UiContext | undefined, root: HTMLElement = document.documentElement) {
   if (!ctx) return
   if (/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(ctx.lang)) root.lang = ctx.lang
@@ -283,6 +289,7 @@ export function applyContext(ctx: UiContext | undefined, root: HTMLElement = doc
   applyTheme(ctx.theme, root)
 }
 
+/** @internal */
 export function applyTheme(vars: Record<string, string> | undefined, root: HTMLElement = document.documentElement) {
   if (!vars) return
   for (const [k, v] of Object.entries(vars)) {
@@ -301,10 +308,13 @@ export async function connect(win: Window = window): Promise<Msk> {
     throw new BridgeError('this page must be opened inside Mosaikit (the host is missing)')
   }
   const bridge = new Bridge(win.parent, host, win)
-  const hello = await bridge.call<Hello>('hello')
+  // the handshake: the host refuses (`incompatible_api`) a plugin built for an API it does not speak
+  const hello = await bridge.call<Hello>('hello', { api: API_VERSION })
   applyTheme(hello.theme)
   applyContext(hello.context)
   const msk = new Msk(bridge, hello)
+  // `theme` is deprecated (API 1 still sends it for plugins that predate `context`); `context` carries the same
+  // variables, so a plugin that gets both applies the same values twice
   msk.onEvent((event, data) => {
     if (event === 'theme') applyTheme(data as Record<string, string>)
     if (event === 'context') {

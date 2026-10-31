@@ -17,19 +17,82 @@ export interface BridgeReply {
   ok?: unknown
   /** the error, in the language of the host */
   err?: string
-  /** stable code of the error (`missing_permission`, `quota_exceeded`, `plugin_error`…); hosts before 1.1 omit it */
-  code?: string
+  /** stable code of the error, see `ErrorCode`; hosts before 1.1 omit it */
+  code?: ErrorCode
   /** HTTP status of the request that failed, if it reached the server */
   status?: number
   /** the message of the server, untranslated */
   message?: string
 }
 
+/**
+ * Codes of the errors a plugin UI meets, in `BridgeReply.code` and `BridgeError.code`. Switch on them, never on
+ * the text. The first group comes from the host and the kernel; `plugin_error` marks an error raised by the
+ * logic of the plugin, and when the logic gave it a code of its own (`Error::coded` in the Rust SDK) that code
+ * arrives instead, hence the open end of the type.
+ */
+export type ErrorCode =
+  // the category of the error, when it has no code of its own
+  | 'bad_request'
+  | 'unauthorized'
+  | 'forbidden'
+  | 'not_found'
+  | 'conflict'
+  | 'too_many'
+  | 'internal'
+  // the plugin and the person
+  | 'missing_permission'
+  | 'plugin_off'
+  | 'base_off'
+  | 'plugin_unavailable'
+  | 'plugin_error'
+  // limits
+  | 'quota_exceeded'
+  | 'content_too_large'
+  | 'too_many_rows'
+  | 'too_many_notifications'
+  // the list and the items
+  | 'sort_unknown'
+  | 'item_exists'
+  // the web (permission `web`)
+  | 'web_blocked'
+  | 'web_unreachable'
+  | 'web_url'
+  // the platform and the connection
+  | 'maintenance'
+  | 'server_unavailable'
+  | 'unexpected'
+  // the handshake
+  | 'incompatible_api'
+  // a code chosen by the logic of the plugin
+  | (string & {})
+
 export interface BridgeEvent {
   msk: 1
   event: string
   data?: unknown
 }
+
+/**
+ * The events the host sends to a plugin UI, with what each carries. A plugin listens with `msk.onContext`
+ * or `msk.onEvent`.
+ *
+ * | event | data | |
+ * |---|---|---|
+ * | `context` | `UiContext` | language, theme and mode changed (also at the handshake, in `Hello.context`) |
+ * | `theme` | CSS variables | **deprecated**, replaced by `context`; still sent in API 1, removed in API 2 |
+ * | `ext.changed` | `{ extension, id }` | an extension changed its values on an item (the base plugin reloads them) |
+ * | `ext.tab.height` | `{ handle, height }` | the tab of an extension asks for a height (handled by `msk.extensions().mountTab`) |
+ */
+export interface HostEvents {
+  context: UiContext
+  /** @deprecated use `context` */
+  theme: Record<string, string>
+  'ext.changed': { extension: string; id: string }
+  'ext.tab.height': { handle: string; height: number }
+}
+
+export type HostEventName = keyof HostEvents
 
 export type FieldKind = 'text' | 'number' | 'bool' | 'date' | 'choice'
 
@@ -171,6 +234,8 @@ export interface UiContext {
 }
 
 export interface Hello {
+  /** the plugin API the host speaks (see `API_VERSION`); hosts before the handshake omit it and speak API 1 */
+  api?: number
   public: boolean
   user?: { id: string; username: string; name: string }
   tenant?: { slug: string; name: string; role: 'manager' | 'member' }
@@ -187,6 +252,24 @@ export interface Hello {
   resource?: PublicResource
   /** only in the tab of an extension: the item it is shown for */
   tab?: TabInfo
+}
+
+/** Metadata of an item (`msk.resource`). */
+export interface ResourceMeta {
+  id: string
+  plugin_id: string
+  kind: string
+  title: string
+  parent_id: string | null
+  owner_id: string
+  owner_name: string
+  size_bytes: number
+  /** what the plugin keeps in the item besides its fields */
+  meta: unknown
+  created_at: string
+  updated_at: string
+  my_level: Level
+  is_owner: boolean
 }
 
 /** A notification of the plugin (`msk.notify`). */

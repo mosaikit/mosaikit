@@ -1,12 +1,21 @@
 {
   "name": "@mosaikit/plugin-api",
   "version": "1.0.0",
-  "private": true,
-  "description": "API of the UIs of Mosaikit plugins: postMessage bridge to the host, generic CRUD, theme",
+  "description": "API of the UIs of Mosaikit plugins (plugin API 1): postMessage bridge to the host, generic CRUD, tables, empty states, theme",
+  "license": "Apache-2.0",
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
     "./style.css": "./src/style.css"
+  },
+  "files": [
+    "src",
+    "!src/**/*.test.ts",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "publishConfig": {
+    "access": "public"
   },
   "scripts": {
     "test": "vitest run",
