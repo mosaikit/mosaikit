@@ -214,7 +214,43 @@ postgres_image = "postgis/postgis:17-3.5-alpine"
 
 [tests]
 cargo = ["tests"]           # integration tests of the distribution
+
+[[sidecars]]                # optional: extra processes next to the kernel
+name = "geo"
+command = "bin/geo-service"             # desktop: copied into the bundle, started before the kernel
+args = ["--listen", "127.0.0.1:9100"]
+env = { TOKEN = "env:GEO_TOKEN" }       # env:NAME = read from the environment
+health = "/health"                      # or "tcp"
+port = 9100                             # also added to MOSAIKIT_ALLOW_PRIVATE_FETCH_HOSTS
+image = "registry.example.com/geo:1"    # Docker and Kubernetes releases
+volumes = ["geodata:/data"]
+restart = "on-failure"                  # never | on-failure | always
+kind = "service"                        # or "oneshot": runs to completion before its dependants (idempotent)
+files = [{ source = "conf/server.xml", target = "/etc/geo/server.xml" }]   # overlay of files of the distribution
 ```
+
+Sidecars: the desktop launcher starts them before the kernel and stops them after it (output in
+`data\logs\sidecar-<name>.log`), `release docker` adds a Compose service each (`compose.sidecars.yml`),
+`release k8s` a Deployment and a Service. `cargo xtask sidecars` validates the section and shows the result.
+`kind = "oneshot"` runs a task to completion (for example a database initialisation) before the sidecars that depend on it start; it must be idempotent because it runs at every start. `files` places files of the distribution where the sidecar expects them (copied at each start on the desktop, read-only bind mounts on Docker, a ConfigMap of at most 512 KiB on Kubernetes). Details in [architecture 14.0](docs/architecture.md).
+
+A distribution can also seed the settings of plugins and the platform keys of outside services, with
+`env:NAME` or `file:PATH` references so that secrets are never written in the file:
+
+```toml
+[[plugin_settings]]
+plugin = "com.example.translate"
+key = "api_token"                     # a secret of the plugin [[config]]
+value = "env:TRANSLATE_TOKEN"
+
+[[service_key_values]]
+service = "translate"                 # a [[service_keys]] service
+value = "file:/run/secrets/translate"
+shared = true
+```
+
+They are applied at the start of the server only while unset and never overwrite what an Administrator
+chose (architecture 14.2).
 
 Every xtask command accepts `--dist <folder>` (or `MOSAIKIT_DIST`); without it,
 it uses the distribution of Mosaikit (`distribution.toml` here).
@@ -567,6 +603,13 @@ From `url` are derived:
   for the plugin UIs;
 - the listening ports (`listen`, `plugin_listen`): local only if the host is
   local.
+
+Two properties for deployers (full description in `mosaikit.example.toml`):
+
+| Property | Env | What |
+|---|---|---|
+| `allow_private_fetch_hosts` | `MOSAIKIT_ALLOW_PRIVATE_FETCH_HOSTS` (comma separated) | exact `host:port` destinations on the private network that `http.fetch` may reach, only for a plugin that lists that origin in its manifest `network` permission. No wildcards or ranges |
+| `plugin_settings_file` | `MOSAIKIT_PLUGIN_SETTINGS_FILE` | file with `[[plugin_settings]]` and `[[service_key_values]]` to seed at the start (never over an Administrator choice); a `distribution.toml` works |
 
 Behind a reverse proxy set `plugin_url` (a second hostname) and the
 internal ports. To check the resolved configuration: `mosaikit-server config`

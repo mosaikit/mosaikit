@@ -1,0 +1,8 @@
+# Seed file for the checks SEED-02 and SEED-03 (docs/manual-tests.md): start the server with
+# MOSAIKIT_PLUGIN_SETTINGS_FILE pointing here and SEED_CHECK_TOKEN=seed-check-1234 in its environment.
+# The value is referenced, never written, as a real deployment should do.
+
+[[service_key_values]]
+service = "translate"
+value = "env:SEED_CHECK_TOKEN"
+shared = true

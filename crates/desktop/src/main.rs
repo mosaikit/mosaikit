@@ -4,6 +4,8 @@
 //! handles the icon in the notification area (menu: Open, Initial credentials,
 //! Data folder, Log, Quit). "Quit" stops the server in an orderly way and with it
 //! the embedded PostgreSQL. Log in `<data_dir>/logs/mosaikit.log`.
+//! Sidecars of the distribution (`sidecars.toml` next to the executable) start before the kernel and stop
+//! after it (see `sidecar.rs`).
 //! A second run, with Mosaikit already active, only opens the browser.
 //!
 //! During the start, if it takes more than half a second, a small window shows name,
@@ -20,13 +22,14 @@
 mod icon;
 #[cfg(windows)]
 mod notify;
+mod sidecar;
 #[cfg(windows)]
 mod splash;
 #[cfg(windows)]
 mod tray;
 
 use std::path::{Path, PathBuf};
-use std::sync::mpsc;
+use std::sync::{mpsc, Arc, Mutex};
 
 use clap::Parser;
 use mosaikit_kernel::{Config, Kernel};
@@ -137,8 +140,54 @@ fn spawn_server(
     cfg: Config,
     stop: tokio::sync::oneshot::Receiver<()>,
     status: mpsc::Sender<Status>,
+    sidecars: (Vec<sidecar::Def>, PathBuf),
 ) -> std::thread::JoinHandle<()> {
     std::thread::spawn(move || {
+        // sidecars first: the plugins may need them as soon as the kernel runs
+        let (defs, base) = sidecars;
+        let mut started = None;
+        if !defs.is_empty() {
+            let progress = status.clone();
+            let report = move |p: &str| {
+                let _ = progress.send(Status::Progress(p.to_string()));
+            };
+            match sidecar::start_all(&defs, &base, &cfg.data_dir.join("logs"), &report) {
+                Ok(r) => started = Some(r),
+                Err(e) => {
+                    tracing::error!("{e}");
+                    let _ = status.send(Status::Failed(e));
+                    return;
+                }
+            }
+        }
+        // the kernel reports to a relay: before a final state (Failed, Stopped) reaches the interface
+        // thread, which may exit the process, the sidecars are stopped (after the kernel, which has
+        // already closed by then)
+        let running = Arc::new(Mutex::new(started));
+        let (relay_tx, relay_rx) = mpsc::channel();
+        let relay = {
+            let running = running.clone();
+            std::thread::spawn(move || {
+                for s in relay_rx {
+                    if matches!(s, Status::Failed(_) | Status::Stopped(_)) {
+                        let mut g = running.lock().unwrap_or_else(|e| e.into_inner());
+                        if let Some(r) = g.as_mut() {
+                            r.stop_all(&|m| tracing::info!("{m}"));
+                        }
+                        *g = None;
+                    }
+                    let _ = status.send(s);
+                }
+            })
+        };
+        serve_blocking(cfg, stop, relay_tx);
+        let _ = relay.join();
+    })
+}
+
+/// The kernel in this thread until `stop` fires (or the start fails).
+fn serve_blocking(cfg: Config, stop: tokio::sync::oneshot::Receiver<()>, status: mpsc::Sender<Status>) {
+    {
         let rt = match tokio::runtime::Builder::new_multi_thread().enable_all().build() {
             Ok(rt) => rt,
             Err(e) => {
@@ -177,7 +226,7 @@ fn spawn_server(
             k.shutdown().await;
             let _ = status.send(Status::Stopped(r.err().map(|e| e.to_string())));
         });
-    })
+    }
 }
 
 pub fn fatal(msg: &str) -> ! {
@@ -200,6 +249,10 @@ fn main() {
     if let Some(cmd) = cli.cmd {
         std::process::exit(run_admin(path, base, cmd));
     }
+    // sidecars of the distribution: their addresses are allowed for the plugins' fetches
+    // (the variable must be set before the configuration is read)
+    let sidecars = sidecar::load(&base).unwrap_or_else(|e| fatal(&format!("Invalid sidecars: {e}")));
+    sidecar::export_fetch_hosts(&sidecars);
     let cfg = match Config::load(path.as_deref(), &base) {
         Ok(c) => c,
         Err(e) => fatal(&format!("Invalid configuration: {e}")),
@@ -235,7 +288,7 @@ fn main() {
     };
     let (stop_tx, stop_rx) = tokio::sync::oneshot::channel();
     let (status_tx, status_rx) = mpsc::channel();
-    let server = spawn_server(cfg, stop_rx, status_tx);
+    let server = spawn_server(cfg, stop_rx, status_tx, (sidecars, base));
 
     #[cfg(windows)]
     tray::run(&app, stop_tx, status_rx);

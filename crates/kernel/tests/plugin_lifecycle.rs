@@ -562,3 +562,218 @@ async fn a_plugin_calls_a_service_with_its_key_and_only_where_allowed() {
     assert!(e.message.contains("not allowed"), "{e}");
     assert_eq!(seen.lock().unwrap().len(), 1, "nothing more reached the double");
 }
+
+/// A plugin that declares the origins in `permissions.network`.
+fn net_toml(origins: &[String]) -> String {
+    let list = origins.iter().map(|o| format!("\"{o}\"")).collect::<Vec<_>>().join(", ");
+    format!("{EVIL_TOML}[permissions]\nnetwork = [{list}]\n",)
+}
+
+#[tokio::test]
+async fn deployer_allow_list_of_private_destinations() {
+    let (port, seen) = translation_double().await;
+    let (other_port, other_seen) = translation_double().await;
+    let get = |p: u16| json!({ "op": "http.fetch", "req": { "url": format!("http://127.0.0.1:{p}/x") } });
+    let listed = format!("http://127.0.0.1:{port}");
+    let both = [listed.clone(), format!("http://127.0.0.1:{other_port}")];
+
+    let allow = format!("127.0.0.1:{port}");
+    let t = start_with(move |c| c.allow_private_fetch_hosts = vec![allow]).await;
+    t.tenant("alfa").await;
+    // the plugin lists the origin and the deployer allowed it: reaches the double
+    let out = evil_with(&t, &net_toml(&both), get(port)).await.unwrap();
+    assert_eq!(out["status"], 200);
+    assert_eq!(seen.lock().unwrap().len(), 1);
+    // same host, another port (listed by the plugin, not by the deployer): refused
+    let e = evil_with(&t, &net_toml(&both), get(other_port)).await.unwrap_err();
+    assert!(e.message.contains("not allowed"), "{e}");
+    assert!(other_seen.lock().unwrap().is_empty());
+    // the plugin does not list the origin: the permission check refuses it first
+    let e = evil_with(&t, &net_toml(&[]), get(port)).await.unwrap_err();
+    assert!(e.message.contains("permissions.network"), "{e}");
+    // an unlisted private host (link-local, listed by the plugin): refused
+    let meta = json!({ "op": "http.fetch", "req": { "url": "http://169.254.169.254/x" } });
+    let e = evil_with(&t, &net_toml(&["http://169.254.169.254".to_string()]), meta).await.unwrap_err();
+    assert!(e.message.contains("not allowed"), "{e}");
+    assert_eq!(seen.lock().unwrap().len(), 1, "nothing more reached the double");
+    drop(t);
+
+    // a name that resolves to a private address is pinned and allowed as before: `localhost:port`
+    let allow = format!("localhost:{port}");
+    let t = start_with(move |c| c.allow_private_fetch_hosts = vec![allow]).await;
+    t.tenant("alfa").await;
+    let url = json!({ "op": "http.fetch", "req": { "url": format!("http://localhost:{port}/x") } });
+    let origin = format!("http://localhost:{port}");
+    // (`localhost` may be pinned to `::1`, where the double does not listen: only the guard is asserted)
+    let r = evil_with(&t, &net_toml(&[origin]), url.clone()).await;
+    assert!(r.is_ok() || !r.unwrap_err().message.contains("not allowed"));
+    drop(t);
+
+    // without the allow-list the same call is refused
+    let t = start().await;
+    t.tenant("alfa").await;
+    let origin = format!("http://localhost:{port}");
+    let e = evil_with(&t, &net_toml(&[origin]), url).await.unwrap_err();
+    assert!(e.message.contains("not allowed"), "{e}");
+}
+
+const SEEDED_TOML: &str = r#"
+id = "com.test.evil"
+name = "Evil"
+version = "1.0.0"
+[contribution]
+icon = "x"
+label = "Evil"
+[[resources]]
+name = "items"
+fields = [{ key = "title", kind = "text" }]
+[[config]]
+key = "endpoint"
+label = "Address"
+kind = "text"
+[[config]]
+key = "retries"
+label = "Retries"
+kind = "number"
+[[config]]
+key = "token"
+label = "Token"
+kind = "secret"
+[[service_keys]]
+id = "translate"
+label = "Translation service"
+"#;
+
+#[tokio::test]
+async fn a_deployment_seeds_settings_and_keys_without_overwriting_the_administrator() {
+    use mosaikit_kernel::plugins::config::{self as pconf, ConfigChange};
+    use mosaikit_kernel::seed::{apply_file, Outcome, SeedFile};
+    let t = start().await;
+    t.tenant("alfa").await;
+    evil_with(&t, SEEDED_TOML, json!({ "op": "db.query", "req": { "sql": "select 1 as n", "params": [] } }))
+        .await
+        .unwrap();
+    let admin = t.admin().await;
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("token"), "tok-secret-777\n").unwrap();
+    std::fs::write(dir.path().join("svc"), "svc-secret-888").unwrap();
+    let file = dir.path().join("seed.toml");
+    std::fs::write(
+        &file,
+        r#"
+[[plugin_settings]]
+plugin = "com.test.evil"
+key = "endpoint"
+value = "env:SEED_ENDPOINT"
+[[plugin_settings]]
+plugin = "com.test.evil"
+key = "retries"
+value = 3
+[[plugin_settings]]
+plugin = "com.test.evil"
+key = "token"
+value = "file:token"
+[[plugin_settings]]
+plugin = "com.test.nobody"
+key = "x"
+value = "y"
+[[plugin_settings]]
+plugin = "com.test.evil"
+key = "nokey"
+value = "y"
+[[service_key_values]]
+service = "translate"
+value = "file:svc"
+[[service_key_values]]
+service = "unknown-service"
+value = "file:svc"
+"#,
+    )
+    .unwrap();
+    let seed = SeedFile::load(&file).unwrap();
+    let env = |n: &str| (n == "SEED_ENDPOINT").then(|| "https://seeded.example".to_string());
+    let r = apply_file(&t, &seed, dir.path(), &env).await.unwrap();
+    use Outcome::*;
+    assert_eq!(r, [Applied, Applied, Applied, Skipped, Skipped, Applied, Skipped]);
+
+    let v = pconf::config(&t, &admin, "com.test.evil", "en").await.unwrap();
+    assert_eq!(v.values["endpoint"], "https://seeded.example");
+    assert_eq!(v.values["retries"], 3.0);
+    assert_eq!(v.secrets, ["token"]);
+    let logic = pconf::for_logic(&t, "com.test.evil").await.unwrap();
+    assert_eq!(logic["token"], "tok-secret-777");
+    // stored encrypted, not readable in the database
+    let sealed: Vec<u8> = mosaikit_db::query_scalar("select value from core.secrets where name = $1")
+        .bind("plugin:com.test.evil:token")
+        .fetch_one(&t.db)
+        .await
+        .unwrap();
+    assert!(!String::from_utf8_lossy(&sealed).contains("tok-secret-777"));
+    let key: Vec<u8> = mosaikit_db::query_scalar(
+        "select secret from core.service_keys where scope = 'platform' and service = 'translate'",
+    )
+    .fetch_one(&t.db)
+    .await
+    .unwrap();
+    assert!(!String::from_utf8_lossy(&key).contains("svc-secret-888"));
+    assert!(mosaikit_kernel::tenancy::keys::platform_keys(&t, &admin, "en")
+        .await
+        .unwrap()
+        .iter()
+        .any(|k| k.service == "translate" && k.set));
+
+    // the Administrator changes a setting, removes the secret and the key: a new start keeps their choice
+    let mut ch = ConfigChange::default();
+    ch.values.insert("endpoint".into(), json!("https://admin.example"));
+    ch.secrets.insert("token".into(), json!(null));
+    pconf::set_config(&t, &admin, "com.test.evil", &ch).await.unwrap();
+    mosaikit_kernel::tenancy::keys::remove_key(
+        &t,
+        admin.user_id,
+        mosaikit_kernel::tenancy::keys::Level::Platform,
+        "translate",
+    )
+    .await
+    .unwrap();
+    let r = apply_file(&t, &seed, dir.path(), &env).await.unwrap();
+    assert_eq!(r, [Kept, Kept, Kept, Skipped, Skipped, Kept, Skipped]);
+    let v = pconf::config(&t, &admin, "com.test.evil", "en").await.unwrap();
+    assert_eq!(v.values["endpoint"], "https://admin.example");
+    assert!(v.secrets.is_empty());
+    assert!(!mosaikit_kernel::tenancy::keys::platform_keys(&t, &admin, "en")
+        .await
+        .unwrap()
+        .iter()
+        .any(|k| k.service == "translate" && k.set));
+}
+
+#[tokio::test]
+async fn a_seed_never_overwrites_a_value_set_before_it() {
+    use mosaikit_kernel::plugins::config::{self as pconf, ConfigChange};
+    use mosaikit_kernel::seed::{apply_file, Outcome, SeedFile};
+    let t = start().await;
+    t.tenant("alfa").await;
+    evil_with(&t, SEEDED_TOML, json!({ "op": "db.query", "req": { "sql": "select 1 as n", "params": [] } }))
+        .await
+        .unwrap();
+    let admin = t.admin().await;
+    let mut ch = ConfigChange::default();
+    ch.values.insert("endpoint".into(), json!("https://admin.example"));
+    ch.secrets.insert("token".into(), json!("admin-token"));
+    pconf::set_config(&t, &admin, "com.test.evil", &ch).await.unwrap();
+    let dir = tempfile::tempdir().unwrap();
+    let file = dir.path().join("seed.toml");
+    std::fs::write(
+        &file,
+        "[[plugin_settings]]\nplugin='com.test.evil'\nkey='endpoint'\nvalue='https://seed'\n\
+         [[plugin_settings]]\nplugin='com.test.evil'\nkey='token'\nvalue='seed-token'\n\
+         [[plugin_settings]]\nplugin='com.test.evil'\nkey='retries'\nvalue='env:MISSING_ONE'\n",
+    )
+    .unwrap();
+    let seed = SeedFile::load(&file).unwrap();
+    let r = apply_file(&t, &seed, dir.path(), &|_| None).await.unwrap();
+    assert_eq!(r, [Outcome::Kept, Outcome::Kept, Outcome::Skipped]);
+    let logic = pconf::for_logic(&t, "com.test.evil").await.unwrap();
+    assert_eq!(logic["endpoint"], "https://admin.example");
+    assert_eq!(logic["token"], "admin-token");
+}

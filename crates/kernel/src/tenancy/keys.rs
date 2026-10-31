@@ -348,6 +348,17 @@ pub async fn set_key(
     Ok(())
 }
 
+/// A platform key of the service exists (the seeding of a deployment never overwrites it).
+pub(crate) async fn platform_key_exists(k: &Kernel, service_id: &str) -> Result<bool> {
+    let n: Option<Uuid> = mosaikit_db::query_scalar(
+        "select id from core.service_keys where scope = 'platform' and service = $1",
+    )
+    .bind(service_id)
+    .fetch_optional(&k.db)
+    .await?;
+    Ok(n.is_some())
+}
+
 /// Removes a key; also of a service no installed plugin declares any more.
 pub async fn remove_key(k: &Kernel, by: Uuid, level: Level, service_id: &str) -> Result<()> {
     let (scope, tenant, user) = level.filter();

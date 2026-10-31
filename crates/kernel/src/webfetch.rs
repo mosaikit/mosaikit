@@ -91,13 +91,28 @@ fn check_url(raw: &str) -> Result<Url> {
     Ok(u)
 }
 
+/// The host of an address as compared with `allow_private_fetch_hosts` (lower case, IPv6 in brackets).
+fn host_of(u: &Url) -> String {
+    u.host_str().unwrap_or_default().to_string()
+}
+
+/// The `host:port` of the origins a plugin declares that the deployer allows on private addresses.
+pub fn private_exemptions(k: &Kernel, origins: &[String]) -> Vec<String> {
+    origins
+        .iter()
+        .filter_map(|o| Url::parse(o).ok())
+        .filter_map(|u| Some(format!("{}:{}", host_of(&u), u.port_or_known_default()?)))
+        .filter(|hp| k.cfg.allow_private_fetch_hosts.contains(hp))
+        .collect()
+}
+
 fn unreachable() -> Error {
     Error::bad("the address cannot be reached").with_code("web_unreachable")
 }
 
 /// One GET, redirects followed by hand (each hop checked), the body cut at `max` bytes.
 async fn fetch(k: &Kernel, raw: &str, max: usize, accept: &str) -> Result<Fetched> {
-    send(k, reqwest::Method::GET, raw, max, accept, &[], None).await
+    send(k, reqwest::Method::GET, raw, max, accept, &[], None, &[]).await
 }
 
 /// What a plugin gets back from [`request`].
@@ -108,7 +123,8 @@ pub struct Reply {
 }
 
 /// A request of a plugin to an outside service, with the same protections as the page probe: http(s)
-/// only, public addresses only (unless `allow_private_fetch`), the connection pinned to the address that
+/// only, public addresses only (unless `allow_private_fetch`, or the exact `host:port` is in `exempt`: the
+/// deployer's `allow_private_fetch_hosts` already narrowed to the origins of the plugin), the connection pinned to the address that
 /// was checked, redirects followed only for a GET and checked at every hop, the body cut at `max` bytes.
 pub async fn request(
     k: &Kernel,
@@ -117,11 +133,14 @@ pub async fn request(
     headers: &[(String, String)],
     body: Option<String>,
     max: usize,
+    exempt: &[String],
 ) -> Result<Reply> {
-    let f = send(k, method, raw, max, "application/json, text/plain;q=0.8, */*;q=0.5", headers, body).await?;
+    let f = send(k, method, raw, max, "application/json, text/plain;q=0.8, */*;q=0.5", headers, body, exempt)
+        .await?;
     Ok(Reply { status: f.status, body: f.body })
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn send(
     k: &Kernel,
     method: reqwest::Method,
@@ -130,6 +149,7 @@ async fn send(
     accept: &str,
     headers: &[(String, String)],
     body: Option<String>,
+    exempt: &[String],
 ) -> Result<Fetched> {
     let follow = method == reqwest::Method::GET;
     let mut url = check_url(raw)?;
@@ -144,7 +164,10 @@ async fn send(
         };
         // every address the name resolves to must be public, and the connection is pinned to one of
         // them: the name cannot change its answer between the check and the connection
-        if addrs.is_empty() || (!k.cfg.allow_private_fetch && addrs.iter().any(|a| !is_public_ip(a.ip()))) {
+        let listed = exempt.contains(&format!("{}:{port}", host_of(&url)));
+        if addrs.is_empty()
+            || (!k.cfg.allow_private_fetch && !listed && addrs.iter().any(|a| !is_public_ip(a.ip())))
+        {
             return Err(Error::bad("this address is not allowed").with_code("web_blocked"));
         }
         let client = reqwest::Client::builder()

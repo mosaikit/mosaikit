@@ -7,6 +7,11 @@ in step).
 
 ## 1.0.0
 
+### Distributions
+
+- A distribution can ship sidecars (`[[sidecars]]` in `distribution.toml`): extra processes next to the app. The desktop app starts them before the kernel (with a progress message, a timeout and a clear error if one cannot start), restarts them according to their policy, logs their output and stops them after the kernel; the Docker and Kubernetes releases add a service for each. Their addresses are allowed for the plugins' fetches automatically.
+- A sidecar can be a one-time task (`kind = "oneshot"`, for example a database initialisation): it runs to completion before the sidecars that depend on it start, and a failure or a timeout stops the start with the end of its log. A sidecar can also receive files of the distribution (`files`, for example a configuration) where it expects them, on the desktop, in Docker and in Kubernetes.
+
 ### The shell
 
 - The lists and cards that were left with a bare line when empty (the two lists of Manage › Pending, Home without apps, usage, backups, log and overview widgets, members of a group) now show an illustration with a title and the action, in a small version inside a widget or a section.
@@ -55,6 +60,7 @@ in step).
 
 ### For plugin authors
 
+- New manifest permission `[permissions] script_eval = true` (default false): the UI of that plugin alone gets `'unsafe-eval'` and `'wasm-unsafe-eval'` in `script-src` and `worker-src`, for engines that compile code at run time. The shell, the contents, the public links and every plugin that does not declare it keep the strict policy; the Administrator sees it in the plugin's «What it asks» as a sensitive permission.
 - A plugin can call an outside service with the key an Administrator set: `http.fetch` takes a `key` (a service of `[[service_keys]]`) and the host adds it as a bearer token; the address may be the one set in Keys of outside services (`address = true`). Requests of plugins go through the same guard as the page probe (public addresses only). The SDK has `ctx.http().fetch_with_key(...)`.
 - Notes translates a note with a translation service (Translate note, under the note), as the example.
 - The destructive buttons of the plugins (Delete) keep a readable contrast in the dark mode, as in the shell. Notes 0.5.0 shows the page that is open in its header (Notes › Mine).
@@ -66,6 +72,9 @@ in step).
   new `notify` host operation (`[permissions] notify = true`, `ctx.notify` in the SDK).
 
 ### The platform
+
+- A deployer can open a service on the private network to the plugins that declare it: `allow_private_fetch_hosts = ["host:port"]` in `mosaikit.toml` (exact entries only). Everything else stays guarded.
+- A distribution can seed the settings of plugins (secrets included) and the platform keys of outside services with `[[plugin_settings]]` and `[[service_key_values]]`, from `env:NAME` or `file:PATH`. They are applied once, only while unset, and never overwrite what an Administrator chose.
 
 - Administrators have a required, unique email. They change their own from Account (current password and second factor) and the name and email of another Administrator from System › Administrators.
 - System › Email says what is missing and how to set it up, with a preset for a local test server (Mailpit in the development setup).
