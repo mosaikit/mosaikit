@@ -89,14 +89,10 @@ jobs:
         run: cargo xtask ci
 
   e2e:
-    # the browser suite in four shards; a failed shard is re-run alone
+    # the browser suite, in file order: the specs build on each other (01 creates the admin, 16 needs the tenants of 15)
     needs: changes
     if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3, 4]
     services:
       postgres:
         image: postgis/postgis:17-3.5
@@ -144,14 +140,15 @@ jobs:
           sudo apt-get install -y postgresql-client-17
           # pg_dump of the backups must match the server (PostGIS 17 above): the wrapper of the runner picks 16
           echo /usr/lib/postgresql/17/bin >> "$GITHUB_PATH"
-      - name: test end-to-end (Playwright), shard ${{ matrix.shard }}/4
+      - name: test end-to-end (Playwright)
         run: |
           pg_dump --version
-          E2E_CHANNEL=chromium cargo xtask e2e -- --shard=${{ matrix.shard }}/4
+          # arguments after `--` run Playwright directly: no wildcard run at the end (its own job below)
+          E2E_CHANNEL=chromium cargo xtask e2e -- --workers=1
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: e2e-results-${{ matrix.shard }}
+          name: e2e-results
           path: |
             mosaikit/tests/e2e/test-results
             mosaikit/.dev/e2e*/*.log
