@@ -648,6 +648,12 @@ pub struct Permissions {
     /// people who see one of its items.
     #[serde(default)]
     pub notify: bool,
+    /// The logic may read the Files area with the permissions of the caller (host operations
+    /// `files.list`, `files.describe`, `files.read`). Sensitive: the Administrator sees it when the
+    /// plugin is installed. Default: false. Not `files`, which is the file API of a plugin that owns
+    /// files.
+    #[serde(default)]
+    pub files_read: bool,
     /// The UI may compile code at run time: its CSP gets `'unsafe-eval'` and `'wasm-unsafe-eval'` in
     /// `script-src` and `worker-src` (e.g. an engine that runs scripts or WebAssembly of its own).
     /// Sensitive: the Administrator sees it when the plugin is installed. Default: false.
@@ -1388,6 +1394,30 @@ fn is_origin(o: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn files_read_defaults_to_false_and_must_be_a_bool() {
+        let base = "id = \"com.x.p\"
+name = \"P\"
+version = \"0.1.0\"
+[contribution]
+icon = \"x\"
+label = \"P\"
+";
+        assert!(!Manifest::from_toml(base).unwrap().permissions.files_read);
+        let on = format!(
+            "{base}[permissions]
+files_read = true
+"
+        );
+        assert!(Manifest::from_toml(&on).unwrap().permissions.files_read);
+        let bad = format!(
+            "{base}[permissions]
+files_read = \"read\"
+"
+        );
+        assert!(Manifest::from_toml(&bad).is_err());
+    }
 
     #[test]
     fn script_eval_defaults_to_false_and_must_be_a_bool() {

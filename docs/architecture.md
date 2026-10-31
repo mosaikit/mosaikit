@@ -984,6 +984,7 @@ frame_src = []           # origins the UI may embed
 calls = []               # plugins whose commands the logic calls (§8.6)
 notify = false           # the logic may send notifications (host operation `notify`, §8.3)
 script_eval = false      # the UI may compile code at run time (CSP 'unsafe-eval', §9); sensitive
+files_read = false       # the logic may read the Files area as the caller (`files.list|describe|read`, §8.3); sensitive
 web = false              # the UI may ask the host about a web page (`msk.web.probe`: may it be framed, title, picture)
 
 [requires]               # optional
@@ -1111,14 +1112,34 @@ reaches the UI of the plugin as `BridgeError.code` (§8.11); without it the UI g
 stays the one shown to the person. Host operations: `db.query`, `db.exec`,
 `resource.create`, `resource.delete`, `http.fetch` (only towards `network` or the address of an address service
 of `[[service_keys]]`; with `"key"` the host adds the key of that service),
-`plugin.call` (only towards `calls`, §8.6), `key.get` (only for the `[[service_keys]]`) and `notify`
-(only with `[permissions] notify = true`).
+`plugin.call` (only towards `calls`, §8.6), `key.get` (only for the `[[service_keys]]`), `notify`
+(only with `[permissions] notify = true`) and `files.list`, `files.describe`, `files.read` (only with
+`[permissions] files_read = true`, below).
+
+An error of a host operation may carry a stable `code` too: `{"err": "…", "code": "…"}` (`Host::error_code` in
+the runtime); the SDK turns it into `Error::coded`, and a logic that returns it unchanged gives it to its UI.
 
 **Context of the call** (`ctx`, `Ctx` in the SDK; old plugins ignore what they do not read): `user`,
 `username`, `tenant` (ids), `plugin`, `perms` (permissions of the caller, §3.2), `config` (settings of
 the plugin) and `groups`: the groups of the tenant the caller belongs to, by name, as
 `[{"id": "<uuid>", "name": "Field"}]` (`[]` when none; never groups of other tenants; read at every
 call). In tests: `MockHost::new().with_groups(&[("g1", "Field")])`.
+
+**`files.list`, `files.describe`, `files.read`** (`[permissions] files_read = true`; default none): the logic of ANY
+plugin reads the Files area with the permissions of the CALLER, the rules the Files UI applies (no one sees
+more than in the UI; a public link is not a caller). Files and folders are kernel resources, so the operations
+run on a read transaction of the plugin that owns them (`plugin`, default `com.mosaikit.files`; it must be on for
+the tenant, declare `files`, and the caller needs `use` on it) with the context of the caller: ownership, ACL
+and sharing come from `core.visible_resources`. Requests: `files.list {parent?}` (root if absent) answers
+`{"entries": [row…], "truncated": bool}` (at most 1000 rows); `files.describe {id}` answers one row;
+`files.read {id, max_bytes?}` answers `{"entry": row, "base64": "…", "size": <bytes returned>, "truncated": bool}`.
+A row is `id, name, is_dir, size, mime, created, modified, owner_id, owner_name, my_level, shared, parent_id`:
+no storage path, no internal key, no secret. `max_bytes` is cut at the hard ceiling of the kernel, 4 MiB
+(`files::HOST_READ_CEILING`); only the head of the file is read from disk, and `truncated` says that the file is
+longer. Errors have a code (Plugin API 1): `permission_denied` (the manifest has no `files_read`),
+`not_found` (missing, or not visible to the caller: the two cannot be told apart), `invalid_argument` (bad id,
+a folder given to `files.read`, bad `max_bytes`). SDK: `ctx.files().list(parent)`, `.describe(id)`,
+`.read(id, max_bytes)`. The Administrator sees the permission in the plugin's «What it asks».
 
 **`notify`**: `{"op":"notify","req":{"title":"…","body":"…","at":"notes/2f1c","resource":"<uuid>"}}`,
 answer `{"ok":null}`. SDK: `ctx.notify(&Notice::new("Title").body("Text").at("notes/1").resource(id))`.

@@ -280,6 +280,62 @@ pub async fn read(k: &Kernel, c: &Caller, plugin_id: &str, id: Uuid) -> Result<(
     Ok((e, data))
 }
 
+/// Hard ceiling, in bytes, of what the host operation `files.read` returns in one call, whatever
+/// `max_bytes` the logic asks (the answer is base64 inside a JSON message of at most 16 MB).
+pub const HOST_READ_CEILING: usize = 4 << 20;
+/// Most rows `files.list` returns for a folder (the rows are cut, `truncated` says so).
+pub const HOST_LIST_MAX: usize = 1000;
+/// The plugin whose files the host operations read when the request does not name another one.
+pub const DEFAULT_SOURCE: &str = "com.mosaikit.files";
+
+/// Plugin whose files the host operations read: active, on for the tenant, with the files permission
+/// of its manifest, and the caller may use it (the rules of its own UI).
+async fn host_source(k: &Kernel, c: &Caller, source: &str) -> Result<std::sync::Arc<LoadedPlugin>> {
+    plugin(k, c, source, crate::access::USE).await
+}
+
+/// `files.list`: the files and folders of `parent` (the root if `None`) the caller sees, as the Files
+/// UI lists them. Never more than [`HOST_LIST_MAX`]; the flag says if rows were left out.
+pub async fn host_list(
+    k: &Kernel,
+    c: &Caller,
+    source: &str,
+    parent: Option<Uuid>,
+) -> Result<(Vec<Entry>, bool)> {
+    let mut entries = list(k, c, source, parent).await?.entries;
+    let cut = entries.len() > HOST_LIST_MAX;
+    entries.truncate(HOST_LIST_MAX);
+    Ok((entries, cut))
+}
+
+/// `files.describe`: the metadata of one file or folder the caller sees.
+pub async fn host_describe(k: &Kernel, c: &Caller, source: &str, id: Uuid) -> Result<Entry> {
+    let p = host_source(k, c, source).await?;
+    let mut tx = k.db.begin_plugin_read(&p.id, &c.ctx()).await?;
+    let e = get_entry(&mut tx, id).await?;
+    tx.commit().await?;
+    Ok(e)
+}
+
+/// `files.read`: the first `max_bytes` (at most [`HOST_READ_CEILING`]) of a file the caller sees.
+/// Returns the entry, the bytes and whether the file is longer than what was returned.
+pub async fn host_read(
+    k: &Kernel,
+    c: &Caller,
+    source: &str,
+    id: Uuid,
+    max_bytes: usize,
+) -> Result<(Entry, Vec<u8>, bool)> {
+    let e = host_describe(k, c, source, id).await?;
+    if e.is_dir {
+        return Err(Error::bad("it is a folder"));
+    }
+    let cap = max_bytes.min(HOST_READ_CEILING);
+    let (data, total) = k.blobs.read_file_head(c.tenant.tenant_id, id, cap)?;
+    let truncated = total > data.len() as u64;
+    Ok((e, data, truncated))
+}
+
 pub async fn rename(k: &Kernel, c: &Caller, plugin_id: &str, id: Uuid, name: &str) -> Result<Entry> {
     if !valid_name(name) {
         return Err(Error::bad("invalid name"));

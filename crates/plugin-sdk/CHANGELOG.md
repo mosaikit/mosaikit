@@ -3,6 +3,12 @@
 Versions follow the plugin API: see `docs/architecture.md` §8.11 of Mosaikit. A deprecated item stays for one major
 version and is removed in the next.
 
+## Unreleased
+
+- `Ctx::files()` (`Files::list`, `describe`, `read`): read the Files area with the permissions of the caller;
+  needs `[permissions] files_read = true`. `read` is capped at 4 MiB and returns the bytes as base64.
+- An error of a host operation keeps its `code`: `Error::coded` instead of `Error::msg` (e.g. `permission_denied`).
+
 ## 1.0.0
 
 First version of the plugin API (API 1).
