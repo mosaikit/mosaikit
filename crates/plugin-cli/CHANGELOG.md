@@ -27,3 +27,7 @@ First version: the executable `mosaikit-plugin`.
   operations the logic calls, read from the source or from `logic.wasm`; migrations numbered with no gap, no irreversible
   statement and accepted for SQLite; the UI: size, outside requests, CSP; i18n coverage; the layout contract of `mountCrud` pages).
   `test` runs it. The templates now carry `author` and `license` placeholders.
+- `self-update` (phase 7): updates the kit from a GitHub Release (or `--from-dir` a folder with the release files). It checks the
+  signature of `SHA256SUMS` against the key in `trusted_key.txt` of the kit (`--trusted-key`, `MOSAIKIT_KIT_KEY`), then the hash of the archive,
+  prints the «Breaking changes» of the release notes and asks for `--yes` when there are some or the major version changes;
+  `--check` only reports. The crate publishes metadata for `cargo install` (with `mosaikit-mskp` and `mosaikit-sql-guard`).

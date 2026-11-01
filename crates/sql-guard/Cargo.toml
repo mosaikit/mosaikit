@@ -4,6 +4,14 @@ description = "Whitelist of the SQL statements of Mosaikit plugins (runtime and 
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+keywords = ["mosaikit", "plugin", "sql"]
+categories = ["development-tools"]
+include = ["src/**", "README.md", "CHANGELOG.md"]
+publish = true
 
 [dependencies]
 sqlparser.workspace = true

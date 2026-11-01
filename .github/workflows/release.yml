@@ -72,3 +72,82 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:${{ github.ref_name }}
             ghcr.io/${{ github.repository }}:latest
+
+  # ---- the plugin dev kit: one archive per platform (docs/devkit/releasing.md) ----
+  # Windows includes the server (mosaikit-server); Linux and macOS have the CLI only and use the Docker image.
+  devkit:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      MOSAIKIT_SIGNING_KEY: ${{ secrets.MOSAIKIT_SIGNING_KEY }}
+    defaults:
+      run:
+        working-directory: mosaikit
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: mosaikit
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci --no-audit --no-fund
+      - run: cargo install cargo-deny --locked
+      - name: build the kit
+        run: cargo xtask release devkit --api-docs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: devkit-${{ matrix.os }}
+          path: |
+            mosaikit/dist/devkit/mosaikit-devkit-*.zip
+            mosaikit/dist/devkit/mosaikit-devkit-*.tar.gz
+            mosaikit/dist/devkit/mosaikit-devkit-*.sig
+            mosaikit/dist/devkit/RELEASE-NOTES.md
+
+  # the Docker image of the kit: the same image as the normal one, the developer profile comes from the compose file
+  devkit-image:
+    runs-on: ubuntu-latest
+    needs: [docker]
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: tag the image of the release as the dev kit image
+        run: |
+          docker buildx imagetools create             --tag ghcr.io/${{ github.repository }}-dev:${{ github.ref_name }}             ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+
+  # SHA256SUMS over the archives of every platform, signed with the key of the official packages; then the GitHub Release
+  devkit-release:
+    needs: [devkit, devkit-image]
+    runs-on: ubuntu-latest
+    env:
+      MOSAIKIT_SIGNING_KEY: ${{ secrets.MOSAIKIT_SIGNING_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: mosaikit
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/download-artifact@v4
+        with:
+          path: kits
+          pattern: devkit-*
+          merge-multiple: true
+      - name: SHA256SUMS and its signature
+        working-directory: mosaikit
+        run: cargo xtask release devkit-sums ../kits
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            kits/mosaikit-devkit-*.zip
+            kits/mosaikit-devkit-*.tar.gz
+            kits/*.sig
+            kits/SHA256SUMS
+          body_path: kits/RELEASE-NOTES.md
+

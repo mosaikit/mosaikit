@@ -4,6 +4,14 @@ description = "Format of the Mosaikit plugin packages (.mskp v3): manifest, hash
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+readme = "README.md"
+keywords = ["mosaikit", "plugin", "signature"]
+categories = ["development-tools"]
+include = ["src/**", "README.md", "CHANGELOG.md"]
+publish = true
 
 [dependencies]
 serde.workspace = true

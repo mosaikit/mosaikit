@@ -4,6 +4,7 @@ description = "Mosaikit desktop: application without a console, with an icon in 
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+publish = false
 
 [[bin]]
 name = "mosaikit"

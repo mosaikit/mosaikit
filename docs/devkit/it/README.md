@@ -18,6 +18,8 @@ Si parte da [Per iniziare](getting-started.md), poi si legge il riferimento che 
 | [Estensioni e layout](extensions-layouts.md) | Estendere un altro plugin; scrivere un layout o un pacchetto lingua |
 | [Linee guida della UI](ui-guidelines.md) | Le regole della shell che valgono per le pagine dei plugin |
 | [Pacchetto e firma](packaging.md) | `.mskp`, chiavi, chiavi fidate, blocklist, versioni, aggiornamenti, l'indice del registro |
+| [Firma dello sviluppatore](signing.md) | Creare una chiave, rendere fidato un editore, revocare una chiave |
+| [Rilasciare il kit](../releasing.md) | Archivi del kit, verifica di un download, `self-update`, `cargo install`, registro privato (solo in inglese) |
 | [Test](testing.md) | Test unitari, `validate --strict`, `@mosaikit/plugin-testing`, ricette per la CI |
 | [Risoluzione dei problemi](troubleshooting.md) | Gli errori che restituiscono il kernel e gli strumenti, con causa e rimedio |
 | [Changelog e compatibilità](changelog.md) | Versioni di kit, piattaforma, SDK e API della UI; deprecazioni |

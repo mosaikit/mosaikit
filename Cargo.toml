@@ -18,6 +18,8 @@ version = "1.0.0"
 edition = "2021"
 license = "Apache-2.0"
 rust-version = "1.85"
+repository = "https://github.com/mosaikit/mosaikit"
+homepage = "https://mosaikit.github.io"
 
 [workspace.lints.rust]
 unsafe_code = "deny"
@@ -79,8 +81,8 @@ tokio-util = { version = "0.7", features = ["io"] }
 # decoding of the band image of a layout, for its contrast check (already in the tree)
 png = "0.17"
 
-mosaikit-mskp = { path = "crates/mskp" }
-mosaikit-sql-guard = { path = "crates/sql-guard" }
+mosaikit-mskp = { path = "crates/mskp", version = "1.0.0" }
+mosaikit-sql-guard = { path = "crates/sql-guard", version = "1.0.0" }
 mosaikit-db = { path = "crates/db" }
 mosaikit-runtime = { path = "crates/runtime" }
 mosaikit-plugin-sdk = { path = "crates/plugin-sdk" }
