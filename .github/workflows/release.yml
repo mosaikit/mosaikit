@@ -100,7 +100,7 @@ jobs:
       - run: cargo install cargo-deny --locked
       - name: build the kit
         run: cargo xtask release devkit --api-docs
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: devkit-${{ matrix.os }}
           path: |
