@@ -39,7 +39,9 @@ pub fn archive_name(version: &str, platform: &str) -> String {
 /// The version inside the name of an archive of `platform`.
 pub fn version_of_archive(name: &str, platform: &str) -> Option<String> {
     let rest = name.strip_prefix("mosaikit-devkit-")?;
-    let v = rest.strip_suffix(&format!("-{platform}.zip")).or_else(|| rest.strip_suffix(&format!("-{platform}.tar.gz")))?;
+    let v = rest
+        .strip_suffix(&format!("-{platform}.zip"))
+        .or_else(|| rest.strip_suffix(&format!("-{platform}.tar.gz")))?;
     Version::parse(v).map(|_| v.to_string())
 }
 
@@ -82,7 +84,13 @@ pub fn parse_sums(text: &str) -> Vec<(String, String)> {
 
 /// The whole check of a download: the signature of the sums against the trusted keys, the archive listed in
 /// them, and its hash.
-pub fn check_download(name: &str, archive: &[u8], sums: &str, sums_sig: &str, trusted: &TrustedKeys) -> Result<String> {
+pub fn check_download(
+    name: &str,
+    archive: &[u8],
+    sums: &str,
+    sums_sig: &str,
+    trusted: &TrustedKeys,
+) -> Result<String> {
     let key = verify_bytes(sums_sig, sums.as_bytes(), trusted).context("SHA256SUMS")?;
     let listed = parse_sums(sums)
         .into_iter()
@@ -141,12 +149,19 @@ pub fn parse_release(json: &str) -> Result<Release> {
         .map(|a| {
             a.iter()
                 .filter_map(|x| {
-                    Some((x.get("name")?.as_str()?.to_string(), x.get("browser_download_url")?.as_str()?.to_string()))
+                    Some((
+                        x.get("name")?.as_str()?.to_string(),
+                        x.get("browser_download_url")?.as_str()?.to_string(),
+                    ))
                 })
                 .collect()
         })
         .unwrap_or_default();
-    Ok(Release { version, body: v.get("body").and_then(|b| b.as_str()).unwrap_or_default().to_string(), assets })
+    Ok(Release {
+        version,
+        body: v.get("body").and_then(|b| b.as_str()).unwrap_or_default().to_string(),
+        assets,
+    })
 }
 
 #[derive(Debug, Clone, Default)]
@@ -201,7 +216,11 @@ fn kit_folder(o: &Options) -> Result<PathBuf> {
 fn trusted_keys(o: &Options, kit: Option<&Path>) -> Result<TrustedKeys> {
     let raw = if let Some(k) = &o.trusted_key {
         let p = Path::new(k);
-        if p.is_file() { std::fs::read_to_string(p)? } else { k.clone() }
+        if p.is_file() {
+            std::fs::read_to_string(p)?
+        } else {
+            k.clone()
+        }
     } else if let Some(k) = std::env::var("MOSAIKIT_KIT_KEY").ok().filter(|k| !k.trim().is_empty()) {
         k
     } else if let Some(f) = kit.map(|k| k.join(TRUSTED_KEY_FILE)).filter(|f| f.is_file()) {
@@ -227,15 +246,26 @@ fn fetch(o: &Options, platform: &str) -> Result<(String, String, Vec<u8>, String
                 }
             }
         }
-        let (_, version, name) = best.ok_or_else(|| anyhow!("no archive for {platform} in {}", d.display()))?;
-        let read = |f: &str| std::fs::read_to_string(d.join(f)).with_context(|| format!("{f} in {}", d.display()));
+        let (_, version, name) =
+            best.ok_or_else(|| anyhow!("no archive for {platform} in {}", d.display()))?;
+        let read =
+            |f: &str| std::fs::read_to_string(d.join(f)).with_context(|| format!("{f} in {}", d.display()));
         let notes = std::fs::read_to_string(d.join("RELEASE-NOTES.md")).unwrap_or_default();
-        return Ok((version, name.clone(), std::fs::read(d.join(&name))?, read(SUMS_FILE)?, read("SHA256SUMS.sig")?, notes));
+        return Ok((
+            version,
+            name.clone(),
+            std::fs::read(d.join(&name))?,
+            read(SUMS_FILE)?,
+            read("SHA256SUMS.sig")?,
+            notes,
+        ));
     }
     let c = client()?;
     let repo = o.repo.clone().unwrap_or_else(|| REPO.to_string());
     let api = match &o.version {
-        Some(v) => format!("https://api.github.com/repos/{repo}/releases/tags/v{}", v.trim_start_matches('v')),
+        Some(v) => {
+            format!("https://api.github.com/repos/{repo}/releases/tags/v{}", v.trim_start_matches('v'))
+        }
         None => format!("https://api.github.com/repos/{repo}/releases/latest"),
     };
     let rel = parse_release(&String::from_utf8(get(&c, &api)?)?)?;
@@ -267,7 +297,8 @@ pub fn install_kit(src: &Path, kit: &Path) -> Result<()> {
                     if dest.exists() {
                         let old = dest.with_extension("old");
                         let _ = std::fs::remove_file(&old);
-                        std::fs::rename(&dest, &old).with_context(|| format!("replacing {}", dest.display()))?;
+                        std::fs::rename(&dest, &old)
+                            .with_context(|| format!("replacing {}", dest.display()))?;
                     }
                     std::fs::copy(f.path(), &dest)?;
                 }
@@ -382,7 +413,10 @@ mod tests {
     fn names_and_versions_round_trip() {
         assert_eq!(archive_name("1.2.3", "windows-x86_64"), "mosaikit-devkit-1.2.3-windows-x86_64.zip");
         assert_eq!(archive_name("1.2.3", "linux-x86_64"), "mosaikit-devkit-1.2.3-linux-x86_64.tar.gz");
-        assert_eq!(version_of_archive("mosaikit-devkit-1.2.3-linux-x86_64.tar.gz", "linux-x86_64").as_deref(), Some("1.2.3"));
+        assert_eq!(
+            version_of_archive("mosaikit-devkit-1.2.3-linux-x86_64.tar.gz", "linux-x86_64").as_deref(),
+            Some("1.2.3")
+        );
         assert_eq!(version_of_archive("mosaikit-devkit-1.2.3-linux-x86_64.tar.gz", "macos-aarch64"), None);
     }
 
