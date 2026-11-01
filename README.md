@@ -484,6 +484,11 @@ cargo xtask release all                           # desktop + Docker + Kubernete
 `release docker` also generates the Kubernetes folder (see below), with the same
 image.
 
+**Development kit with Docker** (for plugin developers, not a deployment): `cargo xtask release devkit-docker` builds the image
+`mosaikit-dev:<version>` and writes `dist/mosaikit-dev-<version>-docker` (compose with PostgreSQL, the server in the developer profile, the
+plugin folder as a volume, ports on `127.0.0.1` only); `--no-build` writes the folder without the image. The daily loop uses
+`mosaikit-plugin dev` instead (architecture §8.12).
+
 The Docker distribution is a folder ready to copy to the server:
 
 ```

@@ -44,6 +44,7 @@ pub async fn run(cfg: Config, cmd: AdminCmd) -> i32 {
         println!("allow_unsigned = {}", cfg.allow_unsigned);
         println!("admin_totp     = {}", cfg.admin_totp);
         println!("dev            = {}", cfg.dev.enabled);
+        println!("developer      = {}", cfg.developer_profile);
         return 0;
     }
     let k = match Kernel::start(cfg).await {

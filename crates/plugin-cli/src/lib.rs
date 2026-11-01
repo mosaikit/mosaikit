@@ -5,6 +5,7 @@
 //! `mosaikit` repository: a plugin is a folder with a `plugin.toml`, wherever it is. `xtask` calls these
 //! functions for the plugins of a distribution.
 
+pub mod dev;
 pub mod install;
 pub mod package;
 pub mod project;

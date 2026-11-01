@@ -170,7 +170,13 @@ pub(crate) fn ok() -> Json<Value> {
 // ------------------------------------------------------------------ authentication
 
 async fn health(State(s): State<AppState>) -> Json<Value> {
-    Json(json!({ "ok": true, "version": mosaikit_kernel::KERNEL_VERSION, "dev": s.k.cfg.dev.enabled }))
+    let mut body =
+        json!({ "ok": true, "version": mosaikit_kernel::KERNEL_VERSION, "dev": s.k.cfg.dev.enabled });
+    // the banner of the developer profile shows before anybody signs in
+    if s.k.cfg.developer_profile {
+        body["developer"] = json!(true);
+    }
+    Json(body)
 }
 
 /// Brand of the product, with the identity, the theme, the top bar and the languages of the platform:
@@ -315,6 +321,7 @@ async fn session_body(s: &AppState, user: &mosaikit_kernel::SessionUser) -> ApiR
         "plugin_url": s.k.cfg.plugin_url,
         "public_origin": s.k.cfg.public_origin(),
         "dev": s.k.cfg.dev.enabled,
+        "developer": s.k.cfg.developer_profile,
         "band": tenancy::shell_band(&s.k).await?,
         "theme": tenancy::platform_theme(&s.k).await?,
         // themes made with the theme editor (platform) and the ones tenants may use
@@ -339,7 +346,7 @@ async fn login(
 }
 
 /// Response of a completed sign-in: session + cookie (`extra` added to the body).
-async fn logged_in(s: &AppState, lr: identity::LoginResult, extra: Value) -> ApiResult<Response> {
+pub(crate) async fn logged_in(s: &AppState, lr: identity::LoginResult, extra: Value) -> ApiResult<Response> {
     let mut body = session_body(s, &lr.user).await?;
     if let (Some(b), Value::Object(e)) = (body.as_object_mut(), extra) {
         b.extend(e);

@@ -19,6 +19,7 @@ import { cn } from '@/lib/utils'
 import { t } from './i18n.ts'
 import { HelpLayer } from './HelpLayer.tsx'
 import { MaintenanceBanner } from './pages/operations.tsx'
+import { DevBanner } from './DevTools.tsx'
 import { QuotaAlert } from './Quotas.tsx'
 import type { Route } from './router.ts'
 import type { LayoutInfo } from './layouts.ts'
@@ -206,6 +207,7 @@ export default function Frame({ session, route, band, layout, bandImage, childre
 
   const main = (
     <main id="main" tabIndex={-1} data-tour="content" className="msk-main relative flex min-h-0 min-w-0 flex-1 flex-col bg-background outline-none">
+      <DevBanner session={session} route={route} />
       <MaintenanceBanner admin={session.user.is_system_admin} />
       {children}
     </main>

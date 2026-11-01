@@ -12,6 +12,7 @@ pub mod brand;
 pub mod config;
 pub mod content;
 pub mod crud;
+pub mod devprofile;
 pub mod embedded;
 mod error;
 pub mod events;
@@ -164,8 +165,16 @@ impl Caller {
 #[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum DevEvent {
-    PluginChanged { id: String, what: String },
-    PluginError { id: String, error: String },
+    PluginChanged {
+        id: String,
+        what: String,
+    },
+    /// `migration_changed`: the error is a changed migration (the developer profile offers to run them again)
+    PluginError {
+        id: String,
+        error: String,
+        migration_changed: bool,
+    },
 }
 
 pub struct Kernel {
@@ -286,6 +295,10 @@ impl Kernel {
         if kernel.cfg.preinstall {
             progress("Installing the plugins");
             plugins::registry::preinstall(&kernel).await?;
+        }
+        if kernel.cfg.developer_profile {
+            Box::pin(devprofile::seed(&kernel)).await?;
+            devprofile::announce(&kernel);
         }
         seed::apply(&kernel).await?;
         blobs::gc(&kernel).await;

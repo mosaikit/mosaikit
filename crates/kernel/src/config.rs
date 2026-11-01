@@ -38,6 +38,16 @@ pub struct Config {
     /// accepts unsigned packages (development only)
     #[serde(default)]
     pub allow_unsigned: bool,
+    /// developer profile: seeds a tenant with test users, loads the plugin folders in `dev.plugins` with hot
+    /// reload and accepts unsigned packages. Opt-in, never the default, and only for a computer that is not
+    /// reachable from outside (`developer_guard`). It is read from the configuration file or the environment
+    /// at start: no tenant and no plugin can turn it on.
+    #[serde(default)]
+    pub developer_profile: bool,
+    /// lets the developer profile run behind a non-loopback address or with a database that is not on this
+    /// computer (the Docker kit, whose container listens on every interface and is published on loopback only)
+    #[serde(default)]
+    pub developer_profile_allow_remote: bool,
     /// pages of the Internet fetched for a plugin (`web` permission) may also be on private addresses
     /// (loopback, local network): only for tests and development, never in production
     #[serde(default)]
@@ -375,6 +385,8 @@ impl Config {
                 "MOSAIKIT_DATABASE" => self.database.backend = Some(v),
                 "MOSAIKIT_DATABASE_URL" | "DATABASE_URL" => self.database.url = Some(v),
                 "MOSAIKIT_ALLOW_UNSIGNED" => self.allow_unsigned = truthy(&v),
+                "MOSAIKIT_DEVELOPER_PROFILE" => self.developer_profile = truthy(&v),
+                "MOSAIKIT_DEVELOPER_PROFILE_ALLOW_REMOTE" => self.developer_profile_allow_remote = truthy(&v),
                 "MOSAIKIT_ALLOW_PRIVATE_FETCH" => self.allow_private_fetch = truthy(&v),
                 "MOSAIKIT_ALLOW_PRIVATE_FETCH_HOSTS" => self
                     .allow_private_fetch_hosts
@@ -442,6 +454,10 @@ impl Config {
         }
         self.allow_private_fetch_hosts = hosts;
         let app = parse_url(self.url.trim())?;
+        // developer profile: every plugin UI on its own `<plugin>.localhost` origin, as in production
+        if self.developer_profile && self.plugin_url_setting.is_none() {
+            self.plugin_url_setting = Some(format!("http://*.localhost:{}", app.port.saturating_add(1)));
+        }
         let plugin = match &self.plugin_url_setting {
             Some(u) => parse_url(u.trim())?,
             None => UrlParts {
@@ -489,7 +505,66 @@ impl Config {
             ));
         }
         self.database.kind = Some(kind);
+        if self.developer_profile {
+            self.developer_guard()?;
+            self.apply_developer_profile();
+        }
         Ok(())
+    }
+
+    /// What the developer profile switches on (the guards have passed): hot reload, unsigned packages, no
+    /// second factor and the known password of the first accounts. With the profile off nothing changes.
+    fn apply_developer_profile(&mut self) {
+        self.dev.enabled = true;
+        self.allow_unsigned = true;
+        self.admin_totp = false;
+        if self.initial_password.is_none() {
+            self.initial_password = Some(crate::devprofile::PASSWORD.to_string());
+        }
+    }
+
+    /// The developer profile has development passwords and no signature checks: it refuses to start where
+    /// somebody else could reach it or where real data may be, unless `developer_profile_allow_remote` is
+    /// set on purpose. Checked on the addresses it listens on, on the public ones, on the database and on
+    /// the reverse proxy flag.
+    pub fn developer_guard(&self) -> Result<()> {
+        if self.developer_profile_allow_remote {
+            return Ok(());
+        }
+        let mut why = Vec::new();
+        for (what, addr) in [("listen", &self.bind), ("plugin_listen", &self.untrusted_bind)] {
+            if !is_loopback_host(addr.rsplit_once(':').map_or(addr.as_str(), |(h, _)| h)) {
+                why.push(format!("{what} is {addr}, not a loopback address"));
+            }
+        }
+        for (what, url) in [("url", &self.app_url), ("plugin_url", &self.plugin_url)] {
+            let host = url
+                .split_once("://")
+                .map(|(_, r)| r.split('/').next().unwrap_or_default())
+                .map(|h| h.rsplit_once(':').filter(|(_, p)| p.parse::<u16>().is_ok()).map_or(h, |(h, _)| h));
+            if !host.is_some_and(is_loopback_host) {
+                why.push(format!("{what} is {url}, not an address of this computer"));
+            }
+        }
+        if let Some(db) = self.database.url.as_deref() {
+            let host = url::Url::parse(db).ok().and_then(|u| u.host_str().map(str::to_string));
+            if !host.as_deref().is_some_and(is_loopback_host) {
+                why.push("the database is not on this computer (database.url)".to_string());
+            }
+        }
+        if self.trust_proxy {
+            why.push("trust_proxy is on (a reverse proxy: this is not a development computer)".to_string());
+        }
+        if why.is_empty() {
+            Ok(())
+        } else {
+            Err(Error::bad(format!(
+                "the developer profile refuses to start: {}. It has known passwords and accepts unsigned packages: use it only on a computer \
+                 nobody else reaches. To run it anyway (the Docker kit does, with the ports published on loopback only) set \
+                 developer_profile_allow_remote = true (MOSAIKIT_DEVELOPER_PROFILE_ALLOW_REMOTE=1).",
+                why.join("; ")
+            )))
+        }
     }
 
     pub fn backend(&self) -> Backend {
@@ -574,6 +649,16 @@ impl Config {
         }
         list
     }
+}
+
+/// A host that is this computer: `localhost`, `*.localhost`, `127.x.x.x`, `::1`, also with the wildcard label.
+pub fn is_loopback_host(host: &str) -> bool {
+    let h = host.trim().trim_start_matches("*.").to_ascii_lowercase();
+    let h = h.trim_start_matches('[').trim_end_matches(']');
+    h == "localhost"
+        || h.ends_with(".localhost")
+        || h == "::1"
+        || h.parse::<std::net::Ipv4Addr>().is_ok_and(|a| a.is_loopback())
 }
 
 fn truthy(v: &str) -> bool {

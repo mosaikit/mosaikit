@@ -21,7 +21,8 @@ fn wasm_path(k: &Kernel, dir: &Path) -> Option<PathBuf> {
     let value: toml::Value = toml::from_str(&cargo).ok()?;
     let name = value.get("package")?.get("name")?.as_str()?.replace('-', "_");
     let file = format!("{name}.wasm");
-    let workspace_target = dir.ancestors().skip(1).find_map(|a| {
+    // a standalone plugin folder is its own Cargo workspace (`[workspace]` in its Cargo.toml): its `target`
+    let workspace_target = dir.ancestors().find_map(|a| {
         let manifest = std::fs::read_to_string(a.join("Cargo.toml")).ok()?;
         manifest.contains("[workspace]").then(|| a.join("target"))
     });
@@ -101,6 +102,14 @@ pub async fn load_one(k: &Kernel, dir: &Path) -> Result<String> {
         language,
     });
     Ok(id)
+}
+
+/// The source folder a plugin in development was loaded from.
+pub fn folder_of(k: &Kernel, id: &str) -> Option<PathBuf> {
+    k.cfg.dev.plugins.iter().find_map(|d| {
+        let m = Manifest::from_toml(&std::fs::read_to_string(d.join("plugin.toml")).ok()?).ok()?;
+        (m.id == id).then(|| d.clone())
+    })
 }
 
 pub async fn load_all(k: &Kernel) {
@@ -202,7 +211,9 @@ pub fn watch(k: Arc<Kernel>) {
                     }
                     Err(e) => {
                         tracing::error!("hot reload {id}: {e}");
-                        k.emit(DevEvent::PluginError { id, error: e.to_string() });
+                        // a migration that changed after it ran: the shell offers to run them again from scratch
+                        let migration_changed = e.message.contains("was already applied and then changed");
+                        k.emit(DevEvent::PluginError { id, error: e.to_string(), migration_changed });
                     }
                 }
             }

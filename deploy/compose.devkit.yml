@@ -1,0 +1,58 @@
+# Mosaikit development kit with Docker: the server in the developer profile + PostgreSQL, to check a plugin
+# against the real database (migrations, row level security) after the daily loop on the desktop kit
+# (`mosaikit-plugin dev`, SQLite).
+#   cargo xtask release devkit-docker          # builds the image mosaikit-dev:<version> and this folder in dist/
+#   PLUGIN_DIR=../my-plugin docker compose up -d
+# The folder PLUGIN_DIR (default ./plugin) is mounted in the container and loaded as a plugin in
+# development: the manifest, the migrations, the UI (ui/dist) and the compiled logic
+# (target/wasm32-unknown-unknown/debug/*.wasm) reload when the files change.
+#
+# This is NOT a deployment. The developer profile has known passwords and accepts unsigned packages, so the
+# container needs MOSAIKIT_DEVELOPER_PROFILE_ALLOW_REMOTE (it listens on every interface of its own network) and
+# the ports are published on the loopback address of the host only: nobody else can reach it. Never remove
+# the "127.0.0.1:" of the ports, never put this behind a proxy, never point it at a real database.
+# Test users (password mosaikit-dev): admin (Administrator access), manager, alice, bob (tenant dev).
+
+services:
+  db:
+    image: ${POSTGRES_IMAGE:-postgres:17-alpine}
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dev-postgres}
+      MOSAIKIT_DB_PASSWORD: ${MOSAIKIT_DB_PASSWORD:-dev-mosaikit}
+    shm_size: 256mb
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # "mosaikit" exists only when the first initialization is complete
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mosaikit"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  app:
+    image: ${MOSAIKIT_DEV_IMAGE:-mosaikit-dev}:${MOSAIKIT_VERSION:-1.0.0}
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MOSAIKIT_DEVELOPER_PROFILE: "1"
+      MOSAIKIT_DEVELOPER_PROFILE_ALLOW_REMOTE: "1"
+      MOSAIKIT_DATABASE_URL: postgres://mosaikit_app:${MOSAIKIT_DB_PASSWORD:-dev-mosaikit}@db:5432/mosaikit
+      # the addresses the browser uses (the ports published below); every plugin UI has its own *.localhost origin
+      MOSAIKIT_URL: http://localhost:${MOSAIKIT_HTTP_PORT:-8080}
+      MOSAIKIT_PLUGIN_URL: "http://*.localhost:${MOSAIKIT_PLUGIN_PORT:-8081}"
+      MOSAIKIT_DEV_PLUGINS: /plugin
+    ports:
+      - "127.0.0.1:${MOSAIKIT_HTTP_PORT:-8080}:8080"
+      - "127.0.0.1:${MOSAIKIT_PLUGIN_PORT:-8081}:8081"
+    volumes:
+      - appdata:/data
+      - ${PLUGIN_DIR:-./plugin}:/plugin
+
+volumes:
+  pgdata:
+  appdata:

@@ -559,6 +559,23 @@ pub async fn set_active(k: &Kernel, admin: Option<&SessionUser>, id: &str, activ
 /// Uninstalls: schema, role, resources (in cascade), contents on disk, files of the package.
 pub async fn uninstall(k: &Kernel, admin: &SessionUser, id: &str) -> Result<()> {
     crate::tenancy::require_admin(admin)?;
+    let p = remove(k, id, true).await?;
+    let dir = k.cfg.data_dir.join("plugins").join(id);
+    if dir.is_dir() && !p.dev {
+        let _ = std::fs::remove_dir_all(dir);
+    }
+    events::record(k, None, Some(admin.user_id), Some(id), None, "plugin.uninstall", json!({})).await;
+    Ok(())
+}
+
+/// Deletes the data of a plugin (schema, role, resources, contents, settings) and its place in memory, for
+/// the reset of the developer profile: the plugin is then loaded again from its folder.
+pub(crate) async fn wipe(k: &Kernel, id: &str) -> Result<()> {
+    remove(k, id, false).await.map(|_| ())
+}
+
+/// The part of the uninstall that deletes: `remember` keeps the state of the plugin for an install again.
+async fn remove(k: &Kernel, id: &str, remember: bool) -> Result<Arc<LoadedPlugin>> {
     let p = k.plugins.get(id).ok_or_else(|| Error::not_found(format!("plugin not installed: {id}")))?;
     let resources: Vec<(Uuid, Uuid)> =
         mosaikit_db::query("select tenant_id, id from core.resources where plugin_id = $1")
@@ -572,7 +589,9 @@ pub async fn uninstall(k: &Kernel, admin: &SessionUser, id: &str) -> Result<()> 
     let ps = k.db.plugin_schema(id, &p.schema());
     let mut tx = k.db.begin_app().await?;
     // its state and the choices of the tenants, for an install again (memory.rs)
-    memory::remember(&mut tx, id).await?;
+    if remember {
+        memory::remember(&mut tx, id).await?;
+    }
     ps.drop(&mut tx).await?;
     mosaikit_db::query("delete from core.plugins where id = $1").bind(id).execute(&mut *tx).await?;
     tx.commit().await?;
@@ -581,12 +600,7 @@ pub async fn uninstall(k: &Kernel, admin: &SessionUser, id: &str) -> Result<()> 
     for (tenant, rid) in resources {
         k.blobs.remove(tenant, rid);
     }
-    let dir = k.cfg.data_dir.join("plugins").join(id);
-    if dir.is_dir() && !p.dev {
-        let _ = std::fs::remove_dir_all(dir);
-    }
-    events::record(k, None, Some(admin.user_id), Some(id), None, "plugin.uninstall", json!({})).await;
-    Ok(())
+    Ok(p)
 }
 
 /// A picture of the brochure of an installed plugin (`media/<name>` of its package) and its type.

@@ -29,7 +29,7 @@ run of each suite are in [results/test-results.md](results/test-results.md), reg
 | Host UI tests | `ui/host/src/**/*.test.ts` | vitest | `cargo xtask test` |
 | Plugin API tests | `ui/plugin-api/src/**/*.test.ts` | vitest | `cargo xtask test` |
 | Plugin UI tests | `../mosaikit-plugins/*/ui/**/*.test.ts` | vitest | `cargo xtask test` |
-| End-to-end tests | `tests/e2e/specs/*.spec.ts` (with axe); `wildcard.spec.ts` (one origin per plugin) runs on a second installation after the suite, as the suite `e2e-wildcard` of the report | Playwright | `cargo xtask e2e` (`--wildcard`: only the wildcard scenario, report untouched) |
+| End-to-end tests | `tests/e2e/specs/*.spec.ts` (with axe); `wildcard.spec.ts` (one origin per plugin) runs on a second installation after the suite, as the suite `e2e-wildcard` of the report; `18-developer-profile.spec.ts` starts a server of its own in the developer profile (`E2E_SERVER_BIN`, set by `cargo xtask e2e`) | Playwright | `cargo xtask e2e` (`--wildcard`: only the wildcard scenario, report untouched) |
 | Manual checks, automated | `tests/manual` (one test per id of `docs/manual-tests.md`, fixtures in `tests/fixtures/manual`) | Playwright | `cargo xtask manual-tests` (`--area R1-L` or `-g P3-` for the checks whose id starts so; `-- --grep P3-12` for one; `--check` compares the ids; `ci` runs the check) |
 | Load test | `tests/perf/` | `cargo xtask perf` | by hand, results in [docs/reports/performance.md](../docs/reports/performance.md) |
 

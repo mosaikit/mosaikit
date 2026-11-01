@@ -27,8 +27,22 @@ enum Cmd {
     Admin(AdminCmd),
 }
 
-#[tokio::main]
-async fn main() {
+/// The futures of the start are deep in a debug build and the main thread of Windows has 1 MB of stack: the
+/// server runs on a thread with a large one.
+fn main() {
+    let thread = std::thread::Builder::new()
+        .name("mosaikit".into())
+        .stack_size(64 << 20)
+        .spawn(|| {
+            tokio::runtime::Builder::new_multi_thread().enable_all().build().expect("runtime").block_on(run())
+        })
+        .expect("thread of the server");
+    if thread.join().is_err() {
+        std::process::exit(1);
+    }
+}
+
+async fn run() {
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_env("MOSAIKIT_LOG")

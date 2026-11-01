@@ -1,6 +1,6 @@
 // Plugin dev kit, phase 2: the command-line tool `mosaikit-plugin` (docs/manual-tests.md, DK-xx).
 // The checks run the executable of crates/plugin-cli in a temporary folder; DK-05 talks to the instance of the run.
-import { execFileSync, spawnSync } from 'node:child_process'
+import { execFileSync, spawn, spawnSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -34,6 +34,27 @@ function temp(): string {
 function cleanup(d: string) {
   fs.rmSync(d, { recursive: true, force: true })
 }
+
+/** The server executable of the run (next to the tool in the build folder of Cargo). */
+const SERVER = path.join(path.dirname(EXE), process.platform === 'win32' ? 'mosaikit-server.exe' : 'mosaikit-server')
+
+function killTree(pid: number | undefined) {
+  if (!pid) return
+  if (process.platform === 'win32') spawnSync('taskkill', ['/PID', String(pid), '/T', '/F'])
+  else process.kill(pid)
+}
+
+/** Runs the server with a configuration and gives its exit code and messages (it is stopped after `ms`). */
+function serverWith(cfg: string, d: string, ms = 20000) {
+  fs.writeFileSync(path.join(d, 'mosaikit.toml'), cfg)
+  const env = { ...process.env }
+  for (const k of ['MOSAIKIT_DATABASE_URL', 'DATABASE_URL', 'MOSAIKIT_URL', 'MOSAIKIT_LISTEN', 'MOSAIKIT_ALLOW_UNSIGNED', 'MOSAIKIT_DEVELOPER_PROFILE', 'MOSAIKIT_DEVELOPER_PROFILE_ALLOW_REMOTE']) delete env[k]
+  const r = spawnSync(SERVER, ['--config', path.join(d, 'mosaikit.toml'), 'serve'], { encoding: 'utf8', env, timeout: ms })
+  return { code: r.status, out: (r.stdout ?? '') + (r.stderr ?? '') }
+}
+
+/** A TOML literal string (single quotes: the backslashes of Windows paths stay). */
+const lit = (p: string) => `'${p}'`
 
 const checks: L.Check[] = [
   {
@@ -156,8 +177,18 @@ const checks: L.Check[] = [
       const c = H.checker()
       const d = temp()
       try {
-        const r = tool(d, ['dev'])
-        c.ok(r.code === 2 && r.out.includes('phase 4'), '`dev` says it arrives with phase 4 and exits with 2')
+        // the tool is copied to an empty folder: in a build folder of Cargo the server stands next to it
+        const alone = path.join(d, 'alone', path.basename(EXE))
+        fs.mkdirSync(path.dirname(alone), { recursive: true })
+        ensureTool()
+        fs.copyFileSync(EXE, alone)
+        tool(d, ['new', 'devdemo', '--no-logic', '--no-ui'])
+        const env = { ...process.env }
+        delete env.MOSAIKIT_SERVER_BIN
+        const r = spawnSync(alone, ['dev', '--no-open'], { cwd: path.join(d, 'devdemo'), encoding: 'utf8', env })
+        const out = (r.stdout ?? '') + (r.stderr ?? '')
+        c.ok(r.status === 1 && out.includes('--server') && out.includes('MOSAIKIT_SERVER_BIN'), '`dev` without a server executable fails with a message that says where to get it')
+        c.ok(tool(path.join(d, 'devdemo'), ['dev', '--server', path.join(d, 'nowhere')]).out.includes('does not exist'), 'a wrong --server path is named')
       } finally {
         cleanup(d)
       }
@@ -261,6 +292,114 @@ const checks: L.Check[] = [
         status: 'NOT VERIFIABLE',
         note: 'builds the logic for wasm32 and installs the UI packages of eight plugins (about two minutes); covered by the crate test cli.rs: every_variant_builds_and_packs_from_the_kit',
       }
+    },
+  },
+  {
+    id: 'DK-12',
+    async run() {
+      const c = H.checker()
+      const d = temp()
+      try {
+        tool(d, ['new', 'loop', '--id', 'com.test.loop', '--no-logic', '--no-ui'])
+        const plugin = path.join(d, 'loop')
+        fs.mkdirSync(path.join(plugin, 'ui', 'dist'), { recursive: true })
+        fs.writeFileSync(path.join(plugin, 'ui', 'dist', 'index.html'), '<!doctype html><title>x</title><p>ok</p>')
+        ensureTool()
+        const child = spawn(EXE, ['dev', '--no-open', '--no-build', '--port', '28860'], { cwd: plugin, env: { ...process.env, MOSAIKIT_SERVER_BIN: SERVER } })
+        let out = ''
+        child.stdout.on('data', (b) => (out += b))
+        child.stderr.on('data', (b) => (out += b))
+        try {
+          const end = Date.now() + 90_000
+          while (!out.includes('Ctrl+C stops it') && Date.now() < end && child.exitCode === null) await new Promise((r) => setTimeout(r, 400))
+          c.ok(out.includes('Ctrl+C stops it'), `dev starts the server and says it is ready (${out.slice(-200)})`)
+          c.ok(/app +http:\/\/127\.0\.0\.1:\d+\//.test(out) && out.includes('http://*.localhost:'), 'it prints the address of the app and the one of the plugins')
+          for (const u of ['admin', 'manager', 'alice', 'bob']) c.ok(out.includes(u), `it prints the test user ${u}`)
+          c.ok(out.includes('mosaikit-dev'), 'it prints the password of the test users')
+          const m = /app +(http:\/\/127\.0\.0\.1:\d+)\//.exec(out)
+          if (m) {
+            const h = (await (await fetch(`${m[1]}/api/health`)).json()) as { developer?: boolean }
+            c.ok(h.developer === true, 'the server runs the developer profile')
+            const info = (await (await fetch(`${m[1]}/api/dev/info`)).json()) as { plugins: { id: string }[] }
+            c.ok(info.plugins.some((p) => p.id === 'com.test.loop'), 'the plugin of the folder is loaded from it')
+          }
+        } finally {
+          killTree(child.pid)
+        }
+      } finally {
+        cleanup(d)
+      }
+      return c.result()
+    },
+  },
+  {
+    id: 'DK-13',
+    async run() {
+      const c = H.checker()
+      const d = temp()
+      try {
+        const data = `data_dir = ${lit(path.join(d, 'data'))}\n`
+        const open = serverWith(`url = "http://127.0.0.1:28870"\nlisten = "0.0.0.0:28870"\nplugin_listen = "127.0.0.1:28871"\n${data}developer_profile = true\n`, d)
+        c.ok(open.code !== 0 && open.out.includes('developer profile refuses to start') && open.out.includes('0.0.0.0:28870'), 'a non-loopback address is refused, with the reason')
+        const remote = serverWith(`url = "http://127.0.0.1:28870"\n${data}developer_profile = true\n[database]\nurl = "postgres://u:p@db.example.org:5432/m"\n`, d)
+        c.ok(remote.code !== 0 && remote.out.includes('the database is not on this computer'), 'a database on another host is refused')
+        const proxy = serverWith(`url = "http://127.0.0.1:28870"\ntrust_proxy = true\n${data}developer_profile = true\n`, d)
+        c.ok(proxy.code !== 0 && proxy.out.includes('trust_proxy'), 'a reverse proxy is refused')
+        // the flag that lifts the guards is explicit: with it the same address starts (the timeout stops the server)
+        const allowed = serverWith(`url = "http://127.0.0.1:28870"\nlisten = "0.0.0.0:28870"\nplugin_listen = "127.0.0.1:28871"\n${data}developer_profile = true\ndeveloper_profile_allow_remote = true\n`, d, 12000)
+        c.ok(!allowed.out.includes('refuses to start') && allowed.out.includes('DEVELOPER PROFILE ON'), 'with developer_profile_allow_remote it starts and says the profile is on')
+        // the default start: nothing about the profile
+        const plain = serverWith(`url = "http://127.0.0.1:28870"\nplugin_url = "http://127.0.0.1:28871"\ndata_dir = ${lit(path.join(d, 'data2'))}\n`, d, 8000)
+        c.ok(!plain.out.includes('DEVELOPER PROFILE'), 'a default start does not mention the developer profile')
+      } finally {
+        cleanup(d)
+      }
+      return c.result()
+    },
+  },
+  {
+    id: 'DK-14',
+    async run() {
+      return {
+        status: 'NOT VERIFIABLE',
+        note: 'a browser session of its own on a server in the developer profile: covered by tests/e2e/specs/18-developer-profile.spec.ts (banner, manifest, host calls, permissions, switch of users, empty state)',
+      }
+    },
+  },
+  {
+    id: 'DK-15',
+    async run() {
+      return {
+        status: 'NOT VERIFIABLE',
+        note: 'changes the files of a plugin folder while the browser is open: covered by tests/e2e/specs/18-developer-profile.spec.ts (UI, manifest, changed migration with its confirmation, reset)',
+      }
+    },
+  },
+  {
+    id: 'DK-16',
+    async run() {
+      const c = H.checker()
+      // the folder is written without building the image
+      const r = spawnSync('cargo', ['xtask', 'release', 'devkit-docker', '--no-build'], { cwd: L.ROOT, encoding: 'utf8' })
+      const out = (r.stdout ?? '') + (r.stderr ?? '')
+      const m = /Docker development kit: (.+)/.exec(out)
+      c.ok(r.status === 0 && !!m, `the folder of the Docker kit is generated (${out.slice(-160)})`)
+      if (m) {
+        const dir = m[1].trim()
+        try {
+          for (const f of ['compose.yml', '.env', 'README.md', 'initdb', 'plugin']) c.ok(fs.existsSync(path.join(dir, f)), `${f} is in the folder`)
+          const compose = fs.readFileSync(path.join(dir, 'compose.yml'), 'utf8')
+          c.ok(compose.includes('MOSAIKIT_DEVELOPER_PROFILE: "1"') && compose.includes('"127.0.0.1:'), 'compose turns the profile on and publishes on loopback only')
+          if (spawnSync('docker', ['--version']).status === 0) {
+            const v = spawnSync('docker', ['compose', 'config', '-q'], { cwd: dir, encoding: 'utf8' })
+            c.ok(v.status === 0, `docker compose accepts the file (${(v.stderr ?? '').slice(0, 160)})`)
+          } else c.note('docker not available: the file was checked as text only')
+        } finally {
+          fs.rmSync(dir, { recursive: true, force: true })
+        }
+      }
+      c.note('the real run (image build, docker compose up) is not part of this check')
+      return c.result()
     },
   },
 ]

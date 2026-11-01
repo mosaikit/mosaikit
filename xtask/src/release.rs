@@ -317,15 +317,9 @@ fn checksums(dist: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Docker image of the active distribution (multi-stage build). The context is the
-/// folder that contains mosaikit, mosaikit-plugins and the distributions; the signing
-/// key arrives as a BuildKit secret.
-pub fn docker(tag: Option<String>) -> Result<()> {
-    if which("docker").is_none() {
-        bail!("docker not found");
-    }
-    let d = crate::dist::current();
-    crate::sidecars::check_containers(&d.sidecars)?;
+/// Builds the image `tag` of a distribution (multi-stage build). The context is the folder that contains
+/// mosaikit, mosaikit-plugins and the distributions; the signing key arrives as a BuildKit secret.
+fn build_image(d: &crate::dist::Distribution, tag: &str) -> Result<()> {
     // build context: mosaikit, the plugin folders and the distribution, copied
     // (without builds, dependencies and data) into a temporary folder with the same
     // relative layout they have locally
@@ -355,8 +349,6 @@ pub fn docker(tag: Option<String>) -> Result<()> {
         copy_sources(&parent.join(t), &context.join(t))?;
     }
     let dist_rel = rel(&d.dir)?.to_string_lossy().replace('\\', "/");
-    let image = d.docker.image.clone().unwrap_or_else(|| d.product.id.clone());
-    let tag = tag.unwrap_or_else(|| format!("{image}:{}", d.product.version));
     let (key, source) = plugins::signing_key()?;
     let key_file = root().join(".dev").join("docker-signing.key");
     std::fs::create_dir_all(key_file.parent().expect(".dev folder"))?;
@@ -367,12 +359,28 @@ pub fn docker(tag: Option<String>) -> Result<()> {
         .env("DOCKER_BUILDKIT", "1")
         .args(["build", "-f", "mosaikit/deploy/Dockerfile", "--build-arg"])
         .arg(format!("DIST={dist_rel}"))
-        .args(["-t", &tag, "--secret"])
+        .args(["-t", tag, "--secret"])
         .arg(format!("id=signing_key,src={}", key_file.display()))
         .arg("."));
     let _ = std::fs::remove_file(&key_file);
     let _ = std::fs::remove_dir_all(&context);
     res?;
+    Ok(())
+}
+
+/// Docker image of the active distribution (multi-stage build). The context is the
+/// folder that contains mosaikit, mosaikit-plugins and the distributions; the signing
+/// key arrives as a BuildKit secret.
+/// Docker image of the active distribution, with the Docker and Kubernetes folders in `dist/`.
+pub fn docker(tag: Option<String>) -> Result<()> {
+    if which("docker").is_none() {
+        bail!("docker not found");
+    }
+    let d = crate::dist::current();
+    crate::sidecars::check_containers(&d.sidecars)?;
+    let image = d.docker.image.clone().unwrap_or_else(|| d.product.id.clone());
+    let tag = tag.unwrap_or_else(|| format!("{image}:{}", d.product.version));
+    build_image(d, &tag)?;
 
     // Docker distribution ready to use in <distribution>/dist/<id>-<version>-docker
     let pg = d.docker.postgres_image.clone().unwrap_or_else(|| "postgres:17-alpine".into());
@@ -421,6 +429,69 @@ pub fn docker(tag: Option<String>) -> Result<()> {
         k.display()
     );
     Ok(())
+}
+
+/// The Docker development kit (phase 4 of docs/plugin-devkit-plan.md): the image `mosaikit-dev:<version>` (the
+/// same image as the normal one, the developer profile is switched on by the compose file) and the folder
+/// `dist/mosaikit-dev-<version>-docker` with `compose.yml`, `initdb`, `.env` and a README. `build` false
+/// writes only the folder (no Docker needed).
+pub fn devkit_docker(tag: Option<String>, build: bool) -> Result<()> {
+    let d = crate::dist::current();
+    let tag = tag.unwrap_or_else(|| format!("mosaikit-dev:{}", d.product.version));
+    let (img, ver) = tag.rsplit_once(':').unwrap_or((tag.as_str(), "latest"));
+    if build {
+        if which("docker").is_none() {
+            bail!("docker not found (use --no-build to write only the folder)");
+        }
+        build_image(d, &tag)?;
+    }
+    let pg = d.docker.postgres_image.clone().unwrap_or_else(|| "postgres:17-alpine".into());
+    let out = devkit_folder(&dist_dir(d).join(format!("mosaikit-dev-{ver}-docker")), img, ver, &pg)?;
+    println!(
+        "
+Docker development kit: {}
+image: {tag}{}",
+        out.display(),
+        if build { "" } else { " (not built)" }
+    );
+    Ok(())
+}
+
+/// Writes the folder of the Docker development kit from the files of `deploy/`.
+pub(crate) fn devkit_folder(out: &Path, image: &str, version: &str, pg: &str) -> Result<PathBuf> {
+    if out.exists() {
+        std::fs::remove_dir_all(out)?;
+    }
+    std::fs::create_dir_all(out.join("plugin"))?;
+    std::fs::copy(root().join("deploy").join("compose.devkit.yml"), out.join("compose.yml"))?;
+    copy_dir(&root().join("deploy").join("initdb"), &out.join("initdb"))?;
+    std::fs::write(out.join("plugin").join(".gitkeep"), "")?;
+    std::fs::write(
+        out.join(".env"),
+        format!(
+            "# Mosaikit development kit (Docker): values used by compose.yml
+             MOSAIKIT_DEV_IMAGE={image}
+MOSAIKIT_VERSION={version}
+POSTGRES_IMAGE={pg}
+             MOSAIKIT_HTTP_PORT=8080
+MOSAIKIT_PLUGIN_PORT=8081
+             # the folder of the plugin to load (its manifest, migrations, ui/dist and target/ are read)
+PLUGIN_DIR=./plugin
+"
+        ),
+    )?;
+    let (pg_repo, pg_tag) = pg.rsplit_once(':').unwrap_or((pg, "latest"));
+    let vars = vec![
+        ("version", version.to_string()),
+        ("postgres_image", pg.to_string()),
+        ("postgres_repo", pg_repo.to_string()),
+        ("postgres_tag", pg_tag.to_string()),
+    ];
+    std::fs::write(
+        out.join("README.md"),
+        render(&std::fs::read_to_string(root().join("deploy").join("README.devkit.md"))?, &vars),
+    )?;
+    Ok(out.to_path_buf())
 }
 
 /// Placeholders of the deploy templates (`{{id}}`, `{{image}}`...).
