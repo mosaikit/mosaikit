@@ -5,6 +5,7 @@
 //! `mosaikit` repository: a plugin is a folder with a `plugin.toml`, wherever it is. `xtask` calls these
 //! functions for the plugins of a distribution.
 
+pub mod conformance;
 pub mod dev;
 pub mod install;
 pub mod package;
@@ -20,10 +21,10 @@ use anyhow::{bail, Result};
 
 pub use project::Plugin;
 
-/// `test`: validates the plugin, runs the tests of its logic (native, with the SDK's mock host) and the
+/// `test`: validates the plugin (the strict conformance suite), runs the tests of its logic (native, with the SDK's mock host) and the
 /// type check, lint and unit tests of its UI.
 pub fn test(p: &Plugin) -> Result<()> {
-    let report = validate::validate(&p.dir)?;
+    let report = validate::validate_with(&p.dir, validate::Options { strict: true })?;
     report.print();
     if !report.ok() {
         bail!("{}: the plugin does not validate", p.id);

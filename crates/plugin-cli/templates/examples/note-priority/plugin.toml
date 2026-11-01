@@ -6,6 +6,9 @@ id = "{{id}}"
 name = "{{label}}"
 version = "0.1.0"
 description = "Adds a priority, a follow-up date and quick actions to the notes"
+# who made it and under which licence: the Administrator reads both before installing
+author = "Your name"
+license = "Apache-2.0"
 kind = "extension"
 
 [requires]

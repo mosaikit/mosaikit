@@ -8,9 +8,9 @@ whole loop, with no dependency on the layout of the `mosaikit` repository: a plu
 mosaikit-plugin doctor                       toolchain: Rust, the wasm32 target, Node
 mosaikit-plugin new acme-reports             a standalone plugin folder (--variant, --example, --lang, --kit, --id, --into)
 mosaikit-plugin build [dir] [--release]      logic (WASM) and UI; installs the wasm32 target if it is missing
-mosaikit-plugin test [dir]                   validate, tests of the logic (native, mock host), type check, lint and tests of the UI
+mosaikit-plugin test [dir]                   strict validation, tests of the logic (native, MockHost), type check, lint and tests of the UI
 mosaikit-plugin pack [dir] [--key file]      build, validate, sign: dist/<id>-<version>.mskp
-mosaikit-plugin validate [dir|file.mskp]     manifest, migrations (SQL allow-list), permissions, package integrity
+mosaikit-plugin validate [dir|file.mskp] [--strict]   manifest, migrations (SQL allow-list), permissions, package integrity; --strict: the conformance suite
 mosaikit-plugin keygen --out publisher.key   a signing key pair (the public key goes in the server's trusted_keys)
 mosaikit-plugin sign file.mskp --key k       sign a package again with another key
 mosaikit-plugin install file.mskp --server <url> --user admin --password ... [--totp code]
@@ -28,6 +28,26 @@ plugin with a `WALKTHROUGH.md`. The folder is standalone: own `Cargo.toml`, `ui/
 
 `validate` exits with 1 when it finds an error; warnings (old keys, no `[requires]`, an unsigned package) do not
 change the exit code.
+
+**`validate --strict`** is the conformance suite a plugin passes before it is proposed to an Administrator. It is static (no
+server, no browser) and works on a folder and, for what a package holds, on a `.mskp`. `test` runs it first.
+
+| Check | How |
+|---|---|
+| Manifest | the schema (`plugin.toml` is read with unknown keys refused) and, in strict mode, `description`, `author` and `license` are required |
+| Permissions against the calls of the logic | in a folder, the Rust source of the logic (`src/**/*.rs`, up to `#[cfg(test)]`, comments left out) is scanned for the SDK calls `.files()`, `.notify(`, `.call_plugin("id"`, `.http()`, `.service_key(` and for the literal names of host operations; in a package, `logic.wasm` is scanned for the literals the SDK links in (`files.*`, `plugin.call`, `http.fetch`, `key.get`; `notify` has no safe literal in the binary, so it is checked in the source only). A call with no permission is an error; `files_read`, `notify` and `calls` asked for and never used are errors too; a listed hook with no registered `"<resource>.<hook>"` is an error |
+| Migrations | `NNN_name.sql` numbered from 001 with no gap or duplicate, names in lower case, no `drop table`, `drop column` or `truncate` (migrations only add), SQL accepted by the guard of PostgreSQL (own schema only) and by the translation for SQLite that the desktop uses |
+| UI | built `ui/dist` (or, if not built, the sources in `ui/`): at most 10 MiB; no script, `<link>`, image, frame or media from an outside origin, no `url()` or `@import` of one, no `fetch`, `import()`, `WebSocket`... of an outside literal address unless the origin is in `network` or `frame_src`; nothing the CSP of plugin pages blocks (inline `<script>`, `on...=` handlers, `javascript:`); `eval` and `new Function` are a warning without `script_eval`; the entry page has a title, a charset and a viewport |
+| i18n | every declared `[i18n.<lang>]` covers `description`, `details`, the label, the resources and their visible fields, the navigation, the KPIs and the user permissions of the English manifest (a language plugin is exempt) |
+| Layout contract of `mountCrud` pages | on the sources of the UI, best effort: the resource of the call is declared in `[[resources]]`, the UI imports `@mosaikit/plugin-api/style.css` and calls `connect()`, the page has a `title` option (a warning), its own `<table>` instead of `gridTable` is a warning |
+
+Not covered by the static suite: the accessibility smoke test (axe) runs in a browser, against the development server, with the
+`expectAccessible` helper of `@mosaikit/plugin-testing`. A missing `[requires]` stays a warning.
+
+**Testing the logic.** `mosaikit_plugin_sdk::testing::MockHost` runs commands and hooks natively against the answers you program
+(`on`, `with_perms`, `with_plugin_command`, `with_files`, `deny`); the documentation of the module has a recipe for `db.query`, `notify`,
+`call_plugin`, permissions and the Files area. **End to end**, `@mosaikit/plugin-testing` (`ui/plugin-testing` in the Mosaikit
+repository) starts or attaches to `mosaikit-plugin dev`, signs in as a test user, opens the plugin and creates an item.
 
 **Signing key.** `--key <file>`, else `MOSAIKIT_SIGNING_KEY` (base64), else `MOSAIKIT_SIGNING_KEY_FILE`, else a
 development key that the tool makes once in the configuration folder of the user (`%APPDATA%\mosaikit\signing.key`,

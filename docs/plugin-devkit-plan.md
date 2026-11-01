@@ -276,7 +276,7 @@ generated files and `docker compose config` are checked), **the desktop archive 
 reload of files through a bind mount from Windows/macOS into the container (file events may not arrive; the README says to restart the app or use
 the desktop kit), and rebuilding the plugin inside the container (the logic and the UI are built on the host).
 
-### Phase 5 — Tests and conformance (5 days)
+### Phase 5 — Tests and conformance (5 days) — done 2026-11-01, except the axe run and the end-to-end run of the helper
 
 - `mosaikit-plugin test`: runs the unit tests of the logic with `MockHost` (documented, with recipes for
   `db.query`, `notify`, `call_plugin`, permissions), and the checks of the package.
@@ -290,6 +290,23 @@ the desktop kit), and rebuilding the plugin inside the container (the logic and 
 - Tests: the suite passes on the official plugins and fails on deliberately broken fixtures.
 
 Output: a plugin that passes `validate --strict` can be proposed to an Administrator with confidence.
+
+**Done.** `validate --strict` (`crates/plugin-cli/src/conformance.rs`) and `test` running it; `MockHost` with `with_perms`,
+`with_plugin_command`, `with_files` (`FakeFile`: `files.list`, `files.describe`, `files.read`) and `deny`, with the recipes in the
+documentation of the module; the package `@mosaikit/plugin-testing` (`ui/plugin-testing`, a workspace of the root `package.json`).
+Choices: permissions are read from the **Rust source** of a folder (the SDK calls and the literal host operations) and from the
+**literals linked into `logic.wasm`** for a package, because a host operation is a string, not a wasm import (the notification has no safe
+literal in the binary, so it is checked in the source only); in strict mode `description`, `author` and `license` are required and the
+templates carry placeholders for the last two; a missing `[requires]` stays a warning (the official plugins do not declare it yet: to be added
+in `mosaikit-plugins`, then it can become an error); "reversible naming" is read as numbering with no gap or duplicate, lower-case names and no
+`drop table`, `drop column` or `truncate`, since the server applies `NNN_name.sql` only (there is no down script). **Tests**: unit tests of the
+conformance module, fixtures in `crates/plugin-cli/tests/fixtures` (`good` and ten `broken/<case>` overlays), crate tests that the good fixture and
+every official plugin of `mosaikit-plugins` pass and that every broken fixture fails, the native tests of `MockHost`, `vitest` of the package; manual
+checks `DK-17..20`.
+
+Left: **the axe smoke run of the plugin pages** (the helper `expectAccessible` is written and typed but was not run against a server: the
+server executable was in use), **an end-to-end spec that uses the helper** against its own server (as `18-developer-profile.spec.ts` does), the
+link of the package in `node_modules` (`npm install` of the workspace), and **`[requires]` in the official plugins**.
 
 ### Phase 6 — Documentation (8 days, in parallel with phases 2–5)
 

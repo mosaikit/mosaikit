@@ -4,6 +4,9 @@ id = "{{id}}"
 name = "{{label}}"
 version = "0.1.0"
 description = "A to-do list: tasks with a due date and a priority, shareable with colleagues"
+# who made it and under which licence: the Administrator reads both before installing
+author = "Your name"
+license = "Apache-2.0"
 
 # the versions of Mosaikit and of the plugin API this plugin works with
 [requires]

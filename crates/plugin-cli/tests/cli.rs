@@ -224,3 +224,99 @@ fn every_variant_builds_and_packs_from_the_kit() {
     );
     assert!(w.join("e-todo/target/wasm32-unknown-unknown/release/e_todo.wasm").is_file());
 }
+
+// ------------------------------------------------------------------ the conformance suite (`validate --strict`)
+
+fn fixtures() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("fixtures")
+}
+
+fn copy_over(from: &Path, to: &Path) {
+    std::fs::create_dir_all(to).unwrap();
+    for e in std::fs::read_dir(from).unwrap().flatten() {
+        let (src, dst) = (e.path(), to.join(e.file_name()));
+        if src.is_dir() {
+            copy_over(&src, &dst);
+        } else {
+            std::fs::copy(&src, &dst).unwrap();
+        }
+    }
+}
+
+/// The good fixture, with the files of a broken case laid over it.
+fn fixture(case: Option<&str>) -> tempfile::TempDir {
+    let d = temp();
+    copy_over(&fixtures().join("good"), d.path());
+    if let Some(c) = case {
+        copy_over(&fixtures().join("broken").join(c), d.path());
+    }
+    d
+}
+
+fn strict(dir: &Path) -> (bool, String) {
+    let o = tool(dir, &["validate", "--strict"]);
+    (o.status.success(), String::from_utf8_lossy(&o.stdout).to_string())
+}
+
+#[test]
+fn the_good_fixture_passes_the_strict_suite() {
+    let d = fixture(None);
+    let (ok, out) = strict(d.path());
+    assert!(ok && out.contains("0 error(s)"), "{out}");
+    assert!(
+        out.contains("migrations checked for PostgreSQL and for SQLite") && out.contains("layout contract"),
+        "{out}"
+    );
+    // the plain validate stays as it was: no conformance report
+    assert!(!ok_plain(d.path()).contains("layout contract"));
+}
+
+fn ok_plain(dir: &Path) -> String {
+    ok(dir, &["validate"])
+}
+
+#[test]
+fn the_broken_fixtures_fail_the_strict_suite() {
+    for (case, expected) in [
+        ("undeclared-notify", "[permissions] notify is not set"),
+        ("unused-permission", "files_read is set but the logic never reads the Files area"),
+        ("hook-not-registered", "registers no hook of it"),
+        ("migration-drop", "is irreversible"),
+        ("migration-gap", "002 is expected"),
+        ("migration-other-schema", "migrations/002_core.sql"),
+        ("ui-outside", "outside origin"),
+        ("i18n-incomplete", "[i18n.it] is incomplete"),
+        ("crud-layout", "which [[resources]] does not declare"),
+        ("no-metadata", "no description"),
+    ] {
+        let d = fixture(Some(case));
+        let (ok, out) = strict(d.path());
+        assert!(!ok && out.contains(expected), "{case}: expected `{expected}` in\n{out}");
+    }
+    // the inline script and the missing style are found too
+    let (_, out) = strict(fixture(Some("ui-outside")).path());
+    assert!(out.contains("inline script"), "{out}");
+    let (_, out) = strict(fixture(Some("crud-layout")).path());
+    assert!(out.contains("style.css") && out.contains("connect()"), "{out}");
+}
+
+#[test]
+fn the_official_plugins_pass_the_strict_suite() {
+    // the repository of the official plugins sits next to this one (CLAUDE.md); without it there is nothing to check
+    let plugins =
+        Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("..").join("..").join("mosaikit-plugins");
+    if !plugins.join("notes").join("plugin.toml").is_file() {
+        eprintln!("mosaikit-plugins is not next to this repository: skipped");
+        return;
+    }
+    let mut failed = Vec::new();
+    for e in std::fs::read_dir(&plugins).unwrap().flatten() {
+        if e.path().join("plugin.toml").is_file() {
+            let (ok, out) = strict(&e.path());
+            if !ok {
+                failed.push(out);
+            }
+        }
+    }
+    assert!(failed.is_empty(), "{}", failed.join("\n"));
+}

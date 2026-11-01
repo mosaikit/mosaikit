@@ -402,6 +402,86 @@ const checks: L.Check[] = [
       return c.result()
     },
   },
+  {
+    id: 'DK-17',
+    async run() {
+      const c = H.checker()
+      const fixtures = path.join(L.ROOT, 'crates', 'plugin-cli', 'tests', 'fixtures')
+      const d = temp()
+      try {
+        fs.cpSync(path.join(fixtures, 'good'), d, { recursive: true })
+        const good = tool(d, ['validate', '--strict'])
+        c.ok(good.code === 0 && good.out.includes('0 error(s)'), `the good fixture passes the strict suite (${good.out.slice(-200)})`)
+        c.ok(good.out.includes('migrations checked for PostgreSQL and for SQLite') && good.out.includes('layout contract'), 'the report says what was checked: migrations on both databases, the layout contract')
+        const plugins = path.join(L.ROOT, '..', 'mosaikit-plugins')
+        if (fs.existsSync(path.join(plugins, 'notes', 'plugin.toml'))) {
+          for (const e of fs.readdirSync(plugins, { withFileTypes: true })) {
+            if (!e.isDirectory() || !fs.existsSync(path.join(plugins, e.name, 'plugin.toml'))) continue
+            const r = tool(plugins, ['validate', '--strict', e.name])
+            c.ok(r.code === 0, `${e.name} passes the strict suite (${r.out.slice(-160)})`)
+          }
+        } else c.note('mosaikit-plugins is not next to this repository: the official plugins were not checked')
+      } finally {
+        cleanup(d)
+      }
+      return c.result()
+    },
+  },
+  {
+    id: 'DK-18',
+    async run() {
+      const c = H.checker()
+      const fixtures = path.join(L.ROOT, 'crates', 'plugin-cli', 'tests', 'fixtures')
+      const cases: [string, string][] = [
+        ['undeclared-notify', '[permissions] notify is not set'],
+        ['unused-permission', 'files_read is set but the logic never reads the Files area'],
+        ['hook-not-registered', 'registers no hook of it'],
+        ['migration-drop', 'is irreversible'],
+        ['migration-gap', '002 is expected'],
+        ['migration-other-schema', 'migrations/002_core.sql'],
+        ['ui-outside', 'outside origin'],
+        ['i18n-incomplete', '[i18n.it] is incomplete'],
+        ['crud-layout', 'which [[resources]] does not declare'],
+        ['no-metadata', 'no description'],
+      ]
+      for (const [name, expected] of cases) {
+        const d = temp()
+        try {
+          fs.cpSync(path.join(fixtures, 'good'), d, { recursive: true })
+          fs.cpSync(path.join(fixtures, 'broken', name), d, { recursive: true })
+          const r = tool(d, ['validate', '--strict'])
+          c.ok(r.code === 1 && r.out.includes(expected), `${name} fails: ${expected} (${r.out.slice(-200)})`)
+          // the basic validate does not run the conformance suite
+        } finally {
+          cleanup(d)
+        }
+      }
+      return c.result()
+    },
+  },
+  {
+    id: 'DK-19',
+    async run() {
+      return {
+        status: 'NOT VERIFIABLE',
+        note: 'the recipes of MockHost (db.query, notify, call_plugin, permissions, files.*) are native tests of the SDK: cargo test -p mosaikit-plugin-sdk testing',
+      }
+    },
+  },
+  {
+    id: 'DK-20',
+    async run() {
+      const c = H.checker()
+      const dir = path.join(L.ROOT, 'ui', 'plugin-testing')
+      for (const f of ['package.json', 'README.md', 'CHANGELOG.md', 'src/index.ts']) c.ok(fs.existsSync(path.join(dir, f)), `${f} is in the package`)
+      const pkg = JSON.parse(fs.readFileSync(path.join(dir, 'package.json'), 'utf8'))
+      c.ok(pkg.name === '@mosaikit/plugin-testing' && pkg.version === '1.0.0' && !!pkg.exports?.['.'], 'name, version 1.0.0 and explicit exports')
+      const r = spawnSync('npx', ['vitest', 'run'], { cwd: dir, encoding: 'utf8', shell: process.platform === 'win32' })
+      c.ok(r.status === 0, `the unit tests pass without a server (${((r.stdout ?? '') + (r.stderr ?? '')).slice(-200)})`)
+      c.note('signing in, opening a plugin, creating an item and the axe check against a development server are by hand: not automated')
+      return c.result()
+    },
+  },
 ]
 
 export default checks

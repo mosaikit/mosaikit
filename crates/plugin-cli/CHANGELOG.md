@@ -23,3 +23,7 @@ First version: the executable `mosaikit-plugin`.
   `MOSAIKIT_SDK_PATH`, `MOSAIKIT_PLUGIN_API_PATH`. A standalone folder has its own lint, `.gitignore`, README, CI file,
   tests and texts in English, Italian and Spanish; the build tools are `typescript ~7.0.2`, `vite ^8.3.4`, `vitest ^5.0.5`, `oxlint ^1.89.0`.
 - `test` also runs the `lint` and `test` scripts of the UI.
+- `validate --strict` (phase 5): the conformance suite (description, author and license required; permissions against the host
+  operations the logic calls, read from the source or from `logic.wasm`; migrations numbered with no gap, no irreversible
+  statement and accepted for SQLite; the UI: size, outside requests, CSP; i18n coverage; the layout contract of `mountCrud` pages).
+  `test` runs it. The templates now carry `author` and `license` placeholders.

@@ -1,0 +1,35 @@
+id = "com.test.fixture"
+name = "Fixture"
+version = "0.1.0"
+description = "A small plugin the conformance tests start from"
+author = "Tests"
+license = "Apache-2.0"
+
+[requires]
+mosaikit = ">=1.0, <2"
+api = 1
+
+[contribution]
+label = "Fixture"
+
+[[resources]]
+name = "items"
+label = "Items"
+title_field = "title"
+fields = [{ key = "title", label = "Title", kind = "text", required = true }]
+
+[ui]
+entry = "index.html"
+
+[permissions]
+hooks = ["items"]
+notify = true
+
+[i18n.it]
+name = "Fixture"
+description = "Un piccolo plugin da cui partono i test di conformita"
+label = "Fixture"
+
+[i18n.it.resources.items]
+label = "Elementi"
+fields = { title = "Titolo" }
