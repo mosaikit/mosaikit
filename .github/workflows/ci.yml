@@ -22,7 +22,7 @@ jobs:
     outputs:
       code: ${{ steps.diff.outputs.code }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - id: diff
@@ -56,10 +56,10 @@ jobs:
       run:
         working-directory: mosaikit
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: mosaikit
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/mosaikit-plugins
           path: mosaikit-plugins
@@ -108,10 +108,10 @@ jobs:
       run:
         working-directory: mosaikit
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: mosaikit
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/mosaikit-plugins
           path: mosaikit-plugins
@@ -173,10 +173,10 @@ jobs:
       run:
         working-directory: mosaikit
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           path: mosaikit
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           repository: ${{ github.repository_owner }}/mosaikit-plugins
           path: mosaikit-plugins
