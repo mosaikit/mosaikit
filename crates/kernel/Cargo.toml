@@ -4,6 +4,7 @@ description = "Mosaikit kernel: tenants, identity, resources and permissions, pu
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+publish = false
 
 [dependencies]
 mosaikit-db.workspace = true

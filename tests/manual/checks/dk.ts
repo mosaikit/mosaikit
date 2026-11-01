@@ -1,6 +1,7 @@
 // Plugin dev kit, phase 2: the command-line tool `mosaikit-plugin` (docs/manual-tests.md, DK-xx).
 // The checks run the executable of crates/plugin-cli in a temporary folder; DK-05 talks to the instance of the run.
 import { execFileSync, spawn, spawnSync } from 'node:child_process'
+import crypto from 'node:crypto'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -24,6 +25,10 @@ function tool(cwd: string, args: string[], env: Record<string, string> = {}) {
   const r = spawnSync(EXE, args, { cwd, encoding: 'utf8', env: base })
   return { code: r.status ?? -1, out: (r.stdout ?? '') + (r.stderr ?? '') }
 }
+
+/** `tar` that reads zip: on Windows the one of the system (the GNU tar of Git takes a drive letter for a remote host). */
+const SYS_TAR = path.join(process.env.SystemRoot ?? 'C:\\Windows', 'System32', 'tar.exe')
+const TAR = process.platform === 'win32' && fs.existsSync(SYS_TAR) ? SYS_TAR : 'tar'
 
 function temp(): string {
   const base = process.env.MOSAIKIT_TEMP
@@ -479,6 +484,199 @@ const checks: L.Check[] = [
       const r = spawnSync('npx', ['vitest', 'run'], { cwd: dir, encoding: 'utf8', shell: process.platform === 'win32' })
       c.ok(r.status === 0, `the unit tests pass without a server (${((r.stdout ?? '') + (r.stderr ?? '')).slice(-200)})`)
       c.note('signing in, opening a plugin, creating an item and the axe check against a development server are by hand: not automated')
+      return c.result()
+    },
+  },
+  {
+    id: 'DK-21',
+    async run() {
+      const c = H.checker()
+      const wf = fs.readFileSync(path.join(L.ROOT, '.github', 'workflows', 'release.yml'), 'utf8')
+      c.ok(/devkit:/.test(wf) && /windows-latest, ubuntu-latest, macos-latest/.test(wf), 'release.yml builds the kit on the three platforms')
+      c.ok(wf.includes('cargo xtask release devkit') && wf.includes('devkit-sums') && wf.includes('MOSAIKIT_SIGNING_KEY'), 'the workflow builds, signs the sums with the official key and publishes')
+      const rel = path.join(process.env.CARGO_TARGET_DIR ?? path.join(L.ROOT, 'target'), 'release', process.platform === 'win32' ? 'mosaikit-plugin.exe' : 'mosaikit-plugin')
+      if (!fs.existsSync(rel)) {
+        c.note('the real archive build (cargo xtask release devkit) is by hand: no release executables here, so the archive is not built by this suite')
+        return c.result()
+      }
+      const out = temp()
+      try {
+        const r = spawnSync('cargo', ['xtask', 'release', 'devkit', '--skip-build', '--allow-dev-key', '--out', out], { cwd: L.ROOT, encoding: 'utf8' })
+        c.ok(r.status === 0, `cargo xtask release devkit works (${((r.stdout ?? '') + (r.stderr ?? '')).slice(-300)})`)
+        const files = fs.readdirSync(out)
+        const archive = files.find((f) => /^mosaikit-devkit-.*\.(zip|tar\.gz)$/.test(f))
+        c.ok(!!archive, 'an archive is written')
+        for (const f of ['SHA256SUMS', 'SHA256SUMS.sig', 'RELEASE-NOTES.md']) c.ok(files.includes(f), `${f} is next to the archive`)
+        if (archive) {
+          c.ok(files.includes(`${archive}.sig`), 'the archive has its signature')
+          const list = spawnSync(TAR, ['-tf', path.join(out, archive)], { encoding: 'utf8' }).stdout ?? ''
+          for (const part of ['/bin/mosaikit-plugin', '/sdk/Cargo.toml', '/plugin-api/package.json', '/docs/devkit/README.md', '/examples/todo/plugin.toml', '/docker/compose.yml', '/LICENSE', '/THIRD-PARTY-NOTICES.md', '/COMPATIBILITY.md', '/trusted_key.txt'])
+            c.ok(list.includes(part), `the archive holds ${part}`)
+        }
+      } finally {
+        cleanup(out)
+      }
+      return c.result()
+    },
+  },
+  {
+    id: 'DK-22',
+    async run() {
+      // self-update from a folder of release files, with a kit made by hand and signed with a key made here
+      const c = H.checker()
+      const d = temp()
+      try {
+        const platform = `${process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'macos' : 'linux'}-${process.arch === 'arm64' ? 'aarch64' : 'x86_64'}`
+        const ext = process.platform === 'win32' ? 'zip' : 'tar.gz'
+        const exe = process.platform === 'win32' ? 'mosaikit-plugin.exe' : 'mosaikit-plugin'
+        ensureTool()
+        const mk = (version: string, notes: string) => {
+          const rel = path.join(d, `rel-${version}`)
+          const name = `mosaikit-devkit-${version}-${platform}`
+          fs.mkdirSync(path.join(rel, 'src', name, 'bin'), { recursive: true })
+          fs.copyFileSync(EXE, path.join(rel, 'src', name, 'bin', exe))
+          fs.writeFileSync(path.join(rel, 'src', name, 'VERSION'), version + '\n')
+          const args = ext === 'zip' ? ['-a', '-c', '-f', path.join(rel, `${name}.zip`), '-C', path.join(rel, 'src'), name] : ['-czf', path.join(rel, `${name}.tar.gz`), '-C', path.join(rel, 'src'), name]
+          spawnSync(TAR, args)
+          fs.writeFileSync(path.join(rel, 'RELEASE-NOTES.md'), notes)
+          return { rel, file: `${name}.${ext}` }
+        }
+        const kp = crypto.generateKeyPairSync('ed25519')
+        const pub = Buffer.from(kp.publicKey.export({ format: 'jwk' }).x as string, 'base64url').toString('base64')
+        const sign = (data: Buffer, key = kp.privateKey) => JSON.stringify({ key: pub, sig: crypto.sign(null, data, key).toString('base64') }) + '\n'
+        const finish = (rel: string, file: string, key = kp.privateKey) => {
+          const sums = `${crypto.createHash('sha256').update(fs.readFileSync(path.join(rel, file))).digest('hex')}  ${file}\n`
+          fs.writeFileSync(path.join(rel, 'SHA256SUMS'), sums)
+          fs.writeFileSync(path.join(rel, 'SHA256SUMS.sig'), sign(Buffer.from(sums), key))
+        }
+        const kit = () => {
+          const k = path.join(d, 'kit')
+          fs.rmSync(k, { recursive: true, force: true })
+          fs.mkdirSync(path.join(k, 'bin'), { recursive: true })
+          fs.writeFileSync(path.join(k, 'VERSION'), '1.0.0\n')
+          fs.writeFileSync(path.join(k, 'bin', 'marker'), 'old')
+          return k
+        }
+        // a release with breaking changes
+        const a = mk('9.0.0', '# Mosaikit dev kit 9.0.0\n\n## Breaking changes\n\n- the `foo` command is gone\n')
+        finish(a.rel, a.file)
+        const common = ['--from-dir', a.rel, '--trusted-key', pub]
+        let r = tool(d, ['self-update', '--check', ...common, '--kit', kit()])
+        c.ok(r.code === 0 && r.out.includes('9.0.0') && r.out.includes('the `foo` command is gone'), `--check lists the release and its breaking changes (${r.out.slice(-200)})`)
+        r = tool(d, ['self-update', ...common, '--kit', kit()])
+        c.ok(r.code === 1 && r.out.includes('--yes'), 'breaking changes need --yes')
+        const k = kit()
+        r = tool(d, ['self-update', '--yes', ...common, '--kit', k])
+        c.ok(r.code === 0 && fs.readFileSync(path.join(k, 'VERSION'), 'utf8').trim() === '9.0.0' && fs.existsSync(path.join(k, 'bin', exe)), `--yes replaces the kit (${r.out.slice(-200)})`)
+        // another key signed the sums: refused, nothing replaced
+        const other = crypto.generateKeyPairSync('ed25519')
+        finish(a.rel, a.file, other.privateKey)
+        const k2 = kit()
+        r = tool(d, ['self-update', '--yes', ...common, '--kit', k2])
+        c.ok(r.code === 1 && /signature|trusted/i.test(r.out) && fs.readFileSync(path.join(k2, 'VERSION'), 'utf8').trim() === '1.0.0', 'a signature that does not match is refused and the kit is untouched')
+        // tampered archive: hash differs from the signed sums
+        finish(a.rel, a.file)
+        fs.appendFileSync(path.join(a.rel, a.file), 'x')
+        const k3 = kit()
+        r = tool(d, ['self-update', '--yes', ...common, '--kit', k3])
+        c.ok(r.code === 1 && r.out.includes('hash does not match') && fs.readFileSync(path.join(k3, 'VERSION'), 'utf8').trim() === '1.0.0', 'a tampered archive is refused and the kit is untouched')
+        // no breaking changes: updates without --yes
+        const b = mk('1.0.1', '# Mosaikit dev kit 1.0.1\n\n## Breaking changes\n\nNone.\n')
+        finish(b.rel, b.file)
+        const k4 = kit()
+        r = tool(d, ['self-update', '--from-dir', b.rel, '--trusted-key', pub, '--kit', k4])
+        c.ok(r.code === 0 && fs.readFileSync(path.join(k4, 'VERSION'), 'utf8').trim() === '1.0.1', `a patch without breaking changes updates without --yes (${r.out.slice(-200)})`)
+        c.note('the download from GitHub Releases (the same checks, the files from the network) is by hand: not automated')
+      } finally {
+        cleanup(d)
+      }
+      return c.result()
+    },
+  },
+  {
+    id: 'DK-23',
+    async run() {
+      const c = H.checker()
+      const d = temp()
+      try {
+        const key = path.join(d, 'publisher.key')
+        let r = tool(d, ['keygen', '--out', key])
+        c.ok(r.code === 0 && fs.existsSync(key) && /public key/i.test(r.out), 'keygen writes the private key and prints the public one')
+        r = tool(d, ['keygen', '--out', key])
+        c.ok(r.code !== 0 && r.out.includes('already exists'), 'keygen never overwrites a key')
+        const doc = fs.readFileSync(path.join(L.ROOT, 'docs', 'devkit', 'signing.md'), 'utf8')
+        for (const part of ['keygen', 'trusted_keys', 'MOSAIKIT_TRUSTED_KEYS', 'Revoke', 'blocklist', 'key is lost']) c.ok(doc.includes(part), `signing.md covers ${part}`)
+        c.ok(fs.existsSync(path.join(L.ROOT, 'docs', 'devkit', 'it', 'signing.md')), 'the Italian translation exists')
+      } finally {
+        cleanup(d)
+      }
+      return c.result()
+    },
+  },
+  {
+    id: 'DK-24',
+    async run() {
+      const c = H.checker()
+      const d = temp()
+      try {
+        const r = spawnSync('cargo', ['xtask', 'release', 'devkit-notes', '--out', d], { cwd: L.ROOT, encoding: 'utf8' })
+        c.ok(r.status === 0, `devkit-notes works (${((r.stdout ?? '') + (r.stderr ?? '')).slice(-200)})`)
+        const notes = fs.existsSync(path.join(d, 'RELEASE-NOTES.md')) ? fs.readFileSync(path.join(d, 'RELEASE-NOTES.md'), 'utf8') : ''
+        const compat = fs.existsSync(path.join(d, 'COMPATIBILITY.md')) ? fs.readFileSync(path.join(d, 'COMPATIBILITY.md'), 'utf8') : ''
+        const version = /^version = "([^"]+)"/m.exec(fs.readFileSync(path.join(L.ROOT, 'Cargo.toml'), 'utf8').split('[workspace.package]')[1])?.[1]
+        c.ok(!!version && notes.startsWith(`# Mosaikit dev kit ${version}`), 'the notes are for the version of the workspace')
+        c.ok(notes.includes('## Breaking changes') && notes.includes('## Changes'), 'the notes have the breaking changes and the changes')
+        c.ok(compat.includes('| Plugin API | 1 |') && compat.includes('mosaikit-plugin-sdk') && compat.includes('`[requires] mosaikit`'), 'the compatibility table has the versions and the ranges of the plugins')
+        c.ok(compat.includes('example todo') && compat.includes('>=1.0, <2'), 'the examples are in the table with their range')
+      } finally {
+        cleanup(d)
+      }
+      return c.result()
+    },
+  },
+  {
+    id: 'DK-25',
+    async run() {
+      const c = H.checker()
+      const d = temp()
+      try {
+        const r = spawnSync('cargo', ['xtask', 'release', 'devkit-notices', '--out', d], { cwd: L.ROOT, encoding: 'utf8' })
+        c.ok(r.status === 0, `devkit-notices works (${((r.stdout ?? '') + (r.stderr ?? '')).slice(-300)})`)
+        const f = path.join(d, 'THIRD-PARTY-NOTICES.md')
+        const t = fs.existsSync(f) ? fs.readFileSync(f, 'utf8') : ''
+        c.ok(t.includes('## Rust crates') && t.includes('| MIT') && t.includes('Apache-2.0'), 'the Rust crates are listed with their licences')
+        c.ok(t.includes('@fontsource-variable/bricolage-grotesque') && t.includes('OFL-1.1'), 'the npm packages of the UI are listed, with the text of their licence')
+        c.ok(!/\|\s*(GPL|AGPL)-/.test(t), 'no GPL licence in the list')
+        c.ok(fs.existsSync(path.join(L.ROOT, 'LICENSE')), 'the LICENSE of Mosaikit is there')
+        c.note(/cargo deny check licenses/.test((r.stderr ?? '') + (r.stdout ?? '')) ? 'cargo deny check licenses ran' : 'cargo-deny is not installed here: the licences were listed but not checked')
+      } finally {
+        cleanup(d)
+      }
+      return c.result()
+    },
+  },
+  {
+    id: 'DK-26',
+    async run() {
+      const c = H.checker()
+      const meta = JSON.parse(execFileSync('cargo', ['metadata', '--no-deps', '--format-version', '1', '--offline'], { cwd: L.ROOT, encoding: 'utf8', maxBuffer: 1 << 26 }))
+      for (const name of ['mosaikit-mskp', 'mosaikit-sql-guard', 'mosaikit-plugin-cli', 'mosaikit-plugin-sdk']) {
+        const p = meta.packages.find((x: { name: string }) => x.name === name)
+        c.ok(!!p, `${name} is in the workspace`)
+        if (!p) continue
+        c.ok(p.version === '1.0.0' && p.license === 'Apache-2.0' && !!p.description && !!p.repository && !!p.readme, `${name}: version, licence, description, repository and readme`)
+        c.ok(p.publish === null, `${name} may be published`)
+      }
+      for (const name of ['mosaikit-db', 'mosaikit-runtime', 'mosaikit-kernel', 'mosaikit-server', 'mosaikit-desktop', 'xtask']) {
+        const p = meta.packages.find((x: { name: string }) => x.name === name)
+        c.ok(p && Array.isArray(p.publish) && p.publish.length === 0, `${name} is not published`)
+      }
+      for (const name of ['mosaikit-mskp', 'mosaikit-sql-guard']) {
+        const r = spawnSync('cargo', ['package', '-p', name, '--list', '--allow-dirty', '--offline'], { cwd: L.ROOT, encoding: 'utf8' })
+        const l = (r.stdout ?? '').replace(/\\/g, '/')
+        c.ok(r.status === 0 && l.includes('README.md') && l.includes('CHANGELOG.md') && l.includes('src/lib.rs'), `${name}: cargo package lists README, CHANGELOG and the sources`)
+      }
+      c.note('cargo install mosaikit-plugin-cli from a registry is by hand: nothing is published by the suite')
       return c.result()
     },
   },

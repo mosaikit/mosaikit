@@ -12,6 +12,7 @@ pub mod package;
 pub mod project;
 pub mod scaffold;
 pub mod toolchain;
+pub mod update;
 pub mod util;
 pub mod validate;
 

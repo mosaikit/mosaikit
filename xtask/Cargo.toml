@@ -26,3 +26,6 @@ sysinfo.workspace = true
 
 [lints]
 workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

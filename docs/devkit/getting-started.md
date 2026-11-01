@@ -9,13 +9,16 @@ The kit is one folder (or archive) with:
 
 | Part | What |
 |---|---|
-| `bin/mosaikit-plugin` | the command-line tool: `new`, `build`, `test`, `validate`, `pack`, `sign`, `keygen`, `install`, `dev`, `doctor` |
+| `bin/mosaikit-plugin` | the command-line tool: `new`, `build`, `test`, `validate`, `pack`, `sign`, `keygen`, `install`, `dev`, `doctor`, `self-update` |
 | `bin/mosaikit-server` | the Mosaikit server that `dev` starts (developer profile, SQLite) |
 | `sdk/`, `plugin-api/` | the Rust SDK (`mosaikit-plugin-sdk`) and the UI package (`@mosaikit/plugin-api`), until a registry has them |
 | `docs/` | these documents |
 
-Put its `bin/` folder on your `PATH`, or point `MOSAIKIT_KIT` at it. The archives per platform are built by the packaging
-phase of the plan: until you have one, build the two executables from the Mosaikit sources
+Download the archive of your platform from the GitHub Releases of `mosaikit/mosaikit`
+(`mosaikit-devkit-<version>-<platform>`), check it ([Releasing the kit](releasing.md)), unpack it, and put its `bin/`
+folder on your `PATH` (or point `MOSAIKIT_KIT` at the folder). The Windows archive has the server; on Linux and macOS the
+development server is the Docker image (`docker/README.md` in the kit). `mosaikit-plugin self-update` brings the kit
+to the next release. Without an archive, build the two executables from the Mosaikit sources
 (`cargo build --release -p mosaikit-plugin-cli -p mosaikit-server`) and use `--sdk-path` and `--plugin-api-path`
 (or `MOSAIKIT_SDK_PATH`, `MOSAIKIT_PLUGIN_API_PATH`) in place of `--kit`.
 

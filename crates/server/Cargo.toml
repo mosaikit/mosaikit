@@ -4,6 +4,7 @@ description = "HTTP server of Mosaikit: API, host UI, plugin UIs, contents and p
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+publish = false
 # `cargo run -p mosaikit-server` (used by `cargo xtask dev`) starts the server, not the test identity provider
 default-run = "mosaikit-server"
 

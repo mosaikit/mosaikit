@@ -126,6 +126,30 @@ enum Cmd {
         #[arg(long)]
         fix: bool,
     },
+    /// Updates this kit from a release: checks the signature and the hash, shows the breaking changes, then replaces the kit
+    SelfUpdate {
+        /// only say whether a newer version exists and what it breaks
+        #[arg(long)]
+        check: bool,
+        /// a given version instead of the latest
+        #[arg(long)]
+        version: Option<String>,
+        /// GitHub repository of the releases (default mosaikit/mosaikit)
+        #[arg(long)]
+        repo: Option<String>,
+        /// a folder with the files of a release (archive, SHA256SUMS, SHA256SUMS.sig, RELEASE-NOTES.md) instead of GitHub
+        #[arg(long)]
+        from_dir: Option<PathBuf>,
+        /// public key of the releases, or a file that holds it (default: MOSAIKIT_KIT_KEY, then trusted_key.txt of this kit)
+        #[arg(long)]
+        trusted_key: Option<String>,
+        /// accept a new major version or the breaking changes the release lists
+        #[arg(long)]
+        yes: bool,
+        /// the kit folder to update (default: the one this tool is in)
+        #[arg(long)]
+        kit: Option<PathBuf>,
+    },
     /// Starts the development server (developer profile) for a plugin folder, opens the browser and prints the test users
     Dev {
         #[arg(default_value = ".")]
@@ -270,6 +294,17 @@ fn run(cli: Cli) -> Result<ExitCode> {
             if !toolchain::all_good(&checks) {
                 return Ok(ExitCode::from(1));
             }
+        }
+        Cmd::SelfUpdate { check, version, repo, from_dir, trusted_key, yes, kit } => {
+            mosaikit_plugin_cli::update::self_update(&mosaikit_plugin_cli::update::Options {
+                check,
+                version,
+                repo,
+                from_dir,
+                trusted_key,
+                yes,
+                kit,
+            })?;
         }
         Cmd::Dev { dir, server, port, data, no_open, no_build, no_watch, fresh } => {
             mosaikit_plugin_cli::dev::dev(&mosaikit_plugin_cli::dev::Options {

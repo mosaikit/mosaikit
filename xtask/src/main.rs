@@ -5,6 +5,7 @@ mod clean;
 mod db;
 mod deploy_check;
 mod dev;
+mod devkit;
 mod dist;
 mod e2e;
 mod heavy;
@@ -231,6 +232,41 @@ enum ReleaseCmd {
         #[arg(long)]
         no_build: bool,
     },
+    /// The plugin dev kit: archive of this platform in dist/devkit (CLI, server where it exists, SDK, UI package, docs,
+    /// examples, licences, notes) with SHA256SUMS and signatures; signed with MOSAIKIT_SIGNING_KEY
+    Devkit {
+        /// folder for the archive (default dist/devkit)
+        #[arg(long)]
+        out: Option<PathBuf>,
+        /// use the executables already built in target/release
+        #[arg(long)]
+        skip_build: bool,
+        /// include mosaikit-server on a platform that does not include it by default
+        #[arg(long)]
+        with_server: bool,
+        /// add the API reference of the SDK (cargo doc)
+        #[arg(long)]
+        api_docs: bool,
+        /// sign with the development key when MOSAIKIT_SIGNING_KEY is missing (a local trial only)
+        #[arg(long)]
+        allow_dev_key: bool,
+    },
+    /// SHA256SUMS and its signature over the kit archives of every platform in a folder
+    DevkitSums {
+        dir: PathBuf,
+        #[arg(long)]
+        allow_dev_key: bool,
+    },
+    /// Release notes and compatibility table of the kit, generated from the manifests (no build)
+    DevkitNotes {
+        #[arg(long)]
+        out: PathBuf,
+    },
+    /// Third-party notices of the kit (cargo metadata, npm licences) and the cargo deny licence check
+    DevkitNotices {
+        #[arg(long)]
+        out: PathBuf,
+    },
     /// Kubernetes manifests only (kustomize) in dist/, without building the image
     K8s {
         /// image (default <image of the distribution>:<version>)
@@ -303,6 +339,12 @@ fn main() -> Result<()> {
             ReleaseCmd::Desktop { pg_dir, no_pg } => release::desktop(pg_dir, no_pg),
             ReleaseCmd::Docker { tag } => release::docker(tag),
             ReleaseCmd::DevkitDocker { tag, no_build } => release::devkit_docker(tag, !no_build),
+            ReleaseCmd::Devkit { out, skip_build, with_server, api_docs, allow_dev_key } => {
+                devkit::devkit(&devkit::Options { out, skip_build, with_server, api_docs, allow_dev_key })
+            }
+            ReleaseCmd::DevkitSums { dir, allow_dev_key } => devkit::sums_only(&dir, allow_dev_key),
+            ReleaseCmd::DevkitNotes { out } => devkit::notes_only(&out),
+            ReleaseCmd::DevkitNotices { out } => devkit::notices_only(&out),
             ReleaseCmd::K8s { tag } => release::k8s(tag),
             ReleaseCmd::All { pg_dir, no_pg } => release::all(pg_dir, no_pg),
         },

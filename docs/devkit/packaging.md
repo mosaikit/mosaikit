@@ -39,6 +39,8 @@ The key used by `pack` and `sign` is, in order: `--key <file>`, `MOSAIKIT_SIGNIN
 
 ## Trusted keys
 
+The procedure (make a key, trust it, revoke it) is in [Developer signing](signing.md).
+
 A server installs a package only if its signature verifies and the **public key is trusted**. The Administrator adds the
 publisher's public key (the one `keygen` printed) to the configuration:
 

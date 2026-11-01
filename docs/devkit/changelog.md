@@ -17,6 +17,13 @@ the plugin API also have a version of their own, with a changelog.
 | Package format `.mskp` | 3 | architecture §8.5 |
 | Manifest | v3 | [Manifest reference](manifest.md) |
 
+## Updating the kit
+
+`mosaikit-plugin self-update` brings an installed kit to the latest release (see [Releasing the kit](releasing.md)). Every
+release has release notes with a **Breaking changes** section (a `### Breaking changes` heading in the changelog of the
+component that breaks); `self-update` shows it and asks for `--yes` when it is not empty or the major version changes.
+Each release also carries `COMPATIBILITY.md`, generated from the manifests.
+
 ## Which versions work together
 
 | Plugin built for | Platform | SDK | UI package | Result |

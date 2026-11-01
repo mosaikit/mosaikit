@@ -353,7 +353,7 @@ will make it, with `bin/`, `sdk/`, `plugin-api/`; until the archives exist it sa
 the items of §8.11 that the three examples now use (`[search]`, the `set` actions of an extension) leave the experimental list, and the choice of
 the place where the kit documents are published for the site.
 
-### Phase 7 — Packaging, signing and distribution (4 days)
+### Phase 7 — Packaging, signing and distribution (4 days) — done 2026-11-01, except the real archive build and the workflow run
 
 - Build pipeline of the kit: archive per platform with the CLI, the desktop server, the Docker image tag, the
   packages of D1, the documents, the examples, `SHA256SUMS` and a signature of the archive.
@@ -364,6 +364,41 @@ the place where the kit documents are published for the site.
 - Update path: `mosaikit-plugin self-update` and a note in each kit release about breaking changes.
 
 Output: a reproducible release of the kit with one command.
+
+**Done (2026-11-01).** Owner decisions applied: the kit is published as GitHub Releases of `mosaikit/mosaikit`; the archives are signed
+with the key of the official packages (`MOSAIKIT_SIGNING_KEY`), with a signed `SHA256SUMS`; Windows, Linux and macOS, the server
+(`mosaikit-server`) only in the Windows archive (Linux and macOS: CLI and the Docker image tag `mosaikit-dev`); D1 as the unpacked `.crate`
+of the SDK (`sdk/`) and the unpacked `npm pack` tarball of `@mosaikit/plugin-api` (`plugin-api/`), with a private-registry publish path
+documented and nothing published.
+- `cargo xtask release devkit` (`xtask/src/devkit.rs`): CLI, server (Windows), `sdk/`, `plugin-api/`, `docs/devkit` (+ `docs/api/sdk` with
+  `--api-docs`), `examples/`, `docker/` (the compose folder of the Docker kit, image `ghcr.io/mosaikit/mosaikit-dev`), `LICENSE`,
+  `THIRD-PARTY-NOTICES.md`, `RELEASE-NOTES.md`, `COMPATIBILITY.md`, `trusted_key.txt`, `KIT.txt`; zip on Windows, tar.gz elsewhere; the
+  archive signature, `SHA256SUMS` and `SHA256SUMS.sig`. It refuses to sign without `MOSAIKIT_SIGNING_KEY` (`--allow-dev-key` for a trial).
+  Pieces on their own: `devkit-notes`, `devkit-notices`, `devkit-sums <dir>`.
+- `release.yml`: jobs `devkit` (matrix of the three platforms), `devkit-image` (the `-dev` tag of the image of the release) and `devkit-release`
+  (signs the sums over every archive and publishes the GitHub Release with the generated notes). Not run, not pushed.
+- Release notes and compatibility table generated from the manifests and changelogs (a `### Breaking changes` heading in a changelog feeds the
+  «Breaking changes» section, "None." when empty); third-party notices from `cargo metadata` and the npm licence texts, with `cargo deny check licenses`
+  (it passes on this tree).
+- `mosaikit-plugin self-update` (`crates/plugin-cli/src/update.rs`): signature of the sums against the trusted key of the installed kit, hash,
+  breaking-changes note, `--yes` for a major version or breaking changes, `--check`, `--from-dir`; replaces `bin/` (the running tool is renamed `.old`).
+- `mosaikit-mskp` and `mosaikit-sql-guard` ready for `cargo install` of the CLI: metadata, README, CHANGELOG, a version on the path dependencies;
+  the other crates are `publish = false`.
+- Documents: `docs/devkit/signing.md` (keygen, an Administrator adds a publisher key, revocation; Italian in `it/signing.md`),
+  `docs/devkit/releasing.md` (release, checking a download, update, `cargo install`, private registry; English only), install section of Getting started.
+- Manual checks DK-21 to DK-26 with their Playwright twins in `tests/manual/checks/dk.ts`.
+
+**Checked:** `cargo check`/tests of `xtask` and `mosaikit-plugin-cli` (unit tests of the signature and hash checks, the breaking-changes parser, the kit
+replacement, the notes, the compatibility table, the crates list and the sums: all pass); DK-22 to DK-26 run (self-update against a kit made on the
+spot, signed with a key made on the spot: key mismatch and tampered archive refused, kit untouched; `devkit-notes`, `devkit-notices` with
+`cargo deny`; `cargo package --list`); `node catalog.mjs` finds DK-21..26 in the document and the checks.
+
+Left, not verified here (disk and the rule of no release build): **the real archive build** on each platform (`cargo xtask release devkit`: the
+`cargo package` of the SDK, `npm pack`, the release build of the server and the zip/tar.gz were written but not run), **the workflow**
+(never run), **the download from GitHub** by `self-update`, `cargo install` from a registry, the TypeDoc reference of `ui/plugin-api` (only `cargo doc`
+is wired). For the owner: the public key of the official packages must reach the first kit (it is written into `trusted_key.txt` at build time:
+a developer downloading the very first kit trusts the GitHub Release; publish the key on the site too), and the Italian Getting started
+still has the old install text.
 
 ### Phase 8 — Pilot with an outside developer (5 days, mostly waiting)
 

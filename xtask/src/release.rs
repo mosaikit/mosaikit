@@ -257,7 +257,7 @@ pub fn desktop(pg_dir: Option<PathBuf>, no_pg: bool) -> Result<()> {
     Ok(())
 }
 
-fn zip_dir(dir: &Path, prefix: &str, dest: &Path) -> Result<()> {
+pub(crate) fn zip_dir(dir: &Path, prefix: &str, dest: &Path) -> Result<()> {
     eprintln!("creating {}", dest.display());
     let f = std::fs::File::create(dest)?;
     let mut w = zip::ZipWriter::new(f);
