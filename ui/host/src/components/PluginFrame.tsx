@@ -3,6 +3,7 @@ import { checkPluginApi, errorReply, execute, OpError, routeOp, safePage, SHELL_
 import type { PluginView, Session, TenantContext } from '../types.ts'
 import { useUi } from '../ui-context.ts'
 import { t } from '../app/i18n.ts'
+import { timed } from '../app/devlog.ts'
 import ExtensionTab, { type TabState } from './ExtensionTab.tsx'
 
 const IDENT = /^[a-z][a-z0-9_]{0,47}$/
@@ -170,7 +171,11 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
             return
           }
           default:
-            reply({ ok: await execute(routeOp(tenant, plugin.id, m.op, m.args)) })
+            // in the developer profile the call is timed for the developer tools (devlog.ts); otherwise it is just made
+            {
+              const op = m.op
+              reply({ ok: await timed(plugin.id, op, () => execute(routeOp(tenant, plugin.id, op, m.args))) })
+            }
         }
       } catch (e) {
         // a plugin built for a newer API than the shell speaks: the person is told (the plugin may also react)

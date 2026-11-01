@@ -170,7 +170,8 @@ pub async fn bootstrap(k: &Kernel) -> Result<()> {
             .await?;
         }
         tx.commit().await?;
-        if generated {
+        // the developer profile prints its own accounts (devprofile::announce)
+        if generated && !k.cfg.developer_profile {
             notes.push(format!(
                 "Administration (link \"Administrator access\", address of the app + #/admin)\n\
                  username: admin\npassword: {password}\n"
@@ -446,6 +447,12 @@ async fn finish_login(k: &Kernel, user_id: Uuid, ip: &str) -> Result<LoginResult
 
 /// Opens the session with the length of the home tenant of the user (the platform's for the
 /// Administrators): hours of a session, or days of "remember me" if asked and allowed.
+/// A session for a user without the password: the switch of test users of the developer profile (the
+/// caller, `devprofile::session_for`, checks that the profile is on).
+pub(crate) async fn dev_session(k: &Kernel, user_id: Uuid, ip: &str) -> Result<LoginResult> {
+    finish_session(k, user_id, ip, false).await
+}
+
 async fn finish_session(k: &Kernel, user_id: Uuid, ip: &str, remember: bool) -> Result<LoginResult> {
     let home: Uuid = mosaikit_db::query_scalar("select home_tenant_id from core.users where id = $1")
         .bind(user_id)

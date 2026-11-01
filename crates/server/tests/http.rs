@@ -2243,3 +2243,76 @@ async fn administrator_changes_own_email_over_http() {
         .await;
     assert_eq!(r.json()["code"], "email_required");
 }
+
+// ------------------------------------------------------------------ developer profile
+
+#[tokio::test]
+async fn a_default_server_has_no_developer_routes_and_no_banner() {
+    let a = App::new().await;
+    let r = a.call(None, Method::GET, "/api/health", None).await;
+    assert_eq!(r.status, StatusCode::OK);
+    assert!(r.json().get("developer").is_none(), "{}", r.text());
+    for (m, path) in [
+        (Method::GET, "/api/dev/info"),
+        (Method::POST, "/api/dev/switch-user"),
+        (Method::POST, "/api/dev/plugins/com.example.x/reset"),
+        (Method::GET, "/api/dev/plugins/com.example.x/manifest"),
+    ] {
+        let r = a.call(None, m, path, Some(json!({ "username": "alice" }))).await;
+        assert_eq!(r.status, StatusCode::NOT_FOUND, "{path}");
+    }
+    let admin = a.admin().await;
+    let r = a.call(Some(&admin), Method::GET, "/api/session", None).await;
+    assert_eq!(r.json()["developer"], false);
+    // a signed-in Administrator does not get them either
+    let r = a
+        .call(Some(&admin), Method::POST, "/api/dev/switch-user", Some(json!({ "username": "alice" })))
+        .await;
+    assert_eq!(r.status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn the_developer_profile_lists_its_users_and_switches_between_them() {
+    let a = App::with(start_with(|c| c.developer_profile = true).await);
+    let r = a.call(None, Method::GET, "/api/health", None).await;
+    assert_eq!(r.json()["developer"], true);
+    let info = a.call(None, Method::GET, "/api/dev/info", None).await.json();
+    assert_eq!(info["tenant"], "dev");
+    assert_eq!(info["password"], "mosaikit-dev");
+    let names: Vec<&str> =
+        info["users"].as_array().unwrap().iter().map(|u| u["username"].as_str().unwrap()).collect();
+    assert_eq!(names, ["admin", "manager", "alice", "bob"]);
+    // the switch needs a session, and goes to the four test users only
+    let r = a.call(None, Method::POST, "/api/dev/switch-user", Some(json!({ "username": "bob" }))).await;
+    assert_eq!(r.status, StatusCode::UNAUTHORIZED);
+    let alice = a.login("dev", "alice", "mosaikit-dev").await;
+    let r = a
+        .call(Some(&alice), Method::POST, "/api/dev/switch-user", Some(json!({ "username": "mallory" })))
+        .await;
+    assert_eq!(r.status, StatusCode::NOT_FOUND);
+    let r =
+        a.call(Some(&alice), Method::POST, "/api/dev/switch-user", Some(json!({ "username": "bob" }))).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    assert_eq!(r.json()["user"]["username"], "bob");
+    let bob = Session {
+        cookie: r.header(header::SET_COOKIE).split(';').next().unwrap().to_string(),
+        csrf: r.json()["csrf"].as_str().unwrap().to_string(),
+    };
+    // the old session is closed, the new one works; a User may become the Administrator (a test tenant)
+    assert_eq!(
+        a.call(Some(&alice), Method::GET, "/api/session", None).await.status,
+        StatusCode::UNAUTHORIZED
+    );
+    let r =
+        a.call(Some(&bob), Method::POST, "/api/dev/switch-user", Some(json!({ "username": "admin" }))).await;
+    assert_eq!(r.json()["user"]["is_system_admin"], true);
+    let root = Session {
+        cookie: r.header(header::SET_COOKIE).split(';').next().unwrap().to_string(),
+        csrf: r.json()["csrf"].as_str().unwrap().to_string(),
+    };
+    // a plugin that is not loaded from a folder cannot be reset; the manifest of an unknown one is 404
+    let r = a.call(Some(&root), Method::GET, "/api/dev/plugins/com.example.x/manifest", None).await;
+    assert_eq!(r.status, StatusCode::NOT_FOUND);
+    let r = a.call(Some(&root), Method::POST, "/api/dev/plugins/com.example.x/reset", None).await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST);
+}

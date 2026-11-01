@@ -222,7 +222,7 @@ workspaces) only for building everything at once; (3) change the CI of `mosaikit
 `cargo xtask plugin build`/`mosaikit-plugin test` outside the monorepo. Until then the official plugins build as before, and the
 standalone path is proved by the kit test above.
 
-### Phase 4 — Development servers (7 days)
+### Phase 4 — Development servers (7 days) — done 2026-11-01, except the real run of the Docker kit and the release of the archives
 
 - **Desktop kit** (SQLite): reduced archive of the existing desktop release with a *developer profile*:
   - tenant `dev`, an Administrator, a Tenant Manager and two Users with known development passwords;
@@ -238,6 +238,43 @@ standalone path is proved by the kit test above.
 - Tests: e2e that starts the kit, installs the example plugin from a folder and changes a file (hot reload).
 
 Output: a developer runs one command and sees the plugin in a real Mosaikit within a minute.
+
+Delivered (2026-11-01):
+
+- **The developer profile** is one switch of the server, `developer_profile = true` (`MOSAIKIT_DEVELOPER_PROFILE=1`), read from the file or the
+  environment at start: no tenant, plugin or API call can turn it on, and with it off nothing changes (a test proves that a default start has
+  no test tenant, no test users, no switch of users, no `/api/dev/*` route and refuses unsigned packages). It brings: the folders of `[dev] plugins`
+  loaded with hot reload (manifest, migrations, `ui/dist`, the `.wasm` of the folder's own `target/`), unsigned packages, `plugin_url` on
+  `http://*.localhost:<port+1>` (one origin per plugin, as in production), no second factor, the tenant `dev` with `admin`, `manager`, `alice` and
+  `bob` (password `mosaikit-dev`), and sample content (a group, welcome notifications, Log entries and, when a plugin declares a resource, one item
+  shared with Bob). Code: `Config::developer_guard`, `crates/kernel/src/devprofile.rs`, `crates/server/src/dev_api.rs`; text in architecture §8.12.
+- **Guards.** The profile refuses to start, naming the reasons, when `listen`/`plugin_listen` are not loopback, `url`/`plugin_url` are not addresses
+  of this computer, `database.url` is on another host or `trust_proxy` is on; the seed refuses a database that has a tenant besides `dev`. One flag
+  lifts them, `developer_profile_allow_remote` (the Docker kit sets it). While on: a log warning and a line on the standard error, `developer: true`
+  in `/api/health` and the session, and a banner in the shell (also on the sign-in page) that cannot be closed.
+- **`mosaikit-plugin dev [dir]`** (`crates/plugin-cli/src/dev.rs`): builds, writes the configuration in `.mosaikit-dev/`, starts the server, waits for
+  `/api/health`, opens the browser and prints the addresses and the test users; rebuilds the logic or the UI when their sources change
+  (`--no-watch`, `--no-build`, `--port`, `--data`, `--no-open`, `--fresh`). The server comes from `--server`, `MOSAIKIT_SERVER_BIN` or next to the tool;
+  otherwise it stops with a message that says so. It removes from the environment what could lift the guards (`DATABASE_URL`, the allow flag, ...).
+- **Docker kit.** `cargo xtask release devkit-docker [--tag] [--no-build]` builds the image `mosaikit-dev:<version>` (the same image, through the
+  existing `build_image`) and writes `dist/mosaikit-dev-<version>-docker` from `deploy/compose.devkit.yml` (PostgreSQL, the profile on, the plugin
+  folder as a volume, ports on `127.0.0.1` only), `deploy/README.devkit.md` and `initdb`. Static tests check the compose file and the generated folder.
+- **Developer tools** in the shell (`DevTools.tsx`, drawn only while the server says `developer`): manifest as the server reads it, host calls with
+  timings and errors (`devlog.ts`, recorded only while the profile is on), permissions of the signed-in user, switch between the four users (a session
+  without a password), reset of the data of a plugin (`plugins::wipe` and a new load from the folder; the tenants keep it on), and a prompt before a
+  changed migration is run again from the first one. Empty states as `docs/refactoring-ui.md` asks; texts in English, Italian and, in `mosaikit-plugins`,
+  Spanish.
+- **Findings along the way.** A standalone plugin folder is its own Cargo workspace: the server now looks for the logic in `<folder>/target` too (it only
+  searched the ancestors). The main thread of a debug build on Windows (1 MB) overflowed while starting with a plugin in development: `mosaikit-server` now
+  runs on a thread with a large stack, and the sample content is boxed.
+- **Tests.** Kernel `tests/developer_profile.rs` (6, on PostgreSQL and SQLite), server `tests/http.rs` (2 new), `devlog.test.ts`, plugin-cli unit and CLI
+  tests, xtask `deploy_check` (2 new), the e2e spec `18-developer-profile.spec.ts` (5 tests: banner and users, hot reload of UI and manifest, host calls,
+  permissions and switch of users, changed migration and reset, empty state). Manual checks `DK-12..16` (DK-06 changed).
+
+Left: **the real run of the Docker kit** (image build and `docker compose up`, not done here: the build takes many minutes and the disk was full; only the
+generated files and `docker compose config` are checked), **the desktop archive of the kit** with `mosaikit-server` next to `mosaikit-plugin` (phase 7), the
+reload of files through a bind mount from Windows/macOS into the container (file events may not arrive; the README says to restart the app or use
+the desktop kit), and rebuilding the plugin inside the container (the logic and the UI are built on the host).
 
 ### Phase 5 — Tests and conformance (5 days)
 

@@ -10,6 +10,7 @@ import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { Button } from '@/components/ui/button'
 import { useSession, useTenantCtx } from './core.ts'
+import DevShell from './DevTools.tsx'
 import { setLanguageContext, useLang, t } from './i18n.ts'
 import { useFavicon } from './mark.ts'
 import { UiServices } from './services.tsx'
@@ -188,6 +189,7 @@ export default function App() {
   return (
     <UiServices>
       <TooltipProvider delayDuration={300}>
+        <DevShell session={s ?? undefined} route={route}>
         {route.area === 'reset' ? (
           // the page of a link to choose a new password works with or without a session
           <ResetPage token={route.token} />
@@ -200,6 +202,7 @@ export default function App() {
             <Page session={s} route={route} />
           </Shell>
         )}
+        </DevShell>
       </TooltipProvider>
       <Toaster richColors closeButton position="bottom-right" containerAriaLabel={t('Notifications')} />
     </UiServices>

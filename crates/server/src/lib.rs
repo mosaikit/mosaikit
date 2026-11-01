@@ -8,6 +8,7 @@
 pub mod admin;
 pub(crate) mod api;
 mod auth;
+mod dev_api;
 pub mod fake_idp;
 mod history_api;
 mod oidc_api;
@@ -165,8 +166,12 @@ async fn maintenance_gate(
 pub fn app_router(k: Arc<Kernel>) -> Router {
     let base = k.cfg.base_path.clone();
     let state = AppState { k };
-    let r = api::router()
-        .merge(oidc_api::router())
+    let mut r = api::router().merge(oidc_api::router());
+    // the routes of the developer profile exist only while it is on: a normal server has none of them
+    if state.k.cfg.developer_profile {
+        r = r.merge(dev_api::router());
+    }
+    let r = r
         .merge(ui::router())
         .layer(axum::middleware::from_fn_with_state(state.clone(), request_info))
         .layer(axum::middleware::from_fn_with_state(state.clone(), measure))

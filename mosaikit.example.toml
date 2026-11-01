@@ -49,6 +49,17 @@ url = "http://127.0.0.1:8080/mosaikit"
 # Env: MOSAIKIT_ALLOW_UNSIGNED
 # allow_unsigned = false
 
+# Developer profile, for a plugin developer's own computer (docs/architecture.md §8.12, `mosaikit-plugin dev`). It seeds the
+# tenant `dev` with four test accounts (admin, manager, alice, bob; password mosaikit-dev), loads the folders of
+# [dev] plugins with hot reload, accepts unsigned packages, serves every plugin UI on <plugin>.localhost and shows a
+# banner and the developer tools in the shell. Never the default, never for real data: it refuses to start with a
+# non-loopback listen address, a database on another host, trust_proxy, or a database that has other tenants.
+# Env: MOSAIKIT_DEVELOPER_PROFILE
+# developer_profile = false
+# Lifts those guards (the Docker development kit, whose ports are published on 127.0.0.1 only). Never in production.
+# Env: MOSAIKIT_DEVELOPER_PROFILE_ALLOW_REMOTE
+# developer_profile_allow_remote = false
+
 # Private destinations that plugins may call with http.fetch: exact "host:port" entries (no wildcards,
 # no ranges). Only for a plugin whose manifest lists that origin in its network permission. A malformed
 # entry stops the start. Not needed for public services.

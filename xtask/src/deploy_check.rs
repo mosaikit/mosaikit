@@ -160,4 +160,79 @@ mod tests {
                 && read("nginx/templates/proxy.inc.template").contains("proxy_read_timeout")
         );
     }
+
+    /// The Docker development kit: the developer profile in a container that listens on every interface of its
+    /// own network, published on the loopback of the host only (docs/architecture.md, the developer profile).
+    #[test]
+    fn devkit_compose_is_the_developer_profile_on_loopback_only() {
+        let c = read("compose.devkit.yml");
+        for (n, line) in c.lines().enumerate() {
+            assert!(!line.contains('\t'), "compose.devkit.yml:{}: tab", n + 1);
+        }
+        for must in [
+            "MOSAIKIT_DEVELOPER_PROFILE: \"1\"",
+            "MOSAIKIT_DEVELOPER_PROFILE_ALLOW_REMOTE: \"1\"",
+            "MOSAIKIT_DEV_PLUGINS: /plugin",
+            "http://*.localhost:",
+            "mosaikit_app:",
+            "/plugin",
+        ] {
+            assert!(c.contains(must), "compose.devkit.yml lacks {must}");
+        }
+        // every published port is bound to 127.0.0.1, and the database is not published at all
+        let ports: Vec<&str> =
+            c.lines().map(str::trim).filter(|l| l.starts_with("- \"") && l.contains(":8")).collect();
+        assert_eq!(ports.len(), 2, "{ports:?}");
+        for p in ports {
+            assert!(p.starts_with("- \"127.0.0.1:"), "port not on loopback: {p}");
+        }
+        let db: String = c
+            .lines()
+            .skip_while(|l| !l.starts_with("  db:"))
+            .take_while(|l| !l.starts_with("  app:"))
+            .collect();
+        assert!(!db.contains("ports:"), "the database must not be published");
+        // no reverse proxy, no trust of forwarded headers, no production flags
+        assert!(!c.contains("MOSAIKIT_TRUST_PROXY") && !c.contains("profiles:"));
+        // the volumes it uses are declared, the init folder exists
+        for v in ["pgdata", "appdata"] {
+            assert!(c.contains(&format!("  {v}:")), "volume {v} not declared");
+        }
+        assert!(deploy().join("initdb").is_dir());
+        // the README documents every variable of the file
+        let readme = read("README.devkit.md");
+        for v in vars(&c) {
+            assert!(
+                readme.contains(&v) || v.starts_with("MOSAIKIT_DB_PASSWORD") || v == "POSTGRES_PASSWORD",
+                "{v} not in README.devkit.md"
+            );
+        }
+    }
+
+    /// The folder of the kit is written without Docker: compose, initdb, `.env`, README and an empty plugin folder.
+    #[test]
+    fn devkit_folder_is_generated_without_docker() {
+        // temporary work goes under MOSAIKIT_TEMP when it is set (CLAUDE.md)
+        let base = std::env::var_os("MOSAIKIT_TEMP").map(PathBuf::from).unwrap_or_else(std::env::temp_dir);
+        let tmp = base.join(format!("devkit-folder-test-{}", std::process::id()));
+        let out =
+            crate::release::devkit_folder(&tmp.join("kit"), "mosaikit-dev", "1.2.3", "postgres:17-alpine")
+                .unwrap();
+        for f in ["compose.yml", ".env", "README.md", "initdb", "plugin/.gitkeep"] {
+            assert!(out.join(f).exists(), "{f}");
+        }
+        let env = std::fs::read_to_string(out.join(".env")).unwrap();
+        assert!(
+            env.contains("MOSAIKIT_DEV_IMAGE=mosaikit-dev") && env.contains("MOSAIKIT_VERSION=1.2.3"),
+            "{env}"
+        );
+        let readme = std::fs::read_to_string(out.join("README.md")).unwrap();
+        assert!(
+            !readme.contains("{{") && readme.contains("mosaikit-dev-1.2.3-image.tar"),
+            "placeholders left"
+        );
+        // the compose file of the folder is the one of deploy/
+        assert_eq!(std::fs::read_to_string(out.join("compose.yml")).unwrap(), read("compose.devkit.yml"));
+        let _ = std::fs::remove_dir_all(&tmp);
+    }
 }

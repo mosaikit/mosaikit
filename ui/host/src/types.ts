@@ -36,6 +36,8 @@ export interface Session {
   plugin_url?: string
   public_origin: string
   dev: boolean
+  /** the server runs the developer profile (banner and developer tools) */
+  developer?: boolean
   /** top bar of the shell, decided by the Administrator (recent servers) */
   band?: ShellBand
   /** theme of the platform, chosen by the Administrator (recent servers) */

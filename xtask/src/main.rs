@@ -222,6 +222,15 @@ enum ReleaseCmd {
         #[arg(long)]
         tag: Option<String>,
     },
+    /// Docker development kit: the image mosaikit-dev:<version> and dist/mosaikit-dev-<version>-docker (compose, PostgreSQL)
+    DevkitDocker {
+        /// image (default mosaikit-dev:<version>)
+        #[arg(long)]
+        tag: Option<String>,
+        /// write the folder only, do not build the image
+        #[arg(long)]
+        no_build: bool,
+    },
     /// Kubernetes manifests only (kustomize) in dist/, without building the image
     K8s {
         /// image (default <image of the distribution>:<version>)
@@ -293,6 +302,7 @@ fn main() -> Result<()> {
             ReleaseCmd::Bundle { out, skip_ui, flavor } => release::bundle(&out, skip_ui, flavor),
             ReleaseCmd::Desktop { pg_dir, no_pg } => release::desktop(pg_dir, no_pg),
             ReleaseCmd::Docker { tag } => release::docker(tag),
+            ReleaseCmd::DevkitDocker { tag, no_build } => release::devkit_docker(tag, !no_build),
             ReleaseCmd::K8s { tag } => release::k8s(tag),
             ReleaseCmd::All { pg_dir, no_pg } => release::all(pg_dir, no_pg),
         },

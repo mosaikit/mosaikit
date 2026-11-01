@@ -223,7 +223,9 @@ impl Instance {
                     format!("http://127.0.0.1:{}", self.port + 1)
                 },
             )
-            .env("E2E_IDP_URL", format!("http://127.0.0.1:{}", self.idp_port));
+            .env("E2E_IDP_URL", format!("http://127.0.0.1:{}", self.idp_port))
+            // the spec of the developer profile starts a server of its own
+            .env("E2E_SERVER_BIN", plugins::target_dir().join("debug").join(exe("mosaikit-server")));
     }
 
     pub(crate) fn stop(&mut self, failed: bool) {

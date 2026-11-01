@@ -9,6 +9,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { MaintenanceBanner } from './pages/operations.tsx'
+import { DevBanner } from './DevTools.tsx'
 import { useBrand } from '../brand.ts'
 import type { Session, ShellBand } from '../types.ts'
 import {
@@ -219,6 +220,7 @@ function RailFrame({ session, route, band, bandImage, children }: { session: Ses
       <AppSidebar session={session} route={route} band={band} />
       <SidebarInset className="min-w-0">
         <TopBar session={session} route={route} band={band} bandImage={bandImage} />
+        <DevBanner session={session} route={route} />
         <MaintenanceBanner admin={session.user.is_system_admin} />
         <div id="main" tabIndex={-1} data-tour="content" className="msk-main flex min-h-0 flex-1 flex-col outline-none">
           {children}

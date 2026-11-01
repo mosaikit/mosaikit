@@ -77,10 +77,33 @@ fn doctor_dev_and_install_say_what_they_do() {
     let o = tool(d.path(), &["doctor"]);
     let out = String::from_utf8_lossy(&o.stdout);
     assert!(out.contains("rustc") && out.contains("wasm32 target") && out.contains("node"), "{out}");
-    // `dev` is announced for phase 4 and exits with 2
-    let o = tool(d.path(), &["dev"]);
-    assert_eq!(o.status.code(), Some(2));
-    assert!(String::from_utf8_lossy(&o.stderr).contains("phase 4"));
+    // `dev` without a server executable says where to get it and exits with 1; it builds nothing first
+    let o = Command::new(env!("CARGO_BIN_EXE_mosaikit-plugin"))
+        .current_dir(d.path())
+        .args(["new", "devdemo", "--no-logic", "--no-ui"])
+        .output()
+        .unwrap();
+    assert!(o.status.success());
+    // the tool is copied to an empty folder: in a build folder of Cargo the server stands next to it
+    let alone =
+        d.path().join("alone").join(if cfg!(windows) { "mosaikit-plugin.exe" } else { "mosaikit-plugin" });
+    std::fs::create_dir_all(alone.parent().unwrap()).unwrap();
+    std::fs::copy(env!("CARGO_BIN_EXE_mosaikit-plugin"), &alone).unwrap();
+    let o = Command::new(&alone)
+        .current_dir(d.path().join("devdemo"))
+        .args(["dev", "--no-open"])
+        .env_remove("MOSAIKIT_SERVER_BIN")
+        .output()
+        .unwrap();
+    assert_eq!(o.status.code(), Some(1));
+    let err = String::from_utf8_lossy(&o.stderr);
+    assert!(err.contains("--server") && err.contains("MOSAIKIT_SERVER_BIN"), "{err}");
+    let o = Command::new(env!("CARGO_BIN_EXE_mosaikit-plugin"))
+        .current_dir(d.path().join("devdemo"))
+        .args(["dev", "--server", "nowhere/mosaikit-server"])
+        .output()
+        .unwrap();
+    assert!(String::from_utf8_lossy(&o.stderr).contains("does not exist"));
     // install needs a package and an Administrator before it sends anything
     let o = tool(d.path(), &["install", "nothing.mskp", "--server", "http://127.0.0.1:9"]);
     assert!(!o.status.success());

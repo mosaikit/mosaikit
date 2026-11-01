@@ -14,7 +14,7 @@ mosaikit-plugin validate [dir|file.mskp]     manifest, migrations (SQL allow-lis
 mosaikit-plugin keygen --out publisher.key   a signing key pair (the public key goes in the server's trusted_keys)
 mosaikit-plugin sign file.mskp --key k       sign a package again with another key
 mosaikit-plugin install file.mskp --server <url> --user admin --password ... [--totp code]
-mosaikit-plugin dev                          arrives with phase 4 (the bundled development server)
+mosaikit-plugin dev [dir] [--server path]    the development server (developer profile) for the folder: builds, starts, opens the browser
 ```
 
 **Variants and examples.** `new --variant app|ui|service|extension|language|layout` (`app` is the default; a
@@ -37,6 +37,22 @@ development key that the tool makes once in the configuration folder of the user
 account has one) and uploads the package the way Plugins › Install from a file does. Give the address with its base
 path (`http://localhost:8080/mosaikit`). The user and the password can come from `MOSAIKIT_ADMIN_USER` and
 `MOSAIKIT_ADMIN_PASSWORD`.
+
+**`dev`** starts the server of the kit in the **developer profile** for the plugin folder and keeps the builds going. It builds the
+logic (debug) and the UI, writes a configuration in `.mosaikit-dev/` of the folder (loopback ports, a SQLite database, the profile
+on), starts `mosaikit-server`, waits until it answers, opens the browser on the plugin and prints the addresses and the test
+users (`admin`, `manager`, `alice`, `bob`, password `mosaikit-dev`; the three of the tenant `dev`, and the Administrator at
+`#/admin`). The server reloads the manifest, the migrations, the UI and the logic when they change; the tool rebuilds the logic
+or the UI when their sources change (`--no-watch` stops that, `--no-build` skips the builds). The banner of the shell says the profile is on, and
+**Developer tools** shows the manifest as the server reads it, the host calls with their timings and errors, the permissions, the
+switch of users and the reset of the data of the plugin. Options: `--port` (default the first free pair from 8080; the plugins
+use the next port), `--data`, `--no-open`, `--fresh` (new database, tenant and users).
+
+The server executable comes from `--server <path>`, else the variable `MOSAIKIT_SERVER_BIN`, else the file `mosaikit-server` next
+to this tool (the kit puts them together); otherwise `dev` stops and says so. The profile refuses to run where somebody else
+could reach it (another address than loopback, a database on another host, a reverse proxy): the tool never sets the flag that
+lifts those guards and removes the variables of the environment that could (`MOSAIKIT_DEVELOPER_PROFILE_ALLOW_REMOTE`,
+`DATABASE_URL`, `MOSAIKIT_URL`, ...). The Docker kit (`mosaikit-dev`, with PostgreSQL) is for the check against the real database.
 
 `cargo xtask plugin new|build|pack|keygen` of the `mosaikit` repository call the same code (the `mosaikit_plugin_cli`
 library) for the plugins of a distribution.

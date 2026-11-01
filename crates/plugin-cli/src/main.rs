@@ -121,8 +121,32 @@ enum Cmd {
         #[arg(long)]
         fix: bool,
     },
-    /// Development server with hot reload (arrives with phase 4 of the dev kit)
-    Dev,
+    /// Starts the development server (developer profile) for a plugin folder, opens the browser and prints the test users
+    Dev {
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        /// the `mosaikit-server` executable of the kit (default: MOSAIKIT_SERVER_BIN, then next to this tool)
+        #[arg(long, env = "MOSAIKIT_SERVER_BIN")]
+        server: Option<PathBuf>,
+        /// port of the app; the plugins use the next one (default: the first free pair from 8080)
+        #[arg(long)]
+        port: Option<u16>,
+        /// data folder of the server (default: .mosaikit-dev in the plugin folder)
+        #[arg(long)]
+        data: Option<PathBuf>,
+        /// do not open the browser
+        #[arg(long)]
+        no_open: bool,
+        /// do not build the logic and the UI (the server still reloads what is already built)
+        #[arg(long)]
+        no_build: bool,
+        /// build once, then do not rebuild when the sources change
+        #[arg(long)]
+        no_watch: bool,
+        /// start from an empty database: the test tenant, the test users and the sample content again
+        #[arg(long)]
+        fresh: bool,
+    },
 }
 
 fn parse_variant(s: &str) -> Result<scaffold::Variant, String> {
@@ -242,10 +266,17 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 return Ok(ExitCode::from(1));
             }
         }
-        Cmd::Dev => {
-            eprintln!("`dev` arrives with phase 4 of the dev kit (docs/plugin-devkit-plan.md): the bundled development server.");
-            eprintln!("Until then: mosaikit-plugin build --release, mosaikit-plugin pack and mosaikit-plugin install --server <url>.");
-            return Ok(ExitCode::from(2));
+        Cmd::Dev { dir, server, port, data, no_open, no_build, no_watch, fresh } => {
+            mosaikit_plugin_cli::dev::dev(&mosaikit_plugin_cli::dev::Options {
+                dir,
+                server,
+                port,
+                data,
+                no_open,
+                no_build,
+                no_watch,
+                fresh,
+            })?;
         }
     }
     Ok(ExitCode::SUCCESS)

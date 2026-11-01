@@ -27,6 +27,7 @@ development and release. The choices described here replace the initial PoC
    - [8.8 Plugins in the tenants](#88-plugins-in-the-tenants)
    - [8.9 Extensions](#89-extensions)
    - [8.10 Settings, updates, uninstall](#810-settings-updates-uninstall)
+   - [8.12 The developer profile](#812-the-developer-profile)
 9. [Web security: origins, cookies, CSP](#9-web-security-origins-cookies-csp)
 10. [Configuration and data dir](#10-configuration-and-data-dir)
    - [10.1 Backup and restore](#101-backup-and-restore)
@@ -1422,6 +1423,54 @@ promise it will stay as it is until a sample (or a template of the dev kit) uses
 `CrudOptions.panel`, `Resources::create` and `Resources::delete` of the SDK. A change to one of them is announced in
 the changelog of the package, with the deprecation rule applied when a distribution relies on it.
 
+### 8.12 The developer profile
+
+A server started for a plugin developer (the development kit, `docs/plugin-devkit-plan.md`, phase 4). It is one switch,
+`developer_profile = true` in `mosaikit.toml` (environment `MOSAIKIT_DEVELOPER_PROFILE=1`), **never the default** and never
+reachable from a tenant, a plugin or the API: it is read once at start, from the file or the environment of whoever starts
+the process, and not stored in any setting.
+
+**What it switches on** (`Config::derive`, `crates/kernel/src/devprofile.rs`):
+
+| What | Effect |
+|---|---|
+| plugin folders | the folders of `[dev] plugins` (or `MOSAIKIT_DEV_PLUGINS`) are loaded as plugins in development: no package, hot reload of the manifest, the migrations, the UI (`ui/dist`) and the logic (the `.wasm` of the folder's own `target/`, or of its workspace) |
+| unsigned packages | `allow_unsigned = true`, so a package made by `mosaikit-plugin pack` with a throwaway key installs |
+| plugin origin | `plugin_url` defaults to `http://*.localhost:<port+1>`: every plugin UI keeps its own origin (§9), which the browser resolves to this computer |
+| second factor | `admin_totp = false` |
+| accounts | the tenant `dev` and the accounts `admin` (Administrator), `manager` (Tenant Manager), `alice` and `bob` (Users), all with the password `mosaikit-dev`, made once with the tenant |
+| sample content | a group, a welcome notification for Alice and Bob, entries in the Log and, when a plugin in development declares a resource, one item of it shared with Bob |
+| API | `/api/dev/info` (the accounts, public), `/api/dev/plugins/{id}/manifest`, `/api/dev/plugins/{id}/reset`, `/api/dev/switch-user`; the routes are added to the router only while the profile is on, so a normal server answers 404 |
+| shell | a banner that cannot be closed, and the **Developer tools** (§ below) |
+
+**Guards.** The profile has known passwords and no signature check, so `Config::developer_guard` makes it refuse to start (the
+message names every reason) when any of these holds: `listen` or `plugin_listen` is not a loopback address; `url` or `plugin_url`
+is not an address of this computer (`localhost`, `*.localhost`, `127.x`, `::1`); `database.url` points to another host;
+`trust_proxy` is on. After the database is open the seed refuses a database that has a tenant besides `dev` (it may hold real
+data). A single explicit flag lifts the guards, `developer_profile_allow_remote = true`
+(`MOSAIKIT_DEVELOPER_PROFILE_ALLOW_REMOTE=1`): the Docker kit needs it, because the container listens on every interface of its
+own network and the database is another container; its compose file publishes the ports on `127.0.0.1` only. While the
+profile is on the server writes a warning to its log and to the standard error at start, `/api/health` and the session carry
+`developer: true`, and the shell shows the banner before and after sign-in. With the profile off nothing changes: signatures,
+origins, CSP, second factor and routes are those of §9; a test (`crates/kernel/tests/developer_profile.rs`, and
+`crates/server/tests/http.rs`) proves that a default start has no test tenant, no test users, no switch of users and refuses
+unsigned packages.
+
+**Developer tools** (`ui/host/src/app/DevTools.tsx`, drawn only when `/api/health` says `developer`): a panel with the
+manifest as the server reads it (it follows the file), the host calls of the plugin with their time and their errors (recorded
+by the bridge only while the profile is on, `devlog.ts`), the permissions of the signed-in user on the plugin, the switch between
+the four test users (a session without a password: `identity::dev_session`) and a button that deletes the data of the plugin and
+runs its migrations again (`plugins::wipe`, then the plugin is loaded again from its folder; the tenants keep it on). A migration
+that changed after it ran is refused at reload with a clear message; the shell then asks, once, whether to delete the data of
+the plugin and run the migrations again from the first one.
+
+**The two kits.** The desktop kit is `mosaikit-plugin dev` (`crates/plugin-cli/src/dev.rs`): it writes a configuration for the
+plugin folder (loopback ports, SQLite in `.mosaikit-dev/`, the profile on), starts the `mosaikit-server` of the kit, waits for
+`/api/health`, opens the browser, prints the addresses and the test users, and rebuilds the logic or the UI when their sources
+change. The Docker kit (`cargo xtask release devkit-docker`, `deploy/compose.devkit.yml`) is the same image tagged
+`mosaikit-dev` with PostgreSQL and the plugin folder as a volume, to check migrations and row level security against the real
+database.
+
 ## 9. Web security: origins, cookies, CSP
 
 | Origin | Listener | Content |
@@ -1682,6 +1731,8 @@ mosaikit/
 | `cargo xtask plugin new <name>` | creates a plugin from the template (in the plugin folder of the distribution) |
 | `cargo xtask plugin pack` | builds and packs the plugins of the distribution (signs with the development key) |
 | `mosaikit-plugin new / build / pack / test / sign / keygen / validate / install / doctor` | the same loop for any plugin folder, without `xtask` nor this repository (crate `crates/plugin-cli`, [its README](../crates/plugin-cli/README.md)); `cargo xtask plugin` calls its library |
+| `mosaikit-plugin dev` | the development server of the kit (developer profile, SQLite) for a plugin folder: banner, test users, hot reload, developer tools (§8.12) |
+| `cargo xtask release devkit-docker` | the Docker development kit: image `mosaikit-dev:<version>` and `dist/mosaikit-dev-<version>-docker` (compose, PostgreSQL, plugin folder as a volume); `--no-build` writes the folder only |
 | `cargo xtask test` | Rust tests on PostgreSQL and on SQLite, tests of the plugins and of the distribution, UI tests |
 | `cargo xtask manual-tests` | the checks of `docs/manual-tests.md`, automated (`tests/manual`), on a new seeded installation; `--check` only compares ids |
 | `cargo xtask ci` | fmt, clippy `-D warnings`, tests, lint and UI build |

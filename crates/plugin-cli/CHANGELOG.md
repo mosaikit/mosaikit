@@ -15,7 +15,9 @@ First version: the executable `mosaikit-plugin`.
 - New: `test`, `sign`, `validate` (manifest, migrations against the SQL allow-list of the server, permissions,
   `.mskp` integrity and signature), `install --server`, `doctor`, and `keygen` that never overwrites a key.
 - `build` installs the `wasm32-unknown-unknown` target with rustup when it is missing.
-- `dev` is a stub that points at phase 4.
+- `dev` (phase 4): starts the server of the kit in the developer profile for a plugin folder (`--server`, `MOSAIKIT_SERVER_BIN`, or
+  the binary next to the tool), builds and rebuilds the logic and the UI, opens the browser and prints the addresses and the
+  test users; `--port`, `--data`, `--no-open`, `--no-build`, `--no-watch`, `--fresh`. New plugin folders ignore `.mosaikit-dev/`.
 - `new` (phase 3): `--variant` (app, ui, service, extension, language, layout), `--example` (todo, insights,
   note-priority, each with a walkthrough), `--lang`, `--kit` / `MOSAIKIT_KIT` and the environment variables
   `MOSAIKIT_SDK_PATH`, `MOSAIKIT_PLUGIN_API_PATH`. A standalone folder has its own lint, `.gitignore`, README, CI file,
