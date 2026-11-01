@@ -241,7 +241,7 @@ fn fetch(o: &Options, platform: &str) -> Result<(String, String, Vec<u8>, String
             if let Some(v) = version_of_archive(&name, platform) {
                 let key = Version::parse(&v).expect("checked");
                 let wanted = o.version.as_deref().map(|w| w.trim_start_matches('v') == v).unwrap_or(true);
-                if wanted && best.as_ref().map_or(true, |b| key > b.0) {
+                if wanted && best.as_ref().is_none_or(|b| key > b.0) {
                     best = Some((key, v, name));
                 }
             }
