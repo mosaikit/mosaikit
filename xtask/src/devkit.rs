@@ -139,8 +139,13 @@ pub fn render_compat(f: &Facts) -> String {
     t.push_str("## Plugins of this release\n\nThe version of the platform each plugin asks for, as its manifest says.\n\n");
     t.push_str("| Plugin | Version | `[requires] mosaikit` | `[requires] api` | Works with this kit |\n|---|---|---|---|---|\n");
     for (id, v, req, api) in &f.plugins {
-        let ok = match (mosaikit_mskp::VersionReq::parse(req), mosaikit_mskp::Version::parse_lenient(&f.version)) {
-            (Some(r), Some(ver)) if api.parse::<u32>().map_or(true, |a| a <= f.api) && r.matches(ver) => "yes",
+        let ok = match (
+            mosaikit_mskp::VersionReq::parse(req),
+            mosaikit_mskp::Version::parse_lenient(&f.version),
+        ) {
+            (Some(r), Some(ver)) if api.parse::<u32>().map_or(true, |a| a <= f.api) && r.matches(ver) => {
+                "yes"
+            }
             (None, _) if req == "-" => "no range declared",
             _ => "no",
         };
@@ -156,11 +161,8 @@ pub fn render_notes(f: &Facts) -> String {
         f.sdk, f.plugin_api, f.testing, api = f.api
     ));
     // one heading, so that `self-update` reads the whole of it
-    let breaking: Vec<String> = f
-        .changes
-        .iter()
-        .filter_map(|(c, s)| breaking_of(s).map(|b| format!("**{c}**\n\n{b}")))
-        .collect();
+    let breaking: Vec<String> =
+        f.changes.iter().filter_map(|(c, s)| breaking_of(s).map(|b| format!("**{c}**\n\n{b}"))).collect();
     t.push_str("## Breaking changes\n\n");
     if breaking.is_empty() {
         t.push_str("None.\n\n");
@@ -227,11 +229,16 @@ pub fn facts() -> Result<Facts> {
         let g = |k: &str| t.get(k).and_then(|v| v.as_str()).unwrap_or("-").to_string();
         let r = t.get("requires");
         let rs = |k: &str| {
-            r.and_then(|r| r.get(k)).map(|v| v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string())).unwrap_or_else(|| "-".into())
+            r.and_then(|r| r.get(k))
+                .map(|v| v.as_str().map(str::to_string).unwrap_or_else(|| v.to_string()))
+                .unwrap_or_else(|| "-".into())
         };
         let id = match g("id") {
             // the examples are templates: their id is a placeholder
-            i if i.starts_with("{{") || i == "x" => format!("example {}", d.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default()),
+            i if i.starts_with("{{") || i == "x" => format!(
+                "example {}",
+                d.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or_default()
+            ),
             i => i,
         };
         plugins_found.push((id, g("version"), rs("mosaikit"), rs("api")));
@@ -284,7 +291,12 @@ pub fn crates_of(meta: &Value, roots: &[&str]) -> Vec<Pkg> {
         .unwrap_or_default();
     let mut todo: Vec<String> = meta["packages"]
         .as_array()
-        .map(|a| a.iter().filter(|p| roots.contains(&p["name"].as_str().unwrap_or(""))).filter_map(|p| p["id"].as_str().map(str::to_string)).collect())
+        .map(|a| {
+            a.iter()
+                .filter(|p| roots.contains(&p["name"].as_str().unwrap_or("")))
+                .filter_map(|p| p["id"].as_str().map(str::to_string))
+                .collect()
+        })
         .unwrap_or_default();
     let mut seen: std::collections::BTreeSet<String> = todo.iter().cloned().collect();
     let mut out = Vec::new();
@@ -304,7 +316,12 @@ pub fn crates_of(meta: &Value, roots: &[&str]) -> Vec<Pkg> {
             continue; // a crate of this workspace
         }
         let s = |k: &str| p[k].as_str().unwrap_or("").to_string();
-        out.push((s("name"), s("version"), if s("license").is_empty() { "see the crate".into() } else { s("license") }, s("repository")));
+        out.push((
+            s("name"),
+            s("version"),
+            if s("license").is_empty() { "see the crate".into() } else { s("license") },
+            s("repository"),
+        ));
     }
     out.sort();
     out
@@ -327,7 +344,9 @@ pub fn render_notices(version: &str, crates: &[Pkg], npm_pkgs: &[(Pkg, String)])
     for (n, v, l, r) in crates {
         t.push_str(&format!("| {n} | {v} | {l} | {r} |\n"));
     }
-    t.push_str("\n## npm packages of the UI\n\n| Package | Version | Licence | Source |\n|---|---|---|---|\n");
+    t.push_str(
+        "\n## npm packages of the UI\n\n| Package | Version | Licence | Source |\n|---|---|---|---|\n",
+    );
     for ((n, v, l, r), _) in npm_pkgs {
         t.push_str(&format!("| {n} | {v} | {l} | {r} |\n"));
     }
@@ -341,18 +360,29 @@ pub fn render_notices(version: &str, crates: &[Pkg], npm_pkgs: &[(Pkg, String)])
 
 /// Runs `cargo metadata`, the npm licence report and (when installed) `cargo deny check licenses`; returns the text.
 pub fn notices() -> Result<String> {
-    let meta = output(Command::new("cargo").current_dir(root()).args(["metadata", "--format-version", "1", "--locked"]))?;
+    let meta = output(Command::new("cargo").current_dir(root()).args([
+        "metadata",
+        "--format-version",
+        "1",
+        "--locked",
+    ]))?;
     let meta: Value = serde_json::from_str(&meta)?;
     let crates = crates_of(&meta, &["mosaikit-plugin-cli", "mosaikit-server"]);
     let mut npm_pkgs = Vec::new();
     let api = package_json("ui/plugin-api")?;
-    for name in api["dependencies"].as_object().map(|d| d.keys().cloned().collect::<Vec<_>>()).unwrap_or_default() {
+    for name in
+        api["dependencies"].as_object().map(|d| d.keys().cloned().collect::<Vec<_>>()).unwrap_or_default()
+    {
         let dir = root().join("node_modules").join(&name);
-        let Ok(j) = serde_json::from_str::<Value>(&read(&dir.join("package.json")).unwrap_or_default()) else {
+        let Ok(j) = serde_json::from_str::<Value>(&read(&dir.join("package.json")).unwrap_or_default())
+        else {
             bail!("{name} is not installed (npm ci): the licence report needs node_modules");
         };
         let s = |k: &str| j[k].as_str().unwrap_or("").to_string();
-        let text = ["LICENSE", "LICENSE.md", "LICENSE.txt"].iter().find_map(|f| std::fs::read_to_string(dir.join(f)).ok()).unwrap_or_default();
+        let text = ["LICENSE", "LICENSE.md", "LICENSE.txt"]
+            .iter()
+            .find_map(|f| std::fs::read_to_string(dir.join(f)).ok())
+            .unwrap_or_default();
         let repo = j["repository"]["url"].as_str().or(j["repository"].as_str()).unwrap_or("").to_string();
         npm_pkgs.push(((name.clone(), s("version"), s("license"), repo), text));
     }
@@ -410,7 +440,13 @@ pub fn write_sums(dir: &Path, key: &ed25519_dalek::SigningKey) -> Result<()> {
 /// `release devkit-sums <dir>`: the checksums and their signature over the archives of every platform (the last
 /// job of the workflow, after the platforms have uploaded theirs).
 pub fn sums_only(dir: &Path, allow_dev_key: bool) -> Result<()> {
-    let key = release_key(&Options { out: None, skip_build: true, with_server: false, api_docs: false, allow_dev_key })?;
+    let key = release_key(&Options {
+        out: None,
+        skip_build: true,
+        with_server: false,
+        api_docs: false,
+        allow_dev_key,
+    })?;
     write_sums(dir, &key)?;
     println!("SHA256SUMS and SHA256SUMS.sig written in {}", dir.display());
     Ok(())
@@ -478,20 +514,36 @@ pub fn devkit(o: &Options) -> Result<()> {
         bins.push("mosaikit-server");
     }
     for b in bins {
-        std::fs::copy(rel.join(exe(b)), kit.join("bin").join(exe(b)))
-            .with_context(|| format!("copying {} from {} (build it, or drop --skip-build)", exe(b), rel.display()))?;
+        std::fs::copy(rel.join(exe(b)), kit.join("bin").join(exe(b))).with_context(|| {
+            format!("copying {} from {} (build it, or drop --skip-build)", exe(b), rel.display())
+        })?;
     }
 
     // --- the packages of D1: the unpacked .crate and the unpacked npm tarball ---
-    run(Command::new("cargo").current_dir(root()).args(["package", "-p", "mosaikit-plugin-sdk", "--allow-dirty", "--no-verify"]))?;
+    run(Command::new("cargo").current_dir(root()).args([
+        "package",
+        "-p",
+        "mosaikit-plugin-sdk",
+        "--allow-dirty",
+        "--no-verify",
+    ]))?;
     let crate_file = plugins::target_dir().join("package").join(format!(
         "mosaikit-plugin-sdk-{}.crate",
-        toml_of(&root().join("crates/plugin-sdk/Cargo.toml"))?["package"]["version"].as_str().context("sdk version")?
+        toml_of(&root().join("crates/plugin-sdk/Cargo.toml"))?["package"]["version"]
+            .as_str()
+            .context("sdk version")?
     ));
     untar(&crate_file, &tmp.join("crate"))?;
-    let unpacked = std::fs::read_dir(tmp.join("crate"))?.flatten().map(|e| e.path()).find(|p| p.is_dir()).context("empty .crate")?;
+    let unpacked = std::fs::read_dir(tmp.join("crate"))?
+        .flatten()
+        .map(|e| e.path())
+        .find(|p| p.is_dir())
+        .context("empty .crate")?;
     copy_dir(&unpacked, &kit.join("sdk"))?;
-    run(npm().current_dir(root().join("ui").join("plugin-api")).args(["pack", "--pack-destination"]).arg(&tmp))?;
+    run(npm()
+        .current_dir(root().join("ui").join("plugin-api"))
+        .args(["pack", "--pack-destination"])
+        .arg(&tmp))?;
     let tgz = std::fs::read_dir(&tmp)?
         .flatten()
         .map(|e| e.path())
@@ -504,11 +556,17 @@ pub fn devkit(o: &Options) -> Result<()> {
     copy_dir(&root().join("docs").join("devkit"), &kit.join("docs").join("devkit"))?;
     std::fs::copy(root().join("docs").join("architecture.md"), kit.join("docs").join("architecture.md"))?;
     if o.api_docs {
-        run(Command::new("cargo").current_dir(root()).args(["doc", "-p", "mosaikit-plugin-sdk", "--no-deps"]))?;
+        run(Command::new("cargo").current_dir(root()).args([
+            "doc",
+            "-p",
+            "mosaikit-plugin-sdk",
+            "--no-deps",
+        ]))?;
         copy_dir(&plugins::target_dir().join("doc"), &kit.join("docs").join("api").join("sdk"))?;
     }
     copy_dir(&root().join("crates/plugin-cli/templates/examples"), &kit.join("examples"))?;
-    let pg = crate::dist::current().docker.postgres_image.clone().unwrap_or_else(|| "postgres:17-alpine".into());
+    let pg =
+        crate::dist::current().docker.postgres_image.clone().unwrap_or_else(|| "postgres:17-alpine".into());
     crate::release::devkit_folder(&kit.join("docker"), DEV_IMAGE, &version, &pg)?;
 
     // --- licences, notes, compatibility ---
@@ -533,7 +591,12 @@ pub fn devkit(o: &Options) -> Result<()> {
     std::fs::write(out.join(sig_name), update::sign_bytes(&key, &std::fs::read(&archive)?))?;
     std::fs::write(out.join("RELEASE-NOTES.md"), std::fs::read(kit.join("RELEASE-NOTES.md"))?)?;
     write_sums(&out, &key)?;
-    println!("\ndev kit: {}\narchive: {}\nchecksums: {}", kit.display(), archive.display(), out.join(update::SUMS_FILE).display());
+    println!(
+        "\ndev kit: {}\narchive: {}\nchecksums: {}",
+        kit.display(),
+        archive.display(),
+        out.join(update::SUMS_FILE).display()
+    );
     Ok(())
 }
 
@@ -645,6 +708,7 @@ mod tests {
         assert_eq!(update::parse_sums(&sums).len(), 2);
         let trusted = mosaikit_mskp::TrustedKeys::from_b64(&[mosaikit_mskp::public_key_b64(&key)]).unwrap();
         let sig = std::fs::read_to_string(d.path().join("SHA256SUMS.sig")).unwrap();
-        update::check_download("mosaikit-devkit-1.0.0-windows-x86_64.zip", b"win", &sums, &sig, &trusted).unwrap();
+        update::check_download("mosaikit-devkit-1.0.0-windows-x86_64.zip", b"win", &sums, &sig, &trusted)
+            .unwrap();
     }
 }
