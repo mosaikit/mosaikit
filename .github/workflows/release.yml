@@ -62,7 +62,7 @@ jobs:
       - name: signing key of the plugins
         run: printf '%s' "${{ secrets.MOSAIKIT_SIGNING_KEY }}" > signing.key
       # context: the folder with mosaikit and mosaikit-plugins (see Dockerfile.dockerignore)
-      - uses: docker/build-push-action@v6
+      - uses: docker/build-push-action@v7
         with:
           context: .
           file: mosaikit/deploy/Dockerfile
