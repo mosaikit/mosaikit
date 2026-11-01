@@ -308,7 +308,7 @@ Left: **the axe smoke run of the plugin pages** (the helper `expectAccessible` i
 server executable was in use), **an end-to-end spec that uses the helper** against its own server (as `18-developer-profile.spec.ts` does), the
 link of the package in `node_modules` (`npm install` of the workspace), and **`[requires]` in the official plugins**.
 
-### Phase 6 — Documentation (8 days, in parallel with phases 2–5)
+### Phase 6 — Documentation (8 days, in parallel with phases 2–5) — done 2026-11-01, except the generated API reference and the check by an outside reader
 
 Written in English with the Italian translation, in `docs/devkit/` and packaged in the kit:
 
@@ -332,6 +332,26 @@ Plus API reference generated from the sources (`cargo doc`, TypeDoc) and publish
 
 Output: a developer who has never seen the code can build the three examples from the documents alone
 (checked in phase 8).
+
+**Done (2026-11-01).** The thirteen documents of the table are in `docs/devkit/` with an index (`README.md`), linked from the root
+README and from architecture §8, and the Italian translation in `docs/devkit/it/` (the convention of `docs/guide/it`: same file names, a link to
+the English version at the top of each page). Files: `getting-started`, `concepts`, `manifest`, `logic`, `ui`, `data`, `security`,
+`extensions-layouts`, `ui-guidelines`, `packaging`, `testing`, `troubleshooting`, `changelog`. Every reference was written from the
+source, not from memory of the architecture: the manifest from `crates/mskp/src/manifest.rs` (every key, type and validation rule, the
+five kinds, `layout.toml` from `layout.rs`, the language pack from `language.rs`), the logic from `crates/plugin-sdk`, `crates/runtime` and
+`crates/kernel/src/host.rs` (host operations, error codes and messages, fuel, memory, message, call-depth and HTTP limits), the UI from
+`ui/plugin-api/src` (the `Msk` client, `CrudOptions`, `GridOptions`, `emptyState`, `pageHead`, `ErrorCode`, the variables of `style.css`), the
+CSP from `csp_for`, packaging from `crates/mskp` and the registry from `crates/kernel/src/plugins/registry.rs`, the testing document from
+`conformance.rs` and the READMEs of the SDK and of `@mosaikit/plugin-testing`. Experimental items are marked as architecture §8.11 lists them.
+**Checked:** every relative link between the documents resolves (a script over the Markdown files, none left broken); `docs/manual-tests.md`
+did not change, so the catalog is untouched; no build or test was run (documents only).
+
+Left: **the generated API reference** (`cargo doc`, TypeDoc: phase 7 publishes it with the kit; the documents only name the commands), **a
+reading by a person who has not seen the code** (phase 8), **the install section of Getting started** (it describes the kit as the packaging phase
+will make it, with `bin/`, `sdk/`, `plugin-api/`; until the archives exist it says to build the two executables from source), and
+**the Italian text, which is a translation by the author of the English one** and wants a reading by a native reviewer. For the owner: whether
+the items of §8.11 that the three examples now use (`[search]`, the `set` actions of an extension) leave the experimental list, and the choice of
+the place where the kit documents are published for the site.
 
 ### Phase 7 — Packaging, signing and distribution (4 days)
 

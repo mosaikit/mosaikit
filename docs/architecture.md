@@ -927,6 +927,9 @@ to 60 s. The reads that never write (lists, get, files) open a deferred transact
 
 ## 8. Plugins
 
+How to write, test, sign and ship a plugin, step by step and field by field: the development kit documents in
+[devkit/README.md](devkit/README.md). This section is the reference of the platform side.
+
 ### 8.1 Layout
 
 The official plugins are in `../mosaikit-plugins`, the ones of a distribution

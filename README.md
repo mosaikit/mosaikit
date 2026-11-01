@@ -21,7 +21,8 @@ Full architecture: **[docs/architecture.md](docs/architecture.md)**. The interfa
 mockup in [docs/mockup](docs/mockup) and the rules of [docs/refactoring-ui.md](docs/refactoring-ui.md);
 the plan to complete it is in [docs/ui-plan.md](docs/ui-plan.md). The interface is in English by
 default, with Italian available. Guides for the people who use it, one per role:
-[docs/guide](docs/guide/README.md).
+[docs/guide](docs/guide/README.md). Writing a plugin: the development kit documents in
+[docs/devkit](docs/devkit/README.md).
 
 ## Contents
 
@@ -122,7 +123,7 @@ mosaikit/
   crates/plugin-cli/  mosaikit-plugin: the tool of plugin developers (and the skeleton of a new plugin)
   xtask/         automation: cargo xtask <command>
     mosaikit.dev.toml    configuration of `cargo xtask dev`
-  docs/          architecture, mockup, interface rules and plan, logo
+  docs/          architecture, mockup, interface rules and plan, guides, plugin development kit (docs/devkit), logo
   distribution.toml        the "Mosaikit" distribution
   mosaikit.example.toml    every configuration property, described
 ```
