@@ -6,6 +6,9 @@ name = "{{label}}"
 version = "0.1.0"
 kind = "layout"
 description = "Apps and pages as tabs under the band"
+# who made it and under which licence: the Administrator reads both before installing
+author = "Your name"
+license = "Apache-2.0"
 
 [requires]
 mosaikit = ">=1.0, <2"

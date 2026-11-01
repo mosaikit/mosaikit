@@ -1471,6 +1471,14 @@ change. The Docker kit (`cargo xtask release devkit-docker`, `deploy/compose.dev
 `mosaikit-dev` with PostgreSQL and the plugin folder as a volume, to check migrations and row level security against the real
 database.
 
+**Tests and conformance** (phase 5). `mosaikit-plugin validate --strict` is the static conformance suite (`crates/plugin-cli/src/conformance.rs`):
+permissions against the host operations the logic calls (read from the Rust source of a folder, from the literals linked into
+`logic.wasm` for a package), the migrations (numbering, no irreversible statement, the guard of PostgreSQL and the translation for SQLite),
+the UI (size, outside requests, what the plugin CSP of §9 blocks), i18n coverage and the layout contract of `mountCrud` pages;
+`mosaikit-plugin test` runs it before the tests of the logic. The logic is tested natively with `MockHost` (`crates/plugin-sdk/src/testing.rs`,
+with a recipe for `db.query`, `notify`, `call_plugin`, permissions and the Files area) and end to end with `@mosaikit/plugin-testing`
+(`ui/plugin-testing`), which starts or attaches to this server, signs in as a test user, opens the plugin, creates an item and runs axe.
+
 ## 9. Web security: origins, cookies, CSP
 
 | Origin | Listener | Content |
@@ -1731,6 +1739,7 @@ mosaikit/
 | `cargo xtask plugin new <name>` | creates a plugin from the template (in the plugin folder of the distribution) |
 | `cargo xtask plugin pack` | builds and packs the plugins of the distribution (signs with the development key) |
 | `mosaikit-plugin new / build / pack / test / sign / keygen / validate / install / doctor` | the same loop for any plugin folder, without `xtask` nor this repository (crate `crates/plugin-cli`, [its README](../crates/plugin-cli/README.md)); `cargo xtask plugin` calls its library |
+| `mosaikit-plugin validate --strict` | the conformance suite of a plugin (permissions against the calls of the logic, migrations for both databases, UI, i18n, `mountCrud` layout) |
 | `mosaikit-plugin dev` | the development server of the kit (developer profile, SQLite) for a plugin folder: banner, test users, hot reload, developer tools (§8.12) |
 | `cargo xtask release devkit-docker` | the Docker development kit: image `mosaikit-dev:<version>` and `dist/mosaikit-dev-<version>-docker` (compose, PostgreSQL, plugin folder as a volume); `--no-build` writes the folder only |
 | `cargo xtask test` | Rust tests on PostgreSQL and on SQLite, tests of the plugins and of the distribution, UI tests |

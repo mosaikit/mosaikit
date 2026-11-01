@@ -76,7 +76,7 @@ enum Cmd {
         #[arg(long)]
         no_build: bool,
     },
-    /// Validates the plugin, runs the tests of its logic and the type check of its UI
+    /// Validates the plugin (strict conformance), runs the tests of its logic and the checks of its UI
     Test {
         #[arg(default_value = ".")]
         dir: PathBuf,
@@ -100,6 +100,11 @@ enum Cmd {
     Validate {
         #[arg(default_value = ".")]
         path: PathBuf,
+        /// the conformance suite a plugin passes before it is proposed to an Administrator: metadata and
+        /// version ranges required, permissions against what the logic calls, migrations for PostgreSQL and
+        /// SQLite, the UI (size, outside requests, CSP), i18n coverage, the layout contract of mountCrud pages
+        #[arg(long)]
+        strict: bool,
     },
     /// Uploads a .mskp to a test server (as an Administrator would from the shell)
     Install {
@@ -236,8 +241,8 @@ fn run(cli: Cli) -> Result<ExitCode> {
             }
             println!("public key (trusted_keys):            {public}");
         }
-        Cmd::Validate { path } => {
-            let report = validate::validate(&path)?;
+        Cmd::Validate { path, strict } => {
+            let report = validate::validate_with(&path, validate::Options { strict })?;
             report.print();
             if !report.ok() {
                 return Ok(ExitCode::from(1));

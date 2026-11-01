@@ -1,0 +1,32 @@
+{
+  "name": "@mosaikit/plugin-testing",
+  "version": "1.0.0",
+  "description": "Playwright helpers to test a Mosaikit plugin end to end against the development server: start or attach to it, sign in as a test user, open the plugin, create an item, check accessibility",
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "!src/**/*.test.ts",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit -p ."
+  },
+  "peerDependencies": {
+    "@axe-core/playwright": "^4.10.0",
+    "@playwright/test": "^1.50.0"
+  },
+  "peerDependenciesMeta": {
+    "@axe-core/playwright": {
+      "optional": true
+    }
+  }
+}

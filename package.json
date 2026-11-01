@@ -4,6 +4,7 @@
   "description": "UI of Mosaikit: host and plugin-api (the plugins are in ../mosaikit-plugins)",
   "workspaces": [
     "ui/plugin-api",
+    "ui/plugin-testing",
     "ui/host",
     "tests/e2e",
     "tests/manual"

@@ -6,6 +6,8 @@ use std::path::Path;
 use anyhow::{bail, Context, Result};
 use mosaikit_mskp::{Manifest, Package, TrustedKeys, API_VERSION};
 
+use crate::conformance;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Level {
     Error,
@@ -27,16 +29,16 @@ pub struct Report {
 }
 
 impl Report {
-    fn add(&mut self, level: Level, message: impl Into<String>) {
+    pub(crate) fn add(&mut self, level: Level, message: impl Into<String>) {
         self.findings.push(Finding { level, message: message.into() });
     }
-    fn error(&mut self, m: impl Into<String>) {
+    pub(crate) fn error(&mut self, m: impl Into<String>) {
         self.add(Level::Error, m);
     }
-    fn warn(&mut self, m: impl Into<String>) {
+    pub(crate) fn warn(&mut self, m: impl Into<String>) {
         self.add(Level::Warning, m);
     }
-    fn info(&mut self, m: impl Into<String>) {
+    pub(crate) fn info(&mut self, m: impl Into<String>) {
         self.add(Level::Info, m);
     }
     pub fn errors(&self) -> usize {
@@ -62,13 +64,26 @@ impl Report {
     }
 }
 
+/// What `validate` checks besides the basics.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Options {
+    /// the conformance suite (`conformance.rs`): permissions against the calls of the logic, migrations,
+    /// the UI, i18n coverage, the layout contract; and the description, author and license are required
+    pub strict: bool,
+}
+
 /// Checks a plugin folder (with a `plugin.toml`) or a `.mskp` file.
 pub fn validate(path: &Path) -> Result<Report> {
+    validate_with(path, Options::default())
+}
+
+/// The same, with options.
+pub fn validate_with(path: &Path, o: Options) -> Result<Report> {
     let mut r = Report { subject: path.display().to_string(), ..Default::default() };
     if path.is_dir() {
-        folder(path, &mut r)?;
+        folder(path, o, &mut r)?;
     } else if path.is_file() {
-        package(path, &mut r)?;
+        package(path, o, &mut r)?;
     } else {
         bail!("{} does not exist", path.display());
     }
@@ -76,8 +91,19 @@ pub fn validate(path: &Path) -> Result<Report> {
 }
 
 /// What the manifest asks for, whatever carries it: versions, deprecated keys, permissions.
-fn manifest_checks(m: &Manifest, r: &mut Report) {
+fn manifest_checks(m: &Manifest, strict: bool, r: &mut Report) {
     r.info(format!("{} {} ({})", m.id, m.version, m.effective_kind().as_str()));
+    if strict {
+        if m.description.trim().is_empty() {
+            r.error("no description: the Administrator reads it before installing");
+        }
+        if m.author.is_none() {
+            r.error("no author");
+        }
+        if m.license.is_none() {
+            r.error("no license");
+        }
+    }
     for d in m.deprecations() {
         r.warn(d);
     }
@@ -139,7 +165,7 @@ fn migration_checks(m: &Manifest, migrations: &[(String, String)], r: &mut Repor
     }
 }
 
-fn folder(dir: &Path, r: &mut Report) -> Result<()> {
+fn folder(dir: &Path, o: Options, r: &mut Report) -> Result<()> {
     let toml_path = dir.join("plugin.toml");
     let text = match std::fs::read_to_string(&toml_path) {
         Ok(t) => t,
@@ -155,7 +181,7 @@ fn folder(dir: &Path, r: &mut Report) -> Result<()> {
             return Ok(());
         }
     };
-    manifest_checks(&m, r);
+    manifest_checks(&m, o.strict, r);
 
     // migrations
     let mut migrations = Vec::new();
@@ -176,6 +202,9 @@ fn folder(dir: &Path, r: &mut Report) -> Result<()> {
         }
     }
     migration_checks(&m, &migrations, r);
+    if o.strict {
+        conformance::folder(dir, &m, &migrations, r);
+    }
 
     // logic
     let has_crate = dir.join("Cargo.toml").is_file();
@@ -215,7 +244,7 @@ fn folder(dir: &Path, r: &mut Report) -> Result<()> {
     Ok(())
 }
 
-fn package(path: &Path, r: &mut Report) -> Result<()> {
+fn package(path: &Path, o: Options, r: &mut Report) -> Result<()> {
     let bytes = std::fs::read(path).with_context(|| path.display().to_string())?;
     let pkg = match Package::read(&bytes) {
         Ok(p) => p,
@@ -225,11 +254,14 @@ fn package(path: &Path, r: &mut Report) -> Result<()> {
         }
     };
     r.info(format!("{} KB, sha256 {}", bytes.len().div_ceil(1024), pkg.sha256));
-    manifest_checks(&pkg.manifest, r);
+    manifest_checks(&pkg.manifest, o.strict, r);
     match pkg.migrations() {
         Ok(ms) => {
             let pairs: Vec<(String, String)> = ms.into_iter().map(|(_, n, s)| (n, s)).collect();
             migration_checks(&pkg.manifest, &pairs, r);
+            if o.strict {
+                conformance::package(&pkg, &pairs, r);
+            }
         }
         Err(e) => r.error(e.to_string()),
     }

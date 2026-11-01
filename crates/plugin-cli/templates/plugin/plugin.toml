@@ -2,6 +2,9 @@ id = "{{id}}"
 name = "{{label}}"
 version = "0.1.0"
 description = "Describe the plugin {{label}} here"
+# who made it and under which licence: the Administrator reads both before installing
+author = "Your name"
+license = "Apache-2.0"
 
 # the versions of Mosaikit and of the plugin API this plugin works with
 [requires]
