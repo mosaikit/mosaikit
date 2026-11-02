@@ -54,6 +54,7 @@ shapes the `[requires]` plan of phase 1 (see 1.1).
 | `files_read` | stable | New: the logic reads the Files area as the caller (`files.list`, `files.describe`, `files.read`); default false, shown at install. Not `files` (the file API of a plugin that owns files) |
 | `[[public_commands]]`, `[[config]] public` | experimental | New: commands and settings a public link page may use (architecture 8.13); additive, no API bump, `[requires] mosaikit = ">=1.0"`; shown at install; default off per tenant |
 | `permissions.run_commands`, `ctx.on_behalf()` | experimental | New: commands a run ticket may call on behalf of a person (architecture 8.14); additive, no API bump, `[requires] mosaikit = ">=1.0"`; shown at install; no `plugin.call` in such a call; the resource scope is enforced by the database |
+| `msk.band` (`band.set`, `band.reset`) | experimental | New: the contextual top band for a resource on the full page (architecture 8.16); additive, no API bump, no permission; `[requires] mosaikit = ">=1.0"` |
 | `permissions.directory`, `ctx.directory()`, `msk.directory.search` | experimental | New: search the people and groups of the tenant (architecture 8.15); additive, no API bump, `[requires] mosaikit = ">=1.0"`; shown at install; only a Tenant Manager or a person who may share; id, username and name only; refused in public links and runs; rate limited and audited without the query |
 | `script_eval` | stable | Unused by official plugins; opt-in, default false, shown at install. Keep as is: CSP `unsafe-eval` and `wasm-unsafe-eval` on `script-src` and `worker-src` is the contract. Add a note that it is sensitive |
 
@@ -88,6 +89,7 @@ shapes the `[requires]` plan of phase 1 (see 1.1).
 | `notify` | stable | Unused | See `notify` |
 | `public.config`, `public.call` (viewer ops, `msk.publicConfig`, `msk.publicCall`) | experimental | New | Only in the public viewer; `public.call` allows `db.query` (SELECT), `http.fetch`, `key.get` and nothing else, tenant keys only |
 | `files.list`, `files.describe`, `files.read` | stable | Unused | See `files_read`; errors carry the codes `permission_denied`, `not_found`, `invalid_argument`; read is capped at 4 MiB |
+| `band.set`, `band.reset` (viewer ops, `msk.band`; events `band.mode`, `band.comments`) | experimental | New | No permission: the state is display-only and sanitised by the shell (names 80, initials 3, 50 people, count 0 to 9999, plain text); only the frame that set it can reset it, and the shell resets it on close and on route change; the controls of the shell cannot be hidden (architecture 8.16) |
 | `directory.search` (`ctx.directory()`; viewer op of the same name, `msk.directory.search`) | experimental | New | Needs `permissions.directory` and, for the caller, Tenant Manager or `share`; `{kind, q, limit}` in, `[{id, username, name}]` or `[{id, name}]` out; codes `permission_denied`, `invalid_argument`, `rate_limited`; refused in public and run calls |
 | Error shape `{"err": "<string>"}` | to change (host operations now also give an optional `code`) | all | No stable error code from the logic; UI gets `plugin_error` only. Add optional `code` (and keep `err` as text) |
 

@@ -5,6 +5,12 @@ version and is removed in the next.
 
 ## Unreleased
 
+- `msk.band.set({ search, mode, presence, comments })` and `msk.band.reset()` (host ops `band.set`, `band.reset`; events
+  `band.mode`, `band.comments`): the contextual top band for a resource on the full page: no search bar, a View | Edit
+  switch (or a "Read only" label), the people connected (3 avatars and "+N"), a comments button. The shell sanitises
+  everything (names 80 characters, initials 3, 50 people, count 0 to 9999) and resets the band when the page closes or
+  the route changes; it never touches tenant, language, theme, help, notifications or the person. No manifest
+  permission. Plugin API unchanged (additive).
 - `msk.directory.search({ kind, q, limit })` (host op `directory.search`): the people (`{ id, username, name }`) or groups
   (`{ id, name }`) of the current tenant, for a picker. Needs `[permissions] directory = true` in the manifest and
   `[requires] mosaikit = ">=1.0"`; only a Tenant Manager or a person with the `share` permission may use it

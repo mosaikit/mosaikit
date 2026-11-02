@@ -1629,6 +1629,64 @@ the answer only as long as that editor needs it, never copy the list into the pl
 another command or send it outside (`http.fetch`, `notify`), and store only the ids the person chose (a name can change; look it up
 again when you show it). Do not search on every keystroke without a pause; the rate limit is a safety net, not a design.
 
+### 8.16 The contextual top band: a resource on the full page
+
+When a plugin opens the detail of a resource on the full page (a map, a dashboard, a process) the top band of the shell can change
+to serve that page. The plugin declares it to the shell with `msk.band.set(state)` (bridge operation `band.set`) and gives the band
+back with `msk.band.reset()` (`band.reset`). While the state is set the band (the rail layout, `ui/host/src/app/Shell.tsx`):
+
+1. has no search bar when the plugin says `search: false`;
+2. keeps the tenant (with its selector when the person has more than one);
+3. shows a View | Edit switch when `mode.canEdit` is true, otherwise the label «Read only»;
+4. shows the people connected to the resource: avatars with their initials (the name in the tooltip and for screen readers), the
+   first three and «+N» for the others;
+5. shows a button that opens and closes the comments of the resource;
+6. keeps, untouched, language, mode, help, notifications and the person (avatar, name and role).
+
+```
+msk.band.set({
+  search: false,
+  mode: { value: 'view' | 'edit', canEdit, onChange(v) },
+  presence: [{ id, name, initials? }],
+  comments: { open, count?, onToggle() },
+})
+```
+
+**Data and callbacks.** Functions cannot cross the iframe boundary: the UI package sends only the data (`mode.value`, `canEdit`,
+`presence`, `comments.open`, `count`) and keeps `onChange` and `onToggle`. When the person flips the switch or presses the button
+the shell posts an event to the iframe (`band.mode` `{ value }`, `band.comments` `{}`) and the package calls the callback. The
+switch does not move by itself: the plugin follows with `band.set` and the new `value` (so the plugin stays the owner of the mode;
+a plugin that ignores the event leaves the switch where it was). The whole state is replaced at every `set`; what is left out
+returns to the default of the shell. **Presence is just data the plugin passes**: the kernel has no real-time service and does not
+know who has what open. The comments button only reports its state; the comments panel of the shell is a later part, and the
+button points at it with `aria-controls` only when the element `#msk-comments-panel` is on the page.
+
+**Who owns it, and when it ends.** The state belongs to the frame that set it (`PluginFrame`): another frame cannot reset it. The
+shell resets it by itself when that frame goes away (the page closes, another plugin or route opens: `Shell` also resets it at every
+change of route), and at the `hello` of every new document of the plugin in the frame (a page that replaces the previous one
+starts clean). Only one plugin page is open at a time, so there is one state. Frames that draw a tab of an extension
+(`ExtensionTab`) do not have the operation. A declarative layout (`layout.toml`, `frames.tsx`) may ignore the state: the built-in
+rail draws it, the other patterns keep their band.
+
+**Security.** Everything that comes from the iframe is untrusted and is checked in `sanitizeBand` (`ui/host/src/app/contextband.ts`)
+before it is drawn, after the usual origin and window check of the bridge. A wrong type refuses the call (`invalid band ...`).
+Names are at most 80 characters, initials at most 3 (derived from the name when missing), the list at most 50 people (the rest is
+dropped), ids at most 64 characters and unique, the count an integer from 0 to 9999 (more is shown as 9999). Control and
+bidirectional-override characters are removed and spaces collapsed; the text is drawn only as React text, never as HTML, and the
+plugin passes no class, style, URL or icon. `search` can only turn the search off (`true` adds nothing), and the controls of the
+shell that a plugin must not hide (tenant, notifications, help, language, mode, the person menu) are not part of the state at all.
+A person who cannot edit is shown in view mode whatever `value` says. **No manifest permission is needed**: the state cannot read or
+write data, cannot reach the network and cannot change what the person is allowed to do (the real checks stay on the server, in the
+calls the plugin makes); the worst a hostile page can do is show a wrong name or hide the search of its own page, which it can do
+anyway inside its iframe. A plugin should set the band when its state changes, not on a timer.
+
+**Colours and accessibility.** The switch, avatars and badge use only the pair `band-foreground` on `band` (and the reverse), so
+the contrast is the one of the band in every theme and in dark mode (`contextband.test.ts` computes it for every band colour:
+at least 4.5:1). The switch is one `role="switch"` button (`aria-checked` = edit mode) with the label «Edit mode»; avatars are
+`role="img"` with the name as label, «+N» is announced with the names it stands for; the comments button has `aria-expanded` and the
+number of comments in its name. Everything is reachable and operable with the keyboard. Below 640 px the avatars are hidden (switch
+and button stay), and below 900 px the bar is the flexible one of the phone.
+
 ## 9. Web security: origins, cookies, CSP
 
 | Origin | Listener | Content |

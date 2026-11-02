@@ -1,6 +1,6 @@
 import { Bridge, BridgeError } from './bridge.ts'
 import { API_VERSION, checkHostApi } from './version.ts'
-import type { DirectoryApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, UiContext, Values, WebProbe } from './protocol.ts'
+import type { BandApi, BandState, DirectoryApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, UiContext, Values, WebProbe } from './protocol.ts'
 
 /** The extensions of the plugin on a resource (fields and actions other plugins add to its items). */
 export interface ExtensionsClient {
@@ -259,6 +259,43 @@ export class Msk {
   async notify(n: Notify): Promise<number> {
     const r = await this.bridge.call<{ sent: number }>('notify', { ...n })
     return r.sent
+  }
+
+  /**
+   * The contextual top band: while a page shows a resource on the full page (a map, a dashboard, a process) the
+   * plugin declares what the band of the shell shows (no search, a View | Edit switch, the people connected, a
+   * comments button). `set` replaces the whole state; `reset` gives the band back. The shell resets it itself when
+   * the page closes or the route changes. No permission is needed. Callbacks travel back as `band.*` events.
+   */
+  get band(): BandApi {
+    return (this.bandApi ??= this.makeBand())
+  }
+  private bandApi?: BandApi
+  private makeBand(): BandApi {
+    let state: BandState | null = null
+    this.bridge.onEvent((event, data) => {
+      if (event === 'band.mode') {
+        const v = (data as { value?: unknown } | null)?.value
+        if (v === 'view' || v === 'edit') state?.mode?.onChange?.(v)
+      } else if (event === 'band.comments') state?.comments?.onToggle?.()
+    })
+    return {
+      set: (s: BandState) => {
+        state = s
+        // functions cannot cross the bridge: the host only learns whether a callback exists
+        const wire = {
+          ...(s.search !== undefined ? { search: s.search } : {}),
+          ...(s.mode ? { mode: { value: s.mode.value, canEdit: s.mode.canEdit } } : {}),
+          ...(s.presence ? { presence: s.presence.map((p) => ({ id: p.id, name: p.name, ...(p.initials ? { initials: p.initials } : {}) })) } : {}),
+          ...(s.comments ? { comments: { open: s.comments.open, ...(s.comments.count !== undefined ? { count: s.comments.count } : {}) } } : {}),
+        }
+        void this.bridge.call('band.set', wire).catch(() => {})
+      },
+      reset: () => {
+        state = null
+        void this.bridge.call('band.reset').catch(() => {})
+      },
+    }
   }
 
   /** Opens the share dialog of the host (users, groups, public links). */

@@ -34,6 +34,7 @@ the origin of the host and is accepted only from it. A call that gets no answer 
 | `msk.isPublic`, `msk.publicResource`, `msk.publicGet()` | public-link viewer (`public_view`) |
 | `msk.publicConfig()` | the `[[config]]` settings marked `public = true` (never a secret), by key |
 | `msk.publicCall(name, args)` | runs a `[[public_commands]]` command, read only, on the shared item; errors `command_not_public`, `public_commands_off`, `public_rate_limited` |
+| `msk.band.set(state)`, `msk.band.reset()` | the contextual top band of the shell for a resource on the full page: `{ search?: false, mode?: { value: 'view'\|'edit', canEdit, onChange }, presence?: [{ id, name, initials? }], comments?: { open, count?, onToggle } }`. No permission. See [the contextual band](#the-contextual-band) |
 | `msk.directory.search({ kind, q, limit? })` | the people (`{id, username, name}`) or groups (`{id, name}`) of the tenant, for a picker; needs `[permissions] directory = true`; only a Tenant Manager or a person who may share; errors `permission_denied`, `invalid_argument`, `rate_limited`; never in public links. See [security](security.md#directory-the-author-rule) |
 
 ### Operations
@@ -83,7 +84,37 @@ when the host could not, in English or Italian.
 
 `context` (language, theme, mode: use `msk.onContext`), `theme` (**deprecated**, the same variables as `context`, still sent
 in API 1, removed in API 2), `ext.changed` `{ extension, id }`, `ext.tab.height` `{ handle, height }` (handled by
-`mountTab`).
+`mountTab`), `band.mode` `{ value }` and `band.comments` `{}` (the switch and the comments button of the contextual band; handled by
+`msk.band`).
+
+### The contextual band
+
+When a page of your plugin shows one resource on the full page (a map, a dashboard, a process), ask the shell for the
+contextual top band: no search bar, the tenant, a **View | Edit** switch (or «Read only»), the people connected, a comments
+button, then language, theme, help, notifications and the person as always.
+
+```ts
+const msk = await connect()
+msk.band.set({
+  search: false,
+  mode: { value: 'view', canEdit: me.canEdit, onChange: (v) => { setMode(v); publish() } },
+  presence: peers.map((p) => ({ id: p.id, name: p.name })), // initials are derived from the name
+  comments: { open: panelOpen, count: comments.length, onToggle: () => { panelOpen = !panelOpen; publish() } },
+})
+// leaving the page (optional: the shell does it when the page closes or the route changes)
+msk.band.reset()
+```
+
+- `set` replaces the whole state; call it again when something changes. The switch shows `mode.value` and moves only when you
+  set the new value, so keep the mode in your page and republish it in `onChange`. With `canEdit: false` the shell shows
+  «Read only».
+- Presence is data you pass: Mosaikit has no real-time service. Show only people who may see the resource.
+- The shell checks everything: names at most 80 characters, initials 3, 50 people (the rest is dropped), `count` an integer
+  0 to 9999, plain text only (never HTML). A wrong type makes the call fail with `invalid band ...`.
+- You cannot hide the tenant, language, theme, help, notifications or the person menu, and no manifest permission is needed.
+- The comments button only calls `onToggle` and shows `open` and `count`; the panel itself is yours for now.
+- Declarative layouts (`layout.toml`) may ignore the band; hosts older than this feature answer «operation not available» (the
+  call is ignored). Architecture §8.16 has the details.
 
 ## `mountCrud(root, msk, resource, options)`
 
