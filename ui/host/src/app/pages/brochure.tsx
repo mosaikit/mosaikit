@@ -103,6 +103,7 @@ function Requirements({ p }: { p: AdminPlugin }) {
   if (perm.files_read) chips.push(t('Reads the files you can see'))
   if (p.public_commands?.length) chips.push(t('Runs commands for public links'))
   if (perm.run_commands?.length) chips.push(t('Runs commands for background runs'))
+  if (perm.directory) chips.push(t('Searches the people of the tenant'))
   if (perm.calls?.length) chips.push(t('Calls: {list}', { list: perm.calls.join(', ') }))
   if (p.requires?.database) chips.push(t('Database: {db}', { db: p.requires.database }))
   return (

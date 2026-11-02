@@ -151,6 +151,7 @@ Tutto è spento per impostazione predefinita. L'Administrator vede ciò che un p
 | `files_read` | bool | la logica legge l'area File come il chiamante. **Sensibile** |
 | `script_eval` | bool | la CSP della UI consente `'unsafe-eval'` e `'wasm-unsafe-eval'`. **Sensibile** |
 | `run_commands` | array di identificatori | comandi della logica che un **ticket di esecuzione** può chiamare per conto di una persona (un processo in background di una distribuzione), al massimo 32. **Sensibile**; richiede `[requires] mosaikit = ">=1.0"`. Vedi [Logica](logic.md#comandi-di-esecuzione-chiamate-per-conto-di-un-run) |
+| `directory` | bool | il plugin può cercare tra le persone e i gruppi del tenant (`ctx.directory()`, `msk.directory.search`), per chi è Tenant Manager o può condividere nel plugin; solo id, username e nome. **Sensibile**; richiede `[requires] mosaikit = ">=1.0"`. Vedi [Logica](logic.md#directory) |
 
 Un'origine è `http://` o `https://` e un host di lettere, cifre e `.-:[]`, senza `/`.
 `validate --strict` confronta i permessi con ciò che la logica chiama: una chiamata senza permesso è un errore, e lo è

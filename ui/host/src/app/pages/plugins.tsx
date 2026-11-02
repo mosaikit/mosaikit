@@ -596,6 +596,9 @@ function PluginAsks({ p, base }: { p: AdminPlugin; base?: string }) {
                 none
               )}
             </AskRow>
+            <AskRow label={t('Searches the people and groups')}>
+              {perm.directory ? <b className="text-destructive">{t('yes (sensitive: it lists the names and usernames of the people and groups of the tenant to whoever may share in it)')}</b> : none}
+            </AskRow>
             <AskRow label={t('Calls the plugins')}>{list(perm.calls)}</AskRow>
             <AskRow label={t('Database')}>{p.requires?.database ? <span className="font-mono text-xs">{[p.requires.database, ...(p.requires.extensions ?? [])].join(', ')}</span> : t('any')}</AskRow>
           </dl>

@@ -113,9 +113,10 @@ fn manifest_checks(m: &Manifest, strict: bool, r: &mut Report) {
     // keys added after the first release of the API: an older Mosaikit refuses a manifest that has them
     let newer = m.config.iter().any(|c| c.public)
         || !m.public_commands.is_empty()
-        || !m.permissions.run_commands.is_empty();
+        || !m.permissions.run_commands.is_empty()
+        || m.permissions.directory;
     if newer && m.requires.mosaikit.is_none() {
-        let msg = "`public` settings, [[public_commands]] and permissions.run_commands need a Mosaikit that knows them: set [requires] mosaikit = \">=1.0\" (an older one refuses the manifest)";
+        let msg = "`public` settings, [[public_commands]], permissions.run_commands and permissions.directory need a Mosaikit that knows them: set [requires] mosaikit = \">=1.0\" (an older one refuses the manifest)";
         if strict {
             r.error(msg);
         } else {
@@ -164,6 +165,9 @@ fn manifest_checks(m: &Manifest, strict: bool, r: &mut Report) {
     }
     if !p.run_commands.is_empty() {
         sensitive.push("run_commands");
+    }
+    if p.directory {
+        sensitive.push("directory");
     }
     if !sensitive.is_empty() {
         r.info(format!("permissions the Administrator will review: {}", sensitive.join(", ")));
@@ -408,6 +412,33 @@ run_commands = [\"node_run\"]
         let r = validate(d.path()).unwrap();
         assert!(r.ok() && r.warnings() == 0, "{:?}", r.findings);
         assert!(r.findings.iter().any(|f| f.message.contains("run_commands")));
+    }
+
+    #[test]
+    fn directory_needs_a_mosaikit_that_knows_it() {
+        let d = tempfile::tempdir().unwrap();
+        let base = "id = \"com.test.demo\"
+name = \"Demo\"
+version = \"0.1.0\"
+[requires]
+api = 1
+";
+        let perm = "[permissions]
+directory = true
+";
+        plugin(d.path(), &format!("{base}{perm}"), None);
+        let r = validate(d.path()).unwrap();
+        assert!(r.ok(), "{:?}", r.findings);
+        assert!(r
+            .findings
+            .iter()
+            .any(|f| f.message.contains("directory") && f.message.contains("[requires]")));
+        let strict = validate_with(d.path(), Options { strict: true }).unwrap();
+        assert!(!strict.ok(), "{:?}", strict.findings);
+        plugin(d.path(), &format!("{MIN}{perm}"), None);
+        let r = validate(d.path()).unwrap();
+        assert!(r.ok() && r.warnings() == 0, "{:?}", r.findings);
+        assert!(r.findings.iter().any(|f| f.message.contains("directory")));
     }
 
     #[test]

@@ -5,6 +5,10 @@ version and is removed in the next.
 
 ## Unreleased
 
+- `msk.directory.search({ kind, q, limit })` (host op `directory.search`): the people (`{ id, username, name }`) or groups
+  (`{ id, name }`) of the current tenant, for a picker. Needs `[permissions] directory = true` in the manifest and
+  `[requires] mosaikit = ">=1.0"`; only a Tenant Manager or a person with the `share` permission may use it
+  (`permission_denied` otherwise). Refused in public links and in runs. Plugin API unchanged (additive).
 - `msk.publicConfig()` (host op `public.config`): the `[[config]]` settings marked `public = true`, in a public link.
 - `msk.publicCall(name, args)` (host op `public.call`): runs a command of `[[public_commands]]` in a public link, read
   only, on the shared item. New error codes: `command_not_public`, `public_commands_off`, `public_rate_limited`,

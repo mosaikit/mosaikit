@@ -34,6 +34,7 @@ the origin of the host and is accepted only from it. A call that gets no answer 
 | `msk.isPublic`, `msk.publicResource`, `msk.publicGet()` | public-link viewer (`public_view`) |
 | `msk.publicConfig()` | the `[[config]]` settings marked `public = true` (never a secret), by key |
 | `msk.publicCall(name, args)` | runs a `[[public_commands]]` command, read only, on the shared item; errors `command_not_public`, `public_commands_off`, `public_rate_limited` |
+| `msk.directory.search({ kind, q, limit? })` | the people (`{id, username, name}`) or groups (`{id, name}`) of the tenant, for a picker; needs `[permissions] directory = true`; only a Tenant Manager or a person who may share; errors `permission_denied`, `invalid_argument`, `rate_limited`; never in public links. See [security](security.md#directory-the-author-rule) |
 
 ### Operations
 

@@ -176,6 +176,18 @@ export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unk
       return { method: 'POST', url: `${base}/web/probe`, json: { url: str(a.url, 'url', 2000), image: a.image === true } }
     case 'resource.meta':
       return { method: 'GET', url: `/api/t/${enc(tenant)}/resources/${uuid(a.id)}` }
+    // the people and groups of the tenant, for a plugin that declares `directory` (the kernel checks the
+    // permission, the right of the person and the limits)
+    case 'directory.search': {
+      const kind = a.kind
+      if (kind !== 'user' && kind !== 'group') throw new OpError('invalid kind')
+      const body: Args = { kind, q: str(a.q, 'q', 64) }
+      if (a.limit !== undefined && a.limit !== null) {
+        if (typeof a.limit !== 'number' || !Number.isInteger(a.limit) || a.limit < 1) throw new OpError('invalid limit')
+        body.limit = Math.min(a.limit, 50)
+      }
+      return { method: 'POST', url: `${base}/directory/search`, json: body }
+    }
     case 'notify': {
       const n: Args = { title: str(a.title, 'title', 160) }
       if (a.body !== undefined && a.body !== null && a.body !== '') n.body = str(a.body, 'body', 600)

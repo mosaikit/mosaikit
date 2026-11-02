@@ -37,6 +37,10 @@
 //! let reader = MockHost::new().with_perms(&["use"]);
 //! let undeclared = MockHost::new().deny("files.read", "the plugin does not declare `files_read` in [permissions]");
 //!
+//! // directory.search (`ctx.directory()`): the people and groups of the tenant, as the real host answers
+//! let host = MockHost::new()
+//!     .with_directory(&[("u1", "anna", "Anna Rossi")], &[("g1", "Editors")]);
+//!
 //! // files.list, files.describe, files.read: the Files area as the caller sees it
 //! let host = MockHost::new().with_files(vec![
 //!     FakeFile::folder("d1", "Reports"),
@@ -247,6 +251,53 @@ impl MockHost {
         })
     }
 
+    /// The people and groups of the tenant for `directory.search`, with the answers of the real host: a
+    /// case-insensitive substring of the username or name (`q` 1 to 64 characters), name order, 20 rows
+    /// by default and at most 50, `{id, username, name}` for people and `{id, name}` for groups. People are
+    /// `(id, username, name)`, groups `(id, name)`. The mock does not know the rights of the caller: use
+    /// `deny("directory.search", ...)` to test a refusal.
+    pub fn with_directory(self, users: &[(&str, &str, &str)], groups: &[(&str, &str)]) -> MockHost {
+        let users: Vec<(String, String, String)> =
+            users.iter().map(|(a, b, c)| (a.to_string(), b.to_string(), c.to_string())).collect();
+        let groups: Vec<(String, String)> =
+            groups.iter().map(|(a, b)| (a.to_string(), b.to_string())).collect();
+        self.on("directory.search", move |req| {
+            let q = req.get("q").and_then(Value::as_str).unwrap_or_default().trim().to_lowercase();
+            let len = q.chars().count();
+            if len == 0 || len > 64 {
+                return Err("q must be 1 to 64 characters".to_string());
+            }
+            let limit = match req.get("limit") {
+                None | Some(Value::Null) => 20,
+                Some(v) => v.as_u64().filter(|n| *n >= 1).ok_or("limit must be a positive integer")?.min(50),
+            } as usize;
+            match req.get("kind").and_then(Value::as_str) {
+                Some("user") => {
+                    let mut rows: Vec<_> = users
+                        .iter()
+                        .filter(|(_, u, n)| u.to_lowercase().contains(&q) || n.to_lowercase().contains(&q))
+                        .collect();
+                    rows.sort_by_key(|(id, u, n)| (n.to_lowercase(), u.clone(), id.clone()));
+                    Ok(Value::Array(
+                        rows.into_iter()
+                            .take(limit)
+                            .map(|(id, u, n)| json!({ "id": id, "username": u, "name": n }))
+                            .collect(),
+                    ))
+                }
+                Some("group") => {
+                    let mut rows: Vec<_> =
+                        groups.iter().filter(|(_, n)| n.to_lowercase().contains(&q)).collect();
+                    rows.sort_by_key(|(id, n)| (n.to_lowercase(), id.clone()));
+                    Ok(Value::Array(
+                        rows.into_iter().take(limit).map(|(id, n)| json!({ "id": id, "name": n })).collect(),
+                    ))
+                }
+                _ => Err("kind must be \"user\" or \"group\"".to_string()),
+            }
+        })
+    }
+
     /// Groups of the caller in the test (`ctx.groups`).
     pub fn with_groups(mut self, groups: &[(&str, &str)]) -> MockHost {
         self.ctx.groups = groups
@@ -404,7 +455,7 @@ mod tests {
 
     crate::plugin! {
         hooks: { "notes.before_create" => default_tag, "notes.before_update" => reject },
-        commands: { "notes.count" => count, "t.greet" => greet, "t.locked" => locked, "t.tour" => tour },
+        commands: { "notes.count" => count, "t.greet" => greet, "t.locked" => locked, "t.tour" => tour, "t.dir" => directory_tour },
     }
 
     #[test]
@@ -524,6 +575,31 @@ mod tests {
             .with_plugin_command("com.example.other", "other.total", |_| Ok(json!(1)))
             .deny("files.list", "the plugin does not declare `files_read` in [permissions]");
         assert!(host.command(&reg, "t.tour", Value::Null).unwrap_err().contains("files_read"));
+    }
+
+    fn directory_tour(ctx: &Ctx, _args: Value) -> Result<Value> {
+        let users = ctx.directory().users("AN", Some(100))?;
+        let groups = ctx.directory().groups("edit", None)?;
+        Ok(json!({ "users": users, "groups": groups }))
+    }
+
+    #[test]
+    fn directory_search_follows_the_real_host() {
+        let reg = __msk_registry();
+        let host = MockHost::new().with_directory(
+            &[("u2", "bruno", "Bruno Ananas"), ("u1", "anna", "Anna Rossi"), ("u3", "carla", "Carla")],
+            &[("g1", "Editors")],
+        );
+        let out = host.command(&reg, "t.dir", Value::Null).unwrap();
+        assert_eq!(out["users"][0], json!({ "id": "u1", "username": "anna", "name": "Anna Rossi" }));
+        assert_eq!(out["users"].as_array().unwrap().len(), 2);
+        assert_eq!(out["groups"], json!([{ "id": "g1", "name": "Editors" }]));
+        // what the logic asked is what the host got (the host caps it)
+        assert_eq!(host.calls()[0].1["limit"], 100);
+        // a refusal of the host is an error of the logic
+        let denied = MockHost::new()
+            .deny("directory.search", "the plugin does not declare `directory` in [permissions]");
+        assert!(denied.command(&reg, "t.dir", Value::Null).unwrap_err().contains("directory"));
     }
 
     #[test]

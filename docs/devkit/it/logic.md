@@ -144,6 +144,19 @@ righe); `files.describe {id}` una riga; `files.read {id, max_bytes?}` risponde `
 `max_bytes` tagliato a 4 MiB. Una riga ha `id, name, is_dir, size, mime, created, modified, owner_id, owner_name, my_level,
 shared, parent_id` e mai un percorso di archiviazione.
 
+### `directory`
+
+Cerca tra le **persone e i gruppi del tenant corrente**, per un selettore tuo (un assegnatario, un revisore). Richiede
+`[permissions] directory = true` e `[requires] mosaikit = ">=1.0"`. `ctx.directory().users("an", Some(10))` risponde con
+`Vec<DirectoryUser>` (`id`, `username`, `name`); `ctx.directory().groups("ed", None)` con `Vec<Group>` (`id`, `name`). `q` è di 1-64
+caratteri, cercato senza distinguere maiuscole dentro username e nome; `limit` è 20 di default e al massimo 50. Si trovano solo
+membri attivi, mai persone di un altro tenant e mai un'email. Può cercare solo un **Tenant Manager o una persona con il permesso
+`share` del tuo plugin**; per chiunque altro la chiamata fallisce con `permission_denied`, come in un comando pubblico e in una
+chiamata per conto di un run. Altri codici: `invalid_argument`, `rate_limited` (30 al minuto per persona). Prova con
+`MockHost::new().with_directory(&[("u1", "anna", "Anna Rossi")], &[("g1", "Editors")])` (risponde come l'host vero) o
+`deny("directory.search", ...)`. Segui la [regola per l'autore](security.md#directory-la-regola-per-lautore): riempi il selettore,
+salva solo gli id scelti dalla persona.
+
 ### Comandi pubblici
 
 Un comando elencato in `[[public_commands]]` può essere eseguito da chiunque abbia un link pubblico di un elemento del tuo

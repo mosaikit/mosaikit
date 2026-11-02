@@ -147,6 +147,7 @@ Everything is off by default. The Administrator sees what a plugin asks for when
 | `files_read` | bool | the logic reads the Files area as the caller. **Sensitive** |
 | `script_eval` | bool | the CSP of the UI allows `'unsafe-eval'` and `'wasm-unsafe-eval'`. **Sensitive** |
 | `run_commands` | array of identifiers | commands of the logic that a **run ticket** may call on behalf of a person (a background process of a distribution), at most 32. **Sensitive**; needs `[requires] mosaikit = ">=1.0"`. See [Logic](logic.md#run-commands-calls-on-behalf-of-a-run) |
+| `directory` | bool | the plugin may search the people and groups of the tenant (`ctx.directory()`, `msk.directory.search`), for callers who are Tenant Managers or may share in it; id, username and name only. **Sensitive**; needs `[requires] mosaikit = ">=1.0"`. See [Logic](logic.md#directory) |
 
 An origin is `http://` or `https://` and a host of letters, digits and `.-:[]`, with no `/`.
 `validate --strict` compares the permissions with what the logic calls: a call with no permission is an error, and so is

@@ -5,6 +5,9 @@ version and is removed in the next.
 
 ## Unreleased
 
+- `Ctx::directory()` (`Directory::users`, `Directory::groups`, `DirectoryUser`): search the people and groups of the tenant; needs
+  `[permissions] directory = true` and `[requires] mosaikit = ">=1.0"`; plugin API unchanged. `MockHost::with_directory(users, groups)`
+  answers like the real host.
 - `Ctx::public` and `Ctx::link_resource()`: set when a visitor of a public link runs a command listed in
   `[[public_commands]]` (no user, `config` without secrets, `link_resource` is the only item to work on).
   `MockHost::as_public(item_id)` tests it. Needs `[requires] mosaikit = ">=1.0"`; plugin API unchanged.

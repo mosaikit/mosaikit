@@ -2057,4 +2057,7 @@ export const IT: Record<string, string> = {
   'yes (sensitive: a service of a distribution calls them as the person who started a run, even after they have signed out)': 'sì (sensibile: un servizio di una distribuzione li chiama come la persona che ha avviato un run, anche dopo che si è disconnessa)',
   'Runs commands for background runs': 'Esegue comandi per i run in background',
   'Open the apps of {name}': 'Apri le app di {name}',
+  'Searches the people and groups': 'Cerca tra le persone e i gruppi',
+  'yes (sensitive: it lists the names and usernames of the people and groups of the tenant to whoever may share in it)': 'sì (sensibile: elenca nomi e username delle persone e dei gruppi del tenant a chi può condividere)',
+  'Searches the people of the tenant': 'Cerca tra le persone del tenant',
 }

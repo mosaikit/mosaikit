@@ -216,6 +216,10 @@ impl Ctx {
     pub fn files(&self) -> Files {
         Files(())
     }
+    /// The people and groups of the tenant (needs `[permissions] directory = true`).
+    pub fn directory(&self) -> Directory {
+        Directory(())
+    }
     pub fn log(&self, msg: &str) {
         host::log(msg);
     }
@@ -308,6 +312,36 @@ impl Files {
     /// `{ "entry": {...}, "base64": "...", "size": <bytes returned>, "truncated": bool }`.
     pub fn read(&self, id: &str, max_bytes: usize) -> Result<Value> {
         host::call("files.read", json!({ "id": id, "max_bytes": max_bytes }))
+    }
+}
+
+/// A person found by [`Directory::users`]: nothing else of them is ever given (no email).
+#[derive(Debug, Clone, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
+pub struct DirectoryUser {
+    pub id: String,
+    pub username: String,
+    pub name: String,
+}
+
+/// Search in the people and groups of the tenant the command runs in (host operation `directory.search`).
+/// Needs `[permissions] directory = true` and `[requires] mosaikit = ">=1.0"`. The kernel lets in only a
+/// caller who is a Tenant Manager or holds the `share` permission of the plugin, only active members, never
+/// another tenant, and answers `permission_denied` in a public command and in a call on behalf of a run.
+/// `q` is 1 to 64 characters (case-insensitive substring of the username or name); `limit` is 20 by
+/// default and at most 50. Errors carry a code: `permission_denied`, `invalid_argument`, `rate_limited`.
+/// The plugin must keep what it gets only as long as the editor on screen needs it.
+pub struct Directory(());
+
+impl Directory {
+    /// Active members of the tenant whose username or name contains `q`, in name order.
+    pub fn users(&self, q: &str, limit: Option<u32>) -> Result<Vec<DirectoryUser>> {
+        let v = host::call("directory.search", json!({ "kind": "user", "q": q, "limit": limit }))?;
+        Ok(serde_json::from_value(v)?)
+    }
+    /// Groups of the tenant whose name contains `q`, in name order.
+    pub fn groups(&self, q: &str, limit: Option<u32>) -> Result<Vec<Group>> {
+        let v = host::call("directory.search", json!({ "kind": "group", "q": q, "limit": limit }))?;
+        Ok(serde_json::from_value(v)?)
     }
 }
 
