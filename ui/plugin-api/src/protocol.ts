@@ -291,6 +291,33 @@ export interface Notify {
   resource?: string
 }
 
+/** What `msk.directory.search` asks: people or groups of the tenant whose name contains `q`. */
+export interface DirectorySearch {
+  kind: 'user' | 'group'
+  /** 1 to 64 characters, matched case-insensitively inside the username and name */
+  q: string
+  /** 20 by default, at most 50 */
+  limit?: number
+}
+
+/** A person found by `msk.directory.search`: nothing else of them is given (no email). */
+export interface DirectoryUser {
+  id: string
+  username: string
+  name: string
+}
+
+/** A group found by `msk.directory.search`. */
+export interface DirectoryGroup {
+  id: string
+  name: string
+}
+
+export interface DirectoryApi {
+  search(s: DirectorySearch & { kind: 'user' }): Promise<DirectoryUser[]>
+  search(s: DirectorySearch & { kind: 'group' }): Promise<DirectoryGroup[]>
+}
+
 export interface PublicResource {
   plugin: string
   plugin_label: string

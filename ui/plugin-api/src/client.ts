@@ -1,6 +1,6 @@
 import { Bridge, BridgeError } from './bridge.ts'
 import { API_VERSION, checkHostApi } from './version.ts'
-import type { ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, UiContext, Values, WebProbe } from './protocol.ts'
+import type { DirectoryApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, UiContext, Values, WebProbe } from './protocol.ts'
 
 /** The extensions of the plugin on a resource (fields and actions other plugins add to its items). */
 export interface ExtensionsClient {
@@ -235,6 +235,18 @@ export class Msk {
   readonly web = {
     probe: (url: string, image = false) => this.bridge.call<WebProbe>('web.probe', { url, image }),
   }
+
+  /**
+   * The people and groups of the current tenant, for a picker of the plugin (needs `[permissions] directory = true`
+   * and `[requires] mosaikit = ">=1.0"`). People come as `{ id, username, name }` (never an email), groups as
+   * `{ id, name }`; only active members, `q` 1 to 64 characters, `limit` 20 by default and at most 50. Only a
+   * Tenant Manager or a person with the `share` permission of the plugin may search: the others get
+   * `permission_denied`. Also `rate_limited` and `invalid_argument`. Keep what you get only as long as the editor
+   * on screen needs it.
+   */
+  readonly directory: DirectoryApi = {
+    search: (s: DirectorySearch) => this.bridge.call('directory.search', { ...s }),
+  } as DirectoryApi
 
   /** Metadata of a resource (owner, level, size...). */
   resource(id: string): Promise<ResourceMeta> {

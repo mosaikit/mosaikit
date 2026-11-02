@@ -25,6 +25,15 @@ describe('routeOp', () => {
     expect(routeOp('alfa', 'p.x', 'crud.list', { resource: 'notes', sort: 'title', dir: 'up' }).url).toBe('/api/t/alfa/p/p.x/r/notes?sort=title')
   })
 
+  it('routes the directory search with checked arguments only', () => {
+    const c = routeOp('alfa', 'p.x', 'directory.search', { kind: 'user', q: 'an', limit: 500, tenant: 'beta', plugin: 'p.evil' })
+    expect(c).toEqual({ method: 'POST', url: '/api/t/alfa/p/p.x/directory/search', json: { kind: 'user', q: 'an', limit: 50 } })
+    expect(routeOp('alfa', 'p.x', 'directory.search', { kind: 'group', q: 'x' }).json).toEqual({ kind: 'group', q: 'x' })
+    for (const bad of [{ q: 'a' }, { kind: 'team', q: 'a' }, { kind: 'user' }, { kind: 'user', q: '' }, { kind: 'user', q: 'x'.repeat(65) }, { kind: 'user', q: 'a', limit: 0 }, { kind: 'user', q: 'a', limit: '5' }]) {
+      expect(() => routeOp('alfa', 'p.x', 'directory.search', bad)).toThrow(OpError)
+    }
+  })
+
   it('refuses identifiers that would change the path', () => {
     expect(() => routeOp('alfa', 'p.x', 'crud.list', { resource: '../../admin' })).toThrow(OpError)
     expect(() => routeOp('alfa', 'p.x', 'crud.get', { resource: 'notes', id: '1/../../x' })).toThrow(OpError)

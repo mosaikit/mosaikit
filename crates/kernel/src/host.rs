@@ -275,6 +275,7 @@ fn coded_of(e: Error) -> Coded {
         Kind::Forbidden | Kind::Unauthorized => "permission_denied",
         Kind::NotFound => "not_found",
         Kind::BadRequest => "invalid_argument",
+        Kind::TooMany => "rate_limited",
         _ => "internal",
     };
     // a file the caller does not see and a file that does not exist look the same
@@ -346,6 +347,17 @@ impl KernelHost {
     }
 }
 
+impl KernelHost {
+    /// `directory.search`: see [`crate::plugin_directory`]. Refused in a public link and in a call on
+    /// behalf of a run ticket; the manifest, the right of the caller and the limits are checked there.
+    fn directory(&mut self, req: &Value) -> std::result::Result<Value, Coded> {
+        let k = self.kernel.clone().ok_or_else(|| Coded("internal", "kernel not available".into()))?;
+        let c = self.user().map_err(|m| Coded("permission_denied", m))?;
+        let plugin = self.plugin_id.clone();
+        self.rt.block_on(crate::plugin_directory::search_from_logic(&k, &c, &plugin, req)).map_err(coded_of)
+    }
+}
+
 impl Host for KernelHost {
     fn error_code(&mut self) -> Option<String> {
         self.last_code.take()
@@ -353,6 +365,11 @@ impl Host for KernelHost {
 
     fn call(&mut self, op: &str, req: &Value) -> std::result::Result<Value, String> {
         self.last_code = None;
+        // a refusal in a public link carries the code of a missing permission, like the other callers
+        if self.public && op == "directory.search" {
+            self.last_code = Some("permission_denied".into());
+            return Err("operation not available in a public link: directory.search".into());
+        }
         // a public command is default deny: reading, outside requests and keys, nothing else
         if self.public && !matches!(op, "db.query" | "http.fetch" | "key.get") {
             return Err(format!("operation not available in a public link: {op}"));
@@ -364,6 +381,10 @@ impl Host for KernelHost {
                     m
                 })
             }
+            "directory.search" => self.directory(req).map_err(|Coded(code, m)| {
+                self.last_code = Some(code.to_string());
+                m
+            }),
             "db.query" => self.db(true, req),
             "db.exec" => self.db(false, req),
             "resource.create" | "resource.delete" => self.resource(op, req),

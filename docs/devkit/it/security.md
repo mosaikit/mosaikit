@@ -36,6 +36,7 @@ minimo:
 | `files_read` | legge l'area File **come il chiamante**: mai più di quanto il chiamante vede. **Sensibile** |
 | `[[public_commands]]` | chiunque abbia un link pubblico esegue il comando, in sola lettura, sull'elemento condiviso. **Sensibile** (vedi sotto) |
 | `run_commands` | un servizio di una distribuzione chiama il comando come la persona che ha avviato un run, in background. **Sensibile** (vedi sotto) |
+| `directory` | elenca username e nomi di persone e gruppi del tenant a chi può condividere. **Sensibile** (vedi sotto) |
 | `[[config]] public = true` | una pagina pubblica può leggere quell'impostazione. Mai un segreto: il manifesto lo rifiuta |
 | `script_eval` | il plugin può eseguire stringhe come codice. Solo per codice di cui ci si fida. **Sensibile** |
 | `network`, `frame_src`, `web` | raggiungono origini esterne; la logica passa dall'host, che rifiuta gli indirizzi privati |
@@ -65,6 +66,21 @@ Questa parte spetta quindi all'autore del plugin, e chi rivede il codice deve co
 5. Dichiara solo i comandi che un run chiama davvero e aspettati che una chiamata fallisca a ticket finito (`run_ticket_invalid`).
 6. Un ticket senza elenco di risorse arriva a tutto ciò che la persona può raggiungere per quel comando: chiedi alla distribuzione
    di restringere il ticket quando il comando tocca dati sensibili.
+
+## Directory: la regola per l'autore
+
+`permissions.directory` permette al plugin di cercare tra le persone e i gruppi del tenant (`ctx.directory()`,
+`msk.directory.search`). Il kernel ammette solo un Tenant Manager o chi può condividere nel plugin, mostra solo membri attivi del
+tenant corrente, dà solo `id`, `username` e `name` (mai un'email), lo rifiuta nei link pubblici e nei run, lo limita e scrive un
+evento al minuto senza testo cercato né righe. Non può limitare ciò che il plugin fa della risposta, quindi la regola spetta
+all'autore:
+
+1. **Riempi il selettore, nient'altro.** Cerca mentre la persona scrive (con una breve pausa), mostra le righe, dimenticale quando
+   l'editor si chiude.
+2. **Non salvare né inoltrare mai la directory.** Non copiare nomi o username nelle tue tabelle, impostazioni, log o notifiche oltre
+   quanto la persona ha scelto; non restituire l'elenco da un altro comando; non mandarlo a un servizio esterno.
+3. **Tieni gli id scelti**, non i nomi (un nome può cambiare; rileggilo per mostrarlo).
+4. **Dichiaralo solo se lo usi**, e aspettati `permission_denied` per chi non può condividere: mostra il campo in sola lettura.
 
 ## Cosa è firmato
 

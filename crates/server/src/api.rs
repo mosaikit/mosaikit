@@ -72,6 +72,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/me/notifications/prefs", get(my_note_prefs).put(my_set_note_prefs))
         .route("/api/t/{t}/p/{plugin}/notify", post(plugin_notify))
         .route("/api/t/{t}/p/{plugin}/web/probe", post(plugin_web_probe))
+        .route("/api/t/{t}/p/{plugin}/directory/search", post(plugin_directory_search))
         .route("/api/admin/email", get(a_email).put(a_set_email))
         .route("/api/admin/email/test", post(a_email_test))
         // tenant
@@ -634,6 +635,17 @@ async fn plugin_notify(
     Json(r): Json<notify::PluginNote>,
 ) -> ApiResult<Json<Value>> {
     Ok(Json(json!({ "sent": notify::from_plugin(&s.k, &c, &p.plugin, &r).await? })))
+}
+
+/// `msk.directory.search`: the people or groups of the tenant for a plugin that declares `directory`
+/// (see `mosaikit_kernel::plugin_directory`).
+async fn plugin_directory_search(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<PluginPath>,
+    Json(r): Json<Value>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(mosaikit_kernel::plugin_directory::search(&s.k, &c, &p.plugin, &r).await?))
 }
 
 #[derive(Deserialize)]

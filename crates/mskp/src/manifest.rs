@@ -698,6 +698,13 @@ pub struct Permissions {
     /// `[requires] mosaikit = ">=1.0"`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub run_commands: Vec<String>,
+    /// The plugin may search the people and groups of the tenant it runs in (`ctx.directory().search` in
+    /// the logic, `msk.directory.search` in the UI): id, username and name only, active members only, and
+    /// only for a caller who is a Tenant Manager or holds the `share` permission of the plugin. Sensitive:
+    /// the Administrator sees it when the plugin is installed. Default: false. Needs
+    /// `[requires] mosaikit = ">=1.0"`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub directory: bool,
 }
 
 /// Most commands a plugin may declare in `permissions.run_commands`.
@@ -1966,6 +1973,28 @@ service_keys = { b = { label = \"y\" } }
             let e = Manifest::from_toml(&with(bad)).unwrap_err().to_string();
             assert!(e.contains("run_commands"), "{bad}: {e}");
         }
+    }
+
+    #[test]
+    fn directory_permission() {
+        let with = |v: &str| {
+            NOTES.replacen(
+                "hooks = [\"notes\"]",
+                &format!(
+                    "hooks = [\"notes\"]
+ directory = {v}"
+                ),
+                1,
+            )
+        };
+        assert!(Manifest::from_toml(&with("true")).unwrap().permissions.directory);
+        assert!(!Manifest::from_toml(&with("false")).unwrap().permissions.directory);
+        assert!(!Manifest::from_toml(NOTES).unwrap().permissions.directory);
+        assert!(Manifest::from_toml(&with("\"yes\"")).is_err());
+        let on = Manifest::from_toml(&with("true")).unwrap();
+        assert_eq!(serde_json::from_str::<Manifest>(&serde_json::to_string(&on).unwrap()).unwrap(), on);
+        let plain = serde_json::to_string(&Manifest::from_toml(NOTES).unwrap()).unwrap();
+        assert!(!plain.contains("directory"), "{plain}");
     }
 
     #[test]

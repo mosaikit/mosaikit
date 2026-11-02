@@ -32,6 +32,7 @@ pub struct HostUse {
     pub http: bool,
     pub service_key: bool,
     pub call_plugin: bool,
+    pub directory: bool,
     /// plugin ids passed as literals to `call_plugin`
     pub called: BTreeSet<String>,
 }
@@ -52,6 +53,7 @@ pub fn host_use_in_source(text: &str) -> HostUse {
         http: s.contains(".http()") || s.contains("\"http.fetch\""),
         service_key: s.contains(".service_key(") || s.contains("\"key.get\""),
         call_plugin: s.contains(".call_plugin(") || s.contains("\"plugin.call\""),
+        directory: s.contains(".directory()") || s.contains("\"directory.search\""),
         called: BTreeSet::new(),
     };
     let mut rest = s.as_str();
@@ -77,6 +79,7 @@ pub fn host_use_in_wasm(wasm: &[u8]) -> HostUse {
         http: has("http.fetch"),
         service_key: has("key.get"),
         call_plugin: has("plugin.call"),
+        directory: has("directory.search"),
         called: BTreeSet::new(),
     }
 }
@@ -86,6 +89,11 @@ fn permission_checks(m: &Manifest, used: &HostUse, from_source: bool, r: &mut Re
     let origin = if from_source { "src/" } else { "logic.wasm" };
     if used.files && !p.files_read {
         r.error(format!("the logic reads the Files area ({origin}) but [permissions] files_read is not set"));
+    }
+    if used.directory && !p.directory {
+        r.error(format!(
+            "the logic searches the directory ({origin}) but [permissions] directory is not set"
+        ));
     }
     if used.http && p.network.is_empty() && m.service_keys.is_empty() {
         r.error(format!(

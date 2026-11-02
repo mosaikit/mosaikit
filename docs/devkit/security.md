@@ -39,6 +39,7 @@ minimum:
 | `notify` | send notifications; never to recipients you choose |
 | `[[public_commands]]` | anyone with a public link runs the command, read only, on the shared item. **Sensitive** (see below) |
 | `run_commands` | a service of a distribution calls the command as the person who started a run, in the background. **Sensitive** (see below) |
+| `directory` | lists the usernames and names of the people and groups of the tenant to callers who may share. **Sensitive** (see below) |
 | `[[config]] public = true` | a public page may read that setting. Never a secret: the manifest refuses it |
 | `files`, `content` | own files and uploaded folder content |
 
@@ -79,6 +80,20 @@ this part, and a reviewer should check each run command against this list:
 5. Declare only the commands a run really calls, and expect a call to fail when the ticket is over (`run_ticket_invalid`).
 6. A ticket without a resource list reaches everything the person can reach for that command: ask the distribution to scope the
    ticket whenever the command touches sensitive data.
+
+## Directory: the author rule
+
+`permissions.directory` lets the plugin search the people and groups of the tenant (`ctx.directory()`, `msk.directory.search`).
+The kernel lets in only a Tenant Manager or a person who may share in the plugin, shows only active members of the current tenant,
+gives only `id`, `username` and `name` (never an email), refuses it in public links and in runs, rate limits it and logs one event
+a minute with no query and no rows. It cannot limit what the plugin does with the answer, so the author carries this rule:
+
+1. **Fill the picker, nothing else.** Search when the person types (with a short pause), show the rows, forget them when the
+   editor closes.
+2. **Never store or forward the directory.** Do not copy names or usernames into your tables, settings, logs or notifications
+   beyond what the person chose; do not return the list from another command; do not send it to an outside service.
+3. **Keep the ids the person picked**, not the names (a name can change; look it up again to show it).
+4. **Declare it only if you use it**, and expect `permission_denied` for people who may not share: show the field read-only.
 
 ## What is signed
 

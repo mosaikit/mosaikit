@@ -34,6 +34,7 @@ dell'host ed è accettato solo da essa. Una chiamata che non riceve risposta in 
 | `msk.isPublic`, `msk.publicResource`, `msk.publicGet()` | visualizzatore dei link pubblici (`public_view`) |
 | `msk.publicConfig()` | le impostazioni `[[config]]` con `public = true` (mai un segreto), per chiave |
 | `msk.publicCall(name, args)` | esegue un comando di `[[public_commands]]`, in sola lettura, sull'elemento condiviso; errori `command_not_public`, `public_commands_off`, `public_rate_limited` |
+| `msk.directory.search({ kind, q, limit? })` | le persone (`{id, username, name}`) o i gruppi (`{id, name}`) del tenant, per un selettore; richiede `[permissions] directory = true`; solo un Tenant Manager o chi può condividere; errori `permission_denied`, `invalid_argument`, `rate_limited`; mai nei link pubblici. Vedi [sicurezza](security.md#directory-la-regola-per-lautore) |
 
 ### Operazioni
 

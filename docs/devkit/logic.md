@@ -97,6 +97,7 @@ with the checks below. Permissions are the `[permissions]` of the manifest.
 | `notify` | `ctx.notify(&Notice)` | `notify = true` | nothing (experimental) |
 | `plugin.call` | `ctx.call_plugin(plugin, name, args)` | `calls` | the result (experimental) |
 | `files.list`, `files.describe`, `files.read` | `ctx.files().list(parent)`, `describe(id)`, `read(id, max_bytes)` | `files_read = true` | rows, see below |
+| `directory.search` | `ctx.directory().users(q, limit)`, `groups(q, limit)` | `directory = true` and the caller may share | `[{id, username, name}]` / `[{id, name}]`, see below |
 
 ### `db`
 
@@ -143,6 +144,19 @@ UI, a public link is not a caller. `files.list {parent?}` answers `{entries, tru
 `files.describe {id}` one row; `files.read {id, max_bytes?}` answers `{entry, base64, size, truncated}`, with `max_bytes`
 cut at 4 MiB. A row has `id, name, is_dir, size, mime, created, modified, owner_id, owner_name, my_level, shared,
 parent_id` and never a storage path.
+
+### `directory`
+
+Searches the **people and groups of the current tenant**, for a picker of your own (an assignee, a reviewer). Needs
+`[permissions] directory = true` and `[requires] mosaikit = ">=1.0"`. `ctx.directory().users("an", Some(10))` answers
+`Vec<DirectoryUser>` (`id`, `username`, `name`); `ctx.directory().groups("ed", None)` answers `Vec<Group>` (`id`, `name`).
+`q` is 1 to 64 characters, matched case-insensitively inside the username and name; `limit` is 20 by default and at most 50.
+Only active members are found, never another tenant's people, and never an email. Only a **Tenant Manager or a person with the
+`share` permission of your plugin** may search; for anyone else the call fails with `permission_denied`, as it does in a public
+command and in a call on behalf of a run. Other codes: `invalid_argument`, `rate_limited` (30 a minute for a person). Test with
+`MockHost::new().with_directory(&[("u1", "anna", "Anna Rossi")], &[("g1", "Editors")])` (it answers like the real host) or
+`deny("directory.search", ...)`. Follow the [author rule](security.md#directory-the-author-rule): fill the picker, store only the
+ids the person chose.
 
 ### Public commands
 

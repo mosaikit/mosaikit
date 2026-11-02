@@ -1589,6 +1589,46 @@ writes minimal and idempotent; (5) `ctx.on_behalf()` tells a run call from a per
 Limits that remain by design: a ticket not scoped to resources is the person's reach for its commands until it expires, is spent or is
 revoked, so keep the lifetime short and have the service call `DELETE /api/run/{ticket}` when the run ends.
 
+### 8.15 Directory search: the people of the tenant for a plugin
+
+A plugin sometimes needs to let a person pick another person or a group (an assignee, a reviewer, who to notify). It cannot do it
+alone: `core.users` is not in the SQL guard (§8.6, only `visible_resources` of the core is) and `ctx.groups` lists the groups of the
+caller only. The kernel offers one narrow operation instead, `directory.search`, in the logic (`ctx.directory().users(q, limit)`,
+`.groups(q, limit)`) and in the UI (`msk.directory.search({ kind, q, limit })`, REST `POST /api/t/{t}/p/{plugin}/directory/search`). It
+has its own query in `kernel::plugin_directory`; the SQL guard is unchanged and a plugin still cannot read `core.users`.
+`permissions.directory` is an additive key of API 1 (no bump, §8.11): a plugin that uses it declares `[requires] mosaikit = ">=1.0"`;
+`mosaikit-plugin validate` warns (an error with `--strict`) when the range is missing, and errors when the logic searches without the
+permission.
+
+**Who may.** (1) The manifest must say `[permissions] directory = true` (`403 permission_denied` otherwise, whoever asks); the
+Administrator sees it as a red row «Searches the people and groups» in «What it asks» and as a chip in the brochure. (2) The caller must
+have `use` of the plugin in the tenant (the plugin on in the tenant, as for any call) **and** be a Tenant Manager or hold the standard
+permission `share` of that plugin: the same right that lets a person see the people of the tenant in the share dialog. The default
+profile has it; a profile that takes it away takes this away too. Everyone else gets `403 permission_denied`.
+
+**What it returns.** `kind` is `"user"` or `"group"`; `q` is 1 to 64 characters after trimming, no control characters, matched
+case-insensitively as a substring of the username or display name (people) or of the name (groups), with `%` and `_` taken literally;
+`limit` is 20 by default, a larger value is capped to 50, below 1 or not an integer is `400 invalid_argument`. People come as `{ id,
+username, name }` and only if the account is active **and** the membership of the tenant is active; groups as `{ id, name }`. Nothing
+else: no email, no picture, no role, no home tenant, no membership of groups. The order is fixed (name, then username, then id), so a
+page does not shuffle. **The tenant is the one of the authenticated caller, never an argument**: an extra `tenant` field is ignored, and
+a person of another tenant or a group of another tenant never appears, even when they also belong to this one's installation.
+
+**Where it is refused.** In a public link (no caller: the host operation is outside the allowed ones, `permission_denied`) and in a call
+on behalf of a run ticket (§8.14: nobody is at the keyboard to pick someone; `permission_denied`). The UI operation is a viewer
+operation of the shell (`directory.search` of the bridge, routed to the REST call above), so it exists in the normal host only, never
+in the public viewer.
+
+**Limits and audit.** 30 searches a minute for a person and 300 for a tenant (`429 directory_rate_limited`, `rate_limited` in the
+logic); a refused or invalid request spends no budget. The Log gets one `directory.search` event per person and plugin per minute at
+most, with only the kind (`user` or `group`): **never the text searched and never the rows found**.
+
+**What the kernel cannot do, so the plugin author must.** The kernel limits who may search and what a row contains; it cannot limit
+what the plugin does with the answer. Rule for plugin authors: use the directory to fill the picker the person has on screen, keep
+the answer only as long as that editor needs it, never copy the list into the plugin's own tables or settings, never return it from
+another command or send it outside (`http.fetch`, `notify`), and store only the ids the person chose (a name can change; look it up
+again when you show it). Do not search on every keystroke without a pause; the rate limit is a safety net, not a design.
+
 ## 9. Web security: origins, cookies, CSP
 
 | Origin | Listener | Content |

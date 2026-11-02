@@ -4,6 +4,8 @@ One version for the whole dev kit, the one of the platform.
 
 ## Unreleased
 
+- Manifest: `[permissions] directory` (bool): the plugin may search the people and groups of the tenant. Additive: manifest v3 and
+  plugin API 1 are unchanged; a plugin that uses it needs `[requires] mosaikit = ">=1.0"`.
 - Manifest: `[[config]] public` (refused on `kind = "secret"`) and `[[public_commands]]` (`name`, `description`,
   `max_arg_bytes`, at most `MAX_PUBLIC_ARG_BYTES`). Additive: manifest v3 and plugin API 1 are unchanged; a plugin that
   uses them needs `[requires] mosaikit = ">=1.0"`.
