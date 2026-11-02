@@ -34,7 +34,7 @@ export async function axe(p: Page, rules?: string[]): Promise<string[]> {
     .filter((v) => v.impact === 'serious' || v.impact === 'critical')
     .map((v) => `${v.id}(${v.nodes.length}): ${v.nodes[0].target.join(' ')}`)
 }
-export async function nav(p: Page, name: string) {
+export async function nav(p: Page, name: string | RegExp) {
   await p.locator('[data-sidebar="sidebar"]').getByRole('link', { name, exact: true }).first().click()
   await p.waitForTimeout(900)
 }

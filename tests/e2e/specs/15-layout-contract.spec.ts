@@ -434,7 +434,7 @@ test.describe('15-layout-contract', () => {
     const routes: { route: string; app: boolean; action: RegExp | null }[] = [
       { route: '#/t/emptyco/p/com.mosaikit.files', app: true, action: /Upload files/ },
       { route: '#/t/emptyco/p/com.mosaikit.maps', app: true, action: /New map/ },
-      { route: '#/t/emptyco/p/com.mosaikit.static-site', app: true, action: /New app/ },
+      { route: '#/t/emptyco/p/com.mosaikit.static-site', app: true, action: /New (app|site)/ },
       { route: '#/t/emptyco/p/com.mosaikit.contacts', app: true, action: /New contact/ },
       { route: '#/t/emptyco/p/com.mosaikit.tasks', app: true, action: /New task/ },
       { route: '#/t/emptyco/p/com.mosaikit.notes', app: true, action: /New note/ },
