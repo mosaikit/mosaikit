@@ -51,6 +51,11 @@ export type ErrorCode =
   | 'content_too_large'
   | 'too_many_rows'
   | 'too_many_notifications'
+  // public links
+  | 'command_not_public'
+  | 'public_commands_off'
+  | 'public_rate_limited'
+  | 'args_too_large'
   // the list and the items
   | 'sort_unknown'
   | 'item_exists'

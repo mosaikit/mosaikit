@@ -156,6 +156,8 @@ pub struct Resolved {
     pub title: String,
     pub meta: serde_json::Value,
     pub password_hash: Option<String>,
+    /// the tenant lets the page of the link run public commands
+    pub public_commands_enabled: bool,
 }
 
 impl Resolved {
@@ -200,6 +202,7 @@ pub async fn resolve(k: &Kernel, token: &str) -> Result<Resolved> {
         title: row.get(5),
         meta: row.get(6),
         password_hash: row.get(7),
+        public_commands_enabled: settings.public_commands_enabled,
     })
 }
 

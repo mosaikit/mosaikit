@@ -2048,4 +2048,9 @@ export const IT: Record<string, string> = {
   'Deletes the tables and the items of this plugin in every tenant, then runs its migrations again from the first one. The plugin stays loaded from its folder.': 'Elimina le tabelle e gli elementi di questo plugin in ogni organizzazione, poi esegue di nuovo le sue migrazioni dalla prima. Il plugin resta caricato dalla sua cartella.',
   'A migration changed after it ran: a reset is the way to apply it.': 'Una migrazione è cambiata dopo l’esecuzione: per applicarla serve un azzeramento.',
   'Reset the data of this plugin': 'Azzera i dati di questo plugin',
+  'Public commands': 'Comandi pubblici',
+  'Let the page of a public link run the commands a plugin declares for it (read only). They can use the outside services of the organisation, so leave this off unless you need it.': 'Lascia che la pagina di un link pubblico esegua i comandi che un plugin dichiara per questo scopo (sola lettura). Possono usare i servizi esterni dell’organizzazione: lascia disattivato se non ti serve.',
+  'Commands open to public links': 'Comandi aperti ai link pubblici',
+  'yes (sensitive: anyone who holds a public link may run them, read only, on the shared item)': 'sì (sensibile: chiunque abbia un link pubblico può eseguirli, in sola lettura, sull’elemento condiviso)',
+  'Runs commands for public links': 'Esegue comandi per i link pubblici',
 }

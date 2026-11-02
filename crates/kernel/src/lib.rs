@@ -113,6 +113,10 @@ pub struct TenantSettings {
     pub public_link_max_days: u32,
     #[serde(default = "yes")]
     pub managers_see_titles: bool,
+    /// The page of a public link may run the public commands of its plugin (`[[public_commands]]`).
+    /// Off by default: an anonymous visitor can make the plugin spend an outside paid key.
+    #[serde(default)]
+    pub public_commands_enabled: bool,
 }
 
 fn yes() -> bool {

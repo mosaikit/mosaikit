@@ -365,6 +365,8 @@ pub struct PluginAdminView {
     /// what it asks of the platform (besides `permissions`)
     pub requires: mosaikit_mskp::Requires,
     pub user_permissions: Vec<mosaikit_mskp::UserPermission>,
+    /// commands any holder of a public link may run (`[[public_commands]]`): sensitive, reviewed at install
+    pub public_commands: Vec<mosaikit_mskp::PublicCommandDecl>,
     /// range of versions of Mosaikit the plugin works with (`>=1.2, <2`; `*` = any)
     pub requires_mosaikit: String,
     /// version of the plugin API the plugin was built for
@@ -431,6 +433,7 @@ pub fn admin_views_in(k: &Kernel, admin: &SessionUser, lang: &str) -> Result<Vec
             kpi: p.manifest.localized(lang).kpi,
             requires: p.manifest.requires.clone(),
             user_permissions: p.manifest.localized(lang).user_permissions,
+            public_commands: p.manifest.public_commands.clone(),
             requires_mosaikit: p.manifest.mosaikit_range().to_string(),
             api: p.manifest.api(),
             extends_min: p.manifest.extends.as_ref().map(|e| e.min_version.clone()),

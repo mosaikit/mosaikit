@@ -2,6 +2,11 @@
 
 One version for the whole dev kit, the one of the platform (docs/plugin-devkit-plan.md, D6).
 
+## Unreleased
+
+- `validate`: a plugin with `public` settings or `[[public_commands]]` and no `[requires] mosaikit` gets a warning (an
+  error with `--strict`); `public_commands` is listed among the permissions the Administrator will review.
+
 ## 1.0.0
 
 First version: the executable `mosaikit-plugin`.

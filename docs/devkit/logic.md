@@ -77,7 +77,8 @@ registered. `Hook` has `hook`, `resource`, `id`, `values`, `previous`. `Values` 
 | `ctx.plugin` | this plugin id |
 | `ctx.perms`, `ctx.can("key")` | permissions of the caller: `use`, `create`, `delete`, `share` and the `[[user_permissions]]` they have |
 | `ctx.groups` | the groups of the tenant the caller belongs to, `[{id, name}]` (empty when none), read at every call |
-| `ctx.config`, `ctx.setting("key")` | the `[[config]]` settings of the platform (`None` when not set; secrets included, never send them to the UI) |
+| `ctx.config`, `ctx.setting("key")` | the `[[config]]` settings of the platform (`None` when not set; secrets included, never send them to the UI; none in a public command) |
+| `ctx.public`, `ctx.link_resource()` | `true` and the id of the shared item when a visitor of a public link runs a [public command](#public-commands) |
 | `ctx.log("text")` | a line in the server log |
 
 ## Host operations
@@ -142,6 +143,25 @@ UI, a public link is not a caller. `files.list {parent?}` answers `{entries, tru
 `files.describe {id}` one row; `files.read {id, max_bytes?}` answers `{entry, base64, size, truncated}`, with `max_bytes`
 cut at 4 MiB. A row has `id, name, is_dir, size, mime, created, modified, owner_id, owner_name, my_level, shared,
 parent_id` and never a storage path.
+
+### Public commands
+
+A command named in `[[public_commands]]` can be run by anyone who holds a public link of an item of your plugin
+(`msk.publicCall(name, args)` in the page, `POST /p/{token}/call/{name}`). The kernel runs it **read only, with no user**:
+
+- `ctx.public` is `true`, `ctx.user` is empty, `ctx.perms` and `ctx.groups` are empty, and `ctx.config` has **no secrets**
+  (a secret is reachable only through `fetch_with_key`).
+- `ctx.link_resource()` is the item of the link. `db.query` sees that item and what is inside it, nothing else, whatever the
+  arguments say.
+- Only `db.query` (a `SELECT`), `http.fetch` and `key.get` work; `db.exec`, `resource.*`, `plugin.call`, `notify` and `files.*`
+  fail with `operation not available in a public link`. `key.get` and `fetch_with_key` use the tenant's shared key or the
+  platform's, **never a personal key**.
+- The link is checked on every call (revoked, expired, password, plugin off). The tenant must allow public commands. A link is
+  limited to 30 calls a minute and a tenant to 300; the fuel is a quarter of a normal command; arguments are at most
+  `max_arg_bytes` (16 KiB). Errors: `command_not_public`, `public_commands_off`, `public_rate_limited`, `args_too_large`.
+
+The kernel limits what the command can **read**; it cannot limit what the logic **returns**. Follow the
+[review checklist](security.md#public-link-commands-review-checklist). Test with `MockHost::new().as_public("<item id>")`.
 
 ### Groups and the web
 
@@ -211,6 +231,7 @@ assert_eq!(out.unwrap()[0]["n"], 2);
 |---|---|
 | `on(op, f)` | the answer to a host operation; an operation with no answer fails with `MockHost: no answer for <op>` (except `notify`, accepted) |
 | `with_perms(&[…])` | `ctx.perms` (default the four standard ones) |
+| `as_public(item_id)` | run as a public command: no user, no permissions, `ctx.public`, `ctx.link_resource()` |
 | `with_groups(&[(id, name)])` | `ctx.groups` |
 | `with_plugin_command(plugin, name, f)` | what `call_plugin` returns |
 | `deny(op, message)` | the host refuses an operation, as when the permission is not in the manifest |

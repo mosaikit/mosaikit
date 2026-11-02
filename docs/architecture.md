@@ -593,11 +593,12 @@ request (the server runs every request inside `events::with_request`).
 
 - Whoever has the manage level creates them. They are **read only**, with expiry
   and an optional password; the token is stored only as a hash.
-- Policy of the tenant: `public_links_enabled`, `public_link_max_days`.
+- Policy of the tenant: `public_links_enabled`, `public_link_max_days`, `public_commands_enabled` (default off, §8.13).
 - URL: `{public_url}/p/{token}` on the **untrusted origin**. If the resource has
   folder content (static site) it is served as it is; otherwise the
   public viewer of the plugin opens (`public_view` in the manifest), which receives
-  only the data of that resource (and of its children).
+  only the data of that resource (and of its children). That page may also read the settings its
+  plugin marks public and run the commands it declares for public links (§8.13).
 - Every visit increments `view_count` and is an event (KPI).
 
 ### 5.1 Notifications
@@ -1028,6 +1029,12 @@ key = "endpoint"
 label = "Address of the service"
 kind = "text"            # text | number | bool | choice (with options) | secret
 default = "https://example.com"
+public = false           # true: a public link page may read it (`msk.publicConfig()`, §8.13); never for a secret
+
+[[public_commands]]      # optional: commands any holder of a public link may run, read only (§8.13); sensitive
+name = "tile_ticket"
+description = "A ticket to load the map of the shared item"
+max_arg_bytes = 1024     # optional, at most 16384
 
 [i18n.it]                # optional: the texts in another language
 name = "Note"
@@ -1125,7 +1132,7 @@ the runtime); the SDK turns it into `Error::coded`, and a logic that returns it 
 
 **Context of the call** (`ctx`, `Ctx` in the SDK; old plugins ignore what they do not read): `user`,
 `username`, `tenant` (ids), `plugin`, `perms` (permissions of the caller, §3.2), `config` (settings of
-the plugin) and `groups`: the groups of the tenant the caller belongs to, by name, as
+the plugin) and `groups` (a public command has no `user` and gets `public`, `link_resource` and no secrets in `config`: §8.13): the groups of the tenant the caller belongs to, by name, as
 `[{"id": "<uuid>", "name": "Field"}]` (`[]` when none; never groups of other tenants; read at every
 call). In tests: `MockHost::new().with_groups(&[("g1", "Field")])`.
 
@@ -1423,7 +1430,7 @@ the emoji `[contribution]` (now optional: absent, the name labels the plugin).
 promise it will stay as it is until a sample (or a template of the dev kit) uses it: `[[config]]` and
 `ctx.setting`, `[[user_permissions]]` and `ctx.can`, `permissions.calls` and `plugin.call`, `ctx.notify` and
 `msk.notify`, `network` and `http.fetch`, `script_eval`, `[search]`, the `command` actions of an extension,
-`CrudOptions.panel`, `Resources::create` and `Resources::delete` of the SDK. A change to one of them is announced in
+`CrudOptions.panel`, `Resources::create` and `Resources::delete` of the SDK, `[[config]] public`, `[[public_commands]]`, `msk.publicConfig` / `msk.publicCall` and `ctx.link_resource()` (§8.13). A change to one of them is announced in
 the changelog of the package, with the deprecation rule applied when a distribution relies on it.
 
 ### 8.12 The developer profile
@@ -1481,6 +1488,47 @@ the UI (size, outside requests, what the plugin CSP of §9 blocks), i18n coverag
 `mosaikit-plugin test` runs it before the tests of the logic. The logic is tested natively with `MockHost` (`crates/plugin-sdk/src/testing.rs`,
 with a recipe for `db.query`, `notify`, `call_plugin`, permissions and the Files area) and end to end with `@mosaikit/plugin-testing`
 (`ui/plugin-testing`), which starts or attaches to this server, signs in as a test user, opens the plugin, creates an item and runs axe.
+
+### 8.13 Public pages: settings and commands
+
+What the page of a public link (§5) may ask of its plugin. Both are additive keys of API 1 (no version bump, §8.11): a plugin that uses
+them declares `[requires] mosaikit = ">=1.0"`, because every struct of the manifest refuses unknown keys, so an older Mosaikit
+rejects the manifest (fail closed). `mosaikit-plugin validate` warns (an error with `--strict`) when the range is missing.
+
+**Public settings.** `[[config]]` takes `public = true` (default false, opt-in key by key). The manifest is refused when a `secret`
+is `public`. `plugins::config::public_values(plugin)` returns the non-secret values of the keys marked public (the manifest default
+where the Administrator chose none); the secrets never pass through it. The page reads them with `GET /p/{token}/config` (the link is
+checked first: revoked, expired, tenant policy, plugin off, password) and the UI with `msk.publicConfig()` (host op `public.config`
+of the public viewer, which still refuses every other op). The plugin is always the one of the link.
+
+**Public commands.** `[[public_commands]]` (`name`, `description`, optional `max_arg_bytes`, at most 16 KiB) lists the commands of the
+logic that any holder of the link may run. The Administrator sees them in «What it asks» when the plugin is installed. The page runs
+one with `POST /p/{token}/call/{name}` (JSON body = the arguments, at most 32 KiB; `Content-Type: application/json` is required, so a
+cross-site form cannot send it) and the UI with `msk.publicCall(name, args)` (host op `public.call`). `crud::call_public` does,
+in order: the link is resolved again on **every call** (`open()`: revoked, expired, trashed, plugin off, password cookie), the name must
+be declared (`403 command_not_public`), the tenant policy `public_commands_enabled` must be on (**default off**, set by the Tenant
+Manager in Manage › Settings; `403 public_commands_off`), the arguments must fit (`400 args_too_large`), and the rate limits hold
+(30 calls a minute for a link, 300 for a tenant; `429 public_rate_limited`). It then runs the logic in a **read only** transaction
+(`set transaction read only` on PostgreSQL) with the link context and **no user**:
+
+| Host op in a public command | |
+|---|---|
+| `db.query` | SELECT only (a write, even with `returning`, is refused); RLS limits it to the item of the link and its descendants |
+| `http.fetch` | only the origins the plugin declares in `permissions.network`; with `key`, the key is added by the host |
+| `key.get` | the tenant's shared key, else the platform's; **never a personal key**, not even the link creator's |
+| everything else (`db.exec`, `resource.*`, `plugin.call`, `notify`, `files.*`) | refused (default deny) |
+
+`ctx` of a public command: `public = true`, `link_resource` (SDK `ctx.link_resource()`), `tenant`, `plugin`, empty `perms` and
+`groups`, no `user`, and `config` **without the secrets** (a secret is reachable only through `http.fetch` with `key`, which never shows
+the value). The fuel is a quarter of a normal command (`FUEL_PUBLIC`). The audit event `link.call` (link, plugin, command; no
+arguments) is written at most once a minute for a link, so an anonymous caller cannot flood the log. Nothing else is minted: the link
+token is the credential, so a stolen link has the exposure of the page itself, and there is no path to a session.
+
+**What the kernel cannot do, so the plugin author must.** The kernel limits what a public command can READ (the item of the link, the
+keys of the tenant); it cannot limit what the logic RETURNS, and WASM may return data it legitimately read. Review checklist for every
+public command: (1) never put a setting, a key or anything from `ctx.config` in the answer; (2) never take the id of the item from the
+arguments, use `ctx.link_resource()` only; (3) treat every argument as chosen by a stranger; (4) remember that an outside request made
+with `key` spends the tenant's or the platform's paid key for an anonymous visitor, so keep it small and cache what you can.
 
 ## 9. Web security: origins, cookies, CSP
 

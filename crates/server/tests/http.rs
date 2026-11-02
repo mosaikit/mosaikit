@@ -2316,3 +2316,127 @@ async fn the_developer_profile_lists_its_users_and_switches_between_them() {
     let r = a.call(Some(&root), Method::POST, "/api/dev/plugins/com.example.x/reset", None).await;
     assert_eq!(r.status, StatusCode::BAD_REQUEST);
 }
+
+/// Logic that answers with the message it received (the public call shows what the logic is given).
+fn echo_wasm() -> Vec<u8> {
+    wat::parse_str(
+        r#"(module
+  (memory (export "memory") 2)
+  (data (i32.const 32768) "{\"ok\":")
+  (global $bump (mut i32) (i32.const 65536))
+  (func (export "msk_alloc") (param $len i32) (result i32)
+    (local $p i32) (local.set $p (global.get $bump))
+    (global.set $bump (i32.add (global.get $bump) (local.get $len))) (local.get $p))
+  (func (export "msk_call") (param $ptr i32) (param $len i32) (result i64)
+    (memory.copy (i32.const 32774) (local.get $ptr) (local.get $len))
+    (i32.store8 (i32.add (i32.const 32774) (local.get $len)) (i32.const 125))
+    (i64.or (i64.shl (i64.const 32768) (i64.const 32))
+            (i64.extend_i32_u (i32.add (local.get $len) (i32.const 7)))))
+)"#,
+    )
+    .unwrap()
+}
+
+#[tokio::test]
+async fn public_settings_and_commands_over_http() {
+    use mosaikit_kernel::plugins::config::{self as pconf, ConfigChange};
+    const ID: &str = "com.test.pubecho";
+    let a = App::new().await;
+    let toml = format!(
+        "id = \"{ID}\"\nname = \"Echo\"\nversion = \"1.0.0\"\n[contribution]\nicon = \"x\"\nlabel = \"Echo\"\n\
+         [[resources]]\nname = \"items\"\nfields = [{{ key = \"title\", kind = \"text\" }}]\n\
+         [[config]]\nkey = \"endpoint\"\nlabel = \"Endpoint\"\nkind = \"text\"\ndefault = \"https://tiles.example\"\npublic = true\n\
+         [[config]]\nkey = \"internal\"\nlabel = \"Internal\"\nkind = \"text\"\ndefault = \"hidden\"\n\
+         [[config]]\nkey = \"token\"\nlabel = \"Token\"\nkind = \"secret\"\n\
+         [[public_commands]]\nname = \"ticket\"\ndescription = \"a ticket for the shared item\"\n"
+    );
+    let mut files = std::collections::BTreeMap::new();
+    files.insert("plugin.toml".to_string(), toml.into_bytes());
+    files.insert("logic.wasm".to_string(), echo_wasm());
+    let pkg = mosaikit_mskp::pack(&files, Some(&mosaikit_kernel::testing::test_key())).unwrap();
+    a.t.install_package(&pkg).await.unwrap();
+    a.t.tenant("alfa").await;
+    let admin = a.t.admin().await;
+    let mut ch = ConfigChange::default();
+    ch.secrets.insert("token".into(), json!("tok-secret-9"));
+    pconf::set_config(&a.t, &admin, ID, &ch).await.unwrap();
+    let g = a.login("alfa", "alfa-manager", PASSWORD).await;
+    let item = |title: &str| json!({ "values": { "title": title } });
+    let rid = a
+        .call(Some(&g), Method::POST, &format!("/api/t/alfa/p/{ID}/r/items"), Some(item("shared")))
+        .await
+        .json()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let link = |body: Value| {
+        let (a, g, rid) = (&a, &g, rid.clone());
+        async move {
+            let l = a
+                .call(Some(g), Method::POST, &format!("/api/t/alfa/resources/{rid}/links"), Some(body))
+                .await;
+            l.json()["url"].as_str().unwrap().trim_start_matches(&a.t.cfg.public_url).to_string()
+        }
+    };
+    let path = link(json!({})).await;
+    let post = |path: String, ctype: Option<&str>, body: &str| {
+        let mut b = Request::builder().method(Method::POST).uri(path);
+        if let Some(c) = ctype {
+            b = b.header(header::CONTENT_TYPE, c);
+        }
+        send(&a.untrusted, b.body(Body::from(body.to_string())).unwrap())
+    };
+
+    // settings: only what the plugin marks public, never the secret
+    let cfg = a.get_untrusted(&format!("{path}config"), None).await;
+    assert_eq!(cfg.status, StatusCode::OK);
+    assert_eq!(cfg.json(), json!({ "endpoint": "https://tiles.example" }));
+    assert!(!cfg.text().contains("tok-secret-9") && !cfg.text().contains("hidden"));
+
+    // the tenant has not allowed public commands: refused, nothing ran
+    let r = post(format!("{path}call/ticket"), Some("application/json"), "{}").await;
+    assert_eq!((r.status, r.json()["code"].as_str()), (StatusCode::FORBIDDEN, Some("public_commands_off")));
+    let mut s: Value = a.call(Some(&g), Method::GET, "/api/t/alfa/manage/settings", None).await.json();
+    s["public_commands_enabled"] = json!(true);
+    let r = a.call(Some(&g), Method::PUT, "/api/t/alfa/manage/settings", Some(s)).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+
+    // a declared command runs: the logic sees the link item, no user and no secret
+    let r = post(format!("{path}call/ticket"), Some("application/json"), r#"{"z":3}"#).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let msg = r.json()["ok"].clone();
+    assert_eq!(msg["ctx"]["link_resource"], rid);
+    assert_eq!((msg["args"].clone(), msg["ctx"]["public"].clone()), (json!({ "z": 3 }), json!(true)));
+    assert!(!r.text().contains("tok-secret-9"), "{}", r.text());
+    assert!(msg["ctx"].get("user").is_none());
+    // an undeclared command, a form post and a body over the limit
+    let r = post(format!("{path}call/other"), Some("application/json"), "{}").await;
+    assert_eq!((r.status, r.json()["code"].as_str()), (StatusCode::FORBIDDEN, Some("command_not_public")));
+    let r = post(format!("{path}call/ticket"), Some("application/x-www-form-urlencoded"), "a=b").await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST);
+    let r = post(format!("{path}call/ticket"), None, "{}").await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST);
+    let big = format!("{{\"a\":\"{}\"}}", "x".repeat(40_000));
+    assert_eq!(
+        post(format!("{path}call/ticket"), Some("application/json"), &big).await.status,
+        StatusCode::BAD_REQUEST
+    );
+    // a password-locked link: neither settings nor commands without the unlock cookie
+    let lpath = link(json!({ "password": "open123" })).await;
+    let r = a.get_untrusted(&format!("{lpath}config"), None).await;
+    assert_eq!(r.status, StatusCode::NOT_FOUND);
+    let r = post(format!("{lpath}call/ticket"), Some("application/json"), "{}").await;
+    assert_eq!(r.status, StatusCode::NOT_FOUND);
+    assert!(!r.text().contains("ctx"));
+
+    // a revoked link: nothing, and the other link of the item is not affected
+    let links =
+        a.call(Some(&g), Method::GET, &format!("/api/t/alfa/resources/{rid}/links"), None).await.json();
+    for l in links.as_array().unwrap() {
+        a.call(Some(&g), Method::DELETE, &format!("/api/t/alfa/links/{}", l["id"].as_str().unwrap()), None)
+            .await;
+    }
+    assert_eq!(a.get_untrusted(&format!("{path}config"), None).await.status, StatusCode::NOT_FOUND);
+    let r = post(format!("{path}call/ticket"), Some("application/json"), "{}").await;
+    assert_eq!(r.status, StatusCode::NOT_FOUND);
+}

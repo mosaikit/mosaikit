@@ -213,6 +213,21 @@ Impostazioni che l'Administrator fissa per la piattaforma (Plugin › Configuraz
 | `kind` | `text`, `number`, `bool`, `choice`, `secret` |
 | `options` | obbligatorie per `choice` |
 | `default` | deve adattarsi al tipo; non ammesso per `secret` |
+| `public` | bool, predefinito false: la pagina di un link pubblico può leggerla (`msk.publicConfig()`). **Un `secret` non può essere pubblico**: il manifesto viene rifiutato |
+
+## `[[public_commands]]`
+
+Comandi della logica che **chiunque abbia un link pubblico** può eseguire, in sola lettura, sull'elemento condiviso.
+**Sensibile**: l'Administrator li vede in «Cosa chiede» quando il plugin viene installato, e un'organizzazione deve attivare
+la regola «Comandi pubblici» (disattivata di default) perché funzionino. Richiede `[requires] mosaikit = ">=1.0"` (un Mosaikit
+più vecchio rifiuta la chiave); `validate` avvisa se l'intervallo manca, con `--strict` fallisce. Vedi
+[Logica](logic.md#comandi-pubblici) e [Sicurezza](security.md#comandi-dei-link-pubblici-lista-di-revisione).
+
+| Chiave | Regola |
+|---|---|
+| `name` | il comando della logica, identificatore, unico |
+| `description` | obbligatoria: cosa può farci un visitatore, mostrata all'Administrator |
+| `max_arg_bytes` | facoltativa, da 1 a 16384 (predefinito e massimo) |
 
 ## `[search]`
 

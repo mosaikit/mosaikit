@@ -15,6 +15,8 @@ use crate::{Error, Kernel, Result};
 
 pub const FUEL_COMMAND: u64 = 2_000_000_000;
 pub const FUEL_HOOK: u64 = 500_000_000;
+/// Fuel of a public command: anonymous visitors get a quarter of the budget of a command.
+pub const FUEL_PUBLIC: u64 = 500_000_000;
 const MAX_HTTP_BODY: usize = 4 << 20;
 
 /// Maximum depth of the calls between plugins (A -> B -> C).
@@ -23,7 +25,13 @@ const MAX_CALL_DEPTH: u8 = 3;
 pub(crate) struct KernelHost {
     rt: tokio::runtime::Handle,
     kernel: Option<Arc<Kernel>>,
-    caller: crate::Caller,
+    /// who runs the call; `None` for a public command (a visitor of a public link has no user)
+    caller: Option<crate::Caller>,
+    /// the tenant of the call
+    tenant: uuid::Uuid,
+    /// public mode: only `db.query` (SELECT, read only), `http.fetch` and `key.get` are available, and
+    /// a key resolves only to the tenant's shared key or the platform's, never to a personal one
+    public: bool,
     calls: Vec<String>,
     depth: u8,
     tx: Option<Tx>,
@@ -59,6 +67,11 @@ pub(crate) fn bind_json(mut q: mosaikit_db::Query, params: &[Value]) -> mosaikit
 }
 
 impl KernelHost {
+    /// The person who runs the call (not available to a public command).
+    fn user(&self) -> std::result::Result<crate::Caller, String> {
+        self.caller.clone().ok_or_else(|| "operation not available in a public link".to_string())
+    }
+
     fn tx(&mut self) -> std::result::Result<&mut Tx, String> {
         self.tx.as_mut().ok_or_else(|| "transaction not available".to_string())
     }
@@ -66,6 +79,9 @@ impl KernelHost {
     fn db(&mut self, rows: bool, req: &Value) -> std::result::Result<Value, String> {
         let sql = req.get("sql").and_then(Value::as_str).ok_or("missing sql")?;
         let checked = mosaikit_sql_guard::check_query(sql, &self.schema).map_err(|e| e.to_string())?;
+        if self.public && checked.kind != mosaikit_sql_guard::Kind::Select {
+            return Err("a public command can only read".to_string());
+        }
         let params = params(req);
         let rt = self.rt.clone();
         let tx = self.tx()?;
@@ -81,7 +97,7 @@ impl KernelHost {
 
     fn resource(&mut self, op: &str, req: &Value) -> std::result::Result<Value, String> {
         let rt = self.rt.clone();
-        let (k, tenant) = (self.kernel.clone(), self.caller.tenant.tenant_id);
+        let (k, tenant) = (self.kernel.clone(), self.tenant);
         let tx = self.tx()?;
         match op {
             "resource.create" => {
@@ -132,7 +148,7 @@ impl KernelHost {
             // SQLite has one write transaction at a time: the one of the caller is open
             return Err("plugin.call requires PostgreSQL".into());
         }
-        let (caller, depth) = (self.caller.clone(), self.depth + 1);
+        let (caller, depth) = (self.user()?, self.depth + 1);
         self.rt.block_on(async move {
             crate::crud::call_depth(&k, &caller, &target, &name, args, depth).await.map_err(|e| e.message)
         })
@@ -147,6 +163,7 @@ impl KernelHost {
         let origin = crate::config::origin_of(&url);
         let k = self.kernel.clone().ok_or("kernel not available")?;
         let caller = self.caller.clone();
+        let tenant = self.tenant;
         let allowed = self.network.contains(&origin);
         // the deployer's private destinations, only for the origins this plugin declares
         let exempt = crate::webfetch::private_exemptions(&k, &self.network);
@@ -169,7 +186,7 @@ impl KernelHost {
             if !allowed {
                 let mut by_address = false;
                 for s in &address_services {
-                    if let Ok(Some(a)) = crate::tenancy::keys::key_in_use(&k, &caller, s).await {
+                    if let Ok(Some(a)) = key_for(&k, caller.as_ref(), tenant, s).await {
                         by_address |= crate::config::origin_of(&a) == origin;
                     }
                 }
@@ -179,7 +196,7 @@ impl KernelHost {
             }
             let mut headers = Vec::new();
             if let Some(s) = key_service {
-                match crate::tenancy::keys::key_in_use(&k, &caller, &s).await.map_err(|e| e.message)? {
+                match key_for(&k, caller.as_ref(), tenant, &s).await.map_err(|e| e.message)? {
                     Some(key) => headers.push(("authorization".to_string(), format!("Bearer {key}"))),
                     None => return Err(format!("no key of the service {s} is set")),
                 }
@@ -205,12 +222,10 @@ impl KernelHost {
         }
         let k = self.kernel.clone().ok_or("kernel not available")?;
         let caller = self.caller.clone();
+        let tenant = self.tenant;
         let service = service.to_string();
         self.rt.block_on(async move {
-            crate::tenancy::keys::key_in_use(&k, &caller, &service)
-                .await
-                .map(|v| json!(v))
-                .map_err(|e| e.message)
+            key_for(&k, caller.as_ref(), tenant, &service).await.map(|v| json!(v)).map_err(|e| e.message)
         })
     }
 }
@@ -227,9 +242,23 @@ impl KernelHost {
         let n: crate::notify::PluginNote =
             serde_json::from_value(req.clone()).map_err(|e| format!("invalid notification: {e}"))?;
         let k = self.kernel.clone().ok_or("kernel not available")?;
-        crate::notify::check_note(&k, &self.caller, &self.plugin_id, &n).map_err(|e| e.message)?;
+        crate::notify::check_note(&k, &self.user()?, &self.plugin_id, &n).map_err(|e| e.message)?;
         self.notes.push(n);
         Ok(Value::Null)
+    }
+}
+
+/// The key of a service in use for the call: for a person, own, else the tenant's, else the
+/// platform's; for a public command (no person) only the tenant's shared key or the platform's.
+async fn key_for(
+    k: &Kernel,
+    caller: Option<&crate::Caller>,
+    tenant: uuid::Uuid,
+    service: &str,
+) -> Result<Option<String>> {
+    match caller {
+        Some(c) => crate::tenancy::keys::key_in_use(k, c, service).await,
+        None => crate::tenancy::keys::key_for_public(k, tenant, service).await,
     }
 }
 
@@ -261,7 +290,7 @@ impl KernelHost {
             ));
         }
         let k = self.kernel.clone().ok_or_else(|| Coded("internal", "kernel not available".into()))?;
-        let c = self.caller.clone();
+        let c = self.user().map_err(|m| Coded("permission_denied", m))?;
         let uuid = |key: &str| -> std::result::Result<Option<uuid::Uuid>, Coded> {
             match req.get(key) {
                 None | Some(Value::Null) => Ok(None),
@@ -320,6 +349,10 @@ impl Host for KernelHost {
 
     fn call(&mut self, op: &str, req: &Value) -> std::result::Result<Value, String> {
         self.last_code = None;
+        // a public command is default deny: reading, outside requests and keys, nothing else
+        if self.public && !matches!(op, "db.query" | "http.fetch" | "key.get") {
+            return Err(format!("operation not available in a public link: {op}"));
+        }
         match op {
             "files.list" | "files.describe" | "files.read" => {
                 self.files(op, req).map_err(|Coded(code, m)| {
@@ -366,11 +399,25 @@ pub(crate) async fn run(
         // the settings of the plugin chosen by the Administrator (`[[config]]`)
         ctx["config"] = config;
     }
-    let module = p.module.clone().ok_or_else(|| Error::bad(format!("{} has no WASM logic", p.id)))?;
-    let host = KernelHost {
+    let host = new_host(p, tx, Some(c.clone()), c.tenant.tenant_id, false, depth, k);
+    exec(k, p, host, msg, fuel, notes).await
+}
+
+fn new_host(
+    p: &Arc<LoadedPlugin>,
+    tx: Tx,
+    caller: Option<crate::Caller>,
+    tenant: uuid::Uuid,
+    public: bool,
+    depth: u8,
+    k: &Kernel,
+) -> KernelHost {
+    KernelHost {
         rt: tokio::runtime::Handle::current(),
         kernel: k.arc(),
-        caller: c.clone(),
+        caller,
+        tenant,
+        public,
         calls: p.manifest.permissions.calls.clone(),
         depth,
         tx: Some(tx),
@@ -389,7 +436,18 @@ pub(crate) async fn run(
         files_read: p.manifest.permissions.files_read,
         last_code: None,
         notes: Vec::new(),
-    };
+    }
+}
+
+async fn exec(
+    k: &Kernel,
+    p: &Arc<LoadedPlugin>,
+    host: KernelHost,
+    msg: Value,
+    fuel: u64,
+    notes: &mut Vec<crate::notify::PluginNote>,
+) -> Result<(Value, Tx)> {
+    let module = p.module.clone().ok_or_else(|| Error::bad(format!("{} has no WASM logic", p.id)))?;
     let engine = k.engine.clone();
     let (res, host) =
         tokio::task::spawn_blocking(move || engine.call_with_fuel(&module, &msg, host, fuel)).await?;
@@ -408,6 +466,34 @@ pub(crate) async fn run(
     }
     notes.extend(asked);
     Ok((reply.get("ok").cloned().unwrap_or(Value::Null), tx))
+}
+
+/// Runs a public command of the plugin for a visitor of a public link, in the (read only) transaction
+/// `tx` that carries the link context. No user: the logic gets `ctx.public = true` and
+/// `ctx.link_resource`, the settings without secrets and no groups or permissions.
+pub(crate) async fn run_public(
+    k: &Kernel,
+    r: &crate::links::Resolved,
+    p: &Arc<LoadedPlugin>,
+    tx: Tx,
+    name: &str,
+    args: Value,
+) -> Result<(Value, Tx)> {
+    let msg = json!({
+        "abi": 1, "kind": "command", "name": name, "args": args,
+        "ctx": {
+            "public": true,
+            "link_resource": r.resource.to_string(),
+            "tenant": r.tenant.to_string(),
+            "plugin": p.id,
+            "perms": [],
+            "groups": [],
+            "config": crate::plugins::config::for_public_logic(k, &p.id).await?,
+        },
+    });
+    let host = new_host(p, tx, None, r.tenant, true, 0, k);
+    let mut notes = Vec::new();
+    exec(k, p, host, msg, FUEL_PUBLIC, &mut notes).await
 }
 
 /// `ctx.groups`: `[{"id", "name"}]`, the groups of the tenant the caller belongs to (by name).

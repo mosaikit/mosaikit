@@ -32,6 +32,8 @@ dell'host ed è accettato solo da essa. Una chiamata che non riceve risposta in 
 | `msk.at` | il posto in cui si è aperta la pagina (da una notifica, o il `place` di una voce `[[nav]]`) |
 | `msk.tab` | in una pagina di estensione aperta come scheda: `{ base, resource, item, key, level }` |
 | `msk.isPublic`, `msk.publicResource`, `msk.publicGet()` | visualizzatore dei link pubblici (`public_view`) |
+| `msk.publicConfig()` | le impostazioni `[[config]]` con `public = true` (mai un segreto), per chiave |
+| `msk.publicCall(name, args)` | esegue un comando di `[[public_commands]]`, in sola lettura, sull'elemento condiviso; errori `command_not_public`, `public_commands_off`, `public_rate_limited` |
 
 ### Operazioni
 

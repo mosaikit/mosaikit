@@ -37,6 +37,8 @@ minimum:
 | `network`, `frame_src`, `web` | reach outside origins; the logic goes through the host, which refuses private addresses |
 | `calls` | call commands of named plugins; the called plugin applies its own rules for the same user |
 | `notify` | send notifications; never to recipients you choose |
+| `[[public_commands]]` | anyone with a public link runs the command, read only, on the shared item. **Sensitive** (see below) |
+| `[[config]] public = true` | a public page may read that setting. Never a secret: the manifest refuses it |
 | `files`, `content` | own files and uploaded folder content |
 
 When the logic gets a refusal such as the text «the plugin does not declare notify in [permissions]» or `permission_denied`, the
@@ -45,6 +47,21 @@ manifest lacks the key; `validate --strict` finds it before you install.
 Permissions of **people** (`use`, `create`, `delete`, `share` and your `[[user_permissions]]`) are separate: the kernel
 enforces the standard ones; **your logic enforces its own** with `ctx.can`. Hiding a button with `msk.can` is only
 comfort.
+
+## Public link commands: review checklist
+
+A command in `[[public_commands]]` is run by strangers. The kernel restricts what it can read (the item of the link and what is
+inside it, the keys of the tenant or the platform), not what it **returns**: WASM may return data it legitimately read, and the
+kernel cannot tell. So the plugin author carries this part, and a reviewer should check each public command against this list:
+
+1. **Never echo a secret.** Nothing from `ctx.config`, no key, no URL with a token in the answer, an error or a log line. Use
+   `fetch_with_key` so the logic never reads the key.
+2. **Never take the id of the item from the arguments.** Use `ctx.link_resource()` only. Arguments are chosen by the visitor.
+3. **Treat every argument as hostile**: validate size and shape, bind parameters in SQL, build no URL by pasting them.
+4. **Mind the cost.** An outside request with a key spends the tenant's or the platform's paid key for an anonymous visitor. Keep
+   it small, cache what you can, and expect the limits (30 a minute per link, 300 per tenant).
+5. **Return the least that the page needs**, not the whole row, and declare only the commands the public page really calls.
+6. Remember the tenant policy: it is off by default, so the page must work (or say so) when the command is refused.
 
 ## What is signed
 

@@ -2,6 +2,12 @@
 
 One version for the whole dev kit, the one of the platform.
 
+## Unreleased
+
+- Manifest: `[[config]] public` (refused on `kind = "secret"`) and `[[public_commands]]` (`name`, `description`,
+  `max_arg_bytes`, at most `MAX_PUBLIC_ARG_BYTES`). Additive: manifest v3 and plugin API 1 are unchanged; a plugin that
+  uses them needs `[requires] mosaikit = ">=1.0"`.
+
 ## 1.0.0
 
 First published version: manifest v3, package format 3, signatures, trusted keys, version ranges. Metadata for

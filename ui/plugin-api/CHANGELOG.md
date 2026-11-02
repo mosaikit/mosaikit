@@ -3,6 +3,13 @@
 Versions follow the plugin API: see `docs/architecture.md` §8.11 of Mosaikit. A deprecated item stays for one major
 version and is removed in the next.
 
+## Unreleased
+
+- `msk.publicConfig()` (host op `public.config`): the `[[config]]` settings marked `public = true`, in a public link.
+- `msk.publicCall(name, args)` (host op `public.call`): runs a command of `[[public_commands]]` in a public link, read
+  only, on the shared item. New error codes: `command_not_public`, `public_commands_off`, `public_rate_limited`,
+  `args_too_large`. Needs `[requires] mosaikit = ">=1.0"` in the plugin; plugin API unchanged (additive).
+
 ## 1.0.0
 
 First version of the plugin API (API 1).

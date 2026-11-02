@@ -114,6 +114,22 @@ pub struct Ctx {
     /// included: key -> value (`null` when not set).
     #[serde(default)]
     pub config: serde_json::Value,
+    /// `true` when a visitor of a public link runs the command (`[[public_commands]]`): there is no
+    /// user, `config` has no secrets, and only `db.query` (read), `http.fetch` and `key.get` work.
+    #[serde(default)]
+    pub public: bool,
+    /// The item of the public link: the only id a public command may work on. Never take the id of
+    /// the item from the arguments of a public command (a visitor chooses them).
+    #[serde(default)]
+    link_resource: Option<String>,
+}
+
+impl Ctx {
+    /// The item of the public link that runs this command (`None` outside a public command). The
+    /// kernel lets a public command read this item and what is inside it, nothing else.
+    pub fn link_resource(&self) -> Option<&str> {
+        self.link_resource.as_deref()
+    }
 }
 
 /// A group of the tenant the caller belongs to (`ctx.groups`).

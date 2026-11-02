@@ -34,6 +34,8 @@ minimo:
 | Permesso | Perché conta |
 |---|---|
 | `files_read` | legge l'area File **come il chiamante**: mai più di quanto il chiamante vede. **Sensibile** |
+| `[[public_commands]]` | chiunque abbia un link pubblico esegue il comando, in sola lettura, sull'elemento condiviso. **Sensibile** (vedi sotto) |
+| `[[config]] public = true` | una pagina pubblica può leggere quell'impostazione. Mai un segreto: il manifesto lo rifiuta |
 | `script_eval` | il plugin può eseguire stringhe come codice. Solo per codice di cui ci si fida. **Sensibile** |
 | `network`, `frame_src`, `web` | raggiungono origini esterne; la logica passa dall'host, che rifiuta gli indirizzi privati |
 | `calls` | chiamano comandi di plugin indicati; il plugin chiamato applica le proprie regole per lo stesso utente |
@@ -53,6 +55,24 @@ Un `.mskp` è uno zip con `MANIFEST.sha256` (l'hash di ogni file) e `SIGNATURE` 
 dell'editore). All'installazione l'host ricalcola ogni hash (nessun file in più o in meno), controlla la firma con le
 **chiavi fidate** della configurazione (`trusted_keys`) e la blocklist. `allow_unsigned = true` è solo per lo sviluppo e
 segnala il pacchetto. Dettagli: [Pacchetto e firma](packaging.md).
+
+## Comandi dei link pubblici: lista di revisione
+
+Un comando in `[[public_commands]]` lo eseguono degli sconosciuti. Il kernel limita cosa può leggere (l'elemento del link e ciò
+che contiene, le chiavi dell'organizzazione o della piattaforma), non cosa **restituisce**: il WASM può restituire dati che ha
+letto legittimamente e il kernel non può accorgersene. Questa parte spetta all'autore del plugin, e chi rivede il plugin dovrebbe
+controllare ogni comando pubblico con questa lista:
+
+1. **Mai restituire un segreto.** Niente da `ctx.config`, nessuna chiave, nessun URL con un token in una risposta, in un errore
+   o in una riga di log. Usa `fetch_with_key`, così la logica non legge mai la chiave.
+2. **Mai prendere l'id dell'elemento dagli argomenti.** Usa solo `ctx.link_resource()`. Gli argomenti li sceglie il visitatore.
+3. **Considera ostile ogni argomento**: controlla dimensione e forma, usa i parametri nell'SQL, non costruire URL incollandoli.
+4. **Bada al costo.** Una richiesta esterna con una chiave spende la chiave a pagamento dell'organizzazione o della piattaforma
+   per un visitatore anonimo. Tienila piccola, usa la cache dove puoi e aspettati i limiti (30 al minuto per link, 300 per
+   organizzazione).
+5. **Restituisci il minimo che serve alla pagina**, non l'intera riga, e dichiara solo i comandi che la pagina pubblica chiama.
+6. Ricorda la regola dell'organizzazione: è disattivata di default, quindi la pagina deve funzionare (o dirlo) quando il comando
+   viene rifiutato.
 
 ## Segreti
 

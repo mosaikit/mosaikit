@@ -17,8 +17,9 @@ pub use manifest::{
     is_media_name, is_plugin_id, is_service_id, schema_name, ConfigDecl, ConfigKind, Contribution,
     ExtActionDecl, ExtFieldDecl, ExtTabDecl, Extends, ExtensionDecl, ExtensionTranslation, FieldDecl,
     FieldKind, Incompatible, KeyScope, KpiDecl, KpiTranslation, Manifest, NavDecl, PermissionTranslation,
-    Permissions, PluginKind, Requires, ResourceDecl, ResourceTranslation, ServiceKeyDecl, Translation,
-    UiDecl, UserPermission, ABI_VERSION, API_VERSION, STANDARD_PERMISSIONS,
+    Permissions, PluginKind, PublicCommandDecl, Requires, ResourceDecl, ResourceTranslation, ServiceKeyDecl,
+    Translation, UiDecl, UserPermission, ABI_VERSION, API_VERSION, MAX_PUBLIC_ARG_BYTES,
+    STANDARD_PERMISSIONS,
 };
 pub use package::{
     pack, package_sha256, parse_migration_name, Package, MAX_FILE_BYTES, MAX_PACKAGE_BYTES, WASM_FILE,

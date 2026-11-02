@@ -182,6 +182,30 @@ pub async fn for_logic(k: &Kernel, plugin: &str) -> Result<Value> {
     Ok(Value::Object(out))
 }
 
+/// What the page of a public link may read of the settings of its plugin: the keys declared
+/// `public = true`, never a secret (the manifest refuses that pair, and `effective` leaves secrets out
+/// again, so two layers hold). The plugin is the one of the link, never one a visitor names.
+pub async fn public_values(k: &Kernel, plugin: &str) -> Result<Map<String, Value>> {
+    let Some(p) = k.plugins.get(plugin) else { return Ok(Map::new()) };
+    let all = effective(&p.manifest.config, &stored(k, plugin).await?);
+    Ok(all
+        .into_iter()
+        .filter(|(key, _)| {
+            p.manifest.config.iter().any(|d| d.public && d.kind != ConfigKind::Secret && &d.key == key)
+        })
+        .collect())
+}
+
+/// What the logic receives in `ctx.config` when a visitor of a public link runs a public command:
+/// the non-secret values only. A secret is reachable there only through `http.fetch` with `key`.
+pub async fn for_public_logic(k: &Kernel, plugin: &str) -> Result<Value> {
+    let Some(p) = k.plugins.get(plugin) else { return Ok(json!({})) };
+    if p.manifest.config.is_empty() {
+        return Ok(json!({}));
+    }
+    Ok(Value::Object(effective(&p.manifest.config, &stored(k, plugin).await?)))
+}
+
 /// Removes the secrets of a plugin (uninstall).
 pub(crate) async fn forget(k: &Kernel, plugin: &str) -> Result<()> {
     mosaikit_db::query("delete from core.secrets where name like $1")
