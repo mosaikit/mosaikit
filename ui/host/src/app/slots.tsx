@@ -4,6 +4,7 @@
 // `msk-*` they carry (docs/architecture.md, layouts).
 
 import { useState, type ReactNode } from 'react'
+import { useHoverMenu, type HoverMenu } from './hoverMenu.ts'
 import { useQueryClient } from '@tanstack/react-query'
 import { Bell, Check, ChevronDown, ChevronRight, CircleHelp, Contrast, KeyRound, LogOut, Settings, ShieldCheck, Trash2, UserRound } from 'lucide-react'
 import { api } from '../api.ts'
@@ -91,6 +92,16 @@ const itemClass = (active: boolean, mini: boolean) =>
     mini && 'justify-center px-0',
   )
 
+/** An icon of the closed sidebar with a menu: it opens on click, keyboard and, with a mouse, on hover. */
+function MiniFlyout({ item }: { item: NavItem }) {
+  const hover = useHoverMenu(true)
+  return (
+    <li {...hover.areaProps}>
+      <FlyoutMenu item={item} hover={hover} trigger={<button type="button" className={itemClass(hasActive(item), true)} aria-label={item.label}>{item.icon}</button>} />
+    </li>
+  )
+}
+
 function TreeItem({ item, onPick, mini, depth = 0 }: { item: NavItem; onPick?: () => void; mini: boolean; depth?: number }) {
   const kids = item.children ?? []
   const [open, setOpen] = useState(() => hasActive(item))
@@ -105,9 +116,7 @@ function TreeItem({ item, onPick, mini, depth = 0 }: { item: NavItem; onPick?: (
         </li>
       )
     return (
-      <li>
-        <FlyoutMenu item={item} trigger={<button type="button" className={itemClass(hasActive(item), true)} aria-label={item.label} title={item.label}>{item.icon}</button>} />
-      </li>
+      <MiniFlyout item={item} />
     )
   }
   const pad = depth ? { paddingLeft: `${10 + depth * 18}px` } : undefined
@@ -162,12 +171,13 @@ function TreeItem({ item, onPick, mini, depth = 0 }: { item: NavItem; onPick?: (
 }
 
 /** The pages of an app in a menu (rail, closed sidebar, tabs): its own page first, then its entries. */
-export function FlyoutMenu({ item, trigger, side = 'right' }: { item: NavItem; trigger: ReactNode; side?: 'right' | 'bottom' }) {
+export function FlyoutMenu({ item, trigger, side = 'right', hover }: { item: NavItem; trigger: ReactNode; side?: 'right' | 'bottom'; hover?: HoverMenu }) {
   const rows = (items: NavItem[], depth: number): ReactNode[] =>
     items.flatMap((c) => [
       c.href ? (
-        <DropdownMenuItem key={`${depth}-${c.label}-${c.href}`} onSelect={() => go(c.href!)} style={{ paddingLeft: `${8 + depth * 14}px` }} className={cn(c.active && 'font-semibold')}>
-          {c.label}
+        <DropdownMenuItem key={`${depth}-${c.label}-${c.href}`} onSelect={() => go(c.href!)} style={{ paddingLeft: `${8 + depth * 14}px` }} className={cn('gap-2', c.active && 'font-semibold')}>
+          {c.icon}
+          <span className="truncate">{c.label}</span>
         </DropdownMenuItem>
       ) : (
         <DropdownMenuLabel key={`${depth}-${c.label}`} className="text-xs text-muted-foreground" style={{ paddingLeft: `${8 + depth * 14}px` }}>
@@ -177,11 +187,23 @@ export function FlyoutMenu({ item, trigger, side = 'right' }: { item: NavItem; t
       ...rows(c.children ?? [], depth + 1),
     ])
   return (
-    <DropdownMenu>
+    <DropdownMenu open={hover?.open} onOpenChange={hover?.onOpenChange} modal={hover ? false : undefined}>
       <DropdownMenuTrigger asChild>{trigger}</DropdownMenuTrigger>
-      <DropdownMenuContent side={side} align="start" className="msk-flyout w-56">
+      <DropdownMenuContent
+        side={side}
+        align="start"
+        className="msk-flyout w-56"
+        {...hover?.contentProps}
+        // opened by the pointer: Escape does not pull the focus back to the icon
+        onCloseAutoFocus={hover?.viaHover ? (e) => e.preventDefault() : undefined}
+      >
         <DropdownMenuLabel className="text-xs uppercase text-muted-foreground">{item.label}</DropdownMenuLabel>
-        {item.href && <DropdownMenuItem onSelect={() => go(item.href!)}>{t('Open {name}', { name: item.label })}</DropdownMenuItem>}
+        {item.href && (
+          <DropdownMenuItem onSelect={() => go(item.href!)} className="gap-2">
+            {item.icon}
+            <span className="truncate">{t('Open {name}', { name: item.label })}</span>
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         {rows(item.children ?? [], 0)}
       </DropdownMenuContent>

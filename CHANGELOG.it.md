@@ -14,6 +14,7 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
 ### La shell
 
+- La barra laterale ha uno stile più sobrio: niente linee di separazione né linee attorno alla voce selezionata (ha uno sfondo morbido e il colore di accento); in un gruppo le app sono rientrate sotto il titolo e le loro pagine un livello più in basso; i menu della barra chiusa mostrano l'icona di ogni voce; Panoramica e Impostazioni mantengono il nome breve anche con la barra aperta; nella barra chiusa i menu si aprono anche fermando il mouse su un'icona (quelle icone non mostrano il suggerimento sopra il menu).
 - Le pagine pubbliche (link pubblici) possono ora essere incorporate per impostazione predefinita dai siti statici della stessa installazione, senza alcuna impostazione; i siti elencati in Impostazioni › Incorporamento si aggiungono, e nessun altro può incorporarle.
 
 - Le liste e le schede rimaste con una riga spoglia quando sono vuote (le due liste di Gestione › In attesa, Home senza app, consumi, backup, log e widget della panoramica, membri di un gruppo) ora mostrano un'illustrazione con titolo e azione, in versione piccola dentro un widget o una sezione.

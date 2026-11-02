@@ -22,7 +22,7 @@ const checks: L.Check[] = [
   {
     id: 'NAV-02',
     async run() {
-      return { status: 'NOT VERIFIABLE', note: 'the closed rail menu, the keyboard and the focus return are driven by specs/19-nav-groups.spec.ts (Playwright e2e)' }
+      return { status: 'NOT VERIFIABLE', note: 'the closed rail menu (click and hover), the keyboard and the focus return are driven by specs/19-nav-groups.spec.ts (Playwright e2e)' }
     },
   },
   {
@@ -38,6 +38,12 @@ const checks: L.Check[] = [
       const c = H.checker()
       c.ok(((await brand()).nav_groups ?? []).length === 0, 'without nav_groups the brand carries none: the sidebar stays flat')
       return c.result()
+    },
+  },
+  {
+    id: 'NAV-05',
+    async run() {
+      return { status: 'NOT VERIFIABLE', note: 'visual (no separators or lines, soft active state, indentation, icons in the menus); driven by specs/19-nav-groups.spec.ts (Playwright e2e)' }
     },
   },
 ]

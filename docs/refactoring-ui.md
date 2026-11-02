@@ -26,6 +26,11 @@ same thing.
   heading and the apps under it, with icon and label. Closed sidebar: the group icon with a short name, a click
   opens a menu with the apps and their pages. Keyboard (arrows, Home, End, Escape) and focus return are required.
   Apps no group lists stay flat under «Other apps». Layouts other than the default sidebar ignore the groups.
+- **Sidebar style**: no separator lines between groups or items, and no lines around the active item; the active
+  item (in the sidebar, the rail and the menus) is shown with a soft background and the accent colour of icon and
+  label. In the open sidebar the items of a group are indented under its heading and the pages of an app one level
+  deeper; the closed rail keeps its layout, and its icons with a menu also open it on hover with a mouse (about 150 ms delay, 150 ms grace to move onto the menu; click, keyboard and Escape work as before; touch: click only). Those icons show no tooltip (it would overlap the menu; the accessible name stays), icons without a menu keep it. An entry with a short name («Overview», «Settings») shows it in the open sidebar too, not the long one; the long name stays as tooltip and accessible name. The menus (group menu, pages of an app) show the item icon before the
+  label, also on the «Open {name}» row; an item without an icon takes no empty space.
 - **Person menu**: Account, Notifications, Trash (not for the Administrator), Sign out. Settings and
   System are only in the sidebar; the Account page has no second «Sign out».
 - **Bell**: opens a panel with the latest notifications, «Mark all as read», a gear towards
