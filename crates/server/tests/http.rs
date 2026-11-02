@@ -2518,7 +2518,8 @@ async fn run_tickets_over_http() {
     let r =
         post(format!("/api/run/{token}/call/com.mosaikit.notes/step"), Some("application/json"), "{}").await;
     assert_eq!(r.status, StatusCode::FORBIDDEN);
-    let forged = format!("{}0", &token[..47]);
+    // the last character is changed to one that differs from the real one (it was a fixed "0": the token ends in "0" one time in sixty-four)
+    let forged = format!("{}{}", &token[..47], if token.ends_with('0') { '1' } else { '0' });
     let r = post(format!("/api/run/{forged}/call/{ID}/step"), Some("application/json"), "{}").await;
     assert_eq!(r.status, StatusCode::UNAUTHORIZED);
     // the ticket is not a session: the normal routes do not take it, as a cookie, a bearer or a header
