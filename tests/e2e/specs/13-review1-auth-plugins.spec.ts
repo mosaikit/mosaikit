@@ -35,7 +35,7 @@ test.describe.serial('review round 1: auth and plugins', () => {
     // Config::app_origins (unit test) and by the manual check; here the frame of every plugin must load
     const alias = BASE_URL
     await login(page, alias, 'City of Beta', 'manager', PASSWORD)
-    for (const [name, heading] of [['Notes', 'Notes'], ['Tasks', 'Tasks'], ['Documents', 'Documents'], [/^(Apps|Sites)$/, /^(Apps|Sites)$/], ['Maps', 'Maps']]) {
+    for (const [name, heading] of [['Notes', 'Notes'], ['Tasks', 'Tasks'], ['Documents', 'Documents'], ['Sites', 'Sites'], ['Maps', 'Maps']]) {
       await nav(page, name).click()
       await expect(page.frameLocator('iframe.plugin-frame').getByRole('heading', { name: heading }).first()).toBeVisible()
     }
@@ -115,14 +115,14 @@ test.describe.serial('review round 1: auth and plugins', () => {
     const addr = (s: http.Server) => `http://127.0.0.1:${(s.address() as AddressInfo).port}/`
     try {
       await login(page, BASE_URL, 'City of Beta', 'manager', PASSWORD)
-      await nav(page, /^(Apps|Sites)$/).click()
+      await nav(page, 'Sites').click()
       const frame = page.frameLocator('iframe.plugin-frame')
-      await expect(frame.getByRole('heading', { name: /^(Apps|Sites)$/ })).toBeVisible()
+      await expect(frame.getByRole('heading', { name: 'Sites', exact: true })).toBeVisible()
       // nothing yet: the illustrated empty state (the cards are the default view once there is an app)
       await expect(frame.getByTestId('empty-state')).toBeVisible()
 
       const create = async (name: string, address: string) => {
-        await frame.getByRole('button', { name: /＋ New (app|site)/ }).first().click()
+        await frame.getByRole('button', { name: '＋ New site' }).first().click()
         await frame.getByLabel('Web address').check()
         await frame.locator('#msks-name').fill(name)
         await frame.locator('#msks-url').fill(address)
@@ -139,7 +139,7 @@ test.describe.serial('review round 1: auth and plugins', () => {
       await card.getByRole('button', { name: /Open$/ }).click()
       await expect(frame.locator('iframe.sframe').nth(1)).toHaveAttribute('src', addr(free))
       await expect(frame.frameLocator('iframe.sframe').nth(1).getByRole('heading', { name: 'Hello from the free site' })).toBeVisible()
-      await frame.getByRole('button', { name: /⬅ List of (apps|sites)/ }).click()
+      await frame.getByRole('button', { name: '⬅ List of sites' }).click()
 
       // a site that forbids framing: created with a warning, opened in a new tab, thumbnail = its first image
       await create(closedName, addr(closed))
@@ -151,7 +151,7 @@ test.describe.serial('review round 1: auth and plugins', () => {
       await closedCard.getByRole('button', { name: /Open$/ }).click()
       expect((await popup).url()).toBe(addr(closed))
       await expect(frame.getByText('does not allow being shown inside Mosaikit')).toBeVisible()
-      await frame.getByRole('button', { name: /⬅ List of (apps|sites)/ }).click()
+      await frame.getByRole('button', { name: '⬅ List of sites' }).click()
 
       // the thumbnail uploaded by the person wins over the one of the site
       await frame.locator('article.card', { hasText: freeName }).getByRole('button', { name: /Edit/ }).click()
@@ -211,9 +211,9 @@ test.describe.serial('review round 1: auth and plugins', () => {
 
     const zipName = `Zip ${Date.now().toString(36)}`
     await login(page, BASE_URL, 'City of Beta', 'manager', PASSWORD)
-    await nav(page, /^(Apps|Sites)$/).click()
+    await nav(page, 'Sites').click()
     const frame = page.frameLocator('iframe.plugin-frame')
-    await frame.getByRole('button', { name: /＋ New (app|site)/ }).first().click()
+    await frame.getByRole('button', { name: '＋ New site' }).first().click()
     await frame.locator('#msks-name').fill(zipName)
     await frame.locator('input[type=file][accept*=zip]').setInputFiles({ name: 'site.zip', mimeType: 'application/zip', buffer: zip })
     await frame.getByRole('button', { name: '💾 Save' }).click()

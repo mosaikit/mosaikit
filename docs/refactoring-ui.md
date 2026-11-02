@@ -245,7 +245,7 @@ picture, «Nothing here yet», «Create the first one to get started.» and the 
 (English, Italian and Spanish: host `it.ts` and `lang-es`, the plugins their own `it.ts`/`TEXTS`). The layout
 contract checks it (R-10).
 
-Converted: the apps Documents (Files), Maps, Apps (static sites), Contacts, Tasks and Notes (`mountCrud` and the plugins' own
+Converted: the apps Documents (Files), Maps, Sites (static sites), Contacts, Tasks and Notes (`mountCrud` and the plugins' own
 pages) and the pages of the host: Tenants, Plugins (installed, updates, catalog; administrator and tenant), Groups, Access requests, Shares, Trash and Notifications. The tenants, shares, trash and log lists show the small
 plain message with «Clear filters» when a filter is the reason. The layout contract checks the host pages a fresh tenant leaves
 empty together with the apps (R-10). Where the header and the empty state both carry the primary action the specs name the
