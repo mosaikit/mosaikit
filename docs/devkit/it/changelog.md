@@ -79,6 +79,7 @@ changelog del pacchetto, con la regola di deprecazione applicata quando una dist
 - `[[config]] public`, `[[public_commands]]`, `msk.publicConfig`, `msk.publicCall` e `ctx.link_resource()` (pagine dei link pubblici)
 - `permissions.run_commands` e `ctx.on_behalf()` (chiamate per conto di un run, con un ticket di esecuzione)
 - `permissions.directory`, `ctx.directory()` e `msk.directory.search` (cerca tra persone e gruppi del tenant)
+- `msk.band` (la barra superiore contestuale per una risorsa a pagina intera; nessun permesso)
 
 L'esempio `insights` ora usa `[search]` e `note-priority` le azioni `set` di un'estensione; l'architettura §8.11 li elenca
 ancora come sperimentali finché il proprietario non li toglie dall'elenco (una decisione per una release, non per questi

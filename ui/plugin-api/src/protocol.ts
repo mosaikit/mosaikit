@@ -88,6 +88,8 @@ export interface BridgeEvent {
  * | `theme` | CSS variables | **deprecated**, replaced by `context`; still sent in API 1, removed in API 2 |
  * | `ext.changed` | `{ extension, id }` | an extension changed its values on an item (the base plugin reloads them) |
  * | `ext.tab.height` | `{ handle, height }` | the tab of an extension asks for a height (handled by `msk.extensions().mountTab`) |
+ * | `band.mode` | `{ value }` | the View \| Edit switch of the top band was flipped (handled by `msk.band`) |
+ * | `band.comments` | `{}` | the comments button of the top band was pressed (handled by `msk.band`) |
  */
 export interface HostEvents {
   context: UiContext
@@ -95,6 +97,10 @@ export interface HostEvents {
   theme: Record<string, string>
   'ext.changed': { extension: string; id: string }
   'ext.tab.height': { handle: string; height: number }
+  /** the person flipped the View | Edit switch of the top band (see `msk.band`) */
+  'band.mode': { value: 'view' | 'edit' }
+  /** the person pressed the comments button of the top band (see `msk.band`) */
+  'band.comments': Record<string, never>
 }
 
 export type HostEventName = keyof HostEvents
@@ -316,6 +322,55 @@ export interface DirectoryGroup {
 export interface DirectoryApi {
   search(s: DirectorySearch & { kind: 'user' }): Promise<DirectoryUser[]>
   search(s: DirectorySearch & { kind: 'group' }): Promise<DirectoryGroup[]>
+}
+
+/** The View | Edit switch of the contextual top band. */
+export interface BandMode {
+  value: 'view' | 'edit'
+  /** false: the shell shows a "Read only" label instead of the switch */
+  canEdit: boolean
+  /** called when the person flips the switch; set `value` again with `msk.band.set` to follow it */
+  onChange?: (value: 'view' | 'edit') => void
+}
+
+/** A person connected to the resource (data only: the kernel has no real-time service). */
+export interface BandPerson {
+  id: string
+  /** at most 80 characters, shown as plain text in the tooltip */
+  name: string
+  /** at most 3 characters; derived from the name when missing */
+  initials?: string
+}
+
+/** The comments button of the contextual top band. */
+export interface BandComments {
+  /** the panel is open: the button shows it pressed */
+  open: boolean
+  /** a badge with the number of comments, an integer 0 to 9999 */
+  count?: number
+  /** called when the person presses the button */
+  onToggle?: () => void
+}
+
+/**
+ * The state of the top band while a full-page resource (a map, a dashboard, a process) is open. What the
+ * plugin leaves out stays as the shell draws it; the controls of the shell itself (tenant, language, theme,
+ * help, notifications, the person) are never affected.
+ */
+export interface BandState {
+  /** `false` hides the search bar of the band (default: unchanged) */
+  search?: boolean
+  mode?: BandMode
+  /** the people connected to the resource: at most 50, the shell shows 3 and "+N" */
+  presence?: BandPerson[]
+  comments?: BandComments
+}
+
+export interface BandApi {
+  /** Declares the state of the band for the page now open; call it again to change it (the whole state is replaced). */
+  set(state: BandState): void
+  /** Gives the band back to the shell. The shell does it by itself when the page closes or the route changes. */
+  reset(): void
 }
 
 export interface PublicResource {

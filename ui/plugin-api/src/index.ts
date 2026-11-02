@@ -7,6 +7,11 @@ export type { Bridge } from './bridge.ts'
 export { Msk, connect, type CrudClient, type ExtensionsClient, type TabClient } from './client.ts'
 export { mountCrud, errText, type CrudOptions, type CrudView, type EditorCtx, type ItemCtx } from './crud-view.ts'
 export type {
+  BandApi,
+  BandComments,
+  BandMode,
+  BandPerson,
+  BandState,
   ErrorCode,
   ExtensionTab,
   ExtensionView,

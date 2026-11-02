@@ -4,6 +4,7 @@ import type { PluginView, Session, TenantContext } from '../types.ts'
 import { useUi } from '../ui-context.ts'
 import { t } from '../app/i18n.ts'
 import { timed } from '../app/devlog.ts'
+import { resetBand, sanitizeBand, setBand } from '../app/contextband.ts'
 import ExtensionTab, { type TabState } from './ExtensionTab.tsx'
 
 const IDENT = /^[a-z][a-z0-9_]{0,47}$/
@@ -64,6 +65,11 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
     setTabs([])
   }, [src])
 
+  // the contextual top band belongs to this frame: it goes when the frame goes (the page closes, another plugin
+  // opens) and when a new document of the plugin starts (its `hello`)
+  const [owner] = useState(() => crypto.randomUUID())
+  useEffect(() => () => resetBand(owner), [src, owner])
+
   /** An event for the page of the plugin (from a tab of an extension: its height, changed values). */
   const toBase = useCallback(
     (event: string, data: unknown) => ref.current?.contentWindow?.postMessage({ msk: 1, event, data }, origin),
@@ -97,6 +103,8 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
         switch (m.op) {
           case 'hello':
             checkPluginApi(m.args)
+            // every document of the plugin starts with `hello`: the band of the page it replaces goes
+            resetBand(owner)
             reply({
               ok: {
                 api: SHELL_API,
@@ -113,6 +121,15 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
             return
           case 'share':
             await ui.share(uuid(m.args?.id))
+            reply({ ok: null })
+            return
+          // the band of the shell for a resource on the full page: validated, plain text only; the callbacks come back as events
+          case 'band.set':
+            setBand(owner, sanitizeBand(m.args), toBase)
+            reply({ ok: null })
+            return
+          case 'band.reset':
+            resetBand(owner)
             reply({ ok: null })
             return
           case 'toast':
@@ -185,7 +202,7 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
-  }, [origin, tenant, plugin.id, plugin.version, session, ctx, ui, at])
+  }, [origin, tenant, plugin.id, plugin.version, session, ctx, ui, at, toBase, owner])
 
   if (!plugin.has_ui) {
     return (

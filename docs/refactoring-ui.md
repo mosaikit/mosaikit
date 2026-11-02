@@ -112,6 +112,15 @@ tenant, with a preview. Switches:
 Bell, person menu and tenant switcher always stay (the switcher goes away by itself with a single
 tenant).
 
+**Contextual band (a resource on the full page).** While a plugin shows a resource on the full page (a map, a
+dashboard, a process) the band changes, in this order: no search bar; the tenant (with the selector when the person
+has more than one); a «View | Edit» switch when the person can edit, otherwise a «Read only» label; the people
+connected to the resource (avatars with initials, the name in the tooltip, «+N» after three); the comments button
+(pressed while the panel is open, with a count badge); then, unchanged, language, mode, help, notifications and the
+person. The plugin declares it (`msk.band`, architecture §8.16); a plugin can never hide the tenant, the bell, the
+help or the person menu. Only the colours of the band are used (white on the band colour), so contrast holds in
+every theme. Below 640 px the avatars give way; the switch and the comments button stay.
+
 ## 8. Glossary
 
 | Use | Instead of |

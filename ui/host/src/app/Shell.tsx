@@ -45,6 +45,8 @@ import { applyStyle, bandImageOf, styleOf, useBandImage, useLayoutInUse, useLayo
 import { AppMark, BandActions, BandSearch, FlyoutMenu, SkipLink, TenantSwitcher } from './slots.tsx'
 import { bandIcon, bandStyle, hasActive, useNav, type NavGroup, type NavItem } from './nav.tsx'
 import Frame from './frames.tsx'
+import { bandEmit, resetBand, useBand } from './contextband.ts'
+import { CommentsButton, ModeSwitch, Presence } from './ContextBand.tsx'
 
 export { AppMark, TenantBadge } from './slots.tsx'
 
@@ -260,10 +262,17 @@ function AppSidebar({ session, route, band }: { session: Session; route: Route; 
 function TopBar({ session, route, band, bandImage }: { session: Session; route: Route; band: ShellBand; bandImage: { src: string | null; scrim: number } }) {
   const nav = useNav(session, route)
   const { isMobile } = useSidebar()
+  // a plugin with a resource on the full page changes the band (contextband.ts): no search (when it asks), the
+  // View | Edit switch in the middle, the people and the comments button next to the actions. Tenant, language,
+  // theme, help, notifications and the person stay as they are.
+  const ctxBand = useBand()
+  const searchOn = band.search && !ctxBand?.hideSearch
+  const modeSwitch = ctxBand?.mode && <ModeSwitch mode={ctxBand.mode} onChange={(value) => bandEmit('band.mode', { value })} />
   return (
     // the search stays in the middle; the sides keep their content and the search gives way when the bar is narrow
     <header
       className="msk-band band-surface @container sticky top-0 z-20 grid h-[50px] shrink-0 grid-cols-[minmax(max-content,1fr)_minmax(0,420px)_minmax(max-content,1fr)] items-center gap-3 bg-band px-4 text-band-foreground max-[900px]:flex"
+      data-context-band={ctxBand ? 'on' : undefined}
       {...bandStyle(bandImage)}
     >
       <div className="flex min-w-0 items-center gap-2">
@@ -272,8 +281,15 @@ function TopBar({ session, route, band, bandImage }: { session: Session; route: 
           <TenantSwitcher session={session} route={route} />
         </div>
       </div>
-      {band.search ? <BandSearch session={session} route={route} nav={nav} /> : <div className="max-[900px]:flex-1" />}
-      <div className="justify-self-end">
+      {searchOn ? (
+        <BandSearch session={session} route={route} nav={nav} />
+      ) : (
+        <div className="flex justify-center max-[900px]:flex-1">{modeSwitch}</div>
+      )}
+      <div className="flex items-center gap-2 justify-self-end">
+        {searchOn && modeSwitch}
+        {ctxBand && <Presence people={ctxBand.presence} />}
+        {ctxBand?.comments && <CommentsButton comments={ctxBand.comments} onToggle={() => bandEmit('band.comments', {})} />}
         <BandActions session={session} route={route} band={band} />
       </div>
     </header>
@@ -308,6 +324,9 @@ export default function Shell({ session, route, children }: { session: Session; 
   const style = styleOf(config, layout)
   const bandImage = useBandImage(bandImageOf(config, layout, route.area === 'tenant' ? route.tenant : undefined))
   useLayoutStylesheet(layout)
+  // the contextual band of a plugin page never outlives the route it was set on
+  const routeKey = route.area === 'tenant' ? `${route.tenant}/${route.page}/${route.id ?? ''}` : route.area
+  useEffect(() => resetBand(), [routeKey])
   useEffect(() => applyStyle(style, layout), [style, layout])
   return (
     <div className={cn('msk-shell contents', layout.class)} data-layout={layout.id}>

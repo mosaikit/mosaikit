@@ -108,7 +108,7 @@ export function safePage(page: string): string {
 }
 
 /** Operations handled locally by the host (they do not become REST calls). */
-export const LOCAL_OPS = new Set(['hello', 'share', 'toast', 'confirm'])
+export const LOCAL_OPS = new Set(['hello', 'share', 'toast', 'confirm', 'band.set', 'band.reset'])
 
 /** Translates an operation of the plugin into a REST call. */
 export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unknown): RestCall {

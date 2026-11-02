@@ -34,6 +34,7 @@ dell'host ed è accettato solo da essa. Una chiamata che non riceve risposta in 
 | `msk.isPublic`, `msk.publicResource`, `msk.publicGet()` | visualizzatore dei link pubblici (`public_view`) |
 | `msk.publicConfig()` | le impostazioni `[[config]]` con `public = true` (mai un segreto), per chiave |
 | `msk.publicCall(name, args)` | esegue un comando di `[[public_commands]]`, in sola lettura, sull'elemento condiviso; errori `command_not_public`, `public_commands_off`, `public_rate_limited` |
+| `msk.band.set(state)`, `msk.band.reset()` | la barra superiore contestuale della shell per una risorsa a pagina intera: `{ search?: false, mode?: { value: 'view'\|'edit', canEdit, onChange }, presence?: [{ id, name, initials? }], comments?: { open, count?, onToggle } }`. Nessun permesso. Vedi [la barra contestuale](#la-barra-contestuale) |
 | `msk.directory.search({ kind, q, limit? })` | le persone (`{id, username, name}`) o i gruppi (`{id, name}`) del tenant, per un selettore; richiede `[permissions] directory = true`; solo un Tenant Manager o chi può condividere; errori `permission_denied`, `invalid_argument`, `rate_limited`; mai nei link pubblici. Vedi [sicurezza](security.md#directory-la-regola-per-lautore) |
 
 ### Operazioni
@@ -83,7 +84,37 @@ non ha potuto, in inglese o italiano.
 
 `context` (lingua, tema, modo: usare `msk.onContext`), `theme` (**deprecato**, le stesse variabili di `context`, ancora
 inviato nell'API 1, rimosso nell'API 2), `ext.changed` `{ extension, id }`, `ext.tab.height` `{ handle, height }` (gestito
-da `mountTab`).
+da `mountTab`), `band.mode` `{ value }` e `band.comments` `{}` (l'interruttore e il pulsante dei commenti della barra contestuale; gestiti
+da `msk.band`).
+
+### La barra contestuale
+
+Quando una pagina del plugin mostra una risorsa a pagina intera (una mappa, una dashboard, un processo), chiedi alla shell la
+barra superiore contestuale: niente ricerca, il tenant, un interruttore **Vista | Modifica** (oppure «Sola lettura»), le persone
+connesse, un pulsante dei commenti, poi lingua, tema, aiuto, notifiche e la persona come sempre.
+
+```ts
+const msk = await connect()
+msk.band.set({
+  search: false,
+  mode: { value: 'view', canEdit: me.canEdit, onChange: (v) => { setMode(v); publish() } },
+  presence: peers.map((p) => ({ id: p.id, name: p.name })), // le iniziali si ricavano dal nome
+  comments: { open: panelOpen, count: comments.length, onToggle: () => { panelOpen = !panelOpen; publish() } },
+})
+// uscendo dalla pagina (facoltativo: la shell lo fa quando la pagina si chiude o la route cambia)
+msk.band.reset()
+```
+
+- `set` sostituisce tutto lo stato: richiamalo quando qualcosa cambia. L'interruttore mostra `mode.value` e si sposta solo quando
+  imposti il nuovo valore: tieni la modalità nella pagina e ripubblicala in `onChange`. Con `canEdit: false` la shell mostra
+  «Sola lettura».
+- La presenza è un dato che passi tu: Mosaikit non ha un servizio in tempo reale. Mostra solo persone che possono vedere la risorsa.
+- La shell controlla tutto: nomi al massimo 80 caratteri, iniziali 3, 50 persone (le altre si scartano), `count` un intero da
+  0 a 9999, solo testo semplice (mai HTML). Un tipo sbagliato fa fallire la chiamata con `invalid band ...`.
+- Non puoi nascondere tenant, lingua, tema, aiuto, notifiche né il menu della persona, e non serve alcun permesso nel manifest.
+- Il pulsante dei commenti chiama solo `onToggle` e mostra `open` e `count`; per ora il pannello è tuo.
+- I layout dichiarativi (`layout.toml`) possono ignorare la barra; gli host precedenti rispondono «operation not available» (la
+  chiamata è ignorata). I dettagli sono nel §8.16 dell'architettura.
 
 ## `mountCrud(root, msk, resource, options)`
 
