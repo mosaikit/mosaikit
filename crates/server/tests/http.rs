@@ -974,23 +974,42 @@ async fn remember_me_and_embedding_of_public_pages() {
     let r = a.call(None, Method::POST, "/api/auth/login", Some(sign_in(true))).await;
     assert!(r.header(header::SET_COOKIE).contains(&format!("Max-Age={}", 10 * 86400)));
 
-    // the tenant allows one of the sites of the platform: only that one embeds its public pages
-    let only = json!({ "values": { "embed.sites": ["https://www.alfa.example"] } });
-    let r = a.call(Some(&m), Method::PUT, "/api/t/alfa/manage/config", Some(only)).await;
-    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
     let note = json!({ "values": { "title": "Open day" } });
     let n = a.call(Some(&m), Method::POST, "/api/t/alfa/p/com.mosaikit.notes/r/notes", Some(note)).await;
     let rid = n.json()["id"].as_str().unwrap().to_string();
     let l =
         a.call(Some(&m), Method::POST, &format!("/api/t/alfa/resources/{rid}/links"), Some(json!({}))).await;
     let path = l.json()["url"].as_str().unwrap().trim_start_matches(&a.t.cfg.public_url).to_string();
+    let own = format!("'self' {} {}", a.t.cfg.app_origins().join(" "), a.t.cfg.plugin_origin());
+    // the tenant allows one of the sites of the platform: it is added on top, the others stay out
+    let only = json!({ "values": { "embed.sites": ["https://www.alfa.example"] } });
+    let r = a.call(Some(&m), Method::PUT, "/api/t/alfa/manage/config", Some(only)).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
     let csp = a.get_untrusted(&path, None).await.header(header::CONTENT_SECURITY_POLICY);
-    assert!(csp.contains("frame-ancestors https://www.alfa.example"), "{csp}");
-    assert!(!csp.contains("intranet"), "{csp}");
+    assert!(csp.contains(&format!("frame-ancestors {own} https://www.alfa.example")), "{csp}");
+    assert!(!csp.contains("intranet") && !csp.contains("evil"), "{csp}");
     // a site the platform does not allow is refused
     let evil = json!({ "values": { "embed.sites": ["https://evil.example"] } });
     let r = a.call(Some(&m), Method::PUT, "/api/t/alfa/manage/config", Some(evil)).await;
     assert_eq!(r.status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn public_pages_are_embeddable_by_the_sites_of_the_installation_by_default() {
+    let a = App::new().await;
+    a.t.install("notes").await;
+    a.t.tenant("alfa").await;
+    let m = a.login("alfa", "alfa-manager", PASSWORD).await;
+    let note = json!({ "values": { "title": "Open day" } });
+    let n = a.call(Some(&m), Method::POST, "/api/t/alfa/p/com.mosaikit.notes/r/notes", Some(note)).await;
+    let rid = n.json()["id"].as_str().unwrap().to_string();
+    let l =
+        a.call(Some(&m), Method::POST, &format!("/api/t/alfa/resources/{rid}/links"), Some(json!({}))).await;
+    let path = l.json()["url"].as_str().unwrap().trim_start_matches(&a.t.cfg.public_url).to_string();
+    let own = format!("'self' {} {}", a.t.cfg.app_origins().join(" "), a.t.cfg.plugin_origin());
+    let csp = a.get_untrusted(&path, None).await.header(header::CONTENT_SECURITY_POLICY);
+    assert!(csp.contains(&format!("frame-ancestors {own};")), "{csp}");
+    assert!(!csp.contains("frame-ancestors 'none'") && !csp.contains("evil"), "{csp}");
 }
 
 #[tokio::test]

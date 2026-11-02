@@ -144,17 +144,18 @@ fn ancestors(s: &AppState) -> String {
     format!("'self' {} {}", s.k.cfg.app_origins().join(" "), s.k.cfg.plugin_origin())
 }
 
-/// Who may embed the public pages of a tenant: the sites the tenant (within the platform's) allows,
-/// besides the origins of Mosaikit for the static sites; nobody else.
-async fn embedders(s: &AppState, tenant: Uuid, own: bool) -> String {
+/// Who may embed the pages of a tenant (static sites and public pages alike): the origins of
+/// Mosaikit itself, so that the static sites of the same installation can embed a public link, plus the
+/// sites the tenant (within the platform's) allows; nobody else.
+async fn embedders(s: &AppState, tenant: Uuid) -> String {
     let sites = mosaikit_kernel::tenancy::levels::embed_sites(&s.k, tenant).await.unwrap_or_default();
-    let mut list: Vec<String> = if own { vec![ancestors(s)] } else { Vec::new() };
+    join_ancestors(&ancestors(s), sites)
+}
+
+fn join_ancestors(own: &str, sites: Vec<String>) -> String {
+    let mut list = vec![own.to_string()];
     list.extend(sites);
-    if list.is_empty() {
-        "'none'".to_string()
-    } else {
-        list.join(" ")
-    }
+    list.join(" ")
 }
 
 /// The CSP of a page with `frame-ancestors 'none'` opened to the sites of the tenant.
@@ -163,7 +164,7 @@ fn embeddable(csp: &str, ancestors: &str) -> String {
 }
 
 async fn serve_site(s: &AppState, tenant: Uuid, rid: Uuid, rel: &str, base: &str, entry: &str) -> Response {
-    let fa = embedders(s, tenant, true).await;
+    let fa = embedders(s, tenant).await;
     let rel = if rel.is_empty() { entry } else { rel };
     let site = s.k.blobs.site_dir(tenant, rid);
     // folder without trailing "/": relative URLs would resolve badly
@@ -286,7 +287,7 @@ async fn public_path(
         links::count_view(&s.k, &r).await;
     }
     let base = format!("{}/p/{token}/", s.k.cfg.plugin_base_path);
-    let fa = embedders(&s, r.tenant, false).await;
+    let fa = embedders(&s, r.tenant).await;
     // static site
     if let Some(entry) = r.meta.pointer("/content/entry").and_then(Value::as_str) {
         return serve_site(&s, r.tenant, r.resource, &path, &base, entry).await;
@@ -626,6 +627,17 @@ label = \"P\"
         ));
         assert!(open.contains("script-src http://p/ui/x/ 'unsafe-eval' 'wasm-unsafe-eval';"));
         assert!(open.contains("worker-src http://p/ui/x/ blob: 'unsafe-eval' 'wasm-unsafe-eval';"));
+    }
+
+    #[test]
+    fn embedders_join_own_origins_and_tenant_sites() {
+        let own = "'self' http://app http://pub";
+        assert_eq!(super::join_ancestors(own, vec![]), own);
+        assert_eq!(
+            super::join_ancestors(own, vec!["https://www.alfa.example".into()]),
+            format!("{own} https://www.alfa.example")
+        );
+        assert!(!super::join_ancestors(own, vec![]).contains("evil"));
     }
 
     #[test]
