@@ -20,8 +20,8 @@ const sidebar = (page: Page) => page.locator('[data-sidebar="sidebar"]').first()
 
 test.describe.serial('19-nav-groups', () => {
   test('open sidebar: heading with its apps, collapse is remembered, keyboard', async ({ page }) => {
-    await withGroups(page)
     await login(page, 'City of Alfa', 'manager', PASSWORD)
+    await withGroups(page)
     await page.evaluate(() => localStorage.removeItem('msk_nav_groups'))
     await page.reload()
     await page.getByRole('button', { name: 'Open or close the sidebar' }).first().click()
@@ -44,8 +44,9 @@ test.describe.serial('19-nav-groups', () => {
   })
 
   test('closed sidebar: one icon opens a menu with the apps; Escape returns the focus', async ({ page }) => {
-    await withGroups(page)
     await login(page, 'City of Alfa', 'manager', PASSWORD)
+    await withGroups(page)
+    await page.reload()
     const trigger = sidebar(page).getByRole('button', { name: 'Open the apps of Work' })
     await expect(trigger).toBeVisible()
     await trigger.click()
@@ -59,8 +60,8 @@ test.describe.serial('19-nav-groups', () => {
   })
 
   test('the group label follows the language', async ({ page }) => {
-    await withGroups(page)
     await login(page, 'City of Alfa', 'manager', PASSWORD)
+    await withGroups(page)
     await page.evaluate(() => localStorage.setItem('msk_lang', 'it'))
     await page.reload()
     await expect(sidebar(page).getByRole('button', { name: 'Apri le app di Lavoro' })).toBeVisible()
