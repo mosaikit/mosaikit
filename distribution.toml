@@ -23,6 +23,15 @@ roots = ["../mosaikit-plugins"]
 # plugins to include in the releases: "*" = every one found
 include = ["*"]
 
+# Optional: arrange the apps of the sidebar in groups (architecture 14.3). Apps not listed stay flat at the bottom.
+# [[nav_groups]]
+# id = "work"
+# label = "Work"
+# icon = "briefcase"
+# plugins = ["com.mosaikit.notes", "com.mosaikit.tasks"]
+# [nav_groups.i18n.it]
+# label = "Lavoro"
+
 [desktop]
 # database of the desktop version: "sqlite" (no server to start) or "postgres" (embedded PostgreSQL)
 database = "sqlite"

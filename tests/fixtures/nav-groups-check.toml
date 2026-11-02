@@ -1,0 +1,17 @@
+# Fixture for the checks NAV-01 and NAV-02 (docs/manual-tests.md): start the server with
+# MOSAIKIT_PLUGIN_SETTINGS_FILE pointing here (and NAV_FIXTURE=1 in the run of the checks).
+# Plugin ids are the official ones; what is not installed is ignored with a warning.
+
+[[nav_groups]]
+id = "work"
+label = "Work"
+icon = "briefcase"
+plugins = ["com.mosaikit.notes", "com.mosaikit.tasks", "com.mosaikit.not-installed"]
+[nav_groups.i18n.it]
+label = "Lavoro"
+
+[[nav_groups]]
+id = "data"
+label = "Data"
+icon = "an-icon-the-shell-does-not-know"   # falls back to the default icon
+plugins = ["com.mosaikit.contacts", "com.mosaikit.files", "com.mosaikit.notes"]   # notes stays in "work"

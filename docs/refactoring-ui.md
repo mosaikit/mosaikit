@@ -22,6 +22,10 @@ same thing.
 | Tenant Manager | Tenant overview · the apps · group «Tenant management»: Manage (people and groups), Plugins, Shares, Usage, Log · at the bottom: Tenant settings |
 | Administrator | Platform overview · Tenants · People · Plugins · Monitoring · Log · at the bottom: System |
 
+- **Groups of apps**: a distribution may arrange the apps in groups (architecture 14.3). Open sidebar: a collapsible
+  heading and the apps under it, with icon and label. Closed sidebar: the group icon with a short name, a click
+  opens a menu with the apps and their pages. Keyboard (arrows, Home, End, Escape) and focus return are required.
+  Apps no group lists stay flat under «Other apps». Layouts other than the default sidebar ignore the groups.
 - **Person menu**: Account, Notifications, Trash (not for the Administrator), Sign out. Settings and
   System are only in the sidebar; the Account page has no second «Sign out».
 - **Bell**: opens a panel with the latest notifications, «Mark all as read», a gear towards

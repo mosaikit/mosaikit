@@ -34,9 +34,35 @@ pub struct Distribution {
     /// platform keys of outside services to seed at the first start of the server
     #[serde(default)]
     pub service_key_values: Vec<ServiceKeyValue>,
+    /// groups of the sidebar navigation (the server validates them and sends them to the shell)
+    #[serde(default)]
+    pub nav_groups: Vec<NavGroup>,
     /// folder of the file (to resolve relative paths)
     #[serde(skip)]
     pub dir: PathBuf,
+}
+
+/// `[[nav_groups]]`: a group of the sidebar (checked by the kernel at the start; here only its shape).
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+pub struct NavGroup {
+    pub id: String,
+    pub label: String,
+    #[serde(default)]
+    pub icon: Option<String>,
+    #[serde(default)]
+    pub plugins: Vec<String>,
+    #[serde(default)]
+    pub i18n: std::collections::BTreeMap<String, NavGroupText>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+#[allow(dead_code)]
+pub struct NavGroupText {
+    #[serde(default)]
+    pub label: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -182,9 +208,9 @@ impl Distribution {
         Ok(())
     }
 
-    /// The distribution seeds settings or keys (the server reads them from `distribution.toml`).
+    /// The distribution has data the server reads from `distribution.toml`: seeds or navigation groups.
     pub fn has_seeds(&self) -> bool {
-        !self.plugin_settings.is_empty() || !self.service_key_values.is_empty()
+        !self.plugin_settings.is_empty() || !self.service_key_values.is_empty() || !self.nav_groups.is_empty()
     }
 
     pub fn load(path: &Path) -> Result<Distribution> {
@@ -268,5 +294,16 @@ mod tests {
             assert!(load(bad).is_err(), "{bad}");
         }
         assert!(!load("").unwrap().has_seeds());
+    }
+
+    #[test]
+    fn nav_groups_are_read_and_unknown_keys_refused() {
+        let d = load(
+            "[[nav_groups]]\nid='data'\nlabel='Data'\nplugins=['a']\n[nav_groups.i18n.it]\nlabel='Dati'\n",
+        )
+        .unwrap();
+        assert_eq!(d.nav_groups.len(), 1);
+        assert!(d.has_seeds(), "the server must be given the file");
+        assert!(load("[[nav_groups]]\nid='x'\nlabel='X'\ncolour='red'\n").is_err());
     }
 }

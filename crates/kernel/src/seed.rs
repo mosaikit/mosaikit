@@ -38,6 +38,9 @@ pub struct SeedFile {
     pub plugin_settings: Vec<PluginSetting>,
     #[serde(default)]
     pub service_key_values: Vec<ServiceKeyValue>,
+    /// groups of the navigation (see `navgroups.rs`), forwarded to the shell
+    #[serde(default)]
+    pub nav_groups: Vec<crate::navgroups::NavGroupDef>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -137,6 +140,16 @@ async fn mark(k: &Kernel, name: &str) -> Result<()> {
     .execute(&k.db)
     .await?;
     Ok(())
+}
+
+/// The validated navigation groups of the seed file; a missing or unreadable file gives none (the seed
+/// step reports a malformed file).
+pub fn nav_groups(cfg: &crate::config::Config) -> Vec<crate::navgroups::NavGroup> {
+    let Some(path) = &cfg.plugin_settings_file else { return Vec::new() };
+    match SeedFile::load(path) {
+        Ok(f) => crate::navgroups::normalize(&f.nav_groups, &mut |m| tracing::warn!("{m}")),
+        Err(_) => Vec::new(),
+    }
 }
 
 /// Applies the seed file of the configuration (if any). A malformed file stops the start; an entry that

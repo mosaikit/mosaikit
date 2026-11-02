@@ -38,8 +38,9 @@ import api from './checks/api.ts'
 import dk from './checks/dk.ts'
 import pl from './checks/pl.ts'
 import rt from './checks/rt.ts'
+import nav from './checks/nav.ts'
 
-const ALL = new Map<string, L.Check>([...p0, ...p0b, ...p1, ...p2, ...p3, ...p4, ...p5, ...p6, ...p7, ...p8, ...p9, ...fu, ...fub, ...fc, ...p10, ...sec, ...ux, ...r2, ...pui, ...npi, ...tbl, ...sc, ...seed, ...pending, ...api, ...dk, ...pl, ...rt].map((c) => [c.id, c]))
+const ALL = new Map<string, L.Check>([...p0, ...p0b, ...p1, ...p2, ...p3, ...p4, ...p5, ...p6, ...p7, ...p8, ...p9, ...fu, ...fub, ...fc, ...p10, ...sec, ...ux, ...r2, ...pui, ...npi, ...tbl, ...sc, ...seed, ...pending, ...api, ...dk, ...pl, ...rt, ...nav].map((c) => [c.id, c]))
 
 /** Defects already reported (docs/reports/qa-walkthrough.md) and owned by a piece of work: expected to fail. */
 const KNOWN: Record<string, string> = {

@@ -81,7 +81,8 @@ const BY_APP: Record<string, LucideIcon> = {
   'static-site': LayoutGrid,
 }
 
-export default function AppIcon({ id, name, className }: { id: string; name?: string | null; className?: string }) {
-  const Icon = (name ? ICONS[name] : undefined) ?? BY_APP[id.split('.').pop() ?? ''] ?? Puzzle
+/** `fallback`: the name drawn when `name` is not one the shell knows (before the icon of the plugin). */
+export default function AppIcon({ id, name, fallback, className }: { id: string; name?: string | null; fallback?: string; className?: string }) {
+  const Icon = (name ? ICONS[name] : undefined) ?? (fallback ? ICONS[fallback] : undefined) ?? BY_APP[id.split('.').pop() ?? ''] ?? Puzzle
   return <Icon className={className} aria-hidden="true" />
 }
