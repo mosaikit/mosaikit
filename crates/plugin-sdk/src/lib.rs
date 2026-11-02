@@ -122,9 +122,29 @@ pub struct Ctx {
     /// the item from the arguments of a public command (a visitor chooses them).
     #[serde(default)]
     link_resource: Option<String>,
+    /// The run a call on behalf of a run ticket belongs to (`permissions.run_commands`); see `on_behalf()`.
+    #[serde(default)]
+    on_behalf: Option<OnBehalf>,
+}
+
+/// The run a command is called for, when a service of a distribution calls it with a run ticket.
+#[derive(Debug, Clone, Default, PartialEq, serde::Deserialize, serde::Serialize)]
+pub struct OnBehalf {
+    /// the service's own name for the run
+    pub run_ref: String,
 }
 
 impl Ctx {
+    /// `Some` when the command is called on behalf of a run ticket (a background process of a
+    /// distribution) rather than by the person at the keyboard; `None` otherwise. The user is still the
+    /// person who started the run, and the kernel limits what the command reads to what they may see
+    /// (and to the resources of the ticket, if it has any); it cannot limit what the command returns.
+    /// Use it to be stricter, never looser. Needs `[permissions] run_commands` and
+    /// `[requires] mosaikit = ">=1.0"`.
+    pub fn on_behalf(&self) -> Option<&OnBehalf> {
+        self.on_behalf.as_ref()
+    }
+
     /// The item of the public link that runs this command (`None` outside a public command). The
     /// kernel lets a public command read this item and what is inside it, nothing else.
     pub fn link_resource(&self) -> Option<&str> {

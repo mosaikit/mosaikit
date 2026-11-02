@@ -690,7 +690,18 @@ pub struct Permissions {
     /// Sensitive: the Administrator sees it when the plugin is installed. Default: false.
     #[serde(default)]
     pub script_eval: bool,
+    /// Commands of the logic that a **run ticket** may call (`permissions.run_commands`): a service of a
+    /// distribution runs a process in the background and calls them on behalf of the person who started
+    /// it. Sensitive: the command runs with the rights of that person (limited to the resources of the
+    /// ticket when it has any), so it must read only what its arguments name and return only what the
+    /// person may see. The Administrator sees them when the plugin is installed. Needs
+    /// `[requires] mosaikit = ">=1.0"`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub run_commands: Vec<String>,
 }
+
+/// Most commands a plugin may declare in `permissions.run_commands`.
+pub const MAX_RUN_COMMANDS: usize = 32;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
@@ -869,6 +880,15 @@ impl Manifest {
         for c in &self.permissions.calls {
             if !is_plugin_id(c) || c == &self.id {
                 return bad(format!("permissions.calls: invalid id '{c}'"));
+            }
+        }
+        if self.permissions.run_commands.len() > MAX_RUN_COMMANDS {
+            return bad(format!("permissions.run_commands: at most {MAX_RUN_COMMANDS} commands"));
+        }
+        let mut seen = std::collections::HashSet::new();
+        for c in &self.permissions.run_commands {
+            if !is_identifier(c) || !seen.insert(c.as_str()) {
+                return bad(format!("permissions.run_commands: '{c}' invalid or duplicate"));
             }
         }
         if let Some(db) = &self.requires.database {
@@ -1922,6 +1942,30 @@ service_keys = { b = { label = \"y\" } }
         assert_eq!(num.check(&serde_json::json!("2.5")), Some(serde_json::json!(2.5)));
         let choice = ConfigDecl { kind: ConfigKind::Choice, options: vec!["a".into()], ..text.clone() };
         assert_eq!(choice.check(&serde_json::json!("b")), None);
+    }
+
+    #[test]
+    fn run_commands() {
+        let with = |list: &str| {
+            NOTES.replacen(
+                "hooks = [\"notes\"]",
+                &format!(
+                    "hooks = [\"notes\"]
+ run_commands = {list}"
+                ),
+                1,
+            )
+        };
+        let m = Manifest::from_toml(&with("[\"node_run\", \"node_check\"]")).unwrap();
+        assert_eq!(m.permissions.run_commands, ["node_run", "node_check"]);
+        assert_eq!(serde_json::from_str::<Manifest>(&serde_json::to_string(&m).unwrap()).unwrap(), m);
+        // nothing new in the JSON of a plugin that does not use them
+        let plain = serde_json::to_string(&Manifest::from_toml(NOTES).unwrap()).unwrap();
+        assert!(!plain.contains("run_commands"), "{plain}");
+        for bad in ["[\"Bad Name\"]", "[\"a\", \"a\"]", "[\"\"]"] {
+            let e = Manifest::from_toml(&with(bad)).unwrap_err().to_string();
+            assert!(e.contains("run_commands"), "{bad}: {e}");
+        }
     }
 
     #[test]

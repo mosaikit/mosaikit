@@ -166,6 +166,27 @@ Il kernel limita cosa il comando può **leggere**, non cosa la logica **restitui
 [lista di revisione](security.md#comandi-dei-link-pubblici-lista-di-revisione). Per provare:
 `MockHost::new().as_public("<id elemento>")`.
 
+### Comandi di esecuzione: chiamate per conto di un run
+
+Una distribuzione può eseguire in background un processo in cui un passo è un comando del tuo plugin. Il servizio che lo esegue
+non ha una sessione: la persona che avvia il run emette un **ticket di esecuzione** e il servizio chiama il tuo comando con quello.
+Elenca i comandi chiamabili così in `[permissions] run_commands = ["node_run"]` (nient'altro lo è: il manifest viene riletto a ogni
+chiamata). Richiede `[requires] mosaikit = ">=1.0"`.
+
+- Il comando gira **come la persona che ha avviato il run**, con i suoi permessi **al momento della chiamata** (chi è stato
+  sospeso, rimosso o a cui è stata tolta una condivisione non passa più). `ctx.user` è quella persona.
+- `ctx.on_behalf()` è `Some` (con `run_ref`, il nome che il servizio dà al run) in una chiamata così e `None` in una normale. Gli
+  argomenti non possono impostarlo. Usalo per essere più severo, mai più permissivo. Prova con `MockHost::new().on_behalf("run-1")`.
+- Un ticket può essere limitato a un elenco di risorse: allora è il **database** a mostrare al comando solo quelle risorse e ciò
+  che contengono, qualunque SQL o argomento usi, e non si può creare un elemento in radice. Un ticket senza elenco ha tutta la
+  portata della persona per i comandi dichiarati, finché scade, si esaurisce o viene revocato.
+- Stesse operazioni dell'host di un comando normale, tranne `plugin.call`, che è rifiutata. Una chiamata ha una vita breve (al
+  massimo 60 minuti), un numero di usi, 256 KiB di argomenti e un limite di frequenza. Errori: `run_ticket_invalid`,
+  `run_wrong_plugin`, `run_wrong_command`, `command_not_declared`, `args_too_large`, `run_rate_limited`.
+
+Il kernel limita ciò che il comando può **leggere**, non ciò che la logica **restituisce**: se il tuo comando restituisce dati che
+ha letto legittimamente, il servizio li riceve. Segui la [lista di controllo](security.md#comandi-di-esecuzione-lista-di-controllo).
+
 ### Gruppi e web
 
 `ctx.groups` (sopra) è il modo di leggere i gruppi; non c'è un'operazione. `msk.web.probe` (permesso `web`) appartiene alla

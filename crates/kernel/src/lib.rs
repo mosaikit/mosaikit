@@ -31,6 +31,7 @@ pub mod paging;
 pub mod personal;
 pub mod plugins;
 pub mod quotas;
+pub mod run_tickets;
 pub mod search;
 pub mod secret;
 pub mod seed;
@@ -147,11 +148,24 @@ pub struct TenantCtx {
 pub struct Caller {
     pub user: SessionUser,
     pub tenant: TenantCtx,
+    /// set when the call is made on behalf of a run ticket (see [`run_tickets`]), never by a session
+    pub run: Option<RunCall>,
+}
+
+/// What a run ticket adds to the caller of a command: the run it belongs to and the resources it is
+/// limited to. The database enforces the resources (`Ctx::scope`).
+#[derive(Debug, Clone)]
+pub struct RunCall {
+    pub ticket: Uuid,
+    pub run_ref: String,
+    pub resources: Option<Vec<Uuid>>,
 }
 
 impl Caller {
     pub fn ctx(&self) -> Ctx {
-        Ctx::user(self.user.user_id, self.tenant.tenant_id)
+        let mut c = Ctx::user(self.user.user_id, self.tenant.tenant_id);
+        c.scope = self.run.as_ref().and_then(|r| r.resources.clone());
+        c
     }
     pub fn is_manager(&self) -> bool {
         self.tenant.role == Role::TenantManager

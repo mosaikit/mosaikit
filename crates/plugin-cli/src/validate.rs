@@ -111,9 +111,11 @@ fn manifest_checks(m: &Manifest, strict: bool, r: &mut Report) {
         r.warn("no [requires] mosaikit: the plugin says it works with any version of Mosaikit (e.g. \">=1.0, <2\")");
     }
     // keys added after the first release of the API: an older Mosaikit refuses a manifest that has them
-    let newer = m.config.iter().any(|c| c.public) || !m.public_commands.is_empty();
+    let newer = m.config.iter().any(|c| c.public)
+        || !m.public_commands.is_empty()
+        || !m.permissions.run_commands.is_empty();
     if newer && m.requires.mosaikit.is_none() {
-        let msg = "`public` settings and [[public_commands]] need a Mosaikit that knows them: set [requires] mosaikit = \">=1.0\" (an older one refuses the manifest)";
+        let msg = "`public` settings, [[public_commands]] and permissions.run_commands need a Mosaikit that knows them: set [requires] mosaikit = \">=1.0\" (an older one refuses the manifest)";
         if strict {
             r.error(msg);
         } else {
@@ -159,6 +161,9 @@ fn manifest_checks(m: &Manifest, strict: bool, r: &mut Report) {
     }
     if !m.public_commands.is_empty() {
         sensitive.push("public_commands");
+    }
+    if !p.run_commands.is_empty() {
+        sensitive.push("run_commands");
     }
     if !sensitive.is_empty() {
         r.info(format!("permissions the Administrator will review: {}", sensitive.join(", ")));
@@ -375,6 +380,34 @@ description = \"A ticket\"
         let r = validate(d.path()).unwrap();
         assert!(r.ok() && r.warnings() == 0, "{:?}", r.findings);
         assert!(r.findings.iter().any(|f| f.message.contains("public_commands")));
+    }
+
+    #[test]
+    fn run_commands_need_a_mosaikit_that_knows_them() {
+        let d = tempfile::tempdir().unwrap();
+        let base = "id = \"com.test.demo\"
+name = \"Demo\"
+version = \"0.1.0\"
+[requires]
+api = 1
+";
+        let perm = "[permissions]
+run_commands = [\"node_run\"]
+";
+        plugin(d.path(), &format!("{base}{perm}"), None);
+        let r = validate(d.path()).unwrap();
+        assert!(r.ok(), "{:?}", r.findings);
+        assert!(r
+            .findings
+            .iter()
+            .any(|f| f.message.contains("run_commands") && f.message.contains("[requires]")));
+        let strict = validate_with(d.path(), Options { strict: true }).unwrap();
+        assert!(!strict.ok(), "{:?}", strict.findings);
+        // with a range the lint is quiet and the review note names the key
+        plugin(d.path(), &format!("{MIN}{perm}"), None);
+        let r = validate(d.path()).unwrap();
+        assert!(r.ok() && r.warnings() == 0, "{:?}", r.findings);
+        assert!(r.findings.iter().any(|f| f.message.contains("run_commands")));
     }
 
     #[test]

@@ -8,6 +8,9 @@ version and is removed in the next.
 - `Ctx::public` and `Ctx::link_resource()`: set when a visitor of a public link runs a command listed in
   `[[public_commands]]` (no user, `config` without secrets, `link_resource` is the only item to work on).
   `MockHost::as_public(item_id)` tests it. Needs `[requires] mosaikit = ">=1.0"`; plugin API unchanged.
+- `Ctx::on_behalf()` (`OnBehalf { run_ref }`): `Some` when the command is called on behalf of a run ticket
+  (`[permissions] run_commands`); `MockHost::on_behalf(run_ref)` tests it. Needs `[requires] mosaikit = ">=1.0"`; plugin API
+  unchanged.
 - `Ctx::files()` (`Files::list`, `describe`, `read`): read the Files area with the permissions of the caller;
   needs `[permissions] files_read = true`. `read` is capped at 4 MiB and returns the bytes as base64.
 - An error of a host operation keeps its `code`: `Error::coded` instead of `Error::msg` (e.g. `permission_denied`).

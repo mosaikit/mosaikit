@@ -586,6 +586,16 @@ function PluginAsks({ p, base }: { p: AdminPlugin; base?: string }) {
                 none
               )}
             </AskRow>
+            <AskRow label={t('Commands a background run may call')}>
+              {perm.run_commands?.length ? (
+                <span>
+                  <b className="text-destructive">{t('yes (sensitive: a service of a distribution calls them as the person who started a run, even after they have signed out)')}</b>
+                  <span className="mt-1 block font-mono text-xs">{perm.run_commands.join(', ')}</span>
+                </span>
+              ) : (
+                none
+              )}
+            </AskRow>
             <AskRow label={t('Calls the plugins')}>{list(perm.calls)}</AskRow>
             <AskRow label={t('Database')}>{p.requires?.database ? <span className="font-mono text-xs">{[p.requires.database, ...(p.requires.extensions ?? [])].join(', ')}</span> : t('any')}</AskRow>
           </dl>

@@ -2053,4 +2053,7 @@ export const IT: Record<string, string> = {
   'Commands open to public links': 'Comandi aperti ai link pubblici',
   'yes (sensitive: anyone who holds a public link may run them, read only, on the shared item)': 'sì (sensibile: chiunque abbia un link pubblico può eseguirli, in sola lettura, sull’elemento condiviso)',
   'Runs commands for public links': 'Esegue comandi per i link pubblici',
+  'Commands a background run may call': 'Comandi che un run in background può chiamare',
+  'yes (sensitive: a service of a distribution calls them as the person who started a run, even after they have signed out)': 'sì (sensibile: un servizio di una distribuzione li chiama come la persona che ha avviato un run, anche dopo che si è disconnessa)',
+  'Runs commands for background runs': 'Esegue comandi per i run in background',
 }

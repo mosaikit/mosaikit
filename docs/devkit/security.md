@@ -38,6 +38,7 @@ minimum:
 | `calls` | call commands of named plugins; the called plugin applies its own rules for the same user |
 | `notify` | send notifications; never to recipients you choose |
 | `[[public_commands]]` | anyone with a public link runs the command, read only, on the shared item. **Sensitive** (see below) |
+| `run_commands` | a service of a distribution calls the command as the person who started a run, in the background. **Sensitive** (see below) |
 | `[[config]] public = true` | a public page may read that setting. Never a secret: the manifest refuses it |
 | `files`, `content` | own files and uploaded folder content |
 
@@ -62,6 +63,22 @@ kernel cannot tell. So the plugin author carries this part, and a reviewer shoul
    it small, cache what you can, and expect the limits (30 a minute per link, 300 per tenant).
 5. **Return the least that the page needs**, not the whole row, and declare only the commands the public page really calls.
 6. Remember the tenant policy: it is off by default, so the page must work (or say so) when the command is refused.
+
+## Run commands: review checklist
+
+A command in `permissions.run_commands` is called by a service with no session, as the person who started the run. The kernel
+checks the ticket, the manifest and the person's rights on every call, and a ticket with a resource list is cut to those resources
+by the database. It cannot limit what the logic **returns**: WASM may return data it legitimately read. So the plugin author carries
+this part, and a reviewer should check each run command against this list:
+
+1. **Return the least the run needs**, not whole rows, and never a setting, a key or anything from `ctx.config`.
+2. **Check what you are asked to work on.** Ids come from the arguments the service sends; read them through the database (it
+   applies the person's rights and the ticket's resources) and treat the arguments as possibly chosen by a compromised service.
+3. **It writes as the person.** Keep writes minimal and idempotent; a repeated call must not do harm.
+4. **Use `ctx.on_behalf()`** to tell a run from the person's own call and be stricter in a run, never looser.
+5. Declare only the commands a run really calls, and expect a call to fail when the ticket is over (`run_ticket_invalid`).
+6. A ticket without a resource list reaches everything the person can reach for that command: ask the distribution to scope the
+   ticket whenever the command touches sensitive data.
 
 ## What is signed
 

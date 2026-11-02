@@ -25,6 +25,7 @@ pub struct PgPluginSchema {
 /// `core` functions the roles of the plugins may run.
 const CORE_GRANTS: &[&str] = &[
     "core.set_ctx(bytea, uuid, uuid, text, uuid)",
+    "core.set_ctx(bytea, uuid, uuid, text, uuid, uuid[])",
     "core.ctx_user()",
     "core.ctx_tenant()",
     "core.ctx_plugin()",

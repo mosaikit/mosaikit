@@ -57,6 +57,7 @@ const MIGRATIONS: &[(i64, &str, &str)] = &[
     (16, "performance_sets", include_str!("0016_performance_sets.sql")),
     (17, "qa_followups", include_str!("0017_qa_followups.sql")),
     (18, "email_required", include_str!("0018_email_required.sql")),
+    (19, "run_tickets", include_str!("0019_run_tickets.sql")),
 ];
 
 /// Context of the transaction on the connection (read by `core_ctx_*()`).
@@ -66,6 +67,8 @@ struct CtxState {
     tenant: Option<String>,
     plugin: Option<String>,
     link: Option<String>,
+    /// JSON array of the resources of a run ticket (see `Ctx::scope`)
+    scope: Option<String>,
     /// transaction of a plugin: the check triggers are active
     active: bool,
 }
@@ -267,11 +270,12 @@ fn open_conn(path: &Path, busy: Duration) -> Result<PConn> {
     conn.create_scalar_function("gen_random_uuid", 0, flags, |_| Ok(Uuid::new_v4().to_string()))
         .map_err(map_err)?;
     type Getter = fn(&CtxState) -> Option<String>;
-    let getters: [(&str, Getter); 4] = [
+    let getters: [(&str, Getter); 5] = [
         ("core_ctx_user", |c| c.user.clone()),
         ("core_ctx_tenant", |c| c.tenant.clone()),
         ("core_ctx_plugin", |c| c.plugin.clone()),
         ("core_ctx_link", |c| c.link.clone()),
+        ("core_ctx_scope", |c| c.scope.clone()),
     ];
     for (name, get) in getters {
         let state = ctx.clone();
@@ -524,6 +528,9 @@ impl LiteDb {
                 tenant: x.tenant.map(|u| u.to_string()),
                 plugin: x.plugin.clone(),
                 link: x.link.map(|u| u.to_string()),
+                scope: x.scope.as_ref().map(|v| {
+                    serde_json::Value::Array(v.iter().map(|u| u.to_string().into()).collect()).to_string()
+                }),
                 active: plugin,
             },
             None => CtxState::default(),
@@ -663,7 +670,8 @@ impl LiteTx {
         else {
             return Err(sql_err("42501", "invalid context to create resources"));
         };
-        if c.link.is_some() {
+        // a link is read only; a run ticket with a scope creates only under a resource of its scope
+        if c.link.is_some() || (c.scope.is_some() && parent.is_none()) {
             return Err(sql_err("42501", "invalid context to create resources"));
         }
         let member_sql = format!("select {}", tr::is_member("?1", "?2"));

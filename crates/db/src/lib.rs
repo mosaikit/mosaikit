@@ -59,6 +59,9 @@ pub struct Ctx {
     pub plugin: Option<String>,
     /// resource reached through a public link (read only)
     pub link: Option<Uuid>,
+    /// resources a run ticket may reach (and their descendants): the level of the user is
+    /// capped to them, whatever the plugin asks (`None`: no cap)
+    pub scope: Option<Vec<Uuid>>,
 }
 
 impl Ctx {

@@ -35,6 +35,7 @@ minimo:
 |---|---|
 | `files_read` | legge l'area File **come il chiamante**: mai più di quanto il chiamante vede. **Sensibile** |
 | `[[public_commands]]` | chiunque abbia un link pubblico esegue il comando, in sola lettura, sull'elemento condiviso. **Sensibile** (vedi sotto) |
+| `run_commands` | un servizio di una distribuzione chiama il comando come la persona che ha avviato un run, in background. **Sensibile** (vedi sotto) |
 | `[[config]] public = true` | una pagina pubblica può leggere quell'impostazione. Mai un segreto: il manifesto lo rifiuta |
 | `script_eval` | il plugin può eseguire stringhe come codice. Solo per codice di cui ci si fida. **Sensibile** |
 | `network`, `frame_src`, `web` | raggiungono origini esterne; la logica passa dall'host, che rifiuta gli indirizzi privati |
@@ -48,6 +49,22 @@ Quando la logica riceve un rifiuto come il testo «the plugin does not declare n
 I permessi delle **persone** (`use`, `create`, `delete`, `share` e i tuoi `[[user_permissions]]`) sono un'altra cosa: il
 kernel applica quelli standard; **la tua logica applica i propri** con `ctx.can`. Nascondere un pulsante con `msk.can` è
 solo comodità.
+
+## Comandi di esecuzione: lista di controllo
+
+Un comando in `permissions.run_commands` lo chiama un servizio senza sessione, come la persona che ha avviato il run. Il kernel
+controlla a ogni chiamata il ticket, il manifest e i permessi della persona, e un ticket con un elenco di risorse è ristretto a
+quelle dal database. Non può limitare ciò che la logica **restituisce**: il WASM può restituire dati che ha letto legittimamente.
+Questa parte spetta quindi all'autore del plugin, e chi rivede il codice deve controllare ogni comando di esecuzione con questa lista:
+
+1. **Restituisci il minimo che serve al run**, non righe intere, e mai un'impostazione, una chiave o nulla di `ctx.config`.
+2. **Controlla su cosa ti chiedono di lavorare.** Gli id arrivano dagli argomenti del servizio; leggili tramite il database (applica
+   i permessi della persona e le risorse del ticket) e tratta gli argomenti come scelti da un servizio forse compromesso.
+3. **Scrive come la persona.** Tieni le scritture minime e idempotenti: una chiamata ripetuta non deve fare danni.
+4. **Usa `ctx.on_behalf()`** per distinguere un run da una chiamata diretta della persona ed essere più severo nel run, mai meno.
+5. Dichiara solo i comandi che un run chiama davvero e aspettati che una chiamata fallisca a ticket finito (`run_ticket_invalid`).
+6. Un ticket senza elenco di risorse arriva a tutto ciò che la persona può raggiungere per quel comando: chiedi alla distribuzione
+   di restringere il ticket quando il comando tocca dati sensibili.
 
 ## Cosa è firmato
 

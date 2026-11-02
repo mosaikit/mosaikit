@@ -18,6 +18,7 @@ mod people_api;
 mod plugins_api;
 mod qa_api;
 mod quotas_api;
+mod run_api;
 mod shell_api;
 mod ui;
 mod untrusted;
@@ -166,7 +167,7 @@ async fn maintenance_gate(
 pub fn app_router(k: Arc<Kernel>) -> Router {
     let base = k.cfg.base_path.clone();
     let state = AppState { k };
-    let mut r = api::router().merge(oidc_api::router());
+    let mut r = api::router().merge(oidc_api::router()).merge(run_api::router());
     // the routes of the developer profile exist only while it is on: a normal server has none of them
     if state.k.cfg.developer_profile {
         r = r.merge(dev_api::router());
