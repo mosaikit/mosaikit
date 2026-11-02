@@ -9,6 +9,26 @@ export function bandOf(session: Session): ShellBand {
   return { ...BAND_ON, ...session.band }
 }
 
+/** The groups of the navigation a person collapsed (id -> false), kept in the browser like the sidebar. */
+export const NAV_GROUPS_PREF = 'msk_nav_groups'
+export function navGroupOpen(id: string): boolean {
+  try {
+    return JSON.parse(localStorage.getItem(NAV_GROUPS_PREF) ?? '{}')[id] !== false
+  } catch {
+    return true
+  }
+}
+export function setNavGroupOpen(id: string, open: boolean) {
+  try {
+    const all = JSON.parse(localStorage.getItem(NAV_GROUPS_PREF) ?? '{}')
+    if (open) delete all[id]
+    else all[id] = false
+    localStorage.setItem(NAV_GROUPS_PREF, JSON.stringify(all))
+  } catch {
+    /* the state is a convenience */
+  }
+}
+
 /** The sidebar at start: closed (icons) or open, chosen in Account › Appearance and language. */
 export const SIDEBAR_PREF = 'msk_sidebar_open'
 export function sidebarOpen(): boolean {

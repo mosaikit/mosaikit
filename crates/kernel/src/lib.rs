@@ -23,6 +23,7 @@ pub mod kpi;
 pub mod links;
 pub mod log;
 pub mod mail;
+pub mod navgroups;
 pub mod notify;
 pub mod oidc;
 pub mod ops;
@@ -203,6 +204,8 @@ pub struct Kernel {
     pub blobs: blobs::Blobs,
     /// brand of the product (name, logo, colours)
     pub brand: brand::Brand,
+    /// groups of the navigation declared by the distribution (validated; may be empty)
+    pub nav_groups: Vec<navgroups::NavGroup>,
     pub(crate) trusted: mosaikit_mskp::TrustedKeys,
     pub(crate) limiter: identity::LoginLimiter,
     pub(crate) argon: Arc<Semaphore>,
@@ -274,12 +277,14 @@ impl Kernel {
             Some(dir) => brand::Brand::load(dir)?,
             None => brand::Brand::default(),
         };
+        let nav_groups = seed::nav_groups(&cfg);
         let trusted = mosaikit_mskp::TrustedKeys::from_b64(&cfg.trusted_keys)?;
         let (dev_events, _) = broadcast::channel(64);
         let (live, _) = broadcast::channel(256);
         let kernel = Arc::new(Kernel {
             blobs: blobs::Blobs::new(cfg.data_dir.join("blobs")),
             brand,
+            nav_groups,
             plugins: plugins::Plugins::default(),
             engine: Arc::new(mosaikit_runtime::Engine::new(mosaikit_runtime::Limits::default())),
             trusted,
@@ -319,6 +324,14 @@ impl Kernel {
             devprofile::announce(&kernel);
         }
         seed::apply(&kernel).await?;
+        for g in &kernel.nav_groups {
+            for p in g.plugins.iter().filter(|p| kernel.plugins.get(p).is_none()) {
+                tracing::warn!(
+                    "nav_groups: plugin {p} of the group \"{}\" is not installed, it is not shown",
+                    g.id
+                );
+            }
+        }
         blobs::gc(&kernel).await;
         if !kernel.cfg.no_background {
             mail::spawn_worker(&kernel);

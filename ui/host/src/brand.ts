@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from 'react'
 import { api, isUnavailable } from './api.ts'
+import type { NavGroupDef } from './app/navgroups.ts'
 import type { ShellBand } from './types.ts'
 
 /** Brand of the product (`brand.toml` of the distribution), with the theme and the top bar of the
@@ -35,6 +36,8 @@ export interface Brand {
   band_image?: { v?: string; scrim?: number } | null
   /** the layout of the platform (recent servers) */
   layout?: string
+  /** groups of the sidebar navigation declared by the distribution (recent servers) */
+  nav_groups?: NavGroupDef[]
   /** maintenance mode and the planned one (recent servers) */
   maintenance?: { on: boolean; message: string; planned_at: string | null; planned_message: string }
 }

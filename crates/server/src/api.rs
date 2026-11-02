@@ -183,6 +183,9 @@ async fn health(State(s): State<AppState>) -> Json<Value> {
 /// public, so the sign-in page has them before a session exists.
 async fn brand(State(s): State<AppState>) -> ApiResult<Json<Value>> {
     let mut b = s.k.brand.public();
+    if let Some(o) = b.as_object_mut() {
+        o.insert("nav_groups".into(), json!(s.k.nav_groups));
+    }
     let v = levels::effective(&s.k, None).await?;
     let text = |key: &str| v.get(key).cloned().unwrap_or(Value::Null);
     if let Some(o) = b.as_object_mut() {

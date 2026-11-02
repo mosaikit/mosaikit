@@ -1937,6 +1937,7 @@ A **distribution** is a product based on Mosaikit, described by
 - `[[sidecars]]`: extra processes or services shipped next to the kernel (see 14.0 below).
 
 - `[[plugin_settings]]` and `[[service_key_values]]`: values to seed (14.2).
+- `[[nav_groups]]`: groups of the sidebar navigation (14.3).
 
 Mosaikit itself is the default distribution. `cargo xtask --dist <folder>`
 uses it for development, tests and release. The kernel does not change: brand and
@@ -2064,6 +2065,40 @@ validates the two tables whenever it loads the distribution (unknown fields refu
 `:`, an entry listed twice, `env:` and `file:` without a name), so `ci` fails on a bad section. Tests:
 `a_deployment_seeds_settings_and_keys_without_overwriting_the_administrator` and
 `a_seed_never_overwrites_a_value_set_before_it` (`crates/kernel/tests/plugin_lifecycle.rs`), `dist::tests`.
+
+### 14.3 Navigation groups
+
+The sidebar lists the apps flat. A distribution can arrange them in a two-level tree, because the grouping is a
+product choice, not the plugin's (a manifest only has its own `[[nav]]`, the pages inside the plugin). In
+`distribution.toml`:
+
+```toml
+[[nav_groups]]
+id = "data"                          # unique; the key of the collapsed state kept in the browser
+label = "Data"                       # English; other languages in [nav_groups.i18n.<lang>]
+icon = "database"                    # a Lucide name of the shell (the list of ui/host AppIcon.tsx)
+plugins = ["com.example.docs", "com.example.geo"]   # plugin ids, in the order shown
+[nav_groups.i18n.it]
+label = "Dati"
+```
+
+How it travels: the same file as the seeds (`plugin_settings_file`, 14.2). The kernel (`crates/kernel/src/navgroups.rs`)
+validates it at start and the public `GET /api/brand` carries it as `nav_groups`; the shell reads it with the brand.
+`cargo xtask` refuses unknown fields. The kernel knows nothing of what the groups hold. The plugin API does not
+change.
+
+Rules. A plugin not listed stays at the bottom, flat, under «Other apps». A plugin that is not installed (or that the
+tenant hid) is ignored: a warning at start, nothing shown. A group id listed twice: the first one wins. A plugin
+listed in two groups stays in the first. A group with no plugin is hidden. An icon the shell does not know falls back
+to the folder icon. Every case is a warning in the log, never an error: a bad group never stops the start.
+
+Shell. In the open sidebar a group is a heading (collapsible, `aria-expanded`, the state is kept in the browser in
+`msk_nav_groups`) over its apps with their icon and name; the arrow keys, Home and End move among the entries. In the
+closed sidebar only the group icon and a short name are drawn; a click opens a menu with the apps and, indented, the
+pages of each app (its `[[nav]]`); Escape closes it and the focus goes back to the icon. On the phone the drawer shows
+the groups open. Groups apply to the default sidebar only: **declarative layouts (`layout.toml`) and the other built-in
+layouts ignore them for now** and keep drawing the flat list. Tests: `navgroups::tests`, `dist::tests`, `navgroups.test.ts`,
+`specs/19-nav-groups.spec.ts`, checks NAV-01 to NAV-04.
 
 ### 14.1 Layouts and style
 

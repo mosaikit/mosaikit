@@ -34,14 +34,15 @@ import {
 import { cn } from '@/lib/utils'
 import { t } from './i18n.ts'
 import { useLiveNotes } from './notes.ts'
-import { bandOf, sidebarOpen } from './prefs.ts'
+import { bandOf, navGroupOpen, setNavGroupOpen, sidebarOpen } from './prefs.ts'
+import { arrowTarget } from './navgroups.ts'
 import { type Route } from './router.ts'
 import { QuotaAlert } from './Quotas.tsx'
 import { HelpLayer } from './HelpLayer.tsx'
 import { useTenantCtx } from './core.ts'
 import { applyStyle, bandImageOf, styleOf, useBandImage, useLayoutInUse, useLayoutStylesheet } from './layouts.ts'
 import { AppMark, BandActions, BandSearch, FlyoutMenu, SkipLink, TenantSwitcher } from './slots.tsx'
-import { bandIcon, bandStyle, hasActive, useNav, type NavItem } from './nav.tsx'
+import { bandIcon, bandStyle, hasActive, useNav, type NavGroup, type NavItem } from './nav.tsx'
 import Frame from './frames.tsx'
 
 export { AppMark, TenantBadge } from './slots.tsx'
@@ -139,10 +140,70 @@ function NavList({ items }: { items: NavItem[] }) {
   )
 }
 
+const groupClass = "py-1 first:pt-0 last:pb-0 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:not-first:mt-3 group-data-[collapsible=icon]:not-first:relative group-data-[collapsible=icon]:not-first:pt-1 group-data-[collapsible=icon]:not-first:before:absolute group-data-[collapsible=icon]:not-first:before:top-0 group-data-[collapsible=icon]:not-first:before:left-1/2 group-data-[collapsible=icon]:not-first:before:h-px group-data-[collapsible=icon]:not-first:before:w-10 group-data-[collapsible=icon]:not-first:before:-translate-x-1/2 group-data-[collapsible=icon]:not-first:before:bg-rail-foreground/45 group-data-[collapsible=icon]:not-first:before:content-['']"
+
+/** A group of the distribution (`[[nav_groups]]`): in the open sidebar a heading that collapses its apps (the
+ *  state is kept in the browser), in the closed rail one icon with a short name that opens a menu with the
+ *  apps and their pages. Arrow keys move among the entries of the open group. */
+function DistGroup({ g, className }: { g: NavGroup; className: string }) {
+  const { isMobile, state } = useSidebar()
+  const rail = state === 'collapsed' && !isMobile
+  const [open, setOpen] = useState(() => navGroupOpen(g.id))
+  const active = g.items.some(hasActive)
+  const label = g.label ?? g.id
+  const body = `msk-navg-${g.id.replace(/[^a-z0-9_-]/gi, '_')}`
+  const toggle = () => {
+    setOpen(!open)
+    setNavGroupOpen(g.id, !open)
+  }
+  if (rail)
+    return (
+      <SidebarGroup className={className}>
+        <SidebarGroupContent>
+          <SidebarMenu className="group-data-[collapsible=icon]:gap-0">
+            <SidebarMenuItem>
+              <FlyoutMenu
+                item={{ label, icon: g.icon, active, children: g.items }}
+                trigger={
+                  <SidebarMenuButton isActive={active} className={railButton} aria-label={t('Open the apps of {name}', { name: label })} title={label}>
+                    {g.icon}
+                    <span>{label}</span>
+                  </SidebarMenuButton>
+                }
+              />
+            </SidebarMenuItem>
+          </SidebarMenu>
+        </SidebarGroupContent>
+      </SidebarGroup>
+    )
+  const onKeyDown = (e: React.KeyboardEvent<HTMLElement>) => {
+    const els = Array.from(e.currentTarget.querySelectorAll<HTMLElement>('button[data-navg-head], a[href], button.msk-nav-toggle'))
+    const to = arrowTarget(e.key, els.indexOf(document.activeElement as HTMLElement), els.length)
+    if (to == null) return
+    e.preventDefault()
+    els[to].focus()
+  }
+  return (
+    <SidebarGroup className={className} role="group" aria-label={label} onKeyDown={onKeyDown}>
+      <SidebarGroupLabel asChild>
+        <button type="button" data-navg-head className="msk-navg-head w-full cursor-pointer justify-between text-sidebar-foreground/85 hover:bg-sidebar-hover focus-visible:ring-2" aria-expanded={open} aria-controls={body} onClick={toggle}>
+          <span className={cn('truncate', active && !open && 'font-semibold text-sidebar-primary')}>{label}</span>
+          <ChevronDown className={cn('size-4 transition-transform', !open && '-rotate-90')} aria-hidden="true" />
+        </button>
+      </SidebarGroupLabel>
+      {open && (
+        <SidebarGroupContent id={body}>
+          <NavList items={g.items} />
+        </SidebarGroupContent>
+      )}
+    </SidebarGroup>
+  )
+}
+
 function AppSidebar({ session, route, band }: { session: Session; route: Route; band: ShellBand }) {
   const brand = useBrand()
   const { isMobile, state } = useSidebar()
-  const nav = useNav(session, route)
+  const nav = useNav(session, route, true)
   const admin = session.user.is_system_admin
   const manager = route.area === 'tenant' && session.memberships.find((m) => m.slug === route.tenant)?.role === 'tenant_manager'
   return (
@@ -167,14 +228,18 @@ function AppSidebar({ session, route, band }: { session: Session; route: Route; 
         </SidebarHeader>
       )}
       <SidebarContent className="msk-hoverscroll border-r border-sidebar-border pt-1 group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:pt-0">
-        {nav.groups.map((g) => (
-          <SidebarGroup key={g.id} className="py-1 first:pt-0 last:pb-0 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:not-first:mt-3 group-data-[collapsible=icon]:not-first:relative group-data-[collapsible=icon]:not-first:pt-1 group-data-[collapsible=icon]:not-first:before:absolute group-data-[collapsible=icon]:not-first:before:top-0 group-data-[collapsible=icon]:not-first:before:left-1/2 group-data-[collapsible=icon]:not-first:before:h-px group-data-[collapsible=icon]:not-first:before:w-10 group-data-[collapsible=icon]:not-first:before:-translate-x-1/2 group-data-[collapsible=icon]:not-first:before:bg-rail-foreground/45 group-data-[collapsible=icon]:not-first:before:content-['']">
-            {g.id === 'apps' || g.id === 'manage' ? <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">{g.label}</SidebarGroupLabel> : null}
-            <SidebarGroupContent>
-              <NavList items={g.items} />
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
+        {nav.groups.map((g) =>
+          g.collapsible ? (
+            <DistGroup key={g.id} g={g} className={groupClass} />
+          ) : (
+            <SidebarGroup key={g.id} className={groupClass}>
+              {g.id === 'apps' || g.id === 'manage' ? <SidebarGroupLabel className="group-data-[collapsible=icon]:hidden">{g.label}</SidebarGroupLabel> : null}
+              <SidebarGroupContent>
+                <NavList items={g.items} />
+              </SidebarGroupContent>
+            </SidebarGroup>
+          ),
+        )}
       </SidebarContent>
       <SidebarFooter className="border-r border-sidebar-border pt-1 pb-1 group-data-[collapsible=icon]:relative group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-0 group-data-[collapsible=icon]:before:absolute group-data-[collapsible=icon]:before:top-0 group-data-[collapsible=icon]:before:left-1/2 group-data-[collapsible=icon]:before:h-px group-data-[collapsible=icon]:before:w-10 group-data-[collapsible=icon]:before:-translate-x-1/2 group-data-[collapsible=icon]:before:bg-rail-foreground/45 group-data-[collapsible=icon]:before:content-['']">
         {/* only when a quota of the tenant passes 80 %: no fixed widget */}

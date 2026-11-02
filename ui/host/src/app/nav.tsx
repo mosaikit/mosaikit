@@ -6,9 +6,11 @@ import type { CSSProperties, ReactNode } from 'react'
 import { Activity, Building2, Gauge, History, House, LayoutDashboard, LayoutGrid, Puzzle, Settings, Share2, ShieldCheck, Users } from 'lucide-react'
 import type { PluginView, Session } from '../types.ts'
 import AppIcon from './AppIcon.tsx'
+import { useBrand } from '../brand.ts'
+import { DEFAULT_GROUP_ICON, splitApps } from './navgroups.ts'
 import type { SearchGroup } from './SearchBox.tsx'
 import { isApp, useTenantCtx } from './core.ts'
-import { t } from './i18n.ts'
+import { lang, t } from './i18n.ts'
 import { to, type Route } from './router.ts'
 
 
@@ -22,6 +24,8 @@ export interface NavItem {
   href?: string
   active: boolean
   children?: NavItem[]
+  /** id of the plugin of an app (to place it in a group of the distribution) */
+  plugin?: string
 }
 export interface NavGroup {
   id: string
@@ -29,6 +33,8 @@ export interface NavGroup {
   /** the icon of the area (Project layout) */
   icon: ReactNode
   items: NavItem[]
+  /** a group of the distribution: collapsible heading in the open sidebar, one icon and a menu in the closed one */
+  collapsible?: boolean
 }
 export interface Nav {
   groups: NavGroup[]
@@ -58,7 +64,8 @@ export const hasActive = (it: NavItem): boolean => it.active || (it.children ?? 
 
 /** The items of the navigation per role (docs/refactoring-ui.md §2): work, management of the scope, at the
  *  bottom the settings of the scope. The personal pages are in the menu of the person. */
-export function useNav(session: Session, route: Route): Nav {
+export function useNav(session: Session, route: Route, grouped = false): Nav {
+  const defs = useBrand().nav_groups
   const slug = route.area === 'tenant' ? route.tenant : ''
   const ctx = useTenantCtx(slug)
   if (route.area === 'admin') {
@@ -96,6 +103,7 @@ export function useNav(session: Session, route: Route): Nav {
     .map((p) => {
       const children = appChildren(slug, p, route)
       return {
+        plugin: p.id,
         label: p.label,
         icon: <AppIcon id={p.id} name={p.icon_name} />,
         href: to.plugin(slug, p.id),
@@ -114,7 +122,7 @@ export function useNav(session: Session, route: Route): Nav {
           : { label: t('Home'), icon: <House />, href: to.tenant(slug), active: page === 'home' },
       ],
     },
-    { id: 'apps', label: t('Apps'), icon: <LayoutGrid />, items: apps },
+    ...appGroups(apps, grouped ? defs : undefined),
   ]
   if (manager)
     groups.push({
@@ -135,6 +143,23 @@ export function useNav(session: Session, route: Route): Nav {
   }
 }
 
+/** The apps as one flat group, or, when the distribution declared groups (default sidebar only), its groups in
+ *  their order and then the apps no group lists, flat. Layouts that do not ask for groups see the flat list. */
+function appGroups(apps: NavItem[], defs: Parameters<typeof splitApps>[1]): NavGroup[] {
+  const { groups, rest } = splitApps(apps, defs, lang())
+  if (!groups.length) return [{ id: 'apps', label: t('Apps'), icon: <LayoutGrid />, items: apps }]
+  return [
+    ...groups.map((g) => ({
+      id: `dist:${g.def.id}`,
+      label: g.label,
+      icon: <AppIcon id="" name={g.def.icon} fallback={DEFAULT_GROUP_ICON} />,
+      items: g.items,
+      collapsible: true,
+    })),
+    ...(rest.length ? [{ id: 'apps', label: t('Other apps'), icon: <LayoutGrid />, items: rest }] : []),
+  ]
+}
+
 /** Every entry with an address, flat (for the search and the launcher). */
 export function flat(items: NavItem[]): NavItem[] {
   return items.flatMap((i) => [...(i.href ? [i] : []), ...flat(i.children ?? [])])
@@ -142,8 +167,9 @@ export function flat(items: NavItem[]): NavItem[] {
 
 /** The groups of the search box from the navigation. */
 export function searchGroups(nav: Nav): SearchGroup[] {
-  const apps = nav.groups.find((g) => g.id === 'apps')?.items ?? []
-  const pages = [...nav.groups.filter((g) => g.id !== 'apps').flatMap((g) => g.items), ...nav.bottom]
+  const isApps = (g: NavGroup) => g.id === 'apps' || g.collapsible
+  const apps = nav.groups.filter(isApps).flatMap((g) => g.items)
+  const pages = [...nav.groups.filter((g) => !isApps(g)).flatMap((g) => g.items), ...nav.bottom]
   return [
     { id: 'pages', label: t('Pages'), items: pages.map((i) => ({ label: i.label, icon: i.icon, href: i.href ?? '' })) },
     { id: 'apps', label: t('Apps'), items: flat(apps).map((i) => ({ label: i.label, icon: i.icon, href: i.href ?? '' })) },
