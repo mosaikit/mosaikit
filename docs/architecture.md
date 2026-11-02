@@ -1563,8 +1563,9 @@ are limited to the path.
   plugins keep the strict policy. The Administrator sees the permission in the plugin's «What it asks».
   A plugin that declares it can run injected strings as code: grant it only to code you trust.
 - **Embedding**: the host UI is never embedded (`frame-ancestors 'none'`); the public pages of a
-  tenant (public links) may be embedded only by the sites in `embed.sites` of the tenant, a subset
-  of the platform's (`frame-ancestors <sites>`, otherwise `'none'`).
+  tenant (public links) may be embedded by the static sites of the same installation (`frame-ancestors
+  'self'`, the app origins and the plugin origin, as for those sites) and by the sites in `embed.sites`
+  of the tenant, a subset of the platform's, added on top; nobody else.
 - In production the two origins are two hostnames behind the reverse proxy
   (e.g. `app.example.com` and `plugins.example.com`), with HTTPS.
 - **One origin per plugin (optional)**: with a wildcard host, `plugin_url =

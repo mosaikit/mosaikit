@@ -621,7 +621,7 @@ export const IT: Record<string, string> = {
   'Shared with the people of the tenant': 'Condivisa con le persone dell’organizzazione',
   'Sign-in codes and urgent notifications': 'Codici di accesso e notifiche urgenti',
   'Sites that may embed public pages': 'Siti che possono incorporare le pagine pubbliche',
-  'Sites that may show the public pages (public links) inside their own pages. Without sites, nobody may.': 'Siti che possono mostrare le pagine pubbliche (link pubblici) dentro le proprie pagine. Senza siti, nessuno può.',
+  'Sites that may show the public pages (public links) inside their own pages, besides the static sites of this installation, which always may.': 'Siti che possono mostrare le pagine pubbliche (link pubblici) dentro le proprie pagine, oltre ai siti statici di questa installazione, che possono sempre.',
   'Square, at least 32 px': 'Quadrata, almeno 32 px',
   'Tenants may choose their theme': 'Le organizzazioni possono scegliere il proprio tema',
   'Tenants may customize it': 'Le organizzazioni possono personalizzarla',

@@ -476,7 +476,7 @@ export function EmbeddingPanel({ level }: { level: Level }) {
       level={level}
       keys={['embed.sites']}
       title={t('Embedding')}
-      description={t('Sites that may show the public pages (public links) inside their own pages. Without sites, nobody may.')}
+      description={t('Sites that may show the public pages (public links) inside their own pages, besides the static sites of this installation, which always may.')}
     >
       {(d, s) => {
         const st = s('embed.sites')!

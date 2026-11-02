@@ -14,6 +14,8 @@ in step).
 
 ### The shell
 
+- Public pages (public links) can now be embedded by default by the static sites of the same installation, with no setting; the sites listed in Settings › Embedding are added on top, and nobody else may embed them.
+
 - The lists and cards that were left with a bare line when empty (the two lists of Manage › Pending, Home without apps, usage, backups, log and overview widgets, members of a group) now show an illustration with a title and the action, in a small version inside a widget or a section.
 - The Overview tab of a plugin fits the screen: the pictures at the left, the information at the right (it scrolls by itself only if it is longer than the screen). Every official plugin now ships two realistic pictures.
 - A new interface for every role, in English and Italian, with light, dark and automatic mode.

@@ -76,6 +76,27 @@ const checks: L.Check[] = [
       return { status: 'NOT VERIFIABLE', note: `needs a signed test package with logic and public commands; automated twin: ${KERNEL_TESTS}` }
     },
   },
+  {
+    id: 'PL-07',
+    async run() {
+      const c = H.checker()
+      const u = await L.apiUser('comune-roma', 's.greco')
+      const note = await u.call('POST', '/mosaikit/api/t/comune-roma/p/com.mosaikit.notes/r/notes', { values: { title: 'PL embed', body: 'x' } })
+      const link = await u.call('POST', `/mosaikit/api/t/comune-roma/resources/${note.id}/links`, {})
+      const anon = await request.newContext()
+      try {
+        const csp = (await anon.get(link.url as string)).headers()['content-security-policy'] ?? ''
+        const fa = /frame-ancestors ([^;]*)/.exec(csp)?.[1] ?? ''
+        c.ok(fa.startsWith("'self'") && !fa.includes("'none'"), `a public page may be embedded by the sites of the installation (frame-ancestors ${fa})`)
+        c.ok(!fa.includes('evil.example'), 'an unrelated origin is not allowed')
+      } finally {
+        await anon.dispose()
+        const links = (await u.call('GET', `/mosaikit/api/t/comune-roma/resources/${note.id}/links`)) as any[]
+        for (const l of links) await u.call('DELETE', `/mosaikit/api/t/comune-roma/links/${l.id}`)
+      }
+      return c.result()
+    },
+  },
 ]
 
 export default checks

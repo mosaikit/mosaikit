@@ -199,7 +199,7 @@ change.
 | **Passwords and sessions** | Minimum length of the password (never below 10), attempts before the lock, length of the lock, length of the session, «Remember me» in days (0: the option does not show). |
 | **Quotas** | **Quotas of new tenants** (storage, people, items; empty: no limit), **Capacity of the platform** with what is given to and used by the tenants (a warning when more is given than the platform has), the tenants with their quotas. A tenant's own quotas are on its page (Details › Quotas: **Customize**, **Restore**). |
 | **Keys of outside services** | Keys the platform pays for, for the services the installed plugins declare (each says which plugins use it; no plugin, no service: the plugins decide which keys exist, and none can be added by hand). A shared key is used by every tenant without one of its own. Only the last four characters show after saving. A key of a service no installed plugin uses any more is marked as not used: remove it. The keys are real: for example Notes declares the **Translation service** key and its **address**; with both set (and shared with the tenants) the **Translation** box of a note translates it with that service, sending the key itself with the request. |
-| **Embedding** | Sites that may show the public pages (public links) inside their own pages. Without sites, nobody may. |
+| **Embedding** | Sites that may show the public pages (public links) inside their own pages, besides the static sites of this installation, which always may. |
 | **Backup and restore** | See *Backups* below. |
 | **Maintenance** | See *Maintenance* below. |
 | **Identity and appearance** | **Identity and texts**, **Theme and mode**, **Languages and formats**, **Top bar** (below). |
