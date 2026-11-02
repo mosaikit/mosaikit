@@ -37,6 +37,8 @@ Regole:
 - La plugin API è un intero che cresce solo con una modifica incompatibile. Una release di Mosaikit che la cambia alza
   insieme SDK e pacchetto UI. L'host parla ogni API fino alla propria; un plugin costruito per una più nuova è rifiutato con
   `incompatible_api`; un host o un plugin anteriore all'handshake conta come API 1.
+- Le chiavi aggiunte all'API 1 senza cambiarne il numero (`[[config]] public`, `[[public_commands]]`) richiedono
+  `[requires] mosaikit = ">=1.0"`: un kernel più vecchio rifiuta il manifesto, ed è il comportamento voluto (chiude in sicurezza).
 - Un kernel che non conosce `[requires]` rifiuta il manifesto (le chiavi sconosciute sono rifiutate): rilasciare il kernel
   che legge una chiave prima del primo plugin che la usa.
 - Costruire la logica con l'SDK della versione maggiore dell'API che si dichiara, e fissare il pacchetto UI con `^1.0.0`.
@@ -74,6 +76,7 @@ changelog del pacchetto, con la regola di deprecazione applicata quando una dist
 - `CrudOptions.panel`
 - `Resources::create` e `Resources::delete` dell'SDK (`resource.create`, `resource.delete`)
 - `msk.web` (permesso `web`)
+- `[[config]] public`, `[[public_commands]]`, `msk.publicConfig`, `msk.publicCall` e `ctx.link_resource()` (pagine dei link pubblici)
 
 L'esempio `insights` ora usa `[search]` e `note-priority` le azioni `set` di un'estensione; l'architettura §8.11 li elenca
 ancora come sperimentali finché il proprietario non li toglie dall'elenco (una decisione per una release, non per questi
@@ -85,7 +88,7 @@ Leggere il changelog di ogni pacchetto quando si aggiorna. In breve, per la prim
 
 - **SDK 1.0.0** — `Error` è una struct con un codice (`Error::coded`); `Ctx` è `#[non_exhaustive]`; `abi`, `Registry` sono
   `#[doc(hidden)]`; `Values::bool` legge `true`, `1`, `yes`. Non rilasciato: `Ctx::files()` (richiede `files_read`); gli
-  errori dell'host tengono il loro `code`.
+  errori dell'host tengono il loro `code`; `ctx.public`, `ctx.link_resource()` e `MockHost::as_public` (comandi pubblici).
 - **`@mosaikit/plugin-api` 1.0.0** — l'handshake di versione (`API_VERSION`, `msk.api`, `isIncompatible`), `ErrorCode`
   tipizzato, `HostEvents`, export espliciti (`Bridge`, `applyTheme`, `emptyArt`… non sono più esportati), `ResourceMeta`.
 - **`mosaikit-plugin` 1.0.0** — `new` (varianti, esempi), `build`, `test`, `validate --strict`, `pack`, `sign`, `keygen`,

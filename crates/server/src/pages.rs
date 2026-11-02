@@ -110,7 +110,7 @@ pub fn viewer(title: &str, frame_src: &str, plugin_origin: &str, nonce: &str) ->
            function reply(x){{x.msk=1;x.id=m.id;f.contentWindow.postMessage(x,PO);}}\
            if(m.op==='hello'||m.op==='public.get'){{fetch('api',{{cache:'no-store'}}).then(function(r){{return r.json();}})\
              .then(function(j){{reply({{ok:m.op==='hello'?{{api:{api},public:true,resource:j}}:j}});}},function(e){{reply({{err:String(e)}});}});return;}}\
-           reply({{err:'operation not available in a public link'}});\
+           if(m.op==='public.config'){{fetch('config',{{cache:'no-store'}}).then(function(r){{return r.json().then(function(j){{return r.ok?j:Promise.reject(j.error||r.status);}});}})             .then(function(j){{reply({{ok:j}});}},function(e){{reply({{err:String(e)}});}});return;}}           if(m.op==='public.call'){{var a=m.args||{{}};var n=a.name;if(typeof n!=='string'||!/^[a-z][a-z0-9_]*$/.test(n)){{reply({{err:'invalid command name'}});return;}}             fetch('call/'+n,{{method:'POST',headers:{{'content-type':'application/json'}},body:JSON.stringify(a.args===undefined?null:a.args),cache:'no-store'}})             .then(function(r){{return r.json().then(function(j){{if(r.ok)reply({{ok:j.ok}});else reply({{err:j.error||String(r.status),code:j.code}});}});}},function(e){{reply({{err:String(e)}});}});return;}}           reply({{err:'operation not available in a public link'}});\
          }});}})();</script></body></html>",
         t = esc(title),
         src = esc(frame_src),

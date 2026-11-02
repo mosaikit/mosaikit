@@ -422,3 +422,14 @@ pub async fn key_in_use(k: &Kernel, c: &Caller, service_id: &str) -> Result<Opti
     }
     read(k, Level::Platform, service_id, true).await
 }
+
+/// The key in use for a public command (a visitor of a public link has no user): the tenant's key,
+/// only when it is shared, else the platform's. Never a personal key, not even the key of the person
+/// who made the link.
+pub async fn key_for_public(k: &Kernel, tenant: uuid::Uuid, service_id: &str) -> Result<Option<String>> {
+    service(k, service_id, None)?;
+    if let Some(v) = read(k, Level::Tenant(tenant), service_id, true).await? {
+        return Ok(Some(v));
+    }
+    read(k, Level::Platform, service_id, true).await
+}

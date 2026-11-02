@@ -152,6 +152,23 @@ describe('Msk.notify', () => {
   })
 })
 
+describe('Msk in a public link', () => {
+  it('publicConfig and publicCall go through the host page', async () => {
+    const { host, sent } = fakeHost()
+    const b = new Bridge(host, 'https://app.example', window)
+    const msk = new Msk(b, { public: true })
+    const c = msk.publicConfig()
+    expect(sent[0].msg).toMatchObject({ msk: 1, op: 'public.config' })
+    reply(window, host, 'https://app.example', { msk: 1, id: sent[0].msg.id, ok: { endpoint: 'https://x' } })
+    await expect(c).resolves.toEqual({ endpoint: 'https://x' })
+    const r = msk.publicCall<{ n: number }>('tile_ticket', { z: 1 })
+    expect(sent[1].msg).toMatchObject({ msk: 1, op: 'public.call', args: { name: 'tile_ticket', args: { z: 1 } } })
+    reply(window, host, 'https://app.example', { msk: 1, id: sent[1].msg.id, ok: { n: 2 } })
+    await expect(r).resolves.toEqual({ n: 2 })
+    b.dispose()
+  })
+})
+
 describe('permissions of the person', () => {
   it('msk.can follows the permissions of the host, everything with an older host', () => {
     const { host } = fakeHost()

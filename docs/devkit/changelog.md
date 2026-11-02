@@ -42,6 +42,8 @@ Rules:
 - The plugin API is an integer that grows only with a breaking change. A release of Mosaikit that changes it raises the
   SDK and the UI package together. The host speaks every API up to its own; a plugin built for a newer one is refused with
   `incompatible_api`; a host or a plugin that predates the handshake counts as API 1.
+- The keys added to API 1 without a bump (`[[config]] public`, `[[public_commands]]`) need `[requires] mosaikit = ">=1.0"`:
+  an older kernel rejects the manifest, which is the intended fail-closed behaviour.
 - A kernel that does not know `[requires]` rejects the manifest (unknown keys are refused): release the kernel that reads a
   key before the first plugin that uses it.
 - Build the logic with the SDK of the major version of the API you declare, and pin the UI package with `^1.0.0`.
@@ -78,6 +80,7 @@ package, with the deprecation rule applied when a distribution relies on it. Exp
 - `CrudOptions.panel`
 - `Resources::create` and `Resources::delete` of the SDK (`resource.create`, `resource.delete`)
 - `msk.web` (permission `web`)
+- `[[config]] public`, `[[public_commands]]`, `msk.publicConfig`, `msk.publicCall` and `ctx.link_resource()` (public link pages)
 
 The `insights` example now uses `[search]` and `note-priority` the `set` actions of an extension; architecture §8.11 still lists them as experimental until the owner takes them off the list (a decision for a release, not for these documents).
 
@@ -87,7 +90,7 @@ Read the changelog of each package when you upgrade. In short, for the first rel
 
 - **SDK 1.0.0** — `Error` is a struct with a code (`Error::coded`); `Ctx` is `#[non_exhaustive]`; `abi`, `Registry` are
   `#[doc(hidden)]`; `Values::bool` reads `true`, `1`, `yes`. Unreleased: `Ctx::files()` (needs `files_read`); host
-  errors keep their `code`.
+  errors keep their `code`; `ctx.public`, `ctx.link_resource()` and `MockHost::as_public` (public commands).
 - **`@mosaikit/plugin-api` 1.0.0** — the version handshake (`API_VERSION`, `msk.api`, `isIncompatible`), typed `ErrorCode`,
   `HostEvents`, explicit exports (`Bridge`, `applyTheme`, `emptyArt`… are no longer exported), `ResourceMeta`.
 - **`mosaikit-plugin` 1.0.0** — `new` (variants, examples), `build`, `test`, `validate --strict`, `pack`, `sign`, `keygen`,

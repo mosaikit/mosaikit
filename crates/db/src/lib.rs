@@ -253,6 +253,15 @@ impl TxConn {
         query(sql).execute(&mut *self).await.map(|_| ())
     }
 
+    /// From now on the transaction cannot write (PostgreSQL enforces it; SQLite read transactions
+    /// are opened for reading by `begin_plugin_read`).
+    pub async fn make_read_only(&mut self) -> Result<()> {
+        match self {
+            TxConn::Pg(_) => self.sql("set transaction read only").await,
+            TxConn::Lite(_) => Ok(()),
+        }
+    }
+
     pub async fn savepoint(&mut self) -> Result<()> {
         self.sql("savepoint msk_sp").await
     }

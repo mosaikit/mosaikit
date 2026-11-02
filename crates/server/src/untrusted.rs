@@ -27,6 +27,8 @@ pub fn router() -> Router<AppState> {
         .route("/p/{token}", get(public_redirect))
         .route("/p/{token}/", get(public_root))
         .route("/p/{token}/api", get(public_api))
+        .route("/p/{token}/config", get(public_config))
+        .route("/p/{token}/call/{name}", post(public_call))
         .route("/p/{token}/unlock", post(public_unlock))
         .route("/p/{token}/f/{id}/{name}", get(public_child_file))
         .route("/p/{token}/d/{id}/", get(public_child_folder))
@@ -481,6 +483,65 @@ async fn public_api(State(s): State<AppState>, Path(token): Path<String>, header
         "kind": r.kind, "title": r.title, "values": values,
     }))
     .into_response();
+    set(&mut res, header::CACHE_CONTROL, "no-store");
+    res
+}
+
+/// The settings of the plugin of the link that the plugin marks `public = true` (never a secret).
+/// The plugin is the one of the link, whatever the request says.
+async fn public_config(State(s): State<AppState>, Path(token): Path<String>, headers: HeaderMap) -> Response {
+    let r = match open(&s, &token, &headers).await {
+        Ok(r) => r,
+        Err(_) => return (StatusCode::NOT_FOUND, Json(json!({ "error": "invalid link" }))).into_response(),
+    };
+    let mut res = match mosaikit_kernel::plugins::config::public_values(&s.k, &r.plugin_id).await {
+        Ok(v) => Json(Value::Object(v)).into_response(),
+        Err(e) => crate::ApiError(e).into_response(),
+    };
+    set(&mut res, header::CACHE_CONTROL, "no-store");
+    res
+}
+
+/// Largest body of a public command (the arguments are capped again by the command's own limit).
+const MAX_PUBLIC_BODY: usize = 32 * 1024;
+
+/// A public command of the plugin of the link (`[[public_commands]]`). The body is the JSON of the
+/// arguments. The link is resolved again on every call: revoked, expired, locked or switched off means
+/// no command runs. The resource is always the one of the link.
+async fn public_call(
+    State(s): State<AppState>,
+    Path((token, name)): Path<(String, String)>,
+    headers: HeaderMap,
+    body: axum::body::Bytes,
+) -> Response {
+    let r = match open(&s, &token, &headers).await {
+        Ok(r) => r,
+        Err(_) => return (StatusCode::NOT_FOUND, Json(json!({ "error": "invalid link" }))).into_response(),
+    };
+    // JSON only: a cross-site form cannot send it, and a script of another origin needs a preflight
+    let json_type = headers
+        .get(header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| v.trim_start().to_ascii_lowercase().starts_with("application/json"));
+    if !json_type || body.len() > MAX_PUBLIC_BODY {
+        return crate::ApiError(mosaikit_kernel::Error::bad("a JSON body of at most 32 KiB is required"))
+            .into_response();
+    }
+    let args: Value = if body.is_empty() {
+        Value::Null
+    } else {
+        match serde_json::from_slice(&body) {
+            Ok(v) => v,
+            Err(_) => {
+                return crate::ApiError(mosaikit_kernel::Error::bad("the arguments are not valid JSON"))
+                    .into_response()
+            }
+        }
+    };
+    let mut res = match crud::call_public(&s.k, &r, &name, args).await {
+        Ok(v) => Json(json!({ "ok": v })).into_response(),
+        Err(e) => crate::ApiError(e).into_response(),
+    };
     set(&mut res, header::CACHE_CONTROL, "no-store");
     res
 }

@@ -80,6 +80,10 @@ pub struct Manifest {
     /// logic reads them in `ctx.config`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub config: Vec<ConfigDecl>,
+    /// Commands the page of a public link may call (`[[public_commands]]`): read only, on the
+    /// resource of the link, with no user. The Administrator sees them when the plugin is installed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub public_commands: Vec<PublicCommandDecl>,
     /// Keys of outside services the plugin uses (`[[service_keys]]`): the keys pages of the platform,
     /// of the tenants and of the people list only the services the installed plugins declare. The
     /// logic reads the key in use for the caller (own, else the tenant's, else the platform's).
@@ -341,7 +345,34 @@ pub struct ConfigDecl {
     /// values of a `choice`
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub options: Vec<String>,
+    /// The page of a public link may read this setting (`msk.publicConfig()`). Never for a `secret`
+    /// (refused when the manifest is read). Default: false. Needs `[requires] mosaikit >= 1.0`.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub public: bool,
 }
+
+fn is_false(b: &bool) -> bool {
+    !*b
+}
+
+/// A command of the logic that the page of a public link may call (`[[public_commands]]`). Sensitive:
+/// anyone who holds the link can run it, read only, on the resource of the link. The Administrator
+/// sees it when the plugin is installed.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct PublicCommandDecl {
+    /// name of the command of the logic
+    pub name: String,
+    /// what it does for a visitor, shown to the Administrator at install
+    #[serde(default)]
+    pub description: String,
+    /// largest size of the arguments, in bytes (default and ceiling: [`MAX_PUBLIC_ARG_BYTES`])
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_arg_bytes: Option<usize>,
+}
+
+/// Ceiling and default of the arguments of a public command.
+pub const MAX_PUBLIC_ARG_BYTES: usize = 16 * 1024;
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -893,6 +924,7 @@ impl Manifest {
         self.validate_kind().map_err(Error::Manifest)?;
         self.validate_nav().map_err(Error::Manifest)?;
         self.validate_config().map_err(Error::Manifest)?;
+        self.validate_public_commands().map_err(Error::Manifest)?;
         self.validate_service_keys().map_err(Error::Manifest)?;
         for (lang, tr) in &self.i18n {
             self.validate_translation(lang, tr).map_err(|m| Error::Manifest(format!("i18n.{lang}: {m}")))?;
@@ -1172,10 +1204,32 @@ impl Manifest {
             if c.kind == ConfigKind::Choice && c.options.is_empty() {
                 return Err(format!("the choice config '{}' has no options", c.key));
             }
+            if c.public && c.kind == ConfigKind::Secret {
+                return Err(format!("the secret config '{}' cannot be public", c.key));
+            }
             if let Some(d) = &c.default {
                 if c.kind == ConfigKind::Secret || c.check(d).is_none() {
                     return Err(format!("the default of the config '{}' does not fit its kind", c.key));
                 }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_public_commands(&self) -> std::result::Result<(), String> {
+        let mut names = std::collections::HashSet::new();
+        for c in &self.public_commands {
+            if !is_identifier(&c.name) || !names.insert(c.name.as_str()) {
+                return Err(format!("public command '{}' invalid or duplicate", c.name));
+            }
+            if c.description.trim().is_empty() {
+                return Err(format!("the public command '{}' has no description", c.name));
+            }
+            if c.max_arg_bytes.is_some_and(|n| n == 0 || n > MAX_PUBLIC_ARG_BYTES) {
+                return Err(format!(
+                    "public command '{}': max_arg_bytes must be between 1 and {MAX_PUBLIC_ARG_BYTES}",
+                    c.name
+                ));
             }
         }
         Ok(())
@@ -1868,6 +1922,88 @@ service_keys = { b = { label = \"y\" } }
         assert_eq!(num.check(&serde_json::json!("2.5")), Some(serde_json::json!(2.5)));
         let choice = ConfigDecl { kind: ConfigKind::Choice, options: vec!["a".into()], ..text.clone() };
         assert_eq!(choice.check(&serde_json::json!("b")), None);
+    }
+
+    #[test]
+    fn public_settings_and_commands() {
+        let ok = format!(
+            "{NOTES}
+[[config]]
+key = \"endpoint\"
+label = \"A\"
+kind = \"text\"
+public = true
+             [[public_commands]]
+name = \"tile_ticket\"
+description = \"A ticket\"
+max_arg_bytes = 1024
+"
+        );
+        let m = Manifest::from_toml(&ok).unwrap();
+        assert!(m.config[0].public);
+        assert_eq!(m.public_commands[0].name, "tile_ticket");
+        // nothing new in the JSON of a plugin that does not use them
+        let plain = serde_json::to_string(&Manifest::from_toml(NOTES).unwrap()).unwrap();
+        assert!(!plain.contains("public"), "{plain}");
+        assert_eq!(serde_json::from_str::<Manifest>(&serde_json::to_string(&m).unwrap()).unwrap(), m);
+        for (bad, why) in [
+            (
+                "[[config]]
+key = \"t\"
+label = \"T\"
+kind = \"secret\"
+public = true
+",
+                "cannot be public",
+            ),
+            (
+                "[[public_commands]]
+name = \"Bad Name\"
+description = \"x\"
+",
+                "invalid or duplicate",
+            ),
+            (
+                "[[public_commands]]
+name = \"a\"
+description = \"x\"
+[[public_commands]]
+name = \"a\"
+description = \"x\"
+",
+                "duplicate",
+            ),
+            (
+                "[[public_commands]]
+name = \"a\"
+",
+                "no description",
+            ),
+            (
+                "[[public_commands]]
+name = \"a\"
+description = \"x\"
+max_arg_bytes = 99999999
+",
+                "max_arg_bytes",
+            ),
+            (
+                "[[public_commands]]
+name = \"a\"
+description = \"x\"
+secret = true
+",
+                "unknown field",
+            ),
+        ] {
+            let e = Manifest::from_toml(&format!(
+                "{NOTES}
+{bad}"
+            ))
+            .unwrap_err()
+            .to_string();
+            assert!(e.contains(why), "{bad}: {e}");
+        }
     }
 
     #[test]

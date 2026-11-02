@@ -1682,6 +1682,13 @@ function Policy({ slug }: { slug: string }) {
           </div>
           <label className="flex items-center justify-between gap-4">
             <span>
+              <b className="block text-sm">{t('Public commands')}</b>
+              <span className="text-xs text-muted-foreground">{t('Let the page of a public link run the commands a plugin declares for it (read only). They can use the outside services of the organisation, so leave this off unless you need it.')}</span>
+            </span>
+            <Switch checked={s.public_commands_enabled} onCheckedChange={(x) => setV({ ...s, public_commands_enabled: x })} />
+          </label>
+          <label className="flex items-center justify-between gap-4">
+            <span>
               <b className="block text-sm">{t('Tenant Managers see the titles of the items')}</b>
               <span className="text-xs text-muted-foreground">{t('Otherwise only counts and sizes')}</span>
             </span>

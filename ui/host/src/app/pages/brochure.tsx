@@ -101,6 +101,7 @@ function Requirements({ p }: { p: AdminPlugin }) {
   if (perm.network.length) chips.push(t('Network: {list}', { list: perm.network.join(', ') }))
   if (perm.frame_src.length) chips.push(t('Embeds: {list}', { list: perm.frame_src.join(', ') }))
   if (perm.files_read) chips.push(t('Reads the files you can see'))
+  if (p.public_commands?.length) chips.push(t('Runs commands for public links'))
   if (perm.calls?.length) chips.push(t('Calls: {list}', { list: perm.calls.join(', ') }))
   if (p.requires?.database) chips.push(t('Database: {db}', { db: p.requires.database }))
   return (

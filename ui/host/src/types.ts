@@ -117,6 +117,7 @@ export interface TenantSettings {
   public_links_enabled: boolean
   public_link_max_days: number
   managers_see_titles: boolean
+  public_commands_enabled: boolean
 }
 
 export type PluginKind = 'app' | 'service' | 'extension' | 'layout' | 'language'
@@ -697,6 +698,8 @@ export interface AdminPlugin extends PluginView {
   /** recent servers */
   requires?: { database: string | null; extensions: string[] }
   user_permissions?: { key: string; label: string; description: string; default: boolean }[]
+  /** commands any holder of a public link may run (recent servers) */
+  public_commands?: { name: string; description: string; max_arg_bytes?: number }[]
   /** range of Mosaikit versions it works with (`>=1.2, <2`; `*` = any) */
   requires_mosaikit?: string
   /** plugin API it was built for */

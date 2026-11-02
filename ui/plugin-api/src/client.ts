@@ -268,6 +268,24 @@ export class Msk {
     return this.bridge.call<PublicResource>('public.get')
   }
 
+  /**
+   * In public links: the settings of the plugin that its manifest marks `public = true` (`[[config]]`), by key.
+   * A secret is never in it. Needs a Mosaikit with `[requires] mosaikit = ">=1.0"` and the key declared `public`.
+   */
+  publicConfig(): Promise<Record<string, unknown>> {
+    return this.bridge.call<Record<string, unknown>>('public.config')
+  }
+
+  /**
+   * In public links: runs a command the plugin declares in `[[public_commands]]`, read only, on the shared
+   * item (never on another one: the arguments cannot choose it). Fails with `command_not_public` for any
+   * other command, `public_commands_off` when the tenant has not allowed them and `public_rate_limited` when
+   * the link is used too often. Needs `[requires] mosaikit = ">=1.0"`.
+   */
+  publicCall<T = unknown>(name: string, args?: unknown): Promise<T> {
+    return this.bridge.call<T>('public.call', { name, args })
+  }
+
   /** Every event of the host (see `HostEvents` for what each carries); returns the function that stops listening. */
   onEvent(fn: (event: HostEventName, data: unknown) => void) {
     return this.bridge.onEvent((event, data) => fn(event as HostEventName, data))

@@ -159,9 +159,23 @@ impl MockHost {
                 perms: ["use", "create", "delete", "share"].map(String::from).to_vec(),
                 groups: Vec::new(),
                 config: serde_json::Value::Null,
+                public: false,
+                link_resource: None,
             },
             ..MockHost::default()
         }
+    }
+
+    /// The command runs as a public command of a link on the item `link_resource`: no user, no
+    /// permissions, `ctx.public` and `ctx.link_resource()` set. The simulated host still answers what you
+    /// program; the real one refuses every operation but `db.query`, `http.fetch` and `key.get`.
+    pub fn as_public(mut self, link_resource: &str) -> MockHost {
+        self.ctx.user = None;
+        self.ctx.username = None;
+        self.ctx.perms = Vec::new();
+        self.ctx.public = true;
+        self.ctx.link_resource = Some(link_resource.to_string());
+        self
     }
 
     /// Answer for a host operation (`db.query`, `db.exec`, `resource.create`, `http.fetch`...).
@@ -442,6 +456,18 @@ mod tests {
         // an old message without `groups` still deserializes
         let ctx: Ctx = serde_json::from_value(json!({ "plugin": "x" })).unwrap();
         assert!(ctx.groups.is_empty());
+    }
+
+    #[test]
+    fn public_command_context() {
+        let ctx: Ctx =
+            serde_json::from_value(json!({ "plugin": "x", "public": true, "link_resource": "r9" })).unwrap();
+        assert!(ctx.public);
+        assert_eq!(ctx.link_resource(), Some("r9"));
+        assert_eq!(Ctx::default().link_resource(), None);
+        let host = MockHost::new().as_public("r9");
+        assert!(host.ctx.public && host.ctx.user.is_none() && host.ctx.perms.is_empty());
+        assert_eq!(host.ctx.link_resource(), Some("r9"));
     }
 
     fn tour(ctx: &Ctx, _args: Value) -> Result<Value> {

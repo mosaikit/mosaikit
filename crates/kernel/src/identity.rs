@@ -61,6 +61,23 @@ impl LoginLimiter {
         e.0 += 1;
         e.1 = Instant::now();
     }
+    /// Counts one use of `key` in a fixed window that starts at its first use; `false` once `max` uses
+    /// are spent in the window (the use is then not counted).
+    pub(crate) fn hit(&self, key: &str, max: u32, window: Duration) -> bool {
+        let mut map = self.0.lock().expect("lock limiter");
+        if map.len() >= LIMITER_PRUNE_AT {
+            map.retain(|_, (_, t)| t.elapsed() < Duration::from_secs(24 * 3600));
+        }
+        let e = map.entry(key.to_string()).or_insert((0, Instant::now()));
+        if e.1.elapsed() >= window {
+            *e = (0, Instant::now());
+        }
+        if e.0 >= max {
+            return false;
+        }
+        e.0 += 1;
+        true
+    }
     pub(crate) fn clear(&self, key: &str) {
         self.0.lock().expect("lock limiter").remove(key);
     }

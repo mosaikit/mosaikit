@@ -77,7 +77,8 @@ e scrive `set`, `remove`.
 | `ctx.plugin` | l'id di questo plugin |
 | `ctx.perms`, `ctx.can("key")` | permessi del chiamante: `use`, `create`, `delete`, `share` e i `[[user_permissions]]` che ha |
 | `ctx.groups` | i gruppi dell'organizzazione a cui il chiamante appartiene, `[{id, name}]` (vuoto se nessuno), letti a ogni chiamata |
-| `ctx.config`, `ctx.setting("key")` | le impostazioni `[[config]]` della piattaforma (`None` se non impostata; segreti inclusi, mai mandarli alla UI) |
+| `ctx.config`, `ctx.setting("key")` | le impostazioni `[[config]]` della piattaforma (`None` se non impostata; segreti inclusi, mai mandarli alla UI; nessuno in un comando pubblico) |
+| `ctx.public`, `ctx.link_resource()` | `true` e l'id dell'elemento condiviso quando un visitatore di un link pubblico esegue un [comando pubblico](#comandi-pubblici) |
 | `ctx.log("testo")` | una riga nel log del server |
 
 ## Operazioni dell'host
@@ -142,6 +143,28 @@ nella UI, un link pubblico non è un chiamante. `files.list {parent?}` risponde 
 righe); `files.describe {id}` una riga; `files.read {id, max_bytes?}` risponde `{entry, base64, size, truncated}`, con
 `max_bytes` tagliato a 4 MiB. Una riga ha `id, name, is_dir, size, mime, created, modified, owner_id, owner_name, my_level,
 shared, parent_id` e mai un percorso di archiviazione.
+
+### Comandi pubblici
+
+Un comando elencato in `[[public_commands]]` può essere eseguito da chiunque abbia un link pubblico di un elemento del tuo
+plugin (`msk.publicCall(name, args)` nella pagina, `POST /p/{token}/call/{name}`). Il kernel lo esegue **in sola lettura, senza
+utente**:
+
+- `ctx.public` è `true`, `ctx.user` è vuoto, `ctx.perms` e `ctx.groups` sono vuoti e `ctx.config` **non ha segreti** (un
+  segreto si raggiunge solo con `fetch_with_key`).
+- `ctx.link_resource()` è l'elemento del link. `db.query` vede quell'elemento e ciò che contiene, nient'altro, qualunque cosa
+  dicano gli argomenti.
+- Funzionano solo `db.query` (un `SELECT`), `http.fetch` e `key.get`; `db.exec`, `resource.*`, `plugin.call`, `notify` e
+  `files.*` falliscono con `operation not available in a public link`. `key.get` e `fetch_with_key` usano la chiave condivisa
+  dell'organizzazione o quella della piattaforma, **mai una chiave personale**.
+- Il link è verificato a ogni chiamata (revocato, scaduto, password, plugin spento). L'organizzazione deve consentire i comandi
+  pubblici. Un link è limitato a 30 chiamate al minuto e un'organizzazione a 300; il carburante è un quarto di un comando
+  normale; gli argomenti sono al massimo `max_arg_bytes` (16 KiB). Errori: `command_not_public`, `public_commands_off`,
+  `public_rate_limited`, `args_too_large`.
+
+Il kernel limita cosa il comando può **leggere**, non cosa la logica **restituisce**. Segui la
+[lista di revisione](security.md#comandi-dei-link-pubblici-lista-di-revisione). Per provare:
+`MockHost::new().as_public("<id elemento>")`.
 
 ### Gruppi e web
 
@@ -215,6 +238,7 @@ assert_eq!(out.unwrap()[0]["n"], 2);
 | `with_plugin_command(plugin, name, f)` | ciò che restituisce `call_plugin` |
 | `deny(op, message)` | l'host rifiuta un'operazione, come quando il permesso non è nel manifesto |
 | `with_files(vec![FakeFile::folder(..), FakeFile::file(..).in_folder(..)])` | l'area File per `files.*` |
+| `as_public(id_elemento)` | esegue come comando pubblico: nessun utente, nessun permesso, `ctx.public`, `ctx.link_resource()` |
 | `command(reg, name, args)`, `command_err(..)`, `hook(reg, hook, resource, values)` | eseguirlo; `command_err` tiene l'errore intero con il suo codice |
 | `calls()`, `notifications()`, `logs()` | ciò che la logica ha chiesto, inviato e scritto nel log |
 

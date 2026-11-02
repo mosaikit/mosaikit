@@ -52,6 +52,7 @@ shapes the `[requires]` plan of phase 1 (see 1.1).
 | `calls` | stable | Unused by official plugins; the only cross-plugin contract, keep |
 | `notify` | stable | Unused by official plugins; documented with tests, keep |
 | `files_read` | stable | New: the logic reads the Files area as the caller (`files.list`, `files.describe`, `files.read`); default false, shown at install. Not `files` (the file API of a plugin that owns files) |
+| `[[public_commands]]`, `[[config]] public` | experimental | New: commands and settings a public link page may use (architecture 8.13); additive, no API bump, `[requires] mosaikit = ">=1.0"`; shown at install; default off per tenant |
 | `script_eval` | stable | Unused by official plugins; opt-in, default false, shown at install. Keep as is: CSP `unsafe-eval` and `wasm-unsafe-eval` on `script-src` and `worker-src` is the contract. Add a note that it is sensitive |
 
 ### 1.4 Other tables
@@ -83,6 +84,7 @@ shapes the `[requires]` plan of phase 1 (see 1.1).
 | `plugin.call` | stable | Unused | See `calls` |
 | `key.get` | stable | notes (4 uses) | Never send the key to the UI (documented) |
 | `notify` | stable | Unused | See `notify` |
+| `public.config`, `public.call` (viewer ops, `msk.publicConfig`, `msk.publicCall`) | experimental | New | Only in the public viewer; `public.call` allows `db.query` (SELECT), `http.fetch`, `key.get` and nothing else, tenant keys only |
 | `files.list`, `files.describe`, `files.read` | stable | Unused | See `files_read`; errors carry the codes `permission_denied`, `not_found`, `invalid_argument`; read is capped at 4 MiB |
 | Error shape `{"err": "<string>"}` | to change (host operations now also give an optional `code`) | all | No stable error code from the logic; UI gets `plugin_error` only. Add optional `code` (and keep `err` as text) |
 

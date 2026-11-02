@@ -571,6 +571,21 @@ function PluginAsks({ p, base }: { p: AdminPlugin; base?: string }) {
             <AskRow label={t('Reads the files of the person who uses it')}>
               {perm.files_read ? <b className="text-destructive">{t('yes (sensitive: its logic reads the Files area with the permissions of the caller)')}</b> : none}
             </AskRow>
+            <AskRow label={t('Commands open to public links')}>
+              {p.public_commands?.length ? (
+                <span>
+                  <b className="text-destructive">{t('yes (sensitive: anyone who holds a public link may run them, read only, on the shared item)')}</b>
+                  <span className="mt-1 block font-mono text-xs">{p.public_commands.map((c) => c.name).join(', ')}</span>
+                  {p.public_commands.map((c) => (
+                    <span key={c.name} className="block text-xs text-muted-foreground">
+                      {c.name}: {c.description}
+                    </span>
+                  ))}
+                </span>
+              ) : (
+                none
+              )}
+            </AskRow>
             <AskRow label={t('Calls the plugins')}>{list(perm.calls)}</AskRow>
             <AskRow label={t('Database')}>{p.requires?.database ? <span className="font-mono text-xs">{[p.requires.database, ...(p.requires.extensions ?? [])].join(', ')}</span> : t('any')}</AskRow>
           </dl>

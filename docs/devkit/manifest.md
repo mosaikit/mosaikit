@@ -209,6 +209,21 @@ Settings the Administrator sets for the platform (Plugins › Configuration). Ex
 | `kind` | `text`, `number`, `bool`, `choice`, `secret` |
 | `options` | required for `choice` |
 | `default` | must fit the kind; not allowed for `secret` |
+| `public` | bool, default false: the page of a public link may read it (`msk.publicConfig()`). **A `secret` cannot be public**: the manifest is refused |
+
+## `[[public_commands]]`
+
+Commands of the logic that **any holder of a public link** may run, read only, on the shared item. **Sensitive**: the
+Administrator sees them in «What it asks» when the plugin is installed, and a tenant must turn on the policy «Public
+commands» (off by default) before they work. Needs `[requires] mosaikit = ">=1.0"` (an older Mosaikit rejects the key);
+`validate` warns when the range is missing, `--strict` fails. See [Logic](logic.md#public-commands) and
+[Security](security.md#public-link-commands-review-checklist).
+
+| Key | Rule |
+|---|---|
+| `name` | the command of the logic, identifier, unique |
+| `description` | required: what a visitor can do with it, shown to the Administrator |
+| `max_arg_bytes` | optional, 1 to 16384 (the default and the ceiling) |
 
 ## `[search]`
 

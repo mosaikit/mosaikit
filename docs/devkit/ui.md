@@ -32,6 +32,8 @@ the origin of the host and is accepted only from it. A call that gets no answer 
 | `msk.at` | the place the page was opened at (from a notification, or the `place` of a `[[nav]]` entry) |
 | `msk.tab` | in an extension page opened as a tab: `{ base, resource, item, key, level }` |
 | `msk.isPublic`, `msk.publicResource`, `msk.publicGet()` | public-link viewer (`public_view`) |
+| `msk.publicConfig()` | the `[[config]]` settings marked `public = true` (never a secret), by key |
+| `msk.publicCall(name, args)` | runs a `[[public_commands]]` command, read only, on the shared item; errors `command_not_public`, `public_commands_off`, `public_rate_limited` |
 
 ### Operations
 

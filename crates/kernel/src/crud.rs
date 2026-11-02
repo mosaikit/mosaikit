@@ -698,3 +698,56 @@ pub(crate) async fn call_depth(
     crate::notify::flush(k, c, &p.id, notes).await;
     Ok(out)
 }
+
+/// Calls per minute a public link allows on its public commands, and the tenant on all its links.
+const PUBLIC_CALLS_PER_LINK: u32 = 30;
+const PUBLIC_CALLS_PER_TENANT: u32 = 300;
+const PUBLIC_WINDOW: std::time::Duration = std::time::Duration::from_secs(60);
+
+/// A public command of the plugin of the link, for whoever holds it (`POST /p/{token}/call/{name}`).
+/// `r` comes from `links::resolve` (the server resolves the link again on every call, so a revoked,
+/// expired or password-locked link never reaches this point). Only a command the plugin declares in
+/// `[[public_commands]]`, only if the tenant allows public commands, within the rate limits. It runs
+/// in a read only transaction with the link context and no user: what it can read is the resource of
+/// the link and its descendants, whatever the arguments say.
+pub async fn call_public(k: &Kernel, r: &crate::links::Resolved, name: &str, args: Value) -> Result<Value> {
+    let p = k.plugins.active(&r.plugin_id)?;
+    let decl = p
+        .manifest
+        .public_commands
+        .iter()
+        .find(|d| d.name == name)
+        .ok_or_else(|| Error::forbidden("this command is not public").with_code("command_not_public"))?;
+    if !r.public_commands_enabled {
+        return Err(Error::forbidden("public commands are turned off for this tenant")
+            .with_code("public_commands_off"));
+    }
+    let max = decl.max_arg_bytes.unwrap_or(mosaikit_mskp::MAX_PUBLIC_ARG_BYTES);
+    if serde_json::to_vec(&args)?.len() > max {
+        return Err(Error::bad("the arguments are too large").with_code("args_too_large"));
+    }
+    if !k.limiter.hit(&format!("pubcall:link:{}", r.link_id), PUBLIC_CALLS_PER_LINK, PUBLIC_WINDOW)
+        || !k.limiter.hit(&format!("pubcall:tenant:{}", r.tenant), PUBLIC_CALLS_PER_TENANT, PUBLIC_WINDOW)
+    {
+        return Err(Error::new(crate::Kind::TooMany, "too many requests: try again in a minute")
+            .with_code("public_rate_limited"));
+    }
+    let mut tx = k.db.begin_plugin_read(&p.id, &r.ctx()).await?;
+    tx.make_read_only().await?;
+    let (out, tx) = host::run_public(k, r, &p, tx, name, args).await?;
+    tx.commit().await?;
+    // one event per link and minute at most: an anonymous caller cannot flood the log
+    if k.limiter.hit(&format!("pubcall:audit:{}", r.link_id), 1, PUBLIC_WINDOW) {
+        events::record(
+            k,
+            Some(r.tenant),
+            None,
+            Some(&r.plugin_id),
+            Some(r.resource),
+            "link.call",
+            json!({ "link": r.link_id, "command": name }),
+        )
+        .await;
+    }
+    Ok(out)
+}
