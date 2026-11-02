@@ -262,7 +262,9 @@ mod tests {
     use super::*;
 
     fn load(extra: &str) -> Result<Distribution> {
-        let dir = std::env::temp_dir().join(format!("mk-dist-test-{}", std::process::id()));
+        static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+        let n = N.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!("mk-dist-test-{}-{n}", std::process::id()));
         std::fs::create_dir_all(&dir).unwrap();
         let f = dir.join("distribution.toml");
         std::fs::write(&f, format!("[product]\nid='p'\nname='P'\nversion='1'\n[plugins]\nroots=[]\n{extra}"))

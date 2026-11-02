@@ -20,7 +20,7 @@ const sidebar = (page: Page) => page.locator('[data-sidebar="sidebar"]').first()
 
 test.describe.serial('19-nav-groups', () => {
   test('open sidebar: heading with its apps, collapse is remembered, keyboard', async ({ page }) => {
-    await login(page, 'City of Alfa', 'manager', PASSWORD)
+    await login(page, 'Alfa', 'manager', PASSWORD)
     await withGroups(page)
     await page.evaluate(() => localStorage.removeItem('msk_nav_groups'))
     await page.reload()
@@ -44,7 +44,7 @@ test.describe.serial('19-nav-groups', () => {
   })
 
   test('closed sidebar: one icon opens a menu with the apps; Escape returns the focus', async ({ page }) => {
-    await login(page, 'City of Alfa', 'manager', PASSWORD)
+    await login(page, 'Alfa', 'manager', PASSWORD)
     await withGroups(page)
     await page.reload()
     const trigger = sidebar(page).getByRole('button', { name: 'Open the apps of Work' })
@@ -60,7 +60,7 @@ test.describe.serial('19-nav-groups', () => {
   })
 
   test('the group label follows the language', async ({ page }) => {
-    await login(page, 'City of Alfa', 'manager', PASSWORD)
+    await login(page, 'Alfa', 'manager', PASSWORD)
     await withGroups(page)
     await page.evaluate(() => localStorage.setItem('msk_lang', 'it'))
     await page.reload()
