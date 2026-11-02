@@ -194,7 +194,9 @@ export function FlyoutMenu({ item, trigger, side = 'right', hover }: { item: Nav
         align="start"
         className="msk-flyout w-56"
         {...hover?.contentProps}
-        // opened by the pointer: Escape does not pull the focus back to the icon
+        // opened by the pointer: the menu takes no focus (the person may be typing) and Escape does not pull
+        // it back to the icon. Radix forwards onOpenAutoFocus to the menu content, its types just omit it.
+        {...({ onOpenAutoFocus: hover?.viaHover ? (e: Event) => e.preventDefault() : undefined } as object)}
         onCloseAutoFocus={hover?.viaHover ? (e) => e.preventDefault() : undefined}
       >
         <DropdownMenuLabel className="text-xs uppercase text-muted-foreground">{item.label}</DropdownMenuLabel>

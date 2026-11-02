@@ -15,7 +15,7 @@ in step).
 
 ### The shell
 
-- The sidebar has a calmer style: no separator lines and no lines around the selected item (it has a soft background and the accent colour instead); in a group the apps are indented under the heading and their pages one level deeper; the menus of the closed sidebar show the icon of each entry; Overview and Settings keep their short name when the sidebar is open; in the closed sidebar the menus also open when the mouse rests on an icon (those icons show no tooltip over the menu).
+- The sidebar has a calmer style: no separator lines and no lines around the selected item (it has a soft background and the accent colour instead); in a group the apps are indented under the heading and their pages one level deeper; the menus of the closed sidebar show the icon of each entry; Overview and Settings keep their short name when the sidebar is open; in the closed sidebar the menus also open when the mouse rests on an icon (those icons show no tooltip over the menu; a menu opened this way never takes the keyboard focus).
 - Public pages (public links) can now be embedded by default by the static sites of the same installation, with no setting; the sites listed in Settings › Embedding are added on top, and nobody else may embed them.
 
 - The lists and cards that were left with a bare line when empty (the two lists of Manage › Pending, Home without apps, usage, backups, log and overview widgets, members of a group) now show an illustration with a title and the action, in a small version inside a widget or a section.
