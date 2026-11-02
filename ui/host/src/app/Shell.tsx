@@ -143,7 +143,7 @@ function NavList({ items }: { items: NavItem[] }) {
   )
 }
 
-const groupClass = 'py-1 first:pt-0 last:pb-0 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:not-first:mt-3'
+const groupClass = 'py-1 first:pt-0 last:pb-0 group-data-[collapsible=icon]:p-0'
 
 /** A group of the distribution (`[[nav_groups]]`): in the open sidebar a heading that collapses its apps (the
  *  state is kept in the browser), in the closed rail one icon with a short name that opens a menu with the
@@ -232,7 +232,7 @@ function AppSidebar({ session, route, band }: { session: Session; route: Route; 
           )}
         </SidebarHeader>
       )}
-      <SidebarContent className="msk-hoverscroll border-r border-sidebar-border pt-1 group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:pt-0">
+      <SidebarContent className="msk-hoverscroll border-r border-sidebar-border pt-1 group-data-[collapsible=icon]:flex-initial group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:pt-0">
         {nav.groups.map((g) =>
           g.collapsible ? (
             <DistGroup key={g.id} g={g} className={groupClass} />

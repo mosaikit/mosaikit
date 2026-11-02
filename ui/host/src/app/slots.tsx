@@ -62,9 +62,9 @@ export function TenantBadge({ name }: { name: string }) {
 export function NavTree({ groups, bottom, labels = true, onPick, mini = false }: { groups: NavGroup[]; bottom?: NavItem[]; labels?: boolean; onPick?: () => void; mini?: boolean }) {
   return (
     <div className="msk-nav-tree flex min-h-0 flex-1 flex-col">
-      <div className="flex-1 overflow-y-auto px-2 py-2">
+      <div className={cn('overflow-y-auto px-2', mini ? 'min-h-0 flex-initial pt-2' : 'flex-1 py-2')}>
         {groups.map((g) => (
-          <div key={g.id} className="mb-2" role="group" aria-label={g.label}>
+          <div key={g.id} className={mini ? 'mb-0.5' : 'mb-2'} role="group" aria-label={g.label}>
             {labels && !mini && g.id !== 'start' && g.label && <div className="px-2.5 pt-2 pb-1 text-xs font-medium text-sidebar-foreground/85">{g.label}</div>}
             <ul className="flex flex-col gap-0.5">
               {g.items.map((it) => (
@@ -75,7 +75,7 @@ export function NavTree({ groups, bottom, labels = true, onPick, mini = false }:
         ))}
       </div>
       {bottom && bottom.length > 0 && (
-        <ul className="flex flex-col gap-0.5 border-t border-sidebar-border px-2 py-2">
+        <ul className={cn('flex flex-col gap-0.5 px-2', mini ? 'pb-2' : 'border-t border-sidebar-border py-2')}>
           {bottom.map((it) => (
             <TreeItem key={it.label} item={it} onPick={onPick} mini={mini} />
           ))}
