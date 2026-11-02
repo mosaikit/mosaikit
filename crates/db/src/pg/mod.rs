@@ -108,12 +108,13 @@ impl PgDb {
     }
 
     async fn set_ctx(&self, tx: &mut PgTx, ctx: &Ctx) -> Result<()> {
-        sqlx::query("select core.set_ctx($1, $2, $3, $4, $5)")
+        sqlx::query("select core.set_ctx($1, $2, $3, $4, $5, $6)")
             .bind(&self.secret)
             .bind(ctx.user)
             .bind(ctx.tenant)
             .bind(ctx.plugin.as_deref())
             .bind(ctx.link)
+            .bind(ctx.scope.as_deref())
             .execute(&mut **tx)
             .await?;
         Ok(())

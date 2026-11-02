@@ -991,6 +991,7 @@ notify = false           # the logic may send notifications (host operation `not
 script_eval = false      # the UI may compile code at run time (CSP 'unsafe-eval', §9); sensitive
 files_read = false       # the logic may read the Files area as the caller (`files.list|describe|read`, §8.3); sensitive
 web = false              # the UI may ask the host about a web page (`msk.web.probe`: may it be framed, title, picture)
+run_commands = []        # commands a run ticket may call on behalf of a person (§8.14); sensitive, needs `[requires] mosaikit = ">=1.0"`
 
 [requires]               # optional
 mosaikit = ">=1.2, <2"   # versions of Mosaikit it works with (a range; absent: any)
@@ -1430,7 +1431,7 @@ the emoji `[contribution]` (now optional: absent, the name labels the plugin).
 promise it will stay as it is until a sample (or a template of the dev kit) uses it: `[[config]]` and
 `ctx.setting`, `[[user_permissions]]` and `ctx.can`, `permissions.calls` and `plugin.call`, `ctx.notify` and
 `msk.notify`, `network` and `http.fetch`, `script_eval`, `[search]`, the `command` actions of an extension,
-`CrudOptions.panel`, `Resources::create` and `Resources::delete` of the SDK, `[[config]] public`, `[[public_commands]]`, `msk.publicConfig` / `msk.publicCall` and `ctx.link_resource()` (§8.13). A change to one of them is announced in
+`CrudOptions.panel`, `Resources::create` and `Resources::delete` of the SDK, `[[config]] public`, `[[public_commands]]`, `msk.publicConfig` / `msk.publicCall` and `ctx.link_resource()` (§8.13), `permissions.run_commands` and `ctx.on_behalf()` (§8.14). A change to one of them is announced in
 the changelog of the package, with the deprecation rule applied when a distribution relies on it.
 
 ### 8.12 The developer profile
@@ -1529,6 +1530,64 @@ keys of the tenant); it cannot limit what the logic RETURNS, and WASM may return
 public command: (1) never put a setting, a key or anything from `ctx.config` in the answer; (2) never take the id of the item from the
 arguments, use `ctx.link_resource()` only; (3) treat every argument as chosen by a stranger; (4) remember that an outside request made
 with `key` spends the tenant's or the platform's paid key for an anonymous visitor, so keep it small and cache what you can.
+
+### 8.14 Run tickets: a plugin called on behalf of a run
+
+A distribution may run a process in the background (a graph of nodes, a report) where a node is a command of a plugin. The service that
+runs it is an outside program with no session, and a run outlives the session of the person who started it. A **run ticket** lets
+that service call one plugin for a while, **as the person**, with the limits below. It is not a session and is never accepted on
+`/api/t/...`; it is not the file ticket of §5 either (that one is tied to a session). `permissions.run_commands` is an additive key
+of API 1 (no version bump, §8.11): a plugin that uses it declares `[requires] mosaikit = ">=1.0"` (an older Mosaikit rejects the
+manifest, fail closed); `mosaikit-plugin validate` warns, an error with `--strict`, when the range is missing, and lists it among the
+permissions the Administrator reviews.
+
+**Manifest.** `[permissions] run_commands = ["node_run", ...]` (identifiers, at most 32) are the only commands of the plugin a run
+ticket can ever call. The Administrator sees them in «What it asks» when the plugin is installed.
+
+**Mint.** `POST /api/t/{t}/run-tickets` with the session of the starter (cookie and CSRF as any request), body `{ plugin, commands,
+run_ref, ttl_minutes?, uses?, resources? }`. The kernel (`run_tickets::mint`) requires the permission `use` of the plugin now; each
+command must be in `run_commands` (`403 command_not_declared`); `run_ref` is the service's own name for the run (1 to 128
+characters, no control characters, shown in the Log); `ttl_minutes` 1 to 60 (default 15); `uses` 1 to 1000 (default 100);
+`resources` (optional, at most 64) must each be visible to the starter now and belong to the plugin. Per person: 30 mints a minute
+and 100 live tickets in a tenant. The answer carries the token **once** (24 random bytes, 48 hex characters); the table
+`core.run_tickets` keeps its SHA-256 only, with the person, the tenant, the plugin, the commands, the resources, the uses left, the
+expiry and the revocation. Event `run_ticket.mint` (ticket id, `run_ref`, commands, expiry; never the token).
+
+**Redeem.** `POST /api/run/{ticket}/call/{plugin}/{command}` (JSON body = the arguments, at most 256 KiB; no cookie, no CSRF,
+`Content-Type: application/json` required) goes to `run_tickets::call`, which on **every call**: finds the ticket by hash (not
+revoked, not expired, uses left: one answer, `401 run_ticket_invalid`, for every failure); checks the plugin and the command against
+the ticket (`403 run_wrong_plugin`, `run_wrong_command`) and against the manifest **as it is now** (an update may have dropped the
+command: `403 command_not_declared`); loads the person again (active account, active tenant, active membership, plugin on in the
+tenant) and rebuilds a `Caller`, never the Administrator; applies the rate limit (120 a minute for a ticket, 1200 for a tenant;
+`429 run_rate_limited`; a refused call spends no use); spends one use atomically (`update ... where uses_left > 0`); and runs
+`crud::call_depth`, which checks the permission `use` and the groups of the person **at that moment**. The rights are never taken from
+the mint: a person suspended, removed, with a share taken back or the plugin turned off loses the ticket's reach at once. The logic
+receives `ctx.on_behalf = { run_ref }` (SDK `ctx.on_behalf()`; the arguments cannot set it). Event `run_ticket.call` (ticket,
+`run_ref`, command, `ok`; no arguments). `DELETE /api/t/{t}/run-tickets/{id}` revokes (the starter or a Tenant Manager, event
+`run_ticket.revoke`); the service ends its run with `DELETE /api/run/{ticket}`, which revokes too. During maintenance a call is refused.
+The token is in the path (like a public link, §5): the server logs no paths, but a reverse proxy in front of it may, so redact `/api/run/` in its
+access log. There is no CORS on these routes and JSON is required, so a page of another site cannot send a call.
+
+**The resource scope (DB level).** With `resources`, the context of the transaction carries `scope` (`core.session_ctx.scope uuid[]`,
+set by the six-argument `core.set_ctx`, migration 0021; on SQLite `core_ctx_scope()`). `core.level_of()`, `core.ctx_levels()` (so the
+RLS of every plugin table and `visible_resources`) and the SQLite twin return level 0 for everything that is not in the scope or one
+of its descendants, and `core.create_resource` refuses a root item: whatever the logic asks, in SQL or through a host operation, it
+reaches only those resources, with the level the person has on them. Without `resources` the ticket has the person's whole reach for
+the declared commands (use the scope for a sensitive plugin). A ticket of tenant A has no way to name tenant B: the tenant is the one
+of the ticket and RLS filters on it.
+
+**Host operations in a run call.** Same as a normal command, except `plugin.call` is **refused** (a ticket names one plugin; with the
+person's rights it must not reach another one). That also keeps SQLite simple: a top-level redeem works there, while a nested
+`plugin.call` stays PostgreSQL only (§8.6) and is not available to a run in any case. A distribution on SQLite desktop is an owner decision.
+
+**What the kernel cannot do, so the plugin author must.** The kernel limits what a run command can READ (what the person may see,
+cut to the resources of the ticket); it cannot limit what the logic RETURNS, and WASM may return data it legitimately read. Review
+checklist for every run command: (1) take the ids it works on from its arguments but check them against what the database lets it
+read (the scope already does for a ticket that has one); (2) never return a setting, a key or anything the caller of the run should not
+see; (3) treat the arguments as chosen by the service, which may be compromised; (4) remember that it writes as the person, so keep
+writes minimal and idempotent; (5) `ctx.on_behalf()` tells a run call from a person's own call: use it to be stricter, never looser.
+Limits that remain by design: a ticket not scoped to resources is the person's reach for its commands until it expires, is spent or is
+revoked, so keep the lifetime short and have the service call `DELETE /api/run/{ticket}` when the run ends.
 
 ## 9. Web security: origins, cookies, CSP
 

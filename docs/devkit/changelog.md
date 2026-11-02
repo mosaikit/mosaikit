@@ -42,7 +42,7 @@ Rules:
 - The plugin API is an integer that grows only with a breaking change. A release of Mosaikit that changes it raises the
   SDK and the UI package together. The host speaks every API up to its own; a plugin built for a newer one is refused with
   `incompatible_api`; a host or a plugin that predates the handshake counts as API 1.
-- The keys added to API 1 without a bump (`[[config]] public`, `[[public_commands]]`) need `[requires] mosaikit = ">=1.0"`:
+- The keys added to API 1 without a bump (`[[config]] public`, `[[public_commands]]`, `permissions.run_commands`) need `[requires] mosaikit = ">=1.0"`:
   an older kernel rejects the manifest, which is the intended fail-closed behaviour.
 - A kernel that does not know `[requires]` rejects the manifest (unknown keys are refused): release the kernel that reads a
   key before the first plugin that uses it.
@@ -81,6 +81,7 @@ package, with the deprecation rule applied when a distribution relies on it. Exp
 - `Resources::create` and `Resources::delete` of the SDK (`resource.create`, `resource.delete`)
 - `msk.web` (permission `web`)
 - `[[config]] public`, `[[public_commands]]`, `msk.publicConfig`, `msk.publicCall` and `ctx.link_resource()` (public link pages)
+- `permissions.run_commands` and `ctx.on_behalf()` (calls on behalf of a run, with a run ticket)
 
 The `insights` example now uses `[search]` and `note-priority` the `set` actions of an extension; architecture §8.11 still lists them as experimental until the owner takes them off the list (a decision for a release, not for these documents).
 

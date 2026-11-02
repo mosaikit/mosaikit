@@ -146,6 +146,7 @@ Everything is off by default. The Administrator sees what a plugin asks for when
 | `notify` | bool | the logic may send notifications (`ctx.notify`) |
 | `files_read` | bool | the logic reads the Files area as the caller. **Sensitive** |
 | `script_eval` | bool | the CSP of the UI allows `'unsafe-eval'` and `'wasm-unsafe-eval'`. **Sensitive** |
+| `run_commands` | array of identifiers | commands of the logic that a **run ticket** may call on behalf of a person (a background process of a distribution), at most 32. **Sensitive**; needs `[requires] mosaikit = ">=1.0"`. See [Logic](logic.md#run-commands-calls-on-behalf-of-a-run) |
 
 An origin is `http://` or `https://` and a host of letters, digits and `.-:[]`, with no `/`.
 `validate --strict` compares the permissions with what the logic calls: a call with no permission is an error, and so is

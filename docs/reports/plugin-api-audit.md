@@ -53,6 +53,7 @@ shapes the `[requires]` plan of phase 1 (see 1.1).
 | `notify` | stable | Unused by official plugins; documented with tests, keep |
 | `files_read` | stable | New: the logic reads the Files area as the caller (`files.list`, `files.describe`, `files.read`); default false, shown at install. Not `files` (the file API of a plugin that owns files) |
 | `[[public_commands]]`, `[[config]] public` | experimental | New: commands and settings a public link page may use (architecture 8.13); additive, no API bump, `[requires] mosaikit = ">=1.0"`; shown at install; default off per tenant |
+| `permissions.run_commands`, `ctx.on_behalf()` | experimental | New: commands a run ticket may call on behalf of a person (architecture 8.14); additive, no API bump, `[requires] mosaikit = ">=1.0"`; shown at install; no `plugin.call` in such a call; the resource scope is enforced by the database |
 | `script_eval` | stable | Unused by official plugins; opt-in, default false, shown at install. Keep as is: CSP `unsafe-eval` and `wasm-unsafe-eval` on `script-src` and `worker-src` is the contract. Add a note that it is sensitive |
 
 ### 1.4 Other tables

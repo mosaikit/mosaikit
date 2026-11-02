@@ -161,6 +161,7 @@ impl MockHost {
                 config: serde_json::Value::Null,
                 public: false,
                 link_resource: None,
+                on_behalf: None,
             },
             ..MockHost::default()
         }
@@ -175,6 +176,13 @@ impl MockHost {
         self.ctx.perms = Vec::new();
         self.ctx.public = true;
         self.ctx.link_resource = Some(link_resource.to_string());
+        self
+    }
+
+    /// The command is called on behalf of a run ticket of the run `run_ref`: `ctx.on_behalf()` is set. The
+    /// user stays the person who started the run. The real host refuses `plugin.call` in such a call.
+    pub fn on_behalf(mut self, run_ref: &str) -> MockHost {
+        self.ctx.on_behalf = Some(crate::OnBehalf { run_ref: run_ref.to_string() });
         self
     }
 
@@ -468,6 +476,16 @@ mod tests {
         let host = MockHost::new().as_public("r9");
         assert!(host.ctx.public && host.ctx.user.is_none() && host.ctx.perms.is_empty());
         assert_eq!(host.ctx.link_resource(), Some("r9"));
+    }
+
+    #[test]
+    fn run_ticket_context() {
+        let ctx: Ctx =
+            serde_json::from_value(json!({ "plugin": "x", "on_behalf": { "run_ref": "run-7" } })).unwrap();
+        assert_eq!(ctx.on_behalf().map(|o| o.run_ref.as_str()), Some("run-7"));
+        assert!(Ctx::default().on_behalf().is_none());
+        let host = MockHost::new().on_behalf("run-7");
+        assert_eq!(host.ctx.on_behalf().unwrap().run_ref, "run-7");
     }
 
     fn tour(ctx: &Ctx, _args: Value) -> Result<Value> {

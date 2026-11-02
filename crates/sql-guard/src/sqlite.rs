@@ -86,6 +86,9 @@ pub fn level_row(r: &str) -> String {
            WHEN core_ctx_tenant() IS NULL OR {r}.tenant_id IS DISTINCT FROM core_ctx_tenant() THEN 0 \
            WHEN core_ctx_plugin() IS NOT NULL AND {r}.plugin_id IS DISTINCT FROM core_ctx_plugin() THEN 0 \
            WHEN {trash} THEN 0 \
+           WHEN core_ctx_scope() IS NOT NULL AND NOT ({r}.id IN (SELECT value FROM json_each(core_ctx_scope())) \
+                OR EXISTS (SELECT 1 FROM json_each({r}.ancestors) msk_sa \
+                           WHERE msk_sa.value IN (SELECT value FROM json_each(core_ctx_scope())))) THEN 0 \
            WHEN core_ctx_link() IS NOT NULL THEN (CASE WHEN {r}.id = core_ctx_link() \
                 OR core_ctx_link() IN (SELECT value FROM json_each({r}.ancestors)) THEN 1 ELSE 0 END) \
            ELSE {} END)",

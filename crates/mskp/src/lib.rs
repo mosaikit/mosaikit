@@ -18,7 +18,7 @@ pub use manifest::{
     ExtActionDecl, ExtFieldDecl, ExtTabDecl, Extends, ExtensionDecl, ExtensionTranslation, FieldDecl,
     FieldKind, Incompatible, KeyScope, KpiDecl, KpiTranslation, Manifest, NavDecl, PermissionTranslation,
     Permissions, PluginKind, PublicCommandDecl, Requires, ResourceDecl, ResourceTranslation, ServiceKeyDecl,
-    Translation, UiDecl, UserPermission, ABI_VERSION, API_VERSION, MAX_PUBLIC_ARG_BYTES,
+    Translation, UiDecl, UserPermission, ABI_VERSION, API_VERSION, MAX_PUBLIC_ARG_BYTES, MAX_RUN_COMMANDS,
     STANDARD_PERMISSIONS,
 };
 pub use package::{

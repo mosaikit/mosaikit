@@ -6,6 +6,8 @@ One version for the whole dev kit, the one of the platform (docs/plugin-devkit-p
 
 - `validate`: a plugin with `public` settings or `[[public_commands]]` and no `[requires] mosaikit` gets a warning (an
   error with `--strict`); `public_commands` is listed among the permissions the Administrator will review.
+- `validate`: `permissions.run_commands` needs `[requires] mosaikit` too (same warning, an error with `--strict`) and `run_commands`
+  is listed among the permissions the Administrator will review.
 
 ## 1.0.0
 

@@ -163,6 +163,27 @@ A command named in `[[public_commands]]` can be run by anyone who holds a public
 The kernel limits what the command can **read**; it cannot limit what the logic **returns**. Follow the
 [review checklist](security.md#public-link-commands-review-checklist). Test with `MockHost::new().as_public("<item id>")`.
 
+### Run commands: calls on behalf of a run
+
+A distribution may run a process in the background where a step is a command of your plugin. The service that runs it has no
+session, so the person who starts the run mints a **run ticket** and the service calls your command with it. List the commands
+that may be called this way in `[permissions] run_commands = ["node_run"]` (and nothing else can: the manifest is read again on
+every call). Needs `[requires] mosaikit = ">=1.0"`.
+
+- The command runs **as the person who started the run**, with their rights **at the time of the call** (a person who was
+  suspended, removed, or whose share was taken back no longer gets through). `ctx.user` is that person.
+- `ctx.on_behalf()` is `Some` (with `run_ref`, the service's name for the run) in such a call and `None` in a normal one. The
+  arguments cannot set it. Use it to be stricter, never looser. Test with `MockHost::new().on_behalf("run-1")`.
+- A ticket may be limited to a list of resources: then the **database** shows the command only those resources and what is
+  inside them, whatever SQL or arguments you use, and a root item cannot be created. A ticket without that list has the person's
+  whole reach for the declared commands, until it expires, is spent or is revoked.
+- Same host operations as a normal command, except `plugin.call`, which is refused. A call counts against a short life (at most
+  60 minutes), a number of uses, 256 KiB of arguments and a rate limit. Errors: `run_ticket_invalid`, `run_wrong_plugin`,
+  `run_wrong_command`, `command_not_declared`, `args_too_large`, `run_rate_limited`.
+
+The kernel limits what the command can **read**; it cannot limit what the logic **returns**: if your command returns data it
+legitimately read, the service gets it. Follow the [review checklist](security.md#run-commands-review-checklist).
+
 ### Groups and the web
 
 `ctx.groups` (above) is the way to read groups; there is no operation. `msk.web.probe` (permission `web`) belongs to the

@@ -137,6 +137,10 @@ impl KernelHost {
         let target = req.get("plugin").and_then(Value::as_str).ok_or("missing plugin")?.to_string();
         let name = req.get("name").and_then(Value::as_str).ok_or("missing name")?.to_string();
         let args = req.get("args").cloned().unwrap_or(Value::Null);
+        // a run ticket names one plugin: with the rights of the person it never reaches another
+        if self.caller.as_ref().is_some_and(|c| c.run.is_some()) {
+            return Err("plugin.call is not available in a call on behalf of a run".into());
+        }
         if !self.calls.contains(&target) {
             return Err(format!("plugin not declared in permissions.calls: {target}"));
         }
@@ -514,10 +518,15 @@ async fn groups_of(k: &Kernel, c: &crate::Caller) -> Result<Value> {
 }
 
 pub(crate) fn ctx_json(c: &crate::Caller, plugin: &str) -> Value {
-    json!({
+    let mut v = json!({
         "user": c.user.user_id.to_string(),
         "username": c.user.username,
         "tenant": c.tenant.tenant_id.to_string(),
         "plugin": plugin,
-    })
+    });
+    // a call on behalf of a run ticket: the command can tell (and must not trust its arguments for this)
+    if let Some(r) = &c.run {
+        v["on_behalf"] = json!({ "run_ref": r.run_ref });
+    }
+    v
 }

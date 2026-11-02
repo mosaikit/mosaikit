@@ -92,6 +92,7 @@ pub async fn caller(k: &Kernel, user: &SessionUser, slug: &str) -> Result<Caller
             settings: serde_json::from_value(settings).unwrap_or_default(),
             role: Role::parse(row.get::<&str, _>(4))?,
         },
+        run: None,
     })
 }
 

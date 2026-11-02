@@ -2459,3 +2459,93 @@ async fn public_settings_and_commands_over_http() {
     let r = post(format!("{path}call/ticket"), Some("application/json"), "{}").await;
     assert_eq!(r.status, StatusCode::NOT_FOUND);
 }
+
+#[tokio::test]
+async fn run_tickets_over_http() {
+    const ID: &str = "com.test.runecho";
+    let a = App::new().await;
+    let toml = format!(
+        "id = \"{ID}\"\nname = \"Echo\"\nversion = \"1.0.0\"\n[contribution]\nicon = \"x\"\nlabel = \"Echo\"\n\
+         [requires]\nmosaikit = \">=1.0\"\n\
+         [[resources]]\nname = \"items\"\nfields = [{{ key = \"title\", kind = \"text\" }}]\n\
+         [permissions]\nrun_commands = [\"step\"]\n"
+    );
+    let mut files = std::collections::BTreeMap::new();
+    files.insert("plugin.toml".to_string(), toml.into_bytes());
+    files.insert("logic.wasm".to_string(), echo_wasm());
+    let pkg = mosaikit_mskp::pack(&files, Some(&mosaikit_kernel::testing::test_key())).unwrap();
+    a.t.install_package(&pkg).await.unwrap();
+    a.t.tenant("alfa").await;
+    let g = a.login("alfa", "alfa-manager", PASSWORD).await;
+    let mint = json!({ "plugin": ID, "commands": ["step"], "run_ref": "run-http", "uses": 3 });
+
+    // mint needs a session (and its CSRF header): nobody else gets a ticket
+    let r = a.call(None, Method::POST, "/api/t/alfa/run-tickets", Some(mint.clone())).await;
+    assert_eq!(r.status, StatusCode::UNAUTHORIZED);
+    let r = a.call(Some(&g), Method::POST, "/api/t/alfa/run-tickets", Some(mint.clone())).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let (token, id) =
+        (r.json()["token"].as_str().unwrap().to_string(), r.json()["id"].as_str().unwrap().to_string());
+    assert_eq!(token.len(), 48);
+    let bad = json!({ "plugin": ID, "commands": ["other"], "run_ref": "r" });
+    let r = a.call(Some(&g), Method::POST, "/api/t/alfa/run-tickets", Some(bad)).await;
+    assert_eq!((r.status, r.json()["code"].as_str()), (StatusCode::FORBIDDEN, Some("command_not_declared")));
+
+    // redeem: no cookie, no CSRF; JSON only
+    let post = |path: String, ctype: Option<&str>, body: &str| {
+        let mut b = Request::builder().method(Method::POST).uri(path);
+        if let Some(c) = ctype {
+            b = b.header(header::CONTENT_TYPE, c);
+        }
+        send(&a.app, b.body(Body::from(body.to_string())).unwrap())
+    };
+    let url = format!("/api/run/{token}/call/{ID}/step");
+    let r = post(url.clone(), Some("application/json"), r#"{"n":1}"#).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let msg = r.json()["ok"].clone();
+    assert_eq!(msg["ctx"]["on_behalf"]["run_ref"], "run-http");
+    assert_eq!(msg["args"], json!({ "n": 1 }));
+    assert_eq!(
+        post(url.clone(), Some("application/x-www-form-urlencoded"), "a=b").await.status,
+        StatusCode::BAD_REQUEST
+    );
+    assert_eq!(post(url.clone(), None, "{}").await.status, StatusCode::BAD_REQUEST);
+    let big = format!("{{\"a\":\"{}\"}}", "x".repeat(300_000));
+    assert_eq!(post(url.clone(), Some("application/json"), &big).await.status, StatusCode::BAD_REQUEST);
+    // wrong command and wrong plugin: refused, and a forged token is a 401
+    let r = post(format!("/api/run/{token}/call/{ID}/other"), Some("application/json"), "{}").await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN);
+    let r =
+        post(format!("/api/run/{token}/call/com.mosaikit.notes/step"), Some("application/json"), "{}").await;
+    assert_eq!(r.status, StatusCode::FORBIDDEN);
+    let forged = format!("{}0", &token[..47]);
+    let r = post(format!("/api/run/{forged}/call/{ID}/step"), Some("application/json"), "{}").await;
+    assert_eq!(r.status, StatusCode::UNAUTHORIZED);
+    // the ticket is not a session: the normal routes do not take it, as a cookie, a bearer or a header
+    for b in [
+        Request::builder()
+            .uri("/api/t/alfa/directory")
+            .header(header::COOKIE, format!("msk_session={token}")),
+        Request::builder()
+            .uri("/api/t/alfa/directory")
+            .header(header::AUTHORIZATION, format!("Bearer {token}")),
+    ] {
+        let r = send(&a.app, b.body(Body::empty()).unwrap()).await;
+        assert_eq!(r.status, StatusCode::UNAUTHORIZED);
+    }
+
+    // revoke by the starter, then nothing runs
+    let r = a.call(Some(&g), Method::DELETE, &format!("/api/t/alfa/run-tickets/{id}"), None).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let r = post(url.clone(), Some("application/json"), "{}").await;
+    assert_eq!(r.status, StatusCode::UNAUTHORIZED);
+
+    // the service ends its own run
+    let r = a.call(Some(&g), Method::POST, "/api/t/alfa/run-tickets", Some(mint)).await;
+    let t2 = r.json()["token"].as_str().unwrap().to_string();
+    let end =
+        Request::builder().method(Method::DELETE).uri(format!("/api/run/{t2}")).body(Body::empty()).unwrap();
+    assert_eq!(send(&a.app, end).await.status, StatusCode::OK);
+    let r = post(format!("/api/run/{t2}/call/{ID}/step"), Some("application/json"), "{}").await;
+    assert_eq!(r.status, StatusCode::UNAUTHORIZED);
+}

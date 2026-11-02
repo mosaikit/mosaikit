@@ -330,6 +330,40 @@ async fn public_link_read_only(b: B) {
     assert_eq!(sqlstate(&e).as_deref(), Some("42501"));
 }
 
+both!(run_ticket_scope_caps_the_level);
+async fn run_ticket_scope_caps_the_level(b: B) {
+    let w = world(b).await;
+    let folder = note(&w, w.alice, w.tenant_a, "folder", None).await;
+    let child = note(&w, w.alice, w.tenant_a, "child", Some(folder)).await;
+    note(&w, w.alice, w.tenant_a, "outside", None).await;
+    assert_eq!(visible(&w, Ctx::user(w.alice, w.tenant_a)).await, 3);
+    // the scope: the folder and its descendants, nothing else, with the level of the user
+    let scoped = Ctx { scope: Some(vec![folder]), ..Ctx::user(w.alice, w.tenant_a) };
+    assert_eq!(visible(&w, scoped.clone()).await, 2);
+    let mut tx = w.db.begin_plugin(PLUGIN, &scoped).await.unwrap();
+    let lvl: i32 = query_scalar("select core.level_of($1)").bind(child).fetch_one(&mut *tx).await.unwrap();
+    assert_eq!(lvl, 3);
+    // a write outside the scope touches nothing; a root item cannot be created
+    let u = query("update notes set title = 'x' where title = 'outside'").execute(&mut *tx).await.unwrap();
+    assert_eq!(u.rows_affected(), 0);
+    tx.savepoint().await.unwrap();
+    let e = tx.create_resource("note", "x", None, &serde_json::json!({})).await.unwrap_err();
+    assert_eq!(sqlstate(&e).as_deref(), Some("42501"));
+    tx.rollback_savepoint().await.unwrap();
+    // under the scope it can
+    let id = tx.create_resource("note", "inside", Some(folder), &serde_json::json!({})).await.unwrap();
+    query("insert into notes (resource_id, title) values ($1, 'inside')")
+        .bind(id)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    tx.commit().await.unwrap();
+    // an empty scope sees nothing; the next transaction of the connection has no scope
+    let none = Ctx { scope: Some(vec![]), ..Ctx::user(w.alice, w.tenant_a) };
+    assert_eq!(visible(&w, none).await, 0);
+    assert_eq!(visible(&w, Ctx::user(w.alice, w.tenant_a)).await, 4);
+}
+
 both!(kpis_aggregated_per_tenant);
 async fn kpis_aggregated_per_tenant(b: B) {
     let w = world(b).await;
