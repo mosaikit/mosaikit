@@ -1,0 +1,84 @@
+name: devkit
+
+# Builds and publishes the plugin dev kit on its own (docs/devkit/releasing.md), without the product release of release.yml.
+# Run it by hand with the tag of the kit release, for example kit-v1.0.0-rc1. The GitHub Release is a draft.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag of the kit release, e.g. kit-v1.0.0-rc1"
+        required: true
+        type: string
+      prerelease:
+        description: "Mark the release as a pre-release"
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  devkit:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      MOSAIKIT_SIGNING_KEY: ${{ secrets.MOSAIKIT_SIGNING_KEY }}
+    defaults:
+      run:
+        working-directory: mosaikit
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: mosaikit
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm ci --no-audit --no-fund
+      - run: cargo install cargo-deny --locked
+      - name: build the kit
+        run: cargo xtask release devkit --api-docs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: devkit-${{ matrix.os }}
+          path: |
+            mosaikit/dist/devkit/mosaikit-devkit-*.zip
+            mosaikit/dist/devkit/mosaikit-devkit-*.tar.gz
+            mosaikit/dist/devkit/mosaikit-devkit-*.sig
+            mosaikit/dist/devkit/RELEASE-NOTES.md
+
+  devkit-release:
+    needs: [devkit]
+    runs-on: ubuntu-latest
+    env:
+      MOSAIKIT_SIGNING_KEY: ${{ secrets.MOSAIKIT_SIGNING_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: mosaikit
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/download-artifact@v4
+        with:
+          path: kits
+          pattern: devkit-*
+          merge-multiple: true
+      - name: SHA256SUMS and its signature
+        working-directory: mosaikit
+        run: cargo xtask release devkit-sums ../kits
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.tag }}
+          draft: true
+          prerelease: ${{ inputs.prerelease }}
+          files: |
+            kits/mosaikit-devkit-*.zip
+            kits/mosaikit-devkit-*.tar.gz
+            kits/*.sig
+            kits/SHA256SUMS
+          body_path: kits/RELEASE-NOTES.md
