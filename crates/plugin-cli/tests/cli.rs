@@ -89,12 +89,22 @@ fn doctor_dev_and_install_say_what_they_do() {
         d.path().join("alone").join(if cfg!(windows) { "mosaikit-plugin.exe" } else { "mosaikit-plugin" });
     std::fs::create_dir_all(alone.parent().unwrap()).unwrap();
     std::fs::copy(env!("CARGO_BIN_EXE_mosaikit-plugin"), &alone).unwrap();
-    let o = Command::new(&alone)
-        .current_dir(d.path().join("devdemo"))
-        .args(["dev", "--no-open"])
-        .env_remove("MOSAIKIT_SERVER_BIN")
-        .output()
-        .unwrap();
+    // a parallel test may fork while the copy is still open for writing: Linux answers "text file busy" (ETXTBSY), try again
+    let mut tries = 0;
+    let o = loop {
+        match Command::new(&alone)
+            .current_dir(d.path().join("devdemo"))
+            .args(["dev", "--no-open"])
+            .env_remove("MOSAIKIT_SERVER_BIN")
+            .output()
+        {
+            Err(e) if e.raw_os_error() == Some(26) && tries < 20 => {
+                tries += 1;
+                std::thread::sleep(std::time::Duration::from_millis(100));
+            }
+            r => break r.unwrap(),
+        }
+    };
     assert_eq!(o.status.code(), Some(1));
     let err = String::from_utf8_lossy(&o.stderr);
     assert!(err.contains("--server") && err.contains("MOSAIKIT_SERVER_BIN"), "{err}");
