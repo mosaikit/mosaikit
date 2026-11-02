@@ -36,6 +36,7 @@ import { t } from './i18n.ts'
 import { useLiveNotes } from './notes.ts'
 import { bandOf, navGroupOpen, setNavGroupOpen, sidebarOpen } from './prefs.ts'
 import { arrowTarget } from './navgroups.ts'
+import { useHoverMenu } from './hoverMenu.ts'
 import { type Route } from './router.ts'
 import { QuotaAlert } from './Quotas.tsx'
 import { HelpLayer } from './HelpLayer.tsx'
@@ -52,16 +53,15 @@ const railButton = cn(
   '[&>svg]:fill-current [&>svg]:[fill-opacity:0.1] data-[active=true]:[&>svg]:[fill-opacity:0.2] hover:[&>svg]:[fill-opacity:0.16]',
   'msk-nav-item relative h-10 gap-2.5 rounded-[8px] px-2.5 text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:font-semibold data-[active=true]:text-sidebar-accent-foreground [&>svg]:size-5',
   // closed, like the Teams bar: icon and name below, grey (--rail-foreground); the active item
-  // and the one under the mouse in the accent colour, the active one with the bar on the left too
-  'group-data-[collapsible=icon]:h-[56px]! group-data-[collapsible=icon]:w-full! group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-1.5 group-data-[collapsible=icon]:rounded-none group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:bg-transparent! group-data-[collapsible=icon]:font-normal! group-data-[collapsible=icon]:text-rail-foreground group-data-[collapsible=icon]:hover:text-sidebar-primary group-data-[collapsible=icon]:data-[active=true]:text-sidebar-primary group-data-[collapsible=icon]:[&>svg]:size-5 group-data-[collapsible=icon]:[&>svg]:stroke-[1.6]',
+  // and the one under the mouse in the accent colour, the active one on a soft background too (no lines)
+  'group-data-[collapsible=icon]:h-[56px]! group-data-[collapsible=icon]:w-full! group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-1.5 group-data-[collapsible=icon]:rounded-none group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:data-[active=false]:bg-transparent! group-data-[collapsible=icon]:data-[active=true]:font-medium! group-data-[collapsible=icon]:font-normal! group-data-[collapsible=icon]:text-rail-foreground group-data-[collapsible=icon]:hover:text-sidebar-primary group-data-[collapsible=icon]:data-[active=true]:text-sidebar-primary group-data-[collapsible=icon]:[&>svg]:size-5 group-data-[collapsible=icon]:[&>svg]:stroke-[1.6]',
   'group-data-[collapsible=icon]:[&>span:last-child]:block group-data-[collapsible=icon]:[&>span:last-child]:max-w-[60px] group-data-[collapsible=icon]:[&>span:last-child]:truncate group-data-[collapsible=icon]:[&>span:last-child]:text-center group-data-[collapsible=icon]:[&>span:last-child]:text-[10px] group-data-[collapsible=icon]:[&>span:last-child]:leading-3',
-  "group-data-[collapsible=icon]:data-[active=true]:before:absolute group-data-[collapsible=icon]:data-[active=true]:before:inset-y-2 group-data-[collapsible=icon]:data-[active=true]:before:left-0 group-data-[collapsible=icon]:data-[active=true]:before:w-[3px] group-data-[collapsible=icon]:data-[active=true]:before:rounded-r-[3px] group-data-[collapsible=icon]:data-[active=true]:before:bg-sidebar-primary group-data-[collapsible=icon]:data-[active=true]:before:content-['']",
 )
 
 /** The pages of an app under it, in the open sidebar and in the drawer of the phone. */
 function SubTree({ items, onPick, depth = 0 }: { items: NavItem[]; onPick: () => void; depth?: number }) {
   return (
-    <SidebarMenuSub className={cn(depth > 0 ? 'mr-0 pr-0' : 'ml-[22px]')}>
+    <SidebarMenuSub className={cn(depth > 0 ? 'mr-0 border-l-0 pr-0' : 'ml-[22px] border-l-0')}>
       {items.map((c) => (
         <SidebarMenuSubItem key={c.label + (c.href ?? '')}>
           {c.href ? (
@@ -83,28 +83,29 @@ function SubTree({ items, onPick, depth = 0 }: { items: NavItem[]; onPick: () =>
 function RailEntry({ it }: { it: NavItem }) {
   const { isMobile, setOpenMobile, state } = useSidebar()
   const rail = state === 'collapsed' && !isMobile
+  const hover = useHoverMenu(rail)
   // on the phone the whole tree is open; in the open sidebar the app of the active page
   const [open, setOpen] = useState(() => hasActive(it))
   const pick = () => isMobile && setOpenMobile(false)
   const kids = it.children ?? []
   return (
-    <SidebarMenuItem>
+    <SidebarMenuItem {...(kids.length > 0 && rail ? hover.areaProps : {})}>
       <SidebarMenuButton asChild isActive={hasActive(it)} className={railButton}>
-        <a href={it.href} aria-label={rail && it.short ? it.label : undefined} title={rail && it.short ? it.label : undefined} onClick={pick}>
+        <a href={it.href} aria-label={it.short ? it.label : undefined} title={it.short && !(rail && kids.length > 0) ? it.label : undefined} onClick={pick}>
           {it.icon}
-          <span>{rail ? (it.short ?? it.label) : it.label}</span>
+          <span>{it.short ?? it.label}</span>
         </a>
       </SidebarMenuButton>
       {kids.length > 0 && rail && (
         // the closed rail: the link opens the app, the small arrow its pages in a menu at the side
         <FlyoutMenu
           item={it}
+          hover={hover}
           trigger={
             <button
               type="button"
               className="msk-nav-toggle absolute top-1 right-0.5 flex size-5 items-center justify-center rounded text-rail-foreground hover:bg-sidebar-hover hover:text-sidebar-primary focus-visible:ring-2 focus-visible:ring-sidebar-ring"
               aria-label={t('Open the pages of {name}', { name: it.label })}
-              title={t('Open the pages of {name}', { name: it.label })}
             >
               <ChevronRight className="size-3.5" />
             </button>
@@ -140,7 +141,7 @@ function NavList({ items }: { items: NavItem[] }) {
   )
 }
 
-const groupClass = "py-1 first:pt-0 last:pb-0 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:not-first:mt-3 group-data-[collapsible=icon]:not-first:relative group-data-[collapsible=icon]:not-first:pt-1 group-data-[collapsible=icon]:not-first:before:absolute group-data-[collapsible=icon]:not-first:before:top-0 group-data-[collapsible=icon]:not-first:before:left-1/2 group-data-[collapsible=icon]:not-first:before:h-px group-data-[collapsible=icon]:not-first:before:w-10 group-data-[collapsible=icon]:not-first:before:-translate-x-1/2 group-data-[collapsible=icon]:not-first:before:bg-rail-foreground/45 group-data-[collapsible=icon]:not-first:before:content-['']"
+const groupClass = 'py-1 first:pt-0 last:pb-0 group-data-[collapsible=icon]:p-0 group-data-[collapsible=icon]:not-first:mt-3'
 
 /** A group of the distribution (`[[nav_groups]]`): in the open sidebar a heading that collapses its apps (the
  *  state is kept in the browser), in the closed rail one icon with a short name that opens a menu with the
@@ -148,6 +149,7 @@ const groupClass = "py-1 first:pt-0 last:pb-0 group-data-[collapsible=icon]:p-0 
 function DistGroup({ g, className }: { g: NavGroup; className: string }) {
   const { isMobile, state } = useSidebar()
   const rail = state === 'collapsed' && !isMobile
+  const hover = useHoverMenu(rail)
   const [open, setOpen] = useState(() => navGroupOpen(g.id))
   const active = g.items.some(hasActive)
   const label = g.label ?? g.id
@@ -161,11 +163,12 @@ function DistGroup({ g, className }: { g: NavGroup; className: string }) {
       <SidebarGroup className={className}>
         <SidebarGroupContent>
           <SidebarMenu className="group-data-[collapsible=icon]:gap-0">
-            <SidebarMenuItem>
+            <SidebarMenuItem {...hover.areaProps}>
               <FlyoutMenu
+                hover={hover}
                 item={{ label, icon: g.icon, active, children: g.items }}
                 trigger={
-                  <SidebarMenuButton isActive={active} className={railButton} aria-label={t('Open the apps of {name}', { name: label })} title={label}>
+                  <SidebarMenuButton isActive={active} className={railButton} aria-label={t('Open the apps of {name}', { name: label })}>
                     {g.icon}
                     <span>{label}</span>
                   </SidebarMenuButton>
@@ -192,7 +195,7 @@ function DistGroup({ g, className }: { g: NavGroup; className: string }) {
         </button>
       </SidebarGroupLabel>
       {open && (
-        <SidebarGroupContent id={body}>
+        <SidebarGroupContent id={body} className="pl-3">
           <NavList items={g.items} />
         </SidebarGroupContent>
       )}
@@ -241,7 +244,7 @@ function AppSidebar({ session, route, band }: { session: Session; route: Route; 
           ),
         )}
       </SidebarContent>
-      <SidebarFooter className="border-r border-sidebar-border pt-1 pb-1 group-data-[collapsible=icon]:relative group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-0 group-data-[collapsible=icon]:before:absolute group-data-[collapsible=icon]:before:top-0 group-data-[collapsible=icon]:before:left-1/2 group-data-[collapsible=icon]:before:h-px group-data-[collapsible=icon]:before:w-10 group-data-[collapsible=icon]:before:-translate-x-1/2 group-data-[collapsible=icon]:before:bg-rail-foreground/45 group-data-[collapsible=icon]:before:content-['']">
+      <SidebarFooter className="border-r border-sidebar-border pt-1 pb-1 group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:px-0 group-data-[collapsible=icon]:py-0">
         {/* only when a quota of the tenant passes 80 %: no fixed widget */}
         {route.area === 'tenant' && (
           <div className="px-2 group-data-[collapsible=icon]:px-2.5">
