@@ -166,6 +166,10 @@ test.describe.serial('12-review-round1-platform', () => {
       const wasOpen = (await rail.count()) === 0
       if (wasOpen) await toggle.click()
       await expect(rail.first()).toBeAttached()
+      // the entries of the footer (Settings, System) are anchored at the bottom of the closed bar
+      const lastEntry = await sidebar.locator('[data-sidebar="menu-button"]').last().boundingBox()
+      const box = await sidebar.boundingBox()
+      expect(box!.y + box!.height - (lastEntry!.y + lastEntry!.height)).toBeLessThanOrEqual(4)
       const groups = sidebar.locator('[data-sidebar="group"]')
       // the Administrator has one group; the step between groups is checked with the Tenant Manager below
       if ((await groups.count()) > 1) {
