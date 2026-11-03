@@ -49,8 +49,11 @@ export function useHoverMenu(enabled: boolean): HoverMenu {
   // a press on the entry (it navigates) mutes the hover until the pointer has left the entry
   const muted = useRef(false)
 
+  // the timer fires later, in an event: the refs are not read while rendering
+  // oxlint-disable-next-line react/preserve-manual-memoization
   const ctl = useMemo(
     () =>
+      // oxlint-disable-next-line react/refs
       createHoverController((o) => {
         if (o) setViaHover(true)
         if (o) viaRef.current = true
