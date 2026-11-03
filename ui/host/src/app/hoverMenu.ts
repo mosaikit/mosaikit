@@ -85,7 +85,10 @@ export function useHoverMenu(enabled: boolean): HoverMenu {
         ctl.cancel()
         muted.current = true
         // only a press on the trigger of the menu (not on the link of the app) keeps it open
-        keepOnClick.current = openRef.current && !!(e.target as HTMLElement).closest?.('[aria-haspopup="menu"]')
+        const onTrigger = !!(e.target as HTMLElement).closest?.('[aria-haspopup="menu"]')
+        keepOnClick.current = openRef.current && onTrigger
+        // a press on the link of the app navigates: the menu the pointer had just opened goes away
+        if (openRef.current && viaHover && !onTrigger) setOpenState(false)
       },
     },
     contentProps: {

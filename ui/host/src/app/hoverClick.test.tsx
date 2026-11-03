@@ -43,13 +43,13 @@ describe('hover menu and a click on the entry', () => {
       vi.advanceTimersByTime(ms)
     })
 
-  it('opens when the pointer rests on the entry', async () => {
+  it('opens as soon as the pointer is on the entry', async () => {
     await fire(area(), 'pointerenter', 200)
     expect(open()).toBe('true')
   })
 
-  it('a press cancels a pending open and the menu does not open while the pointer stays', async () => {
-    await fire(area(), 'pointerenter', 50)
+  it('a press on the link closes the menu the hover opened and it does not reopen while the pointer stays', async () => {
+    await fire(area(), 'pointerenter', 0)
     await fire(host.querySelector('#link')!, 'pointerdown', 500)
     expect(open()).toBe('false')
     await fire(area(), 'pointerenter', 500)
