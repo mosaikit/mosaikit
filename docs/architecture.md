@@ -1818,7 +1818,11 @@ are limited to the path.
   origin, `frame-ancestors 'none'`.
 - **User contents** (static sites, previews): always with
   `Content-Security-Policy: sandbox …` without `allow-same-origin` (opaque
-  origin), `nosniff`, `Referrer-Policy: no-referrer`.
+  origin), `nosniff`, `Referrer-Policy: no-referrer`. The files of a static site also carry
+  `Cross-Origin-Resource-Policy: cross-origin` (the others keep `same-site`): the sandboxed frame
+  has an opaque origin, so its own css, scripts and images are cross-site requests. Access is by the
+  token in the URL (ticket or public link); the unlock cookie of a protected link is `SameSite=Lax`
+  and never goes with such requests.
 - **Passwords**: argon2id, at least 10 characters (the platform and the tenants may ask for more,
   §3.1). Sign-in with a limit of failed attempts per account and per address (default 8 in 15
   minutes, settings of the platform and of the tenant).
