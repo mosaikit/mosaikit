@@ -71,6 +71,15 @@ enum Cmd {
         /// only the scenario with one origin per plugin (a wildcard plugin_url); the full run does it after the suite
         #[arg(long)]
         wildcard: bool,
+        /// only one group of specs of tests/e2e/shards.json (a CI job), on an installation of its own
+        #[arg(long, conflicts_with_all = ["wildcard", "shards"])]
+        shard: Option<String>,
+        /// every group in parallel, then the wildcard scenario: the quick local check, the same split as CI
+        #[arg(long, conflicts_with = "wildcard")]
+        shards: bool,
+        /// installations running at the same time with `--shards`
+        #[arg(long, short = 'j', default_value_t = 3)]
+        jobs: usize,
         /// only these Playwright arguments, e.g. `-- tests/auth.spec.ts -g "sign in"` (report untouched)
         #[arg(last = true)]
         only: Vec<String>,
@@ -322,7 +331,9 @@ fn main() -> Result<()> {
         Cmd::Ci => ci::ci(),
         Cmd::TestReport => report::generate().map(|_| ()),
         Cmd::Sidecars => sidecars::show(),
-        Cmd::E2e { headed, wildcard, only } => e2e::e2e(headed, wildcard, &only),
+        Cmd::E2e { headed, wildcard, shard, shards, jobs, only } => {
+            e2e::e2e(headed, wildcard, shard.as_deref(), shards, jobs, &only)
+        }
         Cmd::ManualTests { check: true, .. } => manual::check(),
         Cmd::ManualTests { serve: true, .. } => manual::serve(),
         Cmd::ManualTests { headed, area, args, .. } => manual::manual_tests(headed, area, &args),

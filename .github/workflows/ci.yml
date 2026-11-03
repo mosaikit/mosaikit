@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+    # `labeled`: the label `full-e2e` runs the whole browser suite on that pull request
+    types: [opened, synchronize, reopened, labeled]
   merge_group:
 
 concurrency:
@@ -15,12 +17,23 @@ concurrency:
 #
 # Jobs run in parallel and can be re-run one by one ("Re-run failed jobs"). The last job, `ci`,
 # is the one the branch protection requires: it passes when every other job passed or was skipped.
+#
+# Speed (the merge queue made a pull request wait for the suite twice):
+#   - the browser suite is split in groups (tests/e2e/shards.json), one job and one installation each;
+#   - a pull request runs everything its change can reach: documentation only skips all the heavy jobs, a
+#     change that cannot reach the server or the shell (tools, manual checks, notes) skips the browser jobs;
+#   - the gate of a pull request and of the merge queue is the backend, the installation with one origin per plugin
+#     and a short group of browser specs (`smoke`): about 10 minutes. The whole browser suite (groups a to d) runs
+#     on main after every merge, and on a pull request that carries the label `full-e2e` (put it on a change that
+#     touches the shell, the sign-in or the plugin frames, or run `cargo xtask e2e --shards` before pushing).
+#     A red run on main is fixed at once, before anything else is merged.
 jobs:
   changes:
-    # a change of documentation only skips the heavy jobs
+    # a change of documentation only skips the heavy jobs; one that cannot reach the browser also skips those
     runs-on: ubuntu-latest
     outputs:
       code: ${{ steps.diff.outputs.code }}
+      browser: ${{ steps.diff.outputs.browser }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -28,12 +41,19 @@ jobs:
       - id: diff
         run: |
           code=true
+          browser=true
           if [ "${{ github.event_name }}" = "pull_request" ]; then
-            if ! git diff --name-only "${{ github.event.pull_request.base.sha }}" HEAD | grep -qvE '^(docs/|CHANGELOG(\.it)?\.md$|README(\.it)?\.md$|LICENSE$)'; then
+            files=$(git diff --name-only "${{ github.event.pull_request.base.sha }}" HEAD)
+            if ! echo "$files" | grep -qvE '^(docs/|CHANGELOG(\.it)?\.md$|README(\.it)?\.md$|LICENSE$)'; then
               code=false
+              browser=false
+            # nothing the server or the shell is built from, nor the browser specs
+            elif ! echo "$files" | grep -qvE '^(docs/|CHANGELOG(\.it)?\.md$|README(\.it)?\.md$|LICENSE$|xtask/|tests/manual/|tests/perf/|tests/results/|tests/README\.md$|crates/plugin-cli/|\.github/workflows/(devkit|release)\.yml$)'; then
+              browser=false
             fi
           fi
           echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "browser=$browser" >> "$GITHUB_OUTPUT"
 
   backend:
     # fmt, clippy, typecheck, lint, build, test (PostgreSQL and SQLite), cargo-deny
@@ -89,10 +109,17 @@ jobs:
         run: cargo xtask ci
 
   e2e:
-    # the browser suite, in file order: the specs build on each other (01 creates the admin, 16 needs the tenants of 15)
+    # the browser suite in groups (tests/e2e/shards.json): the specs of a group build on each other, and the setup
+    # spec (admin and first tenants) runs first in every group. Main and the label `full-e2e` run all the groups,
+    # everything else the short `smoke` group.
+    name: e2e (${{ matrix.shard }})
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && needs.changes.outputs.browser == 'true'
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON((github.event_name == 'push' || contains(github.event.pull_request.labels.*.name, 'full-e2e')) && '["a","b","c","d"]' || '["smoke"]') }}
     services:
       postgres:
         image: postgis/postgis:17-3.5
@@ -132,31 +159,32 @@ jobs:
           PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -c "create role mosaikit_dev login createdb createrole password 'mosaikit_dev'"
           PGPASSWORD=postgres psql -h 127.0.0.1 -U postgres -d template1 -c "create extension if not exists postgis"
       - run: npm ci --no-audit --no-fund
-      - name: browser and PostgreSQL 17 client
+      - name: browser
+        run: npx playwright install --with-deps chromium
+      - name: PostgreSQL 17 client
+        # only the lifecycle spec makes backups (group b)
+        if: matrix.shard == 'b'
         run: |
-          npx playwright install --with-deps chromium
           sudo apt-get install -y postgresql-common
           sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
           sudo apt-get install -y postgresql-client-17
           # pg_dump of the backups must match the server (PostGIS 17 above): the wrapper of the runner picks 16
           echo /usr/lib/postgresql/17/bin >> "$GITHUB_PATH"
-      - name: test end-to-end (Playwright)
-        run: |
-          pg_dump --version
-          # arguments after `--` run Playwright directly: no wildcard run at the end (its own job below)
-          E2E_CHANNEL=chromium cargo xtask e2e -- --workers=1
+      - name: test end-to-end (Playwright), group ${{ matrix.shard }}
+        # no wildcard run here (its own job below)
+        run: E2E_CHANNEL=chromium cargo xtask e2e --shard ${{ matrix.shard }}
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: e2e-results
+          name: e2e-results-${{ matrix.shard }}
           path: |
-            mosaikit/tests/e2e/test-results
+            mosaikit/tests/e2e/test-results-*
             mosaikit/.dev/e2e*/*.log
 
   e2e-wildcard:
     # the installation with one origin per plugin
     needs: changes
-    if: needs.changes.outputs.code == 'true'
+    if: needs.changes.outputs.code == 'true' && needs.changes.outputs.browser == 'true'
     runs-on: ubuntu-latest
     services:
       postgres:
