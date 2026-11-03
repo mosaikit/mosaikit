@@ -64,6 +64,11 @@ pub struct Manifest {
     pub kpi: Vec<KpiDecl>,
     #[serde(default)]
     pub requires: Requires,
+    /// Jobs a person may put on a timetable (`[[schedules]]`): at most [`MAX_SCHEDULES`]. Each one names a
+    /// run command (`permissions.run_commands`) and the service that is told to run it. Sensitive: the job
+    /// runs later with the rights of the person who registered it. Needs `[requires] mosaikit = ">=1.0"`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub schedules: Vec<ScheduleDecl>,
     /// Permissions of the people in the plugin beyond the standard ones of the kernel (`use`,
     /// `create`, `delete`, `share`), given by the permission profiles of the tenant. The kernel
     /// sends the permissions of the caller to the logic (`ctx.perms`) and to the UI: the plugin
@@ -710,6 +715,60 @@ pub struct Permissions {
 /// Most commands a plugin may declare in `permissions.run_commands`.
 pub const MAX_RUN_COMMANDS: usize = 32;
 
+/// Most `[[schedules]]` a plugin may declare.
+pub const MAX_SCHEDULES: usize = 8;
+/// Smallest interval between two runs of a schedule, in minutes (the kernel floor: a manifest may raise it).
+pub const MIN_SCHEDULE_INTERVAL_MINUTES: u32 = 5;
+/// Defaults and ceilings of the numbers of a `[[schedules]]` entry.
+pub const DEFAULT_SCHEDULE_INTERVAL_MINUTES: u32 = 15;
+pub const DEFAULT_SCHEDULE_RUNTIME_MINUTES: u32 = 15;
+pub const MAX_SCHEDULE_RUNTIME_MINUTES: u32 = 60;
+pub const DEFAULT_SCHEDULES_PER_TENANT: u32 = 10;
+pub const MAX_SCHEDULES_PER_TENANT: u32 = 50;
+
+/// A job a person may schedule (`[[schedules]]`): see docs/architecture.md, "Schedules".
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ScheduleDecl {
+    /// identifier, unique in the plugin
+    pub name: String,
+    /// a command of `permissions.run_commands`
+    pub command: String,
+    /// address of the service endpoint that is told to run the job: its origin must be in
+    /// `permissions.network`
+    pub target: String,
+    /// `id` of a `[[service_keys]]` entry: sent as a bearer key to the target
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub service_key: Option<String>,
+    /// least minutes between two runs (default 15; the kernel floor is 5 and wins)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_interval_minutes: Option<u32>,
+    /// longest run in minutes (default 15, at most 60)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_runtime_minutes: Option<u32>,
+    /// schedules of this name a tenant may have (default 10, at most 50)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub max_per_tenant: Option<u32>,
+    /// a schedule must name the resources it is limited to
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub resources_required: bool,
+}
+
+impl ScheduleDecl {
+    /// The interval floor of this schedule: the declared one, never below the kernel floor.
+    pub fn min_interval(&self) -> u32 {
+        self.min_interval_minutes
+            .unwrap_or(DEFAULT_SCHEDULE_INTERVAL_MINUTES)
+            .max(MIN_SCHEDULE_INTERVAL_MINUTES)
+    }
+    pub fn max_runtime(&self) -> u32 {
+        self.max_runtime_minutes.unwrap_or(DEFAULT_SCHEDULE_RUNTIME_MINUTES)
+    }
+    pub fn per_tenant(&self) -> u32 {
+        self.max_per_tenant.unwrap_or(DEFAULT_SCHEDULES_PER_TENANT)
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct KpiDecl {
@@ -898,6 +957,7 @@ impl Manifest {
                 return bad(format!("permissions.run_commands: '{c}' invalid or duplicate"));
             }
         }
+        self.validate_schedules().map_err(Error::Manifest)?;
         if let Some(db) = &self.requires.database {
             if db != "postgres" {
                 return bad(format!("requires.database '{db}' invalid (only \"postgres\")"));
@@ -1196,6 +1256,55 @@ impl Manifest {
                         "the extension tab '{}': page '{page}' is not an .html file of the UI",
                         t.key
                     ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_schedules(&self) -> std::result::Result<(), String> {
+        if self.schedules.len() > MAX_SCHEDULES {
+            return Err(format!("schedules: at most {MAX_SCHEDULES} entries"));
+        }
+        let mut names = std::collections::HashSet::new();
+        for s in &self.schedules {
+            let n = &s.name;
+            if !is_identifier(n) || !names.insert(n.as_str()) {
+                return Err(format!("schedules: name '{n}' invalid or duplicate"));
+            }
+            if !self.permissions.run_commands.contains(&s.command) {
+                return Err(format!(
+                    "schedules '{n}': the command '{}' is not in permissions.run_commands",
+                    s.command
+                ));
+            }
+            let origin = s.target.split('/').take(3).collect::<Vec<_>>().join("/");
+            let clean =
+                !s.target.chars().any(|c| c.is_whitespace() || c.is_control()) && !origin.contains('@');
+            let path_ok = origin == s.target || s.target[origin.len()..].starts_with('/');
+            if !is_origin(&origin) || !clean || !path_ok {
+                return Err(format!(
+                    "schedules '{n}': target must be an http(s) address, e.g. https://svc:8080/run"
+                ));
+            }
+            if !self.permissions.network.contains(&origin) {
+                return Err(format!(
+                    "schedules '{n}': the origin '{origin}' of the target is not in permissions.network"
+                ));
+            }
+            if let Some(key) = &s.service_key {
+                if !self.service_keys.iter().any(|k| &k.id == key) {
+                    return Err(format!("schedules '{n}': service_key '{key}' is not in [[service_keys]]"));
+                }
+            }
+            let ranges = [
+                ("min_interval_minutes", s.min_interval_minutes, 1, 1440 * 31),
+                ("max_runtime_minutes", s.max_runtime_minutes, 1, MAX_SCHEDULE_RUNTIME_MINUTES),
+                ("max_per_tenant", s.max_per_tenant, 1, MAX_SCHEDULES_PER_TENANT),
+            ];
+            for (what, v, lo, hi) in ranges {
+                if v.is_some_and(|v| v < lo || v > hi) {
+                    return Err(format!("schedules '{n}': {what} must be {lo} to {hi}"));
                 }
             }
         }
@@ -1973,6 +2082,75 @@ service_keys = { b = { label = \"y\" } }
             let e = Manifest::from_toml(&with(bad)).unwrap_err().to_string();
             assert!(e.contains("run_commands"), "{bad}: {e}");
         }
+    }
+
+    #[test]
+    fn schedules() {
+        let with = |extra: &str| {
+            let m = NOTES.replacen(
+                "hooks = [\"notes\"]",
+                "hooks = [\"notes\"]
+ run_commands = [\"node_run\"]
+ network = [\"https://svc:8080\"]",
+                1,
+            );
+            format!(
+                "{m}
+[[service_keys]]
+id = \"svc\"
+label = \"Svc\"
+
+[[schedules]]
+name = \"nightly\"
+command = \"node_run\"
+target = \"https://svc:8080/run\"
+{extra}"
+            )
+        };
+        let m = Manifest::from_toml(&with(
+            "service_key = \"svc\"
+min_interval_minutes = 1
+",
+        ))
+        .unwrap();
+        assert_eq!(m.schedules.len(), 1);
+        // the kernel floor wins over a smaller declared interval
+        assert_eq!(m.schedules[0].min_interval(), 5);
+        assert_eq!(m.schedules[0].per_tenant(), 10);
+        assert_eq!(serde_json::from_str::<Manifest>(&serde_json::to_string(&m).unwrap()).unwrap(), m);
+        let plain = serde_json::to_string(&Manifest::from_toml(NOTES).unwrap()).unwrap();
+        assert!(!plain.contains("schedules"), "{plain}");
+        for bad in [
+            "service_key = \"nope\"
+",
+            "max_runtime_minutes = 61
+",
+            "max_per_tenant = 51
+",
+            "max_per_tenant = 0
+",
+            "color = 1
+",
+        ] {
+            assert!(Manifest::from_toml(&with(bad)).is_err(), "{bad}");
+        }
+        let e =
+            |from: &str, to: &str| Manifest::from_toml(&with("").replace(from, to)).unwrap_err().to_string();
+        assert!(e("command = \"node_run\"", "command = \"other\"").contains("run_commands"));
+        assert!(e("https://svc:8080/run", "https://other:8080/run").contains("permissions.network"));
+        assert!(e("https://svc:8080/run", "ftp://svc:8080/run").contains("target"));
+        assert!(e("https://svc:8080/run", "https://u@svc:8080/run").contains("target"));
+        assert!(e("name = \"nightly\"", "name = \"Bad Name\"").contains("name"));
+        let dup = format!(
+            "{}
+[[schedules]]
+name = \"nightly\"
+command = \"node_run\"
+target = \"https://svc:8080\"
+",
+            with("")
+        );
+        assert!(Manifest::from_toml(&dup).unwrap_err().to_string().contains("duplicate"));
     }
 
     #[test]

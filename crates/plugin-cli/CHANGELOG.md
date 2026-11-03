@@ -4,6 +4,9 @@ One version for the whole dev kit, the one of the platform (docs/plugin-devkit-p
 
 ## Unreleased
 
+- `validate`: `[[schedules]]` needs `[requires] mosaikit` (warning, an error with `--strict`) and `schedules` is listed among the
+  permissions the Administrator will review; the manifest is checked (command in `run_commands`, target origin in `permissions.network`,
+  known `service_key`, limits).
 - `validate`: `permissions.directory` needs `[requires] mosaikit` (warning, an error with `--strict`) and is listed among the
   permissions the Administrator will review; `--strict` also errors when the logic searches the directory without it.
 - `validate`: a plugin with `public` settings or `[[public_commands]]` and no `[requires] mosaikit` gets a warning (an

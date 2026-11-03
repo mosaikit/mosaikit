@@ -227,6 +227,26 @@ commands» (off by default) before they work. Needs `[requires] mosaikit = ">=1.
 | `description` | required: what a visitor can do with it, shown to the Administrator |
 | `max_arg_bytes` | optional, 1 to 16384 (the default and the ceiling) |
 
+## `[[schedules]]`
+
+Jobs a person may put on a timetable (a cron expression) and have run later, as that person, by an outside service. At most 8.
+**Sensitive**: `validate` lists it among the permissions the Administrator reviews (the install screen shows it with the shell step of the feature). Needs
+`[requires] mosaikit = ">=1.0"`; `validate` warns when the range is missing, `--strict` fails. Today the kernel keeps the registry
+(create, list, pause, resume, delete); the part that fires the jobs comes in a later release. See architecture §8.17.
+
+| Key | Rule |
+|---|---|
+| `name` | identifier, unique in the plugin; what the UI sends when it registers a schedule |
+| `command` | required: a command of `permissions.run_commands` |
+| `target` | required: the address of the service endpoint, `https://svc:8080/run`; its origin must be in `permissions.network`; no credentials in the address |
+| `service_key` | optional: the `id` of a `[[service_keys]]` entry, sent to the target as a bearer key |
+| `min_interval_minutes` | optional, default 15: the least minutes between two runs; the kernel floor is 5 and wins |
+| `max_runtime_minutes` | optional, default 15, at most 60 |
+| `max_per_tenant` | optional, default 10, at most 50: schedules of this name in a tenant |
+| `resources_required` | optional, default `false`: a schedule must name the resources it is limited to |
+
+The cron expression has five fields in UTC (`minute hour day-of-month month day-of-week`): `*`, numbers, ranges, lists and steps, no names.
+
 ## `[search]`
 
 `command = "<name>"`: a command of the logic (a plain identifier, no dots) that adds results to the search of the
