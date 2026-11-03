@@ -7,7 +7,7 @@
 //! every call (`call`).
 //!
 //! What stops a leaked ticket from being the person's whole account:
-//! - only commands the plugin declares in `permissions.run_commands`, only the ones named at mint,
+//! - only commands the plugin declares in `permissions.run    crate::tenancy::caller(k, &session, &slug).await.map_err(|_| invalid())commands`, only the ones named at mint,
 //!   only the plugin named at mint; the manifest is read again on every call;
 //! - the rights of the person are evaluated at **call** time (user, tenant, membership, plugin on,
 //!   permission to use it), never taken from the mint;
@@ -64,6 +64,9 @@ pub struct MintRequest {
     /// resources the ticket is limited to; none: the rights of the person
     #[serde(default)]
     pub resources: Option<Vec<Uuid>>,
+    /// the schedule that mints the ticket (set by the schedules worker, never by a request)
+    #[serde(skip)]
+    pub schedule: Option<Uuid>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -155,8 +158,8 @@ pub async fn mint(k: &Kernel, c: &Caller, req: &MintRequest) -> Result<Minted> {
     let token = random_token(24);
     let row = mosaikit_db::query(
         "insert into core.run_tickets
-            (token_hash, user_id, tenant_id, plugin_id, run_ref, commands, resources, uses_left, expires_at)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, now() + make_interval(mins => $9))
+            (token_hash, user_id, tenant_id, plugin_id, run_ref, commands, resources, uses_left, expires_at, schedule_id)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, now() + make_interval(mins => $9), $10)
          returning id, expires_at",
     )
     .bind(sha256(token.as_bytes()))
@@ -168,6 +171,7 @@ pub async fn mint(k: &Kernel, c: &Caller, req: &MintRequest) -> Result<Minted> {
     .bind(resources.as_ref().map(|r| json!(r)))
     .bind(uses as i32)
     .bind(ttl as i32)
+    .bind(req.schedule)
     .fetch_one(&k.db)
     .await?;
     let id: Uuid = row.get(0);
@@ -180,7 +184,7 @@ pub async fn mint(k: &Kernel, c: &Caller, req: &MintRequest) -> Result<Minted> {
         None,
         "run_ticket.mint",
         json!({
-            "ticket": id, "run_ref": run_ref, "commands": commands, "uses": uses,
+            "ticket": id, "run_ref": run_ref, "commands": commands, "uses": uses, "schedule": req.schedule,
             "expires_at": expires_at, "resources": resources.as_ref().map(Vec::len),
         }),
     )
@@ -217,7 +221,7 @@ pub async fn revoke(k: &Kernel, c: &Caller, id: Uuid) -> Result<()> {
     Ok(())
 }
 
-async fn revoke_row(k: &Kernel, id: Uuid) -> Result<()> {
+pub(crate) async fn revoke_row(k: &Kernel, id: Uuid) -> Result<()> {
     mosaikit_db::query("update core.run_tickets set revoked_at = now() where id = $1 and revoked_at is null")
         .bind(id)
         .execute(&k.db)
@@ -234,6 +238,8 @@ struct Row {
     run_ref: String,
     commands: Vec<String>,
     resources: Option<Vec<Uuid>>,
+    /// the schedule that minted it and its name
+    schedule: Option<(Uuid, String)>,
 }
 
 async fn lookup(k: &Kernel, token: &str) -> Result<Row> {
@@ -241,9 +247,9 @@ async fn lookup(k: &Kernel, token: &str) -> Result<Row> {
         return Err(invalid());
     }
     let row = mosaikit_db::query(
-        "select id, user_id, tenant_id, plugin_id, run_ref, commands, resources
-         from core.run_tickets
-         where token_hash = $1 and revoked_at is null and uses_left > 0 and expires_at > now()",
+        "select t.id, t.user_id, t.tenant_id, t.plugin_id, t.run_ref, t.commands, t.resources, t.schedule_id, s.name
+         from core.run_tickets t left join core.schedules s on s.id = t.schedule_id
+         where t.token_hash = $1 and t.revoked_at is null and t.uses_left > 0 and t.expires_at > now()",
     )
     .bind(sha256(token.as_bytes()))
     .fetch_optional(&k.db)
@@ -266,28 +272,43 @@ async fn lookup(k: &Kernel, token: &str) -> Result<Row> {
         resources: resources
             .filter(|v| !v.is_null())
             .map(|v| strings(&v).iter().filter_map(|s| s.parse().ok()).collect()),
+        schedule: row.get::<Option<Uuid>, _>(7).zip(row.get::<Option<String>, _>(8)),
     })
 }
 
 /// The person of the ticket as a caller of their tenant, with what the database knows now: an account
 /// that is suspended, removed from the tenant or in a tenant that is off no longer gets a call.
 async fn caller_of(k: &Kernel, t: &Row) -> Result<Caller> {
+    let mut c = caller_for(k, t.user, t.tenant).await?;
+    c.run = Some(RunCall {
+        ticket: t.id,
+        run_ref: t.run_ref.clone(),
+        resources: t.resources.clone(),
+        scheduled_by: t.schedule.as_ref().map(|(id, _)| *id),
+        schedule_name: t.schedule.as_ref().map(|(_, n)| n.clone()),
+    });
+    Ok(c)
+}
+
+/// A person as a caller of one of their tenants, with what the database knows now (no Administrator's
+/// powers): `run_ticket_invalid` when the account or the tenant is suspended or the membership is gone.
+pub(crate) async fn caller_for(k: &Kernel, user_id: Uuid, tenant: Uuid) -> Result<Caller> {
     let user = mosaikit_db::query(
         "select u.username, u.display_name, u.home_tenant_id, h.slug
          from core.users u join core.tenants h on h.id = u.home_tenant_id
          where u.id = $1 and u.status = 'active' and h.status = 'active'",
     )
-    .bind(t.user)
+    .bind(user_id)
     .fetch_optional(&k.db)
     .await?
     .ok_or_else(invalid)?;
     let slug: String = mosaikit_db::query_scalar("select slug from core.tenants where id = $1")
-        .bind(t.tenant)
+        .bind(tenant)
         .fetch_optional(&k.db)
         .await?
         .ok_or_else(invalid)?;
     let session = SessionUser {
-        user_id: t.user,
+        user_id,
         username: user.get(0),
         display_name: user.get(1),
         home_tenant_id: user.get(2),
@@ -297,9 +318,7 @@ async fn caller_of(k: &Kernel, t: &Row) -> Result<Caller> {
         csrf: String::new(),
         token_hash: Vec::new(),
     };
-    let mut c = crate::tenancy::caller(k, &session, &slug).await.map_err(|_| invalid())?;
-    c.run = Some(RunCall { ticket: t.id, run_ref: t.run_ref.clone(), resources: t.resources.clone() });
-    Ok(c)
+    crate::tenancy::caller(k, &session, &slug).await.map_err(|_| invalid())
 }
 
 /// Calls `command` of `plugin` on behalf of the ticket `token` (`POST /api/run/{token}/call/...`).

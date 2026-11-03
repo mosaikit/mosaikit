@@ -42,6 +42,7 @@ notify.workspace = true
 ed25519-dalek.workspace = true
 tempfile.workspace = true
 png.workspace = true
+chrono-tz = { version = "0.10", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 wat = "1"

@@ -1,4 +1,5 @@
-# Manifest reference
+| `target` | required: the address of the service endpoint, `https://svc:8080/schedules/run`; its origin must be in `permissions.network`; no credentials in the address. The kernel `POST`s the run here; the result is read from the same address with a final `/run` replaced by `/runs/{id}` (`/schedules/runs/{id}`), or `/runs/{id}` added to it |
+| `service_key` | optional: the `id` of a `[[service_keys]]` entry; its shared key (the tenant's, else the platform's) is sent to the target as `Authorization: Bearer` |# Manifest reference
 
 `plugin.toml` at the root of the plugin. It is read with **unknown keys refused** in every table: a misspelt key is an
 error, and a kernel that does not know a key rejects the manifest. Source of truth: `crates/mskp/src/manifest.rs`;
@@ -231,8 +232,9 @@ commands» (off by default) before they work. Needs `[requires] mosaikit = ">=1.
 
 Jobs a person may put on a timetable (a cron expression) and have run later, as that person, by an outside service. At most 8.
 **Sensitive**: `validate` lists it among the permissions the Administrator reviews (the install screen shows it with the shell step of the feature). Needs
-`[requires] mosaikit = ">=1.0"`; `validate` warns when the range is missing, `--strict` fails. Today the kernel keeps the registry
-(create, list, pause, resume, delete); the part that fires the jobs comes in a later release. See architecture §8.17.
+`[requires] mosaikit = ">=1.0"`; `validate` warns when the range is missing, `--strict` fails. The kernel keeps the registry (create, list, pause, resume, delete, take over, run now) and a worker fires the jobs when they are
+due: it checks the rights of the author again, mints a run ticket for the one command, and pushes the run to the `target`. See
+architecture §8.17.
 
 | Key | Rule |
 |---|---|
@@ -245,7 +247,21 @@ Jobs a person may put on a timetable (a cron expression) and have run later, as 
 | `max_per_tenant` | optional, default 10, at most 50: schedules of this name in a tenant |
 | `resources_required` | optional, default `false`: a schedule must name the resources it is limited to |
 
-The cron expression has five fields in UTC (`minute hour day-of-month month day-of-week`): `*`, numbers, ranges, lists and steps, no names.
+The cron expression has five fields (`minute hour day-of-month month day-of-week`): `*`, numbers, ranges, lists and steps, no names.
+It is read in the time zone of the schedule (one IANA name, e.g. `Europe/Rome`, chosen when the person registers it; UTC when none is
+given). When the clocks go forward, a wall time that does not exist runs once, just after the gap; when they go back, a wall time
+that happens twice runs once, the first time.
+
+**The push.** The body is JSON: `tenant`, `user` (the author), `schedule`, `schedule_name`, `run`, `run_ref`, `plugin`, `command`, `args`,
+`ticket`, `ticket_path` (`/api/run/<ticket>`) and `expires_at`. The service answers `2xx` at once (`202`) with `{ "run_id": "..." }` and
+works in the background, calling the plugin with the ticket (`POST /api/run/<ticket>/call/...`) and ending with `DELETE /api/run/<ticket>`.
+The kernel asks `GET .../runs/{id}` every 30 seconds for `{ "status": "running" or "succeeded" or "failed", "error"? }` (a `404` is a
+failure). Without a `run_id` the run ends when the service ends the ticket. A run that is not over after `max_runtime_minutes` is `timed_out`
+and its ticket is revoked. The ticket carries the one `command` of the entry and nothing else; the logic sees `ctx.on_behalf().schedule`.
+
+A failed push, a failed run or a timeout counts as a failure: the next run is brought forward to a retry (5 minutes, doubling, at most 60)
+when that is sooner than the timetable, and after 5 failures in a row the schedule is paused. A run that is missed because the kernel was
+down is skipped, unless the schedule was registered with `catch_up_once`: then it runs once.
 
 ## `[search]`
 

@@ -187,7 +187,8 @@ every call). Needs `[requires] mosaikit = ">=1.0"`.
 - The command runs **as the person who started the run**, with their rights **at the time of the call** (a person who was
   suspended, removed, or whose share was taken back no longer gets through). `ctx.user` is that person.
 - `ctx.on_behalf()` is `Some` (with `run_ref`, the service's name for the run) in such a call and `None` in a normal one. The
-  arguments cannot set it. Use it to be stricter, never looser. Test with `MockHost::new().on_behalf("run-1")`.
+  arguments cannot set it. Use it to be stricter, never looser. Test with `MockHost::new().on_behalf("run-1")`. When a schedule (`[[schedules]]`) started the run,
+  `on_behalf().schedule` is the name of its declaration (and `schedule_id` its id); test with `MockHost::new().scheduled("nightly", "run-1")`.
 - A ticket may be limited to a list of resources: then the **database** shows the command only those resources and what is
   inside them, whatever SQL or arguments you use, and a root item cannot be created. A ticket without that list has the person's
   whole reach for the declared commands, until it expires, is spent or is revoked.

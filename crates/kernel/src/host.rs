@@ -548,6 +548,10 @@ pub(crate) fn ctx_json(c: &crate::Caller, plugin: &str) -> Value {
     // a call on behalf of a run ticket: the command can tell (and must not trust its arguments for this)
     if let Some(r) = &c.run {
         v["on_behalf"] = json!({ "run_ref": r.run_ref });
+        if let (Some(id), Some(name)) = (r.scheduled_by, &r.schedule_name) {
+            v["on_behalf"]["schedule"] = json!(name);
+            v["on_behalf"]["schedule_id"] = json!(id.to_string());
+        }
     }
     v
 }
