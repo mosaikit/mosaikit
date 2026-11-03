@@ -231,6 +231,26 @@ più vecchio rifiuta la chiave); `validate` avvisa se l'intervallo manca, con `-
 | `description` | obbligatoria: cosa può farci un visitatore, mostrata all'Administrator |
 | `max_arg_bytes` | facoltativa, da 1 a 16384 (predefinito e massimo) |
 
+## `[[schedules]]`
+
+Lavori che una persona può mettere in calendario (un'espressione cron) per farli eseguire più tardi, a suo nome, da un servizio
+esterno. Al massimo 8. **Sensibile**: `validate` lo elenca fra i permessi che l'Administrator rivede (la schermata di installazione lo mostra col passo della shell della funzione). Richiede `[requires] mosaikit = ">=1.0"`; `validate` avvisa se l'intervallo manca, con `--strict` fallisce.
+Oggi il kernel tiene l'elenco (crea, elenca, sospendi, riprendi, elimina); la parte che avvia i lavori arriva in una versione
+successiva. Vedi architettura §8.17.
+
+| Chiave | Regola |
+|---|---|
+| `name` | identificatore, unico nel plugin; è ciò che la UI invia quando registra una pianificazione |
+| `command` | obbligatorio: un comando di `permissions.run_commands` |
+| `target` | obbligatorio: l'indirizzo dell'endpoint del servizio, `https://svc:8080/run`; la sua origine deve stare in `permissions.network`; niente credenziali nell'indirizzo |
+| `service_key` | facoltativa: l'`id` di una voce di `[[service_keys]]`, inviata al target come chiave bearer |
+| `min_interval_minutes` | facoltativa, predefinita 15: i minuti minimi fra due esecuzioni; il minimo del kernel è 5 e prevale |
+| `max_runtime_minutes` | facoltativa, predefinita 15, al massimo 60 |
+| `max_per_tenant` | facoltativa, predefinita 10, al massimo 50: pianificazioni con questo nome in un'organizzazione |
+| `resources_required` | facoltativa, predefinita `false`: una pianificazione deve indicare le risorse a cui è limitata |
+
+L'espressione cron ha cinque campi in UTC (`minuto ora giorno-del-mese mese giorno-della-settimana`): `*`, numeri, intervalli, elenchi e passi, niente nomi.
+
 ## `[search]`
 
 `command = "<nome>"`: un comando della logica (un identificatore semplice, senza punti) che aggiunge risultati alla ricerca

@@ -17,8 +17,10 @@ pub use manifest::{
     is_media_name, is_plugin_id, is_service_id, schema_name, ConfigDecl, ConfigKind, Contribution,
     ExtActionDecl, ExtFieldDecl, ExtTabDecl, Extends, ExtensionDecl, ExtensionTranslation, FieldDecl,
     FieldKind, Incompatible, KeyScope, KpiDecl, KpiTranslation, Manifest, NavDecl, PermissionTranslation,
-    Permissions, PluginKind, PublicCommandDecl, Requires, ResourceDecl, ResourceTranslation, ServiceKeyDecl,
-    Translation, UiDecl, UserPermission, ABI_VERSION, API_VERSION, MAX_PUBLIC_ARG_BYTES, MAX_RUN_COMMANDS,
+    Permissions, PluginKind, PublicCommandDecl, Requires, ResourceDecl, ResourceTranslation, ScheduleDecl,
+    ServiceKeyDecl, Translation, UiDecl, UserPermission, ABI_VERSION, API_VERSION,
+    DEFAULT_SCHEDULES_PER_TENANT, MAX_PUBLIC_ARG_BYTES, MAX_RUN_COMMANDS, MAX_SCHEDULES,
+    MAX_SCHEDULES_PER_TENANT, MAX_SCHEDULE_RUNTIME_MINUTES, MIN_SCHEDULE_INTERVAL_MINUTES,
     STANDARD_PERMISSIONS,
 };
 pub use package::{

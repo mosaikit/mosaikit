@@ -114,9 +114,10 @@ fn manifest_checks(m: &Manifest, strict: bool, r: &mut Report) {
     let newer = m.config.iter().any(|c| c.public)
         || !m.public_commands.is_empty()
         || !m.permissions.run_commands.is_empty()
+        || !m.schedules.is_empty()
         || m.permissions.directory;
     if newer && m.requires.mosaikit.is_none() {
-        let msg = "`public` settings, [[public_commands]], permissions.run_commands and permissions.directory need a Mosaikit that knows them: set [requires] mosaikit = \">=1.0\" (an older one refuses the manifest)";
+        let msg = "`public` settings, [[public_commands]], permissions.run_commands, [[schedules]] and permissions.directory need a Mosaikit that knows them: set [requires] mosaikit = \">=1.0\" (an older one refuses the manifest)";
         if strict {
             r.error(msg);
         } else {
@@ -165,6 +166,9 @@ fn manifest_checks(m: &Manifest, strict: bool, r: &mut Report) {
     }
     if !p.run_commands.is_empty() {
         sensitive.push("run_commands");
+    }
+    if !m.schedules.is_empty() {
+        sensitive.push("schedules");
     }
     if p.directory {
         sensitive.push("directory");
@@ -412,6 +416,46 @@ run_commands = [\"node_run\"]
         let r = validate(d.path()).unwrap();
         assert!(r.ok() && r.warnings() == 0, "{:?}", r.findings);
         assert!(r.findings.iter().any(|f| f.message.contains("run_commands")));
+    }
+
+    #[test]
+    fn schedules_need_a_mosaikit_that_knows_them() {
+        let d = tempfile::tempdir().unwrap();
+        let base = "id = \"com.test.demo\"
+name = \"Demo\"
+version = \"0.1.0\"
+[requires]
+api = 1
+[permissions]
+run_commands = [\"node_run\"]
+network = [\"https://svc:8080\"]
+[[schedules]]
+name = \"nightly\"
+command = \"node_run\"
+target = \"https://svc:8080/run\"
+";
+        plugin(d.path(), base, None);
+        let r = validate(d.path()).unwrap();
+        assert!(r.ok(), "{:?}", r.findings);
+        assert!(r
+            .findings
+            .iter()
+            .any(|f| f.message.contains("[[schedules]]") && f.message.contains("[requires]")));
+        let strict = validate_with(d.path(), Options { strict: true }).unwrap();
+        assert!(!strict.ok(), "{:?}", strict.findings);
+        // with a range the lint is quiet and the review note names the key
+        plugin(
+            d.path(),
+            &base.replace(
+                "api = 1",
+                "api = 1
+mosaikit = \">=1.0\"",
+            ),
+            None,
+        );
+        let r = validate_with(d.path(), Options { strict: true }).unwrap();
+        assert!(r.findings.iter().any(|f| f.message.contains("schedules")), "{:?}", r.findings);
+        assert!(!r.findings.iter().any(|f| f.message.contains("[requires]")), "{:?}", r.findings);
     }
 
     #[test]

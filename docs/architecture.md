@@ -1690,6 +1690,64 @@ at least 4.5:1). The switch is one `role="switch"` button (`aria-checked` = edit
 number of comments in its name. Everything is reachable and operable with the keyboard. Below 640 px the avatars are hidden (switch
 and button stay), and below 900 px the bar is the flexible one of the phone.
 
+### 8.17 Schedules: recurring jobs run on behalf of their author
+
+A person can put a job of a plugin on a timetable ("every night at 03:00") and have it run later, as that person, by an outside service
+of a distribution. A schedule is the recurring cousin of a run ticket (§8.14): the same idea (the rights are the person's, recomputed
+when the job runs, never stored) with the timetable kept by the kernel. It is an additive key of API 1 (§8.11): a plugin that uses
+`[[schedules]]` declares `[requires] mosaikit = ">=1.0"`; `mosaikit-plugin validate` warns, an error with `--strict`, when the range is
+missing, and lists `schedules` among the permissions the Administrator reviews (the install screen of the shell shows it in the step that adds the UI).
+
+**What this version contains (registry only).** The manifest, the table, the REST routes with their rules and limits, the audit, and the
+hooks that pause the schedules of a person who leaves. **Nothing runs a job yet**: there is no worker, no run ticket is minted from a
+schedule and nothing is sent to a service. `next_run_at` is computed and stored; the worker that fires it (it recomputes the rights of
+the author, mints the ticket, tells the service, backs off after failures) is the next step, and so is the screen of the shell. The
+columns that worker needs (`claimed_until`, `last_run_at`, `last_status`, `consecutive_failures`) already exist in the table. Editing a
+schedule (`PATCH`) and "run now" are not part of this version either.
+
+**Manifest.** `[[schedules]]`, at most 8 per plugin, each one: `name` (identifier, unique), `command` (must be in
+`permissions.run_commands`), `target` (the endpoint of the service; its origin must be in `permissions.network`, no credentials in the
+address), optional `service_key` (an `id` of `[[service_keys]]`), `min_interval_minutes` (default 15; the floor of the kernel is 5 and
+wins), `max_runtime_minutes` (default 15, at most 60), `max_per_tenant` (default 10, at most 50) and `resources_required`. All of this is
+checked when the manifest is parsed, so the kernel and `validate` agree.
+
+**Data.** `core.schedules` (migration `0022`, SQLite `0020`): tenant, author, plugin, name, label, cron, `args`, optional `resources`,
+`status` (`active` or `paused`) with a `paused_reason` (`author`, `manager`, `author_inactive`, `failures`, `plugin_off`,
+`command_removed`) and the columns of the worker. A core table with no RLS, like `run_tickets`: every query filters by `tenant_id`, and a
+test proves that a schedule of one tenant does not exist for another. Rows go with the person, the tenant or the plugin (`on delete
+cascade`).
+
+**Cron.** Five fields (`minute hour day-of-month month day-of-week`), **UTC only**, parsed in `crates/kernel/src/cron.rs` with no
+dependency: `*`, numbers, ranges, lists and steps; no names, no `L`/`W`/`#`, no seconds. When both day fields are restricted a day
+matches if either does (as classic cron). A registration is refused when the expression never fires or when any of the gaps between the
+next ten fire times is shorter than the interval floor of the entry.
+
+**REST** (`crates/server/src/schedule_api.rs`, session and CSRF as any `/api/t/{t}` route):
+
+- `POST /api/t/{t}/schedules` with `{ plugin, name, cron, args?, resources?, label? }` gives `{ id, next_run_at }`;
+- `GET /api/t/{t}/schedules?plugin=` lists: the author's own, or all of the tenant for a Tenant Manager (who does not receive `args` or
+  `resources`);
+- `POST .../{id}/pause`, `POST .../{id}/resume`, `DELETE .../{id}`.
+
+**Who may do what.** The author creates, lists, pauses, resumes and deletes their own. A Tenant Manager lists, pauses and deletes any in
+the tenant and resumes what a manager or the system paused; a manager never creates a schedule for someone else (the author is always
+the caller) and never edits one. Anybody else, and any id of another tenant, gets 404. A run ticket cannot register or manage schedules.
+Resuming by the author checks again that the plugin is on, that they may use it and that the plugin still declares the schedule; a
+manager cannot resume what the author paused or what was paused because the author was removed or suspended: the rights of the author
+must exist again and the author says so.
+
+**Limits.** An entry's `max_per_tenant` per tenant and name; 50 schedules per person per tenant (the check is part of the insert); a
+floor of 5 minutes between runs; `args` at most 64 KiB and a JSON object; at most 64 resources, each one visible to the author now and
+belonging to the plugin; 10 registrations per person per minute; the plugin must be on for the tenant. Refusals carry a `code`
+(`schedule_not_declared`, `bad_cron`, `interval_too_short`, `bad_args`, `args_too_large`, `bad_resources`, `resources_required`,
+`too_many_schedules`, `too_many_schedules_of_kind`, `schedule_rate_limited`, `author_must_resume`).
+
+**Leaving people.** `remove_member` and `set_member_suspended` pause the active schedules of the person in the tenant (all of them when
+removing disables the account) in the same transaction, with `paused_reason = author_inactive`. Reactivating the person resumes nothing.
+
+**Audit** (`events::record`, never the arguments): `schedule.create`, `schedule.pause`, `schedule.resume`, `schedule.delete`, each with the
+schedule, its name and the actor.
+
 ## 9. Web security: origins, cookies, CSP
 
 | Origin | Listener | Content |

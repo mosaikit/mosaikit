@@ -2461,6 +2461,123 @@ async fn public_settings_and_commands_over_http() {
 }
 
 #[tokio::test]
+async fn schedules_over_http() {
+    const ID: &str = "com.test.runecho";
+    let a = App::new().await;
+    let toml = format!(
+        "id = \"{ID}\"
+name = \"Echo\"
+version = \"1.0.0\"
+[contribution]
+icon = \"x\"
+label = \"Echo\"
+         [requires]
+mosaikit = \">=1.0\"
+         [[resources]]
+name = \"items\"
+fields = [{{ key = \"title\", kind = \"text\" }}]
+         [permissions]
+run_commands = [\"step\"]
+network = [\"https://svc:8080\"]
+         [[schedules]]
+name = \"nightly\"
+command = \"step\"
+target = \"https://svc:8080/run\"
+"
+    );
+    let mut files = std::collections::BTreeMap::new();
+    files.insert("plugin.toml".to_string(), toml.into_bytes());
+    files.insert("logic.wasm".to_string(), echo_wasm());
+    let pkg = mosaikit_mskp::pack(&files, Some(&mosaikit_kernel::testing::test_key())).unwrap();
+    a.t.install_package(&pkg).await.unwrap();
+    let alfa = a.t.tenant("alfa").await;
+    a.t.member(&alfa, "anna").await;
+    a.t.member(&alfa, "bruno").await;
+    let beta = a.t.tenant("beta").await;
+    a.t.member(&beta, "carl").await;
+    let g = a.login("alfa", "alfa-manager", PASSWORD).await;
+    let anna = a.login("alfa", "anna", PASSWORD).await;
+    let bruno = a.login("alfa", "bruno", PASSWORD).await;
+    let carl = a.login("beta", "carl", PASSWORD).await;
+    let beta_mgr = a.login("beta", "beta-manager", PASSWORD).await;
+    let body =
+        json!({ "plugin": ID, "name": "nightly", "cron": "0 3 * * *", "args": { "k": 1 }, "label": "Night" });
+
+    // a session and its CSRF header are required
+    let r = a.call(None, Method::POST, "/api/t/alfa/schedules", Some(body.clone())).await;
+    assert_eq!(r.status, StatusCode::UNAUTHORIZED);
+    assert_eq!(
+        a.call(None, Method::GET, "/api/t/alfa/schedules", None).await.status,
+        StatusCode::UNAUTHORIZED
+    );
+    // somebody who is not a member of the tenant is refused
+    let r = a.call(Some(&carl), Method::POST, "/api/t/alfa/schedules", Some(body.clone())).await;
+    assert!(r.status == StatusCode::FORBIDDEN || r.status == StatusCode::NOT_FOUND, "{:?}", r.status);
+    assert_eq!(a.call(Some(&carl), Method::GET, "/api/t/alfa/schedules", None).await.status, r.status);
+
+    let r = a.call(Some(&anna), Method::POST, "/api/t/alfa/schedules", Some(body.clone())).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let id = r.json()["id"].as_str().unwrap().to_string();
+    assert!(r.json()["next_run_at"].is_string());
+
+    // refusals carry a code
+    for (patch, code) in [
+        (json!({ "name": "other" }), "schedule_not_declared"),
+        (json!({ "cron": "* * * * *" }), "interval_too_short"),
+        (json!({ "cron": "0 0 3 * * *" }), "bad_cron"),
+        (json!({ "args": [1] }), "bad_args"),
+    ] {
+        let mut b = body.clone();
+        for (k, v) in patch.as_object().unwrap() {
+            b[k] = v.clone();
+        }
+        let r = a.call(Some(&anna), Method::POST, "/api/t/alfa/schedules", Some(b)).await;
+        assert_eq!((r.status, r.json()["code"].as_str()), (StatusCode::BAD_REQUEST, Some(code)), "{code}");
+    }
+
+    // list: the author sees their own, with the arguments; another member nothing; the manager all, without them
+    let own = a.call(Some(&anna), Method::GET, "/api/t/alfa/schedules?plugin=com.test.runecho", None).await;
+    assert_eq!((own.json().as_array().unwrap().len(), own.json()[0]["args"]["k"].clone()), (1, json!(1)));
+    let other = a.call(Some(&bruno), Method::GET, "/api/t/alfa/schedules", None).await;
+    assert!(other.json().as_array().unwrap().is_empty());
+    let all = a.call(Some(&g), Method::GET, "/api/t/alfa/schedules", None).await;
+    assert_eq!(all.json().as_array().unwrap().len(), 1);
+    assert!(all.json()[0].get("args").is_none(), "{}", all.text());
+    for who in [&carl, &beta_mgr] {
+        let r = a.call(Some(who), Method::GET, "/api/t/beta/schedules", None).await;
+        assert!(r.json().as_array().unwrap().is_empty());
+    }
+
+    // another member of the tenant and the other tenant: the schedule does not exist for them
+    for (s, tenant) in [(&bruno, "alfa"), (&carl, "beta"), (&beta_mgr, "beta")] {
+        for (m, tail) in [(Method::POST, "/pause"), (Method::POST, "/resume"), (Method::DELETE, "")] {
+            let r = a.call(Some(s), m, &format!("/api/t/{tenant}/schedules/{id}{tail}"), None).await;
+            assert_eq!(r.status, StatusCode::NOT_FOUND, "{tenant}{tail}");
+        }
+    }
+    // the bad id is a 400, not a 500
+    let r = a.call(Some(&anna), Method::POST, "/api/t/alfa/schedules/nope/pause", None).await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST);
+
+    // the author pauses; the manager cannot resume that; the author can
+    let r = a.call(Some(&anna), Method::POST, &format!("/api/t/alfa/schedules/{id}/pause"), None).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let r = a.call(Some(&g), Method::POST, &format!("/api/t/alfa/schedules/{id}/resume"), None).await;
+    assert_eq!((r.status, r.json()["code"].as_str()), (StatusCode::FORBIDDEN, Some("author_must_resume")));
+    let r = a.call(Some(&anna), Method::POST, &format!("/api/t/alfa/schedules/{id}/resume"), None).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    // the manager pauses and deletes
+    let r = a.call(Some(&g), Method::POST, &format!("/api/t/alfa/schedules/{id}/pause"), None).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let own = a.call(Some(&anna), Method::GET, "/api/t/alfa/schedules", None).await;
+    assert_eq!(own.json()[0]["paused_reason"], "manager");
+    let r = a.call(Some(&g), Method::DELETE, &format!("/api/t/alfa/schedules/{id}"), None).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let own = a.call(Some(&anna), Method::GET, "/api/t/alfa/schedules", None).await;
+    assert!(own.json().as_array().unwrap().is_empty());
+}
+
+#[tokio::test]
 async fn run_tickets_over_http() {
     const ID: &str = "com.test.runecho";
     let a = App::new().await;

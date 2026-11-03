@@ -58,6 +58,7 @@ const MIGRATIONS: &[(i64, &str, &str)] = &[
     (17, "qa_followups", include_str!("0017_qa_followups.sql")),
     (18, "email_required", include_str!("0018_email_required.sql")),
     (19, "run_tickets", include_str!("0019_run_tickets.sql")),
+    (20, "schedules", include_str!("0020_schedules.sql")),
 ];
 
 /// Context of the transaction on the connection (read by `core_ctx_*()`).
