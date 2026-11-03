@@ -16,7 +16,7 @@ const ALLOWED = /^(automatic message, do not reply.|mosaikit|plugins?|tenant|adm
 // Data, not UI: the names of the tenants the other specs (and this one) made, wherever they show up, and keys
 // (long base64 strings, different on every run) whose random letters can spell an English word, and the initials of a tenant badge (TO) and the KPI labels the Notes manifest declares (plugin data,
 // not translated by the language plugin).
-const DATA = /(City|Town) of [A-Z][a-z]+|Ciudad ES|Notes by tag|bTOb|[A-Za-z0-9+/_-]{20,}={0,2}/g
+const DATA = /(City|Town) of [A-Z][a-z]+|Ciudad ES|Notes by tag|\bTO\b|[A-Za-z0-9+/_-]{20,}={0,2}/g
 
 async function lines(page: Page): Promise<string[]> {
   return page.evaluate(() => {
