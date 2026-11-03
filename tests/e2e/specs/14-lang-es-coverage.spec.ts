@@ -1,12 +1,14 @@
 import fs from 'node:fs'
+import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { expect, test, type Page } from '@playwright/test'
-import { adminLogin, createTenant, fresh, nav, PASSWORD } from './support.ts'
+import { adminLogin, createTenant, fresh, nav, PASSWORD, STATE_DIR } from './support.ts'
 
 // Spanish coverage (docs/manual-tests.md, LANG-01): the whole shell in Spanish, no English left on the main pages.
 // The texts inside plugin iframes are not covered by the language plugin (known limit) and are not scanned.
 
 const SLUG = 'es-cov'
-const OUT = new URL('../test-results/lang-es/', import.meta.url)
+const OUT = pathToFileURL(path.join(STATE_DIR, 'lang-es') + path.sep)
 
 // Words that only an English sentence has; a Spanish text never contains them as a whole word.
 const ENGLISH = /(?<!\p{L})(the|and|your|you|with|from|for|are|this|that|will|have|not|new|add|save|cancel|of|to|is|by|on)(?!\p{L})/iu

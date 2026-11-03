@@ -30,7 +30,9 @@ export function totp(secret: string, step = Math.floor(Date.now() / 30000)): str
 
 // The second factor of the administrator is registered once per run (global-setup.ts empties this file);
 // it is kept on disk so that it survives the restart of the worker after a failed test.
-export const ADMIN_STATE = path.join(import.meta.dirname, '..', 'test-results', 'admin-state.json')
+// the files the specs leave for each other; one folder per shard when the suite runs in parallel (E2E_STATE_DIR)
+export const STATE_DIR = process.env.E2E_STATE_DIR ?? path.join(import.meta.dirname, '..', 'test-results')
+export const ADMIN_STATE = path.join(STATE_DIR, 'admin-state.json')
 function loadAdmin(): { secret: string; step: number } {
   try {
     return JSON.parse(fs.readFileSync(ADMIN_STATE, 'utf8'))

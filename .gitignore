@@ -16,6 +16,7 @@ initial-admin-password.txt
 tests/results/raw/
 tests/e2e/test-results/
 tests/e2e/test-results-wildcard/
+tests/e2e/test-results-*/
 tests/e2e/playwright-report/
 
 # chiavi di firma

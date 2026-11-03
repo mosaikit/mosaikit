@@ -1,0 +1,11 @@
+{
+  "_": "Groups of specs that run in parallel (CI jobs, `cargo xtask e2e --shard <name>` / `--shards`), each on its own installation. The `setup` spec (it creates the admin and the first tenants) runs first in every group. `smoke` is what the merge queue runs; the full suite runs on main. A spec whose data another spec makes (07, 08, 10, 12 and 14-layout-apply use the tenant `Alfa Municipality` that 05 makes, 05 only works after 02, 03 and 04, and 07 to 14 use the people of 06: those five open groups b and c) lists that spec before itself in its group. Keep the groups of similar length and every spec in at least one of a, b, c, d.",
+  "setup": "01-admin-and-manager.spec.ts",
+  "shards": {
+    "a": ["02-member-sharing.spec.ts", "03-notifications.spec.ts", "04-shell-appearance.spec.ts", "05-settings.spec.ts", "06-people-oidc.spec.ts"],
+    "b": ["02-member-sharing.spec.ts", "03-notifications.spec.ts", "04-shell-appearance.spec.ts", "05-settings.spec.ts", "06-people-oidc.spec.ts", "07-plugins.spec.ts", "08-shares-quotas.spec.ts", "09-lifecycle.spec.ts", "10-search-profile-qa.spec.ts", "11-layouts.spec.ts"],
+    "c": ["02-member-sharing.spec.ts", "03-notifications.spec.ts", "04-shell-appearance.spec.ts", "05-settings.spec.ts", "06-people-oidc.spec.ts", "12-review-round1-platform.spec.ts", "13-review1-auth-plugins.spec.ts", "14-feedback-c.spec.ts", "14-lang-es-coverage.spec.ts", "14-layout-apply.spec.ts"],
+    "d": ["15-layout-contract.spec.ts", "15-plugin-layouts.spec.ts", "16-tables.spec.ts", "17-documents-preview.spec.ts", "17-notes-postits.spec.ts", "18-developer-profile.spec.ts", "19-nav-groups.spec.ts"],
+    "smoke": ["02-member-sharing.spec.ts", "03-notifications.spec.ts", "04-shell-appearance.spec.ts", "19-nav-groups.spec.ts"]
+  }
+}

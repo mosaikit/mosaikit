@@ -17,6 +17,11 @@ use crate::dev::kill_tree;
 use crate::util::{exe, npm, output, pg_bin, root, run, which};
 use crate::{plugins, report};
 
+/// Set once the first installation of a parallel run has built the plugins and the server.
+static BUILT: std::sync::Mutex<bool> = std::sync::Mutex::new(false);
+/// A parallel run (`--shards`): the installations after the first reuse its build.
+static SHARDED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
 pub(crate) const ADMIN_PASSWORD: &str = "e2e-admin-password";
 
 /// Administrative role of the tests: `MOSAIKIT_TEST_DATABASE_URL` (CI) or the development cluster.
@@ -142,14 +147,23 @@ impl Instance {
         std::fs::create_dir_all(&dir)?;
 
         let all = plugins::discover()?;
-        plugins::ensure_npm()?;
-        run(npm().current_dir(root()).args(["run", "build"]))?;
-        plugins::build_ui(&all)?;
-        plugins::build_wasm(&all, false)?;
+        // the shards of a parallel run start one after the other and build once
+        let mut built = BUILT.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        if !*built {
+            plugins::ensure_npm()?;
+            run(npm().current_dir(root()).args(["run", "build"]))?;
+            plugins::build_ui(&all)?;
+            plugins::build_wasm(&all, false)?;
+        }
         plugins::pack_all(&all, false, &dir.join("registry"))?;
         let trusted = std::fs::read_to_string(dir.join("registry").join("trusted_key.txt"))?;
         let url = admin_url().replace("/postgres", &format!("/{db}"));
-        run(Command::new("cargo").current_dir(root()).args(["build", "-p", "mosaikit-server"]))?;
+        if !*built {
+            run(Command::new("cargo").current_dir(root()).args(["build", "-p", "mosaikit-server"]))?;
+        }
+        // in a parallel run the next installations reuse this build
+        *built = SHARDED.load(std::sync::atomic::Ordering::Relaxed);
+        drop(built);
         // another checkout may take the ports between the check and the start of the server: then the
         // server (or the provider) exits at once and the next free ports are tried
         let mut taken = Vec::new();
@@ -270,8 +284,102 @@ fn wildcard_run(headed: bool, json: Option<&std::path::Path>) -> Result<bool> {
     Ok(ok)
 }
 
-pub fn e2e(headed: bool, wildcard: bool, only: &[String]) -> Result<()> {
+fn shards_file() -> Result<serde_json::Value> {
+    let file = root().join("tests").join("e2e").join("shards.json");
+    serde_json::from_str(&std::fs::read_to_string(&file)?)
+        .with_context(|| format!("{} is not valid JSON", file.display()))
+}
+
+fn shard_names(json: &serde_json::Value) -> Vec<String> {
+    json["shards"].as_object().map(|o| o.keys().cloned().collect()).unwrap_or_default()
+}
+
+/// The specs of a shard of `tests/e2e/shards.json`: the setup spec first, then the ones of the group.
+fn shard_specs(name: &str) -> Result<Vec<String>> {
+    let json = shards_file()?;
+    let list = json["shards"][name].as_array().with_context(|| {
+        format!("no shard `{name}` in tests/e2e/shards.json (have: {})", shard_names(&json).join(", "))
+    })?;
+    let mut out = Vec::new();
+    if let Some(setup) = json["setup"].as_str() {
+        out.push(format!("specs/{setup}"));
+    }
+    out.extend(list.iter().filter_map(|v| v.as_str()).map(|f| format!("specs/{f}")));
+    Ok(out)
+}
+
+/// One shard on an installation of its own (database `mosaikit_e2e_<name>`, results and state in
+/// `tests/e2e/test-results-<name>`): what a CI job runs. `start` serialises the start of the installations
+/// of a parallel run (build, ports). Returns whether the specs passed.
+fn shard_run(name: &str, headed: bool, start: &std::sync::Mutex<()>) -> Result<bool> {
+    let specs = shard_specs(name)?;
+    let mut inst = {
+        let _one = start.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
+        Instance::start(&format!("e2e_{}", name.replace('-', "_")))?
+    };
+    let results = format!("test-results-{name}");
+    let mut cmd = npm();
+    cmd.current_dir(root()).args(["run", "e2e", "-w", "tests/e2e"]);
+    inst.env(&mut cmd);
+    if headed {
+        cmd.env("E2E_HEADED", "1");
+    }
+    cmd.env("E2E_OUTPUT_DIR", &results);
+    cmd.env("E2E_STATE_DIR", root().join("tests").join("e2e").join(format!("{results}-state")));
+    cmd.arg("--").args(&specs);
+    eprintln!("== shard {name}: {}", specs.join(" "));
+    let ok = run(&mut cmd).is_ok();
+    inst.stop(!ok);
+    Ok(ok)
+}
+
+/// Every shard in parallel (at most `jobs` installations at once) and the wildcard scenario: the quick local
+/// check, the same split as CI. The report of the whole suite is not touched.
+fn shards_run(headed: bool, jobs: usize) -> Result<()> {
+    let names: Vec<String> = shard_names(&shards_file()?).into_iter().filter(|n| n != "smoke").collect();
+    SHARDED.store(true, std::sync::atomic::Ordering::Relaxed);
+    let workers = jobs.clamp(1, names.len().max(1));
+    let queue = std::sync::Mutex::new(names);
+    let failed = std::sync::Mutex::new(Vec::new());
+    let start = std::sync::Mutex::new(());
+    std::thread::scope(|s| {
+        for _ in 0..workers {
+            s.spawn(|| loop {
+                let next = queue.lock().unwrap_or_else(std::sync::PoisonError::into_inner).pop();
+                let Some(name) = next else { break };
+                if !shard_run(&name, headed, &start).unwrap_or(false) {
+                    failed.lock().unwrap_or_else(std::sync::PoisonError::into_inner).push(name);
+                }
+            });
+        }
+    });
+    SHARDED.store(false, std::sync::atomic::Ordering::Relaxed);
+    let wild = wildcard_run(headed, None)?;
+    let failed = failed.into_inner().unwrap_or_default();
+    if !failed.is_empty() || !wild {
+        bail!("end-to-end tests failed: shards {failed:?}{}", if wild { "" } else { " and wildcard" });
+    }
+    Ok(())
+}
+
+pub fn e2e(
+    headed: bool,
+    wildcard: bool,
+    shard: Option<&str>,
+    shards: bool,
+    jobs: usize,
+    only: &[String],
+) -> Result<()> {
     let _slot = crate::heavy::acquire("e2e", "xtask e2e")?;
+    if shards {
+        return shards_run(headed, jobs);
+    }
+    if let Some(name) = shard {
+        if !shard_run(name, headed, &std::sync::Mutex::new(()))? {
+            bail!("end-to-end tests (shard {name}) failed");
+        }
+        return Ok(());
+    }
     // `--wildcard` (or `MOSAIKIT_E2E_WILDCARD=1`): only the scenario with one origin per plugin, report untouched
     if wildcard || std::env::var("MOSAIKIT_E2E_WILDCARD").is_ok_and(|v| v == "1") {
         if !wildcard_run(headed, None)? {
@@ -318,7 +426,37 @@ pub fn e2e(headed: bool, wildcard: bool, only: &[String]) -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::db_with_suffix;
+    use super::{db_with_suffix, shard_names, shards_file};
+
+    /// A new spec must be put in a group of `tests/e2e/shards.json`, or CI never runs it (one that makes data for
+    /// the others may be in several).
+    #[test]
+    fn every_spec_is_in_a_group() {
+        let json = shards_file().unwrap();
+        let setup = json["setup"].as_str().unwrap().to_owned();
+        let mut seen = std::collections::HashMap::<String, usize>::new();
+        for name in shard_names(&json).into_iter().filter(|n| n != "smoke") {
+            for f in json["shards"][&name].as_array().unwrap() {
+                *seen.entry(f.as_str().unwrap().to_owned()).or_default() += 1;
+            }
+        }
+        let dir = crate::util::root().join("tests").join("e2e").join("specs");
+        let mut specs: Vec<String> = std::fs::read_dir(dir)
+            .unwrap()
+            .filter_map(|e| e.ok()?.file_name().into_string().ok())
+            .filter(|f| f.ends_with(".spec.ts") && f != "wildcard.spec.ts" && *f != setup)
+            .collect();
+        specs.sort();
+        for f in &specs {
+            assert!(seen.contains_key(f), "{f} must be in a group of tests/e2e/shards.json");
+        }
+        for f in seen.keys() {
+            assert!(specs.contains(f), "{f} of tests/e2e/shards.json does not exist");
+        }
+        for f in json["shards"]["smoke"].as_array().unwrap() {
+            assert!(seen.contains_key(f.as_str().unwrap()), "smoke spec {f} is in no group");
+        }
+    }
 
     #[test]
     fn database_names() {

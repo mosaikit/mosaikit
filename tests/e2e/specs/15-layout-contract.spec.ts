@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { expect, test, type Frame, type Page } from '@playwright/test'
-import { PASSWORD, adminLogin, login } from './support'
+import { PASSWORD, STATE_DIR, adminLogin, login } from './support'
 
 // The layout contract (docs/refactoring-ui.md, "Layout contract"): the UI rules that keep being found broken by hand,
 // checked on EVERY route of the app (derived from the navigation itself, so new pages are covered at once) for the
@@ -105,7 +105,7 @@ interface Rec {
 const recs: Rec[] = []
 const sidebar: { role: string; family: Family; route: string; idle: any; hover: any }[] = []
 // the measures live on disk: a failed rule test restarts the worker, and the next rules must still find them
-const FILE = path.join(import.meta.dirname, '..', 'test-results', 'layout-contract.json')
+const FILE = path.join(STATE_DIR, 'layout-contract.json')
 let loaded: { recs: Rec[]; sidebar: typeof sidebar } | null = null
 const load = () => (loaded ??= fs.existsSync(FILE) ? JSON.parse(fs.readFileSync(FILE, 'utf8')) : { recs: [], sidebar: [] })
 
