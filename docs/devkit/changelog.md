@@ -83,7 +83,7 @@ package, with the deprecation rule applied when a distribution relies on it. Exp
 - `[[config]] public`, `[[public_commands]]`, `msk.publicConfig`, `msk.publicCall` and `ctx.link_resource()` (public link pages)
 - `permissions.run_commands` and `ctx.on_behalf()` (calls on behalf of a run, with a run ticket)
 - `permissions.directory`, `ctx.directory()` and `msk.directory.search` (search the people and groups of the tenant)
-- `msk.band` (the contextual top band for a resource on the full page; no permission)
+- `msk.band` (the contextual top band for a resource on the full page; no permission); the field `back` (an arrow in the top bar that returns to the list)
 
 The `insights` example now uses `[search]` and `note-priority` the `set` actions of an extension; architecture §8.11 still lists them as experimental until the owner takes them off the list (a decision for a release, not for these documents).
 
