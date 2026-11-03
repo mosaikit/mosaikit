@@ -46,7 +46,7 @@ import { AppMark, BandActions, BandSearch, FlyoutMenu, SkipLink, TenantSwitcher 
 import { bandIcon, bandStyle, hasActive, useNav, type NavGroup, type NavItem } from './nav.tsx'
 import Frame from './frames.tsx'
 import { bandEmit, resetBand, useBand } from './contextband.ts'
-import { CommentsButton, ModeSwitch, Presence } from './ContextBand.tsx'
+import { BackButton, CommentsButton, ModeSwitch, Presence } from './ContextBand.tsx'
 
 export { AppMark, TenantBadge } from './slots.tsx'
 
@@ -281,6 +281,7 @@ function TopBar({ session, route, band, bandImage }: { session: Session; route: 
         <div className="max-[900px]:hidden">
           <TenantSwitcher session={session} route={route} />
         </div>
+        {ctxBand?.back && <BackButton back={ctxBand.back} onBack={() => bandEmit('band.back', {})} />}
       </div>
       {searchOn ? (
         <BandSearch session={session} route={route} nav={nav} />

@@ -18,11 +18,12 @@ describe('sanitizeBand', () => {
         { id: 'b', name: 'Bo', initials: 'xy' },
       ],
       comments: { open: true, count: 4 },
+      back: null,
     })
   })
 
   it('an empty state leaves everything as the shell draws it', () => {
-    expect(sanitizeBand({})).toEqual({ hideSearch: false, mode: null, presence: [], comments: null })
+    expect(sanitizeBand({})).toEqual({ hideSearch: false, mode: null, presence: [], comments: null, back: null })
     expect(sanitizeBand(undefined).hideSearch).toBe(false)
     // `search: true` never adds anything
     expect(sanitizeBand({ search: true }).hideSearch).toBe(false)
@@ -65,6 +66,18 @@ describe('sanitizeBand', () => {
   })
 })
 
+describe('the back button', () => {
+  it('keeps plain text, cut to 80 characters, and refuses a wrong or empty label', () => {
+    expect(sanitizeBand({ back: { label: '  <b>Sites</b>\n list ' } }).back).toEqual({ label: '<b>Sites</b> list' })
+    expect(sanitizeBand({ back: { label: 'x'.repeat(200) } }).back?.label).toHaveLength(80)
+    expect(sanitizeBand({}).back).toBeNull()
+    expect(sanitizeBand({ back: null }).back).toBeNull()
+    expect(() => sanitizeBand({ back: { label: 3 } })).toThrow('invalid band')
+    expect(() => sanitizeBand({ back: { label: '  ' } })).toThrow('invalid band')
+    expect(() => sanitizeBand({ back: 'x' })).toThrow('invalid band')
+  })
+})
+
 describe('the state of the band', () => {
   beforeEach(() => resetBand())
 
@@ -87,7 +100,7 @@ describe('the state of the band', () => {
     bandEmit('band.mode', { value: 'edit' })
     expect(emit).toHaveBeenCalledWith('band.mode', { value: 'edit' })
     resetBand()
-    bandEmit('band.comments', {})
+    bandEmit('band.back', {})
     expect(emit).toHaveBeenCalledOnce()
   })
 })

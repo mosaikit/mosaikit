@@ -114,7 +114,7 @@ tenant).
 
 **Contextual band (a resource on the full page).** While a plugin shows a resource on the full page (a map, a
 dashboard, a process) the band changes, in this order: no search bar; the tenant (with the selector when the person
-has more than one); a «View | Edit» switch when the person can edit, otherwise a «Read only» label; the people
+has more than one); an arrow-left «back» button when the plugin gives one (its label is the accessible name and tooltip); a «View | Edit» switch when the person can edit, otherwise a «Read only» label; the people
 connected to the resource (avatars with initials, the name in the tooltip, «+N» after three); the comments button
 (pressed while the panel is open, with a count badge); then, unchanged, language, mode, help, notifications and the
 person. The plugin declares it (`msk.band`, architecture §8.16); a plugin can never hide the tenant, the bell, the

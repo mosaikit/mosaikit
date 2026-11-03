@@ -1641,7 +1641,9 @@ back with `msk.band.reset()` (`band.reset`). While the state is set the band (th
 4. shows the people connected to the resource: avatars with their initials (the name in the tooltip and for screen readers), the
    first three and «+N» for the others;
 5. shows a button that opens and closes the comments of the resource;
-6. keeps, untouched, language, mode, help, notifications and the person (avatar, name and role).
+6. shows an arrow-left button on the left, right after the tenant, when the plugin gives `back` (its label is the accessible name
+   and the tooltip), for a page that has a way back such as the list of the plugin;
+7. keeps, untouched, language, mode, help, notifications and the person (avatar, name and role).
 
 ```
 msk.band.set({
@@ -1649,12 +1651,13 @@ msk.band.set({
   mode: { value: 'view' | 'edit', canEdit, onChange(v) },
   presence: [{ id, name, initials? }],
   comments: { open, count?, onToggle() },
+  back: { label, onClick() },
 })
 ```
 
 **Data and callbacks.** Functions cannot cross the iframe boundary: the UI package sends only the data (`mode.value`, `canEdit`,
-`presence`, `comments.open`, `count`) and keeps `onChange` and `onToggle`. When the person flips the switch or presses the button
-the shell posts an event to the iframe (`band.mode` `{ value }`, `band.comments` `{}`) and the package calls the callback. The
+`presence`, `comments.open`, `count`, `back.label`) and keeps `onChange`, `onToggle` and `onClick`. When the person flips the switch or presses the button
+the shell posts an event to the iframe (`band.mode` `{ value }`, `band.comments` `{}`, `band.back` `{}`) and the package calls the callback. The
 switch does not move by itself: the plugin follows with `band.set` and the new `value` (so the plugin stays the owner of the mode;
 a plugin that ignores the event leaves the switch where it was). The whole state is replaced at every `set`; what is left out
 returns to the default of the shell. **Presence is just data the plugin passes**: the kernel has no real-time service and does not

@@ -34,7 +34,7 @@ the origin of the host and is accepted only from it. A call that gets no answer 
 | `msk.isPublic`, `msk.publicResource`, `msk.publicGet()` | public-link viewer (`public_view`) |
 | `msk.publicConfig()` | the `[[config]]` settings marked `public = true` (never a secret), by key |
 | `msk.publicCall(name, args)` | runs a `[[public_commands]]` command, read only, on the shared item; errors `command_not_public`, `public_commands_off`, `public_rate_limited` |
-| `msk.band.set(state)`, `msk.band.reset()` | the contextual top band of the shell for a resource on the full page: `{ search?: false, mode?: { value: 'view'\|'edit', canEdit, onChange }, presence?: [{ id, name, initials? }], comments?: { open, count?, onToggle } }`. No permission. See [the contextual band](#the-contextual-band) |
+| `msk.band.set(state)`, `msk.band.reset()` | the contextual top band of the shell for a resource on the full page: `{ search?: false, mode?: { value: 'view'\|'edit', canEdit, onChange }, presence?: [{ id, name, initials? }], comments?: { open, count?, onToggle }, back?: { label, onClick } }`. No permission. See [the contextual band](#the-contextual-band) |
 | `msk.directory.search({ kind, q, limit? })` | the people (`{id, username, name}`) or groups (`{id, name}`) of the tenant, for a picker; needs `[permissions] directory = true`; only a Tenant Manager or a person who may share; errors `permission_denied`, `invalid_argument`, `rate_limited`; never in public links. See [security](security.md#directory-the-author-rule) |
 
 ### Operations
@@ -84,7 +84,7 @@ when the host could not, in English or Italian.
 
 `context` (language, theme, mode: use `msk.onContext`), `theme` (**deprecated**, the same variables as `context`, still sent
 in API 1, removed in API 2), `ext.changed` `{ extension, id }`, `ext.tab.height` `{ handle, height }` (handled by
-`mountTab`), `band.mode` `{ value }` and `band.comments` `{}` (the switch and the comments button of the contextual band; handled by
+`mountTab`), `band.mode` `{ value }`, `band.comments` `{}` and `band.back` `{}` (the switch, the comments and the back button of the contextual band; handled by
 `msk.band`).
 
 ### The contextual band
@@ -100,6 +100,7 @@ msk.band.set({
   mode: { value: 'view', canEdit: me.canEdit, onChange: (v) => { setMode(v); publish() } },
   presence: peers.map((p) => ({ id: p.id, name: p.name })), // initials are derived from the name
   comments: { open: panelOpen, count: comments.length, onToggle: () => { panelOpen = !panelOpen; publish() } },
+  back: { label: 'Back to the list', onClick: () => showList() },
 })
 // leaving the page (optional: the shell does it when the page closes or the route changes)
 msk.band.reset()
@@ -111,6 +112,8 @@ msk.band.reset()
 - Presence is data you pass: Mosaikit has no real-time service. Show only people who may see the resource.
 - The shell checks everything: names at most 80 characters, initials 3, 50 people (the rest is dropped), `count` an integer
   0 to 9999, plain text only (never HTML). A wrong type makes the call fail with `invalid band ...`.
+- `back` adds an arrow-left button on the left, right after the tenant; `label` (plain text, at most 80 characters, already
+  translated by you) is its accessible name and tooltip. Use it for a page that has a way back (for example the plugin's list).
 - You cannot hide the tenant, language, theme, help, notifications or the person menu, and no manifest permission is needed.
 - The comments button only calls `onToggle` and shows `open` and `count`; the panel itself is yours for now.
 - Declarative layouts (`layout.toml`) may ignore the band; hosts older than this feature answer «operation not available» (the

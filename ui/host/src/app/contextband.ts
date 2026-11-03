@@ -11,6 +11,7 @@ export const BAND_MAX_PEOPLE = 50
 export const BAND_MAX_NAME = 80
 export const BAND_MAX_INITIALS = 3
 export const BAND_MAX_COUNT = 9999
+export const BAND_MAX_BACK = 80
 const BAND_MAX_ID = 64
 
 export interface BandPersonView {
@@ -25,6 +26,8 @@ export interface BandView {
   mode: { value: 'view' | 'edit'; canEdit: boolean } | null
   presence: BandPersonView[]
   comments: { open: boolean; count: number | null } | null
+  /** an arrow-left button next to the tenant: the label is its accessible name and tooltip */
+  back: { label: string } | null
 }
 
 type Args = Record<string, unknown>
@@ -51,10 +54,10 @@ export function initialsOf(name: string): string {
 }
 
 /** Validates the arguments of `band.set`. A wrong type refuses the call; a text that is too long is cut; a list
- *  that is too long is cut to the first 50 people; a count above 9999 is shown as 9999. */
+ *  that is too long is cut to the first 50 people; an empty back label is refused; a count above 9999 is shown as 9999. */
 export function sanitizeBand(raw: unknown): BandView {
   const a = plain(raw ?? {})
-  const view: BandView = { hideSearch: false, mode: null, presence: [], comments: null }
+  const view: BandView = { hideSearch: false, mode: null, presence: [], comments: null, back: null }
   if (a.search !== undefined) {
     if (typeof a.search !== 'boolean') throw new OpError('invalid band search')
     view.hideSearch = a.search === false
@@ -87,6 +90,12 @@ export function sanitizeBand(raw: unknown): BandView {
       count = Math.min(c.count, BAND_MAX_COUNT)
     }
     view.comments = { open: c.open, count }
+  }
+  if (a.back !== undefined && a.back !== null) {
+    const b = plain(a.back)
+    const label = cleanText(b.label, BAND_MAX_BACK, 'back label')
+    if (!label) throw new OpError('invalid band back label')
+    view.back = { label }
   }
   return view
 }
@@ -123,7 +132,7 @@ export function currentBand(): BandView | null {
 }
 
 /** The plugin's callbacks: the shell tells it what the person did. */
-export function bandEmit(event: 'band.mode' | 'band.comments', data: unknown) {
+export function bandEmit(event: 'band.mode' | 'band.comments' | 'band.back', data: unknown) {
   state.emit?.(event, data)
 }
 
