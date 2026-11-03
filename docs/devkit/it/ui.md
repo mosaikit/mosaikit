@@ -34,7 +34,7 @@ dell'host ed è accettato solo da essa. Una chiamata che non riceve risposta in 
 | `msk.isPublic`, `msk.publicResource`, `msk.publicGet()` | visualizzatore dei link pubblici (`public_view`) |
 | `msk.publicConfig()` | le impostazioni `[[config]]` con `public = true` (mai un segreto), per chiave |
 | `msk.publicCall(name, args)` | esegue un comando di `[[public_commands]]`, in sola lettura, sull'elemento condiviso; errori `command_not_public`, `public_commands_off`, `public_rate_limited` |
-| `msk.band.set(state)`, `msk.band.reset()` | la barra superiore contestuale della shell per una risorsa a pagina intera: `{ search?: false, mode?: { value: 'view'\|'edit', canEdit, onChange }, presence?: [{ id, name, initials? }], comments?: { open, count?, onToggle } }`. Nessun permesso. Vedi [la barra contestuale](#la-barra-contestuale) |
+| `msk.band.set(state)`, `msk.band.reset()` | la barra superiore contestuale della shell per una risorsa a pagina intera: `{ search?: false, mode?: { value: 'view'\|'edit', canEdit, onChange }, presence?: [{ id, name, initials? }], comments?: { open, count?, onToggle }, back?: { label, onClick } }`. Nessun permesso. Vedi [la barra contestuale](#la-barra-contestuale) |
 | `msk.directory.search({ kind, q, limit? })` | le persone (`{id, username, name}`) o i gruppi (`{id, name}`) del tenant, per un selettore; richiede `[permissions] directory = true`; solo un Tenant Manager o chi può condividere; errori `permission_denied`, `invalid_argument`, `rate_limited`; mai nei link pubblici. Vedi [sicurezza](security.md#directory-la-regola-per-lautore) |
 
 ### Operazioni
@@ -84,7 +84,7 @@ non ha potuto, in inglese o italiano.
 
 `context` (lingua, tema, modo: usare `msk.onContext`), `theme` (**deprecato**, le stesse variabili di `context`, ancora
 inviato nell'API 1, rimosso nell'API 2), `ext.changed` `{ extension, id }`, `ext.tab.height` `{ handle, height }` (gestito
-da `mountTab`), `band.mode` `{ value }` e `band.comments` `{}` (l'interruttore e il pulsante dei commenti della barra contestuale; gestiti
+da `mountTab`), `band.mode` `{ value }`, `band.comments` `{}` e `band.back` `{}` (l'interruttore, il pulsante dei commenti e quello indietro della barra contestuale; gestiti
 da `msk.band`).
 
 ### La barra contestuale
@@ -100,6 +100,7 @@ msk.band.set({
   mode: { value: 'view', canEdit: me.canEdit, onChange: (v) => { setMode(v); publish() } },
   presence: peers.map((p) => ({ id: p.id, name: p.name })), // le iniziali si ricavano dal nome
   comments: { open: panelOpen, count: comments.length, onToggle: () => { panelOpen = !panelOpen; publish() } },
+  back: { label: 'Torna all'elenco', onClick: () => showList() },
 })
 // uscendo dalla pagina (facoltativo: la shell lo fa quando la pagina si chiude o la route cambia)
 msk.band.reset()
@@ -111,6 +112,8 @@ msk.band.reset()
 - La presenza è un dato che passi tu: Mosaikit non ha un servizio in tempo reale. Mostra solo persone che possono vedere la risorsa.
 - La shell controlla tutto: nomi al massimo 80 caratteri, iniziali 3, 50 persone (le altre si scartano), `count` un intero da
   0 a 9999, solo testo semplice (mai HTML). Un tipo sbagliato fa fallire la chiamata con `invalid band ...`.
+- `back` mette un pulsante con freccia a sinistra, subito dopo il tenant; `label` (testo semplice, al massimo 80 caratteri, già
+  tradotto da te) è il nome accessibile e il suggerimento. Serve a una pagina che ha un indietro (per esempio l'elenco del plugin).
 - Non puoi nascondere tenant, lingua, tema, aiuto, notifiche né il menu della persona, e non serve alcun permesso nel manifest.
 - Il pulsante dei commenti chiama solo `onToggle` e mostra `open` e `count`; per ora il pannello è tuo.
 - I layout dichiarativi (`layout.toml`) possono ignorare la barra; gli host precedenti rispondono «operation not available» (la

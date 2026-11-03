@@ -4,7 +4,7 @@
 // the band in every theme and in dark mode (contextband.test.ts computes it). Texts of the plugin are
 // always React text nodes.
 
-import { Lock, MessageSquare } from 'lucide-react'
+import { ArrowLeft, Lock, MessageSquare } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { t } from './i18n.ts'
 import type { BandView } from './contextband.ts'
@@ -90,6 +90,21 @@ export function CommentsButton({ comments, onToggle }: { comments: NonNullable<B
           {comments.count}
         </span>
       )}
+    </button>
+  )
+}
+
+/** The back button: an arrow-left icon, the label of the plugin as its accessible name and tooltip. */
+export function BackButton({ back, onBack }: { back: NonNullable<BandView['back']>; onBack: () => void }) {
+  return (
+    <button
+      type="button"
+      className={cn('msk-band-back flex size-8 shrink-0 items-center justify-center rounded-md text-band-foreground hover:bg-band-hover', focus)}
+      aria-label={back.label}
+      title={back.label}
+      onClick={onBack}
+    >
+      <ArrowLeft className="size-[18px]" aria-hidden="true" />
     </button>
   )
 }

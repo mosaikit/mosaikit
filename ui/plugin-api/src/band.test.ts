@@ -35,6 +35,15 @@ describe('msk.band', () => {
     expect(onToggle).toHaveBeenCalledOnce()
   })
 
+  it('sends the back label without the callback and routes band.back to it', () => {
+    const { msk, calls, emit } = fake()
+    const onClick = vi.fn()
+    msk.band.set({ back: { label: 'Sites', onClick } })
+    expect(calls).toEqual([{ op: 'band.set', args: { back: { label: 'Sites' } } }])
+    emit('band.back', {})
+    expect(onClick).toHaveBeenCalledOnce()
+  })
+
   it('reset drops the callbacks and tells the host', () => {
     const { msk, calls, emit } = fake()
     const onToggle = vi.fn()

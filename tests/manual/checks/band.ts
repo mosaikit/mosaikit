@@ -43,6 +43,10 @@ const checks: L.Check[] = [
     id: 'BAND-08',
     ...covered('the Italian and Spanish texts', 'ui/host/src/app/langpack.test.ts'),
   },
+  {
+    id: 'BAND-09',
+    ...covered('the back button: label, sanitising and the event back to the plugin', 'ui/host/src/app/contextband.test.ts and ui/plugin-api/src/band.test.ts'),
+  },
 ]
 
 export default checks

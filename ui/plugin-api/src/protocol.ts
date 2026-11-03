@@ -90,6 +90,7 @@ export interface BridgeEvent {
  * | `ext.tab.height` | `{ handle, height }` | the tab of an extension asks for a height (handled by `msk.extensions().mountTab`) |
  * | `band.mode` | `{ value }` | the View \| Edit switch of the top band was flipped (handled by `msk.band`) |
  * | `band.comments` | `{}` | the comments button of the top band was pressed (handled by `msk.band`) |
+ * | `band.back` | `{}` | the back button of the top band was pressed (handled by `msk.band`) |
  */
 export interface HostEvents {
   context: UiContext
@@ -101,6 +102,8 @@ export interface HostEvents {
   'band.mode': { value: 'view' | 'edit' }
   /** the person pressed the comments button of the top band (see `msk.band`) */
   'band.comments': Record<string, never>
+  /** the person pressed the back button of the top band (see `msk.band`) */
+  'band.back': Record<string, never>
 }
 
 export type HostEventName = keyof HostEvents
@@ -352,6 +355,14 @@ export interface BandComments {
   onToggle?: () => void
 }
 
+/** The back button of the contextual top band: an arrow-left icon at the left, right after the tenant. */
+export interface BandBack {
+  /** plain text, at most 80 characters: the accessible name and the tooltip of the button */
+  label: string
+  /** called when the person presses the button */
+  onClick?: () => void
+}
+
 /**
  * The state of the top band while a full-page resource (a map, a dashboard, a process) is open. What the
  * plugin leaves out stays as the shell draws it; the controls of the shell itself (tenant, language, theme,
@@ -364,6 +375,8 @@ export interface BandState {
   /** the people connected to the resource: at most 50, the shell shows 3 and "+N" */
   presence?: BandPerson[]
   comments?: BandComments
+  /** a back button next to the tenant (for example, back to the list of the plugin) */
+  back?: BandBack
 }
 
 export interface BandApi {

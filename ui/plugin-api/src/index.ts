@@ -8,6 +8,7 @@ export { Msk, connect, type CrudClient, type ExtensionsClient, type TabClient } 
 export { mountCrud, errText, type CrudOptions, type CrudView, type EditorCtx, type ItemCtx } from './crud-view.ts'
 export type {
   BandApi,
+  BandBack,
   BandComments,
   BandMode,
   BandPerson,
