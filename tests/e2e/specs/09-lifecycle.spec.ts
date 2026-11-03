@@ -84,9 +84,18 @@ test.describe.serial('09-lifecycle', () => {
     await expect(done).toBeVisible({ timeout: 60_000 })
     await expect(page.getByRole('button', { name: 'Run now' })).toBeEnabled()
     await accessible(page, 'backups')
-    await done.getByRole('button', { name: 'Restore a tenant' }).click()
-    await expect(page.getByRole('dialog', { name: 'Restore a tenant' })).toContainText('Town of Delta')
-    await page.keyboard.press('Escape')
+    // the first row may be an older backup of the same run (rows are not sorted by the test): the one made now has the tenant
+    const rows = page.getByRole('row').filter({ hasText: /complete|tenants only/ })
+    let found = false
+    for (let i = 0; i < (await rows.count()) && !found; i++) {
+      await rows.nth(i).getByRole('button', { name: 'Restore a tenant' }).click()
+      const dlg = page.getByRole('dialog', { name: 'Restore a tenant' })
+      await expect(dlg).toContainText('City of Alfa')
+      found = (await dlg.innerText()).includes('Town of Delta')
+      await page.keyboard.press('Escape')
+      await expect(dlg).toBeHidden()
+    }
+    expect(found).toBe(true)
 
     // one item from the backup: deleted for good after it, found by its title, back with its id and the
     // values of its extension (the history of the reviews)
