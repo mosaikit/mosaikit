@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 
 use axum::extract::{Form, Path, Query, State};
-use axum::http::{header, HeaderMap, HeaderValue, StatusCode};
+use axum::http::{header, HeaderMap, HeaderName, HeaderValue, StatusCode};
 use axum::response::{Html, IntoResponse, Redirect, Response};
 use axum::routing::{get, post};
 use axum::{Json, Router};
@@ -173,7 +173,15 @@ async fn serve_site(s: &AppState, tenant: Uuid, rid: Uuid, rel: &str, base: &str
     }
     match s.k.blobs.site_file(tenant, rid, rel) {
         Some(path) => match tokio::fs::read(&path).await {
-            Ok(data) => user_content(data, &path.to_string_lossy(), true, false, &fa),
+            Ok(data) => {
+                let mut res = user_content(data, &path.to_string_lossy(), true, false, &fa);
+                // The sandboxed frame has an opaque origin, so its own css, scripts and images are
+                // cross-site requests: `same-site` (the default) would block them. Access is by the
+                // unguessable token in the URL (a ticket or a public link); the unlock cookie of a
+                // protected link is `SameSite=Lax`, so it never goes with a cross-site subresource.
+                set(&mut res, HeaderName::from_static("cross-origin-resource-policy"), "cross-origin");
+                res
+            }
             Err(_) => (StatusCode::NOT_FOUND, "not found").into_response(),
         },
         None => (StatusCode::NOT_FOUND, "not found").into_response(),

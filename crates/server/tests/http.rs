@@ -464,7 +464,15 @@ async fn user_contents_always_sandboxed() {
     let csp = r.header(header::CONTENT_SECURITY_POLICY);
     assert!(csp.starts_with("sandbox allow-scripts") && !csp.contains("allow-same-origin"), "{csp}");
     assert_eq!(r.header(header::REFERRER_POLICY), "no-referrer");
+    // the frame has an opaque origin: its own subresources must not be blocked by CORP
+    assert_eq!(r.header(header::HeaderName::from_static("cross-origin-resource-policy")), "cross-origin");
     let base = path.trim_end_matches("index.html");
+    assert_eq!(
+        a.get_untrusted(&format!("{base}css/a.css"), None)
+            .await
+            .header(header::HeaderName::from_static("cross-origin-resource-policy")),
+        "cross-origin"
+    );
     assert_eq!(
         a.get_untrusted(&format!("{base}css/a.css"), None).await.header(header::CONTENT_TYPE),
         "text/css"
