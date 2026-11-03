@@ -110,9 +110,12 @@ fn unreachable() -> Error {
     Error::bad("the address cannot be reached").with_code("web_unreachable")
 }
 
-/// One GET, redirects followed by hand (each hop checked), the body cut at `max` bytes.
+/// One GET, redirects followed by hand (each hop checked), the body cut at `max` bytes. Public addresses
+/// only, plus the exact `host:port` entries of `allow_private_fetch_hosts`.
 async fn fetch(k: &Kernel, raw: &str, max: usize, accept: &str) -> Result<Fetched> {
-    send(k, reqwest::Method::GET, raw, max, accept, &[], None, &[]).await
+    // the page probe accepts exactly the `host:port` entries the deployer listed, nothing wider
+    let listed = k.cfg.allow_private_fetch_hosts.clone();
+    send(k, reqwest::Method::GET, raw, max, accept, &[], None, &listed).await
 }
 
 /// What a plugin gets back from [`request`].

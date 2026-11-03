@@ -232,6 +232,34 @@ async fn a_site_by_address_is_probed_safely() {
     assert_eq!(inspect(&t, &at("/go"), false).await.unwrap_err().code(), "web_unreachable");
 }
 
+#[tokio::test]
+async fn the_page_probe_accepts_only_the_hosts_the_deployer_listed() {
+    use mosaikit_kernel::webfetch::inspect;
+    let html =
+        |t: &str| ("Content-Type: text/html\r\n".to_string(), format!("<title>{t}</title>").into_bytes());
+    let (h, b) = html("Listed");
+    let listed = web(vec![("/", h, b)]).await;
+    let (h, b) = html("Unlisted");
+    let unlisted = web(vec![("/", h, b)]).await;
+    let to_unlisted = format!("Location: http://127.0.0.1:{unlisted}/\r\n");
+    let to_listed = format!("Location: http://127.0.0.1:{listed}/\r\n");
+    let hop = web(vec![("/", to_unlisted, vec![]), ("/back", to_listed, vec![])]).await;
+    let allow = vec![format!("127.0.0.1:{listed}"), format!("127.0.0.1:{hop}")];
+    let t = mosaikit_kernel::testing::start_with(move |c| c.allow_private_fetch_hosts = allow).await;
+    // the listed host:port is fetched
+    let ok = inspect(&t, &format!("http://127.0.0.1:{listed}/"), false).await.unwrap();
+    assert_eq!(ok.title, "Listed");
+    // another private port of the same host is still refused
+    let e = inspect(&t, &format!("http://127.0.0.1:{unlisted}/"), false).await.unwrap_err();
+    assert_eq!(e.code(), "web_blocked");
+    // a listed page redirecting to an unlisted private port is refused at that hop
+    let e = inspect(&t, &format!("http://127.0.0.1:{hop}/"), false).await.unwrap_err();
+    assert_eq!(e.code(), "web_blocked");
+    // a redirect between two listed entries is followed
+    let ok = inspect(&t, &format!("http://127.0.0.1:{hop}/back"), false).await.unwrap();
+    assert_eq!(ok.title, "Listed");
+}
+
 // ------------------------------------------------------------------ language plugins (I2)
 
 const LANG_MANIFEST: &str = r#"

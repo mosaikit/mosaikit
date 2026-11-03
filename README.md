@@ -614,7 +614,7 @@ Two properties for deployers (full description in `mosaikit.example.toml`):
 
 | Property | Env | What |
 |---|---|---|
-| `allow_private_fetch_hosts` | `MOSAIKIT_ALLOW_PRIVATE_FETCH_HOSTS` (comma separated) | exact `host:port` destinations on the private network that `http.fetch` may reach, only for a plugin that lists that origin in its manifest `network` permission. No wildcards or ranges |
+| `allow_private_fetch_hosts` | `MOSAIKIT_ALLOW_PRIVATE_FETCH_HOSTS` (comma separated) | exact `host:port` destinations on the private network that `http.fetch` may reach, only for a plugin that lists that origin in its manifest `network` permission; the same entries are also accepted by the Sites web address probe. No wildcards or ranges |
 | `plugin_settings_file` | `MOSAIKIT_PLUGIN_SETTINGS_FILE` | file with `[[plugin_settings]]` and `[[service_key_values]]` to seed at the start (never over an Administrator choice); a `distribution.toml` works |
 
 Behind a reverse proxy set `plugin_url` (a second hostname) and the
