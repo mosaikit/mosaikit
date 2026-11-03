@@ -42,18 +42,19 @@ export interface HoverMenu {
 export function useHoverMenu(enabled: boolean): HoverMenu {
   const [open, setOpenState] = useState(false)
   const [viaHover, setViaHover] = useState(false)
+  // refs follow the state at once: a press can come in the same tick as the pointer enter, before a render
   const openRef = useRef(false)
+  const viaRef = useRef(false)
   const keepOnClick = useRef(false)
   // a press on the entry (it navigates) mutes the hover until the pointer has left the entry
   const muted = useRef(false)
 
-  useEffect(() => {
-    openRef.current = open
-  }, [open])
   const ctl = useMemo(
     () =>
       createHoverController((o) => {
         if (o) setViaHover(true)
+        if (o) viaRef.current = true
+        openRef.current = o
         setOpenState(o)
       }),
     [],
@@ -68,18 +69,23 @@ export function useHoverMenu(enabled: boolean): HoverMenu {
       // a click on the icon of a menu that is already open keeps it open (and makes it a normal one)
       if (!o && keepOnClick.current) {
         keepOnClick.current = false
+        viaRef.current = false
         setViaHover(false)
         return
       }
       keepOnClick.current = false
-      if (o) setViaHover(false)
+      if (o) {
+        viaRef.current = false
+        setViaHover(false)
+      }
+      openRef.current = o
       setOpenState(o)
     },
     areaProps: {
       onPointerEnter: (e) => mouse(e) && !muted.current && ctl.enter(openRef.current),
       onPointerLeave: (e) => {
         muted.current = false
-        if (mouse(e) && viaHover) ctl.leave(openRef.current)
+        if (mouse(e) && viaRef.current) ctl.leave(openRef.current)
       },
       onPointerDownCapture: (e) => {
         ctl.cancel()
@@ -88,12 +94,15 @@ export function useHoverMenu(enabled: boolean): HoverMenu {
         const onTrigger = !!(e.target as HTMLElement).closest?.('[aria-haspopup="menu"]')
         keepOnClick.current = openRef.current && onTrigger
         // a press on the link of the app navigates: the menu the pointer had just opened goes away
-        if (openRef.current && viaHover && !onTrigger) setOpenState(false)
+        if (openRef.current && viaRef.current && !onTrigger) {
+          openRef.current = false
+          setOpenState(false)
+        }
       },
     },
     contentProps: {
       onPointerEnter: (e) => mouse(e) && ctl.enter(true),
-      onPointerLeave: (e) => mouse(e) && viaHover && ctl.leave(true),
+      onPointerLeave: (e) => mouse(e) && viaRef.current && ctl.leave(true),
     },
   }
 }
