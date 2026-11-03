@@ -5,6 +5,8 @@ version and is removed in the next.
 
 ## Unreleased
 
+- `OnBehalf::schedule` and `schedule_id`: `Some` when a schedule of the plugin (`[[schedules]]`) started the run; `None` for a run
+  a person started. `MockHost::scheduled(name, run_ref)` tests it. Needs `[requires] mosaikit = ">=1.0"`; plugin API unchanged.
 - `Ctx::directory()` (`Directory::users`, `Directory::groups`, `DirectoryUser`): search the people and groups of the tenant; needs
   `[permissions] directory = true` and `[requires] mosaikit = ">=1.0"`; plugin API unchanged. `MockHost::with_directory(users, groups)`
   answers like the real host.

@@ -2667,3 +2667,125 @@ async fn run_tickets_over_http() {
     let r = post(format!("/api/run/{t2}/call/{ID}/step"), Some("application/json"), "{}").await;
     assert_eq!(r.status, StatusCode::UNAUTHORIZED);
 }
+
+#[tokio::test]
+async fn schedule_runs_over_http() {
+    use std::sync::{Arc, Mutex};
+    const ID: &str = "com.test.runecho";
+    // a service on the loopback: accepts a push with 202 and a run id, answers the result of the run
+    type Seen = Arc<Mutex<Vec<(Option<String>, Value)>>>;
+    let seen: Seen = Arc::default();
+    let svc = {
+        let seen = seen.clone();
+        Router::new()
+            .route(
+                "/schedules/run",
+                axum::routing::post(move |headers: HeaderMap, axum::Json(b): axum::Json<Value>| {
+                    let seen = seen.clone();
+                    async move {
+                        let auth =
+                            headers.get("authorization").and_then(|v| v.to_str().ok()).map(str::to_string);
+                        seen.lock().unwrap().push((auth, b));
+                        (StatusCode::ACCEPTED, axum::Json(json!({ "run_id": "svc-1" })))
+                    }
+                }),
+            )
+            .route(
+                "/schedules/runs/{id}",
+                axum::routing::get(|| async { axum::Json(json!({ "status": "succeeded" })) }),
+            )
+    };
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let port = listener.local_addr().unwrap().port();
+    tokio::spawn(async move { axum::serve(listener, svc).await.unwrap() });
+
+    let a = App::with(start_with(|c| c.allow_private_fetch = true).await);
+    let toml = format!(
+        "id = \"{ID}\"\nname = \"Echo\"\nversion = \"1.0.0\"\n[contribution]\nicon = \"x\"\nlabel = \"Echo\"\n\
+         [requires]\nmosaikit = \">=1.0\"\n\
+         [[resources]]\nname = \"items\"\nfields = [{{ key = \"title\", kind = \"text\" }}]\n\
+         [[service_keys]]\nid = \"svc\"\nlabel = \"Service\"\n\
+         [permissions]\nrun_commands = [\"step\"]\nnetwork = [\"http://127.0.0.1:{port}\"]\n\
+         [[schedules]]\nname = \"nightly\"\ncommand = \"step\"\ntarget = \"http://127.0.0.1:{port}/schedules/run\"\n\
+         service_key = \"svc\"\n"
+    );
+    let mut files = std::collections::BTreeMap::new();
+    files.insert("plugin.toml".to_string(), toml.into_bytes());
+    files.insert("logic.wasm".to_string(), echo_wasm());
+    let pkg = mosaikit_mskp::pack(&files, Some(&mosaikit_kernel::testing::test_key())).unwrap();
+    a.t.install_package(&pkg).await.unwrap();
+    let admin = a.t.admin().await;
+    mosaikit_kernel::tenancy::keys::set_key(
+        &a.t,
+        admin.user_id,
+        mosaikit_kernel::tenancy::keys::Level::Platform,
+        "svc",
+        Some("shared-key"),
+        Some(true),
+    )
+    .await
+    .unwrap();
+    let alfa = a.t.tenant("alfa").await;
+    a.t.member(&alfa, "anna").await;
+    a.t.member(&alfa, "bruno").await;
+    let g = a.login("alfa", "alfa-manager", PASSWORD).await;
+    let anna = a.login("alfa", "anna", PASSWORD).await;
+    let bruno = a.login("alfa", "bruno", PASSWORD).await;
+
+    let body = json!({ "plugin": ID, "name": "nightly", "cron": "30 2 * * *", "time_zone": "Europe/Rome",
+                       "catch_up_once": true });
+    let r = a.call(Some(&anna), Method::POST, "/api/t/alfa/schedules", Some(body)).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let id = r.json()["id"].as_str().unwrap().to_string();
+    let listed = a.call(Some(&anna), Method::GET, "/api/t/alfa/schedules", None).await.json();
+    assert_eq!(listed[0]["time_zone"], "Europe/Rome");
+    assert_eq!(listed[0]["catch_up_once"], true);
+    let bad = json!({ "plugin": ID, "name": "nightly", "cron": "30 2 * * *", "time_zone": "Mars/Base" });
+    let r = a.call(Some(&anna), Method::POST, "/api/t/alfa/schedules", Some(bad)).await;
+    assert_eq!((r.status, r.json()["code"].as_str()), (StatusCode::BAD_REQUEST, Some("bad_time_zone")));
+
+    // run now: a session is needed; somebody else's schedule does not exist; the author and a manager may
+    let run = format!("/api/t/alfa/schedules/{id}/run");
+    assert_eq!(a.call(None, Method::POST, &run, None).await.status, StatusCode::UNAUTHORIZED);
+    assert_eq!(a.call(Some(&bruno), Method::POST, &run, None).await.status, StatusCode::NOT_FOUND);
+    let r = a.call(Some(&anna), Method::POST, &run, None).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    assert_eq!(
+        (r.json()["status"].as_str(), r.json()["service_run_id"].as_str()),
+        (Some("running"), Some("svc-1"))
+    );
+    let r = a.call(Some(&g), Method::POST, &run, None).await;
+    assert_eq!((r.status, r.json()["code"].as_str()), (StatusCode::CONFLICT, Some("already_running")));
+    {
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 1);
+        assert_eq!(seen[0].0.as_deref(), Some("Bearer shared-key"));
+        assert_eq!(seen[0].1["schedule"], id.as_str());
+        assert!(seen[0].1["ticket"].as_str().unwrap().len() == 48);
+    }
+    // the worker reads the result
+    mosaikit_kernel::schedule_worker::tick(&a.t.k).await.unwrap();
+    let runs =
+        a.call(Some(&anna), Method::GET, &format!("/api/t/alfa/schedules/{id}/runs"), None).await.json();
+    assert_eq!(runs[0]["status"], "succeeded");
+    assert_eq!(
+        a.call(Some(&bruno), Method::GET, &format!("/api/t/alfa/schedules/{id}/runs"), None).await.status,
+        StatusCode::NOT_FOUND
+    );
+
+    // takeover: the manager only; anybody else gets 404 or 403
+    let take = format!("/api/t/alfa/schedules/{id}/take-over");
+    assert_eq!(a.call(Some(&bruno), Method::POST, &take, None).await.status, StatusCode::NOT_FOUND);
+    assert_eq!(a.call(Some(&anna), Method::POST, &take, None).await.status, StatusCode::FORBIDDEN);
+    let r = a.call(Some(&g), Method::POST, &take, None).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    let all = a.call(Some(&g), Method::GET, "/api/t/alfa/schedules", None).await.json();
+    assert_eq!(all[0]["mine"], true);
+    assert!(a
+        .call(Some(&anna), Method::GET, "/api/t/alfa/schedules", None)
+        .await
+        .json()
+        .as_array()
+        .unwrap()
+        .is_empty());
+}

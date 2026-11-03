@@ -2,7 +2,7 @@
 //! put on a timetable. The session, its CSRF header and the membership are checked by `Tenant`.
 
 use axum::extract::{Path, Query, State};
-use axum::routing::{delete, post};
+use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use mosaikit_kernel::schedules::{self, CreateRequest};
 use serde::Deserialize;
@@ -18,6 +18,9 @@ pub fn router() -> Router<AppState> {
         .route("/api/t/{t}/schedules/{id}", delete(remove))
         .route("/api/t/{t}/schedules/{id}/pause", post(pause))
         .route("/api/t/{t}/schedules/{id}/resume", post(resume))
+        .route("/api/t/{t}/schedules/{id}/run", post(run_now))
+        .route("/api/t/{t}/schedules/{id}/take-over", post(take_over))
+        .route("/api/t/{t}/schedules/{id}/runs", get(runs))
 }
 
 async fn create(
@@ -68,4 +71,31 @@ async fn remove(
 ) -> ApiResult<Json<Value>> {
     schedules::delete(&s.k, &c, uuid(&id)?).await?;
     Ok(ok())
+}
+
+async fn run_now(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path((_t, id)): Path<(String, String)>,
+) -> ApiResult<Json<Value>> {
+    let run = schedules::run_now(&s.k, &c, uuid(&id)?).await?;
+    Ok(Json(json!(run)))
+}
+
+async fn take_over(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path((_t, id)): Path<(String, String)>,
+) -> ApiResult<Json<Value>> {
+    schedules::take_over(&s.k, &c, uuid(&id)?).await?;
+    Ok(ok())
+}
+
+async fn runs(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path((_t, id)): Path<(String, String)>,
+) -> ApiResult<Json<Value>> {
+    let rows = schedules::runs(&s.k, &c, uuid(&id)?).await?;
+    Ok(Json(json!(rows)))
 }

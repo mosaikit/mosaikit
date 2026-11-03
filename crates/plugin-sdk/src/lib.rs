@@ -132,6 +132,13 @@ pub struct Ctx {
 pub struct OnBehalf {
     /// the service's own name for the run
     pub run_ref: String,
+    /// `Some(name)` when the run was started by a schedule of the plugin (`[[schedules]]`): the `name` of
+    /// its declaration. `None` for a run a person started with a run ticket.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schedule: Option<String>,
+    /// the id of that schedule
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schedule_id: Option<String>,
 }
 
 impl Ctx {

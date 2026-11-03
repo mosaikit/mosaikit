@@ -494,8 +494,9 @@ pub(super) async fn remove_member_in(
         .execute(&mut *tx)
         .await?;
     // the schedules of the person in this tenant stop with their rights (all of them when the account is disabled)
-    crate::schedules::pause_for_user(&mut *tx, (!disabled).then_some(tenant), user_id, "author_inactive")
-        .await?;
+    let paused_schedules =
+        crate::schedules::pause_for_user(&mut *tx, (!disabled).then_some(tenant), user_id, "author_inactive")
+            .await?;
     if disabled {
         mosaikit_db::query("update core.users set status = 'disabled' where id = $1")
             .bind(user_id)
@@ -507,6 +508,7 @@ pub(super) async fn remove_member_in(
             .await?;
     }
     tx.commit().await?;
+    crate::schedules::notify_paused(k, user_id, &paused_schedules, "the author left").await;
     events::record(
         k,
         Some(tenant),
@@ -562,7 +564,9 @@ pub(super) async fn set_suspended_in(
         .await?;
     if suspended {
         // reactivating does not resume them: the author does it, on purpose
-        crate::schedules::pause_for_user(&k.db, Some(tenant), user_id, "author_inactive").await?;
+        let paused =
+            crate::schedules::pause_for_user(&k.db, Some(tenant), user_id, "author_inactive").await?;
+        crate::schedules::notify_paused(k, user_id, &paused, "the author is suspended").await;
     }
     events::record(
         k,

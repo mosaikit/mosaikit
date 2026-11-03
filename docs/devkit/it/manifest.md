@@ -1,4 +1,5 @@
-# Riferimento del manifesto
+| `target` | obbligatorio: l'indirizzo dell'endpoint del servizio, `https://svc:8080/schedules/run`; la sua origine deve stare in `permissions.network`; niente credenziali nell'indirizzo. Il kernel fa qui il `POST` dell'esecuzione; il risultato si legge dallo stesso indirizzo con un `/run` finale sostituito da `/runs/{id}` (`/schedules/runs/{id}`), oppure con `/runs/{id}` aggiunto |
+| `service_key` | facoltativa: l'`id` di una voce di `[[service_keys]]`; la sua chiave condivisa (quella dell'organizzazione, altrimenti quella della piattaforma) è inviata al target come `Authorization: Bearer` |# Riferimento del manifesto
 
 `plugin.toml` alla radice del plugin. È letto con le **chiavi sconosciute rifiutate** in ogni tabella: una chiave scritta
 male è un errore, e un kernel che non conosce una chiave rifiuta il manifesto. Fonte di verità:
@@ -235,8 +236,9 @@ più vecchio rifiuta la chiave); `validate` avvisa se l'intervallo manca, con `-
 
 Lavori che una persona può mettere in calendario (un'espressione cron) per farli eseguire più tardi, a suo nome, da un servizio
 esterno. Al massimo 8. **Sensibile**: `validate` lo elenca fra i permessi che l'Administrator rivede (la schermata di installazione lo mostra col passo della shell della funzione). Richiede `[requires] mosaikit = ">=1.0"`; `validate` avvisa se l'intervallo manca, con `--strict` fallisce.
-Oggi il kernel tiene l'elenco (crea, elenca, sospendi, riprendi, elimina); la parte che avvia i lavori arriva in una versione
-successiva. Vedi architettura §8.17.
+Il kernel tiene l'elenco (crea, elenca, sospendi, riprendi, elimina, rileva, esegui ora) e un worker avvia i lavori alla scadenza:
+ricontrolla i diritti dell'autore, emette un ticket di esecuzione per il solo comando e invia l'esecuzione al `target`. Vedi
+architettura §8.17.
 
 | Chiave | Regola |
 |---|---|
@@ -249,7 +251,22 @@ successiva. Vedi architettura §8.17.
 | `max_per_tenant` | facoltativa, predefinita 10, al massimo 50: pianificazioni con questo nome in un'organizzazione |
 | `resources_required` | facoltativa, predefinita `false`: una pianificazione deve indicare le risorse a cui è limitata |
 
-L'espressione cron ha cinque campi in UTC (`minuto ora giorno-del-mese mese giorno-della-settimana`): `*`, numeri, intervalli, elenchi e passi, niente nomi.
+L'espressione cron ha cinque campi (`minuto ora giorno-del-mese mese giorno-della-settimana`): `*`, numeri, intervalli, elenchi e passi, niente nomi.
+Si legge nel fuso orario della pianificazione (un nome IANA, es. `Europe/Rome`, scelto quando la persona la registra; UTC se non c'è). Quando
+l'ora avanza, un'ora che non esiste viene eseguita una volta, subito dopo il salto; quando torna indietro, un'ora che capita due volte
+viene eseguita una volta, la prima.
+
+**L'invio.** Il corpo è JSON: `tenant`, `user` (l'autore), `schedule`, `schedule_name`, `run`, `run_ref`, `plugin`, `command`, `args`,
+`ticket`, `ticket_path` (`/api/run/<ticket>`) e `expires_at`. Il servizio risponde subito `2xx` (`202`) con `{ "run_id": "..." }` e lavora in
+background, chiamando il plugin col ticket (`POST /api/run/<ticket>/call/...`) e chiudendo con `DELETE /api/run/<ticket>`. Il kernel chiede
+`GET .../runs/{id}` ogni 30 secondi per `{ "status": "running" oppure "succeeded" oppure "failed", "error"? }` (un `404` è un fallimento). Senza
+`run_id` l'esecuzione finisce quando il servizio chiude il ticket. Un'esecuzione non finita dopo `max_runtime_minutes` è `timed_out` e il suo
+ticket è revocato. Il ticket porta il solo `command` della voce; la logica vede `ctx.on_behalf().schedule`.
+
+Un invio fallito, un'esecuzione fallita o un timeout contano come fallimento: la prossima esecuzione è anticipata a un nuovo tentativo (5
+minuti, raddoppiando, al massimo 60) se è prima del calendario, e dopo 5 fallimenti di fila la pianificazione è sospesa. Un'esecuzione
+saltata perché il kernel era spento viene scartata, salvo che la pianificazione sia stata registrata con `catch_up_once`: allora viene
+eseguita una volta.
 
 ## `[search]`
 

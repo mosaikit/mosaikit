@@ -113,6 +113,7 @@ fn req(name: &str, cron: &str) -> CreateRequest {
         args: None,
         resources: None,
         label: None,
+        ..Default::default()
     }
 }
 
@@ -322,7 +323,13 @@ async fn a_run_ticket_cannot_register_or_manage() {
     let w = world().await;
     let id = make(&w, &w.anna, "sync").await;
     let mut c = w.anna.clone();
-    c.run = Some(mosaikit_kernel::RunCall { ticket: Uuid::new_v4(), run_ref: "r".into(), resources: None });
+    c.run = Some(mosaikit_kernel::RunCall {
+        ticket: Uuid::new_v4(),
+        run_ref: "r".into(),
+        resources: None,
+        scheduled_by: None,
+        schedule_name: None,
+    });
     assert_eq!(sc::create(&w.t, &c, &req("sync", "0 3 * * *")).await.unwrap_err().kind, Kind::Forbidden);
     assert_eq!(sc::pause(&w.t, &c, id).await.unwrap_err().kind, Kind::Forbidden);
     assert_eq!(sc::delete(&w.t, &c, id).await.unwrap_err().kind, Kind::Forbidden);

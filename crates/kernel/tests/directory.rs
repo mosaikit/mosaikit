@@ -297,6 +297,7 @@ async fn it_is_refused_in_a_call_on_behalf_of_a_run() {
             ttl_minutes: None,
             uses: None,
             resources: None,
+            schedule: None,
         },
     )
     .await
@@ -305,7 +306,13 @@ async fn it_is_refused_in_a_call_on_behalf_of_a_run() {
     let e = rt::call(&w.t, &m.token, DIR, "x", host("directory.search", q("user", "bob"))).await.unwrap_err();
     assert!(e.message.contains("run"), "{e}");
     let run = Caller {
-        run: Some(mosaikit_kernel::RunCall { ticket: m.id, run_ref: "r".into(), resources: None }),
+        run: Some(mosaikit_kernel::RunCall {
+            ticket: m.id,
+            run_ref: "r".into(),
+            resources: None,
+            scheduled_by: None,
+            schedule_name: None,
+        }),
         ..w.anna.clone()
     };
     let e = dir::search(&w.t, &run, DIR, &q("user", "bob")).await.unwrap_err();

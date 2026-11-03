@@ -78,7 +78,7 @@ changelog del pacchetto, con la regola di deprecazione applicata quando una dist
 - `msk.web` (permesso `web`)
 - `[[config]] public`, `[[public_commands]]`, `msk.publicConfig`, `msk.publicCall` e `ctx.link_resource()` (pagine dei link pubblici)
 - `permissions.run_commands` e `ctx.on_behalf()` (chiamate per conto di un run, con un ticket di esecuzione)
-- `[[schedules]]` (lavori in calendario, registrati dalle persone; il kernel tiene l'elenco, il worker che li esegue arriva dopo)
+- `[[schedules]]` (lavori in calendario, registrati dalle persone; il kernel tiene l'elenco e un worker li esegue: ricontrolla i diritti dell'autore, emette un ticket di esecuzione per il solo comando e invia l'esecuzione al servizio; `ctx.on_behalf().schedule` dice alla logica che l'ha avviata una pianificazione)
 - `permissions.directory`, `ctx.directory()` e `msk.directory.search` (cerca tra persone e gruppi del tenant)
 - `msk.band` (la barra superiore contestuale per una risorsa a pagina intera; nessun permesso)
 

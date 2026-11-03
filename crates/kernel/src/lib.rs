@@ -35,6 +35,7 @@ pub mod plugin_directory;
 pub mod plugins;
 pub mod quotas;
 pub mod run_tickets;
+pub mod schedule_worker;
 pub mod schedules;
 pub mod search;
 pub mod secret;
@@ -163,6 +164,10 @@ pub struct RunCall {
     pub ticket: Uuid,
     pub run_ref: String,
     pub resources: Option<Vec<Uuid>>,
+    /// the schedule (`core.schedules`) that minted the ticket, with its name: the command can tell
+    /// a scheduled run (`ctx.on_behalf.schedule`)
+    pub scheduled_by: Option<Uuid>,
+    pub schedule_name: Option<String>,
 }
 
 impl Caller {
@@ -339,6 +344,7 @@ impl Kernel {
         if !kernel.cfg.no_background {
             mail::spawn_worker(&kernel);
             ops::spawn_worker(&kernel);
+            schedule_worker::spawn_worker(&kernel);
         }
         Ok(kernel)
     }

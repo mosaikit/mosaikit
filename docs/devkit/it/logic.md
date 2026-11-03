@@ -189,7 +189,7 @@ chiamata). Richiede `[requires] mosaikit = ">=1.0"`.
 - Il comando gira **come la persona che ha avviato il run**, con i suoi permessi **al momento della chiamata** (chi è stato
   sospeso, rimosso o a cui è stata tolta una condivisione non passa più). `ctx.user` è quella persona.
 - `ctx.on_behalf()` è `Some` (con `run_ref`, il nome che il servizio dà al run) in una chiamata così e `None` in una normale. Gli
-  argomenti non possono impostarlo. Usalo per essere più severo, mai più permissivo. Prova con `MockHost::new().on_behalf("run-1")`.
+  argomenti non possono impostarlo. Usalo per essere più severo, mai più permissivo. Prova con `MockHost::new().on_behalf("run-1")`. Quando il run è stato avviato da una pianificazione (`[[schedules]]`), `on_behalf().schedule` è il nome della sua dichiarazione (e `schedule_id` il suo id); prova con `MockHost::new().scheduled("nightly", "run-1")`.
 - Un ticket può essere limitato a un elenco di risorse: allora è il **database** a mostrare al comando solo quelle risorse e ciò
   che contengono, qualunque SQL o argomento usi, e non si può creare un elemento in radice. Un ticket senza elenco ha tutta la
   portata della persona per i comandi dichiarati, finché scade, si esaurisce o viene revocato.

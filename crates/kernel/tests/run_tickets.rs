@@ -142,6 +142,7 @@ fn req(plugin: &str, commands: &[&str], resources: Option<Vec<Uuid>>) -> MintReq
         ttl_minutes: None,
         uses: None,
         resources,
+        schedule: None,
     }
 }
 
@@ -467,7 +468,13 @@ async fn a_call_on_behalf_cannot_call_other_plugins_or_mint() {
     assert!(e.message.contains("on behalf"), "{}", e.message);
     // a caller that is itself a run cannot mint (the server only offers mint behind a session)
     let run = Caller {
-        run: Some(mosaikit_kernel::RunCall { ticket: m.id, run_ref: "r".into(), resources: None }),
+        run: Some(mosaikit_kernel::RunCall {
+            ticket: m.id,
+            run_ref: "r".into(),
+            resources: None,
+            scheduled_by: None,
+            schedule_name: None,
+        }),
         ..w.anna.clone()
     };
     let e = rt::mint(&w.t, &run, &req(PROXY, &["x"], None)).await.unwrap_err();
