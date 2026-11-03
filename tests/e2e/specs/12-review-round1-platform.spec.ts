@@ -157,20 +157,21 @@ test.describe.serial('12-review-round1-platform', () => {
       expect(first!.y - top!.y).toBeLessThanOrEqual(6)
       const last = await sidebar.locator('[data-sidebar="menu-button"]').last().boundingBox()
       const bottom = await sidebar.boundingBox()
-      expect(bottom!.y + bottom!.height - (last!.y + last!.height)).toBeLessThanOrEqual(10)
+      // open: the footer entries stay at the bottom; in the collapsed bar they follow the last group (uniform step)
+      if ((await page.locator('[data-collapsible="icon"]').count()) === 0) expect(bottom!.y + bottom!.height - (last!.y + last!.height)).toBeLessThanOrEqual(10)
     })
-    await test.step('R1-L-05 collapsed bar: a gap between groups', async () => {
+    await test.step('R1-L-05 collapsed bar: one uniform step, also between groups', async () => {
       const toggle = page.getByRole('button', { name: 'Open or close the sidebar' }).first()
       const rail = page.locator('[data-collapsible="icon"]')
       const wasOpen = (await rail.count()) === 0
       if (wasOpen) await toggle.click()
       await expect(rail.first()).toBeAttached()
       const groups = sidebar.locator('[data-sidebar="group"]')
-      // the Administrator has one group; the gap is checked with the Tenant Manager below
+      // the Administrator has one group; the step between groups is checked with the Tenant Manager below
       if ((await groups.count()) > 1) {
         const a = await groups.nth(0).locator('[data-sidebar="menu-button"]').last().boundingBox()
         const b = await groups.nth(1).locator('[data-sidebar="menu-button"]').first().boundingBox()
-        expect(b!.y - (a!.y + a!.height)).toBeGreaterThanOrEqual(8)
+        expect(Math.abs(b!.y - (a!.y + a!.height))).toBeLessThanOrEqual(2)
       }
       if (wasOpen) await toggle.click()
     })
@@ -271,12 +272,12 @@ test.describe.serial('12-review-round1-platform', () => {
       expect(child!.x).toBeGreaterThanOrEqual(parent!.x)
       await toggle.click()
       await expect(page.locator('[data-collapsible="icon"]').first()).toBeAttached()
-      // R1-L-05 for the Tenant Manager: a gap between the groups of the collapsed bar
+      // R1-L-05 for the Tenant Manager: one uniform step between the groups of the collapsed bar
       const groups = nav.locator('[data-sidebar="group"]')
       expect(await groups.count()).toBeGreaterThan(1)
       const g0 = await groups.nth(0).locator('[data-sidebar="menu-button"]').last().boundingBox()
       const g1 = await groups.nth(1).locator('[data-sidebar="menu-button"]').first().boundingBox()
-      expect(g1!.y - (g0!.y + g0!.height)).toBeGreaterThanOrEqual(8)
+      expect(Math.abs(g1!.y - (g0!.y + g0!.height))).toBeLessThanOrEqual(2)
       await page.getByRole('button', { name: 'Open the pages of Notes' }).click()
       await expect(page.getByRole('menuitem', { name: 'Mine' })).toBeVisible()
       await page.keyboard.press('Escape')
