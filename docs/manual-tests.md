@@ -533,7 +533,7 @@ Needs many rows: the data of the load test (`cargo xtask perf --scale probe`, th
 | R1-L-02 | Any page with a scrolling area | Scrollbars are thin |
 | R1-L-03 | Sidebar with more entries than fit | Its scrollbar shows only while the mouse is over the sidebar |
 | R1-L-04 | Look at the first and at the last icon of the sidebar | No extra empty space above the first and below the last |
-| R1-L-05 | Close the sidebar to icons | A visible gap separates the groups (Apps, Management…) |
+| R1-L-05 | Close the sidebar to icons | One uniform step separates every icon, also between the groups (Apps, Management…), with no separator line |
 | R1-L-06 | Administrator › Tenants: use the filter column (search, Status, Reset) | The list follows the filters; Reset brings back all; the button of the header hides or shows the column |
 | R1-L-07 | Tenants: tick one row, then the box of the header | «1 selected» and the actions (Suspend, Reactivate) appear in the header; the header box selects every loaded row |
 | R1-L-08 | Administrator › System: the list of sections | The sections under a heading are indented |
