@@ -1,9 +1,8 @@
 // Hover-to-open for the menus of the closed sidebar. `createHoverController` is the pure timer logic (open
-// after a short delay so a fast pass does nothing, close after a grace delay so the pointer can travel from the
-// icon to the menu); `useHoverMenu` wires it to a controlled Radix menu.
+// at once, close after a grace delay so the pointer can travel from the icon to the menu); `useHoverMenu` wires it to a controlled Radix menu.
 import { useEffect, useMemo, useRef, useState } from 'react'
 
-export const HOVER_OPEN_MS = 150
+export const HOVER_OPEN_MS = 0
 export const HOVER_CLOSE_MS = 150
 
 export function createHoverController(set: (open: boolean) => void, openMs = HOVER_OPEN_MS, closeMs = HOVER_CLOSE_MS) {
@@ -16,7 +15,9 @@ export function createHoverController(set: (open: boolean) => void, openMs = HOV
     /** the pointer is over the icon or the menu */
     enter(isOpen: boolean) {
       clear()
-      if (!isOpen) timer = setTimeout(() => set(true), openMs)
+      if (isOpen) return
+      if (openMs <= 0) set(true)
+      else timer = setTimeout(() => set(true), openMs)
     },
     /** the pointer left both */
     leave(isOpen: boolean) {
@@ -64,8 +65,8 @@ export function useHoverMenu(enabled: boolean): HoverMenu {
     viaHover,
     onOpenChange: (o) => {
       ctl.cancel()
-      // a click on the icon of a menu the pointer opened keeps it open (and makes it a normal one)
-      if (!o && keepOnClick.current && viaHover) {
+      // a click on the icon of a menu that is already open keeps it open (and makes it a normal one)
+      if (!o && keepOnClick.current) {
         keepOnClick.current = false
         setViaHover(false)
         return
@@ -84,7 +85,7 @@ export function useHoverMenu(enabled: boolean): HoverMenu {
         ctl.cancel()
         muted.current = true
         // only a press on the trigger of the menu (not on the link of the app) keeps it open
-        keepOnClick.current = openRef.current && viaHover && !!(e.target as HTMLElement).closest?.('[aria-haspopup="menu"]')
+        keepOnClick.current = openRef.current && !!(e.target as HTMLElement).closest?.('[aria-haspopup="menu"]')
       },
     },
     contentProps: {

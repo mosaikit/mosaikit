@@ -5,7 +5,13 @@ describe('createHoverController', () => {
   beforeEach(() => vi.useFakeTimers())
   afterEach(() => vi.useRealTimers())
 
-  it('opens after the delay, not on a fast pass', () => {
+  it('opens at once by default', () => {
+    const set = vi.fn()
+    createHoverController(set).enter(false)
+    expect(set).toHaveBeenCalledWith(true)
+  })
+
+  it('with an open delay, does not open on a fast pass', () => {
     const set = vi.fn()
     const c = createHoverController(set, 150, 150)
     c.enter(false)
