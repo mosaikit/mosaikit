@@ -43,6 +43,8 @@ export function useHoverMenu(enabled: boolean): HoverMenu {
   const [viaHover, setViaHover] = useState(false)
   const openRef = useRef(false)
   const keepOnClick = useRef(false)
+  // a press on the entry (it navigates) mutes the hover until the pointer has left the entry
+  const muted = useRef(false)
 
   useEffect(() => {
     openRef.current = open
@@ -73,9 +75,14 @@ export function useHoverMenu(enabled: boolean): HoverMenu {
       setOpenState(o)
     },
     areaProps: {
-      onPointerEnter: (e) => mouse(e) && ctl.enter(openRef.current),
-      onPointerLeave: (e) => mouse(e) && viaHover && ctl.leave(openRef.current),
+      onPointerEnter: (e) => mouse(e) && !muted.current && ctl.enter(openRef.current),
+      onPointerLeave: (e) => {
+        muted.current = false
+        if (mouse(e) && viaHover) ctl.leave(openRef.current)
+      },
       onPointerDownCapture: (e) => {
+        ctl.cancel()
+        muted.current = true
         // only a press on the trigger of the menu (not on the link of the app) keeps it open
         keepOnClick.current = openRef.current && viaHover && !!(e.target as HTMLElement).closest?.('[aria-haspopup="menu"]')
       },
