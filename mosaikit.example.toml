@@ -62,7 +62,7 @@ url = "http://127.0.0.1:8080/mosaikit"
 
 # Private destinations that plugins may call with http.fetch: exact "host:port" entries (no wildcards,
 # no ranges). Only for a plugin whose manifest lists that origin in its network permission. A malformed
-# entry stops the start. Not needed for public services.
+# entry stops the start. The Sites web address probe accepts the same entries. Not needed for public services.
 # Env: MOSAIKIT_ALLOW_PRIVATE_FETCH_HOSTS (comma separated, added to the ones of the file)
 # allow_private_fetch_hosts = ["translate.internal:5000"]
 

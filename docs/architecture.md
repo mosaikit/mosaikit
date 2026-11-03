@@ -247,7 +247,9 @@ wildcards, no CIDR ranges, no scheme or path): a malformed entry stops the start
 lifts the public-address rule only for a plugin whose manifest lists that origin in `[permissions] network`
 (the permission check runs first, so another plugin, another port or another host stays refused); the name is
 resolved and the connection pinned to the address as for any other destination, and every redirect hop is
-checked again. `allow_private_fetch` (everything, development and tests only) is unchanged. Test:
+checked again. The same exact entries also lift the rule for the page probe of Sites (New site > Web address): an
+address whose `host:port` is listed is looked at, any other private address or port stays refused, and a redirect to
+an unlisted private host is refused at that hop. `allow_private_fetch` (everything, development and tests only) is unchanged. Test:
 `deployer_allow_list_of_private_destinations` in `crates/kernel/tests/plugin_lifecycle.rs`.
 
 **Own profile.** A person changes their display name (`PUT /api/me/profile`; not for the accounts of
