@@ -238,6 +238,7 @@ impl Instance {
                 },
             )
             .env("E2E_IDP_URL", format!("http://127.0.0.1:{}", self.idp_port))
+            .env("E2E_REGISTRY_DIR", self.dir.join("registry"))
             // the spec of the developer profile starts a server of its own
             .env("E2E_SERVER_BIN", plugins::target_dir().join("debug").join(exe("mosaikit-server")));
     }

@@ -89,7 +89,8 @@ test.describe.serial('11-layouts', () => {
     expect(await call('DELETE', 'api/admin/plugins/com.mosaikit.layout-tabs')).toBe(200)
     await page.goto('./#/admin/plugins')
     await page.getByRole('radio', { name: 'Table' }).click()
-    const dir = path.join(import.meta.dirname, '..', '..', '..', '.dev', 'e2e', 'registry', 'plugins')
+    // the registry of this installation (`cargo xtask e2e` passes it; every group has its own)
+    const dir = path.join(process.env.E2E_REGISTRY_DIR ?? path.join(import.meta.dirname, '..', '..', '..', '.dev', 'e2e', 'registry'), 'plugins')
     const pkg = fs.readdirSync(dir).find((f) => f.includes('layout-tabs'))!
     await page.locator('input[type="file"]').first().setInputFiles(path.join(dir, pkg))
     await expect(page.getByRole('row', { name: /Tabs/ })).toBeVisible()
