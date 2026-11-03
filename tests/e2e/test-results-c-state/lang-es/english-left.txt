@@ -1,0 +1,4 @@
+admin-overview: Disco casi lleno: 1.2% of the disk free
+admin-overview: Alerta: 1.4% of the disk free
+tenant-account-appearance: Names under the icons
+tenant-account-appearance: In the closed sidebar. Off: only the icons, the name shows as a tooltip.

@@ -46,6 +46,12 @@ const checks: L.Check[] = [
       return { status: 'NOT VERIFIABLE', note: 'visual (no separators or lines, soft active state, indentation, icons in the menus); driven by specs/19-nav-groups.spec.ts (Playwright e2e)' }
     },
   },
+  {
+    id: 'NAV-06',
+    async run() {
+      return { status: 'NOT VERIFIABLE', note: 'visual (footer entries at the bottom of the closed bar, names under the icons switched off); driven by specs/19-nav-groups.spec.ts (Playwright e2e)' }
+    },
+  },
 ]
 
 export default checks

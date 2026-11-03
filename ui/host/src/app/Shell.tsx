@@ -34,7 +34,7 @@ import {
 import { cn } from '@/lib/utils'
 import { t } from './i18n.ts'
 import { useLiveNotes } from './notes.ts'
-import { bandOf, navGroupOpen, setNavGroupOpen, sidebarOpen } from './prefs.ts'
+import { bandOf, navGroupOpen, setNavGroupOpen, sidebarOpen, useRailLabels } from './prefs.ts'
 import { arrowTarget } from './navgroups.ts'
 import { useHoverMenu } from './hoverMenu.ts'
 import { type Route } from './router.ts'
@@ -60,6 +60,9 @@ const railButton = cn(
   'group-data-[collapsible=icon]:h-[56px]! group-data-[collapsible=icon]:w-full! group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-1.5 group-data-[collapsible=icon]:rounded-none group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:data-[active=false]:bg-transparent! group-data-[collapsible=icon]:data-[active=true]:font-medium! group-data-[collapsible=icon]:font-normal! group-data-[collapsible=icon]:text-rail-foreground group-data-[collapsible=icon]:hover:text-sidebar-primary group-data-[collapsible=icon]:data-[active=true]:text-sidebar-accent-foreground group-data-[collapsible=icon]:data-[active=true]:[&>svg]:text-sidebar-primary group-data-[collapsible=icon]:[&>svg]:size-5 group-data-[collapsible=icon]:[&>svg]:stroke-[1.6]',
   'group-data-[collapsible=icon]:[&>span:last-child]:block group-data-[collapsible=icon]:[&>span:last-child]:max-w-[60px] group-data-[collapsible=icon]:[&>span:last-child]:truncate group-data-[collapsible=icon]:[&>span:last-child]:text-center group-data-[collapsible=icon]:[&>span:last-child]:text-[10px] group-data-[collapsible=icon]:[&>span:last-child]:leading-3',
 )
+
+/** The closed rail without the names (Account › Appearance and language): lower buttons, icons only. */
+const railIconsOnly = 'group-data-[collapsible=icon]:h-11! group-data-[collapsible=icon]:[&>span:last-child]:hidden!'
 
 /** The pages of an app under it, in the open sidebar and in the drawer of the phone. */
 function SubTree({ items, onPick, depth = 0 }: { items: NavItem[]; onPick: () => void; depth?: number }) {
@@ -87,14 +90,21 @@ function RailEntry({ it }: { it: NavItem }) {
   const { isMobile, setOpenMobile, state } = useSidebar()
   const rail = state === 'collapsed' && !isMobile
   const hover = useHoverMenu(rail)
+  const labels = useRailLabels()
   // on the phone the whole tree is open; in the open sidebar the app of the active page
   const [open, setOpen] = useState(() => hasActive(it))
   const pick = () => isMobile && setOpenMobile(false)
   const kids = it.children ?? []
   return (
     <SidebarMenuItem {...(kids.length > 0 && rail ? hover.areaProps : {})}>
-      <SidebarMenuButton asChild isActive={hasActive(it)} className={railButton}>
-        <a href={it.href} aria-label={it.short ? it.label : undefined} title={it.short && !(rail && kids.length > 0) ? it.label : undefined} onClick={pick}>
+      <SidebarMenuButton asChild isActive={hasActive(it)} className={cn(railButton, !labels && railIconsOnly)}>
+        {/* without the names under the icons the long name is the accessible name and the tooltip */}
+        <a
+          href={it.href}
+          aria-label={it.short || (rail && !labels) ? it.label : undefined}
+          title={(it.short || (rail && !labels)) && !(rail && kids.length > 0) ? it.label : undefined}
+          onClick={pick}
+        >
           {it.icon}
           <span>{it.short ?? it.label}</span>
         </a>
@@ -153,6 +163,7 @@ function DistGroup({ g, className }: { g: NavGroup; className: string }) {
   const { isMobile, state } = useSidebar()
   const rail = state === 'collapsed' && !isMobile
   const hover = useHoverMenu(rail)
+  const labels = useRailLabels()
   const [open, setOpen] = useState(() => navGroupOpen(g.id))
   const active = g.items.some(hasActive)
   const label = g.label ?? g.id
@@ -171,7 +182,7 @@ function DistGroup({ g, className }: { g: NavGroup; className: string }) {
                 hover={hover}
                 item={{ label, icon: g.icon, active, children: g.items }}
                 trigger={
-                  <SidebarMenuButton isActive={active} className={railButton} aria-label={t('Open the apps of {name}', { name: label })}>
+                  <SidebarMenuButton isActive={active} className={cn(railButton, !labels && railIconsOnly)} aria-label={t('Open the apps of {name}', { name: label })}>
                     {g.icon}
                     <span>{label}</span>
                   </SidebarMenuButton>
@@ -233,7 +244,7 @@ function AppSidebar({ session, route, band }: { session: Session; route: Route; 
           )}
         </SidebarHeader>
       )}
-      <SidebarContent className="msk-hoverscroll border-r border-sidebar-border pt-1 group-data-[collapsible=icon]:flex-initial group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:pt-0">
+      <SidebarContent className="msk-hoverscroll border-r border-sidebar-border pt-1 group-data-[collapsible=icon]:gap-0 group-data-[collapsible=icon]:pt-0">
         {nav.groups.map((g) =>
           g.collapsible ? (
             <DistGroup key={g.id} g={g} className={groupClass} />

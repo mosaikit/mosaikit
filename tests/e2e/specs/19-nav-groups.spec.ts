@@ -67,4 +67,35 @@ test.describe.serial('19-nav-groups', () => {
     await expect(sidebar(page).getByRole('button', { name: 'Apri le app di Lavoro' })).toBeVisible()
     await page.evaluate(() => localStorage.removeItem('msk_lang'))
   })
+
+  test('closed sidebar: Settings stay at the bottom; the names under the icons can be hidden', async ({ page }) => {
+    await login(page, 'Alfa', 'manager', PASSWORD)
+    await page.evaluate(() => {
+      localStorage.removeItem('msk_rail_labels')
+      localStorage.removeItem('msk_sidebar_open')
+    })
+    await page.reload()
+    const rail = sidebar(page)
+    await expect(page.locator('[data-collapsible="icon"]')).toBeAttached()
+    const settings = rail.getByRole('link', { name: 'Settings' })
+    const gap = async () => {
+      const b = await settings.boundingBox()
+      const s = await rail.boundingBox()
+      return s!.y + s!.height - (b!.y + b!.height)
+    }
+    expect(await gap()).toBeLessThanOrEqual(4)
+    const withNames = (await settings.boundingBox())!.height
+    // Account › Appearance and language: the switch hides the names, at once
+    await page.goto('./#/t/alfa/account/appearance')
+    await page.getByRole('switch', { name: 'Names under the icons' }).click()
+    await expect(settings.locator('span')).toBeHidden()
+    expect((await settings.boundingBox())!.height).toBeLessThan(withNames)
+    // the icon keeps its name for assistive technology and as a tooltip, and stays at the bottom
+    await expect(settings).toHaveAttribute('title', 'Tenant settings')
+    expect(await gap()).toBeLessThanOrEqual(4)
+    await page.reload()
+    await expect(page.getByRole('switch', { name: 'Names under the icons' })).not.toBeChecked()
+    await page.getByRole('switch', { name: 'Names under the icons' }).click()
+    await expect(settings.locator('span')).toBeVisible()
+  })
 })

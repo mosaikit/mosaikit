@@ -106,6 +106,8 @@ export const IT: Record<string, string> = {
   Profile: 'Profilo',
   'Sign-in and security': 'Accesso e sicurezza',
   'Appearance and language': 'Aspetto e lingua',
+  'Names under the icons': 'Nomi sotto le icone',
+  'In the closed sidebar. Off: only the icons, the name shows as a tooltip.': 'Nella sidebar chiusa. Disattivato: solo le icone, il nome appare come suggerimento.',
   'My tenants': 'I miei organizzazioni',
   Details: 'Dati',
   'Another Administrator changes them.': 'Li cambia un altro Amministratore.',

@@ -23,7 +23,7 @@ import { setLang, t, useLang, useLanguages, type Lang } from '../i18n.ts'
 import { Empty, ErrorBox, FormDialog, Loading, Locked, PageHeader, SaveBar, Sections, type Section } from '../kit.tsx'
 import { ListTable } from '../ListTable.tsx'
 import { go, personal, to, type Route } from '../router.ts'
-import { SIDEBAR_PREF } from '../prefs.ts'
+import { SIDEBAR_PREF, setRailLabels, useRailLabels } from '../prefs.ts'
 import { TenantBadge } from '../Shell.tsx'
 import { KeysPanel } from '../SettingsPanels.tsx'
 import { TenantLeft } from '../Quotas.tsx'
@@ -385,6 +385,7 @@ function Appearance({ route }: { route: Route }) {
   const setContrast = useSetContrast()
   const lang = useLang()
   const langs = useLanguages()
+  const railNames = useRailLabels()
   const [side, setSide] = useState(() => {
     try {
       return localStorage.getItem(SIDEBAR_PREF) === '1'
@@ -463,6 +464,13 @@ function Appearance({ route }: { route: Route }) {
                 }
               }}
             />
+          </label>
+          <label className="flex items-center justify-between gap-4">
+            <span>
+              <b className="block text-sm">{t('Names under the icons')}</b>
+              <span className="text-xs text-muted-foreground">{t('In the closed sidebar. Off: only the icons, the name shows as a tooltip.')}</span>
+            </span>
+            <Switch checked={railNames} onCheckedChange={setRailLabels} aria-label={t('Names under the icons')} />
           </label>
           {route.area === 'tenant' && <AppsInSidebar slug={route.tenant} />}
         </CardContent>
