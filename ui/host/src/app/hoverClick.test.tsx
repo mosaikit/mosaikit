@@ -56,6 +56,14 @@ describe('hover menu and a click on the entry', () => {
     expect(open()).toBe('false')
   })
 
+  it('a press in the same tick as the enter leaves the menu closed', async () => {
+    await act(async () => {
+      area().dispatchEvent(ev('pointerenter'))
+      host.querySelector('#link')!.dispatchEvent(ev('pointerdown'))
+    })
+    expect(open()).toBe('false')
+  })
+
   it('opens again after the pointer left and came back', async () => {
     await fire(host.querySelector('#link')!, 'pointerdown')
     await fire(area(), 'pointerleave', 200)
