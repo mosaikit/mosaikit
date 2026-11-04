@@ -21,6 +21,9 @@ Start with [Getting started](getting-started.md), then read the reference you ne
 | [Developer signing](signing.md) | Make a key, trust a publisher, revoke a key |
 | [Releasing the kit](releasing.md) | The kit archives, checking a download, `self-update`, `cargo install`, a private registry |
 | [Testing](testing.md) | Unit tests, `validate --strict`, `@mosaikit/plugin-testing`, CI recipes |
+| [Building an application](building-an-application.md) | A product (distribution) on the compiled base: brand, plugins, defaults, first start, build, upgrades, tests (`mosaikit-product`) |
+| [Reference product](reference-product.md) | A small complete product, step by step |
+| [Licensing and responsibilities](product-licensing.md) | What a publisher may redistribute, names and brands, who supports what, patches (draft, D9) |
 | [Troubleshooting](troubleshooting.md) | The errors the kernel and the tools return, with cause and fix |
 | [Changelog and compatibility](changelog.md) | Versions of kit, platform, SDK and UI API; deprecations |
 

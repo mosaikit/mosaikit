@@ -224,7 +224,7 @@ workspaces) only for building everything at once; (3) change the CI of `mosaikit
 `cargo xtask plugin build`/`mosaikit-plugin test` outside the monorepo. Until then the official plugins build as before, and the
 standalone path is proved by the kit test above.
 
-### Phase 4 — Development servers (7 days) — done 2026-11-01, except the real run of the Docker kit and the release of the archives
+### Phase 4 — Development servers (7 days) — done 2026-11-01; the real run of the Docker kit done 2026-11-04
 
 - **Desktop kit** (SQLite): reduced archive of the existing desktop release with a *developer profile*:
   - tenant `dev`, an Administrator, a Tenant Manager and two Users with known development passwords;
@@ -273,12 +273,12 @@ Delivered (2026-11-01):
   tests, xtask `deploy_check` (2 new), the e2e spec `18-developer-profile.spec.ts` (5 tests: banner and users, hot reload of UI and manifest, host calls,
   permissions and switch of users, changed migration and reset, empty state). Manual checks `DK-12..16` (DK-06 changed).
 
-Left: **the real run of the Docker kit** (image build and `docker compose up`, not done here: the build takes many minutes and the disk was full; only the
+**Closed 2026-11-04:** the real run of the Docker kit (`cargo xtask release devkit-docker`: the image `mosaikit-dev:1.0.0` was built, 179 MB; `docker compose up` with the PostgreSQL service: both healthy, `/api/health` says `developer`; the Notes plugin loaded from its folder, a test user signed in and `expectAccessible` passed on its page; the volumes were removed afterwards). Before: the real run of the Docker kit (image build and `docker compose up`, not done here: the build takes many minutes and the disk was full; only the
 generated files and `docker compose config` are checked), **the desktop archive of the kit** with `mosaikit-server` next to `mosaikit-plugin` (phase 7), the
 reload of files through a bind mount from Windows/macOS into the container (file events may not arrive; the README says to restart the app or use
 the desktop kit), and rebuilding the plugin inside the container (the logic and the UI are built on the host).
 
-### Phase 5 — Tests and conformance (5 days) — done 2026-11-01, except the axe run and the end-to-end run of the helper
+### Phase 5 — Tests and conformance (5 days) — done 2026-11-01; the axe run, the end-to-end spec of the helper, the link of the package and `[requires]` done 2026-11-04
 
 - `mosaikit-plugin test`: runs the unit tests of the logic with `MockHost` (documented, with recipes for
   `db.query`, `notify`, `call_plugin`, permissions), and the checks of the package.
@@ -306,7 +306,7 @@ conformance module, fixtures in `crates/plugin-cli/tests/fixtures` (`good` and t
 every official plugin of `mosaikit-plugins` pass and that every broken fixture fails, the native tests of `MockHost`, `vitest` of the package; manual
 checks `DK-17..20`.
 
-Left: **the axe smoke run of the plugin pages** (the helper `expectAccessible` is written and typed but was not run against a server: the
+**Closed 2026-11-04:** the end-to-end spec `tests/e2e/specs/20-plugin-testing-helpers.spec.ts` (own server in the developer profile; `signIn`, `openPlugin`, `expectAccessible` pass on the shell and on a plugin page and fail with the list of violations on a bad page; 3 tests, run) and the same helpers against the Docker kit; `@mosaikit/plugin-testing` is linked in `node_modules` (`npm install`, a dependency of `tests/e2e`); every official plugin declares `[requires] mosaikit = ">=1.0, <2"` and `api = 1` (PR to `mosaikit-plugins`), and `validate --strict` now refuses a manifest without `[requires] mosaikit`. Before: **the axe smoke run of the plugin pages** (the helper `expectAccessible` is written and typed but was not run against a server: the
 server executable was in use), **an end-to-end spec that uses the helper** against its own server (as `18-developer-profile.spec.ts` does), the
 link of the package in `node_modules` (`npm install` of the workspace), and **`[requires]` in the official plugins**.
 
@@ -418,7 +418,7 @@ An application is a distribution: a product with its own name, brand, plugins an
 unchanged kernel. Track B starts when phases 1, 2 and 4 of Track A are done (it reuses the stable API, the
 command-line tool and the base servers) and adds what only a product needs.
 
-### Phase 9 — What a product may change, and the contract of the base (3 days)
+### Phase 9 — What a product may change, and the contract of the base (3 days) — done 2026-11-04
 
 - Audit the distribution mechanism (architecture §14, `distribution.toml`, `brand.toml`, `xtask --dist`) and
   write what a product may change (D7) and what is fixed: kernel, security rules, origins, the signature model.
@@ -431,7 +431,11 @@ command-line tool and the base servers) and adds what only a product needs.
 
 Output: a documented, versioned contract between the base and a product.
 
-### Phase 10 — The product builder `mosaikit-product` (8 days)
+Delivered (2026-11-04): `docs/reports/distribution-audit.md` (what a product may change and what is fixed, the folders, ports, variables and extension points of the desktop
+archive and of the Docker image, the versioning rule, and the gaps found with the phase that closes each). The contract needed no change in the kernel; the gaps are
+phases 10 and 11.
+
+### Phase 10 — The product builder `mosaikit-product` (8 days) — done 2026-11-04, except the name and icon of the executable without `rcedit`, the CI matrix and the run on a clean machine
 
 - A command-line tool (same family and installation as `mosaikit-plugin`; a crate `mosaikit-product-cli`):
   - `new`: standalone folder with `distribution.toml`, `branding/` (brand.toml, logo, favicon, icon),
@@ -454,7 +458,20 @@ Output: a documented, versioned contract between the base and a product.
 
 Output: a product is built from the compiled kit with one command, with no Mosaikit source.
 
-### Phase 11 — Defaults, bootstrap and database extensions of a product (6 days)
+Delivered (2026-11-04): crate `crates/product-cli` (library `mosaikit_product_cli`, executable `mosaikit-product`, own README and changelog; it does not link the kernel).
+`new` (the folder with `distribution.toml`, `branding/`, `plugins/`, `shared/`, `tests/`, CI file, README); `validate` (the manifest, the range of the base, the brand,
+the strict checks of the own plugins, and the policy tables by the base itself through `mosaikit-server check-distribution`); `dev` (the base in the developer
+profile with the brand, the policy and the own plugins loaded from their folders, and the official ones from the registry of the base); `build desktop` (the
+base kit as a folder or `.zip`: the executable renamed, `registry/` with the own packages signed by the key of the product and the official ones copied with their
+signature, `branding/`, `distribution.toml`, `mosaikit.toml` trusting both keys, `START.txt`; no compilation); `build docker` (`Dockerfile` `FROM` the base image,
+`compose.yml` with the database image of the product, `initdb/`, optional `docker build`); `build k8s` (kustomize overlay over the `k8s` folder of the kit);
+`sign`; `doctor`. A release never carries an unsigned plugin (every package is verified against the keys it trusts); a product that asks for database
+extensions on SQLite is refused by `build desktop`. Tests: 12 unit tests; manual checks DK-27, DK-30. **Checked by hand:** from a clean folder
+`new` → `validate` (with the real server) → `build desktop` (on the real desktop kit of the repository, two official plugins kept) → `dev` → `test`.
+Left: the name, version and icon of the Windows executable need `rcedit` (the build says so and leaves them); the same flow in CI on three platforms; the
+Docker release was written but the image not built here (the base image of the product is the one of `cargo xtask release docker`).
+
+### Phase 11 — Defaults, bootstrap and database extensions of a product (6 days) — done 2026-11-04, except a dialog for About and the quotas of the first tenant
 
 - `distribution.toml` grows the sections that make a product behave as one, all optional:
   - `[defaults]` values of the settings on the three levels, and `[locked]` the ones the Administrator and the
@@ -474,7 +491,16 @@ Output: a product is built from the compiled kit with one command, with no Mosai
 
 Output: a product sets its identity, defaults and first start in `distribution.toml`.
 
-### Phase 12 — Tests and conformance of a product (4 days)
+Delivered (2026-11-04): `crates/kernel/src/product.rs` and architecture `14.4. `[product] base` (the range of the base, checked first: a base outside it stops the
+start with `product_base`); `[defaults]` (checked against the settings; used in place of the built-in defaults); `[locked] keys` (the setting ignores what is stored,
+is shown locked, `setting_locked` for the Administrator and the Tenant Managers); `[languages]`; `[bootstrap]` (`tenant`, `tenant_name`, `trial_days`,
+`admin_email`; the environment variables win; the developer profile ignores the tenant); `[database] extensions` (checked at start on PostgreSQL, a message that
+names them: `product_extensions`); `[about]` (log at start and `about` in `GET /api/brand`); `mosaikit-server check-distribution`. The known keys are in
+`xtask/src/dist.rs` too, so `cargo xtask --dist` accepts them. Tests: 6 unit tests, kernel test `product_policy` (PostgreSQL and SQLite), manual checks DK-28, DK-29.
+Left: the About **dialog** in the shell (the data are in the API and the log); quotas of the first tenant (use the platform quotas); the seed data of a plugin is a
+`oneshot` sidecar (no new mechanism).
+
+### Phase 12 — Tests and conformance of a product (4 days) — done 2026-11-04, except the layout contract and the accessibility run inside `mosaikit-product test`
 
 - `mosaikit-product test`: smoke test (start, sign in as each test user, open each plugin page, the brand, the
   About dialog), the checks of every included plugin (`validate --strict` of phase 5), the layout contract of the
@@ -486,7 +512,14 @@ Output: a product sets its identity, defaults and first start in `distribution.t
 
 Output: a product publisher can prove their build is sound before shipping it.
 
-### Phase 13 — Documentation for building applications (5 days, in parallel with phases 10–12)
+Delivered (2026-11-04): `mosaikit-product test` (validation with the strict checks of every own plugin and the policy; the product started on the base in the developer
+profile; over HTTP: health, brand name, About data, sign-in of the four test users and of the Administrator, every own plugin in the tenant of the Tenant Manager;
+`--upgrade-from <older server>` runs the product on the older base and then, on the same data, on the current one). Broken products fail: a plugin whose `[requires] mosaikit`
+excludes the base, a wrong default or locked key, an unsigned package in the registry, `[database] extensions` on SQLite. The helpers of `@mosaikit/plugin-testing`
+(`signIn`, `openPlugin`, `expectAccessible`) are linked in `node_modules` and have their own end-to-end spec (`20-plugin-testing-helpers`: 3 tests, run).
+Left: the layout contract and the accessibility of the shell with the brand of a product run in the browser (the helpers do it; `test` does not start a browser).
+
+### Phase 13 — Documentation for building applications (5 days, in parallel with phases 10–12) — done 2026-11-04, except the reading by someone outside and the check of the Italian text
 
 Written in English with the Italian translation, in `docs/devkit/` next to the plugin documents:
 
@@ -506,7 +539,12 @@ Written in English with the Italian translation, in `docs/devkit/` next to the p
 Output: someone who has never seen the code builds the reference product from the documents alone (checked in
 phase 14).
 
-### Phase 14 — Pilot with an outside product (5 days, mostly waiting)
+Delivered (2026-11-04): `docs/devkit/building-an-application.md` (what a product is, the folder, `distribution.toml`, brand and identity, plugins, settings and first start,
+data and extensions, build and release, upgrades, tests, operations; Italian in `it/`), `reference-product.md` (the small complete product, step by step),
+`product-licensing.md` (D9, a draft to be read by whoever is entitled to), the index of `docs/devkit/README.md` and the changelog. Left: a reading by a person who has not seen
+the code (phase 14); the Italian text is the author's translation and wants a native reader.
+
+### Phase 14 — Pilot with an outside product (5 days, mostly waiting) — not started: it needs a team outside the project
 
 - One team outside the project builds a product from the documents alone (brand, plugins, defaults,
   a desktop and a Docker release); every question is logged and answered in the documents.
