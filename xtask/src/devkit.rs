@@ -367,7 +367,7 @@ pub fn notices() -> Result<String> {
         "--locked",
     ]))?;
     let meta: Value = serde_json::from_str(&meta)?;
-    let crates = crates_of(&meta, &["mosaikit-plugin-cli", "mosaikit-server"]);
+    let crates = crates_of(&meta, &["mosaikit-plugin-cli", "mosaikit-product-cli", "mosaikit-server"]);
     let mut npm_pkgs = Vec::new();
     let api = package_json("ui/plugin-api")?;
     for name in
@@ -500,7 +500,7 @@ pub fn devkit(o: &Options) -> Result<()> {
     // --- executables ---
     if !o.skip_build {
         let mut b = Command::new("cargo");
-        b.current_dir(root()).args(["build", "--release", "-p", "mosaikit-plugin-cli"]);
+        b.current_dir(root()).args(["build", "--release", "-p", "mosaikit-plugin-cli", "-p", "mosaikit-product-cli"]);
         if server {
             plugins::ensure_npm()?;
             run(npm().current_dir(root()).args(["run", "build"]))?;
@@ -509,7 +509,7 @@ pub fn devkit(o: &Options) -> Result<()> {
         run(&mut b)?;
     }
     let rel = plugins::target_dir().join("release");
-    let mut bins = vec!["mosaikit-plugin"];
+    let mut bins = vec!["mosaikit-plugin", "mosaikit-product"];
     if server {
         bins.push("mosaikit-server");
     }
