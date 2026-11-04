@@ -737,6 +737,16 @@ accent = "red"
       return c.result()
     },
   },
+  {
+    id: 'DK-32',
+    async run() {
+      const c = H.checker()
+      const b = (await (await fetch(new URL('api/brand', L.BASE))).json()) as { about?: { base?: string } }
+      c.ok(!!b.about && typeof b.about.base === 'string', '/api/brand carries the About data with the version of the base')
+      c.note('the dialog (person menu > About) is checked by hand: the e2e spec of the shell opens it')
+      return c.result()
+    },
+  },
 ]
 
 export default checks
