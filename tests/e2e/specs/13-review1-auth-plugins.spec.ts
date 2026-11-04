@@ -269,16 +269,17 @@ test.describe.serial('review round 1: auth and plugins', () => {
     await expect(frame.frameLocator('iframe.sframe').first().getByRole('heading', { name: 'Zip site works' })).toBeVisible()
   })
 
-  test('R1-A-07 a zip site with a meta refresh into a subfolder loads its css and scripts (CORP of the subresources)', async ({ page }) => {
+  test('R1-A-07 a zip site with a meta refresh into a subfolder loads its css, scripts and data (CORP and CORS of the subresources)', async ({ page }) => {
     // the page of the site runs in a sandboxed frame (opaque origin) served by the plugin origin, which is another
     // site than the shell: every subresource is a cross-site request and needs `Cross-Origin-Resource-Policy: cross-origin`
     const zip = zipOf({
       'index.html': '<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0; url=./app/main/"></head><body></body></html>',
       'app/main/index.html':
-        '<!DOCTYPE html><html><head><link rel="stylesheet" href="../../css/x.css"><link rel="stylesheet" href="./local.css"><script src="../../js/x.js"></script></head><body><h1 id="h">Deep site</h1></body></html>',
+        '<!DOCTYPE html><html><head><link rel="stylesheet" href="../../css/x.css"><link rel="stylesheet" href="./local.css"><script src="../../js/x.js"></script></head><body><h1 id="h">Deep site</h1><p id="d"></p></body></html>',
       'app/main/local.css': '#h { text-decoration: underline; }',
       'css/x.css': '#h { color: rgb(1, 2, 3); }',
-      'js/x.js': 'addEventListener("DOMContentLoaded", () => { document.getElementById("h").textContent = "Deep site, script ran" })',
+      'js/x.js': 'addEventListener("DOMContentLoaded", () => { document.getElementById("h").textContent = "Deep site, script ran"; fetch("../../data.json").then((r) => r.json()).then((j) => { document.getElementById("d").textContent = "fetched " + j.value }, (e) => { document.getElementById("d").textContent = "fetch failed" }) })',
+      'data.json': '{"value": 42}',
     })
     const zipName = `Deep ${Date.now().toString(36)}`
     const bad: string[] = []
@@ -300,6 +301,8 @@ test.describe.serial('review round 1: auth and plugins', () => {
     await expect(h).toHaveText('Deep site, script ran')
     await expect(h).toHaveCSS('color', 'rgb(1, 2, 3)')
     await expect(h).toHaveCSS('text-decoration-line', 'underline')
+    // the script reads a file of its own site with fetch (CORS from the opaque origin)
+    await expect(site.locator('#d')).toHaveText('fetched 42')
     expect(bad).toEqual([])
   })
 

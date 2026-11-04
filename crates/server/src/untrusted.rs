@@ -22,17 +22,17 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/ui/{plugin}/", get(plugin_ui_root))
         .route("/ui/{plugin}/{*path}", get(plugin_ui))
-        .route("/c/{ticket}/", get(ticket_root))
-        .route("/c/{ticket}/{*path}", get(ticket_file))
+        .route("/c/{ticket}/", get(ticket_root).options(site_preflight))
+        .route("/c/{ticket}/{*path}", get(ticket_file).options(site_preflight))
         .route("/p/{token}", get(public_redirect))
-        .route("/p/{token}/", get(public_root))
+        .route("/p/{token}/", get(public_root).options(site_preflight))
         .route("/p/{token}/api", get(public_api))
         .route("/p/{token}/config", get(public_config))
         .route("/p/{token}/call/{name}", post(public_call))
         .route("/p/{token}/unlock", post(public_unlock))
         .route("/p/{token}/f/{id}/{name}", get(public_child_file))
         .route("/p/{token}/d/{id}/", get(public_child_folder))
-        .route("/p/{token}/{*path}", get(public_path))
+        .route("/p/{token}/{*path}", get(public_path).options(site_preflight))
         .fallback(|| async { (StatusCode::NOT_FOUND, "not found") })
 }
 
@@ -180,12 +180,33 @@ async fn serve_site(s: &AppState, tenant: Uuid, rid: Uuid, rel: &str, base: &str
                 // unguessable token in the URL (a ticket or a public link); the unlock cookie of a
                 // protected link is `SameSite=Lax`, so it never goes with a cross-site subresource.
                 set(&mut res, HeaderName::from_static("cross-origin-resource-policy"), "cross-origin");
+                // The scripts of the site read its own files with XHR/fetch: from the opaque origin that
+                // is a CORS request. Only GET/HEAD are served and no credentials are allowed (no
+                // `Allow-Credentials`), so the Lax cookie never goes along and the answer is readable
+                // only by someone who already holds the capability URL.
+                set(&mut res, header::ACCESS_CONTROL_ALLOW_ORIGIN, "*");
                 res
             }
             Err(_) => (StatusCode::NOT_FOUND, "not found").into_response(),
         },
         None => (StatusCode::NOT_FOUND, "not found").into_response(),
     }
+}
+
+/// CORS preflight of a site file (the frame has an opaque origin: `Origin: null`). Answers without
+/// looking at the ticket or token: it carries no data, the GET that follows is the one checked.
+async fn site_preflight(headers: HeaderMap) -> Response {
+    let mut res = StatusCode::NO_CONTENT.into_response();
+    set(&mut res, header::ACCESS_CONTROL_ALLOW_ORIGIN, "*");
+    set(&mut res, header::ACCESS_CONTROL_ALLOW_METHODS, "GET, HEAD, OPTIONS");
+    let asked =
+        headers.get(header::ACCESS_CONTROL_REQUEST_HEADERS).and_then(|v| v.to_str().ok()).unwrap_or("*");
+    set(&mut res, header::ACCESS_CONTROL_ALLOW_HEADERS, asked);
+    set(&mut res, header::ACCESS_CONTROL_MAX_AGE, "600");
+    if headers.get("access-control-request-private-network").is_some_and(|v| v == "true") {
+        set(&mut res, HeaderName::from_static("access-control-allow-private-network"), "true");
+    }
+    res
 }
 
 async fn ticket_root(
