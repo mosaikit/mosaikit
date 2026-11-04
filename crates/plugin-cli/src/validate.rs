@@ -108,7 +108,12 @@ fn manifest_checks(m: &Manifest, strict: bool, r: &mut Report) {
         r.warn(d);
     }
     if m.requires.mosaikit.is_none() {
-        r.warn("no [requires] mosaikit: the plugin says it works with any version of Mosaikit (e.g. \">=1.0, <2\")");
+        let msg = "no [requires] mosaikit: the plugin says it works with any version of Mosaikit (e.g. \">=1.0, <2\")";
+        if strict {
+            r.error(msg);
+        } else {
+            r.warn(msg);
+        }
     }
     // keys added after the first release of the API: an older Mosaikit refuses a manifest that has them
     let newer = m.config.iter().any(|c| c.public)
