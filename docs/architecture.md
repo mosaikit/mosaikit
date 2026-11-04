@@ -1822,7 +1822,11 @@ are limited to the path.
   `Cross-Origin-Resource-Policy: cross-origin` (the others keep `same-site`): the sandboxed frame
   has an opaque origin, so its own css, scripts and images are cross-site requests. Access is by the
   token in the URL (ticket or public link); the unlock cookie of a protected link is `SameSite=Lax`
-  and never goes with such requests.
+  and never goes with such requests. They also carry `Access-Control-Allow-Origin: *` (never
+  `Allow-Credentials`), and the site routes (`/c/{ticket}/...`, `/p/{token}/...`) answer the CORS
+  preflight (`OPTIONS`, 204, methods `GET, HEAD, OPTIONS`, requested headers echoed, `Max-Age`,
+  `Access-Control-Allow-Private-Network` when asked), so the scripts of a site can read its own
+  files with XHR/fetch from the `Origin: null` frame. Only GET/HEAD are served.
 - **Passwords**: argon2id, at least 10 characters (the platform and the tenants may ask for more,
   §3.1). Sign-in with a limit of failed attempts per account and per address (default 8 in 15
   minutes, settings of the platform and of the tenant).

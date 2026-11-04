@@ -467,6 +467,25 @@ async fn user_contents_always_sandboxed() {
     // the frame has an opaque origin: its own subresources must not be blocked by CORP
     assert_eq!(r.header(header::HeaderName::from_static("cross-origin-resource-policy")), "cross-origin");
     let base = path.trim_end_matches("index.html");
+    // the scripts of the site read its files with XHR/fetch from the opaque origin: CORS, no credentials
+    assert_eq!(r.header(header::ACCESS_CONTROL_ALLOW_ORIGIN), "*");
+    assert!(r.headers.get(header::ACCESS_CONTROL_ALLOW_CREDENTIALS).is_none());
+    let pre = Request::builder()
+        .method(Method::OPTIONS)
+        .uri(format!("{base}css/a.css"))
+        .header(header::ORIGIN, "null")
+        .header(header::ACCESS_CONTROL_REQUEST_METHOD, "GET")
+        .header(header::ACCESS_CONTROL_REQUEST_HEADERS, "x-requested-with")
+        .header("access-control-request-private-network", "true")
+        .body(Body::empty())
+        .unwrap();
+    let pre = send(&a.untrusted, pre).await;
+    assert_eq!(pre.status, StatusCode::NO_CONTENT);
+    assert_eq!(pre.header(header::ACCESS_CONTROL_ALLOW_ORIGIN), "*");
+    assert_eq!(pre.header(header::ACCESS_CONTROL_ALLOW_METHODS), "GET, HEAD, OPTIONS");
+    assert_eq!(pre.header(header::ACCESS_CONTROL_ALLOW_HEADERS), "x-requested-with");
+    assert_eq!(pre.header(header::HeaderName::from_static("access-control-allow-private-network")), "true");
+    assert!(pre.headers.get(header::ACCESS_CONTROL_ALLOW_CREDENTIALS).is_none());
     assert_eq!(
         a.get_untrusted(&format!("{base}css/a.css"), None)
             .await
