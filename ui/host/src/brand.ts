@@ -38,6 +38,8 @@ export interface Brand {
   layout?: string
   /** groups of the sidebar navigation declared by the distribution (recent servers) */
   nav_groups?: NavGroupDef[]
+  /** the product, its licence and the base it runs on: the About dialog (recent servers) */
+  about?: { product: string | null; version: string | null; licence: string | null; text: string | null; base: string; base_range: string | null }
   /** maintenance mode and the planned one (recent servers) */
   maintenance?: { on: boolean; message: string; planned_at: string | null; planned_message: string }
 }

@@ -7,7 +7,7 @@ import { useState, type ReactNode } from 'react'
 import { useHoverMenu, type HoverMenu } from './hoverMenu.ts'
 import { backFromActiveEntry } from './contextband.ts'
 import { useQueryClient } from '@tanstack/react-query'
-import { Bell, Check, ChevronDown, ChevronRight, CircleHelp, Contrast, KeyRound, LogOut, Settings, ShieldCheck, Trash2, UserRound } from 'lucide-react'
+import { Bell, Check, ChevronDown, ChevronRight, CircleHelp, Contrast, Info, KeyRound, LogOut, Settings, ShieldCheck, Trash2, UserRound } from 'lucide-react'
 import { api } from '../api.ts'
 import { useBrand } from '../brand.ts'
 import type { Session, ShellBand } from '../types.ts'
@@ -23,6 +23,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import SearchBox from './SearchBox.tsx'
 import { initials, useTenantCtx } from './core.ts'
@@ -453,9 +454,11 @@ function UserMenu({ session, route, band }: { session: Session; route: Route; ba
     if (endSession) window.location.assign(endSession)
     else go(u.is_system_admin ? '#/admin' : '#/')
   }
+  const [aboutOpen, setAboutOpen] = useState(false)
   const role = u.is_system_admin ? t('Administrator') : roleOf(session, route)
   const tenant = route.area === 'tenant' ? session.memberships.find((m) => m.slug === route.tenant)?.name : t('Platform')
   return (
+    <>
     <DropdownMenu>
       <DropdownMenuTrigger
         data-tour="person"
@@ -522,12 +525,45 @@ function UserMenu({ session, route, band }: { session: Session; route: Route; ba
           </>
         )}
         <DropdownMenuSeparator />
+        <DropdownMenuItem onSelect={() => setAboutOpen(true)}>
+          <Info />
+          {t('About')}
+        </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => void logout()}>
           <LogOut />
           {t('Sign out')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
+    <AboutDialog open={aboutOpen} onOpenChange={setAboutOpen} />
+    </>
+  )
+}
+
+/** About: the product (its name and version, licence and text from `[about]` of the distribution) and the base it runs on. */
+function AboutDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
+  const brand = useBrand()
+  const a = brand.about
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>{a?.product || brand.name}</DialogTitle>
+          <DialogDescription>{a?.version ? t('Version {v}', { v: a.version }) : t('Version of the product')}</DialogDescription>
+        </DialogHeader>
+        <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
+          {a?.licence && (
+            <>
+              <dt className="text-muted-foreground">{t('Licence')}</dt>
+              <dd>{a.licence}</dd>
+            </>
+          )}
+          <dt className="text-muted-foreground">{t('Base')}</dt>
+          <dd>{t('Powered by Mosaikit {v}', { v: a?.base ?? brand.kernel_version })}</dd>
+        </dl>
+        {a?.text && <p className="text-sm whitespace-pre-line">{a.text}</p>}
+      </DialogContent>
+    </Dialog>
   )
 }
 

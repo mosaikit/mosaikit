@@ -132,3 +132,11 @@ test('expectAccessible fails with the list of the violations', async ({ page }) 
   await page.setContent('<!doctype html><html lang="en"><title>t</title><main><img src="data:image/gif;base64,R0lGODlhAQABAAAAACw="></main></html>')
   await expect(expectAccessible(page)).rejects.toThrow(/image-alt/)
 })
+
+test('the About dialog of the person menu shows the base the product runs on', async ({ page }) => {
+  await signIn(page, APP, 'alice')
+  await page.getByRole('button', { name: /person menu/ }).click()
+  await page.getByRole('menuitem', { name: 'About' }).click()
+  await expect(page.getByRole('dialog')).toContainText('Powered by Mosaikit')
+  await expectAccessible(page)
+})
