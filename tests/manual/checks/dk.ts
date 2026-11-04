@@ -680,6 +680,63 @@ const checks: L.Check[] = [
       return c.result()
     },
   },
+  {
+    id: 'DK-27',
+    async run() {
+      const c = H.checker()
+      const out = fs.mkdtempSync(path.join(os.tmpdir(), 'dk27-'))
+      execFileSync('cargo', ['build', '-p', 'mosaikit-product-cli'], { cwd: L.ROOT, stdio: 'inherit' })
+      const bin = path.join(L.ROOT, 'target', 'debug', process.platform === 'win32' ? 'mosaikit-product.exe' : 'mosaikit-product')
+      execFileSync(bin, ['new', 'acme-maps', '--into', out])
+      const dir = path.join(out, 'acme-maps')
+      for (const f of ['distribution.toml', 'branding/brand.toml', 'plugins/README.md', 'shared/README.md', 'tests/README.md', '.github/workflows/ci.yml', 'README.md']) c.ok(fs.existsSync(path.join(dir, f)), `${f} is made`)
+      const good = spawnSync(bin, ['validate', dir, '--server', path.join(out, 'no-server')], { encoding: 'utf8' })
+      c.ok(good.status === 0, `a new product validates (${good.status})`)
+      fs.writeFileSync(path.join(dir, 'branding/brand.toml'), 'logo = "gone.svg"
+[colors]
+accent = "red"
+')
+      fs.writeFileSync(path.join(dir, 'distribution.toml'), fs.readFileSync(path.join(dir, 'distribution.toml'), 'utf8').replace('>=1.0, <2', 'banana'))
+      const bad = spawnSync(bin, ['validate', dir, '--server', path.join(out, 'no-server')], { encoding: 'utf8' })
+      c.ok(bad.status === 1 && /gone.svg/.test(bad.stdout) && /colors.accent/.test(bad.stdout) && /banana/.test(bad.stdout), 'the broken product fails and says why')
+      return c.result()
+    },
+  },
+  {
+    id: 'DK-28',
+    async run() {
+      const c = H.checker()
+      const r = spawnSync('cargo', ['test', '-p', 'mosaikit-kernel', '--lib', 'product::'], { cwd: L.ROOT, encoding: 'utf8' })
+      c.ok(r.status === 0 && /6 passed/.test(r.stdout), 'the checks of the policy file (range, defaults, locked, bootstrap, extensions) pass')
+      return c.result()
+    },
+  },
+  {
+    id: 'DK-29',
+    async run() {
+      const c = H.checker()
+      const r = spawnSync('cargo', ['test', '-p', 'mosaikit-kernel', '--test', 'product_policy'], { cwd: L.ROOT, encoding: 'utf8' })
+      c.ok(r.status === 0 && /3 passed/.test(r.stdout), 'defaults, locked settings and the first tenant of a product work in a started kernel')
+      return c.result()
+    },
+  },
+  {
+    id: 'DK-30',
+    async run() {
+      const c = H.checker()
+      const r = spawnSync('cargo', ['test', '-p', 'mosaikit-product-cli'], { cwd: L.ROOT, encoding: 'utf8' })
+      c.ok(r.status === 0 && /12 passed/.test(r.stdout), 'the desktop, Docker and Kubernetes releases, and their refusals (unsigned package, missing official plugin, extensions on SQLite), pass')
+      return c.result()
+    },
+  },
+  {
+    id: 'DK-31',
+    async run() {
+      const c = H.checker()
+      c.note('mosaikit-product test needs a server and a desktop kit: run it by hand as DK-31 says (the reference product)')
+      return c.result()
+    },
+  },
 ]
 
 export default checks

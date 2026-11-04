@@ -21,6 +21,9 @@ Si parte da [Per iniziare](getting-started.md), poi si legge il riferimento che 
 | [Firma dello sviluppatore](signing.md) | Creare una chiave, rendere fidato un editore, revocare una chiave |
 | [Rilasciare il kit](../releasing.md) | Archivi del kit, verifica di un download, `self-update`, `cargo install`, registro privato (solo in inglese) |
 | [Test](testing.md) | Test unitari, `validate --strict`, `@mosaikit/plugin-testing`, ricette per la CI |
+| [Costruire un'applicazione](building-an-application.md) | Un prodotto (distribuzione) sulla base compilata: brand, plugin, valori predefiniti, primo avvio, build, aggiornamenti, test (`mosaikit-product`) |
+| [Prodotto di riferimento](../reference-product.md) | Un piccolo prodotto completo, passo per passo (in inglese) |
+| [Licenza e responsabilità](../product-licensing.md) | Che cosa un publisher può ridistribuire, nomi e marchi, chi supporta cosa (bozza, in inglese) |
 | [Risoluzione dei problemi](troubleshooting.md) | Gli errori che restituiscono il kernel e gli strumenti, con causa e rimedio |
 | [Changelog e compatibilità](changelog.md) | Versioni di kit, piattaforma, SDK e API della UI; deprecazioni |
 

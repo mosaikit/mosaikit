@@ -2236,6 +2236,26 @@ sidecar and without `..`; `mode` is an optional octal string such as `"0644"`.
 A target is relative on the desktop and absolute in containers: a sidecar with `files` is therefore for
 one kind of target (the release of the other kind refuses it with a clear message).
 
+### 14.4 The policy of a product
+
+`distribution.toml` carries, besides the seeds, the policy of the product; the kernel reads it at start from the file of
+`plugin_settings_file` (`crates/kernel/src/product.rs`) and refuses to start on a wrong entry, naming the key. Every table is optional.
+
+- `[product] base = ">=1.0, <2"`: the versions of the base the release works with. A base outside the range stops the start (`product_base`).
+- `[defaults]`: values of the settings of the platform in place of the built-in defaults (checked against the setting: it must exist, belong to the
+  platform and accept the value). `[languages]` (`enabled`, `default`) is sugar for `lang.enabled` and `lang.default`.
+- `[locked] keys = [...]`: settings nobody can change. A locked setting ignores what is stored and keeps the default; the Administrator and the Tenant
+  Managers see it locked and `set_platform` / `set_tenant` answer `setting_locked`.
+- `[bootstrap]`: `tenant` (slug of the first tenant, as `initial_tenant`), `tenant_name`, `trial_days`, `admin_email`. The environment variables win.
+  The developer profile ignores the tenant: it brings its own.
+- `[database] extensions`: PostgreSQL extensions that must be installed; the start stops with a message that names them (`product_extensions`).
+  SQLite has none.
+- `[about]` (`licence`, `text`): with the product name and version and the base version, written to the log at start and returned as `about` by
+  `GET /api/brand`.
+
+`mosaikit-server check-distribution <file>` makes the same checks without starting the kernel. The tool `mosaikit-product`
+(`crates/product-cli`) builds a product from the compiled base: [docs/devkit/building-an-application.md](devkit/building-an-application.md).
+
 ### 14.2 Seeding settings and platform keys
 
 A manifest default works for text and number settings only; a `secret` of `[[config]]` and the platform key of
