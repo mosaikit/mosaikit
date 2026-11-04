@@ -7,6 +7,9 @@ import tailwindcss from '@tailwindcss/vite'
 // In development the app opens from Vite (http://127.0.0.1:5173, HMR) and the API calls are
 // forwarded to the Mosaikit server on :47080. In xtask/mosaikit.dev.toml url points to
 // :5173, so the UIs of the plugins accept being embedded from here.
+// A second instance (`cargo xtask dev --instance`) sets MOSAIKIT_DEV_VITE_PORT and MOSAIKIT_DEV_SERVER_PORT.
+const vitePort = Number(process.env.MOSAIKIT_DEV_VITE_PORT ?? 5173)
+const serverPort = Number(process.env.MOSAIKIT_DEV_SERVER_PORT ?? 47080)
 export default defineConfig({
   // relative paths: the app can be served under a base path (url = ".../mosaikit")
   base: './',
@@ -15,11 +18,11 @@ export default defineConfig({
   resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
   server: {
     host: '127.0.0.1',
-    port: 5173,
+    port: vitePort,
     strictPort: true,
     proxy: {
-      '/api': { target: 'http://127.0.0.1:47080', changeOrigin: false },
-      '/brand': { target: 'http://127.0.0.1:47080', changeOrigin: false },
+      '/api': { target: `http://127.0.0.1:${serverPort}`, changeOrigin: false },
+      '/brand': { target: `http://127.0.0.1:${serverPort}`, changeOrigin: false },
     },
   },
   build: {

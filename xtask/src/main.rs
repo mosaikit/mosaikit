@@ -45,6 +45,13 @@ enum Cmd {
         /// do not start Vite for the host UI
         #[arg(long)]
         no_ui: bool,
+        /// a second, independent instance (own ports, database, data and build folder), next to the
+        /// main one; the plugins are not rebuilt (the main one does it)
+        #[arg(long)]
+        instance: Option<String>,
+        /// with --instance: Vite on this port, the server on the next, the plugins on the one after
+        #[arg(long, default_value_t = 48080)]
+        port_base: u16,
     },
     /// Plugins: build, packages, scaffolding
     Plugin {
@@ -307,7 +314,9 @@ fn main() -> Result<()> {
                 Ok(())
             }
         },
-        Cmd::Dev { no_ui } => dev::dev(no_ui),
+        Cmd::Dev { no_ui, instance, port_base } => {
+            dev::dev(no_ui, instance.map(|n| dev::Instance::new(&n, port_base)))
+        }
         Cmd::Plugin { cmd } => match cmd {
             PluginCmd::Build { release } => {
                 let all = plugins::discover()?;
