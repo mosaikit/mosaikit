@@ -1,5 +1,12 @@
 # Changelog and compatibility
 
+## Unreleased
+
+- New: `mosaikit-product` (`crates/product-cli`): `new`, `validate`, `dev`, `build desktop|docker|k8s`, `sign`, `doctor`, `test`.
+- New in `distribution.toml`: `[product] base`, `[defaults]`, `[locked]`, `[languages]`, `[bootstrap]`, `[database] extensions`, `[about]` (architecture `14.4);
+  `mosaikit-server check-distribution`; `about` in `GET /api/brand`.
+- Changed: `mosaikit-plugin validate --strict` refuses a manifest without `[requires] mosaikit` (a warning without `--strict`).
+
 ## Versions at a glance
 
 One version number for the whole kit, on the cadence of the platform (decision D6 of the plan). The packages that carry
