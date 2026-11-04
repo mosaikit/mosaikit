@@ -33,6 +33,7 @@ pub mod paging;
 pub mod personal;
 pub mod plugin_directory;
 pub mod plugins;
+pub mod product;
 pub mod quotas;
 pub mod run_tickets;
 pub mod schedule_worker;
@@ -214,6 +215,8 @@ pub struct Kernel {
     pub brand: brand::Brand,
     /// groups of the navigation declared by the distribution (validated; may be empty)
     pub nav_groups: Vec<navgroups::NavGroup>,
+    /// what the distribution sets beyond the brand: defaults, locked settings, first start, extensions
+    pub product: product::ProductPolicy,
     pub(crate) trusted: mosaikit_mskp::TrustedKeys,
     pub(crate) limiter: identity::LoginLimiter,
     pub(crate) argon: Arc<Semaphore>,
@@ -249,6 +252,9 @@ impl Kernel {
         progress: &(dyn Fn(&str) + Send + Sync),
     ) -> Result<Arc<Kernel>> {
         cfg.derive()?;
+        // the policy of the product first: a base outside its range, or a wrong entry, stops the start
+        // before anything is opened
+        let product = product::ProductPolicy::load(&cfg)?;
         std::fs::create_dir_all(&cfg.data_dir)?;
         let mut embedded = None;
         let max = cfg.database.max_connections.max(2);
@@ -280,6 +286,21 @@ impl Kernel {
             mosaikit_db::query_scalar("select value from core.secrets where name = 'cookie'")
                 .fetch_one(&db)
                 .await?;
+        let missing =
+            product::missing_extensions(&db, cfg.backend() == config::Backend::Postgres, &product.extensions)
+                .await?;
+        if !missing.is_empty() {
+            return Err(Error::bad(product::missing_message(&missing)).with_code("product_extensions"));
+        }
+        if product.name.is_some() || product.about.licence.is_some() {
+            tracing::info!(
+                "{} {} on Mosaikit {}{}",
+                product.name.as_deref().unwrap_or("product"),
+                product.version.as_deref().unwrap_or(""),
+                product::BASE_VERSION,
+                product.about.licence.as_deref().map(|l| format!(" (licence: {l})")).unwrap_or_default()
+            );
+        }
         let secrets = secret::SecretBox::load(&cfg)?;
         let brand = match &cfg.brand {
             Some(dir) => brand::Brand::load(dir)?,
@@ -293,6 +314,7 @@ impl Kernel {
             blobs: blobs::Blobs::new(cfg.data_dir.join("blobs")),
             brand,
             nav_groups,
+            product,
             plugins: plugins::Plugins::default(),
             engine: Arc::new(mosaikit_runtime::Engine::new(mosaikit_runtime::Limits::default())),
             trusted,

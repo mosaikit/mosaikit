@@ -177,7 +177,10 @@ pub async fn bootstrap(k: &Kernel) -> Result<()> {
         .await?;
         // optional address of the Administrator (development and test environments); otherwise it is
         // added from the Account page
-        if let Some(e) = std::env::var("MOSAIKIT_ADMIN_EMAIL").ok().filter(|e| crate::notify::valid_email(e))
+        if let Some(e) = std::env::var("MOSAIKIT_ADMIN_EMAIL")
+            .ok()
+            .or_else(|| k.product.bootstrap.admin_email.clone())
+            .filter(|e| crate::notify::valid_email(e))
         {
             mosaikit_db::query(
                 "update core.users set email = $1 where username = 'admin' and is_system_admin",
@@ -195,7 +198,7 @@ pub async fn bootstrap(k: &Kernel) -> Result<()> {
             ));
         }
     }
-    if let Some(slug) = k.cfg.initial_tenant.as_deref() {
+    if let Some(slug) = k.cfg.initial_tenant.as_deref().or(k.product.bootstrap.tenant.as_deref()) {
         if let Some(note) = initial_tenant(k, slug).await? {
             notes.push(note);
         }
@@ -251,9 +254,16 @@ async fn initial_tenant(k: &Kernel, slug: &str) -> Result<Option<String>> {
     let tenant: Uuid =
         mosaikit_db::query_scalar("insert into core.tenants (slug, name) values ($1, $2) returning id")
             .bind(&slug)
-            .bind(&k.brand.name)
+            .bind(k.product.bootstrap.tenant_name.as_deref().unwrap_or(&k.brand.name))
             .fetch_one(&mut *tx)
             .await?;
+    if let Some(days) = k.product.bootstrap.trial_days.filter(|d| *d > 0) {
+        mosaikit_db::query("update core.tenants set trial_until = $2, trial_notice = 0 where id = $1")
+            .bind(tenant)
+            .bind(chrono::Utc::now() + chrono::Duration::days(i64::from(days)))
+            .execute(&mut *tx)
+            .await?;
+    }
     let user: Uuid = mosaikit_db::query_scalar(
         "insert into core.users (home_tenant_id, username, display_name, password_hash)
          values ($1, 'user', 'User', $2) returning id",

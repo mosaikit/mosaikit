@@ -37,6 +37,25 @@ pub struct Distribution {
     /// groups of the sidebar navigation (the server validates them and sends them to the shell)
     #[serde(default)]
     pub nav_groups: Vec<NavGroup>,
+    // --- the policy of a product, read and checked by the kernel at start (crates/kernel/src/product.rs) ---
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub defaults: Option<toml::Table>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub locked: Option<toml::Table>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub languages: Option<toml::Table>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub bootstrap: Option<toml::Table>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub database: Option<toml::Table>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub about: Option<toml::Table>,
     /// folder of the file (to resolve relative paths)
     #[serde(skip)]
     pub dir: PathBuf,
@@ -77,6 +96,10 @@ pub struct Product {
     #[serde(default)]
     #[allow(dead_code)] // documentation of the product
     pub description: String,
+    /// range of the versions of the base the product release works with (the kernel checks it at start)
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub base: Option<String>,
     /// name of the desktop executable (without .exe)
     #[serde(default)]
     pub executable: Option<String>,
@@ -210,7 +233,13 @@ impl Distribution {
 
     /// The distribution has data the server reads from `distribution.toml`: seeds or navigation groups.
     pub fn has_seeds(&self) -> bool {
-        !self.plugin_settings.is_empty() || !self.service_key_values.is_empty() || !self.nav_groups.is_empty()
+        !self.plugin_settings.is_empty()
+            || !self.service_key_values.is_empty()
+            || !self.nav_groups.is_empty()
+            || self.product.base.is_some()
+            || [&self.defaults, &self.locked, &self.languages, &self.bootstrap, &self.database, &self.about]
+                .iter()
+                .any(|t| t.is_some())
     }
 
     pub fn load(path: &Path) -> Result<Distribution> {
