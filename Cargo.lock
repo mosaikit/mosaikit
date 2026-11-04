@@ -1966,6 +1966,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "mosaikit-product-cli"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "mosaikit-mskp",
+ "mosaikit-plugin-cli",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "toml 0.8.2",
+ "zip",
+]
+
+[[package]]
 name = "mosaikit-runtime"
 version = "1.0.0"
 dependencies = [

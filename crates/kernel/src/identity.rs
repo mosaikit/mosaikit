@@ -198,7 +198,13 @@ pub async fn bootstrap(k: &Kernel) -> Result<()> {
             ));
         }
     }
-    if let Some(slug) = k.cfg.initial_tenant.as_deref().or(k.product.bootstrap.tenant.as_deref()) {
+    if let Some(slug) = k.cfg.initial_tenant.as_deref().or(k
+        .product
+        .bootstrap
+        .tenant
+        .as_deref()
+        .filter(|_| !k.cfg.developer_profile))
+    {
         if let Some(note) = initial_tenant(k, slug).await? {
             notes.push(note);
         }

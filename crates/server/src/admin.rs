@@ -23,10 +23,19 @@ pub enum AdminCmd {
     },
     /// Prints the resolved configuration (without secrets)
     Config,
+    /// Checks the product policy of a distribution.toml (base range, defaults, locked settings, languages,
+    /// first start, database extensions) against this base, and prints what it sets; exits with 1 on a mistake
+    CheckDistribution {
+        /// the distribution.toml (or the folder that has it)
+        file: std::path::PathBuf,
+    },
 }
 
 /// Runs a command; returns the exit code.
 pub async fn run(cfg: Config, cmd: AdminCmd) -> i32 {
+    if let AdminCmd::CheckDistribution { file } = &cmd {
+        return check_distribution(file);
+    }
     if let AdminCmd::Config = cmd {
         println!("data_dir       = {}", cfg.data_dir.display());
         println!("url            = {}  (listening on {})", cfg.app_url, cfg.bind);
@@ -87,8 +96,35 @@ pub async fn run(cfg: Config, cmd: AdminCmd) -> i32 {
                 1
             }
         },
-        AdminCmd::Config => 0,
+        AdminCmd::Config | AdminCmd::CheckDistribution { .. } => 0,
     };
     k.shutdown().await;
     code
+}
+
+/// `check-distribution`: the same checks the kernel makes at start, without starting it.
+fn check_distribution(file: &std::path::Path) -> i32 {
+    let path = if file.is_dir() { file.join("distribution.toml") } else { file.to_path_buf() };
+    let f = match mosaikit_kernel::seed::SeedFile::load(&path) {
+        Ok(f) => f,
+        Err(e) => {
+            eprintln!("{}: {}", path.display(), e.message);
+            return 1;
+        }
+    };
+    match mosaikit_kernel::product::ProductPolicy::from_seed(&f, mosaikit_kernel::product::BASE_VERSION) {
+        Ok(p) => {
+            println!("base           = Mosaikit {}", mosaikit_kernel::product::BASE_VERSION);
+            println!("product base   = {}", p.base.as_deref().unwrap_or("any"));
+            println!("defaults       = {}", p.defaults.keys().cloned().collect::<Vec<_>>().join(", "));
+            println!("locked         = {}", p.locked.join(", "));
+            println!("first tenant   = {}", p.bootstrap.tenant.as_deref().unwrap_or("-"));
+            println!("extensions     = {}", p.extensions.join(", "));
+            0
+        }
+        Err(e) => {
+            eprintln!("{}: {}", path.display(), e.message);
+            1
+        }
+    }
 }
