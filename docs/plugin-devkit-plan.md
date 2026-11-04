@@ -471,7 +471,7 @@ extensions on SQLite is refused by `build desktop`. Tests: 12 unit tests; manual
 Left: the name, version and icon of the Windows executable need `rcedit` (the build says so and leaves them); the same flow in CI on three platforms; the
 Docker release was written but the image not built here (the base image of the product is the one of `cargo xtask release docker`).
 
-### Phase 11 — Defaults, bootstrap and database extensions of a product (6 days) — done 2026-11-04, except a dialog for About and the quotas of the first tenant
+### Phase 11 — Defaults, bootstrap and database extensions of a product (6 days) — done 2026-11-04, except the quotas of the first tenant
 
 - `distribution.toml` grows the sections that make a product behave as one, all optional:
   - `[defaults]` values of the settings on the three levels, and `[locked]` the ones the Administrator and the
@@ -497,7 +497,7 @@ is shown locked, `setting_locked` for the Administrator and the Tenant Managers)
 `admin_email`; the environment variables win; the developer profile ignores the tenant); `[database] extensions` (checked at start on PostgreSQL, a message that
 names them: `product_extensions`); `[about]` (log at start and `about` in `GET /api/brand`); `mosaikit-server check-distribution`. The known keys are in
 `xtask/src/dist.rs` too, so `cargo xtask --dist` accepts them. Tests: 6 unit tests, kernel test `product_policy` (PostgreSQL and SQLite), manual checks DK-28, DK-29.
-Left: the About **dialog** in the shell (the data are in the API and the log); quotas of the first tenant (use the platform quotas); the seed data of a plugin is a
+The About **dialog** (person menu › About: product, version, licence, text, «Powered by Mosaikit <base>»; Italian and Spanish texts; e2e test in spec 20, check DK-32) was added the same day. Left: quotas of the first tenant (use the platform quotas); the seed data of a plugin is a
 `oneshot` sidecar (no new mechanism).
 
 ### Phase 12 — Tests and conformance of a product (4 days) — done 2026-11-04, except the layout contract and the accessibility run inside `mosaikit-product test`
