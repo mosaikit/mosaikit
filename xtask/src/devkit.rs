@@ -466,6 +466,7 @@ fn kit_txt(version: &str, platform: &str, server: bool) -> String {
          {run_part}\n\
          sdk/                 the Rust SDK (mosaikit-plugin-sdk): `new --kit <this folder>` uses it\n\
          plugin-api/          the UI package (@mosaikit/plugin-api)\n\
+         plugin-testing/      the test helpers (@mosaikit/plugin-testing): signIn, openPlugin, expectAccessible\n\
          docs/devkit/         the documentation (start with README.md and getting-started.md)\n\
          examples/            the three commented examples (todo, insights, note-priority)\n\
          docker/              the Docker development kit (compose file, PostgreSQL)\n\
@@ -500,7 +501,14 @@ pub fn devkit(o: &Options) -> Result<()> {
     // --- executables ---
     if !o.skip_build {
         let mut b = Command::new("cargo");
-        b.current_dir(root()).args(["build", "--release", "-p", "mosaikit-plugin-cli", "-p", "mosaikit-product-cli"]);
+        b.current_dir(root()).args([
+            "build",
+            "--release",
+            "-p",
+            "mosaikit-plugin-cli",
+            "-p",
+            "mosaikit-product-cli",
+        ]);
         if server {
             plugins::ensure_npm()?;
             run(npm().current_dir(root()).args(["run", "build"]))?;
@@ -540,17 +548,19 @@ pub fn devkit(o: &Options) -> Result<()> {
         .find(|p| p.is_dir())
         .context("empty .crate")?;
     copy_dir(&unpacked, &kit.join("sdk"))?;
-    run(npm()
-        .current_dir(root().join("ui").join("plugin-api"))
-        .args(["pack", "--pack-destination"])
-        .arg(&tmp))?;
-    let tgz = std::fs::read_dir(&tmp)?
-        .flatten()
-        .map(|e| e.path())
-        .find(|p| p.extension().is_some_and(|e| e == "tgz"))
-        .context("npm pack made no tarball")?;
-    untar(&tgz, &tmp.join("npm"))?;
-    copy_dir(&tmp.join("npm").join("package"), &kit.join("plugin-api"))?;
+    // the two npm packages of the kit: the UI package and the test helpers
+    for pkg in ["plugin-api", "plugin-testing"] {
+        let dest = tmp.join(format!("pack-{pkg}"));
+        std::fs::create_dir_all(&dest)?;
+        run(npm().current_dir(root().join("ui").join(pkg)).args(["pack", "--pack-destination"]).arg(&dest))?;
+        let tgz = std::fs::read_dir(&dest)?
+            .flatten()
+            .map(|e| e.path())
+            .find(|p| p.extension().is_some_and(|e| e == "tgz"))
+            .context("npm pack made no tarball")?;
+        untar(&tgz, &dest.join("npm"))?;
+        copy_dir(&dest.join("npm").join("package"), &kit.join(pkg))?;
+    }
 
     // --- documents, examples, Docker kit ---
     copy_dir(&root().join("docs").join("devkit"), &kit.join("docs").join("devkit"))?;
