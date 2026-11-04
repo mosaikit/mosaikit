@@ -9,6 +9,52 @@ const PASSWORD = 'password-e2e-123'
 const BASE_URL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:18080/mosaikit/'
 const nav = (page: Page, name: string | RegExp) => page.locator('[data-sidebar="sidebar"]').getByRole('link', { name, exact: true })
 
+/** A zip without compression with the given files (path to text). */
+function zipOf(files: Record<string, string>): Buffer {
+  const crc = (b: Buffer) => {
+    let c = ~0
+    for (const x of b) {
+      c ^= x
+      for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1))
+    }
+    return ~c >>> 0
+  }
+  const parts: Buffer[] = []
+  const dir: Buffer[] = []
+  let offset = 0
+  for (const [path, text] of Object.entries(files)) {
+    const name = Buffer.from(path)
+    const body = Buffer.from(text)
+    const local = Buffer.alloc(30)
+    local.writeUInt32LE(0x04034b50, 0)
+    local.writeUInt16LE(20, 4)
+    local.writeUInt32LE(crc(body), 14)
+    local.writeUInt32LE(body.length, 18)
+    local.writeUInt32LE(body.length, 22)
+    local.writeUInt16LE(name.length, 26)
+    const central = Buffer.alloc(46)
+    central.writeUInt32LE(0x02014b50, 0)
+    central.writeUInt16LE(20, 4)
+    central.writeUInt16LE(20, 6)
+    central.writeUInt32LE(crc(body), 16)
+    central.writeUInt32LE(body.length, 20)
+    central.writeUInt32LE(body.length, 24)
+    central.writeUInt16LE(name.length, 28)
+    central.writeUInt32LE(offset, 42)
+    parts.push(local, name, body)
+    dir.push(central, name)
+    offset += local.length + name.length + body.length
+  }
+  const central = Buffer.concat(dir)
+  const end = Buffer.alloc(22)
+  end.writeUInt32LE(0x06054b50, 0)
+  end.writeUInt16LE(Object.keys(files).length, 8)
+  end.writeUInt16LE(Object.keys(files).length, 10)
+  end.writeUInt32LE(central.length, 12)
+  end.writeUInt32LE(offset, 16)
+  return Buffer.concat([...parts, central, end])
+}
+
 async function login(page: Page, base: string, tenant: string, user: string, password: string) {
   await page.goto(base)
   await page.evaluate(() => {
@@ -221,6 +267,40 @@ test.describe.serial('review round 1: auth and plugins', () => {
     await expect(card.locator('.thumb.placeholder')).toBeVisible()
     await card.getByRole('button', { name: /Open$/ }).click()
     await expect(frame.frameLocator('iframe.sframe').first().getByRole('heading', { name: 'Zip site works' })).toBeVisible()
+  })
+
+  test('R1-A-07 a zip site with a meta refresh into a subfolder loads its css and scripts (CORP of the subresources)', async ({ page }) => {
+    // the page of the site runs in a sandboxed frame (opaque origin) served by the plugin origin, which is another
+    // site than the shell: every subresource is a cross-site request and needs `Cross-Origin-Resource-Policy: cross-origin`
+    const zip = zipOf({
+      'index.html': '<!DOCTYPE html><html><head><meta http-equiv="refresh" content="0; url=./app/main/"></head><body></body></html>',
+      'app/main/index.html':
+        '<!DOCTYPE html><html><head><link rel="stylesheet" href="../../css/x.css"><link rel="stylesheet" href="./local.css"><script src="../../js/x.js"></script></head><body><h1 id="h">Deep site</h1></body></html>',
+      'app/main/local.css': '#h { text-decoration: underline; }',
+      'css/x.css': '#h { color: rgb(1, 2, 3); }',
+      'js/x.js': 'addEventListener("DOMContentLoaded", () => { document.getElementById("h").textContent = "Deep site, script ran" })',
+    })
+    const zipName = `Deep ${Date.now().toString(36)}`
+    const bad: string[] = []
+    page.on('requestfailed', (r) => bad.push(`${r.url()} ${r.failure()?.errorText}`))
+    page.on('response', (r) => {
+      if (r.url().includes('/c/') && r.status() >= 400) bad.push(`${r.url()} ${r.status()}`)
+    })
+    await login(page, BASE_URL, 'City of Beta', 'manager', PASSWORD)
+    await nav(page, 'Sites').click()
+    const frame = page.frameLocator('iframe.plugin-frame')
+    await frame.getByRole('button', { name: '＋ New site' }).first().click()
+    await frame.locator('#msks-name').fill(zipName)
+    await frame.locator('input[type=file][accept*=zip]').setInputFiles({ name: 'site.zip', mimeType: 'application/zip', buffer: zip })
+    await frame.getByRole('button', { name: '💾 Save' }).click()
+    const card = frame.locator('article.card', { hasText: zipName })
+    await card.getByRole('button', { name: /Open$/ }).click()
+    const site = frame.frameLocator('iframe.sframe').first()
+    const h = site.locator('#h')
+    await expect(h).toHaveText('Deep site, script ran')
+    await expect(h).toHaveCSS('color', 'rgb(1, 2, 3)')
+    await expect(h).toHaveCSS('text-decoration-line', 'underline')
+    expect(bad).toEqual([])
   })
 
   test('R1-A-06 a language plugin adds a language to the sign-in page, with the texts of the host', async ({ page }) => {
