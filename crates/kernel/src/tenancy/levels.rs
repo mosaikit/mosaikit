@@ -135,6 +135,24 @@ fn find(key: &str) -> Result<&'static Def> {
         .ok_or_else(|| Error::bad(format!("unknown setting: {key}")).with_code("setting_unknown"))
 }
 
+/// Whether `key` is a setting.
+pub fn is_setting(key: &str) -> bool {
+    DEFS.iter().any(|d| d.key == key)
+}
+
+/// A value a product gives to a setting of the platform in place of the built-in default: the setting must
+/// exist, belong to the platform and accept the value.
+pub fn check_platform_default(key: &str, v: &Value) -> Result<()> {
+    let d = find(key)?;
+    if d.scope == Scope::Tenant {
+        return Err(Error::bad(format!("{key} is a setting of the tenants")));
+    }
+    if d.own_api {
+        return Err(Error::bad(format!("{key} is set through its own page, not as a default")));
+    }
+    (d.check)(v)
+}
+
 // ------------------------------------------------------------------ checks
 
 fn any(_: &Value) -> Result<()> {
@@ -376,6 +394,10 @@ pub struct Defaults {
     pub name: String,
     pub footer: String,
     pub session_hours: i64,
+    /// values the product gives in place of the built-in defaults (`[defaults]` of `distribution.toml`)
+    pub product: Map<String, Value>,
+    /// settings the product locks: they keep the default and nobody can change them
+    pub locked: Vec<String>,
 }
 
 impl Defaults {
@@ -384,10 +406,19 @@ impl Defaults {
             name: k.brand.name.clone(),
             footer: k.brand.footer.clone(),
             session_hours: k.cfg.session_ttl_hours.clamp(1, 720),
+            product: k.product.defaults.clone(),
+            locked: k.product.locked.clone(),
         }
     }
 
+    fn is_locked(&self, key: &str) -> bool {
+        self.locked.iter().any(|k| k == key)
+    }
+
     fn value(&self, key: &str) -> Value {
+        if let Some(v) = self.product.get(key) {
+            return v.clone();
+        }
         match key {
             "identity.name" => json!(self.name),
             "identity.footer" => json!(self.footer),
@@ -509,7 +540,9 @@ pub struct Setting {
 }
 
 fn platform_one(d: &'static Def, platform: &Value, defaults: &Defaults) -> Setting {
-    let own = raw(platform, d.key);
+    let locked = defaults.is_locked(d.key);
+    // a locked setting ignores what is stored: it keeps the default of the product
+    let own = if locked { None } else { raw(platform, d.key) };
     let source = if own.is_some() { "platform" } else { "default" };
     let value = own.unwrap_or_else(|| defaults.value(d.key));
     Setting {
@@ -522,7 +555,7 @@ fn platform_one(d: &'static Def, platform: &Value, defaults: &Defaults) -> Setti
         value,
         source,
         customizable: customizable(platform, d),
-        locked: false,
+        locked,
         inherits: false,
     }
 }
@@ -537,7 +570,7 @@ fn tenant_one(
     let p = platform_one(d, platform, defaults);
     let own = raw(tenant, d.key);
     let cust = customizable(platform, d);
-    let locked = d.kind == Kind::Managed || !cust;
+    let locked = d.kind == Kind::Managed || !cust || defaults.is_locked(d.key);
     let own_default = match d.key {
         "identity.name" => json!(tenant_name),
         _ => defaults.value(d.key),
@@ -694,6 +727,9 @@ pub async fn set_platform(
         if d.scope == Scope::Tenant {
             return Err(Error::bad(format!("{key} is a setting of the tenants")).with_code("setting_unknown"));
         }
+        if k.product.is_locked(key) {
+            return Err(Error::forbidden("locked by the product").with_code("setting_locked"));
+        }
         if d.own_api && !v.is_null() {
             return Err(
                 Error::bad(format!("{key} is changed from its own page")).with_code("setting_own_page")
@@ -748,7 +784,7 @@ pub async fn set_tenant(k: &Kernel, c: &Caller, values: &Map<String, Value>) -> 
                 Error::bad(format!("{key} is a setting of the platform")).with_code("setting_unknown")
             );
         }
-        if d.kind == Kind::Managed || !customizable(&platform, d) {
+        if d.kind == Kind::Managed || !customizable(&platform, d) || k.product.is_locked(key) {
             return Err(Error::forbidden("managed by the Administrator").with_code("setting_locked"));
         }
         if d.own_api && !v.is_null() {
@@ -995,7 +1031,13 @@ mod tests {
     use super::*;
 
     fn defaults() -> Defaults {
-        Defaults { name: "Mosaikit".into(), footer: String::new(), session_hours: 8 }
+        Defaults {
+            name: "Mosaikit".into(),
+            footer: String::new(),
+            session_hours: 8,
+            product: Map::new(),
+            locked: Vec::new(),
+        }
     }
 
     fn get<'a>(l: &'a [Setting], key: &str) -> &'a Setting {

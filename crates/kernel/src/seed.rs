@@ -41,6 +41,21 @@ pub struct SeedFile {
     /// groups of the navigation (see `navgroups.rs`), forwarded to the shell
     #[serde(default)]
     pub nav_groups: Vec<crate::navgroups::NavGroupDef>,
+    // --- the policy of a product (dev kit, phase 11): see `product.rs` ---
+    #[serde(default)]
+    pub product: crate::product::ProductSection,
+    #[serde(default)]
+    pub defaults: toml::Table,
+    #[serde(default)]
+    pub locked: crate::product::LockedSection,
+    #[serde(default)]
+    pub languages: crate::product::LanguagesSection,
+    #[serde(default)]
+    pub bootstrap: crate::product::Bootstrap,
+    #[serde(default)]
+    pub database: crate::product::DatabaseSection,
+    #[serde(default)]
+    pub about: crate::product::About,
 }
 
 #[derive(Debug, Deserialize)]
