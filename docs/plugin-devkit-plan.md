@@ -355,7 +355,7 @@ will make it, with `bin/`, `sdk/`, `plugin-api/`; until the archives exist it sa
 the items of §8.11 that the three examples now use (`[search]`, the `set` actions of an extension) leave the experimental list, and the choice of
 the place where the kit documents are published for the site.
 
-### Phase 7 — Packaging, signing and distribution (4 days) — done 2026-11-01, except the real archive build and the workflow run
+### Phase 7 — Packaging, signing and distribution (4 days) — done 2026-11-01; the real archive build done 2026-11-04, the workflow run not
 
 - Build pipeline of the kit: archive per platform with the CLI, the desktop server, the Docker image tag, the
   packages of D1, the documents, the examples, `SHA256SUMS` and a signature of the archive.
@@ -395,7 +395,7 @@ replacement, the notes, the compatibility table, the crates list and the sums: a
 spot, signed with a key made on the spot: key mismatch and tampered archive refused, kit untouched; `devkit-notes`, `devkit-notices` with
 `cargo deny`; `cargo package --list`); `node catalog.mjs` finds DK-21..26 in the document and the checks.
 
-Left, not verified here (disk and the rule of no release build): **the real archive build** on each platform (`cargo xtask release devkit`: the
+**Closed 2026-11-04:** the real archive build on Windows (`cargo xtask release devkit --with-server --api-docs --allow-dev-key`: the release build of the CLIs and of the server, `cargo doc` of the SDK, the licence check, a 20 MB zip with `bin/` (`mosaikit-plugin`, `mosaikit-product`, `mosaikit-server`), `sdk/`, `plugin-api/`, `docs/` with the API reference, `examples/`, `docker/`, `SHA256SUMS` and its signature; the checksum verifies, `doctor` is green, `mosaikit-product new` and `validate` run from the kit with the server found next to the tool; signed with the development key, so not for release). The workflow, the download from GitHub by `self-update` and `cargo install` from a registry stay unverified (they need the repository to publish). Before: **the real archive build** on each platform (`cargo xtask release devkit`: the
 `cargo package` of the SDK, `npm pack`, the release build of the server and the zip/tar.gz were written but not run), **the workflow**
 (never run), **the download from GitHub** by `self-update`, `cargo install` from a registry, the TypeDoc reference of `ui/plugin-api` (only `cargo doc`
 is wired). For the owner: the public key of the official packages must reach the first kit (it is written into `trusted_key.txt` at build time:
