@@ -5,6 +5,7 @@
 - New: `mosaikit-product` (`crates/product-cli`): `new`, `validate`, `dev`, `build desktop|docker|k8s`, `sign`, `doctor`, `test`.
 - New in `distribution.toml`: `[product] base`, `[defaults]`, `[locked]`, `[languages]`, `[bootstrap]`, `[database] extensions`, `[about]` (architecture `14.4);
   `mosaikit-server check-distribution`; `about` in `GET /api/brand`.
+- New: the kit archive has `plugin-testing/` (`@mosaikit/plugin-testing`: `signIn`, `openPlugin`, `expectAccessible`) next to `plugin-api/`; `npm install ./plugin-testing` in a product or plugin folder.
 - Changed: `mosaikit-plugin validate --strict` refuses a manifest without `[requires] mosaikit` (a warning without `--strict`).
 
 ## Versions at a glance
