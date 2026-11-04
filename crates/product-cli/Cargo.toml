@@ -1,0 +1,37 @@
+[package]
+name = "mosaikit-product-cli"
+description = "mosaikit-product: the command-line tool of the publishers of products (distributions) built on Mosaikit (new, validate, dev, build, sign, doctor)"
+# one version for the whole kit, on the cadence of the platform (docs/plugin-devkit-plan.md, D6)
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+homepage.workspace = true
+publish = false
+readme = "README.md"
+
+[lib]
+name = "mosaikit_product_cli"
+path = "src/lib.rs"
+
+[[bin]]
+name = "mosaikit-product"
+path = "src/main.rs"
+
+[dependencies]
+anyhow.workspace = true
+clap.workspace = true
+serde.workspace = true
+serde_json = { workspace = true, features = ["preserve_order"] }
+toml.workspace = true
+zip.workspace = true
+mosaikit-mskp.workspace = true
+mosaikit-plugin-cli.workspace = true
+reqwest = { workspace = true, features = ["blocking"] }
+
+[dev-dependencies]
+tempfile.workspace = true
+
+[lints]
+workspace = true
