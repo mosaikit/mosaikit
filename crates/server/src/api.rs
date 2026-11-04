@@ -187,6 +187,18 @@ async fn brand(State(s): State<AppState>) -> ApiResult<Json<Value>> {
     let mut b = s.k.brand.public();
     if let Some(o) = b.as_object_mut() {
         o.insert("nav_groups".into(), json!(s.k.nav_groups));
+        // About: the product, its licence and the base it runs on
+        o.insert(
+            "about".into(),
+            json!({
+                "product": s.k.product.name,
+                "version": s.k.product.version,
+                "licence": s.k.product.about.licence,
+                "text": s.k.product.about.text,
+                "base": mosaikit_kernel::product::BASE_VERSION,
+                "base_range": s.k.product.base,
+            }),
+        );
     }
     let v = levels::effective(&s.k, None).await?;
     let text = |key: &str| v.get(key).cloned().unwrap_or(Value::Null);

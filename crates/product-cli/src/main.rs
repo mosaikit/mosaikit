@@ -1,0 +1,245 @@
+//! `mosaikit-product` executable.
+
+use std::path::PathBuf;
+use std::process::ExitCode;
+
+use anyhow::Result;
+use clap::{Parser, Subcommand};
+use mosaikit_plugin_cli::package;
+use mosaikit_product_cli::{build, dev, scaffold, validate, Distribution};
+
+#[derive(Parser)]
+#[command(name = "mosaikit-product", version, about = "Tool of the publishers of products built on Mosaikit")]
+struct Cli {
+    #[command(subcommand)]
+    cmd: Cmd,
+}
+
+#[derive(Subcommand)]
+enum Cmd {
+    /// A new product folder: distribution.toml, brand, plugins, shared code, tests, CI file, README
+    New {
+        /// the id of the product (lower case, digits, '-')
+        name: String,
+        /// folder to create the product folder in (default: the current one)
+        #[arg(long)]
+        into: Option<PathBuf>,
+    },
+    /// Checks the product: distribution.toml, brand, its plugins (strict) and the policy tables (by the server of the base)
+    Validate {
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        /// the mosaikit-server of the base (default: MOSAIKIT_SERVER_BIN, then next to this tool)
+        #[arg(long, env = "MOSAIKIT_SERVER_BIN")]
+        server: Option<PathBuf>,
+    },
+    /// Starts the base in the developer profile with the brand, the policy and the plugins of the product
+    Dev {
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        /// folder of the desktop kit (its registry gives the official plugins)
+        #[arg(long, env = "MOSAIKIT_BASE")]
+        base: Option<PathBuf>,
+        #[arg(long, env = "MOSAIKIT_SERVER_BIN")]
+        server: Option<PathBuf>,
+        #[arg(long)]
+        port: Option<u16>,
+        #[arg(long)]
+        data: Option<PathBuf>,
+        #[arg(long)]
+        no_open: bool,
+        #[arg(long)]
+        no_build: bool,
+        /// start from an empty database
+        #[arg(long)]
+        fresh: bool,
+    },
+    /// Proves the product: validation, then it starts on the base and is checked (brand, About, test users, plugins)
+    Test {
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        #[arg(long, env = "MOSAIKIT_BASE")]
+        base: Option<PathBuf>,
+        #[arg(long, env = "MOSAIKIT_SERVER_BIN")]
+        server: Option<PathBuf>,
+        /// an older mosaikit-server: the product runs on it first, then on the new one with the same data (upgrade test)
+        #[arg(long)]
+        upgrade_from: Option<PathBuf>,
+        #[arg(long)]
+        no_build: bool,
+    },
+    /// A release of the product from a compiled base
+    Build {
+        #[command(subcommand)]
+        target: Target,
+    },
+    /// Signs a package again with the key of the product
+    Sign {
+        file: PathBuf,
+        #[arg(long)]
+        key: Option<PathBuf>,
+    },
+    /// What the tool needs, and what is missing
+    Doctor,
+}
+
+#[derive(Subcommand)]
+enum Target {
+    /// The folder of the desktop release: the executable of the base renamed, plugins, registry, brand, configuration
+    Desktop {
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        /// the desktop kit of the base: its folder or its .zip
+        #[arg(long, env = "MOSAIKIT_BASE")]
+        base: PathBuf,
+        #[command(flatten)]
+        common: Common,
+    },
+    /// The folder of the Docker release: Dockerfile on the base image, registry, brand, configuration, compose file
+    Docker {
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        /// the base image (default mosaikit:<version of the product's base>)
+        #[arg(long, default_value = "mosaikit:1.0.0")]
+        base_image: String,
+        /// the desktop kit of the base, for the registry of the official plugins
+        #[arg(long, env = "MOSAIKIT_BASE")]
+        base: PathBuf,
+        /// run `docker build` too
+        #[arg(long)]
+        build: bool,
+        #[command(flatten)]
+        common: Common,
+    },
+    /// The kustomize overlay of the product over the k8s folder of the base kit
+    K8s {
+        #[arg(default_value = ".")]
+        dir: PathBuf,
+        /// the k8s folder of the base kit
+        #[arg(long)]
+        base_k8s: PathBuf,
+        #[command(flatten)]
+        common: Common,
+    },
+}
+
+#[derive(clap::Args)]
+struct Common {
+    /// folder of the release (default: dist/<id>-<version>-<target>)
+    #[arg(long)]
+    out: Option<PathBuf>,
+    /// the signing key of the product (default: MOSAIKIT_SIGNING_KEY, MOSAIKIT_SIGNING_KEY_FILE, then the development key)
+    #[arg(long)]
+    key: Option<PathBuf>,
+    #[arg(long)]
+    release: bool,
+    /// pack what is already built
+    #[arg(long)]
+    no_build: bool,
+}
+
+impl Common {
+    fn options(self) -> build::Options {
+        build::Options { out: self.out, key: self.key, release: self.release, no_build: self.no_build }
+    }
+}
+
+fn run(cli: Cli) -> Result<ExitCode> {
+    match cli.cmd {
+        Cmd::New { name, into } => {
+            let root = scaffold::new_product(&name, &into.unwrap_or_else(|| PathBuf::from(".")))?;
+            println!("created {}\nnext: cd {} && mosaikit-product validate", root.display(), root.display());
+        }
+        Cmd::Validate { dir, server } => {
+            let r = validate::validate(&dir, &validate::Options { server })?;
+            r.print();
+            if !r.ok() {
+                return Ok(ExitCode::from(1));
+            }
+        }
+        Cmd::Dev { dir, base, server, port, data, no_open, no_build, fresh } => {
+            dev::dev(&dev::Options { dir, base, server, port, data, no_open, no_build, fresh })?;
+        }
+        Cmd::Test { dir, base, server, upgrade_from, no_build } => {
+            let r = mosaikit_product_cli::test::test(&mosaikit_product_cli::test::Options {
+                dir,
+                base,
+                server,
+                upgrade_from,
+                no_build,
+            })?;
+            r.print();
+            if !r.ok() {
+                return Ok(ExitCode::from(1));
+            }
+        }
+        Cmd::Build { target } => match target {
+            Target::Desktop { dir, base, common } => {
+                build::desktop(&Distribution::load(&dir)?, &base, &common.options())?;
+            }
+            Target::Docker { dir, base_image, base, build: run_build, common } => {
+                build::docker(&Distribution::load(&dir)?, &base, &base_image, run_build, &common.options())?;
+            }
+            Target::K8s { dir, base_k8s, common } => {
+                build::k8s(&Distribution::load(&dir)?, &base_k8s, &common.options())?;
+            }
+        },
+        Cmd::Sign { file, key } => {
+            let (k, source) = package::signing_key(key.as_deref(), &package::default_key_path())?;
+            let (path, sha, public) = package::sign(&file, &k, None)?;
+            println!("signed {} with {source}\nsha256 {sha}\npublic key {public}", path.display());
+        }
+        Cmd::Doctor => return doctor(),
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn doctor() -> Result<ExitCode> {
+    let mut bad = false;
+    let mut line = |name: &str, found: Option<String>, hint: &str| match found {
+        Some(w) => println!("  ok       {name}: {w}"),
+        None => {
+            bad = bad || !hint.starts_with("optional");
+            println!("  missing  {name}: {hint}");
+        }
+    };
+    line(
+        "mosaikit-server",
+        mosaikit_plugin_cli::dev::find_server(None).ok().map(|p| p.display().to_string()),
+        "the server of the base: --server, MOSAIKIT_SERVER_BIN, or next to this tool (needed by dev and by the policy check)",
+    );
+    line(
+        "mosaikit-plugin",
+        mosaikit_plugin_cli::util::which("mosaikit-plugin").map(|p| p.display().to_string()),
+        "optional: the tool of the plugins, to make the own plugins of the product",
+    );
+    line(
+        "docker",
+        mosaikit_plugin_cli::util::which("docker").map(|p| p.display().to_string()),
+        "optional: only for `build docker --build`",
+    );
+    if cfg!(windows) {
+        line(
+            "rcedit",
+            mosaikit_plugin_cli::util::which("rcedit").map(|p| p.display().to_string()),
+            "optional: sets the name, version and icon of the desktop executable",
+        );
+    }
+    let key = package::default_key_path();
+    line(
+        "signing key",
+        key.is_file().then(|| key.display().to_string()),
+        "optional: made at the first build, or give --key / MOSAIKIT_SIGNING_KEY",
+    );
+    Ok(if bad { ExitCode::from(1) } else { ExitCode::SUCCESS })
+}
+
+fn main() -> ExitCode {
+    match run(Cli::parse()) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("error: {e:#}");
+            ExitCode::from(2)
+        }
+    }
+}
