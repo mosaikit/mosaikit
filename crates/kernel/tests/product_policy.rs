@@ -63,10 +63,10 @@ async fn the_first_tenant_of_a_product() {
     );
     let t = start_with(|c| c.plugin_settings_file = Some(file.clone())).await;
     let q = |col: &str| format!("select {col} from core.tenants where not is_system");
-    let slug: String = mosaikit_db::query_scalar(&q("slug")).fetch_one(&t.db).await.unwrap();
-    let name: String = mosaikit_db::query_scalar(&q("name")).fetch_one(&t.db).await.unwrap();
+    let slug: String = mosaikit_db::query_scalar(q("slug").as_str()).fetch_one(&t.db).await.unwrap();
+    let name: String = mosaikit_db::query_scalar(q("name").as_str()).fetch_one(&t.db).await.unwrap();
     let trial: bool =
-        mosaikit_db::query_scalar(&q("trial_until is not null")).fetch_one(&t.db).await.unwrap();
+        mosaikit_db::query_scalar(q("trial_until is not null").as_str()).fetch_one(&t.db).await.unwrap();
     assert_eq!((slug.as_str(), name.as_str(), trial), ("work", "Work Co", true));
     let email: Option<String> = mosaikit_db::query_scalar(
         "select email from core.users where username = 'admin' and is_system_admin",
