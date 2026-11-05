@@ -574,6 +574,9 @@ function PluginAsks({ p, base }: { p: AdminPlugin; base?: string }) {
             <AskRow label={t('Lists the items of other plugins')}>
               {perm.resources_read?.length ? <b className="text-destructive">{t('yes (sensitive: {list}, with the permissions of the caller)', { list: perm.resources_read.join(', ') })}</b> : none}
             </AskRow>
+            <AskRow label={t('Calls what other plugins contribute')}>
+              {perm.contributions?.length ? <b className="text-destructive">{t('yes (sensitive: {list}, with the permissions of the caller)', { list: perm.contributions.join(', ') })}</b> : none}
+            </AskRow>
             <AskRow label={t('Commands open to public links')}>
               {p.public_commands?.length ? (
                 <span>

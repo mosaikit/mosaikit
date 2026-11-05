@@ -306,11 +306,24 @@ impl Resources {
 pub struct Files(());
 
 impl Resources {
+    /// The contributions of the plugins on in the tenant to a point you declared in `[permissions]
+    /// contributions`: `[{ plugin, id, label, data }]` (the plugins the caller may use). The contributors can
+    /// then be called with `ctx.call`, as if they were in `calls`.
+    pub fn contributions(&self, point: &str) -> Result<Value> {
+        host::call("contributions.list", json!({ "point": point }))
+    }
+
     /// The resources of another plugin that the caller sees (needs the plugin in `[permissions]
     /// resources_read`): `{ "entries": [{ id, plugin, kind, title, owner_name, my_level, updated_at }],
     /// "truncated": bool }`, newest first. `kind` and `q` (a part of the title) narrow the list; `limit`
     /// is 50 by default and at most 200. Errors carry a code: `permission_denied`, `invalid_argument`.
-    pub fn list(&self, plugin: &str, kind: Option<&str>, q: Option<&str>, limit: Option<u32>) -> Result<Value> {
+    pub fn list(
+        &self,
+        plugin: &str,
+        kind: Option<&str>,
+        q: Option<&str>,
+        limit: Option<u32>,
+    ) -> Result<Value> {
         host::call("resources.list", json!({ "plugin": plugin, "kind": kind, "q": q, "limit": limit }))
     }
 }

@@ -164,6 +164,9 @@ fn manifest_checks(m: &Manifest, strict: bool, r: &mut Report) {
     if !p.resources_read.is_empty() {
         sensitive.push("resources_read");
     }
+    if !p.contributions.is_empty() {
+        sensitive.push("contributions");
+    }
     if !m.public_commands.is_empty() {
         sensitive.push("public_commands");
     }

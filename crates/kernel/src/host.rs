@@ -48,6 +48,8 @@ pub(crate) struct KernelHost {
     files_read: bool,
     /// `[permissions] resources_read`: the plugins whose resources the logic may list as the caller
     resources_read: Vec<String>,
+    /// `[permissions] contributions`: the points whose contributions the logic may list and call
+    contributions: Vec<String>,
     /// code of the last error given to the logic (`Host::error_code`)
     last_code: Option<String>,
     /// notifications asked by the logic: sent after the commit of the operation
@@ -133,6 +135,14 @@ impl KernelHost {
         }
     }
 
+    /// The plugin `target` contributes to a point this plugin declared in `permissions.contributions`.
+    fn contributes_to_declared_point(&self, target: &str) -> bool {
+        let Some(k) = &self.kernel else { return false };
+        k.plugins
+            .active(target)
+            .is_ok_and(|p| p.manifest.contributes.iter().any(|c| self.contributions.contains(&c.point)))
+    }
+
     /// Command of another plugin declared in `permissions.calls`, with the same
     /// user: the called plugin runs in its own transaction and with its own rules.
     fn plugin_call(&mut self, req: &Value) -> std::result::Result<Value, String> {
@@ -143,7 +153,7 @@ impl KernelHost {
         if self.caller.as_ref().is_some_and(|c| c.run.is_some()) {
             return Err("plugin.call is not available in a call on behalf of a run".into());
         }
-        if !self.calls.contains(&target) {
+        if !self.calls.contains(&target) && !self.contributes_to_declared_point(&target) {
             return Err(format!("plugin not declared in permissions.calls: {target}"));
         }
         if self.depth >= MAX_CALL_DEPTH {
@@ -350,6 +360,24 @@ impl KernelHost {
 }
 
 impl KernelHost {
+    /// `contributions.list {point}`: the contributions to a point the manifest declares, of the plugins that
+    /// are on in the tenant and that the caller may use: `[{ plugin, id, label, data }]`.
+    fn contributions_list(&mut self, req: &Value) -> std::result::Result<Value, Coded> {
+        let point = req.get("point").and_then(Value::as_str).unwrap_or("");
+        if !self.contributions.iter().any(|p| p == point) {
+            return Err(Coded(
+                "permission_denied",
+                "the point is not declared in `contributions` in [permissions]".into(),
+            ));
+        }
+        let k = self.kernel.clone().ok_or_else(|| Coded("internal", "kernel not available".into()))?;
+        let c = self.user().map_err(|m| Coded("permission_denied", m))?;
+        let point = point.to_string();
+        self.rt.block_on(crate::resource_list::contributions(&k, &c, &point)).map_err(coded_of)
+    }
+}
+
+impl KernelHost {
     /// `resources.list`: see [`crate::resource_list`]. The manifest names the plugins that may be listed.
     fn resources_list(&mut self, req: &Value) -> std::result::Result<Value, Coded> {
         let k = self.kernel.clone().ok_or_else(|| Coded("internal", "kernel not available".into()))?;
@@ -393,6 +421,10 @@ impl Host for KernelHost {
                     m
                 })
             }
+            "contributions.list" => self.contributions_list(req).map_err(|Coded(code, m)| {
+                self.last_code = Some(code.to_string());
+                m
+            }),
             "resources.list" => self.resources_list(req).map_err(|Coded(code, m)| {
                 self.last_code = Some(code.to_string());
                 m
@@ -476,6 +508,7 @@ fn new_host(
         notify: p.manifest.permissions.notify,
         files_read: p.manifest.permissions.files_read,
         resources_read: p.manifest.permissions.resources_read.clone(),
+        contributions: p.manifest.permissions.contributions.clone(),
         last_code: None,
         notes: Vec::new(),
     }
