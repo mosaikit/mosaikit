@@ -48,20 +48,37 @@ describe('hover menu and a click on the entry', () => {
     expect(open()).toBe('true')
   })
 
-  it('a press on the link closes the menu the hover opened and it does not reopen while the pointer stays', async () => {
+  it('a press on the link keeps the menu the hover opened, and it stays after the pointer leaves', async () => {
     await fire(area(), 'pointerenter', 0)
     await fire(host.querySelector('#link')!, 'pointerdown', 500)
-    expect(open()).toBe('false')
-    await fire(area(), 'pointerenter', 500)
-    expect(open()).toBe('false')
+    expect(open()).toBe('true')
+    await fire(area(), 'pointerleave', 500)
+    expect(open()).toBe('true')
   })
 
-  it('a press in the same tick as the enter leaves the menu closed', async () => {
+  it('a press in the same tick as the enter leaves the menu open', async () => {
     await act(async () => {
       area().dispatchEvent(ev('pointerenter'))
       host.querySelector('#link')!.dispatchEvent(ev('pointerdown'))
     })
-    expect(open()).toBe('false')
+    expect(open()).toBe('true')
+  })
+
+  it('opening a menu closes the one that was open', async () => {
+    await act(async () => {
+      root.render(
+        <>
+          <Probe />
+          <Probe />
+        </>,
+      )
+    })
+    const [a, b] = Array.from(host.querySelectorAll('#area'))
+    await fire(a, 'pointerenter', 0)
+    expect(a.getAttribute('data-open')).toBe('true')
+    await fire(b, 'pointerenter', 0)
+    expect(b.getAttribute('data-open')).toBe('true')
+    expect(a.getAttribute('data-open')).toBe('false')
   })
 
   it('opens again after the pointer left and came back', async () => {

@@ -144,6 +144,17 @@ export function bandEmit(event: 'band.mode' | 'band.comments' | 'band.back', dat
   state.emit?.(event, data)
 }
 
+/**
+ * A click on the entry of the page that is already open: when that page is a detail (a map, a dashboard, a process: it set a
+ * back button in the band) the click does what the back button does, so the person gets back to the list of the plugin.
+ * Returns true when it did, and the caller must not navigate.
+ */
+export function backFromActiveEntry(active: boolean): boolean {
+  if (!active || !state.view?.back) return false
+  bandEmit('band.back', {})
+  return true
+}
+
 const subscribe = (l: () => void) => {
   listeners.add(l)
   return () => listeners.delete(l)

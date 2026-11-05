@@ -28,6 +28,16 @@ export function createHoverController(set: (open: boolean) => void, openMs = HOV
   }
 }
 
+// One menu of the rail is open at a time: when a menu opens, the one that was open closes at once.
+let closeActive: (() => void) | null = null
+function becomeActive(close: () => void) {
+  if (closeActive && closeActive !== close) closeActive()
+  closeActive = close
+}
+function noLongerActive(close: () => void) {
+  if (closeActive === close) closeActive = null
+}
+
 export interface HoverMenu {
   open: boolean
   /** true when the menu was opened by the pointer: it must not take the focus */
@@ -49,20 +59,38 @@ export function useHoverMenu(enabled: boolean): HoverMenu {
   // a press on the entry (it navigates) mutes the hover until the pointer has left the entry
   const muted = useRef(false)
 
+  // closes this menu from outside (another one opened): no timer, no focus change
+  const closeNow = useRef(() => {})
   // the timer fires later, in an event: the refs are not read while rendering
   // oxlint-disable-next-line react/preserve-manual-memoization
   const ctl = useMemo(
     () =>
       // oxlint-disable-next-line react/refs
       createHoverController((o) => {
-        if (o) setViaHover(true)
-        if (o) viaRef.current = true
+        if (o) {
+          becomeActive(closeNow.current)
+          setViaHover(true)
+          viaRef.current = true
+        } else noLongerActive(closeNow.current)
         openRef.current = o
         setOpenState(o)
       }),
     [],
   )
-  useEffect(() => ctl.cancel, [ctl])
+  useEffect(() => {
+    closeNow.current = () => {
+      ctl.cancel()
+      openRef.current = false
+      viaRef.current = false
+      setViaHover(false)
+      setOpenState(false)
+    }
+    const close = closeNow.current
+    return () => {
+      ctl.cancel()
+      noLongerActive(close)
+    }
+  }, [ctl])
   const mouse = (e: React.PointerEvent) => enabled && e.pointerType !== 'touch'
   return {
     open,
@@ -80,7 +108,8 @@ export function useHoverMenu(enabled: boolean): HoverMenu {
       if (o) {
         viaRef.current = false
         setViaHover(false)
-      }
+        becomeActive(closeNow.current)
+      } else noLongerActive(closeNow.current)
       openRef.current = o
       setOpenState(o)
     },
@@ -96,10 +125,11 @@ export function useHoverMenu(enabled: boolean): HoverMenu {
         // only a press on the trigger of the menu (not on the link of the app) keeps it open
         const onTrigger = !!(e.target as HTMLElement).closest?.('[aria-haspopup="menu"]')
         keepOnClick.current = openRef.current && onTrigger
-        // a press on the link of the app navigates: the menu the pointer had just opened goes away
+        // a press on the icon (its link) goes where the link goes and the menu stays open: from now on it is a normal one
+        // (it closes with a click outside or Escape, not when the pointer leaves)
         if (openRef.current && viaRef.current && !onTrigger) {
-          openRef.current = false
-          setOpenState(false)
+          viaRef.current = false
+          setViaHover(false)
         }
       },
     },

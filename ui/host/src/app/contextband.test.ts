@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { OpError } from '../bridge.ts'
-import { bandEmit, cleanText, currentBand, initialsOf, resetBand, sanitizeBand, setBand } from './contextband.ts'
+import { backFromActiveEntry, bandEmit, cleanText, currentBand, initialsOf, resetBand, sanitizeBand, setBand } from './contextband.ts'
 import { contrast } from './themegen.ts'
 
 const bad = (x: unknown) => expect(() => sanitizeBand(x)).toThrow(OpError)
@@ -88,6 +88,18 @@ describe('the back button', () => {
 
 describe('the state of the band', () => {
   beforeEach(() => resetBand())
+
+  it('a click on the entry of the open detail page does what the back button does', () => {
+    const emit = vi.fn()
+    expect(backFromActiveEntry(true)).toBe(false) // no band: the entry navigates as usual
+    setBand('frame-1', sanitizeBand({ back: { label: 'Dashboards' } }), emit)
+    expect(backFromActiveEntry(false)).toBe(false) // an entry of another page
+    expect(emit).not.toHaveBeenCalled()
+    expect(backFromActiveEntry(true)).toBe(true)
+    expect(emit).toHaveBeenCalledWith('band.back', {})
+    setBand('frame-1', sanitizeBand({}), emit) // a list page has no back button
+    expect(backFromActiveEntry(true)).toBe(false)
+  })
 
   it('only the owner resets it; the shell resets it for everybody', () => {
     const emit = vi.fn()
