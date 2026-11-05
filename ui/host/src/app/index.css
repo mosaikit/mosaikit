@@ -260,18 +260,21 @@
   --rail-foreground: #ada39a;
 }
 
-/* The variables the bridge passes to the UIs of the plugins (bridge.ts, THEME_VARS). */
+/* The variables the bridge passes to the UIs of the plugins (bridge.ts, THEME_VARS). They follow the theme and the mode
+   of the shell, always: `!important` because the server injects the `[colors]` of the brand of the distribution
+   (brand.toml) in the page as `:root` variables with the same names, dark ones, which would put a dark plugin in a light shell. */
 :root {
-  --bg: var(--background);
-  --panel: var(--card);
-  --panel2: var(--muted);
-  --line: var(--border);
-  --fg: var(--foreground);
-  --dim: var(--muted-foreground);
-  --acc: var(--primary);
-  --acc-soft: color-mix(in srgb, var(--primary) 12%, transparent);
-  --acc-line: color-mix(in srgb, var(--primary) 40%, transparent);
-  --err: var(--destructive);
+  --bg: var(--background) !important;
+  --panel: var(--card) !important;
+  --panel2: var(--muted) !important;
+  --line: var(--border) !important;
+  --fg: var(--foreground) !important;
+  --dim: var(--muted-foreground) !important;
+  --acc: var(--primary) !important;
+  --acc-soft: color-mix(in srgb, var(--primary) 12%, transparent) !important;
+  --acc-line: color-mix(in srgb, var(--primary) 40%, transparent) !important;
+  --acc-glow: color-mix(in srgb, var(--primary) 22%, transparent) !important;
+  --err: var(--destructive) !important;
   /* text on the accent and on the colour of errors (the buttons of the plugins), as in the shell */
   --on-acc: var(--primary-foreground);
   --on-err: #ffffff;
