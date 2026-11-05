@@ -5,6 +5,7 @@
 
 import { useState, type ReactNode } from 'react'
 import { useHoverMenu, type HoverMenu } from './hoverMenu.ts'
+import { backFromActiveEntry } from './contextband.ts'
 import { useQueryClient } from '@tanstack/react-query'
 import { Bell, Check, ChevronDown, ChevronRight, CircleHelp, Contrast, KeyRound, LogOut, Settings, ShieldCheck, Trash2, UserRound } from 'lucide-react'
 import { api } from '../api.ts'
@@ -110,7 +111,7 @@ function TreeItem({ item, onPick, mini, depth = 0 }: { item: NavItem; onPick?: (
     if (!kids.length)
       return (
         <li>
-          <a href={item.href} className={itemClass(item.active, true)} aria-label={item.label} title={item.label} aria-current={item.active ? 'page' : undefined} onClick={onPick}>
+          <a href={item.href} className={itemClass(item.active, true)} aria-label={item.label} title={item.label} aria-current={item.active ? 'page' : undefined} onClick={(e) => { if (backFromActiveEntry(item.active)) e.preventDefault(); onPick?.() }}>
             {item.icon}
           </a>
         </li>
@@ -124,7 +125,7 @@ function TreeItem({ item, onPick, mini, depth = 0 }: { item: NavItem; onPick?: (
     return (
       <li>
         {item.href ? (
-          <a href={item.href} style={pad} className={itemClass(item.active, false)} aria-current={item.active ? 'page' : undefined} onClick={onPick}>
+          <a href={item.href} style={pad} className={itemClass(item.active, false)} aria-current={item.active ? 'page' : undefined} onClick={(e) => { if (backFromActiveEntry(item.active)) e.preventDefault(); onPick?.() }}>
             {item.icon}
             <span className="truncate">{item.label}</span>
           </a>

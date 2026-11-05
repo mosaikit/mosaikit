@@ -45,7 +45,7 @@ import { applyStyle, bandImageOf, styleOf, useBandImage, useLayoutInUse, useLayo
 import { AppMark, BandActions, BandSearch, FlyoutMenu, SkipLink, TenantSwitcher } from './slots.tsx'
 import { bandIcon, bandStyle, hasActive, useNav, type NavGroup, type NavItem } from './nav.tsx'
 import Frame from './frames.tsx'
-import { bandEmit, resetBand, useBand } from './contextband.ts'
+import { backFromActiveEntry, bandEmit, resetBand, useBand } from './contextband.ts'
 import CommentsController from './CommentsPanel.tsx'
 import { toggleComments, useCommentsState } from './comments.ts'
 import { BackButton, CommentsButton, ModeSwitch, Presence } from './ContextBand.tsx'
@@ -74,7 +74,14 @@ function SubTree({ items, onPick, depth = 0 }: { items: NavItem[]; onPick: () =>
         <SidebarMenuSubItem key={c.label + (c.href ?? '')}>
           {c.href ? (
             <SidebarMenuSubButton asChild isActive={c.active}>
-              <a href={c.href} aria-current={c.active ? 'page' : undefined} onClick={onPick}>
+              <a
+                href={c.href}
+                aria-current={c.active ? 'page' : undefined}
+                onClick={(e) => {
+                  if (backFromActiveEntry(c.active)) e.preventDefault()
+                  onPick()
+                }}
+              >
                 <span>{c.label}</span>
               </a>
             </SidebarMenuSubButton>
@@ -105,7 +112,10 @@ function RailEntry({ it }: { it: NavItem }) {
           href={it.href}
           aria-label={it.short || (rail && !labels) ? it.label : undefined}
           title={(it.short || (rail && !labels)) && !(rail && kids.length > 0) ? it.label : undefined}
-          onClick={pick}
+          onClick={(e) => {
+            if (backFromActiveEntry(it.active)) e.preventDefault()
+            pick()
+          }}
         >
           {it.icon}
           <span>{it.short ?? it.label}</span>
