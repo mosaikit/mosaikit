@@ -1726,7 +1726,7 @@ missing, and lists `schedules` among the permissions the Administrator reviews (
 **What this version contains.** The registry (manifest, table, REST routes with their rules and limits, audit, the hooks that pause the
 schedules of a person who leaves) and the **worker** that runs the jobs: it claims what is due, checks the rights of the author again,
 mints a run ticket, pushes the run to the service of the plugin, follows it to its end, and stops a schedule that keeps failing. Both
-backends use the same code. The screen of the shell is the next step.
+backends use the same code. The screen of the shell (Tenant management › Schedules, for Tenant Managers: the schedules of the tenant with the author, timetable and zone, next and last run, state; pause, resume, run now, delete) draws on the REST routes below.
 
 **Manifest.** `[[schedules]]`, at most 8 per plugin, each one: `name` (identifier, unique), `command` (must be in
 `permissions.run_commands`), `target` (the endpoint of the service; its origin must be in `permissions.network`, no credentials in the
@@ -1820,7 +1820,7 @@ and the ticket), `schedule.skipped` (the reason), `schedule.missed`, `schedule.f
 
 **Time zone.** The tenant setting `timezone` (an IANA name, default `UTC`, set by the Tenant Manager in Manage › Settings, or by a product in `[defaults]`) is the zone of a new schedule that does not ask for one; the zone is stored with the schedule, so a later change of the setting moves none. `next_run_at` and `last_run_at` stay UTC in the API; every schedule carries its `time_zone`.
 
-**Not in this version.** The screen of the shell; a pull model for a service that cannot listen.
+**Not in this version.** A pull model for a service that cannot listen.
 
 ## 9. Web security: origins, cookies, CSP
 
