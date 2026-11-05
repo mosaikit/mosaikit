@@ -91,6 +91,7 @@ export interface BridgeEvent {
  * | `band.mode` | `{ value }` | the View \| Edit switch of the top band was flipped (handled by `msk.band`) |
  * | `band.comments` | `{}` | the comments button of the top band was pressed (handled by `msk.band`) |
  * | `band.back` | `{}` | the back button of the top band was pressed (handled by `msk.band`) |
+ * | `nav.reselect` | `{}` | the person clicked again, in the sidebar, the entry of the page that is open and the page has no back button in the band (see `msk.onNavReselect`) |
  */
 export interface HostEvents {
   context: UiContext
@@ -100,6 +101,8 @@ export interface HostEvents {
   'ext.tab.height': { handle: string; height: number }
   /** the person flipped the View | Edit switch of the top band (see `msk.band`) */
   'band.mode': { value: 'view' | 'edit' }
+  /** the entry of the open page was clicked again in the sidebar (see `msk.onNavReselect`) */
+  'nav.reselect': Record<string, never>
   /** the person pressed the comments button of the top band (see `msk.band`) */
   'band.comments': Record<string, never>
   /** the person pressed the back button of the top band (see `msk.band`) */

@@ -5,6 +5,7 @@ version and is removed in the next.
 
 ## Unreleased
 
+- `msk.onNavReselect(fn)` (host event `nav.reselect`): the person clicked again, in the sidebar, the entry of the page that is open. A page with a back button in the band needs no code: the shell presses it. Plugin API unchanged (additive).
 - `msk.embeds.url({ plugin, name, resource })` (host op `embed.url`) and `embedSession()`: a page of a plugin inside a frame of the page of another, with a ticket for one
   resource. Needs `[permissions] embeds`. Plugin API unchanged (additive).
 - `msk.schedules` (`list({ resource? })`, `create`, `update(id, patch)`, `pause`, `resume`, `remove`, `run`, `runs`, `timezone()`; host ops

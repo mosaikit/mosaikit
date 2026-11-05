@@ -55,7 +55,8 @@ export function useHoverMenu(enabled: boolean): HoverMenu {
   // refs follow the state at once: a press can come in the same tick as the pointer enter, before a render
   const openRef = useRef(false)
   const viaRef = useRef(false)
-  const keepOnClick = useRef(false)
+  // until when a close request is ignored: the press on the icon of an open menu makes Radix ask to close it, more than once (toggle, focus)
+  const keepUntil = useRef(0)
   // a press on the entry (it navigates) mutes the hover until the pointer has left the entry
   const muted = useRef(false)
 
@@ -82,7 +83,7 @@ export function useHoverMenu(enabled: boolean): HoverMenu {
       ctl.cancel()
       openRef.current = false
       viaRef.current = false
-      setViaHover(false)
+      // `viaHover` stays as it was: the closing menu must not give the focus back to its icon (it would close the next one)
       setOpenState(false)
     }
     const close = closeNow.current
@@ -98,13 +99,11 @@ export function useHoverMenu(enabled: boolean): HoverMenu {
     onOpenChange: (o) => {
       ctl.cancel()
       // a click on the icon of a menu that is already open keeps it open (and makes it a normal one)
-      if (!o && keepOnClick.current) {
-        keepOnClick.current = false
+      if (!o && Date.now() < keepUntil.current) {
         viaRef.current = false
         setViaHover(false)
         return
       }
-      keepOnClick.current = false
       if (o) {
         viaRef.current = false
         setViaHover(false)
@@ -124,7 +123,7 @@ export function useHoverMenu(enabled: boolean): HoverMenu {
         muted.current = true
         // only a press on the trigger of the menu (not on the link of the app) keeps it open
         const onTrigger = !!(e.target as HTMLElement).closest?.('[aria-haspopup="menu"]')
-        keepOnClick.current = openRef.current && onTrigger
+        keepUntil.current = openRef.current && onTrigger ? Date.now() + 400 : 0
         // a press on the icon (its link) goes where the link goes and the menu stays open: from now on it is a normal one
         // (it closes with a click outside or Escape, not when the pointer leaves)
         if (openRef.current && viaRef.current && !onTrigger) {
