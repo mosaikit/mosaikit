@@ -33,6 +33,19 @@ pub fn valid_name(name: &str) -> bool {
 }
 
 /// Escape for ILIKE with `escape '\'`.
+/// Percent-encodes a text for a query parameter (letters, digits and `-._~` stay).
+pub fn url_encode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for b in s.bytes() {
+        if b.is_ascii_alphanumeric() || matches!(b, b'-' | b'.' | b'_' | b'~') {
+            out.push(b as char);
+        } else {
+            out.push_str(&format!("%{b:02X}"));
+        }
+    }
+    out
+}
+
 pub fn like_escape(s: &str) -> String {
     s.replace('\\', "\\\\").replace('%', "\\%").replace('_', "\\_")
 }

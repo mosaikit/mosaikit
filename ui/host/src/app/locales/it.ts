@@ -1061,6 +1061,8 @@ export const IT: Record<string, string> = {
   'Delete this schedule? Its history is deleted with it.': 'Eliminare questa programmazione? Il suo storico viene eliminato con lei.',
   'Resumed': 'Ripresa',
   'Calls what other plugins contribute': 'Chiama ciò che altri plugin contribuiscono',
+  'Shows pages of other plugins': 'Mostra pagine di altri plugin',
+  'yes (sensitive: {list}, in frames of its pages)': 'sì (sensibile: {list}, in riquadri delle sue pagine)',
   'No comments yet.': 'Nessun commento.',
   'Write a comment': 'Scrivi un commento',
   'Send': 'Invia',

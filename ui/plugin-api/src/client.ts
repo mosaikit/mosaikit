@@ -1,6 +1,6 @@
 import { Bridge, BridgeError } from './bridge.ts'
 import { API_VERSION, checkHostApi } from './version.ts'
-import type { BandApi, BandState, DirectoryApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, UiContext, Values, WebProbe } from './protocol.ts'
+import type { BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, UiContext, Values, WebProbe } from './protocol.ts'
 
 /** The extensions of the plugin on a resource (fields and actions other plugins add to its items). */
 export interface ExtensionsClient {
@@ -247,6 +247,11 @@ export class Msk {
   readonly directory: DirectoryApi = {
     search: (s: DirectorySearch) => this.bridge.call('directory.search', { ...s }),
   } as DirectoryApi
+
+  /** Pages of other plugins to show in a frame of this one (see `EmbedsApi`). */
+  readonly embeds: EmbedsApi = {
+    url: (a) => this.bridge.call('embed.url', { ...a }),
+  }
 
   /** The schedules of this plugin (see `SchedulesApi`): the shell runs them with the session of the person. */
   readonly schedules: SchedulesApi = {

@@ -97,6 +97,9 @@ pub struct Manifest {
     /// Rules of the tables of the plugin that go beyond the default (`[[tables]]`): who may write rows.
     #[serde(default)]
     pub tables: Vec<TableDecl>,
+    /// Pages of this plugin that another plugin may show inside its own page (`[[embeds]]`), for a resource of this plugin.
+    #[serde(default)]
+    pub embeds: Vec<EmbedDecl>,
     /// Keys of outside services the plugin uses (`[[service_keys]]`): the keys pages of the platform,
     /// of the tenants and of the people list only the services the installed plugins declare. The
     /// logic reads the key in use for the caller (own, else the tenant's, else the platform's).
@@ -397,6 +400,30 @@ pub struct ContributionDecl {
     #[serde(default)]
     pub data: Option<serde_json::Value>,
 }
+
+/// A page of the plugin that another plugin may embed (`[[embeds]]`): a viewer of one of its resources. The page runs in a
+/// frame of the page of the other plugin, on the origin of this plugin, with a **ticket** limited to the resource and to
+/// the `commands` listed here (each must be one of `permissions.run_commands`): it reads the resource with the rights of
+/// the person who looks, never with more. What the two pages tell each other over `postMessage` is the `contract`.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct EmbedDecl {
+    pub name: String,
+    /// the page of the UI (`.html`, relative to `ui/`)
+    pub entry: String,
+    /// the contract of the messages, for the plugins that agree on it (for example `geo-embed/1`)
+    #[serde(default)]
+    pub contract: String,
+    /// the kind of resource the page shows; none: any resource of the plugin
+    #[serde(default)]
+    pub resource_kind: Option<String>,
+    /// commands the page may call with its ticket
+    #[serde(default)]
+    pub commands: Vec<String>,
+}
+
+/// Most embeds of a plugin.
+pub const MAX_EMBEDS: usize = 8;
 
 /// What a table of the plugin lets a **reader** do (`[[tables]]`). By default only a person with the write
 /// permission on the resource of a row may insert, change or delete it. `insert_for = "reader"` also lets a
@@ -761,6 +788,10 @@ pub struct Permissions {
     /// Default: none. Needs `[requires] mosaikit = ">=1.0"`.
     #[serde(default)]
     pub contributions: Vec<String>,
+    /// Plugins whose pages (`[[embeds]]`) this plugin may show in a frame of its own page (`embed.url`): the CSP of its
+    /// pages lets in the origins of those plugins. Sensitive. Default: none. Needs `[requires] mosaikit = ">=1.0"`.
+    #[serde(default)]
+    pub embeds: Vec<String>,
     /// The UI may compile code at run time: its CSP gets `'unsafe-eval'` and `'wasm-unsafe-eval'` in
     /// `script-src` and `worker-src` (e.g. an engine that runs scripts or WebAssembly of its own).
     /// Sensitive: the Administrator sees it when the plugin is installed. Default: false.
@@ -1093,6 +1124,7 @@ impl Manifest {
         self.validate_public_commands().map_err(Error::Manifest)?;
         self.validate_contributions().map_err(Error::Manifest)?;
         self.validate_tables().map_err(Error::Manifest)?;
+        self.validate_embeds().map_err(Error::Manifest)?;
         self.validate_service_keys().map_err(Error::Manifest)?;
         for (lang, tr) in &self.i18n {
             self.validate_translation(lang, tr).map_err(|m| Error::Manifest(format!("i18n.{lang}: {m}")))?;
@@ -1429,6 +1461,38 @@ impl Manifest {
                     return Err(format!("the default of the config '{}' does not fit its kind", c.key));
                 }
             }
+        }
+        Ok(())
+    }
+
+    fn validate_embeds(&self) -> std::result::Result<(), String> {
+        if self.embeds.len() > MAX_EMBEDS {
+            return Err(format!("[[embeds]]: at most {MAX_EMBEDS}"));
+        }
+        let mut seen = std::collections::HashSet::new();
+        for e in &self.embeds {
+            if !is_point(&e.name) || !seen.insert(e.name.clone()) {
+                return Err(format!("[[embeds]]: invalid or repeated name '{}'", e.name));
+            }
+            if !e.entry.ends_with(".html") || !crate::is_safe_path(&e.entry) {
+                return Err(format!("[[embeds]] {}: entry must be an .html page of the UI", e.name));
+            }
+            if e.contract.len() > 32 || e.contract.chars().any(char::is_control) {
+                return Err(format!("[[embeds]] {}: contract is at most 32 characters", e.name));
+            }
+            if e.commands.is_empty() || e.commands.len() > 16 {
+                return Err(format!("[[embeds]] {}: name 1 to 16 commands", e.name));
+            }
+            for c in &e.commands {
+                if !self.permissions.run_commands.contains(c) {
+                    return Err(format!("[[embeds]] {}: '{c}' is not in permissions.run_commands", e.name));
+                }
+            }
+        }
+        if self.permissions.embeds.len() > 16
+            || self.permissions.embeds.iter().any(|p| !is_plugin_id(p) || p == &self.id)
+        {
+            return Err("permissions.embeds: at most 16 plugin ids, not the plugin itself".into());
         }
         Ok(())
     }
@@ -2521,6 +2585,63 @@ data = [1]
 point = \"a\"
 id = \"x\"
 extra = 1
+",
+        ] {
+            assert!(Manifest::from_toml(&with(bad)).is_err(), "{bad}");
+        }
+    }
+
+    #[test]
+    fn embeds_are_checked() {
+        let with = |extra: &str| {
+            format!(
+                "{}
+{extra}",
+                NOTES.replacen(
+                    "[permissions]",
+                    "[permissions]
+run_commands = [\"layers\"]",
+                    1
+                )
+            )
+        };
+        let ok = "[[embeds]]
+name = \"map\"
+entry = \"embed.html\"
+contract = \"geo-embed/1\"
+commands = [\"layers\"]
+";
+        let m = Manifest::from_toml(&with(ok)).unwrap();
+        assert_eq!((m.embeds[0].name.as_str(), m.embeds[0].entry.as_str()), ("map", "embed.html"));
+        for bad in [
+            "[[embeds]]
+name = \"map\"
+entry = \"embed.js\"
+commands = [\"layers\"]
+",
+            "[[embeds]]
+name = \"map\"
+entry = \"../x.html\"
+commands = [\"layers\"]
+",
+            "[[embeds]]
+name = \"map\"
+entry = \"e.html\"
+commands = []
+",
+            "[[embeds]]
+name = \"map\"
+entry = \"e.html\"
+commands = [\"other\"]
+",
+            "[[embeds]]
+name = \"map\"
+entry = \"e.html\"
+commands = [\"layers\"]
+[[embeds]]
+name = \"map\"
+entry = \"f.html\"
+commands = [\"layers\"]
 ",
         ] {
             assert!(Manifest::from_toml(&with(bad)).is_err(), "{bad}");

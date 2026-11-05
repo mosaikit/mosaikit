@@ -16,6 +16,7 @@ pub mod cron;
 pub mod crud;
 pub mod devprofile;
 pub mod embedded;
+pub mod embeds;
 mod error;
 pub mod events;
 pub mod files;

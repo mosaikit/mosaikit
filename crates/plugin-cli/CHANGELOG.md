@@ -4,6 +4,7 @@ One version for the whole dev kit, the one of the platform (docs/plugin-devkit-p
 
 ## Unreleased
 
+- Manifest: `[[embeds]]` (a page another plugin may show in a frame) and `[permissions] embeds` (listed among the permissions the Administrator reviews).
 - Manifest: `[permissions] resources_read` and `contributions` (listed among the permissions the Administrator reviews), `[[contributes]]`
   (point, id, label, data) and `[[tables]]` (`insert_for = "reader"`, `owner_column`: a person who can only read a resource writes the rows that
   are theirs in that table).

@@ -5,6 +5,8 @@ version and is removed in the next.
 
 ## Unreleased
 
+- `msk.embeds.url({ plugin, name, resource })` (host op `embed.url`) and `embedSession()`: a page of a plugin inside a frame of the page of another, with a ticket for one
+  resource. Needs `[permissions] embeds`. Plugin API unchanged (additive).
 - `msk.schedules` (`list({ resource? })`, `create`, `update(id, patch)`, `pause`, `resume`, `remove`, `run`, `runs`, `timezone()`; host ops
   `schedules.*`): the schedules of the plugin, run by the shell with the session of the person; the plugin is forced to the one of the page.
   Types `Schedule`, `ScheduleRun`, `ScheduleCreate`, `SchedulePatch`, `SchedulesApi`. No manifest permission beyond `[[schedules]]`. Plugin API unchanged (additive).
