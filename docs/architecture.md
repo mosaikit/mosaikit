@@ -1703,7 +1703,7 @@ missing, and lists `schedules` among the permissions the Administrator reviews (
 **What this version contains.** The registry (manifest, table, REST routes with their rules and limits, audit, the hooks that pause the
 schedules of a person who leaves) and the **worker** that runs the jobs: it claims what is due, checks the rights of the author again,
 mints a run ticket, pushes the run to the service of the plugin, follows it to its end, and stops a schedule that keeps failing. Both
-backends use the same code. The screen of the shell is the next step. Editing a schedule (`PATCH`) is not part of this version.
+backends use the same code. The screen of the shell is the next step.
 
 **Manifest.** `[[schedules]]`, at most 8 per plugin, each one: `name` (identifier, unique), `command` (must be in
 `permissions.run_commands`), `target` (the endpoint of the service; its origin must be in `permissions.network`, no credentials in the
@@ -1732,13 +1732,14 @@ first occurrence; a fire time is never at or before the previous one. The floor 
 - `POST /api/t/{t}/schedules` with `{ plugin, name, cron, time_zone?, catch_up_once?, args?, resources?, label? }` gives `{ id, next_run_at }`;
 - `GET /api/t/{t}/schedules?plugin=` lists: the author's own, or all of the tenant for a Tenant Manager (who does not receive `args` or
   `resources`);
+- `PATCH .../{id}` with any of `{ label, cron, time_zone, catch_up_once, args, resources, enabled }` edits the schedule in place (the id and the history of its runs stay) and answers with the schedule; the checks of the creation apply, `next_run_at` is computed again when `cron` or `time_zone` change, `enabled: false|true` pauses or resumes under the rules below. The author may change everything; a Tenant Manager only `label`, `cron`, `time_zone`, `catch_up_once` and `enabled`, never `args` or `resources` (`403 author_only`): the job runs as the author, so what it does is the author's to change. Event `schedule.update` (no arguments in it);
 - `POST .../{id}/pause`, `POST .../{id}/resume`, `DELETE .../{id}`;
 - `POST .../{id}/run`: run now (below); `POST .../{id}/take-over`: a Tenant Manager takes the schedule over (below);
 - `GET .../{id}/runs`: the last 50 runs (status, id at the service, error, deadline), for the author or a Tenant Manager.
 
 **Who may do what.** The author creates, lists, pauses, resumes and deletes their own. A Tenant Manager lists, pauses and deletes any in
 the tenant and resumes what a manager or the system paused; a manager never creates a schedule for someone else (the author is always
-the caller) and never edits one; taking a schedule over (below) makes it theirs, as a new registration would, and run-now is open to the author and to a Tenant Manager. Anybody else, and any id of another tenant, gets 404. A run ticket cannot register or manage schedules.
+the caller) and edits only the timetable and the label of one (`PATCH`); taking a schedule over (below) makes it theirs, as a new registration would, and run-now is open to the author and to a Tenant Manager. Anybody else, and any id of another tenant, gets 404. A run ticket cannot register or manage schedules.
 Resuming by the author checks again that the plugin is on, that they may use it and that the plugin still declares the schedule; a
 manager cannot resume what the author paused or what was paused because the author was removed or suspended: the rights of the author
 must exist again and the author says so.
@@ -1794,7 +1795,9 @@ becomes active again whatever its pause, the failure count restarts and the next
 schedule, its name and the actor; by the worker (no actor unless said, `by` is `scheduler` or `manual`): `schedule.run` (the author as user, the run, the run reference
 and the ticket), `schedule.skipped` (the reason), `schedule.missed`, `schedule.failed` (the status only), `schedule.paused` (the reason); and `schedule.takeover`.
 
-**Not in this version.** `PATCH` of a schedule; the screen of the shell; a time zone of the tenant (the default is UTC); a pull model for a service that cannot listen.
+**Time zone.** The tenant setting `timezone` (an IANA name, default `UTC`, set by the Tenant Manager in Manage › Settings, or by a product in `[defaults]`) is the zone of a new schedule that does not ask for one; the zone is stored with the schedule, so a later change of the setting moves none. `next_run_at` and `last_run_at` stay UTC in the API; every schedule carries its `time_zone`.
+
+**Not in this version.** The screen of the shell; a pull model for a service that cannot listen.
 
 ## 9. Web security: origins, cookies, CSP
 
