@@ -1050,7 +1050,12 @@ mod tests {
         assert!(!plain.contains("\"notes\".\"user_id\""), "{plain}");
         sc.tables.insert("tags".into(), true);
         let own = translate_one("update tags set seen = 'x'", Mode::Plugin(&sc)).unwrap();
-        assert!(own.contains("\"tags\".\"user_id\" = core_ctx_user()") && own.contains(">= 2") && own.contains(">= 1"), "{own}");
+        assert!(
+            own.contains("\"tags\".\"user_id\" = core_ctx_user()")
+                && own.contains(">= 2")
+                && own.contains(">= 1"),
+            "{own}"
+        );
     }
 
     fn k(sql: &str) -> String {

@@ -23,6 +23,8 @@ export type {
   DirectoryGroup,
   DirectorySearch,
   DirectoryUser,
+  EmbedUrl,
+  EmbedsApi,
   Schedule,
   ScheduleCreate,
   SchedulePatch,
@@ -45,6 +47,7 @@ export type {
   Values,
   WebProbe,
 } from './protocol.ts'
+export { embedSession, type EmbedSession } from './embed.ts'
 export { pageBody, pageHead, type PageHead } from './head.ts'
 export { avatar, chip } from './items.ts'
 export { h as el } from './dom.ts'

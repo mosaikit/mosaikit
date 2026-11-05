@@ -188,6 +188,13 @@ export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unk
       }
       return { method: 'POST', url: `${base}/directory/search`, json: body }
     }
+    // the page of another plugin to show in a frame (needs `embeds` in the permissions: the kernel checks it)
+    case 'embed.url':
+      return {
+        method: 'POST',
+        url: `${base}/embed/url`,
+        json: { plugin: pluginId(a.plugin), name: ident(a.name, 'name'), resource: uuid(a.resource, 'resource') },
+      }
     // the schedules of the plugin of the iframe: the kernel checks the right of the person, the host forces the plugin
     case 'schedules.list':
       return { method: 'GET', url: `/api/t/${enc(tenant)}/schedules?plugin=${enc(plugin)}` }

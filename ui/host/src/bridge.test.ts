@@ -25,6 +25,12 @@ describe('routeOp', () => {
     expect(routeOp('alfa', 'p.x', 'crud.list', { resource: 'notes', sort: 'title', dir: 'up' }).url).toBe('/api/t/alfa/p/p.x/r/notes?sort=title')
   })
 
+  it('routes the embedded page with checked arguments only', () => {
+    const c = routeOp('alfa', 'p.dash', 'embed.url', { plugin: 'com.mosaikit.maps', name: 'map', resource: ID, host: 'evil', ticket: 'x' })
+    expect(c).toEqual({ method: 'POST', url: '/api/t/alfa/p/p.dash/embed/url', json: { plugin: 'com.mosaikit.maps', name: 'map', resource: ID } })
+    for (const bad of [{ plugin: 'x y', name: 'map', resource: ID }, { plugin: 'p.a', name: 'a b', resource: ID }, { plugin: 'p.a', name: 'map', resource: 'nope' }, {}]) expect(() => routeOp('alfa', 'p.dash', 'embed.url', bad)).toThrow(OpError)
+  })
+
   it('routes the schedules of the plugin of the iframe, with the plugin forced', () => {
     const list = routeOp('alfa', 'p.x', 'schedules.list', { plugin: 'p.evil' })
     expect(list).toEqual({ method: 'GET', url: '/api/t/alfa/schedules?plugin=p.x' })

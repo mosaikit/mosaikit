@@ -1009,6 +1009,7 @@ notify = false           # the logic may send notifications (host operation `not
 script_eval = false      # the UI may compile code at run time (CSP 'unsafe-eval', §9); sensitive
 files_read = false       # the logic may read the Files area as the caller (`files.list|describe|read`, §8.3); sensitive
 resources_read = []     # plugins whose resources the logic may list as the caller (`resources.list`, §8.3); sensitive, needs `[requires] mosaikit = ">=1.0"`
+embeds = []             # plugins whose pages (`[[embeds]]`) this plugin shows in a frame of its own page (`embed.url`, §8.15); sensitive, needs `[requires] mosaikit = ">=1.0"`
 contributions = []      # points whose contributions the logic may list and whose contributors it may call (§8.3); sensitive, needs `[requires] mosaikit = ">=1.0"`
 web = false              # the UI may ask the host about a web page (`msk.web.probe`: may it be framed, title, picture)
 run_commands = []        # commands a run ticket may call on behalf of a person (§8.14); sensitive, needs `[requires] mosaikit = ">=1.0"`
@@ -1568,6 +1569,31 @@ keys of the tenant); it cannot limit what the logic RETURNS, and WASM may return
 public command: (1) never put a setting, a key or anything from `ctx.config` in the answer; (2) never take the id of the item from the
 arguments, use `ctx.link_resource()` only; (3) treat every argument as chosen by a stranger; (4) remember that an outside request made
 with `key` spends the tenant's or the platform's paid key for an anonymous visitor, so keep it small and cache what you can.
+
+### 8.15 Embedded pages: a page of one plugin inside the page of another
+
+A plugin may show a page of another plugin (a viewer of one of its resources: a map, a chart) in a frame of its own page, and the two pages
+may talk. It works with what exists: each plugin keeps its own origin, and the frame carries a **run ticket** (§8.14) limited to one resource.
+
+**Manifest.** The plugin that offers the page declares `[[embeds]]` (at most 8): `name`, `entry` (an `.html` page of its UI), optional `contract` (a name for the
+messages the two pages agree on, for example `geo-embed/1`), optional `resource_kind` (the page shows only resources of that kind), and `commands` (1 to 16 commands
+the page may call; each must be in its `permissions.run_commands`). The plugin that embeds declares `[permissions] embeds = ["<plugin id>"]` (at most 16, needs
+`[requires] mosaikit = ">=1.0"`; sensitive, shown in «What it asks»). Neither side can do it alone.
+
+**`msk.embeds.url({ plugin, name, resource })`** (REST `POST /api/t/{t}/p/{host}/embed/url`) answers `{ url, expires_at, contract, resource }`. The kernel checks that the
+host declares the plugin in `embeds`, that the plugin declares the embed, that the person uses it, and that the resource belongs to it, has the kind of the embed and is
+visible to the person now (else `404`, as for any resource that cannot be seen; `403 permission_denied` for the declaration). It then mints a run ticket for the person limited
+to that resource and to the `commands` of the embed (60 minutes, 1000 calls; the page of the host asks again before `expires_at`) and answers the address of the page on the
+origin of its plugin: `…/ui/{plugin}/{entry}?embed=<ticket>&plugin=…&resource=…&api=<origin of the platform>`.
+
+**The frame.** The host opens it in an `iframe` with `sandbox="allow-scripts"` (no origin of its own, no cookie, no access to the shell). The CSP of the pages of the host
+gets the origin of the embedded plugin in `frame-src`, and the CSP of the embedded page gets the origin of the hosts that declare it in `frame-ancestors`; nothing else
+changes. The embedded page reads its address with `embedSession()` of the UI package and calls its plugin with the ticket (`POST /api/run/{ticket}/call/{plugin}/{command}`, which
+answers CORS for any origin because the ticket is the only credential): it reads with the rights of the person who looks, only the resource, only the commands of the embed.
+A page opened that way has no bridge to the shell (`msk.*`); what it tells the host and the host tells it goes over `window.parent.postMessage` under the contract of the embed
+(`event.source` is checked on both sides; the platform sets no shape for the messages).
+
+**Not in this version.** A public link: the ticket is a person's. An embed in a public view needs a ticket tied to the link and its public commands (§8.13).
 
 ### 8.14 Run tickets: a plugin called on behalf of a run
 

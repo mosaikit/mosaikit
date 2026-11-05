@@ -407,6 +407,28 @@ export interface SchedulesApi {
   timezone(): Promise<string>
 }
 
+/** What `msk.embeds.url` answers: where to open the frame of the embedded page. */
+export interface EmbedUrl {
+  /** the address of the page on the origin of its plugin, with a ticket for the resource */
+  url: string
+  /** UTC: when the ticket stops working; ask again a few minutes before */
+  expires_at: string
+  /** the contract of the messages declared by the embed (for example `geo-embed/1`) */
+  contract: string
+  resource: string
+}
+
+export interface EmbedsApi {
+  /**
+   * The address of a page of another plugin (`[[embeds]]` in its manifest) that shows `resource`, for a frame of your page.
+   * Needs the plugin in `[permissions] embeds` and `[requires] mosaikit = ">=1.0"`. The person must use that plugin and see
+   * the resource; the page gets a ticket for that resource only, with the rights of the person. Open it in an iframe with
+   * `sandbox="allow-scripts"` and talk to it over `postMessage` under the contract of the embed, checking `event.source`.
+   * Errors: `permission_denied`, `not_found`.
+   */
+  url(a: { plugin: string; name: string; resource: string }): Promise<EmbedUrl>
+}
+
 /** The View | Edit switch of the contextual top band. */
 export interface BandMode {
   value: 'view' | 'edit'

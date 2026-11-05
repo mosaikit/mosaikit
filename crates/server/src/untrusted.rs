@@ -53,15 +53,47 @@ fn mime(path: &str) -> String {
 /// uploaded there must never run as a script of a plugin.
 fn plugin_csp(s: &AppState, p: &mosaikit_kernel::plugins::LoadedPlugin) -> String {
     let own = format!("{}/ui/{}/", s.k.cfg.plugin_url_for(&p.id).trim_end_matches('/'), p.id);
-    csp_for(&p.manifest, &own, &s.k.cfg.app_origins().join(" "), &s.k.cfg.public_origin())
+    // the pages of other plugins it embeds (frame-src) and the plugins that embed it (frame-ancestors)
+    let embedded: Vec<String> =
+        p.manifest.permissions.embeds.iter().map(|t| s.k.cfg.plugin_origin_for(t)).collect();
+    let embedders: Vec<String> = if p.manifest.embeds.is_empty() {
+        Vec::new()
+    } else {
+        s.k.plugins
+            .list()
+            .iter()
+            .filter(|h| h.manifest.permissions.embeds.contains(&p.id))
+            .map(|h| s.k.cfg.plugin_origin_for(&h.id))
+            .collect()
+    };
+    csp_for(
+        &p.manifest,
+        &own,
+        &s.k.cfg.app_origins().join(" "),
+        &s.k.cfg.public_origin(),
+        &embedded,
+        &embedders,
+    )
 }
 
 /// The policy itself. Only a plugin that declares `permissions.script_eval` may compile code at run
 /// time (`'unsafe-eval'`, `'wasm-unsafe-eval'`); it applies to the UI of that plugin and nothing else.
-fn csp_for(m: &mosaikit_mskp::Manifest, own: &str, app_origins: &str, public_origin: &str) -> String {
+fn csp_for(
+    m: &mosaikit_mskp::Manifest,
+    own: &str,
+    app_origins: &str,
+    public_origin: &str,
+    embedded: &[String],
+    embedders: &[String],
+) -> String {
     let net = m.permissions.network.join(" ");
     let frames = m.permissions.frame_src.join(" ");
     let mut frame_src = frames.clone();
+    for o in embedded {
+        frame_src.push(' ');
+        frame_src.push_str(o);
+    }
+    let ancestors = embedders.iter().map(|o| format!(" {o}")).collect::<String>();
     // a plugin with the `web` permission embeds sites by address: any http(s) origin (the site decides
     // whether it accepts being framed; the host tells beforehand with `msk.web.probe`)
     if m.permissions.web {
@@ -72,7 +104,7 @@ fn csp_for(m: &mosaikit_mskp::Manifest, own: &str, app_origins: &str, public_ori
         "default-src 'self'; script-src {own}{eval}; style-src 'self' 'unsafe-inline'; \
          img-src 'self' data: blob: {net} {frames}; font-src 'self' data:; media-src 'self' data: blob:; \
          connect-src 'self' {net}; frame-src 'self' blob: {frame_src}; worker-src {own} blob:{eval}; \
-         frame-ancestors {} {}; object-src 'none'; base-uri 'self'; form-action 'self'",
+         frame-ancestors {} {}{ancestors}; object-src 'none'; base-uri 'self'; form-action 'self'",
         app_origins, public_origin
     )
 }
@@ -641,7 +673,7 @@ label = \"P\"
 
     #[test]
     fn script_eval_only_for_the_plugin_that_declares_it() {
-        let csp = |m| super::csp_for(&m, "http://p/ui/x/", "http://app", "http://pub");
+        let csp = |m| super::csp_for(&m, "http://p/ui/x/", "http://app", "http://pub", &[], &[]);
         let strict = csp(manifest(""));
         assert!(strict.contains("script-src http://p/ui/x/;"));
         assert!(!strict.contains("unsafe-eval") && !strict.contains("wasm-unsafe-eval"));
@@ -656,6 +688,26 @@ label = \"P\"
         ));
         assert!(open.contains("script-src http://p/ui/x/ 'unsafe-eval' 'wasm-unsafe-eval';"));
         assert!(open.contains("worker-src http://p/ui/x/ blob: 'unsafe-eval' 'wasm-unsafe-eval';"));
+    }
+
+    #[test]
+    fn embedded_pages_open_the_frames_of_the_two_plugins_and_nothing_else() {
+        let m = manifest("");
+        let csp = super::csp_for(
+            &m,
+            "http://p/ui/x/",
+            "http://app",
+            "http://pub",
+            &["http://maps.plg".into()],
+            &["http://dash.plg".into()],
+        );
+        assert!(csp.contains("frame-src 'self' blob:  http://maps.plg;"), "{csp}");
+        assert!(csp.contains("frame-ancestors http://app http://pub http://dash.plg;"), "{csp}");
+        let plain = super::csp_for(&m, "http://p/ui/x/", "http://app", "http://pub", &[], &[]);
+        assert!(
+            plain.contains("frame-ancestors http://app http://pub;") && !plain.contains("plg"),
+            "{plain}"
+        );
     }
 
     #[test]

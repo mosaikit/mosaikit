@@ -73,6 +73,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/t/{t}/p/{plugin}/notify", post(plugin_notify))
         .route("/api/t/{t}/p/{plugin}/web/probe", post(plugin_web_probe))
         .route("/api/t/{t}/p/{plugin}/directory/search", post(plugin_directory_search))
+        .route("/api/t/{t}/p/{plugin}/embed/url", post(plugin_embed_url))
         .route("/api/admin/email", get(a_email).put(a_set_email))
         .route("/api/admin/email/test", post(a_email_test))
         // tenant
@@ -646,6 +647,16 @@ async fn plugin_directory_search(
     Json(r): Json<Value>,
 ) -> ApiResult<Json<Value>> {
     Ok(Json(mosaikit_kernel::plugin_directory::search(&s.k, &c, &p.plugin, &r).await?))
+}
+
+/// `msk.embeds.url`: the address of a page of another plugin, with its ticket (see `mosaikit_kernel::embeds`).
+async fn plugin_embed_url(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<PluginPath>,
+    Json(r): Json<Value>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(mosaikit_kernel::embeds::url(&s.k, &c, &p.plugin, &r).await?))
 }
 
 #[derive(Deserialize)]

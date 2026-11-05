@@ -167,6 +167,9 @@ fn manifest_checks(m: &Manifest, strict: bool, r: &mut Report) {
     if !p.contributions.is_empty() {
         sensitive.push("contributions");
     }
+    if !p.embeds.is_empty() {
+        sensitive.push("embeds");
+    }
     if !m.public_commands.is_empty() {
         sensitive.push("public_commands");
     }
