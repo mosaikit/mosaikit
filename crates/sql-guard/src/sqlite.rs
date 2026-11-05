@@ -1038,7 +1038,19 @@ mod tests {
             .into_iter()
             .collect(),
             kpi_views: ["kpi_notes".to_string()].into_iter().collect(),
+            reader_tables: [("tags".to_string(), "user_id".to_string())].into_iter().collect(),
         }
+    }
+
+    #[test]
+    fn a_reader_table_lets_a_reader_reach_its_own_rows() {
+        let mut sc = scope();
+        // `notes` has no owner column: the writer-only rule
+        let plain = translate_one("delete from notes", Mode::Plugin(&sc)).unwrap();
+        assert!(!plain.contains("\"notes\".\"user_id\""), "{plain}");
+        sc.tables.insert("tags".into(), true);
+        let own = translate_one("update tags set seen = 'x'", Mode::Plugin(&sc)).unwrap();
+        assert!(own.contains("\"tags\".\"user_id\" = core_ctx_user()") && own.contains(">= 2") && own.contains(">= 1"), "{own}");
     }
 
     fn k(sql: &str) -> String {
