@@ -60,6 +60,7 @@ const MIGRATIONS: &[(i64, &str, &str)] = &[
     (19, "run_tickets", include_str!("0019_run_tickets.sql")),
     (20, "schedules", include_str!("0020_schedules.sql")),
     (21, "schedule_runs", include_str!("0021_schedule_runs.sql")),
+    (22, "resource_comments", include_str!("0022_resource_comments.sql")),
 ];
 
 /// Context of the transaction on the connection (read by `core_ctx_*()`).

@@ -347,8 +347,14 @@ export interface BandPerson {
 
 /** The comments button of the contextual top band. */
 export interface BandComments {
-  /** the panel is open: the button shows it pressed */
-  open: boolean
+  /**
+   * The id of the resource the page shows: the shell then keeps the comments itself (the panel, the number in the
+   * badge, the thread of the resource in the platform) and the page writes no code for them. `open`, `count` and
+   * `onToggle` are not needed.
+   */
+  resource?: string
+  /** the panel is open: the button shows it pressed (not needed with `resource`) */
+  open?: boolean
   /** a badge with the number of comments, an integer 0 to 9999 */
   count?: number
   /** called when the person presses the button */

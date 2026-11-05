@@ -34,7 +34,7 @@ the origin of the host and is accepted only from it. A call that gets no answer 
 | `msk.isPublic`, `msk.publicResource`, `msk.publicGet()` | public-link viewer (`public_view`) |
 | `msk.publicConfig()` | the `[[config]]` settings marked `public = true` (never a secret), by key |
 | `msk.publicCall(name, args)` | runs a `[[public_commands]]` command, read only, on the shared item; errors `command_not_public`, `public_commands_off`, `public_rate_limited` |
-| `msk.band.set(state)`, `msk.band.reset()` | the contextual top band of the shell for a resource on the full page: `{ search?: false, mode?: { value: 'view'\|'edit', canEdit, onChange }, presence?: [{ id, name, initials? }], comments?: { open, count?, onToggle }, back?: { label, onClick } }`. No permission. See [the contextual band](#the-contextual-band) |
+| `msk.band.set(state)`, `msk.band.reset()` | the contextual top band of the shell for a resource on the full page: `{ search?: false, mode?: { value: 'view'\|'edit', canEdit, onChange }, presence?: [{ id, name, initials? }], comments?: { resource } \| { open, count?, onToggle }, back?: { label, onClick } }`. No permission. See [the contextual band](#the-contextual-band) |
 | `msk.directory.search({ kind, q, limit? })` | the people (`{id, username, name}`) or groups (`{id, name}`) of the tenant, for a picker; needs `[permissions] directory = true`; only a Tenant Manager or a person who may share; errors `permission_denied`, `invalid_argument`, `rate_limited`; never in public links. See [security](security.md#directory-the-author-rule) |
 
 ### Operations
@@ -115,7 +115,7 @@ msk.band.reset()
 - `back` adds an arrow-left button on the left, right after the tenant; `label` (plain text, at most 80 characters, already
   translated by you) is its accessible name and tooltip. Use it for a page that has a way back (for example the plugin's list).
 - You cannot hide the tenant, language, theme, help, notifications or the person menu, and no manifest permission is needed.
-- The comments button only calls `onToggle` and shows `open` and `count`; the panel itself is yours for now.
+- **Comments.** Pass `comments: { resource: <id of the resource> }` and the shell keeps the comments itself: the button, its badge, a panel on the right and the thread in the platform (`GET|POST /api/t/{t}/resources/{id}/comments`, whoever sees the resource reads and writes). You write no code for them. Or pass `{ open, count, onToggle }` to draw your own panel: then the button only calls `onToggle` and shows `open` and `count`.
 - Declarative layouts (`layout.toml`) may ignore the band; hosts older than this feature answer «operation not available» (the
   call is ignored). Architecture §8.16 has the details.
 

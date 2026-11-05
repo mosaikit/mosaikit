@@ -1662,10 +1662,23 @@ msk.band.set({
   search: false,
   mode: { value: 'view' | 'edit', canEdit, onChange(v) },
   presence: [{ id, name, initials? }],
-  comments: { open, count?, onToggle() },
+  comments: { resource },            // or { open, count?, onToggle() } to draw the panel yourself
   back: { label, onClick() },
 })
 ```
+
+**Comments on resources (native).** Any resource has a thread of plain-text comments in the platform (`core.resource_comments`, API 1,
+additive). A page that passes `comments: { resource: "<id>" }` gets the comments button, its badge (refreshed every 30 seconds) and a
+panel on the right of the frame from the shell, and writes no code for them. REST (session and CSRF as any `/api/t/{t}` route, the
+right on the resource checked by the kernel): `GET /api/t/{t}/resources/{id}/comments` gives `{ comments: [{ id, author_id, author_name,
+body, created_at, mine, can_delete }], count }` oldest first; `POST …/comments` with `{ body }` adds one; `DELETE …/comments/{cid}`
+deletes one. Whoever **sees** the resource reads and writes (a reader too); a resource the caller does not see is `404`, as for every
+other call. A comment is 1 to 2000 characters of plain text (the shell draws text nodes, never HTML; control characters other than line
+breaks and tabs are refused: `comment_invalid`, `comment_empty`, `comment_too_long`), a resource holds at most 1000
+(`too_many_comments`) and a person writes 20 a minute (`comment_rate_limited`). The author deletes their own and whoever **manages** the
+resource deletes any (`403` for others). Comments go with the resource when it is deleted for good, are never part of a public link and
+are not copied or exported with it. The audit log has `comment.add` and `comment.delete` with the resource and the comment, never the
+text. A run ticket has no part in comments.
 
 **Data and callbacks.** Functions cannot cross the iframe boundary: the UI package sends only the data (`mode.value`, `canEdit`,
 `presence`, `comments.open`, `count`, `back.label`) and keeps `onChange`, `onToggle` and `onClick`. When the person flips the switch or presses the button

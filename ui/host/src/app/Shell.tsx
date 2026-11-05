@@ -46,6 +46,8 @@ import { AppMark, BandActions, BandSearch, FlyoutMenu, SkipLink, TenantSwitcher 
 import { bandIcon, bandStyle, hasActive, useNav, type NavGroup, type NavItem } from './nav.tsx'
 import Frame from './frames.tsx'
 import { bandEmit, resetBand, useBand } from './contextband.ts'
+import CommentsController from './CommentsPanel.tsx'
+import { toggleComments, useCommentsState } from './comments.ts'
 import { BackButton, CommentsButton, ModeSwitch, Presence } from './ContextBand.tsx'
 
 export { AppMark, TenantBadge } from './slots.tsx'
@@ -278,6 +280,7 @@ function TopBar({ session, route, band, bandImage }: { session: Session; route: 
   // View | Edit switch in the middle, the people and the comments button next to the actions. Tenant, language,
   // theme, help, notifications and the person stay as they are.
   const ctxBand = useBand()
+  const native = useCommentsState()
   const searchOn = band.search && !ctxBand?.hideSearch
   const modeSwitch = ctxBand?.mode && <ModeSwitch mode={ctxBand.mode} onChange={(value) => bandEmit('band.mode', { value })} />
   return (
@@ -302,7 +305,12 @@ function TopBar({ session, route, band, bandImage }: { session: Session; route: 
       <div className="flex items-center gap-2 justify-self-end">
         {searchOn && modeSwitch}
         {ctxBand && <Presence people={ctxBand.presence} />}
-        {ctxBand?.comments && <CommentsButton comments={ctxBand.comments} onToggle={() => bandEmit('band.comments', {})} />}
+        {ctxBand?.comments && (
+          <CommentsButton
+            comments={ctxBand.comments.resource ? { ...ctxBand.comments, open: native.open, count: native.count } : ctxBand.comments}
+            onToggle={() => (ctxBand.comments?.resource ? toggleComments() : bandEmit('band.comments', {}))}
+          />
+        )}
         <BandActions session={session} route={route} band={band} />
       </div>
     </header>
@@ -340,9 +348,11 @@ export default function Shell({ session, route, children }: { session: Session; 
   // the contextual band of a plugin page never outlives the route it was set on
   const routeKey = route.area === 'tenant' ? `${route.tenant}/${route.page}/${route.id ?? ''}` : route.area
   useEffect(() => resetBand(), [routeKey])
+  const commentsResource = useBand()?.comments?.resource ?? null
   useEffect(() => applyStyle(style, layout), [style, layout])
   return (
     <div className={cn('msk-shell contents', layout.class)} data-layout={layout.id}>
+      {route.area === 'tenant' && commentsResource && <CommentsController tenant={route.tenant} resource={commentsResource} />}
       {layout.decl.pattern === 'rail' ? (
         <RailFrame session={session} route={route} band={band} bandImage={bandImage}>
           {children}
