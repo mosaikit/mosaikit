@@ -17,9 +17,17 @@ describe('sanitizeBand', () => {
         { id: 'a', name: 'Ada Lovelace', initials: 'AL' },
         { id: 'b', name: 'Bo', initials: 'xy' },
       ],
-      comments: { open: true, count: 4 },
+      comments: { open: true, count: 4, resource: null },
       back: null,
     })
+  })
+
+  it('a resource id hands the comments to the shell; a wrong id is refused', () => {
+    const id = '0F8A4C1E-7B2D-4E55-9A3C-1D2E3F4A5B6C'
+    expect(sanitizeBand({ comments: { resource: id } }).comments).toEqual({ open: false, count: null, resource: id.toLowerCase() })
+    for (const resource of ['x', 5, '../etc', `${id}0`]) expect(() => sanitizeBand({ comments: { resource } })).toThrow()
+    // without a resource the page still says whether the panel is open
+    expect(() => sanitizeBand({ comments: {} })).toThrow()
   })
 
   it('an empty state leaves everything as the shell draws it', () => {

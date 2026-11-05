@@ -13,6 +13,7 @@ export const BAND_MAX_INITIALS = 3
 export const BAND_MAX_COUNT = 9999
 export const BAND_MAX_BACK = 80
 const BAND_MAX_ID = 64
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export interface BandPersonView {
   id: string
@@ -25,7 +26,8 @@ export interface BandView {
   hideSearch: boolean
   mode: { value: 'view' | 'edit'; canEdit: boolean } | null
   presence: BandPersonView[]
-  comments: { open: boolean; count: number | null } | null
+  /** `resource`: the shell keeps the comments itself (panel, count) and the page needs no code for them */
+  comments: { open: boolean; count: number | null; resource: string | null } | null
   /** an arrow-left button next to the tenant: the label is its accessible name and tooltip */
   back: { label: string } | null
 }
@@ -83,13 +85,19 @@ export function sanitizeBand(raw: unknown): BandView {
   }
   if (a.comments !== undefined && a.comments !== null) {
     const c = plain(a.comments)
-    if (typeof c.open !== 'boolean') throw new OpError('invalid band comments')
+    let resource: string | null = null
+    if (c.resource !== undefined && c.resource !== null) {
+      if (typeof c.resource !== 'string' || !UUID.test(c.resource)) throw new OpError('invalid band comments resource')
+      resource = c.resource.toLowerCase()
+    }
+    // with a resource the shell owns the panel: the page does not say whether it is open
+    if (typeof c.open !== 'boolean' && !(resource && c.open === undefined)) throw new OpError('invalid band comments')
     let count: number | null = null
     if (c.count !== undefined && c.count !== null) {
       if (typeof c.count !== 'number' || !Number.isInteger(c.count) || c.count < 0) throw new OpError('invalid band comments count')
       count = Math.min(c.count, BAND_MAX_COUNT)
     }
-    view.comments = { open: c.open, count }
+    view.comments = { open: c.open === true, count, resource }
   }
   if (a.back !== undefined && a.back !== null) {
     const b = plain(a.back)

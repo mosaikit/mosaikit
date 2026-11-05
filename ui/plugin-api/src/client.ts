@@ -288,7 +288,7 @@ export class Msk {
           ...(s.search !== undefined ? { search: s.search } : {}),
           ...(s.mode ? { mode: { value: s.mode.value, canEdit: s.mode.canEdit } } : {}),
           ...(s.presence ? { presence: s.presence.map((p) => ({ id: p.id, name: p.name, ...(p.initials ? { initials: p.initials } : {}) })) } : {}),
-          ...(s.comments ? { comments: { open: s.comments.open, ...(s.comments.count !== undefined ? { count: s.comments.count } : {}) } } : {}),
+          ...(s.comments ? { comments: { ...(s.comments.resource ? { resource: s.comments.resource } : {}), ...(s.comments.open !== undefined ? { open: s.comments.open } : {}), ...(s.comments.count !== undefined ? { count: s.comments.count } : {}) } } : {}),
           ...(s.back ? { back: { label: s.back.label } } : {}),
         }
         void this.bridge.call('band.set', wire).catch(() => {})
