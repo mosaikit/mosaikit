@@ -305,6 +305,16 @@ impl Resources {
 /// `owner_id`, `owner_name`, `my_level`, `shared` and `parent_id`; never a storage path.
 pub struct Files(());
 
+impl Resources {
+    /// The resources of another plugin that the caller sees (needs the plugin in `[permissions]
+    /// resources_read`): `{ "entries": [{ id, plugin, kind, title, owner_name, my_level, updated_at }],
+    /// "truncated": bool }`, newest first. `kind` and `q` (a part of the title) narrow the list; `limit`
+    /// is 50 by default and at most 200. Errors carry a code: `permission_denied`, `invalid_argument`.
+    pub fn list(&self, plugin: &str, kind: Option<&str>, q: Option<&str>, limit: Option<u32>) -> Result<Value> {
+        host::call("resources.list", json!({ "plugin": plugin, "kind": kind, "q": q, "limit": limit }))
+    }
+}
+
 impl Files {
     /// Rows the caller sees in a folder (the root if `None`): `{ "entries": [...], "truncated": bool }`
     /// (at most 1000 rows).

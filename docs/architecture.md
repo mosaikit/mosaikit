@@ -992,6 +992,7 @@ calls = []               # plugins whose commands the logic calls (§8.6)
 notify = false           # the logic may send notifications (host operation `notify`, §8.3)
 script_eval = false      # the UI may compile code at run time (CSP 'unsafe-eval', §9); sensitive
 files_read = false       # the logic may read the Files area as the caller (`files.list|describe|read`, §8.3); sensitive
+resources_read = []     # plugins whose resources the logic may list as the caller (`resources.list`, §8.3); sensitive, needs `[requires] mosaikit = ">=1.0"`
 web = false              # the UI may ask the host about a web page (`msk.web.probe`: may it be framed, title, picture)
 run_commands = []        # commands a run ticket may call on behalf of a person (§8.14); sensitive, needs `[requires] mosaikit = ">=1.0"`
 
@@ -1127,8 +1128,8 @@ stays the one shown to the person. Host operations: `db.query`, `db.exec`,
 `resource.create`, `resource.delete`, `http.fetch` (only towards `network` or the address of an address service
 of `[[service_keys]]`; with `"key"` the host adds the key of that service),
 `plugin.call` (only towards `calls`, §8.6), `key.get` (only for the `[[service_keys]]`), `notify`
-(only with `[permissions] notify = true`) and `files.list`, `files.describe`, `files.read` (only with
-`[permissions] files_read = true`, below).
+(only with `[permissions] notify = true`), `files.list`, `files.describe`, `files.read` (only with
+`[permissions] files_read = true`, below) and `resources.list` (only towards the plugins of `resources_read`, below).
 
 An error of a host operation may carry a stable `code` too: `{"err": "…", "code": "…"}` (`Host::error_code` in
 the runtime); the SDK turns it into `Error::coded`, and a logic that returns it unchanged gives it to its UI.
@@ -1154,6 +1155,15 @@ longer. Errors have a code (Plugin API 1): `permission_denied` (the manifest has
 `not_found` (missing, or not visible to the caller: the two cannot be told apart), `invalid_argument` (bad id,
 a folder given to `files.read`, bad `max_bytes`). SDK: `ctx.files().list(parent)`, `.describe(id)`,
 `.read(id, max_bytes)`. The Administrator sees the permission in the plugin's «What it asks».
+
+**`resources.list`** (`[permissions] resources_read = ["<plugin id>", …]`, at most 16; default none; `[requires] mosaikit = ">=1.0"`): the logic lists the
+resources of ANOTHER plugin that the CALLER sees, for a picker (a map, a dashboard or a document to publish or to link). The manifest names the plugins; the
+call runs on a read transaction of the target plugin with the context of the caller, so the rows are those of `core.visible_resources` (ownership, ACL and
+sharing of the owner; the target must be on for the tenant and the caller needs `use` on it). Request `{plugin, kind?, q?, limit?}` (`kind` is the kind of
+resource, `q` a part of the title, at most 64 characters; `limit` 50 by default and 200 at most) answers `{"entries": [{id, plugin, kind, title, owner_name,
+my_level, updated_at}], "truncated": bool}`, folders left out, newest first. No body, no content, no storage path. Not available in a public link. Errors:
+`permission_denied` (the plugin is not in `resources_read`, or the caller may not use it), `invalid_argument`. SDK: `ctx.resources().list(plugin, kind, q, limit)`.
+The Administrator sees the permission in the plugin's «What it asks».
 
 **`notify`**: `{"op":"notify","req":{"title":"…","body":"…","at":"notes/2f1c","resource":"<uuid>"}}`,
 answer `{"ok":null}`. SDK: `ctx.notify(&Notice::new("Title").body("Text").at("notes/1").resource(id))`.

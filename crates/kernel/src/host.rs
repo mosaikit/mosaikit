@@ -46,6 +46,8 @@ pub(crate) struct KernelHost {
     notify: bool,
     /// `[permissions] files_read`: the logic may read the Files area as the caller
     files_read: bool,
+    /// `[permissions] resources_read`: the plugins whose resources the logic may list as the caller
+    resources_read: Vec<String>,
     /// code of the last error given to the logic (`Host::error_code`)
     last_code: Option<String>,
     /// notifications asked by the logic: sent after the commit of the operation
@@ -348,6 +350,16 @@ impl KernelHost {
 }
 
 impl KernelHost {
+    /// `resources.list`: see [`crate::resource_list`]. The manifest names the plugins that may be listed.
+    fn resources_list(&mut self, req: &Value) -> std::result::Result<Value, Coded> {
+        let k = self.kernel.clone().ok_or_else(|| Coded("internal", "kernel not available".into()))?;
+        let c = self.user().map_err(|m| Coded("permission_denied", m))?;
+        let allowed = self.resources_read.clone();
+        self.rt.block_on(crate::resource_list::list_from_logic(&k, &c, &allowed, req)).map_err(coded_of)
+    }
+}
+
+impl KernelHost {
     /// `directory.search`: see [`crate::plugin_directory`]. Refused in a public link and in a call on
     /// behalf of a run ticket; the manifest, the right of the caller and the limits are checked there.
     fn directory(&mut self, req: &Value) -> std::result::Result<Value, Coded> {
@@ -381,6 +393,10 @@ impl Host for KernelHost {
                     m
                 })
             }
+            "resources.list" => self.resources_list(req).map_err(|Coded(code, m)| {
+                self.last_code = Some(code.to_string());
+                m
+            }),
             "directory.search" => self.directory(req).map_err(|Coded(code, m)| {
                 self.last_code = Some(code.to_string());
                 m
@@ -459,6 +475,7 @@ fn new_host(
             .collect(),
         notify: p.manifest.permissions.notify,
         files_read: p.manifest.permissions.files_read,
+        resources_read: p.manifest.permissions.resources_read.clone(),
         last_code: None,
         notes: Vec::new(),
     }
