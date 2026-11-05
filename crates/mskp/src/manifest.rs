@@ -89,6 +89,11 @@ pub struct Manifest {
     /// resource of the link, with no user. The Administrator sees them when the plugin is installed.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub public_commands: Vec<PublicCommandDecl>,
+    /// What the plugin contributes to a point another plugin offers (`[[contributes]]`): a provider of
+    /// data for a hub, a kind of widget for a dashboard. The platform lists them for the plugins that
+    /// declare the point in `[permissions] contributions`; nothing else changes.
+    #[serde(default)]
+    pub contributes: Vec<ContributionDecl>,
     /// Keys of outside services the plugin uses (`[[service_keys]]`): the keys pages of the platform,
     /// of the tenants and of the people list only the services the installed plugins declare. The
     /// logic reads the key in use for the caller (own, else the tenant's, else the platform's).
@@ -374,6 +379,30 @@ pub struct PublicCommandDecl {
     /// largest size of the arguments, in bytes (default and ceiling: [`MAX_PUBLIC_ARG_BYTES`])
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_arg_bytes: Option<usize>,
+}
+
+/// A contribution to a point (`[[contributes]]`): `point` names what it plugs into (reverse-DNS style,
+/// for example `com.example.provider`), `id` names it inside the plugin, `data` is a small JSON object
+/// the point defines (its shape is the business of the point, never executed).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct ContributionDecl {
+    pub point: String,
+    pub id: String,
+    #[serde(default)]
+    pub label: String,
+    #[serde(default)]
+    pub data: Option<serde_json::Value>,
+}
+
+/// Most contributions of a plugin, most points a plugin may list, and the size of `data`.
+pub const MAX_CONTRIBUTES: usize = 16;
+pub const MAX_CONTRIBUTION_DATA: usize = 4 * 1024;
+
+fn is_point(s: &str) -> bool {
+    !s.is_empty()
+        && s.len() <= 64
+        && s.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || matches!(c, '.' | '-' | '_'))
 }
 
 /// Ceiling and default of the arguments of a public command.
@@ -695,6 +724,11 @@ pub struct Permissions {
     /// sees the list when the plugin is installed. Default: none. Needs `[requires] mosaikit = ">=1.0"`.
     #[serde(default)]
     pub resources_read: Vec<String>,
+    /// Points whose contributions the logic may list (`contributions.list`) and whose contributors it may
+    /// call with `plugin.call`, as if they were in `calls`. Sensitive: the Administrator sees the list.
+    /// Default: none. Needs `[requires] mosaikit = ">=1.0"`.
+    #[serde(default)]
+    pub contributions: Vec<String>,
     /// The UI may compile code at run time: its CSP gets `'unsafe-eval'` and `'wasm-unsafe-eval'` in
     /// `script-src` and `worker-src` (e.g. an engine that runs scripts or WebAssembly of its own).
     /// Sensitive: the Administrator sees it when the plugin is installed. Default: false.
@@ -1025,6 +1059,7 @@ impl Manifest {
         self.validate_nav().map_err(Error::Manifest)?;
         self.validate_config().map_err(Error::Manifest)?;
         self.validate_public_commands().map_err(Error::Manifest)?;
+        self.validate_contributions().map_err(Error::Manifest)?;
         self.validate_service_keys().map_err(Error::Manifest)?;
         for (lang, tr) in &self.i18n {
             self.validate_translation(lang, tr).map_err(|m| Error::Manifest(format!("i18n.{lang}: {m}")))?;
@@ -1361,6 +1396,39 @@ impl Manifest {
                     return Err(format!("the default of the config '{}' does not fit its kind", c.key));
                 }
             }
+        }
+        Ok(())
+    }
+
+    fn validate_contributions(&self) -> std::result::Result<(), String> {
+        if self.contributes.len() > MAX_CONTRIBUTES {
+            return Err(format!("[[contributes]]: at most {MAX_CONTRIBUTES}"));
+        }
+        let mut seen = std::collections::HashSet::new();
+        for c in &self.contributes {
+            if !is_point(&c.point) || !is_point(&c.id) {
+                return Err(format!("[[contributes]]: invalid point or id ('{}', '{}')", c.point, c.id));
+            }
+            if !seen.insert((c.point.clone(), c.id.clone())) {
+                return Err(format!("[[contributes]]: '{}' of '{}' is declared twice", c.id, c.point));
+            }
+            if c.label.chars().count() > 120 || c.label.chars().any(char::is_control) {
+                return Err("[[contributes]]: label is at most 120 characters, no control characters".into());
+            }
+            if let Some(d) = &c.data {
+                if !d.is_object()
+                    || serde_json::to_vec(d).map(|b| b.len()).unwrap_or(usize::MAX) > MAX_CONTRIBUTION_DATA
+                {
+                    return Err(format!(
+                        "[[contributes]]: data must be an object of at most {MAX_CONTRIBUTION_DATA} bytes"
+                    ));
+                }
+            }
+        }
+        if self.permissions.contributions.len() > MAX_CONTRIBUTES
+            || !self.permissions.contributions.iter().all(|p| is_point(p))
+        {
+            return Err(format!("permissions.contributions: at most {MAX_CONTRIBUTES} valid points"));
         }
         Ok(())
     }
@@ -2357,5 +2425,50 @@ fields = [{{ key = \"a\", label = \"A\", kind = \"text\" }}]
 "
         ))
         .is_err());
+    }
+
+    #[test]
+    fn contributions_are_checked() {
+        let with = |extra: &str| {
+            format!(
+                "{NOTES}
+{extra}"
+            )
+        };
+        let ok = Manifest::from_toml(&with(
+            "[[contributes]]
+point = \"a.b\"
+id = \"x\"
+label = \"X\"
+data = { k = 1 }
+",
+        ))
+        .unwrap();
+        assert_eq!((ok.contributes[0].point.as_str(), ok.contributes[0].id.as_str()), ("a.b", "x"));
+        for bad in [
+            "[[contributes]]
+point = \"A B\"
+id = \"x\"
+",
+            "[[contributes]]
+point = \"a\"
+id = \"x\"
+[[contributes]]
+point = \"a\"
+id = \"x\"
+",
+            "[[contributes]]
+point = \"a\"
+id = \"x\"
+data = [1]
+",
+            "[[contributes]]
+point = \"a\"
+id = \"x\"
+extra = 1
+",
+        ] {
+            assert!(Manifest::from_toml(&with(bad)).is_err(), "{bad}");
+        }
     }
 }

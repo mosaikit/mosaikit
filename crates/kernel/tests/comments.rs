@@ -10,9 +10,16 @@ use uuid::Uuid;
 
 async fn item(t: &mosaikit_kernel::testing::TestKernel, who: &mosaikit_kernel::Caller) -> Uuid {
     t.install("notes").await;
-    let row = crud::create(t, who, "com.mosaikit.notes", "notes", json!({ "title": "n" }).as_object().unwrap(), None)
-        .await
-        .unwrap();
+    let row = crud::create(
+        t,
+        who,
+        "com.mosaikit.notes",
+        "notes",
+        json!({ "title": "n" }).as_object().unwrap(),
+        None,
+    )
+    .await
+    .unwrap();
     row["id"].as_str().unwrap().parse().unwrap()
 }
 

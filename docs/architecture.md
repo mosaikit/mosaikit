@@ -993,6 +993,7 @@ notify = false           # the logic may send notifications (host operation `not
 script_eval = false      # the UI may compile code at run time (CSP 'unsafe-eval', §9); sensitive
 files_read = false       # the logic may read the Files area as the caller (`files.list|describe|read`, §8.3); sensitive
 resources_read = []     # plugins whose resources the logic may list as the caller (`resources.list`, §8.3); sensitive, needs `[requires] mosaikit = ">=1.0"`
+contributions = []      # points whose contributions the logic may list and whose contributors it may call (§8.3); sensitive, needs `[requires] mosaikit = ">=1.0"`
 web = false              # the UI may ask the host about a web page (`msk.web.probe`: may it be framed, title, picture)
 run_commands = []        # commands a run ticket may call on behalf of a person (§8.14); sensitive, needs `[requires] mosaikit = ">=1.0"`
 
@@ -1164,6 +1165,15 @@ resource, `q` a part of the title, at most 64 characters; `limit` 50 by default 
 my_level, updated_at}], "truncated": bool}`, folders left out, newest first. No body, no content, no storage path. Not available in a public link. Errors:
 `permission_denied` (the plugin is not in `resources_read`, or the caller may not use it), `invalid_argument`. SDK: `ctx.resources().list(plugin, kind, q, limit)`.
 The Administrator sees the permission in the plugin's «What it asks».
+
+**Contributions** (`[[contributes]]` in the contributor, `[permissions] contributions = ["<point>"]` in the plugin that collects them; `[requires]
+mosaikit = ">=1.0"`): a plugin plugs into a point another plugin offers (a provider of data for a hub, a kind of widget for a dashboard) without the
+host keeping a list of plugins. The contributor declares `[[contributes]]` with `point` (lowercase letters, digits, `.`, `-`, `_`, at most 64), `id` (the
+same, unique per point in the plugin), optional `label` (at most 120 characters) and `data` (a TOML table of at most 4 KiB: its shape is defined by the point
+and it is never executed); at most 16 per plugin. The collector declares the points it reads (at most 16). The host operation `contributions.list {point}` answers
+`[{ plugin, id, label, data }]` for the plugins that are on in the tenant and that the caller may use, ordered by plugin and id; a point the manifest does not
+declare is `permission_denied`. A plugin that contributes to a declared point can also be called with `plugin.call`, as if it were in `calls` (the called plugin
+runs in its own transaction and with its own rules, §8.6). SDK: `ctx.resources().contributions(point)`. The Administrator sees the permission in «What it asks».
 
 **`notify`**: `{"op":"notify","req":{"title":"…","body":"…","at":"notes/2f1c","resource":"<uuid>"}}`,
 answer `{"ok":null}`. SDK: `ctx.notify(&Notice::new("Title").body("Text").at("notes/1").resource(id))`.

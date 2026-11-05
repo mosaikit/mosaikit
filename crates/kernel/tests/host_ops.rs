@@ -386,8 +386,12 @@ async fn resources_list_shows_what_the_caller_sees_of_the_plugins_it_names() {
     let sid: Uuid = shared["id"].as_str().unwrap().parse().unwrap();
     set_grant(&t, &ca, sid, "user", bruno.user_id, Some(Level::Read)).await.unwrap();
     let titles = |v: &Value| -> Vec<String> {
-        let mut x: Vec<String> =
-            v["entries"].as_array().unwrap().iter().map(|e| e["title"].as_str().unwrap().to_string()).collect();
+        let mut x: Vec<String> = v["entries"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|e| e["title"].as_str().unwrap().to_string())
+            .collect();
         x.sort();
         x
     };
@@ -424,6 +428,53 @@ async fn resources_list_needs_the_declaration_in_the_manifest() {
     let g = t.tenant("alfa").await;
     let c = t.home(&g).await;
     let e = ask(&t, &c, json!({ "op": "resources.list", "req": { "plugin": "com.test.owner" } }))
+        .await
+        .unwrap_err();
+    assert_eq!(code_of(&e), "permission_denied", "{e}");
+}
+
+#[tokio::test]
+async fn contributions_are_listed_for_the_points_a_plugin_declares() {
+    let t = start().await;
+    // two contributors, one of them to another point
+    for (id, point, label) in [
+        ("com.test.provb", "test.provider", "B"),
+        ("com.test.prova", "test.provider", "A"),
+        ("com.test.provc", "other.point", "C"),
+    ] {
+        let toml = format!(
+            "id = \"{id}\"\nname = \"P\"\nversion = \"1.0.0\"\n[contribution]\nicon = \"x\"\nlabel = \"P\"\n\
+             [[contributes]]\npoint = \"{point}\"\nid = \"main\"\nlabel = \"{label}\"\ndata = {{ kinds = [\"layer\"] }}\n"
+        );
+        let mut files = BTreeMap::new();
+        files.insert("plugin.toml".to_string(), toml.into_bytes());
+        files.insert("logic.wasm".to_string(), echo_wasm());
+        t.install_package(&mosaikit_mskp::pack(&files, Some(&test_key())).unwrap()).await.unwrap();
+    }
+    let toml = "id = \"com.test.proxy\"\nname = \"H\"\nversion = \"1.0.0\"\n[contribution]\nicon = \"x\"\nlabel = \"H\"\n\
+                [requires]\nmosaikit = \">=1.0\"\n[permissions]\ncontributions = [\"test.provider\"]\n";
+    let mut files = BTreeMap::new();
+    files.insert("plugin.toml".to_string(), toml.as_bytes().to_vec());
+    files.insert("logic.wasm".to_string(), proxy_wasm());
+    t.install_package(&mosaikit_mskp::pack(&files, Some(&test_key())).unwrap()).await.unwrap();
+    let g = t.tenant("alfa").await;
+    let c = t.home(&g).await;
+    let v = ask(&t, &c, json!({ "op": "contributions.list", "req": { "point": "test.provider" } }))
+        .await
+        .unwrap();
+    let list: Vec<(String, String)> = v
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|e| (e["plugin"].as_str().unwrap().to_string(), e["label"].as_str().unwrap().to_string()))
+        .collect();
+    assert_eq!(
+        list,
+        [("com.test.prova".to_string(), "A".to_string()), ("com.test.provb".to_string(), "B".to_string())]
+    );
+    assert_eq!(v[0]["data"], json!({ "kinds": ["layer"] }));
+    // a point the manifest does not declare is refused
+    let e = ask(&t, &c, json!({ "op": "contributions.list", "req": { "point": "other.point" } }))
         .await
         .unwrap_err();
     assert_eq!(code_of(&e), "permission_denied", "{e}");

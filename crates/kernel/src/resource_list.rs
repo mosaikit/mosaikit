@@ -88,3 +88,21 @@ pub(crate) async fn list_from_logic(
         .collect();
     Ok(json!({ "entries": entries, "truncated": truncated }))
 }
+
+/// `contributions.list`: the contributions to `point` of every plugin that is on in the tenant and that the
+/// caller may use, in the order of the plugin id and the id of the contribution.
+pub(crate) async fn contributions(k: &Kernel, c: &Caller, point: &str) -> Result<Value> {
+    let mut plugins = k.plugins.list();
+    plugins.sort_by(|a, b| a.id.cmp(&b.id));
+    let mut out = Vec::new();
+    for p in plugins {
+        let mine: Vec<_> = p.manifest.contributes.iter().filter(|x| x.point == point).collect();
+        if mine.is_empty() || crate::access::require(k, c, &p.id, crate::access::USE).await.is_err() {
+            continue;
+        }
+        for x in mine {
+            out.push(json!({ "plugin": p.id, "id": x.id, "label": x.label, "data": x.data }));
+        }
+    }
+    Ok(Value::Array(out))
+}

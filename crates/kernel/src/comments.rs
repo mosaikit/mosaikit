@@ -119,7 +119,9 @@ pub async fn add(k: &Kernel, c: &Caller, rid: Uuid, body: &str) -> Result<Commen
         return Err(Error::bad("the comment is empty").with_code("comment_empty"));
     }
     if len > MAX_BODY {
-        return Err(Error::bad(format!("a comment is at most {MAX_BODY} characters")).with_code("comment_too_long"));
+        return Err(
+            Error::bad(format!("a comment is at most {MAX_BODY} characters")).with_code("comment_too_long")
+        );
     }
     // line breaks and tabs are text; the other control characters are not
     if body.chars().any(|ch| ch.is_control() && !matches!(ch, '\n' | '\t' | '\r')) {
@@ -144,7 +146,8 @@ pub async fn add(k: &Kernel, c: &Caller, rid: Uuid, body: &str) -> Result<Commen
     .fetch_optional(&k.db)
     .await?
     .ok_or_else(|| {
-        Error::bad(format!("this resource already has {MAX_PER_RESOURCE} comments")).with_code("too_many_comments")
+        Error::bad(format!("this resource already has {MAX_PER_RESOURCE} comments"))
+            .with_code("too_many_comments")
     })?;
     let id: Uuid = row.get(0);
     events::record(
