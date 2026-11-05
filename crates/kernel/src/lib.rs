@@ -32,6 +32,7 @@ pub mod overview;
 pub mod paging;
 pub mod personal;
 pub mod plugin_directory;
+pub mod resource_list;
 pub mod plugins;
 pub mod quotas;
 pub mod run_tickets;

@@ -354,3 +354,77 @@ async fn notify_never_crosses_tenants() {
     assert!(got(&t, &ga).await.is_empty());
     assert!(got(&t, &gb).await.is_empty());
 }
+
+/// A plugin whose logic is the proxy, with `resources_read` as given.
+async fn install_lister(t: &TestKernel, id: &str, resources_read: &str) {
+    let toml = format!(
+        "id = \"{id}\"\nname = \"Lister\"\nversion = \"1.0.0\"\n[contribution]\nicon = \"x\"\nlabel = \"Lister\"\n\
+         [requires]\nmosaikit = \">=1.0\"\n\
+         [permissions]\nresources_read = {resources_read}\n"
+    );
+    let mut files = BTreeMap::new();
+    files.insert("plugin.toml".to_string(), toml.into_bytes());
+    files.insert("logic.wasm".to_string(), proxy_wasm());
+    let pkg = mosaikit_mskp::pack(&files, Some(&test_key())).unwrap();
+    t.install_package(&pkg).await.unwrap();
+}
+
+#[tokio::test]
+async fn resources_list_shows_what_the_caller_sees_of_the_plugins_it_names() {
+    const OTHER: &str = "com.test.owner";
+    let t = start().await;
+    install_with(&t, OTHER, false, false, echo_wasm()).await;
+    install_lister(&t, PROXY, "[\"com.test.owner\"]").await;
+    let g = t.tenant("alfa").await;
+    let ca = t.home(&g).await;
+    let bruno = t.member(&g, "bruno").await;
+    let cb = t.home(&bruno).await;
+    let mk = |title: &str| vals(json!({ "title": title }));
+    let own = crud::create(&t, &ca, OTHER, "items", &mk("Anna map"), None).await.unwrap();
+    let shared = crud::create(&t, &ca, OTHER, "items", &mk("Shared map"), None).await.unwrap();
+    crud::create(&t, &cb, OTHER, "items", &mk("Bruno map"), None).await.unwrap();
+    let sid: Uuid = shared["id"].as_str().unwrap().parse().unwrap();
+    set_grant(&t, &ca, sid, "user", bruno.user_id, Some(Level::Read)).await.unwrap();
+    let titles = |v: &Value| -> Vec<String> {
+        let mut x: Vec<String> =
+            v["entries"].as_array().unwrap().iter().map(|e| e["title"].as_str().unwrap().to_string()).collect();
+        x.sort();
+        x
+    };
+    let req = |extra: Value| {
+        let mut r = vals(json!({ "plugin": OTHER }));
+        r.extend(vals(extra));
+        json!({ "op": "resources.list", "req": r })
+    };
+    // each person sees what the access control list of the owner gives them
+    let v = ask(&t, &cb, req(json!({}))).await.unwrap();
+    assert_eq!(titles(&v), ["Bruno map", "Shared map"]);
+    assert_eq!(v["truncated"], json!(false));
+    let v = ask(&t, &ca, req(json!({ "q": "anna" }))).await.unwrap();
+    assert_eq!(titles(&v), ["Anna map"]);
+    assert_eq!(v["entries"][0]["id"], own["id"]);
+    assert_eq!(v["entries"][0]["plugin"], json!(OTHER));
+    // the page size and the checks of the arguments
+    let v = ask(&t, &ca, req(json!({ "limit": 1 }))).await.unwrap();
+    assert_eq!((v["entries"].as_array().unwrap().len(), v["truncated"].clone()), (1, json!(true)));
+    let e = ask(&t, &ca, req(json!({ "limit": 0 }))).await.unwrap_err();
+    assert_eq!(code_of(&e), "invalid_argument", "{e}");
+    // a plugin the manifest does not name is refused
+    let e = ask(&t, &ca, json!({ "op": "resources.list", "req": { "plugin": "com.mosaikit.notes" } }))
+        .await
+        .unwrap_err();
+    assert_eq!(code_of(&e), "permission_denied", "{e}");
+}
+
+#[tokio::test]
+async fn resources_list_needs_the_declaration_in_the_manifest() {
+    let t = start().await;
+    install_with(&t, "com.test.owner", false, false, echo_wasm()).await;
+    install_lister(&t, PROXY, "[]").await;
+    let g = t.tenant("alfa").await;
+    let c = t.home(&g).await;
+    let e = ask(&t, &c, json!({ "op": "resources.list", "req": { "plugin": "com.test.owner" } }))
+        .await
+        .unwrap_err();
+    assert_eq!(code_of(&e), "permission_denied", "{e}");
+}

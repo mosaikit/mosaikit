@@ -690,6 +690,11 @@ pub struct Permissions {
     /// files.
     #[serde(default)]
     pub files_read: bool,
+    /// Plugins whose resources the logic may list with the permissions of the caller (host operation
+    /// `resources.list`: id, kind, title and little else, for a picker). Sensitive: the Administrator
+    /// sees the list when the plugin is installed. Default: none. Needs `[requires] mosaikit = ">=1.0"`.
+    #[serde(default)]
+    pub resources_read: Vec<String>,
     /// The UI may compile code at run time: its CSP gets `'unsafe-eval'` and `'wasm-unsafe-eval'` in
     /// `script-src` and `worker-src` (e.g. an engine that runs scripts or WebAssembly of its own).
     /// Sensitive: the Administrator sees it when the plugin is installed. Default: false.
@@ -946,6 +951,14 @@ impl Manifest {
         for c in &self.permissions.calls {
             if !is_plugin_id(c) || c == &self.id {
                 return bad(format!("permissions.calls: invalid id '{c}'"));
+            }
+        }
+        if self.permissions.resources_read.len() > 16 {
+            return bad("permissions.resources_read: at most 16 plugins".into());
+        }
+        for c in &self.permissions.resources_read {
+            if !is_plugin_id(c) || c == &self.id {
+                return bad(format!("permissions.resources_read: invalid id '{c}'"));
             }
         }
         if self.permissions.run_commands.len() > MAX_RUN_COMMANDS {
