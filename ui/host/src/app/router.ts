@@ -14,7 +14,7 @@
 import { useSyncExternalStore } from 'react'
 
 export type AdminPage = 'overview' | 'tenants' | 'people' | 'plugins' | 'monitoring' | 'system' | 'account' | 'notifications' | 'log'
-export type TenantPage = 'home' | 'manage' | 'plugins' | 'shares' | 'usage' | 'settings' | 'account' | 'notifications' | 'requests' | 'trash' | 'log'
+export type TenantPage = 'home' | 'manage' | 'plugins' | 'shares' | 'usage' | 'settings' | 'account' | 'notifications' | 'requests' | 'trash' | 'log' | 'schedules'
 
 export type Route =
   | { area: 'admin'; page: AdminPage | 'tenant' | 'person' | 'plugin'; id?: string; section?: string }
@@ -23,7 +23,7 @@ export type Route =
   | { area: 'reset'; token: string }
 
 const ADMIN_PAGES: AdminPage[] = ['tenants', 'people', 'plugins', 'monitoring', 'system', 'account', 'notifications', 'log']
-const TENANT_PAGES: TenantPage[] = ['manage', 'plugins', 'shares', 'usage', 'settings', 'account', 'notifications', 'requests', 'trash', 'log']
+const TENANT_PAGES: TenantPage[] = ['manage', 'plugins', 'shares', 'usage', 'settings', 'account', 'notifications', 'requests', 'trash', 'log', 'schedules']
 
 export function parse(hash: string): Route {
   const p = hash.replace(/^#\/?/, '').split('/').filter(Boolean).map(decodeURIComponent)
