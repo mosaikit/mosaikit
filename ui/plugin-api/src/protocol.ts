@@ -327,6 +327,86 @@ export interface DirectoryApi {
   search(s: DirectorySearch & { kind: 'group' }): Promise<DirectoryGroup[]>
 }
 
+/** A schedule of the plugin (`msk.schedules`): the JSON of `GET /api/t/{t}/schedules`. `args` and `resources` are given to the author only. */
+export interface Schedule {
+  id: string
+  plugin: string
+  name: string
+  label: string
+  author: string
+  author_name: string
+  cron: string
+  time_zone: string
+  catch_up_once: boolean
+  status: 'active' | 'paused'
+  paused_reason: string | null
+  /** UTC */
+  next_run_at: string | null
+  /** UTC */
+  last_run_at: string | null
+  last_status: string | null
+  created_at: string
+  mine: boolean
+  args?: Record<string, unknown>
+  resources?: string[]
+}
+
+export interface ScheduleRun {
+  id: string
+  status: string
+  started_by: string
+  started_at: string
+  finished_at: string | null
+  deadline_at: string
+  error: string | null
+  service_run_id: string | null
+}
+
+export interface ScheduleCreate {
+  /** a `[[schedules]] name` of the plugin */
+  name: string
+  /** five fields, in the time zone of the schedule */
+  cron: string
+  /** IANA name; none: the time zone of the tenant */
+  time_zone?: string
+  catch_up_once?: boolean
+  args?: Record<string, unknown>
+  /** resources the job is limited to; none: the rights of the author */
+  resources?: string[]
+  label?: string
+}
+
+export interface SchedulePatch {
+  label?: string
+  cron?: string
+  time_zone?: string
+  catch_up_once?: boolean
+  args?: Record<string, unknown>
+  resources?: string[]
+  /** `false` pauses, `true` resumes */
+  enabled?: boolean
+}
+
+/**
+ * The schedules of this plugin. The shell runs each call with the session of the person and forces the plugin to the
+ * one of the page, so a page reaches its own schedules only (the id of another plugin is `not_found`). The
+ * rules and the error codes are those of the REST API (`bad_cron`, `interval_too_short`, `bad_time_zone`, `author_only`...).
+ * The plugin declares `[[schedules]]` in its manifest.
+ */
+export interface SchedulesApi {
+  /** The own schedules of the person for this plugin; a Tenant Manager sees every one of the tenant. With `resource`, only those limited to it. */
+  list(opts?: { resource?: string }): Promise<Schedule[]>
+  create(s: ScheduleCreate): Promise<{ id: string; next_run_at: string }>
+  update(id: string, patch: SchedulePatch): Promise<Schedule>
+  pause(id: string): Promise<void>
+  resume(id: string): Promise<void>
+  remove(id: string): Promise<void>
+  run(id: string): Promise<ScheduleRun>
+  runs(id: string): Promise<ScheduleRun[]>
+  /** The time zone of the tenant (IANA name, `UTC` when it sets none): propose it as the default of a new schedule. */
+  timezone(): Promise<string>
+}
+
 /** The View | Edit switch of the contextual top band. */
 export interface BandMode {
   value: 'view' | 'edit'

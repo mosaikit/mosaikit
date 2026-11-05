@@ -7,7 +7,7 @@
 import { api, ApiError, enc, errText } from './api.ts'
 
 export interface RestCall {
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE'
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE'
   url: string
   json?: unknown
   raw?: Blob
@@ -188,6 +188,45 @@ export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unk
       }
       return { method: 'POST', url: `${base}/directory/search`, json: body }
     }
+    // the schedules of the plugin of the iframe: the kernel checks the right of the person, the host forces the plugin
+    case 'schedules.list':
+      return { method: 'GET', url: `/api/t/${enc(tenant)}/schedules?plugin=${enc(plugin)}` }
+    case 'schedules.timezone':
+      return { method: 'GET', url: `/api/t/${enc(tenant)}/schedules/timezone` }
+    case 'schedules.create': {
+      const j: Args = { plugin, name: str(a.name, 'name', 64), cron: str(a.cron, 'cron', 200) }
+      if (a.time_zone !== undefined && a.time_zone !== null && a.time_zone !== '') j.time_zone = str(a.time_zone, 'time zone', 64)
+      if (a.catch_up_once !== undefined) j.catch_up_once = a.catch_up_once === true
+      if (a.label !== undefined && a.label !== null) j.label = str(a.label, 'label', 120)
+      if (a.args !== undefined && a.args !== null) j.args = values(a.args)
+      if (a.resources !== undefined && a.resources !== null) {
+        if (!Array.isArray(a.resources) || a.resources.length > 64) throw new OpError('invalid resources')
+        j.resources = a.resources.map((x) => uuid(x, 'resource'))
+      }
+      return { method: 'POST', url: `/api/t/${enc(tenant)}/schedules`, json: j }
+    }
+    case 'schedules.update': {
+      const j: Args = {}
+      if (a.label !== undefined && a.label !== null) j.label = str(a.label, 'label', 120)
+      if (a.cron !== undefined && a.cron !== null) j.cron = str(a.cron, 'cron', 200)
+      if (a.time_zone !== undefined && a.time_zone !== null) j.time_zone = str(a.time_zone, 'time zone', 64)
+      if (typeof a.catch_up_once === 'boolean') j.catch_up_once = a.catch_up_once
+      if (typeof a.enabled === 'boolean') j.enabled = a.enabled
+      if (a.args !== undefined && a.args !== null) j.args = values(a.args)
+      if (a.resources !== undefined && a.resources !== null) {
+        if (!Array.isArray(a.resources) || a.resources.length > 64) throw new OpError('invalid resources')
+        j.resources = a.resources.map((x) => uuid(x, 'resource'))
+      }
+      return { method: 'PATCH', url: `/api/t/${enc(tenant)}/schedules/${uuid(a.id)}?plugin=${enc(plugin)}`, json: j }
+    }
+    case 'schedules.pause':
+    case 'schedules.resume':
+    case 'schedules.run':
+      return { method: 'POST', url: `/api/t/${enc(tenant)}/schedules/${uuid(a.id)}/${op.slice('schedules.'.length)}?plugin=${enc(plugin)}` }
+    case 'schedules.remove':
+      return { method: 'DELETE', url: `/api/t/${enc(tenant)}/schedules/${uuid(a.id)}?plugin=${enc(plugin)}` }
+    case 'schedules.runs':
+      return { method: 'GET', url: `/api/t/${enc(tenant)}/schedules/${uuid(a.id)}/runs?plugin=${enc(plugin)}` }
     case 'notify': {
       const n: Args = { title: str(a.title, 'title', 160) }
       if (a.body !== undefined && a.body !== null && a.body !== '') n.body = str(a.body, 'body', 600)

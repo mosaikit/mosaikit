@@ -5,6 +5,11 @@ version and is removed in the next.
 
 ## Unreleased
 
+- `msk.schedules` (`list({ resource? })`, `create`, `update(id, patch)`, `pause`, `resume`, `remove`, `run`, `runs`, `timezone()`; host ops
+  `schedules.*`): the schedules of the plugin, run by the shell with the session of the person; the plugin is forced to the one of the page.
+  Types `Schedule`, `ScheduleRun`, `ScheduleCreate`, `SchedulePatch`, `SchedulesApi`. No manifest permission beyond `[[schedules]]`. Plugin API unchanged (additive).
+- `msk.band.set({ comments: { resource } })`: the shell keeps the comments of the resource itself (button, badge, panel, thread in the platform);
+  `open`, `count` and `onToggle` are then not needed. Plugin API unchanged (additive).
 - `msk.band.set({ search, mode, presence, comments, back })` and `msk.band.reset()` (host ops `band.set`, `band.reset`; events
   `band.mode`, `band.comments`): the contextual top band for a resource on the full page: no search bar, a View | Edit
   switch (or a "Read only" label), the people connected (3 avatars and "+N"), a comments button, a back button (`back: { label, onClick }`, event

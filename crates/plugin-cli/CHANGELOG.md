@@ -4,6 +4,9 @@ One version for the whole dev kit, the one of the platform (docs/plugin-devkit-p
 
 ## Unreleased
 
+- Manifest: `[permissions] resources_read` and `contributions` (listed among the permissions the Administrator reviews), `[[contributes]]`
+  (point, id, label, data) and `[[tables]]` (`insert_for = "reader"`, `owner_column`: a person who can only read a resource writes the rows that
+  are theirs in that table).
 - `validate`: `[[schedules]]` needs `[requires] mosaikit` (warning, an error with `--strict`) and `schedules` is listed among the
   permissions the Administrator will review; the manifest is checked (command in `run_commands`, target origin in `permissions.network`,
   known `service_key`, limits).

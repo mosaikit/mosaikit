@@ -25,6 +25,18 @@ describe('routeOp', () => {
     expect(routeOp('alfa', 'p.x', 'crud.list', { resource: 'notes', sort: 'title', dir: 'up' }).url).toBe('/api/t/alfa/p/p.x/r/notes?sort=title')
   })
 
+  it('routes the schedules of the plugin of the iframe, with the plugin forced', () => {
+    const list = routeOp('alfa', 'p.x', 'schedules.list', { plugin: 'p.evil' })
+    expect(list).toEqual({ method: 'GET', url: '/api/t/alfa/schedules?plugin=p.x' })
+    const made = routeOp('alfa', 'p.x', 'schedules.create', { plugin: 'p.evil', name: 'run', cron: '0 3 * * *', extra: 1, resources: [ID] })
+    expect(made).toEqual({ method: 'POST', url: '/api/t/alfa/schedules', json: { plugin: 'p.x', name: 'run', cron: '0 3 * * *', resources: [ID] } })
+    expect(routeOp('alfa', 'p.x', 'schedules.update', { id: ID, enabled: false, cron: '5 * * * *', owner: 'x' })).toEqual({ method: 'PATCH', url: `/api/t/alfa/schedules/${ID}?plugin=p.x`, json: { cron: '5 * * * *', enabled: false } })
+    expect(routeOp('alfa', 'p.x', 'schedules.run', { id: ID }).url).toBe(`/api/t/alfa/schedules/${ID}/run?plugin=p.x`)
+    expect(routeOp('alfa', 'p.x', 'schedules.remove', { id: ID }).method).toBe('DELETE')
+    for (const bad of [{ id: 'nope' }, {}]) expect(() => routeOp('alfa', 'p.x', 'schedules.pause', bad)).toThrow(OpError)
+    expect(() => routeOp('alfa', 'p.x', 'schedules.create', { cron: '* * * * *' })).toThrow(OpError)
+  })
+
   it('routes the directory search with checked arguments only', () => {
     const c = routeOp('alfa', 'p.x', 'directory.search', { kind: 'user', q: 'an', limit: 500, tenant: 'beta', plugin: 'p.evil' })
     expect(c).toEqual({ method: 'POST', url: '/api/t/alfa/p/p.x/directory/search', json: { kind: 'user', q: 'an', limit: 50 } })

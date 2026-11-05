@@ -44,7 +44,7 @@ async fn people_who_see_a_resource_comment_on_it_and_no_one_else() {
     cm::add(&t, &cc, rid, "second").await.unwrap();
     let th = cm::list(&t, &ca, rid).await.unwrap();
     assert_eq!((th.count, th.comments.len()), (2, 2));
-    assert_eq!(th.comments[0].author_name.is_empty(), false);
+    assert!(!th.comments[0].author_name.is_empty());
     assert!(th.comments.iter().all(|c| c.can_delete), "the owner manages the resource");
     assert_eq!(cm::count(&t, &cb, rid).await.unwrap(), 2);
     // delete: the author, or a manager; not another person who only writes
@@ -76,4 +76,48 @@ async fn the_text_and_the_number_of_comments_are_limited() {
     assert_eq!(last.unwrap_err().code(), "comment_rate_limited");
     // the thread goes with the resource
     crud::delete(&t, &ca, "com.mosaikit.notes", "notes", rid).await.ok();
+}
+
+#[tokio::test]
+async fn a_manager_imports_comments_once_and_only_a_manager_can() {
+    use cm::ImportItem;
+    let t = start().await;
+    let g = t.tenant("alfa").await;
+    let anna = t.member(&g, "anna").await;
+    let ca = t.home(&anna).await;
+    let mgr = t.home(&g).await;
+    let rid = item(&t, &ca).await;
+    let at = "2025-03-01T10:00:00Z".parse().unwrap();
+    let items = vec![
+        ImportItem {
+            external_id: "old-1".into(),
+            author_id: anna.user_id,
+            body: "from the old store".into(),
+            created_at: at,
+        },
+        ImportItem {
+            external_id: "old-2".into(),
+            author_id: anna.user_id,
+            body: "second".into(),
+            created_at: at,
+        },
+    ];
+    // the author of the resource is not a manager
+    assert_eq!(cm::import(&t, &ca, rid, &items).await.unwrap_err().kind, Kind::Forbidden);
+    let r = cm::import(&t, &mgr, rid, &items).await.unwrap();
+    assert_eq!((r["imported"].clone(), r["skipped"].clone()), (json!(2), json!(0)));
+    // the same import again adds nothing
+    let r = cm::import(&t, &mgr, rid, &items).await.unwrap();
+    assert_eq!((r["imported"].clone(), r["skipped"].clone()), (json!(0), json!(2)));
+    let th = cm::list(&t, &ca, rid).await.unwrap();
+    assert_eq!(th.count, 2);
+    assert_eq!(th.comments[0].created_at, at);
+    assert!(th.comments[0].mine, "the comment is the one of its author");
+    // an author outside the tenant, an empty text or a missing id are refused
+    let bad = |a: Uuid, b: &str, e: &str| {
+        vec![ImportItem { external_id: e.into(), author_id: a, body: b.into(), created_at: at }]
+    };
+    for list in [bad(Uuid::new_v4(), "x", "e1"), bad(anna.user_id, " ", "e2"), bad(anna.user_id, "x", "")] {
+        assert_eq!(cm::import(&t, &mgr, rid, &list).await.unwrap_err().code(), "bad_import");
+    }
 }
