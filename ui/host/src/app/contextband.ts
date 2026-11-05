@@ -150,10 +150,18 @@ export function bandEmit(event: 'band.mode' | 'band.comments' | 'band.back', dat
  * Returns true when it did, and the caller must not navigate.
  */
 export function backFromActiveEntry(active: boolean): boolean {
-  if (!active || !state.view?.back) return false
-  bandEmit('band.back', {})
-  return true
+  if (!active) return false
+  if (state.view?.back) {
+    bandEmit('band.back', {})
+    return true
+  }
+  // no back button in the band: the page of the plugin is told (`nav.reselect`), a plugin that keeps its own detail view goes to its list
+  window.dispatchEvent(new Event(NAV_RESELECT))
+  return false
 }
+
+/** Window event of the shell: the entry of the page that is already open was clicked again (the frame forwards it to its plugin). */
+export const NAV_RESELECT = 'msk:nav-reselect'
 
 const subscribe = (l: () => void) => {
   listeners.add(l)

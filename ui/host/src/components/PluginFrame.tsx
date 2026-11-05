@@ -4,7 +4,7 @@ import type { PluginView, Session, TenantContext } from '../types.ts'
 import { useUi } from '../ui-context.ts'
 import { t } from '../app/i18n.ts'
 import { timed } from '../app/devlog.ts'
-import { resetBand, sanitizeBand, setBand } from '../app/contextband.ts'
+import { NAV_RESELECT, resetBand, sanitizeBand, setBand } from '../app/contextband.ts'
 import ExtensionTab, { type TabState } from './ExtensionTab.tsx'
 
 const IDENT = /^[a-z][a-z0-9_]{0,47}$/
@@ -75,6 +75,13 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
     (event: string, data: unknown) => ref.current?.contentWindow?.postMessage({ msk: 1, event, data }, origin),
     [origin],
   )
+
+  // the person clicked again the entry of the open page in the sidebar: the plugin may go back to its list
+  useEffect(() => {
+    const on = () => toBase('nav.reselect', {})
+    window.addEventListener(NAV_RESELECT, on)
+    return () => window.removeEventListener(NAV_RESELECT, on)
+  }, [toBase])
 
   // at every change of language, theme or mode the plugin receives the new context (and the theme only, for
   // the plugins written before the `context` event)

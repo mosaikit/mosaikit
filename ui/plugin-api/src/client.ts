@@ -172,6 +172,17 @@ export class Msk {
     })
   }
 
+  /**
+   * Tells when the person clicks again, in the sidebar, the entry of the page that is already open. A plugin with a list page
+   * and a detail page goes back to its list. (A page that declares a back button with `msk.band` needs no code: the shell
+   * presses it.) Returns the function that stops listening.
+   */
+  onNavReselect(fn: () => void) {
+    return this.bridge.onEvent((event) => {
+      if (event === 'nav.reselect') fn()
+    })
+  }
+
   crud(resource: string): CrudClient {
     const b = this.bridge
     return {

@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { OpError } from '../bridge.ts'
-import { backFromActiveEntry, bandEmit, cleanText, currentBand, initialsOf, resetBand, sanitizeBand, setBand } from './contextband.ts'
+import { NAV_RESELECT, backFromActiveEntry, bandEmit, cleanText, currentBand, initialsOf, resetBand, sanitizeBand, setBand } from './contextband.ts'
 import { contrast } from './themegen.ts'
 
 const bad = (x: unknown) => expect(() => sanitizeBand(x)).toThrow(OpError)
@@ -97,8 +97,12 @@ describe('the state of the band', () => {
     expect(emit).not.toHaveBeenCalled()
     expect(backFromActiveEntry(true)).toBe(true)
     expect(emit).toHaveBeenCalledWith('band.back', {})
-    setBand('frame-1', sanitizeBand({}), emit) // a list page has no back button
+    const told = vi.fn()
+    window.addEventListener(NAV_RESELECT, told)
+    setBand('frame-1', sanitizeBand({}), emit) // no back button: the page of the plugin is told instead
     expect(backFromActiveEntry(true)).toBe(false)
+    expect(told).toHaveBeenCalledTimes(1)
+    window.removeEventListener(NAV_RESELECT, told)
   })
 
   it('only the owner resets it; the shell resets it for everybody', () => {
