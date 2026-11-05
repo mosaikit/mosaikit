@@ -562,6 +562,16 @@ impl PluginSchema {
         self
     }
 
+    /// Tables where a person who can only read the resource may write the rows that are theirs:
+    /// `(table, column of the owner)`. Without it only a writer of the resource writes.
+    pub fn with_reader_tables(mut self, tables: Vec<(String, String)>) -> PluginSchema {
+        match &mut self.0 {
+            SchemaInner::Pg(s) => s.reader_tables = tables,
+            SchemaInner::Lite(s) => s.reader_tables = tables,
+        }
+        self
+    }
+
     /// Creates (or updates) the space of the plugin. Idempotent.
     pub async fn provision(&self, tx: &mut TxConn, password: &str) -> Result<()> {
         match &self.0 {

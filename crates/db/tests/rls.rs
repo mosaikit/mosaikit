@@ -578,3 +578,87 @@ async fn reads_as_sets_follow_the_rules(b: B) {
         assert!(qual.contains("ctx_levels"), "{qual}");
     }
 }
+
+both!(a_reader_writes_only_the_rows_that_are_theirs_where_the_table_says_so);
+async fn a_reader_writes_only_the_rows_that_are_theirs_where_the_table_says_so(b: B) {
+    let w = world(b).await;
+    // a table of rows people write about a resource (presence, comments): the owner column is `user_id`
+    let mut tx = w.db.begin_app().await.unwrap();
+    w.ps.thaw(&mut tx).await.unwrap();
+    w.ps.run_as_plugin(
+        &mut tx,
+        &["create table presence (resource_id uuid not null, tenant_id uuid not null default core.ctx_tenant(), user_id uuid not null, seen text)".into()],
+    )
+    .await
+    .unwrap();
+    let ps =
+        w.db.plugin_schema(PLUGIN, SCHEMA).with_reader_tables(vec![("presence".into(), "user_id".into())]);
+    ps.freeze(&mut tx).await.unwrap();
+    tx.commit().await.unwrap();
+    // the manifest of the plugin says so (SQLite reads it to rewrite the writes of the plugin)
+    query("update core.plugins set manifest = $2 where id = $1")
+        .bind(PLUGIN)
+        .bind(serde_json::json!({ "tables": [{ "name": "presence", "insert_for": "reader", "owner_column": "user_id" }] }))
+        .execute(&w.db)
+        .await
+        .unwrap();
+    w.db.forget_plugin_pool(PLUGIN).await;
+
+    let rid = note(&w, w.alice, w.tenant_a, "alice's map", None).await;
+    grant(&w, rid, w.bob, 1).await;
+    let ins = |who: Uuid, owner: Uuid| {
+        let w = &w;
+        async move {
+            let mut tx = w.db.begin_plugin(PLUGIN, &Ctx::user(who, w.tenant_a)).await.unwrap();
+            let r = query("insert into presence (resource_id, user_id, seen) values ($1, $2, 'now')")
+                .bind(rid)
+                .bind(owner)
+                .execute(&mut *tx)
+                .await;
+            if r.is_ok() {
+                tx.commit().await.unwrap();
+            }
+            r.map(|_| ())
+        }
+    };
+    // a reader writes a row of their own, not one in the name of another
+    ins(w.bob, w.bob).await.unwrap();
+    let e = ins(w.bob, w.alice).await.unwrap_err();
+    assert_eq!(sqlstate(&e).as_deref(), Some("42501"), "{e}");
+    // a person who cannot see the resource writes nothing, not even their own row
+    let e = ins(w.carol, w.carol).await.unwrap_err();
+    assert_eq!(sqlstate(&e).as_deref(), Some("42501"), "{e}");
+    // the owner of the resource writes as before
+    ins(w.alice, w.alice).await.unwrap();
+    // the reader changes and deletes their own row, and cannot reach the owner's
+    let mut tx = w.db.begin_plugin(PLUGIN, &Ctx::user(w.bob, w.tenant_a)).await.unwrap();
+    let mine = query("update presence set seen = 'later' where user_id = $1")
+        .bind(w.bob)
+        .execute(&mut *tx)
+        .await
+        .unwrap();
+    assert_eq!(mine.rows_affected(), 1);
+    let theirs = query("update presence set seen = 'tampered' where user_id = $1")
+        .bind(w.alice)
+        .execute(&mut *tx)
+        .await;
+    // PostgreSQL leaves the row out of the statement, SQLite refuses it: either way it does not change
+    assert!(theirs.map(|r| r.rows_affected() == 0).unwrap_or(true));
+    drop(tx);
+    let mut tx = w.db.begin_plugin(PLUGIN, &Ctx::user(w.alice, w.tenant_a)).await.unwrap();
+    let seen: String = query_scalar("select seen from presence where user_id = $1")
+        .bind(w.alice)
+        .fetch_one(&mut *tx)
+        .await
+        .unwrap();
+    assert_eq!(seen, "now");
+    drop(tx);
+    // the default table stays closed to a reader
+    let mut tx = w.db.begin_plugin(PLUGIN, &Ctx::user(w.bob, w.tenant_a)).await.unwrap();
+    let e = query("insert into notes (resource_id, title) values ($1, 'x')")
+        .bind(rid)
+        .execute(&mut *tx)
+        .await
+        .unwrap_err();
+    assert_eq!(sqlstate(&e).as_deref(), Some("42501"), "{e}");
+}

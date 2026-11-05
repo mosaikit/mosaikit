@@ -94,6 +94,9 @@ pub struct Manifest {
     /// declare the point in `[permissions] contributions`; nothing else changes.
     #[serde(default)]
     pub contributes: Vec<ContributionDecl>,
+    /// Rules of the tables of the plugin that go beyond the default (`[[tables]]`): who may write rows.
+    #[serde(default)]
+    pub tables: Vec<TableDecl>,
     /// Keys of outside services the plugin uses (`[[service_keys]]`): the keys pages of the platform,
     /// of the tenants and of the people list only the services the installed plugins declare. The
     /// logic reads the key in use for the caller (own, else the tenant's, else the platform's).
@@ -393,6 +396,35 @@ pub struct ContributionDecl {
     pub label: String,
     #[serde(default)]
     pub data: Option<serde_json::Value>,
+}
+
+/// What a table of the plugin lets a **reader** do (`[[tables]]`). By default only a person with the write
+/// permission on the resource of a row may insert, change or delete it. `insert_for = "reader"` also lets a
+/// person who can only read the resource write rows that are theirs: the insert needs `owner_column` to be the
+/// caller, and the change or the delete only reaches rows whose `owner_column` is the caller. For presence,
+/// comments, favourites and the like. A person never touches the row of another, and still needs to see the
+/// resource.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct TableDecl {
+    /// the table, without the schema
+    pub name: String,
+    /// only `"reader"`
+    pub insert_for: String,
+    /// the `uuid not null` column that holds the person who wrote the row (default `user_id`)
+    #[serde(default = "default_owner_column")]
+    pub owner_column: String,
+}
+
+fn default_owner_column() -> String {
+    "user_id".into()
+}
+
+fn is_ident(s: &str) -> bool {
+    !s.is_empty()
+        && s.len() <= 63
+        && s.chars().next().is_some_and(|c| c.is_ascii_lowercase() || c == '_')
+        && s.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
 }
 
 /// Most contributions of a plugin, most points a plugin may list, and the size of `data`.
@@ -1060,6 +1092,7 @@ impl Manifest {
         self.validate_config().map_err(Error::Manifest)?;
         self.validate_public_commands().map_err(Error::Manifest)?;
         self.validate_contributions().map_err(Error::Manifest)?;
+        self.validate_tables().map_err(Error::Manifest)?;
         self.validate_service_keys().map_err(Error::Manifest)?;
         for (lang, tr) in &self.i18n {
             self.validate_translation(lang, tr).map_err(|m| Error::Manifest(format!("i18n.{lang}: {m}")))?;
@@ -1395,6 +1428,28 @@ impl Manifest {
                 if c.kind == ConfigKind::Secret || c.check(d).is_none() {
                     return Err(format!("the default of the config '{}' does not fit its kind", c.key));
                 }
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_tables(&self) -> std::result::Result<(), String> {
+        if self.tables.len() > 64 {
+            return Err("[[tables]]: at most 64".into());
+        }
+        let mut seen = std::collections::HashSet::new();
+        for t in &self.tables {
+            if !is_ident(&t.name) || !is_ident(&t.owner_column) {
+                return Err(format!(
+                    "[[tables]]: invalid table or column ('{}', '{}')",
+                    t.name, t.owner_column
+                ));
+            }
+            if t.insert_for != "reader" {
+                return Err(format!("[[tables]] {}: insert_for must be \"reader\"", t.name));
+            }
+            if !seen.insert(t.name.clone()) {
+                return Err(format!("[[tables]]: '{}' is declared twice", t.name));
             }
         }
         Ok(())

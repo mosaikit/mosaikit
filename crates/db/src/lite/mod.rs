@@ -61,6 +61,7 @@ const MIGRATIONS: &[(i64, &str, &str)] = &[
     (20, "schedules", include_str!("0020_schedules.sql")),
     (21, "schedule_runs", include_str!("0021_schedule_runs.sql")),
     (22, "resource_comments", include_str!("0022_resource_comments.sql")),
+    (23, "comment_external_id", include_str!("0023_comment_external_id.sql")),
 ];
 
 /// Context of the transaction on the connection (read by `core_ctx_*()`).
@@ -380,6 +381,19 @@ pub(crate) fn load_scope_schema(c: &PConn, schema: &str, plugin_id: Option<&str>
             .collect::<std::result::Result<_, _>>()
             .map_err(map_err)?;
         scope.views = views.into_iter().collect();
+        // the tables where a reader writes the rows that are theirs come from the manifest of the plugin
+        let manifest: Option<String> =
+            c.conn.query_row("select manifest from core_plugins where id = ?1", [id], |r| r.get(0)).ok();
+        if let Some(m) = manifest.and_then(|m| serde_json::from_str::<Value>(&m).ok()) {
+            for t in m.get("tables").and_then(Value::as_array).into_iter().flatten() {
+                if t.get("insert_for").and_then(Value::as_str) == Some("reader") {
+                    if let Some(name) = t.get("name").and_then(Value::as_str) {
+                        let col = t.get("owner_column").and_then(Value::as_str).unwrap_or("user_id");
+                        scope.reader_tables.insert(name.to_string(), col.to_string());
+                    }
+                }
+            }
+        }
     }
     Ok(scope)
 }
@@ -504,6 +518,7 @@ impl LiteDb {
             plugin_id: plugin_id.to_string(),
             schema: schema.to_string(),
             db: self.inner.clone(),
+            reader_tables: Vec::new(),
         }
     }
 

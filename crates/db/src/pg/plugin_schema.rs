@@ -20,6 +20,8 @@ pub struct PgPluginSchema {
     pub reporting_role: String,
     /// schemas of the required extensions (e.g. `public` for PostGIS), after the one of the plugin
     pub extra_path: Vec<String>,
+    /// `(table, owner column)`: a reader writes the rows that are theirs
+    pub reader_tables: Vec<(String, String)>,
 }
 
 /// `core` functions the roles of the plugins may run.
@@ -264,29 +266,50 @@ impl PgPluginSchema {
                         ),
                     )
                     .await?;
+                    // writes: a writer of the resource; and, where the plugin declares `insert_for = "reader"`,
+                    // a person who can read it, for the rows that are theirs
+                    let allowed = match self.reader_tables.iter().find(|(n, _)| n == name) {
+                        Some((_, col)) => {
+                            let ok: bool = sqlx::query_scalar(
+                                "select exists (select 1 from information_schema.columns
+                                   where table_schema = $1 and table_name = $2 and column_name = $3
+                                     and data_type = 'uuid')",
+                            )
+                            .bind(&self.schema)
+                            .bind(name)
+                            .bind(col)
+                            .fetch_one(&mut **tx)
+                            .await?;
+                            if !ok {
+                                return Err(DbError::Invalid(format!(
+                                    "the table {name} must have the column {col} uuid (the owner of the row) for insert_for = \"reader\""
+                                )));
+                            }
+                            format!(
+                                "(core.can_access(resource_id, 2) or (core.can_access(resource_id, 1) and {} = core.ctx_user()))",
+                                qi(col)
+                            )
+                        }
+                        None => "core.can_access(resource_id, 2)".to_string(),
+                    };
                     Self::exec(
                         tx,
                         &format!(
                             "create policy msk_insert on {t} for insert \
-                         with check (core.can_access(resource_id, 2) and tenant_id = core.ctx_tenant())"
+                         with check ({allowed} and tenant_id = core.ctx_tenant())"
                         ),
                     )
                     .await?;
                     Self::exec(
                         tx,
                         &format!(
-                        "create policy msk_update on {t} for update using (core.can_access(resource_id, 2)) \
-                         with check (core.can_access(resource_id, 2) and tenant_id = core.ctx_tenant())"
-                    ),
+                            "create policy msk_update on {t} for update using ({allowed}) \
+                         with check ({allowed} and tenant_id = core.ctx_tenant())"
+                        ),
                     )
                     .await?;
-                    Self::exec(
-                        tx,
-                        &format!(
-                        "create policy msk_delete on {t} for delete using (core.can_access(resource_id, 2))"
-                    ),
-                    )
-                    .await?;
+                    Self::exec(tx, &format!("create policy msk_delete on {t} for delete using ({allowed})"))
+                        .await?;
                     Self::exec(tx, &format!("revoke all on {t} from {r}")).await?;
                     Self::exec(tx, &format!("grant select, insert, update, delete on {t} to {r}")).await?;
                     report.tables.push(name.clone());

@@ -40,6 +40,9 @@ pub struct Scope {
     pub views: BTreeMap<String, String>,
     /// KPI views (real SQLite views, aggregated over every tenant: for the kernel only)
     pub kpi_views: BTreeSet<String>,
+    /// tables where a reader writes the rows that are theirs (`[[tables]] insert_for = "reader"`):
+    /// name -> column of the owner
+    pub reader_tables: BTreeMap<String, String>,
 }
 
 impl Scope {
@@ -743,8 +746,13 @@ fn sentinel() -> ObjectName {
     ObjectName(vec![Ident::new(SENTINEL)])
 }
 
-fn and_level(sel: &mut Option<Expr>, alias: &str, min: u8) -> Result<()> {
-    let cond = format!("{} >= {min}", level_of(&format!("\"{alias}\".resource_id")));
+fn and_level(sel: &mut Option<Expr>, alias: &str, min: u8, owner: Option<&str>) -> Result<()> {
+    let lv = level_of(&format!("\"{alias}\".resource_id"));
+    let cond = match owner {
+        // a reader reaches the rows of their own
+        Some(col) => format!("({lv} >= {min} OR ({lv} >= 1 AND \"{alias}\".\"{col}\" = core_ctx_user()))"),
+        None => format!("{lv} >= {min}"),
+    };
     *sel = Some(match sel.take() {
         Some(s) => parse_expr(&format!("({s}) AND {cond}"))?,
         None => parse_expr(&cond)?,
@@ -964,7 +972,9 @@ fn translate_stmt(mut st: Statement, mode: Mode) -> Result<Translated> {
                         .value
                         .clone();
                     if filter {
-                        and_level(selection, &a, 2)?;
+                        let owner =
+                            tr.scope().and_then(|s| s.reader_tables.get(&logical)).map(String::as_str);
+                        and_level(selection, &a, 2, owner)?;
                     }
                 }
             }
@@ -980,7 +990,9 @@ fn translate_stmt(mut st: Statement, mode: Mode) -> Result<Translated> {
                         .value
                         .clone();
                     if filter {
-                        and_level(&mut d.selection, &a, 2)?;
+                        let owner =
+                            tr.scope().and_then(|s| s.reader_tables.get(&logical)).map(String::as_str);
+                        and_level(&mut d.selection, &a, 2, owner)?;
                     }
                 }
             }

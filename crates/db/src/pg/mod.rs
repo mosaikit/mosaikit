@@ -162,6 +162,7 @@ impl PgDb {
             role: self.plugin_role(plugin_id),
             reporting_role: self.reporting_role(),
             extra_path: Vec::new(),
+            reader_tables: Vec::new(),
         }
     }
 }

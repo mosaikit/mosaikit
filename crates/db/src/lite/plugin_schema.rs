@@ -18,6 +18,8 @@ pub struct LitePluginSchema {
     pub plugin_id: String,
     pub schema: String,
     pub(crate) db: Arc<Inner>,
+    /// `(table, owner column)`: a reader writes the rows that are theirs
+    pub reader_tables: Vec<(String, String)>,
 }
 
 fn q(s: &str) -> String {
@@ -181,19 +183,45 @@ impl LitePluginSchema {
             }
             // check triggers (active only in the transactions of the plugins)
             let lv = |r: &str| tr::level_of(r);
+            // a table where a reader writes the rows that are theirs: the writer's right, or read plus the row is mine
+            let owner = self.reader_tables.iter().find(|(t, _)| t == name).map(|(_, c)| c.clone());
+            if let Some(col) = &owner {
+                let ok = rows.iter().any(|r| {
+                    r.try_get::<String, _>(0).ok().as_deref() == Some(col.as_str())
+                        && r.try_get::<String, _>(1).ok().as_deref() == Some("uuid")
+                });
+                if !ok {
+                    return Err(DbError::Invalid(format!(
+                        "the table {name} must have the column {col} uuid (the owner of the row) for insert_for = \"reader\""
+                    )));
+                }
+            }
+            // `denied`: true when the statement is NOT allowed for the resource `r` and the row `row`
+            let denied = |r: &str, row: &str| match &owner {
+                Some(col) => format!(
+                    "({} < 2 AND NOT ({} >= 1 AND {row}.{} IS core_ctx_user()))",
+                    lv(r),
+                    lv(r),
+                    q(col)
+                ),
+                None => format!("{} < 2", lv(r)),
+            };
             let triggers = [
                 (
                     "msk_ins",
                     "before insert",
-                    format!("({} < 2 OR NEW.tenant_id IS NOT core_ctx_tenant())", lv("NEW.resource_id")),
+                    format!(
+                        "({} OR NEW.tenant_id IS NOT core_ctx_tenant())",
+                        denied("NEW.resource_id", "NEW")
+                    ),
                 ),
                 (
                     "msk_upd",
                     "before update",
                     format!(
-                        "({} < 2 OR {} < 2 OR NEW.tenant_id IS NOT core_ctx_tenant())",
-                        lv("OLD.resource_id"),
-                        lv("NEW.resource_id")
+                        "({} OR {} OR NEW.tenant_id IS NOT core_ctx_tenant())",
+                        denied("OLD.resource_id", "OLD"),
+                        denied("NEW.resource_id", "NEW")
                     ),
                 ),
                 (
@@ -201,8 +229,8 @@ impl LitePluginSchema {
                     "msk_del",
                     "before delete",
                     format!(
-                        "(EXISTS (SELECT 1 FROM core_resources WHERE id = OLD.resource_id) AND {} < 2)",
-                        lv("OLD.resource_id")
+                        "(EXISTS (SELECT 1 FROM core_resources WHERE id = OLD.resource_id) AND {})",
+                        denied("OLD.resource_id", "OLD")
                     ),
                 ),
             ];
