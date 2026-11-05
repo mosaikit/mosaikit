@@ -4,7 +4,7 @@
 use axum::extract::{Path, Query, State};
 use axum::routing::{delete, get, post};
 use axum::{Json, Router};
-use mosaikit_kernel::schedules::{self, CreateRequest};
+use mosaikit_kernel::schedules::{self, CreateRequest, PatchRequest};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -15,7 +15,7 @@ use crate::{ApiResult, AppState};
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/t/{t}/schedules", post(create).get(list))
-        .route("/api/t/{t}/schedules/{id}", delete(remove))
+        .route("/api/t/{t}/schedules/{id}", delete(remove).patch(update))
         .route("/api/t/{t}/schedules/{id}/pause", post(pause))
         .route("/api/t/{t}/schedules/{id}/resume", post(resume))
         .route("/api/t/{t}/schedules/{id}/run", post(run_now))
@@ -44,6 +44,15 @@ async fn list(
 ) -> ApiResult<Json<Value>> {
     let rows = schedules::list(&s.k, &c, q.plugin.as_deref().filter(|p| !p.is_empty())).await?;
     Ok(Json(json!(rows)))
+}
+
+async fn update(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path((_t, id)): Path<(String, String)>,
+    Json(req): Json<PatchRequest>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(json!(schedules::update(&s.k, &c, uuid(&id)?, &req).await?)))
 }
 
 async fn pause(

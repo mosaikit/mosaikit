@@ -110,6 +110,8 @@ const DEFS: &[Def] = &[
     limit("lang.enabled", Rule::Subset, languages),
     def("lang.default", Kind::Custom, Scope::Both, lang_default),
     def("format.locale", Kind::Custom, Scope::Both, locale),
+    // the time zone of the tenant: where the cron expressions of its schedules are read (IANA name)
+    def("timezone", Kind::Custom, Scope::Both, timezone),
     // security
     limit("security.password_min", Rule::Min, password_min),
     limit("security.lock_attempts", Rule::Max, lock_attempts),
@@ -264,6 +266,13 @@ fn locale(v: &Value) -> Result<()> {
     one_of(v, LOCALES, "a format")
 }
 
+fn timezone(v: &Value) -> Result<()> {
+    match v.as_str() {
+        Some(s) if s.parse::<chrono_tz::Tz>().is_ok() => Ok(()),
+        _ => Err(invalid("a time zone of the IANA database (e.g. Europe/Rome)")),
+    }
+}
+
 fn languages(v: &Value) -> Result<()> {
     let list = v.as_array().ok_or_else(|| invalid("a list of languages"))?;
     let mut seen = Vec::new();
@@ -388,6 +397,7 @@ impl Defaults {
             "identity.landing" => json!("home"),
             "theme" => json!(super::settings::DEFAULT_THEME),
             "appearance.mode" | "lang.default" | "format.locale" => json!("auto"),
+            "timezone" => json!("UTC"),
             "band" => serde_json::to_value(super::settings::ShellBand::default()).unwrap_or(Value::Null),
             "lang.enabled" => json!(LANGUAGES),
             "security.password_min" => json!(PASSWORD_FLOOR),

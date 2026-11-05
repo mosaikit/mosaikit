@@ -46,7 +46,7 @@ pub struct CreateRequest {
     pub name: String,
     /// five fields, wall-clock times of the time zone of the schedule
     pub cron: String,
-    /// IANA name (`Europe/Rome`); none: the zone of the tenant, which is UTC while tenants have no zone
+    /// IANA name (`Europe/Rome`); none: the zone of the tenant (setting `timezone`, UTC by default)
     #[serde(default)]
     pub time_zone: Option<String>,
     /// after a downtime run once for all the runs that were missed (default: they are skipped)
@@ -118,6 +118,47 @@ fn plan(expr: &str, tz: Tz, min_interval: u32, now: DateTime<Utc>) -> Result<(Cr
     Ok((cron, next))
 }
 
+fn check_args(args: &Option<Value>) -> Result<Value> {
+    let args = match args {
+        None | Some(Value::Null) => json!({}),
+        Some(v @ Value::Object(_)) => v.clone(),
+        Some(_) => return Err(refuse("args must be a JSON object", "bad_args")),
+    };
+    if serde_json::to_vec(&args).map(|b| b.len()).unwrap_or(usize::MAX) > MAX_ARG_BYTES {
+        return Err(refuse("args are too large (64 KiB at most)", "args_too_large"));
+    }
+    Ok(args)
+}
+
+fn check_label(label: Option<&str>) -> Result<String> {
+    let label = label.unwrap_or("").trim();
+    if label.chars().count() > MAX_LABEL || label.chars().any(char::is_control) {
+        return Err(refuse(
+            format!("label: at most {MAX_LABEL} characters, no control characters"),
+            "bad_label",
+        ));
+    }
+    Ok(label.to_string())
+}
+
+/// The author must see each resource now, and it must belong to the plugin.
+async fn check_resources(k: &Kernel, c: &Caller, plugin: &str, list: &[Uuid]) -> Result<Vec<Uuid>> {
+    if list.is_empty() || list.len() > MAX_RESOURCES {
+        return Err(refuse(format!("resources: 1 to {MAX_RESOURCES}"), "bad_resources"));
+    }
+    let mut ids: Vec<Uuid> = Vec::new();
+    for id in list {
+        let m = acl::meta(k, c, *id).await?;
+        if m.plugin_id != plugin {
+            return Err(refuse("a resource of the schedule belongs to another plugin", "bad_resources"));
+        }
+        if !ids.contains(id) {
+            ids.push(*id);
+        }
+    }
+    Ok(ids)
+}
+
 /// Registers a schedule for the caller (a person with a session: a run ticket cannot).
 pub async fn create(k: &Kernel, c: &Caller, req: &CreateRequest) -> Result<Created> {
     if c.run.is_some() {
@@ -134,53 +175,22 @@ pub async fn create(k: &Kernel, c: &Caller, req: &CreateRequest) -> Result<Creat
     if !p.manifest.permissions.run_commands.contains(&decl.command) {
         return Err(refuse("the command of this schedule is no longer a run command", "command_removed"));
     }
-    let tz = zone_of(req.time_zone.as_deref())?;
-    let (_, next) = plan(&req.cron, tz, decl.min_interval(), Utc::now())?;
-    let args = match &req.args {
-        None | Some(Value::Null) => json!({}),
-        Some(v @ Value::Object(_)) => v.clone(),
-        Some(_) => return Err(refuse("args must be a JSON object", "bad_args")),
+    let tz = match req.time_zone.as_deref().map(str::trim).filter(|n| !n.is_empty()) {
+        Some(n) => zone_of(Some(n))?,
+        None => tenant_zone(k, c.tenant.tenant_id).await,
     };
-    if serde_json::to_vec(&args).map(|b| b.len()).unwrap_or(usize::MAX) > MAX_ARG_BYTES {
-        return Err(refuse("args are too large (64 KiB at most)", "args_too_large"));
-    }
-    let label = req.label.as_deref().unwrap_or("").trim();
-    if label.chars().count() > MAX_LABEL || label.chars().any(char::is_control) {
-        return Err(refuse(
-            format!("label: at most {MAX_LABEL} characters, no control characters"),
-            "bad_label",
-        ));
-    }
+    let (_, next) = plan(&req.cron, tz, decl.min_interval(), Utc::now())?;
+    let args = check_args(&req.args)?;
+    let label = check_label(req.label.as_deref())?;
     let resources = match &req.resources {
-        None => {
-            if decl.resources_required {
-                return Err(refuse(
-                    "this schedule must name the resources it is limited to",
-                    "resources_required",
-                ));
-            }
-            None
+        None if decl.resources_required => {
+            return Err(refuse(
+                "this schedule must name the resources it is limited to",
+                "resources_required",
+            ));
         }
-        Some(list) => {
-            if list.is_empty() || list.len() > MAX_RESOURCES {
-                return Err(refuse(format!("resources: 1 to {MAX_RESOURCES}"), "bad_resources"));
-            }
-            let mut ids: Vec<Uuid> = Vec::new();
-            for id in list {
-                // the author must see each one now, and it must belong to this plugin
-                let m = acl::meta(k, c, *id).await?;
-                if m.plugin_id != p.id {
-                    return Err(refuse(
-                        "a resource of the schedule belongs to another plugin",
-                        "bad_resources",
-                    ));
-                }
-                if !ids.contains(id) {
-                    ids.push(*id);
-                }
-            }
-            Some(ids)
-        }
+        None => None,
+        Some(list) => Some(check_resources(k, c, &p.id, list).await?),
     };
     if !k.limiter.hit(&format!("schedcreate:{}", c.user.user_id), CREATES_PER_MINUTE, WINDOW) {
         return Err(Error::new(Kind::TooMany, "too many schedules created: try again in a minute")
@@ -199,7 +209,7 @@ pub async fn create(k: &Kernel, c: &Caller, req: &CreateRequest) -> Result<Creat
     .bind(c.user.user_id)
     .bind(&p.id)
     .bind(&decl.name)
-    .bind(label)
+    .bind(&label)
     .bind(req.cron.split_whitespace().collect::<Vec<_>>().join(" "))
     .bind(args)
     .bind(resources.as_ref().map(|r| json!(r)))
@@ -334,6 +344,105 @@ async fn target(k: &Kernel, c: &Caller, id: Uuid) -> Result<Target> {
     Ok(t)
 }
 
+/// What `PATCH` may change. Absent: unchanged. `args` and `resources` take effect at the next run.
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct PatchRequest {
+    pub label: Option<String>,
+    pub cron: Option<String>,
+    pub time_zone: Option<String>,
+    pub catch_up_once: Option<bool>,
+    pub args: Option<Value>,
+    /// to drop the limit to resources, delete the schedule and create it again
+    pub resources: Option<Vec<Uuid>>,
+    /// `false` pauses, `true` resumes (the rules of `pause` and `resume` hold)
+    pub enabled: Option<bool>,
+}
+
+/// Edits a schedule without losing its history. The author may change everything; a Tenant Manager only
+/// what does not change what the job does as the author (`label`, `cron`, `time_zone`, `catch_up_once`,
+/// `enabled`), never `args` or `resources`. The checks of `create` apply, and `next_run_at` is computed
+/// again when the timetable changes.
+pub async fn update(k: &Kernel, c: &Caller, id: Uuid, req: &PatchRequest) -> Result<Schedule> {
+    let t = target(k, c, id).await?;
+    let mine = t.author == c.user.user_id;
+    if !mine && (req.args.is_some() || req.resources.is_some()) {
+        return Err(Error::forbidden(
+            "only the author can change the arguments or the resources of a schedule",
+        )
+        .with_code("author_only"));
+    }
+    let (p, _) = if mine {
+        crate::access::require(k, c, &t.plugin, crate::access::USE).await?
+    } else {
+        (k.plugins.active(&t.plugin)?, Default::default())
+    };
+    let decl = p
+        .manifest
+        .schedules
+        .iter()
+        .find(|s| s.name == t.name)
+        .ok_or_else(|| refuse("the plugin no longer declares this schedule", "schedule_not_declared"))?;
+    if !p.manifest.permissions.run_commands.contains(&decl.command) {
+        return Err(refuse("the command of this schedule is no longer a run command", "command_removed"));
+    }
+    let cron = match &req.cron {
+        Some(e) => e.split_whitespace().collect::<Vec<_>>().join(" "),
+        None => t.cron.clone(),
+    };
+    let tz = zone_of(Some(req.time_zone.as_deref().unwrap_or(&t.time_zone)))?;
+    let timetable = req.cron.is_some() || req.time_zone.is_some();
+    let (_, next) = plan(&cron, tz, decl.min_interval(), Utc::now())?;
+    let label = req.label.as_deref().map(|l| check_label(Some(l))).transpose()?;
+    let args = req.args.as_ref().map(|a| check_args(&Some(a.clone()))).transpose()?;
+    let resources = match &req.resources {
+        Some(list) => Some(json!(check_resources(k, c, &p.id, list).await?)),
+        None => None,
+    };
+    if !k.limiter.hit(&format!("schedcreate:{}", c.user.user_id), CREATES_PER_MINUTE * 3, WINDOW) {
+        return Err(Error::new(Kind::TooMany, "too many changes: try again in a minute")
+            .with_code("schedule_rate_limited"));
+    }
+    mosaikit_db::query(
+        "update core.schedules set
+            label = coalesce($3, label), cron = $4, time_zone = $5,
+            catch_up_once = coalesce($6, catch_up_once), args = coalesce($7, args),
+            resources = coalesce($8, resources),
+            next_run_at = case when $9 and status = 'active' then $10 else next_run_at end
+         where id = $1 and tenant_id = $2",
+    )
+    .bind(id)
+    .bind(c.tenant.tenant_id)
+    .bind(label.as_deref())
+    .bind(&cron)
+    .bind(tz.name())
+    .bind(req.catch_up_once)
+    .bind(args)
+    .bind(resources)
+    .bind(timetable)
+    .bind(next)
+    .execute(&k.db)
+    .await?;
+    events::record(
+        k,
+        Some(c.tenant.tenant_id),
+        Some(c.user.user_id),
+        Some(&t.plugin),
+        None,
+        "schedule.update",
+        json!({
+            "schedule": id, "name": t.name, "author": t.author, "cron": cron, "time_zone": tz.name(),
+            "args": req.args.is_some(), "resources": req.resources.is_some(),
+        }),
+    )
+    .await;
+    match req.enabled {
+        Some(false) => pause(k, c, id).await?,
+        Some(true) => resume(k, c, id).await?,
+        None => {}
+    }
+    list(k, c, Some(&t.plugin)).await?.into_iter().find(|s| s.id == id).ok_or_else(not_found)
+}
+
 /// Pauses a schedule: the author, or a Tenant Manager.
 pub async fn pause(k: &Kernel, c: &Caller, id: Uuid) -> Result<()> {
     let t = target(k, c, id).await?;
@@ -448,8 +557,16 @@ pub async fn delete(k: &Kernel, c: &Caller, id: Uuid) -> Result<()> {
     Ok(())
 }
 
-/// The time zone of a schedule: the one asked for (an IANA name), else the one of the tenant. Tenants have
-/// no time zone of their own yet, so the default is UTC.
+/// The time zone of the tenant (the setting `timezone`; UTC when it is not set).
+pub(crate) async fn tenant_zone(k: &Kernel, tenant: Uuid) -> Tz {
+    crate::tenancy::levels::effective(k, Some(tenant))
+        .await
+        .ok()
+        .and_then(|v| v.get("timezone").and_then(Value::as_str).and_then(|n| n.parse::<Tz>().ok()))
+        .unwrap_or(chrono_tz::UTC)
+}
+
+/// The time zone of a schedule: an IANA name (the one of a request, or the one stored with the schedule).
 pub(crate) fn zone_of(name: Option<&str>) -> Result<Tz> {
     match name.map(str::trim).filter(|n| !n.is_empty()) {
         None => Ok(chrono_tz::UTC),

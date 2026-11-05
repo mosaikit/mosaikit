@@ -416,3 +416,76 @@ async fn a_suspended_or_removed_author_has_their_schedules_paused() {
     assert_eq!(state(&w, a1).await.0, "active");
     assert_eq!(state(&w, c1).await.0, "active");
 }
+
+#[tokio::test]
+async fn a_schedule_is_edited_in_place_and_keeps_its_history() {
+    use mosaikit_kernel::schedules::PatchRequest;
+    let w = world().await;
+    let id = make(&w, &w.anna, "sync").await;
+    let patch = |f: &dyn Fn(&mut PatchRequest)| {
+        let mut p = PatchRequest::default();
+        f(&mut p);
+        p
+    };
+    // the author changes the label, the timetable and the arguments; the id stays
+    let s = sc::update(
+        &w.t,
+        &w.anna,
+        id,
+        &patch(&|p| {
+            p.label = Some("Nightly".into());
+            p.cron = Some("30  4 * * *".into());
+            p.time_zone = Some("Europe/Rome".into());
+            p.args = Some(json!({ "x": 1 }));
+        }),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        (s.id, s.label.as_str(), s.cron.as_str(), s.time_zone.as_str()),
+        (id, "Nightly", "30 4 * * *", "Europe/Rome")
+    );
+    assert_eq!(s.args, Some(json!({ "x": 1 })));
+    assert!(s.next_run_at.is_some());
+    // pause and resume through `enabled`
+    let s = sc::update(&w.t, &w.anna, id, &patch(&|p| p.enabled = Some(false))).await.unwrap();
+    assert_eq!(s.status, "paused");
+    let s = sc::update(&w.t, &w.anna, id, &patch(&|p| p.enabled = Some(true))).await.unwrap();
+    assert_eq!(s.status, "active");
+    // the same checks as a create
+    let e = sc::update(&w.t, &w.anna, id, &patch(&|p| p.cron = Some("* * * * *".into()))).await.unwrap_err();
+    assert_eq!(e.code(), "interval_too_short");
+    let e =
+        sc::update(&w.t, &w.anna, id, &patch(&|p| p.time_zone = Some("Mars/Base".into()))).await.unwrap_err();
+    assert_eq!(e.code(), "bad_time_zone");
+    let e = sc::update(&w.t, &w.anna, id, &patch(&|p| p.resources = Some(vec![w.other]))).await.unwrap_err();
+    assert_eq!(e.code(), "bad_resources");
+    // a manager changes the timetable, never what the job does as the author
+    sc::update(&w.t, &w.mgr, id, &patch(&|p| p.cron = Some("0 5 * * *".into()))).await.unwrap();
+    let e = sc::update(&w.t, &w.mgr, id, &patch(&|p| p.args = Some(json!({})))).await.unwrap_err();
+    assert_eq!(e.code(), "author_only");
+    // another person does not even learn it exists
+    let e = sc::update(&w.t, &w.bob, id, &patch(&|p| p.label = Some("x".into()))).await.unwrap_err();
+    assert_eq!(e.kind, Kind::NotFound);
+    assert_eq!(events(&w, "schedule.update").await.len(), 4);
+}
+
+#[tokio::test]
+async fn a_new_schedule_reads_its_cron_in_the_time_zone_of_the_tenant() {
+    let w = world().await;
+    let values = json!({ "timezone": "Europe/Rome" }).as_object().cloned().unwrap();
+    tenancy::levels::set_tenant(&w.t, &w.mgr, &values).await.unwrap();
+    let id = make(&w, &w.anna, "sync").await;
+    let list = sc::list(&w.t, &w.anna, None).await.unwrap();
+    assert_eq!(list.iter().find(|s| s.id == id).unwrap().time_zone, "Europe/Rome");
+    // a zone asked for wins; a wrong setting is refused
+    let mut r = req("sync", "0 3 * * *");
+    r.time_zone = Some("UTC".into());
+    let other = sc::create(&w.t, &w.anna, &r).await.unwrap().id;
+    assert_eq!(
+        sc::list(&w.t, &w.anna, None).await.unwrap().iter().find(|s| s.id == other).unwrap().time_zone,
+        "UTC"
+    );
+    let bad = json!({ "timezone": "Mars/Base" }).as_object().cloned().unwrap();
+    assert!(tenancy::levels::set_tenant(&w.t, &w.mgr, &bad).await.is_err());
+}
