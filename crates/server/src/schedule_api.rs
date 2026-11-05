@@ -15,6 +15,7 @@ use crate::{ApiResult, AppState};
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/t/{t}/schedules", post(create).get(list))
+        .route("/api/t/{t}/schedules/timezone", get(timezone))
         .route("/api/t/{t}/schedules/{id}", delete(remove).patch(update))
         .route("/api/t/{t}/schedules/{id}/pause", post(pause))
         .route("/api/t/{t}/schedules/{id}/resume", post(resume))
@@ -50,8 +51,10 @@ async fn update(
     State(s): State<AppState>,
     Tenant(c): Tenant,
     Path((_t, id)): Path<(String, String)>,
+    Query(q): Query<PluginQ>,
     Json(req): Json<PatchRequest>,
 ) -> ApiResult<Json<Value>> {
+    guard(&s, &c, &id, &q).await?;
     Ok(Json(json!(schedules::update(&s.k, &c, uuid(&id)?, &req).await?)))
 }
 
@@ -59,7 +62,9 @@ async fn pause(
     State(s): State<AppState>,
     Tenant(c): Tenant,
     Path((_t, id)): Path<(String, String)>,
+    Query(q): Query<PluginQ>,
 ) -> ApiResult<Json<Value>> {
+    guard(&s, &c, &id, &q).await?;
     schedules::pause(&s.k, &c, uuid(&id)?).await?;
     Ok(ok())
 }
@@ -68,7 +73,9 @@ async fn resume(
     State(s): State<AppState>,
     Tenant(c): Tenant,
     Path((_t, id)): Path<(String, String)>,
+    Query(q): Query<PluginQ>,
 ) -> ApiResult<Json<Value>> {
+    guard(&s, &c, &id, &q).await?;
     schedules::resume(&s.k, &c, uuid(&id)?).await?;
     Ok(ok())
 }
@@ -77,7 +84,9 @@ async fn remove(
     State(s): State<AppState>,
     Tenant(c): Tenant,
     Path((_t, id)): Path<(String, String)>,
+    Query(q): Query<PluginQ>,
 ) -> ApiResult<Json<Value>> {
+    guard(&s, &c, &id, &q).await?;
     schedules::delete(&s.k, &c, uuid(&id)?).await?;
     Ok(ok())
 }
@@ -86,7 +95,9 @@ async fn run_now(
     State(s): State<AppState>,
     Tenant(c): Tenant,
     Path((_t, id)): Path<(String, String)>,
+    Query(q): Query<PluginQ>,
 ) -> ApiResult<Json<Value>> {
+    guard(&s, &c, &id, &q).await?;
     let run = schedules::run_now(&s.k, &c, uuid(&id)?).await?;
     Ok(Json(json!(run)))
 }
@@ -104,7 +115,27 @@ async fn runs(
     State(s): State<AppState>,
     Tenant(c): Tenant,
     Path((_t, id)): Path<(String, String)>,
+    Query(q): Query<PluginQ>,
 ) -> ApiResult<Json<Value>> {
+    guard(&s, &c, &id, &q).await?;
     let rows = schedules::runs(&s.k, &c, uuid(&id)?).await?;
     Ok(Json(json!(rows)))
+}
+
+/// `?plugin=<id>` on the routes of one schedule: the schedule must belong to that plugin. The shell adds it for a
+/// page of a plugin (`msk.schedules`), so the page reaches the schedules of its own plugin only.
+#[derive(Deserialize, Default)]
+struct PluginQ {
+    plugin: Option<String>,
+}
+
+async fn guard(s: &AppState, c: &mosaikit_kernel::Caller, id: &str, q: &PluginQ) -> ApiResult<()> {
+    if let Some(p) = q.plugin.as_deref().filter(|p| !p.is_empty()) {
+        schedules::ensure_plugin(&s.k, c, uuid(id)?, p).await?;
+    }
+    Ok(())
+}
+
+async fn timezone(State(s): State<AppState>, Tenant(c): Tenant) -> ApiResult<Json<Value>> {
+    Ok(Json(json!({ "time_zone": schedules::tenant_time_zone(&s.k, c.tenant.tenant_id).await })))
 }

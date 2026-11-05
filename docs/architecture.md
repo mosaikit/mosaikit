@@ -810,6 +810,22 @@ create policy msk_update on t for update using (core.can_access(resource_id, 2))
 create policy msk_delete on t for delete using (core.can_access(resource_id, 3));
 ```
 
+**Rows a reader writes (`[[tables]]`).** By default only a person with the write permission on the resource of a row writes it. A plugin that keeps
+rows people write about a resource they may only read (who is looking now, comments, favourites) declares the table:
+
+```toml
+[[tables]]
+name = "presence"
+insert_for = "reader"          # the only value
+owner_column = "user_id"       # uuid column with the person who wrote the row (default user_id)
+```
+
+For that table the three write policies become `(core.can_access(resource_id, 2) or (core.can_access(resource_id, 1) and user_id = core.ctx_user()))`: a person who
+**sees** the resource inserts rows whose owner is themselves, and changes or deletes the rows that are theirs; the rows of another person stay out of reach, and so
+does a resource they cannot see. Everything else about the table is unchanged (the tenant is still the one of the context). The table must have the owner column
+as `uuid` (the install refuses it otherwise); other tables keep the default. On SQLite the same rule is in the triggers and in the rewriting of `update` and
+`delete`; the manifest is read from `core.plugins`. Tested on both backends (`a_reader_writes_only_the_rows_that_are_theirs_where_the_table_says_so`).
+
 The read policy is a **set**: `core.ctx_levels()` (what the person of the context sees in the current
 plugin, public links included, the same rules as `can_access()`) is computed once per statement and
 the rows are kept by key, instead of one `can_access()` call per row (a third of the time of a list).
@@ -1690,6 +1706,8 @@ resource deletes any (`403` for others). Comments go with the resource when it i
 are not copied or exported with it. The audit log has `comment.add` and `comment.delete` with the resource and the comment, never the
 text. A run ticket has no part in comments.
 
+**Import.** A Tenant Manager brings the comments of another store with `POST /api/t/{t}/resources/{id}/comments/import` and `{ comments: [{ external_id, author_id, body, created_at }] }` (1 to 1000 per call). Each comment keeps its author (a member of the tenant) and its date; the `external_id` (at most 128 characters) is kept with it, and a comment whose `external_id` is already on the resource is skipped, so the import can be run again. Answers `{ imported, skipped }`; `comment.import` in the audit log (counts only). Others get `403`.
+
 **Data and callbacks.** Functions cannot cross the iframe boundary: the UI package sends only the data (`mode.value`, `canEdit`,
 `presence`, `comments.open`, `count`, `back.label`) and keeps `onChange`, `onToggle` and `onClick`. When the person flips the switch or presses the button
 the shell posts an event to the iframe (`band.mode` `{ value }`, `band.comments` `{}`, `band.back` `{}`) and the package calls the callback. The
@@ -1755,6 +1773,8 @@ dependency for the grammar: `*`, numbers, ranges, lists and steps; no names, no 
 matches if either does (as classic cron). A registration is refused when the expression never fires or when any of the gaps between the
 next ten fire times is shorter than the interval floor of the entry.
 
+**From a plugin page.** The UI package has `msk.schedules` (`list({resource?})`, `create`, `update(id, patch)`, `pause`, `resume`, `remove`, `run`, `runs`, `timezone()`): the shell runs each call with the session of the person against the routes above and **forces** `plugin` to the one of the page (`?plugin=` on the routes of one schedule, in the body of the creation), so a page reaches the schedules of its own plugin only. No permission beyond the `[[schedules]]` of the manifest; the rules, limits and error codes are the ones of the REST API.
+
 **Time zone.** One IANA name per schedule (`time_zone` of the registration, checked with `chrono-tz`: `bad_time_zone`), read as the wall clock of that
 zone. The default is the zone of the tenant; tenants have none yet, so it is UTC. Daylight saving time is resolved the same way every time: a wall time
 that does not exist (clocks forward) fires once, at the first instant after the gap; a wall time that happens twice (clocks back) fires once, at its
@@ -1766,6 +1786,7 @@ first occurrence; a fire time is never at or before the previous one. The floor 
 - `GET /api/t/{t}/schedules?plugin=` lists: the author's own, or all of the tenant for a Tenant Manager (who does not receive `args` or
   `resources`);
 - `PATCH .../{id}` with any of `{ label, cron, time_zone, catch_up_once, args, resources, enabled }` edits the schedule in place (the id and the history of its runs stay) and answers with the schedule; the checks of the creation apply, `next_run_at` is computed again when `cron` or `time_zone` change, `enabled: false|true` pauses or resumes under the rules below. The author may change everything; a Tenant Manager only `label`, `cron`, `time_zone`, `catch_up_once` and `enabled`, never `args` or `resources` (`403 author_only`): the job runs as the author, so what it does is the author's to change. Event `schedule.update` (no arguments in it);
+- `GET /api/t/{t}/schedules/timezone` gives `{ time_zone }`, the zone of the tenant (below); every route of one schedule (`PATCH`, `pause`, `resume`, `DELETE`, `run`, `runs`) takes an optional `?plugin=<id>`: the schedule must belong to that plugin, else `404`. The shell adds it for a page of a plugin (`msk.schedules`, below);
 - `POST .../{id}/pause`, `POST .../{id}/resume`, `DELETE .../{id}`;
 - `POST .../{id}/run`: run now (below); `POST .../{id}/take-over`: a Tenant Manager takes the schedule over (below);
 - `GET .../{id}/runs`: the last 50 runs (status, id at the service, error, deadline), for the author or a Tenant Manager.

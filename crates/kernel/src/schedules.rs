@@ -443,6 +443,22 @@ pub async fn update(k: &Kernel, c: &Caller, id: Uuid, req: &PatchRequest) -> Res
     list(k, c, Some(&t.plugin)).await?.into_iter().find(|s| s.id == id).ok_or_else(not_found)
 }
 
+/// The schedule must belong to `plugin` (a page of a plugin reaches its own schedules only): else "not found",
+/// as for a schedule that is not the caller's.
+pub async fn ensure_plugin(k: &Kernel, c: &Caller, id: Uuid, plugin: &str) -> Result<()> {
+    let t = target(k, c, id).await?;
+    if t.plugin == plugin {
+        Ok(())
+    } else {
+        Err(not_found())
+    }
+}
+
+/// The time zone of the tenant as an IANA name (UTC when it sets none).
+pub async fn tenant_time_zone(k: &Kernel, tenant: Uuid) -> String {
+    tenant_zone(k, tenant).await.name().to_string()
+}
+
 /// Pauses a schedule: the author, or a Tenant Manager.
 pub async fn pause(k: &Kernel, c: &Caller, id: Uuid) -> Result<()> {
     let t = target(k, c, id).await?;

@@ -5,6 +5,10 @@ version and is removed in the next.
 
 ## Unreleased
 
+- `Resources::list(plugin, kind, q, limit)` (host operation `resources.list`): the resources of another plugin that the caller sees, for a
+  picker; needs the plugin in `[permissions] resources_read` and `[requires] mosaikit = ">=1.0"`. `Resources::contributions(point)` (host
+  operation `contributions.list`): the plugins that contribute to a point declared in `[permissions] contributions`, which can then be called
+  with `plugin.call`. Plugin API unchanged (additive).
 - `OnBehalf::schedule` and `schedule_id`: `Some` when a schedule of the plugin (`[[schedules]]`) started the run; `None` for a run
   a person started. `MockHost::scheduled(name, run_ref)` tests it. Needs `[requires] mosaikit = ">=1.0"`; plugin API unchanged.
 - `Ctx::directory()` (`Directory::users`, `Directory::groups`, `DirectoryUser`): search the people and groups of the tenant; needs

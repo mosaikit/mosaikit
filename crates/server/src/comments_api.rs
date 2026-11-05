@@ -2,7 +2,7 @@
 //! session, its CSRF header and the membership are checked by `Tenant`; the right on the resource by the kernel.
 
 use axum::extract::{Path, State};
-use axum::routing::{delete, get};
+use axum::routing::{delete, get, post};
 use axum::{Json, Router};
 use mosaikit_kernel::comments;
 use serde::Deserialize;
@@ -16,6 +16,7 @@ pub fn router() -> Router<AppState> {
     Router::new()
         .route("/api/t/{t}/resources/{id}/comments", get(list).post(add))
         .route("/api/t/{t}/resources/{id}/comments/{cid}", delete(remove))
+        .route("/api/t/{t}/resources/{id}/comments/import", post(import))
 }
 
 async fn list(
@@ -47,4 +48,18 @@ async fn remove(
 ) -> ApiResult<Json<Value>> {
     comments::delete(&s.k, &c, uuid(&id)?, uuid(&cid)?).await?;
     Ok(ok())
+}
+
+#[derive(Deserialize)]
+struct Import {
+    comments: Vec<comments::ImportItem>,
+}
+
+async fn import(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path((_t, id)): Path<(String, String)>,
+    Json(req): Json<Import>,
+) -> ApiResult<Json<Value>> {
+    Ok(Json(comments::import(&s.k, &c, uuid(&id)?, &req.comments).await?))
 }

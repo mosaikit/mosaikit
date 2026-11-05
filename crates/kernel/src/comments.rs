@@ -203,3 +203,89 @@ pub async fn delete(k: &Kernel, c: &Caller, rid: Uuid, comment: Uuid) -> Result<
     .await;
     Ok(())
 }
+
+/// One comment brought from another store.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct ImportItem {
+    /// the id the comment had where it came from: importing it again adds nothing
+    pub external_id: String,
+    pub author_id: Uuid,
+    pub body: String,
+    pub created_at: DateTime<Utc>,
+}
+
+/// Most comments in one import call.
+pub const MAX_IMPORT: usize = 1000;
+
+/// Adds the comments of another store to a resource, as their authors and at their dates. Only a Tenant
+/// Manager may, each author must be a member of the tenant, and a comment whose `external_id` is already on
+/// the resource is skipped, so the import can be run again. Answers `{ imported, skipped }`.
+pub async fn import(k: &Kernel, c: &Caller, rid: Uuid, items: &[ImportItem]) -> Result<serde_json::Value> {
+    if !c.is_manager() || c.run.is_some() {
+        return Err(Error::forbidden("only a Tenant Manager can import comments"));
+    }
+    if items.is_empty() || items.len() > MAX_IMPORT {
+        return Err(
+            Error::bad(format!("an import carries 1 to {MAX_IMPORT} comments")).with_code("bad_import")
+        );
+    }
+    let plugin: String =
+        mosaikit_db::query_scalar("select plugin_id from core.resources where id = $1 and tenant_id = $2")
+            .bind(rid)
+            .bind(c.tenant.tenant_id)
+            .fetch_optional(&k.db)
+            .await?
+            .ok_or_else(|| Error::not_found("resource not found"))?;
+    let (mut imported, mut skipped) = (0u32, 0u32);
+    for it in items {
+        let body = it.body.trim();
+        let len = body.chars().count();
+        let ext = it.external_id.trim();
+        if len == 0 || len > MAX_BODY || ext.is_empty() || ext.chars().count() > 128 {
+            return Err(Error::bad("a comment of the import is empty, too long or has no external id")
+                .with_code("bad_import"));
+        }
+        let member: Option<i32> =
+            mosaikit_db::query_scalar("select 1 from core.memberships where tenant_id = $1 and user_id = $2")
+                .bind(c.tenant.tenant_id)
+                .bind(it.author_id)
+                .fetch_optional(&k.db)
+                .await?;
+        if member.is_none() {
+            return Err(
+                Error::bad("the author of a comment is not a member of the tenant").with_code("bad_import")
+            );
+        }
+        let done = mosaikit_db::query(
+            "insert into core.resource_comments (tenant_id, resource_id, user_id, body, created_at, external_id)
+             select $1, $2, $3, $4, $5, $6
+             where (select count(*) from core.resource_comments where resource_id = $2) < $7
+             on conflict (resource_id, external_id) where external_id is not null do nothing",
+        )
+        .bind(c.tenant.tenant_id)
+        .bind(rid)
+        .bind(it.author_id)
+        .bind(body)
+        .bind(it.created_at)
+        .bind(ext)
+        .bind(MAX_PER_RESOURCE)
+        .execute(&k.db)
+        .await?;
+        if done.rows_affected() > 0 {
+            imported += 1;
+        } else {
+            skipped += 1;
+        }
+    }
+    events::record(
+        k,
+        Some(c.tenant.tenant_id),
+        Some(c.user.user_id),
+        Some(&plugin),
+        Some(rid),
+        "comment.import",
+        json!({ "imported": imported, "skipped": skipped }),
+    )
+    .await;
+    Ok(json!({ "imported": imported, "skipped": skipped }))
+}

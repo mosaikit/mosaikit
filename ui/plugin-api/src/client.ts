@@ -1,6 +1,6 @@
 import { Bridge, BridgeError } from './bridge.ts'
 import { API_VERSION, checkHostApi } from './version.ts'
-import type { BandApi, BandState, DirectoryApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, UiContext, Values, WebProbe } from './protocol.ts'
+import type { BandApi, BandState, DirectoryApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, UiContext, Values, WebProbe } from './protocol.ts'
 
 /** The extensions of the plugin on a resource (fields and actions other plugins add to its items). */
 export interface ExtensionsClient {
@@ -247,6 +247,23 @@ export class Msk {
   readonly directory: DirectoryApi = {
     search: (s: DirectorySearch) => this.bridge.call('directory.search', { ...s }),
   } as DirectoryApi
+
+  /** The schedules of this plugin (see `SchedulesApi`): the shell runs them with the session of the person. */
+  readonly schedules: SchedulesApi = {
+    list: async (opts) => {
+      const all = await this.bridge.call<Schedule[]>('schedules.list', {})
+      const r = opts?.resource
+      return r ? all.filter((s) => s.resources?.includes(r)) : all
+    },
+    create: (s) => this.bridge.call('schedules.create', { ...s }),
+    update: (id, patch) => this.bridge.call('schedules.update', { ...patch, id }),
+    pause: (id) => this.bridge.call<void>('schedules.pause', { id }),
+    resume: (id) => this.bridge.call<void>('schedules.resume', { id }),
+    remove: (id) => this.bridge.call<void>('schedules.remove', { id }),
+    run: (id) => this.bridge.call('schedules.run', { id }),
+    runs: (id) => this.bridge.call('schedules.runs', { id }),
+    timezone: async () => (await this.bridge.call<{ time_zone: string }>('schedules.timezone', {})).time_zone,
+  }
 
   /** Metadata of a resource (owner, level, size...). */
   resource(id: string): Promise<ResourceMeta> {
