@@ -39,6 +39,8 @@ pub struct Instance {
     pub name: String,
     /// Vite; the server is on the next port, the plugins on the one after
     pub port: u16,
+    /// plugin UIs on `<plugin>.localhost` origins instead of one shared origin
+    pub wildcard: bool,
 }
 
 impl Instance {
@@ -47,7 +49,15 @@ impl Instance {
             .chars()
             .map(|c| if c.is_ascii_alphanumeric() { c.to_ascii_lowercase() } else { '_' })
             .collect();
-        Self { name, port }
+        Self { name, port, wildcard: false }
+    }
+    pub fn wildcard(mut self, on: bool) -> Self {
+        self.wildcard = on;
+        self
+    }
+    fn plugin_url(&self) -> String {
+        let plug = self.port + 2;
+        if self.wildcard { format!("http://*.localhost:{plug}") } else { format!("http://127.0.0.1:{plug}") }
     }
     fn db(&self) -> String {
         format!("mosaikit_{}", self.name)
@@ -62,7 +72,7 @@ impl Instance {
         c.env("CARGO_TARGET_DIR", self.target())
             .env("MOSAIKIT_URL", format!("http://127.0.0.1:{vite}"))
             .env("MOSAIKIT_LISTEN", format!("127.0.0.1:{api}"))
-            .env("MOSAIKIT_PLUGIN_URL", format!("http://127.0.0.1:{plug}"))
+            .env("MOSAIKIT_PLUGIN_URL", self.plugin_url())
             .env("MOSAIKIT_PLUGIN_LISTEN", format!("127.0.0.1:{plug}"))
             .env("MOSAIKIT_DATA_DIR", root().join(".dev").join(format!("data-{}", self.name)))
             .env(
