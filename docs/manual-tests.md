@@ -955,3 +955,16 @@ A schedule can be changed (PATCH), has the time zone of the tenant, and Tenant M
 | SCH-01 | Change the time, the arguments and the state of a schedule; change one of another person as a plain member | The changes apply and the next run is recomputed; the member is refused | Playwright (NOT VERIFIABLE in the manual run: covered by the kernel tests `schedules`) |
 | SCH-02 | Set a time zone for the tenant and create a daily schedule at 09:00; look at the next run across a change of summer time | It runs at 09:00 local time | Playwright (NOT VERIFIABLE: covered by the kernel tests `schedules` and `schedule_worker`) |
 | SCH-03 | As Tenant Manager open the Schedules page of the shell; as a member try the same address | The manager sees every schedule of the tenant and can pause or delete one; the member does not get the page | Playwright `tests/e2e/specs/21-schedules-page.spec.ts` (the list of the tenant is answered by the spec: no official plugin offers a schedule yet) |
+
+
+## Embedded pages in a public link view
+
+A plugin page opened through a public link may show a page of another plugin; its ticket belongs to the link, not to a person (§8.15). The tenant must allow public commands (Manage > Settings).
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| PUBEMB-01 | Share a resource of a plugin that embeds another one (public link); open the link without signing in | The embedded page loads in its frame and shows the resource; no sign-in is asked | Playwright (NOT VERIFIABLE: needs a signed plugin that declares `embeds`; kernel tests of `public_embeds` cover the rules) |
+| PUBEMB-02 | In the public view ask for an embed of a resource outside the link, of another plugin or of another kind | The frame does not open (not found); nothing of that resource is shown | Playwright (NOT VERIFIABLE: kernel tests of `public_embeds`) |
+| PUBEMB-03 | From the embedded page call a command that is in the embed but not in `[[public_commands]]` of its plugin, and one that is public but not in the embed | Both refused (`command_not_public`, `run_wrong_command`); the page shows its error state | Playwright (NOT VERIFIABLE: kernel tests of `public_embeds`) |
+| PUBEMB-04 | Revoke the link, or let it expire, while the page is open; use the embedded page again | The next call fails (`run_ticket_invalid`); the public page itself shows «link not valid» on reload | Playwright (NOT VERIFIABLE: kernel tests of `public_embeds`) |
+| PUBEMB-05 | Turn off «public commands» in Manage > Settings while the public page is open; use the embedded page | The calls fail with `public_commands_off`; turning it on again restores them | Playwright (NOT VERIFIABLE: kernel tests of `public_embeds`) |
