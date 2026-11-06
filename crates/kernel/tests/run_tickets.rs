@@ -8,6 +8,7 @@
 use std::collections::BTreeMap;
 
 use mosaikit_kernel::acl::Level;
+use mosaikit_kernel::plugins::tenants;
 use mosaikit_kernel::run_tickets::{self as rt, MintRequest, Minted};
 use mosaikit_kernel::testing::{start, test_key, TestKernel};
 use mosaikit_kernel::{acl, crud, Caller, Kind};
@@ -16,6 +17,10 @@ use uuid::Uuid;
 
 const PROXY: &str = "com.test.runproxy";
 const ECHO: &str = "com.test.runecho";
+/// a second target, with the logic of the proxy so a test can query it; both are in `run_targets` of PROXY
+const TARGET: &str = "com.test.runtarget";
+/// installed and with run commands, but not in `run_targets` of PROXY
+const OTHER: &str = "com.test.runother";
 
 fn proxy_wasm() -> Vec<u8> {
     wat::parse_str(
@@ -75,19 +80,24 @@ fn echo_wasm() -> Vec<u8> {
     .unwrap()
 }
 
-fn toml(id: &str, version: &str, run_commands: &str) -> String {
+fn toml(id: &str, version: &str, run_commands: &str, run_targets: &str) -> String {
     format!(
         "id = \"{id}\"\nname = \"Run\"\nversion = \"{version}\"\n[contribution]\nicon = \"x\"\nlabel = \"Run\"\n\
          [requires]\nmosaikit = \">=1.0\"\n\
          [[resources]]\nname = \"items\"\nfields = [{{ key = \"title\", kind = \"text\" }}]\n\
-         [permissions]\nrun_commands = {run_commands}\n"
+         [permissions]\nrun_commands = {run_commands}\nrun_targets = {run_targets}\n"
     )
 }
 
 async fn install(t: &TestKernel, id: &str, version: &str, run_commands: &str) {
-    let wasm = if id == PROXY { proxy_wasm() } else { echo_wasm() };
+    let targets = if id == PROXY { r#"["com.test.runecho", "com.test.runtarget"]"# } else { "[]" };
+    install_with(t, id, version, run_commands, targets).await;
+}
+
+async fn install_with(t: &TestKernel, id: &str, version: &str, run_commands: &str, run_targets: &str) {
+    let wasm = if id == PROXY || id == TARGET { proxy_wasm() } else { echo_wasm() };
     let mut files = BTreeMap::new();
-    files.insert("plugin.toml".to_string(), toml(id, version, run_commands).into_bytes());
+    files.insert("plugin.toml".to_string(), toml(id, version, run_commands, run_targets).into_bytes());
     files.insert("logic.wasm".to_string(), wasm);
     let pkg = mosaikit_mskp::pack(&files, Some(&test_key())).unwrap();
     t.install_package(&pkg).await.unwrap();
@@ -100,6 +110,7 @@ struct World {
     anna: Caller,
     bob: Caller,
     mgr: Caller,
+    carl: Caller,
     a: Uuid,
     b: Uuid,
     c: Uuid,
@@ -117,6 +128,8 @@ async fn world() -> World {
     let t = start().await;
     install(&t, PROXY, "1.0.0", r#"["x", "z"]"#).await;
     install(&t, ECHO, "1.0.0", r#"["x"]"#).await;
+    install(&t, TARGET, "1.0.0", r#"["x"]"#).await;
+    install(&t, OTHER, "1.0.0", r#"["x"]"#).await;
     let alfa = t.tenant("alfa").await;
     let anna = t.member(&alfa, "anna").await;
     let bob = t.member(&alfa, "bob").await;
@@ -131,7 +144,7 @@ async fn world() -> World {
         item(&t, &bob, "item c").await,
         item(&t, &carl, "item d").await,
     );
-    World { t, anna, bob, mgr, a, b, c, d }
+    World { t, anna, bob, mgr, carl, a, b, c, d }
 }
 
 fn req(plugin: &str, commands: &[&str], resources: Option<Vec<Uuid>>) -> MintRequest {
@@ -142,6 +155,7 @@ fn req(plugin: &str, commands: &[&str], resources: Option<Vec<Uuid>>) -> MintReq
         ttl_minutes: None,
         uses: None,
         resources,
+        targets: vec![],
         schedule: None,
     }
 }
@@ -576,4 +590,410 @@ async fn mint_call_and_revoke_leave_audit_rows_with_the_run() {
             .map(|r| (r.get(0), r.get(1)))
             .collect();
     assert!(who.iter().all(|x| *x == (w.anna.user.user_id, w.anna.tenant.tenant_id)));
+}
+
+// ------------------------------------------------------------------ targets: a run that reaches other plugins
+
+use mosaikit_kernel::access::{create_profile, set_member_profile, update_profile, ProfileChange};
+use mosaikit_kernel::run_tickets::Target;
+
+fn target(plugin: &str, commands: &[&str], resources: Option<Vec<Uuid>>) -> Target {
+    Target { plugin: plugin.into(), commands: commands.iter().map(|c| c.to_string()).collect(), resources }
+}
+
+fn req_t(targets: Vec<Target>) -> MintRequest {
+    MintRequest { targets, ..req(PROXY, &["x"], None) }
+}
+
+async fn titem(w: &World, who: &Caller, title: &str) -> Uuid {
+    let row = crud::create(&w.t, who, TARGET, "items", json!({ "title": title }).as_object().unwrap(), None)
+        .await
+        .unwrap();
+    row["id"].as_str().unwrap().parse().unwrap()
+}
+
+async fn target_titles(w: &World, token: &str) -> Vec<String> {
+    let out =
+        rt::call(&w.t, token, TARGET, "x", query("select title from items order by title")).await.unwrap();
+    out.as_array().unwrap().iter().map(|r| r["title"].as_str().unwrap().to_string()).collect()
+}
+
+async fn tickets_written(w: &World) -> i64 {
+    mosaikit_db::query_scalar("select count(*) from core.run_tickets").fetch_one(&w.t.db).await.unwrap()
+}
+
+/// A profile where the person uses PROXY and nothing else: the target is closed to them.
+async fn only_proxy(w: &World) {
+    let p = create_profile(&w.t, &w.mgr, "Only proxy", "", None).await.unwrap();
+    let ch = ProfileChange {
+        plugins: [
+            (PROXY.to_string(), vec!["use".to_string()]),
+            (TARGET.to_string(), vec![]),
+            (ECHO.to_string(), vec![]),
+        ]
+        .into(),
+        ..Default::default()
+    };
+    update_profile(&w.t, &w.mgr, p.id, &ch).await.unwrap();
+    set_member_profile(&w.t, &w.mgr, w.anna.user.user_id, Some(p.id)).await.unwrap();
+}
+
+#[tokio::test]
+async fn a_mint_names_only_declared_targets_with_declared_commands() {
+    let w = world().await;
+    let before = tickets_written(&w).await;
+    // a plugin that is installed but not in `run_targets`
+    let e = rt::mint(&w.t, &w.anna, &req_t(vec![target(OTHER, &["x"], None)])).await.unwrap_err();
+    assert_eq!((e.kind, code(&e).as_str()), (Kind::Forbidden, "target_not_declared"));
+    // a command the target does not declare in `run_commands`
+    let e = rt::mint(&w.t, &w.anna, &req_t(vec![target(TARGET, &["z"], None)])).await.unwrap_err();
+    assert_eq!((e.kind, code(&e).as_str()), (Kind::Forbidden, "command_not_declared"));
+    // the commands of the first plugin do not count for the target (PROXY declares `z`, TARGET does not)
+    let e = rt::mint(&w.t, &w.anna, &req_t(vec![target(TARGET, &["x", "z"], None)])).await.unwrap_err();
+    assert_eq!(code(&e), "command_not_declared");
+    // no command, the plugin itself, a repeat, too many
+    for bad in [
+        vec![target(ECHO, &[], None)],
+        vec![target(PROXY, &["x"], None)],
+        vec![target(ECHO, &["x"], None), target(ECHO, &["x"], None)],
+        (0..9).map(|_| target(ECHO, &["x"], None)).collect(),
+    ] {
+        let e = rt::mint(&w.t, &w.anna, &req_t(bad)).await.unwrap_err();
+        assert_eq!(e.kind, Kind::BadRequest, "{e}");
+    }
+    // a resource of the target must belong to the target and be visible to the person
+    let (ta, tb) = (titem(&w, &w.anna, "ta").await, titem(&w, &w.bob, "tb").await);
+    let e = rt::mint(&w.t, &w.anna, &req_t(vec![target(TARGET, &["x"], Some(vec![w.a]))])).await.unwrap_err();
+    assert_eq!(e.kind, Kind::BadRequest, "an item of the first plugin in the entry of the target: {e}");
+    let e = rt::mint(&w.t, &w.anna, &req_t(vec![target(TARGET, &["x"], Some(vec![tb]))])).await.unwrap_err();
+    assert_eq!(e.kind, Kind::NotFound, "an item the person does not see: {e}");
+    let e = rt::mint(&w.t, &w.anna, &req_t(vec![target(TARGET, &["x"], Some(vec![]))])).await.unwrap_err();
+    assert_eq!(e.kind, Kind::BadRequest);
+    // none of the refused mints left a ticket behind
+    assert_eq!(tickets_written(&w).await, before);
+    // and the same request, right, is accepted
+    rt::mint(&w.t, &w.anna, &req_t(vec![target(TARGET, &["x"], Some(vec![ta]))])).await.unwrap();
+}
+
+#[tokio::test]
+async fn a_mint_refuses_a_target_that_is_off_missing_or_not_used_by_the_person() {
+    let w = world().await;
+    // off in the tenant
+    tenants::set_enabled(&w.t, &w.mgr, TARGET, false).await.unwrap();
+    let e = rt::mint(&w.t, &w.anna, &req_t(vec![target(TARGET, &["x"], None)])).await.unwrap_err();
+    assert_eq!((e.kind, code(&e).as_str()), (Kind::Forbidden, "target_not_available"));
+    tenants::set_enabled(&w.t, &w.mgr, TARGET, true).await.unwrap();
+    // declared but not installed at all
+    install_with(&w.t, PROXY, "1.2.0", r#"["x"]"#, r#"["com.test.runghost"]"#).await;
+    let e =
+        rt::mint(&w.t, &w.anna, &req_t(vec![target("com.test.runghost", &["x"], None)])).await.unwrap_err();
+    assert_eq!(code(&e), "target_not_available");
+    install_with(&w.t, PROXY, "1.3.0", r#"["x", "z"]"#, r#"["com.test.runecho", "com.test.runtarget"]"#)
+        .await;
+    // the person has no `use` of the target
+    only_proxy(&w).await;
+    let e = rt::mint(&w.t, &w.anna, &req_t(vec![target(TARGET, &["x"], None)])).await.unwrap_err();
+    assert_eq!((e.kind, code(&e).as_str()), (Kind::Forbidden, "missing_permission"));
+    // and a target is never reached through the rights of someone else: bob mints for himself
+    rt::mint(&w.t, &w.bob, &req_t(vec![target(TARGET, &["x"], None)])).await.unwrap();
+}
+
+#[tokio::test]
+async fn a_ticket_cannot_mint_another_with_targets_either() {
+    let w = world().await;
+    let m = rt::mint(&w.t, &w.anna, &req_t(vec![target(ECHO, &["x"], None)])).await.unwrap();
+    let run = Caller {
+        run: Some(mosaikit_kernel::RunCall {
+            ticket: m.id,
+            run_ref: "r".into(),
+            resources: None,
+            scheduled_by: None,
+            schedule_name: None,
+        }),
+        ..w.anna.clone()
+    };
+    let e = rt::mint(&w.t, &run, &req_t(vec![target(ECHO, &["x"], None)])).await.unwrap_err();
+    assert_eq!(e.kind, Kind::Forbidden);
+    // nor from the logic of a call on behalf of the run
+    let mint = host("runs.mint", json!({ "commands": ["x"], "run_ref": "again" }));
+    let e = rt::call(&w.t, &m.token, ECHO, "x", Value::Null).await;
+    assert!(e.is_ok());
+    let t = rt::mint(&w.t, &w.anna, &req_t(vec![])).await.unwrap();
+    let e = rt::call(&w.t, &t.token, PROXY, "x", mint).await.unwrap_err();
+    assert!(e.message.contains("on behalf of a run"), "{}", e.message);
+}
+
+#[tokio::test]
+async fn one_ticket_calls_its_plugin_and_its_targets_as_the_person() {
+    let w = world().await;
+    let (ta, _tb) = (titem(&w, &w.anna, "ta").await, titem(&w, &w.bob, "tb").await);
+    let m = rt::mint(&w.t, &w.anna, &req_t(vec![target(ECHO, &["x"], None), target(TARGET, &["x"], None)]))
+        .await
+        .unwrap();
+    // the first plugin and each target, with the same token, as anna and knowing the run
+    assert_eq!(titles(&w, &m.token).await, ["item a", "item b"]);
+    assert_eq!(target_titles(&w, &m.token).await, ["ta"]);
+    let out = rt::call(&w.t, &m.token, ECHO, "x", json!({ "on_behalf": "forged" })).await.unwrap();
+    assert_eq!(out["ctx"]["user"], w.anna.user.user_id.to_string());
+    assert_eq!(out["ctx"]["on_behalf"]["run_ref"], "run-1");
+    // one budget for all of them
+    assert_eq!(uses_left(&w, m.id).await, rt::DEFAULT_USES as i32 - 3);
+    // the audit log names the target that was called, and the targets that were minted
+    let calls = events(&w, "run_ticket.call").await;
+    assert_eq!(calls.iter().filter(|e| e["target"] == PROXY).count(), 2, "{calls:?}");
+    assert_eq!(calls.iter().filter(|e| e["target"].is_null()).count(), 1);
+    let mints = events(&w, "run_ticket.mint").await;
+    assert_eq!(mints[0]["targets"].as_array().unwrap().len(), 2);
+    let _ = ta;
+}
+
+#[tokio::test]
+async fn a_ticket_reaches_no_plugin_or_command_it_does_not_name() {
+    let w = world().await;
+    let m = rt::mint(&w.t, &w.anna, &req_t(vec![target(ECHO, &["x"], None)])).await.unwrap();
+    // a plugin that is not an entry of the ticket (declared by the manifest, not named at mint), or not declared at all
+    for plugin in [TARGET, OTHER] {
+        let e = rt::call(&w.t, &m.token, plugin, "x", query("select 1")).await.unwrap_err();
+        assert_eq!((e.kind, code(&e).as_str()), (Kind::Forbidden, "run_wrong_plugin"), "{plugin}");
+    }
+    // a command of the target that the ticket did not name
+    let e = rt::call(&w.t, &m.token, ECHO, "y", Value::Null).await.unwrap_err();
+    assert_eq!((e.kind, code(&e).as_str()), (Kind::Forbidden, "run_wrong_command"));
+    // the commands of the first plugin do not open the target's: PROXY has `z`, ECHO has not
+    let e = rt::call(&w.t, &m.token, ECHO, "z", Value::Null).await.unwrap_err();
+    assert_eq!(code(&e), "run_wrong_command");
+    // the entry of a target says nothing about the first plugin's commands
+    let e = rt::call(&w.t, &m.token, PROXY, "z", query("select 1")).await.unwrap_err();
+    assert_eq!(code(&e), "run_wrong_command");
+    // refused calls spent nothing
+    assert_eq!(uses_left(&w, m.id).await, rt::DEFAULT_USES as i32);
+}
+
+#[tokio::test]
+async fn the_manifests_are_read_again_for_a_target_on_every_call() {
+    let w = world().await;
+    let mk = || async {
+        rt::mint(&w.t, &w.anna, &req_t(vec![target(ECHO, &["x"], None), target(TARGET, &["x"], None)]))
+            .await
+            .unwrap()
+    };
+    // the first plugin no longer declares the target: that target stops at once, the rest goes on
+    let m = mk().await;
+    rt::call(&w.t, &m.token, TARGET, "x", query("select 1")).await.unwrap();
+    install_with(&w.t, PROXY, "1.1.0", r#"["x", "z"]"#, r#"["com.test.runecho"]"#).await;
+    let e = rt::call(&w.t, &m.token, TARGET, "x", query("select 1")).await.unwrap_err();
+    assert_eq!((e.kind, code(&e).as_str()), (Kind::Forbidden, "target_not_declared"));
+    rt::call(&w.t, &m.token, ECHO, "x", Value::Null).await.unwrap();
+    rt::call(&w.t, &m.token, PROXY, "x", query("select 1")).await.unwrap();
+    install_with(&w.t, PROXY, "1.2.0", r#"["x", "z"]"#, r#"["com.test.runecho", "com.test.runtarget"]"#)
+        .await;
+    // the target no longer declares the command
+    install_with(&w.t, TARGET, "1.1.0", r#"["z"]"#, "[]").await;
+    let e = rt::call(&w.t, &m.token, TARGET, "x", query("select 1")).await.unwrap_err();
+    assert_eq!(code(&e), "command_not_declared");
+}
+
+#[tokio::test]
+async fn the_rights_for_a_target_are_the_ones_of_the_person_at_the_call() {
+    let w = world().await;
+    let (_ta, _tb) = (titem(&w, &w.anna, "ta").await, titem(&w, &w.bob, "tb").await);
+    let m = rt::mint(&w.t, &w.anna, &req_t(vec![target(TARGET, &["x"], None)])).await.unwrap();
+    // a share taken or given is seen at once, in the target too
+    assert_eq!(target_titles(&w, &m.token).await, ["ta"]);
+    // the target turned off in the tenant
+    tenants::set_enabled(&w.t, &w.mgr, TARGET, false).await.unwrap();
+    assert!(rt::call(&w.t, &m.token, TARGET, "x", query("select 1")).await.is_err());
+    tenants::set_enabled(&w.t, &w.mgr, TARGET, true).await.unwrap();
+    assert_eq!(target_titles(&w, &m.token).await, ["ta"]);
+    // the person loses the use of the target after the mint
+    only_proxy(&w).await;
+    let e = rt::call(&w.t, &m.token, TARGET, "x", query("select 1")).await.unwrap_err();
+    assert_eq!(e.kind, Kind::Forbidden);
+    titles(&w, &m.token).await;
+    // a suspended person gets nothing, in any of the plugins
+    mosaikit_kernel::tenancy::set_member_suspended(&w.t, &w.mgr, w.anna.user.user_id, true).await.unwrap();
+    assert!(titles_err(&w, &m.token).await);
+}
+
+async fn titles_err(w: &World, token: &str) -> bool {
+    rt::call(&w.t, token, PROXY, "x", query("select 1")).await.is_err()
+}
+
+#[tokio::test]
+async fn an_expired_revoked_or_finished_ticket_reaches_no_target() {
+    let w = world().await;
+    let mk = || async { rt::mint(&w.t, &w.anna, &req_t(vec![target(TARGET, &["x"], None)])).await.unwrap() };
+    let (expired, revoked, finished) = (mk().await, mk().await, mk().await);
+    mosaikit_db::query(
+        "update core.run_tickets set expires_at = now() - make_interval(mins => 1) where id = $1",
+    )
+    .bind(expired.id)
+    .execute(&w.t.db)
+    .await
+    .unwrap();
+    rt::revoke(&w.t, &w.anna, revoked.id).await.unwrap();
+    rt::finish(&w.t, &finished.token).await.unwrap();
+    for t in [expired, revoked, finished] {
+        let e = rt::call(&w.t, &t.token, TARGET, "x", query("select 1")).await.unwrap_err();
+        assert_eq!((e.kind, code(&e).as_str()), (Kind::Unauthorized, "run_ticket_invalid"));
+    }
+    // a ticket ends for every plugin at once: one `finish`, one token
+    let m = mk().await;
+    rt::call(&w.t, &m.token, TARGET, "x", query("select 1")).await.unwrap();
+    rt::finish(&w.t, &m.token).await.unwrap();
+    assert!(rt::call(&w.t, &m.token, TARGET, "x", query("select 1")).await.is_err());
+}
+
+#[tokio::test]
+async fn uses_size_and_rate_are_shared_by_the_plugins_of_a_ticket() {
+    let w = world().await;
+    let mut r = req_t(vec![target(TARGET, &["x"], None)]);
+    r.uses = Some(2);
+    let m = rt::mint(&w.t, &w.anna, &r).await.unwrap();
+    rt::call(&w.t, &m.token, PROXY, "x", query("select 1")).await.unwrap();
+    rt::call(&w.t, &m.token, TARGET, "x", query("select 1")).await.unwrap();
+    let e = rt::call(&w.t, &m.token, TARGET, "x", query("select 1")).await.unwrap_err();
+    assert_eq!((e.kind, code(&e).as_str()), (Kind::Unauthorized, "run_ticket_invalid"));
+    // size of the arguments, for a target as for the first plugin
+    let m = rt::mint(&w.t, &w.anna, &req_t(vec![target(TARGET, &["x"], None)])).await.unwrap();
+    let big = json!({ "pad": "x".repeat(rt::MAX_ARG_BYTES) });
+    let e = rt::call(&w.t, &m.token, TARGET, "x", big).await.unwrap_err();
+    assert_eq!(code(&e), "args_too_large");
+    // rate: 120 calls a minute per ticket, whatever the plugin
+    let mut r = req_t(vec![target(TARGET, &["x"], None)]);
+    r.uses = Some(rt::MAX_USES);
+    let m = rt::mint(&w.t, &w.anna, &r).await.unwrap();
+    let mut limited = false;
+    for i in 0..130 {
+        let plugin = if i % 2 == 0 { PROXY } else { TARGET };
+        if let Err(e) = rt::call(&w.t, &m.token, plugin, "x", query("select 1")).await {
+            assert_eq!(code(&e), "run_rate_limited");
+            limited = true;
+            break;
+        }
+    }
+    assert!(limited, "the limit of the ticket applies to the calls of all its plugins");
+}
+
+#[tokio::test]
+async fn each_entry_has_its_own_resource_scope() {
+    let w = world().await;
+    let (ta, ta2, _tb) =
+        (titem(&w, &w.anna, "ta").await, titem(&w, &w.anna, "ta2").await, titem(&w, &w.bob, "tb").await);
+    // the first plugin limited to `a`, the target limited to `ta`
+    let mut r = req_t(vec![target(TARGET, &["x"], Some(vec![ta]))]);
+    r.resources = Some(vec![w.a]);
+    let m = rt::mint(&w.t, &w.anna, &r).await.unwrap();
+    assert_eq!(titles(&w, &m.token).await, ["item a"]);
+    assert_eq!(target_titles(&w, &m.token).await, ["ta"]);
+    // the first plugin limited, the target not: the target has the person's reach (and no more)
+    let mut r = req_t(vec![target(TARGET, &["x"], None)]);
+    r.resources = Some(vec![w.a]);
+    let m = rt::mint(&w.t, &w.anna, &r).await.unwrap();
+    assert_eq!(titles(&w, &m.token).await, ["item a"]);
+    assert_eq!(target_titles(&w, &m.token).await, ["ta", "ta2"]);
+    // the first plugin not limited, the target limited
+    let m = rt::mint(&w.t, &w.anna, &req_t(vec![target(TARGET, &["x"], Some(vec![ta2]))])).await.unwrap();
+    assert_eq!(titles(&w, &m.token).await, ["item a", "item b"]);
+    assert_eq!(target_titles(&w, &m.token).await, ["ta2"]);
+}
+
+#[tokio::test]
+async fn the_ticket_of_one_tenant_reaches_no_target_of_another() {
+    let w = world().await;
+    titem(&w, &w.anna, "ta").await;
+    titem(&w, &w.carl, "of carl").await;
+    let m = rt::mint(&w.t, &w.anna, &req_t(vec![target(TARGET, &["x"], None)])).await.unwrap();
+    assert_eq!(target_titles(&w, &m.token).await, ["ta"]);
+    // a resource of the other tenant cannot be put in the scope of an entry
+    let theirs = titem(&w, &w.carl, "scoped").await;
+    let e =
+        rt::mint(&w.t, &w.anna, &req_t(vec![target(TARGET, &["x"], Some(vec![theirs]))])).await.unwrap_err();
+    assert_eq!(e.kind, Kind::NotFound);
+}
+
+// ------------------------------------------------------------------ runs.mint, the host operation
+
+fn mint_op(targets: Value) -> Value {
+    host(
+        "runs.mint",
+        json!({ "commands": ["x"], "run_ref": "started-by-the-plugin", "ttl_minutes": 5, "uses": 10, "targets": targets }),
+    )
+}
+
+#[tokio::test]
+async fn the_logic_mints_for_its_own_plugin_and_the_person_who_called() {
+    let w = world().await;
+    let ta = titem(&w, &w.anna, "ta").await;
+    let _ = titem(&w, &w.bob, "tb").await;
+    let before = tickets_written(&w).await;
+    let args = mint_op(
+        json!([{ "plugin": TARGET, "commands": ["x"], "resources": [ta] }, { "plugin": ECHO, "commands": ["x"] }]),
+    );
+    let out = crud::call(&w.t, &w.anna, PROXY, "x", args).await.unwrap();
+    // given to the logic at once, written when the command has committed
+    let token = out["token"].as_str().unwrap();
+    assert_eq!(token.len(), 48);
+    assert_eq!(out["uses"], 10);
+    assert_eq!(tickets_written(&w).await, before + 1);
+    // it works for the plugin that minted it and for its targets, as anna, within the entry's scope
+    assert_eq!(titles(&w, token).await, ["item a", "item b"]);
+    assert_eq!(target_titles(&w, token).await, ["ta"]);
+    rt::call(&w.t, token, ECHO, "x", Value::Null).await.unwrap();
+    let mints = events(&w, "run_ticket.mint").await;
+    assert_eq!(mints.last().unwrap()["by"], "plugin");
+    assert_eq!(mints.last().unwrap()["run_ref"], "started-by-the-plugin");
+    // the token is the only copy: the table keeps the hash
+    let kept: i64 = mosaikit_db::query_scalar("select count(*) from core.run_tickets where id::text = $1")
+        .bind(out["id"].as_str().unwrap())
+        .fetch_one(&w.t.db)
+        .await
+        .unwrap();
+    assert_eq!(kept, 1);
+}
+
+#[tokio::test]
+async fn the_logic_cannot_mint_beyond_its_manifest_or_the_person() {
+    let w = world().await;
+    // the plugin is the one that runs: no field names another, and the targets are its own `run_targets`
+    let e = cmd(
+        &w,
+        &w.anna,
+        PROXY,
+        host("runs.mint", json!({ "plugin": OTHER, "commands": ["x"], "run_ref": "r" })),
+    )
+    .await
+    .unwrap_err();
+    assert!(e.message.contains("runs.mint"), "{}", e.message);
+    // TARGET declares no `run_targets`: whatever it asks, ECHO is not reachable from its tickets
+    let e =
+        cmd(&w, &w.anna, TARGET, mint_op(json!([{ "plugin": ECHO, "commands": ["x"] }]))).await.unwrap_err();
+    assert!(e.message.contains("run_targets"), "{}", e.message);
+    // not in `run_targets`, not a command of the target, the person lacks the target
+    let e =
+        cmd(&w, &w.anna, PROXY, mint_op(json!([{ "plugin": OTHER, "commands": ["x"] }]))).await.unwrap_err();
+    assert!(e.message.contains("run_targets"), "{}", e.message);
+    let e =
+        cmd(&w, &w.anna, PROXY, mint_op(json!([{ "plugin": TARGET, "commands": ["z"] }]))).await.unwrap_err();
+    assert!(e.message.contains("run command"), "{}", e.message);
+    only_proxy(&w).await;
+    let e =
+        cmd(&w, &w.anna, PROXY, mint_op(json!([{ "plugin": TARGET, "commands": ["x"] }]))).await.unwrap_err();
+    assert!(e.message.contains("permission"), "{}", e.message);
+    // limits of the mint
+    let e = cmd(
+        &w,
+        &w.anna,
+        PROXY,
+        host("runs.mint", json!({ "commands": ["x"], "run_ref": "r", "uses": 100000 })),
+    )
+    .await
+    .unwrap_err();
+    assert!(e.message.contains("uses"), "{}", e.message);
+    // nothing was written by any of them
+    assert_eq!(tickets_written(&w).await, 0);
+}
+
+async fn cmd(w: &World, who: &Caller, plugin: &str, args: Value) -> mosaikit_kernel::Result<Value> {
+    crud::call(&w.t, who, plugin, "x", args).await
 }

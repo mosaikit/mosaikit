@@ -145,12 +145,15 @@ impl Fake {
 }
 
 fn toml(id: &str, port: u16, extra: &str) -> String {
+    // an install with extra lines is a new version of the plugin
+    let version = if extra.is_empty() { "1.0.0" } else { "1.0.1" };
+    let targets = if id == PLUGIN { format!("run_targets = [\"{OTHER}\"]\n") } else { String::new() };
     format!(
-        "id = \"{id}\"\nname = \"Sched\"\nversion = \"1.0.0\"\n[contribution]\nicon = \"x\"\nlabel = \"Sched\"\n\
+        "id = \"{id}\"\nname = \"Sched\"\nversion = \"{version}\"\n[contribution]\nicon = \"x\"\nlabel = \"Sched\"\n\
          [requires]\nmosaikit = \">=1.0\"\n\
          [[resources]]\nname = \"items\"\nfields = [{{ key = \"title\", kind = \"text\" }}]\n\
          [[service_keys]]\nid = \"svc\"\nlabel = \"Service\"\n\
-         [permissions]\nrun_commands = [\"x\"]\nnetwork = [\"http://127.0.0.1:{port}\"]\n\
+         [permissions]\nrun_commands = [\"x\"]\n{targets}network = [\"http://127.0.0.1:{port}\"]\n\
          [[schedules]]\nname = \"sync\"\ncommand = \"x\"\ntarget = \"http://127.0.0.1:{port}/schedules/run\"\n\
          service_key = \"svc\"\nmax_runtime_minutes = 20\n{extra}"
     )
@@ -392,6 +395,51 @@ async fn the_rights_of_the_author_are_checked_when_the_run_is_due() {
     .await
     .unwrap();
     assert_eq!(n, 1);
+}
+
+#[tokio::test]
+async fn a_schedule_may_name_other_plugins_its_ticket_reaches() {
+    let w = world().await;
+    // the schedule names OTHER, which PLUGIN declares in run_targets: the same ticket calls both, as the author
+    install(&w.t, PLUGIN, w.fake.port, &format!("targets = [\"{OTHER}\"]\n")).await;
+    let id = make(&w, &w.anna).await;
+    due(&w, id, 1).await;
+    tick(&w).await;
+    let p = &w.fake.posts()[0];
+    assert_eq!(p.body["targets"], json!([OTHER]));
+    let token = p.body["ticket"].as_str().unwrap().to_string();
+    rt::call(&w.t, &token, PLUGIN, "x", json!({})).await.unwrap();
+    let out = rt::call(&w.t, &token, OTHER, "x", json!({})).await;
+    assert!(out.is_ok(), "{out:?}");
+    assert_eq!(rt::call(&w.t, &token, OTHER, "y", json!({})).await.unwrap_err().code(), "run_wrong_command");
+    // the entry of the ticket is the target's own run commands, no scope
+    let targets: Value = mosaikit_db::query_scalar(
+        "select targets from core.run_tickets where run_ref like 'schedule:sync:%'",
+    )
+    .fetch_one(&w.t.db)
+    .await
+    .unwrap();
+    assert_eq!(targets, json!([{ "plugin": OTHER, "commands": ["x"] }]));
+    let mints = events(&w, "run_ticket.mint").await;
+    assert_eq!(mints[0]["targets"][0]["plugin"], OTHER);
+}
+
+#[tokio::test]
+async fn a_target_the_author_can_no_longer_use_fails_the_run_instead_of_being_dropped() {
+    let w = world().await;
+    install(&w.t, PLUGIN, w.fake.port, &format!("targets = [\"{OTHER}\"]\n")).await;
+    let id = make(&w, &w.anna).await;
+    tenants::set_enabled(&w.t, &w.mgr, OTHER, false).await.unwrap();
+    due(&w, id, 1).await;
+    tick(&w).await;
+    // nothing was pushed, no ticket exists, and the run says why
+    assert!(w.fake.posts().is_empty());
+    let r = runs(&w, id).await;
+    assert_eq!(r[0].0, "failed", "{r:?}");
+    assert!(r[0].2.as_deref().unwrap_or_default().contains(OTHER), "{r:?}");
+    let n: i64 =
+        mosaikit_db::query_scalar("select count(*) from core.run_tickets").fetch_one(&w.t.db).await.unwrap();
+    assert_eq!(n, 0);
 }
 
 #[tokio::test]

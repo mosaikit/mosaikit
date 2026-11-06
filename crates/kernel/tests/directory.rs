@@ -297,6 +297,7 @@ async fn it_is_refused_in_a_call_on_behalf_of_a_run() {
             ttl_minutes: None,
             uses: None,
             resources: None,
+            targets: vec![],
             schedule: None,
         },
     )

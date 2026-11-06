@@ -74,6 +74,7 @@ pub async fn url(k: &Kernel, c: &Caller, host: &str, req: &Value) -> Result<Valu
             ttl_minutes: Some(TTL_MINUTES),
             uses: Some(USES),
             resources: Some(vec![rid]),
+            targets: Vec::new(),
             schedule: None,
         },
     )

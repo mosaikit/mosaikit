@@ -53,7 +53,33 @@ pub(crate) struct KernelHost {
     /// code of the last error given to the logic (`Host::error_code`)
     last_code: Option<String>,
     /// notifications asked by the logic: sent after the commit of the operation
-    notes: Vec<crate::notify::PluginNote>,
+    deferred: Deferred,
+}
+
+/// What the logic asked for during an operation and that happens once the operation has committed
+/// (a rolled back operation does nothing): notifications and run tickets.
+#[derive(Default)]
+pub(crate) struct Deferred {
+    pub(crate) notes: Vec<crate::notify::PluginNote>,
+    pub(crate) tickets: Vec<crate::run_tickets::Prepared>,
+}
+
+impl Deferred {
+    pub(crate) fn extend(&mut self, other: Deferred) {
+        self.notes.extend(other.notes);
+        self.tickets.extend(other.tickets);
+    }
+
+    /// Sends the notifications and writes the tickets. A ticket that cannot be written is logged: the
+    /// token the logic was given then never works (`run_ticket_invalid`).
+    pub(crate) async fn flush(self, k: &Kernel, c: &crate::Caller, plugin: &str) {
+        for t in &self.tickets {
+            if let Err(e) = crate::run_tickets::insert(k, t).await {
+                tracing::warn!(target: "plugin", plugin, "run ticket not written: {}", e.message);
+            }
+        }
+        crate::notify::flush(k, c, plugin, self.notes).await;
+    }
 }
 
 type Params = Vec<Value>;
@@ -259,7 +285,7 @@ impl KernelHost {
             serde_json::from_value(req.clone()).map_err(|e| format!("invalid notification: {e}"))?;
         let k = self.kernel.clone().ok_or("kernel not available")?;
         crate::notify::check_note(&k, &self.user()?, &self.plugin_id, &n).map_err(|e| e.message)?;
-        self.notes.push(n);
+        self.deferred.notes.push(n);
         Ok(Value::Null)
     }
 }
@@ -388,6 +414,33 @@ impl KernelHost {
 }
 
 impl KernelHost {
+    /// `runs.mint`: see [`crate::run_tickets::prepare_from_logic`]. Not in a nested call (a ticket names the plugin
+    /// that runs, and the caller of a nested call is another plugin's), not in a call on behalf of a run (a ticket
+    /// cannot mint a ticket); the ticket is written once the command has committed.
+    fn runs_mint(&mut self, req: &Value) -> std::result::Result<Value, Coded> {
+        let k = self.kernel.clone().ok_or_else(|| Coded("internal", "kernel not available".into()))?;
+        let c = self.user().map_err(|m| Coded("permission_denied", m))?;
+        if c.run.is_some() || self.depth > 0 {
+            return Err(Coded(
+                "permission_denied",
+                "runs.mint is not available in a nested call or in a call on behalf of a run".into(),
+            ));
+        }
+        if self.deferred.tickets.len() >= crate::run_tickets::MAX_MINTS_PER_COMMAND {
+            return Err(Coded("run_too_many", "too many run tickets in one command".into()));
+        }
+        let plugin = self.plugin_id.clone();
+        let t = self
+            .rt
+            .block_on(crate::run_tickets::prepare_from_logic(&k, &c, &plugin, req))
+            .map_err(coded_of)?;
+        let answer = t.answer();
+        self.deferred.tickets.push(t);
+        Ok(answer)
+    }
+}
+
+impl KernelHost {
     /// `directory.search`: see [`crate::plugin_directory`]. Refused in a public link and in a call on
     /// behalf of a run ticket; the manifest, the right of the caller and the limits are checked there.
     fn directory(&mut self, req: &Value) -> std::result::Result<Value, Coded> {
@@ -433,6 +486,10 @@ impl Host for KernelHost {
                 self.last_code = Some(code.to_string());
                 m
             }),
+            "runs.mint" => self.runs_mint(req).map_err(|Coded(code, m)| {
+                self.last_code = Some(code.to_string());
+                m
+            }),
             "db.query" => self.db(true, req),
             "db.exec" => self.db(false, req),
             "resource.create" | "resource.delete" => self.resource(op, req),
@@ -460,7 +517,7 @@ pub(crate) async fn run(
     mut msg: Value,
     fuel: u64,
     depth: u8,
-    notes: &mut Vec<crate::notify::PluginNote>,
+    notes: &mut Deferred,
 ) -> Result<(Value, Tx)> {
     // what the caller may do in the plugin: the logic enforces the permissions it declares
     let perms = crate::access::effective(k, c, &p.id).await?;
@@ -510,7 +567,7 @@ fn new_host(
         resources_read: p.manifest.permissions.resources_read.clone(),
         contributions: p.manifest.permissions.contributions.clone(),
         last_code: None,
-        notes: Vec::new(),
+        deferred: Deferred::default(),
     }
 }
 
@@ -520,14 +577,14 @@ async fn exec(
     host: KernelHost,
     msg: Value,
     fuel: u64,
-    notes: &mut Vec<crate::notify::PluginNote>,
+    notes: &mut Deferred,
 ) -> Result<(Value, Tx)> {
     let module = p.module.clone().ok_or_else(|| Error::bad(format!("{} has no WASM logic", p.id)))?;
     let engine = k.engine.clone();
     let (res, host) =
         tokio::task::spawn_blocking(move || engine.call_with_fuel(&module, &msg, host, fuel)).await?;
     let tx = host.tx.ok_or_else(|| Error::internal("transaction lost"))?;
-    let asked = host.notes;
+    let asked = host.deferred;
     let reply = res?;
     if let Some(e) = reply.get("err") {
         // the message of the plugin itself: its own code, so the interface shows it instead of the
@@ -567,7 +624,7 @@ pub(crate) async fn run_public(
         },
     });
     let host = new_host(p, tx, None, r.tenant, true, 0, k);
-    let mut notes = Vec::new();
+    let mut notes = Deferred::default();
     exec(k, p, host, msg, FUEL_PUBLIC, &mut notes).await
 }
 
