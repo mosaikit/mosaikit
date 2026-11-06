@@ -1004,3 +1004,10 @@ A background run of one plugin may call a command of another plugin with the sam
 | EMBS-05 | Open a normal page of the plugin (no `embed=`), and a file other than the entry of the embed, and look at the response CSP | No `sandbox` directive on either | Playwright (NOT VERIFIABLE: server unit test) |
 | EMBS-06 | In a public link view ask `msk.embeds.url` for the embed that declares `same_origin = true` | The answer says `"allow-scripts"` (opaque origin) and the page is served that way | Playwright (NOT VERIFIABLE: kernel test `public_embeds`) |
 
+
+## Dev kit: activation hint of `mosaikit-plugin install` and checks of `mosaikit-product validate`
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| DK-35 | Install a plugin on a running server that does not turn it on by itself: `mosaikit-plugin install <package> --server <url>` (as the Administrator); then install the same package again after turning it on (Platform > Plugins > Turn on) | The first run prints, after the result, one line «<id> is not on yet: sign in as an Administrator (#/admin), Platform > Plugins > <id> > Turn on»; the second prints no such line | Manual (stub in `tests/manual/checks/dk.ts`; unit test `hint_only_when_not_active`) |
+| DK-36 | In a product folder run `mosaikit-product validate` after each change in turn: (a) a misspelled key in `distribution.toml` (a table and a key inside `[product]`); (b) a `[[nav_groups]]` that lists a plugin id not in `[plugins] include`; (c) with `--base <desktop kit>`, an official plugin in `include` that is not in `registry/index.json` of that kit; (d) without `--base` | (a) an error that names the unknown key or table; (b) a warning that names the group and the plugin and says the group will not show it; (c) an error «not in the registry of the base» that says `build` will stop; (d) no registry check is made (a warning says the official plugins were not checked when there is no registry) | Manual (stub in `tests/manual/checks/dk.ts`; unit tests in `crates/product-cli`) |

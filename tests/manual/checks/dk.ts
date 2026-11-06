@@ -760,6 +760,22 @@ const checks: L.Check[] = [
       return c.result()
     },
   },
+  {
+    id: 'DK-35',
+    async run() {
+      const c = H.checker()
+      c.note('the activation hint of mosaikit-plugin install needs a running server and a package: run it by hand as DK-35 says (unit test hint_only_when_not_active)')
+      return c.result()
+    },
+  },
+  {
+    id: 'DK-36',
+    async run() {
+      const c = H.checker()
+      c.note('the checks of mosaikit-product validate (unknown keys, nav group plugin not in include, --base registry) are run by hand as DK-36 says; the unit tests of crates/product-cli cover them')
+      return c.result()
+    },
+  },
 ]
 
 export default checks
