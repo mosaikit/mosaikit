@@ -95,6 +95,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/t/{t}/p/{plugin}/files/folder", post(files_mkdir))
         .route("/api/t/{t}/p/{plugin}/files/{id}/content", get(files_content))
         .route("/api/t/{t}/p/{plugin}/files/{id}/zip", get(files_zip))
+        .route("/api/t/{t}/p/{plugin}/files/{id}/profiles", get(files_profiles))
         .route("/api/t/{t}/p/{plugin}/files/{id}/rename", post(files_rename))
         .route("/api/t/{t}/p/{plugin}/files/{id}/move", post(files_move))
         .route("/api/t/{t}/p/{plugin}/files/{id}/copy", post(files_copy))
@@ -1101,6 +1102,20 @@ async fn files_unzip(
     Ok(Json(json!(
         files::unzip(&s.k, &c, &plugin, opt_uuid(q.get("parent"))?, folder, &body, on_conflict).await?
     )))
+}
+
+/// What a folder looks like to the plugins that declare `[[folder_profiles]]` (nothing is announced).
+async fn files_profiles(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<PluginPath>,
+    Query(q): Query<HashMap<String, String>>,
+) -> ApiResult<Json<Value>> {
+    let plugin = files_target(&s, &p.plugin, &q, false)?;
+    let id = p.id()?;
+    // the folder must be one the person sees in that Files area
+    files::list(&s.k, &c, &plugin, Some(id)).await?;
+    Ok(Json(json!({ "suggestions": mosaikit_kernel::profiles::detect(&s.k, &c, &plugin, id).await? })))
 }
 
 /// Content as a download: `application/octet-stream` + attachment, never interpreted by the browser.

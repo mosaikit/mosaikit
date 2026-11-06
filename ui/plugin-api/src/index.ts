@@ -43,6 +43,7 @@ export type {
   Row,
   SiteInfo,
   Unzipped,
+  FolderSuggestion,
   TabInfo,
   UiContext,
   Values,

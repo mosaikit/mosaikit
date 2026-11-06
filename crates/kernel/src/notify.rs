@@ -777,10 +777,7 @@ async fn deliver(k: &Kernel, c: &Caller, plugin: &str, n: &PluginNote) -> Result
             readers(k, c.tenant.tenant_id, rid, c.user.user_id).await?
         }
     };
-    let link = match &n.at {
-        Some(at) => format!("#/t/{}/p/{}/{}", c.tenant.slug, p.id, urlencode(at)),
-        None => format!("#/t/{}/p/{}", c.tenant.slug, p.id),
-    };
+    let link = plugin_link(&c.tenant.slug, &p.id, n.at.as_deref());
     let label = p.manifest.contribution.label.clone();
     for user in &users {
         send(
@@ -810,6 +807,14 @@ async fn deliver(k: &Kernel, c: &Caller, plugin: &str, n: &PluginNote) -> Result
     )
     .await;
     Ok(users.len() as i64)
+}
+
+/// The address in the app of a plugin page, at a place inside it (`msk.at`).
+pub fn plugin_link(slug: &str, plugin: &str, at: Option<&str>) -> String {
+    match at {
+        Some(at) => format!("#/t/{slug}/p/{plugin}/{}", urlencode(at)),
+        None => format!("#/t/{slug}/p/{plugin}"),
+    }
 }
 
 fn urlencode(s: &str) -> String {

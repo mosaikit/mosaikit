@@ -228,8 +228,25 @@ export interface WebProbe {
   image: string | null
 }
 
+/** A plugin that could take a folder further (`[[folder_profiles]]` in its manifest). */
+export interface FolderSuggestion {
+  /** the plugin and its name */
+  plugin: string
+  plugin_label: string
+  /** the kind of folder (id and English label) */
+  profile: string
+  label: string
+  /** the folder that holds the marker file (the one asked about, or the only folder inside it) */
+  folder: string
+  marker: string
+  /** the place inside the plugin the page opens at (`msk.at`) */
+  at: string
+}
+
 /** What unpacking a zip made (`files.unzip`). */
 export interface Unzipped {
+  /** plugins that could take the folder further; the person was also told in the bell */
+  suggestions: FolderSuggestion[]
   /** the folder made for the content, when one was asked for */
   folder: FileEntry | null
   files: number

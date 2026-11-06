@@ -176,6 +176,11 @@ export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unk
       if (a.source !== undefined && a.source !== null) q.set('source', pluginId(a.source))
       return { method: 'POST', url: `${base}/files/unzip?${q}`, raw: blob(a.file) }
     }
+    // what the plugins that know a kind of folder (`[[folder_profiles]]`) make of one folder
+    case 'files.profiles': {
+      const src = a.source !== undefined && a.source !== null ? `?source=${enc(pluginId(a.source))}` : ''
+      return { method: 'GET', url: `${base}/files/${uuid(a.id)}/profiles${src}` }
+    }
     case 'files.rename':
       return { method: 'POST', url: `${base}/files/${uuid(a.id)}/rename`, json: { name: str(a.name, 'nome') } }
     case 'files.move':
