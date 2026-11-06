@@ -64,7 +64,7 @@ Un hook si registra come `"<risorsa>.<hook>"` e gira **nella stessa transazione*
 | `after_delete` | dopo l'eliminazione di una riga | `Err` annulla l'eliminazione |
 
 La risorsa deve essere elencata in `[permissions] hooks`; `validate --strict` boccia un hook elencato e mai registrato.
-`Hook` ha `hook`, `resource`, `id`, `values`, `previous`. `Values` legge `str`, `f64`, `bool` (`true`, `1`, `yes`), `get`,
+`Hook` ha `hook`, `resource`, `id`, `values`, `previous`. `Values` legge `str` (una `String`, vuota se assente), `f64` (un `Option<f64>`: `None` se la chiave manca o non è un numero), `bool` (`true`, `1`, `yes`), `get`,
 e scrive `set`, `remove`.
 
 ## Contesto

@@ -163,7 +163,16 @@ An origin is `http://` or `https://` and a host of letters, digits and `.-:[]`, 
 | `label` | required |
 | `columns` | optional labels of the columns of the view |
 
-Only the reporting role reads `kpi_*` views.
+Only the reporting role reads `kpi_*` views. A view may compare or combine columns, so a KPI of two counts is one view
+(here the notes and, of them, the ones with no tag):
+
+```sql
+create view kpi_notes_health as
+  select tenant_id, count(*) as notes, count(*) filter (where tag is null) as untagged
+  from notes group by tenant_id;
+```
+
+with `columns = ["Notes", "Untagged"]` in the `[[kpi]]` entry.
 
 ## `[[nav]]`
 
@@ -285,7 +294,9 @@ For `kind = "language"`: `code` (two or three lower case letters, not `en` or `i
 
 Translations of the manifest. `<lang>` is two or three lower case letters, not `en` (English is the manifest itself).
 Every key is optional and falls back to English; a key that names something the manifest does not have is an error,
-and no text is longer than 300 characters.
+and no text is longer than 300 characters. **When you remove or rename a field, a resource, a KPI view or a
+permission, remove it from every `[i18n.<lang>]` too** (the template translates its sample fields in `it` and `es`):
+`validate` fails with `i18n.es: field 'inventory.status' does not exist`, which names the language and the field.
 
 ```toml
 [i18n.it]

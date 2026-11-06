@@ -28,7 +28,7 @@ Start with [Getting started](getting-started.md), then read the reference you ne
 | [Changelog and compatibility](changelog.md) | Versions of kit, platform, SDK and UI API; deprecations |
 
 **Examples.** `mosaikit-plugin new <name> --example todo|insights|note-priority` makes a complete commented plugin
-with a `WALKTHROUGH.md` (source: `crates/plugin-cli/templates/examples`).
+with a `WALKTHROUGH.md` (they are also in the `examples/` folder of the kit).
 
 **Where the truth is.** The architecture of the platform is [../architecture.md](../architecture.md) (§8 plugins,
 §8.11 plugin API 1, §8.12 developer profile). These documents repeat what a plugin author needs and point there for
@@ -37,5 +37,3 @@ as it is (architecture §8.11).
 
 **API reference generated from the sources** (`cargo doc -p mosaikit-plugin-sdk --no-deps`, and TypeDoc on
 `ui/plugin-api`) is published with the kit (`cargo xtask release devkit --api-docs` adds the SDK reference to `docs/api/sdk`); these documents are written by hand.
-
-Plan of the kit: [../plugin-devkit-plan.md](../plugin-devkit-plan.md).

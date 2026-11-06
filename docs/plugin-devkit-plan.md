@@ -402,7 +402,9 @@ is wired). For the owner: the public key of the official packages must reach the
 a developer downloading the very first kit trusts the GitHub Release; publish the key on the site too), and the Italian Getting started
 still has the old install text.
 
-### Phase 8 — Pilot with an outside developer (5 days, mostly waiting)
+### Phase 8 — Pilot with an outside developer (5 days, mostly waiting) — dry run by a simulated outside developer done 2026-11-06; the real pilot with an outside person is still to be done
+
+**Status.** On 2026-11-06 an AI agent playing an outside developer, with only the kit as reading, made a plugin, ran it in the development server in under 4 minutes, packed and signed it and installed it on the Docker kit. It found: the image of the Docker kit could not be pulled and the README did not say where it comes from; `MOSAIKIT_TRUSTED_KEYS` of the `.env` never reached the server; after `install` the plugin stays "installed" until an Administrator turns it on and nothing said so (the biggest loss of time); a dead link, the wrong compose path in getting started, no way to smoke-test a plugin page without a browser, and small gaps (the `[i18n]` of removed fields, `Values::f64` being an `Option`, stray spaces in `.env`). All fixed in the documents and tools. This is not the pilot of this phase: a real developer outside the team, on a clean machine, with a log of questions, is still to be done and the kit is not declared ready until then.
 
 - One developer outside the team builds a plugin from the documents alone, on a clean machine, with no help except
   the support channel; every question is logged.
@@ -544,7 +546,9 @@ data and extensions, build and release, upgrades, tests, operations; Italian in 
 `product-licensing.md` (D9, a draft to be read by whoever is entitled to), the index of `docs/devkit/README.md` and the changelog. Left: a reading by a person who has not seen
 the code (phase 14); the Italian text is the author's translation and wants a native reader.
 
-### Phase 14 — Pilot with an outside product (5 days, mostly waiting) — not started: it needs a team outside the project
+### Phase 14 — Pilot with an outside product (5 days, mostly waiting) — dry run by a simulated outside team done 2026-11-06; the real pilot with an outside team is still to be done
+
+**Status.** On 2026-11-06 an AI agent playing an outside product builder, with only the kit as reading, made a product (brand, colour, a navigation group, base range, locked setting, bootstrap, About), validated and tested it, built the desktop release and checked the upgrade refusal. It found: the desktop kit of the base that `build desktop --base` needs is not in the dev kit and no document said where to get it; no example of `[[nav_groups]]`, no list of the icon names or of the `[colors]` names; the quotas of the first tenant (already added to `[bootstrap.quota]` on 2026-11-06) and the body of the quotas API; unknown tables of `distribution.toml` accepted silently; `validate` silent about official plugins missing from the registry and about nav groups listing plugins that are not in `include`; the credentials text naming the product instead of the tenant; dead links. All fixed in the documents and tools. This is not the pilot of this phase: a real team outside the project is still to be done (the build with `rcedit` on a clean machine and the Docker release with an upgrade of the base were not tried by the dry run).
 
 - One team outside the project builds a product from the documents alone (brand, plugins, defaults,
   a desktop and a Docker release); every question is logged and answered in the documents.

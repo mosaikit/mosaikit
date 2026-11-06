@@ -28,7 +28,7 @@ Si parte da [Per iniziare](getting-started.md), poi si legge il riferimento che 
 | [Changelog e compatibilità](changelog.md) | Versioni di kit, piattaforma, SDK e API della UI; deprecazioni |
 
 **Esempi.** `mosaikit-plugin new <nome> --example todo|insights|note-priority` crea un plugin completo e commentato con
-un `WALKTHROUGH.md` (sorgente: `crates/plugin-cli/templates/examples`).
+un `WALKTHROUGH.md` (sono anche nella cartella `examples/` del kit).
 
 **Dove sta la verità.** L'architettura della piattaforma è [../../architecture.md](../../architecture.md) (§8 plugin,
 §8.11 plugin API 1, §8.12 profilo sviluppatore), in inglese. Questi documenti ripetono ciò che serve a chi scrive un
@@ -37,5 +37,3 @@ plugin e rimandano lì per il resto. Dove una funzione non ha ancora un esempio 
 
 **Riferimento delle API generato dai sorgenti** (`cargo doc -p mosaikit-plugin-sdk --no-deps` e TypeDoc su
 `ui/plugin-api`): lo pubblica con il kit la fase di impacchettamento del piano; questi documenti sono scritti a mano.
-
-Piano del kit: [../../plugin-devkit-plan.md](../../plugin-devkit-plan.md).
