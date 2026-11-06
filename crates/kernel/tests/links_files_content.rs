@@ -256,3 +256,56 @@ async fn guessing_the_password_of_a_link_is_limited() {
     // the link waits: even the right password is not checked any more for a while
     assert_eq!(links::check_password(&t, &r, "secret1").await.unwrap_err().kind, Kind::TooMany);
 }
+
+#[tokio::test]
+async fn folder_served_as_a_tree() {
+    let (t, _mgr, anna, bruno) = setup().await;
+    let root = files::mkdir(&t, &anna, FILES, None, "tiles").await.unwrap();
+    let sub = files::mkdir(&t, &anna, FILES, Some(root.id), "0").await.unwrap();
+    files::upload(&t, &anna, FILES, Some(root.id), "tileset.json", b"{}", false).await.unwrap();
+    files::upload(&t, &anna, FILES, Some(sub.id), "a.b3dm", b"tile", false).await.unwrap();
+    files::upload(&t, &anna, FILES, None, "outside.txt", b"x", false).await.unwrap();
+
+    let ctx = |c: &Caller| mosaikit_db::Ctx::user(c.user.user_id, c.tenant.tenant_id);
+    let find = |c: &Caller, rel: &'static str| {
+        let (t, ctx) = (&t, ctx(c));
+        async move { files::resolve_path(t, FILES, &ctx, root.id, rel).await.unwrap() }
+    };
+    assert_eq!(find(&anna, "tileset.json").await.unwrap().name, "tileset.json");
+    assert_eq!(find(&anna, "0/a.b3dm").await.unwrap().name, "a.b3dm");
+    // a folder, a missing file, an empty path and unsafe paths lead nowhere
+    for rel in [
+        "",
+        "0",
+        "0/",
+        "missing.json",
+        "0/missing",
+        "../outside.txt",
+        "0/../tileset.json",
+        "./tileset.json",
+        "/tileset.json",
+        "0//a.b3dm",
+        r"0\a.b3dm",
+    ] {
+        assert!(find(&anna, rel).await.is_none(), "{rel:?}");
+    }
+    // somebody who does not see the folder finds nothing; with a grant on the folder, everything below it
+    assert!(find(&bruno, "tileset.json").await.is_none());
+    set_grant(&t, &anna, root.id, "user", bruno.user.user_id, Some(Level::Read)).await.unwrap();
+    assert!(find(&bruno, "0/a.b3dm").await.is_some());
+    set_grant(&t, &anna, root.id, "user", bruno.user.user_id, None).await.unwrap();
+    assert!(find(&bruno, "0/a.b3dm").await.is_none(), "revoked");
+
+    // the ticket of a folder is the address of its root: the caller adds the path
+    let tk = content::ticket(&t, &anna, FILES, root.id, false).await.unwrap();
+    assert!(tk.url.ends_with('/'), "{}", tk.url);
+    let token = tk.url.split("/c/").nth(1).unwrap().split('/').next().unwrap().to_string();
+    let target = content::resolve_ticket(&t, &token).await.unwrap();
+    assert_eq!((target.kind.as_str(), target.plugin_id.as_str()), ("folder", FILES));
+
+    // a public link on the folder sees the same tree and nothing outside it
+    let l = links::create(&t, &anna, root.id, None, None).await.unwrap();
+    let r = links::resolve(&t, &token_of(&l.url)).await.unwrap();
+    assert!(files::resolve_path(&t, FILES, &r.ctx(), root.id, "0/a.b3dm").await.unwrap().is_some());
+    assert!(files::resolve_path(&t, FILES, &r.ctx(), root.id, "../outside.txt").await.unwrap().is_none());
+}

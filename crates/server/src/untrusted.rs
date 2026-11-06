@@ -241,7 +241,15 @@ fn embeddable(csp: &str, ancestors: &str) -> String {
     csp.replace("frame-ancestors 'none'", &format!("frame-ancestors {ancestors}"))
 }
 
-async fn serve_site(s: &AppState, tenant: Uuid, rid: Uuid, rel: &str, base: &str, entry: &str) -> Response {
+async fn serve_site(
+    s: &AppState,
+    tenant: Uuid,
+    rid: Uuid,
+    rel: &str,
+    base: &str,
+    entry: &str,
+    req: &HeaderMap,
+) -> Response {
     let fa = embedders(s, tenant).await;
     let rel = if rel.is_empty() { entry } else { rel };
     let site = s.k.blobs.site_dir(tenant, rid);
@@ -250,24 +258,123 @@ async fn serve_site(s: &AppState, tenant: Uuid, rid: Uuid, rel: &str, base: &str
         return Redirect::permanent(&format!("{base}{rel}/")).into_response();
     }
     match s.k.blobs.site_file(tenant, rid, rel) {
-        Some(path) => match tokio::fs::read(&path).await {
-            Ok(data) => {
-                let mut res = user_content(data, &path.to_string_lossy(), true, false, &fa);
-                // The sandboxed frame has an opaque origin, so its own css, scripts and images are
-                // cross-site requests: `same-site` (the default) would block them. Access is by the
-                // unguessable token in the URL (a ticket or a public link); the unlock cookie of a
-                // protected link is `SameSite=Lax`, so it never goes with a cross-site subresource.
-                set(&mut res, HeaderName::from_static("cross-origin-resource-policy"), "cross-origin");
-                // The scripts of the site read its own files with XHR/fetch: from the opaque origin that
-                // is a CORS request. Only GET/HEAD are served and no credentials are allowed (no
-                // `Allow-Credentials`), so the Lax cookie never goes along and the answer is readable
-                // only by someone who already holds the capability URL.
-                set(&mut res, header::ACCESS_CONTROL_ALLOW_ORIGIN, "*");
-                res
-            }
-            Err(_) => (StatusCode::NOT_FOUND, "not found").into_response(),
-        },
+        Some(path) => serve_file(&path, &path.to_string_lossy(), true, &fa, req).await,
         None => (StatusCode::NOT_FOUND, "not found").into_response(),
+    }
+}
+
+/// A file of a user content with the headers of a capability URL (ticket or public link). The sandboxed
+/// frame has an opaque origin, so its own css, scripts and images are cross-site requests: `same-site`
+/// (the default) would block them. Access is by the unguessable token in the URL; the unlock cookie of
+/// a protected link is `SameSite=Lax`, so it never goes with a cross-site subresource. The scripts read
+/// the files with XHR/fetch (a CORS request from the opaque origin): only GET/HEAD are served and no
+/// credentials are allowed (no `Allow-Credentials`), so the answer is readable only by someone who
+/// already holds the URL. Supports one byte range (`Range`, `206`/`416`) and `ETag` (`304`), which
+/// formats read in pieces (PMTiles, COG) and big tiles need.
+async fn serve_file(
+    path: &std::path::Path,
+    name: &str,
+    allow_scripts: bool,
+    frame_ancestors: &str,
+    req: &HeaderMap,
+) -> Response {
+    use tokio::io::{AsyncReadExt, AsyncSeekExt};
+    let not_found = || (StatusCode::NOT_FOUND, "not found").into_response();
+    let Ok(meta) = tokio::fs::metadata(path).await else { return not_found() };
+    let size = meta.len();
+    let mtime = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map_or(0, |d| d.as_secs());
+    let etag = format!("W/\"{size:x}-{mtime:x}\"");
+    let cors = |res: &mut Response| {
+        set(res, header::ETAG, &etag);
+        set(res, header::ACCEPT_RANGES, "bytes");
+        set(res, header::CACHE_CONTROL, "no-cache");
+        set(res, HeaderName::from_static("cross-origin-resource-policy"), "cross-origin");
+        set(res, header::ACCESS_CONTROL_ALLOW_ORIGIN, "*");
+        set(res, header::ACCESS_CONTROL_EXPOSE_HEADERS, "content-range, content-length, etag, accept-ranges");
+    };
+    if req.get(header::IF_NONE_MATCH).and_then(|v| v.to_str().ok()).is_some_and(|v| v == etag) {
+        let mut res = StatusCode::NOT_MODIFIED.into_response();
+        cors(&mut res);
+        return res;
+    }
+    let range = req.get(header::RANGE).and_then(|v| v.to_str().ok()).and_then(|v| parse_range(v, size));
+    let (status, start, len) = match range {
+        Some(Ok((a, b))) => (StatusCode::PARTIAL_CONTENT, a, b - a + 1),
+        Some(Err(())) => {
+            let mut res = StatusCode::RANGE_NOT_SATISFIABLE.into_response();
+            cors(&mut res);
+            set(&mut res, header::CONTENT_RANGE, &format!("bytes */{size}"));
+            return res;
+        }
+        None => (StatusCode::OK, 0, size),
+    };
+    let Ok(mut f) = tokio::fs::File::open(path).await else { return not_found() };
+    if start > 0 && f.seek(std::io::SeekFrom::Start(start)).await.is_err() {
+        return not_found();
+    }
+    let mut data = Vec::with_capacity(len as usize);
+    if f.take(len).read_to_end(&mut data).await.is_err() {
+        return not_found();
+    }
+    let mut res = user_content(data, name, allow_scripts, false, frame_ancestors);
+    *res.status_mut() = status;
+    cors(&mut res);
+    if status == StatusCode::PARTIAL_CONTENT {
+        set(&mut res, header::CONTENT_RANGE, &format!("bytes {start}-{}/{size}", start + len - 1));
+    }
+    res
+}
+
+/// One range of `Range: bytes=…` over a file of `size` bytes. `None`: not a single byte range (another
+/// unit, several ranges, malformed), so the whole file is served; `Err`: it cannot be met (`416`).
+fn parse_range(v: &str, size: u64) -> Option<Result<(u64, u64), ()>> {
+    let spec = v.trim().strip_prefix("bytes=")?;
+    if spec.contains(',') {
+        return None;
+    }
+    let (a, b) = spec.split_once('-')?;
+    let (a, b) = (a.trim(), b.trim());
+    if size == 0 {
+        return Some(Err(()));
+    }
+    if a.is_empty() {
+        // suffix: the last n bytes
+        let n: u64 = b.parse().ok()?;
+        if n == 0 {
+            return Some(Err(()));
+        }
+        return Some(Ok((size.saturating_sub(n), size - 1)));
+    }
+    let a: u64 = a.parse().ok()?;
+    let b: u64 = if b.is_empty() { size - 1 } else { b.parse::<u64>().ok()?.min(size - 1) };
+    if a >= size || a > b {
+        return Some(Err(()));
+    }
+    Some(Ok((a, b)))
+}
+
+/// A file of a folder tree (Files) by its path under the root folder: 404 when it is not there or the
+/// context does not see it. The ticket or the link is the folder itself, so the context decides.
+#[allow(clippy::too_many_arguments)]
+async fn serve_tree(
+    s: &AppState,
+    plugin_id: &str,
+    ctx: &mosaikit_db::Ctx,
+    tenant: Uuid,
+    root: Uuid,
+    rel: &str,
+    frame_ancestors: &str,
+    req: &HeaderMap,
+) -> Response {
+    match mosaikit_kernel::files::resolve_path(&s.k, plugin_id, ctx, root, rel).await {
+        Ok(Some(f)) => {
+            serve_file(&s.k.blobs.file_path(tenant, f.id), &f.name, false, frame_ancestors, req).await
+        }
+        _ => (StatusCode::NOT_FOUND, "not found").into_response(),
     }
 }
 
@@ -291,14 +398,16 @@ async fn ticket_root(
     s: State<AppState>,
     Path(ticket): Path<String>,
     q: Query<HashMap<String, String>>,
+    headers: HeaderMap,
 ) -> Response {
-    ticket_file(s, Path((ticket, String::new())), q).await
+    ticket_file(s, Path((ticket, String::new())), q, headers).await
 }
 
 async fn ticket_file(
     State(s): State<AppState>,
     Path((ticket, path)): Path<(String, String)>,
     Query(q): Query<HashMap<String, String>>,
+    headers: HeaderMap,
 ) -> Response {
     let t = match content::resolve_ticket(&s.k, &ticket).await {
         Ok(t) => t,
@@ -311,9 +420,14 @@ async fn ticket_file(
         let download = t.download || q.contains_key("download");
         return user_content(data, &t.title, false, download, &ancestors(&s));
     }
+    if t.kind == "folder" {
+        let ctx = mosaikit_db::Ctx::user(t.user, t.tenant);
+        return serve_tree(&s, &t.plugin_id, &ctx, t.tenant, t.resource, &path, &ancestors(&s), &headers)
+            .await;
+    }
     let entry = site_entry(&s, t.resource).await;
-    serve_site(&s, t.tenant, t.resource, &path, &format!("{}/c/{ticket}/", s.k.cfg.plugin_base_path), &entry)
-        .await
+    let base = format!("{}/c/{ticket}/", s.k.cfg.plugin_base_path);
+    serve_site(&s, t.tenant, t.resource, &path, &base, &entry, &headers).await
 }
 
 async fn site_entry(s: &AppState, rid: Uuid) -> String {
@@ -397,7 +511,11 @@ async fn public_path(
     let fa = embedders(&s, r.tenant).await;
     // static site
     if let Some(entry) = r.meta.pointer("/content/entry").and_then(Value::as_str) {
-        return serve_site(&s, r.tenant, r.resource, &path, &base, entry).await;
+        return serve_site(&s, r.tenant, r.resource, &path, &base, entry, &headers).await;
+    }
+    // a shared folder is also a static tree: its files by relative path
+    if r.kind == "folder" && !path.is_empty() {
+        return serve_tree(&s, &r.plugin_id, &r.ctx(), r.tenant, r.resource, &path, &fa, &headers).await;
     }
     if !path.is_empty() {
         return (StatusCode::NOT_FOUND, "not found").into_response();
@@ -732,6 +850,23 @@ fn with_ancestors(mut res: Response, ancestors: &str) -> Response {
 #[cfg(test)]
 mod tests {
     use serde_json::json;
+
+    #[test]
+    fn byte_ranges() {
+        use super::parse_range as r;
+        assert_eq!(r("bytes=0-9", 100), Some(Ok((0, 9))));
+        assert_eq!(r("bytes=90-", 100), Some(Ok((90, 99))));
+        assert_eq!(r("bytes=90-500", 100), Some(Ok((90, 99))), "the end is cut to the file");
+        assert_eq!(r("bytes=-10", 100), Some(Ok((90, 99))));
+        assert_eq!(r("bytes=-500", 100), Some(Ok((0, 99))));
+        assert_eq!(r("bytes=100-", 100), Some(Err(())));
+        assert_eq!(r("bytes=5-2", 100), Some(Err(())));
+        assert_eq!(r("bytes=-0", 100), Some(Err(())));
+        assert_eq!(r("bytes=0-0", 0), Some(Err(())));
+        assert_eq!(r("bytes=0-1,5-6", 100), None, "several ranges: the whole file");
+        assert_eq!(r("items=0-1", 100), None);
+        assert_eq!(r("bytes=a-b", 100), None);
+    }
 
     fn manifest(perms: &str) -> mosaikit_mskp::Manifest {
         mosaikit_mskp::Manifest::from_toml(&format!(
