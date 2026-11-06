@@ -59,6 +59,8 @@ errors are `unsigned package` and `publisher key not trusted: <key>`.
 - You, against a test server: `mosaikit-plugin install file.mskp --server http://localhost:8080 --user admin --password …
   [--totp code]` (`MOSAIKIT_ADMIN_USER`, `MOSAIKIT_ADMIN_PASSWORD`). The address carries its base path if the server has
   one.
+- A package that was installed is **installed, not on**: an Administrator turns it on (Platform > Plugins > the plugin >
+  **Turn on**). `mosaikit-plugin install` prints a reminder when the plugin is not active.
 
 At install the host recomputes every hash, checks the signature and the blocklist, checks `[requires]` against its
 version and API, applies the migrations in one transaction and, if anything fails, rolls everything back.

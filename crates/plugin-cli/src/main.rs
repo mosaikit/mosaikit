@@ -283,9 +283,12 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 },
             )?;
             println!("installed {} {} ({})", done.id, done.version, done.status);
-            match done.signed_by {
+            match &done.signed_by {
                 Some(k) => println!("signed by {k}"),
                 None => println!("unsigned"),
+            }
+            if let Some(h) = install::activation_hint(&done) {
+                println!("{h}");
             }
         }
         Cmd::Doctor { fix } => {

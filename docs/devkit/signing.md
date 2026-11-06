@@ -36,7 +36,8 @@ key to the configuration and restarts the server:
 trusted_keys = ["<key of the official packages>", "<public key of the publisher>"]
 ```
 
-or, in Docker, `MOSAIKIT_TRUSTED_KEYS="key1,key2"` in the `.env` file. Before adding a key check that it comes from the
+or, in the Docker kit, `MOSAIKIT_TRUSTED_KEYS=key1,key2` (no quotes, separated by commas) in the `.env` file next to
+`compose.yml`; `docker compose up -d` passes it to the server (`docker/README.md`, "Trust a key"). Before adding a key check that it comes from the
 publisher through another channel than the package itself (a call, the publisher's site): the key is the whole trust.
 Keep the key of the official packages in the list, or the plugins of the release stop installing.
 

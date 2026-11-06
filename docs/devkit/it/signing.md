@@ -33,7 +33,8 @@ pubblica dell'editore alla configurazione e riavvia:
 trusted_keys = ["<chiave dei pacchetti ufficiali>", "<chiave pubblica dell'editore>"]
 ```
 
-oppure, in Docker, `MOSAIKIT_TRUSTED_KEYS="chiave1,chiave2"` nel file `.env`. Prima di aggiungerla si verifica che la
+oppure, nel kit Docker, `MOSAIKIT_TRUSTED_KEYS=chiave1,chiave2` (senza virgolette, separate da virgole) nel file `.env` accanto a `compose.yml`;
+`docker compose up -d` lo passa al server (`docker/README.md`, "Trust a key"). Prima di aggiungerla si verifica che la
 chiave arrivi dall'editore per un altro canale rispetto al pacchetto. Si lascia nell'elenco la chiave dei pacchetti
 ufficiali. Un pacchetto firmato con un'altra chiave è rifiutato (`publisher key not trusted`), uno non firmato con
 `unsigned package`.

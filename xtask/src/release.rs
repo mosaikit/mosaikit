@@ -447,6 +447,12 @@ pub fn devkit_docker(tag: Option<String>, build: bool) -> Result<()> {
     }
     let pg = d.docker.postgres_image.clone().unwrap_or_else(|| "postgres:17-alpine".into());
     let out = devkit_folder(&dist_dir(d).join(format!("mosaikit-dev-{ver}-docker")), img, ver, &pg)?;
+    if build {
+        // for whoever cannot pull the image: `docker load -i` (see the README of the folder)
+        let tar = dist_dir(d).join(format!("mosaikit-dev-{ver}-image.tar"));
+        run(Command::new("docker").args(["save", "-o"]).arg(&tar).arg(&tag))?;
+        println!("image archive: {}", tar.display());
+    }
     println!(
         "
 Docker development kit: {}
@@ -470,13 +476,15 @@ pub(crate) fn devkit_folder(out: &Path, image: &str, version: &str, pg: &str) ->
         out.join(".env"),
         format!(
             "# Mosaikit development kit (Docker): values used by compose.yml
-             MOSAIKIT_DEV_IMAGE={image}
+MOSAIKIT_DEV_IMAGE={image}
 MOSAIKIT_VERSION={version}
 POSTGRES_IMAGE={pg}
-             MOSAIKIT_HTTP_PORT=8080
+MOSAIKIT_HTTP_PORT=8080
 MOSAIKIT_PLUGIN_PORT=8081
-             # the folder of the plugin to load (its manifest, migrations, ui/dist and target/ are read)
+# the folder of the plugin to load (its manifest, migrations, ui/dist and target/ are read); leave it as it is to install a .mskp instead
 PLUGIN_DIR=./plugin
+# public keys of the publishers this server trusts, separated by commas (see README.md, Trust a key)
+MOSAIKIT_TRUSTED_KEYS=
 "
         ),
     )?;

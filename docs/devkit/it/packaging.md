@@ -60,6 +60,8 @@ Gli errori sono `unsigned package` e `publisher key not trusted: <chiave>`.
 - Tu, su un server di prova: `mosaikit-plugin install file.mskp --server http://localhost:8080 --user admin --password …
   [--totp codice]` (`MOSAIKIT_ADMIN_USER`, `MOSAIKIT_ADMIN_PASSWORD`). L'indirizzo porta il suo percorso base se il server
   ne ha uno.
+- Un pacchetto installato è **installed, non acceso**: un Administrator lo accende (Piattaforma > Plugin > il plugin > **Turn on**).
+  `mosaikit-plugin install` stampa un promemoria quando il plugin non è attivo.
 
 All'installazione l'host ricalcola ogni hash, controlla la firma e la blocklist, controlla `[requires]` rispetto alla
 propria versione e API, applica le migrazioni in una transazione e, se qualcosa fallisce, annulla tutto.
