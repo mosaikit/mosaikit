@@ -577,6 +577,9 @@ pub struct Translation {
     /// labels of the entries of the navigation, by id
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub nav: BTreeMap<String, String>,
+    /// labels of the `[[folder_profiles]]`, by id
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub folder_profiles: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -1176,6 +1179,14 @@ impl Manifest {
     }
 
     /// `[[nav]]`: only an app has pages; ids unique, two levels, places and permissions that exist.
+    /// The label of a folder profile in every language the manifest translates it into (`[i18n.<lang>.folder_profiles]`).
+    pub fn folder_profile_labels(&self, id: &str) -> BTreeMap<String, String> {
+        self.i18n
+            .iter()
+            .filter_map(|(lang, tr)| tr.folder_profiles.get(id).map(|l| (lang.clone(), l.clone())))
+            .collect()
+    }
+
     fn validate_folder_profiles(&self) -> Result<()> {
         let bad = |m: String| Err(Error::Manifest(format!("folder_profiles: {m}")));
         if self.folder_profiles.len() > MAX_FOLDER_PROFILES {
@@ -1719,6 +1730,14 @@ impl Manifest {
             }
             all.push(label);
         }
+        for (id, label) in &tr.folder_profiles {
+            if !self.folder_profiles.iter().any(|p| &p.id == id) {
+                return Err(format!("folder profile '{id}' is not declared"));
+            }
+            if label.trim().is_empty() || label.chars().count() > 80 {
+                return Err(format!("folder profile '{id}': a label of 1 to 80 characters is required"));
+            }
+        }
         for (id, label) in &tr.nav {
             if !self.nav.iter().any(|n| &n.id == id) {
                 return Err(format!("nav entry '{id}' is not declared"));
@@ -1808,6 +1827,11 @@ impl Manifest {
         for t in &mut m.extension.tabs {
             if let Some(label) = tr.extension.tabs.get(&t.key) {
                 t.label = label.clone();
+            }
+        }
+        for p in &mut m.folder_profiles {
+            if let Some(label) = tr.folder_profiles.get(&p.id) {
+                p.label = label.clone();
             }
         }
         for n in &mut m.nav {
@@ -1921,6 +1945,13 @@ label = \"P\"
         ] {
             assert!(Manifest::from_toml(&format!("{base}[[folder_profiles]]\n{bad}\n")).is_err(), "{bad}");
         }
+        // translated labels: only for a declared profile, and the localized manifest carries them
+        let it = format!("{ok}[i18n.it.folder_profiles]\ntiles3d = \"Dataset 3D Tiles\"\n");
+        let m = Manifest::from_toml(&it).unwrap();
+        assert_eq!(m.localized("it").folder_profiles[0].label, "Dataset 3D Tiles");
+        assert_eq!(m.localized("en").folder_profiles[0].label, "3D Tiles dataset");
+        assert_eq!(m.folder_profile_labels("tiles3d")["it"], "Dataset 3D Tiles");
+        assert!(Manifest::from_toml(&format!("{ok}[i18n.it.folder_profiles]\nother = \"x\"\n")).is_err());
         let twice = format!("{ok}[[folder_profiles]]\nid = \"tiles3d\"\nlabel = \"y\"\nmarkers = [\"b\"]\n");
         assert!(Manifest::from_toml(&twice).is_err());
     }

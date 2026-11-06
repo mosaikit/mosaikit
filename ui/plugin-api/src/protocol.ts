@@ -236,6 +236,8 @@ export interface FolderSuggestion {
   /** the kind of folder (id and English label) */
   profile: string
   label: string
+  /** the label in other languages, by language (`it`...); absent ones fall back to `label` */
+  labels?: Record<string, string>
   /** the folder that holds the marker file (the one asked about, or the only folder inside it) */
   folder: string
   marker: string

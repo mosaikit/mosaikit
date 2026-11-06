@@ -2021,6 +2021,8 @@ export const IT: Record<string, string> = {
   'Network: {list}': 'Rete: {list}',
   'Embeds: {list}': 'Incorpora: {list}',
   'Reads the files you can see': 'Legge i file che puoi vedere',
+  '“{name}” looks like a {label}': '“{name}” sembra un {label}',
+  'Open it in {app} to publish it.': 'Aprilo in {app} per pubblicarlo.',
   'Writes in the Files area for you': 'Scrive nell’area File al posto tuo',
   'Calls: {list}': 'Chiama: {list}',
   'Database: {db}': 'Database: {db}',

@@ -1,0 +1,28 @@
+id = "com.mosaikit.e2e-folder-probe"
+name = "Folder probe"
+version = "0.1.0"
+kind = "app"
+description = "Test fixture of the browser tests: declares a folder profile and shows what the files calls on another plugin answer"
+
+[requires]
+mosaikit = ">=1.0, <2"
+api = 1
+
+[contribution]
+icon = "▦"
+label = "Folder probe"
+
+[ui]
+entry = "index.html"
+
+[permissions]
+# reads the Files area (list, tickets) but does NOT write in it: files_write is left out on purpose
+files_read = true
+
+[[folder_profiles]]
+id = "tiles3d"
+label = "3D Tiles dataset"
+markers = ["tileset.json"]
+
+[i18n.it.folder_profiles]
+tiles3d = "dataset 3D Tiles"
