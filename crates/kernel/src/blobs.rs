@@ -50,6 +50,24 @@ impl Blobs {
         Ok(())
     }
 
+    /// Where the uploads in pieces of a tenant wait until they are complete (`<tenant>/.uploads/`).
+    pub fn upload_dir(&self, tenant: Uuid) -> PathBuf {
+        self.root.join(tenant.to_string()).join(".uploads")
+    }
+
+    /// Makes a staged file the content of the resource `rid`: moved, not copied (the staging area is on the
+    /// same volume), so a file of any size costs no memory and no second write.
+    pub fn adopt_file(&self, tenant: Uuid, rid: Uuid, staged: &Path) -> Result<()> {
+        let dir = self.dir(tenant, rid);
+        std::fs::create_dir_all(&dir)?;
+        let to = dir.join("file");
+        if std::fs::rename(staged, &to).is_err() {
+            std::fs::copy(staged, &to)?;
+            std::fs::remove_file(staged)?;
+        }
+        Ok(())
+    }
+
     pub fn read_file(&self, tenant: Uuid, rid: Uuid) -> Result<Vec<u8>> {
         std::fs::read(self.file_path(tenant, rid)).map_err(|e| match e.kind() {
             std::io::ErrorKind::NotFound => Error::not_found("content of the file missing"),
@@ -193,6 +211,7 @@ pub async fn gc(k: &Kernel) {
     let Ok(tenants) = std::fs::read_dir(k.blobs.root()) else { return };
     for t in tenants.flatten() {
         let Ok(tenant) = t.file_name().to_string_lossy().parse::<Uuid>() else { continue };
+        crate::uploads::sweep(&k.blobs.upload_dir(tenant));
         let Ok(items) = std::fs::read_dir(t.path()) else { continue };
         for it in items.flatten() {
             let Ok(rid) = it.file_name().to_string_lossy().parse::<Uuid>() else { continue };

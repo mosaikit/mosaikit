@@ -5,7 +5,7 @@ use std::io::Write;
 use mosaikit_kernel::acl::{set_grant, Level};
 use mosaikit_kernel::tenancy::set_settings;
 use mosaikit_kernel::testing::{start, TestKernel};
-use mosaikit_kernel::{content, crud, files, links, Caller, Kind};
+use mosaikit_kernel::{content, crud, files, links, uploads, Caller, Kind};
 use serde_json::{json, Value};
 use uuid::Uuid;
 
@@ -368,4 +368,55 @@ async fn unzip_into_files() {
     assert!(files::unzip(&t, &bruno, FILES, Some(city.id), None, &zip, files::OnConflict::Fail)
         .await
         .is_err());
+}
+
+#[tokio::test]
+async fn upload_in_pieces() {
+    let (t, _mgr, anna, bruno) = setup().await;
+    let begin = |name: &'static str, size: u64, replace: bool| {
+        uploads::begin(&t, &anna, FILES, None, name, size, replace)
+    };
+
+    let up = begin("big.bin", 10, false).await.unwrap();
+    assert_eq!((up.received, up.size), (0, 10));
+    assert_eq!(uploads::chunk(&t, &anna, FILES, up.id, 0, b"abcde").await.unwrap().received, 5);
+    // a piece sent twice or out of order says how far the upload is
+    let again = uploads::chunk(&t, &anna, FILES, up.id, 0, b"abcde").await.unwrap_err();
+    assert_eq!((again.kind, again.code()), (Kind::Conflict, "upload_offset"));
+    assert!(again.message.contains("5 bytes"), "{}", again.message);
+    assert_eq!(uploads::status(&t, &anna, FILES, up.id).await.unwrap().received, 5);
+    // not finished, nothing in Files yet, and nobody else may continue it
+    assert_eq!(uploads::finish(&t, &anna, FILES, up.id).await.unwrap_err().code(), "upload_incomplete");
+    assert!(files::list(&t, &anna, FILES, None).await.unwrap().entries.is_empty());
+    assert_eq!(uploads::chunk(&t, &bruno, FILES, up.id, 5, b"x").await.unwrap_err().kind, Kind::NotFound);
+    assert_eq!(
+        uploads::chunk(&t, &anna, FILES, up.id, 5, b"fghijk").await.unwrap_err().kind,
+        Kind::BadRequest
+    );
+    assert_eq!(uploads::chunk(&t, &anna, FILES, up.id, 5, b"fghij").await.unwrap().received, 10);
+
+    let e = uploads::finish(&t, &anna, FILES, up.id).await.unwrap();
+    assert_eq!((e.name.as_str(), e.size), ("big.bin", 10));
+    assert_eq!(files::read(&t, &anna, FILES, e.id).await.unwrap().1, b"abcdefghij");
+    assert_eq!(uploads::status(&t, &anna, FILES, up.id).await.unwrap_err().kind, Kind::NotFound, "consumed");
+
+    // what an upload would be refused for comes before the bytes
+    assert_eq!(begin("big.bin", 3, false).await.unwrap_err().kind, Kind::Conflict);
+    assert_eq!(begin("a/b", 3, false).await.unwrap_err().kind, Kind::BadRequest);
+    assert_eq!(begin("zero", 0, false).await.unwrap_err().kind, Kind::BadRequest);
+    // replacing keeps the file and changes its content
+    let again = begin("big.bin", 3, true).await.unwrap();
+    uploads::chunk(&t, &anna, FILES, again.id, 0, b"xyz").await.unwrap();
+    let e2 = uploads::finish(&t, &anna, FILES, again.id).await.unwrap();
+    assert_eq!(e2.id, e.id);
+    assert_eq!(files::read(&t, &anna, FILES, e.id).await.unwrap().1, b"xyz");
+
+    // an upload thrown away is gone; a person has a few open at a time
+    let gone = begin("gone", 5, false).await.unwrap();
+    uploads::abort(&t, &anna, FILES, gone.id).await.unwrap();
+    assert_eq!(uploads::status(&t, &anna, FILES, gone.id).await.unwrap_err().kind, Kind::NotFound);
+    for i in 0..8 {
+        uploads::begin(&t, &anna, FILES, None, &format!("open{i}"), 5, false).await.unwrap();
+    }
+    assert_eq!(begin("one-more", 5, false).await.unwrap_err().kind, Kind::TooMany);
 }

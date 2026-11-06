@@ -111,6 +111,18 @@ export function safePage(page: string): string {
 export const LOCAL_OPS = new Set(['hello', 'share', 'toast', 'confirm', 'band.set', 'band.reset'])
 
 /** Translates an operation of the plugin into a REST call. */
+/** A whole number of at least zero (a size, an offset). */
+function count(v: unknown, what: string): number {
+  if (typeof v !== 'number' || !Number.isSafeInteger(v) || v < 0) throw new OpError(`invalid ${what}`)
+  return v
+}
+
+/** The `source` of a files call (the Files area of another plugin) as a query string; `first` is what comes before it. */
+function sourceQuery(a: Args, first = ''): string {
+  if (a.source === undefined || a.source === null) return first
+  return `${first || '?'}${first ? '&' : ''}source=${enc(pluginId(a.source))}`
+}
+
 export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unknown): RestCall {
   const base = `/api/t/${enc(tenant)}/p/${enc(plugin)}`
   const a = obj(rawArgs)
@@ -181,6 +193,21 @@ export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unk
       const src = a.source !== undefined && a.source !== null ? `?source=${enc(pluginId(a.source))}` : ''
       return { method: 'GET', url: `${base}/files/${uuid(a.id)}/profiles${src}` }
     }
+    // a file too big for one request, in pieces: begin, one chunk at a time (`offset` is where it starts), finish
+    case 'files.upload.begin':
+      return {
+        method: 'POST',
+        url: `${base}/files/uploads${sourceQuery(a)}`,
+        json: { name: str(a.name, 'nome'), parent: optUuid(a.parent), size: count(a.size, 'size'), replace: a.replace === true },
+      }
+    case 'files.upload.chunk':
+      return { method: 'PUT', url: `${base}/files/uploads/${uuid(a.id)}${sourceQuery(a, `?offset=${count(a.offset, 'offset')}`)}`, raw: blob(a.file) }
+    case 'files.upload.status':
+      return { method: 'GET', url: `${base}/files/uploads/${uuid(a.id)}${sourceQuery(a)}` }
+    case 'files.upload.finish':
+      return { method: 'POST', url: `${base}/files/uploads/${uuid(a.id)}/finish${sourceQuery(a)}` }
+    case 'files.upload.abort':
+      return { method: 'DELETE', url: `${base}/files/uploads/${uuid(a.id)}${sourceQuery(a)}` }
     case 'files.rename':
       return { method: 'POST', url: `${base}/files/${uuid(a.id)}/rename`, json: { name: str(a.name, 'nome') } }
     case 'files.move':

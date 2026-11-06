@@ -1,6 +1,6 @@
 import { Bridge, BridgeError } from './bridge.ts'
 import { API_VERSION, checkHostApi } from './version.ts'
-import type { BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, Unzipped, FolderSuggestion, UiContext, Values, WebProbe } from './protocol.ts'
+import type { BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, Unzipped, UploadProgress, FolderSuggestion, UiContext, Values, WebProbe } from './protocol.ts'
 
 /** The extensions of the plugin on a resource (fields and actions other plugins add to its items). */
 export interface ExtensionsClient {
@@ -234,6 +234,44 @@ export class Msk {
       this.bridge.call<FileEntry>('files.mkdir', { name, parent: parent ?? null, source }),
     upload: (file: Blob, name: string, parent?: string | null, replace = false, source?: string) =>
       this.bridge.call<FileEntry>('files.upload', { file, name, parent: parent ?? null, replace, source }),
+    /**
+     * A file of any size, sent in pieces (of `chunk` bytes, 8 MB by default) so that no request is big: it shows in the
+     * folder only when it is complete. A piece that fails is sent again from where the server says the upload is.
+     * `onProgress(sent, total)` is called after every piece.
+     */
+    uploadLarge: async (
+      file: Blob,
+      name: string,
+      opts: { parent?: string | null; replace?: boolean; source?: string; chunk?: number; onProgress?: (sent: number, total: number) => void } = {},
+    ): Promise<FileEntry> => {
+      const b = this.bridge
+      const { parent = null, replace = false, source } = opts
+      const size = file.size
+      const step = Math.max(1, Math.min(opts.chunk ?? 8 << 20, 64 << 20))
+      const up = await b.call<UploadProgress>('files.upload.begin', { name, parent, size, replace, source })
+      try {
+        let at = up.received
+        while (at < size) {
+          let tries = 0
+          for (;;) {
+            try {
+              const r = await b.call<UploadProgress>('files.upload.chunk', { id: up.id, offset: at, file: file.slice(at, Math.min(size, at + step)), source })
+              at = r.received
+              break
+            } catch (e) {
+              if (++tries >= 3) throw e
+              // where the server is: a piece that arrived but whose answer was lost is not sent again
+              at = (await b.call<UploadProgress>('files.upload.status', { id: up.id, source })).received
+            }
+          }
+          opts.onProgress?.(at, size)
+        }
+        return await b.call<FileEntry>('files.upload.finish', { id: up.id, source })
+      } catch (e) {
+        await b.call('files.upload.abort', { id: up.id, source }).catch(() => {})
+        throw e
+      }
+    },
     /**
      * Unpacks a zip into the folder `parent` (the root if absent), or into a new folder `folder` inside it,
      * keeping its structure. `conflict` says what to do with a name already taken: `fail` (default, nothing is

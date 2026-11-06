@@ -47,7 +47,12 @@ pub struct Listing {
 }
 
 /// The plugin, with the files permission of its manifest and the permission `perm` of the caller.
-async fn plugin(k: &Kernel, c: &Caller, id: &str, perm: &str) -> Result<std::sync::Arc<LoadedPlugin>> {
+pub(crate) async fn plugin(
+    k: &Kernel,
+    c: &Caller,
+    id: &str,
+    perm: &str,
+) -> Result<std::sync::Arc<LoadedPlugin>> {
     let (p, _) = crate::access::require(k, c, id, perm).await?;
     if !p.manifest.permissions.files {
         return Err(Error::forbidden("the plugin does not declare the files permission"));
@@ -109,7 +114,7 @@ fn need(e: &Entry, lvl: u8) -> Result<()> {
     Ok(())
 }
 
-async fn folder(tx: &mut Tx, parent: Option<Uuid>) -> Result<Option<Entry>> {
+pub(crate) async fn folder(tx: &mut Tx, parent: Option<Uuid>) -> Result<Option<Entry>> {
     match parent {
         None => Ok(None),
         Some(id) => {
@@ -122,7 +127,7 @@ async fn folder(tx: &mut Tx, parent: Option<Uuid>) -> Result<Option<Entry>> {
     }
 }
 
-async fn sibling(
+pub(crate) async fn sibling(
     tx: &mut Tx,
     parent: Option<Uuid>,
     name: &str,
@@ -221,6 +226,33 @@ pub async fn upload(
     data: &[u8],
     replace: bool,
 ) -> Result<Entry> {
+    store(k, c, plugin_id, parent, name, Content::Bytes(data), replace).await
+}
+
+/// The content of a file being stored: in memory, or already on disk in the staging area (an upload in pieces).
+pub(crate) enum Content<'a> {
+    Bytes(&'a [u8]),
+    Staged(&'a std::path::Path, u64),
+}
+
+impl Content<'_> {
+    fn len(&self) -> usize {
+        match self {
+            Content::Bytes(b) => b.len(),
+            Content::Staged(_, n) => *n as usize,
+        }
+    }
+}
+
+pub(crate) async fn store(
+    k: &Kernel,
+    c: &Caller,
+    plugin_id: &str,
+    parent: Option<Uuid>,
+    name: &str,
+    content: Content<'_>,
+    replace: bool,
+) -> Result<Entry> {
     if !valid_name(name) {
         return Err(Error::bad("invalid name"));
     }
@@ -231,8 +263,8 @@ pub async fn upload(
     let existing = sibling(&mut tx, parent, name, None).await?;
     // at the limit nothing new comes in: a new file adds an item and its bytes, a replaced one the difference
     let add = match &existing {
-        Some(e) => crate::quotas::Add::storage(data.len() as i64 - e.size),
-        None => crate::quotas::Add { items: 1, storage: data.len() as i64, people: 0 },
+        Some(e) => crate::quotas::Add::storage(content.len() as i64 - e.size),
+        None => crate::quotas::Add { items: 1, storage: content.len() as i64, people: 0 },
     };
     crate::quotas::check(k, tenant, add).await?;
     let id = match existing {
@@ -244,9 +276,12 @@ pub async fn upload(
         }
         None => tx.create_resource("file", name, parent, &json!({ "mime": mime_of(name) })).await?,
     };
-    tx.update_resource(id, None, Some(&json!({ "mime": mime_of(name) })), Some(data.len() as i64)).await?;
+    tx.update_resource(id, None, Some(&json!({ "mime": mime_of(name) })), Some(content.len() as i64)).await?;
     let e = get_entry(&mut tx, id).await?;
-    k.blobs.write_file(tenant, id, data)?;
+    match &content {
+        Content::Bytes(data) => k.blobs.write_file(tenant, id, data)?,
+        Content::Staged(path, _) => k.blobs.adopt_file(tenant, id, path)?,
+    }
     if let Err(err) = tx.commit().await {
         if !replace {
             k.blobs.remove(tenant, id);
@@ -260,7 +295,7 @@ pub async fn upload(
         Some(&p.id),
         Some(id),
         "file.upload",
-        json!({ "size": data.len() }),
+        json!({ "size": content.len() }),
     )
     .await;
     crate::quotas::touched(k, tenant);
