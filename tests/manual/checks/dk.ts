@@ -735,6 +735,22 @@ const checks: L.Check[] = [
     },
   },
   {
+    id: 'DK-33',
+    async run() {
+      const c = H.checker()
+      c.note('the quotas of the first tenant are covered by the kernel test product_policy; the start with a negative quota is checked by hand as DK-33 says')
+      return c.result()
+    },
+  },
+  {
+    id: 'DK-34',
+    async run() {
+      const c = H.checker()
+      c.note('mosaikit-product test --browser needs Playwright and a desktop kit: run it by hand as DK-34 says (the reference product)')
+      return c.result()
+    },
+  },
+  {
     id: 'DK-32',
     async run() {
       const c = H.checker()

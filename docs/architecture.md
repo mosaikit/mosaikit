@@ -2385,7 +2385,7 @@ one kind of target (the release of the other kind refuses it with a clear messag
   platform and accept the value). `[languages]` (`enabled`, `default`) is sugar for `lang.enabled` and `lang.default`.
 - `[locked] keys = [...]`: settings nobody can change. A locked setting ignores what is stored and keeps the default; the Administrator and the Tenant
   Managers see it locked and `set_platform` / `set_tenant` answer `setting_locked`.
-- `[bootstrap]`: `tenant` (slug of the first tenant, as `initial_tenant`), `tenant_name`, `trial_days`, `admin_email`. The environment variables win.
+- `[bootstrap]`: `tenant` (slug of the first tenant, as `initial_tenant`), `tenant_name`, `trial_days`, `admin_email`, and `[bootstrap.quota]` (`storage_mb`, `people`, `items`: the quotas of the tenant itself, written into its settings at creation; a quota left out is inherited from the platform). The environment variables win.
   The developer profile ignores the tenant: it brings its own.
 - `[database] extensions`: PostgreSQL extensions that must be installed; the start stops with a message that names them (`product_extensions`).
   SQLite has none.

@@ -110,12 +110,18 @@ tenant = "main"                  # slug of the first tenant
 tenant_name = "Acme Maps"
 trial_days = 30                  # optional trial of that tenant
 admin_email = "ops@acme.example"
+
+[bootstrap.quota]                # optional: the quotas of that tenant (a quota left out is the one of the platform)
+storage_mb = 5000
+people = 50
+items = 100000
 ```
 
 The keys of `[defaults]` and `[locked]` are the settings of the platform (identity, theme, languages and formats, passwords and
 sessions, notifications, retention, layout). A value a setting refuses is an error at start. A locked setting ignores what is stored
 and keeps the default of the product. In the developer profile (`mosaikit-product dev`) the first tenant of `[bootstrap]` is not
-created: the profile brings its own tenant and users.
+created: the profile brings its own tenant and users. `[bootstrap.quota]` sets the quotas of the first tenant (the quotas of the tenant itself, as the
+Administrator would set them on its page); a negative number is an error at start, and the tenant can be changed later like any other.
 
 **Seeds** (`[[plugin_settings]]`, `[[service_key_values]]`) put the settings and keys of plugins in place at the first start,
 by reference (`env:NAME`, `file:PATH`): never write a secret in the file ([architecture §14.2](../architecture.md)).
@@ -165,6 +171,11 @@ mosaikit-product build k8s     --base-k8s <k8s folder of the kit>       dist/<id
 developer profile and checks over HTTP that it answers, has its brand and its About data, that every test user signs in and that the Tenant Manager
 sees every own plugin of the release; with `--upgrade-from` it runs the upgrade test. The pages of the plugins and the accessibility are checked in the
 browser with `@mosaikit/plugin-testing` (`signIn`, `openPlugin`, `expectAccessible`: [Testing](testing.md)); the reference product has a spec that does it.
+
+With `--browser`, `test` also runs the shell with the brand of the product in a browser: the sign-in page shows the brand, and the shell, as the Tenant Manager,
+on a desktop and on a phone, has no horizontal overflow (rule R-9 of the layout contract) and passes the accessibility check (axe). It needs Playwright in the
+product folder (`npm install --save-dev @playwright/test @axe-core/playwright @mosaikit/plugin-testing`, then `npx playwright install chromium`); without it the
+command stops and says so. It is off by default because it starts a browser. The whole layout contract (every route, every rule) stays with the end-to-end suite of the base.
 
 ## 11. Operations
 
