@@ -66,6 +66,7 @@ fn plugin_csp(s: &AppState, p: &mosaikit_kernel::plugins::LoadedPlugin) -> Strin
             .map(|h| s.k.cfg.plugin_origin_for(&h.id))
             .collect()
     };
+    let app_origin = s.k.cfg.app_origin();
     csp_for(
         &p.manifest,
         &own,
@@ -73,6 +74,8 @@ fn plugin_csp(s: &AppState, p: &mosaikit_kernel::plugins::LoadedPlugin) -> Strin
         &s.k.cfg.public_origin(),
         &embedded,
         &embedders,
+        // the page of an embed calls its plugin on the platform with the ticket of its address (`api=`)
+        if p.manifest.embeds.is_empty() { "" } else { &app_origin },
     )
 }
 
@@ -85,6 +88,7 @@ fn csp_for(
     public_origin: &str,
     embedded: &[String],
     embedders: &[String],
+    api_origin: &str,
 ) -> String {
     let net = m.permissions.network.join(" ");
     let frames = m.permissions.frame_src.join(" ");
@@ -99,11 +103,12 @@ fn csp_for(
     if m.permissions.web {
         frame_src.push_str(" https: http:");
     }
+    let api = if api_origin.is_empty() { String::new() } else { format!(" {api_origin}") };
     let eval = if m.permissions.script_eval { " 'unsafe-eval' 'wasm-unsafe-eval'" } else { "" };
     format!(
         "default-src 'self'; script-src {own}{eval}; style-src 'self' 'unsafe-inline'; \
          img-src 'self' data: blob: {net} {frames}; font-src 'self' data:; media-src 'self' data: blob:; \
-         connect-src 'self' {net}; frame-src 'self' blob: {frame_src}; worker-src {own} blob:{eval}; \
+         connect-src 'self' {net}{api}; frame-src 'self' blob: {frame_src}; worker-src {own} blob:{eval}; \
          frame-ancestors {} {}{ancestors}; object-src 'none'; base-uri 'self'; form-action 'self'",
         app_origins, public_origin
     )
@@ -673,7 +678,7 @@ label = \"P\"
 
     #[test]
     fn script_eval_only_for_the_plugin_that_declares_it() {
-        let csp = |m| super::csp_for(&m, "http://p/ui/x/", "http://app", "http://pub", &[], &[]);
+        let csp = |m| super::csp_for(&m, "http://p/ui/x/", "http://app", "http://pub", &[], &[], "");
         let strict = csp(manifest(""));
         assert!(strict.contains("script-src http://p/ui/x/;"));
         assert!(!strict.contains("unsafe-eval") && !strict.contains("wasm-unsafe-eval"));
@@ -700,10 +705,12 @@ label = \"P\"
             "http://pub",
             &["http://maps.plg".into()],
             &["http://dash.plg".into()],
+            "http://app",
         );
+        assert!(csp.contains("connect-src 'self'  http://app;"), "{csp}");
         assert!(csp.contains("frame-src 'self' blob:  http://maps.plg;"), "{csp}");
         assert!(csp.contains("frame-ancestors http://app http://pub http://dash.plg;"), "{csp}");
-        let plain = super::csp_for(&m, "http://p/ui/x/", "http://app", "http://pub", &[], &[]);
+        let plain = super::csp_for(&m, "http://p/ui/x/", "http://app", "http://pub", &[], &[], "");
         assert!(
             plain.contains("frame-ancestors http://app http://pub;") && !plain.contains("plg"),
             "{plain}"
