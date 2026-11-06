@@ -332,6 +332,21 @@ pub(crate) async fn dispatch(k: &Kernel, s: &Claimed, manual: bool) -> Result<Ou
             ttl_minutes: Some(ttl),
             uses: Some(crate::run_tickets::MAX_USES),
             resources: s.resources.clone(),
+            // the plugins the declaration names, with everything they declare for runs: the mint checks
+            // each one again (declared in `run_targets`, on, used by the author)
+            targets: decl
+                .targets
+                .iter()
+                .map(|t| crate::run_tickets::Target {
+                    plugin: t.clone(),
+                    commands: k
+                        .plugins
+                        .active(t)
+                        .map(|p| p.manifest.permissions.run_commands.clone())
+                        .unwrap_or_default(),
+                    resources: None,
+                })
+                .collect(),
             schedule: Some(s.id),
         },
     )
@@ -393,6 +408,8 @@ pub(crate) async fn dispatch(k: &Kernel, s: &Claimed, manual: bool) -> Result<Ou
         "args": s.args,
         "ticket": minted.token,
         "ticket_path": format!("/api/run/{}", minted.token),
+        // the other plugins the same ticket may call (`[[schedules]] targets`)
+        "targets": decl.targets,
         "expires_at": minted.expires_at,
     });
     match push(k, &plugin, &decl, s.tenant, body).await {

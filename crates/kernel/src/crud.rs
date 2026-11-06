@@ -505,7 +505,7 @@ async fn run_hook(
     id: Option<Uuid>,
     values: Values,
     previous: Option<&Values>,
-    notes: &mut Vec<crate::notify::PluginNote>,
+    notes: &mut crate::host::Deferred,
 ) -> Result<(Values, Tx)> {
     if p.module.is_none() || !p.manifest.permissions.hooks.contains(&d.name) {
         return Ok((values, tx));
@@ -538,7 +538,7 @@ pub async fn create(
     let d = decl(&p, resource)?;
     let values = coerce(d, input, None)?;
     let tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
-    let mut notes = Vec::new();
+    let mut notes = crate::host::Deferred::default();
     let (values, mut tx) = run_hook(k, c, &p, d, tx, "before_create", None, values, None, &mut notes).await?;
     check_required(d, &values)?;
     crate::quotas::check(k, c.tenant.tenant_id, crate::quotas::Add::items(1)).await?;
@@ -561,7 +561,7 @@ pub async fn create(
     let row =
         get_in(k, &mut tx, &p, d, id).await?.ok_or_else(|| Error::internal("created record not visible"))?;
     tx.commit().await?;
-    crate::notify::flush(k, c, &p.id, notes).await;
+    notes.flush(k, c, &p.id).await;
     crate::search::index(k, id, &crate::search::text_of(d, &values)).await;
     set_due(k, d, id, &values).await;
     crate::quotas::touched(k, c.tenant.tenant_id);
@@ -596,7 +596,7 @@ pub async fn update(
     }
     let previous: Values = prev_row.get("values").and_then(Value::as_object).cloned().unwrap_or_default();
     let values = coerce(d, input, Some(&previous))?;
-    let mut notes = Vec::new();
+    let mut notes = crate::host::Deferred::default();
     let (values, mut tx) =
         run_hook(k, c, &p, d, tx, "before_update", Some(id), values, Some(&previous), &mut notes).await?;
     check_required(d, &values)?;
@@ -623,7 +623,7 @@ pub async fn update(
     tx.update_resource(id, Some(&title_of(d, &values)), None, None).await?;
     let row = get_in(k, &mut tx, &p, d, id).await?.ok_or_else(|| Error::internal("record not visible"))?;
     tx.commit().await?;
-    crate::notify::flush(k, c, &p.id, notes).await;
+    notes.flush(k, c, &p.id).await;
     crate::search::index(k, id, &crate::search::text_of(d, &values)).await;
     set_due(k, d, id, &values).await;
     events::record(
@@ -656,12 +656,12 @@ pub async fn delete(k: &Kernel, c: &Caller, plugin: &str, resource: &str, id: Uu
         .await?;
     // to the trash: the contents on disk stay until the purge
     tx.delete_resource(id).await?;
-    let mut notes = Vec::new();
+    let mut notes = crate::host::Deferred::default();
     let (_, tx) =
         run_hook(k, c, &p, d, tx, "after_delete", Some(id), previous.clone(), Some(&previous), &mut notes)
             .await?;
     tx.commit().await?;
-    crate::notify::flush(k, c, &p.id, notes).await;
+    notes.flush(k, c, &p.id).await;
     events::record(
         k,
         Some(c.tenant.tenant_id),
@@ -692,10 +692,10 @@ pub(crate) async fn call_depth(
     let (p, _) = crate::access::require(k, c, plugin, crate::access::USE).await?;
     let tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
     let msg = json!({ "abi": 1, "kind": "command", "name": name, "args": args, "ctx": ctx_json(c, &p.id) });
-    let mut notes = Vec::new();
+    let mut notes = crate::host::Deferred::default();
     let (out, tx) = host::run(k, c, &p, tx, msg, FUEL_COMMAND, depth, &mut notes).await?;
     tx.commit().await?;
-    crate::notify::flush(k, c, &p.id, notes).await;
+    notes.flush(k, c, &p.id).await;
     Ok(out)
 }
 
