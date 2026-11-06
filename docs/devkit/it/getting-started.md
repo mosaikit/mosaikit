@@ -9,13 +9,16 @@ Il kit è una cartella (o un archivio) con:
 
 | Parte | Cosa |
 |---|---|
-| `bin/mosaikit-plugin` | lo strumento a riga di comando: `new`, `build`, `test`, `validate`, `pack`, `sign`, `keygen`, `install`, `dev`, `doctor` |
+| `bin/mosaikit-plugin` | lo strumento a riga di comando: `new`, `build`, `test`, `validate`, `pack`, `sign`, `keygen`, `install`, `dev`, `doctor`, `self-update` |
 | `bin/mosaikit-server` | il server Mosaikit che avvia `dev` (profilo sviluppatore, SQLite) |
 | `sdk/`, `plugin-api/` | l'SDK Rust (`mosaikit-plugin-sdk`) e il pacchetto della UI (`@mosaikit/plugin-api`), finché non li ha un registro |
 | `docs/` | questi documenti |
 
-Mettere la sua cartella `bin/` nel `PATH`, oppure puntare `MOSAIKIT_KIT` su di essa. Gli archivi per piattaforma li produce la fase
-di impacchettamento del piano: finché non se ne ha uno, si compilano i due eseguibili dai sorgenti di Mosaikit
+Scaricare l'archivio della propria piattaforma dalle GitHub Releases di `mosaikit/mosaikit`
+(`mosaikit-devkit-<versione>-<piattaforma>`), verificarlo ([Releasing the kit, in inglese](../releasing.md)), scompattarlo e mettere la sua cartella
+`bin/` nel `PATH` (oppure puntare `MOSAIKIT_KIT` sulla cartella). L'archivio per Windows contiene il server; su Linux e macOS il
+server di sviluppo è l'immagine Docker (`docker/README.md` nel kit). `mosaikit-plugin self-update` porta il kit alla versione successiva.
+Senza un archivio, si compilano i due eseguibili dai sorgenti di Mosaikit
 (`cargo build --release -p mosaikit-plugin-cli -p mosaikit-server`) e si usano `--sdk-path` e `--plugin-api-path`
 (o `MOSAIKIT_SDK_PATH`, `MOSAIKIT_PLUGIN_API_PATH`) al posto di `--kit`.
 
