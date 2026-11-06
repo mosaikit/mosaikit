@@ -71,6 +71,24 @@ async fn call(
     Path((ticket, plugin, command)): Path<(String, String, String)>,
     headers: HeaderMap,
     body: Bytes,
+) -> Response {
+    let mut res = match call_inner(s, ticket, plugin, command, headers, body).await {
+        Ok(res) => res,
+        Err(e) => e.into_response(),
+    };
+    // read by the frame of an embedded page, which has no origin of its own (see `preflight`): the refusals too, or the page
+    // could not tell an expired ticket or a command outside its embed from a network failure
+    res.headers_mut().insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, HeaderValue::from_static("*"));
+    res
+}
+
+async fn call_inner(
+    s: AppState,
+    ticket: String,
+    plugin: String,
+    command: String,
+    headers: HeaderMap,
+    body: Bytes,
 ) -> ApiResult<Response> {
     mosaikit_kernel::ops::maintenance::check(&s.k, None).await?;
     let json_type = headers
@@ -86,10 +104,7 @@ async fn call(
         serde_json::from_slice(&body).map_err(|_| bad("the arguments are not valid JSON"))?
     };
     let out = run_tickets::call(&s.k, &ticket, &plugin, &command, args).await?;
-    let mut res = no_store(Json(json!({ "ok": out })).into_response());
-    // read by the frame of an embedded page, which has no origin of its own (see `preflight`)
-    res.headers_mut().insert(header::ACCESS_CONTROL_ALLOW_ORIGIN, HeaderValue::from_static("*"));
-    Ok(res)
+    Ok(no_store(Json(json!({ "ok": out })).into_response()))
 }
 
 /// The service says the run is over: the ticket stops working.
