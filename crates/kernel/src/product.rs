@@ -21,6 +21,11 @@
 //! trial_days = 30               # optional trial period of that tenant
 //! admin_email = "ops@example.com"
 //!
+//! [bootstrap.quota]             # quotas of that tenant (the quotas of the tenant itself; omitted: the platform ones)
+//! storage_mb = 5000
+//! people = 50
+//! items = 100000
+//!
 //! [database]
 //! extensions = ["postgis"]      # PostgreSQL extensions that must be installed (checked at start)
 //!
@@ -81,6 +86,52 @@ pub struct Bootstrap {
     /// address of the Administrator
     #[serde(default)]
     pub admin_email: Option<String>,
+    /// quotas of the first tenant (a quota left out is the one of the platform)
+    #[serde(default)]
+    pub quota: Option<BootstrapQuota>,
+}
+
+/// Quotas of the first tenant.
+#[derive(Debug, Default, Clone, Deserialize)]
+pub struct BootstrapQuota {
+    /// storage in megabytes (1 MB = 1 048 576 bytes)
+    #[serde(default)]
+    pub storage_mb: Option<i64>,
+    #[serde(default)]
+    pub people: Option<i64>,
+    #[serde(default)]
+    pub items: Option<i64>,
+}
+
+impl BootstrapQuota {
+    /// The `quota` object of the settings of the tenant (`{metric: {limit}}`), `None` when nothing is set.
+    pub fn to_settings(&self) -> Option<Value> {
+        let mut m = Map::new();
+        if let Some(mb) = self.storage_mb {
+            m.insert("storage".into(), serde_json::json!({ "limit": mb.saturating_mul(1_048_576) }));
+        }
+        if let Some(n) = self.people {
+            m.insert("people".into(), serde_json::json!({ "limit": n }));
+        }
+        if let Some(n) = self.items {
+            m.insert("items".into(), serde_json::json!({ "limit": n }));
+        }
+        (!m.is_empty()).then(|| Value::Object(m))
+    }
+
+    fn check(&self) -> std::result::Result<(), String> {
+        for (k, v) in [("storage_mb", self.storage_mb), ("people", self.people), ("items", self.items)] {
+            if v.is_some_and(|v| v < 0) {
+                return Err(format!(
+                    "distribution.toml [bootstrap.quota] {k}: a quota cannot be negative (leave it out for the quota of the platform)"
+                ));
+            }
+        }
+        if self.storage_mb.is_some_and(|v| v > 1_000_000_000) {
+            return Err("distribution.toml [bootstrap.quota] storage_mb: too large".into());
+        }
+        Ok(())
+    }
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -193,6 +244,9 @@ impl ProductPolicy {
                 )));
             }
         }
+        if let Some(q) = &f.bootstrap.quota {
+            q.check().map_err(Error::bad)?;
+        }
         for x in &f.database.extensions {
             if x.is_empty()
                 || !x.bytes().all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_' || b == b'-')
@@ -285,6 +339,37 @@ mod tests {
         .unwrap();
         assert_eq!(p.bootstrap.trial_days, Some(30));
         assert_eq!(p.extensions, ["postgis"]);
+    }
+
+    #[test]
+    fn bootstrap_quotas_are_checked_and_converted() {
+        assert!(load(
+            "[bootstrap.quota]
+people = -1
+",
+            "1.0.0"
+        )
+        .is_err());
+        assert!(load(
+            "[bootstrap.quota]
+storage_mb = 5000000000
+",
+            "1.0.0"
+        )
+        .is_err());
+        let p = load(
+            "[bootstrap.quota]
+storage_mb = 2
+people = 5
+",
+            "1.0.0",
+        )
+        .unwrap();
+        let v = p.bootstrap.quota.unwrap().to_settings().unwrap();
+        assert_eq!(v["storage"]["limit"], 2_097_152);
+        assert_eq!(v["people"]["limit"], 5);
+        assert!(v.get("items").is_none());
+        assert!(BootstrapQuota::default().to_settings().is_none());
     }
 
     #[test]

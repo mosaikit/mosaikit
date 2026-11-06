@@ -105,9 +105,14 @@ struct World {
 }
 
 async fn world(plugin: &str, allow: bool) -> World {
+    world_with(plugin, allow, "").await
+}
+
+/// As `world`, with more manifest text for the plugin.
+async fn world_with(plugin: &str, allow: bool, extra: &str) -> World {
     let t = start().await;
     let wasm = if plugin == PROXY { proxy_wasm() } else { echo_wasm() };
-    install(&t, plugin, wasm, "").await;
+    install(&t, plugin, wasm, extra).await;
     let g = t.tenant("alfa").await;
     let anna = t.member(&g, "anna").await;
     let mgr = t.home(&g).await;
@@ -198,6 +203,38 @@ async fn a_public_command_cannot_write_or_reach_other_operations() {
     assert_eq!(item_count(&w).await, 2);
     let row = crud::get(&w.t, &w.anna, PROXY, "items", w.shared).await.unwrap();
     assert_eq!(row["values"]["title"], "shared item");
+}
+
+/// `runs.mint` is for a person: a visitor of a public link gets no ticket, even when the manifest could mint one, and
+/// nothing is written.
+#[tokio::test]
+async fn a_public_command_cannot_mint_a_run_ticket() {
+    let w = world_with(PROXY, true, "[permissions]\nrun_commands = [\"x\"]\n").await;
+    let r = link(&w).await;
+    let count = || async {
+        mosaikit_db::query_scalar::<i64>("select count(*) from core.run_tickets")
+            .fetch_one(&w.t.db)
+            .await
+            .unwrap()
+    };
+    let before = count().await;
+    let mint =
+        host("runs.mint", json!({ "commands": ["x"], "run_ref": "visitor", "ttl_minutes": 5, "uses": 10 }));
+    let e = crud::call_public(&w.t, &r, "x", mint).await.unwrap_err();
+    assert!(e.message.contains("public link") && e.message.contains("runs.mint"), "{}", e.message);
+    // with targets too
+    let targets = host(
+        "runs.mint",
+        json!({ "commands": ["x"], "run_ref": "visitor", "targets": [{ "plugin": PROXY, "commands": ["x"] }] }),
+    );
+    assert!(crud::call_public(&w.t, &r, "x", targets).await.is_err());
+    assert_eq!(count().await, before, "no ticket was written");
+    let audit: i64 =
+        mosaikit_db::query_scalar("select count(*) from core.events where action = 'run_ticket.mint'")
+            .fetch_one(&w.t.db)
+            .await
+            .unwrap();
+    assert_eq!(audit, 0);
 }
 
 #[tokio::test]

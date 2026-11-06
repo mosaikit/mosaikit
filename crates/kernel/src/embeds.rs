@@ -192,6 +192,17 @@ fn public_embed(k: &Kernel, r: &crate::links::Resolved, target: &str, name: &str
 /// commands of the embed that the plugin also exposes as public commands, runs read only as a visitor (no person, no
 /// rights) and stops with the link.
 pub async fn public_url(k: &Kernel, r: &crate::links::Resolved, req: &Value) -> Result<Value> {
+    public_url_at(k, r, req, chrono::Utc::now()).await
+}
+
+/// `public_url` as of `now`: the clock is a parameter so that a test can mint a ticket that is already over.
+#[doc(hidden)]
+pub async fn public_url_at(
+    k: &Kernel,
+    r: &crate::links::Resolved,
+    req: &Value,
+    now: chrono::DateTime<chrono::Utc>,
+) -> Result<Value> {
     let bad = |m: &str| Error::bad(m.to_string());
     let target = req.get("plugin").and_then(Value::as_str).ok_or_else(|| bad("plugin is required"))?;
     let name = req.get("name").and_then(Value::as_str).ok_or_else(|| bad("name is required"))?;
@@ -214,7 +225,7 @@ pub async fn public_url(k: &Kernel, r: &crate::links::Resolved, req: &Value) -> 
         );
     }
     shown(k, r, rid, decl.resource_kind.as_deref()).await?;
-    let exp = chrono::Utc::now() + chrono::Duration::minutes(i64::from(TTL_MINUTES));
+    let exp = now + chrono::Duration::minutes(i64::from(TTL_MINUTES));
     let payload = serde_json::to_vec(&PublicTicket {
         l: r.link_id,
         r: rid,
