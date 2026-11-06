@@ -380,3 +380,36 @@ describe('mountCrud', () => {
     expect(calls.some((c) => c.op === 'crud.update')).toBe(false)
   })
 })
+
+describe('mountCrud: the entry of the page pressed again in the sidebar', () => {
+  const item = (c: any) => Object.assign(document.createElement('b'), { textContent: c.text('title') })
+  const open = async (opts: Record<string, unknown>) => {
+    const el = document.createElement('div')
+    const { msk, emit } = fakeMsk([row('1', 'first', 'manage')])
+    mountCrud(el, msk, 'notes', { title: 'Notes', views: [{ key: 'cards', label: 'Cards', kind: 'cards', item }], ...opts })
+    await tick()
+    el.querySelector<HTMLElement>('.msk-item')!.click()
+    const split = el.querySelector<HTMLElement>('.msk-split')!
+    expect(split.dataset.open).toBe('true')
+    return { el, split, emit }
+  }
+
+  it('closes the open panel and goes back to the list', async () => {
+    const { split, emit } = await open({})
+    emit('nav.reselect', {})
+    expect(split.dataset.open).toBe('false')
+    // with the list already showing, nothing changes
+    emit('nav.reselect', {})
+    expect(split.dataset.open).toBe('false')
+  })
+
+  it('an item that was being edited after reading closes too, and other events do nothing', async () => {
+    const reader = () => Object.assign(document.createElement('p'), { className: 'read' })
+    const { el, split, emit } = await open({ reader })
+    el.querySelector<HTMLButtonElement>('.msk-editor .ed')?.click()
+    emit('ext.changed', {})
+    expect(split.dataset.open).toBe('true')
+    emit('nav.reselect', {})
+    expect(split.dataset.open).toBe('false')
+  })
+})

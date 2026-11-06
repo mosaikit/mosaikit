@@ -877,12 +877,19 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
       })
       .catch(() => {})
   })
+  // the entry of this page was pressed again in the sidebar: the open panel closes, as with Escape (an item that was
+  // being edited after reading goes back to reading first, so a second step closes it)
+  const offNav = msk.onEvent((event) => {
+    if (event !== 'nav.reselect' || disposed || !views.length) return
+    for (let i = 0; i < 2 && split.dataset.open === 'true'; i++) btnCancel.click()
+  })
   void load()
   return () => {
     disposed = true
     clearTimeout(typing)
     off()
     offExt()
+    offNav()
     closeTab()
     foot.disconnect()
     root.replaceChildren()
