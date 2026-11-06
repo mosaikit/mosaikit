@@ -1,4 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
+import fs from 'node:fs'
+import os from 'node:os'
+import path from 'node:path'
 import { crc32 } from 'node:zlib'
 import { PASSWORD, adminLogin, login } from './support'
 
@@ -124,5 +127,43 @@ test.describe.serial('24-files-tree', () => {
     await expect(probe.locator('#list')).toHaveText('ok')
     await expect(probe.locator('#mkdir')).toHaveText(/^err:/)
     await expect(probe.locator('#profiles')).toHaveText('tiles3d')
+  })
+
+  test('a folder picked from the disk is uploaded with its structure, and the app that knows it is offered', async ({ page }) => {
+    test.setTimeout(180_000)
+    // a folder on disk: files, a folder inside it and an empty one
+    const root = fs.mkdtempSync(path.join(process.env.MOSAIKIT_TEMP ?? os.tmpdir(), 'folder-upload-'))
+    try {
+      const dir = path.join(root, 'plateau')
+      fs.mkdirSync(path.join(dir, 'tiles', '0'), { recursive: true })
+      fs.mkdirSync(path.join(dir, 'empty'))
+      fs.writeFileSync(path.join(dir, 'tileset.json'), '{"asset":{"version":"1.1"}}')
+      fs.writeFileSync(path.join(dir, 'tiles', '0', 'a.b3dm'), 'tile')
+      await login(page, 'Tree Co', 'mgr', PASSWORD)
+      await page.setViewportSize({ width: 1440, height: 900 })
+      await page.goto('./#/t/treeco/p/com.mosaikit.files')
+      const frame = page.frameLocator('iframe.plugin-frame')
+      // «Upload folder» in the menu of the page asks the browser for a folder (the chooser is answered with the one on disk)
+      const pickFolder = async () => {
+        const chooser = page.waitForEvent('filechooser')
+        await frame.locator('.fm-main').click({ button: 'right', position: { x: 20, y: 480 } })
+        await frame.getByRole('menuitem', { name: 'Upload folder' }).click()
+        await (await chooser).setFiles(dir)
+      }
+      await pickFolder()
+      await expect(frame.locator('.fm-main').getByText('plateau', { exact: true }).first()).toBeVisible()
+      await expect(frame.locator('.fm-note')).toContainText('“plateau” looks like a 3D Tiles dataset')
+
+      const list = await API(page, 'GET', 'api/t/treeco/p/com.mosaikit.files/files')
+      const top = list.json.entries.find((e: { name: string }) => e.name === 'plateau')
+      expect(top.is_dir).toBe(true)
+      const names = async (id: string) => (await API(page, 'GET', `api/t/treeco/p/com.mosaikit.files/files?parent=${id}`)).json.entries.map((e: { name: string }) => e.name).sort()
+      expect(await names(top.id)).toEqual(['tiles', 'tileset.json'])
+      // the same folder again: a new one next to it, nothing merged
+      await pickFolder()
+      await expect(frame.locator('.fm-main').getByText('plateau (1)', { exact: true }).first()).toBeVisible()
+    } finally {
+      fs.rmSync(root, { recursive: true, force: true })
+    }
   })
 })
