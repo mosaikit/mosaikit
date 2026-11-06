@@ -54,7 +54,7 @@ function zip(entries: Record<string, string>): Buffer {
   return Buffer.concat([...parts, cd, end])
 }
 
-test.describe.serial('22-files-tree', () => {
+test.describe.serial('24-files-tree', () => {
   test('a zip unpacked into a folder is served as a tree with ranges and ETag', async ({ page }) => {
     test.setTimeout(180_000)
     await adminLogin(page)
