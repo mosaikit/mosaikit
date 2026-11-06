@@ -2865,6 +2865,8 @@ async fn run_tickets_over_http() {
     let forged = format!("{}{}", &token[..47], if token.ends_with('0') { '1' } else { '0' });
     let r = post(format!("/api/run/{forged}/call/{ID}/step"), Some("application/json"), "{}").await;
     assert_eq!(r.status, StatusCode::UNAUTHORIZED);
+    // the refusals carry the CORS header too: the frame of an embedded page (no origin of its own) must be able to read them
+    assert_eq!(r.header(header::ACCESS_CONTROL_ALLOW_ORIGIN), "*");
     // the ticket is not a session: the normal routes do not take it, as a cookie, a bearer or a header
     for b in [
         Request::builder()
