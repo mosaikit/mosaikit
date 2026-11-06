@@ -1169,6 +1169,15 @@ the plugin) and `groups` (a public command has no `user` and gets `public`, `lin
 `[{"id": "<uuid>", "name": "Field"}]` (`[]` when none; never groups of other tenants; read at every
 call). In tests: `MockHost::new().with_groups(&[("g1", "Field")])`.
 
+**Folders a plugin knows (`[[folder_profiles]]`).** A plugin lists, in its manifest, kinds of folder by the file names at
+their root (`id`, `label`, `markers`, §8.3). After `files.unzip` the kernel compares the root of the folder made (or of the
+folder it went into), and of the only folder inside it, with the profiles of the plugins that are on for the tenant and that the
+person may use (`kernel::profiles::detect`: names only, nothing read, no code run). Each match is returned in
+`suggestions` (`plugin`, `profile`, `label`, `folder`, `marker`, `at`) and announced in the bell of the person (a plugin
+notification that opens the plugin at `profile/<id>/<folder>?source=<files plugin>`). `GET …/files/{id}/profiles` answers
+the same for any folder the person sees, without announcing it (`msk.files.profiles(id)`); `msk.open(plugin, at)` opens the page
+of another plugin of the tenant at a place inside it.
+
 **The files calls of a UI on the Files area of another plugin.** The files calls of the bridge (`files.list`, `files.mkdir`,
 `files.upload`, `files.unzip`, `ticket`) take an optional `source`: the id of the plugin whose files area they work on
 (usually `com.mosaikit.files`), always with the permissions of the person. `files_read` is enough for `files.list` and `ticket`;

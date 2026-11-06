@@ -100,6 +100,11 @@ pub struct Manifest {
     /// Pages of this plugin that another plugin may show inside its own page (`[[embeds]]`), for a resource of this plugin.
     #[serde(default)]
     pub embeds: Vec<EmbedDecl>,
+    /// Kinds of folder of the Files area the plugin knows (`[[folder_profiles]]`): when a person unpacks a zip
+    /// into a folder that has one of the marker files, the kernel tells them the plugin can take it further.
+    /// Only names at the root are looked at; no code runs.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub folder_profiles: Vec<FolderProfileDecl>,
     /// Keys of outside services the plugin uses (`[[service_keys]]`): the keys pages of the platform,
     /// of the tenants and of the people list only the services the installed plugins declare. The
     /// logic reads the key in use for the caller (own, else the tenant's, else the platform's).
@@ -199,6 +204,22 @@ impl PluginKind {
         }
     }
 }
+
+/// A kind of folder a plugin knows (`[[folder_profiles]]`).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct FolderProfileDecl {
+    /// stable name of the kind (`tiles3d`), given back to the plugin in the place it is opened at
+    pub id: String,
+    /// what the person reads («3D Tiles dataset»), in English
+    pub label: String,
+    /// file names at the root of the folder, in any case: one of them is enough
+    pub markers: Vec<String>,
+}
+
+/// Most `[[folder_profiles]]` of one plugin, and most markers of one.
+pub const MAX_FOLDER_PROFILES: usize = 16;
+pub const MAX_PROFILE_MARKERS: usize = 8;
 
 /// `[extends]`: the plugin an extension extends, from a minimum version.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -1147,6 +1168,7 @@ impl Manifest {
         self.validate_tables().map_err(Error::Manifest)?;
         self.validate_embeds().map_err(Error::Manifest)?;
         self.validate_service_keys().map_err(Error::Manifest)?;
+        self.validate_folder_profiles()?;
         for (lang, tr) in &self.i18n {
             self.validate_translation(lang, tr).map_err(|m| Error::Manifest(format!("i18n.{lang}: {m}")))?;
         }
@@ -1154,6 +1176,37 @@ impl Manifest {
     }
 
     /// `[[nav]]`: only an app has pages; ids unique, two levels, places and permissions that exist.
+    fn validate_folder_profiles(&self) -> Result<()> {
+        let bad = |m: String| Err(Error::Manifest(format!("folder_profiles: {m}")));
+        if self.folder_profiles.len() > MAX_FOLDER_PROFILES {
+            return bad(format!("at most {MAX_FOLDER_PROFILES}"));
+        }
+        let mut seen = std::collections::HashSet::new();
+        for p in &self.folder_profiles {
+            if !is_identifier(&p.id) || !seen.insert(p.id.as_str()) {
+                return bad(format!("invalid or repeated id '{}'", p.id));
+            }
+            if p.label.trim().is_empty() || p.label.chars().count() > 80 {
+                return bad(format!("'{}': a label of 1 to 80 characters is required", p.id));
+            }
+            if p.markers.is_empty() || p.markers.len() > MAX_PROFILE_MARKERS {
+                return bad(format!("'{}': 1 to {MAX_PROFILE_MARKERS} markers are required", p.id));
+            }
+            for m in &p.markers {
+                let ok = !m.is_empty()
+                    && m.len() <= 255
+                    && m.trim() == m
+                    && m != "."
+                    && m != ".."
+                    && !m.chars().any(|c| c == '/' || c == '\\' || c.is_control());
+                if !ok {
+                    return bad(format!("'{}': '{m}' is not a file name", p.id));
+                }
+            }
+        }
+        Ok(())
+    }
+
     fn validate_brochure(&self) -> std::result::Result<(), String> {
         let long = |v: &Option<String>, max: usize| v.as_ref().is_some_and(|s| s.chars().count() > max);
         if long(&self.author, 120) || long(&self.license, 80) || long(&self.details, 4000) {
@@ -1843,6 +1896,33 @@ files_read = \"read\"
 "
         );
         assert!(Manifest::from_toml(&bad).is_err());
+    }
+
+    #[test]
+    fn folder_profiles_are_checked() {
+        let base = "id = \"com.x.p\"
+name = \"P\"
+version = \"0.1.0\"
+[contribution]
+icon = \"x\"
+label = \"P\"
+";
+        let ok = format!("{base}[[folder_profiles]]\nid = \"tiles3d\"\nlabel = \"3D Tiles dataset\"\nmarkers = [\"tileset.json\"]\n");
+        let m = Manifest::from_toml(&ok).unwrap();
+        assert_eq!(m.folder_profiles[0].markers, ["tileset.json"]);
+        assert!(Manifest::from_toml(base).unwrap().folder_profiles.is_empty());
+        for bad in [
+            "id = \"Bad Id\"\nlabel = \"x\"\nmarkers = [\"a\"]",
+            "id = \"a\"\nlabel = \"\"\nmarkers = [\"a\"]",
+            "id = \"a\"\nlabel = \"x\"\nmarkers = []",
+            "id = \"a\"\nlabel = \"x\"\nmarkers = [\"a/b\"]",
+            "id = \"a\"\nlabel = \"x\"\nmarkers = [\"..\"]",
+            "id = \"a\"\nlabel = \"x\"\nmarkers = [\"a\"]\nextra = 1",
+        ] {
+            assert!(Manifest::from_toml(&format!("{base}[[folder_profiles]]\n{bad}\n")).is_err(), "{bad}");
+        }
+        let twice = format!("{ok}[[folder_profiles]]\nid = \"tiles3d\"\nlabel = \"y\"\nmarkers = [\"b\"]\n");
+        assert!(Manifest::from_toml(&twice).is_err());
     }
 
     #[test]

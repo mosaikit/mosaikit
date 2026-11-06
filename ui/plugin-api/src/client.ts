@@ -1,6 +1,6 @@
 import { Bridge, BridgeError } from './bridge.ts'
 import { API_VERSION, checkHostApi } from './version.ts'
-import type { BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, Unzipped, UiContext, Values, WebProbe } from './protocol.ts'
+import type { BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, Unzipped, FolderSuggestion, UiContext, Values, WebProbe } from './protocol.ts'
 
 /** The extensions of the plugin on a resource (fields and actions other plugins add to its items). */
 export interface ExtensionsClient {
@@ -212,6 +212,11 @@ export class Msk {
     }
   }
 
+  /** Opens the page of another plugin of the tenant, at a place inside it (what the page reads as `msk.at`). */
+  open(plugin: string, at?: string): Promise<void> {
+    return this.bridge.call<void>('nav.open', { plugin, at })
+  }
+
   /** Command of the WASM logic of the plugin. */
   async call<T = unknown>(name: string, args?: unknown): Promise<T> {
     const r = await this.bridge.call<{ result: T }>('call', { name, args })
@@ -246,6 +251,9 @@ export class Msk {
     blob: (id: string) => this.bridge.call<Blob>('files.blob', { id }),
     /** zip of a folder */
     zip: (id: string) => this.bridge.call<Blob>('files.zip', { id }),
+    /** the plugins that know a kind of folder and recognise this one (nothing is announced) */
+    profiles: async (id: string, source?: string) =>
+      (await this.bridge.call<{ suggestions: FolderSuggestion[] }>('files.profiles', { id, source })).suggestions,
     /** temporary URL on the origin of the contents (iframe, new tab, download) */
     url: async (id: string, download = false, source?: string) => (await this.bridge.call<{ url: string }>('ticket', { id, download, source })).url,
   }

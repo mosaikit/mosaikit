@@ -253,8 +253,11 @@ export function PluginPage({ session, slug, id, at }: { session: Session; slug: 
     () => ({
       ...base,
       share: (rid) => new Promise<void>((done) => setShare({ id: rid, done })),
+      open: (plugin, place) => {
+        window.location.hash = `#/t/${slug}/p/${plugin}${place ? '/' + encodeURIComponent(place) : ''}`
+      },
     }),
-    [base],
+    [base, slug],
   )
   if (ctx.isLoading) return <Loading />
   if (ctx.error) return <ErrorBox error={ctx.error} />

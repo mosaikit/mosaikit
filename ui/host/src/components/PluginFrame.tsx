@@ -9,6 +9,8 @@ import ExtensionTab, { type TabState } from './ExtensionTab.tsx'
 
 const IDENT = /^[a-z][a-z0-9_]{0,47}$/
 const EXT_ID = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/
+/** a place inside a plugin (`msk.at`): the same characters the kernel lets a notification carry */
+const PLACE = /^[A-Za-z0-9/_\-.=&?%:]{1,200}$/
 /** at most this many tabs of extensions open at a time in a frame (the oldest closes) */
 const MAX_TABS = 4
 
@@ -139,6 +141,16 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
             resetBand(owner)
             reply({ ok: null })
             return
+          // the page of another plugin of the tenant, at a place inside it: only plugins the person has in the sidebar
+          case 'nav.open': {
+            const target = String(m.args?.plugin ?? '')
+            const place = m.args?.at === undefined || m.args?.at === null ? '' : String(m.args.at)
+            if (!EXT_ID.test(target) || (place && !PLACE.test(place))) throw new OpError('invalid page')
+            if (!ctx.plugins.some((x) => x.id === target)) throw new OpError('plugin not available', 'not_found')
+            ui.open(target, place || undefined)
+            reply({ ok: null })
+            return
+          }
           case 'toast':
             ui.toast(String(m.args?.text ?? '').slice(0, 300), m.args?.error === true)
             reply({ ok: null })

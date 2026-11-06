@@ -628,6 +628,8 @@ pub struct Unzipped {
     pub files: usize,
     pub folders: usize,
     pub skipped: usize,
+    /// plugins that could take the folder further (`[[folder_profiles]]`); the person was told in the bell
+    pub suggestions: Vec<crate::profiles::Suggestion>,
 }
 
 const UNZIP_MAX_FILES: usize = 20_000;
@@ -823,7 +825,23 @@ pub async fn unzip(
             )
             .await;
             crate::quotas::touched(k, tenant);
-            Ok(Unzipped { folder, files: nfiles, folders: nfolders, skipped })
+            // what the folder looks like: the one made for the content, or the one it went into
+            let target = match (&folder, parent) {
+                (Some(f), _) => Some((f.id, f.name.clone())),
+                (None, Some(id)) => {
+                    let mut tx = k.db.begin_plugin_read(&p.id, &c.ctx()).await?;
+                    let e = get_entry(&mut tx, id).await?;
+                    tx.commit().await?;
+                    Some((id, e.name))
+                }
+                (None, None) => None,
+            };
+            let mut suggestions = Vec::new();
+            if let (Some((id, name)), true) = (target, nfiles > 0) {
+                suggestions = crate::profiles::detect(k, c, plugin_id, id).await.unwrap_or_default();
+                crate::profiles::announce(k, c, &name, &suggestions).await;
+            }
+            Ok(Unzipped { folder, files: nfiles, folders: nfolders, skipped, suggestions })
         }
         Err(e) => {
             // newest first: the files before the folders that hold them

@@ -641,6 +641,7 @@ version of the contract, and the plugins that offer profiles say which version t
 (`ticket` with `source`) before it expires. A page that needs a fixed address uses a public link on the folder, with the
 token in the path (a query string is not kept by relative links).
 
-**Not done yet:** Files does not ask the plugins that offer profiles whether a folder it has just unpacked is
-recognised (the «this folder is a dataset, publish it?» notice). Until an extension point for it exists, the plugin that
-offers the profiles lists the folders of Files it recognises («add from Files»).
+**Recognition.** A plugin declares the kinds of folder it knows by file names at the root (`[[folder_profiles]]`: `id`,
+`label`, `markers`). After a zip is unpacked the kernel compares the names, tells the person in the bell and Files offers
+«Open in …» (`msk.open`); `files.profiles` asks the same of any folder. This is only the first step of the contract
+(`detect`): `validate`, `describe` and `render` stay inside the plugin.

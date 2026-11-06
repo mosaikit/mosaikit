@@ -35,6 +35,8 @@ export function UiServices({ children }: { children: ReactNode }) {
       confirm,
       // the share dialog is opened by the page of the plugin, which knows the tenant (PluginPage)
       share: async () => {},
+      // opening a plugin page needs the tenant: PluginPage provides it
+      open: () => {},
     }),
     [confirm],
   )

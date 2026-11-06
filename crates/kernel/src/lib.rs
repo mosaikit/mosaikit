@@ -36,6 +36,7 @@ pub mod personal;
 pub mod plugin_directory;
 pub mod plugins;
 pub mod product;
+pub mod profiles;
 pub mod quotas;
 pub mod resource_list;
 pub mod run_tickets;

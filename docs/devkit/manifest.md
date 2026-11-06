@@ -156,6 +156,22 @@ An origin is `http://` or `https://` and a host of letters, digits and `.-:[]`, 
 `validate --strict` compares the permissions with what the logic calls: a call with no permission is an error, and so is
 `files_read`, `notify` or `calls` asked for and never used.
 
+## `[[folder_profiles]]`
+
+Kinds of folder of the Files area the plugin knows. When a person unpacks a zip and the folder (or the only folder
+inside it) has one of the marker files at its root, the kernel tells them in the bell, and Files offers a button, to open
+the plugin at that folder. Nothing is read and no code runs: only the names at the root are compared.
+
+```toml
+[[folder_profiles]]
+id = "tiles3d"                 # identifier, unique in the plugin
+label = "3D Tiles dataset"     # what the person reads (English), 1 to 80 characters
+markers = ["tileset.json"]     # file names, any case; one is enough (1 to 8)
+```
+
+At most 16 profiles. The page of the plugin is opened with `msk.at = "profile/<id>/<folder id>?source=<plugin that holds the
+folder>"`; it reads the folder with `msk.files` and the `source` (needs `files_read`, and `files_write` to add to it).
+
 ## `[[kpi]]`
 
 | Key | Rule |
