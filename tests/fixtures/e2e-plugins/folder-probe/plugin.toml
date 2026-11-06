@@ -26,3 +26,12 @@ markers = ["tileset.json"]
 
 [i18n.it.folder_profiles]
 tiles3d = "dataset 3D Tiles"
+
+# the browser tests check that nothing is left in English when the interface is in Spanish
+[i18n.es]
+name = "Sonda de carpetas"
+description = "Material de pruebas del navegador: declara un perfil de carpeta y muestra qué responden las llamadas de archivos sobre otro plugin"
+label = "Sonda de carpetas"
+
+[i18n.es.folder_profiles]
+tiles3d = "conjunto de datos 3D Tiles"
