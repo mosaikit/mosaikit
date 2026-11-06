@@ -924,3 +924,34 @@ A site shown by the Sites plugin receives the language and the tone (light or da
 |---|---|---|---|
 | SITE-01 | Open a zip site that answers `context`; change the tone of the shell | The site changes tone without reloading and stays on the same page | Playwright (NOT VERIFIABLE in the manual run: needs a site that answers `context`) |
 | SITE-02 | Change the language of the shell with a site open | The site gets the new language and stays open; when you go back to the list of sites the Sites page is in the new language | Playwright (NOT VERIFIABLE in the manual run: needs a site that answers `context`) |
+
+## Comments on resources
+
+People who see a resource comment on it from the shell ([architecture](architecture.md)); a Tenant Manager can import comments with an external id. Text and number are limited.
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| COM-01 | As a person who sees a resource open its comments, write one, and write another as a person who sees the resource; then try as a person who does not see it | Both comments appear in order with author and time; the third person gets nothing (404) | Playwright (NOT VERIFIABLE in the manual run: covered by the kernel test `people_who_see_a_resource_comment_on_it_and_no_one_else`) |
+| COM-02 | Write an empty comment, one over the length limit, and more comments than the limit allows on one resource | Each is refused with the reason; the others stay | Playwright (NOT VERIFIABLE: covered by `the_text_and_the_number_of_comments_are_limited`) |
+| COM-03 | As Tenant Manager import comments twice with the same external ids; then try as a plain member; use an author who is not a member | The second import adds nothing; the member is refused; the foreign author is refused with `bad_import`. Same on SQLite | Playwright (NOT VERIFIABLE: covered by `a_manager_imports_comments_once_and_only_a_manager_can`, on both databases) |
+
+## Embedded pages of another plugin
+
+A plugin that declares `[permissions] embeds` shows a page of another plugin (`[[embeds]]`) in a frame, with a ticket for one resource ([architecture 8.15](architecture.md)).
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| EMB-01 | From a plugin that declares the other in `embeds`, ask `msk.embeds.url` for a resource the person sees; open the address in the frame | The page shows the resource; it can call only the commands of the embed, with the rights of the person | Playwright (NOT VERIFIABLE in the manual run: needs two plugins; covered by the kernel test `a_plugin_shows_the_page_of_another_for_one_resource_with_the_rights_of_the_person`) |
+| EMB-02 | Ask for an embed the plugin did not declare, a plugin it does not list, a resource of another kind, and a resource the person cannot see | `permission_denied` for the declarations, `404` for the resource; no ticket is made | Playwright (NOT VERIFIABLE: kernel tests of `embeds`) |
+| EMB-03 | Use the ticket for another resource or for a command outside the embed; let it expire | Both refused; the page of the host asks again before `expires_at` | Playwright (NOT VERIFIABLE: kernel tests of `embeds` and `run_tickets`) |
+| EMB-04 | Open «What it asks» of a plugin that declares `embeds` | A row «Shows pages of other plugins» in red as sensitive (Italian: «Mostra pagine di altri plugin») | Playwright (NOT VERIFIABLE: needs a signed package with the permission) |
+
+## Schedules: PATCH, time zone and the page of the shell
+
+A schedule can be changed (PATCH), has the time zone of the tenant, and Tenant Managers see all of them on the Schedules page of the shell.
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| SCH-01 | Change the time, the arguments and the state of a schedule; change one of another person as a plain member | The changes apply and the next run is recomputed; the member is refused | Playwright (NOT VERIFIABLE in the manual run: covered by the kernel tests `schedules`) |
+| SCH-02 | Set a time zone for the tenant and create a daily schedule at 09:00; look at the next run across a change of summer time | It runs at 09:00 local time | Playwright (NOT VERIFIABLE: covered by the kernel tests `schedules` and `schedule_worker`) |
+| SCH-03 | As Tenant Manager open the Schedules page of the shell; as a member try the same address | The manager sees every schedule of the tenant and can pause or delete one; the member does not get the page | Playwright (NOT VERIFIABLE in the manual run: the spec is still to be written) |
