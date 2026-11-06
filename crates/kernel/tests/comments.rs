@@ -41,6 +41,8 @@ async fn people_who_see_a_resource_comment_on_it_and_no_one_else() {
     // a reader writes too
     let first = cm::add(&t, &cb, rid, "  First <b>comment</b>\nline two ").await.unwrap();
     assert_eq!(first.body, "First <b>comment</b>\nline two");
+    // SQLite times have millisecond precision: apart, so the order of the two does not depend on their ids
+    tokio::time::sleep(std::time::Duration::from_millis(5)).await;
     cm::add(&t, &cc, rid, "second").await.unwrap();
     let th = cm::list(&t, &ca, rid).await.unwrap();
     assert_eq!((th.count, th.comments.len()), (2, 2));
