@@ -990,3 +990,15 @@ A background run of one plugin may call a command of another plugin with the sam
 | RUNTK-07 | From a call made with a run ticket, try to mint another ticket (`runs.mint`) or call `plugin.call` | Both refused | Playwright (NOT VERIFIABLE: kernel tests `run_tickets`) |
 | RUNTK-08 | Call the first plugin and the target alternately past the uses of the ticket, or past 120 calls in a minute | The limits are shared by the whole ticket: `run_ticket_invalid` when the uses are over, `run_rate_limited` on the rate | Playwright (NOT VERIFIABLE: kernel tests `run_tickets`) |
 | RUNTK-09 | Create a schedule whose declaration has `targets`; let it fire | The service receives one ticket and the list `targets`; the ticket calls the plugin and each target, nothing else | Playwright (NOT VERIFIABLE: kernel tests `schedule_worker`) |
+
+## Embedded pages with the origin of the plugin (`same_origin`)
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| EMBS-01 | Declare `same_origin = true` in an `[[embeds]]` and run `mosaikit-plugin validate` | The info line «permissions the Administrator will review» lists `embeds.same_origin`; without the key it does not | Playwright (NOT VERIFIABLE: unit test of `validate`) |
+| EMBS-02 | As Administrator open Manage > Plugins > the offering plugin > What it asks | The row «Offers pages with the origin of its own» is red and names the embeds; for a plugin without `same_origin` it says «nothing» | Playwright (NOT VERIFIABLE: no official plugin declares `same_origin`) |
+| EMBS-03 | Ask `msk.embeds.url` for an embed with `same_origin = true` (installation with a wildcard `plugin_url`), then for one without | The answer has `sandbox` `"allow-scripts allow-same-origin"` for the first, `"allow-scripts"` for the second; with one origin for all plugins both say `"allow-scripts"` | Playwright (NOT VERIFIABLE: kernel tests `embeds`, both backends) |
+| EMBS-04 | Open the address of the answer in a frame whose `sandbox` is exactly the answer, then in a frame that adds `allow-same-origin` to an embed that did not ask for it | The first frame has the origin of the plugin (the page can frame the third-party app that lists that origin in `frame-ancestors`); the second stays opaque because the page is served with the CSP `sandbox` of the answer | Playwright (NOT VERIFIABLE: server unit test `the_page_of_an_embed_is_sandboxed_as_answered`) |
+| EMBS-05 | Open a normal page of the plugin (no `embed=`), and a file other than the entry of the embed, and look at the response CSP | No `sandbox` directive on either | Playwright (NOT VERIFIABLE: server unit test) |
+| EMBS-06 | In a public link view ask `msk.embeds.url` for the embed that declares `same_origin = true` | The answer says `"allow-scripts"` (opaque origin) and the page is served that way | Playwright (NOT VERIFIABLE: kernel test `public_embeds`) |
+

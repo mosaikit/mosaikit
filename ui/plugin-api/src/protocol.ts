@@ -419,6 +419,12 @@ export interface EmbedUrl {
   /** the contract of the messages declared by the embed (for example `geo-embed/1`) */
   contract: string
   resource: string
+  /**
+   * What to put, exactly, in the `sandbox` attribute of the iframe: `"allow-scripts"`, or `"allow-scripts allow-same-origin"` for
+   * an embed whose plugin declared `same_origin = true` (the frame then has the origin of that plugin). The kernel serves the page
+   * with the same value as a CSP `sandbox`, so adding more gets nothing. Absent on servers older than this field: use `"allow-scripts"`.
+   */
+  sandbox?: string
 }
 
 export interface EmbedsApi {
@@ -426,7 +432,7 @@ export interface EmbedsApi {
    * The address of a page of another plugin (`[[embeds]]` in its manifest) that shows `resource`, for a frame of your page.
    * Needs the plugin in `[permissions] embeds` and `[requires] mosaikit = ">=1.0"`. The person must use that plugin and see
    * the resource; the page gets a ticket for that resource only, with the rights of the person. Open it in an iframe with
-   * `sandbox="allow-scripts"` and talk to it over `postMessage` under the contract of the embed, checking `event.source`.
+   * the `sandbox` of the answer (`"allow-scripts"` by default) and talk to it over `postMessage` under the contract of the embed, checking `event.source`.
    * Errors: `permission_denied`, `not_found`.
    */
   url(a: { plugin: string; name: string; resource: string }): Promise<EmbedUrl>

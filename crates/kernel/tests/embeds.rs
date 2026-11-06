@@ -99,3 +99,67 @@ async fn a_plugin_shows_the_page_of_another_for_one_resource_with_the_rights_of_
         Kind::NotFound
     );
 }
+
+/// `same_origin` of an embed: the answer says what the host must put in the `sandbox` of the frame. Only an embed that asks
+/// for it, on an installation with one origin per plugin, gets `allow-same-origin`; every other case stays opaque.
+#[tokio::test]
+async fn same_origin_is_asked_by_the_plugin_that_offers_the_page_and_only_it() {
+    const BODY: &str = "[permissions]
+run_commands = [\"layers\"]
+        [[embeds]]
+name = \"pinned\"
+entry = \"pinned.html\"
+commands = [\"layers\"]
+same_origin = true
+        [[embeds]]
+name = \"map\"
+entry = \"embed.html\"
+commands = [\"layers\"]
+        [[embeds]]
+name = \"off\"
+entry = \"off.html\"
+commands = [\"layers\"]
+same_origin = false
+";
+    for wildcard in [true, false] {
+        let t = mosaikit_kernel::testing::start_with(|c| {
+            if wildcard {
+                c.plugin_url_setting = Some("http://*.localhost:19999".into());
+                c.derive().unwrap();
+            }
+        })
+        .await;
+        install(&t, MAPS, BODY).await;
+        install(
+            &t,
+            HOST,
+            &format!(
+                "[permissions]
+embeds = [\"{MAPS}\"]
+"
+            ),
+        )
+        .await;
+        let g = t.tenant("alfa").await;
+        let anna = t.member(&g, "anna").await;
+        let ca = t.home(&anna).await;
+        let rid = map(&t, &ca, MAPS).await;
+        let sandbox = |name: &'static str| {
+            let (t, ca) = (&t, &ca);
+            async move { embeds::url(t, ca, HOST, &ask(MAPS, name, rid)).await.unwrap()["sandbox"].clone() }
+        };
+        let want = if wildcard { "allow-scripts allow-same-origin" } else { "allow-scripts" };
+        assert_eq!(sandbox("pinned").await, json!(want), "wildcard {wildcard}");
+        assert_eq!(sandbox("map").await, json!("allow-scripts"), "default is opaque");
+        assert_eq!(sandbox("off").await, json!("allow-scripts"));
+        // the kernel gives the page the same value (the server sends it as the CSP `sandbox` of the page)
+        let k = &t;
+        let h = k.plugins.active(MAPS).unwrap();
+        let decl = h.manifest.embeds.iter().find(|e| e.name == "pinned").unwrap();
+        assert_eq!(embeds::sandbox_for(k, decl), want);
+        assert_eq!(
+            embeds::sandbox_for(k, h.manifest.embeds.iter().find(|e| e.name == "map").unwrap()),
+            "allow-scripts"
+        );
+    }
+}

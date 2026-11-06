@@ -176,6 +176,9 @@ fn manifest_checks(m: &Manifest, strict: bool, r: &mut Report) {
     if !p.embeds.is_empty() {
         sensitive.push("embeds");
     }
+    if m.embeds.iter().any(|e| e.same_origin) {
+        sensitive.push("embeds.same_origin");
+    }
     if !m.public_commands.is_empty() {
         sensitive.push("public_commands");
     }
@@ -555,5 +558,32 @@ directory = true
         assert!(validate(&f).unwrap().warnings() == 1);
         std::fs::write(&f, b"not a zip").unwrap();
         assert!(!validate(&f).unwrap().ok());
+    }
+
+    #[test]
+    fn an_embed_with_same_origin_is_listed_for_the_administrator() {
+        let d = tempfile::tempdir().unwrap();
+        let embed = |extra: &str| {
+            format!(
+                "{MIN}[permissions]
+run_commands = [\"layers\"]
+[[embeds]]
+name = \"map\"
+entry = \"embed.html\"
+commands = [\"layers\"]
+{extra}"
+            )
+        };
+        let reviewed = |toml: &str| {
+            plugin(d.path(), toml, None);
+            let r = validate(d.path()).unwrap();
+            assert!(r.ok(), "{:?}", r.findings);
+            r.findings.iter().any(|f| f.message.contains("embeds.same_origin"))
+        };
+        assert!(!reviewed(&embed("")), "opaque by default: nothing extra to review");
+        assert!(reviewed(&embed(
+            "same_origin = true
+"
+        )));
     }
 }

@@ -10,6 +10,7 @@ version and is removed in the next.
 - `msk.embeds.url({ plugin, name, resource })` (host op `embed.url`) and `embedSession()`: a page of a plugin inside a frame of the page of another, with a ticket for one
   resource. Needs `[permissions] embeds`. Plugin API unchanged (additive).
 - `msk.embeds.url` also works in a public link view: the ticket is tied to the link, `resource` must be the shared item or one under it, and the embedded page may call only the commands of the embed that its plugin also lists in `[[public_commands]]`. New errors: `public_commands_off`, `command_not_public`. Plugin API unchanged (additive).
+- `EmbedUrl.sandbox`: the exact `sandbox` of the iframe of an embed (`"allow-scripts"` or `"allow-scripts allow-same-origin"`). A plugin that offers a page may declare `same_origin = true` in `[[embeds]]` (default false, sensitive) so that the frame has the origin of that plugin, for a page that frames an app whose `frame-ancestors` lists it; the kernel serves the page with the same CSP `sandbox`, and a public link view always gets `"allow-scripts"`. Plugin API unchanged (additive).
 - `msk.schedules` (`list({ resource? })`, `create`, `update(id, patch)`, `pause`, `resume`, `remove`, `run`, `runs`, `timezone()`; host ops
   `schedules.*`): the schedules of the plugin, run by the shell with the session of the person; the plugin is forced to the one of the page.
   Types `Schedule`, `ScheduleRun`, `ScheduleCreate`, `SchedulePatch`, `SchedulesApi`. No manifest permission beyond `[[schedules]]`. Plugin API unchanged (additive).

@@ -115,11 +115,44 @@ fn csp_for(
     )
 }
 
-async fn plugin_ui_root(s: State<AppState>, Path(plugin): Path<String>) -> Response {
-    plugin_ui(s, Path((plugin, String::new()))).await
+async fn plugin_ui_root(
+    s: State<AppState>,
+    Path(plugin): Path<String>,
+    q: Query<HashMap<String, String>>,
+) -> Response {
+    plugin_ui(s, Path((plugin, String::new())), q).await
 }
 
-async fn plugin_ui(State(s): State<AppState>, Path((plugin, path)): Path<(String, String)>) -> Response {
+/// The CSP `sandbox` of the page of an embed (`[[embeds]]`, architecture 8.15): only the entry page of an embed of the plugin
+/// opened with an `embed=` ticket of the shape of a run ticket (48 hex characters) or of a public view (`pe.`) gets one, and it is
+/// the value `embed.url` answered: a host that adds `allow-same-origin` by itself gets no more than the plugin asked for. Any
+/// other page of the plugin has none. The ticket is not checked here (the calls check it); the shape only selects the case.
+fn embed_sandbox(
+    m: &mosaikit_mskp::Manifest,
+    wildcard: bool,
+    rel: &str,
+    ticket: Option<&str>,
+) -> Option<&'static str> {
+    use mosaikit_kernel::embeds::{SANDBOX_OPAQUE, SANDBOX_SAME_ORIGIN};
+    let t = ticket?;
+    let mut decls = m.embeds.iter().filter(|e| e.entry == rel).peekable();
+    decls.peek()?;
+    if t.starts_with(mosaikit_kernel::embeds::PUBLIC_PREFIX) {
+        return Some(SANDBOX_OPAQUE);
+    }
+    if t.len() != 48 || !t.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return None;
+    }
+    // one page shared by several embeds: the origin only when every one of them asks for it
+    let all = decls.all(|e| e.same_origin);
+    Some(if all && wildcard { SANDBOX_SAME_ORIGIN } else { SANDBOX_OPAQUE })
+}
+
+async fn plugin_ui(
+    State(s): State<AppState>,
+    Path((plugin, path)): Path<(String, String)>,
+    Query(q): Query<HashMap<String, String>>,
+) -> Response {
     let Ok(p) = s.k.plugins.active(&plugin) else {
         return (StatusCode::NOT_FOUND, "plugin not active").into_response();
     };
@@ -137,7 +170,14 @@ async fn plugin_ui(State(s): State<AppState>, Path((plugin, path)): Path<(String
     };
     let mut res = data.into_response();
     set(&mut res, header::CONTENT_TYPE, &mime(&rel));
-    set(&mut res, header::CONTENT_SECURITY_POLICY, &plugin_csp(&s, &p));
+    let mut csp = plugin_csp(&s, &p);
+    if let Some(sb) =
+        embed_sandbox(&p.manifest, s.k.cfg.plugin_wildcard, &rel, q.get("embed").map(String::as_str))
+    {
+        csp.push_str("; sandbox ");
+        csp.push_str(sb);
+    }
+    set(&mut res, header::CONTENT_SECURITY_POLICY, &csp);
     let cache = if p.dev || rel.ends_with(".html") { "no-cache" } else { "public, max-age=300" };
     set(&mut res, header::CACHE_CONTROL, cache);
     // the tab of an extension runs in a frame without an origin of its own (sandbox without
@@ -746,6 +786,53 @@ label = \"P\"
             plain.contains("frame-ancestors http://app http://pub;") && !plain.contains("plg"),
             "{plain}"
         );
+    }
+
+    #[test]
+    fn the_page_of_an_embed_is_sandboxed_as_answered_and_no_other_page() {
+        let m = manifest(
+            "run_commands = [\"c\"]
+[[embeds]]
+name = \"a\"
+entry = \"a.html\"
+commands = [\"c\"]
+same_origin = true
+[[embeds]]
+name = \"b\"
+entry = \"b.html\"
+commands = [\"c\"]
+[[embeds]]
+name = \"c\"
+entry = \"shared.html\"
+commands = [\"c\"]
+same_origin = true
+[[embeds]]
+name = \"d\"
+entry = \"shared.html\"
+commands = [\"c\"]
+",
+        );
+        let hex = "0123456789abcdef0123456789abcdef0123456789abcdef";
+        let bad = hex.replace('0', "z");
+        let sb = |wild, rel, t| super::embed_sandbox(&m, wild, rel, t);
+        // the same value `embed.url` answers
+        assert_eq!(sb(true, "a.html", Some(hex)), Some("allow-scripts allow-same-origin"));
+        assert_eq!(sb(true, "b.html", Some(hex)), Some("allow-scripts"), "default: opaque");
+        assert_eq!(
+            sb(false, "a.html", Some(hex)),
+            Some("allow-scripts"),
+            "one origin for all plugins: opaque"
+        );
+        assert_eq!(sb(true, "shared.html", Some(hex)), Some("allow-scripts"), "one embed does not ask");
+        // a public view never gets the origin
+        assert_eq!(sb(true, "a.html", Some("pe.00.11")), Some("allow-scripts"));
+        // nothing for a normal page, for another file, without a ticket or with one of another shape
+        assert_eq!(sb(true, "a.html", None), None);
+        assert_eq!(sb(true, "index.html", Some(hex)), None);
+        assert_eq!(sb(true, "a.js", Some(hex)), None);
+        assert_eq!(sb(true, "a.html", Some("abc")), None);
+        assert_eq!(sb(true, "a.html", Some(&bad)), None);
+        assert_eq!(sb(true, "a.html", Some("")), None);
     }
 
     #[test]

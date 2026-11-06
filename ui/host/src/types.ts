@@ -689,6 +689,8 @@ export interface ItemRestoreReport {
 }
 
 export interface AdminPlugin extends PluginView {
+  /** the pages it offers to other plugins (`[[embeds]]`); recent servers */
+  embeds?: { name: string; entry: string; same_origin?: boolean }[]
   status: 'installed' | 'active' | 'blocked'
   sha256: string
   signed_by: string | null
