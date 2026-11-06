@@ -605,6 +605,16 @@ function PluginAsks({ p, base }: { p: AdminPlugin; base?: string }) {
                 none
               )}
             </AskRow>
+            <AskRow label={t('Background runs may also reach')}>
+              {perm.run_targets?.length ? (
+                <span>
+                  <b className="text-destructive">{t('yes (sensitive: a run it starts may call the run commands of these plugins as the person who started it, if that person uses them)')}</b>
+                  <span className="mt-1 block font-mono text-xs">{perm.run_targets.join(', ')}</span>
+                </span>
+              ) : (
+                none
+              )}
+            </AskRow>
             <AskRow label={t('Searches the people and groups')}>
               {perm.directory ? <b className="text-destructive">{t('yes (sensitive: it lists the names and usernames of the people and groups of the tenant to whoever may share in it)')}</b> : none}
             </AskRow>
