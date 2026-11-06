@@ -89,6 +89,22 @@ describe('routeOp', () => {
     expect(routeOp('alfa', 'p.x', 'files.profiles', { id: ID, source: 'com.mosaikit.files' })).toMatchObject({ method: 'GET', url: `/api/t/alfa/p/p.x/files/${ID}/profiles?source=com.mosaikit.files` })
   })
 
+  it('builds the calls of an upload in pieces', () => {
+    const f = new Blob(['x'])
+    expect(routeOp('alfa', 'p.x', 'files.upload.begin', { name: 'big.bin', parent: ID, size: 10, replace: true })).toEqual({
+      method: 'POST',
+      url: '/api/t/alfa/p/p.x/files/uploads',
+      json: { name: 'big.bin', parent: ID, size: 10, replace: true },
+    })
+    const c = routeOp('alfa', 'p.x', 'files.upload.chunk', { id: ID, offset: 5, file: f, source: 'com.mosaikit.files' })
+    expect([c.method, c.url, c.raw]).toEqual(['PUT', `/api/t/alfa/p/p.x/files/uploads/${ID}?offset=5&source=com.mosaikit.files`, f])
+    expect(routeOp('alfa', 'p.x', 'files.upload.status', { id: ID }).url).toBe(`/api/t/alfa/p/p.x/files/uploads/${ID}`)
+    expect(routeOp('alfa', 'p.x', 'files.upload.finish', { id: ID, source: 'com.mosaikit.files' }).url).toBe(`/api/t/alfa/p/p.x/files/uploads/${ID}/finish?source=com.mosaikit.files`)
+    expect(routeOp('alfa', 'p.x', 'files.upload.abort', { id: ID })).toMatchObject({ method: 'DELETE' })
+    expect(() => routeOp('alfa', 'p.x', 'files.upload.begin', { name: 'x', size: -1 })).toThrow(OpError)
+    expect(() => routeOp('alfa', 'p.x', 'files.upload.chunk', { id: ID, offset: 1.5, file: f })).toThrow(OpError)
+  })
+
   it('builds the notifications of the plugin, limited to the plugin and without recipients', () => {
     const n = routeOp('alfa', 'com.mosaikit.notes', 'notify', { title: 'Due today', body: 'Plan', at: 'notes/1', resource: ID, to: 'everybody' })
     expect(n).toEqual({ method: 'POST', url: '/api/t/alfa/p/com.mosaikit.notes/notify', json: { title: 'Due today', body: 'Plan', at: 'notes/1', resource: ID } })

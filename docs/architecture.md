@@ -1178,6 +1178,17 @@ notification that opens the plugin at `profile/<id>/<folder>?source=<files plugi
 the same for any folder the person sees, without announcing it (`msk.files.profiles(id)`); `msk.open(plugin, at)` opens the page
 of another plugin of the tenant at a place inside it.
 
+**Files too big for one request.** A request carries at most 512 MB, so a bigger file goes up in pieces
+(`msk.files.uploadLarge(file, name, {parent, replace, source, chunk, onProgress})`, up to 16 GB, pieces of 1 byte to 64 MB, 8 MB by
+default). `POST …/files/uploads` {name, parent, size, replace} begins it and already answers what a finished upload would be refused
+for (no write permission, a name taken without `replace`, the quota; at most 8 uploads open per person, `too_many_uploads`);
+`PUT …/files/uploads/{id}?offset=N` adds the piece that starts at N, which must be exactly where the upload stands (otherwise
+`409 upload_offset`, saying how far it is); `GET` answers `{received, size}`; `POST …/finish` makes it the file (the same checks as
+any upload; `upload_incomplete` if bytes are missing) by moving the staged bytes, so no memory is used; `DELETE` throws it away. The
+bytes wait in `<tenant>/.uploads/` (not in Files) and only the person who began the upload may continue it; what nobody touched for
+24 hours is removed by the cleanup of the contents. A piece whose answer was lost is not sent again: the client asks `GET` where
+the upload is. A zip is still unpacked from memory (`files.unzip`, at most 512 MB inflated): Files keeps a zip over 400 MB as a file.
+
 **The files calls of a UI on the Files area of another plugin.** The files calls of the bridge (`files.list`, `files.mkdir`,
 `files.upload`, `files.unzip`, `ticket`) take an optional `source`: the id of the plugin whose files area they work on
 (usually `com.mosaikit.files`), always with the permissions of the person. `files_read` is enough for `files.list` and `ticket`;

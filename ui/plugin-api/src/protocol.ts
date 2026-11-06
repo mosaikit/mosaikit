@@ -228,6 +228,13 @@ export interface WebProbe {
   image: string | null
 }
 
+/** How far an upload in pieces has got (`files.uploadLarge`). */
+export interface UploadProgress {
+  id: string
+  received: number
+  size: number
+}
+
 /** A plugin that could take a folder further (`[[folder_profiles]]` in its manifest). */
 export interface FolderSuggestion {
   /** the plugin and its name */

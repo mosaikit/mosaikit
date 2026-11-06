@@ -14,7 +14,7 @@ use mosaikit_kernel::acl::{self, Level, ResourceFilter};
 use mosaikit_kernel::tenancy::keys::{self, Level as KeyLevel};
 use mosaikit_kernel::tenancy::{self, levels, NewTenant};
 use mosaikit_kernel::{
-    content, crud, files, identity, kpi, links, mail, notify, plugins, Error, Role, TenantSettings,
+    content, crud, files, identity, kpi, links, mail, notify, plugins, uploads, Error, Role, TenantSettings,
 };
 use serde::Deserialize;
 use serde_json::{json, Map, Value};
@@ -30,6 +30,7 @@ pub fn router() -> Router<AppState> {
     let uploads = Router::new()
         .route("/api/t/{t}/p/{plugin}/files/upload", post(files_upload))
         .route("/api/t/{t}/p/{plugin}/files/unzip", post(files_unzip))
+        .route("/api/t/{t}/p/{plugin}/files/uploads/{id}", put(upload_chunk))
         .route("/api/t/{t}/p/{plugin}/content/{id}", post(content_upload))
         .layer(DefaultBodyLimit::max(UPLOAD_LIMIT));
     let packages = Router::new()
@@ -94,6 +95,9 @@ pub fn router() -> Router<AppState> {
         .route("/api/t/{t}/p/{plugin}/files", get(files_list))
         .route("/api/t/{t}/p/{plugin}/files/folder", post(files_mkdir))
         .route("/api/t/{t}/p/{plugin}/files/{id}/content", get(files_content))
+        .route("/api/t/{t}/p/{plugin}/files/uploads", post(upload_begin))
+        .route("/api/t/{t}/p/{plugin}/files/uploads/{id}", get(upload_status).delete(upload_abort))
+        .route("/api/t/{t}/p/{plugin}/files/uploads/{id}/finish", post(upload_finish))
         .route("/api/t/{t}/p/{plugin}/files/{id}/zip", get(files_zip))
         .route("/api/t/{t}/p/{plugin}/files/{id}/profiles", get(files_profiles))
         .route("/api/t/{t}/p/{plugin}/files/{id}/rename", post(files_rename))
@@ -1084,6 +1088,72 @@ async fn files_upload(
     let replace = q.get("replace").is_some_and(|v| v == "1" || v == "true");
     let plugin = files_target(&s, &p.plugin, &q, true)?;
     Ok(Json(json!(files::upload(&s.k, &c, &plugin, opt_uuid(q.get("parent"))?, name, &body, replace).await?)))
+}
+
+#[derive(Deserialize)]
+struct UploadReq {
+    name: String,
+    #[serde(default)]
+    parent: Option<Uuid>,
+    size: u64,
+    #[serde(default)]
+    replace: bool,
+}
+
+/// A file too big for one request goes up in pieces: begin, one `PUT` per piece (`offset` is where it starts),
+/// finish; `GET` says how far it has got, `DELETE` throws it away. `source` as in the other files calls.
+async fn upload_begin(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<PluginPath>,
+    Query(q): Query<HashMap<String, String>>,
+    Json(r): Json<UploadReq>,
+) -> ApiResult<Json<Value>> {
+    let plugin = files_target(&s, &p.plugin, &q, true)?;
+    Ok(Json(json!(uploads::begin(&s.k, &c, &plugin, r.parent, &r.name, r.size, r.replace).await?)))
+}
+
+async fn upload_chunk(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<PluginPath>,
+    Query(q): Query<HashMap<String, String>>,
+    body: Bytes,
+) -> ApiResult<Json<Value>> {
+    let plugin = files_target(&s, &p.plugin, &q, true)?;
+    let offset: u64 = q.get("offset").and_then(|v| v.parse().ok()).ok_or_else(|| bad("missing offset"))?;
+    Ok(Json(json!(uploads::chunk(&s.k, &c, &plugin, p.id()?, offset, &body).await?)))
+}
+
+async fn upload_status(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<PluginPath>,
+    Query(q): Query<HashMap<String, String>>,
+) -> ApiResult<Json<Value>> {
+    let plugin = files_target(&s, &p.plugin, &q, true)?;
+    Ok(Json(json!(uploads::status(&s.k, &c, &plugin, p.id()?).await?)))
+}
+
+async fn upload_finish(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<PluginPath>,
+    Query(q): Query<HashMap<String, String>>,
+) -> ApiResult<Json<Value>> {
+    let plugin = files_target(&s, &p.plugin, &q, true)?;
+    Ok(Json(json!(uploads::finish(&s.k, &c, &plugin, p.id()?).await?)))
+}
+
+async fn upload_abort(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<PluginPath>,
+    Query(q): Query<HashMap<String, String>>,
+) -> ApiResult<Json<Value>> {
+    let plugin = files_target(&s, &p.plugin, &q, true)?;
+    uploads::abort(&s.k, &c, &plugin, p.id()?).await?;
+    Ok(Json(json!({ "ok": true })))
 }
 
 /// Unpacks a zip into a folder (`parent`), or into a new one inside it (`folder`); `conflict` is

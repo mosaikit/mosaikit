@@ -51,6 +51,7 @@ pub mod testing;
 pub mod totp;
 pub mod transfer;
 pub mod trash;
+pub mod uploads;
 mod util;
 pub mod webfetch;
 
