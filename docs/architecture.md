@@ -1013,6 +1013,7 @@ embeds = []             # plugins whose pages (`[[embeds]]`) this plugin shows i
 contributions = []      # points whose contributions the logic may list and whose contributors it may call (§8.3); sensitive, needs `[requires] mosaikit = ">=1.0"`
 web = false              # the UI may ask the host about a web page (`msk.web.probe`: may it be framed, title, picture)
 run_commands = []        # commands a run ticket may call on behalf of a person (§8.14); sensitive, needs `[requires] mosaikit = ">=1.0"`
+run_targets = []         # other plugins a run ticket of this plugin may also call, with their own run_commands (§8.14); sensitive, needs `[requires] mosaikit = ">=1.0"`
 
 [requires]               # optional
 mosaikit = ">=1.2, <2"   # versions of Mosaikit it works with (a range; absent: any)
@@ -1470,7 +1471,7 @@ the emoji `[contribution]` (now optional: absent, the name labels the plugin).
 promise it will stay as it is until a sample (or a template of the dev kit) uses it: `[[config]]` and
 `ctx.setting`, `[[user_permissions]]` and `ctx.can`, `permissions.calls` and `plugin.call`, `ctx.notify` and
 `msk.notify`, `network` and `http.fetch`, `script_eval`, `[search]`, the `command` actions of an extension,
-`CrudOptions.panel`, `Resources::create` and `Resources::delete` of the SDK, `[[config]] public`, `[[public_commands]]`, `msk.publicConfig` / `msk.publicCall` and `ctx.link_resource()` (§8.13), `permissions.run_commands` and `ctx.on_behalf()` (§8.14). A change to one of them is announced in
+`CrudOptions.panel`, `Resources::create` and `Resources::delete` of the SDK, `[[config]] public`, `[[public_commands]]`, `msk.publicConfig` / `msk.publicCall` and `ctx.link_resource()` (§8.13), `permissions.run_commands`, `permissions.run_targets`, `runs.mint` / `ctx.runs()`, `[[schedules]] targets` and `ctx.on_behalf()` (§8.14). A change to one of them is announced in
 the changelog of the package, with the deprecation rule applied when a distribution relies on it.
 
 ### 8.12 The developer profile

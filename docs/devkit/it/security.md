@@ -36,6 +36,7 @@ minimo:
 | `files_read` | legge l'area File **come il chiamante**: mai più di quanto il chiamante vede. **Sensibile** |
 | `[[public_commands]]` | chiunque abbia un link pubblico esegue il comando, in sola lettura, sull'elemento condiviso. **Sensibile** (vedi sotto) |
 | `run_commands` | un servizio di una distribuzione chiama il comando come la persona che ha avviato un run, in background. **Sensibile** (vedi sotto) |
+| `run_targets` | un run avviato da questo plugin può chiamare i comandi per i run di questi altri plugin come la persona. **Sensibile** |
 | `directory` | elenca username e nomi di persone e gruppi del tenant a chi può condividere. **Sensibile** (vedi sotto) |
 | `[[config]] public = true` | una pagina pubblica può leggere quell'impostazione. Mai un segreto: il manifesto lo rifiuta |
 | `script_eval` | il plugin può eseguire stringhe come codice. Solo per codice di cui ci si fida. **Sensibile** |

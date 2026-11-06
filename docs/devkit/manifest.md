@@ -148,6 +148,7 @@ Everything is off by default. The Administrator sees what a plugin asks for when
 | `files_read` | bool | the logic reads the Files area as the caller. **Sensitive** |
 | `script_eval` | bool | the CSP of the UI allows `'unsafe-eval'` and `'wasm-unsafe-eval'`. **Sensitive** |
 | `run_commands` | array of identifiers | commands of the logic that a **run ticket** may call on behalf of a person (a background process of a distribution), at most 32. **Sensitive**; needs `[requires] mosaikit = ">=1.0"`. See [Logic](logic.md#run-commands-calls-on-behalf-of-a-run) |
+| `run_targets` | array of plugin ids | other plugins that a run ticket of this plugin may also call (a background process that needs a command of another plugin in the middle of the run), at most 16, not the plugin itself, only with `run_commands`. Only the commands the target declares in its own `run_commands` can be reached, and only for a person who uses it. **Sensitive**; needs `[requires] mosaikit = ">=1.0"`. See [Logic](logic.md#run-targets-a-run-that-reaches-other-plugins) |
 | `directory` | bool | the plugin may search the people and groups of the tenant (`ctx.directory()`, `msk.directory.search`), for callers who are Tenant Managers or may share in it; id, username and name only. **Sensitive**; needs `[requires] mosaikit = ">=1.0"`. See [Logic](logic.md#directory) |
 
 An origin is `http://` or `https://` and a host of letters, digits and `.-:[]`, with no `/`.
@@ -240,6 +241,7 @@ architecture §8.17.
 |---|---|
 | `name` | identifier, unique in the plugin; what the UI sends when it registers a schedule |
 | `command` | required: a command of `permissions.run_commands` |
+| `targets` | optional: plugins of `permissions.run_targets` that the run of this schedule may also call, with all their `run_commands` (default: none) |
 | `target` | required: the address of the service endpoint, `https://svc:8080/run`; its origin must be in `permissions.network`; no credentials in the address |
 | `service_key` | optional: the `id` of a `[[service_keys]]` entry, sent to the target as a bearer key |
 | `min_interval_minutes` | optional, default 15: the least minutes between two runs; the kernel floor is 5 and wins |
