@@ -101,6 +101,7 @@ function Requirements({ p }: { p: AdminPlugin }) {
   if (perm.network.length) chips.push(t('Network: {list}', { list: perm.network.join(', ') }))
   if (perm.frame_src.length) chips.push(t('Embeds: {list}', { list: perm.frame_src.join(', ') }))
   if (perm.files_read) chips.push(t('Reads the files you can see'))
+  if (perm.files_write) chips.push(t('Writes in the Files area for you'))
   if (perm.resources_read?.length) chips.push(t('Lists the items of: {list}', { list: perm.resources_read.join(', ') }))
   if (p.public_commands?.length) chips.push(t('Runs commands for public links'))
   if (perm.run_commands?.length) chips.push(t('Runs commands for background runs'))

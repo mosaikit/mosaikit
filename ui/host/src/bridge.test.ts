@@ -74,6 +74,20 @@ describe('routeOp', () => {
     expect(t).toMatchObject({ method: 'POST', json: { download: true } })
   })
 
+  it('builds unzip and the calls on the Files area of another plugin (source)', () => {
+    const f = new Blob(['z'])
+    const z = routeOp('alfa', 'com.geo.data', 'files.unzip', { file: f, parent: ID, folder: 'city', conflict: 'skip', source: 'com.mosaikit.files' })
+    expect(z.method).toBe('POST')
+    expect(z.url).toBe(`/api/t/alfa/p/com.geo.data/files/unzip?parent=${ID}&folder=city&conflict=skip&source=com.mosaikit.files`)
+    expect(z.raw).toBe(f)
+    // an unknown conflict policy is dropped (the server then uses fail), the area of the plugin stays the default
+    expect(routeOp('alfa', 'p.x', 'files.unzip', { file: f, conflict: 'drop' }).url).toBe('/api/t/alfa/p/p.x/files/unzip?')
+    expect(routeOp('alfa', 'p.x', 'files.list', { parent: ID, source: 'com.mosaikit.files' }).url).toBe(`/api/t/alfa/p/p.x/files?parent=${ID}&source=com.mosaikit.files`)
+    expect(routeOp('alfa', 'p.x', 'files.mkdir', { name: 'n', source: 'com.mosaikit.files' }).url).toBe('/api/t/alfa/p/p.x/files/folder?source=com.mosaikit.files')
+    expect(routeOp('alfa', 'p.x', 'ticket', { id: ID, source: 'com.mosaikit.files' }).url).toBe(`/api/t/alfa/p/p.x/ticket/${ID}?source=com.mosaikit.files`)
+    expect(() => routeOp('alfa', 'p.x', 'files.list', { source: '../x' })).toThrow(OpError)
+  })
+
   it('builds the notifications of the plugin, limited to the plugin and without recipients', () => {
     const n = routeOp('alfa', 'com.mosaikit.notes', 'notify', { title: 'Due today', body: 'Plan', at: 'notes/1', resource: ID, to: 'everybody' })
     expect(n).toEqual({ method: 'POST', url: '/api/t/alfa/p/com.mosaikit.notes/notify', json: { title: 'Due today', body: 'Plan', at: 'notes/1', resource: ID } })

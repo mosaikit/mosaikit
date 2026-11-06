@@ -309,3 +309,63 @@ async fn folder_served_as_a_tree() {
     assert!(files::resolve_path(&t, FILES, &r.ctx(), root.id, "0/a.b3dm").await.unwrap().is_some());
     assert!(files::resolve_path(&t, FILES, &r.ctx(), root.id, "../outside.txt").await.unwrap().is_none());
 }
+
+#[tokio::test]
+async fn unzip_into_files() {
+    let (t, _mgr, anna, bruno) = setup().await;
+    let zip = zip_of(&[
+        ("tileset.json", b"{}"),
+        ("tiles/0/a.b3dm", b"tile"),
+        ("tiles/0/b.b3dm", b"tile2"),
+        ("__MACOSX/._tileset.json", b"junk"),
+        ("tiles/._x", b"junk"),
+    ]);
+    let names = |l: files::Listing| l.entries.iter().map(|e| e.name.clone()).collect::<Vec<_>>();
+
+    // into a new folder
+    let r = files::unzip(&t, &anna, FILES, None, Some("city"), &zip, files::OnConflict::Fail).await.unwrap();
+    let city = r.folder.unwrap();
+    assert_eq!((r.files, r.skipped), (3, 0));
+    assert_eq!(r.folders, 3, "city, tiles, 0");
+    assert_eq!(names(files::list(&t, &anna, FILES, Some(city.id)).await.unwrap()), ["tiles", "tileset.json"]);
+    let ctx = mosaikit_db::Ctx::user(anna.user.user_id, anna.tenant.tenant_id);
+    assert!(files::resolve_path(&t, FILES, &ctx, city.id, "tiles/0/b.b3dm").await.unwrap().is_some());
+    assert!(files::resolve_path(&t, FILES, &ctx, city.id, "__MACOSX/._tileset.json")
+        .await
+        .unwrap()
+        .is_none());
+
+    // the folder name is taken: nothing is created (fail), or the content goes in (skip / replace)
+    let again = files::unzip(&t, &anna, FILES, None, Some("city"), &zip, files::OnConflict::Fail).await;
+    assert_eq!(again.unwrap_err().kind, Kind::Conflict);
+    let skip =
+        files::unzip(&t, &anna, FILES, None, Some("city"), &zip, files::OnConflict::Skip).await.unwrap();
+    assert_eq!((skip.files, skip.skipped), (0, 3));
+    let rep =
+        files::unzip(&t, &anna, FILES, None, Some("city"), &zip, files::OnConflict::Replace).await.unwrap();
+    assert_eq!((rep.files, rep.skipped), (3, 0));
+
+    // into the folder itself, a name already taken stops the whole thing and undoes what was made
+    let more = zip_of(&[("new/x.txt", b"x"), ("tileset.json", b"other")]);
+    let err = files::unzip(&t, &anna, FILES, Some(city.id), None, &more, files::OnConflict::Fail).await;
+    assert_eq!(err.unwrap_err().kind, Kind::Conflict);
+    assert_eq!(names(files::list(&t, &anna, FILES, Some(city.id)).await.unwrap()), ["tiles", "tileset.json"]);
+
+    // unsafe or invalid archives are refused before anything is created
+    for evil in [
+        zip_of(&[("../outside.txt", b"x")]),
+        zip_of(&[("/abs.txt", b"x")]),
+        zip_of(&[("C:/win.txt", b"x")]),
+        zip_of(&[("ok.txt", b"x"), ("a/../../b.txt", b"x")]),
+    ] {
+        let e = files::unzip(&t, &anna, FILES, None, Some("evil"), &evil, files::OnConflict::Fail).await;
+        assert_eq!(e.unwrap_err().kind, Kind::BadRequest);
+    }
+    assert!(files::unzip(&t, &anna, FILES, None, None, b"not a zip", files::OnConflict::Fail).await.is_err());
+    assert!(!names(files::list(&t, &anna, FILES, None).await.unwrap()).contains(&"evil".to_string()));
+
+    // write permission on the destination is required
+    assert!(files::unzip(&t, &bruno, FILES, Some(city.id), None, &zip, files::OnConflict::Fail)
+        .await
+        .is_err());
+}

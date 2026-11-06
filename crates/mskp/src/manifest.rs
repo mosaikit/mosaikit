@@ -782,6 +782,12 @@ pub struct Permissions {
     /// files.
     #[serde(default)]
     pub files_read: bool,
+    /// The UI of the plugin may work in the Files area of another plugin (`source` on the files calls) with
+    /// the permissions of the caller: list, create folders, upload, unpack a zip, and ask for an address to
+    /// show a file or a folder (`files_read` is enough for what only reads). Sensitive: the Administrator
+    /// sees it when the plugin is installed. Default: false.
+    #[serde(default)]
+    pub files_write: bool,
     /// Plugins whose resources the logic may list with the permissions of the caller (host operation
     /// `resources.list`: id, kind, title and little else, for a picker). Sensitive: the Administrator
     /// sees the list when the plugin is installed. Default: none. Needs `[requires] mosaikit = ">=1.0"`.
@@ -1836,6 +1842,22 @@ files_read = true
 files_read = \"read\"
 "
         );
+        assert!(Manifest::from_toml(&bad).is_err());
+    }
+
+    #[test]
+    fn files_write_defaults_to_false_and_must_be_a_bool() {
+        let base = "id = \"com.x.p\"
+name = \"P\"
+version = \"0.1.0\"
+[contribution]
+icon = \"x\"
+label = \"P\"
+";
+        assert!(!Manifest::from_toml(base).unwrap().permissions.files_write);
+        let on = format!("{base}[permissions]\nfiles_write = true\n");
+        assert!(Manifest::from_toml(&on).unwrap().permissions.files_write);
+        let bad = format!("{base}[permissions]\nfiles_write = \"yes\"\n");
         assert!(Manifest::from_toml(&bad).is_err());
     }
 

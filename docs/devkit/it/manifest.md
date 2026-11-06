@@ -149,7 +149,8 @@ Tutto è spento per impostazione predefinita. L'Administrator vede ciò che un p
 | `web` | bool | la UI può chiamare `msk.web.probe(url)` e incorporare qualsiasi sito web (`frame-src https: http:`) |
 | `calls` | array di id di plugin | plugin di cui la logica chiama i comandi con `plugin.call`; non se stesso |
 | `notify` | bool | la logica può inviare notifiche (`ctx.notify`) |
-| `files_read` | bool | la logica legge l'area File come il chiamante. **Sensibile** |
+| `files_read` | bool | la logica legge l'area File come il chiamante; la UI può elencarla e chiedere l'indirizzo di un file o di una cartella (`source` sulle chiamate files). **Sensibile** |
+| `files_write` | bool | la UI crea cartelle, carica file ed estrae archivi zip nell'area File come il chiamante (`source` sulle chiamate files). **Sensibile** |
 | `script_eval` | bool | la CSP della UI consente `'unsafe-eval'` e `'wasm-unsafe-eval'`. **Sensibile** |
 | `run_commands` | array di identificatori | comandi della logica che un **ticket di esecuzione** può chiamare per conto di una persona (un processo in background di una distribuzione), al massimo 32. **Sensibile**; richiede `[requires] mosaikit = ">=1.0"`. Vedi [Logica](logic.md#comandi-di-esecuzione-chiamate-per-conto-di-un-run) |
 | `run_targets` | array di id di plugin | altri plugin che un ticket di esecuzione di questo plugin può chiamare (un processo in background che a metà run ha bisogno di un comando di un altro plugin), al massimo 16, non il plugin stesso, solo con `run_commands`. Si raggiungono solo i comandi che il bersaglio dichiara nei propri `run_commands`, e solo per una persona che lo usa. **Sensibile**; richiede `[requires] mosaikit = ">=1.0"`. Vedi [Logica](logic.md) |

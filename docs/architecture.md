@@ -1017,6 +1017,7 @@ calls = []               # plugins whose commands the logic calls (§8.6)
 notify = false           # the logic may send notifications (host operation `notify`, §8.3)
 script_eval = false      # the UI may compile code at run time (CSP 'unsafe-eval', §9); sensitive
 files_read = false       # the logic may read the Files area as the caller (`files.list|describe|read`, §8.3); sensitive
+files_write = false      # the UI may work in the Files area of another plugin as the caller (`source` on the files calls, §8.3); sensitive
 resources_read = []     # plugins whose resources the logic may list as the caller (`resources.list`, §8.3); sensitive, needs `[requires] mosaikit = ">=1.0"`
 embeds = []             # plugins whose pages (`[[embeds]]`) this plugin shows in a frame of its own page (`embed.url`, §8.15); sensitive, needs `[requires] mosaikit = ">=1.0"`
 contributions = []      # points whose contributions the logic may list and whose contributors it may call (§8.3); sensitive, needs `[requires] mosaikit = ">=1.0"`
@@ -1167,6 +1168,16 @@ the runtime); the SDK turns it into `Error::coded`, and a logic that returns it 
 the plugin) and `groups` (a public command has no `user` and gets `public`, `link_resource` and no secrets in `config`: §8.13): the groups of the tenant the caller belongs to, by name, as
 `[{"id": "<uuid>", "name": "Field"}]` (`[]` when none; never groups of other tenants; read at every
 call). In tests: `MockHost::new().with_groups(&[("g1", "Field")])`.
+
+**The files calls of a UI on the Files area of another plugin.** The files calls of the bridge (`files.list`, `files.mkdir`,
+`files.upload`, `files.unzip`, `ticket`) take an optional `source`: the id of the plugin whose files area they work on
+(usually `com.mosaikit.files`), always with the permissions of the person. `files_read` is enough for `files.list` and `ticket`;
+the others need `files_write` (`forbidden` otherwise). The source must be on for the tenant, declare `files`, and the person
+needs `use` on it. `files.unzip {file, parent?, folder?, conflict?}` (`POST …/files/unzip`) unpacks a zip into `parent`, or into a
+new folder `folder` inside it, keeping the structure, and answers `{folder, files, folders, skipped}`. The whole archive is checked
+before anything is created (no `..`, absolute or drive paths, separators or control characters in a name; at most 20 000 entries
+and 512 MB really inflated; the quotas of the tenant); `__MACOSX/` and `._*` are dropped. `conflict` is `fail` (default: the call stops
+and what it created is removed), `skip` or `replace`.
 
 **`files.list`, `files.describe`, `files.read`** (`[permissions] files_read = true`; default none): the logic of ANY
 plugin reads the Files area with the permissions of the CALLER, the rules the Files UI applies (no one sees

@@ -1,6 +1,6 @@
 import { Bridge, BridgeError } from './bridge.ts'
 import { API_VERSION, checkHostApi } from './version.ts'
-import type { BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, UiContext, Values, WebProbe } from './protocol.ts'
+import type { BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, Unzipped, UiContext, Values, WebProbe } from './protocol.ts'
 
 /** The extensions of the plugin on a resource (fields and actions other plugins add to its items). */
 export interface ExtensionsClient {
@@ -218,11 +218,24 @@ export class Msk {
     return r.result
   }
 
+  /**
+   * Files and folders. `source` (the id of another plugin, usually `com.mosaikit.files`) works in the Files
+   * area of that plugin instead of the own one, as the person: `files_read` in the manifest is enough for
+   * `list` and `url`, the rest needs `files_write`.
+   */
   readonly files = {
-    list: (parent?: string | null) => this.bridge.call<Listing>('files.list', { parent: parent ?? null }),
-    mkdir: (name: string, parent?: string | null) => this.bridge.call<FileEntry>('files.mkdir', { name, parent: parent ?? null }),
-    upload: (file: Blob, name: string, parent?: string | null, replace = false) =>
-      this.bridge.call<FileEntry>('files.upload', { file, name, parent: parent ?? null, replace }),
+    list: (parent?: string | null, source?: string) => this.bridge.call<Listing>('files.list', { parent: parent ?? null, source }),
+    mkdir: (name: string, parent?: string | null, source?: string) =>
+      this.bridge.call<FileEntry>('files.mkdir', { name, parent: parent ?? null, source }),
+    upload: (file: Blob, name: string, parent?: string | null, replace = false, source?: string) =>
+      this.bridge.call<FileEntry>('files.upload', { file, name, parent: parent ?? null, replace, source }),
+    /**
+     * Unpacks a zip into the folder `parent` (the root if absent), or into a new folder `folder` inside it,
+     * keeping its structure. `conflict` says what to do with a name already taken: `fail` (default, nothing is
+     * left behind), `skip` or `replace`.
+     */
+    unzip: (file: Blob, opts: { parent?: string | null; folder?: string; conflict?: 'fail' | 'skip' | 'replace'; source?: string } = {}) =>
+      this.bridge.call<Unzipped>('files.unzip', { file, parent: opts.parent ?? null, folder: opts.folder, conflict: opts.conflict, source: opts.source }),
     rename: (id: string, name: string) => this.bridge.call<FileEntry>('files.rename', { id, name }),
     move: (id: string, parent: string | null) => this.bridge.call<FileEntry>('files.move', { id, parent }),
     copy: (id: string, parent: string | null) => this.bridge.call<FileEntry>('files.copy', { id, parent }),
@@ -234,7 +247,7 @@ export class Msk {
     /** zip of a folder */
     zip: (id: string) => this.bridge.call<Blob>('files.zip', { id }),
     /** temporary URL on the origin of the contents (iframe, new tab, download) */
-    url: async (id: string, download = false) => (await this.bridge.call<{ url: string }>('ticket', { id, download })).url,
+    url: async (id: string, download = false, source?: string) => (await this.bridge.call<{ url: string }>('ticket', { id, download, source })).url,
   }
 
   readonly content = {

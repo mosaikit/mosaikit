@@ -145,7 +145,8 @@ Everything is off by default. The Administrator sees what a plugin asks for when
 | `web` | bool | the UI may call `msk.web.probe(url)` and embed any web site (`frame-src https: http:`) |
 | `calls` | array of plugin ids | plugins whose commands the logic calls with `plugin.call`; not itself |
 | `notify` | bool | the logic may send notifications (`ctx.notify`) |
-| `files_read` | bool | the logic reads the Files area as the caller. **Sensitive** |
+| `files_read` | bool | the logic reads the Files area as the caller; the UI may list it and ask for the address of a file or folder (`source` on the files calls). **Sensitive** |
+| `files_write` | bool | the UI creates folders, uploads files and unpacks zip archives in the Files area as the caller (`source` on the files calls). **Sensitive** |
 | `script_eval` | bool | the CSP of the UI allows `'unsafe-eval'` and `'wasm-unsafe-eval'`. **Sensitive** |
 | `run_commands` | array of identifiers | commands of the logic that a **run ticket** may call on behalf of a person (a background process of a distribution), at most 32. **Sensitive**; needs `[requires] mosaikit = ">=1.0"`. See [Logic](logic.md#run-commands-calls-on-behalf-of-a-run) |
 | `run_targets` | array of plugin ids | other plugins that a run ticket of this plugin may also call (a background process that needs a command of another plugin in the middle of the run), at most 16, not the plugin itself, only with `run_commands`. Only the commands the target declares in its own `run_commands` can be reached, and only for a person who uses it. **Sensitive**; needs `[requires] mosaikit = ">=1.0"`. See [Logic](logic.md#run-targets-a-run-that-reaches-other-plugins) |
