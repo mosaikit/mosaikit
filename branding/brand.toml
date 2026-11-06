@@ -36,7 +36,8 @@ tagline = "apps, data and sharing for every tenant"
 # icon = "icon.ico"
 
 # Colours of the theme (#rrggbb only). The transparent variants of the accent are
-# computed from `accent`. The plugin UIs receive the same colours.
+# computed from `accent`. They colour the shell and the pages the server brands; the plugin UIs
+# follow the theme of the shell (light or dark, theme preset), not these colours.
 [colors]
 # accent = "#f0b23e"  # accent: buttons, selection, charts
 # bg     = "#0b0c0f"  # background of the page
