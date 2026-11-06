@@ -29,6 +29,7 @@ pub fn router() -> Router<AppState> {
         .route("/p/{token}/api", get(public_api))
         .route("/p/{token}/config", get(public_config))
         .route("/p/{token}/call/{name}", post(public_call))
+        .route("/p/{token}/embed", post(public_embed))
         .route("/p/{token}/unlock", post(public_unlock))
         .route("/p/{token}/f/{id}/{name}", get(public_child_file))
         .route("/p/{token}/d/{id}/", get(public_child_folder))
@@ -606,6 +607,36 @@ async fn public_call(
         }
     };
     let mut res = match crud::call_public(&s.k, &r, &name, args).await {
+        Ok(v) => Json(json!({ "ok": v })).into_response(),
+        Err(e) => crate::ApiError(e).into_response(),
+    };
+    set(&mut res, header::CACHE_CONTROL, "no-store");
+    res
+}
+
+/// `msk.embeds.url` in a public view: the address of the page of another plugin for a resource of the link, with a ticket
+/// that belongs to the link (see `mosaikit_kernel::embeds::public_url`). Same rules as a public command: the link is resolved
+/// again, JSON only.
+async fn public_embed(
+    State(s): State<AppState>,
+    Path(token): Path<String>,
+    headers: HeaderMap,
+    body: axum::body::Bytes,
+) -> Response {
+    let r = match open(&s, &token, &headers).await {
+        Ok(r) => r,
+        Err(_) => return (StatusCode::NOT_FOUND, Json(json!({ "error": "invalid link" }))).into_response(),
+    };
+    let json_type = headers
+        .get(header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .is_some_and(|v| v.trim_start().to_ascii_lowercase().starts_with("application/json"));
+    let req: Option<Value> = serde_json::from_slice(&body).ok();
+    let (true, true, Some(req)) = (json_type, body.len() <= 2048, req) else {
+        return crate::ApiError(mosaikit_kernel::Error::bad("a JSON body of at most 2 KiB is required"))
+            .into_response();
+    };
+    let mut res = match mosaikit_kernel::embeds::public_url(&s.k, &r, &req).await {
         Ok(v) => Json(json!({ "ok": v })).into_response(),
         Err(e) => crate::ApiError(e).into_response(),
     };
