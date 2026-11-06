@@ -692,10 +692,7 @@ const checks: L.Check[] = [
       for (const f of ['distribution.toml', 'branding/brand.toml', 'plugins/README.md', 'shared/README.md', 'tests/README.md', '.github/workflows/ci.yml', 'README.md']) c.ok(fs.existsSync(path.join(dir, f)), `${f} is made`)
       const good = spawnSync(bin, ['validate', dir, '--server', path.join(out, 'no-server')], { encoding: 'utf8' })
       c.ok(good.status === 0, `a new product validates (${good.status})`)
-      fs.writeFileSync(path.join(dir, 'branding/brand.toml'), 'logo = "gone.svg"
-[colors]
-accent = "red"
-')
+      fs.writeFileSync(path.join(dir, 'branding/brand.toml'), 'logo = "gone.svg"\n[colors]\naccent = "red"\n')
       fs.writeFileSync(path.join(dir, 'distribution.toml'), fs.readFileSync(path.join(dir, 'distribution.toml'), 'utf8').replace('>=1.0, <2', 'banana'))
       const bad = spawnSync(bin, ['validate', dir, '--server', path.join(out, 'no-server')], { encoding: 'utf8' })
       c.ok(bad.status === 1 && /gone.svg/.test(bad.stdout) && /colors.accent/.test(bad.stdout) && /banana/.test(bad.stdout), 'the broken product fails and says why')
