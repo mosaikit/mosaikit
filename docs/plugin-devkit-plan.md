@@ -471,7 +471,7 @@ extensions on SQLite is refused by `build desktop`. Tests: 12 unit tests; manual
 Left: the name, version and icon of the Windows executable need `rcedit` (the build says so and leaves them); the same flow in CI on three platforms; the
 Docker release was written but the image not built here (the base image of the product is the one of `cargo xtask release docker`).
 
-### Phase 11 — Defaults, bootstrap and database extensions of a product (6 days) — done 2026-11-04, except the quotas of the first tenant
+### Phase 11 — Defaults, bootstrap and database extensions of a product (6 days) — done 2026-11-04 (quotas of the first tenant added 2026-11-06)
 
 - `distribution.toml` grows the sections that make a product behave as one, all optional:
   - `[defaults]` values of the settings on the three levels, and `[locked]` the ones the Administrator and the
@@ -497,10 +497,10 @@ is shown locked, `setting_locked` for the Administrator and the Tenant Managers)
 `admin_email`; the environment variables win; the developer profile ignores the tenant); `[database] extensions` (checked at start on PostgreSQL, a message that
 names them: `product_extensions`); `[about]` (log at start and `about` in `GET /api/brand`); `mosaikit-server check-distribution`. The known keys are in
 `xtask/src/dist.rs` too, so `cargo xtask --dist` accepts them. Tests: 6 unit tests, kernel test `product_policy` (PostgreSQL and SQLite), manual checks DK-28, DK-29.
-The About **dialog** (person menu › About: product, version, licence, text, «Powered by Mosaikit <base>»; Italian and Spanish texts; e2e test in spec 20, check DK-32) was added the same day. Left: quotas of the first tenant (use the platform quotas); the seed data of a plugin is a
+The About **dialog** (person menu › About: product, version, licence, text, «Powered by Mosaikit <base>»; Italian and Spanish texts; e2e test in spec 20, check DK-32) was added the same day. Quotas of the first tenant added later (`[bootstrap.quota]`: `storage_mb`, `people`, `items`, written as the quotas of the tenant itself; negative numbers refused; unit test, kernel test `product_policy`, check DK-33). Left: the seed data of a plugin is a
 `oneshot` sidecar (no new mechanism).
 
-### Phase 12 — Tests and conformance of a product (4 days) — done 2026-11-04, except the layout contract and the accessibility run inside `mosaikit-product test`
+### Phase 12 — Tests and conformance of a product (4 days) — done 2026-11-04 (a slice of the layout contract and the accessibility run in a browser with `test --browser`, added 2026-11-06)
 
 - `mosaikit-product test`: smoke test (start, sign in as each test user, open each plugin page, the brand, the
   About dialog), the checks of every included plugin (`validate --strict` of phase 5), the layout contract of the
@@ -517,7 +517,7 @@ profile; over HTTP: health, brand name, About data, sign-in of the four test use
 `--upgrade-from <older server>` runs the product on the older base and then, on the same data, on the current one). Broken products fail: a plugin whose `[requires] mosaikit`
 excludes the base, a wrong default or locked key, an unsigned package in the registry, `[database] extensions` on SQLite. The helpers of `@mosaikit/plugin-testing`
 (`signIn`, `openPlugin`, `expectAccessible`) are linked in `node_modules` and have their own end-to-end spec (`20-plugin-testing-helpers`: 3 tests, run).
-Left: the layout contract and the accessibility of the shell with the brand of a product run in the browser (the helpers do it; `test` does not start a browser).
+Added later: `mosaikit-product test --browser` (off by default; needs Playwright in the product folder and says so when missing) writes a spec under `.mosaikit-product/browser` and runs it against the started product: brand on the sign-in page, no horizontal overflow of the shell on desktop and phone (rule R-9), axe on both (check DK-34). Left: only this slice of the layout contract runs there (the whole contract stays with the end-to-end suite of the base); the browser run has unit tests of the wiring but was not run end to end here.
 
 ### Phase 13 — Documentation for building applications (5 days, in parallel with phases 10–12) — done 2026-11-04, except the reading by someone outside and the check of the Italian text
 

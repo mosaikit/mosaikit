@@ -96,10 +96,16 @@ tenant = "main"
 tenant_name = "Acme Maps"
 trial_days = 30
 admin_email = "ops@acme.example"
+
+[bootstrap.quota]                # facoltativo: le quote di quel tenant (una quota omessa è quella della piattaforma)
+storage_mb = 5000
+people = 50
+items = 100000
 ```
 
 La base si rifiuta di partire con una voce sbagliata e nomina la chiave. Un'impostazione bloccata ignora ciò che è memorizzato e tiene il valore del prodotto.
-Nel profilo sviluppatore (`mosaikit-product dev`) il primo tenant di `[bootstrap]` non viene creato. **Semi** (`[[plugin_settings]]`, `[[service_key_values]]`) per riferimento
+Nel profilo sviluppatore (`mosaikit-product dev`) il primo tenant di `[bootstrap]` non viene creato. `[bootstrap.quota]` imposta le quote del primo tenant (le quote proprie del tenant, come le imposterebbe
+l'Amministratore dalla sua pagina); un numero negativo è un errore all'avvio, e il tenant si può cambiare poi come ogni altro. **Semi** (`[[plugin_settings]]`, `[[service_key_values]]`) per riferimento
 (`env:NOME`, `file:PERCORSO`): mai un segreto nel file. I **dati iniziali** di un plugin sono un sidecar `kind = "oneshot"` idempotente.
 
 ## 7. Dati ed estensioni
@@ -130,6 +136,11 @@ ricostruisci e distribuisci entro il termine di [Licenza e responsabilità](../p
 
 `mosaikit-product test` valida il prodotto, lo avvia sulla base nel profilo sviluppatore e controlla via HTTP: risponde, ha brand e dati About, ogni utente di prova
 accede, il Tenant Manager vede ogni plugin proprio. Le pagine dei plugin e l'accessibilità si provano nel browser con `@mosaikit/plugin-testing`.
+
+Con `--browser`, `test` prova anche la shell con il brand del prodotto in un browser: la pagina di accesso mostra il brand e la shell, come Tenant Manager, su desktop
+e su telefono, non ha overflow orizzontale (regola R-9 del contratto di layout) e passa il controllo di accessibilità (axe). Serve Playwright nella cartella del prodotto
+(`npm install --save-dev @playwright/test @axe-core/playwright @mosaikit/plugin-testing`, poi `npx playwright install chromium`); senza, il comando si ferma e lo dice.
+È spento di default perché avvia un browser. Il contratto di layout completo (ogni percorso, ogni regola) resta nella suite end-to-end della base.
 
 ## 11. Operatività
 

@@ -26,6 +26,113 @@ pub struct Options {
     /// an older `mosaikit-server`: the product runs on it first, then on the new one with the same data
     pub upgrade_from: Option<PathBuf>,
     pub no_build: bool,
+    /// also run the shell checks (layout slice, accessibility) with the brand of the product in a browser:
+    /// needs Playwright (and `@axe-core/playwright`) installed in the product folder
+    pub browser: bool,
+}
+
+/// The spec of the browser run: the shell with the brand of the product. A slice of the layout contract
+/// (docs/refactoring-ui.md: R-9 no horizontal overflow, the main area is visible) and the accessibility smoke
+/// test (axe) of the sign-in page and of the shell after sign-in, for the Tenant Manager.
+pub const SHELL_SPEC: &str = r#"import { expect, test } from '@playwright/test'
+import { expectAccessible, signIn } from '@mosaikit/plugin-testing'
+
+const APP = process.env.MOSAIKIT_APP ?? ''
+const NAME = process.env.MOSAIKIT_BRAND_NAME ?? ''
+
+test.skip(!APP, 'MOSAIKIT_APP: the address of the running product is not set')
+
+test('the sign-in page has the brand and is accessible', async ({ page }) => {
+  await page.goto(APP)
+  if (NAME) await expect(page.getByText(NAME).first()).toBeVisible()
+  await expectAccessible(page)
+})
+
+for (const vp of [{ name: 'desktop', width: 1440, height: 900 }, { name: 'phone', width: 390, height: 844 }]) {
+  test(`the shell has no horizontal overflow and is accessible (${vp.name})`, async ({ page }) => {
+    await page.setViewportSize({ width: vp.width, height: vp.height })
+    await signIn(page, APP, 'manager')
+    await expect(page.locator('main, [role="main"]').first()).toBeVisible()
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)
+    expect(overflow, 'R-9: no horizontal overflow').toBeLessThanOrEqual(0)
+    await expectAccessible(page)
+  })
+}
+"#;
+
+pub const PLAYWRIGHT_CONFIG: &str = r#"import { defineConfig } from '@playwright/test'
+
+export default defineConfig({
+  testDir: '.',
+  testMatch: 'shell.spec.ts',
+  timeout: 60_000,
+  workers: 1,
+  reporter: 'list',
+  use: { headless: true },
+})
+"#;
+
+/// The message when the browser run cannot start because Playwright is not installed in the product folder.
+pub fn playwright_missing(dir: &Path) -> String {
+    format!(
+        "--browser needs Playwright in {}: run `npm install --save-dev @playwright/test @axe-core/playwright @mosaikit/plugin-testing` and `npx playwright install chromium` there, or leave --browser out",
+        dir.display()
+    )
+}
+
+/// Whether `@playwright/test` can be resolved from the product folder (Node and the package installed).
+fn playwright_installed(dir: &Path) -> bool {
+    std::process::Command::new("node")
+        .current_dir(dir)
+        .args(["-e", "require.resolve('@playwright/test')"])
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .status()
+        .map(|s| s.success())
+        .unwrap_or(false)
+}
+
+/// Writes the spec and the configuration of the browser run under `.mosaikit-product/browser`; gives the config.
+pub fn write_browser_files(dir: &Path) -> Result<PathBuf> {
+    let b = dir.join(".mosaikit-product").join("browser");
+    std::fs::create_dir_all(&b)?;
+    std::fs::write(b.join("shell.spec.ts"), SHELL_SPEC)?;
+    let cfg = b.join("playwright.config.ts");
+    std::fs::write(&cfg, PLAYWRIGHT_CONFIG)?;
+    Ok(cfg)
+}
+
+/// The arguments of `npx` for the browser run.
+pub fn browser_args(config: &Path) -> Vec<String> {
+    vec!["playwright".into(), "test".into(), "-c".into(), config.display().to_string()]
+}
+
+/// The shell checks in a browser against the running product `app`.
+pub fn browser(d: &Distribution, app: &str, r: &mut Report) -> Result<()> {
+    if !playwright_installed(&d.dir) {
+        bail!("{}", playwright_missing(&d.dir));
+    }
+    let cfg = write_browser_files(&d.dir)?;
+    let brand_name = d
+        .brand_dir()
+        .and_then(|b| std::fs::read_to_string(b.join("brand.toml")).ok())
+        .and_then(|t| toml::from_str::<toml::Table>(&t).ok())
+        .and_then(|t| t.get("name").and_then(|v| v.as_str().map(str::to_string)))
+        .unwrap_or_default();
+    let npx = if cfg!(windows) { "npx.cmd" } else { "npx" };
+    let status = std::process::Command::new(npx)
+        .current_dir(&d.dir)
+        .args(browser_args(&cfg))
+        .env("MOSAIKIT_APP", app)
+        .env("MOSAIKIT_BRAND_NAME", brand_name)
+        .status()
+        .with_context(|| format!("starting {npx}"))?;
+    if status.success() {
+        r.add(Level::Info, "browser: the shell with the brand of the product passes the layout slice and the accessibility check");
+    } else {
+        r.add(Level::Error, format!("browser: the shell checks failed ({status}); the list is above"));
+    }
+    Ok(())
 }
 
 fn get(client: &Client, url: &str, cookie: Option<&str>) -> Result<(u16, Value)> {
@@ -165,7 +272,11 @@ pub fn test(o: &Options) -> Result<Report> {
         match dev::start(&d, &own, o.base.as_deref(), bin, &data, port) {
             Ok((_server, app)) => {
                 r.add(Level::Info, format!("{label}: started on {app}"));
-                smoke(&d, &ids, &app, r)
+                smoke(&d, &ids, &app, r)?;
+                if o.browser && r.ok() {
+                    browser(&d, &app, r)?;
+                }
+                Ok(())
             }
             Err(e) => {
                 r.add(Level::Error, format!("{label}: the product does not start: {e:#}"));
@@ -184,4 +295,32 @@ pub fn test(o: &Options) -> Result<Report> {
         run(&server_bin, "on the base", &mut r)?;
     }
     Ok(r)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_browser_files_are_written_and_the_command_names_the_config() {
+        let t = tempfile::tempdir().unwrap();
+        let cfg = write_browser_files(t.path()).unwrap();
+        assert!(cfg.ends_with("playwright.config.ts") && cfg.exists());
+        let spec = std::fs::read_to_string(cfg.with_file_name("shell.spec.ts")).unwrap();
+        assert!(spec.contains("expectAccessible") && spec.contains("MOSAIKIT_APP") && spec.contains("R-9"));
+        let a = browser_args(&cfg);
+        assert_eq!(&a[..3], ["playwright", "test", "-c"]);
+        assert_eq!(a[3], cfg.display().to_string());
+    }
+
+    #[test]
+    fn a_folder_without_playwright_is_told_what_to_install() {
+        let t = tempfile::tempdir().unwrap();
+        assert!(!playwright_installed(t.path()));
+        let m = playwright_missing(t.path());
+        assert!(
+            m.contains("@playwright/test") && m.contains("playwright install") && m.contains("--browser"),
+            "{m}"
+        );
+    }
 }

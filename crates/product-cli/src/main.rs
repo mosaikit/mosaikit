@@ -67,6 +67,10 @@ enum Cmd {
         upgrade_from: Option<PathBuf>,
         #[arg(long)]
         no_build: bool,
+        /// also check the shell with the brand of the product in a browser (layout slice, accessibility); needs
+        /// Playwright installed in the product folder
+        #[arg(long)]
+        browser: bool,
     },
     /// A release of the product from a compiled base
     Build {
@@ -160,13 +164,14 @@ fn run(cli: Cli) -> Result<ExitCode> {
         Cmd::Dev { dir, base, server, port, data, no_open, no_build, fresh } => {
             dev::dev(&dev::Options { dir, base, server, port, data, no_open, no_build, fresh })?;
         }
-        Cmd::Test { dir, base, server, upgrade_from, no_build } => {
+        Cmd::Test { dir, base, server, upgrade_from, no_build, browser } => {
             let r = mosaikit_product_cli::test::test(&mosaikit_product_cli::test::Options {
                 dir,
                 base,
                 server,
                 upgrade_from,
                 no_build,
+                browser,
             })?;
             r.print();
             if !r.ok() {
@@ -241,5 +246,18 @@ fn main() -> ExitCode {
             eprintln!("error: {e:#}");
             ExitCode::from(2)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_takes_the_browser_flag_and_runs_without_it_by_default() {
+        let c = Cli::try_parse_from(["mosaikit-product", "test"]).unwrap();
+        assert!(matches!(c.cmd, Cmd::Test { browser: false, .. }));
+        let c = Cli::try_parse_from(["mosaikit-product", "test", "--browser", "--no-build"]).unwrap();
+        assert!(matches!(c.cmd, Cmd::Test { browser: true, no_build: true, .. }));
     }
 }

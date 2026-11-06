@@ -59,7 +59,8 @@ async fn defaults_and_locked_settings_of_a_product() {
 async fn the_first_tenant_of_a_product() {
     let (_dir, file) = seed_file(
         "[product]\nid = \"x\"\nname = \"X\"\nversion = \"1.0.0\"\n\
-         [bootstrap]\ntenant = \"work\"\ntenant_name = \"Work Co\"\ntrial_days = 30\nadmin_email = \"ops@example.com\"\n",
+         [bootstrap]\ntenant = \"work\"\ntenant_name = \"Work Co\"\ntrial_days = 30\nadmin_email = \"ops@example.com\"\n\
+         [bootstrap.quota]\nstorage_mb = 2\npeople = 7\n",
     );
     let t = start_with(|c| c.plugin_settings_file = Some(file.clone())).await;
     let q = |col: &str| format!("select {col} from core.tenants where not is_system");
@@ -77,12 +78,6 @@ async fn the_first_tenant_of_a_product() {
     assert_eq!(email.as_deref(), Some("ops@example.com"));
     // the quotas of the first tenant: its own, the rest inherited from the platform (no limit)
     let id: uuid::Uuid = mosaikit_db::query_scalar(q("id").as_str()).fetch_one(&t.db).await.unwrap();
-    let raw: String = mosaikit_db::query_scalar("select settings::text from core.tenants where id = $1")
-        .bind(id)
-        .fetch_one(&t.db)
-        .await
-        .unwrap();
-    eprintln!("RAW {raw}");
     let l = mosaikit_kernel::quotas::limits(&t, id).await.unwrap();
     assert_eq!((l.storage, l.people, l.items), (Some(2 * 1_048_576), Some(7), None));
 }
