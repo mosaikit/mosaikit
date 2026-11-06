@@ -143,18 +143,38 @@ export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unk
       if (typeof name !== 'string' || !COMMAND.test(name)) throw new OpError('invalid command name')
       return { method: 'POST', url: `${base}/call/${enc(name)}`, json: { args: a.args ?? null } }
     }
+    // `source`: the Files area of another plugin (the kernel checks `files_read` / `files_write` of the manifest)
     case 'files.list': {
+      const q = new URLSearchParams()
       const parent = optUuid(a.parent)
-      return { method: 'GET', url: `${base}/files${parent ? '?parent=' + parent : ''}` }
+      if (parent) q.set('parent', parent)
+      if (a.source !== undefined && a.source !== null) q.set('source', pluginId(a.source))
+      const qs = q.toString()
+      return { method: 'GET', url: `${base}/files${qs ? '?' + qs : ''}` }
     }
-    case 'files.mkdir':
-      return { method: 'POST', url: `${base}/files/folder`, json: { name: str(a.name, 'nome'), parent: optUuid(a.parent) } }
+    case 'files.mkdir': {
+      const q = new URLSearchParams()
+      if (a.source !== undefined && a.source !== null) q.set('source', pluginId(a.source))
+      const qs = q.toString()
+      return { method: 'POST', url: `${base}/files/folder${qs ? '?' + qs : ''}`, json: { name: str(a.name, 'nome'), parent: optUuid(a.parent) } }
+    }
     case 'files.upload': {
       const q = new URLSearchParams({ name: str(a.name, 'nome') })
       const parent = optUuid(a.parent)
       if (parent) q.set('parent', parent)
       if (a.replace === true) q.set('replace', '1')
+      if (a.source !== undefined && a.source !== null) q.set('source', pluginId(a.source))
       return { method: 'POST', url: `${base}/files/upload?${q}`, raw: blob(a.file) }
+    }
+    // a zip unpacked into a folder (`parent`) or into a new one inside it (`folder`); `conflict`: fail, skip or replace
+    case 'files.unzip': {
+      const q = new URLSearchParams()
+      const parent = optUuid(a.parent)
+      if (parent) q.set('parent', parent)
+      if (typeof a.folder === 'string' && a.folder) q.set('folder', str(a.folder, 'folder'))
+      if (a.conflict === 'skip' || a.conflict === 'replace') q.set('conflict', a.conflict)
+      if (a.source !== undefined && a.source !== null) q.set('source', pluginId(a.source))
+      return { method: 'POST', url: `${base}/files/unzip?${q}`, raw: blob(a.file) }
     }
     case 'files.rename':
       return { method: 'POST', url: `${base}/files/${uuid(a.id)}/rename`, json: { name: str(a.name, 'nome') } }
@@ -168,8 +188,10 @@ export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unk
       return { method: 'GET', url: `${base}/files/${uuid(a.id)}/content`, blob: true }
     case 'files.zip':
       return { method: 'GET', url: `${base}/files/${uuid(a.id)}/zip`, blob: true }
-    case 'ticket':
-      return { method: 'POST', url: `${base}/ticket/${uuid(a.id)}`, json: { download: a.download === true } }
+    case 'ticket': {
+      const src = a.source !== undefined && a.source !== null ? `?source=${enc(pluginId(a.source))}` : ''
+      return { method: 'POST', url: `${base}/ticket/${uuid(a.id)}${src}`, json: { download: a.download === true } }
+    }
     case 'content.upload':
       return { method: 'POST', url: `${base}/content/${uuid(a.id)}`, raw: blob(a.file) }
     case 'web.probe':

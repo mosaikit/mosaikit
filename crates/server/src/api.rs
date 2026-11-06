@@ -29,6 +29,7 @@ const PACKAGE_LIMIT: usize = 64 << 20;
 pub fn router() -> Router<AppState> {
     let uploads = Router::new()
         .route("/api/t/{t}/p/{plugin}/files/upload", post(files_upload))
+        .route("/api/t/{t}/p/{plugin}/files/unzip", post(files_unzip))
         .route("/api/t/{t}/p/{plugin}/content/{id}", post(content_upload))
         .layer(DefaultBodyLimit::max(UPLOAD_LIMIT));
     let packages = Router::new()
@@ -1023,13 +1024,35 @@ pub(crate) fn opt_uuid(v: Option<&String>) -> ApiResult<Option<Uuid>> {
     v.filter(|s| !s.is_empty() && *s != "null").map(|s| uuid(s)).transpose()
 }
 
+/// The plugin whose Files area a call works on: the caller's own, or another one (`source`) when the
+/// manifest of the caller allows it: `files_read` for what only reads, `files_write` for what changes.
+/// The kernel then checks the source (on for the tenant, declares `files`) and what the person may do.
+fn files_target(s: &AppState, own: &str, q: &HashMap<String, String>, write: bool) -> ApiResult<String> {
+    let source = match q.get("source").filter(|v| !v.is_empty()) {
+        Some(v) if v != own => v,
+        _ => return Ok(own.to_string()),
+    };
+    let perms = s.k.plugins.active(own)?.manifest.permissions.clone();
+    let allowed = if write { perms.files_write } else { perms.files_read || perms.files_write };
+    if !allowed {
+        return Err(Error::forbidden(if write {
+            "the plugin does not declare `files_write` in [permissions]"
+        } else {
+            "the plugin does not declare `files_read` in [permissions]"
+        })
+        .into());
+    }
+    Ok(source.clone())
+}
+
 async fn files_list(
     State(s): State<AppState>,
     Tenant(c): Tenant,
     Path(p): Path<PluginPath>,
     Query(q): Query<HashMap<String, String>>,
 ) -> ApiResult<Json<Value>> {
-    Ok(Json(json!(files::list(&s.k, &c, &p.plugin, opt_uuid(q.get("parent"))?).await?)))
+    let plugin = files_target(&s, &p.plugin, &q, false)?;
+    Ok(Json(json!(files::list(&s.k, &c, &plugin, opt_uuid(q.get("parent"))?).await?)))
 }
 
 #[derive(Deserialize)]
@@ -1042,9 +1065,11 @@ async fn files_mkdir(
     State(s): State<AppState>,
     Tenant(c): Tenant,
     Path(p): Path<PluginPath>,
+    Query(q): Query<HashMap<String, String>>,
     Json(r): Json<FolderReq>,
 ) -> ApiResult<Json<Value>> {
-    Ok(Json(json!(files::mkdir(&s.k, &c, &p.plugin, r.parent, &r.name).await?)))
+    let plugin = files_target(&s, &p.plugin, &q, true)?;
+    Ok(Json(json!(files::mkdir(&s.k, &c, &plugin, r.parent, &r.name).await?)))
 }
 
 async fn files_upload(
@@ -1056,8 +1081,25 @@ async fn files_upload(
 ) -> ApiResult<Json<Value>> {
     let name = q.get("name").ok_or_else(|| bad("missing name"))?;
     let replace = q.get("replace").is_some_and(|v| v == "1" || v == "true");
+    let plugin = files_target(&s, &p.plugin, &q, true)?;
+    Ok(Json(json!(files::upload(&s.k, &c, &plugin, opt_uuid(q.get("parent"))?, name, &body, replace).await?)))
+}
+
+/// Unpacks a zip into a folder (`parent`), or into a new one inside it (`folder`); `conflict` is
+/// `fail` (default), `skip` or `replace`.
+async fn files_unzip(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<PluginPath>,
+    Query(q): Query<HashMap<String, String>>,
+    body: Bytes,
+) -> ApiResult<Json<Value>> {
+    let on_conflict = files::OnConflict::parse(q.get("conflict").map_or("", String::as_str))
+        .ok_or_else(|| bad("conflict must be fail, skip or replace"))?;
+    let folder = q.get("folder").filter(|f| !f.is_empty()).map(String::as_str);
+    let plugin = files_target(&s, &p.plugin, &q, true)?;
     Ok(Json(json!(
-        files::upload(&s.k, &c, &p.plugin, opt_uuid(q.get("parent"))?, name, &body, replace).await?
+        files::unzip(&s.k, &c, &plugin, opt_uuid(q.get("parent"))?, folder, &body, on_conflict).await?
     )))
 }
 
@@ -1170,10 +1212,12 @@ async fn ticket(
     State(s): State<AppState>,
     Tenant(c): Tenant,
     Path(p): Path<PluginPath>,
+    Query(q): Query<HashMap<String, String>>,
     body: Option<Json<TicketReq>>,
 ) -> ApiResult<Json<Value>> {
     let download = body.map(|b| b.0.download).unwrap_or(false);
-    Ok(Json(json!(content::ticket(&s.k, &c, &p.plugin, p.id()?, download).await?)))
+    let plugin = files_target(&s, &p.plugin, &q, false)?;
+    Ok(Json(json!(content::ticket(&s.k, &c, &plugin, p.id()?, download).await?)))
 }
 
 // ------------------------------------------------------------------ manager of the tenant

@@ -228,6 +228,15 @@ export interface WebProbe {
   image: string | null
 }
 
+/** What unpacking a zip made (`files.unzip`). */
+export interface Unzipped {
+  /** the folder made for the content, when one was asked for */
+  folder: FileEntry | null
+  files: number
+  folders: number
+  skipped: number
+}
+
 export interface SiteInfo {
   files: number
   size: number

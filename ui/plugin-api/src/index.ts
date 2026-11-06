@@ -42,6 +42,7 @@ export type {
   ResourceMeta,
   Row,
   SiteInfo,
+  Unzipped,
   TabInfo,
   UiContext,
   Values,

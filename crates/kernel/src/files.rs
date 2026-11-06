@@ -599,6 +599,242 @@ pub async fn resolve_path(
     Ok(None)
 }
 
+/// What to do with a file of the zip whose name is already taken in the destination.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OnConflict {
+    /// stop and undo what was created (the default)
+    Fail,
+    /// keep the existing one
+    Skip,
+    /// overwrite the content of an existing file (what was overwritten cannot be undone)
+    Replace,
+}
+
+impl OnConflict {
+    pub fn parse(s: &str) -> Option<OnConflict> {
+        match s {
+            "" | "fail" => Some(OnConflict::Fail),
+            "skip" => Some(OnConflict::Skip),
+            "replace" => Some(OnConflict::Replace),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Unzipped {
+    /// the folder made for the content, when one was asked for
+    pub folder: Option<Entry>,
+    pub files: usize,
+    pub folders: usize,
+    pub skipped: usize,
+}
+
+const UNZIP_MAX_FILES: usize = 20_000;
+const UNZIP_MAX_BYTES: u64 = 512 << 20;
+
+/// A folder called `name` under `parent`: the existing one, or a new one (then its id is in `created`).
+async fn ensure_folder(
+    k: &Kernel,
+    c: &Caller,
+    plugin_id: &str,
+    parent: Option<Uuid>,
+    name: &str,
+    created: &mut Vec<Uuid>,
+) -> Result<Uuid> {
+    let p = plugin(k, c, plugin_id, crate::access::USE).await?;
+    let mut tx = k.db.begin_plugin_read(&p.id, &c.ctx()).await?;
+    let existing = sibling(&mut tx, parent, name, None).await?;
+    tx.commit().await?;
+    match existing {
+        Some(e) if e.is_dir => Ok(e.id),
+        Some(_) => Err(Error::conflict(format!("a file '{name}' already exists where a folder is needed"))),
+        None => {
+            let e = mkdir(k, c, plugin_id, parent, name).await?;
+            created.push(e.id);
+            Ok(e.id)
+        }
+    }
+}
+
+/// Unpacks a zip into the folder `parent` (the root if `None`), or into a new folder `folder` inside it,
+/// keeping its structure. The whole archive is checked before anything is created: paths (no `..`, no
+/// absolute or drive paths, no separators or control characters in a name), the number of files, the
+/// size really inflated (the sizes in a zip header are written by whoever made it) and the quotas of the
+/// tenant. `__MACOSX/` and `._*` entries are dropped. If a step fails, what was created is removed.
+pub async fn unzip(
+    k: &Kernel,
+    c: &Caller,
+    plugin_id: &str,
+    parent: Option<Uuid>,
+    folder: Option<&str>,
+    zip_bytes: &[u8],
+    on_conflict: OnConflict,
+) -> Result<Unzipped> {
+    use std::io::Read;
+    let p = plugin(k, c, plugin_id, crate::access::CREATE).await?;
+    if let Some(f) = folder {
+        if !valid_name(f) {
+            return Err(Error::bad("invalid folder name"));
+        }
+    }
+    let mut zip = zip::ZipArchive::new(std::io::Cursor::new(zip_bytes))
+        .map_err(|e| Error::bad(format!("invalid zip: {e}")))?;
+    if zip.len() > UNZIP_MAX_FILES {
+        return Err(Error::bad(format!("the zip contains more than {UNZIP_MAX_FILES} entries")));
+    }
+
+    // pass 1: names and real sizes
+    struct Item {
+        index: usize,
+        segs: Vec<String>,
+        is_dir: bool,
+    }
+    let mut items: Vec<Item> = Vec::new();
+    let (mut total, mut files, mut dirs) = (0u64, 0usize, std::collections::HashSet::new());
+    for i in 0..zip.len() {
+        let mut f = zip.by_index(i).map_err(|e| Error::bad(format!("zip: {e}")))?;
+        let name = f.name().map_err(|e| Error::bad(format!("zip: {e}")))?.replace('\\', "/");
+        let trimmed = name.trim_end_matches('/');
+        if trimmed.is_empty() {
+            continue;
+        }
+        if f.enclosed_name().is_none() || trimmed.starts_with('/') || trimmed.contains(':') {
+            return Err(Error::bad(format!("unsafe path in the zip: {name}")));
+        }
+        let segs: Vec<String> = trimmed.split('/').map(str::to_string).collect();
+        if segs[0] == "__MACOSX" || segs.last().is_some_and(|s| s.starts_with("._")) {
+            continue;
+        }
+        if segs.len() > 64 || !segs.iter().all(|s| valid_name(s)) {
+            return Err(Error::bad(format!("unsafe or invalid name in the zip: {name}")));
+        }
+        for n in 1..segs.len() {
+            dirs.insert(segs[..n].join("/"));
+        }
+        let is_dir = f.is_dir();
+        if is_dir {
+            dirs.insert(segs.join("/"));
+        } else {
+            let left = UNZIP_MAX_BYTES - total;
+            let n = std::io::copy(&mut (&mut f).take(left + 1), &mut std::io::sink())
+                .map_err(|e| Error::bad(format!("zip: {e}")))?;
+            total += n;
+            if total > UNZIP_MAX_BYTES {
+                return Err(Error::bad(format!("content of the zip over {} MB", UNZIP_MAX_BYTES >> 20))
+                    .with_code("content_too_large"));
+            }
+            files += 1;
+        }
+        items.push(Item { index: i, segs, is_dir });
+    }
+    let tenant = c.tenant.tenant_id;
+    crate::quotas::check(
+        k,
+        tenant,
+        crate::quotas::Add {
+            items: (files + dirs.len() + usize::from(folder.is_some())) as i64,
+            storage: total as i64,
+            people: 0,
+        },
+    )
+    .await?;
+
+    // pass 2: create; on failure remove what this call made
+    let mut created: Vec<Uuid> = Vec::new();
+    let res = async {
+        let mut root = parent;
+        let mut made = None;
+        if let Some(name) = folder {
+            if on_conflict == OnConflict::Fail {
+                let mut tx = k.db.begin_plugin_read(&p.id, &c.ctx()).await?;
+                let taken = sibling(&mut tx, parent, name, None).await?;
+                tx.commit().await?;
+                if taken.is_some() {
+                    return Err(Error::conflict(format!("an item called '{name}' already exists")));
+                }
+            }
+            let id = ensure_folder(k, c, plugin_id, parent, name, &mut created).await?;
+            root = Some(id);
+            made = Some(id);
+        }
+        let mut ids: std::collections::HashMap<String, Uuid> = std::collections::HashMap::new();
+        let (mut nfiles, mut skipped) = (0usize, 0usize);
+        for it in &items {
+            // the folders on the way
+            let upto = if it.is_dir { it.segs.len() } else { it.segs.len() - 1 };
+            let mut at = root;
+            for n in 1..=upto {
+                let key = it.segs[..n].join("/");
+                let id = match ids.get(&key) {
+                    Some(id) => *id,
+                    None => {
+                        let id = ensure_folder(k, c, plugin_id, at, &it.segs[n - 1], &mut created).await?;
+                        ids.insert(key, id);
+                        id
+                    }
+                };
+                at = Some(id);
+            }
+            if it.is_dir {
+                continue;
+            }
+            let mut f = zip.by_index(it.index).map_err(|e| Error::bad(format!("zip: {e}")))?;
+            let mut buf = Vec::with_capacity(f.size().min(16 << 20) as usize);
+            (&mut f)
+                .take(UNZIP_MAX_BYTES + 1)
+                .read_to_end(&mut buf)
+                .map_err(|e| Error::bad(format!("zip: {e}")))?;
+            drop(f);
+            let name = it.segs.last().expect("a file has a name");
+            match upload(k, c, plugin_id, at, name, &buf, on_conflict == OnConflict::Replace).await {
+                Ok(e) => {
+                    if on_conflict != OnConflict::Replace {
+                        created.push(e.id);
+                    }
+                    nfiles += 1;
+                }
+                Err(e) if on_conflict == OnConflict::Skip && e.kind == crate::Kind::Conflict => skipped += 1,
+                Err(e) => return Err(e),
+            }
+        }
+        Ok((made, nfiles, ids.len() + usize::from(folder.is_some()), skipped))
+    }
+    .await;
+    match res {
+        Ok((made, nfiles, nfolders, skipped)) => {
+            let folder = match made {
+                Some(id) => {
+                    let mut tx = k.db.begin_plugin_read(&p.id, &c.ctx()).await?;
+                    let e = get_entry(&mut tx, id).await?;
+                    tx.commit().await?;
+                    Some(e)
+                }
+                None => None,
+            };
+            events::record(
+                k,
+                Some(tenant),
+                Some(c.user.user_id),
+                Some(&p.id),
+                folder.as_ref().map(|f| f.id).or(parent),
+                "file.unzip",
+                json!({ "files": nfiles, "folders": nfolders, "skipped": skipped }),
+            )
+            .await;
+            crate::quotas::touched(k, tenant);
+            Ok(Unzipped { folder, files: nfiles, folders: nfolders, skipped })
+        }
+        Err(e) => {
+            // newest first: the files before the folders that hold them
+            for id in created.into_iter().rev() {
+                let _ = delete(k, c, plugin_id, id).await;
+            }
+            Err(e)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
