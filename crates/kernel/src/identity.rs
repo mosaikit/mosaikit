@@ -257,10 +257,11 @@ async fn initial_tenant(k: &Kernel, slug: &str) -> Result<Option<String>> {
     let password = initial_password(k);
     let hash = hash_password(k, &password).await?;
     let mut tx = k.db.begin_app().await?;
+    let tenant_name = k.product.bootstrap.tenant_name.clone().unwrap_or_else(|| k.brand.name.clone());
     let tenant: Uuid =
         mosaikit_db::query_scalar("insert into core.tenants (slug, name) values ($1, $2) returning id")
             .bind(&slug)
-            .bind(k.product.bootstrap.tenant_name.as_deref().unwrap_or(&k.brand.name))
+            .bind(&tenant_name)
             .fetch_one(&mut *tx)
             .await?;
     if let Some(q) = k.product.bootstrap.quota.as_ref().and_then(|q| q.to_settings()) {
@@ -295,7 +296,12 @@ async fn initial_tenant(k: &Kernel, slug: &str) -> Result<Option<String>> {
     .await?;
     crate::access::create_default_profile(&mut tx, tenant).await?;
     tx.commit().await?;
-    Ok(Some(format!("Work (sign-in page, tenant {})\nusername: user\npassword: {password}\n", k.brand.name)))
+    Ok(Some(credentials_text(&tenant_name, &slug, &password)))
+}
+
+/// The text of the credentials file of the first tenant: the name and the slug the tenant really has.
+fn credentials_text(tenant_name: &str, slug: &str, password: &str) -> String {
+    format!("Work (sign-in page, tenant {tenant_name}, slug {slug})\nusername: user\npassword: {password}\n")
 }
 
 pub struct LoginResult {
@@ -978,6 +984,12 @@ pub fn valid_username(u: &str) -> bool {
 #[cfg(test)]
 mod limiter_tests {
     use super::*;
+
+    #[test]
+    fn the_credentials_name_the_tenant_that_was_made() {
+        let t = credentials_text("Acme Corp", "acme", "pw");
+        assert!(t.contains("tenant Acme Corp, slug acme") && t.contains("password: pw"), "{t}");
+    }
 
     #[test]
     fn the_limiter_forgets_stale_keys() {

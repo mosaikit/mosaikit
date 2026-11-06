@@ -4,9 +4,17 @@ An **application** (a *product*, in the code a *distribution*) is Mosaikit with 
 and a way of starting that are yours. You build it from the **compiled** Mosaikit (the desktop kit and the Docker
 image): no source of Mosaikit, no fork, no compilation of the kernel. The tool is `mosaikit-product`.
 
+**Where the base comes from.** The development kit has the tools (`mosaikit-product`, `mosaikit-plugin`,
+`mosaikit-server`) but **not** the desktop kit of the base (`mosaikit.exe` and `registry/index.json`, the official
+plugins), which `build desktop --base` needs. The desktop kit is the zip of the platform release
+(`mosaikit-<version>-desktop-windows-x86_64.zip`, GitHub Releases of `mosaikit/mosaikit`): give `--base` the zip or the
+folder you unpacked it into. `validate` and `dev` of a product with no official plugin do not need it; `build desktop`
+does, and stops with `no mosaikit.exe in the desktop kit` without it. For Docker the base is the image
+(`--base-image`), for Kubernetes the k8s folder of the release (`--base-k8s`).
+
 A worked example, step by step, is in [Reference product](reference-product.md). The terms of redistribution are in
 [Licensing and responsibilities](product-licensing.md). The contract between the base and a product is in
-[../reports/distribution-audit.md](../reports/distribution-audit.md).
+[architecture §14](../architecture.md).
 
 ## 1. What a product is
 
@@ -19,7 +27,8 @@ A worked example, step by step, is in [Reference product](reference-product.md).
 | The desktop and Docker packaging, the migrations of the base | Seeds (plugin settings, platform keys), navigation groups, sidecars |
 
 **What a product cannot change:** the kernel, the security rules, the origins, the signature model, the plugin API,
-the format of the data. Everything it may change is listed in the audit report and is set in `distribution.toml`.
+the format of the data. Everything it may change is set in `distribution.toml` ([architecture §14](../architecture.md)); a table or key the tool
+does not know is refused by `validate`, so a typo does not pass silently.
 
 ## 2. The product folder
 
@@ -68,6 +77,22 @@ postgres_image = "postgis/postgis:17-3.5-alpine"
 high), `favicon`, `icon` (a `.ico` of 16–256 px, for the desktop executable and the notification area) and `[colors]` (`#rrggbb`
 only; the transparent variants of the accent are computed). The plugin UIs receive the same colours. `validate` checks that
 the files exist and that the colours are `#rrggbb`.
+
+The names in `[colors]` are `accent` (buttons, links, focus), `bg` (page), `panel`, `panel2` (cards and bands), `line`
+(borders), `fg` (text), `dim` (secondary text), `ok` and `err`. Any other name is refused. The colours are injected in the
+page the server sends; `GET /api/brand` does not carry them.
+
+```toml
+# branding/brand.toml
+name = "Acme Maps"
+icon = "icon.ico"
+[colors]
+accent = "#0b6e4f"
+```
+
+The `.ico` must be a real icon file, not a renamed PNG. The kit has no tool to make one: export it from your design
+tool or use an icon converter that writes a multi-size file (16, 32, 48 and 256 px). `validate` checks that the file
+exists; it does not read it, so open the built executable to see the icon.
 
 On the **desktop**, the name, version and icon of the executable are written with
 [`rcedit`](https://github.com/electron/rcedit) when it is on the PATH (Windows); without it the build says so and leaves the
@@ -123,8 +148,33 @@ and keeps the default of the product. In the developer profile (`mosaikit-produc
 created: the profile brings its own tenant and users. `[bootstrap.quota]` sets the quotas of the first tenant (the quotas of the tenant itself, as the
 Administrator would set them on its page); a negative number is an error at start, and the tenant can be changed later like any other.
 
+If the tenant already exists (the database was made before), the first-start quotas are not applied again: the Administrator
+sets them on the page of the tenant, or through the API once signed in at `POST /api/auth/admin/login`:
+`PUT /api/admin/tenants/<tenant id>/quotas` with a body such as `{"people": {"customized": true, "limit": 25}, "storage": {"customized": true, "limit": 5368709120}}`
+(`storage` in bytes; the list of tenants and their ids is `GET /api/admin/tenants`). A plain number instead of the object is refused.
+
+**Navigation groups** gather the plugins of the sidebar under headings. They are `[[nav_groups]]` tables:
+
+```toml
+[[nav_groups]]
+id = "data"                 # unique; the key of the collapsed state kept in the browser
+label = "Data"              # English; other languages below
+icon = "database"           # one of the icon names below; an unknown one falls back to the folder icon
+plugins = ["com.acme.parcels", "com.mosaikit.notes"]    # plugin ids, in the order shown
+[nav_groups.i18n.it]
+label = "Dati"
+```
+
+A plugin that no group lists stays under "Other apps". A plugin that is not installed is ignored (a warning in the log), and
+a group with no plugin is hidden: list in a group only plugins of `include`, `validate` warns about the others. The icon
+names are: archive, badge-check, bar-chart-3, bell, book, book-open, book-user, bot, briefcase, building-2, calendar,
+camera, chart-pie, clipboard-list, clock, cloud, code, database, file-text, files, folder, gauge, globe, grid, image,
+inbox, kanban, landmark, layers, layout-dashboard, link, list, list-checks, mail, map, map-pin, message-square,
+notebook-pen, package, pen-tool, puzzle, receipt, route, server, settings, share-2, shield-check, shopping-cart,
+square-check-big, star, table, tag, truck, users, wallet, wrench. Groups apply to the default sidebar only.
+
 **Seeds** (`[[plugin_settings]]`, `[[service_key_values]]`) put the settings and keys of plugins in place at the first start,
-by reference (`env:NAME`, `file:PATH`): never write a secret in the file ([architecture §14.2](../architecture.md)).
+by reference (`env:NAME`, `file:PATH`, a relative path being relative to the folder of `distribution.toml`): never write a secret in the file ([architecture §14.2](../architecture.md)).
 **Seed data** of a plugin (an idempotent command run once) is a `kind = "oneshot"` sidecar ([architecture §14.0](../architecture.md)).
 
 ## 7. Data and extensions
@@ -136,12 +186,12 @@ by reference (`env:NAME`, `file:PATH`): never write a secret in the file ([archi
   asks for them without `[desktop] database = "postgres"`.
 - **Migrations**: those of the base and of the plugins run at start, as for any installation ([Data](data.md)).
 - **Backup and restore**: a desktop product copies the `data/` folder with the program stopped; Docker uses the scheduled backups of the
-  Administrator (System › Backup and restore) and the volumes ([deploy/README.docker.md](../../deploy/README.docker.md)).
+  Administrator (System › Backup and restore) and the volumes (the `README.md` of the Docker release that `build docker` writes).
 
 ## 8. Build and release
 
 ```text
-mosaikit-product build desktop --base <desktop kit folder or .zip>      dist/<id>-<version>-desktop
+mosaikit-product build desktop --base <desktop kit folder or .zip>      dist/<id>-<version>-desktop   (the platform release zip, see the top)
 mosaikit-product build docker  --base <desktop kit> --base-image mosaikit:1.0.0 [--build]   dist/<id>-<version>-docker
 mosaikit-product build k8s     --base-k8s <k8s folder of the kit>       dist/<id>-<version>-k8s
 ```
@@ -169,13 +219,16 @@ mosaikit-product build k8s     --base-k8s <k8s folder of the kit>       dist/<id
 
 `mosaikit-product test` validates the product (the strict checks of every own plugin, the brand, the policy by the base), starts it on the base in the
 developer profile and checks over HTTP that it answers, has its brand and its About data, that every test user signs in and that the Tenant Manager
-sees every own plugin of the release; with `--upgrade-from` it runs the upgrade test. The pages of the plugins and the accessibility are checked in the
+sees every own plugin of the release (the official ones are not checked: pass `--base` to get a warning when one is not in the registry of the base); with `--upgrade-from` it runs the upgrade test. The pages of the plugins and the accessibility are checked in the
 browser with `@mosaikit/plugin-testing` (`signIn`, `openPlugin`, `expectAccessible`: [Testing](testing.md)); the reference product has a spec that does it.
 
 With `--browser`, `test` also runs the shell with the brand of the product in a browser: the sign-in page shows the brand, and the shell, as the Tenant Manager,
 on a desktop and on a phone, has no horizontal overflow (rule R-9 of the layout contract) and passes the accessibility check (axe). It needs Playwright in the
 product folder (`npm install --save-dev @playwright/test @axe-core/playwright @mosaikit/plugin-testing`, then `npx playwright install chromium`); without it the
 command stops and says so. It is off by default because it starts a browser. The whole layout contract (every route, every rule) stays with the end-to-end suite of the base.
+
+For a check by `curl` of a running product (the sign-in endpoints, the address of a plugin page) see "Smoke test without a
+browser" in [Testing](testing.md).
 
 ## 11. Operations
 

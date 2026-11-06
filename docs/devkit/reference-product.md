@@ -4,7 +4,8 @@ A small, complete product, made step by step with the tools of the kit: a brand,
 start. Each step is a command you can run; the checks of the manual catalog (DK-27 to DK-31) repeat them.
 
 You need the kit (`mosaikit-plugin`, `mosaikit-product`, `mosaikit-server`) and the desktop kit of the base
-(a folder or its `.zip`). With the kit on the PATH, set `MOSAIKIT_BASE` to the desktop kit and `MOSAIKIT_SERVER_BIN`
+(a folder or its `.zip`: the desktop zip of the platform release, which the dev kit does not include;
+[Building an application](building-an-application.md) says where to get it). With the kit on the PATH, set `MOSAIKIT_BASE` to the desktop kit and `MOSAIKIT_SERVER_BIN`
 to its server (`mosaikit-server`) so that the commands below need no extra option.
 
 ## 1. Make it

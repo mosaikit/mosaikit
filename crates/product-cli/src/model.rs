@@ -9,6 +9,7 @@ use mosaikit_plugin_cli::Plugin;
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Product {
     pub id: String,
     pub name: String,
@@ -24,12 +25,14 @@ pub struct Product {
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Brand {
     #[serde(default)]
     pub dir: Option<PathBuf>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Plugins {
     /// folders that contain plugins: a plugin folder itself, or a folder of plugin folders
     #[serde(default)]
@@ -41,6 +44,7 @@ pub struct Plugins {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Desktop {
     /// "sqlite" (default) or "postgres" (embedded)
     #[serde(default = "sqlite")]
@@ -63,6 +67,7 @@ fn port() -> u16 {
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Docker {
     /// name of the image of the product (default: the id)
     #[serde(default)]
@@ -73,6 +78,7 @@ pub struct Docker {
 }
 
 #[derive(Debug, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Distribution {
     pub product: Product,
     #[serde(default)]
@@ -83,6 +89,30 @@ pub struct Distribution {
     pub desktop: Desktop,
     #[serde(default)]
     pub docker: Docker,
+    // The tables below are read by the base or by other tools; they are named here only so that a table
+    // that nobody reads (a typo such as `[quota_defaults]`) is refused instead of silently ignored.
+    #[serde(default)]
+    pub tests: Option<toml::Value>,
+    #[serde(default)]
+    pub sidecars: Option<toml::Value>,
+    #[serde(default)]
+    pub plugin_settings: Option<toml::Value>,
+    #[serde(default)]
+    pub service_key_values: Option<toml::Value>,
+    #[serde(default)]
+    pub nav_groups: Option<toml::Value>,
+    #[serde(default)]
+    pub defaults: Option<toml::Value>,
+    #[serde(default)]
+    pub locked: Option<toml::Value>,
+    #[serde(default)]
+    pub languages: Option<toml::Value>,
+    #[serde(default)]
+    pub bootstrap: Option<toml::Value>,
+    #[serde(default)]
+    pub database: Option<toml::Value>,
+    #[serde(default)]
+    pub about: Option<toml::Value>,
     /// folder of the file (to resolve the relative paths)
     #[serde(skip)]
     pub dir: PathBuf,
@@ -204,5 +234,49 @@ mod tests {
         )
         .unwrap();
         assert!(Distribution::load(t.path()).is_err());
+    }
+
+    #[test]
+    fn a_table_or_key_nobody_reads_is_refused() {
+        let t = tempfile::tempdir().unwrap();
+        let head = "[product]
+id = \"acme\"
+name = \"Acme\"
+version = \"1.0.0\"
+";
+        let load = |extra: &str| {
+            std::fs::write(t.path().join("distribution.toml"), format!("{head}{extra}")).unwrap();
+            Distribution::load(t.path())
+        };
+        assert!(load(
+            "[bootstrap]
+tenant = \"acme\"
+[nav_groups_typo]
+x = 1
+"
+        )
+        .is_err());
+        assert!(load(
+            "[quota_defaults]
+people = 5
+"
+        )
+        .is_err());
+        assert!(load(
+            "[desktop]
+prot = 1
+"
+        )
+        .is_err());
+        assert!(load(
+            "[bootstrap]
+tenant = \"acme\"
+[[nav_groups]]
+id = \"a\"
+[about]
+text = \"x\"
+"
+        )
+        .is_ok());
     }
 }

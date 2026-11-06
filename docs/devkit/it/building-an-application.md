@@ -4,9 +4,16 @@ Un'**applicazione** (un *prodotto*, nel codice una *distribuzione*) è Mosaikit 
 e un modo di avviarsi che sono tuoi. La costruisci dal Mosaikit **compilato** (il kit desktop e l'immagine Docker): niente
 sorgenti di Mosaikit, niente fork, niente compilazione del kernel. Lo strumento è `mosaikit-product`.
 
+**Da dove viene la base.** Il kit di sviluppo ha gli strumenti (`mosaikit-product`, `mosaikit-plugin`, `mosaikit-server`) ma **non** il
+kit desktop della base (`mosaikit.exe` e `registry/index.json`, i plugin ufficiali), che serve a `build desktop --base`. Il kit desktop
+è lo zip desktop della release della piattaforma (`mosaikit-<versione>-desktop-windows-x86_64.zip`, GitHub Releases di
+`mosaikit/mosaikit`): dai a `--base` lo zip o la cartella in cui l'hai scompattato. `validate` e `dev` di un prodotto senza plugin ufficiali
+non lo richiedono; `build desktop` sì, e senza si ferma con `no mosaikit.exe in the desktop kit`. Per Docker la base è l'immagine
+(`--base-image`), per Kubernetes la cartella k8s della release (`--base-k8s`).
+
 Un esempio completo, passo per passo, è in [Prodotto di riferimento](../reference-product.md). I termini di ridistribuzione sono in
 [Licenza e responsabilità](../product-licensing.md). Il contratto fra base e prodotto è in
-[../../reports/distribution-audit.md](../../reports/distribution-audit.md). *(Traduzione a cura dell'autore: vuole la lettura di
+[architecture §14](../../architecture.md). *(Traduzione a cura dell'autore: vuole la lettura di
 un madrelingua.)*
 
 ## 1. Che cos'è un prodotto
@@ -66,6 +73,10 @@ postgres_image = "postgis/postgis:17-3.5-alpine"
 
 `branding/brand.toml`: `name`, `tagline`, `login_message`, `footer`, `support_url`, `logo`, `favicon`, `icon` (un `.ico` 16–256 px) e `[colors]`
 (solo `#rrggbb`). I plugin ricevono gli stessi colori. `validate` controlla che i file esistano e che i colori siano `#rrggbb`.
+I nomi di `[colors]` sono `accent` (pulsanti, link, focus), `bg` (pagina), `panel`, `panel2` (schede e fasce), `line` (bordi), `fg` (testo),
+`dim` (testo secondario), `ok` ed `err`; ogni altro nome è rifiutato. I colori sono iniettati nella pagina che il server invia; `GET /api/brand`
+non li porta. Il `.ico` deve essere un vero file icona, non un PNG rinominato: il kit non ha uno strumento per farlo (esportalo dal tuo programma
+di grafica o usa un convertitore che scriva un file a più dimensioni: 16, 32, 48 e 256 px). `validate` controlla solo che il file esista.
 Su **desktop** nome, versione e icona dell'eseguibile si scrivono con [`rcedit`](https://github.com/electron/rcedit) se è nel PATH (Windows);
 senza, la build lo dice e lascia l'eseguibile com'è. Dati **About** (`[about]`, prodotto, versione, base): nel log all'avvio e in `GET /api/brand` (`about`).
 
@@ -105,8 +116,32 @@ items = 100000
 
 La base si rifiuta di partire con una voce sbagliata e nomina la chiave. Un'impostazione bloccata ignora ciò che è memorizzato e tiene il valore del prodotto.
 Nel profilo sviluppatore (`mosaikit-product dev`) il primo tenant di `[bootstrap]` non viene creato. `[bootstrap.quota]` imposta le quote del primo tenant (le quote proprie del tenant, come le imposterebbe
-l'Amministratore dalla sua pagina); un numero negativo è un errore all'avvio, e il tenant si può cambiare poi come ogni altro. **Semi** (`[[plugin_settings]]`, `[[service_key_values]]`) per riferimento
-(`env:NOME`, `file:PERCORSO`): mai un segreto nel file. I **dati iniziali** di un plugin sono un sidecar `kind = "oneshot"` idempotente.
+l'Amministratore dalla sua pagina); un numero negativo è un errore all'avvio, e il tenant si può cambiare poi come ogni altro. Se il tenant esiste già (il database è stato fatto prima) le quote del primo avvio non si riapplicano: l'Amministratore le imposta dalla pagina del tenant,
+o via API dopo l'accesso a `POST /api/auth/admin/login`: `PUT /api/admin/tenants/<id del tenant>/quotas` con un corpo come
+`{"people": {"customized": true, "limit": 25}, "storage": {"customized": true, "limit": 5368709120}}` (`storage` in byte; elenco e id dei tenant:
+`GET /api/admin/tenants`). Un numero semplice al posto dell'oggetto è rifiutato.
+
+**Gruppi di navigazione**: riuniscono i plugin della barra laterale sotto un titolo, con tabelle `[[nav_groups]]`:
+
+```toml
+[[nav_groups]]
+id = "data"                 # unico; la chiave dello stato chiuso/aperto nel browser
+label = "Data"              # inglese; le altre lingue sotto
+icon = "database"           # uno dei nomi sotto; un nome ignoto ricade sull'icona della cartella
+plugins = ["com.acme.parcels", "com.mosaikit.notes"]    # id dei plugin, nell'ordine mostrato
+[nav_groups.i18n.it]
+label = "Dati"
+```
+
+Un plugin che nessun gruppo elenca resta sotto "Other apps". Un plugin non installato è ignorato (un avviso nel log) e un gruppo senza plugin è nascosto:
+elenca in un gruppo solo plugin di `include` (`validate` avvisa degli altri). Nomi delle icone: archive, badge-check, bar-chart-3, bell, book, book-open,
+book-user, bot, briefcase, building-2, calendar, camera, chart-pie, clipboard-list, clock, cloud, code, database, file-text, files, folder, gauge, globe,
+grid, image, inbox, kanban, landmark, layers, layout-dashboard, link, list, list-checks, mail, map, map-pin, message-square, notebook-pen, package,
+pen-tool, puzzle, receipt, route, server, settings, share-2, shield-check, shopping-cart, square-check-big, star, table, tag, truck, users, wallet,
+wrench. I gruppi valgono solo per la barra laterale predefinita.
+
+**Semi** (`[[plugin_settings]]`, `[[service_key_values]]`) per riferimento
+(`env:NOME`, `file:PERCORSO`, un percorso relativo è relativo alla cartella di `distribution.toml`): mai un segreto nel file. I **dati iniziali** di un plugin sono un sidecar `kind = "oneshot"` idempotente.
 
 ## 7. Dati ed estensioni
 
@@ -118,7 +153,7 @@ l'Amministratore dalla sua pagina); un numero negativo è un errore all'avvio, e
 ## 8. Build e release
 
 ```text
-mosaikit-product build desktop --base <kit desktop>                          dist/<id>-<versione>-desktop
+mosaikit-product build desktop --base <kit desktop>                          dist/<id>-<versione>-desktop   (lo zip della release della piattaforma, vedi in alto)
 mosaikit-product build docker  --base <kit desktop> --base-image mosaikit:1.0.0 [--build]
 mosaikit-product build k8s     --base-k8s <cartella k8s del kit>
 ```
