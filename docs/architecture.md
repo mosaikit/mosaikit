@@ -1593,7 +1593,26 @@ answers CORS for any origin because the ticket is the only credential): it reads
 A page opened that way has no bridge to the shell (`msk.*`); what it tells the host and the host tells it goes over `window.parent.postMessage` under the contract of the embed
 (`event.source` is checked on both sides; the platform sets no shape for the messages).
 
-**Not in this version.** A public link: the ticket is a person's. An embed in a public view needs a ticket tied to the link and its public commands (§8.13).
+**In a public link view.** The same `msk.embeds.url` works in the page of a public link (§8.13), but the ticket is not a person's: nobody is signed in, so it
+is tied to the link. The shell of the public page answers the call (`POST /p/{token}/embed`, JSON body `{ plugin, name, resource }`, at most 2 KiB; the link is resolved
+again first, as for a public command) with `embeds::public_url`, which requires, in order: the tenant allows public commands (`403 public_commands_off`); the plugin
+of the link declares the other one in `permissions.embeds` (`403 permission_denied`) and the other plugin declares the embed (`404`); the `resource` is the shared one
+or a descendant of it and has the kind of the embed (else `404`: what the link cannot see does not exist; it is a resource of the plugin of the link, because a resource never has a
+parent of another plugin, so the embedded plugin keeps its own data for it in its own tables); and at least one command of
+the embed is also in `[[public_commands]]` of the embedded plugin (`403 command_not_public`). The ticket is **not stored**: `pe.<payload>.<mac>` with the payload
+`{ link, resource, plugin, embed, expiry }` (60 minutes) and `mac` the HMAC-SHA256 of the payload and of the password of the link under the secret of the server (so a
+new password of the link kills the tickets made before). A person's run ticket is 48 hex characters; the prefix `pe.` tells them apart, and the same route answers
+(`POST /api/run/{ticket}/call/{plugin}/{command}`, so `embedSession()` works as it is).
+
+`embeds::call_public` checks everything again on **every call**, in this order: the link by its id (revoked, expired, trashed, plugin off, tenant policy: the ticket
+dies with the link), the signature and the expiry (`401 run_ticket_invalid` for all of them), the plugin of the ticket (`403 run_wrong_plugin`), the declarations of both
+plugins **as they are now**, the command (`403 run_wrong_command` when the embed does not list it, `403 command_not_public` when the plugin does not expose it as public),
+and the resource (it must still be under the link and of the kind of the embed). It then runs `crud::call_public` like any public command (read only, no user, `perms` and
+`groups` empty, no secrets in `config`, the rate limits of the link, the audit event `link.call`), with the link **narrowed to the resource of the frame**: the database
+shows the command that resource and its descendants only, and `ctx.link_resource()` is that resource. A person's rights never enter, and the ticket can never do more
+than the link grants: the page of the host and the embedded page share the 30 calls a minute of the link. The CSP needs no change: the page of the host and the embedded
+page already list each other (`frame-src`, `frame-ancestors`), and the public origin is already an ancestor of every plugin page. The review checklist of §8.13 applies to
+the commands that an embed exposes: they run for a stranger.
 
 ### 8.14 Run tickets: a plugin called on behalf of a run
 
