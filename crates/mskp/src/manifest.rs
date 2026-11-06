@@ -805,6 +805,13 @@ pub struct Permissions {
     /// `[requires] mosaikit = ">=1.0"`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub run_commands: Vec<String>,
+    /// Plugins that a run ticket of this plugin may also call (`permissions.run_targets`): a process of this plugin that
+    /// needs a command of another one in the middle of the run, as the person who started it. Only the target's own
+    /// `run_commands` can be reached, and the person must use the target. Sensitive: the Administrator sees the list when
+    /// the plugin is installed. At most 16 plugin ids, not the plugin itself, only with `run_commands`. Needs
+    /// `[requires] mosaikit = ">=1.0"`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub run_targets: Vec<String>,
     /// The plugin may search the people and groups of the tenant it runs in (`ctx.directory().search` in
     /// the logic, `msk.directory.search` in the UI): id, username and name only, active members only, and
     /// only for a caller who is a Tenant Manager or holds the `share` permission of the plugin. Sensitive:
@@ -854,6 +861,10 @@ pub struct ScheduleDecl {
     /// a schedule must name the resources it is limited to
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub resources_required: bool,
+    /// plugins of `permissions.run_targets` that the run of this schedule may also call, with all their `run_commands`
+    /// (default: none)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub targets: Vec<String>,
 }
 
 impl ScheduleDecl {
@@ -1391,6 +1402,9 @@ impl Manifest {
                     s.command
                 ));
             }
+            if let Some(t) = s.targets.iter().find(|t| !self.permissions.run_targets.contains(t)) {
+                return Err(format!("schedules '{n}': the target '{t}' is not in permissions.run_targets"));
+            }
             let origin = s.target.split('/').take(3).collect::<Vec<_>>().join("/");
             let clean =
                 !s.target.chars().any(|c| c.is_whitespace() || c.is_control()) && !origin.contains('@');
@@ -1493,6 +1507,18 @@ impl Manifest {
             || self.permissions.embeds.iter().any(|p| !is_plugin_id(p) || p == &self.id)
         {
             return Err("permissions.embeds: at most 16 plugin ids, not the plugin itself".into());
+        }
+        let targets = &self.permissions.run_targets;
+        let mut seen = std::collections::HashSet::new();
+        if targets.len() > 16
+            || targets.iter().any(|p| !is_plugin_id(p) || p == &self.id || !seen.insert(p.as_str()))
+        {
+            return Err(
+                "permissions.run_targets: at most 16 distinct plugin ids, not the plugin itself".into()
+            );
+        }
+        if !targets.is_empty() && self.permissions.run_commands.is_empty() {
+            return Err("permissions.run_targets needs permissions.run_commands".into());
         }
         Ok(())
     }
@@ -2589,6 +2615,37 @@ extra = 1
         ] {
             assert!(Manifest::from_toml(&with(bad)).is_err(), "{bad}");
         }
+    }
+
+    #[test]
+    fn run_targets_are_checked() {
+        let with = |commands: &str, targets: &str| {
+            NOTES.replacen(
+                "hooks = [\"notes\"]",
+                &format!(
+                    "hooks = [\"notes\"]
+ run_commands = {commands}
+ run_targets = {targets}"
+                ),
+                1,
+            )
+        };
+        let m = Manifest::from_toml(&with("[\"node_run\"]", "[\"com.geoportal.widgets\"]")).unwrap();
+        assert_eq!(m.permissions.run_targets, ["com.geoportal.widgets"]);
+        // without them the key is not written back
+        let plain = toml::to_string(&Manifest::from_toml(NOTES).unwrap()).unwrap();
+        assert!(!plain.contains("run_targets"), "{plain}");
+        for (c, t) in [
+            ("[]", "[\"com.geoportal.widgets\"]"),
+            ("[\"node_run\"]", "[\"Not An Id\"]"),
+            ("[\"node_run\"]", "[\"com.geoportal.widgets\", \"com.geoportal.widgets\"]"),
+            ("[\"node_run\"]", "[\"com.mosaikit.notes\"]"),
+        ] {
+            let e = Manifest::from_toml(&with(c, t)).unwrap_err().to_string();
+            assert!(e.contains("run_targets"), "{c} {t}: {e}");
+        }
+        let many: Vec<String> = (0..17).map(|i| format!("\"com.t.p{i}\"")).collect();
+        assert!(Manifest::from_toml(&with("[\"node_run\"]", &format!("[{}]", many.join(",")))).is_err());
     }
 
     #[test]
