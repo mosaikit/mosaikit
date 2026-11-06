@@ -5,6 +5,7 @@ version and is removed in the next.
 
 ## Unreleased
 
+- `mountCrud`: pressing again in the sidebar the entry of the page that is open closes the detail panel of a list with views (as Escape does), so the plugins that use it need no `msk.onNavReselect` code of their own.
 - `msk.onNavReselect(fn)` (host event `nav.reselect`): the person clicked again, in the sidebar, the entry of the page that is open. A page with a back button in the band needs no code: the shell presses it. Plugin API unchanged (additive).
 - `msk.embeds.url({ plugin, name, resource })` (host op `embed.url`) and `embedSession()`: a page of a plugin inside a frame of the page of another, with a ticket for one
   resource. Needs `[permissions] embeds`. Plugin API unchanged (additive).
