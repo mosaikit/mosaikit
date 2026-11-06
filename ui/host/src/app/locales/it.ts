@@ -1066,6 +1066,8 @@ export const IT: Record<string, string> = {
   'Resumed': 'Ripresa',
   'Calls what other plugins contribute': 'Chiama ciò che altri plugin contribuiscono',
   'Shows pages of other plugins': 'Mostra pagine di altri plugin',
+  'Offers pages with the origin of its own': "Offre pagine con l'origine propria",
+  'yes (sensitive: {list}, shown in frames that have the origin of this plugin)': "sì (sensibile: {list}, mostrate in riquadri che hanno l'origine di questo plugin)",
   'yes (sensitive: {list}, in frames of its pages)': 'sì (sensibile: {list}, in riquadri delle sue pagine)',
   'No comments yet.': 'Nessun commento.',
   'Write a comment': 'Scrivi un commento',

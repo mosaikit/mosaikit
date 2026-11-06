@@ -577,6 +577,13 @@ function PluginAsks({ p, base }: { p: AdminPlugin; base?: string }) {
             <AskRow label={t('Shows pages of other plugins')}>
               {perm.embeds?.length ? <b className="text-destructive">{t('yes (sensitive: {list}, in frames of its pages)', { list: perm.embeds.join(', ') })}</b> : none}
             </AskRow>
+            <AskRow label={t('Offers pages with the origin of its own')}>
+              {p.embeds?.some((e) => e.same_origin) ? (
+                <b className="text-destructive">{t('yes (sensitive: {list}, shown in frames that have the origin of this plugin)', { list: p.embeds.filter((e) => e.same_origin).map((e) => e.name).join(', ') })}</b>
+              ) : (
+                none
+              )}
+            </AskRow>
             <AskRow label={t('Calls what other plugins contribute')}>
               {perm.contributions?.length ? <b className="text-destructive">{t('yes (sensitive: {list}, with the permissions of the caller)', { list: perm.contributions.join(', ') })}</b> : none}
             </AskRow>

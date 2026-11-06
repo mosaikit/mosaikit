@@ -79,8 +79,23 @@ pub async fn url(k: &Kernel, c: &Caller, host: &str, req: &Value) -> Result<Valu
         },
     )
     .await?;
-    Ok(answer(k, &t.id, decl, &minted.token, rid, json!(minted.expires_at)))
+    Ok(answer(k, &t.id, decl, &minted.token, rid, json!(minted.expires_at), sandbox_for(k, decl)))
 }
+
+/// The `sandbox` a frame of an embed must have: `allow-same-origin` only when the offering plugin asks for it and the
+/// installation gives each plugin an origin of its own (with one origin for all plugins it would be shared: opaque).
+pub fn sandbox_for(k: &Kernel, decl: &mosaikit_mskp::EmbedDecl) -> &'static str {
+    if decl.same_origin && k.cfg.plugin_wildcard {
+        SANDBOX_SAME_ORIGIN
+    } else {
+        SANDBOX_OPAQUE
+    }
+}
+
+/// The `sandbox` of a frame without an origin of its own.
+pub const SANDBOX_OPAQUE: &str = "allow-scripts";
+/// The `sandbox` of a frame with the origin of the plugin that offers the page (`same_origin = true`).
+pub const SANDBOX_SAME_ORIGIN: &str = "allow-scripts allow-same-origin";
 
 /// The answer of `embed.url`: the address of the page on the origin of its plugin, with its ticket.
 fn answer(
@@ -90,6 +105,7 @@ fn answer(
     token: &str,
     rid: Uuid,
     exp: Value,
+    sandbox: &str,
 ) -> Value {
     let base = k.cfg.plugin_url_for(plugin);
     let api = k.cfg.app_origin();
@@ -105,6 +121,7 @@ fn answer(
         "expires_at": exp,
         "contract": decl.contract,
         "resource": rid,
+        "sandbox": sandbox,
     })
 }
 
@@ -224,7 +241,8 @@ pub async fn public_url(k: &Kernel, r: &crate::links::Resolved, req: &Value) -> 
     })?;
     let mac = sign(k, &payload, r.password_hash.as_deref()).finalize().into_bytes();
     let token = format!("{PUBLIC_PREFIX}{}.{}", hex::encode(&payload), hex::encode(mac));
-    Ok(answer(k, &t.id, &decl, &token, rid, json!(exp)))
+    // a public view never gets the origin of the plugin, whatever the embed declares
+    Ok(answer(k, &t.id, &decl, &token, rid, json!(exp), SANDBOX_OPAQUE))
 }
 
 fn invalid() -> Error {

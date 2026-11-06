@@ -1651,6 +1651,26 @@ than the link grants: the page of the host and the embedded page share the 30 ca
 page already list each other (`frame-src`, `frame-ancestors`), and the public origin is already an ancestor of every plugin page. The review checklist of §8.13 applies to
 the commands that an embed exposes: they run for a stranger.
 
+**`same_origin` (an embed that is not opaque).** An embedded page may itself frame a third-party app whose `frame-ancestors` lists the origin of the plugin; an opaque
+origin (`sandbox="allow-scripts"`) never matches such a list. The plugin that offers the embed may therefore declare `same_origin = true` in `[[embeds]]` (default
+`false`; sensitive: `mosaikit-plugin validate` lists it, and «What it asks» of the offering plugin shows it). `embed.url` then answers one more field, `sandbox`:
+`"allow-scripts allow-same-origin"` for such an embed, `"allow-scripts"` for every other. The host plugin puts **exactly that string** in the `sandbox` attribute of
+the frame (the bridge passes it through unchanged). The kernel enforces it from the other side: the page of the embed (the entry of an `[[embeds]]` of the plugin,
+opened with an `embed=` ticket of the shape of a run ticket or of `pe.`) is served with a CSP `sandbox` directive equal to the same value, so a host that adds
+`allow-same-origin` of its own gets no more than the offering plugin asked for, and a host that leaves it out still works (the frame stays opaque). Normal pages of the plugin, and
+its files other than the entry, carry no `sandbox` directive. In a public link view (`pe.` tickets) `same_origin` is **ignored**: the answer says `"allow-scripts"` and the page is
+served that way. `same_origin` is also ignored when the installation has one origin for all plugins (no wildcard `plugin_url`): there the origin is not
+the plugin's own, so the answer is `"allow-scripts"` again (fail closed).
+
+*Review points.* What `same_origin` gives: the frame runs on the origin of the offering plugin (one origin per plugin with a wildcard `plugin_url`, never the origin of the app), so it
+can read what that origin serves (its own UI files, which are public anyway) and keep its own `localStorage` and cookies there; it can load its own pages and frame them; the third
+party sees that origin as the ancestor. What it does not give: the origin of the app (no cookie or session of the shell, no `msk.*` bridge: an embedded page has none), the origin of any
+other plugin, a wider ticket (the run ticket still limits it to one resource and to the commands of the embed), a looser CSP (`script-src` stays the UI folder of the plugin,
+so nothing uploaded runs as a script there), nor the tenant content: `/c/` (user files) and `/p/` (public links) are served on that origin too, but always under a CSP `sandbox`
+that gives them an opaque origin of their own, so the page cannot read them through the DOM; it may fetch them only with a ticket it already holds. The risk that remains is
+the plugin's own: a page with the origin of the plugin shares storage with any other page of that plugin served without sandbox on it, so a plugin that stores secrets in
+the browser must not offer a `same_origin` embed.
+
 ### 8.14 Run tickets: a plugin called on behalf of a run
 
 A distribution may run a process in the background (a graph of nodes, a report) where a node is a command of a plugin. The service that

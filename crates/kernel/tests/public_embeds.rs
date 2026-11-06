@@ -6,7 +6,7 @@
 use std::collections::BTreeMap;
 
 use mosaikit_kernel::tenancy::set_settings;
-use mosaikit_kernel::testing::{start, test_key, TestKernel};
+use mosaikit_kernel::testing::{start_with, test_key, TestKernel};
 use mosaikit_kernel::{crud, embeds, links, run_tickets, Caller, Kind};
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -68,7 +68,8 @@ const MAPS_TOML: &str = "[permissions]\nrun_commands = [\"layers\", \"extent\", 
     [[public_commands]]\nname = \"layers\"\ndescription = \"layers\"\n\
     [[public_commands]]\nname = \"tiles\"\ndescription = \"tiles\"\n\
     [[embeds]]\nname = \"map\"\nentry = \"embed.html\"\nresource_kind = \"items\"\ncommands = [\"layers\", \"extent\"]\n\
-    [[embeds]]\nname = \"plain\"\nentry = \"plain.html\"\ncommands = [\"extent\"]\n";
+    [[embeds]]\nname = \"plain\"\nentry = \"plain.html\"\ncommands = [\"extent\"]\n\
+    [[embeds]]\nname = \"pinned\"\nentry = \"pinned.html\"\ncommands = [\"layers\"]\nsame_origin = true\n";
 
 struct World {
     t: TestKernel,
@@ -98,7 +99,11 @@ async fn item(
 }
 
 async fn world() -> World {
-    let t = start().await;
+    world_with(|_| {}).await
+}
+
+async fn world_with(f: impl FnOnce(&mut mosaikit_kernel::config::Config)) -> World {
+    let t = start_with(f).await;
     install(&t, MAPS, msg_wasm(), MAPS_TOML).await;
     install(&t, HOST, echo_wasm(), &format!("[permissions]\nembeds = [\"{MAPS}\"]\n")).await;
     install(&t, OTHER, echo_wasm(), "").await;
@@ -256,4 +261,22 @@ async fn a_public_ticket_stops_with_the_link_the_policy_and_the_resource() {
     links::revoke(&w.t, &w.anna, w.link.link_id).await.unwrap();
     assert_eq!(call(&w, &token, "layers").await.unwrap_err().code(), "run_ticket_invalid");
     assert!(links::resolve_id(&w.t, w.link.link_id).await.is_err());
+}
+
+/// `same_origin` is for a person's frame only: in a public view the frame keeps the opaque origin, whatever the plugin
+/// declares and whatever the installation (here one origin per plugin, where a person gets `allow-same-origin`: see the test of `embeds`).
+#[tokio::test]
+async fn a_public_view_never_gets_the_origin_of_the_plugin() {
+    let w = world_with(|c| {
+        c.plugin_url_setting = Some("http://*.localhost:19999".into());
+        c.derive().unwrap();
+    })
+    .await;
+    let rid = w.map;
+    let public = embeds::public_url(&w.t, &w.link, &ask(MAPS, "pinned", rid)).await.unwrap();
+    assert_eq!(public["sandbox"], json!("allow-scripts"), "{public}");
+    assert!(ticket(&public).starts_with("pe."));
+    // an embed that does not ask stays opaque for everybody
+    let plain = embeds::public_url(&w.t, &w.link, &ask(MAPS, "map", rid)).await.unwrap();
+    assert_eq!(plain["sandbox"], json!("allow-scripts"));
 }

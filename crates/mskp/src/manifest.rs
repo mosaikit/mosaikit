@@ -420,6 +420,10 @@ pub struct EmbedDecl {
     /// commands the page may call with its ticket
     #[serde(default)]
     pub commands: Vec<String>,
+    /// the frame gets the origin of this plugin instead of an opaque one (`sandbox="allow-scripts allow-same-origin"`), for a
+    /// page that frames an app whose `frame-ancestors` lists the origin of the plugin. Sensitive; never in a public link view
+    #[serde(default)]
+    pub same_origin: bool,
 }
 
 /// Most embeds of a plugin.
@@ -2646,6 +2650,31 @@ extra = 1
         }
         let many: Vec<String> = (0..17).map(|i| format!("\"com.t.p{i}\"")).collect();
         assert!(Manifest::from_toml(&with("[\"node_run\"]", &format!("[{}]", many.join(",")))).is_err());
+    }
+
+    #[test]
+    fn same_origin_of_an_embed_is_off_unless_declared() {
+        let with = |extra: &str| {
+            Manifest::from_toml(&format!(
+                "id = \"com.x.maps\"
+name = \"M\"
+version = \"0.1.0\"
+[contribution]
+icon = \"x\"
+label = \"M\"
+[permissions]
+run_commands = [\"layers\"]
+[[embeds]]
+name = \"map\"
+entry = \"embed.html\"
+commands = [\"layers\"]
+{extra}"
+            ))
+        };
+        assert!(!with("").unwrap().embeds[0].same_origin, "default: opaque");
+        assert!(with("same_origin = true").unwrap().embeds[0].same_origin);
+        assert!(!with("same_origin = false").unwrap().embeds[0].same_origin);
+        assert!(with("same_origin = \"yes\"").is_err(), "a boolean, nothing else");
     }
 
     #[test]
