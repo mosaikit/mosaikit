@@ -80,16 +80,20 @@ pub fn playwright_missing(dir: &Path) -> String {
     )
 }
 
-/// Whether `@playwright/test` can be resolved from the product folder (Node and the package installed).
-fn playwright_installed(dir: &Path) -> bool {
-    std::process::Command::new("node")
+/// The `cli.js` of the `@playwright/test` that Node resolves from the product folder (None when it is not installed).
+/// Running it with `node` (not `npx playwright`) avoids another `playwright` on the PATH, such as the Python one.
+fn playwright_cli(dir: &Path) -> Option<PathBuf> {
+    let out = std::process::Command::new("node")
         .current_dir(dir)
-        .args(["-e", "require.resolve('@playwright/test')"])
-        .stdout(std::process::Stdio::null())
+        .args(["-p", "require.resolve('@playwright/test/cli')"])
         .stderr(std::process::Stdio::null())
-        .status()
-        .map(|s| s.success())
-        .unwrap_or(false)
+        .output()
+        .ok()?;
+    if !out.status.success() {
+        return None;
+    }
+    let p = String::from_utf8_lossy(&out.stdout).trim().to_string();
+    (!p.is_empty()).then(|| PathBuf::from(p))
 }
 
 /// Writes the spec and the configuration of the browser run under `.mosaikit-product/browser`; gives the config.
@@ -102,15 +106,29 @@ pub fn write_browser_files(dir: &Path) -> Result<PathBuf> {
     Ok(cfg)
 }
 
-/// The arguments of `npx` for the browser run.
-pub fn browser_args(config: &Path) -> Vec<String> {
-    vec!["playwright".into(), "test".into(), "-c".into(), config.display().to_string()]
+/// The arguments of `node` for the browser run: the Playwright CLI of the product folder, then `test -c <config>`.
+pub fn browser_args(cli: &Path, config: &Path) -> Vec<String> {
+    vec![cli.display().to_string(), "test".into(), "-c".into(), config.display().to_string()]
+}
+
+/// Whether the page of the server is the placeholder of a `mosaikit-server` built without the host UI
+/// (`npm run build -w ui/host` before the build): the browser would only find that page.
+pub fn ui_not_built(html: &str) -> bool {
+    html.contains("UI not built")
 }
 
 /// The shell checks in a browser against the running product `app`.
 pub fn browser(d: &Distribution, app: &str, r: &mut Report) -> Result<()> {
-    if !playwright_installed(&d.dir) {
+    let Some(cli) = playwright_cli(&d.dir) else {
         bail!("{}", playwright_missing(&d.dir));
+    };
+    let home = reqwest::blocking::get(app).and_then(|x| x.text()).unwrap_or_default();
+    if ui_not_built(&home) {
+        r.add(
+            Level::Error,
+            "browser: this mosaikit-server was built without the host UI (the page says \"UI not built\"): use the server of a release, or run `npm run build -w ui/host` and build the server again",
+        );
+        return Ok(());
     }
     let cfg = write_browser_files(&d.dir)?;
     let brand_name = d
@@ -119,14 +137,13 @@ pub fn browser(d: &Distribution, app: &str, r: &mut Report) -> Result<()> {
         .and_then(|t| toml::from_str::<toml::Table>(&t).ok())
         .and_then(|t| t.get("name").and_then(|v| v.as_str().map(str::to_string)))
         .unwrap_or_default();
-    let npx = if cfg!(windows) { "npx.cmd" } else { "npx" };
-    let status = std::process::Command::new(npx)
+    let status = std::process::Command::new("node")
         .current_dir(&d.dir)
-        .args(browser_args(&cfg))
+        .args(browser_args(&cli, &cfg))
         .env("MOSAIKIT_APP", app)
         .env("MOSAIKIT_BRAND_NAME", brand_name)
         .status()
-        .with_context(|| format!("starting {npx}"))?;
+        .context("starting node")?;
     if status.success() {
         r.add(Level::Info, "browser: the shell with the brand of the product passes the layout slice and the accessibility check");
     } else {
@@ -309,15 +326,23 @@ mod tests {
         assert!(cfg.ends_with("playwright.config.ts") && cfg.exists());
         let spec = std::fs::read_to_string(cfg.with_file_name("shell.spec.ts")).unwrap();
         assert!(spec.contains("expectAccessible") && spec.contains("MOSAIKIT_APP") && spec.contains("R-9"));
-        let a = browser_args(&cfg);
-        assert_eq!(&a[..3], ["playwright", "test", "-c"]);
+        let cli = t.path().join("cli.js");
+        let a = browser_args(&cli, &cfg);
+        assert_eq!(a[0], cli.display().to_string());
+        assert_eq!(&a[1..3], ["test", "-c"]);
         assert_eq!(a[3], cfg.display().to_string());
+    }
+
+    #[test]
+    fn the_placeholder_of_a_server_without_ui_is_recognised() {
+        assert!(ui_not_built("<h1>UI not built</h1><p>Run npm run build</p>"));
+        assert!(!ui_not_built("<!doctype html><title>Brw Product</title><div id=root></div>"));
     }
 
     #[test]
     fn a_folder_without_playwright_is_told_what_to_install() {
         let t = tempfile::tempdir().unwrap();
-        assert!(!playwright_installed(t.path()));
+        assert!(playwright_cli(t.path()).is_none());
         let m = playwright_missing(t.path());
         assert!(
             m.contains("@playwright/test") && m.contains("playwright install") && m.contains("--browser"),
