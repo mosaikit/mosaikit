@@ -256,6 +256,7 @@ export default function ShareDialog({ ctx, resourceId, onClose }: { ctx: TenantC
                         </Button>
                       </div>
                       <p className="text-xs text-muted-foreground">{t('The link is shown only now: the server keeps only a fingerprint of it.')}</p>
+                      {res?.kind === 'folder' && <p className="text-xs text-muted-foreground">{t('Add the path of a file to the link to reach a file of this folder, for example …/tileset.json')}</p>}
                     </div>
                   )}
                   {(links.data ?? []).length > 0 && (

@@ -2023,6 +2023,7 @@ export const IT: Record<string, string> = {
   'Reads the files you can see': 'Legge i file che puoi vedere',
   '“{name}” looks like a {label}': '“{name}” sembra un {label}',
   'Open it in {app} to publish it.': 'Aprilo in {app} per pubblicarlo.',
+  'Add the path of a file to the link to reach a file of this folder, for example …/tileset.json': 'Aggiungi al link il percorso di un file per raggiungere un file di questa cartella, per esempio …/tileset.json',
   'Writes in the Files area for you': 'Scrive nell’area File al posto tuo',
   'Calls: {list}': 'Chiama: {list}',
   'Database: {db}': 'Database: {db}',
