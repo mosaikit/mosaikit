@@ -1564,6 +1564,42 @@ the value). The fuel is a quarter of a normal command (`FUEL_PUBLIC`). The audit
 arguments) is written at most once a minute for a link, so an anonymous caller cannot flood the log. Nothing else is minted: the link
 token is the credential, so a stolen link has the exposure of the page itself, and there is no path to a session.
 
+**Targets: a run that reaches other plugins.** A process of one plugin may need a command of another one in the middle of the run
+(a Processes plugin that runs a node of a widgets plugin). One ticket may therefore name, besides its own plugin, a list of
+**targets**: `{ plugin, commands, resources? }`, at most 8. One ticket and not one per plugin: the run keeps one token, one
+budget of uses, one rate limit and one revocation (`DELETE /api/run/{ticket}` ends everything at once). The service calls the same
+route, `POST /api/run/{ticket}/call/{target}/{command}`; it is **not** `plugin.call` (still refused in a run call): the kernel
+redeems the call directly against the target, so the checks of the redeem apply to it unchanged. `permissions.run_targets` is an
+additive key of API 1 (no bump, §8.11), sensitive, shown in «What it asks» and in the brochure, and needs `[requires] mosaikit =
+">=1.0"`: `run_targets = ["<plugin id>", ...]` (at most 16 ids, not the plugin itself, only with a non-empty `run_commands`)
+lists the plugins a ticket of this plugin may name. The target does not need to know: what it lets in is what it already declares
+in its own `permissions.run_commands`.
+
+- **Who may name targets.** Only the plugin of the ticket, and only from its `run_targets` (`403 target_not_declared`). Nothing
+  chains: a target of a ticket is never a source of further targets, and the `run_targets` of the target are not read.
+- **Mint.** The three ways to mint take the same `targets` and the same checks (`run_tickets::prepare`): the target is in
+  `run_targets` of the plugin of the ticket; it is installed and on in the tenant (`403 target_not_available`); the person holds
+  `use` of it now (`403 permission_denied`); each command is in the target's `run_commands` now (`403 command_not_declared`);
+  each resource is visible to the person and belongs to the target. Same limits (short life, uses, size, mint rate, live tickets).
+  (1) `POST /api/t/{t}/run-tickets` takes `targets` next to `plugin`. (2) A **schedule** names its targets in `[[schedules]] targets =
+  ["<plugin id>"]` (each in `run_targets`; none by default, so a schedule reaches another plugin only when its manifest says so); the
+  worker mints the ticket with all the `run_commands` of each target, gate and mint as for the schedule's own command, and a target
+  that is no longer usable by the author fails the run (`failed`, with the reason) instead of being dropped. (3) A **manual launch**:
+  the host operation `runs.mint` of the logic (`ctx.runs().mint(...)` in the SDK), called by the plugin command that starts the run;
+  the plugin of the ticket is the calling plugin (the request cannot name another one), the person is the caller, and it is refused
+  in a public link, in a nested `plugin.call` and in a call on behalf of a run (a ticket cannot mint a ticket). Because a command
+  holds the transaction (on SQLite the only writer), the ticket is **checked and given to the logic at once but written once the
+  command has committed**: a command that fails mints nothing; a service told inside the same command must retry `401
+  run_ticket_invalid` for a moment, or be told after the command (a page, a worker). At most 8 `runs.mint` per command.
+- **Redeem.** Every check of the redeem is made against the plugin **called**: the ticket must name it (`run_wrong_plugin`) and the
+  command (`run_wrong_command`); the manifest of the target is read now (`command_not_declared`); the plugin of the ticket must still
+  declare the target in `run_targets` (`target_not_declared`: an update that takes it away stops the ticket at once); the person is
+  loaded again and the target must be on in the tenant and `use`d by the person (`crud::call_depth`). The audit event
+  `run_ticket.call` carries the called plugin. The rights are the person's, never more.
+- **Scope.** A `resources` list limits the plugin of its own entry only, and each entry carries its own: a call to a target is
+  limited to the resources of the target's entry, and an entry without `resources` has the person's whole reach in that plugin.
+  The resources of one plugin never open or close another's.
+
 **What the kernel cannot do, so the plugin author must.** The kernel limits what a public command can READ (the item of the link, the
 keys of the tenant); it cannot limit what the logic RETURNS, and WASM may return data it legitimately read. Review checklist for every
 public command: (1) never put a setting, a key or anything from `ctx.config` in the answer; (2) never take the id of the item from the
