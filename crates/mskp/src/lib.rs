@@ -14,7 +14,7 @@ mod version;
 
 pub use collect::collect_plugin_dir;
 pub use manifest::{
-    is_media_name, is_plugin_id, is_service_id, schema_name, ConfigDecl, ConfigKind, Contribution,
+    is_media_name, is_plugin_id, is_service_id, schema_name, ConfigDecl, ConfigKind, Contribution, EmbedDecl,
     ExtActionDecl, ExtFieldDecl, ExtTabDecl, Extends, ExtensionDecl, ExtensionTranslation, FieldDecl,
     FieldKind, Incompatible, KeyScope, KpiDecl, KpiTranslation, Manifest, NavDecl, PermissionTranslation,
     Permissions, PluginKind, PublicCommandDecl, Requires, ResourceDecl, ResourceTranslation, ScheduleDecl,

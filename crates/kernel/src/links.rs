@@ -166,24 +166,41 @@ impl Resolved {
     }
 }
 
+const RESOLVE_SQL: &str =
+    "select l.id, r.id, r.tenant_id, r.plugin_id, r.kind, r.title, r.meta, l.password_hash, t.settings
+         from core.public_links l
+         join core.resources r on r.id = l.resource_id
+         join core.tenants t on t.id = r.tenant_id and t.status = 'active'
+         join core.plugins p on p.id = r.plugin_id and p.status = 'active'
+         where l.revoked_at is null and (l.expires_at is null or l.expires_at > now())
+           and not core.in_trash(r.id) and ";
+
 pub async fn resolve(k: &Kernel, token: &str) -> Result<Resolved> {
     let not_found = || Error::not_found("invalid, expired or revoked link");
     if token.len() != 48 || !token.chars().all(|c| c.is_ascii_hexdigit()) {
         return Err(not_found());
     }
-    let row = mosaikit_db::query(
-        "select l.id, r.id, r.tenant_id, r.plugin_id, r.kind, r.title, r.meta, l.password_hash, t.settings
-         from core.public_links l
-         join core.resources r on r.id = l.resource_id
-         join core.tenants t on t.id = r.tenant_id and t.status = 'active'
-         join core.plugins p on p.id = r.plugin_id and p.status = 'active'
-         where l.token_hash = $1 and l.revoked_at is null and (l.expires_at is null or l.expires_at > now())
-           and not core.in_trash(r.id)",
-    )
-    .bind(sha256(token.as_bytes()))
-    .fetch_optional(&k.db)
-    .await?
-    .ok_or_else(not_found)?;
+    let row = mosaikit_db::query(format!("{RESOLVE_SQL}l.token_hash = $1"))
+        .bind(sha256(token.as_bytes()))
+        .fetch_optional(&k.db)
+        .await?
+        .ok_or_else(not_found)?;
+    finish_resolve(k, row).await
+}
+
+/// The same checks as `resolve`, for a link named by its id (the ticket of an embedded page in a public view, which
+/// is derived from the link and must stop working with it).
+pub async fn resolve_id(k: &Kernel, link: Uuid) -> Result<Resolved> {
+    let row = mosaikit_db::query(format!("{RESOLVE_SQL}l.id = $1"))
+        .bind(link)
+        .fetch_optional(&k.db)
+        .await?
+        .ok_or_else(|| Error::not_found("invalid, expired or revoked link"))?;
+    finish_resolve(k, row).await
+}
+
+async fn finish_resolve(k: &Kernel, row: mosaikit_db::Row) -> Result<Resolved> {
+    let not_found = || Error::not_found("invalid, expired or revoked link");
     let settings: TenantSettings = serde_json::from_value(row.get(8)).unwrap_or_default();
     if !settings.public_links_enabled {
         return Err(not_found());

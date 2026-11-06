@@ -324,6 +324,10 @@ pub(crate) async fn caller_for(k: &Kernel, user_id: Uuid, tenant: Uuid) -> Resul
 /// Calls `command` of `plugin` on behalf of the ticket `token` (`POST /api/run/{token}/call/...`).
 /// Every check is made again on every call.
 pub async fn call(k: &Kernel, token: &str, plugin: &str, command: &str, args: Value) -> Result<Value> {
+    // the ticket of an embedded page in a public link view belongs to the link, not to a person
+    if token.starts_with(crate::embeds::PUBLIC_PREFIX) {
+        return crate::embeds::call_public(k, token, plugin, command, args).await;
+    }
     let t = lookup(k, token).await?;
     if t.plugin != plugin {
         return Err(Error::forbidden("this ticket is for another plugin").with_code("run_wrong_plugin"));
