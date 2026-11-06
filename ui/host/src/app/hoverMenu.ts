@@ -92,6 +92,14 @@ export function useHoverMenu(enabled: boolean): HoverMenu {
       noLongerActive(close)
     }
   }, [ctl])
+  // Escape always closes: it ends the window in which a press on the icon keeps the menu open (it runs before Radix's own handler)
+  useEffect(() => {
+    const esc = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') keepUntil.current = 0
+    }
+    document.addEventListener('keydown', esc, true)
+    return () => document.removeEventListener('keydown', esc, true)
+  }, [])
   const mouse = (e: React.PointerEvent) => enabled && e.pointerType !== 'touch'
   return {
     open,
