@@ -279,4 +279,29 @@ async fn a_public_view_never_gets_the_origin_of_the_plugin() {
     // an embed that does not ask stays opaque for everybody
     let plain = embeds::public_url(&w.t, &w.link, &ask(MAPS, "map", rid)).await.unwrap();
     assert_eq!(plain["sandbox"], json!("allow-scripts"));
+
+#[tokio::test]
+async fn a_public_ticket_expires_after_its_lifetime() {
+    let w = world().await;
+    let ttl = chrono::Duration::minutes(i64::from(embeds::TTL_MINUTES));
+    let mint_at = |at: chrono::DateTime<chrono::Utc>| {
+        let w = &w;
+        async move {
+            let v = embeds::public_url_at(&w.t, &w.link, &ask(MAPS, "map", w.map), at).await.unwrap();
+            ticket(&v)
+        }
+    };
+    // made now: works, and the answer says when it ends
+    let now = chrono::Utc::now();
+    let live = mint_at(now).await;
+    call(&w, &live, "layers").await.unwrap();
+    // made one lifetime plus a minute ago, or exactly one lifetime ago (the end itself is over): refused, the same way as a forged one
+    for age in [ttl + chrono::Duration::minutes(1), ttl + chrono::Duration::seconds(1), ttl] {
+        let old = mint_at(now - age).await;
+        let e = call(&w, &old, "layers").await.unwrap_err();
+        assert_eq!((e.kind, e.code()), (Kind::Unauthorized, "run_ticket_invalid"), "{age}");
+    }
+    // just inside its lifetime it still runs
+    let almost = mint_at(now - ttl + chrono::Duration::minutes(2)).await;
+    call(&w, &almost, "layers").await.unwrap();
 }

@@ -263,6 +263,14 @@ async fn initial_tenant(k: &Kernel, slug: &str) -> Result<Option<String>> {
             .bind(k.product.bootstrap.tenant_name.as_deref().unwrap_or(&k.brand.name))
             .fetch_one(&mut *tx)
             .await?;
+    if let Some(q) = k.product.bootstrap.quota.as_ref().and_then(|q| q.to_settings()) {
+        // the quotas of the tenant itself (see quotas.rs: `quota.<metric>.limit` in its settings)
+        mosaikit_db::query("update core.tenants set settings = $2 where id = $1")
+            .bind(tenant)
+            .bind(serde_json::json!({ "quota": q }))
+            .execute(&mut *tx)
+            .await?;
+    }
     if let Some(days) = k.product.bootstrap.trial_days.filter(|d| *d > 0) {
         mosaikit_db::query("update core.tenants set trial_until = $2, trial_notice = 0 where id = $1")
             .bind(tenant)
