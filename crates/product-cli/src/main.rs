@@ -32,6 +32,9 @@ enum Cmd {
         /// the mosaikit-server of the base (default: MOSAIKIT_SERVER_BIN, then next to this tool)
         #[arg(long, env = "MOSAIKIT_SERVER_BIN")]
         server: Option<PathBuf>,
+        /// folder of the desktop kit: warns when an official plugin of `include` is not in its registry
+        #[arg(long, env = "MOSAIKIT_BASE")]
+        base: Option<PathBuf>,
     },
     /// Starts the base in the developer profile with the brand, the policy and the plugins of the product
     Dev {
@@ -154,8 +157,8 @@ fn run(cli: Cli) -> Result<ExitCode> {
             let root = scaffold::new_product(&name, &into.unwrap_or_else(|| PathBuf::from(".")))?;
             println!("created {}\nnext: cd {} && mosaikit-product validate", root.display(), root.display());
         }
-        Cmd::Validate { dir, server } => {
-            let r = validate::validate(&dir, &validate::Options { server })?;
+        Cmd::Validate { dir, server, base } => {
+            let r = validate::validate(&dir, &validate::Options { server, base })?;
             r.print();
             if !r.ok() {
                 return Ok(ExitCode::from(1));

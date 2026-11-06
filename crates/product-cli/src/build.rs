@@ -165,6 +165,21 @@ fn has_bootstrap_tenant(d: &Distribution) -> bool {
         .is_some()
 }
 
+/// Slug and name of the first tenant as the base will create it: `[bootstrap]` of the file, else `main` and the name
+/// of the product (the defaults of the configuration written by `desktop_config`).
+fn first_tenant(d: &Distribution) -> (String, String) {
+    let b = std::fs::read_to_string(d.file())
+        .ok()
+        .and_then(|t| toml::from_str::<toml::Table>(&t).ok())
+        .and_then(|t| t.get("bootstrap").and_then(|b| b.as_table()).cloned())
+        .unwrap_or_default();
+    let get = |k: &str| b.get(k).and_then(|v| v.as_str()).map(str::to_string);
+    (
+        get("tenant").unwrap_or_else(|| "main".into()),
+        get("tenant_name").unwrap_or_else(|| d.product.name.clone()),
+    )
+}
+
 fn trusted_line(keys: &[String]) -> String {
     format!("trusted_keys = [{}]", keys.iter().map(|k| format!("\"{k}\"")).collect::<Vec<_>>().join(", "))
 }
@@ -307,9 +322,11 @@ pub fn desktop(d: &Distribution, base: &Path, o: &Options) -> Result<PathBuf> {
     std::fs::write(
         out.join("START.txt"),
         format!(
-            "{name} {version}\n\n1. Start {exe} (double click). The first start creates the database and installs the plugins;\n   the browser opens on http://127.0.0.1:{port}.\n2. User \"user\" works in the tenant; \"admin\" (link \"Administrator access\") administers the platform.\n   Initial password of both: \"mosaikit\" (change it from the Account page).\n3. Configuration: mosaikit.toml (every property is described in mosaikit.example.toml).\n   Backup: with the program stopped copy the whole data\\ folder.\n\nBuilt on Mosaikit, with the policy of distribution.toml.\n",
+            "{name} {version}\n\n1. Start {exe} (double click). The first start creates the database and installs the plugins;\n   the browser opens on http://127.0.0.1:{port}.\n2. User \"user\" works in the tenant {tenant} (slug {slug}); \"admin\" (link \"Administrator access\") administers the platform.\n   Initial password of both: \"mosaikit\" (change it from the Account page).\n3. Configuration: mosaikit.toml (every property is described in mosaikit.example.toml).\n   Backup: with the program stopped copy the whole data\\ folder.\n\nBuilt on Mosaikit, with the policy of distribution.toml.\n",
             name = d.product.name,
             version = d.product.version,
+            tenant = first_tenant(d).1,
+            slug = first_tenant(d).0,
             exe = exe(&d.executable()),
             port = d.desktop.port
         ),
@@ -535,6 +552,10 @@ version = \"1.0.0\"
             "{cfg}"
         );
         assert!(out.join("branding/brand.toml").is_file() && out.join("distribution.toml").is_file());
+        // START.txt names the tenant of the policy, not the product
+        let start = std::fs::read_to_string(out.join("START.txt")).unwrap();
+        let (slug, name) = first_tenant(&d);
+        assert!(start.contains(&format!("tenant {name} (slug {slug})")), "{start}");
     }
 
     #[test]

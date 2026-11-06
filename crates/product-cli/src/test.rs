@@ -251,7 +251,8 @@ pub fn smoke(d: &Distribution, own: &[String], app: &str, r: &mut Report) -> Res
 }
 
 pub fn test(o: &Options) -> Result<Report> {
-    let mut r = validate::validate(&o.dir, &validate::Options { server: o.server.clone() })?;
+    let mut r =
+        validate::validate(&o.dir, &validate::Options { server: o.server.clone(), base: o.base.clone() })?;
     if !r.ok() {
         return Ok(r);
     }

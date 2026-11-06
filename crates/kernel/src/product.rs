@@ -59,12 +59,14 @@ pub struct ProductSection {
 }
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct LockedSection {
     #[serde(default)]
     pub keys: Vec<String>,
 }
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct LanguagesSection {
     #[serde(default)]
     pub enabled: Vec<String>,
@@ -73,6 +75,7 @@ pub struct LanguagesSection {
 }
 
 #[derive(Debug, Default, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Bootstrap {
     /// slug of the first tenant
     #[serde(default)]
@@ -93,6 +96,7 @@ pub struct Bootstrap {
 
 /// Quotas of the first tenant.
 #[derive(Debug, Default, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct BootstrapQuota {
     /// storage in megabytes (1 MB = 1 048 576 bytes)
     #[serde(default)]
@@ -135,12 +139,14 @@ impl BootstrapQuota {
 }
 
 #[derive(Debug, Default, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct DatabaseSection {
     #[serde(default)]
     pub extensions: Vec<String>,
 }
 
 #[derive(Debug, Default, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct About {
     #[serde(default)]
     pub licence: Option<String>,
@@ -295,6 +301,32 @@ mod tests {
     fn load(text: &str, base: &str) -> Result<ProductPolicy> {
         let f: SeedFile = toml::from_str(text).unwrap();
         ProductPolicy::from_seed(&f, base)
+    }
+
+    #[test]
+    fn an_unknown_key_in_a_policy_table_is_refused() {
+        for bad in [
+            "[bootstrap]
+quotas = { people = 5 }
+",
+            "[bootstrap.quota]
+peopl = 5
+",
+            "[locked]
+key = [\"theme\"]
+",
+            "[languages]
+enable = [\"en\"]
+",
+            "[database]
+extension = [\"postgis\"]
+",
+            "[about]
+license = \"x\"
+",
+        ] {
+            assert!(toml::from_str::<SeedFile>(bad).is_err(), "{bad}");
+        }
     }
 
     #[test]

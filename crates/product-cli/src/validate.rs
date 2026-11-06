@@ -52,6 +52,8 @@ impl Report {
 pub struct Options {
     /// the `mosaikit-server` of the base, to check the policy tables against it
     pub server: Option<PathBuf>,
+    /// the desktop kit of the base (a folder): its registry is checked for the official plugins the product keeps
+    pub base: Option<PathBuf>,
 }
 
 pub fn validate(dir: &Path, o: &Options) -> Result<Report> {
@@ -109,6 +111,10 @@ pub fn validate(dir: &Path, o: &Options) -> Result<Report> {
             }
         }
     }
+    check_nav_groups(&d, &mut r);
+    if let Some(base) = o.base.as_deref().filter(|b| b.is_dir()) {
+        check_base_registry(&d, base, &mut r);
+    }
     // the policy tables, by the base itself
     match mosaikit_plugin_cli::dev::find_server(o.server.as_deref()) {
         Ok(server) => match Command::new(&server).arg("check-distribution").arg(&d.dir).output() {
@@ -141,6 +147,57 @@ pub fn validate(dir: &Path, o: &Options) -> Result<Report> {
         ),
     }
     Ok(r)
+}
+
+/// A group of the sidebar that lists a plugin the release does not carry: the server only warns at start and shows
+/// nothing, so say it here.
+fn check_nav_groups(d: &Distribution, r: &mut Report) {
+    let Some(groups) = d.nav_groups.as_ref().and_then(|v| v.as_array()) else { return };
+    let own: Vec<String> = d.own_plugins().map(|o| o.into_iter().map(|p| p.id).collect()).unwrap_or_default();
+    let official = d.official_ids().unwrap_or_default();
+    for g in groups {
+        let name = g.get("id").and_then(|v| v.as_str()).unwrap_or("?");
+        for id in g.get("plugins").and_then(|v| v.as_array()).into_iter().flatten().filter_map(|v| v.as_str())
+        {
+            let carried = (own.iter().any(|o| o == id) && d.includes(id))
+                || official.iter().any(|o| o == id)
+                || d.all_official();
+            if !carried {
+                r.add(
+                    Level::Warning,
+                    format!("[[nav_groups]] \"{name}\": the plugin {id} is not in [plugins] include, so the group will not show it"),
+                );
+            }
+        }
+    }
+}
+
+/// The official plugins the product keeps must be in the registry of the base, or `build` stops.
+fn check_base_registry(d: &Distribution, base: &Path, r: &mut Report) {
+    let Ok(text) = std::fs::read_to_string(base.join("registry").join("index.json")) else {
+        r.add(
+            Level::Warning,
+            format!(
+                "{}: no registry/index.json: the official plugins of [plugins] include were not checked",
+                base.display()
+            ),
+        );
+        return;
+    };
+    let Ok(idx) = serde_json::from_str::<serde_json::Value>(&text) else { return };
+    let have: Vec<&str> =
+        idx["plugins"].as_array().into_iter().flatten().filter_map(|e| e["id"].as_str()).collect();
+    for id in d.official_ids().unwrap_or_default() {
+        if !have.contains(&id.as_str()) {
+            r.add(
+                Level::Warning,
+                format!(
+                    "[plugins] include \"{id}\": not in the registry of the base ({}): `build` will stop",
+                    base.display()
+                ),
+            );
+        }
+    }
 }
 
 fn check_brand(dir: &Path, r: &mut Report) {
@@ -183,7 +240,8 @@ mod tests {
     fn a_new_product_has_no_error() {
         let t = tempfile::tempdir().unwrap();
         let root = crate::scaffold::new_product("acme", t.path()).unwrap();
-        let r = validate(&root, &Options { server: Some(t.path().join("no-server")) }).unwrap();
+        let r = validate(&root, &Options { server: Some(t.path().join("no-server")), ..Options::default() })
+            .unwrap();
         assert!(r.ok(), "{:?}", r.findings);
     }
 
@@ -196,9 +254,37 @@ mod tests {
         let text =
             std::fs::read_to_string(root.join("distribution.toml")).unwrap().replace(">=1.0, <2", "banana");
         std::fs::write(root.join("distribution.toml"), text).unwrap();
-        let r = validate(&root, &Options { server: Some(t.path().join("no-server")) }).unwrap();
+        let r = validate(&root, &Options { server: Some(t.path().join("no-server")), ..Options::default() })
+            .unwrap();
         let all = format!("{:?}", r.findings);
         assert!(all.contains("gone.svg") && all.contains("colors.accent") && all.contains("banana"), "{all}");
         assert!(!r.ok());
+    }
+
+    #[test]
+    fn a_nav_group_plugin_and_an_official_plugin_the_base_lacks_are_warned() {
+        let t = tempfile::tempdir().unwrap();
+        let root = crate::scaffold::new_product("acme", t.path()).unwrap();
+        let mut text = std::fs::read_to_string(root.join("distribution.toml")).unwrap();
+        text = text.replace("include = [\"*\"]", "include = [\"com.mosaikit.notes\"]");
+        text.push_str(
+            "
+[[nav_groups]]
+id = \"g\"
+label = \"G\"
+icon = \"folder\"
+plugins = [\"com.mosaikit.notes\", \"com.acme.gone\"]
+",
+        );
+        std::fs::write(root.join("distribution.toml"), text).unwrap();
+        let base = t.path().join("base");
+        std::fs::create_dir_all(base.join("registry")).unwrap();
+        std::fs::write(base.join("registry/index.json"), r#"{"plugins":[]}"#).unwrap();
+        let r =
+            validate(&root, &Options { server: Some(t.path().join("no-server")), base: Some(base) }).unwrap();
+        let all = format!("{:?}", r.findings);
+        assert!(r.ok(), "{all}");
+        assert!(all.contains("com.acme.gone") && all.contains("not in [plugins] include"), "{all}");
+        assert!(all.contains("not in the registry of the base"), "{all}");
     }
 }
