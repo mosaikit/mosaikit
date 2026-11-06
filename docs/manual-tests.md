@@ -903,3 +903,24 @@ A plugin that shows a resource on the full page can change the top band of the s
 | BAND-07 | Look at the band in light, dark and the high contrast mode, in a theme with a dark and one with a light band, with a band image; read the controls with the keyboard only and with a screen reader; use 400 px wide | Texts and icons stay readable (at least 4.5:1); the switch is announced as a switch named «Edit mode», avatars by name, the comments button as «Comments» with the number and its state; every control takes the focus in a visible order; at 400 px nothing overflows | Playwright (NOT VERIFIABLE: the contrast of every band colour is computed by `contextband.test.ts`; the rest needs a test page and a screen reader) |
 | BAND-08 | Switch the language to Italian and, with the Spanish language plugin on, to Spanish | The texts of the band (View, Edit, Read only, Edit mode, Comments, the people and the tooltips) are translated | Playwright (NOT VERIFIABLE: needs a test page; the keys are checked by `langpack.test.ts`) |
 | BAND-09 | From a test page call `msk.band.set({ back: { label: 'Back to the list', onClick } })`; look at the band; press the button with the mouse and with the keyboard; send a label with markup, one of 200 characters and an empty one; open another route | An arrow-left icon button sits on the left right after the tenant, named and with a tooltip «Back to the list» (read as text, never HTML, cut to 80 characters); pressing it calls `onClick` once; an empty or non-text label makes the call fail with `invalid band back label`; the button is gone after the route changes | Playwright (NOT VERIFIABLE: needs a test page; the checks and the event are covered by `contextband.test.ts` and `band.test.ts`) |
+
+## Sidebar: back to the list and hover menus
+
+The icon of the open plugin in the sidebar returns to the list of the plugin when a detail page is open, and the menus of the icons open on hover ([refactoring-ui](refactoring-ui.md), `msk.onNavReselect` of the dev kit). The plugin colours follow the theme of the shell, not the colours of `brand.toml`.
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| RAIL-01 | Open a detail page of a plugin that has a list and a detail (a note, a task) and press its icon in the sidebar | The page returns to the list of the plugin; on a list page nothing changes | Playwright (NOT VERIFIABLE in the manual run: the spec is still to be written; the behaviour is covered by `hoverClick.test.tsx` and `contextband.test.ts`) |
+| RAIL-02 | Do the same in a plugin that sets a band back button (`msk.band.set({ back })`) and in one that listens to `msk.onNavReselect` | The first uses its back button (and its confirmation for unsaved changes); the second goes back to its list; a plugin that does neither stays where it is | Playwright (NOT VERIFIABLE in the manual run: needs a test page; covered by `contextband.test.ts` and `client.test.ts`) |
+| RAIL-03 | Hover an icon that has a menu; then move to another icon with a menu | The menu opens at once; the first one closes when the second opens; only one menu is open | Playwright (NOT VERIFIABLE in the manual run: the spec is still to be written; the behaviour is covered by `hoverClick.test.tsx` and `contextband.test.ts`) |
+| RAIL-04 | Press the icon of an open hover menu, with the mouse and with the keyboard | The menu stays open and the plugin opens; with the keyboard Escape closes it and the focus returns to the icon | Playwright (NOT VERIFIABLE in the manual run: covered by `hoverClick.test.tsx`) |
+| RAIL-05 | With a brand whose `[colors]` are dark (a distribution), open the shell in light mode and then a plugin | The plugin is light like the shell; switching the shell to dark makes the plugin dark; no frame stays in the other tone | Playwright (NOT VERIFIABLE in the manual run: needs a distribution brand; covered by the check of the theme variables of `PluginFrame`) |
+
+## Sites: language and tone of a zip site
+
+A site shown by the Sites plugin receives the language and the tone (light or dark) of the shell with `{ msk: 1, event: 'context', data: { lang, mode } }` and tells `ready` when it loads.
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| SITE-01 | Open a zip site that answers `context`; change the tone of the shell | The site changes tone without reloading and stays on the same page | Playwright (NOT VERIFIABLE in the manual run: needs a site that answers `context`) |
+| SITE-02 | Change the language of the shell with a site open | The site gets the new language and stays open; when you go back to the list of sites the Sites page is in the new language | Playwright (NOT VERIFIABLE in the manual run: needs a site that answers `context`) |
