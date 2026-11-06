@@ -52,6 +52,10 @@ enum Cmd {
         /// with --instance: Vite on this port, the server on the next, the plugins on the one after
         #[arg(long, default_value_t = 48080)]
         port_base: u16,
+        /// with --instance: every plugin UI on its own `<plugin>.localhost:<port+2>` origin (as in production), so an
+        /// embed may ask `same_origin`; a service that lists the plugin origins must list each one
+        #[arg(long)]
+        wildcard_plugins: bool,
     },
     /// Plugins: build, packages, scaffolding
     Plugin {
@@ -314,8 +318,8 @@ fn main() -> Result<()> {
                 Ok(())
             }
         },
-        Cmd::Dev { no_ui, instance, port_base } => {
-            dev::dev(no_ui, instance.map(|n| dev::Instance::new(&n, port_base)))
+        Cmd::Dev { no_ui, instance, port_base, wildcard_plugins } => {
+            dev::dev(no_ui, instance.map(|n| dev::Instance::new(&n, port_base).wildcard(wildcard_plugins)))
         }
         Cmd::Plugin { cmd } => match cmd {
             PluginCmd::Build { release } => {
