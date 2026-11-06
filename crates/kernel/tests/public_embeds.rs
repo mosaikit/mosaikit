@@ -279,6 +279,7 @@ async fn a_public_view_never_gets_the_origin_of_the_plugin() {
     // an embed that does not ask stays opaque for everybody
     let plain = embeds::public_url(&w.t, &w.link, &ask(MAPS, "map", rid)).await.unwrap();
     assert_eq!(plain["sandbox"], json!("allow-scripts"));
+}
 
 #[tokio::test]
 async fn a_public_ticket_expires_after_its_lifetime() {
