@@ -46,6 +46,8 @@ services:
       MOSAIKIT_URL: http://localhost:${MOSAIKIT_HTTP_PORT:-8080}
       MOSAIKIT_PLUGIN_URL: "http://*.localhost:${MOSAIKIT_PLUGIN_PORT:-8081}"
       MOSAIKIT_DEV_PLUGINS: /plugin
+      # public keys (separated by commas) of the publishers the server trusts; see "Trust a key" in the README
+      MOSAIKIT_TRUSTED_KEYS: ${MOSAIKIT_TRUSTED_KEYS:-}
     ports:
       - "127.0.0.1:${MOSAIKIT_HTTP_PORT:-8080}:8080"
       - "127.0.0.1:${MOSAIKIT_PLUGIN_PORT:-8081}:8081"

@@ -4,6 +4,7 @@ One version for the whole dev kit, the one of the platform (docs/plugin-devkit-p
 
 ## Unreleased
 
+- `install` prints a reminder when the plugin is installed but not active: an Administrator turns it on (Platform > Plugins > Turn on).
 - `validate`: `permissions.run_targets` needs `[requires] mosaikit` (warning, an error with `--strict`) and is listed among the permissions the Administrator will review; the conformance check errors when the logic mints run tickets (`ctx.runs()`) without `run_commands`.
 
 - Manifest: `[[embeds]]` (a page another plugin may show in a frame) and `[permissions] embeds` (listed among the permissions the Administrator reviews).

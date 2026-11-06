@@ -47,6 +47,11 @@ file, a sample migration, tests, and texts in English, Italian and Spanish.
 | `--lang fr` | the code of a language pack (needs `--variant language`, or a name like `lang-fr`) |
 | `--kit`, `--sdk-path`, `--plugin-api-path` | where the SDK and the UI package come from |
 
+`ui/package.json` points at the UI package of the kit with a relative `file:` path (for example
+`file:../../../mosaikit-devkit/plugin-api`). The path is relative to `ui/`: if you move the plugin or the kit, edit it
+(or run `npm pkg set "dependencies.@mosaikit/plugin-api=file:<new path>"` in `ui/`). The templates hold non-ASCII text
+(accents): edit them with a UTF-8 editor (a script that reads them as cp1252 on Windows corrupts them).
+
 What is in an `app` folder:
 
 ```
@@ -89,7 +94,8 @@ somebody else could reach it (not loopback, a database on another host, a revers
 (architecture §8.12).
 
 To check migrations and row level security on the real database (PostgreSQL) use the Docker kit: image
-`mosaikit-dev`, compose file `deploy/compose.devkit.yml` (built with `cargo xtask release devkit-docker`).
+in the kit's `docker/` folder: `docker compose up -d` there (`docker/README.md` says where the image comes from, how to load
+it offline and how to set a trusted key).
 
 ## 4. Change something
 
@@ -108,6 +114,10 @@ mosaikit-plugin install dist/<file>.mskp --server http://localhost:8080 --user a
 `pack` signs with `--key`, else `MOSAIKIT_SIGNING_KEY`, else `MOSAIKIT_SIGNING_KEY_FILE`, else a development key the tool
 makes once for you. A server installs a signed package only if it trusts the public key; the developer profile also
 accepts unsigned ones. See [Packaging and signing](packaging.md) and [Testing](testing.md).
+
+**After `install` the plugin is only "installed", not on.** The tool says so. An Administrator turns it on: open `#/admin`,
+Platform > Plugins > your plugin > **Turn on** (then it is `active` and available to the tenant `dev`). Until then its page
+does not appear in the shell.
 
 ## Next
 

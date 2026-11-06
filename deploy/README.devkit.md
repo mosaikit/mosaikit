@@ -11,9 +11,18 @@ point it at a database with real data (the server refuses a database that has te
 ## Start
 
 ```
-docker load -i mosaikit-dev-{{version}}-image.tar      # only if the image is not in your Docker yet
 PLUGIN_DIR=../my-plugin docker compose up -d           # the folder of your plugin (default: ./plugin)
 ```
+
+The first start pulls the image `MOSAIKIT_DEV_IMAGE:MOSAIKIT_VERSION` of `.env` (the kit points it at the registry where
+the release publishes it). If the pull is refused or you are offline, the image is not in the kit: ask whoever gave you
+the kit for the image archive (`mosaikit-dev-{{version}}-image.tar`, made with `docker save`), then
+
+```
+docker load -i mosaikit-dev-{{version}}-image.tar
+```
+
+and set `MOSAIKIT_DEV_IMAGE=mosaikit-dev` in `.env` (that is the name the archive carries).
 
 Open <http://localhost:8080>. Sign in as one of the test users, password `mosaikit-dev`:
 
@@ -26,6 +35,22 @@ Open <http://localhost:8080>. Sign in as one of the test users, password `mosaik
 The banner at the top says the profile is on; **Developer tools** shows the manifest as the server reads it, the
 host calls of the plugin with their timings and errors, the permissions of the signed-in user, the switch
 between the four users and the reset of the data of the plugin.
+
+To install a signed package (`mosaikit-plugin install file.mskp --server http://localhost:8080 --user admin --password
+mosaikit-dev`) leave `PLUGIN_DIR` as it is: the empty `./plugin` only makes the server log a harmless `ERROR`/`WARN`
+(`development plugin /plugin ...`) at start. A plugin installed this way is only **installed**: sign in as `admin`
+(`#/admin`), Platform > Plugins > the plugin > **Turn on**, and it appears for the tenant `dev`.
+
+## Trust a key
+
+The developer profile accepts unsigned packages, so a key is not needed here. To see what a real server does (a
+package refused with `publisher key not trusted: <key>`), put the public key that `mosaikit-plugin keygen` prints in
+`.env`, one or more separated by commas, and recreate the app:
+
+```
+MOSAIKIT_TRUSTED_KEYS=key1,key2
+docker compose up -d
+```
 
 ## The plugin folder
 
@@ -44,6 +69,7 @@ migrations again from the first one.
 |---|---|---|
 | `MOSAIKIT_DEV_IMAGE`, `MOSAIKIT_VERSION` | `mosaikit-dev`, `{{version}}` | the image |
 | `MOSAIKIT_HTTP_PORT`, `MOSAIKIT_PLUGIN_PORT` | `8080`, `8081` | ports on the loopback of the host |
+| `MOSAIKIT_TRUSTED_KEYS` | empty | public keys of the trusted publishers, separated by commas |
 | `PLUGIN_DIR` | `./plugin` | the folder of the plugin |
 | `POSTGRES_IMAGE` | `{{postgres_image}}` | PostgreSQL (use a PostGIS image for geographic plugins) |
 

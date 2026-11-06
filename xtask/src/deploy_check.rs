@@ -226,6 +226,14 @@ mod tests {
             env.contains("MOSAIKIT_DEV_IMAGE=mosaikit-dev") && env.contains("MOSAIKIT_VERSION=1.2.3"),
             "{env}"
         );
+        assert!(env.lines().all(|l| l == l.trim_start()), "stray spaces in .env: {env}");
+        assert!(
+            env.contains(
+                "
+MOSAIKIT_TRUSTED_KEYS="
+            ),
+            "{env}"
+        );
         let readme = std::fs::read_to_string(out.join("README.md")).unwrap();
         assert!(
             !readme.contains("{{") && readme.contains("mosaikit-dev-1.2.3-image.tar"),

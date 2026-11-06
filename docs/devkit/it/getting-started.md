@@ -47,6 +47,10 @@ L'id del plugin è `com.example.<nome>` salvo `--id com.acme.reports` (almeno du
 | `--lang fr` | il codice di un pacchetto lingua (serve `--variant language`, o un nome come `lang-fr`) |
 | `--kit`, `--sdk-path`, `--plugin-api-path` | da dove arrivano l'SDK e il pacchetto della UI |
 
+`ui/package.json` punta al pacchetto della UI del kit con un percorso `file:` relativo (per esempio `file:../../../mosaikit-devkit/plugin-api`). Il percorso è
+relativo a `ui/`: se sposti il plugin o il kit, correggilo (o esegui in `ui/` `npm pkg set "dependencies.@mosaikit/plugin-api=file:<nuovo percorso>"`).
+I template hanno testo non ASCII (accenti): modificali con un editor UTF-8 (uno script che li legge come cp1252 su Windows li rovina).
+
 Cosa c'è in una cartella `app`:
 
 ```
@@ -88,8 +92,8 @@ utenti). Il server viene da `--server`, da `MOSAIKIT_SERVER_BIN` o dal file acca
 di partire dove altri potrebbero raggiungerlo (non loopback, database su un altro host, reverse proxy): è solo per il
 proprio computer (architettura §8.12).
 
-Per controllare migrazioni e row level security sul database vero (PostgreSQL) c'è il kit Docker: immagine
-`mosaikit-dev`, file compose `deploy/compose.devkit.yml` (si costruisce con `cargo xtask release devkit-docker`).
+Per controllare migrazioni e row level security sul database vero (PostgreSQL) c'è il kit Docker: nella cartella
+`docker/` del kit: lì `docker compose up -d` (`docker/README.md` dice da dove viene l'immagine, come caricarla offline e come impostare una chiave fidata).
 
 ## 4. Cambiare qualcosa
 
@@ -109,6 +113,9 @@ mosaikit-plugin install dist/<file>.mskp --server http://localhost:8080 --user a
 chiave di sviluppo che lo strumento crea una volta per te. Un server installa un pacchetto firmato solo se si fida della
 chiave pubblica; il profilo sviluppatore accetta anche quelli non firmati. Vedi [Pacchetto e firma](packaging.md) e
 [Test](testing.md).
+
+**Dopo `install` il plugin è solo "installed", non acceso.** Lo strumento lo dice. Un Administrator lo accende: apri `#/admin`, Piattaforma > Plugin >
+il tuo plugin > **Turn on** (poi è `active` e disponibile all'organizzazione `dev`). Finché non è acceso la sua pagina non compare nella shell.
 
 ## Dopo
 

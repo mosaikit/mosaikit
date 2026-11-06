@@ -469,13 +469,16 @@ fn kit_txt(version: &str, platform: &str, server: bool) -> String {
          plugin-testing/      the test helpers (@mosaikit/plugin-testing): signIn, openPlugin, expectAccessible\n\
          docs/devkit/         the documentation (start with README.md and getting-started.md)\n\
          examples/            the three commented examples (todo, insights, note-priority)\n\
-         docker/              the Docker development kit (compose file, PostgreSQL)\n\
+         docker/              the Docker development kit (compose file, PostgreSQL; the image is pulled from {DEV_IMAGE}, see docker/README.md)\n\
          RELEASE-NOTES.md     what changed, and the breaking changes\n\
          COMPATIBILITY.md     which versions work together (generated from the manifests)\n\
          LICENSE, THIRD-PARTY-NOTICES.md\n\
          trusted_key.txt      the public key that signed this kit: `mosaikit-plugin self-update` checks the next one with it\n\n\
          Install: put bin/ on your PATH (or set MOSAIKIT_KIT to this folder). Check the download first: SHA256SUMS is signed\n\
-         with trusted_key.txt (`mosaikit-plugin self-update --from-dir <folder with the release files> --check`).\n"
+         with trusted_key.txt (`mosaikit-plugin self-update --from-dir <folder with the release files> --check`).\n\n\
+         Building a product (`mosaikit-product build desktop --base`) needs the desktop kit of the platform release\n\
+         (mosaikit-<version>-desktop-<platform>.zip on GitHub Releases), which is not part of this kit:\n\
+         see docs/devkit/building-an-application.md.\n"
     )
 }
 

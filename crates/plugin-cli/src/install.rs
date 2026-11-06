@@ -31,6 +31,16 @@ pub struct Installed {
     pub signed_by: Option<String>,
 }
 
+/// One line for the developer when the plugin was installed but is not on yet: only an Administrator turns it on.
+pub fn activation_hint(done: &Installed) -> Option<String> {
+    (done.status != "active").then(|| {
+        format!(
+            "{} is not on yet: sign in as an Administrator (#/admin), Platform > Plugins > {} > Turn on",
+            done.id, done.id
+        )
+    })
+}
+
 fn api(server: &str, path: &str) -> String {
     format!("{}{path}", server.trim_end_matches('/'))
 }
@@ -125,6 +135,19 @@ pub fn install(server: &str, package: &Path, login: &Login) -> Result<Installed>
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn hint_only_when_not_active() {
+        let mut i = Installed {
+            id: "com.x.y".into(),
+            version: "1.0.0".into(),
+            status: "installed".into(),
+            signed_by: None,
+        };
+        assert!(activation_hint(&i).unwrap().contains("Turn on"));
+        i.status = "active".into();
+        assert!(activation_hint(&i).is_none());
+    }
+
     use super::*;
     use std::io::{Read, Write};
     use std::net::TcpListener;
