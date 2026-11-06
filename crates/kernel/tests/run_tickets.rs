@@ -81,11 +81,13 @@ fn echo_wasm() -> Vec<u8> {
 }
 
 fn toml(id: &str, version: &str, run_commands: &str, run_targets: &str) -> String {
+    // the proxy may call the target plugin (a nested call), as a plugin that declares it in `calls`
+    let calls = if id == PROXY { format!("calls = [\"{TARGET}\"]\n") } else { String::new() };
     format!(
         "id = \"{id}\"\nname = \"Run\"\nversion = \"{version}\"\n[contribution]\nicon = \"x\"\nlabel = \"Run\"\n\
          [requires]\nmosaikit = \">=1.0\"\n\
          [[resources]]\nname = \"items\"\nfields = [{{ key = \"title\", kind = \"text\" }}]\n\
-         [permissions]\nrun_commands = {run_commands}\nrun_targets = {run_targets}\n"
+         [permissions]\nrun_commands = {run_commands}\nrun_targets = {run_targets}\n{calls}"
     )
 }
 
@@ -996,4 +998,14 @@ async fn the_logic_cannot_mint_beyond_its_manifest_or_the_person() {
 
 async fn cmd(w: &World, who: &Caller, plugin: &str, args: Value) -> mosaikit_kernel::Result<Value> {
     crud::call(&w.t, who, plugin, "x", args).await
+}
+
+#[tokio::test]
+async fn runs_mint_is_refused_in_a_nested_call() {
+    let w = world().await;
+    // the nested plugin runs the host operation: the caller of a nested call is another plugin's
+    let nested = host("plugin.call", json!({ "plugin": TARGET, "name": "x", "args": mint_op(json!([])) }));
+    let e = cmd(&w, &w.anna, PROXY, nested).await.unwrap_err();
+    assert!(e.message.contains("nested") || e.message.contains("plugin.call"), "{}", e.message);
+    assert_eq!(tickets_written(&w).await, 0);
 }
