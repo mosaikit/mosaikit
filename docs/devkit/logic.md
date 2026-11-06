@@ -64,8 +64,8 @@ A hook is registered as `"<resource>.<hook>"` and runs **in the same transaction
 | `after_delete` | after a row is deleted | `Err` rolls back the delete |
 
 The resource must be listed in `[permissions] hooks`; `validate --strict` fails a hook that is listed and never
-registered. `Hook` has `hook`, `resource`, `id`, `values`, `previous`. `Values` reads `str`, `f64`, `bool` (`true`,
-`1`, `yes`), `get`, and writes `set`, `remove`.
+registered. `Hook` has `hook`, `resource`, `id`, `values`, `previous`. `Values` reads `str` (a `String`, empty when absent), `f64` (an `Option<f64>`: `None` when the key is absent or not a number; a
+numeric text counts), `bool` (`true`, `1`, `yes`; absent is `false`), `get`, and writes `set`, `remove`.
 
 ## Context
 

@@ -167,7 +167,15 @@ anche `files_read`, `notify` o `calls` chiesti e mai usati.
 | `label` | obbligatoria |
 | `columns` | etichette facoltative delle colonne della vista |
 
-Solo il ruolo di reporting legge le viste `kpi_*`.
+Solo il ruolo di reporting legge le viste `kpi_*`. Una vista può confrontare o combinare colonne, quindi un KPI con due conteggi è una sola vista:
+
+```sql
+create view kpi_notes_health as
+  select tenant_id, count(*) as notes, count(*) filter (where tag is null) as untagged
+  from notes group by tenant_id;
+```
+
+con `columns = ["Notes", "Untagged"]` nella voce `[[kpi]]`.
 
 ## `[[nav]]`
 
@@ -290,7 +298,8 @@ Per `kind = "language"`: `code` (due o tre lettere minuscole, non `en` né `it`)
 
 Traduzioni del manifesto. `<lang>` è di due o tre lettere minuscole, non `en` (l'inglese è il manifesto stesso). Ogni
 chiave è facoltativa e ripiega sull'inglese; una chiave che nomina qualcosa che il manifesto non ha è un errore, e nessun
-testo supera i 300 caratteri.
+testo supera i 300 caratteri. **Quando togli o rinomini un campo, una risorsa, una vista KPI o un permesso, toglilo anche da ogni `[i18n.<lang>]`**
+(il template traduce i suoi campi d'esempio in `it` ed `es`): `validate` fallisce con `i18n.es: field 'inventory.status' does not exist`, che nomina lingua e campo.
 
 ```toml
 [i18n.it]

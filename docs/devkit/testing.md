@@ -104,6 +104,25 @@ test('Alice creates a note', async ({ page }) => {
 | `accessibilityViolations`, `expectAccessible`, `formatViolations` | the axe smoke test |
 | `pluginUrl`, `waitForHealth`, `devArgs`, `parseDevOutput`, `freePort` | small pieces for tests that do things their own way |
 
+Set up once in the plugin folder: `npm install --save-dev @playwright/test @mosaikit/plugin-testing` (the package comes from
+the kit like `@mosaikit/plugin-api`) and `npx playwright install chromium`; start `mosaikit-plugin dev --no-open` and run
+`MOSAIKIT_DEV_URL=http://127.0.0.1:<port>/ npx playwright test`.
+
+### Smoke test without a browser
+
+To see from a script that a running server has your plugin (a CI step, `curl`), without Playwright:
+
+```
+curl -s http://127.0.0.1:8080/api/health                         # {"status":"ok"...}
+curl -s http://127.0.0.1:8080/api/auth/tenants                   # the tenants of the sign-in page (slug `dev`)
+curl -s -c jar -H 'Content-Type: application/json' -d '{"tenant":"dev","username":"alice","password":"mosaikit-dev"}' http://127.0.0.1:8080/api/auth/login
+```
+
+The Administrator signs in at `POST /api/auth/admin/login` with `{"username":"admin","password":"mosaikit-dev"}`. The UI of a
+plugin is served on its own origin: the id with its dots turned into dashes, on `.localhost`, on the **plugin port** (the
+app port plus one), at `/ui/<id>/`: for `com.example.notes` on a server at port 8080,
+`http://com-example-notes.localhost:8081/ui/com.example.notes/` answers `200` with the page (the root `/` answers `404`).
+
 The shell is driven in English, so the labels the helpers click are the English ones. They work only against a server in
 the developer profile. To test sharing or roles, sign in as `bob` or `manager` in another context.
 

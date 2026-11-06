@@ -105,6 +105,24 @@ test('Alice creates a note', async ({ page }) => {
 | `accessibilityViolations`, `expectAccessible`, `formatViolations` | il test di fumo axe |
 | `pluginUrl`, `waitForHealth`, `devArgs`, `parseDevOutput`, `freePort` | piccoli pezzi per test che fanno a modo loro |
 
+Da fare una volta nella cartella del plugin: `npm install --save-dev @playwright/test @mosaikit/plugin-testing` (il pacchetto viene dal kit come
+`@mosaikit/plugin-api`) e `npx playwright install chromium`; avvia `mosaikit-plugin dev --no-open` ed esegui
+`MOSAIKIT_DEV_URL=http://127.0.0.1:<porta>/ npx playwright test`.
+
+### Prova rapida senza browser
+
+Per vedere da uno script che un server in esecuzione ha il tuo plugin (un passo di CI, `curl`), senza Playwright:
+
+```
+curl -s http://127.0.0.1:8080/api/health                         # {"status":"ok"...}
+curl -s http://127.0.0.1:8080/api/auth/tenants                   # le organizzazioni della pagina di accesso (slug `dev`)
+curl -s -c jar -H 'Content-Type: application/json' -d '{"tenant":"dev","username":"alice","password":"mosaikit-dev"}' http://127.0.0.1:8080/api/auth/login
+```
+
+L'Administrator accede con `POST /api/auth/admin/login` e `{"username":"admin","password":"mosaikit-dev"}`. La UI di un plugin è servita sulla propria origine:
+l'id con i punti trasformati in trattini, su `.localhost`, sulla **porta dei plugin** (porta dell'app più uno), a `/ui/<id>/`: per `com.example.notes` su un server
+alla porta 8080, `http://com-example-notes.localhost:8081/ui/com.example.notes/` risponde `200` con la pagina (la radice `/` risponde `404`).
+
 La shell è pilotata in inglese, quindi le etichette che gli helper cliccano sono quelle inglesi. Funzionano solo contro un
 server nel profilo sviluppatore. Per provare condivisione o ruoli, accedere come `bob` o `manager` in un altro contesto.
 
