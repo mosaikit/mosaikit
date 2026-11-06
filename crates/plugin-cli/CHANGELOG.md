@@ -4,6 +4,8 @@ One version for the whole dev kit, the one of the platform (docs/plugin-devkit-p
 
 ## Unreleased
 
+- `validate`: `permissions.run_targets` needs `[requires] mosaikit` (warning, an error with `--strict`) and is listed among the permissions the Administrator will review; the conformance check errors when the logic mints run tickets (`ctx.runs()`) without `run_commands`.
+
 - Manifest: `[[embeds]]` (a page another plugin may show in a frame) and `[permissions] embeds` (listed among the permissions the Administrator reviews).
 - Manifest: `[permissions] resources_read` and `contributions` (listed among the permissions the Administrator reviews), `[[contributes]]`
   (point, id, label, data) and `[[tables]]` (`insert_for = "reader"`, `owner_column`: a person who can only read a resource writes the rows that

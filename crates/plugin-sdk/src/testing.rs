@@ -466,7 +466,7 @@ mod tests {
 
     crate::plugin! {
         hooks: { "notes.before_create" => default_tag, "notes.before_update" => reject },
-        commands: { "notes.count" => count, "t.greet" => greet, "t.locked" => locked, "t.tour" => tour, "t.dir" => directory_tour },
+        commands: { "notes.count" => count, "t.greet" => greet, "t.locked" => locked, "t.tour" => tour, "t.dir" => directory_tour, "t.run" => run_tour },
     }
 
     #[test]
@@ -600,6 +600,37 @@ mod tests {
         let users = ctx.directory().users("AN", Some(100))?;
         let groups = ctx.directory().groups("edit", None)?;
         Ok(json!({ "users": users, "groups": groups }))
+    }
+
+    fn run_tour(ctx: &Ctx, _args: Value) -> Result<Value> {
+        let t = ctx.runs().mint(&crate::RunMint {
+            commands: vec!["node_run".into()],
+            run_ref: "r1".into(),
+            targets: vec![crate::RunTarget {
+                plugin: "com.x.w".into(),
+                commands: vec!["node_run".into()],
+                resources: None,
+            }],
+            ..Default::default()
+        })?;
+        Ok(json!({ "token": t.token, "uses": t.uses }))
+    }
+
+    #[test]
+    fn runs_mint_sends_what_the_real_host_expects() {
+        let reg = __msk_registry();
+        let host = MockHost::new().on("runs.mint", |_| {
+            Ok(json!({ "id": "t1", "token": "ab", "expires_at": "2030-01-01T00:00:00Z", "uses": 100 }))
+        });
+        let out = host.command(&reg, "t.run", Value::Null).unwrap();
+        assert_eq!(out, json!({ "token": "ab", "uses": 100 }));
+        let (op, req) = &host.calls()[0];
+        assert_eq!(op, "runs.mint");
+        assert_eq!(req["targets"][0]["plugin"], "com.x.w");
+        // optional fields are left out, not sent as null
+        assert!(req.get("ttl_minutes").is_none() && req.get("resources").is_none());
+        let denied = MockHost::new().deny("runs.mint", "not in run_targets");
+        assert!(denied.command(&reg, "t.run", Value::Null).unwrap_err().contains("run_targets"));
     }
 
     #[test]

@@ -5,6 +5,8 @@ version and is removed in the next.
 
 ## Unreleased
 
+- `Ctx::runs()` and `Runs::mint(&RunMint)` (host operation `runs.mint`): a ticket for the plugin and, with `RunTarget`, for the other plugins it declares in `[permissions] run_targets`; written when the command has committed. Plugin API unchanged (additive).
+
 - `Resources::list(plugin, kind, q, limit)` (host operation `resources.list`): the resources of another plugin that the caller sees, for a
   picker; needs the plugin in `[permissions] resources_read` and `[requires] mosaikit = ">=1.0"`. `Resources::contributions(point)` (host
   operation `contributions.list`): the plugins that contribute to a point declared in `[permissions] contributions`, which can then be called
