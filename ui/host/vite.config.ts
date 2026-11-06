@@ -20,6 +20,8 @@ export default defineConfig({
     host: '127.0.0.1',
     port: vitePort,
     strictPort: true,
+    // the proxy must forward the preflight of /api/run/* (a page with no origin calls it): the server answers CORS itself
+    cors: false,
     proxy: {
       '/api': { target: `http://127.0.0.1:${serverPort}`, changeOrigin: false },
       '/brand': { target: `http://127.0.0.1:${serverPort}`, changeOrigin: false },
