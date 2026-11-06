@@ -578,7 +578,14 @@ pub fn devkit(o: &Options) -> Result<()> {
         run(npm()
             .current_dir(root().join("ui").join("plugin-api"))
             .args(["exec", "--yes", "typedoc@0.28.20", "--"])
-            .args(["--entryPoints", "src/index.ts", "--tsconfig", "tsconfig.json", "--name", "Mosaikit plugin API"])
+            .args([
+                "--entryPoints",
+                "src/index.ts",
+                "--tsconfig",
+                "tsconfig.json",
+                "--name",
+                "Mosaikit plugin API",
+            ])
             .args(["--excludeInternal", "--skipErrorChecking", "--out"])
             .arg(&ui_api))?;
     }
