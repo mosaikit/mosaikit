@@ -548,6 +548,57 @@ pub async fn zip_folder(k: &Kernel, c: &Caller, plugin_id: &str, id: Uuid) -> Re
     Ok((format!("{}.zip", root.name), bytes))
 }
 
+/// A file found inside a folder tree by its relative path.
+#[derive(Debug, Clone)]
+pub struct TreeFile {
+    pub id: Uuid,
+    pub name: String,
+}
+
+/// Finds the file at `rel` (segments separated by `/`) under the folder `root`, as the context `ctx`
+/// sees it (a person's, or a public link's): trashed or hidden items are not found. Names are matched
+/// exactly; siblings never differ only by case. `None` for an empty path, a path that is not safe
+/// (`.`, `..`, empty segments, separators or control characters in a name) or one that leads to a
+/// folder. This is how a folder is served as a static tree (tickets and public links).
+pub async fn resolve_path(
+    k: &Kernel,
+    plugin_id: &str,
+    ctx: &mosaikit_db::Ctx,
+    root: Uuid,
+    rel: &str,
+) -> Result<Option<TreeFile>> {
+    let segs: Vec<&str> = rel.split('/').collect();
+    if rel.is_empty() || segs.len() > 64 || !segs.iter().all(|s| valid_name(s)) {
+        return Ok(None);
+    }
+    let mut tx = k.db.begin_plugin_read(plugin_id, ctx).await?;
+    let mut cur = root;
+    for (i, seg) in segs.iter().enumerate() {
+        let last = i + 1 == segs.len();
+        let row = mosaikit_db::query(
+            "select id, title from core.visible_resources
+             where parent_id = $1 and title = $2 and kind = $3 limit 1",
+        )
+        .bind(cur)
+        .bind(*seg)
+        .bind(if last { "file" } else { "folder" })
+        .fetch_optional(&mut *tx)
+        .await?;
+        let Some(row) = row else {
+            tx.commit().await?;
+            return Ok(None);
+        };
+        cur = row.get(0);
+        if last {
+            let name: String = row.get(1);
+            tx.commit().await?;
+            return Ok(Some(TreeFile { id: cur, name }));
+        }
+    }
+    tx.commit().await?;
+    Ok(None)
+}
+
 #[cfg(test)]
 mod tests {
     #[test]

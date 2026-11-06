@@ -136,8 +136,10 @@ fn urlencode_path(p: &str) -> String {
 pub struct Target {
     pub tenant: Uuid,
     pub resource: Uuid,
+    pub user: Uuid,
     pub kind: String,
     pub title: String,
+    pub plugin_id: String,
     pub download: bool,
 }
 
@@ -156,14 +158,24 @@ pub async fn resolve_ticket(k: &Kernel, token: &str) -> Result<Target> {
     let user: Uuid = row.get(1);
     let tenant: Uuid = row.get(2);
     let mut tx = k.db.begin(&mosaikit_db::Ctx::user(user, tenant)).await?;
-    let r = mosaikit_db::query("select kind, title, core.level_of(id) from core.resources where id = $1")
-        .bind(rid)
-        .fetch_optional(&mut *tx)
-        .await?;
+    let r = mosaikit_db::query(
+        "select kind, title, core.level_of(id), plugin_id from core.resources where id = $1",
+    )
+    .bind(rid)
+    .fetch_optional(&mut *tx)
+    .await?;
     tx.commit().await?;
     let r = r.ok_or_else(|| Error::not_found("resource not found"))?;
     if r.get::<i32, _>(2) < 1 {
         return Err(Error::forbidden("access revoked"));
     }
-    Ok(Target { tenant, resource: rid, kind: r.get(0), title: r.get(1), download: row.get(3) })
+    Ok(Target {
+        tenant,
+        resource: rid,
+        user,
+        kind: r.get(0),
+        title: r.get(1),
+        plugin_id: r.get(3),
+        download: row.get(3),
+    })
 }

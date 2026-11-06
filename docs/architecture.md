@@ -601,6 +601,15 @@ request (the server runs every request inside `events::with_request`).
   public viewer of the plugin opens (`public_view` in the manifest), which receives
   only the data of that resource (and of its children). That page may also read the settings its
   plugin marks public and run the commands it declares for public links (§8.13).
+- **A folder of Files is a static tree.** `/p/{token}/{path}` (a link on a folder) and `/c/{ticket}/{path}`
+  (the ticket of a folder: `content.url`/`ticket` returns its root, the caller adds the path) serve the file
+  found by walking the names under the folder, so relative URLs inside a dataset (3D Tiles, tile pyramids,
+  glTF with its textures) resolve. What is seen is decided by the context of the link or of the person
+  (`files::resolve_path`): trash, hidden items and anything outside the folder are 404; `.`, `..`, empty
+  segments and separators in a name are refused. The ticket lasts 8 hours and is bound to the session, a
+  link has no session: a page that needs a fixed address uses a public link.
+- Files of sites and trees are served with `Range` (one byte range, `206`/`416`), `ETag` and `If-None-Match`
+  (`304`), `Accept-Ranges: bytes`, so formats read in pieces (PMTiles, COG) work.
 - Every visit increments `view_count` and is an event (KPI).
 
 ### 5.1 Notifications
