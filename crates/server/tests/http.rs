@@ -2487,6 +2487,205 @@ async fn public_settings_and_commands_over_http() {
     assert_eq!(r.status, StatusCode::NOT_FOUND);
 }
 
+/// Runs the script of a public viewer page in Node against a fake DOM (viewer_harness.js) and checks the relay of
+/// `embed.url`: what it asks of `POST embed`, what it answers the frame, and what it ignores. Skipped without Node.
+fn viewer_script_relays_embed_url(html: &str, plugin_origin: &str) {
+    let node = std::process::Command::new("node").arg("--version").output();
+    if node.map(|o| !o.status.success()).unwrap_or(true) {
+        eprintln!("node not found: the script of the public viewer is not run");
+        return;
+    }
+    let open = html.find("<script nonce=\"").expect("a script");
+    let from = open + html[open..].find('>').unwrap() + 1;
+    let script = &html[from..from + html[from..].find("</script>").unwrap()];
+    let dir = std::env::temp_dir().join(format!("msk-viewer-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let file = dir.join("viewer.js");
+    std::fs::write(&file, script).unwrap();
+    let harness = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/viewer_harness.js");
+    let out = std::process::Command::new("node").arg(harness).arg(&file).arg(plugin_origin).output().unwrap();
+    std::fs::remove_dir_all(&dir).ok();
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    let r: Value = serde_json::from_slice(&out.stdout).unwrap();
+
+    // the frame's request goes to `embed` as JSON with the three fields and nothing else
+    let f = &r["fetchedOk"][0];
+    assert_eq!((f["url"].clone(), f["method"].clone()), (json!("embed"), json!("POST")), "{r}");
+    assert_eq!(f["type"], "application/json");
+    let sent: Value = serde_json::from_str(f["body"].as_str().unwrap()).unwrap();
+    assert_eq!(sent, json!({ "plugin": "com.x.maps", "name": "map", "resource": "R1" }));
+    // the answer is the `ok` of the route, to the frame's origin, with the id of the message
+    let a = &r["ok"][0];
+    assert_eq!(a["ok"], json!({ "url": "U", "expires_at": "E", "resource": "R" }), "{r}");
+    assert_eq!(
+        (a["id"].clone(), a["msk"].clone(), a["_origin"].clone()),
+        (json!(7), json!(1), json!(plugin_origin))
+    );
+    // a refusal keeps its message and code
+    let a = &r["refused"][0];
+    assert_eq!(
+        (a["err"].clone(), a["code"].clone(), a["id"].clone()),
+        (json!("refused"), json!("permission_denied"), json!(8))
+    );
+    // messages from another origin, another window or without the envelope are ignored: no answer, no request
+    for k in ["wrongOrigin", "wrongSource", "noEnvelope"] {
+        assert!(r[k].as_array().unwrap().is_empty(), "{k}: {r}");
+    }
+    assert!(r["fetchedIgnored"].as_array().unwrap().is_empty(), "{r}");
+    // the other operations of the host stay closed, `runs.mint` included
+    for k in ["unknown", "mint"] {
+        assert_eq!(r[k][0]["err"], "operation not available in a public link", "{k}: {r}");
+    }
+}
+
+/// `POST /p/{token}/embed` and the public viewer page that relays `embed.url` to it.
+#[tokio::test]
+async fn public_embed_over_http() {
+    const HOST: &str = "com.test.pubboard";
+    const MAPS: &str = "com.test.pubmaps";
+    let a = App::new().await;
+    let manifest = |id: &str, extra: &str| {
+        format!(
+            "id = \"{id}\"\nname = \"P\"\nversion = \"1.0.0\"\n[contribution]\nicon = \"x\"\nlabel = \"P\"\n\
+             [requires]\nmosaikit = \">=1.0\"\n\
+             [[resources]]\nname = \"items\"\nfields = [{{ key = \"title\", kind = \"text\" }}]\n{extra}"
+        )
+    };
+    let pack = |toml: String, ui: bool| {
+        let mut files = std::collections::BTreeMap::new();
+        files.insert("plugin.toml".to_string(), toml.into_bytes());
+        files.insert("logic.wasm".to_string(), echo_wasm());
+        if ui {
+            files.insert("ui/index.html".to_string(), b"<!doctype html><title>x</title>".to_vec());
+            files.insert("ui/public.html".to_string(), b"<!doctype html><title>public</title>".to_vec());
+        }
+        mosaikit_mskp::pack(&files, Some(&mosaikit_kernel::testing::test_key())).unwrap()
+    };
+    let maps = manifest(
+        MAPS,
+        "[permissions]\nrun_commands = [\"layers\"]\n\
+         [[public_commands]]\nname = \"layers\"\ndescription = \"layers\"\n\
+         [[embeds]]\nname = \"map\"\nentry = \"embed.html\"\nresource_kind = \"items\"\ncommands = [\"layers\"]\n",
+    );
+    let host = manifest(
+        HOST,
+        &format!("[permissions]\nembeds = [\"{MAPS}\"]\n[ui]\nentry = \"index.html\"\npublic_view = \"public.html\"\n"),
+    );
+    a.t.install_package(&pack(maps, false)).await.unwrap();
+    a.t.install_package(&pack(host, true)).await.unwrap();
+    a.t.tenant("alfa").await;
+    let g = a.login("alfa", "alfa-manager", PASSWORD).await;
+    let rid = a
+        .call(
+            Some(&g),
+            Method::POST,
+            &format!("/api/t/alfa/p/{HOST}/r/items"),
+            Some(json!({ "values": { "title": "shared" } })),
+        )
+        .await
+        .json()["id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+    let l =
+        a.call(Some(&g), Method::POST, &format!("/api/t/alfa/resources/{rid}/links"), Some(json!({}))).await;
+    let path = l.json()["url"].as_str().unwrap().trim_start_matches(&a.t.cfg.public_url).to_string();
+    let post = |path: String, ctype: Option<&str>, body: &str| {
+        let mut b = Request::builder().method(Method::POST).uri(path);
+        if let Some(c) = ctype {
+            b = b.header(header::CONTENT_TYPE, c);
+        }
+        send(&a.untrusted, b.body(Body::from(body.to_string())).unwrap())
+    };
+    let ask = json!({ "plugin": MAPS, "name": "map", "resource": rid }).to_string();
+    let url = format!("{path}embed");
+
+    // the tenant has not allowed public commands: no frame, no ticket
+    let r = post(url.clone(), Some("application/json"), &ask).await;
+    assert_eq!((r.status, r.json()["code"].as_str()), (StatusCode::FORBIDDEN, Some("public_commands_off")));
+    let mut st: Value = a.call(Some(&g), Method::GET, "/api/t/alfa/manage/settings", None).await.json();
+    st["public_commands_enabled"] = json!(true);
+    let r = a.call(Some(&g), Method::PUT, "/api/t/alfa/manage/settings", Some(st)).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+
+    // bad requests: not JSON, no content type, a body over 2 KiB, a body that is not the request
+    let r = post(url.clone(), Some("application/x-www-form-urlencoded"), "a=b").await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST);
+    assert_eq!(post(url.clone(), None, &ask).await.status, StatusCode::BAD_REQUEST);
+    let big = format!("{{\"plugin\":\"{}\"}}", "x".repeat(3000));
+    assert_eq!(post(url.clone(), Some("application/json"), &big).await.status, StatusCode::BAD_REQUEST);
+    assert_eq!(post(url.clone(), Some("application/json"), "{").await.status, StatusCode::BAD_REQUEST);
+    assert_eq!(post(url.clone(), Some("application/json"), "{}").await.status, StatusCode::BAD_REQUEST);
+    // a plugin the host does not declare, a page that does not exist, a resource that is not under the link
+    for body in [
+        json!({ "plugin": "com.test.nobody", "name": "map", "resource": rid }),
+        json!({ "plugin": MAPS, "name": "nope", "resource": rid }),
+        json!({ "plugin": MAPS, "name": "map", "resource": uuid::Uuid::new_v4() }),
+    ] {
+        let r = post(url.clone(), Some("application/json"), &body.to_string()).await;
+        assert!(r.status.is_client_error(), "{body}: {}", r.text());
+        assert!(!r.text().contains("pe."), "{}", r.text());
+    }
+
+    // a frame: the address of the page of the embedded plugin with a ticket of the link, never cached
+    let r = post(url.clone(), Some("application/json"), &ask).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    assert_eq!(r.header(header::CACHE_CONTROL), "no-store");
+    let ok = r.json()["ok"].clone();
+    let frame = ok["url"].as_str().unwrap().to_string();
+    assert!(frame.contains(&format!("/ui/{MAPS}/embed.html?embed=pe.")), "{ok}");
+    assert_eq!(ok["resource"], json!(rid));
+    // the ticket runs the public command through the platform
+    let ticket = frame.split("embed=").nth(1).unwrap().split('&').next().unwrap().to_string();
+    let call = format!("/api/run/{ticket}/call/{MAPS}/layers");
+    let run = |path: String| {
+        let b = Request::builder()
+            .method(Method::POST)
+            .uri(path)
+            .header(header::CONTENT_TYPE, "application/json");
+        send(&a.app, b.body(Body::from("{}")).unwrap())
+    };
+    let r = run(call.clone()).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    // no frame without the link: a made-up token, a password-locked link
+    assert_eq!(
+        post("/p/nope/embed".into(), Some("application/json"), &ask).await.status,
+        StatusCode::NOT_FOUND
+    );
+    let lock = a
+        .call(
+            Some(&g),
+            Method::POST,
+            &format!("/api/t/alfa/resources/{rid}/links"),
+            Some(json!({ "password": "open123" })),
+        )
+        .await;
+    let lpath = lock.json()["url"].as_str().unwrap().trim_start_matches(&a.t.cfg.public_url).to_string();
+    let r = post(format!("{lpath}embed"), Some("application/json"), &ask).await;
+    assert_eq!(r.status, StatusCode::NOT_FOUND);
+
+    // the viewer page carries the relay of `embed.url`, with the nonce of its CSP
+    let page = a.get_untrusted(&path, None).await;
+    assert_eq!(page.status, StatusCode::OK, "{}", page.text());
+    let csp = page.header(header::CONTENT_SECURITY_POLICY);
+    let html = page.text();
+    let nonce = csp.split("script-src 'nonce-").nth(1).unwrap().split('\'').next().unwrap();
+    assert!(html.contains(&format!("<script nonce=\"{nonce}\">")), "{html}");
+    assert!(html.contains("m.op==='embed.url'") && html.contains("fetch('embed'"), "{html}");
+    viewer_script_relays_embed_url(&html, &a.t.cfg.plugin_origin_for(HOST));
+
+    // a revoked link gives no more frames and its tickets stop
+    let links =
+        a.call(Some(&g), Method::GET, &format!("/api/t/alfa/resources/{rid}/links"), None).await.json();
+    for l in links.as_array().unwrap() {
+        a.call(Some(&g), Method::DELETE, &format!("/api/t/alfa/links/{}", l["id"].as_str().unwrap()), None)
+            .await;
+    }
+    assert_eq!(post(url, Some("application/json"), &ask).await.status, StatusCode::NOT_FOUND);
+    let r = run(call).await;
+    assert_eq!(r.status, StatusCode::UNAUTHORIZED, "{}", r.text());
+}
+
 #[tokio::test]
 async fn schedules_over_http() {
     const ID: &str = "com.test.runecho";
