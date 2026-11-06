@@ -609,3 +609,38 @@ Track A alone (plugins) is 47 days and can be released first.
 - Hosting, billing or tenancy management of a product's customers.
 - Support for logic written in languages other than Rust (the ABI allows it; templates for other languages can
   follow once the kit is stable).
+
+## 9. Static publications and profiles
+
+A folder of Files is a static tree (architecture §5): reached by the address of a ticket or of a public link, with
+the paths of its files, byte ranges and ETag. A plugin that knows a format (a dataset made of many files with
+relative links, a pyramid of tiles, a single file read in pieces) builds on it without a store of its own.
+
+**Who does what**
+- **Files** keeps the bytes and the access rules (folders, sharing with people and groups, public links, trash, quota)
+  and unpacks zip archives (`files.unzip`).
+- **The kernel** serves the tree and checks access. It knows no format.
+- **A plugin with `files_read` / `files_write`** works in the Files area as the person (`source` on the files calls) and
+  keeps what it knows about a format: how to recognise it, check it, describe it and show it.
+
+**Contract of a profile** (kept by the plugin that offers it; version 1)
+
+| Part | Meaning |
+|---|---|
+| `id`, `version` | stable name of the format (e.g. `tiles3d`, `pmtiles`, `cog`) and the version of the contract it follows |
+| `detect(folder)` | cheap: looks at marker files at the root of a folder (or at one file), never reads the whole tree. Answers the entry point (`tileset.json`) or nothing |
+| `validate(folder)` | checks that the files the entry point names exist and are readable; answers errors and warnings with the path |
+| `describe(folder)` | what a catalogue shows: title, extent, coordinate system, size, count of files, zoom range, attribution |
+| `render` | what a page needs to show it: the kind of layer and the address of the entry point (the ticket or link of the folder plus the path) |
+
+Rules: a profile only reads, through the files calls of the person (so it never sees more than they do); it is
+optional (a folder without a profile is still published as it is); a change that removes or renames a part raises the
+version of the contract, and the plugins that offer profiles say which version they follow.
+
+**Addresses.** A ticket lasts 8 hours and is bound to the session: a page that shows the dataset asks for a new one
+(`ticket` with `source`) before it expires. A page that needs a fixed address uses a public link on the folder, with the
+token in the path (a query string is not kept by relative links).
+
+**Not done yet:** Files does not ask the plugins that offer profiles whether a folder it has just unpacked is
+recognised (the «this folder is a dataset, publish it?» notice). Until an extension point for it exists, the plugin that
+offers the profiles lists the folders of Files it recognises («add from Files»).
