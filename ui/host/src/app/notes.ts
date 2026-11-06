@@ -7,7 +7,7 @@ import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-quer
 import { api, appUrl } from '../api.ts'
 import type { Session } from '../types.ts'
 import { useAction } from './core.ts'
-import { t } from './i18n.ts'
+import { lang, t } from './i18n.ts'
 
 export type NoteKind = 'invitation' | 'share' | 'link' | 'plugin' | 'system'
 
@@ -149,6 +149,10 @@ export function noteTitle(n: Note): string {
       return t('The trial of {tenant} ends on {date}', { tenant: d.tenant, date: d.until })
     case 'tenant.trial_ended':
       return t('The trial of {tenant} ended: the tenant is suspended', { tenant: d.tenant })
+    case 'folder_profile': {
+      const labels = (n.data as { labels?: Record<string, string> }).labels ?? {}
+      return t('“{name}” looks like a {label}', { name: d.name, label: labels[lang().split('-')[0]] ?? d.label })
+    }
     case 'backup.failed':
       return t('The backup failed')
     case 'backup.item_restored':
@@ -191,6 +195,8 @@ export function noteBody(n: Note): string {
       return t('At the end the tenant is suspended; the data stay')
     case 'tenant.trial_ended':
       return t('Reactivate it or extend the trial from its page.')
+    case 'folder_profile':
+      return t('Open it in {app} to publish it.', { app: d.app })
     case 'alert.raised':
       return t('See Monitoring for the state of the platform.')
     case 'backup.item_restored':

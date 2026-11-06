@@ -110,5 +110,19 @@ test.describe.serial('22-files-tree', () => {
     for (const p of ['missing.json', 'tiles/', 'tiles/0', '__MACOSX/._tileset.json']) {
       expect((await page.request.get(base + p)).status(), p).toBe(404)
     }
+
+    // the folder has a marker a plugin knows (the fixture « Folder probe »): the notice, in the bell and in Files
+    const note = frame.locator('.fm-note')
+    await expect(note).toContainText('“tiles” looks like a 3D Tiles dataset')
+    const bell = await API(page, 'GET', 'api/me/notifications')
+    expect(JSON.stringify(bell.json)).toContain('looks like 3D Tiles dataset')
+    // its button opens the plugin at that folder; the page reads where it was opened and what the Files calls answer
+    await note.getByRole('button', { name: 'Open in Folder probe' }).click()
+    await expect(page).toHaveURL(/#\/t\/treeco\/p\/com\.mosaikit\.e2e-folder-probe\/profile%2Ftiles3d%2F/)
+    const probe = page.frameLocator('iframe.plugin-frame')
+    await expect(probe.locator('#at')).toHaveText(`profile/tiles3d/${folder.id}?source=com.mosaikit.files`)
+    await expect(probe.locator('#list')).toHaveText('ok')
+    await expect(probe.locator('#mkdir')).toHaveText(/^err:/)
+    await expect(probe.locator('#profiles')).toHaveText('tiles3d')
   })
 })

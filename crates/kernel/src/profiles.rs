@@ -18,6 +18,8 @@ pub struct Suggestion {
     /// the id of the profile and its English label (`[[folder_profiles]]`)
     pub profile: String,
     pub label: String,
+    /// the label in the other languages the manifest has it in (`[i18n.<lang>.folder_profiles]`), by language
+    pub labels: std::collections::BTreeMap<String, String>,
     /// the folder that holds the marker: the one given, or the only folder inside it (a zip often has one
     /// folder around everything)
     pub folder: Uuid,
@@ -63,6 +65,7 @@ pub async fn detect(k: &Kernel, c: &Caller, source: &str, folder: Uuid) -> Resul
                 plugin_label: p.manifest.contribution.label.clone(),
                 profile: prof.id.clone(),
                 label: prof.label.clone(),
+                labels: p.manifest.folder_profile_labels(&prof.id),
                 folder: at_folder,
                 marker,
                 link: crate::notify::plugin_link(&c.tenant.slug, &p.id, Some(&at)),
@@ -102,7 +105,7 @@ pub async fn announce(k: &Kernel, c: &Caller, name: &str, found: &[Suggestion]) 
                 link: s.link.clone(),
                 source: s.plugin.clone(),
                 resource: Some(s.folder),
-                data: json!({ "app": s.plugin_label, "code": "folder_profile", "name": name, "label": s.label }),
+                data: json!({ "app": s.plugin_label, "code": "folder_profile", "name": name, "label": s.label, "labels": s.labels }),
             },
         )
         .await;

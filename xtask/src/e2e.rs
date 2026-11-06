@@ -113,6 +113,31 @@ pub(crate) fn wait_health(url: &str) -> Result<()> {
     bail!("the server does not answer on {url}")
 }
 
+/// The plugins of `tests/fixtures/e2e-plugins` (only the browser tests install them): each folder holds a
+/// `plugin.toml` and a `ui/` that is copied as it is into the `ui/dist` of a copy under `dir`, because the
+/// packages carry `ui/dist` and a `dist` folder is not committed.
+fn fixture_plugins(dir: &std::path::Path) -> Result<Vec<plugins::Plugin>> {
+    let src = root().join("tests").join("fixtures").join("e2e-plugins");
+    let mut out = Vec::new();
+    let Ok(rd) = std::fs::read_dir(&src) else { return Ok(out) };
+    let mut folders: Vec<_> =
+        rd.flatten().map(|e| e.path()).filter(|p| p.join("plugin.toml").is_file()).collect();
+    folders.sort();
+    for from in folders {
+        let name = from.file_name().context("fixture name")?.to_owned();
+        let to = dir.join("fixture-plugins").join(&name);
+        std::fs::create_dir_all(to.join("ui").join("dist"))?;
+        std::fs::copy(from.join("plugin.toml"), to.join("plugin.toml"))?;
+        if let Ok(files) = std::fs::read_dir(from.join("ui")) {
+            for f in files.flatten().filter(|f| f.path().is_file()) {
+                std::fs::copy(f.path(), to.join("ui").join("dist").join(f.file_name()))?;
+            }
+        }
+        out.push(plugins::Plugin::load(&to)?);
+    }
+    Ok(out)
+}
+
 /// A full installation for the browser tests: new database, plugins built, signed and preinstalled from
 /// the registry, the server and the test identity provider, on the first free ports.
 pub(crate) struct Instance {
@@ -146,7 +171,10 @@ impl Instance {
         }
         std::fs::create_dir_all(&dir)?;
 
-        let all = plugins::discover()?;
+        let mut all = plugins::discover()?;
+        if suite.starts_with("e2e") {
+            all.extend(fixture_plugins(&dir)?);
+        }
         // the shards of a parallel run start one after the other and build once
         let mut built = BUILT.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
         if !*built {

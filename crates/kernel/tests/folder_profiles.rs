@@ -24,7 +24,8 @@ fn zip_of(entries: &[(&str, &[u8])]) -> Vec<u8> {
 async fn install_geo(t: &TestKernel) {
     let toml = format!(
         "id = \"{GEO}\"\nname = \"Geo\"\nversion = \"1.0.0\"\n[contribution]\nicon = \"x\"\nlabel = \"Geo data\"\n\
-         [[folder_profiles]]\nid = \"tiles3d\"\nlabel = \"3D Tiles dataset\"\nmarkers = [\"tileset.json\"]\n"
+         [[folder_profiles]]\nid = \"tiles3d\"\nlabel = \"3D Tiles dataset\"\nmarkers = [\"tileset.json\"]\n\
+         [i18n.it.folder_profiles]\ntiles3d = \"dataset 3D Tiles\"\n"
     );
     let mut files = BTreeMap::new();
     files.insert("plugin.toml".to_string(), toml.into_bytes());
@@ -54,6 +55,7 @@ async fn an_unpacked_folder_is_recognised_and_announced() {
         (GEO, "tiles3d", "3D Tiles dataset")
     );
     assert_eq!((s.folder, s.marker.as_str()), (city.id, "TILESET.JSON"));
+    assert_eq!(s.labels["it"], "dataset 3D Tiles");
     assert_eq!(s.at, format!("profile/tiles3d/{}?source={FILES}", city.id));
     assert!(s.link.starts_with("#/t/alfa/p/com.test.geo/profile%2Ftiles3d%2F"), "{}", s.link);
     // the bell has it, with a link that opens the plugin at that place
@@ -61,6 +63,7 @@ async fn an_unpacked_folder_is_recognised_and_announced() {
     let n = bell.items.iter().find(|n| n.source == GEO).expect("a notification of the plugin");
     assert!(n.title.contains("city") && n.title.contains("3D Tiles dataset"), "{}", n.title);
     assert_eq!(n.link, s.link);
+    assert_eq!(n.data["labels"]["it"], "dataset 3D Tiles", "the bell translates the label");
 
     // a zip with one folder around everything: the folder that holds the marker is the inner one
     let z = zip_of(&[("data/tileset.json", b"{}"), ("data/t/0.b3dm", b"x")]);
