@@ -57,7 +57,11 @@ impl Instance {
     }
     fn plugin_url(&self) -> String {
         let plug = self.port + 2;
-        if self.wildcard { format!("http://*.localhost:{plug}") } else { format!("http://127.0.0.1:{plug}") }
+        if self.wildcard {
+            format!("http://*.localhost:{plug}")
+        } else {
+            format!("http://127.0.0.1:{plug}")
+        }
     }
     fn db(&self) -> String {
         format!("mosaikit_{}", self.name)
