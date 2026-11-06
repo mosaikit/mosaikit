@@ -116,7 +116,7 @@ impl BootstrapQuota {
         if let Some(n) = self.items {
             m.insert("items".into(), serde_json::json!({ "limit": n }));
         }
-        (!m.is_empty()).then(|| Value::Object(m))
+        (!m.is_empty()).then_some(Value::Object(m))
     }
 
     fn check(&self) -> std::result::Result<(), String> {
