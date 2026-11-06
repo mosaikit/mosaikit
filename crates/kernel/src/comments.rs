@@ -260,7 +260,7 @@ pub async fn import(k: &Kernel, c: &Caller, rid: Uuid, items: &[ImportItem]) -> 
             "insert into core.resource_comments (tenant_id, resource_id, user_id, body, created_at, external_id)
              select $1, $2, $3, $4, $5, $6
              where (select count(*) from core.resource_comments where resource_id = $2) < $7
-             on conflict (resource_id, external_id) where external_id is not null do nothing",
+             on conflict do nothing",
         )
         .bind(c.tenant.tenant_id)
         .bind(rid)
