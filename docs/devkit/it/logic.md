@@ -183,6 +183,8 @@ Il kernel limita cosa il comando può **leggere**, non cosa la logica **restitui
 
 Una distribuzione può eseguire in background un processo in cui un passo è un comando del tuo plugin. Il servizio che lo esegue
 non ha una sessione: la persona che avvia il run emette un **ticket di esecuzione** e il servizio chiama il tuo comando con quello.
+Un run può raggiungere anche altri plugin con lo stesso ticket: dichiarali in `[permissions] run_targets = ["com.example.widgets"]` (al massimo 16; richiede `run_commands`); il bersaglio resta raggiungibile solo per i comandi dei propri `run_commands`, solo per chi lo usa, e il kernel lo ricontrolla a ogni chiamata. Una pianificazione li nomina in `[[schedules]] targets`; un comando che avvia un run usa `ctx.runs().mint(...)` (operazione `runs.mint`), il cui ticket è scritto a comando concluso. Un ticket non ne emette altri.
+
 Elenca i comandi chiamabili così in `[permissions] run_commands = ["node_run"]` (nient'altro lo è: il manifest viene riletto a ogni
 chiamata). Richiede `[requires] mosaikit = ">=1.0"`.
 

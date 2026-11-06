@@ -90,6 +90,7 @@ package, with the deprecation rule applied when a distribution relies on it. Exp
 - `msk.web` (permission `web`)
 - `[[config]] public`, `[[public_commands]]`, `msk.publicConfig`, `msk.publicCall` and `ctx.link_resource()` (public link pages)
 - `permissions.run_commands` and `ctx.on_behalf()` (calls on behalf of a run, with a run ticket)
+- `permissions.run_targets`, `[[schedules]] targets` and `ctx.runs()` / `runs.mint` (a run that reaches other plugins with one ticket)
 - `[[schedules]]` (jobs on a timetable, registered by people; the kernel keeps the registry and a worker runs them: it checks the rights of the author again, mints a run ticket for the one command and pushes the run to the service; `ctx.on_behalf().schedule` tells the logic that a schedule started the run)
 - `permissions.directory`, `ctx.directory()` and `msk.directory.search` (search the people and groups of the tenant)
 - `msk.band` (the contextual top band for a resource on the full page; no permission); the field `back` (an arrow in the top bar that returns to the list)

@@ -98,6 +98,7 @@ with the checks below. Permissions are the `[permissions]` of the manifest.
 | `plugin.call` | `ctx.call_plugin(plugin, name, args)` | `calls` | the result (experimental) |
 | `files.list`, `files.describe`, `files.read` | `ctx.files().list(parent)`, `describe(id)`, `read(id, max_bytes)` | `files_read = true` | rows, see below |
 | `directory.search` | `ctx.directory().users(q, limit)`, `groups(q, limit)` | `directory = true` and the caller may share | `[{id, username, name}]` / `[{id, name}]`, see below |
+| `runs.mint` | `ctx.runs().mint(&RunMint { .. })` | `run_commands` (and `run_targets` for other plugins) | `RunTicket { id, token, expires_at, uses }`, see below |
 
 ### `db`
 
@@ -198,6 +199,29 @@ every call). Needs `[requires] mosaikit = ">=1.0"`.
 
 The kernel limits what the command can **read**; it cannot limit what the logic **returns**: if your command returns data it
 legitimately read, the service gets it. Follow the [review checklist](security.md#run-commands-review-checklist).
+
+### Run targets: a run that reaches other plugins
+
+A process of your plugin (a graph of nodes) may need a command of **another** plugin in the middle of the run, as the person who
+started it. One ticket can name your plugin and several **targets**:
+
+1. Declare them: `[permissions] run_targets = ["com.example.widgets"]` (at most 16; not your own id; needs `run_commands` and
+   `[requires] mosaikit = ">=1.0"`). The Administrator reviews the list.
+2. The target declares in its own `run_commands` the commands a run may call. Nothing else of it is reachable.
+3. Get a ticket. **A schedule**: add `targets = ["com.example.widgets"]` to the `[[schedules]]` entry; the kernel mints the ticket
+   with all the run commands of each target and sends the list to the service (`targets` in the push). **A command that starts a
+   run**: `ctx.runs().mint(&RunMint { commands, run_ref, targets: vec![RunTarget { plugin, commands, resources: None }], .. })`
+   (host operation `runs.mint`). Or the REST mint, with `targets` next to `plugin`.
+4. The service calls `POST /api/run/{ticket}/call/{plugin}/{command}` with the **same** token for your plugin and for each target.
+
+The kernel checks, at mint and again on every call: the target is in your `run_targets`, it is installed and on in the tenant, the
+person uses it **now**, and the command is in the target's `run_commands`. Uses, rate, size, life and revocation are shared by the
+whole ticket. A `resources` list limits the entry of its own plugin only (the items of the target for the target's entry; an
+entry without it has the person's reach in that plugin). `plugin.call` is still refused in a run call and a ticket cannot mint a
+ticket (`runs.mint` is refused in a run call, in a nested call and in a public link). The ticket given by `runs.mint` is written
+once the command has committed (a failing command mints nothing), so tell the service after the command, or let it retry
+`run_ticket_invalid` for a moment. Never log the token or send it to the UI. Errors: `target_not_declared`, `target_not_available`,
+`command_not_declared`, `run_wrong_plugin`, `run_wrong_command`. Test with `MockHost::new().on("runs.mint", ...)`.
 
 ### Groups and the web
 

@@ -152,6 +152,7 @@ Tutto è spento per impostazione predefinita. L'Administrator vede ciò che un p
 | `files_read` | bool | la logica legge l'area File come il chiamante. **Sensibile** |
 | `script_eval` | bool | la CSP della UI consente `'unsafe-eval'` e `'wasm-unsafe-eval'`. **Sensibile** |
 | `run_commands` | array di identificatori | comandi della logica che un **ticket di esecuzione** può chiamare per conto di una persona (un processo in background di una distribuzione), al massimo 32. **Sensibile**; richiede `[requires] mosaikit = ">=1.0"`. Vedi [Logica](logic.md#comandi-di-esecuzione-chiamate-per-conto-di-un-run) |
+| `run_targets` | array di id di plugin | altri plugin che un ticket di esecuzione di questo plugin può chiamare (un processo in background che a metà run ha bisogno di un comando di un altro plugin), al massimo 16, non il plugin stesso, solo con `run_commands`. Si raggiungono solo i comandi che il bersaglio dichiara nei propri `run_commands`, e solo per una persona che lo usa. **Sensibile**; richiede `[requires] mosaikit = ">=1.0"`. Vedi [Logica](logic.md) |
 | `directory` | bool | il plugin può cercare tra le persone e i gruppi del tenant (`ctx.directory()`, `msk.directory.search`), per chi è Tenant Manager o può condividere nel plugin; solo id, username e nome. **Sensibile**; richiede `[requires] mosaikit = ">=1.0"`. Vedi [Logica](logic.md#directory) |
 
 Un'origine è `http://` o `https://` e un host di lettere, cifre e `.-:[]`, senza `/`.
@@ -244,6 +245,7 @@ architettura §8.17.
 |---|---|
 | `name` | identificatore, unico nel plugin; è ciò che la UI invia quando registra una pianificazione |
 | `command` | obbligatorio: un comando di `permissions.run_commands` |
+| `targets` | facoltativo: plugin di `permissions.run_targets` che il run di questa pianificazione può chiamare, con tutti i loro `run_commands` (predefinito: nessuno) |
 | `target` | obbligatorio: l'indirizzo dell'endpoint del servizio, `https://svc:8080/run`; la sua origine deve stare in `permissions.network`; niente credenziali nell'indirizzo |
 | `service_key` | facoltativa: l'`id` di una voce di `[[service_keys]]`, inviata al target come chiave bearer |
 | `min_interval_minutes` | facoltativa, predefinita 15: i minuti minimi fra due esecuzioni; il minimo del kernel è 5 e prevale |

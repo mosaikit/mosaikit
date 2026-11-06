@@ -77,6 +77,7 @@ changelog del pacchetto, con la regola di deprecazione applicata quando una dist
 - `Resources::create` e `Resources::delete` dell'SDK (`resource.create`, `resource.delete`)
 - `msk.web` (permesso `web`)
 - `[[config]] public`, `[[public_commands]]`, `msk.publicConfig`, `msk.publicCall` e `ctx.link_resource()` (pagine dei link pubblici)
+- `permissions.run_targets`, `[[schedules]] targets` e `ctx.runs()` / `runs.mint` (un run che raggiunge altri plugin con un solo ticket)
 - `permissions.run_commands` e `ctx.on_behalf()` (chiamate per conto di un run, con un ticket di esecuzione)
 - `[[schedules]]` (lavori in calendario, registrati dalle persone; il kernel tiene l'elenco e un worker li esegue: ricontrolla i diritti dell'autore, emette un ticket di esecuzione per il solo comando e invia l'esecuzione al servizio; `ctx.on_behalf().schedule` dice alla logica che l'ha avviata una pianificazione)
 - `permissions.directory`, `ctx.directory()` e `msk.directory.search` (cerca tra persone e gruppi del tenant)

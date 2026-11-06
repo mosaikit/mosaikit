@@ -39,6 +39,7 @@ minimum:
 | `notify` | send notifications; never to recipients you choose |
 | `[[public_commands]]` | anyone with a public link runs the command, read only, on the shared item. **Sensitive** (see below) |
 | `run_commands` | a service of a distribution calls the command as the person who started a run, in the background. **Sensitive** (see below) |
+| `run_targets` | a run started by this plugin may call the run commands of these other plugins as the person. **Sensitive** (see below) |
 | `directory` | lists the usernames and names of the people and groups of the tenant to callers who may share. **Sensitive** (see below) |
 | `[[config]] public = true` | a public page may read that setting. Never a secret: the manifest refuses it |
 | `files`, `content` | own files and uploaded folder content |
@@ -80,6 +81,12 @@ this part, and a reviewer should check each run command against this list:
 5. Declare only the commands a run really calls, and expect a call to fail when the ticket is over (`run_ticket_invalid`).
 6. A ticket without a resource list reaches everything the person can reach for that command: ask the distribution to scope the
    ticket whenever the command touches sensitive data.
+
+`permissions.run_targets` is the other side: the plugin whose process **starts** a run lists the plugins that run may reach. List
+only what the process really needs (every entry is a plugin whose run commands run with the person's rights, reviewed by the
+Administrator), mint tickets for the least set of targets and commands, scope the entries to the items of the run when you can, and
+treat what a target returns as data of the person, not of the run. The target does not have to agree, but it decides what is
+reachable: only its own `run_commands`.
 
 ## Directory: the author rule
 
