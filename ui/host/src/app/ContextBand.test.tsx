@@ -63,7 +63,7 @@ describe('Presence', () => {
 describe('CommentsButton', () => {
   it('reports its state with aria-expanded and calls onToggle', async () => {
     const onToggle = vi.fn()
-    const el = await draw(<CommentsButton comments={{ open: false, count: 3 }} onToggle={onToggle} />)
+    const el = await draw(<CommentsButton comments={{ open: false, count: 3, resource: null }} onToggle={onToggle} />)
     const b = el.querySelector('button')!
     expect(b.getAttribute('aria-expanded')).toBe('false')
     expect(b.textContent).toContain('Comments')
@@ -77,7 +77,7 @@ describe('CommentsButton', () => {
     const panel = document.createElement('div')
     panel.id = COMMENTS_PANEL_ID
     document.body.appendChild(panel)
-    const el = await draw(<CommentsButton comments={{ open: true, count: 0 }} onToggle={() => {}} />)
+    const el = await draw(<CommentsButton comments={{ open: true, count: 0, resource: null }} onToggle={() => {}} />)
     const b = el.querySelector('button')!
     expect(b.getAttribute('aria-expanded')).toBe('true')
     expect(b.getAttribute('aria-controls')).toBe(COMMENTS_PANEL_ID)
