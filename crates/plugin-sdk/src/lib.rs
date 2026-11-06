@@ -227,6 +227,11 @@ impl Ctx {
     pub fn directory(&self) -> Directory {
         Directory(())
     }
+    /// Run tickets for a run this command starts (needs `[permissions] run_commands`; the plugins it may
+    /// reach are `run_targets`).
+    pub fn runs(&self) -> Runs {
+        Runs(())
+    }
     pub fn log(&self, msg: &str) {
         host::log(msg);
     }
@@ -371,6 +376,62 @@ impl Directory {
     /// Groups of the tenant whose name contains `q`, in name order.
     pub fn groups(&self, q: &str, limit: Option<u32>) -> Result<Vec<Group>> {
         let v = host::call("directory.search", json!({ "kind": "group", "q": q, "limit": limit }))?;
+        Ok(serde_json::from_value(v)?)
+    }
+}
+
+/// A plugin that a run ticket may also call, with its commands (each in the target's own `run_commands`) and,
+/// optionally, the items of the target the entry is limited to.
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
+pub struct RunTarget {
+    pub plugin: String,
+    pub commands: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resources: Option<Vec<String>>,
+}
+
+/// What `ctx.runs().mint` asks for.
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize)]
+pub struct RunMint {
+    /// commands of this plugin (in `permissions.run_commands`) the ticket may call
+    pub commands: Vec<String>,
+    /// the service's own name for the run (1 to 128 characters), shown in the Log
+    pub run_ref: String,
+    /// minutes of life, 1 to 60 (default 15)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub ttl_minutes: Option<u32>,
+    /// calls allowed, 1 to 1000 (default 100)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uses: Option<u32>,
+    /// items of this plugin the ticket is limited to (none: the rights of the person)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resources: Option<Vec<String>>,
+    /// other plugins the run may call (each in `permissions.run_targets`, at most 8)
+    pub targets: Vec<RunTarget>,
+}
+
+/// A run ticket the kernel has checked. It is valid once the command that minted it has committed (a
+/// command that fails mints nothing): give it to the service after the command, or let the service retry
+/// `run_ticket_invalid` for a moment.
+#[derive(Debug, Clone, PartialEq, serde::Deserialize)]
+pub struct RunTicket {
+    pub id: String,
+    /// the bearer secret, shown only now: never log it, never send it to the UI
+    pub token: String,
+    pub expires_at: String,
+    pub uses: u32,
+}
+
+/// Mint run tickets (host operation `runs.mint`) for the person who called the command, for this plugin and
+/// the targets it declares in `[permissions] run_targets`. Needs `[permissions] run_commands` and
+/// `[requires] mosaikit = ">=1.0"`. Refused in a public command, in a nested call and in a call on behalf of
+/// a run (a ticket cannot mint a ticket). The rights stay the person's: the kernel checks that they use
+/// every plugin named, that it is on in the tenant and that each command is declared by its plugin.
+pub struct Runs(());
+
+impl Runs {
+    pub fn mint(&self, ask: &RunMint) -> Result<RunTicket> {
+        let v = host::call("runs.mint", serde_json::to_value(ask)?)?;
         Ok(serde_json::from_value(v)?)
     }
 }

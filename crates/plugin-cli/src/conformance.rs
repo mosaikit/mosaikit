@@ -33,6 +33,7 @@ pub struct HostUse {
     pub service_key: bool,
     pub call_plugin: bool,
     pub directory: bool,
+    pub runs: bool,
     /// plugin ids passed as literals to `call_plugin`
     pub called: BTreeSet<String>,
 }
@@ -54,6 +55,7 @@ pub fn host_use_in_source(text: &str) -> HostUse {
         service_key: s.contains(".service_key(") || s.contains("\"key.get\""),
         call_plugin: s.contains(".call_plugin(") || s.contains("\"plugin.call\""),
         directory: s.contains(".directory()") || s.contains("\"directory.search\""),
+        runs: s.contains(".runs()") || s.contains("\"runs.mint\""),
         called: BTreeSet::new(),
     };
     let mut rest = s.as_str();
@@ -80,6 +82,7 @@ pub fn host_use_in_wasm(wasm: &[u8]) -> HostUse {
         service_key: has("key.get"),
         call_plugin: has("plugin.call"),
         directory: has("directory.search"),
+        runs: has("runs.mint"),
         called: BTreeSet::new(),
     }
 }
@@ -94,6 +97,9 @@ fn permission_checks(m: &Manifest, used: &HostUse, from_source: bool, r: &mut Re
         r.error(format!(
             "the logic searches the directory ({origin}) but [permissions] directory is not set"
         ));
+    }
+    if used.runs && p.run_commands.is_empty() {
+        r.error(format!("the logic mints run tickets ({origin}) but [permissions] run_commands is empty"));
     }
     if used.http && p.network.is_empty() && m.service_keys.is_empty() {
         r.error(format!(

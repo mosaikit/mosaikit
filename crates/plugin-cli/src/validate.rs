@@ -120,9 +120,10 @@ fn manifest_checks(m: &Manifest, strict: bool, r: &mut Report) {
         || !m.public_commands.is_empty()
         || !m.permissions.run_commands.is_empty()
         || !m.schedules.is_empty()
+        || !m.permissions.run_targets.is_empty()
         || m.permissions.directory;
     if newer && m.requires.mosaikit.is_none() {
-        let msg = "`public` settings, [[public_commands]], permissions.run_commands, [[schedules]] and permissions.directory need a Mosaikit that knows them: set [requires] mosaikit = \">=1.0\" (an older one refuses the manifest)";
+        let msg = "`public` settings, [[public_commands]], permissions.run_commands, permissions.run_targets, [[schedules]] and permissions.directory need a Mosaikit that knows them: set [requires] mosaikit = \">=1.0\" (an older one refuses the manifest)";
         if strict {
             r.error(msg);
         } else {
@@ -180,6 +181,9 @@ fn manifest_checks(m: &Manifest, strict: bool, r: &mut Report) {
     }
     if !p.run_commands.is_empty() {
         sensitive.push("run_commands");
+    }
+    if !p.run_targets.is_empty() {
+        sensitive.push("run_targets");
     }
     if !m.schedules.is_empty() {
         sensitive.push("schedules");
@@ -470,6 +474,34 @@ mosaikit = \">=1.0\"",
         let r = validate_with(d.path(), Options { strict: true }).unwrap();
         assert!(r.findings.iter().any(|f| f.message.contains("schedules")), "{:?}", r.findings);
         assert!(!r.findings.iter().any(|f| f.message.contains("[requires]")), "{:?}", r.findings);
+    }
+
+    #[test]
+    fn run_targets_need_a_mosaikit_that_knows_them() {
+        let d = tempfile::tempdir().unwrap();
+        let base = "id = \"com.test.demo\"
+name = \"Demo\"
+version = \"0.1.0\"
+[requires]
+api = 1
+";
+        let perm = "[permissions]
+run_commands = [\"node_run\"]
+run_targets = [\"com.test.other\"]
+";
+        plugin(d.path(), &format!("{base}{perm}"), None);
+        let r = validate(d.path()).unwrap();
+        assert!(r.ok(), "{:?}", r.findings);
+        assert!(r
+            .findings
+            .iter()
+            .any(|f| f.message.contains("run_targets") && f.message.contains("[requires]")));
+        let strict = validate_with(d.path(), Options { strict: true }).unwrap();
+        assert!(!strict.ok(), "{:?}", strict.findings);
+        plugin(d.path(), &format!("{MIN}{perm}"), None);
+        let r = validate(d.path()).unwrap();
+        assert!(r.ok() && r.warnings() == 0, "{:?}", r.findings);
+        assert!(r.findings.iter().any(|f| f.message.contains("review") && f.message.contains("run_targets")));
     }
 
     #[test]
