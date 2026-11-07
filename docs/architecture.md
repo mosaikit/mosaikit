@@ -1190,14 +1190,20 @@ bytes wait in `<tenant>/.uploads/` (not in Files) and only the person who began 
 the upload is. A zip is still unpacked from memory (`files.unzip`, at most 512 MB inflated): Files keeps a zip over 400 MB as a file.
 
 **The files calls of a UI on the Files area of another plugin.** The files calls of the bridge (`files.list`, `files.mkdir`,
-`files.upload`, `files.unzip`, `ticket`) take an optional `source`: the id of the plugin whose files area they work on
-(usually `com.mosaikit.files`), always with the permissions of the person. `files_read` is enough for `files.list` and `ticket`;
+`files.upload`, `files.unzip`, `files.delete`, `files.info`, `files.profiles`, `ticket`) take an optional `source`: the id of the plugin whose files area they work on
+(usually `com.mosaikit.files`), always with the permissions of the person. `files_read` is enough for `files.list`, `files.info` and `ticket`;
 the others need `files_write` (`forbidden` otherwise). The source must be on for the tenant, declare `files`, and the person
 needs `use` on it. `files.unzip {file, parent?, folder?, conflict?}` (`POST …/files/unzip`) unpacks a zip into `parent`, or into a
 new folder `folder` inside it, keeping the structure, and answers `{folder, files, folders, skipped}`. The whole archive is checked
 before anything is created (no `..`, absolute or drive paths, separators or control characters in a name; at most 20 000 entries
 and 512 MB really inflated; the quotas of the tenant); `__MACOSX/` and `._*` are dropped. `conflict` is `fail` (default: the call stops
 and what it created is removed), `skip` or `replace`.
+
+`files.delete` (`DELETE …/files/{id}?source=`) sends an entry to the trash and is refused (`forbidden`) when the person may not delete it in Files (she must manage it). `files.info`
+(`GET …/files/{id}/info?source=`) answers `{ id, is_dir, size, can_share, public_link }`: `size` is the file, or the sum of the files under a folder that the person sees; `can_share` is
+true when she manages the entry, and only then `public_link` holds the active link (`id`, `expires_at`, `has_password`, `view_count`, …) or `null`. The address of a link is never returned: the server keeps only the
+hash of its token, so the address exists once, when the link is made. `ticket` answers `{ url, expires_in }` (8 hours today). A page opens Files on a folder, with its sharing
+dialog, with `nav.open` of Files at `f=<folder>&share=1` (`msk.files.open`); the plugin never makes the public link.
 
 **`files.list`, `files.describe`, `files.read`** (`[permissions] files_read = true`; default none): the logic of ANY
 plugin reads the Files area with the permissions of the CALLER, the rules the Files UI applies (no one sees

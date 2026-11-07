@@ -214,8 +214,14 @@ export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unk
       return { method: 'POST', url: `${base}/files/${uuid(a.id)}/move`, json: { parent: optUuid(a.parent) } }
     case 'files.copy':
       return { method: 'POST', url: `${base}/files/${uuid(a.id)}/copy`, json: { parent: optUuid(a.parent) } }
-    case 'files.delete':
-      return { method: 'DELETE', url: `${base}/files/${uuid(a.id)}` }
+    case 'files.delete': {
+      const src = a.source !== undefined && a.source !== null ? `?source=${enc(pluginId(a.source))}` : ''
+      return { method: 'DELETE', url: `${base}/files/${uuid(a.id)}${src}` }
+    }
+    case 'files.info': {
+      const src = a.source !== undefined && a.source !== null ? `?source=${enc(pluginId(a.source))}` : ''
+      return { method: 'GET', url: `${base}/files/${uuid(a.id)}/info${src}` }
+    }
     case 'files.blob':
       return { method: 'GET', url: `${base}/files/${uuid(a.id)}/content`, blob: true }
     case 'files.zip':

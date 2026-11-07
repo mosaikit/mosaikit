@@ -86,6 +86,11 @@ describe('routeOp', () => {
     expect(routeOp('alfa', 'p.x', 'files.mkdir', { name: 'n', source: 'com.mosaikit.files' }).url).toBe('/api/t/alfa/p/p.x/files/folder?source=com.mosaikit.files')
     expect(routeOp('alfa', 'p.x', 'ticket', { id: ID, source: 'com.mosaikit.files' }).url).toBe(`/api/t/alfa/p/p.x/ticket/${ID}?source=com.mosaikit.files`)
     expect(() => routeOp('alfa', 'p.x', 'files.list', { source: '../x' })).toThrow(OpError)
+    expect(routeOp('alfa', 'p.x', 'files.delete', { id: ID })).toEqual({ method: 'DELETE', url: `/api/t/alfa/p/p.x/files/${ID}` })
+    expect(routeOp('alfa', 'p.x', 'files.delete', { id: ID, source: 'com.mosaikit.files' }).url).toBe(`/api/t/alfa/p/p.x/files/${ID}?source=com.mosaikit.files`)
+    expect(routeOp('alfa', 'p.x', 'files.info', { id: ID, source: 'com.mosaikit.files' })).toEqual({ method: 'GET', url: `/api/t/alfa/p/p.x/files/${ID}/info?source=com.mosaikit.files` })
+    expect(routeOp('alfa', 'p.x', 'files.info', { id: ID }).url).toBe(`/api/t/alfa/p/p.x/files/${ID}/info`)
+    expect(() => routeOp('alfa', 'p.x', 'files.info', { id: ID, source: '../x' })).toThrow(OpError)
     expect(routeOp('alfa', 'p.x', 'files.profiles', { id: ID, source: 'com.mosaikit.files' })).toMatchObject({ method: 'GET', url: `/api/t/alfa/p/p.x/files/${ID}/profiles?source=com.mosaikit.files` })
   })
 

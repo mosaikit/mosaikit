@@ -235,6 +235,28 @@ export interface UploadProgress {
   size: number
 }
 
+/** What `msk.files.ticket` answers: the address and how long it works. */
+export interface FileTicket {
+  url: string
+  /** seconds; the address stops working after that (8 hours today: do not rely on the number, read it) */
+  expires_in: number
+}
+
+/** What `msk.files.info` answers about a file or folder. */
+export interface FileInfo {
+  id: string
+  is_dir: boolean
+  /** bytes: the file, or every file under the folder that the person can see */
+  size: number
+  /** the person manages the entry: she can see its public link and make one in Files */
+  can_share: boolean
+  /**
+   * The active public link, when there is one and `can_share`. The address is not given: the server keeps only a hash of
+   * the token, so the address is shown once, when the link is made.
+   */
+  public_link: { id: string; created_at: string; expires_at: string | null; has_password: boolean; view_count: number; created_by: string | null; active: boolean } | null
+}
+
 /** A plugin that could take a folder further (`[[folder_profiles]]` in its manifest). */
 export interface FolderSuggestion {
   /** the plugin and its name */
