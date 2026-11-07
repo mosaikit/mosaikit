@@ -75,7 +75,7 @@ export default defineConfig({
 /// The message when the browser run cannot start because Playwright is not installed in the product folder.
 pub fn playwright_missing(dir: &Path) -> String {
     format!(
-        "--browser needs Playwright in {}: run `npm install --save-dev @playwright/test @axe-core/playwright @mosaikit/plugin-testing` and `npx playwright install chromium` there, or leave --browser out",
+        "--browser needs Playwright in {}: run `npm install --save-dev --install-links @playwright/test @axe-core/playwright <kit>/plugin-testing` (the folder `plugin-testing` of the kit) and `npx playwright install chromium` there, or leave --browser out",
         dir.display()
     )
 }

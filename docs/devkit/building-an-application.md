@@ -224,7 +224,7 @@ browser with `@mosaikit/plugin-testing` (`signIn`, `openPlugin`, `expectAccessib
 
 With `--browser`, `test` also runs the shell with the brand of the product in a browser: the sign-in page shows the brand, and the shell, as the Tenant Manager,
 on a desktop and on a phone, has no horizontal overflow (rule R-9 of the layout contract) and passes the accessibility check (axe). It needs Playwright in the
-product folder (`npm install --save-dev @playwright/test @axe-core/playwright @mosaikit/plugin-testing`, then `npx playwright install chromium`); without it the
+product folder (`npm install --save-dev --install-links @playwright/test @axe-core/playwright <kit>/plugin-testing` (the package is in the kit, not in the npm registry), then `npx playwright install chromium`); without it the
 command stops and says so. It is off by default because it starts a browser. The whole layout contract (every route, every rule) stays with the end-to-end suite of the base.
 
 For a check by `curl` of a running product (the sign-in endpoints, the address of a plugin page) see "Smoke test without a

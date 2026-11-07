@@ -452,6 +452,29 @@ pub fn sums_only(dir: &Path, allow_dev_key: bool) -> Result<()> {
     Ok(())
 }
 
+/// The test helpers ship as JavaScript: Node does not strip types of a file under `node_modules`, and Playwright does not
+/// transform one, so a package with TypeScript source cannot be installed with `npm install ./plugin-testing`.
+fn compile_plugin_testing(dir: &Path) -> Result<()> {
+    let src = root().join("ui").join("plugin-testing");
+    let tsc = root().join("node_modules").join("typescript").join("bin").join("tsc");
+    let out = dir.join("dist");
+    run(Command::new("node")
+        .current_dir(&src)
+        .arg(&tsc)
+        .args(["-p", "tsconfig.build.json", "--outDir"])
+        .arg(&out))?;
+    std::fs::remove_dir_all(dir.join("src"))?;
+    let pj = dir.join("package.json");
+    let mut v: Value = serde_json::from_str(&read(&pj)?)?;
+    v["exports"] = serde_json::json!({ ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } });
+    v["files"] = serde_json::json!(["dist", "README.md", "CHANGELOG.md"]);
+    if let Some(o) = v.as_object_mut() {
+        o.remove("scripts");
+    }
+    std::fs::write(&pj, serde_json::to_string_pretty(&v)? + "\n")?;
+    Ok(())
+}
+
 fn kit_txt(version: &str, platform: &str, server: bool) -> String {
     let run_part = if server {
         "bin/mosaikit-server  the Mosaikit server that `mosaikit-plugin dev` starts (developer profile, SQLite).".to_string()
@@ -563,6 +586,9 @@ pub fn devkit(o: &Options) -> Result<()> {
             .context("npm pack made no tarball")?;
         untar(&tgz, &dest.join("npm"))?;
         copy_dir(&dest.join("npm").join("package"), &kit.join(pkg))?;
+        if pkg == "plugin-testing" {
+            compile_plugin_testing(&kit.join(pkg))?;
+        }
     }
 
     // --- documents, examples, Docker kit ---

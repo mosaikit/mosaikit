@@ -105,8 +105,8 @@ test('Alice creates a note', async ({ page }) => {
 | `accessibilityViolations`, `expectAccessible`, `formatViolations` | il test di fumo axe |
 | `pluginUrl`, `waitForHealth`, `devArgs`, `parseDevOutput`, `freePort` | piccoli pezzi per test che fanno a modo loro |
 
-Da fare una volta nella cartella del plugin: `npm install --save-dev @playwright/test @mosaikit/plugin-testing` (il pacchetto viene dal kit come
-`@mosaikit/plugin-api`) e `npx playwright install chromium`; avvia `mosaikit-plugin dev --no-open` ed esegui
+Da fare una volta nella cartella del plugin: `npm install --save-dev --install-links @playwright/test <kit>/plugin-testing` (il pacchetto viene dal kit come
+`@mosaikit/plugin-api`, non dal registro npm; `--install-links` lo copia così trova `@playwright/test`) e `npx playwright install chromium`; avvia `mosaikit-plugin dev --no-open` ed esegui
 `MOSAIKIT_DEV_URL=http://127.0.0.1:<porta>/ npx playwright test`.
 
 ### Prova rapida senza browser
