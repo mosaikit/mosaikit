@@ -178,6 +178,31 @@ async fn files_and_folders_with_inheritance() {
     assert!(mosaikit_kernel::trash::list(&t, &anna, None, None).await.unwrap().is_empty());
 }
 
+#[tokio::test]
+async fn info_of_a_folder_size_and_public_link() {
+    let (t, _g, anna, bruno) = setup().await;
+    let folder = files::mkdir(&t, &anna, FILES, None, "Data").await.unwrap();
+    let sub = files::mkdir(&t, &anna, FILES, Some(folder.id), "Inner").await.unwrap();
+    files::upload(&t, &anna, FILES, Some(folder.id), "a.txt", b"12345", false).await.unwrap();
+    files::upload(&t, &anna, FILES, Some(sub.id), "b.txt", b"123", false).await.unwrap();
+    let i = files::info(&t, &anna, FILES, folder.id).await.unwrap();
+    assert!(i.is_dir && i.can_share);
+    assert_eq!(i.size, 8, "every file under the folder");
+    assert!(i.public_link.is_none());
+    // a link makes it show; its address is not given again
+    let l = links::create(&t, &anna, folder.id, None, None).await.unwrap();
+    let i = files::info(&t, &anna, FILES, folder.id).await.unwrap();
+    assert_eq!(i.public_link.unwrap().id, l.info.id);
+    // someone who only reads or writes cannot see the link and cannot share
+    set_grant(&t, &anna, folder.id, "user", bruno.user.user_id, Some(Level::Write)).await.unwrap();
+    let j = files::info(&t, &bruno, FILES, folder.id).await.unwrap();
+    assert!(!j.can_share && j.public_link.is_none());
+    assert_eq!(j.size, 8);
+    // a folder nobody shared with bruno stays not found
+    let hidden = files::mkdir(&t, &anna, FILES, None, "Hidden").await.unwrap();
+    assert_eq!(files::info(&t, &bruno, FILES, hidden.id).await.unwrap_err().kind, Kind::NotFound);
+}
+
 fn zip_of(entries: &[(&str, &[u8])]) -> Vec<u8> {
     let mut w = zip::ZipWriter::new(std::io::Cursor::new(Vec::new()));
     for (name, data) in entries {

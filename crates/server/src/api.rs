@@ -99,6 +99,7 @@ pub fn router() -> Router<AppState> {
         .route("/api/t/{t}/p/{plugin}/files/uploads/{id}", get(upload_status).delete(upload_abort))
         .route("/api/t/{t}/p/{plugin}/files/uploads/{id}/finish", post(upload_finish))
         .route("/api/t/{t}/p/{plugin}/files/{id}/zip", get(files_zip))
+        .route("/api/t/{t}/p/{plugin}/files/{id}/info", get(files_info))
         .route("/api/t/{t}/p/{plugin}/files/{id}/profiles", get(files_profiles))
         .route("/api/t/{t}/p/{plugin}/files/{id}/rename", post(files_rename))
         .route("/api/t/{t}/p/{plugin}/files/{id}/move", post(files_move))
@@ -1273,9 +1274,21 @@ async fn files_delete(
     State(s): State<AppState>,
     Tenant(c): Tenant,
     Path(p): Path<PluginPath>,
+    Query(q): Query<HashMap<String, String>>,
 ) -> ApiResult<Json<Value>> {
-    files::delete(&s.k, &c, &p.plugin, p.id()?).await?;
+    let plugin = files_target(&s, &p.plugin, &q, true)?;
+    files::delete(&s.k, &c, &plugin, p.id()?).await?;
     Ok(ok())
+}
+
+async fn files_info(
+    State(s): State<AppState>,
+    Tenant(c): Tenant,
+    Path(p): Path<PluginPath>,
+    Query(q): Query<HashMap<String, String>>,
+) -> ApiResult<Json<Value>> {
+    let plugin = files_target(&s, &p.plugin, &q, false)?;
+    Ok(Json(json!(files::info(&s.k, &c, &plugin, p.id()?).await?)))
 }
 
 async fn content_upload(

@@ -46,7 +46,10 @@ the origin of the host and is accepted only from it. A call that gets no answer 
 | `msk.crud(resource).list({ filter, parent, limit, cursor, sort, dir })` | rows, latest changed first; all of them (up to 5,000) or a page with `limit` (the next with `cursor` = the previous `next`); `sort` a declared field that is not hidden, or `created_at`, `updated_at`, `owner_name`, sorts the whole list; an unknown field is `sort_unknown` |
 | `.get(id)`, `.create(values, parent?)`, `.update(id, values)`, `.remove(id)` | one row; each is limited to this plugin and runs with the session |
 | `msk.call(name, args)` | a command of the logic |
-| `msk.files.*` (`list`, `mkdir`, `upload`, `rename`, `move`, `copy`, `remove`, `blob`, `zip`, `url`) | the file API, only with `[permissions] files` |
+| `msk.files.*` (`list`, `mkdir`, `upload`, `rename`, `move`, `copy`, `remove`, `blob`, `zip`, `url`) | the file API, only with `[permissions] files`. `source` (the last argument of `list`, `remove`, `info`, `url`, `ticket`…) points at the Files area of another plugin: `files_read` for what reads, `files_write` for what changes, and the person's rights there still decide (`remove` is refused for a folder she may not delete in Files) |
+| `msk.files.info(id, source?)` | `{ id, is_dir, size, can_share, public_link }`: the size in bytes (a folder: every file under it that the person sees) and the active public link (id, expiry, password, views) when there is one and the person manages the entry. The address of a link is not given: the server keeps only a hash of the token, so it is shown once, when the link is made. Needs `files_read` for a `source` |
+| `msk.files.ticket(id, download?, source?)` | like `msk.files.url`, answers `{ url, expires_in }` (seconds): ask again before it ends |
+| `msk.files.open(folder, { share? })` | opens the Files page on a folder, with its sharing dialog when `share` is true and the person manages it. The plugin never makes the public link: the person does, in Files. Needs Files in the sidebar of the person (`nav.open`) |
 | `msk.content.upload(id, zip)`, `.url(id)` | folder content, only with `content` |
 | `msk.web.probe(url, image?)` | may the page be framed, its title and picture; only with `web`. Experimental |
 | `msk.resource(id)` | metadata of an item (owner, level, size…) |

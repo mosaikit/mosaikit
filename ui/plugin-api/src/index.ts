@@ -44,6 +44,8 @@ export type {
   SiteInfo,
   Unzipped,
   UploadProgress,
+  FileInfo,
+  FileTicket,
   FolderSuggestion,
   TabInfo,
   UiContext,

@@ -1,6 +1,6 @@
 import { Bridge, BridgeError } from './bridge.ts'
 import { API_VERSION, checkHostApi } from './version.ts'
-import type { BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, Unzipped, UploadProgress, FolderSuggestion, UiContext, Values, WebProbe } from './protocol.ts'
+import type { BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, Unzipped, UploadProgress, FolderSuggestion, FileInfo, FileTicket, UiContext, Values, WebProbe } from './protocol.ts'
 
 /** The extensions of the plugin on a resource (fields and actions other plugins add to its items). */
 export interface ExtensionsClient {
@@ -282,8 +282,9 @@ export class Msk {
     rename: (id: string, name: string) => this.bridge.call<FileEntry>('files.rename', { id, name }),
     move: (id: string, parent: string | null) => this.bridge.call<FileEntry>('files.move', { id, parent }),
     copy: (id: string, parent: string | null) => this.bridge.call<FileEntry>('files.copy', { id, parent }),
-    remove: async (id: string) => {
-      await this.bridge.call('files.delete', { id })
+    /** to the trash; `source`: another plugin's Files area (needs `files_write`); refused where the person may not delete in Files */
+    remove: async (id: string, source?: string) => {
+      await this.bridge.call('files.delete', { id, source })
     },
     /** content of the file (previews, downloads from the plugin) */
     blob: (id: string) => this.bridge.call<Blob>('files.blob', { id }),
@@ -294,6 +295,16 @@ export class Msk {
       (await this.bridge.call<{ suggestions: FolderSuggestion[] }>('files.profiles', { id, source })).suggestions,
     /** temporary URL on the origin of the contents (iframe, new tab, download) */
     url: async (id: string, download = false, source?: string) => (await this.bridge.call<{ url: string }>('ticket', { id, download, source })).url,
+    /** the same, with how long the address works (`expires_in`, seconds): ask again before it ends */
+    ticket: (id: string, download = false, source?: string) => this.bridge.call<FileTicket>('ticket', { id, download, source }),
+    /** the size and the public link of a file or folder (`source`: another plugin's Files area, needs `files_read`) */
+    info: (id: string, source?: string) => this.bridge.call<FileInfo>('files.info', { id, source }),
+    /**
+     * Opens the Files page on a folder, with its sharing dialog when `share` is true and the person manages it. The
+     * plugin never makes the public link itself: the person does, in Files. `files` is the id of the Files plugin.
+     */
+    open: (folder: string, opts: { share?: boolean; files?: string } = {}) =>
+      this.bridge.call<void>('nav.open', { plugin: opts.files ?? 'com.mosaikit.files', at: `f=${folder}${opts.share ? '&share=1' : ''}` }),
   }
 
   readonly content = {

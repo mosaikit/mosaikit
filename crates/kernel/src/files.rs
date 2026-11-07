@@ -501,6 +501,41 @@ async fn copy_rec(
     Ok(id)
 }
 
+/// What a page of a plugin may ask about an entry of the Files area: the size and the public link of a folder.
+#[derive(Debug, Clone, Serialize)]
+pub struct Info {
+    pub id: Uuid,
+    pub is_dir: bool,
+    /// bytes: the file, or every file under the folder that the person can see
+    pub size: i64,
+    /// the person may manage the entry, so she may see and make its public links
+    pub can_share: bool,
+    /// the active public link, when there is one and the person manages the entry. Its address is not here: the
+    /// server keeps only the hash of the token, the address is shown once, when the link is made.
+    pub public_link: Option<crate::links::LinkInfo>,
+}
+
+pub async fn info(k: &Kernel, c: &Caller, plugin_id: &str, id: Uuid) -> Result<Info> {
+    let p = plugin(k, c, plugin_id, crate::access::USE).await?;
+    let mut tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
+    let e = get_entry(&mut tx, id).await?;
+    let mut size = e.size;
+    if e.is_dir {
+        size = mosaikit_db::query(
+            "select coalesce(sum(size_bytes), 0)::bigint from core.visible_resources where $1 = any(ancestors) and kind = 'file'",
+        )
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await?
+        .get::<i64, _>(0);
+    }
+    tx.commit().await?;
+    let can_share = level_rank(&e.my_level) >= 3;
+    let public_link =
+        if can_share { crate::links::list(k, c, id).await?.into_iter().find(|l| l.active) } else { None };
+    Ok(Info { id, is_dir: e.is_dir, size, can_share, public_link })
+}
+
 pub async fn delete(k: &Kernel, c: &Caller, plugin_id: &str, id: Uuid) -> Result<()> {
     let p = plugin(k, c, plugin_id, crate::access::DELETE).await?;
     let mut tx = k.db.begin_plugin(&p.id, &c.ctx()).await?;
