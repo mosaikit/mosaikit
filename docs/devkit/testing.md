@@ -104,8 +104,8 @@ test('Alice creates a note', async ({ page }) => {
 | `accessibilityViolations`, `expectAccessible`, `formatViolations` | the axe smoke test |
 | `pluginUrl`, `waitForHealth`, `devArgs`, `parseDevOutput`, `freePort` | small pieces for tests that do things their own way |
 
-Set up once in the plugin folder: `npm install --save-dev @playwright/test @mosaikit/plugin-testing` (the package comes from
-the kit like `@mosaikit/plugin-api`) and `npx playwright install chromium`; start `mosaikit-plugin dev --no-open` and run
+Set up once in the plugin folder: `npm install --save-dev --install-links @playwright/test <kit>/plugin-testing` (the package comes from
+the kit like `@mosaikit/plugin-api`, not from the npm registry; `--install-links` copies it so that it finds `@playwright/test`) and `npx playwright install chromium`; start `mosaikit-plugin dev --no-open` and run
 `MOSAIKIT_DEV_URL=http://127.0.0.1:<port>/ npx playwright test`.
 
 ### Smoke test without a browser

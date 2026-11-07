@@ -174,7 +174,7 @@ accede, il Tenant Manager vede ogni plugin proprio. Le pagine dei plugin e l'acc
 
 Con `--browser`, `test` prova anche la shell con il brand del prodotto in un browser: la pagina di accesso mostra il brand e la shell, come Tenant Manager, su desktop
 e su telefono, non ha overflow orizzontale (regola R-9 del contratto di layout) e passa il controllo di accessibilità (axe). Serve Playwright nella cartella del prodotto
-(`npm install --save-dev @playwright/test @axe-core/playwright @mosaikit/plugin-testing`, poi `npx playwright install chromium`); senza, il comando si ferma e lo dice.
+(`npm install --save-dev --install-links @playwright/test @axe-core/playwright <kit>/plugin-testing` (il pacchetto è nel kit, non nel registro npm), poi `npx playwright install chromium`); senza, il comando si ferma e lo dice.
 È spento di default perché avvia un browser. Il contratto di layout completo (ogni percorso, ogni regola) resta nella suite end-to-end della base.
 
 ## 11. Operatività

@@ -1,0 +1,96 @@
+name: devkit-smoke
+
+# Tries a published kit release on a clean machine of each platform (docs/devkit/releasing.md, "Check a download"):
+# download, check the hashes and the signature with the official key, unpack, then make, validate, build and test a plugin
+# with the unpacked tools only. Run it by hand with the tag of the kit release, for example kit-v1.0.0-rc1.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag of the kit release to try, e.g. kit-v1.0.0-rc1"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows-x86_64
+            ext: zip
+          - os: ubuntu-latest
+            platform: linux-x86_64
+            ext: tar.gz
+          - os: macos-latest
+            platform: macos-aarch64
+            ext: tar.gz
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+      # the official public key, the same as on the site (docs/devkit/signing.md)
+      KIT_KEY: NFOuLYouMh4B5PX99+IAf40mlQf1gHRXTXuqaOXyVCc=
+    steps:
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: download the release
+        run: |
+          mkdir -p dl kit
+          gh release download "${{ inputs.tag }}" --repo "${{ github.repository }}" --dir dl \
+            --pattern "mosaikit-devkit-*-${{ matrix.platform }}.${{ matrix.ext }}*" --pattern "SHA256SUMS*"
+          ls -l dl
+      - name: hashes
+        working-directory: dl
+        run: |
+          if command -v sha256sum >/dev/null; then sha256sum -c SHA256SUMS --ignore-missing; else shasum -a 256 -c SHA256SUMS --ignore-missing; fi
+      - name: unpack
+        run: |
+          case "${{ matrix.ext }}" in
+            zip) unzip -q dl/mosaikit-devkit-*-${{ matrix.platform }}.zip -d kit ;;
+            *) tar -xzf dl/mosaikit-devkit-*-${{ matrix.platform }}.tar.gz -C kit ;;
+          esac
+          KIT="$(echo kit/*/)"; echo "KIT=$(cd "$KIT" && pwd)" >> "$GITHUB_ENV"
+      - name: signature of SHA256SUMS, with the official key
+        run: |
+          "$KIT/bin/mosaikit-plugin" self-update --from-dir dl --trusted-key "$KIT_KEY" --check
+      - name: the key inside the kit is the official one
+        run: |
+          test "$(tr -d '[:space:]' < "$KIT/trusted_key.txt")" = "$KIT_KEY"
+      - name: doctor
+        run: |
+          "$KIT/bin/mosaikit-plugin" doctor
+      - name: make, validate, build and test a plugin
+        run: |
+          "$KIT/bin/mosaikit-plugin" new smoke-plugin --kit "$KIT"
+          cd smoke-plugin
+          "$KIT/bin/mosaikit-plugin" validate
+          "$KIT/bin/mosaikit-plugin" build
+          "$KIT/bin/mosaikit-plugin" test
+      - name: pack and sign with a throw-away key
+        run: |
+          cd smoke-plugin
+          "$KIT/bin/mosaikit-plugin" keygen --out ../smoke.key
+          "$KIT/bin/mosaikit-plugin" pack --key ../smoke.key
+      - name: product, with the browser checks (only where the kit has the server)
+        if: matrix.platform == 'windows-x86_64'
+        run: |
+          KITW="$(cygpath -w "$KIT")"
+          export PATH="$KIT/bin:$PATH" MOSAIKIT_KIT="$KITW"
+          mosaikit-product new smoke-product
+          cd smoke-product
+          mosaikit-product validate
+          npm init -y
+          npm install --save-dev --install-links @playwright/test @axe-core/playwright "$KITW\plugin-testing" --no-audit --no-fund
+          npx playwright install chromium
+          mosaikit-product test --browser
