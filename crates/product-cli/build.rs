@@ -2,11 +2,13 @@
 // without the Windows resource compiler the build goes on and warns.
 fn main() {
     println!("cargo:rerun-if-changed=build.rs");
-    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
-        return;
-    }
     #[cfg(windows)]
-    {
+    embed();
+}
+
+#[cfg(windows)]
+fn embed() {
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
         let mut res = winresource::WindowsResource::new();
         res.set("FileDescription", "Mosaikit product tool");
         res.set("ProductName", "Mosaikit");

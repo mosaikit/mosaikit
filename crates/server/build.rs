@@ -11,11 +11,13 @@ fn main() {
     println!("cargo:rerun-if-changed=../../ui/host/dist");
     println!("cargo:rerun-if-changed=../../ui/host/dist/index.html");
     println!("cargo:rerun-if-changed=../desktop/src/icon.rs");
-    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("windows") {
-        return;
-    }
     #[cfg(windows)]
-    {
+    embed();
+}
+
+#[cfg(windows)]
+fn embed() {
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() == Ok("windows") {
         let out = std::path::PathBuf::from(std::env::var("OUT_DIR").expect("OUT_DIR"));
         let path = out.join("mosaikit.ico");
         std::fs::write(&path, icon::ico()).expect("writing the icon");
