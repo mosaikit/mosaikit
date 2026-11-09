@@ -14,9 +14,23 @@ Il kit è una cartella (o un archivio) con:
 | `sdk/`, `plugin-api/` | l'SDK Rust (`mosaikit-plugin-sdk`) e il pacchetto della UI (`@mosaikit/plugin-api`), finché non li ha un registro |
 | `docs/` | questi documenti |
 
-Scaricare l'archivio della propria piattaforma dalle GitHub Releases di `mosaikit/mosaikit`
-(`mosaikit-devkit-<versione>-<piattaforma>`), verificarlo ([Releasing the kit, in inglese](../releasing.md)), scompattarlo e mettere la sua cartella
-`bin/` nel `PATH` (oppure puntare `MOSAIKIT_KIT` sulla cartella). L'archivio per Windows contiene il server; su Linux e macOS il
+**Scaricamento.** Apri le release di `mosaikit/mosaikit`: <https://github.com/mosaikit/mosaikit/releases>. Il kit è la
+release il cui nome inizia con `kit-v` (per esempio `kit-v1.0.0-rc3`; una pre-release è un kit ancora in prova). In fondo alla
+sua pagina apri l'elenco **Assets** e scarica l'archivio del tuo sistema, `mosaikit-devkit-<versione>-<piattaforma>.zip`
+(Windows) o `.tar.gz` (Linux, macOS), e anche `SHA256SUMS` e `SHA256SUMS.sig`. Verificali ([Releasing the kit, in inglese](../releasing.md)) e scompatta l'archivio in una cartella a scelta.
+
+**Metti `bin/` nel `PATH`.** È obbligatorio: i comandi `mosaikit-plugin` e `mosaikit-server` stanno nella cartella `bin/` del kit
+e il sistema li trova solo tramite `PATH`. Impostare solo `MOSAIKIT_KIT` non basta: quella variabile dice dove sta il kit (è il
+valore predefinito di `--kit` in `mosaikit-plugin new`), non rende disponibili i comandi. Con il kit scompattato in
+`C:\Tools\mosaikit-devkit-1.0.0-windows-x86_64`:
+
+- Windows, per la finestra PowerShell corrente: `$env:Path = "C:\Tools\mosaikit-devkit-1.0.0-windows-x86_64\bin;" + $env:Path`. Per
+  tutte le finestre: Start > "Modifica le variabili di ambiente di sistema" > Variabili d'ambiente > `Path` del tuo utente >
+  Nuovo > il percorso completo della cartella `bin`; poi apri una finestra nuova.
+- Linux e macOS: `export PATH="$HOME/mosaikit-devkit/bin:$PATH"` (la riga va in `~/.profile` o `~/.zshrc` per mantenerla).
+
+Controlla in una finestra **nuova**: `mosaikit-plugin doctor`. Facoltativo, per non scrivere `--kit` in `mosaikit-plugin new`: imposta
+`MOSAIKIT_KIT` sulla cartella del kit (quella che contiene `bin/`, `sdk/` e `docs/`). L'archivio per Windows contiene il server; su Linux e macOS il
 server di sviluppo è l'immagine Docker (`docker/README.md` nel kit). `mosaikit-plugin self-update` porta il kit alla versione successiva.
 Senza un archivio, si compilano i due eseguibili dai sorgenti di Mosaikit
 (`cargo build --release -p mosaikit-plugin-cli -p mosaikit-server`) e si usano `--sdk-path` e `--plugin-api-path`
@@ -100,8 +114,31 @@ Per controllare migrazioni e row level security sul database vero (PostgreSQL) c
 ## 4. Cambiare qualcosa
 
 1. In `plugin.toml` aggiungere un campo alla risorsa: `{ key = "due", label = "Scadenza", kind = "date" }`. Il server aggiunge la colonna; modulo e tabella la mostrano. Poi dai un'etichetta al campo in ogni lingua che il plugin dichiara, altrimenti `mosaikit-plugin test` fallisce con `[i18n.it] is incomplete`: in `[i18n.it.resources.<risorsa>]` e in `[i18n.es.resources.<risorsa>]` aggiungi `due = "..."` a `fields` (per esempio `Scadenza`, `Vence`).
-2. In `src/lib.rs` cambiare ciò che fa un hook. Lo strumento ricompila; ricaricare la pagina.
-3. In `ui/src/main.ts` cambiare le opzioni di `mountCrud` (`title`, `columns`, `empty`).
+2. In `src/lib.rs` cambiare ciò che fa un hook. Lo strumento ricompila; ricaricare la pagina. Esempio: l'hook `before_save` rifiuta un titolo più corto di 3 caratteri; chiedine 5. Cambia i due punti che dicono 3:
+
+   ```rust
+   if title.len() < 5 {
+       return Err(Error::msg("il titolo deve avere almeno 5 caratteri"));
+   }
+   ```
+
+   Aspetta che `dev` scriva di aver ricompilato la logica, ricarica la pagina e salva un elemento con titolo `abc`: il modulo mostra il
+   messaggio e non salva nulla. `mosaikit-plugin test` continua a passare (il test del modello usa un titolo di 5 caratteri).
+3. In `ui/src/main.ts` cambiare le opzioni di `mountCrud` (`title`, `columns`, `empty`). Esempio: scegli le colonne della tabella e
+   scrivi un testo tuo per la pagina vuota. In `main.ts`, nelle opzioni di `mountCrud`, aggiungi la riga `columns`:
+
+   ```ts
+   return mountCrud(app, msk, 'acme_reports', {
+     title: t.title,
+     columns: ['title', 'status', 'due'],   // la tabella mostra questi campi, in quest'ordine
+     newLabel: t.newLabel,
+     empty: { art: 'generic', title: t.emptyTitle, text: t.emptyText },
+   })
+   ```
+
+   I testi (`title`, `empty`) sono in `ui/src/i18n.ts`, uno per lingua: cambia `emptyText` (inglese `'Add the first item to start.'`) in
+   `'No report yet: add the first one.'` e quelli in italiano e spagnolo allo stesso modo. `dev` ricostruisce la UI da solo; ricarica
+   la pagina: la tabella ha tre colonne e la pagina vuota ha il tuo testo (lo mostra una lista vuota).
 
 ## 5. Collaudare, impacchettare, installare
 
