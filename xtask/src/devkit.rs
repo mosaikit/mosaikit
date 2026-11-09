@@ -531,6 +531,10 @@ Everything you need to write, test, sign and install a plugin for Mosaikit, with
 
 5. **Check it and pack it.** `mosaikit-plugin validate --strict`, `mosaikit-plugin test`, then `mosaikit-plugin pack`. To install the package on a server like a real one (the Docker kit, with a trusted key), follow section 6 of `docs/devkit/getting-started.md`: `dev` cannot install a plugin it runs from a folder.
 
+## What do I download?
+
+For a plugin, this Dev Kit is enough. For a product you also need the **Base**, which is Mosaikit compiled: the desktop zip `mosaikit-<version>-desktop-windows-x86_64.zip` in the same release `v<version>` as this kit (<https://github.com/mosaikit/mosaikit/releases>), and the image `ghcr.io/mosaikit/mosaikit:v<version>`.
+
 ## A plugin or a product?
 
 A **plugin** is one feature that runs inside Mosaikit (`mosaikit-plugin`); you ship a signed `.mskp` file. A **product** is Mosaikit with your own name, brand, plugins and defaults (`mosaikit-product`); you ship a desktop archive and a Docker image. A product contains plugins. To build a product read `docs/devkit/building-an-application.md` and `docs/devkit/reference-product.md`. The table in `docs/devkit/getting-started.md` shows the difference.

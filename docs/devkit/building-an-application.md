@@ -4,7 +4,7 @@ An **application** (a *product*, in the code a *distribution*) is Mosaikit with 
 and a way of starting that are yours. You build it from the **compiled** Mosaikit (the desktop kit and the Docker
 image): no source of Mosaikit, no fork, no compilation of the kernel. The tool is `mosaikit-product`.
 
-**Where the base comes from.** The development kit has the tools (`mosaikit-product`, `mosaikit-plugin`,
+**Where the base comes from.** It is in the platform release `v<version>` of `mosaikit/mosaikit`, next to the Dev Kit: the same release page has both ([Getting started](getting-started.md), "What do I download?"). The Dev Kit has the tools (`mosaikit-product`, `mosaikit-plugin`,
 `mosaikit-server`) but **not** the desktop kit of the base (`mosaikit.exe` and `registry/index.json`, the official
 plugins), which `build desktop --base` needs. The desktop kit is the zip of the platform release
 (`mosaikit-<version>-desktop-windows-x86_64.zip`, in the **Assets** of the release `v<version>` of `mosaikit/mosaikit`: <https://github.com/mosaikit/mosaikit/releases>): give `--base` the zip or the

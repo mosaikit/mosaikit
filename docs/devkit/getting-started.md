@@ -5,6 +5,17 @@ you do not need a checkout of Mosaikit.
 
 ## 1. Install the kit
 
+**What do I download?** Mosaikit has two things to download, and the platform release holds both:
+
+| I want to | I need | Where |
+|---|---|---|
+| Make a **plugin** | the **Dev Kit**: `mosaikit-plugin`, the documents, the examples | the archive `mosaikit-devkit-<version>-<platform>` in the **Assets** of a release |
+| Make a **product** (an application) | the Dev Kit (`mosaikit-product` is in it) **and** the **Base**: Mosaikit compiled, which the product is built on | the Base is in the same release: the desktop zip `mosaikit-<version>-desktop-windows-x86_64.zip` and the image `ghcr.io/mosaikit/mosaikit:v<version>` |
+
+The releases named `v<version>` (for example `v1.0.0`) have everything: the Dev Kit for every system, the desktop zip of the Base and the
+notes. The releases named `kit-v<version>` (for example `kit-v1.0.0-rc3`) have the Dev Kit alone, for a version still being tried. A
+plugin needs only the Dev Kit; the Base is for products ([Building an application](building-an-application.md)).
+
 The kit is one folder (or archive) with:
 
 | Part | What |
