@@ -42,8 +42,14 @@ pub const USERS: [TestUser; 4] = [
 
 /// The line of the log, and the text printed at start, while the profile is on.
 pub fn announce(k: &Kernel) {
+    // with the strict setting the profile checks the signatures as a server does: say which of the two it is
+    let signatures = if k.cfg.allow_unsigned {
+        "unsigned packages and any signing key accepted"
+    } else {
+        "signatures checked as on a server (only trusted keys)"
+    };
     let msg = format!(
-        "DEVELOPER PROFILE ON: known passwords ({PASSWORD}), unsigned packages accepted, tenant '{TENANT}' with \
+        "DEVELOPER PROFILE ON: known passwords ({PASSWORD}), {signatures}, tenant '{TENANT}' with \
          the users admin, manager, alice and bob. Never use it for real data. App {}",
         k.cfg.app_url
     );
