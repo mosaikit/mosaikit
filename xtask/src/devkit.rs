@@ -724,6 +724,23 @@ pub fn notices_only(out: &Path) -> Result<()> {
 mod tests {
     use super::*;
 
+    /// The zip of the Base is named after the version of `distribution.toml` (`mosaikit-<version>-desktop-...`): it must be the
+    /// version of the platform, or a release of 1.0.1 ships a file that says 1.0.0.
+    #[test]
+    fn the_distribution_of_the_platform_has_the_version_of_the_platform() {
+        let text = std::fs::read_to_string(root().join("distribution.toml")).unwrap();
+        let version = text
+            .lines()
+            .find_map(|l| l.strip_prefix("version = \""))
+            .and_then(|l| l.strip_suffix('"'))
+            .expect("version of distribution.toml");
+        assert_eq!(
+            version,
+            workspace_version().unwrap(),
+            "distribution.toml and Cargo.toml (workspace.package) are out of step"
+        );
+    }
+
     #[test]
     fn kit_readme_is_plain_markdown_and_points_at_the_documents() {
         for server in [true, false] {
