@@ -10,7 +10,7 @@ documents. The maintainers watch, log every stumble and fix the documents and th
 
 ## Rules for the maintainers
 
-1. Give the participants the kit release (`kit-v1.0.0-rc3` or later), the public key (it is in the kit as
+1. Give the participants the kit release (`v1.0.1` or later), the public key (it is in the kit as
    `trusted_key.txt`) and their brief. Nothing else.
 2. Questions go to GitHub Issues of `mosaikit/mosaikit` with the label `pilot`. The only help is an answer in the issue.
    Do not share a screen and do not type for them.

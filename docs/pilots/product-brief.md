@@ -16,13 +16,13 @@ compiled Mosaikit (the base), without the source code of the platform.
 
 | What | Where |
 |---|---|
-| The kit (`mosaikit-product`, `mosaikit-plugin`, the documents) | <https://github.com/mosaikit/mosaikit/releases/tag/kit-v1.0.0-rc3>, list **Assets** at the end of the page |
+| The Dev Kit (`mosaikit-product`, `mosaikit-plugin`, the documents) | <https://github.com/mosaikit/mosaikit/releases/tag/v1.0.1>, list **Assets** at the end of the page: `mosaikit-devkit-1.0.1-<your system>`, with `SHA256SUMS` and `SHA256SUMS.sig` |
 | The base 1.0.0: desktop zip | <https://github.com/mosaikit/mosaikit/releases/tag/v1.0.0>, **Assets**: `mosaikit-1.0.0-desktop-windows-x86_64.zip` |
 | The base 1.0.0: Docker image | `ghcr.io/mosaikit/mosaikit:v1.0.0` |
 | The base 1.0.1 (for the upgrade): desktop zip | <https://github.com/mosaikit/mosaikit/releases/tag/v1.0.1>, **Assets**: `mosaikit-1.0.1-desktop-windows-x86_64.zip` |
 | The base 1.0.1: Docker image | `ghcr.io/mosaikit/mosaikit:v1.0.1` |
 
-Download the kit archive of your system and `SHA256SUMS` and `SHA256SUMS.sig`, check them as `docs/devkit/releasing.md` says,
+Download the Dev Kit archive of your system and `SHA256SUMS` and `SHA256SUMS.sig`, check them as `docs/devkit/releasing.md` says,
 and unpack it. Start at `README.md` of the kit, then `docs/devkit/building-an-application.md`.
 
 **The task**
