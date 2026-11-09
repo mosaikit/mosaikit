@@ -123,7 +123,7 @@ jobs:
         &root,
         "README.md",
         &format!(
-            "# {title}\n\nA product built on Mosaikit.\n\n```text\nmosaikit-product validate          check the product\nmosaikit-product dev               start it with the brand and the plugins loaded from their folders\nmosaikit-product build desktop --base <desktop kit folder>\nmosaikit-product build docker  --base-image mosaikit:1.0.0\n```\n"
+            "# {title}\n\nA product built on Mosaikit.\n\n```text\nmosaikit-product validate          check the product\nmosaikit-product dev               start it with the brand and the plugins loaded from their folders\nmosaikit-product build desktop --base <desktop kit folder>\nmosaikit-product build docker  --base-image ghcr.io/mosaikit/mosaikit:v<version of the base>\n```\n"
         ),
     )?;
     Ok(root)

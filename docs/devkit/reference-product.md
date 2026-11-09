@@ -43,6 +43,39 @@ trial_days = 30
 licence = "Proprietary"
 ```
 
+### Give it a face
+
+The brand is the folder `branding/`: put the files in it and name them in `branding/brand.toml`. Every property is optional.
+
+```toml
+name = "Acme Maps"                    # the name in the sign-in page, the title of the tab and the shell
+tagline = "Maps for the field team"   # under the name on the sign-in page
+login_message = "Sign in with the account your administrator gave you."
+footer = "Acme Srl"
+support_url = "https://acme.example/support"
+logo = "logo.svg"                     # svg, png or webp, about 64 px high
+favicon = "favicon.svg"               # the icon of the browser tab
+icon = "icon.ico"                     # a real .ico (16 to 256 px): the desktop executable and the notification area
+
+[colors]
+accent = "#0b6e4f"                    # buttons, links, focus
+bg = "#f6f8f7"                        # page
+panel = "#ffffff"                     # cards
+fg = "#16231e"                        # text
+```
+
+- **Logo, favicon, icon**: copy the files into `branding/` next to `brand.toml`; the names are relative to it. The `.ico` must be a
+  real icon file, not a renamed PNG; the kit does not make one.
+- **Colours**: `#rrggbb` only. The names are `accent`, `bg`, `panel`, `panel2`, `line`, `fg`, `dim`, `ok` and `err`; any other name is refused.
+  The plugins receive the same colours.
+- **Texts**: the strings of the sign-in page and the welcome text. Languages are chosen in `[languages]` above; a product default such as
+  `"identity.welcome"` goes under `[defaults]`.
+- **Locked**: `[locked] keys = ["identity.name"]` stops the Administrator and the tenants from changing the name from Settings; leave a key out and they can
+  change it (and the logos and the theme).
+- **Check**: `mosaikit-product validate` tells whether the files exist and the colours are valid; `mosaikit-product dev` shows the result,
+  and `mosaikit-product test --browser` looks at the sign-in page and the shell with your brand. [Building an application](building-an-application.md) (section 4)
+  has the full list.
+
 ## 3. Check it
 
 ```text
@@ -88,7 +121,7 @@ For the pages of the plugins in the browser, a Playwright spec with `@mosaikit/p
 
 ```text
 mosaikit-product build desktop --base <desktop kit>
-mosaikit-product build docker --base <desktop kit> --base-image ghcr.io/mosaikit/mosaikit:v1.0.0 --build
+mosaikit-product build docker --base <desktop kit> --base-image ghcr.io/mosaikit/mosaikit:v1.0.1 --build
 ```
 
 The first gives `dist/acme-maps-<version>-desktop`: unzip anywhere and start `acme-maps.exe`. The second gives the image `acme-maps:<version>` and a
