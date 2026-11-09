@@ -108,7 +108,7 @@ it offline and how to set a trusted key).
 ```
 mosaikit-plugin test                       # strict validation, cargo test, tsc, lint and vitest of the UI
 mosaikit-plugin pack                       # dist/<id>-<version>.mskp, signed with your key
-mosaikit-plugin install dist/<file>.mskp --server http://localhost:8080 --user admin --password mosaikit-dev
+mosaikit-plugin install dist/<file>.mskp --server <address of another server> --user admin --password <password>
 ```
 
 `pack` signs with `--key`, else `MOSAIKIT_SIGNING_KEY`, else `MOSAIKIT_SIGNING_KEY_FILE`, else a development key the tool
@@ -121,7 +121,22 @@ What the three commands do:
 - `pack` builds the plugin and writes one file, `dist/<id>-<version>.mskp`: the logic, the UI, the migrations and the manifest, with a signature. Nothing is sent anywhere.
 - `install` uploads that file to a **running** Mosaikit server: it signs in as an Administrator (`--user`, `--password`) and sends the package. The server checks the signature against its trusted keys and installs it. `--server` is the address of that server.
 
-**The server must be running when you run `install`.** Start one first, in another window: `mosaikit-plugin dev` (leave it open; it prints its address, `http://localhost:8080` unless that port is taken; the users are in [section 3](#3-the-development-loop)), or the Docker kit (`docker compose -f docker/compose.yml up -d` in the `docker/` folder of the kit; the address is `http://localhost:8080`). Without a server `install` stops with `reaching <address>` and `os error 10061` (connection refused).
+**`install` does not go to the server that `dev` started for this plugin.** `dev` loads the plugin from its folder and marks it as "in development": a server in that state refuses a `.mskp` of the same plugin (`is loaded in development mode`), and removing the plugin in the web page does not last, because `dev` loads it again from the folder. The `.mskp` goes to another server, the one you would use for real. Start one in another window and give its address to `--server`:
+
+- **The Docker kit** (any system): `docker compose -f docker/compose.yml up -d` in the `docker/` folder of the kit. The address is `http://localhost:8080`; the Administrator user and password are the ones of the `.env` of the kit (`docker/README.md`). Stop `dev` first if it holds port 8080.
+- **A second development server with no plugin** (Windows, where the kit has `bin/mosaikit-server`): make a file `server.toml` outside the plugin folder with
+
+  ```toml
+  url = "http://127.0.0.1:8090"
+  listen = "127.0.0.1:8090"
+  plugin_listen = "127.0.0.1:8091"
+  data_dir = "C:/mosaikit-test-server"
+  developer_profile = true
+  ```
+
+  and run `mosaikit-server --config server.toml serve`. It starts empty with the same test users as `dev` (`admin`, password `mosaikit-dev`), accepts unsigned packages and keeps its own data. Then `mosaikit-plugin install dist/<file>.mskp --server http://127.0.0.1:8090 --user admin --password mosaikit-dev`.
+
+Without a server `install` stops with `reaching <address>` and `os error 10061` (connection refused).
 
 **After `install` the plugin is only "installed", not on.** The tool says so. An Administrator turns it on: open `#/admin`,
 Platform > Plugins > your plugin > **Turn on** (then it is `active` and available to the tenant `dev`). Until then its page
