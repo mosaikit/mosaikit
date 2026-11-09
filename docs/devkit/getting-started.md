@@ -31,6 +31,8 @@ mosaikit-plugin doctor --fix    # installs the wasm32 target if it is missing
 
 ## 2. Make a plugin
 
+You choose where to start: a **new** plugin (the commands below), or a **copy of an example** (`--example todo`, `insights` or `note-priority`: complete, commented, with a `WALKTHROUGH.md`; see [An example plugin to read](#an-example-plugin-to-read)). Both make a standalone folder you then change.
+
 ```
 mosaikit-plugin new acme-reports --kit <the folder where you unpacked the kit>
 cd acme-reports
@@ -145,6 +147,36 @@ keys). Do this once the plugin passes `test`.
 
 Without a server running, `install` stops with `reaching <address>` and `os error 10061` (connection refused). To start again
 from nothing: `docker compose down -v`. The ports, the `.env` and the folder of the plugin are in `docker/README.md`.
+
+## An example plugin to read
+
+Before you write your own, read a finished one. In the kit the three examples are in `examples/`
+(`todo`, `insights`, `note-priority`); each has a `WALKTHROUGH.md` that explains the plugin file by file, in order
+(about 250 lines). To get a working copy to run and change:
+
+```
+mosaikit-plugin new my-todo --kit /path/to/kit --example todo
+cd my-todo
+mosaikit-plugin dev
+```
+
+Start with `todo` (a list with a form, a stored value and a test). `insights` adds KPIs and a view; `note-priority`
+extends another plugin ([Extensions and layouts](extensions-layouts.md)).
+
+## A plugin or a product?
+
+| | Plugin | Product (application) |
+|---|---|---|
+| What it is | One feature that runs inside Mosaikit: logic (WASM), a UI, its own data | Mosaikit with a name, a brand, a choice of plugins and defaults that are yours |
+| You make it with | `mosaikit-plugin` | `mosaikit-product` |
+| You ship | A signed `.mskp` file that an Administrator installs | A desktop archive and a Docker image that carry your brand and your plugins |
+| It changes | What users can do | What users get on first start: name, logo, colours, plugins, settings, first tenant |
+| It cannot change | The kernel, the security rules, the plugin API | The kernel, the security rules, the origins, the signature model |
+| Start with | This document | [Building an application](building-an-application.md), then [Reference product](reference-product.md) |
+
+A product contains plugins: its own (made with `mosaikit-plugin new <name> --into plugins`) and official ones it
+keeps. Make a plugin when you add a feature to an existing Mosaikit; make a product when you want to hand out your own
+application. To start a product: `mosaikit-product new acme-maps`.
 
 ## Next
 
