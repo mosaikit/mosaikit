@@ -97,7 +97,7 @@ Per controllare migrazioni e row level security sul database vero (PostgreSQL) c
 
 ## 4. Cambiare qualcosa
 
-1. In `plugin.toml` aggiungere un campo alla risorsa: `{ key = "due", label = "Scadenza", kind = "date" }`. Il server aggiunge la colonna; modulo e tabella la mostrano.
+1. In `plugin.toml` aggiungere un campo alla risorsa: `{ key = "due", label = "Scadenza", kind = "date" }`. Il server aggiunge la colonna; modulo e tabella la mostrano. Poi dai un'etichetta al campo in ogni lingua che il plugin dichiara, altrimenti `mosaikit-plugin test` fallisce con `[i18n.it] is incomplete`: in `[i18n.it.resources.<risorsa>]` e in `[i18n.es.resources.<risorsa>]` aggiungi `due = "..."` a `fields` (per esempio `Scadenza`, `Vence`).
 2. In `src/lib.rs` cambiare ciò che fa un hook. Lo strumento ricompila; ricaricare la pagina.
 3. In `ui/src/main.ts` cambiare le opzioni di `mountCrud` (`title`, `columns`, `empty`).
 

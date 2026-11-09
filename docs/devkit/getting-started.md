@@ -99,7 +99,7 @@ it offline and how to set a trusted key).
 
 ## 4. Change something
 
-1. In `plugin.toml` add a field to the resource: `{ key = "due", label = "Due", kind = "date" }`. The server adds the column; the form and the table show it.
+1. In `plugin.toml` add a field to the resource: `{ key = "due", label = "Due", kind = "date" }`. The server adds the column; the form and the table show it. Then give the field a label in each language the plugin declares, or `mosaikit-plugin test` fails with `[i18n.it] is incomplete`: in `[i18n.it.resources.<resource>]` and in `[i18n.es.resources.<resource>]` add `due = "..."` to `fields` (for example `Scadenza`, `Vence`).
 2. In `src/lib.rs` change what a hook does. The tool rebuilds; reload the page.
 3. In `ui/src/main.ts` change the `mountCrud` options (`title`, `columns`, `empty`).
 
