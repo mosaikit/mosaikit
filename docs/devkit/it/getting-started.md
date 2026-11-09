@@ -108,7 +108,7 @@ Per controllare migrazioni e row level security sul database vero (PostgreSQL) c
 ```
 mosaikit-plugin test                       # validazione stretta, cargo test, tsc, lint e vitest della UI
 mosaikit-plugin pack                       # dist/<id>-<versione>.mskp, firmato con la tua chiave
-mosaikit-plugin install dist/<file>.mskp --server http://localhost:8080 --user admin --password mosaikit-dev   # sul kit Docker, sezione 6
+mosaikit-plugin install dist/com.example.acme-reports-0.1.0.mskp --server http://localhost:8080 --user admin --password mosaikit-dev   # sul kit Docker, sezione 6; il file è quello stampato da `pack`
 ```
 
 `pack` firma con `--key`, altrimenti `MOSAIKIT_SIGNING_KEY`, altrimenti `MOSAIKIT_SIGNING_KEY_FILE`, altrimenti con una
@@ -133,12 +133,12 @@ un elenco di chiavi fidate). Si fa quando il plugin supera `test`.
 1. **Ferma `dev`** (Ctrl+C nella sua finestra). Occupa la porta 8080.
 2. **Crea una chiave di firma** e tieni la chiave pubblica che stampa:
    `mosaikit-plugin keygen --out publisher.key`
-3. **Fidati della chiave nel kit.** In `docker/.env` scrivi `MOSAIKIT_TRUSTED_KEYS=<la chiave pubblica>`. Lascia `PLUGIN_DIR` com'è: se punta alla cartella del plugin, il plugin torna "in sviluppo" e `install` fallisce.
+3. **Fidati della chiave nel kit.** In `docker/.env` scrivi `MOSAIKIT_TRUSTED_KEYS=<la chiave pubblica>` **e** `MOSAIKIT_DEVELOPER_PROFILE_STRICT_SIGNATURES=1`. Senza la seconda riga il profilo sviluppatore accetta un pacchetto firmato con una chiave qualunque, e il controllo del passo 9 non può fallire. Lascia `PLUGIN_DIR` com'è: se punta alla cartella del plugin, il plugin torna "in sviluppo" e `install` fallisce.
 4. **Avvia il kit**, nella cartella `docker/` del kit: `docker compose up -d`. Il primo avvio scarica l'immagine; se il download è rifiutato, vedi `docker/README.md` (l'immagine si può caricare da un archivio, offline). Apri `http://localhost:8080`.
 5. **Impacchetta con quella chiave**, nella cartella del plugin:
    `mosaikit-plugin pack --key publisher.key`
 6. **Installa**:
-   `mosaikit-plugin install dist/<file>.mskp --server http://localhost:8080 --user admin --password mosaikit-dev`
+   `mosaikit-plugin install dist/com.example.acme-reports-0.1.0.mskp --server http://localhost:8080 --user admin --password mosaikit-dev` (il nome del file stampato da `pack`; non scrivere `<file>`)
    (anche il kit Docker è un profilo sviluppatore: stessi utenti di prova di `dev`).
 7. **Accendi il plugin.** Dopo `install` è solo "installed": apri `#/admin`, Piattaforma > Plugin > il tuo plugin > **Turn on** (poi è `active` e disponibile all'organizzazione `dev`). Finché non è acceso la sua pagina non compare nella shell.
 8. **Usalo.** Accedi come `alice` o `manager` (tenant `dev`) e crea, modifica e cancella una voce.

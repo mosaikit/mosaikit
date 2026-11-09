@@ -1547,7 +1547,10 @@ is not an address of this computer (`localhost`, `*.localhost`, `127.x`, `::1`);
 data). A single explicit flag lifts the guards, `developer_profile_allow_remote = true`
 (`MOSAIKIT_DEVELOPER_PROFILE_ALLOW_REMOTE=1`): the Docker kit needs it, because the container listens on every interface of its
 own network and the database is another container; its compose file publishes the ports on `127.0.0.1` only. While the
-profile is on the server writes a warning to its log and to the standard error at start, `/api/health` and the session carry
+profile accepts unsigned packages and a package signed with any valid key; `developer_profile_strict_signatures = true`
+(`MOSAIKIT_DEVELOPER_PROFILE_STRICT_SIGNATURES=1`) keeps the rules of §9 for the signature (no unsigned package, only keys of
+`trusted_keys`) inside the profile, so a developer can see a package refused as a real server would (the Docker kit passes it
+through its `.env`). While the profile is on the server writes a warning to its log and to the standard error at start, `/api/health` and the session carry
 `developer: true`, and the shell shows the banner before and after sign-in. With the profile off nothing changes: signatures,
 origins, CSP, second factor and routes are those of §9; a test (`crates/kernel/tests/developer_profile.rs`, and
 `crates/server/tests/http.rs`) proves that a default start has no test tenant, no test users, no switch of users and refuses

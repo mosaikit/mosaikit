@@ -59,6 +59,10 @@ url = "http://127.0.0.1:8080/mosaikit"
 # Lifts those guards (the Docker development kit, whose ports are published on 127.0.0.1 only). Never in production.
 # Env: MOSAIKIT_DEVELOPER_PROFILE_ALLOW_REMOTE
 # developer_profile_allow_remote = false
+# Keeps the signature rules of a real server inside the developer profile: no unsigned package, and a signed one only from a
+# key in trusted_keys (without it the profile accepts any key). For the Docker development kit.
+# Env: MOSAIKIT_DEVELOPER_PROFILE_STRICT_SIGNATURES
+# developer_profile_strict_signatures = false
 
 # Private destinations that plugins may call with http.fetch: exact "host:port" entries (no wildcards,
 # no ranges). Only for a plugin whose manifest lists that origin in its network permission. A malformed
