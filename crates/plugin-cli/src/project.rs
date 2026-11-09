@@ -124,9 +124,43 @@ pub fn build_wasm(plugins: &[Plugin], release: bool) -> Result<()> {
         for c in crates {
             cmd.args(["-p", c]);
         }
-        run(&mut cmd)?;
+        if let Err(e) = run(&mut cmd) {
+            let hint = registry_sdk_hint(plugins);
+            return Err(match hint {
+                Some(h) => e.context(h),
+                None => e,
+            });
+        }
     }
     Ok(())
+}
+
+/// The plugins whose `Cargo.toml` asks the registry for the SDK (made without `--kit`): until the SDK is
+/// published the build cannot find it, so a failed build says what to change.
+fn registry_sdk_hint(plugins: &[Plugin]) -> Option<String> {
+    let names: Vec<String> = plugins
+        .iter()
+        .filter(|p| {
+            asks_registry_for_sdk(&std::fs::read_to_string(p.dir.join("Cargo.toml")).unwrap_or_default())
+        })
+        .map(|p| p.dir.display().to_string())
+        .collect();
+    if names.is_empty() {
+        return None;
+    }
+    Some(format!(
+        "{} take `mosaikit-plugin-sdk` from the registry, where it is not published yet. In its Cargo.toml use          `mosaikit-plugin-sdk = {{ path = \"<folder of the kit>/sdk\" }}` (and `file:<folder of the kit>/plugin-api` in          ui/package.json), or make the plugin again with `mosaikit-plugin new ... --kit <folder of the kit>`",
+        names.join(", ")
+    ))
+}
+
+fn asks_registry_for_sdk(cargo_toml: &str) -> bool {
+    cargo_toml.lines().map(str::trim).any(|l| {
+        l.strip_prefix("mosaikit-plugin-sdk").is_some_and(|r| {
+            let r = r.trim_start();
+            r.starts_with("= \"") || (r.starts_with("= {") && r.contains("version") && !r.contains("path"))
+        })
+    })
 }
 
 /// `npm install` in the given root if node_modules is missing.
@@ -174,4 +208,17 @@ pub fn ui_has_script(p: &Plugin, script: &str) -> bool {
         .ok()
         .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
         .is_some_and(|v| v.get("scripts").and_then(|s| s.get(script)).is_some())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::asks_registry_for_sdk;
+
+    #[test]
+    fn a_plugin_that_asks_the_registry_for_the_sdk_is_recognised() {
+        assert!(asks_registry_for_sdk("[dependencies]\nmosaikit-plugin-sdk = \"1\"\n"));
+        assert!(asks_registry_for_sdk("mosaikit-plugin-sdk = { version = \"1\" }"));
+        assert!(!asks_registry_for_sdk("mosaikit-plugin-sdk = { path = \"/kit/sdk\" }"));
+        assert!(!asks_registry_for_sdk("mosaikit-plugin-sdk.workspace = true"));
+    }
 }
