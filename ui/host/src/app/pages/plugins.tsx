@@ -11,7 +11,6 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { DropdownMenuItem } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
@@ -187,9 +186,11 @@ export function AdminPlugins({ section }: { section?: string }) {
   const preparedCatalog = applyView(cur === 'updates' ? updates : available, catalogCols, words, sort)
   const ids = [...sel].filter((id) => rows.some((r) => r.id === id))
   const picked = rows.filter((r) => ids.includes(r.id))
-  async function bulk(what: 'update' | 'off' | 'uninstall') {
+  async function bulk(what: 'update' | 'on' | 'off' | 'uninstall') {
     if (what === 'update') {
       for (const p of picked.filter((p) => byId.get(p.id)?.update_available)) await install.mutateAsync(p.id)
+    } else if (what === 'on') {
+      for (const p of picked.filter((p) => p.status !== 'active')) await act.mutateAsync({ id: p.id, action: 'activate' })
     } else if (what === 'off') {
       if (!(await confirm(t('Turn off {n} plugins? They go off in every tenant.', { n: picked.length }), true))) return
       for (const p of picked.filter((p) => p.status === 'active')) await act.mutateAsync({ id: p.id, action: 'deactivate' })
@@ -248,7 +249,10 @@ export function AdminPlugins({ section }: { section?: string }) {
             <Button variant="outline" size="sm" disabled={!picked.some((p) => byId.get(p.id)?.update_available)} onClick={() => void bulk('update')}>
               {t('Update')}
             </Button>
-            <Button variant="outline" size="sm" onClick={() => void bulk('off')}>
+            <Button variant="outline" size="sm" disabled={!picked.some((p) => p.status !== 'active')} onClick={() => void bulk('on')}>
+              {t('Turn on')}
+            </Button>
+            <Button variant="outline" size="sm" disabled={!picked.some((p) => p.status === 'active')} onClick={() => void bulk('off')}>
               {t('Turn off')}
             </Button>
             <Button variant="outline" size="sm" onClick={() => void bulk('uninstall')}>
@@ -466,31 +470,33 @@ export function AdminPluginPage({ id, tab }: { id: string; tab?: string }) {
         badge={<StatusBadge status={p.status} />}
         sub={`${kindLabel(kind)} · ${p.version} · ${p.id}`}
         actions={
-          c?.update_available ? (
-            <Button disabled={update.isPending} onClick={() => update.mutate(undefined)}>
-              <ArrowUpCircle />
-              {t('Update to {v}', { v: c.latest })}
-            </Button>
-          ) : undefined
-        }
-        more={
           <>
+            {c?.update_available && (
+              <Button disabled={update.isPending} onClick={() => update.mutate(undefined)}>
+                <ArrowUpCircle />
+                {t('Update to {v}', { v: c.latest })}
+              </Button>
+            )}
             {p.status === 'active' ? (
-              <DropdownMenuItem onSelect={async () => (await confirm(t('Turn off {label}? It goes off in every tenant.', { label: p.label }), true)) && act.mutate('deactivate')}>
+              <Button
+                variant="outline"
+                disabled={act.isPending}
+                onClick={async () => (await confirm(t('Turn off {label}? It goes off in every tenant.', { label: p.label }), true)) && act.mutate('deactivate')}
+              >
                 <Power />
                 {t('Turn off')}
-              </DropdownMenuItem>
+              </Button>
             ) : (
-              <DropdownMenuItem onSelect={() => act.mutate('activate')}>
+              <Button disabled={act.isPending} onClick={() => act.mutate('activate')}>
                 <Power />
                 {t('Turn on')}
-              </DropdownMenuItem>
+              </Button>
             )}
             {!p.dev && (
-              <DropdownMenuItem variant="destructive" onSelect={() => void remove()}>
+              <Button variant="outline" className="text-destructive" disabled={uninstall.isPending} onClick={() => void remove()}>
                 <Trash2 />
                 {t('Uninstall')}
-              </DropdownMenuItem>
+              </Button>
             )}
           </>
         }
