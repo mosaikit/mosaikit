@@ -529,7 +529,7 @@ Everything you need to write, test, sign and install a plugin for Mosaikit, with
 
 {run}
 
-5. **Check it, pack it, install it.** `mosaikit-plugin validate --strict`, `mosaikit-plugin test`, then `mosaikit-plugin pack`, `mosaikit-plugin sign` and `mosaikit-plugin install`. After `install` the plugin is only installed: an Administrator turns it on in the Administration.
+5. **Check it and pack it.** `mosaikit-plugin validate --strict`, `mosaikit-plugin test`, then `mosaikit-plugin pack`. To install the package on a server like a real one (the Docker kit, with a trusted key), follow section 6 of `docs/devkit/getting-started.md`: `dev` cannot install a plugin it runs from a folder.
 
 ## A plugin or a product?
 
