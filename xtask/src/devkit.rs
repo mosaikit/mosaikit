@@ -486,7 +486,7 @@ fn kit_txt(version: &str, platform: &str, server: bool) -> String {
     format!(
         "Mosaikit dev kit {version} ({platform})\n\n\
          START HERE: to write a plugin, read README.md (the first steps), then docs/devkit/getting-started.md and\n\
-         docs/devkit/README.md (the list of every document). Setting PATH or MOSAIKIT_KIT is only the installation.\n\n\
+         docs/devkit/README.md (the list of every document). Put bin/ on your PATH first.\n\n\
          bin/mosaikit-plugin  the command-line tool: new, build, test, validate, pack, sign, keygen, install, dev, doctor, self-update\n\
          {run_part}\n\
          sdk/                 the Rust SDK (mosaikit-plugin-sdk): `new --kit <this folder>` uses it\n\
@@ -499,7 +499,7 @@ fn kit_txt(version: &str, platform: &str, server: bool) -> String {
          COMPATIBILITY.md     which versions work together (generated from the manifests)\n\
          LICENSE, THIRD-PARTY-NOTICES.md\n\
          trusted_key.txt      the public key that signed this kit: `mosaikit-plugin self-update` checks the next one with it\n\n\
-         Install: put bin/ on your PATH (or set MOSAIKIT_KIT to this folder). Check the download first: SHA256SUMS is signed\n\
+         Install: put bin/ on your PATH (required: the commands are found only through it; MOSAIKIT_KIT alone does not work, it only gives the default of `new --kit`). Check the download first: SHA256SUMS is signed\n\
          with trusted_key.txt (`mosaikit-plugin self-update --from-dir <folder with the release files> --check`).\n\n\
          Building a product (`mosaikit-product build desktop --base`) needs the desktop kit of the platform release\n\
          (mosaikit-<version>-desktop-<platform>.zip on GitHub Releases), which is not part of this kit:\n\
@@ -520,7 +520,7 @@ Everything you need to write, test, sign and install a plugin for Mosaikit, with
 
 ## Your first plugin in five steps
 
-1. **Put the tools on your path.** Add the `bin/` folder of this kit to `PATH`, or set `MOSAIKIT_KIT` to this folder.
+1. **Put the tools on your path.** Add the `bin/` folder of this kit to `PATH` (required), then open a new terminal and run `mosaikit-plugin doctor`. Setting only `MOSAIKIT_KIT` does not work: it is just the default of `--kit` in `mosaikit-plugin new`. `docs/devkit/getting-started.md` shows the commands for Windows, Linux and macOS.
 2. **Check the machine.** `mosaikit-plugin doctor` (add `--fix` to install the `wasm32-unknown-unknown` target).
 3. **Choose where to start.**
    - A new plugin: `mosaikit-plugin new my-plugin --kit <this folder>`.

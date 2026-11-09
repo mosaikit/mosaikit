@@ -14,9 +14,24 @@ The kit is one folder (or archive) with:
 | `sdk/`, `plugin-api/` | the Rust SDK (`mosaikit-plugin-sdk`) and the UI package (`@mosaikit/plugin-api`), until a registry has them |
 | `docs/` | these documents |
 
-Download the archive of your platform from the GitHub Releases of `mosaikit/mosaikit`
-(`mosaikit-devkit-<version>-<platform>`), check it ([Releasing the kit](releasing.md)), unpack it, and put its `bin/`
-folder on your `PATH` (or point `MOSAIKIT_KIT` at the folder). The Windows archive has the server; on Linux and macOS the
+**Download.** Open the releases of `mosaikit/mosaikit`: <https://github.com/mosaikit/mosaikit/releases>. The kit is the
+release whose name starts with `kit-v` (for example `kit-v1.0.0-rc3`; a pre-release is a kit that is still being tried). At
+the end of its page, open the list **Assets** and download the archive of your system,
+`mosaikit-devkit-<version>-<platform>.zip` (Windows) or `.tar.gz` (Linux, macOS), and also `SHA256SUMS` and
+`SHA256SUMS.sig`. Check them ([Releasing the kit](releasing.md)) and unpack the archive in a folder of your choice.
+
+**Put `bin/` on your `PATH`.** This is required: the commands `mosaikit-plugin` and `mosaikit-server` are in the `bin/` folder
+of the kit, and the system finds them only through `PATH`. Setting only `MOSAIKIT_KIT` does not work: that variable says where
+the kit is (the default of `--kit` in `mosaikit-plugin new`), it does not make the commands available. With the kit unpacked in
+`C:\Tools\mosaikit-devkit-1.0.0-windows-x86_64`:
+
+- Windows, for the current PowerShell window: `$env:Path = "C:\Tools\mosaikit-devkit-1.0.0-windows-x86_64\bin;" + $env:Path`. For
+  every window: Start > "Edit the system environment variables" > Environment Variables > `Path` of your user > New >
+  the full path of the `bin` folder; then open a new window.
+- Linux and macOS: `export PATH="$HOME/mosaikit-devkit/bin:$PATH"` (put the line in `~/.profile` or `~/.zshrc` to keep it).
+
+Check it in a **new** window: `mosaikit-plugin doctor`. Optional, to skip `--kit` in `mosaikit-plugin new`: set
+`MOSAIKIT_KIT` to the folder of the kit (the one that holds `bin/`, `sdk/` and `docs/`). The Windows archive has the server; on Linux and macOS the
 development server is the Docker image (`docker/README.md` in the kit). `mosaikit-plugin self-update` brings the kit
 to the next release. Without an archive, build the two executables from the Mosaikit sources
 (`cargo build --release -p mosaikit-plugin-cli -p mosaikit-server`) and use `--sdk-path` and `--plugin-api-path`
@@ -102,8 +117,31 @@ it offline and how to set a trusted key).
 ## 4. Change something
 
 1. In `plugin.toml` add a field to the resource: `{ key = "due", label = "Due", kind = "date" }`. The server adds the column; the form and the table show it. Then give the field a label in each language the plugin declares, or `mosaikit-plugin test` fails with `[i18n.it] is incomplete`: in `[i18n.it.resources.<resource>]` and in `[i18n.es.resources.<resource>]` add `due = "..."` to `fields` (for example `Scadenza`, `Vence`).
-2. In `src/lib.rs` change what a hook does. The tool rebuilds; reload the page.
-3. In `ui/src/main.ts` change the `mountCrud` options (`title`, `columns`, `empty`).
+2. In `src/lib.rs` change what a hook does. The tool rebuilds; reload the page. Example: the hook `before_save` refuses a title shorter than 3 characters; ask for 5. Change the two places that say 3:
+
+   ```rust
+   if title.len() < 5 {
+       return Err(Error::msg("the title must have at least 5 characters"));
+   }
+   ```
+
+   Wait for `dev` to print that it rebuilt the logic, reload the page and save an item titled `abc`: the form shows the message and
+   saves nothing. `mosaikit-plugin test` still passes (the unit test of the template uses a title of 5 characters).
+3. In `ui/src/main.ts` change the `mountCrud` options (`title`, `columns`, `empty`). Example: choose the columns of the table, and
+   write your own text for the empty page. In `main.ts`, in the options of `mountCrud`, add the line `columns`:
+
+   ```ts
+   return mountCrud(app, msk, 'acme_reports', {
+     title: t.title,
+     columns: ['title', 'status', 'due'],   // the table shows these fields, in this order
+     newLabel: t.newLabel,
+     empty: { art: 'generic', title: t.emptyTitle, text: t.emptyText },
+   })
+   ```
+
+   The texts (`title`, `empty`) are in `ui/src/i18n.ts`, one per language: change `emptyText` (English `'Add the first item to start.'`) to
+   `'No report yet: add the first one.'`, and the Italian and Spanish ones the same way. `dev` rebuilds the UI by itself; reload the
+   page: the table has three columns and the empty page has your text (an empty list shows it).
 
 ## 5. Test, pack, install
 
