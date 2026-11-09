@@ -176,6 +176,16 @@ const STANDALONE_TSCONFIG: &str = r#"{
 }
 "#;
 
+/// The kit folder this tool runs from (`<kit>/bin/mosaikit-plugin`, with `sdk/` and `plugin-api/` next to `bin/`):
+/// a plugin made with the tool of a kit takes the SDK and the UI package from it, with no option.
+pub fn kit_of_this_tool() -> Option<PathBuf> {
+    let exe = std::env::current_exe().ok()?;
+    let bin = exe.parent()?;
+    let kit = bin.parent()?;
+    (bin.file_name()? == "bin" && kit.join("sdk").is_dir() && kit.join("plugin-api").is_dir())
+        .then(|| kit.to_path_buf())
+}
+
 /// Versions of the build tools of a standalone UI: the ones `mosaikit` and `mosaikit-plugins` use.
 pub const TYPESCRIPT: &str = "~7.0.2";
 pub const VITE: &str = "^8.3.4";
@@ -535,7 +545,7 @@ fn readme(
                     None => t.push_str("- `ui/package.json` asks for the published `@mosaikit/plugin-api` (`^1.0.0`).\n"),
                 }
             }
-            t.push_str("\nUntil the two packages are in a public registry they come with the Mosaikit kit (folders `sdk/` and `plugin-api/`). Make the plugin with `mosaikit-plugin new <name> --kit <folder of the kit>` (or the variable `MOSAIKIT_KIT`), or point at each one with `--sdk-path` and `--plugin-api-path`. In CI the repository variable `MOSAIKIT_KIT` does the same (see `.github/workflows/ci.yml`).\n");
+            t.push_str("\nUntil the two packages are in a public registry they come with the Mosaikit kit (folders `sdk/` and `plugin-api/`). Make the plugin with `mosaikit-plugin new <name>` with the tool of the kit (or `--kit <folder of the kit>`, or the variable `MOSAIKIT_KIT`), or point at each one with `--sdk-path` and `--plugin-api-path`. In CI the repository variable `MOSAIKIT_KIT` does the same (see `.github/workflows/ci.yml`).\n");
             t
         }
     };
