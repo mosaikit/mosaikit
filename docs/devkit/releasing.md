@@ -29,6 +29,11 @@ Inside an archive: `bin/`, `sdk/` (the unpacked `.crate` of `mosaikit-plugin-sdk
    (`cargo xtask release devkit`), tags the Docker image `-dev`, then signs `SHA256SUMS` over all the archives
    (`cargo xtask release devkit-sums`) and publishes the GitHub Release with the generated release notes. The signing key is
    the secret `MOSAIKIT_SIGNING_KEY`, the same as the official `.mskp` packages.
+   The workflow `devkit.yml` (run by hand with the tag of the kit) does the same for a kit on its own, and also pushes the image
+   `ghcr.io/mosaikit/mosaikit-dev:<version>` that the Docker kit pulls. **The first time**, an owner of the organization must
+   make that package public (organization settings > Packages allow public packages; then the package `mosaikit-dev` >
+   Package settings > link it to the repository and set the visibility to Public). Without this the pull answers `denied` and a
+   developer cannot start the Docker kit. Check it from a machine with no login: `docker pull ghcr.io/mosaikit/mosaikit-dev:<version>`.
 3. On one machine, the same command: `cargo xtask release devkit` (needs `MOSAIKIT_SIGNING_KEY`; `--allow-dev-key` for a
    trial with a key nobody trusts). It writes `dist/devkit/`.
 
