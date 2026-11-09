@@ -30,6 +30,33 @@ fn the_default_configuration_has_none_of_the_development_behaviours() {
 }
 
 #[test]
+fn strict_signatures_keep_the_signature_rules_of_a_server_inside_the_profile() {
+    let derive = |strict: &str| {
+        let mut c = Config::default();
+        let mut env = vec![("MOSAIKIT_DEVELOPER_PROFILE".to_string(), "1".to_string())];
+        if !strict.is_empty() {
+            env.push(("MOSAIKIT_DEVELOPER_PROFILE_STRICT_SIGNATURES".to_string(), strict.to_string()));
+        }
+        c.apply_env(env.into_iter());
+        c.derive().unwrap();
+        c
+    };
+    // the profile alone takes any key and unsigned packages; with the setting it checks them as a server does
+    assert!(derive("").allow_unsigned);
+    assert!(derive("0").allow_unsigned, "0 is off");
+    let strict = derive("1");
+    assert!(
+        !strict.allow_unsigned && strict.dev.enabled && strict.developer_profile,
+        "the rest of the profile stays"
+    );
+    // an unrelated setting of the environment, and a configuration without the profile, change nothing
+    let mut c = Config::default();
+    c.apply_env([("MOSAIKIT_DEVELOPER_PROFILE_STRICT_SIGNATURES".to_string(), "1".to_string())].into_iter());
+    c.derive().unwrap();
+    assert!(!c.developer_profile && !c.allow_unsigned);
+}
+
+#[test]
 fn the_profile_refuses_a_machine_others_can_reach() {
     let on = |f: &dyn Fn(&mut Config)| {
         let mut c = Config { developer_profile: true, ..Config::default() };

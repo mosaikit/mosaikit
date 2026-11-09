@@ -43,14 +43,18 @@ mosaikit-dev`) leave `PLUGIN_DIR` as it is: the empty `./plugin` only makes the 
 
 ## Trust a key
 
-The developer profile accepts unsigned packages, so a key is not needed here. To see what a real server does (a
-package refused with `publisher key not trusted: <key>`), put the public key that `mosaikit-plugin keygen` prints in
-`.env`, one or more separated by commas, and recreate the app:
+The developer profile accepts unsigned packages and a package signed with **any** key, so a key is not needed here and
+`MOSAIKIT_TRUSTED_KEYS` alone changes nothing. To see what a real server does (a package refused with
+`publisher key not trusted: <key>`), put the public key that `mosaikit-plugin keygen` prints in `.env`, one or more
+separated by commas, **and** turn the check on, then recreate the app:
 
 ```
 MOSAIKIT_TRUSTED_KEYS=key1,key2
+MOSAIKIT_DEVELOPER_PROFILE_STRICT_SIGNATURES=1
 docker compose up -d
 ```
+
+With the check on, an unsigned package is refused (`unsigned package`) and so is one signed with a key that is not in the list.
 
 ## The plugin folder
 
@@ -70,6 +74,7 @@ migrations again from the first one.
 | `MOSAIKIT_DEV_IMAGE`, `MOSAIKIT_VERSION` | `mosaikit-dev`, `{{version}}` | the image |
 | `MOSAIKIT_HTTP_PORT`, `MOSAIKIT_PLUGIN_PORT` | `8080`, `8081` | ports on the loopback of the host |
 | `MOSAIKIT_TRUSTED_KEYS` | empty | public keys of the trusted publishers, separated by commas |
+| `MOSAIKIT_DEVELOPER_PROFILE_STRICT_SIGNATURES` | empty | `1`: refuse unsigned packages and keys that are not trusted, as a production server does |
 | `PLUGIN_DIR` | `./plugin` | the folder of the plugin |
 | `POSTGRES_IMAGE` | `{{postgres_image}}` | PostgreSQL (use a PostGIS image for geographic plugins) |
 

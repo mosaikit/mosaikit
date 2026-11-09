@@ -231,6 +231,9 @@ mod tests {
             env.contains(
                 "
 MOSAIKIT_TRUSTED_KEYS="
+            ) && env.contains(
+                "
+MOSAIKIT_DEVELOPER_PROFILE_STRICT_SIGNATURES="
             ),
             "{env}"
         );

@@ -48,6 +48,7 @@ services:
       MOSAIKIT_DEV_PLUGINS: /plugin
       # public keys (separated by commas) of the publishers the server trusts; see "Trust a key" in the README
       MOSAIKIT_TRUSTED_KEYS: ${MOSAIKIT_TRUSTED_KEYS:-}
+      MOSAIKIT_DEVELOPER_PROFILE_STRICT_SIGNATURES: ${MOSAIKIT_DEVELOPER_PROFILE_STRICT_SIGNATURES:-}
     ports:
       - "127.0.0.1:${MOSAIKIT_HTTP_PORT:-8080}:8080"
       - "127.0.0.1:${MOSAIKIT_PLUGIN_PORT:-8081}:8081"
