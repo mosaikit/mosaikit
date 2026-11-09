@@ -187,9 +187,9 @@ The dev environment loads the plugins of `mosaikit-plugins` from their folders (
 | Id | Check | Expected |
 |---|---|---|
 | P4-01 | As Administrator: Plugins | Every plugin with its icon, kind (App, Service, Extension) and version; *Note review* is an Extension; the filter Apps / Services / Extensions narrows the list |
-| P4-02 | Tick two plugins | The selection bar appears only now: Update (when an update exists), Turn off, Uninstall, Deselect |
+| P4-02 | Tick two plugins | The selection bar appears only now: Update (when an update exists), Turn on, Turn off, Uninstall, Deselect |
 | P4-03 | Updates and Catalog | Updates lists only newer versions with what they bring (release notes); Catalog what is not installed yet |
-| P4-04 | Click *Notes* | Its page: breadcrumb to Plugins, status badge, tabs Overview, What it asks, Tenants, Extensions; the "⋯" menu has Turn off and Uninstall |
+| P4-04 | Click *Notes* | Its page: breadcrumb to Plugins, status badge, tabs Overview, What it asks, Tenants, Extensions; the header has the buttons Turn off (Turn on when it is off) and Uninstall |
 | P4-05 | What it asks | What the plugin uses: logic on the server, hooks, files, network, other plugins, database (the permissions it brings are listed in Access and permissions, not here) |
 | P4-06 | Extensions tab | *Note review* (active); a link opens its page, whose What it asks lists the field «Reviewed» and the action «Mark as reviewed» |
 | P4-07 | Tenants tab | One row per tenant: Available switch, whether the tenant turned it on, Restore when the tenant has its own choice; the switch «Available to every tenant» on top |
@@ -205,7 +205,7 @@ The dev environment loads the plugins of `mosaikit-plugins` from their folders (
 | P4-17 | Switch to Italiano | «Revisionata», «Segna come revisionata»; kinds App / Servizio / Estensione in the pages of the plugins |
 | P4-18 | A public link to a note, then turn Notes off in the tenant | The link stops working; on again, it works again |
 | P4-19 | As Administrator: a plugin with settings (`[[config]]`), Configuration tab | A field per setting; secrets show «Saved: type to replace» and never their value; the save bar appears only after a change (none of the official plugins has settings yet: try with a package of your own) |
-| P4-20 | Uninstall *Note review* (⋯ › Uninstall) | The confirmation says how many items and tenants are touched; the extension disappears, Notes keeps working; reinstall it from Catalog (Install): it comes back in the state it had before (on, with the tenants that had it), the platform remembers it |
+| P4-20 | Uninstall *Note review* (the Uninstall button of its page) | The confirmation says how many items and tenants are touched; the extension disappears, Notes keeps working; reinstall it from Catalog (Install): it comes back in the state it had before (on, with the tenants that had it), the platform remembers it |
 | P4-21 | Dark mode on the new pages | Readable; switches and badges visible |
 
 ## Phase 5 — Shares, Trash, Log
