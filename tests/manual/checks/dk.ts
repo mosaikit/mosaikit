@@ -769,6 +769,14 @@ const checks: L.Check[] = [
     },
   },
   {
+    id: 'DK-37',
+    async run() {
+      const c = H.checker()
+      c.note('the Keycloak of the Docker release of a product (sample tenant idp-demo, branded sign-in page) needs Docker and a released base: run it by hand as DK-37 says; the kernel test the_sample_tenant_of_an_identity_provider and the unit tests of crates/product-cli cover the rest')
+      return c.result()
+    },
+  },
+  {
     id: 'DK-36',
     async run() {
       const c = H.checker()

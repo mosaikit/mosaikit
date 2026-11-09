@@ -70,7 +70,16 @@ pub fn validate(dir: &Path, o: &Options) -> Result<Report> {
             Level::Error,
             format!("[product] base = \"{range}\": not a range of versions (e.g. \">=1.0, <2\")"),
         ),
-        Some(_) => {}
+        Some(range) => {
+            // the sample tenant of Keycloak is made by the base from 1.0.3; an older one refuses the table
+            let old = mosaikit_mskp::Version::parse("1.0.2").zip(VersionReq::parse(range));
+            if d.docker.keycloak && old.is_some_and(|(v, req)| req.matches(v)) {
+                r.add(
+                    Level::Error,
+                    format!("[docker] keycloak = true needs a base from 1.0.3, and [product] base = \"{range}\" accepts 1.0.2: set base = \">=1.0.3, <2\" or keycloak = false"),
+                );
+            }
+        }
         None => r.add(
             Level::Warning,
             "no [product] base: the product says it works with any version of the base (e.g. \">=1.0, <2\")",
@@ -252,13 +261,27 @@ mod tests {
         std::fs::write(root.join("branding/brand.toml"), "logo = \"gone.svg\"\n[colors]\naccent = \"red\"\n")
             .unwrap();
         let text =
-            std::fs::read_to_string(root.join("distribution.toml")).unwrap().replace(">=1.0, <2", "banana");
+            std::fs::read_to_string(root.join("distribution.toml")).unwrap().replace(">=1.0.3, <2", "banana");
         std::fs::write(root.join("distribution.toml"), text).unwrap();
         let r = validate(&root, &Options { server: Some(t.path().join("no-server")), ..Options::default() })
             .unwrap();
         let all = format!("{:?}", r.findings);
         assert!(all.contains("gone.svg") && all.contains("colors.accent") && all.contains("banana"), "{all}");
         assert!(!r.ok());
+    }
+
+    #[test]
+    fn keycloak_needs_a_base_that_knows_the_sample_tenant() {
+        let t = tempfile::tempdir().unwrap();
+        let root = crate::scaffold::new_product("acme", t.path()).unwrap();
+        let file = root.join("distribution.toml");
+        let text = std::fs::read_to_string(&file).unwrap();
+        assert!(text.contains("keycloak = true"), "a new product has Keycloak");
+        let opts = || Options { server: Some(t.path().join("no-server")), ..Options::default() };
+        assert!(!format!("{:?}", validate(&root, &opts()).unwrap().findings).contains("keycloak"));
+        std::fs::write(&file, text.replace(">=1.0.3, <2", ">=1.0, <2")).unwrap();
+        let r = validate(&root, &opts()).unwrap();
+        assert!(format!("{:?}", r.findings).contains("needs a base from 1.0.3") && !r.ok());
     }
 
     #[test]

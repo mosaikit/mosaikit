@@ -75,6 +75,9 @@ pub struct Docker {
     /// image of the database (default: postgres:17-alpine; e.g. a PostGIS image)
     #[serde(default)]
     pub postgres_image: Option<String>,
+    /// also run Keycloak with a realm of the product and a sample tenant that signs in through it (a demonstration)
+    #[serde(default)]
+    pub keycloak: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]

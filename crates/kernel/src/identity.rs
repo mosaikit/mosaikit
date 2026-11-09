@@ -209,6 +209,7 @@ pub async fn bootstrap(k: &Kernel) -> Result<()> {
             notes.push(note);
         }
     }
+    crate::oidc::seed_demo(k).await?;
     if !notes.is_empty() {
         let file = k.cfg.data_dir.join(INITIAL_CREDENTIALS);
         let text = format!(

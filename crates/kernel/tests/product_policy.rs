@@ -83,6 +83,69 @@ async fn the_first_tenant_of_a_product() {
 }
 
 #[tokio::test]
+async fn the_sample_tenant_of_an_identity_provider() {
+    // the secret comes from the environment, never from the file
+    std::env::set_var("MOSAIKIT_TEST_IDP_SECRET", "s3cret-1234");
+    let (_dir, file) = seed_file(
+        "[product]
+id = \"x\"
+name = \"X\"
+version = \"1.0.0\"
+         [bootstrap]
+tenant = \"work\"
+         [bootstrap.idp_demo]
+tenant = \"idp-demo\"
+tenant_name = \"IdP demo\"
+         issuer = \"http://localhost:8180/realms/x\"
+client_id = \"x\"
+client_secret_env = \"MOSAIKIT_TEST_IDP_SECRET\"
+         manager_groups = [\"x-managers\"]
+user_groups = [\"x-users\"]
+button_text = \"Sign in with Keycloak\"
+",
+    );
+    let t = start_with(|c| c.plugin_settings_file = Some(file.clone())).await;
+    let row = mosaikit_db::query(
+        "select o.enabled, o.issuer, o.client_id, o.secret_hint, o.roles_source, o.button_text, t.name
+         from core.tenant_oidc o join core.tenants t on t.id = o.tenant_id where t.slug = 'idp-demo'",
+    )
+    .fetch_one(&t.db)
+    .await
+    .unwrap();
+    let (enabled, issuer, client, hint, roles, button, name): (
+        bool,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+    ) = (row.get(0), row.get(1), row.get(2), row.get(3), row.get(4), row.get(5), row.get(6));
+    assert!(enabled);
+    assert_eq!(
+        (issuer.as_str(), client.as_str(), hint.as_str()),
+        ("http://localhost:8180/realms/x", "x", "1234")
+    );
+    assert_eq!(
+        (roles.as_str(), button.as_str(), name.as_str()),
+        ("idp", "Sign in with Keycloak", "IdP demo")
+    );
+    // the first tenant is a local one, and it is not touched
+    let local: i64 = mosaikit_db::query_scalar("select count(*) from core.tenant_oidc o join core.tenants t on t.id = o.tenant_id where t.slug = 'work'")
+        .fetch_one(&t.db)
+        .await
+        .unwrap();
+    assert_eq!(local, 0);
+    // a second start does not make it again
+    mosaikit_kernel::oidc::seed_demo(&t).await.unwrap();
+    let n: i64 = mosaikit_db::query_scalar("select count(*) from core.tenants where slug = 'idp-demo'")
+        .fetch_one(&t.db)
+        .await
+        .unwrap();
+    assert_eq!(n, 1);
+}
+
+#[tokio::test]
 async fn a_base_outside_the_range_of_the_product_does_not_start() {
     let (_dir, file) =
         seed_file("[product]\nid = \"x\"\nname = \"X\"\nversion = \"1.0.0\"\nbase = \">=99.0\"\n");

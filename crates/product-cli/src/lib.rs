@@ -7,6 +7,7 @@
 pub mod basefetch;
 pub mod build;
 pub mod dev;
+pub mod keycloak;
 pub mod model;
 pub mod scaffold;
 pub mod test;

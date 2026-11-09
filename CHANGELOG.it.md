@@ -4,6 +4,16 @@ Cosa cambia da una versione di Mosaikit alla successiva. La shell mostra la sezi
 Aiuto › Novità (un titolo `## <versione>` per versione, voci `- `, gruppi `### `). Questo file è la
 versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
+## 1.0.3
+
+### La piattaforma
+
+- Un prodotto può creare al primo avvio un tenant d'esempio che accede tramite un identity provider: `[bootstrap.idp_demo]` in `distribution.toml` (tenant, issuer, client id, gruppi dei Tenant Manager e degli Utenti; il segreto del client è letto da una variabile d'ambiente, mai dal file). Non succede nulla nel profilo sviluppatore o se il tenant esiste.
+
+### Il kit di sviluppo
+
+- La release Docker di un prodotto può avviare anche Keycloak (`[docker] keycloak = true`, il valore predefinito di `mosaikit-product new`): un realm col nome del prodotto, una pagina di accesso con logo e colori del brand, tre persone di prova e il tenant d'esempio `idp-demo`, per provare subito l'integrazione con un identity provider tramite OpenID Connect. È una dimostrazione e richiede una base dalla 1.0.3: `validate` lo dice.
+
 ## 1.0.2
 
 ### Il kit di sviluppo

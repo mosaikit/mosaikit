@@ -92,6 +92,34 @@ pub struct Bootstrap {
     /// quotas of the first tenant (a quota left out is the one of the platform)
     #[serde(default)]
     pub quota: Option<BootstrapQuota>,
+    /// a second tenant that signs in through an identity provider (OIDC), to try the integration
+    #[serde(default)]
+    pub idp_demo: Option<BootstrapIdp>,
+}
+
+/// A sample tenant that signs in through an identity provider, made at the first start (never in the developer
+/// profile). The client secret is read from an environment variable, never written in the file.
+#[derive(Debug, Default, Clone, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct BootstrapIdp {
+    /// slug of the tenant
+    pub tenant: String,
+    /// name of the tenant (default: the slug)
+    #[serde(default)]
+    pub tenant_name: Option<String>,
+    pub issuer: String,
+    pub client_id: String,
+    /// the environment variable that holds the client secret (default `MOSAIKIT_OIDC_CLIENT_SECRET`)
+    #[serde(default)]
+    pub client_secret_env: Option<String>,
+    /// groups of the provider that make a Tenant Manager and a User; with none the Tenant Manager gives the roles
+    #[serde(default)]
+    pub manager_groups: Vec<String>,
+    #[serde(default)]
+    pub user_groups: Vec<String>,
+    /// text of the sign-in button
+    #[serde(default)]
+    pub button_text: Option<String>,
 }
 
 /// Quotas of the first tenant.
