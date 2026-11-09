@@ -87,6 +87,7 @@ text ([UI reference](ui.md)).
 
 | You see | Cause | Fix |
 |---|---|---|
+| `[i18n.it] is incomplete (…): resources.<resource>.fields.<key>` | you added a field (or a menu entry, KPI, permission) and did not translate it into a language the plugin declares | add it to `[i18n.<lang>]` of `plugin.toml` for every language: `[i18n.it.resources.<resource>]` with `fields = { <key> = "text" }`; see [Manifest reference](manifest.md#i18nlang) |
 | `failed to read C:\path	o\kit\sdk\Cargo.toml` (from `cargo build`) | the plugin was made with the text `/path/to/kit` of a document instead of the real folder of the kit | make the plugin again with `--kit <the folder where you unpacked the kit>`, or change the `path` of `mosaikit-plugin-sdk` in `Cargo.toml` and of `plugin-api` in `ui/package.json`. Newer tools refuse a `--kit` that is not a kit: `this is not the folder of an unpacked kit` |
 | `mosaikit-plugin doctor` reports the wasm target missing | no `wasm32-unknown-unknown` | `mosaikit-plugin doctor --fix` (also installed on first build) |
 | `invalid id: … (e.g. com.company.<name>)` | the id breaks the rule | at least two segments, lower case, digits, `-` |

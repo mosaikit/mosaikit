@@ -529,7 +529,7 @@ pub fn i18n_checks(m: &Manifest, r: &mut Report) {
             need(t.permissions.contains_key(&p.key), format!("permissions.{}", p.key));
         }
         if !missing.is_empty() {
-            r.error(format!("[i18n.{lang}] is incomplete (English is the fallback, but a declared language covers everything): {}", missing.join(", ")));
+            r.error(format!("[i18n.{lang}] is incomplete (English is the fallback, but a declared language covers everything): {}. Add each one to [i18n.{lang}] in plugin.toml, for example `[i18n.{lang}.resources.<resource>]` with `fields = {{ <key> = \"text\" }}` (docs/devkit/manifest.md, section [i18n.<lang>])", missing.join(", ")));
         }
     }
 }
