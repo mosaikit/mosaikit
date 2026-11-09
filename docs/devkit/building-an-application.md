@@ -7,7 +7,7 @@ image): no source of Mosaikit, no fork, no compilation of the kernel. The tool i
 **Where the base comes from.** The development kit has the tools (`mosaikit-product`, `mosaikit-plugin`,
 `mosaikit-server`) but **not** the desktop kit of the base (`mosaikit.exe` and `registry/index.json`, the official
 plugins), which `build desktop --base` needs. The desktop kit is the zip of the platform release
-(`mosaikit-<version>-desktop-windows-x86_64.zip`, GitHub Releases of `mosaikit/mosaikit`): give `--base` the zip or the
+(`mosaikit-<version>-desktop-windows-x86_64.zip`, in the **Assets** of the release `v<version>` of `mosaikit/mosaikit`: <https://github.com/mosaikit/mosaikit/releases>): give `--base` the zip or the
 folder you unpacked it into. `validate` and `dev` of a product with no official plugin do not need it; `build desktop`
 does, and stops with `no mosaikit.exe in the desktop kit` without it. For Docker the base is the image
 (`--base-image`), for Kubernetes the k8s folder of the release (`--base-k8s`).
@@ -192,14 +192,14 @@ by reference (`env:NAME`, `file:PATH`, a relative path being relative to the fol
 
 ```text
 mosaikit-product build desktop --base <desktop kit folder or .zip>      dist/<id>-<version>-desktop   (the platform release zip, see the top)
-mosaikit-product build docker  --base <desktop kit> --base-image mosaikit:1.0.0 [--build]   dist/<id>-<version>-docker
+mosaikit-product build docker  --base <desktop kit> --base-image ghcr.io/mosaikit/mosaikit:v1.0.0 [--build]   dist/<id>-<version>-docker
 mosaikit-product build k8s     --base-k8s <k8s folder of the kit>       dist/<id>-<version>-k8s
 ```
 
 - **Desktop**: the executable of the base renamed, `registry/` (your signed packages and the official ones you keep), `branding/`,
   `distribution.toml`, `mosaikit.toml` (written, commented) and `START.txt`. The configuration trusts the key of the product and,
   if you keep official plugins, the official key.
-- **Docker**: a `Dockerfile` `FROM` the base image that adds the registry, the brand and the configuration, and a `compose.yml` with
+- **Docker**: the base image is the one the platform release publishes, `ghcr.io/mosaikit/mosaikit:v<version>` (public, no login; the version of the release, with the `v`). The default of `--base-image`, `mosaikit:1.0.0`, is only a name you must have given to an image yourself: pass the published one. A `Dockerfile` `FROM` the base image that adds the registry, the brand and the configuration, and a `compose.yml` with
   the database (`--build` runs `docker build`).
 - **Kubernetes**: a kustomize overlay over the base kit that sets the image.
 - **Signing**: `--key`, `MOSAIKIT_SIGNING_KEY` or `MOSAIKIT_SIGNING_KEY_FILE`; without one a development key is made and used

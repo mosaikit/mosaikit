@@ -5,7 +5,7 @@ You are testing the documents, not yourself. If something is unclear, that is ou
 **You need:** a computer with Node 24 or later, Rust (stable) with the `wasm32-unknown-unknown` target, and Docker. Nothing
 from Mosaikit is installed yet.
 
-**You get:** the release `kit-v1.0.0-rc2` of `github.com/mosaikit/mosaikit`. Download the archive for your system, check the
+**You get:** the release `kit-v1.0.0-rc3` of `github.com/mosaikit/mosaikit`. Download the archive for your system, check the
 hashes and the signature as `docs/devkit/releasing.md` says, unpack it. Start at `docs/devkit/README.md`.
 
 **The task**

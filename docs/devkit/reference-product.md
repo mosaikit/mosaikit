@@ -88,7 +88,7 @@ For the pages of the plugins in the browser, a Playwright spec with `@mosaikit/p
 
 ```text
 mosaikit-product build desktop --base <desktop kit>
-mosaikit-product build docker --base <desktop kit> --base-image mosaikit:1.0.0 --build
+mosaikit-product build docker --base <desktop kit> --base-image ghcr.io/mosaikit/mosaikit:v1.0.0 --build
 ```
 
 The first gives `dist/acme-maps-<version>-desktop`: unzip anywhere and start `acme-maps.exe`. The second gives the image `acme-maps:<version>` and a
