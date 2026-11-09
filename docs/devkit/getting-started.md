@@ -108,7 +108,7 @@ it offline and how to set a trusted key).
 ```
 mosaikit-plugin test                       # strict validation, cargo test, tsc, lint and vitest of the UI
 mosaikit-plugin pack                       # dist/<id>-<version>.mskp, signed with your key
-mosaikit-plugin install dist/<file>.mskp --server <address of another server> --user admin --password <password>
+mosaikit-plugin install dist/<file>.mskp --server http://localhost:8080 --user admin --password mosaikit-dev   # on the Docker kit, section 6
 ```
 
 `pack` signs with `--key`, else `MOSAIKIT_SIGNING_KEY`, else `MOSAIKIT_SIGNING_KEY_FILE`, else a development key the tool
@@ -121,15 +121,30 @@ What the three commands do:
 - `pack` builds the plugin and writes one file, `dist/<id>-<version>.mskp`: the logic, the UI, the migrations and the manifest, with a signature. Nothing is sent anywhere.
 - `install` uploads that file to a **running** Mosaikit server: it signs in as an Administrator (`--user`, `--password`) and sends the package. The server checks the signature against its trusted keys and installs it. `--server` is the address of that server.
 
-**`install` does not go to the server that `dev` started for this plugin.** `dev` loads the plugin from its folder and marks it as "in development": a server in that state refuses a `.mskp` of the same plugin (`is loaded in development mode`), and removing the plugin in the web page does not last, because `dev` loads it again from the folder. The `.mskp` goes to another server, the one you would use for real: the Docker kit. Start it in another window and give its address to `--server`:
+## 6. Install on the Docker kit
 
-- **The Docker kit** (any system): `docker compose -f docker/compose.yml up -d` in the `docker/` folder of the kit. The address is `http://localhost:8080`; the Administrator user and password are the ones of the `.env` of the kit (`docker/README.md`). Stop `dev` first if it holds port 8080.
+`dev` runs your plugin from its folder, so it cannot also install the `.mskp`: a server that loaded a plugin from a folder
+refuses a package of the same plugin (`is loaded in development mode`), and removing the plugin in the web page does not
+last, because `dev` loads it again. The package goes to **another** server: the Docker kit, which is the nearest thing to
+a real installation (PostgreSQL, the roles and the row level security the platform makes for the plugin, a list of trusted
+keys). Do this once the plugin passes `test`.
 
-Without a server `install` stops with `reaching <address>` and `os error 10061` (connection refused).
+1. **Stop `dev`** (Ctrl+C in its window). It holds port 8080.
+2. **Make a signing key** and keep the public key it prints:
+   `mosaikit-plugin keygen --out publisher.key`
+3. **Trust the key in the kit.** In `docker/.env` set `MOSAIKIT_TRUSTED_KEYS=<the public key>`. Leave `PLUGIN_DIR` as it is: if it points at your plugin folder the plugin is "in development" again and `install` fails.
+4. **Start the kit**, in the `docker/` folder of the kit: `docker compose up -d`. The first start pulls the image; if the pull is refused, see `docker/README.md` (an image archive can be loaded offline). Open `http://localhost:8080`.
+5. **Pack with that key**, in the folder of the plugin:
+   `mosaikit-plugin pack --key publisher.key`
+6. **Install**:
+   `mosaikit-plugin install dist/<file>.mskp --server http://localhost:8080 --user admin --password mosaikit-dev`
+   (the Docker kit is a developer profile too: same test users as `dev`).
+7. **Turn the plugin on.** After `install` it is only "installed": open `#/admin`, Platform > Plugins > your plugin > **Turn on** (then it is `active` and available to the tenant `dev`). Until then its page does not appear in the shell.
+8. **Use it.** Sign in as `alice` or `manager` (tenant `dev`) and create, change and delete an entry.
+9. **Check that the key matters.** Pack again with another key that the kit does not trust (`mosaikit-plugin keygen --out other.key`, `pack --key other.key`) and run `install` again: it must be refused with `publisher key not trusted: <key>`. Without this, you have not shown that the kit checks who published a package.
 
-**After `install` the plugin is only "installed", not on.** The tool says so. An Administrator turns it on: open `#/admin`,
-Platform > Plugins > your plugin > **Turn on** (then it is `active` and available to the tenant `dev`). Until then its page
-does not appear in the shell.
+Without a server running, `install` stops with `reaching <address>` and `os error 10061` (connection refused). To start again
+from nothing: `docker compose down -v`. The ports, the `.env` and the folder of the plugin are in `docker/README.md`.
 
 ## Next
 
