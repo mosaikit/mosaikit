@@ -121,7 +121,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: tag the image of the release as the dev kit image
         run: |
-          docker buildx imagetools create             --tag ghcr.io/${{ github.repository }}-dev:${{ github.ref_name }}             ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+          docker buildx imagetools create             --tag ghcr.io/${{ github.repository }}-dev:${GITHUB_REF_NAME#v}             ghcr.io/${{ github.repository }}:${{ github.ref_name }}
 
   # SHA256SUMS over the archives of every platform, signed with the key of the official packages; then the GitHub Release
   devkit-release:
