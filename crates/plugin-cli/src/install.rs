@@ -83,7 +83,7 @@ pub fn install(server: &str, package: &Path, login: &Login) -> Result<Installed>
         .post(api(server, "/api/auth/admin/login"))
         .json(&json!({ "username": login.user, "password": login.password }))
         .send()
-        .with_context(|| format!("reaching {server}"))?;
+        .with_context(|| format!("reaching {server}: is a Mosaikit server running there? Start `mosaikit-plugin dev` (the address it prints) or the Docker kit (`docker compose -f docker/compose.yml up -d`), then give that address to --server"))?;
     if !r.status().is_success() {
         return Err(failure("sign-in", r));
     }

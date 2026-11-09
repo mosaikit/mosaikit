@@ -87,6 +87,7 @@ Gli errori che restituiscono il kernel e gli strumenti, con causa e rimedio. I t
 
 | Cosa si vede | Causa | Rimedio |
 |---|---|---|
+| `reaching http://localhost:8080 … os error 10061` (da `install`) | nessun server Mosaikit risponde a quell'indirizzo: `dev` non è in esecuzione (si ferma quando si chiude la finestra), ha preso un'altra porta, o il kit Docker non è avviato | avvia `mosaikit-plugin dev` in un'altra finestra e usa l'indirizzo che stampa, oppure `docker compose -f docker/compose.yml up -d`; poi rilancia `install` con quell'indirizzo |
 | `[i18n.it] is incomplete (…): resources.<risorsa>.fields.<chiave>` | hai aggiunto un campo (o una voce di menu, un KPI, un permesso) senza tradurlo in una lingua dichiarata dal plugin | aggiungilo a `[i18n.<lingua>]` di `plugin.toml` per ogni lingua: `[i18n.it.resources.<risorsa>]` con `fields = { <chiave> = "testo" }`; vedi [Riferimento del manifesto](manifest.md#i18nlang) |
 | `failed to read C:\path	o\kit\sdk\Cargo.toml` (da `cargo build`) | il plugin è stato creato con il testo `/path/to/kit` di un documento invece della cartella vera del kit | ricrea il plugin con `--kit <la cartella dove hai decompresso il kit>`, oppure correggi il `path` di `mosaikit-plugin-sdk` in `Cargo.toml` e di `plugin-api` in `ui/package.json`. Gli strumenti nuovi rifiutano un `--kit` che non è un kit: `this is not the folder of an unpacked kit` |
 | `mosaikit-plugin doctor` segnala il target wasm mancante | manca `wasm32-unknown-unknown` | `mosaikit-plugin doctor --fix` (si installa anche alla prima build) |
