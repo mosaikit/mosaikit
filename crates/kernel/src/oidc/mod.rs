@@ -544,6 +544,74 @@ pub async fn set_config(k: &Kernel, admin: &SessionUser, tenant: Uuid, i: &OidcI
     config(k, admin, tenant).await
 }
 
+/// The sample tenant of `[bootstrap.idp_demo]` of the product: made once, with its sign-in through the provider
+/// already configured, so that the integration can be tried without touching the Administrator pages.
+/// Nothing happens when the product has none, when the tenant exists, or in the developer profile.
+pub async fn seed_demo(k: &Kernel) -> Result<()> {
+    let Some(d) = k.product.bootstrap.idp_demo.as_ref().filter(|_| !k.cfg.developer_profile) else {
+        return Ok(());
+    };
+    let slug = d.tenant.trim().to_lowercase();
+    if !crate::tenancy::valid_slug(&slug) {
+        return Err(Error::bad(format!(
+            "invalid [bootstrap.idp_demo] tenant: {slug} (lower case, digits and '-')"
+        )));
+    }
+    check_url("issuer", d.issuer.trim())?;
+    let exists: bool =
+        mosaikit_db::query_scalar("select exists (select 1 from core.tenants where slug = $1)")
+            .bind(&slug)
+            .fetch_one(&k.db)
+            .await?;
+    if exists {
+        return Ok(());
+    }
+    let env = d.client_secret_env.as_deref().unwrap_or("MOSAIKIT_OIDC_CLIENT_SECRET");
+    let secret = std::env::var(env).ok().filter(|s| !s.trim().is_empty());
+    let name = d.tenant_name.clone().filter(|n| !n.trim().is_empty()).unwrap_or_else(|| slug.clone());
+    let mut tx = k.db.begin_app().await?;
+    let tenant: Uuid =
+        mosaikit_db::query_scalar("insert into core.tenants (slug, name) values ($1, $2) returning id")
+            .bind(&slug)
+            .bind(&name)
+            .fetch_one(&mut *tx)
+            .await?;
+    crate::access::create_default_profile(&mut tx, tenant).await?;
+    let (sealed, hint) = match &secret {
+        Some(s) => {
+            let s = s.trim();
+            let hint: String = s.chars().rev().take(4).collect::<Vec<_>>().into_iter().rev().collect();
+            (Some(k.secrets.seal(secret_aad(tenant).as_bytes(), s.as_bytes())), hint)
+        }
+        None => (None, String::new()),
+    };
+    let idp_roles = !d.manager_groups.is_empty() || !d.user_groups.is_empty();
+    mosaikit_db::query(
+        "insert into core.tenant_oidc (tenant_id, enabled, issuer, client_id, client_secret, secret_hint, scopes,
+             button_text, roles_source, manager_groups, user_groups, updated_at)
+         values ($1, true, $2, $3, $4, $5, 'openid profile email', $6, $7, $8, $9, now())",
+    )
+    .bind(tenant)
+    .bind(d.issuer.trim())
+    .bind(d.client_id.trim())
+    .bind(sealed)
+    .bind(hint)
+    .bind(d.button_text.clone().unwrap_or_default().trim().chars().take(80).collect::<String>())
+    .bind(if idp_roles { "idp" } else { "mosaikit" })
+    .bind(group_list(&d.manager_groups)?)
+    .bind(group_list(&d.user_groups)?)
+    .execute(&mut *tx)
+    .await?;
+    tx.commit().await?;
+    if secret.is_none() {
+        tracing::warn!(
+            "[bootstrap.idp_demo]: {env} is not set, the client secret of the tenant {slug} is empty"
+        );
+    }
+    tracing::info!("sample tenant {slug} made, it signs in through {}", d.issuer.trim());
+    Ok(())
+}
+
 /// One step of the check of a configuration.
 #[derive(Debug, Clone, Serialize)]
 pub struct CheckStep {

@@ -46,7 +46,7 @@ name = "{title}"
 version = "0.1.0"
 description = "{title}, built on Mosaikit"
 # the versions of the base this release works with; the base refuses to start outside the range
-base = ">=1.0, <2"
+base = ">=1.0.3, <2"
 # name of the desktop executable (without .exe)
 executable = "{name}"
 
@@ -68,6 +68,9 @@ port = 48080
 # image of the product (default: the id) and of the database (a PostGIS image, for example)
 image = "{name}"
 # postgres_image = "postgis/postgis:17-3.5-alpine"
+# Keycloak with a realm of the product, a sign-in page in your brand and a sample tenant that signs in through it
+# (OpenID Connect): a demonstration, see keycloak/README.md in the Docker release. Remove it for a real release.
+keycloak = true
 
 # ---- identity, defaults and first start (optional) ----
 # [defaults]                       # values of the settings of the platform, in place of the built-in ones

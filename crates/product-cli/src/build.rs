@@ -374,6 +374,16 @@ pub fn docker(d: &Distribution, base: &Path, base_image: &str, build: bool, o: &
         std::fs::create_dir_all(out.join("branding"))?;
     }
     std::fs::copy(d.file(), out.join("distribution.toml"))?;
+    if d.docker.keycloak {
+        crate::keycloak::write(d, brand.as_deref(), &out)?;
+        let mut text = std::fs::read_to_string(out.join("distribution.toml"))?;
+        if text.contains("idp_demo") {
+            eprintln!("[bootstrap.idp_demo] is already in distribution.toml: kept as it is");
+        } else {
+            text.push_str(&crate::keycloak::bootstrap(d));
+            std::fs::write(out.join("distribution.toml"), text)?;
+        }
+    }
     std::fs::write(out.join("mosaikit.toml"), server_config(d, &keys, brand.is_some()))?;
     let image = format!("{}:{}", d.image(), d.product.version);
     std::fs::write(
@@ -385,7 +395,10 @@ pub fn docker(d: &Distribution, base: &Path, base_image: &str, build: bool, o: &
         ),
     )?;
     let pg = d.docker.postgres_image.clone().unwrap_or_else(|| "postgres:17-alpine".into());
-    std::fs::write(out.join("compose.yml"), compose(&image, &pg))?;
+    std::fs::write(
+        out.join("compose.yml"),
+        compose(&image, &pg, d.docker.keycloak.then_some(d.product.id.as_str())),
+    )?;
     std::fs::create_dir_all(out.join("initdb"))?;
     std::fs::write(
         out.join("initdb").join("01-mosaikit.sh"),
@@ -401,8 +414,8 @@ pub fn docker(d: &Distribution, base: &Path, base_image: &str, build: bool, o: &
     Ok(out)
 }
 
-fn compose(image: &str, postgres: &str) -> String {
-    format!(
+fn compose(image: &str, postgres: &str, keycloak: Option<&str>) -> String {
+    let text = format!(
         r#"# {image} + PostgreSQL. Start: docker compose up -d   (app on :8080, plugins on :8081)
 # Set MOSAIKIT_ADMIN_PASSWORD, POSTGRES_PASSWORD and MOSAIKIT_DB_PASSWORD (a .env file), MOSAIKIT_URL and
 # MOSAIKIT_PLUGIN_URL when the app is not on localhost. The database is never published on the host.
@@ -443,6 +456,29 @@ volumes:
   pgdata:
   appdata:
 "#
+    );
+    let Some(id) = keycloak else { return text };
+    // Keycloak: its services before the volumes, its secret for the app (the sample tenant reads it) and its volume
+    text.replace(
+        "volumes:
+  pgdata:
+  appdata:
+",
+        &format!(
+            "{}volumes:
+  pgdata:
+  appdata:
+  kcdata:
+",
+            crate::keycloak::services(id)
+        ),
+    )
+    .replace(
+        "      MOSAIKIT_PLUGIN_URL: ${MOSAIKIT_PLUGIN_URL:-http://localhost:8081}
+",
+        "      MOSAIKIT_PLUGIN_URL: ${MOSAIKIT_PLUGIN_URL:-http://localhost:8081}
+      MOSAIKIT_OIDC_CLIENT_SECRET: ${MOSAIKIT_OIDC_CLIENT_SECRET:-mosaikit-dev-secret}
+",
     )
 }
 
@@ -613,6 +649,46 @@ extensions",
         assert!(c.contains("image: acme:0.1.0") && c.contains("postgis/postgis"), "{c}");
         assert!(std::fs::read_to_string(out.join("mosaikit.toml")).unwrap().contains("0.0.0.0:8080"));
         assert!(out.join("initdb/01-mosaikit.sh").is_file());
+    }
+
+    #[test]
+    fn the_docker_release_can_run_keycloak_with_a_sample_tenant() {
+        let t = tempfile::tempdir().unwrap();
+        let mut d = product(t.path());
+        d.plugins.include = vec!["com.mosaikit.notes".into()];
+        d.docker.keycloak = false;
+        let base = fake_desktop_base(t.path());
+        let o = |n: &str| Options { out: Some(t.path().join(n)), ..Options::default() };
+        // without it nothing of Keycloak is there
+        let plain = docker(&d, &base, "mosaikit:1.0.0", false, &o("plain")).unwrap();
+        assert!(!plain.join("keycloak").exists());
+        assert!(!std::fs::read_to_string(plain.join("compose.yml")).unwrap().contains("keycloak"));
+        d.docker.keycloak = true;
+        let out = docker(&d, &base, "mosaikit:1.0.0", false, &o("kc")).unwrap();
+        let c = std::fs::read_to_string(out.join("compose.yml")).unwrap();
+        assert!(
+            c.contains(
+                "  keycloak:
+"
+            ) && c.contains("keycloak-localhost:")
+                && c.contains("kcdata:"),
+            "{c}"
+        );
+        assert!(c.contains("realm-acme.json") && c.contains("themes/acme"), "{c}");
+        assert!(c.contains("MOSAIKIT_OIDC_CLIENT_SECRET"), "{c}");
+        assert!(out.join("keycloak/realm-acme.json").is_file() && out.join("keycloak/README.md").is_file());
+        assert!(out.join("keycloak/themes/acme/login/theme.properties").is_file());
+        assert!(out.join("keycloak/themes/acme/login/resources/css/login.css").is_file());
+        // the sample tenant is in the distribution.toml of the release, not in the one of the product
+        let dist = std::fs::read_to_string(out.join("distribution.toml")).unwrap();
+        let v: toml::Table = toml::from_str(&dist).unwrap();
+        assert_eq!(
+            v["bootstrap"]["idp_demo"]["issuer"].as_str(),
+            Some("http://localhost:8180/realms/acme"),
+            "{dist}"
+        );
+        assert_eq!(v["bootstrap"]["idp_demo"]["client_id"].as_str(), Some("acme"));
+        assert!(!std::fs::read_to_string(d.file()).unwrap().contains("idp_demo"));
     }
 
     #[test]

@@ -5,6 +5,16 @@ in Help › What is new (one `## <version>` heading per version, `- ` items, `##
 language of the person: this file in English, [CHANGELOG.it.md](CHANGELOG.it.md) in Italian (keep them
 in step).
 
+## 1.0.3
+
+### The platform
+
+- A product can make a sample tenant that signs in through an identity provider at the first start: `[bootstrap.idp_demo]` in `distribution.toml` (tenant, issuer, client id, groups of the Tenant Managers and of the Users; the client secret is read from an environment variable, never from the file). Nothing happens in the developer profile or when the tenant exists.
+
+### The development kit
+
+- The Docker release of a product can also run Keycloak (`[docker] keycloak = true`, the default of `mosaikit-product new`): a realm named after the product, a sign-in page with the logo and the colours of the brand, three test people and the sample tenant `idp-demo`, to try the integration with an identity provider through OpenID Connect at once. It is a demonstration, and it needs a base from 1.0.3: `validate` says so.
+
 ## 1.0.2
 
 ### The development kit

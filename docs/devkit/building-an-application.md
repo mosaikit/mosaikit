@@ -72,6 +72,7 @@ port = 48080
 [docker]
 image = "acme-maps"
 postgres_image = "postgis/postgis:17-3.5-alpine"
+keycloak = true             # Keycloak and a sample tenant that signs in through it (section 8); a demonstration
 ```
 
 ## 4. Brand and identity
@@ -204,6 +205,12 @@ mosaikit-product build k8s     --base-k8s <k8s folder of the kit>       dist/<id
   if you keep official plugins, the official key.
 - **Docker**: the base image is the one the platform release publishes, `ghcr.io/mosaikit/mosaikit:v<version>` (public, no login; the version of the release, with the `v`). With `--base <version>` the image is `ghcr.io/mosaikit/mosaikit:v<version>` by itself; with a folder or a zip, pass `--base-image`. A `Dockerfile` `FROM` the base image that adds the registry, the brand and the configuration, and a `compose.yml` with
   the database (`--build` runs `docker build`).
+  **Keycloak**: with `[docker] keycloak = true` (what `mosaikit-product new` writes; it needs a base from 1.0.3, and `validate` says so) the compose file
+  also starts Keycloak with a realm named after the product, a sign-in page that takes the logo and the colours of your brand, three test people
+  and a sample tenant `idp-demo` that is made at the first start with its sign-in through Keycloak already set (`[bootstrap.idp_demo]`, added to the
+  `distribution.toml` of the release; the client secret comes from `MOSAIKIT_OIDC_CLIENT_SECRET`). Open the product, choose the tenant `idp-demo`, press
+  "Sign in with Keycloak". It is a demonstration (`start-dev`, test passwords): `keycloak/README.md` in the release says how to read it, change it or
+  remove it. A real release uses its own identity provider, set per tenant by the Administrator.
 - **Kubernetes**: a kustomize overlay over the base kit that sets the image.
 - **Signing**: `--key`, `MOSAIKIT_SIGNING_KEY` or `MOSAIKIT_SIGNING_KEY_FILE`; without one a development key is made and used
   (never ship with it). A release never carries an unsigned plugin: the build verifies every package against the keys it will trust.
