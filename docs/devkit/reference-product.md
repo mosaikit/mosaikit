@@ -3,10 +3,10 @@
 A small, complete product, made step by step with the tools of the kit: a brand, three official plugins, defaults and a first
 start. Each step is a command you can run; the checks of the manual catalog (DK-27 to DK-31) repeat them.
 
-You need the kit (`mosaikit-plugin`, `mosaikit-product`, `mosaikit-server`) and the desktop kit of the base
-(a folder or its `.zip`: the desktop zip of the platform release, which the dev kit does not include;
-[Building an application](building-an-application.md) says where to get it). With the kit on the PATH, set `MOSAIKIT_BASE` to the desktop kit and `MOSAIKIT_SERVER_BIN`
-to its server (`mosaikit-server`) so that the commands below need no extra option.
+You need the Dev Kit (`mosaikit-plugin`, `mosaikit-product`, `mosaikit-server`) and Docker: nothing else to download. The Base (Mosaikit compiled, with the
+official plugins) comes by itself when you give `--base` a version; [Building an application](building-an-application.md) says where it is kept.
+With the kit on the PATH, set `MOSAIKIT_BASE` to the version of the Base (for example `1.0.2`) and `MOSAIKIT_SERVER_BIN`
+to the server of the kit (`mosaikit-server`) so that the commands below need no extra option.
 
 ## 1. Make it
 
@@ -88,7 +88,7 @@ valid. A wrong key stops it with the key named: try `"no.such" = 1` under `[defa
 ## 4. Run it
 
 ```text
-mosaikit-product dev --base <desktop kit>
+mosaikit-product dev --base 1.0.2
 ```
 
 The base starts in the developer profile with your brand and policy; the address and the test users (password `mosaikit-dev`) are printed.
@@ -97,7 +97,7 @@ The sign-in page shows *Acme Maps*; the setting *Name* is locked.
 ## 5. Add a plugin of its own
 
 ```text
-mosaikit-plugin new parcels --into plugins --id com.acme.parcels --kit <folder of the kit>
+mosaikit-plugin new parcels --into plugins --id com.acme.parcels
 ```
 
 Set `roots = ["plugins"]` and add `"com.acme.parcels"` to `include`. `mosaikit-product dev` loads the plugin from its folder and reloads it when
@@ -120,8 +120,8 @@ For the pages of the plugins in the browser, a Playwright spec with `@mosaikit/p
 ## 7. Build it
 
 ```text
-mosaikit-product build desktop --base <desktop kit>
-mosaikit-product build docker --base <desktop kit> --base-image ghcr.io/mosaikit/mosaikit:v1.0.1 --build
+mosaikit-product build desktop --base 1.0.2
+mosaikit-product build docker --base 1.0.2 --build
 ```
 
 The first gives `dist/acme-maps-<version>-desktop`: unzip anywhere and start `acme-maps.exe`. The second gives the image `acme-maps:<version>` and a

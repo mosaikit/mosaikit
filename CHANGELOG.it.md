@@ -4,6 +4,16 @@ Cosa cambia da una versione di Mosaikit alla successiva. La shell mostra la sezi
 Aiuto › Novità (un titolo `## <versione>` per versione, voci `- `, gruppi `### `). Questo file è la
 versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
+## 1.0.2
+
+### Il kit di sviluppo
+
+- `mosaikit-product` prende da solo la Base: `--base 1.0.2` (o `MOSAIKIT_BASE=1.0.2`) scarica una volta il kit desktop di quella release, lo verifica con il `SHA256SUMS` firmato e lo tiene in una cache (`MOSAIKIT_CACHE` la sposta). Per un prodotto basta il Dev Kit, come per un plugin. Con `--base <versione>` l'immagine Docker della base è `ghcr.io/mosaikit/mosaikit:v<versione>` da sola.
+- La release firma insieme al Dev Kit anche il kit desktop della Base, ed è ciò che rende possibile quella verifica (le release precedenti non lo elencano: si usa il loro zip a mano).
+- `mosaikit-plugin new` prende l'SDK e il pacchetto della UI dal kit in cui si trova lo strumento: niente `--kit`. Una build fallita di un plugin che chiede l'SDK al registro dice cosa cambiare.
+- `mosaikit-product build` dice chiaramente quando un plugin di `include` non è né nei roots né nella base.
+- I documenti sono rivisti per la via più breve a un plugin e a un prodotto: cosa scaricare (solo il Dev Kit), il brand di un prodotto (logo, favicon, icona, colori, testi) e l'immagine base pubblica.
+
 ## 1.0.1
 
 ### La piattaforma

@@ -106,9 +106,9 @@ enum Target {
     Docker {
         #[arg(default_value = ".")]
         dir: PathBuf,
-        /// the base image (default mosaikit:<version of the product's base>)
-        #[arg(long, default_value = "mosaikit:1.0.0")]
-        base_image: String,
+        /// the base image (default with `--base <version>`: ghcr.io/mosaikit/mosaikit:v<version>)
+        #[arg(long)]
+        base_image: Option<String>,
         /// the desktop kit of the base (folder, .zip or a version such as 1.0.1), for the registry of the official plugins
         #[arg(long, env = "MOSAIKIT_BASE")]
         base: PathBuf,
@@ -190,8 +190,15 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 build::desktop(&Distribution::load(&dir)?, &base, &common.options())?;
             }
             Target::Docker { dir, base_image, base, build: run_build, common } => {
+                let image = match (base_image, mosaikit_product_cli::basefetch::version_of(&base)) {
+                    (Some(i), _) => i,
+                    (None, Some(v)) => format!("ghcr.io/mosaikit/mosaikit:v{v}"),
+                    (None, None) => anyhow::bail!(
+                        "give --base-image: the image of the base, for example ghcr.io/mosaikit/mosaikit:v<version>"
+                    ),
+                };
                 let base = mosaikit_product_cli::basefetch::resolve(base)?;
-                build::docker(&Distribution::load(&dir)?, &base, &base_image, run_build, &common.options())?;
+                build::docker(&Distribution::load(&dir)?, &base, &image, run_build, &common.options())?;
             }
             Target::K8s { dir, base_k8s, common } => {
                 build::k8s(&Distribution::load(&dir)?, &base_k8s, &common.options())?;
