@@ -5,6 +5,17 @@ serve una copia di Mosaikit. Versione inglese: [../getting-started.md](../gettin
 
 ## 1. Installare il kit
 
+**Cosa scarico?** Mosaikit ha due cose da scaricare, e la release della piattaforma le contiene entrambe:
+
+| Voglio fare | Mi serve | Dove |
+|---|---|---|
+| Un **plugin** | il **Dev Kit**: `mosaikit-plugin`, i documenti, gli esempi | l'archivio `mosaikit-devkit-<versione>-<piattaforma>` negli **Assets** di una release |
+| Un **prodotto** (un'applicazione) | il Dev Kit (`mosaikit-product` è lì dentro) **e** la **Base**: Mosaikit compilato, su cui il prodotto si costruisce | la Base è nella stessa release: lo zip desktop `mosaikit-<versione>-desktop-windows-x86_64.zip` e l'immagine `ghcr.io/mosaikit/mosaikit:v<versione>` |
+
+Le release che si chiamano `v<versione>` (per esempio `v1.0.0`) hanno tutto: il Dev Kit per ogni sistema, lo zip desktop della Base e le
+note. Le release `kit-v<versione>` (per esempio `kit-v1.0.0-rc3`) hanno solo il Dev Kit, per una versione ancora in prova. Per un
+plugin basta il Dev Kit; la Base serve ai prodotti ([Costruire un'applicazione](building-an-application.md)).
+
 Il kit è una cartella (o un archivio) con:
 
 | Parte | Cosa |
