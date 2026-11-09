@@ -266,22 +266,7 @@ fn unpack_base(base: &Path, scratch: &Path) -> Result<PathBuf> {
     if base.extension().is_some_and(|e| e == "zip") {
         let target = scratch.join(".base");
         fresh_dir(&target)?;
-        let mut zip = zip::ZipArchive::new(std::fs::File::open(base)?)?;
-        for i in 0..zip.len() {
-            let mut f = zip.by_index(i)?;
-            let Some(rel) = f.enclosed_name() else { continue };
-            let dst = target.join(rel);
-            if f.is_dir() {
-                std::fs::create_dir_all(&dst)?;
-            } else {
-                if let Some(p) = dst.parent() {
-                    std::fs::create_dir_all(p)?;
-                }
-                std::io::copy(&mut f, &mut std::fs::File::create(&dst)?)?;
-            }
-        }
-        let tops: Vec<PathBuf> = std::fs::read_dir(&target)?.flatten().map(|e| e.path()).collect();
-        return Ok(if tops.len() == 1 && tops[0].is_dir() { tops[0].clone() } else { target });
+        return crate::basefetch::extract_zip(base, &target);
     }
     bail!("--base {}: give the folder of the desktop kit, or its .zip", base.display())
 }

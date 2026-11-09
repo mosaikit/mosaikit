@@ -37,11 +37,15 @@ jobs:
       - name: release desktop
         shell: pwsh
         run: cargo xtask release desktop
+      # the desktop kit is listed in the signed SHA256SUMS of the release (devkit-release), which
+      # `mosaikit-product --base <version>` checks; so no unsigned SHA256SUMS of its own here
+      - uses: actions/upload-artifact@v4
+        with:
+          name: devkit-desktop
+          path: mosaikit/dist/mosaikit-*-desktop-*.zip
       - uses: softprops/action-gh-release@v2
         with:
-          files: |
-            mosaikit/dist/*.zip
-            mosaikit/dist/SHA256SUMS
+          files: mosaikit/dist/*.zip
 
   docker:
     runs-on: ubuntu-latest
@@ -125,7 +129,7 @@ jobs:
 
   # SHA256SUMS over the archives of every platform, signed with the key of the official packages; then the GitHub Release
   devkit-release:
-    needs: [devkit, devkit-image]
+    needs: [desktop-windows, devkit, devkit-image]
     runs-on: ubuntu-latest
     env:
       MOSAIKIT_SIGNING_KEY: ${{ secrets.MOSAIKIT_SIGNING_KEY }}

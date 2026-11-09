@@ -32,7 +32,7 @@ enum Cmd {
         /// the mosaikit-server of the base (default: MOSAIKIT_SERVER_BIN, then next to this tool)
         #[arg(long, env = "MOSAIKIT_SERVER_BIN")]
         server: Option<PathBuf>,
-        /// folder of the desktop kit: warns when an official plugin of `include` is not in its registry
+        /// the desktop kit (folder, .zip or a released version such as 1.0.1, downloaded once): warns when an official plugin of `include` is not in its registry
         #[arg(long, env = "MOSAIKIT_BASE")]
         base: Option<PathBuf>,
     },
@@ -40,7 +40,7 @@ enum Cmd {
     Dev {
         #[arg(default_value = ".")]
         dir: PathBuf,
-        /// folder of the desktop kit (its registry gives the official plugins)
+        /// the desktop kit (folder, .zip or a released version such as 1.0.1): its registry gives the official plugins
         #[arg(long, env = "MOSAIKIT_BASE")]
         base: Option<PathBuf>,
         #[arg(long, env = "MOSAIKIT_SERVER_BIN")]
@@ -96,7 +96,7 @@ enum Target {
     Desktop {
         #[arg(default_value = ".")]
         dir: PathBuf,
-        /// the desktop kit of the base: its folder or its .zip
+        /// the desktop kit of the base: its folder, its .zip or a released version such as 1.0.1 (downloaded once, checked)
         #[arg(long, env = "MOSAIKIT_BASE")]
         base: PathBuf,
         #[command(flatten)]
@@ -109,7 +109,7 @@ enum Target {
         /// the base image (default mosaikit:<version of the product's base>)
         #[arg(long, default_value = "mosaikit:1.0.0")]
         base_image: String,
-        /// the desktop kit of the base, for the registry of the official plugins
+        /// the desktop kit of the base (folder, .zip or a version such as 1.0.1), for the registry of the official plugins
         #[arg(long, env = "MOSAIKIT_BASE")]
         base: PathBuf,
         /// run `docker build` too
@@ -158,6 +158,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
             println!("created {}\nnext: cd {} && mosaikit-product validate", root.display(), root.display());
         }
         Cmd::Validate { dir, server, base } => {
+            let base = mosaikit_product_cli::basefetch::resolve_opt(base)?;
             let r = validate::validate(&dir, &validate::Options { server, base })?;
             r.print();
             if !r.ok() {
@@ -165,9 +166,11 @@ fn run(cli: Cli) -> Result<ExitCode> {
             }
         }
         Cmd::Dev { dir, base, server, port, data, no_open, no_build, fresh } => {
+            let base = mosaikit_product_cli::basefetch::resolve_opt(base)?;
             dev::dev(&dev::Options { dir, base, server, port, data, no_open, no_build, fresh })?;
         }
         Cmd::Test { dir, base, server, upgrade_from, no_build, browser } => {
+            let base = mosaikit_product_cli::basefetch::resolve_opt(base)?;
             let r = mosaikit_product_cli::test::test(&mosaikit_product_cli::test::Options {
                 dir,
                 base,
@@ -183,9 +186,11 @@ fn run(cli: Cli) -> Result<ExitCode> {
         }
         Cmd::Build { target } => match target {
             Target::Desktop { dir, base, common } => {
+                let base = mosaikit_product_cli::basefetch::resolve(base)?;
                 build::desktop(&Distribution::load(&dir)?, &base, &common.options())?;
             }
             Target::Docker { dir, base_image, base, build: run_build, common } => {
+                let base = mosaikit_product_cli::basefetch::resolve(base)?;
                 build::docker(&Distribution::load(&dir)?, &base, &base_image, run_build, &common.options())?;
             }
             Target::K8s { dir, base_k8s, common } => {
