@@ -32,7 +32,7 @@ mosaikit-plugin doctor --fix    # installs the wasm32 target if it is missing
 ## 2. Make a plugin
 
 ```
-mosaikit-plugin new acme-reports --kit /path/to/kit
+mosaikit-plugin new acme-reports --kit <the folder where you unpacked the kit>
 cd acme-reports
 ```
 

@@ -32,7 +32,7 @@ mosaikit-plugin doctor --fix    # installa il target wasm32 se manca
 ## 2. Creare un plugin
 
 ```
-mosaikit-plugin new acme-reports --kit /percorso/del/kit
+mosaikit-plugin new acme-reports --kit <la cartella dove hai decompresso il kit>
 cd acme-reports
 ```
 
