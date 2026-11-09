@@ -101,7 +101,12 @@ pub fn registry(
         }
         for id in &ids {
             if !found.contains(id) {
-                bail!("the official plugin {id} is not in the registry of the base");
+                let mine: Vec<&str> = own.iter().map(|p| p.id.as_str()).collect();
+                bail!(
+                    "{id} of [plugins] include is not in the registry of the base and is not one of your own plugins (found in roots {:?}: {}).                      If it is yours, check that `roots` of distribution.toml names its folder and that `id` in its plugin.toml is {id}",
+                    d.plugins.roots,
+                    if mine.is_empty() { "none".to_string() } else { mine.join(", ") }
+                );
             }
         }
         if let Ok(k) = std::fs::read_to_string(base.join("trusted_key.txt")) {
