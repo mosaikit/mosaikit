@@ -35,7 +35,7 @@ formato dei dati. Tutto ciò che può cambiare è nel rapporto di audit e si imp
 acme-maps/
   distribution.toml      il prodotto: identità, plugin, valori predefiniti, primo avvio, estensioni
   branding/              brand.toml, logo, favicon, icona
-  plugins/               i suoi plugin, una cartella autonoma ciascuno (mosaikit-plugin new <nome> --into plugins)
+  plugins/               i suoi plugin, una cartella autonoma ciascuno (mosaikit-plugin new <nome> --into plugins --kit <cartella del kit>)
   shared/                codice usato da più plugin, per percorso
   tests/                 i suoi test
   .github/workflows/     CI
@@ -84,7 +84,7 @@ senza, la build lo dice e lascia l'eseguibile com'è. Dati **About** (`[about]`,
 
 - **Plugin ufficiali**: per id in `include`, copiati con la loro firma dal registro della base. Un id che la base non ha è un errore. Non si fa il fork: per
   un altro comportamento si scrive un plugin di *estensione*.
-- **Plugin propri**: in `roots`, ognuno un progetto autonomo (`mosaikit-plugin new`); `mosaikit-product validate` esegue i controlli strict su tutti. La release li
+- **Plugin propri**: in `roots`, ognuno un progetto autonomo (`mosaikit-plugin new <nome> --into plugins --kit <cartella del kit>`; senza `--kit` o `MOSAIKIT_KIT` la build fallisce con `no matching package named mosaikit-plugin-sdk`); `mosaikit-product validate` esegue i controlli strict su tutti. La release li
   firma con la chiave del prodotto.
 - **Codice condiviso**: in `shared/`, per percorso.
 - Un plugin dichiara `[requires] mosaikit`; `validate` rifiuta un plugin il cui intervallo non include la base.

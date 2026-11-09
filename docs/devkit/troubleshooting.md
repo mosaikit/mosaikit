@@ -94,6 +94,7 @@ text ([UI reference](ui.md)).
 | `mosaikit-plugin doctor` reports the wasm target missing | no `wasm32-unknown-unknown` | `mosaikit-plugin doctor --fix` (also installed on first build) |
 | `invalid id: … (e.g. com.company.<name>)` | the id breaks the rule | at least two segments, lower case, digits, `-` |
 | `new` cannot find the SDK or the UI package | no registry yet | `--kit <folder>`, `MOSAIKIT_KIT`, or `--sdk-path` and `--plugin-api-path` |
+| `no matching package named mosaikit-plugin-sdk` when a product builds a plugin | the plugin was made without `--kit`, so its `Cargo.toml` asks the registry | in `Cargo.toml` use `mosaikit-plugin-sdk = { path = "<kit>/sdk" }` (and `file:<kit>/plugin-api` in `ui/package.json`), or make the plugin again with `--kit <folder of the kit>` |
 | `dev`: `the server executable … does not exist (--server / MOSAIKIT_SERVER_BIN)` | no `mosaikit-server` next to the tool | `--server <path>` or `MOSAIKIT_SERVER_BIN` |
 | `dev`: `the ports N and N+1 are not both free: choose another with --port` | the app and the plugin origin need two ports | `--port` |
 | `dev`: `the server stopped at start …` | the developer profile refuses to run here: not loopback, a database on another host, `trust_proxy`, or the database already has tenants besides `dev` | read the message above it; use `--fresh` or `--data` for a clean folder. Do not lift the guard |
