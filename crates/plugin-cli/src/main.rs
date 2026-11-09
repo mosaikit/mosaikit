@@ -221,7 +221,10 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 install,
             })?;
             println!("plugin created in {}", dir.display());
-            println!("  next: cd {} && mosaikit-plugin build && mosaikit-plugin pack", dir.display());
+            println!("  next: cd {} && mosaikit-plugin dev", dir.display());
+            println!(
+                "  (dev builds it and runs it in a development server; to ship it later: build, pack, sign)"
+            );
         }
         Cmd::Build { dir, release } => {
             let p = plugin(&dir)?;
