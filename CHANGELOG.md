@@ -5,6 +5,12 @@ in Help › What is new (one `## <version>` heading per version, `- ` items, `##
 language of the person: this file in English, [CHANGELOG.it.md](CHANGELOG.it.md) in Italian (keep them
 in step).
 
+## 1.0.1
+
+### The platform
+
+- The first update of the platform after 1.0.0, made so that a product can be tried on one base and then moved to the next one with its data. It changes no behaviour of the kernel, the plugin API or the shell: a product built for `>=1.0, <2` runs on it as it is.
+
 ## 1.0.0
 
 ### Distributions

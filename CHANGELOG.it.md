@@ -4,6 +4,12 @@ Cosa cambia da una versione di Mosaikit alla successiva. La shell mostra la sezi
 Aiuto › Novità (un titolo `## <versione>` per versione, voci `- `, gruppi `### `). Questo file è la
 versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
+## 1.0.1
+
+### La piattaforma
+
+- Il primo aggiornamento della piattaforma dopo la 1.0.0, fatto perché un prodotto possa essere provato su una base e poi spostato sulla successiva con i suoi dati. Non cambia nessun comportamento del kernel, della plugin API o della shell: un prodotto costruito per `>=1.0, <2` gira così com'è.
+
 ## 1.0.0
 
 ### Le distribuzioni
