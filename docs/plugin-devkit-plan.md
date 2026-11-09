@@ -647,3 +647,25 @@ token in the path (a query string is not kept by relative links).
 `label`, `markers`). After a zip is unpacked the kernel compares the names, tells the person in the bell and Files offers
 «Open in …» (`msk.open`); `files.profiles` asks the same of any folder. This is only the first step of the contract
 (`detect`): `validate`, `describe` and `render` stay inside the plugin.
+
+## 10. Improvements for the next kit release
+
+Found by the pilots (2026-11-09) and not done yet. None blocks the kit; the order is the one of the benefit for a person who starts.
+
+1. **One image name.** `ghcr.io/mosaikit/mosaikit-dev` is the same image as `ghcr.io/mosaikit/mosaikit` under another name (the same `Dockerfile`; the
+   developer profile comes from the compose file of the kit, not from the image). Point the Docker kit at `ghcr.io/mosaikit/mosaikit:v<version>`, stop
+   building and tagging `-dev` (`devkit.yml` job `devkit-image`, the step `tag the image of the release as the dev kit image` of `release.yml`,
+   `DEV_IMAGE` in `xtask/src/devkit.rs`), and keep `mosaikit-dev` for one release so the kits already published still pull. One package less to explain,
+   to make public and to keep in step.
+2. **The base image of `mosaikit-product`.** The default of `--base-image` is `mosaikit:1.0.0`, a name nobody has (the published image is
+   `ghcr.io/mosaikit/mosaikit:v<version>`) and a version written in the code. Default to the published image of the base the product is built on.
+3. **Names of the files of the Base.** `mosaikit-<version>-desktop-<platform>.zip` becomes `mosaikit-base-<version>-desktop-<platform>.zip`, so the page
+   of a release says what is the Dev Kit and what is the Base (`xtask`, `mosaikit-product`, the documents, the smoke test).
+4. **Get the Base by version.** `mosaikit-product build desktop --base 1.0.1` downloads and checks (signature, hash) the zip of that release, as
+   `self-update` does for the kit, instead of asking the person to find it. Today the Base is only for Windows (the desktop zip) and for Docker (the
+   image); a team on Linux or macOS can only make the Docker release.
+5. **The empty plugin folder of the Docker kit** logs `ERROR development plugin /plugin: No such file or directory` at every start. It is harmless and
+   looks like a failure: do not mount it, or log it at a lower level, when the folder is empty.
+6. **Open rows of the pilot log** ([pilots/question-log.md](pilots/question-log.md)): the form of a new item that showed no fields once (not reproduced); why
+   the removal of a plugin in the web page of `dev` does not last; the `409 already installed with a different content` that answered once and then
+   did not.
