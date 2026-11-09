@@ -525,11 +525,11 @@ Everything you need to write, test, sign and install a plugin for Mosaikit, with
 
 ## Your first plugin in five steps
 
-1. **Put the tools on your path.** Add the `bin/` folder of this kit to `PATH` (required), then open a new terminal and run `mosaikit-plugin doctor`. Setting only `MOSAIKIT_KIT` does not work: it is just the default of `--kit` in `mosaikit-plugin new`. `docs/devkit/getting-started.md` shows the commands for Windows, Linux and macOS.
+1. **Put the tools on your path.** Add the `bin/` folder of this kit to `PATH` (required), then open a new terminal and run `mosaikit-plugin doctor`. Setting only `MOSAIKIT_KIT` does not work. `docs/devkit/getting-started.md` shows the commands for Windows, Linux and macOS.
 2. **Check the machine.** `mosaikit-plugin doctor` (add `--fix` to install the `wasm32-unknown-unknown` target).
 3. **Choose where to start.**
-   - A new plugin: `mosaikit-plugin new my-plugin --kit <this folder>`.
-   - A copy of an example (`todo`, `insights`, `note-priority`): `mosaikit-plugin new my-plugin --kit <this folder> --example todo`. It is complete, commented and has a `WALKTHROUGH.md`; change it into your own.
+   - A new plugin: `mosaikit-plugin new my-plugin` (the tool takes the SDK and the UI package from this kit).
+   - A copy of an example (`todo`, `insights`, `note-priority`): `mosaikit-plugin new my-plugin --example todo`. It is complete, commented and has a `WALKTHROUGH.md`; change it into your own.
 4. **Run it.** From the folder of the plugin:
 
 {run}
@@ -538,7 +538,16 @@ Everything you need to write, test, sign and install a plugin for Mosaikit, with
 
 ## What do I download?
 
-For a plugin, this Dev Kit is enough. For a product you also need the **Base**, which is Mosaikit compiled: the desktop zip `mosaikit-<version>-desktop-windows-x86_64.zip` in the same release `v<version>` as this kit (<https://github.com/mosaikit/mosaikit/releases>), and the image `ghcr.io/mosaikit/mosaikit:v<version>`.
+Only this Dev Kit, for a plugin and for a product. A product is built on the **Base** (Mosaikit compiled, with the official plugins): give `--base` the version and `mosaikit-product` downloads it once from the release `v<version>` (<https://github.com/mosaikit/mosaikit/releases>), checks it against the signed `SHA256SUMS` and keeps it in a cache (from version 1.0.2; for an older one download the zip `mosaikit-<version>-desktop-windows-x86_64.zip` from the Assets of its release and give `--base` the zip). The Docker image `ghcr.io/mosaikit/mosaikit:v<version>` is pulled by Docker, so a product also needs Docker.
+
+## Your first product in four steps
+
+1. `mosaikit-product new acme-maps` and `cd acme-maps`.
+2. `mosaikit-product validate`, then `mosaikit-product test --base {version}`.
+3. `mosaikit-product dev --base {version}`: it starts the product with its brand and prints the test users.
+4. `mosaikit-product build desktop --base {version}` (Windows) or `mosaikit-product build docker --base {version} --build`.
+
+A plugin of the product: `mosaikit-plugin new <name> --into plugins`. Set `MOSAIKIT_BASE={version}` once to drop `--base`. The step by step, with the brand, is `docs/devkit/reference-product.md`.
 
 ## A plugin or a product?
 
@@ -844,11 +853,13 @@ mod tests {
         let d = tempfile::tempdir().unwrap();
         std::fs::write(d.path().join("mosaikit-devkit-1.0.0-linux-x86_64.tar.gz"), b"linux").unwrap();
         std::fs::write(d.path().join("mosaikit-devkit-1.0.0-windows-x86_64.zip"), b"win").unwrap();
+        std::fs::write(d.path().join("mosaikit-1.0.0-desktop-windows-x86_64.zip"), b"base").unwrap();
         std::fs::write(d.path().join("notes.md"), b"x").unwrap();
         let key = mosaikit_mskp::generate_key();
         write_sums(d.path(), &key).unwrap();
         let sums = std::fs::read_to_string(d.path().join("SHA256SUMS")).unwrap();
-        assert_eq!(update::parse_sums(&sums).len(), 2);
+        // the two kits and the desktop kit of the Base, which `mosaikit-product --base <version>` checks
+        assert_eq!(update::parse_sums(&sums).len(), 3);
         let trusted = mosaikit_mskp::TrustedKeys::from_b64(&[mosaikit_mskp::public_key_b64(&key)]).unwrap();
         let sig = std::fs::read_to_string(d.path().join("SHA256SUMS.sig")).unwrap();
         update::check_download("mosaikit-devkit-1.0.0-windows-x86_64.zip", b"win", &sums, &sig, &trusted)

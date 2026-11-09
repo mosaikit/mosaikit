@@ -5,6 +5,16 @@ in Help › What is new (one `## <version>` heading per version, `- ` items, `##
 language of the person: this file in English, [CHANGELOG.it.md](CHANGELOG.it.md) in Italian (keep them
 in step).
 
+## 1.0.2
+
+### The development kit
+
+- `mosaikit-product` takes the Base by itself: `--base 1.0.2` (or `MOSAIKIT_BASE=1.0.2`) downloads the desktop kit of that release once, checks it against the signed `SHA256SUMS` and keeps it in a cache (`MOSAIKIT_CACHE` moves it). A product now needs only the Dev Kit, like a plugin. With `--base <version>` the Docker base image is `ghcr.io/mosaikit/mosaikit:v<version>` by itself.
+- The release signs the desktop kit of the Base together with the Dev Kit, which is what makes that check possible (earlier releases do not list it: use their zip by hand).
+- `mosaikit-plugin new` takes the SDK and the UI package from the kit the tool is in: no `--kit`. A failed build of a plugin that asks the registry for the SDK says what to change.
+- `mosaikit-product build` says clearly when a plugin of `include` is neither in the roots nor in the base.
+- The documents are revised for the shortest way to a plugin and to a product: what to download (only the Dev Kit), the brand of a product (logo, favicon, icon, colours, texts) and the public base image.
+
 ## 1.0.1
 
 ### The platform

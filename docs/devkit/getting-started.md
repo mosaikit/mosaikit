@@ -5,16 +5,18 @@ you do not need a checkout of Mosaikit.
 
 ## 1. Install the kit
 
-**What do I download?** Mosaikit has two things to download, and the platform release holds both:
+**What do I download?** Only the **Dev Kit**, the archive `mosaikit-devkit-<version>-<platform>` in the **Assets** of a release. It is enough
+for both jobs:
 
-| I want to | I need | Where |
+| I want to | I do | What else comes by itself |
 |---|---|---|
-| Make a **plugin** | the **Dev Kit**: `mosaikit-plugin`, the documents, the examples | the archive `mosaikit-devkit-<version>-<platform>` in the **Assets** of a release |
-| Make a **product** (an application) | the Dev Kit (`mosaikit-product` is in it) **and** the **Base**: Mosaikit compiled, which the product is built on | the Base is in the same release: the desktop zip `mosaikit-<version>-desktop-windows-x86_64.zip` and the image `ghcr.io/mosaikit/mosaikit:v<version>` |
+| Make a **plugin** | `mosaikit-plugin new <name>`: the tool finds the SDK and the UI package in the kit | nothing |
+| Make a **product** (an application) | `mosaikit-product new <name>`, then `--base <version>` in the commands | the **Base** (Mosaikit compiled, with the official plugins) is downloaded once, checked and kept in a cache; the Docker image `ghcr.io/mosaikit/mosaikit:v<version>` is pulled by Docker |
 
-The releases named `v<version>` (for example `v1.0.0`) have everything: the Dev Kit for every system, the desktop zip of the Base and the
-notes. The releases named `kit-v<version>` (for example `kit-v1.0.0-rc3`) have the Dev Kit alone, for a version still being tried. A
-plugin needs only the Dev Kit; the Base is for products ([Building an application](building-an-application.md)).
+For a product you also need Docker, to build and run the Docker release. The Base download works from the release `v1.0.2`: for an
+older Base, download `mosaikit-<version>-desktop-windows-x86_64.zip` from the **Assets** of its release and give `--base` the zip.
+The releases named `kit-v<version>` have the Dev Kit alone, for a version still being tried
+([Building an application](building-an-application.md)).
 
 The kit is one folder (or archive) with:
 
@@ -32,8 +34,7 @@ the end of its page, open the list **Assets** and download the archive of your s
 `SHA256SUMS.sig`. Check them ([Releasing the kit](releasing.md)) and unpack the archive in a folder of your choice.
 
 **Put `bin/` on your `PATH`.** This is required: the commands `mosaikit-plugin` and `mosaikit-server` are in the `bin/` folder
-of the kit, and the system finds them only through `PATH`. Setting only `MOSAIKIT_KIT` does not work: that variable says where
-the kit is (the default of `--kit` in `mosaikit-plugin new`), it does not make the commands available. With the kit unpacked in
+of the kit, and the system finds them only through `PATH`. Setting only `MOSAIKIT_KIT` does not work: it does not make the commands available. With the kit unpacked in
 `C:\Tools\mosaikit-devkit-1.0.0-windows-x86_64`:
 
 - Windows, for the current PowerShell window: `$env:Path = "C:\Tools\mosaikit-devkit-1.0.0-windows-x86_64\bin;" + $env:Path`. For
@@ -41,8 +42,8 @@ the kit is (the default of `--kit` in `mosaikit-plugin new`), it does not make t
   the full path of the `bin` folder; then open a new window.
 - Linux and macOS: `export PATH="$HOME/mosaikit-devkit/bin:$PATH"` (put the line in `~/.profile` or `~/.zshrc` to keep it).
 
-Check it in a **new** window: `mosaikit-plugin doctor`. Optional, to skip `--kit` in `mosaikit-plugin new`: set
-`MOSAIKIT_KIT` to the folder of the kit (the one that holds `bin/`, `sdk/` and `docs/`). The Windows archive has the server; on Linux and macOS the
+Check it in a **new** window: `mosaikit-plugin doctor`. `mosaikit-plugin new` takes the SDK and the UI package from the kit the tool is in: no option. Only a tool installed elsewhere
+needs `--kit <folder of the kit>` (or `MOSAIKIT_KIT`). The Windows archive has the server; on Linux and macOS the
 development server is the Docker image (`docker/README.md` in the kit). `mosaikit-plugin self-update` brings the kit
 to the next release. Without an archive, build the two executables from the Mosaikit sources
 (`cargo build --release -p mosaikit-plugin-cli -p mosaikit-server`) and use `--sdk-path` and `--plugin-api-path`
@@ -60,7 +61,7 @@ mosaikit-plugin doctor --fix    # installs the wasm32 target if it is missing
 You choose where to start: a **new** plugin (the commands below), or a **copy of an example** (`--example todo`, `insights` or `note-priority`: complete, commented, with a `WALKTHROUGH.md`; see [An example plugin to read](#an-example-plugin-to-read)). Both make a standalone folder you then change.
 
 ```
-mosaikit-plugin new acme-reports --kit <the folder where you unpacked the kit>
+mosaikit-plugin new acme-reports
 cd acme-reports
 ```
 
@@ -73,7 +74,7 @@ file, a sample migration, tests, and texts in English, Italian and Spanish.
 | `--variant` | `app` (logic and UI, the default), `ui`, `service` (logic only), `extension`, `language`, `layout` |
 | `--example` | `todo`, `insights`, `note-priority`: a complete commented plugin with a `WALKTHROUGH.md` |
 | `--lang fr` | the code of a language pack (needs `--variant language`, or a name like `lang-fr`) |
-| `--kit`, `--sdk-path`, `--plugin-api-path` | where the SDK and the UI package come from |
+| `--kit`, `--sdk-path`, `--plugin-api-path` | where the SDK and the UI package come from (default: the kit of the tool) |
 
 `ui/package.json` points at the UI package of the kit with a relative `file:` path (for example
 `file:../../../mosaikit-devkit/plugin-api`). The path is relative to `ui/`: if you move the plugin or the kit, edit it
@@ -204,7 +205,7 @@ Before you write your own, read a finished one. In the kit the three examples ar
 (about 250 lines). To get a working copy to run and change:
 
 ```
-mosaikit-plugin new my-todo --kit /path/to/kit --example todo
+mosaikit-plugin new my-todo --example todo
 cd my-todo
 mosaikit-plugin dev
 ```

@@ -4,12 +4,15 @@ Un'**applicazione** (un *prodotto*, nel codice una *distribuzione*) è Mosaikit 
 e un modo di avviarsi che sono tuoi. La costruisci dal Mosaikit **compilato** (il kit desktop e l'immagine Docker): niente
 sorgenti di Mosaikit, niente fork, niente compilazione del kernel. Lo strumento è `mosaikit-product`.
 
-**Da dove viene la base.** Il kit di sviluppo ha gli strumenti (`mosaikit-product`, `mosaikit-plugin`, `mosaikit-server`) ma **non** il
-kit desktop della base (`mosaikit.exe` e `registry/index.json`, i plugin ufficiali), che serve a `build desktop --base`. Il kit desktop
-è lo zip desktop della release della piattaforma (`mosaikit-<versione>-desktop-windows-x86_64.zip`, GitHub Releases di
-`mosaikit/mosaikit`): dai a `--base` lo zip o la cartella in cui l'hai scompattato. `validate` e `dev` di un prodotto senza plugin ufficiali
-non lo richiedono; `build desktop` sì, e senza si ferma con `no mosaikit.exe in the desktop kit`. Per Docker la base è l'immagine
-(`--base-image`), per Kubernetes la cartella k8s della release (`--base-k8s`).
+**Da dove viene la base.** Il Dev Kit ha gli strumenti (`mosaikit-product`, `mosaikit-plugin`, `mosaikit-server`) e non scarichi altro:
+dai a `--base` una **versione** e lo strumento scarica il kit desktop di quella release (`mosaikit.exe` e `registry/index.json`, i plugin ufficiali)
+dalla release `v<versione>` di `mosaikit/mosaikit`, lo verifica con il `SHA256SUMS` firmato della release e lo tiene in una cache: lo scarica una volta sola,
+per esempio `mosaikit-product build desktop --base 1.0.2`. La cache è `%LOCALAPPDATA%\mosaikit\base\<versione>` (Windows),
+`~/.cache/mosaikit/base/<versione>` (Linux) o `~/Library/Caches/mosaikit/base/<versione>` (macOS); `MOSAIKIT_CACHE` la sposta. `--base` accetta anche una cartella o uno `.zip` del kit desktop, ed è così che usi una
+Base precedente alla 1.0.2 (lo zip è negli **Assets** della sua release: <https://github.com/mosaikit/mosaikit/releases>). `validate` e `dev` di un prodotto senza
+plugin ufficiali non richiedono nessuna base. Per Docker la base è l'immagine `ghcr.io/mosaikit/mosaikit:v<versione>`, che `--base <versione>` indica da solo
+(`--base-image` la cambia) e che scarica Docker; per Kubernetes è la cartella k8s della release (`--base-k8s`).
+Imposta una volta `MOSAIKIT_BASE=1.0.2` e i comandi non hanno più bisogno di `--base`.
 
 Un esempio completo, passo per passo, è in [Prodotto di riferimento](../reference-product.md). I termini di ridistribuzione sono in
 [Licenza e responsabilità](../product-licensing.md). Il contratto fra base e prodotto è in
@@ -35,7 +38,7 @@ formato dei dati. Tutto ciò che può cambiare è nel rapporto di audit e si imp
 acme-maps/
   distribution.toml      il prodotto: identità, plugin, valori predefiniti, primo avvio, estensioni
   branding/              brand.toml, logo, favicon, icona
-  plugins/               i suoi plugin, una cartella autonoma ciascuno (mosaikit-plugin new <nome> --into plugins --kit <cartella del kit>)
+  plugins/               i suoi plugin, una cartella autonoma ciascuno (mosaikit-plugin new <nome> --into plugins)
   shared/                codice usato da più plugin, per percorso
   tests/                 i suoi test
   .github/workflows/     CI
@@ -84,7 +87,7 @@ senza, la build lo dice e lascia l'eseguibile com'è. Dati **About** (`[about]`,
 
 - **Plugin ufficiali**: per id in `include`, copiati con la loro firma dal registro della base. Un id che la base non ha è un errore. Non si fa il fork: per
   un altro comportamento si scrive un plugin di *estensione*.
-- **Plugin propri**: in `roots`, ognuno un progetto autonomo (`mosaikit-plugin new <nome> --into plugins --kit <cartella del kit>`; senza `--kit` o `MOSAIKIT_KIT` la build fallisce con `no matching package named mosaikit-plugin-sdk`); `mosaikit-product validate` esegue i controlli strict su tutti. La release li
+- **Plugin propri**: in `roots`, ognuno un progetto autonomo (`mosaikit-plugin new <nome> --into plugins`, con lo strumento del kit: prende l'SDK da lì; uno strumento installato altrove vuole `--kit <cartella del kit>`, altrimenti la build fallisce con `no matching package named mosaikit-plugin-sdk`); `mosaikit-product validate` esegue i controlli strict su tutti. La release li
   firma con la chiave del prodotto.
 - **Codice condiviso**: in `shared/`, per percorso.
 - Un plugin dichiara `[requires] mosaikit`; `validate` rifiuta un plugin il cui intervallo non include la base.
@@ -153,8 +156,8 @@ wrench. I gruppi valgono solo per la barra laterale predefinita.
 ## 8. Build e release
 
 ```text
-mosaikit-product build desktop --base <kit desktop>                          dist/<id>-<versione>-desktop   (lo zip della release della piattaforma, vedi in alto)
-mosaikit-product build docker  --base <kit desktop> --base-image ghcr.io/mosaikit/mosaikit:v1.0.1 [--build]
+mosaikit-product build desktop --base <versione | cartella | .zip>       dist/<id>-<versione>-desktop   (il kit desktop della Base, vedi in alto)
+mosaikit-product build docker  --base <versione | cartella | .zip> [--base-image <immagine>] [--build]
 mosaikit-product build k8s     --base-k8s <cartella k8s del kit>
 ```
 
