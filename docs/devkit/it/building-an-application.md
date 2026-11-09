@@ -154,7 +154,7 @@ wrench. I gruppi valgono solo per la barra laterale predefinita.
 
 ```text
 mosaikit-product build desktop --base <kit desktop>                          dist/<id>-<versione>-desktop   (lo zip della release della piattaforma, vedi in alto)
-mosaikit-product build docker  --base <kit desktop> --base-image ghcr.io/mosaikit/mosaikit:v1.0.0 [--build]
+mosaikit-product build docker  --base <kit desktop> --base-image ghcr.io/mosaikit/mosaikit:v1.0.1 [--build]
 mosaikit-product build k8s     --base-k8s <cartella k8s del kit>
 ```
 

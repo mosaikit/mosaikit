@@ -192,7 +192,7 @@ by reference (`env:NAME`, `file:PATH`, a relative path being relative to the fol
 
 ```text
 mosaikit-product build desktop --base <desktop kit folder or .zip>      dist/<id>-<version>-desktop   (the platform release zip, see the top)
-mosaikit-product build docker  --base <desktop kit> --base-image ghcr.io/mosaikit/mosaikit:v1.0.0 [--build]   dist/<id>-<version>-docker
+mosaikit-product build docker  --base <desktop kit> --base-image ghcr.io/mosaikit/mosaikit:v1.0.1 [--build]   dist/<id>-<version>-docker
 mosaikit-product build k8s     --base-k8s <k8s folder of the kit>       dist/<id>-<version>-k8s
 ```
 
