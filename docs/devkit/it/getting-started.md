@@ -120,20 +120,9 @@ Cosa fanno i tre comandi:
 - `pack` compila il plugin e scrive un solo file, `dist/<id>-<versione>.mskp`: la logica, la UI, le migrazioni e il manifesto, con una firma. Non invia nulla.
 - `install` carica quel file su un server Mosaikit **in esecuzione**: accede come amministratore (`--user`, `--password`) e invia il pacchetto. Il server controlla la firma con le sue chiavi fidate e lo installa. `--server` è l'indirizzo di quel server.
 
-**`install` non va sul server che `dev` ha avviato per questo plugin.** `dev` carica il plugin dalla sua cartella e lo segna "in sviluppo": un server in questo stato rifiuta un `.mskp` dello stesso plugin (`is loaded in development mode`), e disinstallare il plugin dalla pagina web non dura, perché `dev` lo ricarica dalla cartella. Il `.mskp` va su un altro server, quello che useresti per davvero. Avviane uno in un'altra finestra e passa il suo indirizzo a `--server`:
+**`install` non va sul server che `dev` ha avviato per questo plugin.** `dev` carica il plugin dalla sua cartella e lo segna "in sviluppo": un server in questo stato rifiuta un `.mskp` dello stesso plugin (`is loaded in development mode`), e disinstallare il plugin dalla pagina web non dura, perché `dev` lo ricarica dalla cartella. Il `.mskp` va su un altro server, quello che useresti per davvero: il kit Docker. Avvialo in un'altra finestra e passa il suo indirizzo a `--server`:
 
 - **Il kit Docker** (qualunque sistema): `docker compose -f docker/compose.yml up -d` nella cartella `docker/` del kit. L'indirizzo è `http://localhost:8080`; utente e password dell'amministratore sono quelli del `.env` del kit (`docker/README.md`). Ferma prima `dev` se occupa la porta 8080.
-- **Un secondo server di sviluppo senza plugin** (Windows, dove il kit ha `bin/mosaikit-server`): crea un file `server.toml` fuori dalla cartella del plugin con
-
-  ```toml
-  url = "http://127.0.0.1:8090"
-  listen = "127.0.0.1:8090"
-  plugin_listen = "127.0.0.1:8091"
-  data_dir = "C:/mosaikit-test-server"
-  developer_profile = true
-  ```
-
-  e lancia `mosaikit-server --config server.toml serve`. Parte vuoto con gli stessi utenti di prova di `dev` (`admin`, password `mosaikit-dev`), accetta pacchetti non firmati e tiene i suoi dati. Poi `mosaikit-plugin install dist/<file>.mskp --server http://127.0.0.1:8090 --user admin --password mosaikit-dev`.
 
 Senza un server `install` si ferma con `reaching <indirizzo>` e `os error 10061` (connessione rifiutata).
 
