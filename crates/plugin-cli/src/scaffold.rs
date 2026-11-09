@@ -315,6 +315,16 @@ pub fn new_plugin(o: &NewOptions) -> Result<PathBuf> {
         && std::fs::read_to_string(base.join("package.json")).is_ok_and(|t| t.contains("\"workspaces\""));
     let standalone = !cargo_ws && !npm_ws;
 
+    // a folder that is not a kit would only fail later, in `cargo build`, with a message about a path nobody typed
+    if let Some(k) = &o.kit {
+        if !k.join("sdk").is_dir() || !k.join("plugin-api").is_dir() {
+            bail!(
+                "--kit {}: this is not the folder of an unpacked kit (it has no sdk/ and plugin-api/). Give the folder where you unpacked the kit, the one with bin/, sdk/ and docs/ (the text `/path/to/kit` in the documents stands for it)",
+                k.display()
+            );
+        }
+    }
+
     // where the SDK and the UI package come from: the paths, else the folder of the kit, else the published ones
     let sdk_path = o.sdk_path.clone().or_else(|| o.kit.as_ref().map(|k| k.join("sdk")));
     let api_path = o.plugin_api_path.clone().or_else(|| o.kit.as_ref().map(|k| k.join("plugin-api")));
@@ -725,11 +735,23 @@ mod tests {
         assert!(ui.contains("\"^1.0.0\""));
 
         let kit = w.join("kit");
+        std::fs::create_dir_all(kit.join("sdk")).unwrap();
+        std::fs::create_dir_all(kit.join("plugin-api")).unwrap();
         let from_kit = make(w, "from-kit", |o| o.kit = Some(kit.clone()));
         let cargo = std::fs::read_to_string(from_kit.join("Cargo.toml")).unwrap();
         assert!(cargo.contains(&format!("path = \"{}\"", slashed(&kit.join("sdk")))), "{cargo}");
         let ui = std::fs::read_to_string(from_kit.join("ui/package.json")).unwrap();
         assert!(ui.contains("plugin-api\"") && ui.contains("file:"), "{ui}");
+
+        // a folder that is not a kit is refused at once
+        let bad = NewOptions {
+            name: "bad-kit".into(),
+            into: w.into(),
+            kit: Some(PathBuf::from("C:/path/to/kit")),
+            ..Default::default()
+        };
+        let err = new_plugin(&bad).unwrap_err();
+        assert!(err.to_string().contains("not the folder of an unpacked kit"), "{err}");
 
         // a path beats the kit
         let own = w.join("own-sdk");

@@ -87,6 +87,7 @@ text ([UI reference](ui.md)).
 
 | You see | Cause | Fix |
 |---|---|---|
+| `failed to read C:\path	o\kit\sdk\Cargo.toml` (from `cargo build`) | the plugin was made with the text `/path/to/kit` of a document instead of the real folder of the kit | make the plugin again with `--kit <the folder where you unpacked the kit>`, or change the `path` of `mosaikit-plugin-sdk` in `Cargo.toml` and of `plugin-api` in `ui/package.json`. Newer tools refuse a `--kit` that is not a kit: `this is not the folder of an unpacked kit` |
 | `mosaikit-plugin doctor` reports the wasm target missing | no `wasm32-unknown-unknown` | `mosaikit-plugin doctor --fix` (also installed on first build) |
 | `invalid id: … (e.g. com.company.<name>)` | the id breaks the rule | at least two segments, lower case, digits, `-` |
 | `new` cannot find the SDK or the UI package | no registry yet | `--kit <folder>`, `MOSAIKIT_KIT`, or `--sdk-path` and `--plugin-api-path` |

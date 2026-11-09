@@ -87,6 +87,7 @@ Gli errori che restituiscono il kernel e gli strumenti, con causa e rimedio. I t
 
 | Cosa si vede | Causa | Rimedio |
 |---|---|---|
+| `failed to read C:\path	o\kit\sdk\Cargo.toml` (da `cargo build`) | il plugin è stato creato con il testo `/path/to/kit` di un documento invece della cartella vera del kit | ricrea il plugin con `--kit <la cartella dove hai decompresso il kit>`, oppure correggi il `path` di `mosaikit-plugin-sdk` in `Cargo.toml` e di `plugin-api` in `ui/package.json`. Gli strumenti nuovi rifiutano un `--kit` che non è un kit: `this is not the folder of an unpacked kit` |
 | `mosaikit-plugin doctor` segnala il target wasm mancante | manca `wasm32-unknown-unknown` | `mosaikit-plugin doctor --fix` (si installa anche alla prima build) |
 | `invalid id: … (e.g. com.company.<nome>)` | l'id viola la regola | almeno due segmenti, minuscole, cifre, `-` |
 | `new` non trova l'SDK o il pacchetto della UI | ancora nessun registro | `--kit <cartella>`, `MOSAIKIT_KIT`, oppure `--sdk-path` e `--plugin-api-path` |
