@@ -64,7 +64,7 @@ The sign-in page shows *Acme Maps*; the setting *Name* is locked.
 ## 5. Add a plugin of its own
 
 ```text
-mosaikit-plugin new parcels --into plugins --id com.acme.parcels
+mosaikit-plugin new parcels --into plugins --id com.acme.parcels --kit <folder of the kit>
 ```
 
 Set `roots = ["plugins"]` and add `"com.acme.parcels"` to `include`. `mosaikit-product dev` loads the plugin from its folder and reloads it when

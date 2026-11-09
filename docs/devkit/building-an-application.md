@@ -36,7 +36,7 @@ does not know is refused by `validate`, so a typo does not pass silently.
 acme-maps/
   distribution.toml      the product: identity, plugins, defaults, first start, extensions
   branding/              brand.toml, logo, favicon, icon
-  plugins/               its own plugins, one standalone folder each (mosaikit-plugin new <name> --into plugins)
+  plugins/               its own plugins, one standalone folder each (mosaikit-plugin new <name> --into plugins --kit <folder of the kit>)
   shared/                code several of its plugins use (a Rust crate, an npm package), by path
   tests/                 its own tests
   .github/workflows/     CI
@@ -107,7 +107,7 @@ log at start and returned by `GET /api/brand` as `about`.
 - **Official plugins** are listed by id in `include`; they are copied, with their own signature, from the registry of the base.
   An id the base does not have is an error. You never fork one: if you need another behaviour write an *extension* plugin
   ([Extensions and layouts](extensions-layouts.md)).
-- **Your plugins** live in `roots`. Each is a standalone project made with `mosaikit-plugin new` and checked with
+- **Your plugins** live in `roots`. Each is a standalone project made with `mosaikit-plugin new <name> --into plugins --kit <folder of the kit>` (without `--kit`, or `MOSAIKIT_KIT`, the build fails with `no matching package named mosaikit-plugin-sdk`) and checked with
   `mosaikit-plugin test` ([Testing](testing.md)); `mosaikit-product validate` runs the strict checks of all of them. A release signs
   them with the key of the product.
 - **Shared code** goes in `shared/` and each plugin refers to it by path, so the plugins stay standalone.
