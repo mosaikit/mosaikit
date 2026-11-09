@@ -31,6 +31,8 @@ mosaikit-plugin doctor --fix    # installa il target wasm32 se manca
 
 ## 2. Creare un plugin
 
+Scegli da dove partire: un plugin **nuovo** (i comandi qui sotto) oppure la **copia di un esempio** (`--example todo`, `insights` o `note-priority`: completo, commentato, con un `WALKTHROUGH.md`; vedi [Un plugin di esempio da leggere](#un-plugin-di-esempio-da-leggere)). In entrambi i casi si crea una cartella autonoma che poi modifichi.
+
 ```
 mosaikit-plugin new acme-reports --kit /percorso/del/kit
 cd acme-reports
@@ -116,6 +118,36 @@ chiave pubblica; il profilo sviluppatore accetta anche quelli non firmati. Vedi 
 
 **Dopo `install` il plugin è solo "installed", non acceso.** Lo strumento lo dice. Un Administrator lo accende: apri `#/admin`, Piattaforma > Plugin >
 il tuo plugin > **Turn on** (poi è `active` e disponibile all'organizzazione `dev`). Finché non è acceso la sua pagina non compare nella shell.
+
+## Un plugin di esempio da leggere
+
+Prima di scrivere il tuo, leggine uno finito. Nel kit i tre esempi sono in `examples/` (`todo`, `insights`,
+`note-priority`); ognuno ha un `WALKTHROUGH.md` che spiega il plugin file per file, in ordine (circa 250 righe). Per avere
+una copia funzionante da avviare e modificare:
+
+```
+mosaikit-plugin new my-todo --kit /percorso/del/kit --example todo
+cd my-todo
+mosaikit-plugin dev
+```
+
+Parti da `todo` (un elenco con un modulo, un valore salvato e un test). `insights` aggiunge KPI e una vista;
+`note-priority` estende un altro plugin ([Estensioni e layout](extensions-layouts.md)).
+
+## Un plugin o un prodotto?
+
+| | Plugin | Prodotto (applicazione) |
+|---|---|---|
+| Cos'è | Una funzione che gira dentro Mosaikit: logica (WASM), una UI, dati propri | Mosaikit con un nome, un marchio, una scelta di plugin e impostazioni che sono tuoi |
+| Si crea con | `mosaikit-plugin` | `mosaikit-product` |
+| Cosa distribuisci | Un file `.mskp` firmato che un amministratore installa | Un archivio desktop e un'immagine Docker con il tuo marchio e i tuoi plugin |
+| Cosa cambia | Cosa possono fare gli utenti | Cosa trovano al primo avvio: nome, logo, colori, plugin, impostazioni, primo tenant |
+| Cosa non può cambiare | Il nucleo, le regole di sicurezza, la plugin API | Il nucleo, le regole di sicurezza, le origini, il modello di firma |
+| Si parte da | Questo documento | [Costruire un'applicazione](building-an-application.md), poi [Prodotto di riferimento](../reference-product.md) (in inglese) |
+
+Un prodotto contiene plugin: i suoi (creati con `mosaikit-plugin new <nome> --into plugins`) e quelli ufficiali che
+tiene. Crea un plugin quando aggiungi una funzione a un Mosaikit esistente; crea un prodotto quando vuoi distribuire una tua
+applicazione. Per iniziare un prodotto: `mosaikit-product new acme-maps`.
 
 ## Dopo
 

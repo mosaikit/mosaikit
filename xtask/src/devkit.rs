@@ -510,45 +510,42 @@ fn kit_txt(version: &str, platform: &str, server: bool) -> String {
 /// The first file a developer opens: the five steps from an unpacked kit to a plugin running.
 fn kit_readme(version: &str, platform: &str, server: bool) -> String {
     let run = if server {
-        "```
-mosaikit-plugin dev
-```
-
-It builds the plugin, starts the development server (SQLite), opens the browser and prints the test users (`admin`, `manager`, `alice`, `bob`; password `mosaikit-dev`)."
+        "```\nmosaikit-plugin dev\n```\n\nIt builds the plugin, starts the development server (SQLite), opens the browser and prints the test users (`admin`, `manager`, `alice`, `bob`; password `mosaikit-dev`)."
     } else {
-        "```
-docker compose -f docker/compose.yml up -d
-```
-
-There is no server executable for this platform: the development server is the Docker image (see `docker/README.md`)."
+        "```\ndocker compose -f docker/compose.yml up -d\n```\n\nThere is no server executable for this platform: the development server is the Docker image (see `docker/README.md`)."
     };
-    format!(
-        "# Mosaikit dev kit {version} ({platform})
+    const TEMPLATE: &str = r#"# Mosaikit dev kit {version} ({platform})
 
-         Everything you need to write, test, sign and install a plugin for Mosaikit, without the source code of the platform.
+Everything you need to write, test, sign and install a plugin for Mosaikit, without the source code of the platform.
 
-         ## Your first plugin in five steps
+## Your first plugin in five steps
 
-         1. **Put the tools on your path.** Add the `bin/` folder of this kit to `PATH`, or set `MOSAIKIT_KIT` to this folder.
-         2. **Check the machine.** `mosaikit-plugin doctor` (add `--fix` to install the `wasm32-unknown-unknown` target).
-         3. **Make a plugin.** `mosaikit-plugin new my-plugin --kit <this folder>`. For a complete commented one: `mosaikit-plugin new my-plugin --kit <this folder> --example todo`; it comes with a `WALKTHROUGH.md`.
-         4. **Run it.** From the folder of the plugin:
+1. **Put the tools on your path.** Add the `bin/` folder of this kit to `PATH`, or set `MOSAIKIT_KIT` to this folder.
+2. **Check the machine.** `mosaikit-plugin doctor` (add `--fix` to install the `wasm32-unknown-unknown` target).
+3. **Choose where to start.**
+   - A new plugin: `mosaikit-plugin new my-plugin --kit <this folder>`.
+   - A copy of an example (`todo`, `insights`, `note-priority`): `mosaikit-plugin new my-plugin --kit <this folder> --example todo`. It is complete, commented and has a `WALKTHROUGH.md`; change it into your own.
+4. **Run it.** From the folder of the plugin:
 
 {run}
 
-         5. **Check it, pack it, install it.** `mosaikit-plugin validate --strict`, `mosaikit-plugin test`, then `mosaikit-plugin pack`, `mosaikit-plugin sign` and `mosaikit-plugin install`. The server turns on only plugins an Administrator enables: after `install`, turn the plugin on in the Administration.
+5. **Check it, pack it, install it.** `mosaikit-plugin validate --strict`, `mosaikit-plugin test`, then `mosaikit-plugin pack`, `mosaikit-plugin sign` and `mosaikit-plugin install`. After `install` the plugin is only installed: an Administrator turns it on in the Administration.
 
-         ## Where to read
+## A plugin or a product?
 
-         - `docs/devkit/getting-started.md`: the same steps with the details.
-         - `docs/devkit/README.md`: the list of every document (concepts, manifest, logic, UI, data, security, packaging, testing).
-         - `docs/devkit/troubleshooting.md`: an error, its cause and its fix.
-         - `examples/`: three complete plugins (`todo`, `insights`, `note-priority`).
-         - `KIT.txt`: what each folder of the kit holds. `RELEASE-NOTES.md`: what changed.
+A **plugin** is one feature that runs inside Mosaikit (`mosaikit-plugin`); you ship a signed `.mskp` file. A **product** is Mosaikit with your own name, brand, plugins and defaults (`mosaikit-product`); you ship a desktop archive and a Docker image. A product contains plugins. To build a product read `docs/devkit/building-an-application.md` and `docs/devkit/reference-product.md`. The table in `docs/devkit/getting-started.md` shows the difference.
 
-         Questions and problems: https://github.com/mosaikit/mosaikit/issues
-"
-    )
+## Where to read
+
+- `docs/devkit/getting-started.md`: the same steps with the details, an example plugin to read, plugin or product.
+- `docs/devkit/README.md`: the list of every document (concepts, manifest, logic, UI, data, security, packaging, testing).
+- `docs/devkit/troubleshooting.md`: an error, its cause and its fix.
+- `examples/<name>/WALKTHROUGH.md`: the commented walkthrough of each example plugin (`todo`, `insights`, `note-priority`). Read `todo` first.
+- `KIT.txt`: what each folder of the kit holds. `RELEASE-NOTES.md`: what changed.
+
+Questions and problems: https://github.com/mosaikit/mosaikit/issues
+"#;
+    TEMPLATE.replace("{version}", version).replace("{platform}", platform).replace("{run}", run)
 }
 
 /// The kit: folder, archive, signature, sums.
@@ -722,6 +719,25 @@ pub fn notices_only(out: &Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn kit_readme_is_plain_markdown_and_points_at_the_documents() {
+        for server in [true, false] {
+            let t = kit_readme("1.0.0", "linux-x86_64", server);
+            assert!(t.starts_with(
+                "# Mosaikit dev kit 1.0.0 (linux-x86_64)
+"
+            ));
+            assert!(!t.contains("{run}") && !t.contains("{version}"));
+            // an indented line would render as a code block
+            assert!(t.lines().all(|l| !l.starts_with("    ")), "indented line in the README");
+            for doc in ["docs/devkit/getting-started.md", "WALKTHROUGH.md", "building-an-application.md"] {
+                assert!(t.contains(doc), "{doc}");
+            }
+        }
+        let k = kit_txt("1.0.0", "linux-x86_64", false);
+        assert!(k.contains("START HERE") && k.contains("README.md"));
+    }
 
     fn facts_for_test() -> Facts {
         Facts {
