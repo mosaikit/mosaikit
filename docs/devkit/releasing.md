@@ -19,7 +19,7 @@ the developer profile on).
 Inside an archive: `bin/`, `sdk/` (the unpacked `.crate` of `mosaikit-plugin-sdk`), `plugin-api/` (the unpacked
 `npm pack` tarball of `@mosaikit/plugin-api`), `docs/devkit/` (and `docs/api/sdk` with `--api-docs`), `examples/`,
 `docker/`, `LICENSE`, `THIRD-PARTY-NOTICES.md`, `RELEASE-NOTES.md`, `COMPATIBILITY.md`, `VERSION`, `trusted_key.txt`,
-`KIT.txt`.
+`KIT.txt` and `README.md` (the first steps).
 
 ## Make a release (maintainer)
 
