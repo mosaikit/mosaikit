@@ -114,6 +114,14 @@ chiave di sviluppo che lo strumento crea una volta per te. Un server installa un
 chiave pubblica; il profilo sviluppatore accetta anche quelli non firmati. Vedi [Pacchetto e firma](packaging.md) e
 [Test](testing.md).
 
+Cosa fanno i tre comandi:
+
+- `test` controlla il plugin senza un server: il manifesto e le sue regole (`validate --strict`), le migrazioni su PostgreSQL e SQLite, le traduzioni, poi i test Rust, `tsc`, il lint e i test della UI.
+- `pack` compila il plugin e scrive un solo file, `dist/<id>-<versione>.mskp`: la logica, la UI, le migrazioni e il manifesto, con una firma. Non invia nulla.
+- `install` carica quel file su un server Mosaikit **in esecuzione**: accede come amministratore (`--user`, `--password`) e invia il pacchetto. Il server controlla la firma con le sue chiavi fidate e lo installa. `--server` è l'indirizzo di quel server.
+
+**Il server deve essere acceso quando lanci `install`.** Avvialo prima, in un'altra finestra: `mosaikit-plugin dev` (lascialo aperto; stampa il suo indirizzo, `http://localhost:8080` se quella porta è libera; gli utenti sono nella [sezione 3](#3-il-ciclo-di-sviluppo)), oppure il kit Docker (`docker compose -f docker/compose.yml up -d` nella cartella `docker/` del kit; l'indirizzo è `http://localhost:8080`). Senza un server `install` si ferma con `reaching <indirizzo>` e `os error 10061` (connessione rifiutata).
+
 **Dopo `install` il plugin è solo "installed", non acceso.** Lo strumento lo dice. Un Administrator lo accende: apri `#/admin`, Piattaforma > Plugin >
 il tuo plugin > **Turn on** (poi è `active` e disponibile all'organizzazione `dev`). Finché non è acceso la sua pagina non compare nella shell.
 

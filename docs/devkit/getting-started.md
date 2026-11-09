@@ -115,6 +115,14 @@ mosaikit-plugin install dist/<file>.mskp --server http://localhost:8080 --user a
 makes once for you. A server installs a signed package only if it trusts the public key; the developer profile also
 accepts unsigned ones. See [Packaging and signing](packaging.md) and [Testing](testing.md).
 
+What the three commands do:
+
+- `test` checks the plugin without a server: the manifest and its rules (`validate --strict`), the migrations on PostgreSQL and SQLite, the translations, then the Rust tests, `tsc`, the lint and the tests of the UI.
+- `pack` builds the plugin and writes one file, `dist/<id>-<version>.mskp`: the logic, the UI, the migrations and the manifest, with a signature. Nothing is sent anywhere.
+- `install` uploads that file to a **running** Mosaikit server: it signs in as an Administrator (`--user`, `--password`) and sends the package. The server checks the signature against its trusted keys and installs it. `--server` is the address of that server.
+
+**The server must be running when you run `install`.** Start one first, in another window: `mosaikit-plugin dev` (leave it open; it prints its address, `http://localhost:8080` unless that port is taken; the users are in [section 3](#3-the-development-loop)), or the Docker kit (`docker compose -f docker/compose.yml up -d` in the `docker/` folder of the kit; the address is `http://localhost:8080`). Without a server `install` stops with `reaching <address>` and `os error 10061` (connection refused).
+
 **After `install` the plugin is only "installed", not on.** The tool says so. An Administrator turns it on: open `#/admin`,
 Platform > Plugins > your plugin > **Turn on** (then it is `active` and available to the tenant `dev`). Until then its page
 does not appear in the shell.
