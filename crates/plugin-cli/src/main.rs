@@ -46,7 +46,7 @@ enum Cmd {
         /// use @mosaikit/plugin-api from this folder instead of the published one
         #[arg(long, env = "MOSAIKIT_PLUGIN_API_PATH")]
         plugin_api_path: Option<PathBuf>,
-        /// folder of an unpacked Mosaikit kit: its sdk/ and plugin-api/ stand for the two paths above
+        /// folder of an unpacked Mosaikit kit: its sdk/ and plugin-api/ stand for the two paths above (default: the kit this tool is in)
         #[arg(long, env = "MOSAIKIT_KIT")]
         kit: Option<PathBuf>,
         /// run `npm install` after adding the UI to an npm workspace
@@ -217,7 +217,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 into: into.unwrap_or_else(|| PathBuf::from(".")),
                 sdk_path,
                 plugin_api_path,
-                kit,
+                kit: kit.or_else(scaffold::kit_of_this_tool),
                 install,
             })?;
             println!("plugin created in {}", dir.display());
