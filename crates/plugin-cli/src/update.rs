@@ -181,14 +181,14 @@ pub struct Options {
     pub kit: Option<PathBuf>,
 }
 
-fn client() -> Result<reqwest::blocking::Client> {
+pub fn client() -> Result<reqwest::blocking::Client> {
     Ok(reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(600))
         .user_agent(format!("mosaikit-plugin/{}", env!("CARGO_PKG_VERSION")))
         .build()?)
 }
 
-fn get(c: &reqwest::blocking::Client, url: &str) -> Result<Vec<u8>> {
+pub fn get(c: &reqwest::blocking::Client, url: &str) -> Result<Vec<u8>> {
     let r = c.get(url).send().with_context(|| format!("downloading {url}"))?;
     if !r.status().is_success() {
         bail!("{url}: the server answered {}", r.status());

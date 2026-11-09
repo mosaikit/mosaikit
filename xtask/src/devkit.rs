@@ -424,7 +424,12 @@ pub fn write_sums(dir: &Path, key: &ed25519_dalek::SigningKey) -> Result<()> {
     let mut entries = Vec::new();
     for e in std::fs::read_dir(dir)?.flatten() {
         let name = e.file_name().to_string_lossy().to_string();
-        if name.starts_with("mosaikit-devkit-") && (name.ends_with(".zip") || name.ends_with(".tar.gz")) {
+        // the kits of the dev kit, and the desktop kit of the base (`mosaikit-<version>-desktop-windows-x86_64.zip`), which
+        // `mosaikit-product --base <version>` downloads and checks against these sums
+        let kit =
+            name.starts_with("mosaikit-devkit-") && (name.ends_with(".zip") || name.ends_with(".tar.gz"));
+        let base = name.starts_with("mosaikit-") && name.contains("-desktop-") && name.ends_with(".zip");
+        if kit || base {
             entries.push((update::sha256_hex(&std::fs::read(e.path())?), name));
         }
     }
