@@ -485,6 +485,8 @@ MOSAIKIT_PLUGIN_PORT=8081
 PLUGIN_DIR=./plugin
 # public keys of the publishers this server trusts, separated by commas (see README.md, Trust a key)
 MOSAIKIT_TRUSTED_KEYS=
+# 1: check the signatures as a production server does (a package signed with a key that is not in the list above, or not signed, is refused). Off, the developer profile accepts any key
+MOSAIKIT_DEVELOPER_PROFILE_STRICT_SIGNATURES=
 "
         ),
     )?;

@@ -48,6 +48,10 @@ pub struct Config {
     /// computer (the Docker kit, whose container listens on every interface and is published on loopback only)
     #[serde(default)]
     pub developer_profile_allow_remote: bool,
+    /// the developer profile keeps the signature check of a real server: no unsigned package, and a signed one only
+    /// from a key in `trusted_keys` (the Docker kit uses it to show what a production server refuses)
+    #[serde(default)]
+    pub developer_profile_strict_signatures: bool,
     /// pages of the Internet fetched for a plugin (`web` permission) may also be on private addresses
     /// (loopback, local network): only for tests and development, never in production
     #[serde(default)]
@@ -387,6 +391,9 @@ impl Config {
                 "MOSAIKIT_ALLOW_UNSIGNED" => self.allow_unsigned = truthy(&v),
                 "MOSAIKIT_DEVELOPER_PROFILE" => self.developer_profile = truthy(&v),
                 "MOSAIKIT_DEVELOPER_PROFILE_ALLOW_REMOTE" => self.developer_profile_allow_remote = truthy(&v),
+                "MOSAIKIT_DEVELOPER_PROFILE_STRICT_SIGNATURES" => {
+                    self.developer_profile_strict_signatures = truthy(&v)
+                }
                 "MOSAIKIT_ALLOW_PRIVATE_FETCH" => self.allow_private_fetch = truthy(&v),
                 "MOSAIKIT_ALLOW_PRIVATE_FETCH_HOSTS" => self
                     .allow_private_fetch_hosts
@@ -512,11 +519,13 @@ impl Config {
         Ok(())
     }
 
-    /// What the developer profile switches on (the guards have passed): hot reload, unsigned packages, no
+    /// What the developer profile switches on (the guards have passed): hot reload, unsigned packages (not with
+    /// `developer_profile_strict_signatures`), no
     /// second factor and the known password of the first accounts. With the profile off nothing changes.
     fn apply_developer_profile(&mut self) {
         self.dev.enabled = true;
-        self.allow_unsigned = true;
+        // unsigned packages and any signing key, unless the profile is asked to check the signatures as a server does
+        self.allow_unsigned = !self.developer_profile_strict_signatures;
         self.admin_totp = false;
         if self.initial_password.is_none() {
             self.initial_password = Some(crate::devprofile::PASSWORD.to_string());
