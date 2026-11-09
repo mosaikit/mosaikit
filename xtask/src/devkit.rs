@@ -485,6 +485,8 @@ fn kit_txt(version: &str, platform: &str, server: bool) -> String {
     };
     format!(
         "Mosaikit dev kit {version} ({platform})\n\n\
+         START HERE: to write a plugin, read README.md (the first steps), then docs/devkit/getting-started.md and\n\
+         docs/devkit/README.md (the list of every document). Setting PATH or MOSAIKIT_KIT is only the installation.\n\n\
          bin/mosaikit-plugin  the command-line tool: new, build, test, validate, pack, sign, keygen, install, dev, doctor, self-update\n\
          {run_part}\n\
          sdk/                 the Rust SDK (mosaikit-plugin-sdk): `new --kit <this folder>` uses it\n\
@@ -502,6 +504,50 @@ fn kit_txt(version: &str, platform: &str, server: bool) -> String {
          Building a product (`mosaikit-product build desktop --base`) needs the desktop kit of the platform release\n\
          (mosaikit-<version>-desktop-<platform>.zip on GitHub Releases), which is not part of this kit:\n\
          see docs/devkit/building-an-application.md.\n"
+    )
+}
+
+/// The first file a developer opens: the five steps from an unpacked kit to a plugin running.
+fn kit_readme(version: &str, platform: &str, server: bool) -> String {
+    let run = if server {
+        "```
+mosaikit-plugin dev
+```
+
+It builds the plugin, starts the development server (SQLite), opens the browser and prints the test users (`admin`, `manager`, `alice`, `bob`; password `mosaikit-dev`)."
+    } else {
+        "```
+docker compose -f docker/compose.yml up -d
+```
+
+There is no server executable for this platform: the development server is the Docker image (see `docker/README.md`)."
+    };
+    format!(
+        "# Mosaikit dev kit {version} ({platform})
+
+         Everything you need to write, test, sign and install a plugin for Mosaikit, without the source code of the platform.
+
+         ## Your first plugin in five steps
+
+         1. **Put the tools on your path.** Add the `bin/` folder of this kit to `PATH`, or set `MOSAIKIT_KIT` to this folder.
+         2. **Check the machine.** `mosaikit-plugin doctor` (add `--fix` to install the `wasm32-unknown-unknown` target).
+         3. **Make a plugin.** `mosaikit-plugin new my-plugin --kit <this folder>`. For a complete commented one: `mosaikit-plugin new my-plugin --kit <this folder> --example todo`; it comes with a `WALKTHROUGH.md`.
+         4. **Run it.** From the folder of the plugin:
+
+{run}
+
+         5. **Check it, pack it, install it.** `mosaikit-plugin validate --strict`, `mosaikit-plugin test`, then `mosaikit-plugin pack`, `mosaikit-plugin sign` and `mosaikit-plugin install`. The server turns on only plugins an Administrator enables: after `install`, turn the plugin on in the Administration.
+
+         ## Where to read
+
+         - `docs/devkit/getting-started.md`: the same steps with the details.
+         - `docs/devkit/README.md`: the list of every document (concepts, manifest, logic, UI, data, security, packaging, testing).
+         - `docs/devkit/troubleshooting.md`: an error, its cause and its fix.
+         - `examples/`: three complete plugins (`todo`, `insights`, `note-priority`).
+         - `KIT.txt`: what each folder of the kit holds. `RELEASE-NOTES.md`: what changed.
+
+         Questions and problems: https://github.com/mosaikit/mosaikit/issues
+"
     )
 }
 
@@ -632,6 +678,7 @@ pub fn devkit(o: &Options) -> Result<()> {
     std::fs::write(kit.join("VERSION"), format!("{version}\n"))?;
     std::fs::write(kit.join(update::TRUSTED_KEY_FILE), mosaikit_mskp::public_key_b64(&key) + "\n")?;
     std::fs::write(kit.join("KIT.txt"), kit_txt(&version, &platform, server))?;
+    std::fs::write(kit.join("README.md"), kit_readme(&version, &platform, server))?;
     std::fs::remove_dir_all(&tmp)?;
 
     // --- archive, signatures ---
