@@ -4,6 +4,14 @@ Cosa cambia da una versione di Mosaikit alla successiva. La shell mostra la sezi
 Aiuto › Novità (un titolo `## <versione>` per versione, voci `- `, gruppi `### `). Questo file è la
 versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
+## 1.0.6
+
+- La release Docker di un prodotto ha un `README.md` con cos'è la cartella, le credenziali predefinite di una nuova installazione, come recuperare il secondo fattore e la password, e dove leggere altro.
+- La pagina di accesso di Keycloak in quella release ha l'aspetto della pagina di accesso del prodotto: una fascia con il nome, la frase e il logo del brand, il modulo a destra, i colori del brand.
+- Il pulsante del tenant di esempio dice «Accedi con SSO» (diceva «Accedi con Sign in with Keycloak»).
+- Un accesso tramite identity provider avviato a un indirizzo dell'app diverso da quello di `MOSAIKIT_URL` (per esempio `127.0.0.1` invece di `localhost`) ora lo dice, invece di «avviato in un altro browser».
+- `mosaikit-product validate`, `dev` e `test` prendono da soli la Base del Dev Kit quando il prodotto tiene plugin ufficiali.
+
 ## 1.0.5
 
 - `mosaikit-product build desktop` e `build docker` non richiedono più `--base`: senza, la Base è la versione del Dev Kit che usi, che esce insieme. `--base` resta per un'altra versione, una cartella o uno `.zip`.

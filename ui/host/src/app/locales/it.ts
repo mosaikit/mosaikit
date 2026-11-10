@@ -1004,7 +1004,7 @@ export const IT: Record<string, string> = {
   'Sign-out at the provider': 'Uscita dal provider',
   'Back-channel logout': 'Logout back-channel',
   'errors.oidc_tenant': 'Questa organizzazione accede con il suo provider di identità: non ci sono password locali',
-  'errors.oidc_state': 'L’accesso è scaduto o è stato avviato in un altro browser: ricomincia',
+  'errors.oidc_state': 'L’accesso è scaduto, oppure è stato avviato in un altro browser o a un altro indirizzo dell’app: apri l’app al suo indirizzo abituale e ricomincia',
   'errors.oidc_token': 'Il provider di identità ha inviato un token non valido: riprova o avvisa l’amministratore',
   'errors.oidc_provider': 'Il provider di identità non risponde come previsto: riprova più tardi',
   'errors.oidc_denied': 'Il provider di identità ha rifiutato l’accesso',

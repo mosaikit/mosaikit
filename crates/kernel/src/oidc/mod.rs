@@ -858,15 +858,15 @@ pub async fn finish(
         .with_code("oidc_denied"));
     }
     let sealed = cookie.and_then(|c| URL_SAFE_NO_PAD.decode(c).ok()).ok_or_else(|| {
-        flow_error("the sign-in has expired or was started in another browser: start again")
+        flow_error("the sign-in has expired, or it was started in another browser or at another address of the app: open the app at its usual address and start again")
     })?;
     let flow: Flow =
         k.secrets.open(FLOW_AAD, &sealed).ok().and_then(|p| serde_json::from_slice(&p).ok()).ok_or_else(
-            || flow_error("the sign-in has expired or was started in another browser: start again"),
+            || flow_error("the sign-in has expired, or it was started in another browser or at another address of the app: open the app at its usual address and start again"),
         )?;
     let now = chrono::Utc::now().timestamp();
     if flow.exp < now || flow.slug != slug {
-        return Err(flow_error("the sign-in has expired or was started in another browser: start again"));
+        return Err(flow_error("the sign-in has expired, or it was started in another browser or at another address of the app: open the app at its usual address and start again"));
     }
     let state = cb.state.as_deref().unwrap_or_default();
     if state.is_empty() || state != flow.state {

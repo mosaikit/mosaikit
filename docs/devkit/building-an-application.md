@@ -209,7 +209,7 @@ mosaikit-product build k8s     --base-k8s <k8s folder of the kit>       dist/<id
   also starts Keycloak with a realm named after the product, a sign-in page that takes the logo and the colours of your brand, three test people
   and a sample tenant `idp-demo` that is made at the first start with its sign-in through Keycloak already set (`[bootstrap.idp_demo]`, added to the
   `distribution.toml` of the release; the client secret comes from `MOSAIKIT_OIDC_CLIENT_SECRET`). Open the product, choose the tenant `idp-demo`, press
-  "Sign in with Keycloak". It is a demonstration (`start-dev`, test passwords): `keycloak/README.md` in the release says how to read it, change it or
+  "Sign in with SSO". It is a demonstration (`start-dev`, test passwords): `keycloak/README.md` in the release says how to read it, change it or
   remove it. A real release uses its own identity provider, set per tenant by the Administrator.
 - **Kubernetes**: a kustomize overlay over the base kit that sets the image.
 - **Signing**: `--key`, `MOSAIKIT_SIGNING_KEY` or `MOSAIKIT_SIGNING_KEY_FILE`; without one a development key is made and used

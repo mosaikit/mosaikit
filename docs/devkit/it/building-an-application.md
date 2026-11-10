@@ -165,7 +165,7 @@ mosaikit-product build k8s     --base-k8s <cartella k8s del kit>
 **Keycloak**: con `[docker] keycloak = true` (lo scrive `mosaikit-product new`; serve una base dalla 1.0.3 e `validate` lo dice) il compose avvia anche Keycloak con un
 realm che porta il nome del prodotto, una pagina di accesso che prende logo e colori del tuo brand, tre persone di prova e un tenant d'esempio `idp-demo`, creato al
 primo avvio con l'accesso tramite Keycloak già impostato (`[bootstrap.idp_demo]`, aggiunto al `distribution.toml` della release; il segreto del client arriva da
-`MOSAIKIT_OIDC_CLIENT_SECRET`). Apri il prodotto, scegli il tenant `idp-demo` e premi "Sign in with Keycloak". È una dimostrazione (`start-dev`, password di prova):
+`MOSAIKIT_OIDC_CLIENT_SECRET`). Apri il prodotto, scegli il tenant `idp-demo` e premi "Sign in with SSO". È una dimostrazione (`start-dev`, password di prova):
 `keycloak/README.md` nella release dice come leggerla, cambiarla o toglierla. Una release vera usa un identity provider proprio, impostato per tenant dall'Amministratore.
 
 La release non porta mai un plugin non firmato: la build verifica ogni pacchetto contro le chiavi che il server considererà fidate. Firma con `--key`,

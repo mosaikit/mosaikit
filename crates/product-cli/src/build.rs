@@ -399,6 +399,7 @@ pub fn docker(d: &Distribution, base: &Path, base_image: &str, build: bool, o: &
         out.join("compose.yml"),
         compose(&image, &pg, d.docker.keycloak.then_some(d.product.id.as_str())),
     )?;
+    std::fs::write(out.join("README.md"), docker_readme(d, &image))?;
     std::fs::create_dir_all(out.join("initdb"))?;
     std::fs::write(
         out.join("initdb").join("01-mosaikit.sh"),
@@ -412,6 +413,46 @@ pub fn docker(d: &Distribution, base: &Path, base_image: &str, build: bool, o: &
     }
     println!("docker release: {} (image {image}{})", out.display(), if build { "" } else { ", not built" });
     Ok(out)
+}
+
+/// The README of the Docker release: what the folder is, the credentials of a new installation, how to recover the
+/// access, where to read more. The parts about Keycloak are there only when the release has it.
+fn docker_readme(d: &Distribution, image: &str) -> String {
+    let kc = d.docker.keycloak;
+    let on = |text: &str| if kc { text.to_string() } else { String::new() };
+    let section = on("## Single sign-on with Keycloak (demonstration)
+
+        The sample tenant **idp-demo** signs in through the Keycloak of this release (OpenID Connect): open the product, choose the tenant
+        `idp-demo`, press *Sign in with SSO*, and sign in to Keycloak as `anna.manager` (becomes Tenant Manager) or `bruno.user` (becomes
+        User). `carla.noaccess` has no group and is refused. The sign-in page of Keycloak has the look of the one of the product. The
+        first start of Keycloak takes about a minute: if the button does not answer at once, wait and try again. `keycloak/README.md`
+        explains how it is wired and how to remove it.
+
+");
+    include_str!("../templates/docker-README.md")
+        .replace("{name}", &d.product.name)
+        .replace("{version}", &d.product.version)
+        .replace("{image}", image)
+        .replace("{keycloak_services}", &on(", and Keycloak with a sample tenant to try single sign-on"))
+        .replace(
+            "{keycloak_compose_rows}",
+            &on(", `keycloak` (on port 8180) and `keycloak-localhost` (lets the app reach Keycloak as `localhost:8180`)"),
+        )
+        .replace("{keycloak_bootstrap_note}", &on(", the sample tenant `idp-demo`"))
+        .replace(
+            "{keycloak_folder_row}",
+            &on("| `keycloak/` | the realm, the sign-in page and the README of the demonstration |
+"),
+        )
+        .replace(
+            "{keycloak_credential_rows}",
+            &on("| Sample tenant `idp-demo` (single sign-on) | http://localhost:8080, choose `idp-demo`, *Sign in with SSO* | `anna.manager` (Tenant Manager), `bruno.user` (User), `carla.noaccess` (refused) | `change-me` |
+                | Keycloak console | http://localhost:8180 | `admin` | `change-me-now` (`KEYCLOAK_ADMIN_PASSWORD`) |
+"),
+        )
+        .replace("{keycloak_section}", &section)
+        .replace("{keycloak_volume}", &on(", `kcdata`"))
+        .replace("{keycloak_remove}", &on(" (the Keycloak services and the tenant `idp-demo`: see `keycloak/README.md`)"))
 }
 
 fn compose(image: &str, postgres: &str, keycloak: Option<&str>) -> String {
@@ -663,8 +704,23 @@ extensions",
         let plain = docker(&d, &base, "mosaikit:1.0.0", false, &o("plain")).unwrap();
         assert!(!plain.join("keycloak").exists());
         assert!(!std::fs::read_to_string(plain.join("compose.yml")).unwrap().contains("keycloak"));
+        // the README of the release: credentials and how to get the access back; Keycloak only when it is there
+        let r = std::fs::read_to_string(plain.join("README.md")).unwrap();
+        assert!(
+            r.contains("change-me-now") && r.contains("reset-totp") && r.contains("reset-password"),
+            "{r}"
+        );
+        assert!(!r.to_lowercase().contains("keycloak") && !r.contains('{'), "{r}");
         d.docker.keycloak = true;
         let out = docker(&d, &base, "mosaikit:1.0.0", false, &o("kc")).unwrap();
+        let r = std::fs::read_to_string(out.join("README.md")).unwrap();
+        assert!(
+            r.contains("anna.manager")
+                && r.contains("Sign in with SSO")
+                && r.contains("kcdata")
+                && !r.contains('{'),
+            "{r}"
+        );
         let c = std::fs::read_to_string(out.join("compose.yml")).unwrap();
         assert!(
             c.contains(

@@ -57,9 +57,17 @@ fn set_var(css: &mut String, var: &str, value: &str) {
     }
 }
 
-/// The style sheet of the sign-in page: the one of the platform, with the colours and the logo of the brand.
-pub fn css(colors: &toml::Table, logo_file: &str) -> String {
+/// A text as a CSS string.
+fn quoted(text: &str) -> String {
+    format!("\"{}\"", text.replace('\\', "\\\\").replace('"', "\\\"").replace('\n', " "))
+}
+
+/// The style sheet of the sign-in page: the one of the platform (the look of the sign-in page of Mosaikit), with the
+/// name, the line, the colours and the logo of the brand.
+pub fn css(colors: &toml::Table, logo_file: &str, name: &str, tagline: &str) -> String {
     let mut css = CSS.replace("../img/logo.svg", &format!("../img/{logo_file}"));
+    set_var(&mut css, "--msk-name", &quoted(name));
+    set_var(&mut css, "--msk-tagline", &quoted(tagline));
     let get = |k: &str| colors.get(k).and_then(|v| v.as_str()).filter(|v| v.len() == 7 && v.starts_with('#'));
     if let Some(a) = get("accent") {
         set_var(&mut css, "--msk-accent", a);
@@ -68,7 +76,7 @@ pub fn css(colors: &toml::Table, logo_file: &str) -> String {
         }
     }
     for (var, key) in
-        [("--msk-bg", "bg"), ("--msk-card", "panel"), ("--msk-text", "fg"), ("--msk-border", "line")]
+        [("--msk-band", "band"), ("--msk-bg", "bg"), ("--msk-text", "fg"), ("--msk-border", "line")]
     {
         if let Some(v) = get(key) {
             set_var(&mut css, var, v);
@@ -110,7 +118,12 @@ pub fn write(d: &Distribution, brand: Option<&Path>, out: &Path) -> Result<()> {
         None => std::fs::write(img.join(&logo_file), LOGO)?,
     }
     let colors = table.get("colors").and_then(|v| v.as_table()).cloned().unwrap_or_default();
-    std::fs::write(theme.join("resources").join("css").join("login.css"), css(&colors, &logo_file))?;
+    let tagline =
+        table.get("tagline").and_then(|v| v.as_str()).filter(|t| !t.trim().is_empty()).unwrap_or("Workspace");
+    std::fs::write(
+        theme.join("resources").join("css").join("login.css"),
+        css(&colors, &logo_file, &d.product.name, tagline),
+    )?;
     std::fs::write(dir.join("README.md"), readme(d))?;
     Ok(())
 }
@@ -122,7 +135,7 @@ pub fn bootstrap(d: &Distribution) -> String {
         "\n# added by `mosaikit-product build docker` ([docker] keycloak = true): a sample tenant that signs in through Keycloak\n\
          [bootstrap.idp_demo]\ntenant = \"{TENANT}\"\ntenant_name = \"{name} (identity provider demo)\"\n\
          issuer = \"http://localhost:{PORT}/realms/{id}\"\nclient_id = \"{id}\"\n\
-         manager_groups = [\"{id}-managers\"]\nuser_groups = [\"{id}-users\"]\nbutton_text = \"Sign in with Keycloak\"\n",
+         manager_groups = [\"{id}-managers\"]\nuser_groups = [\"{id}-users\"]\nbutton_text = \"SSO\"\n",
         name = d.product.name
     )
 }
@@ -172,9 +185,12 @@ fn readme(d: &Distribution) -> String {
 | What | Where |
 |---|---|
 | The product | http://localhost:8080 |
-| The sample tenant | `{TENANT}`: choose it on the sign-in page, then "Sign in with Keycloak" |
+| The sample tenant | `{TENANT}`: choose it on the sign-in page, then "Sign in with SSO" |
 | Keycloak console | http://localhost:{PORT} (`KEYCLOAK_ADMIN`, `KEYCLOAK_ADMIN_PASSWORD`; default `admin` / `change-me-now`) |
 | The realm | `{id}`, imported from `keycloak/realm-{id}.json` at the first start |
+
+Open the product at exactly `http://localhost:8080`: the sign-in comes back to that address, and from `127.0.0.1` or the name of the
+computer it ends with *The sign-in has expired, or it was started in another browser or at another address*. Start again from `localhost`.
 
 Test people (password `change-me`): `anna.manager` (group `{id}-managers`, becomes Tenant Manager), `bruno.user` (group `{id}-users`, becomes
 User) and `carla.noaccess` (no group, refused by the product).
@@ -208,11 +224,16 @@ mod tests {
     fn the_sign_in_page_takes_the_colours_of_the_brand() {
         let t: toml::Table =
             toml::from_str("accent = \"#0b6e4f\"\nbg = \"#f6f8f7\"\nfg = \"nonsense\"").unwrap();
-        let c = css(&t, "logo.png");
+        let c = css(&t, "logo.png", "Acme Maps", "built on Mosaikit");
         assert!(c.contains("--msk-accent: #0b6e4f;") && c.contains("--msk-bg: #f6f8f7;"), "{c}");
         assert!(c.contains("--msk-accent-dark: #08583f;"), "{c}");
         assert!(c.contains("../img/logo.png") && !c.contains("../img/logo.svg"));
         // a colour that is not #rrggbb is left as it was
-        assert!(c.contains("--msk-text: #1b2333;"));
+        assert!(c.contains("--msk-text: #242424;"));
+        // the name and the line of the product are on the band
+        assert!(
+            c.contains("--msk-name: \"Acme Maps\";") && c.contains("--msk-tagline: \"built on Mosaikit\";"),
+            "{c}"
+        );
     }
 }
