@@ -53,7 +53,7 @@ function readSource(src) {
 
 const docId = (src) => slug(src.replace(/\.md/g, '').replace(/[\\/#]/g, '-'));
 
-function render(src, ids) {
+function render(src, ids, figures = [], lang = 'en') {
   const { file, text } = readSource(src);
   const id = docId(src);
   const dir = path.posix.dirname(file);
@@ -75,7 +75,26 @@ function render(src, ids) {
     return `<a href="${cfg.repo}${target}${frag ? `#${frag}` : ''}">${inner}</a>`;
   };
   renderer.html = ({ text: raw }) => esc(raw);
-  return `<section class="doc" id="doc-${id}">${marked.parse(text, { renderer, gfm: true })}</section>`;
+  let html = marked.parse(text, { renderer, gfm: true });
+  for (const fg of figures.filter((x) => x.doc === file)) html = addFigure(html, `${id}--${slug(fg.heading)}`, fg, lang);
+  return `<section class="doc" id="doc-${id}">${html}</section>`;
+}
+
+// A figure goes after the first block that follows its heading (a paragraph, a list or a table).
+function addFigure(html, headingId, fg, lang) {
+  const at = html.indexOf(`id="${headingId}"`);
+  if (at < 0) throw new Error(`figure ${fg.image}: no heading "${fg.heading}" in ${fg.doc}`);
+  const rest = html.slice(at);
+  const ends = ['</p>', '</ul>', '</ol>', '</table>']
+    .map((t) => [rest.indexOf(t), t.length])
+    .filter(([i]) => i >= 0)
+    .sort((a, b) => a[0] - b[0]);
+  const next = rest.search(/<h[1-6] /g, 1);
+  const [i, len] = ends[0] ?? [rest.length, 0];
+  const cut = at + (next > 0 && next < i ? next : i + len);
+  const data = fs.readFileSync(path.join(root, fg.image)).toString('base64');
+  const cap = fg.caption[lang] ?? fg.caption.en;
+  return `${html.slice(0, cut)}<figure><img src="data:image/png;base64,${data}" alt="${esc(cap)}"><figcaption>${esc(cap)}</figcaption></figure>${html.slice(cut)}`;
 }
 
 const CSS = `
@@ -110,6 +129,9 @@ th { background: #f1f3f8; }
 tr { break-inside: avoid; }
 blockquote { margin: 8px 0; padding: 2px 12px; border-left: 3px solid #e8b94a; color: #3b465f; background: #fbf7ec; }
 img { max-width: 100%; }
+figure { margin: 12px 0 14px; text-align: center; break-inside: avoid; }
+figure img { max-width: 86%; border: 1px solid #d5dbe6; border-radius: 4px; box-shadow: 0 2px 8px rgba(27, 35, 51, .12); }
+figcaption { font-size: 8.8pt; color: #55607a; margin-top: 4px; font-style: italic; }
 `;
 
 let browserPromise;
@@ -119,7 +141,7 @@ async function manual(m, lang, ver, date) {
   const sources = m.sources[lang];
   if (!sources) return null;
   const ids = new Map(sources.map((s) => [s.split('#')[0], docId(s)]));
-  const body = sources.map((s) => render(s, ids)).join('\n');
+  const body = sources.map((s) => render(s, ids, m.figures ?? [], lang)).join('\n');
   const toc = [...body.matchAll(/<h([12]) id="([^"]+)">(.*?)<\/h\1>/g)]
     .map(([, d, id, t]) => `<li class="d${d}"><a href="#${id}">${t.replace(/<[^>]+>/g, '')}</a></li>`)
     .join('\n');

@@ -28,6 +28,10 @@ They are not committed: the Markdown and `deck.json` are the only sources.
   percentage and the cost are computed.
 - The version and the date are the ones of the build.
 
+## The screenshots of the user manuals
+
+`docs/presentation/screens/*.png` are the pictures of the user manual. They are not part of the guides of the application (`docs/guide/*.md` are shown inside the app and stay text): `tools/docs/manuals.json` says after which heading of which guide each picture goes (`figures`). To make them again, start a new desktop release (empty data folder; `open_browser = false`, a free port) and run `node tools/docs/shots.mjs --server http://127.0.0.1:<port>/`: it signs in as `admin` and `user`, makes sample people, groups and notes, and writes the pictures.
+
 ## Needs
 
 Node 24 and a Chromium (the one of Playwright; `DOCS_BROWSER` points to another). `cargo xtask docs` runs
