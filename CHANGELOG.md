@@ -5,6 +5,10 @@ in Help › What is new (one `## <version>` heading per version, `- ` items, `##
 language of the person: this file in English, [CHANGELOG.it.md](CHANGELOG.it.md) in Italian (keep them
 in step).
 
+## 1.0.5
+
+- `mosaikit-product build desktop` and `build docker` no longer need `--base`: without it the Base is the version of the Dev Kit you run, which is released together with it. `--base` stays for another version, a folder or a `.zip`.
+
 ## 1.0.4
 
 - The sign-in page of Keycloak in the Docker release of a product shows the logo once, a readable title and a card at full width.

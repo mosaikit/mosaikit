@@ -4,6 +4,10 @@ Cosa cambia da una versione di Mosaikit alla successiva. La shell mostra la sezi
 Aiuto › Novità (un titolo `## <versione>` per versione, voci `- `, gruppi `### `). Questo file è la
 versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
+## 1.0.5
+
+- `mosaikit-product build desktop` e `build docker` non richiedono più `--base`: senza, la Base è la versione del Dev Kit che usi, che esce insieme. `--base` resta per un'altra versione, una cartella o uno `.zip`.
+
 ## 1.0.4
 
 - La pagina di accesso di Keycloak nella release Docker di un prodotto mostra il logo una volta sola, un titolo leggibile e la scheda a tutta larghezza.

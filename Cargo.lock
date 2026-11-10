@@ -1846,7 +1846,7 @@ dependencies = [
 
 [[package]]
 name = "mosaikit-db"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "chrono",
  "hex",
@@ -1865,7 +1865,7 @@ dependencies = [
 
 [[package]]
 name = "mosaikit-desktop"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "clap",
  "mosaikit-kernel",
@@ -1883,7 +1883,7 @@ dependencies = [
 
 [[package]]
 name = "mosaikit-kernel"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "argon2",
  "base64 0.22.1",
@@ -1926,7 +1926,7 @@ dependencies = [
 
 [[package]]
 name = "mosaikit-mskp"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "base64 0.22.1",
  "ed25519-dalek",
@@ -1942,7 +1942,7 @@ dependencies = [
 
 [[package]]
 name = "mosaikit-plugin-cli"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "anyhow",
  "clap",
@@ -1968,7 +1968,7 @@ dependencies = [
 
 [[package]]
 name = "mosaikit-product-cli"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "anyhow",
  "clap",
@@ -1985,7 +1985,7 @@ dependencies = [
 
 [[package]]
 name = "mosaikit-runtime"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "serde_json",
  "thiserror 2.0.21",
@@ -1995,7 +1995,7 @@ dependencies = [
 
 [[package]]
 name = "mosaikit-server"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -2031,7 +2031,7 @@ dependencies = [
 
 [[package]]
 name = "mosaikit-sql-guard"
-version = "1.0.4"
+version = "1.0.5"
 dependencies = [
  "sqlparser",
  "thiserror 2.0.21",
