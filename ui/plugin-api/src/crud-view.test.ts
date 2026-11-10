@@ -203,6 +203,35 @@ describe('mountCrud', () => {
     expect(create.args).toEqual({ resource: 'notes', values: { title: 'new note', done: true }, parent: undefined })
   })
 
+  it('form: modal keeps the form out of the page and opens it for «new» and for an item', async () => {
+    const el = document.createElement('div')
+    const { msk, calls } = fakeMsk([row('a', 'first', 'manage')])
+    mountCrud(el, msk, 'notes', { form: 'modal' })
+    await tick()
+    const dialog = el.querySelector<HTMLDialogElement>('dialog.msk-modal')!
+    // the form is in the dialog, not under the table, and the dialog is closed
+    expect(dialog.querySelector('.msk-form')).not.toBeNull()
+    expect(el.querySelector('.msk-body > .msk-form')).toBeNull()
+    expect(dialog.hasAttribute('open')).toBe(false)
+    // «new» opens it
+    const buttons = () => [...el.querySelectorAll<HTMLButtonElement>('button')]
+    buttons().find((b) => b.textContent === '＋ New')!.click()
+    expect(dialog.hasAttribute('open')).toBe(true)
+    // saving creates the item and closes it
+    el.querySelector<HTMLInputElement>('[data-key="title"]')!.value = 'second'
+    ;[...dialog.querySelectorAll<HTMLButtonElement>('.msk-actions button')].find((b) => b.textContent === 'Save')!.click()
+    await tick()
+    expect(calls.some((c) => c.op === 'crud.create')).toBe(true)
+    expect(dialog.hasAttribute('open')).toBe(false)
+    // selecting a row opens it, cancelling closes it
+    el.querySelector<HTMLElement>('[data-id="a"], tr, [role="row"]')
+    const rowEl = [...el.querySelectorAll<HTMLElement>('[role="row"], tr')].find((r) => r.textContent?.includes('first'))!
+    rowEl.click()
+    expect(dialog.hasAttribute('open')).toBe(true)
+    ;[...dialog.querySelectorAll<HTMLButtonElement>('.msk-actions button')].find((b) => b.textContent === 'Close' || b.textContent === 'Cancel')!.click()
+    expect(dialog.hasAttribute('open')).toBe(false)
+  })
+
   it('shows the labels of the choice values, and stores the values', async () => {
     const el = document.createElement('div')
     const decl = [{ key: 'tag', label: 'Etichetta', kind: 'choice', options: ['work', 'home'], option_labels: { work: 'lavoro' } }]

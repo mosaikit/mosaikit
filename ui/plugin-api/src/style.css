@@ -219,3 +219,15 @@ html.msk-fill #app { padding: 0; height: 100%; display: flex; flex-direction: co
 .msk-splitbody .msk-items-box > .msk-items, .msk-splitbody .msk-items-box > .msk-board { flex: none; }
 .msk-split[data-open='true'] .msk-detail, .msk-split[data-panel='always'] .msk-detail { display: block; }
 @media (max-width: 900px) { .msk-split[data-panel='always']:not([data-open='true']) .msk-detail { display: none; } }
+
+/* The form of an item in a dialog over the page (`form: 'modal'` of mountCrud) */
+dialog.msk-modal { border: 0; padding: 0; border-radius: 16px; width: min(640px, calc(100vw - 32px)); max-height: calc(100vh - 48px); background: var(--panel); color: var(--fg); box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35); overflow: hidden; }
+dialog.msk-modal[open] { display: flex; flex-direction: column; animation: msk-modal-in 0.16s ease-out; }
+dialog.msk-modal::backdrop { background: rgba(15, 18, 30, 0.5); backdrop-filter: blur(2px); }
+dialog.msk-modal .msk-form { margin: 0; max-width: none; border: 0; border-radius: 0; background: none; padding: 24px 26px; overflow: auto; }
+dialog.msk-modal .msk-form h3 { font-size: 18px; text-transform: none; letter-spacing: 0; color: var(--fg); font-weight: 600; margin: 0 0 16px; }
+dialog.msk-modal .msk-form h3:focus { outline: none; }
+dialog.msk-modal .msk-actions { position: sticky; bottom: -24px; margin: 18px -26px -24px; padding: 14px 26px; background: var(--panel); border-top: 1px solid var(--line); justify-content: flex-end; }
+@keyframes msk-modal-in { from { opacity: 0; transform: translateY(8px) scale(0.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { dialog.msk-modal[open] { animation: none; } }
+
