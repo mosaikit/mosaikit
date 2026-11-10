@@ -5,6 +5,10 @@ in Help › What is new (one `## <version>` heading per version, `- ` items, `##
 language of the person: this file in English, [CHANGELOG.it.md](CHANGELOG.it.md) in Italian (keep them
 in step).
 
+## 1.0.4
+
+- The sign-in page of Keycloak in the Docker release of a product shows the logo once, a readable title and a card at full width.
+
 ## 1.0.3
 
 ### The platform

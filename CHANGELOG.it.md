@@ -4,6 +4,10 @@ Cosa cambia da una versione di Mosaikit alla successiva. La shell mostra la sezi
 Aiuto › Novità (un titolo `## <versione>` per versione, voci `- `, gruppi `### `). Questo file è la
 versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
+## 1.0.4
+
+- La pagina di accesso di Keycloak nella release Docker di un prodotto mostra il logo una volta sola, un titolo leggibile e la scheda a tutta larghezza.
+
 ## 1.0.3
 
 ### La piattaforma
