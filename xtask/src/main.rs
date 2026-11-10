@@ -71,8 +71,8 @@ enum Cmd {
     },
     /// CI checks: fmt, clippy, deny, typecheck, lint, build, test
     Ci,
-    /// PDF manuals (user, installation, developer, architecture) and the PowerPoint presentation, from docs/ and
-    /// docs/presentation/deck.json, in dist/docs (English and Italian where the source exists)
+    /// PDF manuals (user, installation, developer, architecture) and the PowerPoint presentation, in English, from docs/
+    /// and docs/presentation/deck.json, in dist/docs
     Docs {
         /// folder for the files (default dist/docs)
         #[arg(long)]
@@ -80,7 +80,7 @@ enum Cmd {
         /// only check that the sources exist and the deck is translated; build nothing
         #[arg(long)]
         check: bool,
-        /// languages, for example en or en,it (default both)
+        /// languages, for example en,it (default en: the documents are in English)
         #[arg(long)]
         lang: Option<String>,
     },

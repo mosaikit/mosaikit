@@ -8,7 +8,7 @@ in step).
 ## 1.0.5
 
 - `mosaikit-product build desktop` and `build docker` no longer need `--base`: without it the Base is the version of the Dev Kit you run, which is released together with it. `--base` stays for another version, a folder or a `.zip`.
-- `cargo xtask docs` makes the PDF manuals (user, installation, developer, architecture; English and Italian where a translation exists) and a PowerPoint presentation of Mosaikit, with its advantages, a measured footprint and an estimate of the time and cost saved against starting from zero. Every release attaches them.
+- `cargo xtask docs` makes the PDF manuals (user, installation, developer, architecture), in English, and a PowerPoint presentation of Mosaikit, with its advantages, a measured footprint and an estimate of the time and cost saved against starting from zero. Every release attaches them.
 
 ## 1.0.4
 

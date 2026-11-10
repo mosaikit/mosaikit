@@ -4,13 +4,14 @@
 
 | File | From |
 |---|---|
-| `mosaikit-user-manual-<version>-<lang>.pdf` | `docs/guide/` (User, Tenant Manager, Administrator) |
+| `mosaikit-user-manual-<version>-en.pdf` | `docs/guide/` (User, Tenant Manager, Administrator) |
 | `mosaikit-installation-guide-<version>-en.pdf` | the Desktop, Docker, Kubernetes and Configuration sections of `README.md`, `deploy/README.docker.md`, `deploy/k8s/README.md` |
-| `mosaikit-developer-guide-<version>-<lang>.pdf` | `docs/devkit/` |
+| `mosaikit-developer-guide-<version>-en.pdf` | `docs/devkit/` |
 | `mosaikit-architecture-<version>-en.pdf` | `docs/architecture.md` |
-| `mosaikit-presentation-<version>-<lang>.pptx` | `docs/presentation/deck.json` |
+| `mosaikit-presentation-<version>-en.pptx` | `docs/presentation/deck.json` |
 
-Every release (`release.yml`, job `docs`) builds them and attaches them to the GitHub Release next to the Dev Kit.
+The documents are in English. `--lang en,it` also makes the Italian ones that have a source (the Italian guides, the
+Italian texts of the deck). Every release (`release.yml`, job `docs`) builds the English ones and attaches them to the GitHub Release next to the Dev Kit.
 They are not committed: the Markdown and `deck.json` are the only sources.
 
 ## Keeping them up to date
@@ -18,7 +19,7 @@ They are not committed: the Markdown and `deck.json` are the only sources.
 - **The manuals** follow the Markdown. Nothing to do, unless a document is added: list it in `tools/docs/manuals.json`
   (the order of the chapters is the order of the list). A language that has no source for a manual is skipped.
 - **The presentation** is `deck.json`: slides of a few kinds (`title`, `bullets`, `columns`, `cards`, `steps`, `kpis`,
-  `savings`, `closing`), each text in English and in Italian. `cargo xtask docs --check` (part of `cargo xtask ci`)
+  `savings`, `closing`), each text in English with an Italian version. `cargo xtask docs --check` (part of `cargo xtask ci`)
   fails when a text misses one of the two languages or a source of a manual is gone.
 - **The numbers.** `measured` holds the footprint and the start-up times: measure again on the release you present
   and change them there. `estimate` holds the effort of each part of the platform if built from scratch, in
