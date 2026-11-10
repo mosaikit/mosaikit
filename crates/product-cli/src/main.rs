@@ -188,7 +188,9 @@ fn run(cli: Cli) -> Result<ExitCode> {
         }
         Cmd::Build { target } => match target {
             Target::Desktop { dir, base, common } => {
-                let base = mosaikit_product_cli::basefetch::resolve(base.unwrap_or_else(mosaikit_product_cli::basefetch::this_version))?;
+                let base = mosaikit_product_cli::basefetch::resolve(
+                    base.unwrap_or_else(mosaikit_product_cli::basefetch::this_version),
+                )?;
                 build::desktop(&Distribution::load(&dir)?, &base, &common.options())?;
             }
             Target::Docker { dir, base_image, base, build: run_build, common } => {
