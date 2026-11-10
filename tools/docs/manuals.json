@@ -1,0 +1,94 @@
+{
+  "repo": "https://github.com/mosaikit/mosaikit/blob/main/",
+  "logo": "docs/logo/mosaikit-A-tessera-giallorossa-orizzontale-positivo.svg",
+  "manuals": [
+    {
+      "id": "user-manual",
+      "title": { "en": "Mosaikit — User manual", "it": "Mosaikit — Manuale utente" },
+      "subtitle": {
+        "en": "For the people who use Mosaikit: User, Tenant Manager and Administrator",
+        "it": "Per chi usa Mosaikit: Utente, Responsabile del tenant e Amministratore"
+      },
+      "sources": {
+        "en": ["docs/guide/user.md", "docs/guide/tenant-manager.md", "docs/guide/administrator.md"],
+        "it": ["docs/guide/it/user.md", "docs/guide/it/tenant-manager.md", "docs/guide/it/administrator.md"]
+      }
+    },
+    {
+      "id": "installation-guide",
+      "title": { "en": "Mosaikit — Installation guide", "it": "Mosaikit — Guida all'installazione" },
+      "subtitle": {
+        "en": "Desktop, Docker and Kubernetes releases, and their configuration",
+        "it": "Release Desktop, Docker e Kubernetes, e la loro configurazione"
+      },
+      "sources": {
+        "en": [
+          "README.md#Desktop release",
+          "README.md#Server release with Docker",
+          "README.md#Kubernetes release",
+          "README.md#Configuration",
+          "deploy/README.docker.md",
+          "deploy/k8s/README.md"
+        ]
+      }
+    },
+    {
+      "id": "developer-guide",
+      "title": { "en": "Mosaikit — Developer guide", "it": "Mosaikit — Guida per lo sviluppatore" },
+      "subtitle": {
+        "en": "Write, test, sign and ship plugins, and build a product on Mosaikit",
+        "it": "Scrivere, provare, firmare e distribuire plugin, e costruire un prodotto su Mosaikit"
+      },
+      "sources": {
+        "en": [
+          "docs/devkit/README.md",
+          "docs/devkit/getting-started.md",
+          "docs/devkit/concepts.md",
+          "docs/devkit/manifest.md",
+          "docs/devkit/logic.md",
+          "docs/devkit/ui.md",
+          "docs/devkit/data.md",
+          "docs/devkit/security.md",
+          "docs/devkit/extensions-layouts.md",
+          "docs/devkit/ui-guidelines.md",
+          "docs/devkit/packaging.md",
+          "docs/devkit/signing.md",
+          "docs/devkit/releasing.md",
+          "docs/devkit/testing.md",
+          "docs/devkit/building-an-application.md",
+          "docs/devkit/reference-product.md",
+          "docs/devkit/product-licensing.md",
+          "docs/devkit/troubleshooting.md",
+          "docs/devkit/changelog.md"
+        ],
+        "it": [
+          "docs/devkit/it/README.md",
+          "docs/devkit/it/getting-started.md",
+          "docs/devkit/it/concepts.md",
+          "docs/devkit/it/manifest.md",
+          "docs/devkit/it/logic.md",
+          "docs/devkit/it/ui.md",
+          "docs/devkit/it/data.md",
+          "docs/devkit/it/security.md",
+          "docs/devkit/it/extensions-layouts.md",
+          "docs/devkit/it/ui-guidelines.md",
+          "docs/devkit/it/packaging.md",
+          "docs/devkit/it/signing.md",
+          "docs/devkit/it/testing.md",
+          "docs/devkit/it/building-an-application.md",
+          "docs/devkit/it/troubleshooting.md",
+          "docs/devkit/it/changelog.md"
+        ]
+      }
+    },
+    {
+      "id": "architecture",
+      "title": { "en": "Mosaikit — Architecture", "it": "Mosaikit — Architettura" },
+      "subtitle": {
+        "en": "How the kernel, the plugins and the distributions fit together",
+        "it": "Come stanno insieme kernel, plugin e distribuzioni"
+      },
+      "sources": { "en": ["docs/architecture.md"] }
+    }
+  ]
+}

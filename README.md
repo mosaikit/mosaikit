@@ -674,6 +674,7 @@ All of them accept `--dist <folder of the distribution>`.
 | `cargo xtask worktree add\|remove\|list <name>` | parallel checkout (kernel + plugins) with its own port and database |
 | `cargo xtask clean-temp [--days N] [--yes]` | disk usage of `mosaikit-temp`; deletes stale `target` folders |
 | `cargo xtask release bundle\|desktop\|docker\|k8s\|all` | releases of the distribution |
+| `cargo xtask docs [--out] [--lang en,it] [--check]` | the PDF manuals (user, installation, developer, architecture) and the PowerPoint presentation, in `dist/docs`; attached to every release. How they are kept up to date: [docs/presentation/README.md](docs/presentation/README.md) |
 
 ### Working in parallel: worktrees, ports, heavy-run slots
 

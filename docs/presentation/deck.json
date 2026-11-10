@@ -1,0 +1,174 @@
+{
+  "_comment": "Source of the PowerPoint deck (cargo xtask docs). Every text has an en and an it version; the version, the date and the totals of the estimate are computed. Edit the numbers of `estimate` and `measured` here, never in the .pptx.",
+  "brand": { "red": "8B1A2B", "gold": "E8B94A", "ink": "1B2333", "muted": "55607A", "soft": "F6F1E7", "line": "D5DBE6" },
+  "estimate": {
+    "dayRate": 500,
+    "currency": "EUR",
+    "note": {
+      "en": "Indicative estimate by the Mosaikit team for a team that already knows the technologies, not a measurement. Replace the figures with your own: they live in docs/presentation/deck.json.",
+      "it": "Stima indicativa del team Mosaikit per un gruppo che conosce già le tecnologie, non una misura. Sostituisci i numeri con i tuoi: sono in docs/presentation/deck.json."
+    },
+    "rows": [
+      { "what": { "en": "Multi-tenancy and data isolation (PostgreSQL RLS, SQLite)", "it": "Multi-tenancy e isolamento dei dati (RLS PostgreSQL, SQLite)" }, "scratch": 40 },
+      { "what": { "en": "Sign-in, second factor, single sign-on (OpenID Connect)", "it": "Accesso, secondo fattore, single sign-on (OpenID Connect)" }, "scratch": 30 },
+      { "what": { "en": "Roles, groups, sharing with inheritance, access requests", "it": "Ruoli, gruppi, condivisione con ereditarietà, richieste di accesso" }, "scratch": 35 },
+      { "what": { "en": "Public links (expiry, password, visit count)", "it": "Link pubblici (scadenza, password, conteggio visite)" }, "scratch": 10 },
+      { "what": { "en": "Activity log, KPIs, quotas and usage", "it": "Registro attività, KPI, quote e consumi" }, "scratch": 30 },
+      { "what": { "en": "Administration screens for platform, tenants and people", "it": "Schermate di amministrazione di piattaforma, tenant e persone" }, "scratch": 40 },
+      { "what": { "en": "Notifications, global search, trash with restore", "it": "Notifiche, ricerca globale, cestino con ripristino" }, "scratch": 25 },
+      { "what": { "en": "Languages, themes, brand of the product", "it": "Lingue, temi, brand del prodotto" }, "scratch": 15 },
+      { "what": { "en": "A safe place for third-party code (sandbox, permissions)", "it": "Un posto sicuro per il codice di terzi (sandbox, permessi)" }, "scratch": 60 },
+      { "what": { "en": "Packaging, signing, registry, updates, blocklist", "it": "Pacchetti, firma, registro, aggiornamenti, blocklist" }, "scratch": 30 },
+      { "what": { "en": "Desktop, Docker and Kubernetes releases", "it": "Release Desktop, Docker e Kubernetes" }, "scratch": 25 }
+    ],
+    "withMosaikit": {
+      "days": 10,
+      "what": { "en": "Install, brand, set the defaults, choose plugins, ship", "it": "Installare, applicare il brand, impostare i default, scegliere i plugin, distribuire" }
+    }
+  },
+  "measured": {
+    "version": "1.0.3",
+    "where": { "en": "Windows desktop release, an empty tenant, a developer laptop", "it": "Release desktop Windows, tenant vuoto, portatile di sviluppo" },
+    "items": [
+      { "v": "31", "u": "MB", "t": { "en": "memory at rest, the whole desktop platform running", "it": "di memoria a riposo, con tutta la piattaforma desktop in esecuzione" } },
+      { "v": "0.8", "u": "s", "t": { "en": "to restart, ready to sign in", "it": "per riavviare, pronta all'accesso" } },
+      { "v": "2.9", "u": "s", "t": { "en": "first start: database, tenant and plugins created", "it": "primo avvio: creati database, tenant e plugin" } },
+      { "v": "17", "u": "MB", "t": { "en": "desktop release to download, plugins included", "it": "da scaricare per la release desktop, plugin inclusi" } },
+      { "v": "42", "u": "MB", "t": { "en": "the single executable of the platform", "it": "l'eseguibile unico della piattaforma" } },
+      { "v": "179", "u": "MB", "t": { "en": "the Docker image of a product", "it": "l'immagine Docker di un prodotto" } }
+    ]
+  },
+  "slides": [
+    {
+      "kind": "title",
+      "title": { "en": "Build enterprise products out of plugins", "it": "Costruisci prodotti enterprise con i plugin" },
+      "text": { "en": "Mosaikit: the platform every application needs, written once", "it": "Mosaikit: la piattaforma di cui ogni applicazione ha bisogno, scritta una volta sola" }
+    },
+    {
+      "kind": "bullets",
+      "title": { "en": "Every new product starts by rebuilding the same plumbing", "it": "Ogni nuovo prodotto riparte dalla stessa impiantistica" },
+      "items": [
+        { "en": "Tenants, users, roles and permissions", "it": "Tenant, utenti, ruoli e permessi" },
+        { "en": "Sign-in, second factor and single sign-on", "it": "Accesso, secondo fattore e single sign-on" },
+        { "en": "Sharing, public links, audit log, quotas", "it": "Condivisione, link pubblici, registro, quote" },
+        { "en": "Admin screens, notifications, search, languages", "it": "Schermate di amministrazione, notifiche, ricerca, lingue" },
+        { "en": "Packaging and a safe way to run other people's code", "it": "Pacchetti e un modo sicuro di eseguire il codice di altri" },
+        { "en": "Months of work before the first line of your own domain", "it": "Mesi di lavoro prima della prima riga del tuo dominio" }
+      ]
+    },
+    {
+      "kind": "columns",
+      "title": { "en": "One idea: a kernel that knows nothing of your domain", "it": "Un'idea: un kernel che non sa nulla del tuo dominio" },
+      "columns": [
+        { "h": { "en": "Kernel", "it": "Kernel" }, "t": { "en": "Tenants, users, three roles, resources, access control, public links, KPIs, plugins. Domain-agnostic, written once.", "it": "Tenant, utenti, tre ruoli, risorse, controllo accessi, link pubblici, KPI, plugin. Agnostico al dominio, scritto una volta." } },
+        { "h": { "en": "Plugins", "it": "Plugin" }, "t": { "en": "Your domain: logic in WebAssembly, interface in an isolated frame, own data. Written by you or by third parties.", "it": "Il tuo dominio: logica in WebAssembly, interfaccia in un frame isolato, dati propri. Scritti da te o da terzi." } },
+        { "h": { "en": "Products", "it": "Prodotti" }, "t": { "en": "A distribution: your name, brand, plugins and defaults on the compiled platform. Desktop, Docker or Kubernetes.", "it": "Una distribuzione: nome, brand, plugin e default tuoi sulla piattaforma compilata. Desktop, Docker o Kubernetes." } }
+      ]
+    },
+    {
+      "kind": "cards",
+      "title": { "en": "What the platform gives you, ready", "it": "Cosa ti dà la piattaforma, già pronto" },
+      "cards": [
+        { "h": { "en": "Multi-tenant", "it": "Multi-tenant" }, "t": { "en": "People, groups, policies, quotas and brand per tenant; isolation in the database.", "it": "Persone, gruppi, policy, quote e brand per tenant; isolamento nel database." } },
+        { "h": { "en": "Three roles", "it": "Tre ruoli" }, "t": { "en": "Administrator, Tenant Manager, User; sharing at three levels with inheritance.", "it": "Amministratore, Responsabile del tenant, Utente; condivisione su tre livelli con ereditarietà." } },
+        { "h": { "en": "Single sign-on", "it": "Single sign-on" }, "t": { "en": "Local accounts or the identity provider of the tenant (OpenID Connect), second factor.", "it": "Account locali o l'identity provider del tenant (OpenID Connect), secondo fattore." } },
+        { "h": { "en": "Public links", "it": "Link pubblici" }, "t": { "en": "Read-only, expiring, with password and visit count.", "it": "Sola lettura, con scadenza, password e conteggio visite." } },
+        { "h": { "en": "KPIs and log", "it": "KPI e registro" }, "t": { "en": "Per tenant and across tenants; metadata and aggregates, never contents.", "it": "Per tenant e tra tenant; metadati e aggregati, mai i contenuti." } },
+        { "h": { "en": "Quotas", "it": "Quote" }, "t": { "en": "Limits and usage for every tenant, visible to the people who reach them.", "it": "Limiti e consumi per ogni tenant, visibili a chi li raggiunge." } },
+        { "h": { "en": "Shell services", "it": "Servizi della shell" }, "t": { "en": "Bell, global search, trash and help work for every plugin.", "it": "Campanella, ricerca globale, cestino e aiuto valgono per ogni plugin." } },
+        { "h": { "en": "Languages and themes", "it": "Lingue e temi" }, "t": { "en": "English and Italian, a language is a plugin; light and dark.", "it": "Inglese e italiano, una lingua è un plugin; chiaro e scuro." } },
+        { "h": { "en": "Your brand", "it": "Il tuo brand" }, "t": { "en": "Name, logo, favicon, colours and texts from one brand.toml.", "it": "Nome, logo, favicon, colori e testi da un solo brand.toml." } }
+      ]
+    },
+    {
+      "kind": "cards",
+      "title": { "en": "A plugin is small, and safe by construction", "it": "Un plugin è piccolo e sicuro per costruzione" },
+      "cards": [
+        { "h": { "en": "Logic in WebAssembly", "it": "Logica in WebAssembly" }, "t": { "en": "Limited fuel and memory; files, network and clock only through the host.", "it": "Carburante e memoria limitati; file, rete e orologio solo tramite l'host." } },
+        { "h": { "en": "Interface in an isolated frame", "it": "Interfaccia in un frame isolato" }, "t": { "en": "Own origin and strict content security policy, yet it receives the language, theme and colours.", "it": "Origine propria e content security policy rigida, ma riceve lingua, tema e colori." } },
+        { "h": { "en": "Own data, same rules", "it": "Dati propri, stesse regole" }, "t": { "en": "PostgreSQL with row-level security or SQLite; SQL limited to the tables of the plugin.", "it": "PostgreSQL con row-level security o SQLite; SQL limitato alle tabelle del plugin." } },
+        { "h": { "en": "One manifest", "it": "Un solo manifesto" }, "t": { "en": "Resources, permissions, pages and settings declared in plugin.toml; the kernel does the rest.", "it": "Risorse, permessi, pagine e impostazioni dichiarati in plugin.toml; il resto lo fa il kernel." } },
+        { "h": { "en": "Extend other plugins", "it": "Estendi altri plugin" }, "t": { "en": "Add to a plugin of someone else without touching its code: extensions, layouts, language packs.", "it": "Aggiungi a un plugin altrui senza toccarne il codice: estensioni, layout, pacchetti lingua." } },
+        { "h": { "en": "A versioned API", "it": "Un'API versionata" }, "t": { "en": "Plugins declare the versions they need; a conformance check protects every upgrade.", "it": "I plugin dichiarano le versioni richieste; un controllo di conformità protegge ogni aggiornamento." } }
+      ]
+    },
+    {
+      "kind": "steps",
+      "title": { "en": "Third-party plugins, with trust built in", "it": "Plugin di terzi, con la fiducia incorporata" },
+      "steps": [
+        { "h": { "en": "Anyone writes", "it": "Chiunque scrive" }, "t": { "en": "With the Dev Kit alone: no platform source needed.", "it": "Con il solo Dev Kit: il sorgente della piattaforma non serve." } },
+        { "h": { "en": "Signs", "it": "Firma" }, "t": { "en": "A .mskp package signed with the key of the publisher.", "it": "Un pacchetto .mskp firmato con la chiave dell'editore." } },
+        { "h": { "en": "Publishes", "it": "Pubblica" }, "t": { "en": "In a registry, public or private.", "it": "In un registro, pubblico o privato." } },
+        { "h": { "en": "Tenant chooses", "it": "Il tenant sceglie" }, "t": { "en": "Installs, updates and turns on per tenant; only trusted keys.", "it": "Installa, aggiorna e attiva per tenant; solo chiavi fidate." } },
+        { "h": { "en": "Blocklist", "it": "Blocklist" }, "t": { "en": "A bad plugin can be stopped everywhere at once.", "it": "Un plugin dannoso si ferma ovunque in un colpo solo." } }
+      ]
+    },
+    {
+      "kind": "cards",
+      "title": { "en": "From plugins to a product of your own", "it": "Dai plugin a un prodotto tuo" },
+      "cards": [
+        { "h": { "en": "Brand", "it": "Brand" }, "t": { "en": "Logo, favicon, colours, texts of the sign-in page, desktop icon.", "it": "Logo, favicon, colori, testi della pagina di accesso, icona desktop." } },
+        { "h": { "en": "Defaults and locks", "it": "Default e blocchi" }, "t": { "en": "Your values for the settings; lock what tenants must not change.", "it": "I tuoi valori per le impostazioni; blocca ciò che i tenant non devono cambiare." } },
+        { "h": { "en": "First start", "it": "Primo avvio" }, "t": { "en": "First tenant, trial, quotas and plugins created for you.", "it": "Primo tenant, prova, quote e plugin creati per te." } },
+        { "h": { "en": "Identity provider demo", "it": "Demo identity provider" }, "t": { "en": "A Docker release can bring Keycloak and a sample tenant to try OpenID Connect.", "it": "Una release Docker può portare Keycloak e un tenant di esempio per provare OpenID Connect." } },
+        { "h": { "en": "Three releases", "it": "Tre release" }, "t": { "en": "Desktop archive, Docker image with compose, Kubernetes overlay.", "it": "Archivio desktop, immagine Docker con compose, overlay Kubernetes." } },
+        { "h": { "en": "Upgrades", "it": "Aggiornamenti" }, "t": { "en": "Move to a new base keeping the data; checked by a test.", "it": "Passa a una nuova base mantenendo i dati; verificato da un test." } }
+      ]
+    },
+    {
+      "kind": "kpis",
+      "title": { "en": "Light and fast: a very small footprint", "it": "Leggera e veloce: ingombro minimo" }
+    },
+    {
+      "kind": "steps",
+      "title": { "en": "Fast to start: from download to release", "it": "Veloce da avviare: dal download alla release" },
+      "steps": [
+        { "h": { "en": "Download the Dev Kit", "it": "Scarica il Dev Kit" }, "t": { "en": "The only download. Put bin/ on your PATH.", "it": "L'unico download. Metti bin/ nel PATH." } },
+        { "h": { "en": "Plugin", "it": "Plugin" }, "t": { "en": "mosaikit-plugin new my-plugin, then mosaikit-plugin dev: a running server, reloaded at every change.", "it": "mosaikit-plugin new my-plugin, poi mosaikit-plugin dev: un server attivo, ricaricato a ogni modifica." } },
+        { "h": { "en": "Product", "it": "Prodotto" }, "t": { "en": "mosaikit-product new acme-maps, then mosaikit-product dev.", "it": "mosaikit-product new acme-maps, poi mosaikit-product dev." } },
+        { "h": { "en": "Ship", "it": "Distribuisci" }, "t": { "en": "mosaikit-product build desktop or build docker --build.", "it": "mosaikit-product build desktop oppure build docker --build." } }
+      ]
+    },
+    {
+      "kind": "savings",
+      "title": { "en": "Start from Mosaikit, not from zero: time and cost", "it": "Parti da Mosaikit, non da zero: tempi e costi" }
+    },
+    {
+      "kind": "bullets",
+      "title": { "en": "A domain product is mostly your domain", "it": "Un prodotto di dominio è quasi tutto dominio" },
+      "items": [
+        { "en": "Model your resources and permissions in plugin.toml", "it": "Modella risorse e permessi in plugin.toml" },
+        { "en": "Write the logic and the pages of your domain as plugins", "it": "Scrivi logica e pagine del tuo dominio come plugin" },
+        { "en": "Add plugins from third parties for what is not your core", "it": "Aggiungi plugin di terzi per ciò che non è il tuo core" },
+        { "en": "Apply the brand, set the defaults, build the release", "it": "Applica il brand, imposta i default, costruisci la release" },
+        { "en": "Example: a parcels register, built step by step in the reference product", "it": "Esempio: un registro delle particelle, costruito passo passo nel prodotto di riferimento" }
+      ]
+    },
+    {
+      "kind": "bullets",
+      "title": { "en": "Ready-made plugins to use or to copy", "it": "Plugin già pronti da usare o da copiare" },
+      "items": [
+        { "en": "Files, notes, tasks, contacts, maps, static sites", "it": "File, note, attività, contatti, mappe, siti statici" },
+        { "en": "Layouts (tabs, workspace, suite, project) and a language pack", "it": "Layout (schede, area di lavoro, suite, progetto) e un pacchetto lingua" },
+        { "en": "Each one a standalone project you can read, copy and change", "it": "Ognuno è un progetto autonomo da leggere, copiare e modificare" },
+        { "en": "Three commented examples in the Dev Kit", "it": "Tre esempi commentati nel Dev Kit" }
+      ]
+    },
+    {
+      "kind": "bullets",
+      "title": { "en": "Open and trustworthy", "it": "Aperta e affidabile" },
+      "items": [
+        { "en": "MPL 2.0 licence: use it and ship your product", "it": "Licenza MPL 2.0: usala e distribuisci il tuo prodotto" },
+        { "en": "Releases signed; the Base is downloaded and checked for you", "it": "Release firmate; la Base viene scaricata e verificata per te" },
+        { "en": "Automated tests on PostgreSQL and SQLite, and in a real browser", "it": "Test automatici su PostgreSQL e SQLite, e in un browser reale" },
+        { "en": "Documents for every role: users, installers, developers", "it": "Documenti per ogni ruolo: utenti, installatori, sviluppatori" }
+      ]
+    },
+    {
+      "kind": "closing",
+      "title": { "en": "Try it today", "it": "Provalo oggi" },
+      "text": { "en": "Download the Dev Kit and make your first plugin or product.", "it": "Scarica il Dev Kit e crea il tuo primo plugin o prodotto." },
+      "link": "https://mosaikit.github.io/"
+    }
+  ]
+}

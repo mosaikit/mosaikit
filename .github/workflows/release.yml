@@ -127,9 +127,32 @@ jobs:
         run: |
           docker buildx imagetools create             --tag ghcr.io/${{ github.repository }}-dev:${GITHUB_REF_NAME#v}             ghcr.io/${{ github.repository }}:${{ github.ref_name }}
 
+  # the PDF manuals and the PowerPoint presentation, from docs/ and docs/presentation/deck.json
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: tools
+        working-directory: tools/docs
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright-core install --with-deps chromium
+      - name: manuals and presentation
+        working-directory: tools/docs
+        run: node build.mjs all --out ../../dist/docs --version "${GITHUB_REF_NAME#v}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: docs-files
+          path: |
+            dist/docs/*.pdf
+            dist/docs/*.pptx
+
   # SHA256SUMS over the archives of every platform, signed with the key of the official packages; then the GitHub Release
   devkit-release:
-    needs: [desktop-windows, devkit, devkit-image]
+    needs: [desktop-windows, devkit, devkit-image, docs]
     runs-on: ubuntu-latest
     env:
       MOSAIKIT_SIGNING_KEY: ${{ secrets.MOSAIKIT_SIGNING_KEY }}
@@ -143,6 +166,10 @@ jobs:
           path: kits
           pattern: devkit-*
           merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: docs-files
+          path: docs-files
       - name: SHA256SUMS and its signature
         working-directory: mosaikit
         run: cargo xtask release devkit-sums ../kits
@@ -153,5 +180,7 @@ jobs:
             kits/mosaikit-devkit-*.tar.gz
             kits/*.sig
             kits/SHA256SUMS
+            docs-files/*.pdf
+            docs-files/*.pptx
           body_path: kits/RELEASE-NOTES.md
 

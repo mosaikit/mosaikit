@@ -158,6 +158,7 @@ pub fn test(skip_db: bool) -> Result<()> {
         })?;
         note(&mut failed, ok, &title);
     }
+    note(&mut failed, crate::docs::make(None, true, None).is_ok(), "Documents: sources and deck");
     report::generate()?;
     if !failed.is_empty() {
         bail!("failed: {}", failed.join("; "));

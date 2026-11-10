@@ -7,6 +7,7 @@ mod deploy_check;
 mod dev;
 mod devkit;
 mod dist;
+mod docs;
 mod e2e;
 mod heavy;
 mod manual;
@@ -70,6 +71,19 @@ enum Cmd {
     },
     /// CI checks: fmt, clippy, deny, typecheck, lint, build, test
     Ci,
+    /// PDF manuals (user, installation, developer, architecture) and the PowerPoint presentation, from docs/ and
+    /// docs/presentation/deck.json, in dist/docs (English and Italian where the source exists)
+    Docs {
+        /// folder for the files (default dist/docs)
+        #[arg(long)]
+        out: Option<PathBuf>,
+        /// only check that the sources exist and the deck is translated; build nothing
+        #[arg(long)]
+        check: bool,
+        /// languages, for example en or en,it (default both)
+        #[arg(long)]
+        lang: Option<String>,
+    },
     /// tests/results/test-results.md from the latest results of every suite (tests/results/raw)
     TestReport,
     /// Validate the [[sidecars]] of the distribution and print what each target gets
@@ -342,6 +356,7 @@ fn main() -> Result<()> {
         },
         Cmd::Test { skip_db } => ci::test(skip_db),
         Cmd::Ci => ci::ci(),
+        Cmd::Docs { out, check, lang } => docs::make(out.as_deref(), check, lang.as_deref()),
         Cmd::TestReport => report::generate().map(|_| ()),
         Cmd::Sidecars => sidecars::show(),
         Cmd::E2e { headed, wildcard, shard, shards, jobs, only } => {
