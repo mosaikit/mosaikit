@@ -42,7 +42,7 @@ export const EN: Record<string, string> = {
   'errors.wrong_code': 'Invalid code',
   'errors.admin_door': 'Administrators sign in from «Administrator access»',
   'errors.oidc_tenant': 'This tenant signs in with its identity provider: there are no local passwords',
-  'errors.oidc_state': 'The sign-in has expired or was started in another browser: start again',
+  'errors.oidc_state': 'The sign-in has expired, or it was started in another browser or at another address of the app: open the app at its usual address and start again',
   'errors.oidc_token': 'The identity provider sent a token that is not valid: try again or tell the administrator',
   'errors.oidc_provider': 'The identity provider does not answer as expected: try again later',
   'errors.oidc_denied': 'The identity provider refused the sign-in',

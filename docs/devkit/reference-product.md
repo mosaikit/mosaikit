@@ -129,6 +129,6 @@ The first gives `dist/acme-maps-<version>-desktop`: unzip anywhere and start `ac
 `compose.yml` with PostgreSQL; `docker compose up -d` starts it on `:8080`. Sign with your own key (`--key`) before you ship.
 
 The Docker release also starts **Keycloak** (`[docker] keycloak = true`, the default of a new product): open the product, choose the tenant `idp-demo` and
-press "Sign in with Keycloak" (`anna.manager` or `bruno.user`, password `change-me`) to see a tenant that signs in through an identity provider (OpenID
+press "Sign in with SSO" (`anna.manager` or `bruno.user`, password `change-me`) to see a tenant that signs in through an identity provider (OpenID
 Connect). The Keycloak page has the logo and the colours of your brand. It is a demonstration: `keycloak/README.md` in the release tells how to remove it.
 It needs a base from 1.0.3.

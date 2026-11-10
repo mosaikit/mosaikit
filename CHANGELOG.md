@@ -5,6 +5,14 @@ in Help › What is new (one `## <version>` heading per version, `- ` items, `##
 language of the person: this file in English, [CHANGELOG.it.md](CHANGELOG.it.md) in Italian (keep them
 in step).
 
+## 1.0.6
+
+- The Docker release of a product has a `README.md` with what the folder is, the default credentials of a new installation, how to recover the second factor and the password, and where to read more.
+- The sign-in page of Keycloak in that release has the look of the sign-in page of the product: a band with the name, the line and the logo of the brand, the form on the right, the colours of the brand.
+- The button of the sample tenant reads "Sign in with SSO" (it read "Sign in with Sign in with Keycloak").
+- A sign-in through an identity provider started at another address of the app than the one in `MOSAIKIT_URL` (for example `127.0.0.1` instead of `localhost`) now says so, instead of "started in another browser".
+- `mosaikit-product validate`, `dev` and `test` take the Base of the Dev Kit by themselves when the product keeps official plugins.
+
 ## 1.0.5
 
 - `mosaikit-product build desktop` and `build docker` no longer need `--base`: without it the Base is the version of the Dev Kit you run, which is released together with it. `--base` stays for another version, a folder or a `.zip`.
