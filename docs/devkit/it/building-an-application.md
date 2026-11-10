@@ -5,7 +5,7 @@ e un modo di avviarsi che sono tuoi. La costruisci dal Mosaikit **compilato** (i
 sorgenti di Mosaikit, niente fork, niente compilazione del kernel. Lo strumento è `mosaikit-product`.
 
 **Da dove viene la base.** Il Dev Kit ha gli strumenti (`mosaikit-product`, `mosaikit-plugin`, `mosaikit-server`) e non scarichi altro:
-dai a `--base` una **versione** e lo strumento scarica il kit desktop di quella release (`mosaikit.exe` e `registry/index.json`, i plugin ufficiali)
+senza `--base` la Base è la versione del Dev Kit che usi (escono insieme); dai a `--base` una **versione** e lo strumento scarica il kit desktop di quella release (`mosaikit.exe` e `registry/index.json`, i plugin ufficiali)
 dalla release `v<versione>` di `mosaikit/mosaikit`, lo verifica con il `SHA256SUMS` firmato della release e lo tiene in una cache: lo scarica una volta sola,
 per esempio `mosaikit-product build desktop --base 1.0.2`. La cache è `%LOCALAPPDATA%\mosaikit\base\<versione>` (Windows),
 `~/.cache/mosaikit/base/<versione>` (Linux) o `~/Library/Caches/mosaikit/base/<versione>` (macOS); `MOSAIKIT_CACHE` la sposta. `--base` accetta anche una cartella o uno `.zip` del kit desktop, ed è così che usi una

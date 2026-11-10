@@ -120,9 +120,11 @@ For the pages of the plugins in the browser, a Playwright spec with `@mosaikit/p
 ## 7. Build it
 
 ```text
-mosaikit-product build desktop --base 1.0.2
-mosaikit-product build docker --base 1.0.2 --build
+mosaikit-product build desktop
+mosaikit-product build docker --build
 ```
+
+Without `--base` the Base is the version of the Dev Kit you run, so the two always go together; give `--base <version>` (or a folder, or a `.zip`) only to build on another one.
 
 The first gives `dist/acme-maps-<version>-desktop`: unzip anywhere and start `acme-maps.exe`. The second gives the image `acme-maps:<version>` and a
 `compose.yml` with PostgreSQL; `docker compose up -d` starts it on `:8080`. Sign with your own key (`--key`) before you ship.

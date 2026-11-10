@@ -5,9 +5,9 @@ and a way of starting that are yours. You build it from the **compiled** Mosaiki
 image): no source of Mosaikit, no fork, no compilation of the kernel. The tool is `mosaikit-product`.
 
 **Where the base comes from.** The Dev Kit has the tools (`mosaikit-product`, `mosaikit-plugin`, `mosaikit-server`) and you download nothing else:
-give `--base` a **version** and the tool fetches the desktop kit of that release (`mosaikit.exe` and `registry/index.json`, the official
+without `--base` the Base is the version of the Dev Kit you run (they are released together); give `--base` a **version** and the tool fetches the desktop kit of that release (`mosaikit.exe` and `registry/index.json`, the official
 plugins) from the release `v<version>` of `mosaikit/mosaikit`, checks it against the signed `SHA256SUMS` of the release
-and keeps it in a cache, so it downloads it once: `mosaikit-product build desktop --base 1.0.2`. The cache is
+and keeps it in a cache, so it downloads it once: `mosaikit-product build desktop --base 1.0.2` (the same as plain `build desktop`, with the Dev Kit 1.0.2). The cache is
 `%LOCALAPPDATA%\mosaikit\base\<version>` (Windows), `~/.cache/mosaikit/base/<version>` (Linux) or
 `~/Library/Caches/mosaikit/base/<version>` (macOS); `MOSAIKIT_CACHE` puts it elsewhere. `--base` also takes a folder or a `.zip` of the desktop kit, which is how you use a
 Base older than 1.0.2 (the zip is in the **Assets** of its release: <https://github.com/mosaikit/mosaikit/releases>). `validate` and `dev` of a product with

@@ -96,9 +96,10 @@ enum Target {
     Desktop {
         #[arg(default_value = ".")]
         dir: PathBuf,
-        /// the desktop kit of the base: its folder, its .zip or a released version such as 1.0.1 (downloaded once, checked)
+        /// the desktop kit of the base: its folder, its .zip or a released version such as 1.0.1 (downloaded once,
+        /// checked). Optional: the version of this tool, which is the version of the Mosaikit it came with
         #[arg(long, env = "MOSAIKIT_BASE")]
-        base: PathBuf,
+        base: Option<PathBuf>,
         #[command(flatten)]
         common: Common,
     },
@@ -106,12 +107,13 @@ enum Target {
     Docker {
         #[arg(default_value = ".")]
         dir: PathBuf,
-        /// the base image (default with `--base <version>`: ghcr.io/mosaikit/mosaikit:v<version>)
+        /// the base image (default: ghcr.io/mosaikit/mosaikit:v<version of the base>)
         #[arg(long)]
         base_image: Option<String>,
-        /// the desktop kit of the base (folder, .zip or a version such as 1.0.1), for the registry of the official plugins
+        /// the desktop kit of the base (folder, .zip or a version such as 1.0.1), for the registry of the official plugins.
+        /// Optional: the version of this tool
         #[arg(long, env = "MOSAIKIT_BASE")]
-        base: PathBuf,
+        base: Option<PathBuf>,
         /// run `docker build` too
         #[arg(long)]
         build: bool,
@@ -186,10 +188,11 @@ fn run(cli: Cli) -> Result<ExitCode> {
         }
         Cmd::Build { target } => match target {
             Target::Desktop { dir, base, common } => {
-                let base = mosaikit_product_cli::basefetch::resolve(base)?;
+                let base = mosaikit_product_cli::basefetch::resolve(base.unwrap_or_else(mosaikit_product_cli::basefetch::this_version))?;
                 build::desktop(&Distribution::load(&dir)?, &base, &common.options())?;
             }
             Target::Docker { dir, base_image, base, build: run_build, common } => {
+                let base = base.unwrap_or_else(mosaikit_product_cli::basefetch::this_version);
                 let image = match (base_image, mosaikit_product_cli::basefetch::version_of(&base)) {
                     (Some(i), _) => i,
                     (None, Some(v)) => format!("ghcr.io/mosaikit/mosaikit:v{v}"),

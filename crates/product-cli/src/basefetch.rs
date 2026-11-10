@@ -34,6 +34,11 @@ pub fn cache_dir() -> Result<PathBuf> {
     dir.ok_or_else(|| anyhow!("no folder for the cache: set MOSAIKIT_CACHE"))
 }
 
+/// The base when `--base` is not given: the version of this tool, which is the version of the Mosaikit it came with.
+pub fn this_version() -> PathBuf {
+    PathBuf::from(env!("CARGO_PKG_VERSION"))
+}
+
 /// A `--base`: the path as it is, or the cached desktop kit of a version (downloaded when it is not there yet).
 pub fn resolve(base: PathBuf) -> Result<PathBuf> {
     match version_of(&base) {
@@ -138,6 +143,11 @@ pub fn extract_zip(zip_file: &Path, target: &Path) -> Result<PathBuf> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn without_a_base_it_is_the_version_of_the_tool() {
+        assert_eq!(version_of(&this_version()).as_deref(), Some(env!("CARGO_PKG_VERSION")));
+    }
+
     use super::*;
 
     #[test]
