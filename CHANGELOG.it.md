@@ -7,6 +7,7 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 ## 1.0.5
 
 - `mosaikit-product build desktop` e `build docker` non richiedono più `--base`: senza, la Base è la versione del Dev Kit che usi, che esce insieme. `--base` resta per un'altra versione, una cartella o uno `.zip`.
+- `cargo xtask docs` produce i manuali PDF (utente, installazione, sviluppatore, architettura; in inglese e in italiano dove esiste la traduzione) e una presentazione PowerPoint di Mosaikit, con i vantaggi, l'ingombro misurato e una stima di tempi e costi risparmiati rispetto a partire da zero. Ogni release li allega.
 
 ## 1.0.4
 
