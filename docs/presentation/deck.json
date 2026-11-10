@@ -22,7 +22,7 @@
       { "what": { "en": "Desktop, Docker and Kubernetes releases", "it": "Release Desktop, Docker e Kubernetes" }, "scratch": 12.5 }
     ],
     "withMosaikit": {
-      "days": 10,
+      "days": 5,
       "what": { "en": "Install, brand, set the defaults, choose plugins, ship", "it": "Installare, applicare il brand, impostare i default, scegliere i plugin, distribuire" }
     }
   },
