@@ -4,19 +4,243 @@
   "manuals": [
     {
       "id": "user-manual",
-      "title": { "en": "Mosaikit — User manual", "it": "Mosaikit — Manuale utente" },
+      "title": {
+        "en": "Mosaikit — User manual",
+        "it": "Mosaikit — Manuale utente"
+      },
       "subtitle": {
         "en": "For the people who use Mosaikit: User, Tenant Manager and Administrator",
         "it": "Per chi usa Mosaikit: Utente, Responsabile del tenant e Amministratore"
       },
       "sources": {
-        "en": ["docs/guide/user.md", "docs/guide/tenant-manager.md", "docs/guide/administrator.md"],
-        "it": ["docs/guide/it/user.md", "docs/guide/it/tenant-manager.md", "docs/guide/it/administrator.md"]
-      }
+        "en": [
+          "docs/guide/user.md",
+          "docs/guide/tenant-manager.md",
+          "docs/guide/administrator.md"
+        ],
+        "it": [
+          "docs/guide/it/user.md",
+          "docs/guide/it/tenant-manager.md",
+          "docs/guide/it/administrator.md"
+        ]
+      },
+      "figures": [
+        {
+          "doc": "docs/guide/user.md",
+          "heading": "Signing in",
+          "image": "docs/presentation/screens/user-signin.png",
+          "caption": {
+            "en": "The sign-in page: choose the tenant, then your username and password."
+          }
+        },
+        {
+          "doc": "docs/guide/user.md",
+          "heading": "Home",
+          "image": "docs/presentation/screens/user-home.png",
+          "caption": {
+            "en": "The home page of a tenant, with the apps you can use."
+          }
+        },
+        {
+          "doc": "docs/guide/user.md",
+          "heading": "Apps and items",
+          "image": "docs/presentation/screens/user-notes.png",
+          "caption": {
+            "en": "An app: here Notes, with the list of items and the detail of the selected one."
+          }
+        },
+        {
+          "doc": "docs/guide/user.md",
+          "heading": "Sharing an item",
+          "image": "docs/presentation/screens/user-share.png",
+          "caption": {
+            "en": "Share with people and groups at three levels, or with a public link."
+          }
+        },
+        {
+          "doc": "docs/guide/user.md",
+          "heading": "Notifications",
+          "image": "docs/presentation/screens/user-notifications.png",
+          "caption": {
+            "en": "The bell: invitations, requests and messages of the apps."
+          }
+        },
+        {
+          "doc": "docs/guide/user.md",
+          "heading": "Trash",
+          "image": "docs/presentation/screens/user-trash.png",
+          "caption": {
+            "en": "The trash keeps what you delete for a while, so you can restore it."
+          }
+        },
+        {
+          "doc": "docs/guide/user.md",
+          "heading": "Account",
+          "image": "docs/presentation/screens/user-account.png",
+          "caption": {
+            "en": "Your account: appearance, language, security and notifications."
+          }
+        },
+        {
+          "doc": "docs/guide/user.md",
+          "heading": "Search",
+          "image": "docs/presentation/screens/user-search.png",
+          "caption": {
+            "en": "Search everywhere with Ctrl K."
+          }
+        },
+        {
+          "doc": "docs/guide/tenant-manager.md",
+          "heading": "Your sidebar",
+          "image": "docs/presentation/screens/manager-overview.png",
+          "caption": {
+            "en": "The overview of the tenant: people, items, activity and usage."
+          }
+        },
+        {
+          "doc": "docs/guide/tenant-manager.md",
+          "heading": "People",
+          "image": "docs/presentation/screens/manager-people.png",
+          "caption": {
+            "en": "The people of the tenant, with their role and status."
+          }
+        },
+        {
+          "doc": "docs/guide/tenant-manager.md",
+          "heading": "People",
+          "image": "docs/presentation/screens/manager-new-user.png",
+          "caption": {
+            "en": "Create a person: username, name, e-mail, initial password and role."
+          }
+        },
+        {
+          "doc": "docs/guide/tenant-manager.md",
+          "heading": "Groups",
+          "image": "docs/presentation/screens/manager-groups.png",
+          "caption": {
+            "en": "Groups, to share with several people at once."
+          }
+        },
+        {
+          "doc": "docs/guide/tenant-manager.md",
+          "heading": "Permission profiles",
+          "image": "docs/presentation/screens/manager-profiles.png",
+          "caption": {
+            "en": "A profile is a named set of permissions in the plugins."
+          }
+        },
+        {
+          "doc": "docs/guide/tenant-manager.md",
+          "heading": "Plugins",
+          "image": "docs/presentation/screens/manager-plugins.png",
+          "caption": {
+            "en": "The plugins available to the tenant, to turn on or off and to give permissions."
+          }
+        },
+        {
+          "doc": "docs/guide/tenant-manager.md",
+          "heading": "Shares",
+          "image": "docs/presentation/screens/manager-shares.png",
+          "caption": {
+            "en": "Everything shared with people, groups or a public link."
+          }
+        },
+        {
+          "doc": "docs/guide/tenant-manager.md",
+          "heading": "Usage",
+          "image": "docs/presentation/screens/manager-usage.png",
+          "caption": {
+            "en": "The quotas set by the Administrator, the trend and who uses the most."
+          }
+        },
+        {
+          "doc": "docs/guide/tenant-manager.md",
+          "heading": "Log",
+          "image": "docs/presentation/screens/manager-log.png",
+          "caption": {
+            "en": "The activity log: who did what, on what, and the result."
+          }
+        },
+        {
+          "doc": "docs/guide/tenant-manager.md",
+          "heading": "Tenant settings",
+          "image": "docs/presentation/screens/manager-settings.png",
+          "caption": {
+            "en": "Settings of the tenant: sharing, passwords, sign-in services, embedding."
+          }
+        },
+        {
+          "doc": "docs/guide/administrator.md",
+          "heading": "Your sidebar",
+          "image": "docs/presentation/screens/admin-overview.png",
+          "caption": {
+            "en": "The overview of the platform."
+          }
+        },
+        {
+          "doc": "docs/guide/administrator.md",
+          "heading": "Tenants",
+          "image": "docs/presentation/screens/admin-tenants.png",
+          "caption": {
+            "en": "The tenants of the installation, with members, items, space and status."
+          }
+        },
+        {
+          "doc": "docs/guide/administrator.md",
+          "heading": "People of the installation",
+          "image": "docs/presentation/screens/admin-people.png",
+          "caption": {
+            "en": "Everybody of the installation, across tenants."
+          }
+        },
+        {
+          "doc": "docs/guide/administrator.md",
+          "heading": "Plugins",
+          "image": "docs/presentation/screens/admin-plugins.png",
+          "caption": {
+            "en": "The plugin catalogue: install, update and make available."
+          }
+        },
+        {
+          "doc": "docs/guide/administrator.md",
+          "heading": "System",
+          "image": "docs/presentation/screens/admin-system.png",
+          "caption": {
+            "en": "The system settings."
+          }
+        },
+        {
+          "doc": "docs/guide/administrator.md",
+          "heading": "Backups",
+          "image": "docs/presentation/screens/admin-backup.png",
+          "caption": {
+            "en": "Backups of the installation."
+          }
+        },
+        {
+          "doc": "docs/guide/administrator.md",
+          "heading": "Monitoring",
+          "image": "docs/presentation/screens/admin-monitoring.png",
+          "caption": {
+            "en": "Monitoring: health and load of the platform."
+          }
+        },
+        {
+          "doc": "docs/guide/administrator.md",
+          "heading": "Log",
+          "image": "docs/presentation/screens/admin-log.png",
+          "caption": {
+            "en": "The log of the whole platform."
+          }
+        }
+      ]
     },
     {
       "id": "installation-guide",
-      "title": { "en": "Mosaikit — Installation guide", "it": "Mosaikit — Guida all'installazione" },
+      "title": {
+        "en": "Mosaikit — Installation guide",
+        "it": "Mosaikit — Guida all'installazione"
+      },
       "subtitle": {
         "en": "Desktop, Docker and Kubernetes releases, and their configuration",
         "it": "Release Desktop, Docker e Kubernetes, e la loro configurazione"
@@ -34,7 +258,10 @@
     },
     {
       "id": "developer-guide",
-      "title": { "en": "Mosaikit — Developer guide", "it": "Mosaikit — Guida per lo sviluppatore" },
+      "title": {
+        "en": "Mosaikit — Developer guide",
+        "it": "Mosaikit — Guida per lo sviluppatore"
+      },
       "subtitle": {
         "en": "Write, test, sign and ship plugins, and build a product on Mosaikit",
         "it": "Scrivere, provare, firmare e distribuire plugin, e costruire un prodotto su Mosaikit"
@@ -83,12 +310,19 @@
     },
     {
       "id": "architecture",
-      "title": { "en": "Mosaikit — Architecture", "it": "Mosaikit — Architettura" },
+      "title": {
+        "en": "Mosaikit — Architecture",
+        "it": "Mosaikit — Architettura"
+      },
       "subtitle": {
         "en": "How the kernel, the plugins and the distributions fit together",
         "it": "Come stanno insieme kernel, plugin e distribuzioni"
       },
-      "sources": { "en": ["docs/architecture.md"] }
+      "sources": {
+        "en": [
+          "docs/architecture.md"
+        ]
+      }
     }
   ]
 }
