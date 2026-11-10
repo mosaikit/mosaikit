@@ -16,9 +16,9 @@ compiled Mosaikit (the base), without the source code of the platform.
 
 | What | Where |
 |---|---|
-| The Dev Kit (`mosaikit-product`, `mosaikit-plugin`, the documents). **It is all you download.** | <https://github.com/mosaikit/mosaikit/releases/tag/v1.0.5>, list **Assets** at the end of the page: `mosaikit-devkit-1.0.5-<your system>`, with `SHA256SUMS` and `SHA256SUMS.sig` |
-| The base 1.0.5 (Mosaikit compiled) | comes by itself: `build` without `--base` downloads, checks and keeps the base of the Dev Kit you run; the Docker image is `ghcr.io/mosaikit/mosaikit:v1.0.5` |
-| The base 1.0.4 (the older one, for the upgrade test) | comes by itself with `--base 1.0.4`; the image is `ghcr.io/mosaikit/mosaikit:v1.0.4`. For step 6 you also need the `mosaikit-server` of the Dev Kit 1.0.4, in the **Assets** of <https://github.com/mosaikit/mosaikit/releases/tag/v1.0.4> |
+| The Dev Kit (`mosaikit-product`, `mosaikit-plugin`, the documents). **It is all you download.** | <https://github.com/mosaikit/mosaikit/releases/tag/v1.0.6>, list **Assets** at the end of the page: `mosaikit-devkit-1.0.6-<your system>`, with `SHA256SUMS` and `SHA256SUMS.sig` |
+| The base 1.0.6 (Mosaikit compiled) | comes by itself: `build` without `--base` downloads, checks and keeps the base of the Dev Kit you run; the Docker image is `ghcr.io/mosaikit/mosaikit:v1.0.6` |
+| The base 1.0.5 (the older one, for the upgrade test) | comes by itself with `--base 1.0.5`; the image is `ghcr.io/mosaikit/mosaikit:v1.0.5`. For step 6 you also need the `mosaikit-server` of the Dev Kit 1.0.5, in the **Assets** of <https://github.com/mosaikit/mosaikit/releases/tag/v1.0.5> |
 
 Download the Dev Kit archive of your system and `SHA256SUMS` and `SHA256SUMS.sig`, check them as `docs/devkit/releasing.md` says,
 and unpack it. Put its `bin/` folder on the `PATH`. Start at `README.md` of the kit, then `docs/devkit/reference-product.md`.
@@ -30,11 +30,11 @@ and unpack it. Put its `bin/` folder on the `PATH`. Start at `README.md` of the 
    `>=1.0, <2`.
 2. `mosaikit-product validate` and `mosaikit-product test` pass.
 3. Run it (`mosaikit-product dev`), sign in as the test users, and check the brand.
-4. Build the **desktop** release on the older base (`mosaikit-product build desktop --base 1.0.4`) and run it.
-5. Build the **Docker** release on the older base (`mosaikit-product build docker --base 1.0.4 --build`), install it on the
+4. Build the **desktop** release on the older base (`mosaikit-product build desktop --base 1.0.5`) and run it.
+5. Build the **Docker** release on the older base (`mosaikit-product build docker --base 1.0.5 --build`), install it on the
    clean machine (copy the folder of the release, `docker compose up -d`), sign in and create some data.
-6. **Upgrade the base** to 1.0.5: run `mosaikit-product test --upgrade-from <the `mosaikit-server` of the Dev Kit 1.0.4>`, then rebuild the
-   Docker release without `--base` (it is the base of your Dev Kit, 1.0.5), bring the installed product up on it
+6. **Upgrade the base** to 1.0.6: run `mosaikit-product test --upgrade-from <the `mosaikit-server` of the Dev Kit 1.0.5>`, then rebuild the
+   Docker release without `--base` (it is the base of your Dev Kit, 1.0.6), bring the installed product up on it
    (`docker compose up -d` in the same folder, so the volumes stay), and check that the data of step 5 is still there.
 
 **How to work**
