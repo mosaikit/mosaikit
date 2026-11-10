@@ -173,7 +173,7 @@ jobs:
       - name: test end-to-end (Playwright), group ${{ matrix.shard }}
         # no wildcard run here (its own job below)
         run: E2E_CHANNEL=chromium cargo xtask e2e --shard ${{ matrix.shard }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: e2e-results-${{ matrix.shard }}
@@ -234,7 +234,7 @@ jobs:
           echo /usr/lib/postgresql/17/bin >> "$GITHUB_PATH"
       - name: test end-to-end (Playwright), one origin per plugin
         run: E2E_CHANNEL=chromium cargo xtask e2e --wildcard
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: e2e-results-wildcard
