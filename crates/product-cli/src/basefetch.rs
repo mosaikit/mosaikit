@@ -51,6 +51,19 @@ pub fn resolve_opt(base: Option<PathBuf>) -> Result<Option<PathBuf>> {
     base.map(resolve).transpose()
 }
 
+/// The base of `validate`, `dev` and `test`: the one given, else the version of this tool when the product keeps
+/// official plugins (they come from the registry of the base); a product of its own plugins needs none.
+pub fn for_product(dir: &Path, base: Option<PathBuf>) -> Result<Option<PathBuf>> {
+    if base.is_some() {
+        return resolve_opt(base);
+    }
+    let official = crate::model::Distribution::load(dir).and_then(|d| d.official_ids()).unwrap_or_default();
+    if official.is_empty() {
+        return Ok(None);
+    }
+    resolve(this_version()).map(Some)
+}
+
 /// Name of the desktop kit of a version in its release.
 pub fn archive_name(version: &str) -> String {
     format!("mosaikit-{version}-desktop-windows-x86_64.zip")

@@ -1,7 +1,10 @@
 # Changelog and compatibility
 
-## Unreleased
+## Since 1.0.0 (current release: 1.0.5)
 
+- New in 1.0.2: the Dev Kit is the only download for a plugin and for a product. `mosaikit-product ... --base <version>` downloads the Base from the release `v<version>`, checks it against the signed `SHA256SUMS` and keeps it in a cache; `mosaikit-plugin new` takes the SDK and the UI package from the kit by itself.
+- New in 1.0.3: `[bootstrap.idp_demo]` in `distribution.toml` and `[docker] keycloak = true`: the Docker release of a product runs Keycloak with a sample tenant that signs in through OpenID Connect.
+- New in 1.0.5: `mosaikit-product build desktop` and `build docker` take the Base of the Dev Kit when `--base` is not given; `validate`, `dev` and `test` do the same when the product keeps official plugins. The PDF manuals and a presentation are attached to every release (`cargo xtask docs`).
 - New: `mosaikit-product` (`crates/product-cli`): `new`, `validate`, `dev`, `build desktop|docker|k8s`, `sign`, `doctor`, `test`.
 - New in `distribution.toml`: `[product] base`, `[defaults]`, `[locked]`, `[languages]`, `[bootstrap]`, `[database] extensions`, `[about]` (architecture `14.4);
   `mosaikit-server check-distribution`; `about` in `GET /api/brand`.
@@ -15,8 +18,8 @@ the plugin API also have a version of their own, with a changelog.
 
 | Piece | Version | Changelog |
 |---|---|---|
-| Mosaikit (platform) | 1.0.0 | [CHANGELOG.md](../../CHANGELOG.md) |
-| Dev kit (`mosaikit-plugin`, this documentation) | 1.0.0 (the version of the platform) | [crates/plugin-cli/CHANGELOG.md](../../crates/plugin-cli/CHANGELOG.md) |
+| Mosaikit (platform) | 1.0.5 | [CHANGELOG.md](../../CHANGELOG.md) |
+| Dev kit (`mosaikit-plugin`, `mosaikit-product`, this documentation) | 1.0.5 (the version of the platform) | [crates/plugin-cli/CHANGELOG.md](../../crates/plugin-cli/CHANGELOG.md) |
 | Plugin API | 1 | architecture §8.11 |
 | Logic ABI | 1 | architecture §8.3 |
 | SDK `mosaikit-plugin-sdk` | 1.0.0 | [crates/plugin-sdk/CHANGELOG.md](../../crates/plugin-sdk/CHANGELOG.md) |

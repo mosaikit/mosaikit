@@ -9,8 +9,8 @@ portano la plugin API hanno anche una versione propria, con un changelog.
 
 | Pezzo | Versione | Changelog |
 |---|---|---|
-| Mosaikit (piattaforma) | 1.0.0 | [CHANGELOG.it.md](../../../CHANGELOG.it.md) |
-| Kit di sviluppo (`mosaikit-plugin`, questa documentazione) | 1.0.0 (la versione della piattaforma) | [crates/plugin-cli/CHANGELOG.md](../../../crates/plugin-cli/CHANGELOG.md) |
+| Mosaikit (piattaforma) | 1.0.5 | [CHANGELOG.it.md](../../../CHANGELOG.it.md) |
+| Kit di sviluppo (`mosaikit-plugin`, `mosaikit-product`, questa documentazione) | 1.0.5 (la versione della piattaforma) | [crates/plugin-cli/CHANGELOG.md](../../../crates/plugin-cli/CHANGELOG.md) |
 | Plugin API | 1 | architettura §8.11 |
 | ABI della logica | 1 | architettura §8.3 |
 | SDK `mosaikit-plugin-sdk` | 1.0.0 | [crates/plugin-sdk/CHANGELOG.md](../../../crates/plugin-sdk/CHANGELOG.md) |

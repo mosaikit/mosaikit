@@ -11,11 +11,10 @@ for both jobs:
 | I want to | I do | What else comes by itself |
 |---|---|---|
 | Make a **plugin** | `mosaikit-plugin new <name>`: the tool finds the SDK and the UI package in the kit | nothing |
-| Make a **product** (an application) | `mosaikit-product new <name>`, then `--base <version>` in the commands | the **Base** (Mosaikit compiled, with the official plugins) is downloaded once, checked and kept in a cache; the Docker image `ghcr.io/mosaikit/mosaikit:v<version>` is pulled by Docker |
+| Make a **product** (an application) | `mosaikit-product new <name>`: no option needed | the **Base** (Mosaikit compiled, with the official plugins) is downloaded once, checked and kept in a cache; the Docker image `ghcr.io/mosaikit/mosaikit:v<version>` is pulled by Docker |
 
-For a product you also need Docker, to build and run the Docker release. The Base download works from the release `v1.0.2`: for an
-older Base, download `mosaikit-<version>-desktop-windows-x86_64.zip` from the **Assets** of its release and give `--base` the zip.
-The releases named `kit-v<version>` have the Dev Kit alone, for a version still being tried
+For a product you also need Docker, to build and run the Docker release. The Base of your Dev Kit is downloaded when a command needs it. For an
+older Base (from 1.0.2 it is downloaded by version), download `mosaikit-<version>-desktop-windows-x86_64.zip` from the **Assets** of its release and give `--base` the zip.
 ([Building an application](building-an-application.md)).
 
 The kit is one folder (or archive) with:
@@ -28,16 +27,16 @@ The kit is one folder (or archive) with:
 | `docs/` | these documents |
 
 **Download.** Open the releases of `mosaikit/mosaikit`: <https://github.com/mosaikit/mosaikit/releases>. The kit is the
-release whose name starts with `kit-v` (for example `kit-v1.0.0-rc3`; a pre-release is a kit that is still being tried). At
+release of the version you want, named `v<version>` (for example `v1.0.5`; a pre-release is a version still being tried). At
 the end of its page, open the list **Assets** and download the archive of your system,
 `mosaikit-devkit-<version>-<platform>.zip` (Windows) or `.tar.gz` (Linux, macOS), and also `SHA256SUMS` and
 `SHA256SUMS.sig`. Check them ([Releasing the kit](releasing.md)) and unpack the archive in a folder of your choice.
 
 **Put `bin/` on your `PATH`.** This is required: the commands `mosaikit-plugin` and `mosaikit-server` are in the `bin/` folder
 of the kit, and the system finds them only through `PATH`. Setting only `MOSAIKIT_KIT` does not work: it does not make the commands available. With the kit unpacked in
-`C:\Tools\mosaikit-devkit-1.0.0-windows-x86_64`:
+`C:\Tools\mosaikit-devkit-1.0.5-windows-x86_64`:
 
-- Windows, for the current PowerShell window: `$env:Path = "C:\Tools\mosaikit-devkit-1.0.0-windows-x86_64\bin;" + $env:Path`. For
+- Windows, for the current PowerShell window: `$env:Path = "C:\Tools\mosaikit-devkit-1.0.5-windows-x86_64\bin;" + $env:Path`. For
   every window: Start > "Edit the system environment variables" > Environment Variables > `Path` of your user > New >
   the full path of the `bin` folder; then open a new window.
 - Linux and macOS: `export PATH="$HOME/mosaikit-devkit/bin:$PATH"` (put the line in `~/.profile` or `~/.zshrc` to keep it).
