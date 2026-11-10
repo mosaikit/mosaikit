@@ -2,24 +2,24 @@
   "_comment": "Source of the PowerPoint deck (cargo xtask docs). Every text has an en and an it version; the version, the date and the totals of the estimate are computed. Edit the numbers of `estimate` and `measured` here, never in the .pptx.",
   "brand": { "red": "8B1A2B", "gold": "E8B94A", "ink": "1B2333", "muted": "55607A", "soft": "F6F1E7", "line": "D5DBE6" },
   "estimate": {
-    "dayRate": 500,
+    "dayRate": 400,
     "currency": "EUR",
     "note": {
       "en": "Indicative estimate by the Mosaikit team for a team that already knows the technologies, not a measurement. Replace the figures with your own: they live in docs/presentation/deck.json.",
       "it": "Stima indicativa del team Mosaikit per un gruppo che conosce già le tecnologie, non una misura. Sostituisci i numeri con i tuoi: sono in docs/presentation/deck.json."
     },
     "rows": [
-      { "what": { "en": "Multi-tenancy and data isolation (PostgreSQL RLS, SQLite)", "it": "Multi-tenancy e isolamento dei dati (RLS PostgreSQL, SQLite)" }, "scratch": 40 },
-      { "what": { "en": "Sign-in, second factor, single sign-on (OpenID Connect)", "it": "Accesso, secondo fattore, single sign-on (OpenID Connect)" }, "scratch": 30 },
-      { "what": { "en": "Roles, groups, sharing with inheritance, access requests", "it": "Ruoli, gruppi, condivisione con ereditarietà, richieste di accesso" }, "scratch": 35 },
-      { "what": { "en": "Public links (expiry, password, visit count)", "it": "Link pubblici (scadenza, password, conteggio visite)" }, "scratch": 10 },
-      { "what": { "en": "Activity log, KPIs, quotas and usage", "it": "Registro attività, KPI, quote e consumi" }, "scratch": 30 },
-      { "what": { "en": "Administration screens for platform, tenants and people", "it": "Schermate di amministrazione di piattaforma, tenant e persone" }, "scratch": 40 },
-      { "what": { "en": "Notifications, global search, trash with restore", "it": "Notifiche, ricerca globale, cestino con ripristino" }, "scratch": 25 },
-      { "what": { "en": "Languages, themes, brand of the product", "it": "Lingue, temi, brand del prodotto" }, "scratch": 15 },
-      { "what": { "en": "A safe place for third-party code (sandbox, permissions)", "it": "Un posto sicuro per il codice di terzi (sandbox, permessi)" }, "scratch": 60 },
-      { "what": { "en": "Packaging, signing, registry, updates, blocklist", "it": "Pacchetti, firma, registro, aggiornamenti, blocklist" }, "scratch": 30 },
-      { "what": { "en": "Desktop, Docker and Kubernetes releases", "it": "Release Desktop, Docker e Kubernetes" }, "scratch": 25 }
+      { "what": { "en": "Multi-tenancy and data isolation (PostgreSQL RLS, SQLite)", "it": "Multi-tenancy e isolamento dei dati (RLS PostgreSQL, SQLite)" }, "scratch": 27 },
+      { "what": { "en": "Sign-in, second factor, single sign-on (OpenID Connect)", "it": "Accesso, secondo fattore, single sign-on (OpenID Connect)" }, "scratch": 20 },
+      { "what": { "en": "Roles, groups, sharing with inheritance, access requests", "it": "Ruoli, gruppi, condivisione con ereditarietà, richieste di accesso" }, "scratch": 23 },
+      { "what": { "en": "Public links (expiry, password, visit count)", "it": "Link pubblici (scadenza, password, conteggio visite)" }, "scratch": 7 },
+      { "what": { "en": "Activity log, KPIs, quotas and usage", "it": "Registro attività, KPI, quote e consumi" }, "scratch": 20 },
+      { "what": { "en": "Administration screens for platform, tenants and people", "it": "Schermate di amministrazione di piattaforma, tenant e persone" }, "scratch": 27 },
+      { "what": { "en": "Notifications, global search, trash with restore", "it": "Notifiche, ricerca globale, cestino con ripristino" }, "scratch": 17 },
+      { "what": { "en": "Languages, themes, brand of the product", "it": "Lingue, temi, brand del prodotto" }, "scratch": 10 },
+      { "what": { "en": "A safe place for third-party code (sandbox, permissions)", "it": "Un posto sicuro per il codice di terzi (sandbox, permessi)" }, "scratch": 40 },
+      { "what": { "en": "Packaging, signing, registry, updates, blocklist", "it": "Pacchetti, firma, registro, aggiornamenti, blocklist" }, "scratch": 20 },
+      { "what": { "en": "Desktop, Docker and Kubernetes releases", "it": "Release Desktop, Docker e Kubernetes" }, "scratch": 17 }
     ],
     "withMosaikit": {
       "days": 10,
