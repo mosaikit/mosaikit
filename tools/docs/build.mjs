@@ -1,5 +1,6 @@
 // PDF manuals and the PowerPoint deck of Mosaikit, made from the Markdown of docs/ and from docs/presentation/deck.json.
 // node build.mjs manuals|deck|all [--out <folder>] [--lang en,it] [--version <x.y.z>]
+// The documents are in English; --lang it adds the Italian ones that have a source.
 // The browser is the one of Playwright (set DOCS_BROWSER to the path of a Chromium to use another).
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,7 +20,7 @@ const opt = (name, dflt) => {
   return i >= 0 ? args[i + 1] : dflt;
 };
 const out = path.resolve(opt('out', path.join(root, 'dist', 'docs')));
-const langs = opt('lang', 'en,it').split(',');
+const langs = opt('lang', 'en').split(',');
 
 function workspaceVersion() {
   const t = fs.readFileSync(path.join(root, 'Cargo.toml'), 'utf8');
