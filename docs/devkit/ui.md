@@ -140,6 +140,8 @@ English, Italian and Spanish by itself and follows language changes. Returns a f
 | `views` | `CrudView[]` | your own rendering next to the detail panel instead of the table; more than one adds a switch |
 | `empty` | `{ art?, title?, text?, actions? }` | the empty state; defaults are a generic picture, «Nothing here yet», «Create the first one to get started.» and the new button |
 | `panel` | `'selected' \| 'always'` | the detail panel only while an item is open (default), or always. Experimental |
+| `form` | `'inline' \| 'modal'` | where the form of an item is: `inline` (under the table, or in the detail panel with `views`) or `modal`, a dialog over the page opened by «New» and by selecting a row, closed by Save, Cancel, Escape or a click outside. The template of `mosaikit-plugin new` uses `modal` |
+| `cell` | `(field, row, text) => string \| Node \| undefined` | draws a cell of the table your own way (the template shows the status as a chip with `chip`); `undefined` keeps the default |
 | `detail` | `(row, box) => void` | your own tools in the detail of an existing item |
 | `reader` | `(ctx: ItemCtx) => HTMLElement` | a read-only view of the open item, with «Edit» for the fields |
 | `bar` | `HTMLElement[]` | a bar of yours above the list, under the header |

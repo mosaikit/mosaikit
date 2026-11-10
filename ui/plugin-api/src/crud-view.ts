@@ -34,6 +34,9 @@ export interface CrudOptions {
   /** the panel next to the list: `selected` (default) shows it only while an item is open or a new one is being written, so the
    *  list has the whole width otherwise; `always` keeps it in sight (an empty panel when nothing is open) */
   panel?: 'selected' | 'always'
+  /** where the form of an item is drawn: `inline` (default) under the table, or next to it with `views`; `modal` in a dialog
+   *  over the page, opened by the «new» button and by selecting an item, and closed by saving, cancelling or Escape */
+  form?: 'inline' | 'modal'
   /** the read-only view of the open item (with «Edit» for the fields): used instead of the form until the person edits */
   reader?: (ctx: ItemCtx) => HTMLElement
   /** a bar of the plugin above the list, under the header (a «Tags» button, a menu of tags…); it stays in sight while the list scrolls */
@@ -41,6 +44,9 @@ export interface CrudOptions {
   /** the plugin's own part of the form (a colour picker, a tag chooser…): draws into `box` after the fields, for a new and for an open
    *  item, and sets values of fields the form does not show (hidden ones) with `ctx.set`; they are saved with the form */
   editor?: (ctx: EditorCtx, box: HTMLElement) => void
+  /** draws a cell of the table your own way (a chip for a status, a bar, a link): `text` is what the table would show;
+   *  return a string or an element, or nothing to keep the default */
+  cell?: (field: FieldDecl, row: Row, text: string) => string | Node | null | undefined
   /** called with the rows every time the list is loaded (all the rows, when the plugin filters with `where`) */
   onLoad?: (rows: Row[]) => void
 }
@@ -323,12 +329,16 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   subbar.hidden = !opts.bar?.length
   const master = h('div', { class: 'msk-master' }, subbar, items, morebar)
   const split = h('div', { class: 'msk-split' }, master, h('aside', { class: 'msk-detail', 'aria-label': tr('detail'), id: 'msk-detail' }, form))
-  const body = views.length ? pageBody(split) : pageBody(grid.el, emptyBox, form)
+  // `form: 'modal'`: the form is a dialog over the page, not a part of it
+  const modal = opts.form === 'modal' ? h('dialog', { class: 'msk-modal', 'aria-labelledby': 'msk-modal-title' }, form) : null
+  if (modal) formTitle.id = 'msk-modal-title'
+  const body = views.length ? pageBody(split) : pageBody(grid.el, emptyBox, ...(modal ? [] : [form]))
   body.classList.add(views.length ? 'msk-splitbody' : 'msk-tablebody')
   root.replaceChildren(
     // the header and the filters never scroll: the table, the foot and the form do
     pageHead({ title: opts.title ?? resource, section: opts.section, sub: count, actions: [btnNew], filters: views.length > 1 ? [switcher, filter] : [filter] }),
     body,
+    ...(modal ? [modal] : []),
   )
   // the rest of the rows come as the foot of the table comes into view
   const foot = new IntersectionObserver((e) => e.some((x) => x.isIntersecting) && !btnMore.hidden && !btnMore.disabled && void loadMore(), { root: views.length ? master : grid.scroller, rootMargin: '200px' })
@@ -337,6 +347,18 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   const setMsg = (t: string, err = false) => {
     msg.textContent = t
     msg.classList.toggle('err', err)
+  }
+  /** The dialog is open while an item is open or a new one is being written. */
+  function syncModal() {
+    if (!modal) return
+    const want = !!(st.selected || st.editing)
+    if (want && !modal.open) {
+      if (typeof modal.showModal === 'function') modal.showModal()
+      else modal.setAttribute('open', '')
+    } else if (!want && modal.open) {
+      if (typeof modal.close === 'function') modal.close()
+      else modal.removeAttribute('open')
+    }
   }
   const visibleFields = () => st.fields.filter((f) => !f.hidden)
   const columns = () => {
@@ -503,7 +525,8 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
         sort: (r) => text(f, r.values[f.key]),
         serverSort: f.key,
         cell: (r) => {
-          const box = h('span', {}, display(f, r.values[f.key]))
+          const shown = display(f, r.values[f.key])
+          const box = h('span', {}, opts.cell?.(f, r, shown) ?? shown)
           if (i === 0) {
             if (r.shared) box.append(h('span', { class: 'msk-badge acc' }, tr('shared')))
             if (r.my_level !== 'manage') {
@@ -603,6 +626,11 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   }
 
   function renderForm() {
+    renderFormBody()
+    syncModal()
+  }
+
+  function renderFormBody() {
     const row = selectedRow()
     const canWrite = !row || row.my_level === 'write' || row.my_level === 'manage'
     const canManage = !row || row.my_level === 'manage'
@@ -817,6 +845,16 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   root.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && views.length && split.dataset.open === 'true' && !(e.target as HTMLElement | null)?.closest?.('select, dialog, [role="dialog"]')) btnCancel.click()
   })
+  if (modal) {
+    // Escape and a click on the backdrop do what «Cancel» does
+    modal.addEventListener('cancel', (e) => {
+      e.preventDefault()
+      btnCancel.click()
+    })
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) btnCancel.click()
+    })
+  }
   btnSave.addEventListener('click', () =>
     busy(async () => {
       const values = collect()
@@ -824,12 +862,13 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
       const saved = row ? await api.update(row.id, values) : await api.create(values)
       if (row) for (const [ext, v] of Object.entries(collectExt(row))) await extApi.set(row.id, ext, v)
       // saving closes the panel (the list takes the whole width again) unless the plugin reads the item in it: then it shows the saved item
-      st.selected = views.length && !opts.reader && opts.panel !== 'always' ? null : saved.id
+      st.selected = (views.length || modal) && !opts.reader && opts.panel !== 'always' ? null : saved.id
       st.editing = false
       st.editorVals = {}
       split.dataset.open = st.selected ? 'true' : 'false'
       setMsg(tr('saved'))
-      if (!st.selected && views.length) msk.toast(tr('saved'))
+      if (!st.selected && (views.length || modal)) msk.toast(tr('saved'))
+      syncModal()
       await load()
       if (!st.selected && views.length) items.querySelector<HTMLElement>(`[data-id="${CSS.escape(saved.id)}"]`)?.focus()
     }),
@@ -842,6 +881,8 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
       await api.remove(row.id)
       st.selected = null
       split.dataset.open = 'false'
+      syncModal()
+      msk.toast(tr('deleted'))
       setMsg(tr('deleted'))
       await load()
     }),
@@ -892,6 +933,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     offNav()
     closeTab()
     foot.disconnect()
+    if (modal?.open) modal.close?.()
     root.replaceChildren()
   }
 }
