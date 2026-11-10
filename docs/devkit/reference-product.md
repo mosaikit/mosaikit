@@ -4,9 +4,8 @@ A small, complete product, made step by step with the tools of the kit: a brand,
 start. Each step is a command you can run; the checks of the manual catalog (DK-27 to DK-31) repeat them.
 
 You need the Dev Kit (`mosaikit-plugin`, `mosaikit-product`, `mosaikit-server`) and Docker: nothing else to download. The Base (Mosaikit compiled, with the
-official plugins) comes by itself when you give `--base` a version; [Building an application](building-an-application.md) says where it is kept.
-With the kit on the PATH, set `MOSAIKIT_BASE` to the version of the Base (for example `1.0.2`) and `MOSAIKIT_SERVER_BIN`
-to the server of the kit (`mosaikit-server`) so that the commands below need no extra option.
+official plugins) comes by itself, in the version of your Dev Kit; [Building an application](building-an-application.md) says where it is kept.
+With the kit on the PATH, the commands below need no option on Windows: `mosaikit-product` finds the `mosaikit-server` of the kit next to itself. On Linux and macOS set `MOSAIKIT_SERVER_BIN` to a `mosaikit-server` (see [Getting started](getting-started.md)).
 
 ## 1. Make it
 
@@ -88,7 +87,7 @@ valid. A wrong key stops it with the key named: try `"no.such" = 1` under `[defa
 ## 4. Run it
 
 ```text
-mosaikit-product dev --base 1.0.2
+mosaikit-product dev
 ```
 
 The base starts in the developer profile with your brand and policy; the address and the test users (password `mosaikit-dev`) are printed.

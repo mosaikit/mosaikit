@@ -40,7 +40,7 @@ enum Cmd {
     Dev {
         #[arg(default_value = ".")]
         dir: PathBuf,
-        /// the desktop kit (folder, .zip or a released version such as 1.0.1): its registry gives the official plugins
+        /// the desktop kit (folder, .zip or a released version such as 1.0.1): its registry gives the official plugins (default: the version of this tool, when the product keeps official plugins)
         #[arg(long, env = "MOSAIKIT_BASE")]
         base: Option<PathBuf>,
         #[arg(long, env = "MOSAIKIT_SERVER_BIN")]
@@ -160,7 +160,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
             println!("created {}\nnext: cd {} && mosaikit-product validate", root.display(), root.display());
         }
         Cmd::Validate { dir, server, base } => {
-            let base = mosaikit_product_cli::basefetch::resolve_opt(base)?;
+            let base = mosaikit_product_cli::basefetch::for_product(&dir, base)?;
             let r = validate::validate(&dir, &validate::Options { server, base })?;
             r.print();
             if !r.ok() {
@@ -168,11 +168,11 @@ fn run(cli: Cli) -> Result<ExitCode> {
             }
         }
         Cmd::Dev { dir, base, server, port, data, no_open, no_build, fresh } => {
-            let base = mosaikit_product_cli::basefetch::resolve_opt(base)?;
+            let base = mosaikit_product_cli::basefetch::for_product(&dir, base)?;
             dev::dev(&dev::Options { dir, base, server, port, data, no_open, no_build, fresh })?;
         }
         Cmd::Test { dir, base, server, upgrade_from, no_build, browser } => {
-            let base = mosaikit_product_cli::basefetch::resolve_opt(base)?;
+            let base = mosaikit_product_cli::basefetch::for_product(&dir, base)?;
             let r = mosaikit_product_cli::test::test(&mosaikit_product_cli::test::Options {
                 dir,
                 base,

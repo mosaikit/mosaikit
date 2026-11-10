@@ -7,13 +7,13 @@ image): no source of Mosaikit, no fork, no compilation of the kernel. The tool i
 **Where the base comes from.** The Dev Kit has the tools (`mosaikit-product`, `mosaikit-plugin`, `mosaikit-server`) and you download nothing else:
 without `--base` the Base is the version of the Dev Kit you run (they are released together); give `--base` a **version** and the tool fetches the desktop kit of that release (`mosaikit.exe` and `registry/index.json`, the official
 plugins) from the release `v<version>` of `mosaikit/mosaikit`, checks it against the signed `SHA256SUMS` of the release
-and keeps it in a cache, so it downloads it once: `mosaikit-product build desktop --base 1.0.2` (the same as plain `build desktop`, with the Dev Kit 1.0.2). The cache is
+and keeps it in a cache, so it downloads it once: `mosaikit-product build desktop --base 1.0.5` (the same as plain `build desktop` with the Dev Kit 1.0.5). The cache is
 `%LOCALAPPDATA%\mosaikit\base\<version>` (Windows), `~/.cache/mosaikit/base/<version>` (Linux) or
 `~/Library/Caches/mosaikit/base/<version>` (macOS); `MOSAIKIT_CACHE` puts it elsewhere. `--base` also takes a folder or a `.zip` of the desktop kit, which is how you use a
-Base older than 1.0.2 (the zip is in the **Assets** of its release: <https://github.com/mosaikit/mosaikit/releases>). `validate` and `dev` of a product with
-no official plugin do not need a base at all. For Docker the base is the image `ghcr.io/mosaikit/mosaikit:v<version>`, which `--base <version>`
+Base older than 1.0.2 (the zip is in the **Assets** of its release: <https://github.com/mosaikit/mosaikit/releases>). `validate`, `dev` and `test` take the Base of the Dev Kit by
+themselves when the product keeps official plugins, and need none when it has only its own. For Docker the base is the image `ghcr.io/mosaikit/mosaikit:v<version>`, which `--base <version>`
 names by itself (`--base-image` overrides it), and Docker pulls it; for Kubernetes it is the k8s folder of the release (`--base-k8s`).
-Set `MOSAIKIT_BASE=1.0.2` once and the commands need no `--base`.
+`MOSAIKIT_BASE=<version>` sets another default for every command.
 
 A worked example, step by step, is in [Reference product](reference-product.md). The terms of redistribution are in
 [Licensing and responsibilities](product-licensing.md). The contract between the base and a product is in
@@ -195,8 +195,8 @@ by reference (`env:NAME`, `file:PATH`, a relative path being relative to the fol
 ## 8. Build and release
 
 ```text
-mosaikit-product build desktop --base <version | folder | .zip>       dist/<id>-<version>-desktop   (the desktop kit of the Base, see the top)
-mosaikit-product build docker  --base <version | folder | .zip> [--base-image <image>] [--build]   dist/<id>-<version>-docker
+mosaikit-product build desktop [--base <version | folder | .zip>]     dist/<id>-<version>-desktop   (the desktop kit of the Base, see the top)
+mosaikit-product build docker  [--base <version | folder | .zip>] [--base-image <image>] [--build]   dist/<id>-<version>-docker
 mosaikit-product build k8s     --base-k8s <k8s folder of the kit>       dist/<id>-<version>-k8s
 ```
 
