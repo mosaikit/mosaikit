@@ -6,6 +6,7 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
 ## 1.0.6
 
+- Il log del kit Docker non mostra più un `ERROR` per la cartella vuota dei plugin in sviluppo: dice che non c'è niente da caricare.
 - Il plugin creato da `mosaikit-plugin new` ha una pagina a elenco con il modulo dell'elemento in una finestra (si apre con «Nuovo» e quando selezioni una riga), lo stato come etichetta colorata e lo stato vuoto illustrato. `mountCrud` ha le opzioni `form: 'modal'` e `cell` per i plugin che vogliono lo stesso.
 - La release Docker di un prodotto ha un `README.md` con cos'è la cartella, le credenziali predefinite di una nuova installazione, come recuperare il secondo fattore e la password, e dove leggere altro.
 - La pagina di accesso di Keycloak in quella release ha l'aspetto della pagina di accesso del prodotto: una fascia con il nome, la frase e il logo del brand, il modulo a destra, i colori del brand.

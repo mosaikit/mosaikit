@@ -114,6 +114,11 @@ pub fn folder_of(k: &Kernel, id: &str) -> Option<PathBuf> {
 
 pub async fn load_all(k: &Kernel) {
     for dir in k.cfg.dev.plugins.clone() {
+        // an empty folder (the one of the Docker kit, waiting for a plugin) is not a failure
+        if !dir.join("plugin.toml").exists() {
+            tracing::info!("development plugin folder {}: no plugin.toml, nothing to load", dir.display());
+            continue;
+        }
         match load_one(k, &dir).await {
             Ok(id) => tracing::info!("development plugin {id} loaded from {}", dir.display()),
             Err(e) => tracing::error!("development plugin {}: {e}", dir.display()),

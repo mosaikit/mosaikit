@@ -7,6 +7,7 @@ in step).
 
 ## 1.0.6
 
+- The log of the Docker kit no longer shows an `ERROR` for the empty development plugin folder: it says there is nothing to load.
 - The plugin made by `mosaikit-plugin new` has a list page with the form of an item in a dialog (it opens with «New» and when you select a row), the status as a coloured chip and the illustrated empty state. `mountCrud` has the options `form: 'modal'` and `cell` for the plugins that want the same.
 - The Docker release of a product has a `README.md` with what the folder is, the default credentials of a new installation, how to recover the second factor and the password, and where to read more.
 - The sign-in page of Keycloak in that release has the look of the sign-in page of the product: a band with the name, the line and the logo of the brand, the form on the right, the colours of the brand.
