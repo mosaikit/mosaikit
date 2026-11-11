@@ -8,7 +8,7 @@ id = "mosaikit"
 # name shown to users (title, sign-in, icon in the notification area)
 name = "Mosaikit"
 # version of the product
-version = "1.0.6"
+version = "1.0.7"
 description = "Multi-tenant web platform built out of plugins"
 # name of the desktop executable (without .exe)
 executable = "mosaikit"

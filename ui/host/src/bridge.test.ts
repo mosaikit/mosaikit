@@ -90,6 +90,10 @@ describe('routeOp', () => {
     expect(routeOp('alfa', 'p.x', 'files.delete', { id: ID, source: 'com.mosaikit.files' }).url).toBe(`/api/t/alfa/p/p.x/files/${ID}?source=com.mosaikit.files`)
     expect(routeOp('alfa', 'p.x', 'files.info', { id: ID, source: 'com.mosaikit.files' })).toEqual({ method: 'GET', url: `/api/t/alfa/p/p.x/files/${ID}/info?source=com.mosaikit.files` })
     expect(routeOp('alfa', 'p.x', 'files.info', { id: ID }).url).toBe(`/api/t/alfa/p/p.x/files/${ID}/info`)
+    // the content of a file of another plugin's Files area, and of the own one
+    expect(routeOp('alfa', 'p.x', 'files.blob', { id: ID, source: 'com.mosaikit.files' })).toEqual({ method: 'GET', url: `/api/t/alfa/p/p.x/files/${ID}/content?source=com.mosaikit.files`, blob: true })
+    expect(routeOp('alfa', 'p.x', 'files.blob', { id: ID }).url).toBe(`/api/t/alfa/p/p.x/files/${ID}/content`)
+    expect(() => routeOp('alfa', 'p.x', 'files.blob', { id: ID, source: '../x' })).toThrow(OpError)
     expect(() => routeOp('alfa', 'p.x', 'files.info', { id: ID, source: '../x' })).toThrow(OpError)
     expect(routeOp('alfa', 'p.x', 'files.profiles', { id: ID, source: 'com.mosaikit.files' })).toMatchObject({ method: 'GET', url: `/api/t/alfa/p/p.x/files/${ID}/profiles?source=com.mosaikit.files` })
   })

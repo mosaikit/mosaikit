@@ -222,8 +222,10 @@ export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unk
       const src = a.source !== undefined && a.source !== null ? `?source=${enc(pluginId(a.source))}` : ''
       return { method: 'GET', url: `${base}/files/${uuid(a.id)}/info${src}` }
     }
-    case 'files.blob':
-      return { method: 'GET', url: `${base}/files/${uuid(a.id)}/content`, blob: true }
+    case 'files.blob': {
+      const src = a.source !== undefined && a.source !== null ? `?source=${enc(pluginId(a.source))}` : ''
+      return { method: 'GET', url: `${base}/files/${uuid(a.id)}/content${src}`, blob: true }
+    }
     case 'files.zip':
       return { method: 'GET', url: `${base}/files/${uuid(a.id)}/zip`, blob: true }
     case 'ticket': {

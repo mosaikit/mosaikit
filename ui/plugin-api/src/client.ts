@@ -286,8 +286,8 @@ export class Msk {
     remove: async (id: string, source?: string) => {
       await this.bridge.call('files.delete', { id, source })
     },
-    /** content of the file (previews, downloads from the plugin) */
-    blob: (id: string) => this.bridge.call<Blob>('files.blob', { id }),
+    /** content of the file (previews, downloads from the plugin; `source`: another plugin's Files area, needs `files_read`) */
+    blob: (id: string, source?: string) => this.bridge.call<Blob>('files.blob', { id, source }),
     /** zip of a folder */
     zip: (id: string) => this.bridge.call<Blob>('files.zip', { id }),
     /** the plugins that know a kind of folder and recognise this one (nothing is announced) */
