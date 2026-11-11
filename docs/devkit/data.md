@@ -16,7 +16,28 @@ Write SQL for PostgreSQL. On SQLite it is **translated** (names, casts, `now()`,
 safe equivalent is refused with a clear message (`json_agg` of whole rows, `DISTINCT ON`, regular expressions,
 `ALTER COLUMN TYPE`). `validate --strict` runs your migrations through that translation, so you learn it before the
 desktop does. A plugin that needs PostgreSQL features says `[requires] database = "postgres"`; it then does not install on
-SQLite. Check against the real database with the Docker kit.
+SQLite. Check against the real database with the Docker kit, or run the development server on PostgreSQL (next section).
+
+## Running `dev` and `test` on PostgreSQL
+
+`mosaikit-plugin dev`, `mosaikit-product dev` and `mosaikit-product test` start the server on SQLite. A plugin with
+`[requires] database = "postgres"` (PostGIS, `plugin.call`) does not load there. Give them a PostgreSQL database **of your
+computer** with `--database postgres://user:password@localhost:5432/name` (or `MOSAIKIT_DEV_DATABASE_URL`; never read from
+`DATABASE_URL`, on purpose: the developer profile has known passwords, and the server refuses a database that is not on
+this computer). The database must be **empty and prepared as the Docker release prepares it**: a role that is not a
+superuser, with `CREATEROLE` (the roles of the plugins), owning the database, and the PostGIS extension made by a superuser
+when a plugin needs it. A throwaway one:
+
+```text
+docker run -d --name msk-pg -e POSTGRES_PASSWORD=pgpass -p 127.0.0.1:55433:5432 postgis/postgis:17-3.5-alpine
+docker exec msk-pg psql -U postgres -c "CREATE ROLE mosaikit_app LOGIN CREATEROLE PASSWORD 'apppass'" -c "CREATE DATABASE mosaikit_dev OWNER mosaikit_app"
+docker exec msk-pg psql -U postgres -d mosaikit_dev -c "CREATE EXTENSION IF NOT EXISTS postgis"
+mosaikit-product dev --database postgres://mosaikit_app:apppass@localhost:55433/mosaikit_dev
+```
+
+The tenant `dev` and the test users are made in that database at the first start and stay there: `--fresh` does not empty a
+PostgreSQL database (drop it and create it again). `mosaikit-product test --database ...` uses it as it is, so give it an
+empty one for a clean run. The embedded PostgreSQL of the desktop release (`database.embedded`) is not part of the Dev Kit.
 
 ## Tables
 

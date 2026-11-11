@@ -41,6 +41,33 @@ pub struct Options {
     pub no_watch: bool,
     /// delete the data folder first: a new database, the tenant and the test users again
     pub fresh: bool,
+    /// a PostgreSQL database of this computer to run on instead of SQLite (`postgres://user:password@localhost:5432/name`)
+    pub database: Option<String>,
+}
+
+/// The URL of a PostgreSQL database for the development server: a `postgres://` URL. The developer profile has known
+/// passwords, so the server itself refuses a database that is not on this computer.
+pub fn check_database_url(url: &str) -> Result<()> {
+    let ok = url.starts_with("postgres://") || url.starts_with("postgresql://");
+    if !ok || url.len() <= "postgres://".len() {
+        bail!(
+            "--database: a PostgreSQL URL (postgres://user:password@localhost:5432/name), got `{}`",
+            redact_database_url(url)
+        );
+    }
+    Ok(())
+}
+
+/// The URL without its password, for the screen.
+pub fn redact_database_url(url: &str) -> String {
+    let Some((scheme, rest)) = url.split_once("://") else { return url.to_string() };
+    match rest.split_once('@') {
+        Some((cred, host)) => {
+            let user = cred.split(':').next().unwrap_or_default();
+            format!("{scheme}://{user}@{host}")
+        }
+        None => url.to_string(),
+    }
 }
 
 /// Where the server executable is, or why it is not found.
@@ -192,6 +219,14 @@ pub fn dev(o: &Options) -> Result<()> {
         project::build_wasm(std::slice::from_ref(&p), false)?;
         project::build_ui(std::slice::from_ref(&p))?;
     }
+    if let Some(u) = &o.database {
+        check_database_url(u)?;
+        if o.fresh {
+            eprintln!(
+                "--fresh does not empty a PostgreSQL database: drop and create it again to start clean"
+            );
+        }
+    }
     let data = o.data.clone().unwrap_or_else(|| p.dir.join(".mosaikit-dev"));
     let data = std::path::absolute(&data).unwrap_or(data);
     if o.fresh && data.exists() {
@@ -221,6 +256,10 @@ pub fn dev(o: &Options) -> Result<()> {
     ] {
         cmd.env_remove(var);
     }
+    // only a database the developer asks for with `--database`; the server checks that it is on this computer
+    if let Some(u) = &o.database {
+        cmd.env("MOSAIKIT_DATABASE_URL", u);
+    }
     cmd.stdin(Stdio::null());
     let mut server = Server(cmd.spawn().with_context(|| format!("starting {}", bin.display()))?);
     let url = format!("http://127.0.0.1:{port}");
@@ -230,7 +269,10 @@ pub fn dev(o: &Options) -> Result<()> {
     println!("Mosaikit developer profile for {} ({})", p.id, p.dir.display());
     println!("  app      {url}/");
     println!("  plugins  http://*.localhost:{} (one origin per plugin)", port + 1);
-    println!("  data     {}", data.display());
+    match &o.database {
+        Some(u) => println!("  database {} (PostgreSQL)", redact_database_url(u)),
+        None => println!("  data     {}", data.display()),
+    }
     println!("  test users (password {PASSWORD}):");
     for (name, role, door) in USERS {
         println!("    {name:<8} {role:<15} {door}");
@@ -328,5 +370,27 @@ mod tests {
         std::fs::write(d.path().join("node_modules").join("x.rs"), "").unwrap();
         let before = newest(&[d.path().to_path_buf()], &[".rs"]);
         assert_eq!(before, newest(&[d.path().join("src")], &[".rs"]), "node_modules is left out");
+    }
+}
+
+#[cfg(test)]
+mod database_tests {
+    use super::*;
+
+    #[test]
+    fn a_database_url_is_checked_and_its_password_is_not_shown() {
+        assert!(check_database_url("postgres://u:p@localhost:5432/db").is_ok());
+        assert!(check_database_url("postgresql://u@127.0.0.1/db").is_ok());
+        assert!(check_database_url("mysql://u@localhost/db").is_err());
+        assert!(check_database_url("postgres://").is_err());
+        assert!(check_database_url("localhost").is_err());
+        assert_eq!(
+            redact_database_url("postgres://anna:s3cret@localhost:5432/db"),
+            "postgres://anna@localhost:5432/db"
+        );
+        assert_eq!(redact_database_url("postgres://localhost/db"), "postgres://localhost/db");
+        // the error does not carry the password either
+        let e = check_database_url("mysql://anna:s3cret@localhost/db").unwrap_err().to_string();
+        assert!(!e.contains("s3cret"), "{e}");
     }
 }

@@ -4,6 +4,10 @@ Cosa cambia da una versione di Mosaikit alla successiva. La shell mostra la sezi
 Aiuto › Novità (un titolo `## <versione>` per versione, voci `- `, gruppi `### `). Questo file è la
 versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
+## 1.0.9
+
+- `mosaikit-plugin dev`, `mosaikit-product dev` e `mosaikit-product test` accettano `--database postgres://…` (o `MOSAIKIT_DEV_DATABASE_URL`): il server di sviluppo gira su un database PostgreSQL di questo computer invece che su SQLite, per i plugin con `[requires] database = "postgres"` (PostGIS). La procedura è in `docs/devkit/data.md`.
+
 ## 1.0.8
 
 - `mosaikit-plugin validate --strict` non dice più che `files_read` è inutilizzato quando la pagina del plugin chiama `msk.files.*` (si accetta un plugin la cui sola pagina legge l'area File di un altro plugin).

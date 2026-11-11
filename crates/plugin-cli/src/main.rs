@@ -175,6 +175,11 @@ enum Cmd {
         /// start from an empty database: the test tenant, the test users and the sample content again
         #[arg(long)]
         fresh: bool,
+        /// run on a PostgreSQL database of this computer instead of SQLite (a plugin with `[requires] database = "postgres"`,
+        /// PostGIS...): `postgres://user:password@localhost:5432/name`, an empty database prepared as the section on
+        /// PostgreSQL of docs/devkit/data.md says. Not read from the environment of the shell, on purpose
+        #[arg(long, env = "MOSAIKIT_DEV_DATABASE_URL")]
+        database: Option<String>,
     },
 }
 
@@ -312,7 +317,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 kit,
             })?;
         }
-        Cmd::Dev { dir, server, port, data, no_open, no_build, no_watch, fresh } => {
+        Cmd::Dev { dir, server, port, data, no_open, no_build, no_watch, fresh, database } => {
             mosaikit_plugin_cli::dev::dev(&mosaikit_plugin_cli::dev::Options {
                 dir,
                 server,
@@ -322,6 +327,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 no_build,
                 no_watch,
                 fresh,
+                database,
             })?;
         }
     }
