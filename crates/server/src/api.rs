@@ -1219,8 +1219,11 @@ async fn files_content(
     State(s): State<AppState>,
     Tenant(c): Tenant,
     Path(p): Path<PluginPath>,
+    Query(q): Query<HashMap<String, String>>,
 ) -> ApiResult<Response> {
-    let (e, data) = files::read(&s.k, &c, &p.plugin, p.id()?).await?;
+    // `source`: the Files area of another plugin, with `files_read` (as `info` and the ticket)
+    let plugin = files_target(&s, &p.plugin, &q, false)?;
+    let (e, data) = files::read(&s.k, &c, &plugin, p.id()?).await?;
     Ok(attachment(&e.name, data))
 }
 

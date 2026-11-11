@@ -5,6 +5,7 @@ version and is removed in the next.
 
 ## Unreleased
 
+- `msk.files.blob(id, source?)`: `source` reads the content of a file of another plugin's Files area (host op `files.blob`, route `GET …/files/{id}/content?source=`), with `files_read` enough, like `info` and `ticket`. Additive.
 - `mountCrud` option `form: 'modal'`: the form of an item is a dialog over the page, opened by the «new» button and by selecting a row, closed by saving, cancelling, Escape or a click outside; the list is never pushed down by a form. `inline` (the default) is as before. Additive.
 - `mountCrud` option `cell(field, row, text)`: draws a cell of the table your own way (a chip for a status). Additive.
 - `msk.files.remove(id, source?)` (the `source` of the Files area of another plugin, `files_write`), `msk.files.info(id, source?)` (size, `can_share`, active `public_link`), `msk.files.ticket(id, download?, source?)` (`{ url, expires_in }`) and `msk.files.open(folder, { share? })` (Files page on a folder, sharing dialog open). Plugin API unchanged (additive).

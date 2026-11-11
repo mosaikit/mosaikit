@@ -5,6 +5,10 @@ in Help › What is new (one `## <version>` heading per version, `- ` items, `##
 language of the person: this file in English, [CHANGELOG.it.md](CHANGELOG.it.md) in Italian (keep them
 in step).
 
+## 1.0.7
+
+- A plugin with `files_read` can read the content of a file of another plugin's Files area: `msk.files.blob(id, source)` (the route `GET …/files/{id}/content?source=`), as it already could list it, ask its size and get a ticket.
+
 ## 1.0.6
 
 - The log of the Docker kit no longer shows an `ERROR` for the empty development plugin folder: it says there is nothing to load.

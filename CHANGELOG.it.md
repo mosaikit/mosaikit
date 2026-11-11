@@ -4,6 +4,10 @@ Cosa cambia da una versione di Mosaikit alla successiva. La shell mostra la sezi
 Aiuto › Novità (un titolo `## <versione>` per versione, voci `- `, gruppi `### `). Questo file è la
 versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
+## 1.0.7
+
+- Un plugin con `files_read` può leggere il contenuto di un file dell'area File di un altro plugin: `msk.files.blob(id, source)` (la rotta `GET …/files/{id}/content?source=`), come già poteva elencarla, chiederne la dimensione e ottenere un ticket.
+
 ## 1.0.6
 
 - Il log del kit Docker non mostra più un `ERROR` per la cartella vuota dei plugin in sviluppo: dice che non c'è niente da caricare.
