@@ -28,7 +28,7 @@ another address, set `MOSAIKIT_URL` (and `MOSAIKIT_PLUGIN_URL`) in a `.env` file
 | `branding/` | the brand: name, logo, favicon, colours, texts |
 | `registry/` | the plugins of the product (signed packages) |
 | `initdb/` | the first initialization of the database |
-{keycloak_folder_row}
+{product_compose_rows}{keycloak_folder_row}
 ## Credentials of a new installation
 
 These are the defaults of `compose.yml`: **demonstration values, change them before anyone else uses the product**.

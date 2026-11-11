@@ -35,7 +35,9 @@ Inside an archive: `bin/`, `sdk/` (the unpacked `.crate` of `mosaikit-plugin-sdk
    Package settings > link it to the repository and set the visibility to Public). Without this the pull answers `denied` and a
    developer cannot start the Docker kit. Check it from a machine with no login: `docker pull ghcr.io/mosaikit/mosaikit-dev:<version>`.
 3. On one machine, the same command: `cargo xtask release devkit` (needs `MOSAIKIT_SIGNING_KEY`; `--allow-dev-key` for a
-   trial with a key nobody trusts). It writes `dist/devkit/`.
+   trial with a key nobody trusts). It writes `dist/devkit/`: the archive, its signature, `SHA256SUMS` and, next to them, the **unpacked kit**
+   `dist/devkit/mosaikit-devkit-<version>-<platform>/` with the layout of the archive. `--skip-build` uses the executables already built;
+   `--with-server` adds `mosaikit-server` on Linux and macOS. It is how a kit that is not released yet is tried.
 
 Pieces on their own, with no build: `cargo xtask release devkit-notes --out <folder>` (release notes and the compatibility
 table, generated from the manifests: versions, plugin API, `[requires]` of the examples and of the official plugins) and

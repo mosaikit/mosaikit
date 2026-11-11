@@ -29,6 +29,8 @@ pub struct Options {
     /// also run the shell checks (layout slice, accessibility) with the brand of the product in a browser:
     /// needs Playwright (and `@axe-core/playwright`) installed in the product folder
     pub browser: bool,
+    /// commands of the product to run against the running product (`MOSAIKIT_APP`, the test users...): its own tests
+    pub run: Vec<String>,
 }
 
 /// The spec of the browser run: the shell with the brand of the product. A slice of the layout contract
@@ -115,6 +117,49 @@ pub fn browser_args(cli: &Path, config: &Path) -> Vec<String> {
 /// (`npm run build -w ui/host` before the build): the browser would only find that page.
 pub fn ui_not_built(html: &str) -> bool {
     html.contains("UI not built")
+}
+
+/// The environment a command of the product runs with: where the product is, how to sign in, its name.
+pub fn command_env(d: &Distribution, app: &str) -> Vec<(String, String)> {
+    let brand_name = d
+        .brand_dir()
+        .and_then(|b| std::fs::read_to_string(b.join("brand.toml")).ok())
+        .and_then(|t| toml::from_str::<toml::Table>(&t).ok())
+        .and_then(|t| t.get("name").and_then(|v| v.as_str().map(str::to_string)))
+        .unwrap_or_default();
+    vec![
+        ("MOSAIKIT_APP".into(), app.to_string()),
+        ("MOSAIKIT_TENANT".into(), "dev".into()),
+        ("MOSAIKIT_TEST_USERS".into(), "admin,manager,alice,bob".into()),
+        ("MOSAIKIT_TEST_PASSWORD".into(), PASSWORD.into()),
+        ("MOSAIKIT_BRAND_NAME".into(), brand_name),
+        ("MOSAIKIT_PRODUCT_ID".into(), d.product.id.clone()),
+    ]
+}
+
+/// A command of the product (its own HTTP or browser tests, a script) run in the product folder against the running
+/// product: it passes when it exits with 0. The shell of the system runs it (`sh -c`, `cmd /C`).
+pub fn run_command(d: &Distribution, app: &str, command: &str, r: &mut Report) -> Result<()> {
+    let mut c = if cfg!(windows) {
+        let mut c = std::process::Command::new("cmd");
+        c.args(["/C", command]);
+        c
+    } else {
+        let mut c = std::process::Command::new("sh");
+        c.args(["-c", command]);
+        c
+    };
+    let status = c
+        .current_dir(&d.dir)
+        .envs(command_env(d, app))
+        .status()
+        .with_context(|| format!("starting `{command}`"))?;
+    if status.success() {
+        r.add(Level::Info, format!("run: `{command}` passes"));
+    } else {
+        r.add(Level::Error, format!("run: `{command}` failed ({status}); its output is above"));
+    }
+    Ok(())
 }
 
 /// The shell checks in a browser against the running product `app`.
@@ -294,6 +339,11 @@ pub fn test(o: &Options) -> Result<Report> {
                 if o.browser && r.ok() {
                     browser(&d, &app, r)?;
                 }
+                for command in &o.run {
+                    if r.ok() {
+                        run_command(&d, &app, command, r)?;
+                    }
+                }
                 Ok(())
             }
             Err(e) => {
@@ -331,6 +381,24 @@ mod tests {
         assert_eq!(a[0], cli.display().to_string());
         assert_eq!(&a[1..3], ["test", "-c"]);
         assert_eq!(a[3], cfg.display().to_string());
+    }
+
+    #[test]
+    fn a_command_of_the_product_gets_the_address_and_the_test_users() {
+        let t = tempfile::tempdir().unwrap();
+        let d = crate::model::Distribution::load(&crate::scaffold::new_product("demo", t.path()).unwrap())
+            .unwrap();
+        let env = command_env(&d, "http://127.0.0.1:8300");
+        let get = |k: &str| env.iter().find(|(n, _)| n == k).map(|(_, v)| v.as_str());
+        assert_eq!(get("MOSAIKIT_APP"), Some("http://127.0.0.1:8300"));
+        assert_eq!((get("MOSAIKIT_TENANT"), get("MOSAIKIT_TEST_PASSWORD")), (Some("dev"), Some(PASSWORD)));
+        assert!(get("MOSAIKIT_TEST_USERS").is_some_and(|u| u.contains("manager")));
+        // it passes with 0 and fails otherwise
+        let mut r = Report::default();
+        run_command(&d, "http://x", if cfg!(windows) { "exit 0" } else { "true" }, &mut r).unwrap();
+        assert!(r.ok(), "{:?}", r.findings);
+        run_command(&d, "http://x", if cfg!(windows) { "exit 3" } else { "false" }, &mut r).unwrap();
+        assert!(!r.ok());
     }
 
     #[test]

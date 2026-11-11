@@ -78,6 +78,31 @@ pub struct Docker {
     /// also run Keycloak with a realm of the product and a sample tenant that signs in through it (a demonstration)
     #[serde(default)]
     pub keycloak: bool,
+    /// compose files of the product (services next to the product: a map server, a catalogue, a worker), laid over the
+    /// generated `compose.yml` of the release: `docker compose up -d` starts all of them
+    #[serde(default)]
+    pub compose_files: Vec<String>,
+    /// files and folders of the product copied into the release with the same relative path (what the compose files above
+    /// mount or build: configuration, an image context)
+    #[serde(default)]
+    pub copy: Vec<String>,
+}
+
+impl Docker {
+    /// A path of `compose_files` or `copy`: relative, inside the folder of the product.
+    pub fn safe_path(p: &str) -> bool {
+        let path = std::path::Path::new(p);
+        !p.trim().is_empty()
+            && path.is_relative()
+            && !path.components().any(|c| {
+                matches!(
+                    c,
+                    std::path::Component::ParentDir
+                        | std::path::Component::Prefix(_)
+                        | std::path::Component::RootDir
+                )
+            })
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]

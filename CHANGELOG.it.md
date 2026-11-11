@@ -4,6 +4,12 @@ Cosa cambia da una versione di Mosaikit alla successiva. La shell mostra la sezi
 Aiuto › Novità (un titolo `## <versione>` per versione, voci `- `, gruppi `### `). Questo file è la
 versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
+## 1.0.8
+
+- `mosaikit-plugin validate --strict` non dice più che `files_read` è inutilizzato quando la pagina del plugin chiama `msk.files.*` (si accetta un plugin la cui sola pagina legge l'area File di un altro plugin).
+- `mosaikit-product test --run "<comando>"` esegue un comando del prodotto (i suoi test HTTP o nel browser) contro il prodotto avviato, con `MOSAIKIT_APP` e gli utenti di prova nell'ambiente: per provare un prodotto non serve nessun crate del kernel.
+- `[docker] compose_files` e `copy` in `distribution.toml`: la release Docker prende i file compose del prodotto (servizi accanto) e li unisce al `compose.yml` generato tramite `.env`; `validate` controlla i percorsi.
+
 ## 1.0.7
 
 - Un plugin con `files_read` può leggere il contenuto di un file dell'area File di un altro plugin: `msk.files.blob(id, source)` (la rotta `GET …/files/{id}/content?source=`), come già poteva elencarla, chiederne la dimensione e ottenere un ticket.

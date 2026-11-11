@@ -399,6 +399,7 @@ pub fn docker(d: &Distribution, base: &Path, base_image: &str, build: bool, o: &
         out.join("compose.yml"),
         compose(&image, &pg, d.docker.keycloak.then_some(d.product.id.as_str())),
     )?;
+    add_product_files(d, &out)?;
     std::fs::write(out.join("README.md"), docker_readme(d, &image))?;
     std::fs::create_dir_all(out.join("initdb"))?;
     std::fs::write(
@@ -413,6 +414,57 @@ pub fn docker(d: &Distribution, base: &Path, base_image: &str, build: bool, o: &
     }
     println!("docker release: {} (image {image}{})", out.display(), if build { "" } else { ", not built" });
     Ok(out)
+}
+
+/// The compose files and the files of the product that go into the Docker release (`[docker] compose_files`, `copy`),
+/// and the `.env` that makes `docker compose` read the generated `compose.yml` and then the compose files of the product.
+fn add_product_files(d: &Distribution, out: &Path) -> Result<()> {
+    for rel in &d.docker.copy {
+        if !crate::model::Docker::safe_path(rel) {
+            bail!("[docker] copy = \"{rel}\": a path inside the folder of the product");
+        }
+        let (from, to) = (d.dir.join(rel), out.join(rel));
+        if from.is_dir() {
+            copy_dir(&from, &to)?;
+        } else {
+            if let Some(p) = to.parent() {
+                std::fs::create_dir_all(p)?;
+            }
+            std::fs::copy(&from, &to).with_context(|| format!("[docker] copy = \"{rel}\""))?;
+        }
+    }
+    let mut names = Vec::new();
+    for rel in &d.docker.compose_files {
+        if !crate::model::Docker::safe_path(rel) {
+            bail!("[docker] compose_files = \"{rel}\": a path inside the folder of the product");
+        }
+        let name = Path::new(rel)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .context("name of a compose file")?
+            .to_string();
+        if name == "compose.yml" || names.contains(&name) {
+            bail!(
+                "[docker] compose_files: two files called {name} in the release: give them different names"
+            );
+        }
+        std::fs::copy(d.dir.join(rel), out.join(&name))
+            .with_context(|| format!("[docker] compose_files = \"{rel}\""))?;
+        names.push(name);
+    }
+    if !names.is_empty() {
+        std::fs::write(
+            out.join(".env"),
+            format!(
+                "# the compose files of this release: the generated compose.yml, then the ones of the product ([docker] compose_files)
+COMPOSE_PATH_SEPARATOR=,
+COMPOSE_FILE=compose.yml,{}
+",
+                names.join(",")
+            ),
+        )?;
+    }
+    Ok(())
 }
 
 /// The README of the Docker release: what the folder is, the credentials of a new installation, how to recover the
@@ -433,6 +485,18 @@ fn docker_readme(d: &Distribution, image: &str) -> String {
         .replace("{name}", &d.product.name)
         .replace("{version}", &d.product.version)
         .replace("{image}", image)
+        .replace(
+            "{product_compose_rows}",
+            &d.docker
+                .compose_files
+                .iter()
+                .filter_map(|p| Path::new(p).file_name().and_then(|n| n.to_str()))
+                .map(|n| format!("| `{n}` | services of the product, laid over `compose.yml` (see `.env`) |
+"))
+                .chain((!d.docker.compose_files.is_empty()).then(|| "| `.env` | `COMPOSE_FILE`: `docker compose` reads `compose.yml` and then the compose files of the product |
+".to_string()))
+                .collect::<String>(),
+        )
         .replace("{keycloak_services}", &on(", and Keycloak with a sample tenant to try single sign-on"))
         .replace(
             "{keycloak_compose_rows}",
@@ -690,6 +754,48 @@ extensions",
         assert!(c.contains("image: acme:0.1.0") && c.contains("postgis/postgis"), "{c}");
         assert!(std::fs::read_to_string(out.join("mosaikit.toml")).unwrap().contains("0.0.0.0:8080"));
         assert!(out.join("initdb/01-mosaikit.sh").is_file());
+    }
+
+    #[test]
+    fn the_docker_release_takes_the_compose_files_and_the_files_of_the_product() {
+        let t = tempfile::tempdir().unwrap();
+        let mut d = product(t.path());
+        d.plugins.include = vec!["com.mosaikit.notes".into()];
+        d.docker.keycloak = false;
+        std::fs::create_dir_all(d.dir.join("deploy/geoserver")).unwrap();
+        std::fs::write(
+            d.dir.join("deploy/compose.maps.yml"),
+            "services:
+  geoserver:
+    image: x
+",
+        )
+        .unwrap();
+        std::fs::write(d.dir.join("deploy/geoserver/data.xml"), "<d/>").unwrap();
+        d.docker.compose_files = vec!["deploy/compose.maps.yml".into()];
+        d.docker.copy = vec!["deploy/geoserver".into()];
+        let base = fake_desktop_base(t.path());
+        let o = Options { out: Some(t.path().join("rel")), ..Options::default() };
+        let out = docker(&d, &base, "acme:1.0.0", false, &o).unwrap();
+        assert!(out.join("compose.maps.yml").is_file() && out.join("deploy/geoserver/data.xml").is_file());
+        let env = std::fs::read_to_string(out.join(".env")).unwrap();
+        assert!(
+            env.contains("COMPOSE_FILE=compose.yml,compose.maps.yml")
+                && env.contains("COMPOSE_PATH_SEPARATOR=,"),
+            "{env}"
+        );
+        let r = std::fs::read_to_string(out.join("README.md")).unwrap();
+        assert!(r.contains("compose.maps.yml") && !r.contains('{'), "{r}");
+        // no compose file of the product: no .env
+        d.docker.compose_files.clear();
+        let o = Options { out: Some(t.path().join("rel2")), ..Options::default() };
+        assert!(!docker(&d, &base, "acme:1.0.0", false, &o).unwrap().join(".env").exists());
+        // a path out of the folder is refused
+        assert!(
+            !crate::model::Docker::safe_path("../x")
+                && !crate::model::Docker::safe_path("/etc/x")
+                && crate::model::Docker::safe_path("deploy/x")
+        );
     }
 
     #[test]

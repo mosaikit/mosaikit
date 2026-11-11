@@ -74,6 +74,11 @@ enum Cmd {
         /// Playwright installed in the product folder
         #[arg(long)]
         browser: bool,
+        /// a command of the product to run against the running product, for its own tests (HTTP, browser, a script):
+        /// it gets MOSAIKIT_APP, MOSAIKIT_TENANT, MOSAIKIT_TEST_USERS, MOSAIKIT_TEST_PASSWORD and MOSAIKIT_BRAND_NAME and
+        /// passes when it exits with 0. More than one is allowed
+        #[arg(long = "run")]
+        run: Vec<String>,
     },
     /// A release of the product from a compiled base
     Build {
@@ -171,7 +176,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
             let base = mosaikit_product_cli::basefetch::for_product(&dir, base)?;
             dev::dev(&dev::Options { dir, base, server, port, data, no_open, no_build, fresh })?;
         }
-        Cmd::Test { dir, base, server, upgrade_from, no_build, browser } => {
+        Cmd::Test { dir, base, server, upgrade_from, no_build, browser, run } => {
             let base = mosaikit_product_cli::basefetch::for_product(&dir, base)?;
             let r = mosaikit_product_cli::test::test(&mosaikit_product_cli::test::Options {
                 dir,
@@ -180,6 +185,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 upgrade_from,
                 no_build,
                 browser,
+                run,
             })?;
             r.print();
             if !r.ok() {
