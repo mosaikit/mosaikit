@@ -29,6 +29,9 @@ pub struct Options {
     /// also run the shell checks (layout slice, accessibility) with the brand of the product in a browser:
     /// needs Playwright (and `@axe-core/playwright`) installed in the product folder
     pub browser: bool,
+    /// a PostgreSQL database of this computer to run on instead of SQLite (a product whose plugins need PostgreSQL or
+    /// PostGIS); an empty one, prepared like the one of the Docker release
+    pub database: Option<String>,
     /// commands of the product to run against the running product (`MOSAIKIT_APP`, the test users...): its own tests
     pub run: Vec<String>,
 }
@@ -319,6 +322,9 @@ pub fn test(o: &Options) -> Result<Report> {
         return Ok(r);
     }
     let d = Distribution::load(&o.dir)?;
+    if let Some(u) = &o.database {
+        mosaikit_plugin_cli::dev::check_database_url(u)?;
+    }
     let server_bin = find_server(o.server.as_deref())?;
     let own = d.release_plugins()?;
     if !o.no_build && !own.is_empty() {
@@ -332,7 +338,7 @@ pub fn test(o: &Options) -> Result<Report> {
     }
     let run = |bin: &Path, label: &str, r: &mut Report| -> Result<()> {
         let port = ports(None, 8300)?;
-        match dev::start(&d, &own, o.base.as_deref(), bin, &data, port) {
+        match dev::start(&d, &own, o.base.as_deref(), bin, &data, port, o.database.as_deref()) {
             Ok((_server, app)) => {
                 r.add(Level::Info, format!("{label}: started on {app}"));
                 smoke(&d, &ids, &app, r)?;

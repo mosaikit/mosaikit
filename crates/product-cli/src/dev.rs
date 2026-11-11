@@ -26,6 +26,8 @@ pub struct Options {
     pub no_build: bool,
     /// delete the data folder first: a new database, the tenant and the test users again
     pub fresh: bool,
+    /// a PostgreSQL database of this computer to run on instead of SQLite (`postgres://user:password@localhost:5432/name`)
+    pub database: Option<String>,
 }
 
 /// A TOML literal string for a path (single quotes: no escapes, so the backslashes of Windows stay).
@@ -97,18 +99,19 @@ pub(crate) fn start(
     server_bin: &Path,
     data: &Path,
     port: u16,
+    database: Option<&str>,
 ) -> Result<(Server, String)> {
     std::fs::create_dir_all(data)?;
     let cfg = d.dir.join(".mosaikit-product").join("mosaikit.toml");
     std::fs::create_dir_all(cfg.parent().expect("folder"))?;
     std::fs::write(&cfg, config(d, own, base, &std::path::absolute(data)?, port))?;
-    let child = Command::new(server_bin)
-        .arg("--config")
-        .arg(&cfg)
-        .arg("serve")
-        .stdin(Stdio::null())
-        .spawn()
-        .with_context(|| format!("starting {}", server_bin.display()))?;
+    let mut cmd = Command::new(server_bin);
+    cmd.arg("--config").arg(&cfg).arg("serve").stdin(Stdio::null());
+    // PostgreSQL only when asked for with `--database` (not read from the environment of the shell, on purpose)
+    if let Some(u) = database {
+        cmd.env("MOSAIKIT_DATABASE_URL", u);
+    }
+    let child = cmd.spawn().with_context(|| format!("starting {}", server_bin.display()))?;
     let mut server = Server(child);
     let url = format!("http://127.0.0.1:{port}");
     wait_ready(&mut server, &url)?;
@@ -129,13 +132,25 @@ pub fn dev(o: &Options) -> Result<()> {
     }
     std::fs::create_dir_all(&data)?;
     let port = ports(o.port, 8080)?;
-    let (mut server, url) = start(&d, &own, o.base.as_deref(), &server_bin, &data, port)?;
+    if let Some(u) = &o.database {
+        mosaikit_plugin_cli::dev::check_database_url(u)?;
+        if o.fresh {
+            eprintln!(
+                "--fresh does not empty a PostgreSQL database: drop and create it again to start clean"
+            );
+        }
+    }
+    let (mut server, url) =
+        start(&d, &own, o.base.as_deref(), &server_bin, &data, port, o.database.as_deref())?;
     println!(
         "\n  {} {} in development\n  app:      {url}\n  plugins:  http://127.0.0.1:{}",
         d.product.name,
         d.product.version,
         port + 1
     );
+    if let Some(u) = &o.database {
+        println!("  database: {} (PostgreSQL)", mosaikit_plugin_cli::dev::redact_database_url(u));
+    }
     println!("  test users (password {PASSWORD}):");
     for (user, role, place) in USERS {
         println!("    {user:<8} {role:<15} {place}");

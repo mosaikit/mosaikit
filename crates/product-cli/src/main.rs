@@ -56,6 +56,11 @@ enum Cmd {
         /// start from an empty database
         #[arg(long)]
         fresh: bool,
+        /// run on a PostgreSQL database of this computer instead of SQLite (for plugins with `[requires] database = "postgres"`,
+        /// PostGIS...): `postgres://user:password@localhost:5432/name`, an empty database prepared as the section on PostgreSQL
+        /// of docs/devkit/data.md says. Not read from the environment of the shell, on purpose
+        #[arg(long, env = "MOSAIKIT_DEV_DATABASE_URL")]
+        database: Option<String>,
     },
     /// Proves the product: validation, then it starts on the base and is checked (brand, About, test users, plugins)
     Test {
@@ -79,6 +84,9 @@ enum Cmd {
         /// passes when it exits with 0. More than one is allowed
         #[arg(long = "run")]
         run: Vec<String>,
+        /// run on a PostgreSQL database of this computer instead of SQLite, as `dev --database`
+        #[arg(long, env = "MOSAIKIT_DEV_DATABASE_URL")]
+        database: Option<String>,
     },
     /// A release of the product from a compiled base
     Build {
@@ -172,11 +180,11 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 return Ok(ExitCode::from(1));
             }
         }
-        Cmd::Dev { dir, base, server, port, data, no_open, no_build, fresh } => {
+        Cmd::Dev { dir, base, server, port, data, no_open, no_build, fresh, database } => {
             let base = mosaikit_product_cli::basefetch::for_product(&dir, base)?;
-            dev::dev(&dev::Options { dir, base, server, port, data, no_open, no_build, fresh })?;
+            dev::dev(&dev::Options { dir, base, server, port, data, no_open, no_build, fresh, database })?;
         }
-        Cmd::Test { dir, base, server, upgrade_from, no_build, browser, run } => {
+        Cmd::Test { dir, base, server, upgrade_from, no_build, browser, run, database } => {
             let base = mosaikit_product_cli::basefetch::for_product(&dir, base)?;
             let r = mosaikit_product_cli::test::test(&mosaikit_product_cli::test::Options {
                 dir,
@@ -186,6 +194,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 no_build,
                 browser,
                 run,
+                database,
             })?;
             r.print();
             if !r.ok() {

@@ -5,6 +5,10 @@ in Help › What is new (one `## <version>` heading per version, `- ` items, `##
 language of the person: this file in English, [CHANGELOG.it.md](CHANGELOG.it.md) in Italian (keep them
 in step).
 
+## 1.0.9
+
+- `mosaikit-plugin dev`, `mosaikit-product dev` and `mosaikit-product test` take `--database postgres://…` (or `MOSAIKIT_DEV_DATABASE_URL`): the development server runs on a PostgreSQL database of this computer instead of SQLite, for plugins with `[requires] database = "postgres"` (PostGIS). The recipe is in `docs/devkit/data.md`.
+
 ## 1.0.8
 
 - `mosaikit-plugin validate --strict` no longer says that `files_read` is unused when the page of the plugin calls `msk.files.*` (a plugin whose page alone reads the Files area of another plugin is accepted).
