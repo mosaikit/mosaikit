@@ -73,7 +73,15 @@ port = 48080
 image = "acme-maps"
 postgres_image = "postgis/postgis:17-3.5-alpine"
 keycloak = true             # Keycloak and a sample tenant that signs in through it (section 8); a demonstration
+compose_files = ["deploy/compose.maps.yml"]   # services next to the product (a map server, a catalogue...): see below
+copy = ["deploy/geoserver"]                   # files and folders of the product copied into the release
 ```
+
+**Services next to the product.** `compose_files` lists compose files of the product (paths inside its folder); `build docker` copies them into the
+release and writes a `.env` with `COMPOSE_FILE=compose.yml,<yours>`, so `docker compose up -d` merges the generated `compose.yml` with them: your
+services start with the product, and a file of yours can also add to the `app` service (an environment variable with the address of a service). `copy`
+puts files and folders of the product in the release with the same relative path, for what your compose files mount or build (configuration, an image
+context). A path with `..`, an absolute one, a missing file or a file called `compose.yml` is an error of `validate`.
 
 ## 4. Brand and identity
 
@@ -226,6 +234,12 @@ mosaikit-product build k8s     --base-k8s <k8s folder of the kit>       dist/<id
 - At every security patch of the base you rebuild and ship within the term of [Licensing and responsibilities](product-licensing.md).
 
 ## 10. Testing a product
+
+**Your own tests.** `mosaikit-product test --run "<command>"` starts the product on the base, runs the checks below, then runs your command in the folder of the
+product and stops the product. The command gets `MOSAIKIT_APP` (the address), `MOSAIKIT_TENANT` (`dev`), `MOSAIKIT_TEST_USERS` (`admin,manager,alice,bob`),
+`MOSAIKIT_TEST_PASSWORD` and `MOSAIKIT_BRAND_NAME`, and passes when it exits with 0; `--run` can be given more than once. It is how a product tests its own
+pages and services over HTTP or in a browser, with no crate of the kernel: sign in with `POST $MOSAIKIT_APP/api/auth/login`
+(`{ "tenant", "username", "password" }`) or with `signIn` of `@mosaikit/plugin-testing`.
 
 `mosaikit-product test` validates the product (the strict checks of every own plugin, the brand, the policy by the base), starts it on the base in the
 developer profile and checks over HTTP that it answers, has its brand and its About data, that every test user signs in and that the Tenant Manager

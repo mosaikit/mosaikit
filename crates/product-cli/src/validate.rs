@@ -85,6 +85,23 @@ pub fn validate(dir: &Path, o: &Options) -> Result<Report> {
             "no [product] base: the product says it works with any version of the base (e.g. \">=1.0, <2\")",
         ),
     }
+    // the compose files and the files the Docker release takes from the folder of the product
+    for (what, list) in [("compose_files", &d.docker.compose_files), ("copy", &d.docker.copy)] {
+        for p in list {
+            if !crate::model::Docker::safe_path(p) {
+                r.add(Level::Error, format!("[docker] {what} = \"{p}\": a path inside the folder of the product (no `..`, not absolute)"));
+            } else if !d.dir.join(p).exists() {
+                r.add(Level::Error, format!("[docker] {what} = \"{p}\": not found in {}", d.dir.display()));
+            }
+        }
+    }
+    if d.docker
+        .compose_files
+        .iter()
+        .any(|p| std::path::Path::new(p).file_name().is_some_and(|n| n == "compose.yml"))
+    {
+        r.add(Level::Error, "[docker] compose_files: a file called compose.yml would replace the generated one: give it another name");
+    }
     // the brand
     match (&d.brand.dir, d.brand_dir()) {
         (Some(p), None) => r.add(Level::Error, format!("[brand] dir = {}: not a folder", p.display())),

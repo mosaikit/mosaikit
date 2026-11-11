@@ -5,6 +5,12 @@ in Help › What is new (one `## <version>` heading per version, `- ` items, `##
 language of the person: this file in English, [CHANGELOG.it.md](CHANGELOG.it.md) in Italian (keep them
 in step).
 
+## 1.0.8
+
+- `mosaikit-plugin validate --strict` no longer says that `files_read` is unused when the page of the plugin calls `msk.files.*` (a plugin whose page alone reads the Files area of another plugin is accepted).
+- `mosaikit-product test --run "<command>"` runs a command of the product (its own HTTP or browser tests) against the running product, with `MOSAIKIT_APP` and the test users in the environment: no crate of the kernel is needed to test a product.
+- `[docker] compose_files` and `copy` in `distribution.toml`: the Docker release takes compose files of the product (services next to it) and merges them with the generated `compose.yml` through `.env`; `validate` checks the paths.
+
 ## 1.0.7
 
 - A plugin with `files_read` can read the content of a file of another plugin's Files area: `msk.files.blob(id, source)` (the route `GET …/files/{id}/content?source=`), as it already could list it, ask its size and get a ticket.

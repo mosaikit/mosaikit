@@ -154,7 +154,9 @@ Everything is off by default. The Administrator sees what a plugin asks for when
 
 An origin is `http://` or `https://` and a host of letters, digits and `.-:[]`, with no `/`.
 `validate --strict` compares the permissions with what the logic calls: a call with no permission is an error, and so is
-`files_read`, `notify` or `calls` asked for and never used.
+`files_read`, `notify` or `calls` asked for and never used. `files_read` counts as used when the page of the plugin calls `msk.files.*` (it reads the
+source of the UI: `msk.files.list(`, `files.blob(`...), so a plugin whose page alone reads the Files area of another plugin is accepted; a package that
+has a UI is given the benefit of the doubt, because a bundle cannot say.
 
 ## `[[folder_profiles]]`
 

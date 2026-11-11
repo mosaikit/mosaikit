@@ -87,7 +87,65 @@ pub fn host_use_in_wasm(wasm: &[u8]) -> HostUse {
     }
 }
 
-fn permission_checks(m: &Manifest, used: &HostUse, from_source: bool, r: &mut Report) {
+/// The methods of `msk.files` a page calls.
+const FILES_METHODS: [&str; 16] = [
+    "list",
+    "mkdir",
+    "upload",
+    "uploadLarge",
+    "unzip",
+    "rename",
+    "move",
+    "copy",
+    "remove",
+    "blob",
+    "zip",
+    "url",
+    "ticket",
+    "info",
+    "open",
+    "profiles",
+];
+
+/// Whether the source of a UI calls the Files area of the host: `msk.files.list(`, `files.blob(` of a variable that
+/// holds it, or the operation by name (`"files.list"`). Only a source can say it: a built bundle has the names of
+/// every operation in the client, used or not.
+pub fn ui_files_use(text: &str) -> bool {
+    let b = text.as_bytes();
+    let mut from = 0;
+    while let Some(i) = text[from..].find("files.") {
+        let at = from + i;
+        from = at + "files.".len();
+        // `files` is the whole word (not `profiles.list(`): preceded by a dot, a quote or a non-word character
+        let before = if at == 0 { b' ' } else { b[at - 1] };
+        if before.is_ascii_alphanumeric() || before == b'_' || before == b'$' {
+            continue;
+        }
+        let rest = &text[from..];
+        let name: String = rest.chars().take_while(|c| c.is_ascii_alphanumeric()).collect();
+        if !FILES_METHODS.contains(&name.as_str()) && !["delete", "describe", "read"].contains(&name.as_str())
+        {
+            continue;
+        }
+        let after = rest[name.len()..].trim_start();
+        if after.starts_with('(') || after.starts_with('"') || after.starts_with('\'') {
+            return true;
+        }
+    }
+    false
+}
+
+/// `ui_files_use` over the sources of a UI (the scripts of its tree).
+pub fn ui_files_use_in(tree: &BTreeMap<String, Vec<u8>>) -> bool {
+    tree.iter().any(|(name, data)| {
+        [".ts", ".tsx", ".js", ".jsx", ".mjs", ".vue", ".svelte"].iter().any(|e| name.ends_with(e))
+            && std::str::from_utf8(data).is_ok_and(ui_files_use)
+    })
+}
+
+/// `ui_uses_files`: whether the page may use the Files area (so `files_read` is not unused): known from the source of a
+/// folder, assumed for a package that has a UI (a bundle cannot say).
+fn permission_checks(m: &Manifest, used: &HostUse, from_source: bool, ui_uses_files: bool, r: &mut Report) {
     let p = &m.permissions;
     let origin = if from_source { "src/" } else { "logic.wasm" };
     if used.files && !p.files_read {
@@ -128,9 +186,9 @@ fn permission_checks(m: &Manifest, used: &HostUse, from_source: bool, r: &mut Re
         }
     }
     // the permissions of the logic that the Administrator reads as sensitive: asked for and unused is an error
-    if p.files_read && !used.files {
+    if p.files_read && !used.files && !ui_uses_files {
         r.error(format!(
-            "[permissions] files_read is set but the logic never reads the Files area ({origin})"
+            "[permissions] files_read is set but the logic never reads the Files area ({origin}) and the UI does not use `msk.files`"
         ));
     }
     if !p.calls.is_empty() && !used.call_plugin {
@@ -591,9 +649,16 @@ pub fn layout_checks(m: &Manifest, ui_src: &BTreeMap<String, Vec<u8>>, r: &mut R
 
 /// Strict checks of a plugin folder.
 pub fn folder(dir: &Path, m: &Manifest, migrations: &[(String, String)], r: &mut Report) {
+    // the sources of the UI: the layout contract reads them, and so does the permission of the Files area (a page may use it)
+    let ui_sources = if m.ui.is_some() && dir.join("ui").is_dir() {
+        read_tree(&dir.join("ui"), &["node_modules", "dist", "target", ".git"])
+    } else {
+        BTreeMap::new()
+    };
+    let ui_files = ui_files_use_in(&ui_sources);
     if dir.join("Cargo.toml").is_file() {
         let used = host_use_in_source(&read_sources(&dir.join("src")));
-        permission_checks(m, &used, true, r);
+        permission_checks(m, &used, true, ui_files, r);
         let src = production_source(&read_sources(&dir.join("src")));
         for h in &m.permissions.hooks {
             if !src.contains(&format!("\"{h}.")) {
@@ -602,8 +667,8 @@ pub fn folder(dir: &Path, m: &Manifest, migrations: &[(String, String)], r: &mut
         }
     } else {
         let p = &m.permissions;
-        if p.files_read || p.notify || !p.calls.is_empty() {
-            r.error("[permissions] files_read, notify or calls are set but the plugin has no logic (no Cargo.toml)");
+        if p.notify || !p.calls.is_empty() || (p.files_read && !ui_files) {
+            r.error("[permissions] files_read (unless the UI uses `msk.files`), notify or calls are set but the plugin has no logic (no Cargo.toml)");
         }
     }
     migration_checks(m, migrations, r);
@@ -613,11 +678,9 @@ pub fn folder(dir: &Path, m: &Manifest, migrations: &[(String, String)], r: &mut
         if dist.is_dir() {
             ui_checks(m, &read_tree(&dist, &[]), true, r);
         } else {
-            let tree = read_tree(&dir.join("ui"), &["node_modules", "dist", "target", ".git"]);
-            ui_checks(m, &tree, false, r);
+            ui_checks(m, &ui_sources, false, r);
         }
-        let tree = read_tree(&dir.join("ui"), &["node_modules", "dist", "target", ".git"]);
-        layout_checks(m, &tree, r);
+        layout_checks(m, &ui_sources, r);
     }
 }
 
@@ -625,7 +688,7 @@ pub fn folder(dir: &Path, m: &Manifest, migrations: &[(String, String)], r: &mut
 pub fn package(pkg: &mosaikit_mskp::Package, migrations: &[(String, String)], r: &mut Report) {
     let m = &pkg.manifest;
     if let Some(w) = pkg.wasm() {
-        permission_checks(m, &host_use_in_wasm(w), false, r);
+        permission_checks(m, &host_use_in_wasm(w), false, m.ui.is_some(), r);
     }
     migration_checks(m, migrations, r);
     i18n_checks(m, r);
@@ -660,12 +723,43 @@ mod tests {
     fn permissions_and_calls_must_agree() {
         let m = manifest("[permissions]\nnotify = true\n");
         let mut r = Report::default();
-        permission_checks(&m, &HostUse::default(), true, &mut r);
+        permission_checks(&m, &HostUse::default(), true, false, &mut r);
         assert_eq!(r.errors(), 1, "{:?}", r.findings);
         let mut r = Report::default();
         let used = HostUse { files: true, http: true, ..HostUse::default() };
-        permission_checks(&manifest(""), &used, true, &mut r);
+        permission_checks(&manifest(""), &used, true, false, &mut r);
         assert_eq!(r.errors(), 2, "{:?}", r.findings);
+    }
+
+    #[test]
+    fn a_page_that_uses_the_files_area_justifies_files_read() {
+        assert!(ui_files_use("const l = await msk.files.list(null, 'com.mosaikit.files')"));
+        assert!(ui_files_use(
+            "const { files } = msk
+await files.blob(id, src)"
+        ));
+        assert!(ui_files_use("bridge.call(\"files.info\", { id })"));
+        // not the Files area: other words that end in `files`, and a name that is not an operation
+        assert!(!ui_files_use("profiles.list(x); const myfiles = 1; files.length; files.forEach(f)"));
+        assert!(!ui_files_use("// no files here"));
+        // the permission: unused when neither the logic nor the page reads
+        let m = manifest(
+            "[permissions]
+files_read = true
+",
+        );
+        let mut r = Report::default();
+        permission_checks(&m, &HostUse::default(), true, false, &mut r);
+        assert_eq!(r.errors(), 1, "{:?}", r.findings);
+        let mut r = Report::default();
+        permission_checks(&m, &HostUse::default(), true, true, &mut r);
+        assert_eq!(r.errors(), 0, "{:?}", r.findings);
+        // the sources of a UI
+        let mut tree = BTreeMap::new();
+        tree.insert("src/main.ts".to_string(), b"msk.files.ticket(id, false, 'com.mosaikit.files')".to_vec());
+        assert!(ui_files_use_in(&tree));
+        tree.insert("src/main.ts".to_string(), b"msk.crud('x')".to_vec());
+        assert!(!ui_files_use_in(&tree));
     }
 
     #[test]
