@@ -42,7 +42,7 @@ use mosaikit_server::admin::{self, AdminCmd};
     about = "Desktop version: without commands it starts the app with the icon in the notification area"
 )]
 struct Cli {
-    /// configuration file (default: MOSAIKIT_CONFIG, then mosaikit.toml next to the executable)
+    /// configuration file (default: MOSAIKIT_CONFIG, then <executable>.toml or mosaikit.toml next to the executable)
     #[arg(long, short, global = true)]
     config: Option<PathBuf>,
     #[command(subcommand)]

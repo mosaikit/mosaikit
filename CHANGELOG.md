@@ -7,6 +7,8 @@ in step).
 
 ## 1.0.13
 
+- Desktop of a product: the configuration file takes the name of the executable (`geoportal.exe` reads `geoportal.toml`, and the release ships `geoportal.example.toml`); `mosaikit.toml` is still read when there is no file with the new name, so an installation made earlier works. `START.txt` and the comments of the file name it. Not renamed (internal names the data depends on): `data/logs/mosaikit.log`, `data/database/mosaikit.db`, the PostgreSQL database `mosaikit`, the files of the Docker and Kubernetes releases (`mosaikit.toml` inside the image).
+
 - Desktop (Windows): no console window flashes at start or stop any more: every helper process of the program (`initdb`, `pg_ctl`, `pg_dump`, `icacls`) runs hidden. The sidecars were already started hidden.
 - Desktop: only «Open» of the icon menu (and a click on the icon) opens the browser; choosing another item (Quit, Data folder...) no longer opens a tab.
 - The file with the initial credentials of the first start is `initial-credentials.txt` (it was `credenziali-iniziali.txt`); the icon menu still opens the old file of an installation made earlier.

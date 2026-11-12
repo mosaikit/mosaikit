@@ -246,7 +246,7 @@ pub async fn bind(k: &Kernel) -> std::io::Result<Listeners> {
         tokio::net::TcpListener::bind(&addr).await.map_err(|e| {
             std::io::Error::new(
                 e.kind(),
-                format!("cannot listen on {addr} ({e}): port taken? change the port of url (or listen/plugin_listen) in mosaikit.toml"),
+                format!("cannot listen on {addr} ({e}): port taken? change the port of url (or listen/plugin_listen) in the configuration file"),
             )
         })
     };
@@ -299,7 +299,18 @@ pub async fn serve_until(
     Ok(())
 }
 
-/// Configuration file: `--config`, `MOSAIKIT_CONFIG`, then `mosaikit.toml` next to
+/// Names of the configuration file for an executable: `<name>.toml` (a product renames the executable of the
+/// base: `geoportal.exe` reads `geoportal.toml`) and, for the installations made before, `mosaikit.toml`.
+pub fn config_file_names(exe_stem: &str) -> Vec<String> {
+    let mut v = Vec::new();
+    if !matches!(exe_stem, "" | "mosaikit" | "mosaikit-server") {
+        v.push(format!("{exe_stem}.toml"));
+    }
+    v.push("mosaikit.toml".to_string());
+    v
+}
+
+/// Configuration file: `--config`, `MOSAIKIT_CONFIG`, then `<executable>.toml` or `mosaikit.toml` next to
 /// the executable or in the current folder. It also returns the base folder for the
 /// relative paths when the file is missing (the one of the executable).
 pub fn config_path(cli: Option<std::path::PathBuf>) -> (Option<std::path::PathBuf>, std::path::PathBuf) {
@@ -310,10 +321,16 @@ pub fn config_path(cli: Option<std::path::PathBuf>) -> (Option<std::path::PathBu
     if let Some(p) = cli.or_else(|| std::env::var_os("MOSAIKIT_CONFIG").map(std::path::PathBuf::from)) {
         return (Some(p), exe_dir);
     }
+    let stem = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.file_stem().map(|s| s.to_string_lossy().to_string()))
+        .unwrap_or_default();
     for dir in [exe_dir.clone(), std::env::current_dir().unwrap_or_else(|_| ".".into())] {
-        let p = dir.join("mosaikit.toml");
-        if p.is_file() {
-            return (Some(p), exe_dir);
+        for name in config_file_names(&stem) {
+            let p = dir.join(name);
+            if p.is_file() {
+                return (Some(p), exe_dir);
+            }
         }
     }
     (None, exe_dir)
@@ -331,5 +348,18 @@ pub fn open_browser(url: &str) {
     };
     if let Err(e) = r {
         tracing::warn!("{url} not opened: {e}");
+    }
+}
+
+#[cfg(test)]
+mod config_name_tests {
+    use super::config_file_names;
+
+    #[test]
+    fn a_product_reads_its_own_file_first_and_the_old_name_after() {
+        assert_eq!(config_file_names("geoportal"), ["geoportal.toml", "mosaikit.toml"]);
+        assert_eq!(config_file_names("mosaikit"), ["mosaikit.toml"]);
+        assert_eq!(config_file_names("mosaikit-server"), ["mosaikit.toml"]);
+        assert_eq!(config_file_names(""), ["mosaikit.toml"]);
     }
 }
