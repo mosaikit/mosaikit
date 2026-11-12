@@ -164,10 +164,19 @@ export function noteTitle(n: Note): string {
   }
 }
 
-/** The kernel words the detail of an alert in English; the services it lists are translated here. */
+/** The kernel words the detail of an alert in English; the services and the numbers it lists are translated here. */
 export function alertDetailText(detail: string): string {
   const m = /^not answering: (.*)$/.exec(detail)
-  return m ? `${t('not answering')}: ${m[1].split(', ').map((n) => t(n)).join(', ')}` : detail
+  if (m) return `${t('not answering')}: ${m[1].split(', ').map((n) => t(n)).join(', ')}`
+  const disk = /^([\d.]+)% of the disk free$/.exec(detail)
+  if (disk) return t('{pct}% of the disk free', { pct: disk[1] })
+  const errors = /^([\d.]+)% of the requests failed in 15 minutes$/.exec(detail)
+  if (errors) return t('{pct}% of the requests failed in 15 minutes', { pct: errors[1] })
+  const mail = /^(\d+) emails failed in the last hour$/.exec(detail)
+  if (mail) return t('{n} emails failed in the last hour', { n: mail[1] })
+  const backup = /^the last backup failed: (.*)$/s.exec(detail)
+  if (backup) return t('the last backup failed: {error}', { error: backup[1] })
+  return detail
 }
 
 export function noteBody(n: Note): string {

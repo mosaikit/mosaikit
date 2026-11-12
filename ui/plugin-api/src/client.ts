@@ -1,6 +1,6 @@
 import { Bridge, BridgeError } from './bridge.ts'
 import { API_VERSION, checkHostApi } from './version.ts'
-import type { BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, Unzipped, UploadProgress, FolderSuggestion, FileInfo, FileTicket, UiContext, Values, WebProbe } from './protocol.ts'
+import type { RealtimeEvent, RealtimeMessage, RealtimePerson, RealtimeStatus, BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, Unzipped, UploadProgress, FolderSuggestion, FileInfo, FileTicket, UiContext, Values, WebProbe } from './protocol.ts'
 
 /** The extensions of the plugin on a resource (fields and actions other plugins add to its items). */
 export interface ExtensionsClient {
@@ -181,6 +181,15 @@ export class Msk {
     return this.bridge.onEvent((event) => {
       if (event === 'nav.reselect') fn()
     })
+  }
+
+  /**
+   * Real-time channels (needs `[permissions] realtime = true`): ephemeral messages and presence between the people who may see a
+   * resource of the plugin. Who may listen and who may send is the access rule of the resource (read, write). The kernel stores
+   * nothing: keep what must last in the data of the plugin. See `docs/realtime-design.md`.
+   */
+  readonly realtime: RealtimeApi = {
+    open: (o) => openChannel(this.bridge, o),
   }
 
   crud(resource: string): CrudClient {
@@ -495,4 +504,109 @@ export async function connect(win: Window = window): Promise<Msk> {
     }
   })
   return msk
+}
+
+
+// ------------------------------------------------------------------------------------------------------ real-time
+
+export interface RealtimeOptions {
+  /** the resource of the plugin the channel is about */
+  resource: string
+  /** 1 to 64 characters of a-z 0-9 _ - . : a resource may have several channels (chat, call, cursors) */
+  name: string
+  /** what the others see of you (at most 1 KB of JSON): `{ typing: false }` */
+  state?: unknown
+}
+
+export interface RealtimeChannel {
+  /** a message of someone (also yours, with `from` you) */
+  onMessage(fn: (m: RealtimeMessage) => void): () => void
+  /** the people on the channel, now and at every change */
+  onPresence(fn: (people: RealtimePerson[]) => void): () => void
+  onStatus(fn: (s: RealtimeStatus) => void): () => void
+  /** sends `data` (at most 16 KB) to everyone, or to one person with `to` (their user id); rejects with `rt_forbidden`, `rt_too_large` or `rt_rate` */
+  send(data: unknown, opts?: { to?: string }): Promise<{ seq: number }>
+  /** changes what the others see of you (typing, cursor) */
+  setState(state: unknown): Promise<void>
+  readonly people: RealtimePerson[]
+  readonly status: RealtimeStatus
+  close(): void
+}
+
+export interface RealtimeApi {
+  open(o: RealtimeOptions): RealtimeChannel
+}
+
+function openChannel(b: Bridge, o: RealtimeOptions): RealtimeChannel {
+  const handle = crypto.randomUUID()
+  const msg = new Set<(m: RealtimeMessage) => void>()
+  const pres = new Set<(p: RealtimePerson[]) => void>()
+  const stat = new Set<(s: RealtimeStatus) => void>()
+  let people = new Map<string, RealtimePerson>()
+  let status: RealtimeStatus = 'connecting'
+  let closed = false
+  const list = () => [...people.values()]
+  const setStatus = (s: RealtimeStatus) => {
+    status = s
+    for (const f of stat) f(s)
+  }
+  const off = b.onEvent((event, data) => {
+    if (event !== 'rt.event') return
+    const e = data as RealtimeEvent
+    if (e.handle !== handle) return
+    const d = e.data as Record<string, unknown>
+    switch (e.type) {
+      case 'status':
+        setStatus(String(d.status) as RealtimeStatus)
+        break
+      case 'presence': {
+        people = new Map((d.people as RealtimePerson[]).map((p) => [p.id, p]))
+        for (const f of pres) f(list())
+        break
+      }
+      case 'join':
+      case 'state': {
+        const from = d.from as RealtimePerson
+        people.set(from.id, from)
+        for (const f of pres) f(list())
+        break
+      }
+      case 'leave':
+        people.delete((d.from as RealtimePerson).id)
+        for (const f of pres) f(list())
+        break
+      case 'message':
+        for (const f of msg) f({ seq: d.seq as number, from: d.from as RealtimePerson, data: d.data })
+        break
+    }
+  })
+  void b
+    .call('rt.open', { handle, resource: o.resource, name: o.name, state: o.state ?? {} })
+    .catch(() => {
+      if (!closed) setStatus('closed')
+    })
+  const sub = <T>(set: Set<T>, fn: T) => {
+    set.add(fn)
+    return () => void set.delete(fn)
+  }
+  return {
+    onMessage: (fn) => sub(msg, fn),
+    onPresence: (fn) => sub(pres, fn),
+    onStatus: (fn) => sub(stat, fn),
+    send: (data, opts) => b.call('rt.send', { resource: o.resource, name: o.name, data, ...(opts?.to ? { to: opts.to } : {}) }),
+    setState: (state) => b.call('rt.state', { resource: o.resource, name: o.name, state }),
+    get people() {
+      return list()
+    },
+    get status() {
+      return status
+    },
+    close: () => {
+      if (closed) return
+      closed = true
+      off()
+      void b.call('rt.close', { handle }).catch(() => undefined)
+      setStatus('closed')
+    },
+  }
 }

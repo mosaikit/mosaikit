@@ -4,7 +4,10 @@
 // A filter that matches nothing is NOT an empty state: `filtered` gives the small plain message with «Clear filters».
 
 /** The pictures of the plugins (the pages of the host have their own). */
-export type ArtName = 'documents' | 'maps' | 'notes' | 'tasks' | 'contacts' | 'apps' | 'generic'
+export type ArtName =
+  | 'documents' | 'maps' | 'notes' | 'tasks' | 'contacts' | 'apps' | 'generic'
+  | 'chat' | 'calls' | 'calendar' | 'polls' | 'forms' | 'wiki' | 'projects' | 'tickets' | 'bookmarks' | 'inventory' | 'dashboard' | 'time'
+  | 'announcements' | 'snippets' | 'surveys' | 'approvals' | 'whiteboard'
 
 /** The symbol of each picture: paths on a 24x24 grid, drawn in white on the big tile. */
 const GLYPHS: Record<ArtName, string[]> = {
@@ -15,6 +18,23 @@ const GLYPHS: Record<ArtName, string[]> = {
   contacts: ['M12 5.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7z', 'M5 20c1-4 4-5.5 7-5.5s6 1.5 7 5.5'],
   apps: ['M4 4h6.5v6.5H4z', 'M13.5 4H20v6.5h-6.5z', 'M4 13.5h6.5V20H4z', 'M13.5 13.5H20V20h-6.5z'],
   generic: ['M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z'],
+  chat: ['M4 5h16v11H9l-5 4z', 'M8 9.5h8', 'M8 12.5h5'],
+  calls: ['M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a1 1 0 0 1-1 1A15 15 0 0 1 4 5a1 1 0 0 1 1-1z'],
+  calendar: ['M4 6h16v14H4z', 'M4 10h16', 'M8 3v4', 'M16 3v4', 'M8 14h2', 'M14 14h2'],
+  polls: ['M5 20V11', 'M11 20V5', 'M17 20v-7', 'M3 20h18'],
+  forms: ['M6 3h12v18H6z', 'M9 8h6', 'M9 12h6', 'M9 16h3'],
+  wiki: ['M4 5c3-1 6-1 8 1 2-2 5-2 8-1v13c-3-1-6-1-8 1-2-2-5-2-8-1z', 'M12 6v13'],
+  projects: ['M4 5h5v14H4z', 'M10 5h5v9h-5z', 'M16 5h4v5h-4z'],
+  tickets: ['M4 8a2 2 0 0 0 0 4v4h16v-4a2 2 0 0 1 0-4V4H4z', 'M9 9h6', 'M9 13h4'],
+  bookmarks: ['M7 3h10v18l-5-4-5 4z'],
+  inventory: ['M3 8l9-5 9 5v8l-9 5-9-5z', 'M3 8l9 5 9-5', 'M12 13v8'],
+  dashboard: ['M4 4h7v9H4z', 'M13 4h7v5h-7z', 'M13 11h7v9h-7z', 'M4 15h7v5H4z'],
+  time: ['M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16z', 'M12 8v4l3 2'],
+  announcements: ['M4 10v4h3l7 4V6L7 10z', 'M17 9a4 4 0 0 1 0 6', 'M7 14l1.5 5h2.5l-1-4.5'],
+  snippets: ['M9 7l-5 5 5 5', 'M15 7l5 5-5 5', 'M13.5 5l-3 14'],
+  surveys: ['M5 4h14v16H5z', 'M8 9l1.5 1.5L12 8', 'M14 9.5h3', 'M8 15l1.5 1.5L12 14', 'M14 15.5h3'],
+  approvals: ['M12 3l8 3v6c0 4.5-3.4 7.7-8 9-4.6-1.3-8-4.5-8-9V6z', 'M8.5 12l2.5 2.5 4.5-5'],
+  whiteboard: ['M3 5h18v12H3z', 'M8 21l2-4', 'M16 21l-2-4', 'M7 12c2-3 3 2 5-1s3 1 5-1'],
 }
 
 const NS = 'http://www.w3.org/2000/svg'

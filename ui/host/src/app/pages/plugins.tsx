@@ -599,11 +599,16 @@ function PluginAsks({ p, base }: { p: AdminPlugin; base?: string }) {
             <AskRow label={t('Commands open to public links')}>
               {p.public_commands?.length ? (
                 <span>
-                  <b className="text-destructive">{t('yes (sensitive: anyone who holds a public link may run them, read only, on the shared item)')}</b>
+                  <b className="text-destructive">
+                    {p.public_commands.some((c) => c.write)
+                      ? t('yes (sensitive: anyone who holds a public link may run them, and some of them add data: only rows of the tables the plugin made for visitors, never a change or a delete)')
+                      : t('yes (sensitive: anyone who holds a public link may run them, read only, on the shared item)')}
+                  </b>
                   <span className="mt-1 block font-mono text-xs">{p.public_commands.map((c) => c.name).join(', ')}</span>
                   {p.public_commands.map((c) => (
                     <span key={c.name} className="block text-xs text-muted-foreground">
-                      {c.name}: {c.description}
+                      {c.name}
+                      {c.write ? ` (${t('adds data')})` : ''}: {c.description}
                     </span>
                   ))}
                 </span>
@@ -633,6 +638,12 @@ function PluginAsks({ p, base }: { p: AdminPlugin; base?: string }) {
             </AskRow>
             <AskRow label={t('Searches the people and groups')}>
               {perm.directory ? <b className="text-destructive">{t('yes (sensitive: it lists the names and usernames of the people and groups of the tenant to whoever may share in it)')}</b> : none}
+            </AskRow>
+            <AskRow label={t('Real-time channels')}>
+              {perm.realtime ? <b className="text-destructive">{t('yes (sensitive: live messages and who is connected, between the people who may see a resource of the plugin)')}</b> : none}
+            </AskRow>
+            <AskRow label={t('Camera and microphone')}>
+              {perm.media ? <b className="text-destructive">{t('yes (sensitive: the pages it embeds may ask the person for the camera, the microphone and the screen)')}</b> : none}
             </AskRow>
             <AskRow label={t('Calls the plugins')}>{list(perm.calls)}</AskRow>
             <AskRow label={t('Database')}>{p.requires?.database ? <span className="font-mono text-xs">{[p.requires.database, ...(p.requires.extensions ?? [])].join(', ')}</span> : t('any')}</AskRow>

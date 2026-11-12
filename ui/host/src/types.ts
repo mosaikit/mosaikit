@@ -151,7 +151,7 @@ export interface PluginView {
   /** where its UI is served: the address of the plugins, or its own host with a wildcard plugin_url (recent servers) */
   ui_url?: string
   dev: boolean
-  permissions: { hooks: string[]; files: boolean; content: boolean; network: string[]; frame_src: string[]; calls?: string[]; script_eval?: boolean; files_read?: boolean; files_write?: boolean; resources_read?: string[]; contributions?: string[]; embeds?: string[]; run_commands?: string[]; run_targets?: string[]; directory?: boolean }
+  permissions: { hooks: string[]; files: boolean; content: boolean; network: string[]; frame_src: string[]; calls?: string[]; script_eval?: boolean; files_read?: boolean; files_write?: boolean; resources_read?: string[]; contributions?: string[]; embeds?: string[]; run_commands?: string[]; run_targets?: string[]; directory?: boolean; realtime?: boolean; media?: boolean }
   /** the pages of an app in the navigation of the shell (recent servers) */
   nav?: NavEntry[]
 }
@@ -701,7 +701,7 @@ export interface AdminPlugin extends PluginView {
   requires?: { database: string | null; extensions: string[] }
   user_permissions?: { key: string; label: string; description: string; default: boolean }[]
   /** commands any holder of a public link may run (recent servers) */
-  public_commands?: { name: string; description: string; max_arg_bytes?: number }[]
+  public_commands?: { name: string; description: string; max_arg_bytes?: number; write?: boolean }[]
   /** range of Mosaikit versions it works with (`>=1.2, <2`; `*` = any) */
   requires_mosaikit?: string
   /** plugin API it was built for */

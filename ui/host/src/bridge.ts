@@ -52,6 +52,8 @@ export function errorReply(e: unknown): { err: string; code?: string; status?: n
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const IDENT = /^[a-z][a-z0-9_]{0,47}$/
 const COMMAND = /^[A-Za-z0-9_.-]{1,64}$/
+/** The name of a real-time channel (the kernel checks it again). */
+const CHANNEL = /^[a-z0-9_.-]{1,64}$/
 const PLUGIN_ID = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/
 
 type Args = Record<string, unknown>
@@ -73,6 +75,11 @@ function optUuid(v: unknown, what = 'parent'): string | null {
 
 function ident(v: unknown, what: string): string {
   if (typeof v !== 'string' || !IDENT.test(v)) throw new OpError(`invalid ${what}`)
+  return v
+}
+
+export function channelName(v: unknown): string {
+  if (typeof v !== 'string' || !CHANNEL.test(v)) throw new OpError('invalid channel name')
   return v
 }
 
@@ -250,6 +257,15 @@ export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unk
       }
       return { method: 'POST', url: `${base}/directory/search`, json: body }
     }
+    // real-time channels (needs `realtime` in the permissions: the kernel checks it, the right to read or write the resource and
+    // the limits); the stream itself is opened by the frame (`rt.open`), these two only send
+    case 'rt.send': {
+      const body: Args = { data: a.data === undefined ? null : a.data }
+      if (a.to !== undefined && a.to !== null && a.to !== '') body.to = uuid(a.to, 'recipient')
+      return { method: 'POST', url: `${base}/rt/${uuid(a.resource, 'resource')}/${channelName(a.name)}`, json: body }
+    }
+    case 'rt.state':
+      return { method: 'POST', url: `${base}/rt/${uuid(a.resource, 'resource')}/${channelName(a.name)}/state`, json: { state: a.state === undefined ? {} : a.state } }
     // the page of another plugin to show in a frame (needs `embeds` in the permissions: the kernel checks it)
     case 'embed.url':
       return {
