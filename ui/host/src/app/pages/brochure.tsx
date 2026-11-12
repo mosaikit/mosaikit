@@ -107,6 +107,8 @@ function Requirements({ p }: { p: AdminPlugin }) {
   if (perm.run_commands?.length) chips.push(t('Runs commands for background runs'))
   if (perm.run_targets?.length) chips.push(t('Background runs reach other plugins'))
   if (perm.directory) chips.push(t('Searches the people of the tenant'))
+  if (perm.realtime) chips.push(t('Live messages and presence'))
+  if (perm.media) chips.push(t('Camera and microphone'))
   if (perm.calls?.length) chips.push(t('Calls: {list}', { list: perm.calls.join(', ') }))
   if (p.requires?.database) chips.push(t('Database: {db}', { db: p.requires.database }))
   return (

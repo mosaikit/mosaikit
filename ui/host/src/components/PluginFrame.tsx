@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { checkPluginApi, errorReply, execute, OpError, routeOp, safePage, SHELL_API, themeVars, uuid } from '../bridge.ts'
+import { channelName, checkPluginApi, errorReply, execute, OpError, routeOp, safePage, SHELL_API, themeVars, uuid } from '../bridge.ts'
 import type { PluginView, Session, TenantContext } from '../types.ts'
+import { appUrl, enc } from '../api.ts'
 import { useUi } from '../ui-context.ts'
 import { t } from '../app/i18n.ts'
 import { timed } from '../app/devlog.ts'
@@ -78,6 +79,47 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
     [origin],
   )
 
+  // real-time channels the page opened (`msk.realtime`): one EventSource each, closed with the page or the document
+  const streams = useRef(new Map<string, EventSource>())
+  const closeStreams = useCallback(() => {
+    for (const es of streams.current.values()) es.close()
+    streams.current.clear()
+  }, [])
+  useEffect(() => closeStreams, [src, closeStreams])
+
+  /** Opens the stream of a channel and relays what arrives to the page. The browser reconnects by itself (with `Last-Event-ID`). */
+  const openStream = useCallback(
+    (handle: string, resource: string, name: string, state: unknown) => {
+      if (streams.current.has(handle) || streams.current.size >= 8) throw new OpError('too many channels')
+      const q = JSON.stringify(state ?? {})
+      if (q.length > 1024) throw new OpError('the state is too large', 'rt_too_large')
+      const url = appUrl(`/api/t/${enc(tenant)}/p/${enc(plugin.id)}/rt/${resource}/${name}/stream?state=${encodeURIComponent(q)}`)
+      const es = new EventSource(url)
+      streams.current.set(handle, es)
+      const status = (v: string) => toBase('rt.event', { handle, type: 'status', data: { status: v } })
+      es.onopen = () => status('live')
+      es.onerror = () => {
+        // a refused channel (403, 404) is final: the browser would retry for ever
+        status(es.readyState === EventSource.CLOSED ? 'closed' : 'reconnecting')
+      }
+      for (const type of ['presence', 'message', 'join', 'leave', 'state'] as const)
+        es.addEventListener(type, (e) => {
+          try {
+            toBase('rt.event', { handle, type, data: JSON.parse((e as MessageEvent<string>).data) })
+          } catch {
+            /* a frame that is not JSON is dropped */
+          }
+        })
+      es.addEventListener('gap', () => status('gap'))
+      es.addEventListener('closed', () => {
+        es.close()
+        streams.current.delete(handle)
+        status('closed')
+      })
+    },
+    [plugin.id, tenant, toBase],
+  )
+
   // the person clicked again the entry of the open page in the sidebar: the plugin may go back to its list
   useEffect(() => {
     const on = () => toBase('nav.reselect', {})
@@ -112,8 +154,9 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
         switch (m.op) {
           case 'hello':
             checkPluginApi(m.args)
-            // every document of the plugin starts with `hello`: the band of the page it replaces goes
+            // every document of the plugin starts with `hello`: the band and the channels of the page it replaces go
             resetBand(owner)
+            closeStreams()
             reply({
               ok: {
                 api: SHELL_API,
@@ -141,6 +184,21 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
             resetBand(owner)
             reply({ ok: null })
             return
+          // real-time channels: the stream is opened here (the page has no origin to open it from), sending goes through `routeOp`
+          case 'rt.open': {
+            const handle = String(m.args?.handle ?? '')
+            if (!/^[0-9a-f-]{36}$/i.test(handle)) throw new OpError('invalid handle')
+            openStream(handle, uuid(m.args?.resource, 'resource'), channelName(m.args?.name), m.args?.state)
+            reply({ ok: null })
+            return
+          }
+          case 'rt.close': {
+            const handle = String(m.args?.handle ?? '')
+            streams.current.get(handle)?.close()
+            streams.current.delete(handle)
+            reply({ ok: null })
+            return
+          }
           // the page of another plugin of the tenant, at a place inside it: only plugins the person has in the sidebar
           case 'nav.open': {
             const target = String(m.args?.plugin ?? '')
@@ -221,7 +279,7 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
     }
     window.addEventListener('message', onMessage)
     return () => window.removeEventListener('message', onMessage)
-  }, [origin, tenant, plugin.id, plugin.version, session, ctx, ui, at, toBase, owner])
+  }, [origin, tenant, plugin.id, plugin.version, session, ctx, ui, at, toBase, owner, openStream, closeStreams])
 
   if (!plugin.has_ui) {
     return (
@@ -240,7 +298,7 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
         title={plugin.label}
         src={src}
         sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads allow-modals"
-        allow="fullscreen; geolocation; clipboard-write"
+        allow={plugin.permissions.media ? 'fullscreen; geolocation; clipboard-write; camera; microphone; display-capture' : 'fullscreen; geolocation; clipboard-write'}
         referrerPolicy="no-referrer"
         onLoad={() => {
           setLoaded(true)

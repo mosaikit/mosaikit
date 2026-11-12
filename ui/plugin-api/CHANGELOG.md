@@ -5,6 +5,14 @@ version and is removed in the next.
 
 ## Unreleased
 
+- `kanban`: the «nothing here» of an empty column is a `listitem` of its list (a list with no item failed the accessibility check `aria-required-children`). Visual no change.
+- `msk.publicCall(name, args)` also runs a public command declared with `write = true` (it may insert an answer, a vote); the call is the same. Additive.
+- `emptyState` art names `announcements`, `snippets`, `surveys`, `approvals` and `whiteboard`. Additive.
+- `msk.realtime.open({ resource, name, state? })` (host ops `rt.open`, `rt.close`, `rt.send`, `rt.state`; host event `rt.event`; types `RealtimeChannel`, `RealtimeMessage`, `RealtimePerson`, `RealtimeStatus`): live messages and presence between the people who may see a resource of the plugin. Needs `[permissions] realtime = true` and `[requires] mosaikit = ">=1.0"`; nothing is stored by the kernel. Plugin API unchanged (additive). See `docs/architecture.md` §8.18.
+- `CrudView.sort(a, b)`: the order of the items of a view (pinned notes first); stable, applied after `where`. Plugin API unchanged (additive).
+- The colour of `.msk-avatar` is darker (30% lightness) so the white initials have a contrast of 4.5 to 1 or more on every hue. Visual only.
+- `CrudView` kind `custom` with `render(api: CustomViewApi)`: the plugin draws the whole view (a board with drag and drop, grouped lists, a week) from the rows that pass `where`; `mountCrud` now returns a `CrudHandle`, the same close function with `reload()`. Plugin API unchanged (additive).
+- The UI kit (docs/refactoring-ui.md §13), all additive: `toast`, `skeleton`, `progress` (bar, ring), `segmented`, `popover`, `menu`, `dialog`, `confirmDialog`, `tagInput`, `personPicker` (over `msk.directory`), `dateField`, `addDays`, `timeline`, `avatarStack`, `kanban` (pointer and keyboard drag and drop), `richText` (Markdown editor with preview), `renderMarkdown`, `renderInline`, `toggleCheck`, `checkProgress`; `avatar(name, big, src?)` takes a picture; `ArtName` has 12 more pictures (chat, calls, calendar, polls, forms, wiki, projects, tickets, bookmarks, inventory, dashboard, time); CSS tokens `--sp-1..6`, `--r-s/m/l/pill`, `--sh-1..3`, `--ease`, `--dur-1/2`. Plugin API unchanged.
 - `msk.files.blob(id, source?)`: `source` reads the content of a file of another plugin's Files area (host op `files.blob`, route `GET …/files/{id}/content?source=`), with `files_read` enough, like `info` and `ticket`. Additive.
 - `mountCrud` option `form: 'modal'`: the form of an item is a dialog over the page, opened by the «new» button and by selecting a row, closed by saving, cancelling, Escape or a click outside; the list is never pushed down by a form. `inline` (the default) is as before. Additive.
 - `mountCrud` option `cell(field, row, text)`: draws a cell of the table your own way (a chip for a status). Additive.

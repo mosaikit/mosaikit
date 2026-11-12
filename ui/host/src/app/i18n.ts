@@ -24,6 +24,14 @@ const BUILTIN = ['en', 'it']
 const CODE = /^[a-z]{2,3}$/
 const loaded = new Set<string>(BUILTIN)
 
+/** Languages written from right to left. */
+const RTL = new Set(['ar', 'he', 'fa', 'ur'])
+/** The language and the direction of the page follow the language of the interface. */
+export function setDocLang(l: string) {
+  document.documentElement.lang = l
+  document.documentElement.dir = RTL.has(l.slice(0, 2).toLowerCase()) ? 'rtl' : 'ltr'
+}
+
 const KEY = 'msk_lang'
 function chosen(): Lang | null {
   try {
@@ -54,7 +62,7 @@ void i18next.use(initReactI18next).init({
   interpolation: { escapeValue: false, prefix: '{', suffix: '}' },
   initAsync: false,
 })
-document.documentElement.lang = i18next.language
+setDocLang(i18next.language)
 setRequestLanguage(i18next.language)
 i18next.on('languageChanged', (l) => setRequestLanguage(l))
 
@@ -79,14 +87,14 @@ async function loadLanguage(code: string): Promise<boolean> {
 async function switchTo(l: Lang) {
   if (!(await loadLanguage(l))) return
   void i18next.changeLanguage(l)
-  document.documentElement.lang = l
+  setDocLang(l)
   ctxListeners.forEach((f) => f())
 }
 
 export function setLang(l: Lang) {
   if (BUILTIN.includes(l)) {
     void i18next.changeLanguage(l)
-    document.documentElement.lang = l
+    setDocLang(l)
   } else void switchTo(l)
   try {
     localStorage.setItem(KEY, l)
@@ -146,7 +154,7 @@ function applyContext() {
   if (next !== lang()) {
     if (BUILTIN.includes(next)) {
       void i18next.changeLanguage(next)
-      document.documentElement.lang = next
+      setDocLang(next)
     } else void switchTo(next)
   }
   ctxListeners.forEach((f) => f())

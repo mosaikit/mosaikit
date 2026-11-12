@@ -107,6 +107,34 @@ export interface HostEvents {
   'band.comments': Record<string, never>
   /** the person pressed the back button of the top band (see `msk.band`) */
   'band.back': Record<string, never>
+  /** something happened on a real-time channel the plugin opened (see `msk.realtime`) */
+  'rt.event': RealtimeEvent
+}
+
+/** A person on a real-time channel. `state` is what they last set with `setState` (typing, cursor, muted…). */
+export interface RealtimePerson {
+  id: string
+  name: string
+  state?: unknown
+}
+
+/** A message of a real-time channel: `from` is set by the kernel, never by the sender. */
+export interface RealtimeMessage {
+  seq: number
+  from: RealtimePerson
+  data: unknown
+}
+
+/** `connecting` before the first answer, `live`, `reconnecting` after the connection broke (the browser retries and the channel
+ *  catches up), `gap` when messages were lost and the plugin must reload what it needs from its own data, `closed` when the person
+ *  may no longer listen (logged out, access removed). */
+export type RealtimeStatus = 'connecting' | 'live' | 'reconnecting' | 'gap' | 'closed'
+
+/** What the host sends for a channel: the page of the plugin hears it through `msk.realtime`. */
+export interface RealtimeEvent {
+  handle: string
+  type: 'presence' | 'message' | 'join' | 'leave' | 'state' | 'status'
+  data: unknown
 }
 
 export type HostEventName = keyof HostEvents

@@ -85,13 +85,29 @@ export interface CrudView {
   /** name of the view in the switch */
   label: string
   /** a vertical list, a grid of cards, items that flow and wrap each with its own size (`flow`), or columns (`columns`) */
-  kind: 'list' | 'cards' | 'flow' | 'board'
+  kind: 'list' | 'cards' | 'flow' | 'board' | 'custom'
+  /** `custom` only: draws the whole view from the rows that pass `where` (a board with drag and drop, a calendar, grouped lists);
+   *  called again at every change of the rows or of the selection. `ctx(row)` is what `item` would get, `open(id)` selects an item. */
+  render?: (api: CustomViewApi) => HTMLElement
+  /** the order of the items of the view (pinned first…): applied to the rows that pass `where`, before they are drawn; a stable sort, so equal items keep the order of the server */
+  sort?: (a: Row, b: Row) => number
   /** the box of each item (the element with the selection and the keyboard): the plugin may style it or add listeners */
   box?: (ctx: ItemCtx, el: HTMLElement) => void
   /** the content of an item; the view adds the box, selection and keyboard */
   item: (ctx: ItemCtx) => HTMLElement
   /** board only: the columns and which rows fall in each */
   columns?: { key: string; label: (lang: string) => string; match: (row: Row) => boolean }[]
+}
+
+/** What the `render` of a `custom` view works with. */
+export interface CustomViewApi {
+  rows: Row[]
+  ctx(row: Row): ItemCtx
+  /** opens the detail of an item (the form or the reader of the panel) */
+  open(id: string): void
+  /** the open item, if any */
+  selected: string | null
+  lang: string
 }
 
 /** Rows asked at a time: the list grows with «Load more». */
@@ -241,7 +257,10 @@ const TEXTS = {
 }
 type Text = keyof (typeof TEXTS)['en']
 
-export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: CrudOptions = {}): () => void {
+/** What `mountCrud` returns: call it to close the view; `reload()` loads the rows again (after the plugin created or changed items by itself). */
+export type CrudHandle = (() => void) & { reload(): Promise<void> }
+
+export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: CrudOptions = {}): CrudHandle {
   const api = msk.crud(resource)
   const extApi = msk.extensions(resource)
   const st: State = { fields: [], rows: [], next: null, sort: null, total: null, selected: null, filter: '', busy: false, ext: [], extValues: {}, tab: null, editing: false, view: '', editorVals: {} }
@@ -435,7 +454,8 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   /** The items of the plugin's views: a box for each, with selection (click, Enter, Space) and the arrows. */
   function renderItems() {
     const view = activeView()!
-    const shown = opts.where ? st.rows.filter(opts.where) : st.rows
+    const kept = opts.where ? st.rows.filter(opts.where) : st.rows
+    const shown = view.sort ? [...kept].sort(view.sort) : kept
     const total = opts.where ? shown.length : (st.total ?? shown.length)
     count.textContent = total > shown.length ? tr('shownOf', { shown: shown.length, total }) : total === 1 ? tr('item') : tr('items', { n: total })
     btnMore.hidden = !st.next
@@ -475,6 +495,8 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     const list = (rows: Row[], kind: string) => h('div', { class: `msk-items ${kind}`, role: 'list' }, ...rows.map(box))
     if (!shown.length) {
       items.replaceChildren(emptyNode())
+    } else if (view.kind === 'custom' && view.render) {
+      items.replaceChildren(view.render({ rows: shown, ctx: itemCtx, open: pick, selected: st.selected, lang: hostLang() }))
     } else if (view.kind === 'board' && view.columns) {
       items.replaceChildren(
         h(
@@ -491,7 +513,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
           }),
         ),
       )
-    } else items.replaceChildren(list(shown, view.kind))
+    } else items.replaceChildren(list(shown, view.kind === 'custom' ? 'list' : view.kind))
     // a re-render drops the focus of the item that had it
     if (document.activeElement === document.body && st.selected) items.querySelector<HTMLElement>(`[data-id="${CSS.escape(st.selected)}"]`)?.focus({ preventScroll: true })
   }
@@ -925,7 +947,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     for (let i = 0; i < 2 && split.dataset.open === 'true'; i++) btnCancel.click()
   })
   void load()
-  return () => {
+  const dispose = () => {
     disposed = true
     clearTimeout(typing)
     off()
@@ -936,6 +958,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     if (modal?.open) modal.close?.()
     root.replaceChildren()
   }
+  return Object.assign(dispose, { reload: () => load() })
 }
 
 /** The text of an error in the language of the host (see `errorText`). */

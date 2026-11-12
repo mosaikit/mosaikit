@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { ApiError } from './api.ts'
-import { checkPluginApi, errorReply, OpError, routeOp, safePage, SHELL_API } from './bridge.ts'
+import { channelName, checkPluginApi, errorReply, OpError, routeOp, safePage, SHELL_API } from './bridge.ts'
 
 const ID = '8b0f6f3e-2d6a-4c7e-9a51-0c6a3d2b1f10'
 
@@ -195,5 +195,30 @@ describe('plugin API handshake (host side)', () => {
     expect(errorReply(err)).toMatchObject({ code: 'incompatible_api' })
     expect(() => checkPluginApi({ api: 0 })).toThrow(OpError)
     expect(() => checkPluginApi({ api: 'one' })).toThrow(OpError)
+  })
+})
+
+describe('real-time channels', () => {
+  it('sends and sets the state through the plugin and the tenant of the iframe', () => {
+    expect(routeOp('alfa', 'p.x', 'rt.send', { resource: ID, name: 'chat', data: { a: 1 } })).toEqual({
+      method: 'POST',
+      url: `/api/t/alfa/p/p.x/rt/${ID}/chat`,
+      json: { data: { a: 1 } },
+    })
+    const to = '1b0f6f3e-2d6a-4c7e-9a51-0c6a3d2b1f11'
+    expect(routeOp('alfa', 'p.x', 'rt.send', { resource: ID, name: 'call', data: 1, to, plugin: 'com.evil.x' }).json).toEqual({ data: 1, to })
+    expect(routeOp('alfa', 'p.x', 'rt.state', { resource: ID, name: 'chat', state: { typing: true } })).toEqual({
+      method: 'POST',
+      url: `/api/t/alfa/p/p.x/rt/${ID}/chat/state`,
+      json: { state: { typing: true } },
+    })
+  })
+
+  it('refuses a bad resource, name or recipient', () => {
+    expect(() => routeOp('alfa', 'p.x', 'rt.send', { resource: 'x', name: 'chat', data: 1 })).toThrow(OpError)
+    expect(() => routeOp('alfa', 'p.x', 'rt.send', { resource: ID, name: '../x', data: 1 })).toThrow(OpError)
+    expect(() => routeOp('alfa', 'p.x', 'rt.send', { resource: ID, name: 'chat', data: 1, to: 'nobody' })).toThrow(OpError)
+    expect(() => channelName('Chat')).toThrow(OpError)
+    expect(channelName('doc.1_a-b')).toBe('doc.1_a-b')
   })
 })

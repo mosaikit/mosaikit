@@ -9,8 +9,8 @@ export function initials(name: string): string {
   return (first + last).toLocaleUpperCase()
 }
 
-/** A circle with the initials of `name`; the colour comes from the name, so a person keeps theirs. */
-export function avatar(name: string, big = false): HTMLElement {
+/** A circle with the initials of `name`; the colour comes from the name, so a person keeps theirs. `src` shows a picture instead (the initials stay if it fails to load). */
+export function avatar(name: string, big = false, src?: string): HTMLElement {
   let hue = 0
   for (const c of name) hue = (hue * 31 + c.codePointAt(0)!) % 360
   const e = document.createElement('span')
@@ -18,6 +18,12 @@ export function avatar(name: string, big = false): HTMLElement {
   e.style.setProperty('--h', String(hue))
   e.setAttribute('aria-hidden', 'true')
   e.textContent = initials(name)
+  if (src) {
+    const img = document.createElement('img')
+    img.alt = ''
+    img.src = src
+    img.addEventListener('load', () => e.replaceChildren(img))
+  }
   return e
 }
 
