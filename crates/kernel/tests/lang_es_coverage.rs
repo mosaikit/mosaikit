@@ -124,6 +124,11 @@ fn language_plugins_have_the_page_texts_of_every_adopted_plugin() {
         eprintln!("mosaikit-plugins not found next to this repository: skipped");
         return;
     }
+    // the platform may land before the language plugins that carry the files (the two repositories check each other out)
+    if !langs.iter().any(|l| root.join(l).join("lang/ui").is_dir()) {
+        eprintln!("no language plugin has lang/ui yet: skipped");
+        return;
+    }
     let read = |lang: &str, id: &str| -> Option<serde_json::Map<String, Value>> {
         let t = std::fs::read_to_string(root.join(lang).join(format!("lang/ui/{id}.json"))).ok()?;
         serde_json::from_str(&t).ok()
