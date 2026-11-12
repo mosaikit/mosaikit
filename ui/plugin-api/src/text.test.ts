@@ -1,5 +1,6 @@
+// @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest'
-import { Msk } from './client.ts'
+import { applyContext, Msk } from './client.ts'
 import { fill, translate } from './text.ts'
 import type { Bridge } from './bridge.ts'
 import type { UiContext } from './protocol.ts'
@@ -36,5 +37,15 @@ describe('msk.t', () => {
     m.context = ctx('en')
     expect(m.t('Upload')).toBe('Upload')
     expect(translate('A', undefined, { A: 'a' }, { A: 'b' })).toBe('a')
+  })
+})
+
+describe('applyContext direction', () => {
+  it('writes right to left for Arabic and left to right otherwise', () => {
+    const root = document.createElement('html')
+    applyContext(ctx('ar'), root)
+    expect(root.dir).toBe('rtl')
+    applyContext(ctx('es'), root)
+    expect(root.dir).toBe('ltr')
   })
 })

@@ -3,7 +3,7 @@ import { channelName, checkPluginApi, errorReply, execute, OpError, routeOp, saf
 import type { PluginView, Session, TenantContext } from '../types.ts'
 import { appUrl, enc } from '../api.ts'
 import { useUi } from '../ui-context.ts'
-import { t } from '../app/i18n.ts'
+import { pageTextsFor, t } from '../app/i18n.ts'
 import { timed } from '../app/devlog.ts'
 import { NAV_RESELECT, resetBand, sanitizeBand, setBand } from '../app/contextband.ts'
 import ExtensionTab, { type TabState } from './ExtensionTab.tsx'
@@ -311,7 +311,7 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
         }}
       />
       {tabs.map((tab) => (
-        <ExtensionTab key={tab.handle} tab={tab} session={session} ctx={ctx} reloadKey={reloadKey} context={() => uiContext(shellRef.current)} uiKey={uiKey} toBase={toBase} />
+        <ExtensionTab key={tab.handle} tab={tab} session={session} ctx={ctx} reloadKey={reloadKey} context={(id) => uiContext(shellRef.current, id)} uiKey={uiKey} toBase={toBase} />
       ))}
       {!loaded && <div className="frame-msg">{t('Loading {label}…', { label: plugin.label })}</div>}
     </div>
