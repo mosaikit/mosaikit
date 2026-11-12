@@ -14,6 +14,13 @@ fn notes_files() -> BTreeMap<String, Vec<u8>> {
     mosaikit_mskp::collect_plugin_dir(&dir, Some(&wasm)).unwrap()
 }
 
+/// The version the plugin of the repository has today (the tests must not depend on it).
+fn real_version(plugin: &str) -> String {
+    let toml = std::fs::read_to_string(plugins_root().join(plugin).join("plugin.toml")).unwrap();
+    let line = toml.lines().find(|l| l.starts_with("version = ")).unwrap();
+    line.trim_start_matches("version = ").trim_matches('"').to_string()
+}
+
 fn with_version(files: BTreeMap<String, Vec<u8>>, v: &str) -> BTreeMap<String, Vec<u8>> {
     edit_manifest(files, |toml| {
         toml.lines()
@@ -79,11 +86,11 @@ async fn update_with_migrations_keeps_the_data() {
     .await
     .unwrap();
 
-    let mut v2 = with_version(notes_files(), "0.7.2");
+    let mut v2 = with_version(notes_files(), "1.0.1");
     v2.insert("migrations/004_priority.sql".into(), b"alter table notes add column priority text".to_vec());
     install(&t, &v2).await.unwrap();
     let p = t.plugins.get("com.mosaikit.notes").unwrap();
-    assert_eq!(p.manifest.version, "0.7.2");
+    assert_eq!(p.manifest.version, "1.0.1");
     assert!(p.is_active(), "the active state is kept");
     let rows = crud::list(&t, &c, "com.mosaikit.notes", "notes", None, None).await.unwrap().rows;
     assert_eq!(rows.len(), 1);
@@ -99,7 +106,7 @@ async fn update_with_migrations_keeps_the_data() {
     same.insert("migrations/005_x.sql".into(), b"alter table notes add column x text".to_vec());
     assert_eq!(install(&t, &same).await.unwrap_err().kind, Kind::Conflict);
     // migration already applied and then changed
-    let mut changed = with_version(notes_files(), "0.7.3");
+    let mut changed = with_version(notes_files(), "1.0.2");
     changed.insert(
         "migrations/004_priority.sql".into(),
         b"alter table notes add column priority2 text".to_vec(),
@@ -199,12 +206,13 @@ async fn catalog_and_blocklist() {
     let pkg = pack_plugin("notes");
     std::fs::write(dir.join("plugins/notes.mskp"), &pkg).unwrap();
     let sha = mosaikit_mskp::package_sha256(&pkg);
+    let real = real_version("notes");
     let index = |blocked: bool, sha: &str| {
         json!({
             "plugins": [{ "id": "com.mosaikit.notes", "name": "Notes", "versions": [
-                { "version": "0.7.1", "file": "plugins/notes.mskp", "sha256": sha }
+                { "version": real, "file": "plugins/notes.mskp", "sha256": sha }
             ]}],
-            "blocklist": if blocked { json!([{ "id": "com.mosaikit.notes", "version": "0.7.1", "reason": "test" }]) } else { json!([]) }
+            "blocklist": if blocked { json!([{ "id": "com.mosaikit.notes", "version": real, "reason": "test" }]) } else { json!([]) }
         })
     };
     std::fs::write(dir.join("index.json"), index(false, "0000").to_string()).unwrap();
@@ -218,7 +226,7 @@ async fn catalog_and_blocklist() {
     assert_eq!(e.kind, Kind::Forbidden);
     std::fs::write(t.cfg.registry.as_ref().unwrap(), index(false, &sha).to_string()).unwrap();
     plugins::registry::install_from_catalog(&t, &admin, "com.mosaikit.notes").await.unwrap();
-    assert_eq!(plugins::registry::catalog(&t, &admin).unwrap()[0].installed.as_deref(), Some("0.7.1"));
+    assert_eq!(plugins::registry::catalog(&t, &admin).unwrap()[0].installed.as_deref(), Some(real.as_str()));
     // blocklist: it is not turned on and not reinstalled
     std::fs::write(t.cfg.registry.as_ref().unwrap(), index(true, &sha).to_string()).unwrap();
     plugins::uninstall(&t, &admin, "com.mosaikit.notes").await.unwrap();

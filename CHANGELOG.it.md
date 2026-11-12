@@ -4,6 +4,14 @@ Cosa cambia da una versione di Mosaikit alla successiva. La shell mostra la sezi
 Aiuto › Novità (un titolo `## <versione>` per versione, voci `- `, gruppi `### `). Questo file è la
 versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
+## 1.0.13
+
+- Comandi pubblici che scrivono: `[[public_commands]]` accetta `write = true` e `[[tables]]` accetta `insert_for = "visitor"`; chi visita un link pubblico può allora aggiungere righe (una risposta a un modulo, un voto) alle tabelle pensate per i visitatori, solo per l’elemento del link e senza mai modificarne o cancellarne una; 10 chiamate al minuto per link, mostrato all’Amministratore come «aggiunge dati».
+- Lingue scritte da destra a sinistra: la pagina prende la direzione (`dir`) dalla lingua (arabo, ebraico, persiano, urdu). I plugin di lingua ufficiali ora sono spagnolo, portoghese, francese, olandese, arabo, cinese e russo.
+- Canali in tempo reale: un plugin con `permissions.realtime` apre un canale su una risorsa con `msk.realtime.open` (presenza, messaggi a tutti o a una persona, un piccolo stato per persona, su SSE e POST); il kernel si limita a inoltrare, non salva nulla.
+- `permissions.media`: il frame del plugin può passare camera, microfono e schermo a un servizio che incorpora (con `frame_src`).
+- `mountCrud` ha il tipo di vista `custom`, l'opzione `sort` e un handle con `reload()`; il plugin API ha un kit UI (toast, dialog, menu, popover, tag input, selettore persone, campo data, timeline, kanban, Markdown) e `MockHost::hook_with_previous` per provare gli hook.
+
 ## 1.0.12
 
 - Correzione: `mosaikit-product build k8s` senza `--base-k8s` (1.0.11) scriveva i manifest Kubernetes con i segnaposto `{{id}}`, `{{image}}`... non risolti e senza lo script `initdb`, quindi `kubectl kustomize` falliva. Ora i manifest sono compilati con id, nome, versione, immagine e immagine PostgreSQL del prodotto, e il risultato è verificato con `kubectl kustomize` nei test.

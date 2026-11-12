@@ -88,10 +88,14 @@ fn toml(id: &str, extra: &str) -> String {
     )
 }
 
-async fn install(t: &TestKernel, id: &str, wasm: Vec<u8>, extra: &str) {
+/// As `install`, with migrations (`(file name, SQL)`).
+async fn install_with(t: &TestKernel, id: &str, wasm: Vec<u8>, extra: &str, migrations: &[(&str, &str)]) {
     let mut files = BTreeMap::new();
     files.insert("plugin.toml".to_string(), toml(id, extra).into_bytes());
     files.insert("logic.wasm".to_string(), wasm);
+    for (name, sql) in migrations {
+        files.insert(format!("migrations/{name}"), sql.as_bytes().to_vec());
+    }
     let pkg = mosaikit_mskp::pack(&files, Some(&test_key())).unwrap();
     t.install_package(&pkg).await.unwrap();
 }
@@ -110,9 +114,14 @@ async fn world(plugin: &str, allow: bool) -> World {
 
 /// As `world`, with more manifest text for the plugin.
 async fn world_with(plugin: &str, allow: bool, extra: &str) -> World {
+    world_full(plugin, allow, extra, &[]).await
+}
+
+/// As `world_with`, with migrations for the plugin.
+async fn world_full(plugin: &str, allow: bool, extra: &str, migrations: &[(&str, &str)]) -> World {
     let t = start().await;
     let wasm = if plugin == PROXY { proxy_wasm() } else { echo_wasm() };
-    install(&t, plugin, wasm, extra).await;
+    install_with(&t, plugin, wasm, extra, migrations).await;
     let g = t.tenant("alfa").await;
     let anna = t.member(&g, "anna").await;
     let mgr = t.home(&g).await;
@@ -425,4 +434,73 @@ async fn a_secret_setting_cannot_be_declared_public() {
     let e = mosaikit_mskp::pack(&files, Some(&test_key())).unwrap_err();
     assert!(e.to_string().contains("cannot be public"), "{e}");
     assert!(t.plugins.get("com.test.badpub").is_none());
+}
+
+const WRITES: &str = "[[public_commands]]\nname = \"w\"\ndescription = \"adds an answer\"\nwrite = true\n\
+                      [[tables]]\nname = \"answers\"\ninsert_for = \"visitor\"\n";
+const ANSWERS: &str = "create table answers (resource_id uuid not null, tenant_id uuid not null, user_id uuid not null, body text);";
+
+/// A public command declared with `write = true` may INSERT into the tables made for visitors, for the item of the link
+/// and nothing else: no update, no delete, no other table, and the plain commands stay read only.
+#[tokio::test]
+async fn a_public_command_that_writes_only_inserts_into_a_visitor_table() {
+    let w = world_full(PROXY, true, WRITES, &[("001_answers.sql", ANSWERS)]).await;
+    let r = link(&w).await;
+    let insert = |item: Uuid, body: &str| {
+        host(
+            "db.exec",
+            json!({ "sql": "insert into answers (resource_id, tenant_id, user_id, body) values ($1::uuid, $2::uuid, $3::uuid, $4)",
+                    "params": [item.to_string(), r.tenant.to_string(), Uuid::new_v4().to_string(), body] }),
+        )
+    };
+    // the command that writes inserts an answer for the item of the link
+    crud::call_public(&w.t, &r, "w", insert(w.shared, "yes")).await.unwrap();
+    // the plain command cannot write, whatever the table
+    let e = crud::call_public(&w.t, &r, "x", insert(w.shared, "no")).await.unwrap_err();
+    assert!(e.message.contains("public link"), "{}", e.message);
+    // the command that writes still cannot update, delete or touch the items of the plugin
+    for sql in [
+        "update answers set body = 'tampered'",
+        "delete from answers",
+        "insert into items (title) values ('x')",
+    ] {
+        let e = crud::call_public(&w.t, &r, "w", host("db.exec", json!({ "sql": sql, "params": [] })))
+            .await
+            .unwrap_err();
+        assert!(!e.message.is_empty(), "{sql}");
+    }
+    // and not for an item the link does not reach
+    assert!(crud::call_public(&w.t, &r, "w", insert(w.other, "elsewhere")).await.is_err());
+    // what is there: one answer, said by the visitor, intact; the items of the plugin are as they were
+    let rows = crud::call_public(
+        &w.t,
+        &r,
+        "x",
+        host("db.query", json!({ "sql": "select body from answers", "params": [] })),
+    )
+    .await
+    .unwrap();
+    assert_eq!(rows, json!([{ "body": "yes" }]));
+    assert_eq!(item_count(&w).await, 2);
+}
+
+/// The calls of a command that writes are limited more tightly than the reading ones.
+#[tokio::test]
+async fn a_public_command_that_writes_is_rate_limited() {
+    let w = world_full(PROXY, true, WRITES, &[("001_answers.sql", ANSWERS)]).await;
+    let r = link(&w).await;
+    let read = host("db.query", json!({ "sql": "select body from answers", "params": [] }));
+    let mut refused = None;
+    for n in 0..20 {
+        match crud::call_public(&w.t, &r, "w", read.clone()).await {
+            Ok(_) => {}
+            Err(e) => {
+                refused = Some((n, e.code().to_string()));
+                break;
+            }
+        }
+    }
+    assert_eq!(refused, Some((10, "public_rate_limited".to_string())), "ten calls a minute for a link");
+    // reading with the plain command is still allowed (its own, larger limit)
+    crud::call_public(&w.t, &r, "x", read).await.unwrap();
 }

@@ -825,7 +825,7 @@ rows people write about a resource they may only read (who is looking now, comme
 ```toml
 [[tables]]
 name = "presence"
-insert_for = "reader"          # the only value
+insert_for = "reader"          # or "visitor": the same, and a visitor of a public link may insert too (§8.13)
 owner_column = "user_id"       # uuid column with the person who wrote the row (default user_id)
 ```
 
@@ -1720,6 +1720,20 @@ that gives them an opaque origin of their own, so the page cannot read them thro
 the plugin's own: a page with the origin of the plugin shares storage with any other page of that plugin served without sandbox on it, so a plugin that stores secrets in
 the browser must not offer a `same_origin` embed.
 
+**Public commands that write** (additive keys of API 1, `[requires] mosaikit = ">=1.0"`). `[[public_commands]]` takes `write = true`
+(default false) and `[[tables]]` takes `insert_for = "visitor"` (the rules of `"reader"` plus what follows). A command with
+`write` runs in a transaction that may write, still with the link context and **no user**, and `db.exec` is open to it for
+`INSERT` only (`host::KernelHost::db`: `update`, `delete`, `resource.*`, `plugin.call`, `notify` and `files.*` stay refused). What
+a visitor may insert is decided by the database, not by the logic: for a `visitor` table the policy `msk_insert` of PostgreSQL
+(and the trigger `msk_ins` of SQLite) also accepts `core.ctx_user() is null and core.can_access(resource_id, 1)`, that is a
+visitor of a link, for the item of the link and its descendants; the update and delete policies are the ones of `reader`, which a
+visitor, with no `user_id`, never satisfies. The manifest is refused when a command has `write` and no table is for visitors. The
+calls of a command that writes are limited to 10 a minute for a link and 100 for a tenant (`public_rate_limited`), on top of the
+limits of any public call, and each one is recorded in the log (`link.call`). The Administrator sees «adds data» next to the
+command in «What it asks». The tenant policy `public_commands_enabled` is still the switch. Tested in `crates/db/tests/rls.rs`
+(`a_visitor_of_a_link_inserts_only_where_the_table_says_so`, both backends), `crates/kernel/tests/public_commands.rs` and the
+manifest tests.
+
 ### 8.14 Run tickets: a plugin called on behalf of a run
 
 A distribution may run a process in the background (a graph of nodes, a report) where a node is a command of a plugin. The service that
@@ -2003,6 +2017,52 @@ and the ticket), `schedule.skipped` (the reason), `schedule.missed`, `schedule.f
 **Time zone.** The tenant setting `timezone` (an IANA name, default `UTC`, set by the Tenant Manager in Manage › Settings, or by a product in `[defaults]`) is the zone of a new schedule that does not ask for one; the zone is stored with the schedule, so a later change of the setting moves none. `next_run_at` and `last_run_at` stay UTC in the API; every schedule carries its `time_zone`.
 
 **Not in this version.** A pull model for a service that cannot listen.
+
+### 8.18 Real-time channels: live messages and presence for a plugin
+
+Chat, call signalling and live co-editing need to push small messages to the people who look at the same thing. The kernel offers
+one generic service for it; it stores nothing (design: [realtime-design.md](realtime-design.md)). `permissions.realtime` is an additive
+key of API 1 (no bump, §8.11): a plugin that uses it declares `[requires] mosaikit = ">=1.0"`; `mosaikit-plugin validate` warns (an
+error with `--strict`) when the range is missing, and the Administrator sees a red row «Real-time channels» in «What it asks» and a chip
+in the brochure.
+
+**Channel.** `(tenant, plugin, resource, name)`: always bound to a resource of the plugin (`name` is 1 to 64 characters of `a-z 0-9 _ - .`;
+a resource may have several, such as `chat`, `call`, `cursors`). The access rule is the one of the resource: `read` to listen, `write` to
+send; a person who does not see the resource gets `404`, one who sees it without the level `403 rt_forbidden`. A call on behalf of a run
+and a public link have no channels.
+
+**Routes** (`kernel::realtime`, `server::realtime_api`):
+
+| Route | What |
+|---|---|
+| `GET /api/t/{t}/p/{plugin}/rt/{resource}/{name}/stream?state=<json>` | server-sent events; `Last-Event-ID` resumes. First event `presence` (`{ people, me }`), then `message`, `join`, `leave`, `state`; `gap` when frames were lost (the buffer no longer has them, or the listener was too slow); `closed` and the end of the stream when the session is over or the right was removed (checked every 30 s) |
+| `POST …/rt/{resource}/{name}` | `{ data, to? }`: a message to everyone, or to one person (`to` is a user id, for signalling); answers `{ seq }` |
+| `POST …/rt/{resource}/{name}/state` | `{ state }`: what the others see of the caller (typing, cursor); the caller must be listening |
+
+**Frames** carry a sequence number per channel and the sender (`from: { id, name, state? }`), set by the kernel and never taken from the
+body. Messages are not stored: a buffer of the last 200 messages or 60 seconds serves a client that reconnects. Presence is kept in
+memory by connection: a person with two tabs is announced once and leaves with the last one; the person who just joined gets the list
+of people and not their own `join`.
+
+**Limits.** `data` at most 16 KB, `state` 1 KB (`rt_too_large`); 30 messages a second per person and channel, 20 open channels per
+person, 500 connections per channel (`429 rt_rate`).
+
+**Fan-out.** In the process (one server, the SQLite desktop). Several servers on PostgreSQL need the relay of the design note (§4,
+`LISTEN/NOTIFY`), which is **not built yet**: until then a channel reaches the people connected to the same server.
+
+**Plugin side.** The host holds the `EventSource` (the iframe has no origin of its own) and relays by `postMessage` (host ops `rt.open`,
+`rt.close`, `rt.send`, `rt.state`; event `rt.event`); at most 8 channels per page, all closed with the document. In the package:
+`msk.realtime.open({ resource, name, state }) → { onMessage, onPresence, onStatus, send, setState, people, status, close }`.
+Not yet: publishing from the logic of a plugin (`rt.publish`).
+
+### 8.19 Camera and microphone for the pages a plugin embeds
+
+A plugin that shows a meeting service in a frame (`permissions.frame_src`) needs the browser to let that frame use the camera, the
+microphone and the screen. The frame of a plugin UI does not pass them on by default. `permissions.media = true` is an additive key of
+API 1 (no bump, §8.11; `[requires] mosaikit = ">=1.0"`, a warning of `mosaikit-plugin validate` without it) that adds
+`camera; microphone; display-capture` to the `allow` of the frame of that plugin only; the browser still asks the person, and what
+the embedded page may reach stays what `frame_src` lists (the CSP of the plugin). The Administrator sees a red row «Camera and
+microphone» in «What it asks» and a chip in the brochure. A plugin without the key is unchanged.
 
 ## 9. Web security: origins, cookies, CSP
 

@@ -3017,3 +3017,116 @@ async fn schedule_runs_over_http() {
         .unwrap()
         .is_empty());
 }
+
+/// Reads the body of an event stream until `until` has arrived (5 seconds at most for each piece).
+async fn read_until(body: &mut Body, seen: &mut String, until: &str) {
+    while !seen.contains(until) {
+        let f = tokio::time::timeout(std::time::Duration::from_secs(5), body.frame())
+            .await
+            .expect("an event in time")
+            .expect("the stream is open")
+            .unwrap();
+        if let Some(d) = f.data_ref() {
+            seen.push_str(&String::from_utf8_lossy(d));
+        }
+    }
+}
+
+#[tokio::test]
+async fn realtime_channel_over_http() {
+    use std::collections::BTreeMap;
+    let a = App::new().await;
+    let manifest = "id = \"com.test.rt\"
+name = \"Rt\"
+version = \"1.0.0\"
+[contribution]
+icon = \"x\"
+label = \"Rt\"
+        [requires]
+mosaikit = \">=1.0\"
+[[resources]]
+name = \"rooms\"
+fields = [{ key = \"title\", kind = \"text\" }]
+[permissions]
+realtime = true
+";
+    let mut files = BTreeMap::new();
+    files.insert("plugin.toml".to_string(), manifest.as_bytes().to_vec());
+    let pkg = mosaikit_mskp::pack(&files, Some(&mosaikit_kernel::testing::test_key())).unwrap();
+    a.t.install_package(&pkg).await.unwrap();
+    let g = a.t.tenant("alfa").await;
+    a.t.member(&g, "anna").await;
+    let bruno_u = a.t.member(&g, "bruno").await;
+    a.t.member(&g, "dora").await;
+    let anna = a.login("alfa", "anna", PASSWORD).await;
+    let bruno = a.login("alfa", "bruno", PASSWORD).await;
+    let dora = a.login("alfa", "dora", PASSWORD).await;
+    let r = a
+        .call(
+            Some(&anna),
+            Method::POST,
+            "/api/t/alfa/p/com.test.rt/r/rooms",
+            Some(json!({ "values": { "title": "r" } })),
+        )
+        .await;
+    assert!(r.status.is_success(), "{} {}", r.status, r.text());
+    let room = r.json()["id"].as_str().unwrap().to_string();
+    let r = a
+        .call(
+            Some(&anna),
+            Method::PUT,
+            &format!("/api/t/alfa/resources/{room}/grants"),
+            Some(json!({ "principal_type": "user", "principal_id": bruno_u.user_id, "level": "write" })),
+        )
+        .await;
+    assert!(r.status.is_success(), "{} {}", r.status, r.text());
+
+    let base = format!("/api/t/alfa/p/com.test.rt/rt/{room}/chat");
+    // the stream: the first event is the presence
+    let req = Request::builder()
+        .uri(format!("{base}/stream"))
+        .header(header::COOKIE, &anna.cookie)
+        .body(Body::empty())
+        .unwrap();
+    let res = a.app.clone().oneshot(req).await.unwrap();
+    assert_eq!(res.status(), StatusCode::OK);
+    assert!(res
+        .headers()
+        .get(header::CONTENT_TYPE)
+        .unwrap()
+        .to_str()
+        .unwrap()
+        .starts_with("text/event-stream"));
+    let mut body = res.into_body();
+    let mut seen = String::new();
+    read_until(&mut body, &mut seen, "event: presence").await;
+    // bruno sends: anna receives it, with bruno as the sender
+    let r = a.call(Some(&bruno), Method::POST, &base, Some(json!({ "data": { "text": "hello" } }))).await;
+    assert_eq!(r.status, StatusCode::OK, "{}", r.text());
+    read_until(&mut body, &mut seen, "event: message").await;
+    assert!(seen.contains("\"text\":\"hello\""), "{seen}");
+    assert!(seen.contains("bruno"), "{seen}");
+    // a person who does not see the room is refused, and a bad name too
+    let r = a.call(Some(&dora), Method::POST, &base, Some(json!({ "data": 1 }))).await;
+    assert_eq!(r.status, StatusCode::NOT_FOUND, "{}", r.text());
+    let r = a
+        .call(
+            Some(&bruno),
+            Method::POST,
+            &format!("/api/t/alfa/p/com.test.rt/rt/{room}/Bad%20Name"),
+            Some(json!({ "data": 1 })),
+        )
+        .await;
+    assert_eq!(r.status, StatusCode::BAD_REQUEST, "{}", r.text());
+    assert_eq!(r.json()["code"], "rt_name");
+    // presence state needs a listener: bruno is not one
+    let r = a
+        .call(
+            Some(&bruno),
+            Method::POST,
+            &format!("{base}/state"),
+            Some(json!({ "state": { "typing": true } })),
+        )
+        .await;
+    assert_eq!(r.json()["code"], "rt_not_connected", "{}", r.text());
+}

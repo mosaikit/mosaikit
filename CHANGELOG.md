@@ -5,6 +5,14 @@ in Help › What is new (one `## <version>` heading per version, `- ` items, `##
 language of the person: this file in English, [CHANGELOG.it.md](CHANGELOG.it.md) in Italian (keep them
 in step).
 
+## 1.0.13
+
+- Public commands that write: `[[public_commands]]` takes `write = true` and `[[tables]]` takes `insert_for = "visitor"`; a visitor of a public link can then add rows (an answer to a form, a vote) to the tables made for visitors, only for the item of the link and never change or delete one; 10 calls a minute for a link, shown to the Administrator as «adds data».
+- Languages written from right to left: the page takes its direction (`dir`) from the language (Arabic, Hebrew, Persian, Urdu). The official language plugins now are Spanish, Portuguese, French, Dutch, Arabic, Chinese and Russian.
+- Real-time channels: a plugin with `permissions.realtime` opens a channel on a resource with `msk.realtime.open` (presence, messages to everyone or to one person, a small state per person, over SSE and POST); the kernel only relays, nothing is stored.
+- `permissions.media`: the frame of the plugin may pass the camera, the microphone and the screen to a service it embeds (with `frame_src`).
+- `mountCrud` has the view kind `custom`, the option `sort` and a handle with `reload()`; the plugin API has a UI kit (toast, dialog, menu, popover, tag input, person picker, date field, timeline, kanban, Markdown) and `MockHost::hook_with_previous` for hook tests.
+
 ## 1.0.12
 
 - Fix: `mosaikit-product build k8s` without `--base-k8s` (1.0.11) wrote the Kubernetes manifests with their `{{id}}`, `{{image}}`... placeholders unresolved and without the `initdb` script, so `kubectl kustomize` failed. The manifests are now rendered with the id, name, version, image and PostgreSQL image of the product, and the result is checked with `kubectl kustomize` in the tests.

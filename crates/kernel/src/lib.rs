@@ -38,6 +38,7 @@ pub mod plugins;
 pub mod product;
 pub mod profiles;
 pub mod quotas;
+pub mod realtime;
 pub mod resource_list;
 pub mod run_tickets;
 pub mod schedule_worker;
@@ -229,6 +230,8 @@ pub struct Kernel {
     pub dev_events: broadcast::Sender<DevEvent>,
     /// live events of the notifications, for the open sessions (`/api/me/stream`)
     pub live: broadcast::Sender<notify::Live>,
+    /// real-time channels of the plugins (`realtime`, docs/realtime-design.md)
+    pub rt: realtime::Hub,
     /// notifications sent by the plugins in the last minute, per person and plugin
     pub(crate) notify_rate:
         std::sync::Mutex<std::collections::HashMap<(Uuid, String), Vec<std::time::Instant>>>,
@@ -332,6 +335,7 @@ impl Kernel {
                 .map_err(|e| Error::internal(e.to_string()))?,
             dev_events,
             live,
+            rt: realtime::Hub::default(),
             notify_rate: std::sync::Mutex::new(std::collections::HashMap::new()),
             cookie_secret,
             secrets,

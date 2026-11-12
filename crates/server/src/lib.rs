@@ -19,6 +19,7 @@ mod people_api;
 mod plugins_api;
 mod qa_api;
 mod quotas_api;
+mod realtime_api;
 mod run_api;
 mod schedule_api;
 mod shell_api;
@@ -172,6 +173,7 @@ pub fn app_router(k: Arc<Kernel>) -> Router {
     let mut r = api::router()
         .merge(oidc_api::router())
         .merge(run_api::router())
+        .merge(realtime_api::router())
         .merge(schedule_api::router())
         .merge(comments_api::router());
     // the routes of the developer profile exist only while it is on: a normal server has none of them

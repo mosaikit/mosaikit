@@ -32,6 +32,9 @@ pub(crate) struct KernelHost {
     /// public mode: only `db.query` (SELECT, read only), `http.fetch` and `key.get` are available, and
     /// a key resolves only to the tenant's shared key or the platform's, never to a personal one
     public: bool,
+    /// a public command declared with `write = true`: besides reading it may INSERT (never update or delete) into the
+    /// tables the plugin declares with `insert_for = "visitor"`; the policies of the tables enforce which
+    public_write: bool,
     calls: Vec<String>,
     depth: u8,
     tx: Option<Tx>,
@@ -110,7 +113,14 @@ impl KernelHost {
         let sql = req.get("sql").and_then(Value::as_str).ok_or("missing sql")?;
         let checked = mosaikit_sql_guard::check_query(sql, &self.schema).map_err(|e| e.to_string())?;
         if self.public && checked.kind != mosaikit_sql_guard::Kind::Select {
-            return Err("a public command can only read".to_string());
+            // a public command that writes may only insert: the policies of a `visitor` table do the rest
+            if !(self.public_write && checked.kind == mosaikit_sql_guard::Kind::Insert) {
+                return Err(if self.public_write {
+                    "a public command can only read and insert".to_string()
+                } else {
+                    "a public command can only read".to_string()
+                });
+            }
         }
         let params = params(req);
         let rt = self.rt.clone();
@@ -463,8 +473,12 @@ impl Host for KernelHost {
             self.last_code = Some("permission_denied".into());
             return Err("operation not available in a public link: directory.search".into());
         }
-        // a public command is default deny: reading, outside requests and keys, nothing else
-        if self.public && !matches!(op, "db.query" | "http.fetch" | "key.get") {
+        // a public command is default deny: reading, outside requests and keys, nothing else; one declared with `write`
+        // also has `db.exec` (inserts into the tables made for visitors: `db()` and the policies decide)
+        if self.public
+            && !(matches!(op, "db.query" | "http.fetch" | "key.get")
+                || (self.public_write && op == "db.exec"))
+        {
             return Err(format!("operation not available in a public link: {op}"));
         }
         match op {
@@ -548,6 +562,7 @@ fn new_host(
         caller,
         tenant,
         public,
+        public_write: false,
         calls: p.manifest.permissions.calls.clone(),
         depth,
         tx: Some(tx),
@@ -610,6 +625,7 @@ pub(crate) async fn run_public(
     tx: Tx,
     name: &str,
     args: Value,
+    write: bool,
 ) -> Result<(Value, Tx)> {
     let msg = json!({
         "abi": 1, "kind": "command", "name": name, "args": args,
@@ -623,7 +639,8 @@ pub(crate) async fn run_public(
             "config": crate::plugins::config::for_public_logic(k, &p.id).await?,
         },
     });
-    let host = new_host(p, tx, None, r.tenant, true, 0, k);
+    let mut host = new_host(p, tx, None, r.tenant, true, 0, k);
+    host.public_write = write;
     let mut notes = Deferred::default();
     exec(k, p, host, msg, FUEL_PUBLIC, &mut notes).await
 }

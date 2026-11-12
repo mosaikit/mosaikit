@@ -37,7 +37,7 @@ minimum:
 | `network`, `frame_src`, `web` | reach outside origins; the logic goes through the host, which refuses private addresses |
 | `calls` | call commands of named plugins; the called plugin applies its own rules for the same user |
 | `notify` | send notifications; never to recipients you choose |
-| `[[public_commands]]` | anyone with a public link runs the command, read only, on the shared item. **Sensitive** (see below) |
+| `[[public_commands]]` | anyone with a public link runs the command, read only, on the shared item; with `write = true` it may also insert rows into the `insert_for = "visitor"` tables of the plugin. **Sensitive** (see below) |
 | `run_commands` | a service of a distribution calls the command as the person who started a run, in the background. **Sensitive** (see below) |
 | `run_targets` | a run started by this plugin may call the run commands of these other plugins as the person. **Sensitive** (see below) |
 | `directory` | lists the usernames and names of the people and groups of the tenant to callers who may share. **Sensitive** (see below) |

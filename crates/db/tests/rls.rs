@@ -662,3 +662,81 @@ async fn a_reader_writes_only_the_rows_that_are_theirs_where_the_table_says_so(b
         .unwrap_err();
     assert_eq!(sqlstate(&e).as_deref(), Some("42501"), "{e}");
 }
+
+both!(a_visitor_of_a_link_inserts_only_where_the_table_says_so);
+async fn a_visitor_of_a_link_inserts_only_where_the_table_says_so(b: B) {
+    let w = world(b).await;
+    // a table of the answers a visitor of a public link writes (a form): `insert_for = "visitor"`
+    let mut tx = w.db.begin_app().await.unwrap();
+    w.ps.thaw(&mut tx).await.unwrap();
+    w.ps.run_as_plugin(
+        &mut tx,
+        &["create table answers (resource_id uuid not null, tenant_id uuid not null, user_id uuid not null, body text)".into()],
+    )
+    .await
+    .unwrap();
+    let ps =
+        w.db.plugin_schema(PLUGIN, SCHEMA)
+            .with_reader_tables(vec![("answers".into(), "user_id".into())])
+            .with_visitor_tables(vec!["answers".into()]);
+    ps.freeze(&mut tx).await.unwrap();
+    tx.commit().await.unwrap();
+    query("update core.plugins set manifest = $2 where id = $1")
+        .bind(PLUGIN)
+        .bind(serde_json::json!({ "tables": [{ "name": "answers", "insert_for": "visitor", "owner_column": "user_id" }] }))
+        .execute(&w.db)
+        .await
+        .unwrap();
+    w.db.forget_plugin_pool(PLUGIN).await;
+
+    let rid = note(&w, w.alice, w.tenant_a, "a form", None).await;
+    let other = note(&w, w.alice, w.tenant_a, "another form", None).await;
+    let voter = Uuid::new_v4();
+    let ins = |link: Uuid, target: Uuid| {
+        let w = &w;
+        async move {
+            let mut tx = w.db.begin_plugin(PLUGIN, &visitor_ctx(w, link)).await.unwrap();
+            let r = query(
+                "insert into answers (resource_id, tenant_id, user_id, body) values ($1, $2, $3, 'yes')",
+            )
+            .bind(target)
+            .bind(w.tenant_a)
+            .bind(voter)
+            .execute(&mut *tx)
+            .await;
+            if r.is_ok() {
+                tx.commit().await.unwrap();
+            }
+            r.map(|_| ())
+        }
+    };
+    fn visitor_ctx(w: &World, link: Uuid) -> Ctx {
+        Ctx { user: None, tenant: Some(w.tenant_a), plugin: None, link: Some(link), scope: None }
+    }
+    // the visitor of the link inserts a row for the item of the link
+    ins(rid, rid).await.unwrap();
+    // not for another item, which the link does not reach
+    let e = ins(rid, other).await.unwrap_err();
+    assert_eq!(sqlstate(&e).as_deref(), Some("42501"), "{e}");
+    // the visitor changes and deletes nothing: the row stays
+    let mut tx = w.db.begin_plugin(PLUGIN, &visitor_ctx(&w, rid)).await.unwrap();
+    let changed = query("update answers set body = 'tampered'").execute(&mut *tx).await;
+    assert!(changed.map(|r| r.rows_affected() == 0).unwrap_or(true));
+    drop(tx);
+    let mut tx = w.db.begin_plugin(PLUGIN, &visitor_ctx(&w, rid)).await.unwrap();
+    let gone = query("delete from answers").execute(&mut *tx).await;
+    assert!(gone.map(|r| r.rows_affected() == 0).unwrap_or(true));
+    drop(tx);
+    let mut tx = w.db.begin_plugin(PLUGIN, &Ctx::user(w.alice, w.tenant_a)).await.unwrap();
+    let body: String = query_scalar("select body from answers").fetch_one(&mut *tx).await.unwrap();
+    assert_eq!(body, "yes");
+    drop(tx);
+    // the default tables stay closed to a visitor
+    let mut tx = w.db.begin_plugin(PLUGIN, &visitor_ctx(&w, rid)).await.unwrap();
+    let e = query("insert into notes (resource_id, title) values ($1, 'x')")
+        .bind(rid)
+        .execute(&mut *tx)
+        .await
+        .unwrap_err();
+    assert_eq!(sqlstate(&e).as_deref(), Some("42501"), "{e}");
+}

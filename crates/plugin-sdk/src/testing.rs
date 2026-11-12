@@ -376,10 +376,27 @@ impl MockHost {
         resource: &str,
         values: Value,
     ) -> Result<Option<Values>, String> {
+        self.hook_with_previous(reg, hook, resource, values, None)
+    }
+
+    /// Like [`MockHost::hook`], for an update: `previous` are the values before the change.
+    pub fn hook_with_previous(
+        &self,
+        reg: &Registry,
+        hook: &str,
+        resource: &str,
+        values: Value,
+        previous: impl Into<Option<Value>>,
+    ) -> Result<Option<Values>, String> {
+        let previous: Option<Value> = previous.into();
         let h = Hook {
             hook: hook.into(),
             resource: resource.into(),
             values: serde_json::from_value(values).map_err(|e| e.to_string())?,
+            previous: match previous {
+                Some(p) => Some(serde_json::from_value(p).map_err(|e| e.to_string())?),
+                None => None,
+            },
             ..Hook::default()
         };
         let mut msg = serde_json::to_value(&h).map_err(|e| e.to_string())?;

@@ -121,9 +121,12 @@ fn manifest_checks(m: &Manifest, strict: bool, r: &mut Report) {
         || !m.permissions.run_commands.is_empty()
         || !m.schedules.is_empty()
         || !m.permissions.run_targets.is_empty()
-        || m.permissions.directory;
+        || m.permissions.directory
+        || m.permissions.realtime
+        || m.permissions.media
+        || m.tables.iter().any(|t| t.insert_for == "visitor");
     if newer && m.requires.mosaikit.is_none() {
-        let msg = "`public` settings, [[public_commands]], permissions.run_commands, permissions.run_targets, [[schedules]] and permissions.directory need a Mosaikit that knows them: set [requires] mosaikit = \">=1.0\" (an older one refuses the manifest)";
+        let msg = "`public` settings, [[public_commands]], permissions.run_commands, permissions.run_targets, [[schedules]], permissions.directory, permissions.realtime, permissions.media, `write` of a public command and `insert_for = \"visitor\"` need a Mosaikit that knows them: set [requires] mosaikit = \">=1.0\" (an older one refuses the manifest)";
         if strict {
             r.error(msg);
         } else {
@@ -179,7 +182,9 @@ fn manifest_checks(m: &Manifest, strict: bool, r: &mut Report) {
     if m.embeds.iter().any(|e| e.same_origin) {
         sensitive.push("embeds.same_origin");
     }
-    if !m.public_commands.is_empty() {
+    if m.public_commands.iter().any(|c| c.write) {
+        sensitive.push("public_commands that write");
+    } else if !m.public_commands.is_empty() {
         sensitive.push("public_commands");
     }
     if !p.run_commands.is_empty() {
@@ -193,6 +198,12 @@ fn manifest_checks(m: &Manifest, strict: bool, r: &mut Report) {
     }
     if p.directory {
         sensitive.push("directory");
+    }
+    if p.realtime {
+        sensitive.push("realtime");
+    }
+    if p.media {
+        sensitive.push("media");
     }
     if !sensitive.is_empty() {
         r.info(format!("permissions the Administrator will review: {}", sensitive.join(", ")));

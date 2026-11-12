@@ -20,6 +20,8 @@ pub struct LitePluginSchema {
     pub(crate) db: Arc<Inner>,
     /// `(table, owner column)`: a reader writes the rows that are theirs
     pub reader_tables: Vec<(String, String)>,
+    /// the reader tables where a visitor of a public link (no user) may also insert
+    pub visitor_tables: Vec<String>,
 }
 
 fn q(s: &str) -> String {
@@ -206,14 +208,22 @@ impl LitePluginSchema {
                 ),
                 None => format!("{} < 2", lv(r)),
             };
+            // a visitor of a public link (no user, level 1 on the item of the link) may insert, never change
+            let visitor = self.visitor_tables.iter().any(|t| t == name);
+            let insert_denied = if visitor {
+                format!(
+                    "({} AND NOT (core_ctx_user() IS NULL AND {} >= 1))",
+                    denied("NEW.resource_id", "NEW"),
+                    lv("NEW.resource_id")
+                )
+            } else {
+                denied("NEW.resource_id", "NEW")
+            };
             let triggers = [
                 (
                     "msk_ins",
                     "before insert",
-                    format!(
-                        "({} OR NEW.tenant_id IS NOT core_ctx_tenant())",
-                        denied("NEW.resource_id", "NEW")
-                    ),
+                    format!("({insert_denied} OR NEW.tenant_id IS NOT core_ctx_tenant())"),
                 ),
                 (
                     "msk_upd",

@@ -572,6 +572,16 @@ impl PluginSchema {
         self
     }
 
+    /// Tables (among the reader tables) where a visitor of a public link, who has no user, may also INSERT rows
+    /// for the item of the link (`insert_for = "visitor"`): never change or delete them.
+    pub fn with_visitor_tables(mut self, tables: Vec<String>) -> PluginSchema {
+        match &mut self.0 {
+            SchemaInner::Pg(s) => s.visitor_tables = tables,
+            SchemaInner::Lite(s) => s.visitor_tables = tables,
+        }
+        self
+    }
+
     /// Creates (or updates) the space of the plugin. Idempotent.
     pub async fn provision(&self, tx: &mut TxConn, password: &str) -> Result<()> {
         match &self.0 {
