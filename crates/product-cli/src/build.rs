@@ -624,7 +624,7 @@ volumes:
 }
 
 /// The Kubernetes manifests of the base (`deploy/k8s`), built into this kit: always the version of the kit.
-const BASE_K8S: [(&str, &str); 8] = [
+const BASE_K8S: [(&str, &str); 9] = [
     ("README.md", include_str!("../../../deploy/k8s/README.md")),
     ("app.yaml", include_str!("../../../deploy/k8s/app.yaml")),
     ("config.env", include_str!("../../../deploy/k8s/config.env")),
@@ -633,7 +633,25 @@ const BASE_K8S: [(&str, &str); 8] = [
     ("namespace.yaml", include_str!("../../../deploy/k8s/namespace.yaml")),
     ("postgres.yaml", include_str!("../../../deploy/k8s/postgres.yaml")),
     ("secret.env", include_str!("../../../deploy/k8s/secret.env")),
+    ("initdb/01-mosaikit.sh", include_str!("../../../deploy/initdb/01-mosaikit.sh")),
 ];
+
+/// The manifests are templates: `{{id}}`, `{{name}}`, `{{version}}`, `{{image}}` and the PostgreSQL image.
+fn render_k8s(text: &str, d: &Distribution) -> String {
+    let pg = d.docker.postgres_image.clone().unwrap_or_else(|| "postgres:17-alpine".into());
+    let (pg_repo, pg_tag) = pg.rsplit_once(':').unwrap_or((pg.as_str(), "latest"));
+    [
+        ("id", d.product.id.as_str()),
+        ("name", d.product.name.as_str()),
+        ("version", d.product.version.as_str()),
+        ("image", d.image().as_str()),
+        ("postgres_image", pg.as_str()),
+        ("postgres_repo", pg_repo),
+        ("postgres_tag", pg_tag),
+    ]
+    .iter()
+    .fold(text.to_string(), |acc, (k, v)| acc.replace(&format!("{{{{{k}}}}}"), v))
+}
 
 /// `build k8s`: the kustomize overlay of the product over the `k8s` manifests of the base: the ones built into
 /// the kit, or the folder `base_k8s`.
@@ -652,22 +670,23 @@ pub fn k8s(d: &Distribution, base_k8s: Option<&Path>, o: &Options) -> Result<Pat
     match base_k8s {
         Some(b) => copy_dir(b, &out.join("base"))?,
         None => {
-            std::fs::create_dir_all(out.join("base"))?;
             for (name, text) in BASE_K8S {
-                std::fs::write(out.join("base").join(name), text)?;
+                let to = out.join("base").join(name);
+                std::fs::create_dir_all(to.parent().context("folder")?)?;
+                std::fs::write(to, render_k8s(text, d))?;
             }
         }
     }
     std::fs::write(
         out.join("kustomization.yaml"),
         format!(
-            "# {name} {version} on Kubernetes: the base manifests plus the image of the product.
+            "# {name} {version} on Kubernetes: the base manifests plus the image of the product (edit newName to point at your registry).
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
   - base
 images:
-  - name: mosaikit
+  - name: {image}
     newName: {image}
     newTag: \"{version}\"
 ",
@@ -720,7 +739,11 @@ mod tests {
         let n = std::fs::read_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/k8s"))
             .unwrap()
             .count();
-        assert_eq!(n, BASE_K8S.len(), "a file was added to deploy/k8s: add it to BASE_K8S");
+        assert_eq!(
+            n,
+            BASE_K8S.iter().filter(|(f, _)| !f.starts_with("initdb/")).count(),
+            "a file was added to deploy/k8s: add it to BASE_K8S"
+        );
         assert!(k8s(&d, Some(t.path()), &o).is_err(), "a folder without kustomization.yaml is refused");
     }
 

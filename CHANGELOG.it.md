@@ -4,6 +4,10 @@ Cosa cambia da una versione di Mosaikit alla successiva. La shell mostra la sezi
 Aiuto › Novità (un titolo `## <versione>` per versione, voci `- `, gruppi `### `). Questo file è la
 versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
+## 1.0.12
+
+- Correzione: `mosaikit-product build k8s` senza `--base-k8s` (1.0.11) scriveva i manifest Kubernetes con i segnaposto `{{id}}`, `{{image}}`... non risolti e senza lo script `initdb`, quindi `kubectl kustomize` falliva. Ora i manifest sono compilati con id, nome, versione, immagine e immagine PostgreSQL del prodotto, e il risultato è verificato con `kubectl kustomize` nei test.
+
 ## 1.0.11
 
 - `mosaikit-product build k8s` non richiede più `--base-k8s`: i manifest Kubernetes del Base sono dentro il kit, quindi coincidono sempre con la sua versione. `--base-k8s <cartella>` li sostituisce ancora. I `[[sidecars]]` non hanno effetto su Kubernetes (un avviso lo segnala).
