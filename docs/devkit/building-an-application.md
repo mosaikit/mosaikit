@@ -83,6 +83,36 @@ services start with the product, and a file of yours can also add to the `app` s
 puts files and folders of the product in the release with the same relative path, for what your compose files mount or build (configuration, an image
 context). A path with `..`, an absolute one, a missing file or a file called `compose.yml` is an error of `validate`.
 
+**Processes next to the desktop product.** `[[sidecars]]` lists extra processes the desktop application starts before the kernel and stops after it
+(a Node service, a map server...). `build desktop` copies the executable folder into `sidecars/<name>/` and writes `sidecars.toml` next to the
+executable; the launcher of the Base starts them in the order of `depends_on`, waits for the health check, restarts them with the `restart`
+policy and writes their output to `<data>/logs/sidecar-<name>.log`.
+
+```toml
+[[sidecars]]
+name = "geo-service"                  # lower case, digits, '-'
+command = "services/geo/node.exe"     # the first folder (services) is copied into sidecars/geo-service/
+args = ["server.js"]
+port = 9100                           # also allowed for the fetches of the plugins (127.0.0.1:9100)
+health = "/health"                    # or "tcp"; needs port
+env = { DATABASE_URL = "env:GEO_DATABASE_URL" }   # env:NAME is read from the environment of the launcher
+depends_on = ["geo-init"]
+
+[[sidecars]]
+name = "geo-init"
+kind = "oneshot"                      # runs to completion (exit 0) before the dependants start; must be idempotent
+command = "services/init.exe"
+
+[[sidecars.files]]                    # a file of the product placed where the sidecar expects it, at every start
+source = "deploy/geo.conf"
+target = "conf/geo.conf"              # relative to sidecars/<name>/
+```
+
+Keys: `name`, `command`, `args`, `env`, `health`, `port` (1024-65535), `depends_on`, `restart` (`never`, `on-failure` by default, `always`),
+`start_timeout_secs` (30), `kind` (`service` or `oneshot`) and `files`. `validate` warns about a missing executable; `build desktop` refuses it.
+`build docker` and `build k8s` do not use `[[sidecars]]` and print a warning: in Docker add the services with `compose_files`. A runtime
+(Java, Node) is not installed by the release: put it in the folder of the sidecar. Needs a Base that starts sidecars (every Base of the 1.0 line).
+
 ## 4. Brand and identity
 
 `branding/brand.toml`: `name`, `tagline`, `login_message`, `footer`, `support_url`, `logo` (svg, png or webp, about 64 px
