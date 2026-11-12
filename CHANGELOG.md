@@ -5,6 +5,10 @@ in Help › What is new (one `## <version>` heading per version, `- ` items, `##
 language of the person: this file in English, [CHANGELOG.it.md](CHANGELOG.it.md) in Italian (keep them
 in step).
 
+## 1.0.11
+
+- `mosaikit-product build k8s` no longer needs `--base-k8s`: the Kubernetes manifests of the Base are built into the kit, so they always match its version. `--base-k8s <folder>` still replaces them. `[[sidecars]]` have no effect on Kubernetes (a warning says so).
+
 ## 1.0.10
 
 - `[[sidecars]]` in `distribution.toml` now work for products built with the kit: `mosaikit-product build desktop` copies the executables into `sidecars/<name>/` and writes `sidecars.toml`, so the desktop application starts a Node service, a map server... before the kernel and stops it after. Keys: `command`, `args`, `env`, `health`, `port`, `depends_on`, `restart`, `kind = "oneshot"`, `files`. `validate` warns about a missing executable; `build docker` and `build k8s` print a warning (use `[docker] compose_files`).

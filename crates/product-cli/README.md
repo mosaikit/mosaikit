@@ -10,7 +10,7 @@ mosaikit-product validate [dir]                distribution.toml, brand, the own
 mosaikit-product dev [dir] [--base kit]        the base in the developer profile with the brand, the policy and the plugins of the product
 mosaikit-product build desktop --base <kit>    the executable of the base renamed, signed registry, brand, mosaikit.toml, START.txt
 mosaikit-product build docker  --base <kit> --base-image mosaikit:1.0.0 [--build]   Dockerfile on the base image, compose file
-mosaikit-product build k8s --base-k8s <folder> kustomize overlay with the image of the product
+mosaikit-product build k8s                   kustomize overlay with the image of the product (manifests of the base built in; --base-k8s <folder> replaces them)
 mosaikit-product sign file.mskp --key k        sign a package again with the key of the product
 mosaikit-product doctor                        what the tool needs
 ```
