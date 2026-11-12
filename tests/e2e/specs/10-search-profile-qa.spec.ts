@@ -60,7 +60,7 @@ test.describe.serial('10-search-profile-qa', () => {
     await page.keyboard.press('Escape')
     await page.getByRole('button', { name: 'Help', exact: true }).click()
     await page.getByRole('menuitem', { name: /What is new/ }).click()
-    await expect(page.getByRole('dialog', { name: /What is new/ })).toContainText('Files area')
+    await expect(page.getByRole('dialog', { name: /What is new/ })).toContainText('The changes of this version')
     await page.keyboard.press('Escape')
     // "g" then "n": the notifications
     await page.keyboard.press('g')
