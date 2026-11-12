@@ -29,7 +29,7 @@ interface Props {
   ctx: TenantContext
   reloadKey: number
   /** context of the shell (language, theme, mode, contrast), as for the plugin */
-  context: () => Record<string, unknown>
+  context: (pluginId: string) => Record<string, unknown>
   uiKey: string
   /** sends an event to the frame of the base plugin */
   toBase: (event: string, data: unknown) => void
@@ -55,10 +55,10 @@ export default function ExtensionTab({ tab, session, ctx, reloadKey, context, ui
     ctxRef.current = context
   })
   useEffect(() => {
-    const c = ctxRef.current()
+    const c = ctxRef.current(tab.ext)
     post({ msk: 1, event: 'context', data: c })
     post({ msk: 1, event: 'theme', data: c.theme })
-  }, [uiKey])
+  }, [uiKey, tab.ext])
 
   useEffect(() => {
     const onMessage = async (ev: MessageEvent) => {
@@ -82,7 +82,7 @@ export default function ExtensionTab({ tab, session, ctx, reloadKey, context, ui
                 tenant: { slug: ctx.tenant.slug, name: ctx.tenant.name, role: ctx.tenant.role },
                 plugin: { id: tab.ext, version: p?.version ?? '' },
                 theme: themeVars(),
-                context: ctxRef.current(),
+                context: ctxRef.current(tab.ext),
                 ...(ctx.perms ? { perms: ctx.perms[tab.ext] ?? [] } : {}),
                 tab: { base: tab.base, resource: tab.resource, item: tab.item, key: tab.key, level: tab.level },
               },

@@ -478,7 +478,11 @@ export class Msk {
 /** @internal */
 export function applyContext(ctx: UiContext | undefined, root: HTMLElement = document.documentElement) {
   if (!ctx) return
-  if (/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(ctx.lang)) root.lang = ctx.lang
+  if (/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(ctx.lang)) {
+    root.lang = ctx.lang
+    // the languages written from right to left (the page of the host does the same)
+    root.dir = ['ar', 'he', 'fa', 'ur'].includes(ctx.lang.slice(0, 2)) ? 'rtl' : 'ltr'
+  }
   if (ctx.mode === 'light' || ctx.mode === 'dark') {
     root.dataset.mode = ctx.mode
     root.style.colorScheme = ctx.mode
