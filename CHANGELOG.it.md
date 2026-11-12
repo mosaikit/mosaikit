@@ -6,6 +6,8 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
 ## 1.0.13
 
+- Desktop di un prodotto: il file di configurazione prende il nome dell'eseguibile (`geoportal.exe` legge `geoportal.toml`, e la release include `geoportal.example.toml`); `mosaikit.toml` si legge ancora se non c'è il file con il nuovo nome, così un'installazione precedente funziona. `START.txt` e i commenti del file lo nominano. Non rinominati (nomi interni da cui dipendono i dati): `data/logs/mosaikit.log`, `data/database/mosaikit.db`, il database PostgreSQL `mosaikit`, i file delle release Docker e Kubernetes (`mosaikit.toml` dentro l'immagine).
+
 - Desktop (Windows): all'avvio e alla chiusura non lampeggiano più finestre di console: ogni processo di supporto del programma (`initdb`, `pg_ctl`, `pg_dump`, `icacls`) gira nascosto. I sidecar erano già avviati nascosti.
 - Desktop: solo «Open» del menu dell'icona (e il clic sull'icona) apre il browser; scegliere un'altra voce (Quit, Data folder...) non apre più una scheda.
 - Il file con le credenziali iniziali del primo avvio si chiama `initial-credentials.txt` (era `credenziali-iniziali.txt`); il menu dell'icona apre ancora il vecchio file di un'installazione precedente.

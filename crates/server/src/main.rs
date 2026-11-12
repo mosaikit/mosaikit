@@ -12,7 +12,7 @@ use mosaikit_server::{config_path, open_browser};
 #[derive(Parser)]
 #[command(name = "mosaikit-server", version, about = "Mosaikit: multi-tenant plugin platform")]
 struct Cli {
-    /// configuration file (default: MOSAIKIT_CONFIG, then mosaikit.toml next to the executable or in the current folder)
+    /// configuration file (default: MOSAIKIT_CONFIG, then mosaikit.toml (for a product, <executable>.toml) next to the executable or in the current folder)
     #[arg(long, short, global = true)]
     config: Option<PathBuf>,
     #[command(subcommand)]

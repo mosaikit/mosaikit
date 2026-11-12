@@ -189,10 +189,20 @@ fn trusted_line(keys: &[String]) -> String {
     format!("trusted_keys = [{}]", keys.iter().map(|k| format!("\"{k}\"")).collect::<Vec<_>>().join(", "))
 }
 
+/// Name of the configuration file of the desktop release: the one of the executable (`geoportal.toml`).
+fn config_name(d: &Distribution) -> String {
+    format!("{}.toml", d.executable())
+}
+
+/// Name of the file that describes every property (`geoportal.example.toml`).
+fn example_name(d: &Distribution) -> String {
+    format!("{}.example.toml", d.executable())
+}
+
 fn desktop_config(d: &Distribution, keys: &[String], brand: bool) -> String {
     let mut l: Vec<String> = vec![
         format!("# {} desktop: everything on this computer.", d.product.name),
-        "# Every available property is described in mosaikit.example.toml.".into(),
+        format!("# Every available property is described in {}.", example_name(d)),
         String::new(),
         "# address of the app (UI of the plugins and public links on the next port)".into(),
         format!("url = \"http://127.0.0.1:{}\"", d.desktop.port),
@@ -289,7 +299,13 @@ pub fn desktop(d: &Distribution, base: &Path, o: &Options) -> Result<PathBuf> {
         let name = e.file_name().to_string_lossy().to_string();
         if matches!(
             name.as_str(),
-            "data" | "registry" | "branding" | "mosaikit.toml" | "START.txt" | "distribution.toml"
+            "data"
+                | "registry"
+                | "branding"
+                | "mosaikit.toml"
+                | "mosaikit.example.toml"
+                | "START.txt"
+                | "distribution.toml"
         ) || e.path() == base_exe
         {
             continue;
@@ -308,16 +324,22 @@ pub fn desktop(d: &Distribution, base: &Path, o: &Options) -> Result<PathBuf> {
         copy_dir(b, &out.join("branding"))?;
     }
     std::fs::copy(d.file(), out.join("distribution.toml"))?;
-    std::fs::write(out.join("mosaikit.toml"), desktop_config(d, &keys, brand.is_some()))?;
+    std::fs::write(out.join(config_name(d)), desktop_config(d, &keys, brand.is_some()))?;
+    // the description of every property, under the name of the product
+    if base_dir.join("mosaikit.example.toml").is_file() {
+        std::fs::copy(base_dir.join("mosaikit.example.toml"), out.join(example_name(d)))?;
+    }
     std::fs::write(
         out.join("START.txt"),
         format!(
-            "{name} {version}\n\n1. Start {exe} (double click). The first start creates the database and installs the plugins;\n   the browser opens on http://127.0.0.1:{port}.\n2. User \"user\" works in the tenant {tenant} (slug {slug}); \"admin\" (link \"Administrator access\") administers the platform.\n   Initial password of both: \"mosaikit\" (change it from the Account page).\n3. Configuration: mosaikit.toml (every property is described in mosaikit.example.toml).\n   Backup: with the program stopped copy the whole data\\ folder.\n\nBuilt on Mosaikit, with the policy of distribution.toml.\n",
+            "{name} {version}\n\n1. Start {exe} (double click). The first start creates the database and installs the plugins;\n   the browser opens on http://127.0.0.1:{port}.\n2. User \"user\" works in the tenant {tenant} (slug {slug}); \"admin\" (link \"Administrator access\") administers the platform.\n   Initial password of both: \"mosaikit\" (change it from the Account page).\n3. Configuration: {config} (every property is described in {example}).\n   Backup: with the program stopped copy the whole data\\ folder.\n\nBuilt on Mosaikit, with the policy of distribution.toml.\n",
             name = d.product.name,
             version = d.product.version,
             tenant = first_tenant(d).1,
             slug = first_tenant(d).0,
             exe = exe(&d.executable()),
+            config = config_name(d),
+            example = example_name(d),
             port = d.desktop.port
         ),
     )?;
@@ -843,7 +865,9 @@ version = \"1.0.0\"
         assert!(!out.join("registry/plugins/gone.mskp").exists(), "only the plugins the product keeps");
         let index = std::fs::read_to_string(out.join("registry/index.json")).unwrap();
         assert!(index.contains("com.mosaikit.notes") && !index.contains("com.mosaikit.tasks"), "{index}");
-        let cfg = std::fs::read_to_string(out.join("mosaikit.toml")).unwrap();
+        let cfg = std::fs::read_to_string(out.join("acme.toml")).unwrap();
+        assert!(out.join("acme.example.toml").is_file() && !out.join("mosaikit.toml").exists());
+        assert!(std::fs::read_to_string(out.join("START.txt")).unwrap().contains("acme.toml"));
         assert!(
             cfg.contains("trusted_keys = [\"")
                 && cfg.contains("brand = \"branding\"")

@@ -239,7 +239,7 @@ mosaikit-product build k8s                                              dist/<id
 ```
 
 - **Desktop**: the executable of the base renamed, `registry/` (your signed packages and the official ones you keep), `branding/`,
-  `distribution.toml`, `mosaikit.toml` (written, commented) and `START.txt`. The configuration trusts the key of the product and,
+  `distribution.toml`, `<executable>.toml` (the configuration, written and commented; `acme.toml` for `acme.exe`), `<executable>.example.toml` (every property, described) and `START.txt`. The configuration trusts the key of the product and,
   if you keep official plugins, the official key.
 - **Docker**: the base image is the one the platform release publishes, `ghcr.io/mosaikit/mosaikit:v<version>` (public, no login; the version of the release, with the `v`). With `--base <version>` the image is `ghcr.io/mosaikit/mosaikit:v<version>` by itself; with a folder or a zip, pass `--base-image`. A `Dockerfile` `FROM` the base image that adds the registry, the brand and the configuration, and a `compose.yml` with
   the database (`--build` runs `docker build`).
