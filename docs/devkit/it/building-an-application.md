@@ -11,7 +11,7 @@ per esempio `mosaikit-product build desktop --base 1.0.5` (come `build desktop` 
 `~/.cache/mosaikit/base/<versione>` (Linux) o `~/Library/Caches/mosaikit/base/<versione>` (macOS); `MOSAIKIT_CACHE` la sposta. `--base` accetta anche una cartella o uno `.zip` del kit desktop, ed è così che usi una
 Base precedente alla 1.0.2 (lo zip è negli **Assets** della sua release: <https://github.com/mosaikit/mosaikit/releases>). `validate`, `dev` e `test` prendono da soli la Base del Dev Kit
 quando il prodotto tiene plugin ufficiali, e non ne richiedono se ha solo i propri. Per Docker la base è l'immagine `ghcr.io/mosaikit/mosaikit:v<versione>`, che `--base <versione>` indica da solo
-(`--base-image` la cambia) e che scarica Docker; per Kubernetes è la cartella k8s della release (`--base-k8s`).
+(`--base-image` la cambia) e che scarica Docker; per Kubernetes i manifest del Base sono dentro il kit, quindi coincidono sempre con la sua versione (`--base-k8s <cartella>` li sostituisce).
 `MOSAIKIT_BASE=<versione>` imposta un'altra base predefinita per tutti i comandi.
 
 Un esempio completo, passo per passo, è in [Prodotto di riferimento](../reference-product.md). I termini di ridistribuzione sono in
@@ -159,7 +159,7 @@ wrench. I gruppi valgono solo per la barra laterale predefinita.
 ```text
 mosaikit-product build desktop [--base <versione | cartella | .zip>]     dist/<id>-<versione>-desktop   (il kit desktop della Base, vedi in alto)
 mosaikit-product build docker  [--base <versione | cartella | .zip>] [--base-image <immagine>] [--build]
-mosaikit-product build k8s     --base-k8s <cartella k8s del kit>
+mosaikit-product build k8s
 ```
 
 **Keycloak**: con `[docker] keycloak = true` (lo scrive `mosaikit-product new`; serve una base dalla 1.0.3 e `validate` lo dice) il compose avvia anche Keycloak con un

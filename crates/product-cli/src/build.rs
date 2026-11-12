@@ -623,19 +623,54 @@ volumes:
     )
 }
 
-/// `build k8s`: the kustomize overlay of the product over the `k8s` folder of the base kit.
-pub fn k8s(d: &Distribution, base_k8s: &Path, o: &Options) -> Result<PathBuf> {
-    if !base_k8s.join("kustomization.yaml").is_file() {
-        bail!("{}: no kustomization.yaml (give the k8s folder of the base kit)", base_k8s.display());
+/// The Kubernetes manifests of the base (`deploy/k8s`), built into this kit: always the version of the kit.
+const BASE_K8S: [(&str, &str); 8] = [
+    ("README.md", include_str!("../../../deploy/k8s/README.md")),
+    ("app.yaml", include_str!("../../../deploy/k8s/app.yaml")),
+    ("config.env", include_str!("../../../deploy/k8s/config.env")),
+    ("ingress.yaml", include_str!("../../../deploy/k8s/ingress.yaml")),
+    ("kustomization.yaml", include_str!("../../../deploy/k8s/kustomization.yaml")),
+    ("namespace.yaml", include_str!("../../../deploy/k8s/namespace.yaml")),
+    ("postgres.yaml", include_str!("../../../deploy/k8s/postgres.yaml")),
+    ("secret.env", include_str!("../../../deploy/k8s/secret.env")),
+];
+
+/// `build k8s`: the kustomize overlay of the product over the `k8s` manifests of the base: the ones built into
+/// the kit, or the folder `base_k8s`.
+pub fn k8s(d: &Distribution, base_k8s: Option<&Path>, o: &Options) -> Result<PathBuf> {
+    if let Some(b) = base_k8s {
+        if !b.join("kustomization.yaml").is_file() {
+            bail!(
+                "{}: no kustomization.yaml (give a k8s folder, or leave --base-k8s out to use the kit's own)",
+                b.display()
+            );
+        }
     }
     warn_sidecars(d, "Kubernetes");
     let out = out_dir(d, o, "k8s");
     fresh_dir(&out)?;
-    copy_dir(base_k8s, &out.join("base"))?;
+    match base_k8s {
+        Some(b) => copy_dir(b, &out.join("base"))?,
+        None => {
+            std::fs::create_dir_all(out.join("base"))?;
+            for (name, text) in BASE_K8S {
+                std::fs::write(out.join("base").join(name), text)?;
+            }
+        }
+    }
     std::fs::write(
         out.join("kustomization.yaml"),
         format!(
-            "# {name} {version} on Kubernetes: the base kit plus the image of the product.\napiVersion: kustomize.config.k8s.io/v1beta1\nkind: Kustomization\nresources:\n  - base\nimages:\n  - name: mosaikit\n    newName: {image}\n    newTag: \"{version}\"\n",
+            "# {name} {version} on Kubernetes: the base manifests plus the image of the product.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - base
+images:
+  - name: mosaikit
+    newName: {image}
+    newTag: \"{version}\"
+",
             name = d.product.name,
             version = d.product.version,
             image = d.image()
@@ -662,6 +697,31 @@ mod tests {
             .replace("roots = [\"plugins\"]", "roots = []");
         std::fs::write(root.join("distribution.toml"), text).unwrap();
         Distribution::load(&root).unwrap()
+    }
+
+    #[test]
+    fn k8s_uses_the_manifests_built_into_the_kit() {
+        let t = tempfile::tempdir().unwrap();
+        let d = product(t.path());
+        let o = Options { out: Some(t.path().join("k8s")), ..Default::default() };
+        let out = k8s(&d, None, &o).unwrap();
+        for (name, _) in BASE_K8S {
+            assert!(out.join("base").join(name).is_file(), "{name}");
+        }
+        let k = std::fs::read_to_string(out.join("kustomization.yaml")).unwrap();
+        assert!(
+            k.contains(
+                "resources:
+  - base"
+            ) && k.contains("newTag"),
+            "{k}"
+        );
+        // every manifest of deploy/k8s is built in
+        let n = std::fs::read_dir(Path::new(env!("CARGO_MANIFEST_DIR")).join("../../deploy/k8s"))
+            .unwrap()
+            .count();
+        assert_eq!(n, BASE_K8S.len(), "a file was added to deploy/k8s: add it to BASE_K8S");
+        assert!(k8s(&d, Some(t.path()), &o).is_err(), "a folder without kustomization.yaml is refused");
     }
 
     #[test]
@@ -945,10 +1005,11 @@ extensions",
         let k = t.path().join("k8s");
         std::fs::create_dir_all(&k).unwrap();
         std::fs::write(k.join("kustomization.yaml"), "resources: []\n").unwrap();
-        let out = k8s(&d, &k, &Options { out: Some(t.path().join("kout")), ..Options::default() }).unwrap();
+        let out =
+            k8s(&d, Some(&k), &Options { out: Some(t.path().join("kout")), ..Options::default() }).unwrap();
         let text = std::fs::read_to_string(out.join("kustomization.yaml")).unwrap();
         assert!(text.contains("newName: acme") && text.contains("newTag: \"0.1.0\""), "{text}");
         assert!(out.join("base/kustomization.yaml").is_file());
-        assert!(k8s(&d, &t.path().join("nope"), &Options::default()).is_err());
+        assert!(k8s(&d, Some(&t.path().join("nope")), &Options::default()).is_err());
     }
 }

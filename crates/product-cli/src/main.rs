@@ -137,9 +137,9 @@ enum Target {
     K8s {
         #[arg(default_value = ".")]
         dir: PathBuf,
-        /// the k8s folder of the base kit
+        /// a k8s folder to use instead of the manifests built into this kit (the same version as the kit)
         #[arg(long)]
-        base_k8s: PathBuf,
+        base_k8s: Option<PathBuf>,
         #[command(flatten)]
         common: Common,
     },
@@ -221,7 +221,7 @@ fn run(cli: Cli) -> Result<ExitCode> {
                 build::docker(&Distribution::load(&dir)?, &base, &image, run_build, &common.options())?;
             }
             Target::K8s { dir, base_k8s, common } => {
-                build::k8s(&Distribution::load(&dir)?, &base_k8s, &common.options())?;
+                build::k8s(&Distribution::load(&dir)?, base_k8s.as_deref(), &common.options())?;
             }
         },
         Cmd::Sign { file, key } => {

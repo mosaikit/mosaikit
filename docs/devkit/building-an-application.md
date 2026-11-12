@@ -12,7 +12,7 @@ and keeps it in a cache, so it downloads it once: `mosaikit-product build deskto
 `~/Library/Caches/mosaikit/base/<version>` (macOS); `MOSAIKIT_CACHE` puts it elsewhere. `--base` also takes a folder or a `.zip` of the desktop kit, which is how you use a
 Base older than 1.0.2 (the zip is in the **Assets** of its release: <https://github.com/mosaikit/mosaikit/releases>). `validate`, `dev` and `test` take the Base of the Dev Kit by
 themselves when the product keeps official plugins, and need none when it has only its own. For Docker the base is the image `ghcr.io/mosaikit/mosaikit:v<version>`, which `--base <version>`
-names by itself (`--base-image` overrides it), and Docker pulls it; for Kubernetes it is the k8s folder of the release (`--base-k8s`).
+names by itself (`--base-image` overrides it), and Docker pulls it; for Kubernetes the manifests of the base are built into the kit, so they always match its version (`--base-k8s <folder>` replaces them).
 `MOSAIKIT_BASE=<version>` sets another default for every command.
 
 A worked example, step by step, is in [Reference product](reference-product.md). The terms of redistribution are in
@@ -235,7 +235,7 @@ by reference (`env:NAME`, `file:PATH`, a relative path being relative to the fol
 ```text
 mosaikit-product build desktop [--base <version | folder | .zip>]     dist/<id>-<version>-desktop   (the desktop kit of the Base, see the top)
 mosaikit-product build docker  [--base <version | folder | .zip>] [--base-image <image>] [--build]   dist/<id>-<version>-docker
-mosaikit-product build k8s     --base-k8s <k8s folder of the kit>       dist/<id>-<version>-k8s
+mosaikit-product build k8s                                              dist/<id>-<version>-k8s
 ```
 
 - **Desktop**: the executable of the base renamed, `registry/` (your signed packages and the official ones you keep), `branding/`,
