@@ -71,11 +71,21 @@ setErrorTranslator((code, message) => {
   return k && i18next.exists(k) ? i18next.t(k) : message
 })
 
+/** language code → id of a plugin → English phrase → translation: the texts inside the pages of the plugins */
+const pageTexts = new Map<string, Record<string, Record<string, string>>>()
+
+/** The texts a language plugin brings for the page of a plugin (`lang/ui/<id>.json`), for the `context` event;
+ *  undefined for `en`, `it` and any language without a file for that plugin (the page then keeps its own texts). */
+export function pageTextsFor(code: string, pluginId: string): Record<string, string> | undefined {
+  return pageTexts.get(code)?.[pluginId]
+}
+
 /** The texts of a language of a plugin, fetched once. */
 async function loadLanguage(code: string): Promise<boolean> {
   if (loaded.has(code)) return true
   try {
-    const r = await api<{ strings: Record<string, string> }>('GET', `/api/languages/${encodeURIComponent(code)}`)
+    const r = await api<{ strings: Record<string, string>; ui?: Record<string, Record<string, string>> }>('GET', `/api/languages/${encodeURIComponent(code)}`)
+    pageTexts.set(code, r.ui ?? {})
     i18next.addResourceBundle(code, 'translation', r.strings, true, true)
     loaded.add(code)
     return true

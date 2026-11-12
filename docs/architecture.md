@@ -1087,7 +1087,7 @@ label = "Esportare"
 **service** works behind the scenes (logic, hooks, KPIs); an **extension** adds fields and
 actions to another plugin (§8.9) and needs `[extends]`; a **layout** arranges the slots of the shell
 (`layout/layout.toml`, a style and images: declarative, never code); a **language** brings a language of
-the interface (`[language]` with `code` and `name`, texts in `lang/`: never code). People who work see
+the interface (`[language]` with `code` and `name`, texts in `lang/`: never code: `lang/host.json` for the shell, `lang/plugins/<id>.toml` for the manifests of other plugins and `lang/ui/<id>.json` for the texts inside the page of another plugin, English phrase to translation; `GET /api/languages/{code}` serves them as `strings` and `ui`). People who work see
 the apps; the Administrator and the Tenant Managers see every plugin with its kind. `icon` names an icon
 of the set of the shell; the shell draws only the names it knows (a manifest cannot load an image).
 New plugins state `kind`; when it is absent the kernel derives it (`extension` with `[extends]`, `app`
@@ -1320,7 +1320,17 @@ written before, the `theme` event with the variables only). `connect()` applies 
 to `<html>` (`lang`, `data-mode`, `data-preset`, `data-contrast`, `color-scheme`, variables);
 to react, for example changing the labels:
 
+**Texts of the page.** `msk.t(phrase, vars?)` returns the phrase in the language of the host. The key is the
+English phrase, `{name}` is replaced by `vars.name`. The translation comes from the language plugin: the shell
+reads `lang/ui/<plugin id>.json` of the active language (served with the texts of the language), and passes the part
+of this plugin as `context.texts` at the handshake and at every `context` event. Without it (English, Italian, a language
+with no file for the plugin, an older host) the phrase itself comes back; `msk.ownTexts({ it: {...} })` lets a plugin keep
+its own table for a language (its Italian). Additive and opt-in: a plugin that does not call `msk.t` keeps its texts,
+the plugin API stays 1. The files are checked when the language plugin is installed (names are plugin ids, flat object of
+texts, no control characters, at most 3000 texts per file).
+
 ```ts
+msk.t('Owner: {name}', { name })           // «Propietario: Ada» with lang-es
 msk.context?.lang                          // at start
 msk.onContext((c) => render(c.lang))       // at every change
 ```

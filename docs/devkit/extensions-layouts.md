@@ -138,8 +138,11 @@ name = "Français"           # at most 60 characters
 ```
 lang/host.json                      the texts of the shell: English phrase -> translation, same {placeholders}
 lang/plugins/<plugin id>.toml       the texts of another plugin's manifest, in the shape of its [i18n.<code>]
+lang/ui/<plugin id>.json            the texts inside the page of another plugin: English phrase -> translation
 ```
 
-Limits: `host.json` at most 1 MiB and 6000 texts of at most 1000 characters; at most 100 plugin files of 200 KiB. The
-texts inside the UI of a plugin (its iframe) stay that plugin's business; a plugin that has its own `[i18n.<code>]`
-keeps it. A language plugin is exempt from the i18n coverage check of `validate --strict`.
+Limits: `host.json` at most 1 MiB and 6000 texts of at most 1000 characters; at most 100 plugin files of 200 KiB; at most
+100 `ui/` files of 512 KiB and 3000 texts each. The texts inside the page of a plugin (its iframe) reach it only if that
+plugin reads them with `msk.t(phrase, vars?)` (the key is the English phrase, `{name}` placeholders; the shell passes the
+file of the plugin in the `context`, a missing phrase stays in English); a plugin that does not use `msk.t` keeps its own
+texts, and one that has its own `[i18n.<code>]` keeps it. A language plugin is exempt from the i18n coverage check of `validate --strict`.

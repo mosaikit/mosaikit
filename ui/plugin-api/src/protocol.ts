@@ -331,6 +331,9 @@ export interface UiContext {
   preference: 'light' | 'dark' | 'auto'
   /** high contrast chosen by the person (older hosts: absent); the theme variables already have it */
   contrast?: boolean
+  /** the texts of the page of this plugin in `lang`, when a language plugin brings them (`lang/ui/<plugin id>.json`:
+   *  English phrase to translation); read them with `msk.t`. Absent for `en`, `it` and older hosts */
+  texts?: Record<string, string>
   /** CSS variables of the theme */
   theme: Record<string, string>
 }
