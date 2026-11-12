@@ -7,7 +7,7 @@ import { PASSWORD, accessible, login, nav } from './support'
 const day = (n: number) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10)
 const frameOf = (page: Page) => page.frameLocator('iframe.plugin-frame')
 
-async function add(frame: FrameLocator, values: Record<string, string | boolean>) {
+async function add(frame: FrameLocator, values: Record<string, string | boolean>, closeDetail = false) {
   await frame.getByRole('button', { name: /^＋ New/ }).first().click()
   for (const [k, v] of Object.entries(values)) {
     const el = frame.locator(`[data-key="${k}"]`).first()
@@ -18,6 +18,14 @@ async function add(frame: FrameLocator, values: Record<string, string | boolean>
   await frame.getByRole('button', { name: 'Save' }).click()
   // saved: the item is in the list (the next one starts from a settled page)
   await expect(frame.locator('.msk-item', { hasText: String(Object.values(values)[0]) }).first()).toBeVisible()
+  // Tasks may open the detail of the new item over the list: close it, so the next one starts from a settled page
+  if (closeDetail) {
+    await frame
+      .locator('dialog.msk-modal[open]')
+      .waitFor({ state: 'visible', timeout: 1500 })
+      .then(() => frame.locator('body').press('Escape'))
+      .catch(() => undefined)
+  }
 }
 
 /** Nothing of the page scrolls sideways, and the header of the plugin stays at the top of the frame. */
@@ -39,7 +47,7 @@ test.describe.serial('15-plugin-layouts', () => {
     await expect(card).toContainText('Customer')
     // the new contact is open for reading: name, the address as a link, Edit
     await expect(frame.locator('.contact-read h2')).toHaveText('Ada Lovelace')
-    await expect(frame.locator('.contact-read a[href="mailto:ada@example.org"]')).toBeVisible()
+    await expect(frame.locator('.contact-read dd a[href="mailto:ada@example.org"]')).toBeVisible()
     await expect(frame.locator('[data-key="name"]')).toBeHidden()
     await frame.getByRole('button', { name: 'Edit' }).click()
     await expect(frame.locator('[data-key="name"]')).toHaveValue('Ada Lovelace')
@@ -58,21 +66,22 @@ test.describe.serial('15-plugin-layouts', () => {
     await login(page, 'Alfa', 'manager', PASSWORD)
     await nav(page, 'Tasks').click()
     const frame = frameOf(page)
-    await add(frame, { title: 'Send the offer', due: day(-3), priority: 'high' })
-    await add(frame, { title: 'Prepare the meeting', due: day(5), priority: 'medium' })
+    await add(frame, { title: 'Send the offer', due: day(-3), priority: 'high' }, true)
+    await add(frame, { title: 'Prepare the meeting', due: day(5), priority: 'medium' }, true)
     const late = frame.locator('.msk-item', { hasText: 'Send the offer' })
     await expect(late.locator('.msk-chip')).toHaveText('high')
     await expect(late.locator('.tdue.late')).toBeVisible()
     await expect(frame.locator('.msk-item', { hasText: 'Prepare the meeting' }).locator('.tdue.late')).toHaveCount(0)
     // the board: Overdue, Open and Done
     await frame.getByRole('button', { name: 'Board' }).click()
-    await expect(frame.locator('.msk-col')).toHaveCount(3)
-    await expect(frame.locator('.msk-col', { hasText: 'Overdue' }).locator('.msk-item', { hasText: 'Send the offer' })).toBeVisible()
-    await expect(frame.locator('.msk-col', { hasText: 'Open' }).locator('.msk-item', { hasText: 'Prepare the meeting' })).toBeVisible()
+    // (the board of Tasks 2.0 is the kit's kanban: columns `.msk-kcol[data-col]`, cards `.msk-kcard`)
+    await expect(frame.locator('.msk-kcol')).toHaveCount(3)
+    await expect(frame.locator('.msk-kcol[data-col="overdue"] .msk-kcard', { hasText: 'Send the offer' })).toBeVisible()
+    await expect(frame.locator('.msk-kcol[data-col="open"] .msk-kcard', { hasText: 'Prepare the meeting' })).toBeVisible()
     // ticking the box completes the task without opening it: it moves to Done
     await frame.getByRole('checkbox', { name: 'Mark as done: Send the offer' }).check()
-    await expect(frame.locator('.msk-col', { hasText: 'Done' }).locator('.msk-item', { hasText: 'Send the offer' })).toBeVisible()
-    await expect(frame.locator('.msk-col', { hasText: 'Done' }).locator('.task.done')).toHaveCount(1)
+    await expect(frame.locator('.msk-kcol[data-col="done"] .msk-kcard', { hasText: 'Send the offer' })).toBeVisible()
+    await expect(frame.locator('.msk-kcol[data-col="done"] .msk-kcard')).toHaveCount(1)
     await pinned(frame)
     await accessible(page, 'tasks')
     // the choice of view is kept

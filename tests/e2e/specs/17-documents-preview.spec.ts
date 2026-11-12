@@ -34,7 +34,7 @@ test.describe.serial('17-documents-preview', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('./#/t/docsco/p/com.mosaikit.files')
     const frame = page.frameLocator('iframe.plugin-frame')
-    await frame.locator('input[type="file"]').setInputFiles([
+    await frame.locator('input[type="file"]:not([webkitdirectory])').setInputFiles([
       { name: 'pic.png', mimeType: 'image/png', buffer: PNG },
       { name: 'note.txt', mimeType: 'text/plain', buffer: Buffer.from('hello text preview') },
       { name: 'doc.pdf', mimeType: 'application/pdf', buffer: PDF },
@@ -91,7 +91,7 @@ test.describe.serial('17-documents-preview', () => {
     // few rows: no scrollbar in the table; many rows: it shows
     const table = frame.locator('.fm-table')
     await expect(table).not.toHaveAttribute('data-scrolls', /.*/)
-    await frame.locator('input[type="file"]').setInputFiles(Array.from({ length: 30 }, (_, i) => ({ name: `bulk-${String(i).padStart(2, '0')}.txt`, mimeType: 'text/plain', buffer: Buffer.from('x') })))
+    await frame.locator('input[type="file"]:not([webkitdirectory])').setInputFiles(Array.from({ length: 30 }, (_, i) => ({ name: `bulk-${String(i).padStart(2, '0')}.txt`, mimeType: 'text/plain', buffer: Buffer.from('x') })))
     await expect(table).toHaveAttribute('data-scrolls', '')
     await frame.locator('.fm-table tbody tr').first().click()
 
@@ -107,7 +107,7 @@ test.describe.serial('17-documents-preview', () => {
     await page.setViewportSize({ width: 1440, height: 900 })
     await page.goto('./#/t/docsco/p/com.mosaikit.files')
     const frame = page.frameLocator('iframe.plugin-frame')
-    await frame.locator('input[type="file"]').setInputFiles(Array.from({ length: 110 }, (_, i) => ({ name: `page-${String(i).padStart(3, '0')}.txt`, mimeType: 'text/plain', buffer: Buffer.from('x') })))
+    await frame.locator('input[type="file"]:not([webkitdirectory])').setInputFiles(Array.from({ length: 110 }, (_, i) => ({ name: `page-${String(i).padStart(3, '0')}.txt`, mimeType: 'text/plain', buffer: Buffer.from('x') })))
     const rows = frame.locator('.fm-table tbody tr.it')
     const count = frame.locator('.fm-foot .msk-count')
     // the first page only, with its foot

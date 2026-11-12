@@ -725,6 +725,7 @@ The language plugin `com.mosaikit.lang-es` translates the whole shell (same keys
 | Id | Steps | Expected | Twin |
 |---|---|---|---|
 | LANG-01 | Choose **Español** in Account › Appearance and language, as Administrator and as Tenant Manager; visit Home, Overview, Manage, Plugins, Shares, Usage, Log, Settings, Account and, as Administrator, System | No English text is left in the shell (apart from names, brands and technical terms); the plugin names and the labels of the fields come in Spanish; the texts inside the iframe of a plugin may stay in English | e2e `14-lang-es-coverage.spec.ts` + manual |
+| LANG-02 | Open the language menu of the top bar and choose, one after the other, Español, Português, Français, Nederlands, العربية, 中文 and Русский; open Account | Every language is offered by its own name; the page takes the language (`lang`) and, for Arabic, the direction right to left (`dir`); the title of the page is in that language; no accessibility violation in any of them; going back to English restores left to right | e2e `22-languages.spec.ts` + manual |
 | R2-06 | Open System and Monitoring as Administrator, and Settings, Usage, Account and Manage as Tenant Manager, at 2000 and 390 px; pick another subsection of each | The header shows the page and the selected subsection, «System › Administrators» (the page in a lighter weight, the subsection in bold, on one line, pinned like the rest of the header; the description line follows); picking another subsection changes the second part and the list at the left agrees. On the phone the page part shortens first and the subsection stays readable. A plugin page with a sub-navigation does the same through `pageHead({ section })` of plugin-api | Playwright (e2e `14-layout-apply`, and the check) |
 | R2-07 | As Administrator open System › Identity and appearance at 1440 and 390 px, in light and dark, and go through its tabs (Identity, Theme, Layout, Style, Languages, Top bar); scroll the page; choose another layout and **Save** (and the same as a Tenant Manager in Settings) | Nothing overflows, overlaps or is cut at either width or in either theme; the tabs stay under the header while the page scrolls; after **Save** the shell is drawn with the new layout at once, without reloading the page | Playwright (e2e `14-layout-apply`) |
 | R2-08 | Open System (or Settings, Account) with a short window and scroll the page; hover the list of sections | The list of sections stays where it is, does not scroll with the page, and has its own scrollbar when it does not fit, shown only under the mouse; the wheel scrolls it | Playwright (e2e `14-layout-apply`) |
@@ -1034,3 +1035,283 @@ A zip can be unpacked when it is uploaded; a folder of Files is reached by addre
 | FTREE-14 | Upload a file of more than 100 MB in Files (and one of more than 500 MB) | It goes up with a progress bar and appears when complete; nothing shows in the folder while it goes up; the bytes are those of the file | Vitest of Files (`sends a big file in pieces…`) and of the client (`files.uploadLarge`); kernel test `upload_in_pieces` (NOT VERIFIABLE in the browser run: needs a file of that size) |
 | FTREE-15 | Upload a zip of more than 400 MB and choose «Unpack here» | A message says it is too big to unpack and the zip goes up as a file | Vitest of Files (`…keeps a zip too big to unpack as a file`) |
 | FTREE-16 | Interrupt the network in the middle of a big upload and restore it | The piece that failed is sent again from where the server says the upload is; after three failures the upload is thrown away with the error | Vitest of the client (`does not send again a piece whose answer was lost…`) |
+
+## Tasks 2.0
+
+Tasks have a quick-add line, a list grouped by when things are due, a board and a week where a card is dragged to the day it will be done, a Markdown description with a check list, labels, a project and repetition. Twin in `tests/e2e/specs/21-tasks.spec.ts`.
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| TSK-01 | In **Tasks** type «Call Ana tomorrow !high #work @phone» in the line above the list and press **Add** | A task «Call Ana» appears in the group Next 7 days with a high chip, the project work and the label phone; the line is empty again and a toast confirms | Playwright |
+| TSK-02 | Add a task without a date and tick it; add «Water today every week» and tick it | The first moves to Done; the repeating one is not closed: it stays open with the date one week later | Playwright |
+| TSK-03 | Open the **Week** view, focus a card and press Alt and the right arrow (or drag it onto another day) | The card moves to the next day column and its date changes; the columns Overdue and Later do not accept cards; a screen reader announces the move | Playwright |
+| TSK-04 | **New task**, write a description with a check list («- [ ] one», «- [x] two»), save; open it and tick a box | The card shows the progress 1/3 and the reader a progress bar; ticking a box in the reader saves at once and the card shows 2/3 | Playwright |
+
+## Contacts 2.0
+
+Contacts are cards (with job, organization and tags) or an A–Z list, with a filter by tag, a reading panel with quick actions, vCard and CSV in and out, and a finder of duplicates. Twin in `tests/e2e/specs/21-contacts.spec.ts`.
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| CON-01 | **New contact** with a name, email, phone, job title, organization, a birthday and two tags; save; click the card | The card has a large avatar, «job · organization», the tags and, when the birthday is within 14 days, a «🎂» note; the panel has **Email** and **Call** buttons with the right links | Playwright |
+| CON-02 | Press a tag in the bar; press **All**; switch **Cards** / **List** | Only the people with that tag show; the list view shows the same people, grouped by letter, with organization, email and phone on a wide screen and only the name on a phone | Playwright |
+| CON-03 | **Export** › vCard and CSV; **Import** a .vcf and a .csv (one row with an invalid email) | Two files download; the import asks first, adds the valid people and says how many were skipped | Playwright |
+| CON-04 | Create two contacts with the same email (different case); press **Duplicates** | A dialog lists them as a group, each with **Open**; with no duplicates it says so | Playwright |
+
+## Notes 2.0
+
+Notes are written in Markdown (a toolbar over the text), drawn as such in the post-it, the list and the reading panel, with a check list that shows its progress; notes can be pinned, archived and exported. Twin in `tests/e2e/specs/21-notes.spec.ts`.
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| NOT-01 | **New note**, select a word and press **Bold**; type a check list («- [ ] milk», «- [x] bread»); **Save** | The reading panel shows the word in bold and a check list with a progress bar (1 of 2) | Playwright |
+| NOT-02 | Tick a box in the reading panel; close the panel | The progress changes at once and the post-it shows the new count (for example 2/3) | Playwright |
+| NOT-03 | Hover a post-it and press its pin; press it again | The pinned note moves first and keeps a pin mark, also in the list view; pressing again puts it back | Playwright |
+| NOT-04 | In the reading panel press **Export as Markdown**, then **Archive**; open **Notes › Archive** and **Restore** | A .md file downloads with the title and the text; the archived note leaves every list and is in the Archive page until restored | Playwright (the Archive page: manual) |
+
+## Real-time channels
+
+A plugin that declares `[permissions] realtime` opens live channels on its resources (`docs/architecture.md` §8.18). Twins: `crates/kernel/tests/realtime.rs` (both databases), `crates/server/tests/http.rs` (`realtime_channel_over_http`), `ui/host/src/bridge.test.ts`; the path through the page of a plugin is exercised by the Chat checks once that plugin exists.
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| RT-01 | Install a plugin with `realtime = true`; open **Plugins** and the plugin | A red row «Real-time channels» in «What it asks» and a chip «Live messages and presence» in the brochure; a plugin without the key shows neither | Playwright (NOT VERIFIABLE until a plugin uses it) |
+| RT-02 | Two people see the same resource; one sends, the other listens | The message arrives at once with the sender's name; a person who does not see the resource gets «not found», a person who only reads gets «forbidden» when sending | Rust, HTTP |
+| RT-03 | Open two tabs as the same person, close one, then the other | The others see them join once and leave when the last tab closes | Rust |
+| RT-04 | Send more than 30 messages in a second, a message over 16 KB, open 21 channels | `rt_rate`, `rt_too_large`, `rt_rate` and nothing is delivered for the refused ones | Rust |
+| RT-05 | Remove the access of a listener to the resource, or sign them out, and wait 30 seconds | Their stream receives `closed` and ends | Manual |
+
+## Chat
+
+Channels on the left, a live conversation on the right: a message is saved in the channel (the history) and arrives at once for everyone who has the channel open. Twin in `tests/e2e/specs/21-chat.spec.ts` (two sessions of one person stand for two people; the access rules are in `crates/kernel/tests/realtime.rs`).
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| CHT-01 | In **Chat** press **＋**, name a channel and a topic, **Create** | The channel is listed and open, with its name and topic in the header; the composer is ready | Playwright |
+| CHT-02 | Open the channel in a second window (another person who has it shared, or the same person) and write «hello **world**» in the first | The message shows in both at once with «world» in bold; the second window did not reload | Playwright |
+| CHT-03 | Reply to a message from its buttons; edit your own message | The reply shows the quote of the original on both sides; the edited message shows «edited» on both | Playwright |
+| CHT-04 | React with 👍 from the menu, press the pill again | The count shows on both sides, and goes away when taken back | Playwright |
+| CHT-05 | Delete your message and confirm | It disappears on both sides; with the **manage** level a person can delete any message | Playwright |
+| CHT-06 | Share the channel read only with a colleague and open it as them | They read and see the live messages, the composer is disabled with a hint; with **write** they can talk | Manual |
+| CHT-07 | Start typing in one window | The other shows «<name> is typing…» for a few seconds; who is online shows in the header | Manual (needs two people) |
+| CHT-08 | Cut the network of one window for a minute and restore it | A banner says the connection was lost, then the messages sent meanwhile appear after reconnecting | Manual |
+| CHT-09 | At 390 px wide | The list and the conversation are shown one at a time, with a back button | Manual |
+
+## Meet
+
+A room is an item that opens inside the page with the Jitsi Meet service; the plugin declares `permissions.media` (the shell lets its frame pass the camera, the microphone and the screen on) and `frame_src` for the service. Twin in `tests/e2e/specs/21-meet.spec.ts`.
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| MET-01 | In **Meet** create a room with a name and a topic | A card with the name, the topic and **Join**; the owner also has Share, Edit and Delete | Playwright |
+| MET-02 | Press **Join** | The room opens inside the page with the meeting service (the pre-join screen with your name), the header says you are in the room; the browser asks for the camera and the microphone the first time | Playwright (the call itself: manual) |
+| MET-03 | Press **Leave** | Back to the rooms; no meeting frame is left | Playwright |
+| MET-04 | Share a room with a colleague and join from both windows | Both see each other in the call; the header shows who has the room open | Manual |
+| MET-05 | In **Chat** press **Start a call** | A new tab opens on the room of the channel and the channel gets a message with the link to join | Manual |
+| MET-06 | As Administrator open the plugin in **Plugins** | Red rows for «Camera and microphone», «Real-time channels» and «Embeds pages of https://meet.jit.si» | Manual |
+
+## Notes: editing together
+
+Two people who have the same note open for editing see each other type: the text is a Yjs document that travels on the real-time channel `doc` of the note; Save keeps the text as before. Twin in `tests/e2e/specs/21-notes.spec.ts` (two sessions of one person stand for two people; the document logic is in `notes/ui/src/collab.test.ts`).
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| NCO-01 | Two people open the same note and press **Edit**; one types at the end | The other sees the letters appear in the text field within a second, without losing their own cursor | Playwright |
+| NCO-02 | Both type at the same time, one at the start and one at the end | Nothing is lost and both fields end with the same text | Playwright |
+| NCO-03 | One person presses **Save** | The note shows the shared text; the other can save too and the text stays the same | Playwright |
+| NCO-04 | With a colleague in the note, a bar above the text says «Editing together with <name>» | The bar shows their avatar and name, and goes away when they leave | Manual (needs two people) |
+| NCO-05 | Open a note of more than 8000 characters for editing with a colleague | A notice says it is too long to edit together; nothing is sent | Manual |
+| NCO-06 | Cut the network of one editor, type, restore it | The two texts are merged after reconnecting, with the edits of both | Manual |
+
+## Announcements
+
+A notice board: notices with a level and a period, urgent and pinned first, and a confirmation of reading. Plugin `com.mosaikit.announcements`; the confirmations are rows a reader writes (`[[tables]]` of the manifest).
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| ANN-01 | Open **Announcements** with no notices | The illustrated empty state with the primary action «New notice» | e2e `30-announcements.spec.ts` + manual |
+| ANN-02 | Publish an urgent notice with Markdown text, an information one and a pinned one | Each shows its level in words; the pinned one is first, then the urgent one, then the information one; the text is drawn as Markdown, never as HTML | e2e `30-announcements.spec.ts` |
+| ANN-03 | Publish a notice that ended in the past; use the filters Current, Upcoming, Past and All | Only the current ones are in Current; the ended one is in Past; Upcoming is empty with a message; All shows every notice | e2e `30-announcements.spec.ts` |
+| ANN-04 | On a notice that asks for confirmation press **I have read it**; open «Confirmed by 1» | The notice says «You confirmed», counts one confirmation and the list shows who confirmed and when; a second press is not possible | e2e `30-announcements.spec.ts` |
+| ANN-05 | Save a notice whose period ends before it starts | A clear message and nothing is saved | e2e `30-announcements.spec.ts` |
+| ANN-06 | Share a notice with a colleague who can only read it | They see it and can confirm it; they cannot edit or delete it; their confirmation shows to everyone who sees the notice | Manual |
+
+## Bookmarks
+
+A shared collection of web links with a note and tags. Plugin `com.mosaikit.bookmarks`; the address rules (http and https only, https assumed, host name as the title, tags clean) are a hook of the plugin.
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| BKM-01 | Open **Bookmarks** with no bookmarks | The illustrated empty state with the primary action «New bookmark» | e2e `31-bookmarks.spec.ts` + manual |
+| BKM-02 | Save a bookmark with an address, a title, a note and tags typed in mixed case | A card with a letter avatar, the title, the host name of the address, the note and the tags in lower case; **Open** opens the address in a new tab and nothing is fetched from the site | e2e `31-bookmarks.spec.ts` |
+| BKM-03 | Type in the search box a word of a title, of an address, of a note and of a tag; then a word that matches nothing | Only the matching cards stay; with no match a message with «Clear filters» that brings every card back | e2e `31-bookmarks.spec.ts` |
+| BKM-04 | Save the address `example.org/status` with no title | It is saved as `https://example.org/status` and the title is the host name `example.org` | e2e `31-bookmarks.spec.ts` |
+| BKM-05 | Click a tag in the filter row (with its count), then click it again | The first click shows only the bookmarks with that tag, the second shows all; several tags narrow the list | e2e `31-bookmarks.spec.ts` |
+| BKM-06 | Press the star of a card, then the **Favourites** filter | The star is filled and the card is a favourite; the filter keeps only the favourites | e2e `31-bookmarks.spec.ts` |
+| BKM-07 | Save the address `javascript:alert(1)` (and try `data:` and `file:` ones) | A clear message «only http and https addresses are allowed» and nothing is saved | e2e `31-bookmarks.spec.ts` |
+| BKM-08 | Edit a bookmark (change its title); delete another | The card shows the new title; Delete asks for confirmation and the card disappears | e2e `31-bookmarks.spec.ts` |
+| BKM-09 | Press **Copy link** on a card and paste elsewhere | A toast says «Link copied» and the pasted text is the address | Manual |
+| BKM-10 | Share a bookmark with a colleague who can only read it | They see it and can open and copy the link; they cannot edit, star, share or delete it | Manual |
+| BKM-11 | Open the KPI page of the tenant | «Status of the bookmarks» shows the total and the favourites (Italian: «Stato dei segnalibri», totale, preferiti) | Manual |
+| BKM-12 | Switch the language to Italian and to Spanish | The page, the form and the messages are translated (Segnalibri, Marcadores) | Manual |
+
+## Snippets
+
+A shared collection of reusable texts and pieces of code with tags, copied in one click. Plugin `com.mosaikit.snippets`; the rules of a snippet (title, content, kind, tags) are a hook of the plugin.
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| SNP-01 | Open **Snippets** with no snippets | The illustrated empty state with the primary action «New snippet» | e2e `32-snippets.spec.ts` + manual |
+| SNP-02 | Create a snippet of kind Shell with the tags «Ops» and «Deploy», then one with the default kind | The list shows each with its title, its kind as a small chip and the first line of the content; the tags are kept in lower case; the kind of the second is Text | e2e `32-snippets.spec.ts` |
+| SNP-03 | Type in the search box a word of a title, of a content and of a tag; then a word that is nowhere | Only the matching snippets stay in the list; with no match a short message and «Clear filters» appear, and the button brings every snippet back | e2e `32-snippets.spec.ts` |
+| SNP-04 | Choose a kind in the kind filter, then «All kinds» | Only the snippets of that kind are listed (a kind with none says so); all are back with «All kinds» | e2e `32-snippets.spec.ts` |
+| SNP-05 | Press a tag chip, then press it again | The chips show how many snippets carry each tag; the pressed chip filters the list and is marked as pressed; the second press removes the filter | e2e `32-snippets.spec.ts` |
+| SNP-06 | Select a snippet whose content has several lines, indentation and text such as `<b>you</b>`; use the arrow keys in the list | The content is shown in a monospaced block with its line breaks and spaces, and the tags are written as text, never drawn as HTML; Up and Down move the selection and show the snippet; only the line breaks at the very end of a content are dropped | e2e `32-snippets.spec.ts` |
+| SNP-07 | Press **Copy** on a snippet and paste somewhere else | The toast «Copied» appears and the clipboard holds exactly the content, with its line breaks | e2e `32-snippets.spec.ts` + manual |
+| SNP-08 | Edit a snippet (title, kind, content, tags); delete one and cancel the confirmation, then delete it for real | The changes show in the list and in the detail; Cancel keeps the snippet; the confirmation deletes it, and with the last one the empty state comes back | e2e `32-snippets.spec.ts` |
+| SNP-09 | Save a snippet with an empty content, with more than 12 tags, or with a tag longer than 30 characters | A clear message and nothing is saved | Manual (rules covered by the unit tests of the plugin) |
+| SNP-10 | Share a snippet with a colleague who can only read it | They see it and can copy it; they have no Edit, Share or Delete; with write access they can also edit it | Manual |
+| SNP-11 | Open **Snippets** on a narrow screen (phone width) | One pane at a time: the list; selecting a snippet shows it with «Back to the list» above it | Manual |
+| SNP-12 | Open the KPI «Snippets by kind» of the tenant | One row per kind with the number of snippets of that kind | Manual |
+
+## Polls
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| POL-01 | Open **Polls** with no polls | The illustrated empty state with the primary action «New poll» | e2e `33-polls.spec.ts` + manual |
+| POL-02 | Create a poll with a question and three options | It appears in the list as Open with its question; opening it shows the three options as radio buttons | e2e `33-polls.spec.ts` |
+| POL-03 | Choose an option and press **Vote** | The results show bars with percentage and number of votes (100% for the choice), the name of the voter under it, and the button changes to «Change my vote» | e2e `33-polls.spec.ts` |
+| POL-04 | Open the same poll in two browser windows and change the vote in one | The bars of the other window move at once, without reloading | e2e `33-polls.spec.ts` |
+| POL-05 | Create a poll with «Allow more than one choice» and tick two options | The options are checkboxes; every ticked option counts | e2e `33-polls.spec.ts` |
+| POL-06 | Close a poll with **Close the poll**, look in Closed, then **Reopen** it | While closed, voting is disabled with a message and the poll is in Closed; after reopening one can vote again | e2e `33-polls.spec.ts` |
+| POL-07 | Save a poll with an empty option or two equal options | A clear message and nothing is saved; a poll always keeps from 2 to 12 options | e2e `33-polls.spec.ts` |
+| POL-08 | Share a poll with a colleague who can only read it; they vote | They see the poll and can vote and change their vote; they cannot edit, close or delete it; with «After the person votes» they see the bars only after voting; with «Only when the poll is closed» only after it closes | Manual |
+| POL-09 | Create a poll with «Hide who voted» and one with a past closing date | The first never shows names; the second is Closed and cannot be voted on | Manual |
+| POL-10 | Open a poll you manage and press «Public link» (next to «Share…»); read the hint under the buttons | The sharing dialog opens, where you can create the public link; the hint says that outsiders vote once for each browser and never see names; the button and the hint are not offered to someone without manage level | e2e `38-polls-public.spec.ts` |
+| POL-11 | As the Tenant Manager turn on the policy «Public commands», create the link of a poll that shows results «Always», open it in a private window with no session, choose an option and press «Vote» | The page shows the question, the options (round buttons, or boxes for a poll with more than one choice) and «Vote»; after the vote «Your vote is saved» and the results as bars with percent and number of votes | e2e `38-polls-public.spec.ts` |
+| POL-12 | In the same browser reload the page, or try to vote again | «You have already voted from this browser. A vote cannot be changed.»; the choice is shown ticked and disabled and there is no «Vote» button; a second browser (another private window) can vote | e2e `38-polls-public.spec.ts` |
+| POL-13 | Vote from a second browser for another option, then look at the results on the public page | Both bars move; the total says «2 people voted»; no name, no list of voters and no word «visitor» is shown, whatever «Hide who voted» says | e2e `38-polls-public.spec.ts` |
+| POL-14 | Back in the signed-in session open the poll (also one with a named voter) | The owner sees every voter counted, and for the public ones one line «Visitors: N» instead of names; named voters are still listed unless the votes are hidden; the list of polls counts the visitors among the voters | e2e `38-polls-public.spec.ts` (visitors) + manual (named voters) |
+| POL-15 | Close the poll (or set a past closing date) and reload the public page | The page says «Closed» and «This poll is closed: voting is disabled.»; the options are disabled and there is no «Vote» button; with a vote sent before closing, the page says the poll closed before the vote | e2e `38-polls-public.spec.ts` |
+| POL-16 | Turn «Public commands» off for the tenant and reload the public page; turn it on and vote ten times a minute from the same link with different browsers | With the policy off: «This poll cannot take votes from a public link right now.»; over the limit of votes a minute: «Too many attempts. Wait a minute and try again.»; nothing is lost when the policy is turned on again | e2e `38-polls-public.spec.ts` (off) + manual (limit) |
+| POL-17 | Create polls with results «After the person votes» and «Only when the poll is closed»; open each link in a new browser, vote, and look at the page; switch the browser language to Italian and Spanish; look at the page at 390 px wide and in dark mode | «After the vote»: no bars before the vote, bars after it; «When closed»: only the message «The results appear when the poll is closed.» until the owner closes it; texts follow the browser language; the page works with the keyboard, is readable at 390 px and in light and dark | manual |
+
+## Approvals
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| APR-01 | Open **Approvals** with no requests | The illustrated empty state with the primary action «New request» | e2e `35-approvals.spec.ts` + manual |
+| APR-02 | Send a request with a title, details, an amount and a person found with the approver search (type part of the name, pick the person) | The request is listed with the state chip «Pending» written in words, the amount, who asked and when, and the approvers as avatars with a mark («…» while they have not decided); the dialog «Request sent» offers «Share…» and «Later» | e2e `35-approvals.spec.ts` |
+| APR-03 | As an approver whose turn it is, open the tab «To decide» | The request is listed with «Your turn», and the header shows the badge «1 to decide»; when nothing is left the empty state says «Nothing to decide» and the badge disappears | e2e `35-approvals.spec.ts` |
+| APR-04 | Open the request and press «Reject» with no comment | A message asks why you reject; nothing is saved and the request stays Pending | e2e `35-approvals.spec.ts` |
+| APR-05 | Approve with a comment | The state becomes «Approved», «Approve» and «Reject» disappear, the history shows who decided, when and the comment (also on the card in «All»); a second decision is not possible | e2e `35-approvals.spec.ts` |
+| APR-06 | As the owner, press «Cancel the request» and confirm | The state becomes «Cancelled» and the request leaves «To decide»; «Keep it» leaves it unchanged; a request already approved or rejected cannot be cancelled | e2e `35-approvals.spec.ts` |
+| APR-07 | Create a request with the mode «Everybody must approve» and two approvers; each decides in turn; then try the mode «One approval is enough» and «One after the other» | With everybody: it stays Pending until both approve and one rejection closes it as Rejected; with one is enough: the first approval closes it as Approved; in sequence only the next approver sees the buttons, the others see it as «not yet their turn» | Manual (rules covered by the unit tests of the plugin) |
+| APR-08 | Send a request with no title, with no approver, with more than 10 approvers or with the same person twice | A clear message and nothing is saved (the approvers and the mode of an existing request cannot be changed either) | Manual (rules covered by the unit tests of the plugin) |
+| APR-09 | Share a request with an approver (read access) and let them decide; keep another session open on the same request | The approver sees the request in «To decide» and can approve or reject; the other session refreshes by itself when the decision is made; a person who is not in the list of approvers has no buttons | Manual |
+| APR-10 | Edit a request (title, details, amount) and delete one | The changes show in the list and the detail; the approvers stay as they were; Delete asks for a confirmation | Manual |
+| APR-11 | Open **Approvals** on a narrow screen (phone width) | The header wraps, the cards use the full width and the detail dialog fits the screen | Manual |
+| APR-12 | Open the KPI «Status of the requests» of the tenant | One row with the number of requests, of cancelled requests and of requests with at least one decision | Manual |
+
+## Surveys
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| SUR-01 | Open **Surveys** with no surveys | The illustrated empty state with the primary action «New survey» | e2e `34-surveys.spec.ts` + manual |
+| SUR-02 | Create a survey with a question that has no text (and, separately, a quiz question that gives points but has no correct answer) | A clear message such as «Question 1 needs a text»; the dialog stays open and nothing is saved | e2e `34-surveys.spec.ts` |
+| SUR-03 | Build a quiz with a title, a pass mark, a «One answer» question, a «Several answers» question (add a third option) and a «Free text» question; mark the correct options and the points; move a question down and up with the buttons, using only the keyboard | The survey card shows «Open», the number of questions and «0 responses»; the order of the questions is kept; every control has a name read by a screen reader | e2e `34-surveys.spec.ts` + manual |
+| SUR-04 | Answer the quiz (a wrong choice, the exact set in the multi question, a text) and press **Submit**; try first to submit leaving a required question empty | The progress bar follows the answers; an empty required question is refused with its number; after the submit the score («3 of 5 points (60%)») and «Passed» or «Not passed» are shown, with right or wrong per question and the correct answer of the wrong ones; a survey that is not a quiz shows only a thank-you | e2e `34-surveys.spec.ts` |
+| SUR-05 | Answer the same survey a second time (for example from a second tab) | The second submit is refused with the message «you have already answered this survey»; the first answers are kept and the card shows «Answered» with no «Answer» button | e2e `34-surveys.spec.ts` |
+| SUR-06 | As the author open **Results** | A bar per option with the count and the percentage, the correct options marked in a quiz, the average and a bar per value for a scale, the list of text answers and the table of respondents with their score | e2e `34-surveys.spec.ts` |
+| SUR-07 | Press **Export CSV** in the results | A file `<title>.csv` is downloaded with a header (respondent, date, score columns for a quiz, one column per question) and one row per respondent; options are written by their words, and a cell that starts with `=`, `+`, `-` or `@` is prefixed with `'` | e2e `34-surveys.spec.ts` (+ unit tests of the CSV) |
+| SUR-08 | Share a survey with a colleague who can only read it, and let them answer it | They see the survey, the «Answer» button and, after answering, «My result» with their own score only; they have no Results of the others, Edit, Share or Delete; the author sees the response in the table | Manual |
+| SUR-09 | Close a survey (Edit, «Closed») or set «Closes on» to a past day; try to answer it | It moves to the Closed filter with the «Closed» chip, it has no «Answer» button and a submit from an open page is refused with «this survey is closed» | Manual |
+| SUR-10 | Open the KPI «Status of the surveys» of the tenant | One row with the number of surveys, the open ones and the responses | Manual |
+| SUR-11 | Edit a quiz and open it again; as a colleague who can only read it, open the survey and look at the data the plugin receives (browser tools, or the API of the plugin) before submitting | The author finds the correct options ticked in the builder; the reader's data has the questions, options and points but never the correct answers, which appear only in the result of their own submit | e2e `34-surveys.spec.ts` (builder round trip, `data-has-key="false"` while answering) + manual (API) |
+| SUR-12 | Save a quiz without marking any correct option | The builder warns that every answer will score 0 (a note while editing and a message after saving); answering such a quiz gives 0 of 0 points | Manual (covered by the unit tests of the plugin) |
+
+## Dashboard
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| DSH-01 | Open **Dashboard** for the first time, with Tasks (and other apps with widgets) on | A board «My dashboard» exists with every widget the apps offer; the card «Open tasks» shows a big number, and the number counts the tasks the person has open (never the tenant's tasks) | e2e `36-dashboard.spec.ts` + manual |
+| DSH-02 | Press «Edit», move a widget down with ↓, untick the last widget, press «Save»; reload the page | The cards follow the new order and the unticked widget is gone; after the reload the same order is shown | e2e `36-dashboard.spec.ts` |
+| DSH-03 | Press «＋ New board», give it a name, tick one widget, choose 2 columns and save; switch between the two boards with the board selector | The new board shows only that widget in two columns; each board keeps its own arrangement when switching | e2e `36-dashboard.spec.ts` |
+| DSH-04 | Untick every widget of a board and save; with no app offering a widget the page also has an empty state | An illustrated empty state with the action «Choose widgets» (for a board without widgets) or an explanation that apps add widgets by themselves (no widget offered) | e2e `36-dashboard.spec.ts` + manual |
+| DSH-05 | Delete the second board; share a board with a colleague and open it as the colleague | The board disappears from the selector and the first one stays; the colleague sees the shared board but the widgets show the colleague's own data | e2e `36-dashboard.spec.ts` (delete) + manual (share) |
+| DSH-06 | Look at a number widget with a tone (for example overdue tasks) and at a list widget with more than six items; switch the language to Italian and Spanish | The tone is written in words with a symbol, not only a colour; a list shows six rows and «＋N more»; the texts of each widget follow the language, English when a language is missing | manual |
+| DSH-07 | Make one app fail (turn its plugin off for the tenant or break its widget); press «Refresh»; leave the page open for a minute in a visible tab and in a hidden tab | The other widgets still show; the failing one says it is not available; the page refreshes by itself every minute only while it is visible | manual |
+
+## Forms
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| FRM-01 | Open **Forms** the first time, with no forms | An illustrated empty state (a sheet with lines) with the title, a short text and the primary action «＋ New form»; the filter Open / Closed / All is above | e2e `37-forms.spec.ts` |
+| FRM-02 | Press «＋ New form», give it a title, press «＋ Add field» and press «Create» without writing the label of the field | A message «Field 1 needs a label» and the focus on that label; nothing is saved; the same for a choice with fewer than 2 options, an empty or repeated option and a most-answers value outside 1 to 5000 | e2e `37-forms.spec.ts` |
+| FRM-03 | Build a form with a short text (required), a choice with two options and a required email; tick «Open», write a thank-you message and press «Create». Move a field with ↑ ↓, remove one, change a choice into a date | The card shows the title, the chip «Open», «3 fields», the author and the introduction; ↑ ↓ keep the focus on the same button; the options appear only for a choice or several choices; a form takes at most 30 fields and a field at most 12 options | e2e `37-forms.spec.ts` |
+| FRM-04 | Press «Fill in» on the card; press «Send» with the required fields empty, then with a wrong email, then correctly | The form lists what is missing in a summary («Name is required», «Email: enter an email address…») and under each field, and moves the focus to the first one; after a correct answer the thank-you message you wrote; the card now says «Answered» and the form cannot be answered twice by the same person | e2e `37-forms.spec.ts` |
+| FRM-05 | Open the tab «Answers» of the form | «Answers: N», the counts per option as bars with percent, and a table with one row per answer, the newest first, with the name of who answered; a person with only read level does not see the tab | e2e `37-forms.spec.ts` |
+| FRM-06 | As the Tenant Manager turn on the policy «Public commands»; on the card of a form you manage press «Public link» | The sharing dialog opens, where you create the public link; the button is not offered to someone without manage level | e2e `37-forms.spec.ts` (link) + manual (button) |
+| FRM-07 | Open the public link in a private window with no session; press «Send» with the required fields empty, then with a wrong email | The page shows the title, the introduction and the fields with their labels and help texts; the errors are listed in a summary announced by a screen reader and shown under each field; nothing is sent; the page shows neither the answers of others nor how many there are | e2e `37-forms.spec.ts` |
+| FRM-08 | Fill in the public page correctly and press «Send» | The thank-you message of the form; in the signed-in session the answers table has the new row with the name «visitor» and the count of the card goes up | e2e `37-forms.spec.ts` |
+| FRM-09 | In the same private window reload the page and send another answer | «You have already answered this form.»; another browser (a different private window) can still answer | e2e `37-forms.spec.ts` |
+| FRM-10 | On «Answers» press «Export CSV» and open the file in a spreadsheet; send an answer whose text starts with `=` | A file with a header (name, date, one column per field) and one row per answer, opens with the accents right; the text starting with `=` is shown as text and never runs as a formula | e2e `37-forms.spec.ts` (rows) + manual (spreadsheet) |
+| FRM-11 | As the owner press «Delete» on one answer and confirm; then try the same as a person with only write level | The answer disappears and the count goes down; a person who is not a manager of the form has no «Delete» button | e2e `37-forms.spec.ts` (manager) + manual (writer) |
+| FRM-12 | Edit the form and untick «Open» (or set a past closing date); reload the public page and the «Fill in» tab | The card says «Closed»; the public page says «This form is closed: it is not taking answers.» with no «Send» button; a form that reached its most answers says it has received all it can take | e2e `37-forms.spec.ts` |
+| FRM-13 | Turn «Public commands» off for the tenant and reload the public page; send ten answers in a minute with different browsers | With the policy off: «This form is not available: the organisation has not allowed public forms.»; over the limit: «Too many requests. Wait a minute and try again.»; nothing is lost when the policy is turned on again | e2e `37-forms.spec.ts` (off) + manual (limit) |
+| FRM-14 | As the Administrator open **Plugins**, choose Forms and read «What it asks» | The list says the plugin has public commands and marks `public_submit` with «adds data» (in red), `public_form` without it; the reading command is described as reading the form and never the answers | manual |
+| FRM-15 | Open the public page in Italian and Spanish browsers, at 390 px wide, in light and dark mode and with the keyboard only | The texts follow the browser language (English when it is neither); the page is readable and has no horizontal scroll at 390 px; every field is reachable with Tab in order and has a visible focus; the hidden spam field is never reached by Tab | manual + e2e `37-forms.spec.ts` (axe in light, dark and with errors) |
+
+## Projects
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| PRJ-01 | Open **Projects** with no project yet | An illustrated empty state with the title «No projects yet», a line of text and the primary action «＋ New project» | e2e `39-projects.spec.ts` |
+| PRJ-02 | Press «＋ New project», write a name and press «Create» | The project opens on its board with the three columns «To do», «Doing» and «Done», its status «Active» in words and «No tasks yet» in the progress header; an empty name is refused with «Write a name» | e2e `39-projects.spec.ts` |
+| PRJ-03 | On the board write a title in «Add a task to To do» and press Enter, three times | Each task appears in the first column; the header says «0 of 3 tasks done»; the same tasks are in the **Tasks** plugin with the name of the project (check «▣ name»), and a person who may only read the project sees no field to add | e2e `39-projects.spec.ts` |
+| PRJ-04 | On a card press «Move to…» and choose another column; then drag a card with the mouse and, with the keyboard, focus a card and press Alt+Arrow Right | The card goes to the chosen column and a message says so; dragging and the keyboard do the same; moving a card to the last column does **not** complete the task (the progress does not change); a reader has no «Move to…» and cannot drag | e2e `39-projects.spec.ts` («Move to…») + manual (drag, keyboard) |
+| PRJ-05 | Mark a task of the project as done in **Tasks**, then reopen the project | The progress bar and the header («1 of 3 tasks done · 33% complete») follow the done tasks; the card shows «✓ Done» and sits in the last column when it was never placed | e2e `39-projects.spec.ts` |
+| PRJ-06 | On «Milestones» add a milestone with a past date and another one in the future; tick the first | An empty state first; the past one carries the word «Overdue» until it is ticked as done; edit and remove (with confirmation) work; a reader sees the list without the buttons | e2e `39-projects.spec.ts` |
+| PRJ-07 | On «Sprints» add a sprint that contains today and give a task to it with the select on its row | The sprint is marked «Current», shows its dates and «1 of 1 done», its own progress bar, and lists the task; tasks with no sprint are listed under «Unassigned»; a sprint that ends before it starts is refused | e2e `39-projects.spec.ts` |
+| PRJ-08 | Create a task in **Tasks** with no project; in the project press «Add existing tasks…», search for it, tick it and press «Add to project» | The dialog lists only open tasks that belong to no project; the task appears in the first column and in Tasks carries the name of the project; «Pick at least one task» when nothing is ticked | e2e `39-projects.spec.ts` |
+| PRJ-09 | Open the list of projects; use the filter by status | Each card shows the name, the status in words, the progress bar with «x of y tasks done», the next milestone with its date and the dates of the project; a status with no project shows «No project with this status.» | e2e `39-projects.spec.ts` |
+| PRJ-10 | On «Details» enter one column only, then three names (one per line), change the status and save; rename the project | One column: «a board has from 2 to 8 columns»; the new columns show on the board and the cards of removed ones go back to the first column; the status chip changes; after a rename the tasks you can change follow the new name | e2e `39-projects.spec.ts` (columns, status) + manual (rename) |
+| PRJ-11 | Turn the **Tasks** plugin off for the tenant (or use an installation without it) and open a project | The board says «Install the Tasks plugin» with a short explanation instead of an error; the list still opens, without progress and with the note «Progress needs the Tasks plugin.» | manual |
+| PRJ-12 | Share a project with a person at read level and with another at write level; each opens **Projects** | Both see the project; the reader sees the board but cannot add, move, edit or attach; the writer can arrange the board; both see only the tasks they may already see in Tasks (the counts can differ) | manual |
+| PRJ-13 | Delete the project from «Details» (Share… and Delete are offered to a manager only) | After confirming, the project is gone from the list and in the trash; its tasks stay in Tasks with the old project name | manual |
+| PRJ-14 | Open Projects in Italian and Spanish, at 390 px wide, in light and dark mode and with the keyboard only | The texts follow the language of the host; the board scrolls sideways inside its frame and the page has no horizontal scroll; every control is reachable with Tab with a visible focus; no colour alone carries a state (status, overdue, done are words) | manual + e2e `39-projects.spec.ts` (axe on the list, board, milestones, sprints and details) |
+
+## Calendar
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| CAL-01 | Open **Calendar** | The month view with six weeks, Monday first, today highlighted (a filled day number, `aria-current`), the title of the month, the buttons Today, previous and next, the segmented control Month / Week / Day, the switch «Show task due dates» (on), «My invitations» and «＋ New event». With no events and no tasks a hint with the calendar illustration shows below the grid, without blocking it | e2e `40-calendar.spec.ts` + manual (hint) |
+| CAL-02 | Press «＋ New event», write a title, choose a start time (for example 10:15) and press «Create event» | The event is a chip on today with its time and title («10:15 …») and a colour bar; the end time is filled one hour after the start; the dialog says that times are local times with no time zone conversion; a day with more than three items shows «+N more», which opens a list of all of them | e2e `40-calendar.spec.ts` + manual (+N more) |
+| CAL-03 | Create an event with «Every week», open the Week view and press next | The series shows on the same weekday in the week of today and in the next week; «Every month» on the 31st falls on the last day of shorter months and «Every year» on 29 February on the 28th in common years (unit tests); «Repeat until» stops the series; a multi-day event shows on each day it covers | e2e `40-calendar.spec.ts` (weekly) + Rust unit tests |
+| CAL-04 | Open the Week and the Day views | The time grid of 00:00-24:00 with the all-day row on top, the events at their hour (48 px an hour), overlapping events side by side, the line of the current time in today's column, and a click on an empty slot opens a new event at that hour | e2e `40-calendar.spec.ts` (hours, line) + manual (slot click, overlap) |
+| CAL-05 | Create an event and invite a person found with «Invite a person» (several, each removable), then save | The dialog «Share the event with the invitees so they can see it» with the button «Share…», which opens the sharing dialog of the event | e2e `40-calendar.spec.ts` |
+| CAL-06 | As an invitee open **Calendar** | «My invitations» shows a badge with the number of events waiting for an answer, from today on; the list has quick answers Yes / Maybe / No; after answering the badge goes down | e2e `40-calendar.spec.ts` (the manager invites himself) + manual (another person) |
+| CAL-07 | Open an event: read the invitees and answer; press «Add to my calendar (.ics)» | The detail shows when, where, the details, the invitees with ✓ ✗ ? and the words coming / not coming / maybe, the counts and your answer, which you can change; the file downloaded is a valid iCalendar file with `BEGIN:VEVENT`, `SUMMARY`, `DTSTART`, `DTEND` and, for a series, an `RRULE`; «Export month (.ics)» downloads every event of the month | e2e `40-calendar.spec.ts` |
+| CAL-08 | Make a task with a due date today in **Tasks**; open the Calendar; turn «Show task due dates» off and on | The task is a small chip with a box and a tooltip «Task due: …» that opens nothing (it lives in Tasks); with the switch off the chips are gone; if Tasks is not installed or fails the calendar still opens and shows a short note | e2e `40-calendar.spec.ts` + manual (no Tasks) |
+| CAL-09 | Delete an event (and a series) from its detail | A confirmation, which for a series says that the whole series is deleted; the chips disappear; Edit, Share and Delete are offered only to who has the level (write, manage, manage); editing a series says that the whole series changes | e2e `40-calendar.spec.ts` + manual (levels) |
+| CAL-10 | Use the keyboard in the month: arrow keys, Enter, `t`, `m`, `w`, `d` | The arrows move the focus one day (or one week) and the grid follows into the next month; Enter opens the day view; `t` goes to today; `m`, `w`, `d` switch the view; nothing fires while typing in a field | manual |
+| CAL-11 | At 390 px wide, light and dark, Italian and Spanish | The month shows a dot per event and, below, the list of the selected day with a button to add an event; no horizontal scroll of the page; the week scrolls inside its own area; texts and day names follow the language; colours are never the only signal (each chip has its text) | manual + e2e `40-calendar.spec.ts` (axe on month, week and dialog) |
+| CAL-12 | As the Administrator open **Plugins**, choose Calendar and read «What it asks» | The plugin reads the people directory (invitees) and calls Tasks (due dates); the KPI «Status of the events» counts events and recurring events | manual |
+
+## Whiteboard
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| WBD-01 | Open **Whiteboard** with no boards | The illustrated empty state with the primary action «New whiteboard» | e2e `41-whiteboard.spec.ts` + manual |
+| WBD-02 | Press «New whiteboard», give it a title and press **Create** | The board opens in the editor with the toolbar (back, title, tools, colours, undo and redo, zoom, export, who is here, share) and an empty canvas | e2e `41-whiteboard.spec.ts` |
+| WBD-03 | Pick **Sticky note**, click the canvas and type a text; press Escape | A sticky note appears where you clicked, with the text wrapped inside it; double click or Enter on it edits the text again | e2e `41-whiteboard.spec.ts` |
+| WBD-04 | Draw a rectangle by dragging, move it by dragging, press **Undo**; also try the ellipse, text, arrow and pen tools, the colours, Ctrl+D, Delete, resize handles | Each object is drawn as expected; the move is undone and the rectangle goes back; a selection shows its handles; the pen stroke is smooth; Ctrl+Z and Ctrl+Shift+Z undo and redo | e2e `41-whiteboard.spec.ts` + manual |
+| WBD-05 | After a change wait for «Saved» (about 3 seconds), reload the page and open the board again | The objects are all there; leaving the board with the back button also saves | e2e `41-whiteboard.spec.ts` |
+| WBD-06 | Open the same board in two sessions and draw in one | The object, its text and its changes appear in the other without a reload, in both directions; an undo in one is undone in the other | e2e `41-whiteboard.spec.ts` |
+| WBD-07 | Move the mouse over the canvas in one session | In the other session a small coloured pointer with the name of the person follows, and the avatar of the person is among those who are here | e2e `41-whiteboard.spec.ts` + manual |
+| WBD-08 | Check the list and the editor with a screen reader or axe; use only the keyboard (Tab to the canvas, Tab and Shift+Tab between objects, arrows, Enter, Delete, `?`) | Every toolbar button has a name, the canvas is announced with the number of objects of each kind, the main actions work from the keyboard and the legend of shortcuts opens with `?`; no serious axe violation in light and dark | e2e `41-whiteboard.spec.ts` + manual |
+| WBD-09 | Share a board for reading only with another person and open it as that person | The board is drawn and follows live what the writers do, but there are no tools, no colours and no undo, the title cannot be edited and nothing the person tries changes the board; zooming and panning work | manual (unit tests of the reader rules) |
+| WBD-10 | Zoom with the wheel and the buttons (10% to 400%), pan with Space and drag, the middle button or the Hand tool, press «Fit to content»; on a touch screen pinch with two fingers | The view follows and stays within the limits; the pointer under the finger or the mouse stays where it was while zooming | manual |
+| WBD-11 | Export the board as **PNG** and as **SVG** | Two files named after the board are downloaded; they show every object on the paper with the chosen background, with a margin around | manual |
+| WBD-12 | Delete a board from the list | After the confirmation the board is gone and, if it was the last one, the empty state is shown | e2e `41-whiteboard.spec.ts` |
+| WBD-13 | Draw a board bigger than a frame of the live channel (a few hundred notes), then open it in a second session | The second session receives the board in pieces and shows all of it; no error is shown | manual (unit tests of the frames) |

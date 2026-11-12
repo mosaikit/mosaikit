@@ -60,7 +60,7 @@ test.describe.serial('10-search-profile-qa', () => {
     await page.keyboard.press('Escape')
     await page.getByRole('button', { name: 'Help', exact: true }).click()
     await page.getByRole('menuitem', { name: /What is new/ }).click()
-    await expect(page.getByRole('dialog', { name: /What is new/ })).toContainText('The shell')
+    await expect(page.getByRole('dialog', { name: /What is new/ })).toContainText('Files area')
     await page.keyboard.press('Escape')
     // "g" then "n": the notifications
     await page.keyboard.press('g')
@@ -161,7 +161,7 @@ test.describe.serial('10-search-profile-qa', () => {
     await page.reload()
     await page.getByRole('button', { name: 'Aiuto', exact: true }).click()
     await page.getByRole('menuitem', { name: /Novità della versione/ }).click()
-    await expect(page.getByRole('dialog', { name: /Novità della versione/ })).toContainText('La shell')
+    await expect(page.getByRole('dialog', { name: /Novità della versione/ })).toContainText('area File')
     await page.keyboard.press('Escape')
     await page.getByRole('button', { name: 'Aiuto', exact: true }).click()
     await page.getByRole('menuitem', { name: 'Guida di Mosaikit' }).click()

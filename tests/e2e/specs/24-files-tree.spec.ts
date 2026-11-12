@@ -69,7 +69,7 @@ test.describe.serial('24-files-tree', () => {
     await page.goto('./#/t/treeco/p/com.mosaikit.files')
     const frame = page.frameLocator('iframe.plugin-frame')
 
-    await frame.locator('input[type="file"]').setInputFiles([
+    await frame.locator('input[type="file"]:not([webkitdirectory])').setInputFiles([
       { name: 'tiles.zip', mimeType: 'application/zip', buffer: zip({ 'tileset.json': '{"asset":{"version":"1.1"}}', 'tiles/0/a.b3dm': '0123456789', '__MACOSX/._tileset.json': 'junk' }) },
     ])
     // the zip is not unpacked until the person chooses

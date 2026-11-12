@@ -110,7 +110,7 @@ export async function adminLogin(page: Page) {
   if (first) {
     const status = await page.evaluate(async () => {
       const s = await (await fetch('api/session')).json()
-      const r = await fetch('api/admin/settings', { method: 'PUT', headers: { 'content-type': 'application/json', 'x-csrf-token': s.csrf }, body: JSON.stringify({ values: { 'lang.enabled': ['en', 'it', 'es'] } }) })
+      const r = await fetch('api/admin/settings', { method: 'PUT', headers: { 'content-type': 'application/json', 'x-csrf-token': s.csrf }, body: JSON.stringify({ values: { 'lang.enabled': ['en', 'it', 'es', 'pt', 'fr', 'nl', 'ar', 'zh', 'ru'] } }) })
       return r.status
     })
     expect(status).toBe(200)

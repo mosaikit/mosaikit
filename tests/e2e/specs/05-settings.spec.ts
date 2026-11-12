@@ -3,6 +3,8 @@ import { PASSWORD, NEW_PASSWORD, adminLogin, fresh, login, logout, appearanceTab
 
 // Settings on three levels and the languages of the platform. Runs in order after the previous file (the state of the installation is shared).
 
+const PLUGIN_LANGUAGES = ['Español', 'Português', 'Français', 'Nederlands', 'العربية', '中文', 'Русский']
+
 test.describe.serial('05-settings', () => {
   test('settings on three levels: platform, tenant, person', async ({ page }) => {
     // two sign-ins of the Administrator: the second may wait for a new code of the second factor
@@ -144,10 +146,9 @@ test.describe.serial('05-settings', () => {
     await adminLogin(page)
     await nav(page, 'System').click()
     await appearanceTab(page, 'Languages and formats')
-    const spanish = page.getByRole('checkbox', { name: 'Español' })
     await page.getByRole('checkbox', { name: 'Italiano' }).click()
-    // the language plugin of Spanish is on the list too (the e2e names it once at the first sign-in)
-    if (await spanish.count()) await spanish.click()
+    // the language plugins are on the list too (the e2e names them once at the first sign-in)
+    for (const n of PLUGIN_LANGUAGES) if (await page.getByRole('checkbox', { name: n }).count()) await page.getByRole('checkbox', { name: n }).click()
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByText('Settings saved').last()).toBeVisible()
     // one language: nothing to choose in the bar
@@ -164,7 +165,7 @@ test.describe.serial('05-settings', () => {
     await nav(page, 'System').click()
     await appearanceTab(page, 'Languages and formats')
     await page.getByRole('checkbox', { name: 'Italiano' }).click()
-    if (await page.getByRole('checkbox', { name: 'Español' }).count()) await page.getByRole('checkbox', { name: 'Español' }).click()
+    for (const n of PLUGIN_LANGUAGES) if (await page.getByRole('checkbox', { name: n }).count()) await page.getByRole('checkbox', { name: n }).click()
     await page.getByRole('button', { name: 'Save' }).click()
     await expect(page.getByText('Settings saved').last()).toBeVisible()
     await expect(page.getByRole('button', { name: /Language:/ })).toBeVisible()
