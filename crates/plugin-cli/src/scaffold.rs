@@ -510,7 +510,7 @@ fn readme(
         ("src/lib.rs", "the logic (WASM): hooks, commands and their tests"),
         ("Cargo.toml", "the crate of the logic; it depends on `mosaikit-plugin-sdk`"),
         ("ui/", "the UI: `src/` (TypeScript), `package.json`, `tsconfig.json`, `vite.config.ts`; it depends on `@mosaikit/plugin-api`"),
-        ("lang/", "the texts: `host.json` for the shell, `plugins/<plugin id>.toml` for each app"),
+        ("lang/", "the texts: `host.json` for the shell, `plugins/<plugin id>.toml` for the manifest of each app, `ui/<plugin id>.json` for the texts inside its page"),
         ("layout/", "the arrangement of the shell (`layout.toml`) and its style (`layout.css`)"),
         ("WALKTHROUGH.md", "the walkthrough of this example"),
         (".oxlintrc.json", "the lint rules of the UI"),

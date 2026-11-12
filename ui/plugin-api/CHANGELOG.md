@@ -5,6 +5,7 @@ version and is removed in the next.
 
 ## Unreleased
 
+- `msk.t(phrase, vars?)` and `msk.ownTexts(tables)`; `UiContext.texts` (host: `lang/ui/<plugin id>.json` of the active language plugin, English phrase to translation): the texts inside the page of a plugin in the language of the person, `{name}` placeholders, the English phrase when there is no translation or the host is older. Also `fillText`. Plugin API unchanged (additive, opt-in).
 - `kanban`: the «nothing here» of an empty column is a `listitem` of its list (a list with no item failed the accessibility check `aria-required-children`). Visual no change.
 - `msk.publicCall(name, args)` also runs a public command declared with `write = true` (it may insert an answer, a vote); the call is the same. Additive.
 - `emptyState` art names `announcements`, `snippets`, `surveys`, `approvals` and `whiteboard`. Additive.

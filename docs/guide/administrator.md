@@ -102,7 +102,8 @@ English and Italian are built in. A **language plugin** (Plugins › kind **Lang
 person menu) next to the built-in ones, for the whole platform (unless **Languages offered** in
 Settings leaves a built-in language out: then only the languages listed are offered); turn the plugin off
 or uninstall it to withdraw the language (the people who chose it go back to English). It brings the texts of the shell and
-the names and labels of other plugins; the texts inside the screens of a plugin stay those of that plugin.
+the names and labels of other plugins and, for the plugins that read their texts through the platform, the texts inside their screens; a screen
+with no translation stays in English.
 Plugin authors: see the README of `mosaikit-plugins` (folder `lang/`).
 
 ## Sign-in of a tenant

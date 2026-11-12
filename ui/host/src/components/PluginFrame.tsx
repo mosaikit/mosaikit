@@ -33,12 +33,16 @@ interface Props {
   at?: string
 }
 
-/** Language, theme and mode to pass to the plugin (without `ui`, the ones of the page). */
-function uiContext(ui: Props['ui']) {
+/** Language, theme and mode to pass to the plugin (without `ui`, the ones of the page). With `pluginId`, also the texts
+ *  of its page in the language, when a language plugin brings them (`texts`, read by `msk.t`). */
+function uiContext(ui: Props['ui'], pluginId?: string) {
   const root = document.documentElement
   const dark = root.classList.contains('dark') || root.dataset.theme === 'dark'
+  const lang = ui?.lang ?? (root.lang || 'it')
+  const texts = pluginId ? pageTextsFor(lang, pluginId) : undefined
   return {
-    lang: ui?.lang ?? (root.lang || 'it'),
+    lang,
+    ...(texts ? { texts } : {}),
     preset: ui?.preset ?? (root.dataset.preset || 'mosaikit'),
     mode: ui?.mode ?? (dark ? 'dark' : 'light'),
     preference: ui?.preference ?? (dark ? 'dark' : 'light'),
@@ -137,10 +141,10 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
   useEffect(() => {
     const win = ref.current?.contentWindow
     if (!win || !loaded) return
-    const c = uiContext(shellRef.current)
+    const c = uiContext(shellRef.current, plugin.id)
     win.postMessage({ msk: 1, event: 'context', data: c }, origin)
     win.postMessage({ msk: 1, event: 'theme', data: c.theme }, origin)
-  }, [uiKey, loaded, origin])
+  }, [uiKey, loaded, origin, plugin.id])
 
   useEffect(() => {
     const onMessage = async (ev: MessageEvent) => {
@@ -165,7 +169,7 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
                 tenant: { slug: ctx.tenant.slug, name: ctx.tenant.name, role: ctx.tenant.role },
                 plugin: { id: plugin.id, version: plugin.version },
                 theme: themeVars(),
-                context: uiContext(shellRef.current),
+                context: uiContext(shellRef.current, plugin.id),
                 ...(ctx.perms ? { perms: ctx.perms[plugin.id] ?? [] } : {}),
                 ...(at ? { at: at.slice(0, 200) } : {}),
               },
