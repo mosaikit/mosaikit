@@ -45,4 +45,20 @@ test.describe.serial('Language plugins', () => {
     await page.getByRole('button', { name: /Language/ }).click()
     for (const { name } of LANGS) await expect(page.getByText(name, { exact: true })).toBeVisible()
   })
+
+  test('LANG-03 the page of a plugin speaks the language: the texts of lang/ui/<plugin id>.json come through msk.t', async ({ page }) => {
+    const ui = (code: string): Record<string, string> => JSON.parse(fs.readFileSync(path.join(ROOT, `lang-${code}`, 'lang', 'ui', 'com.mosaikit.files.json'), 'utf8'))
+    await login(page, 'Alfa', 'manager', PASSWORD)
+    for (const code of ['es', 'ar', 'en']) {
+      await page.evaluate((c) => localStorage.setItem('msk_lang', c), code)
+      await page.goto('./#/t/alfa/p/com.mosaikit.files')
+      await page.reload()
+      const frame = page.frameLocator('iframe.plugin-frame')
+      const word = code === 'en' ? 'New folder' : ui(code)['New folder']
+      await expect(frame.getByText(word).first()).toBeVisible()
+      // the page of the plugin takes the language and the direction too
+      await expect(frame.locator('html')).toHaveAttribute('lang', code)
+      await expect(frame.locator('html')).toHaveAttribute('dir', code === 'ar' ? 'rtl' : 'ltr')
+    }
+  })
 })

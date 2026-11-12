@@ -5,6 +5,7 @@ export { API_VERSION, checkHostApi, INCOMPATIBLE_API, isIncompatible } from './v
 export { BridgeError } from './bridge.ts'
 export type { Bridge } from './bridge.ts'
 export { Msk, connect, type RealtimeApi, type RealtimeChannel, type RealtimeOptions, type CrudClient, type ExtensionsClient, type TabClient } from './client.ts'
+export { fill as fillText, type Vars as TextVars } from './text.ts'
 export { mountCrud, errText, type CrudHandle, type CrudOptions, type CrudView, type CustomViewApi, type EditorCtx, type ItemCtx } from './crud-view.ts'
 export type {
   BandApi,

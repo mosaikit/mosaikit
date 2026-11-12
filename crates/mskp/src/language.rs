@@ -9,7 +9,11 @@
 //!   the shape of that plugin's `[i18n.<code>]` table (name, description, labels of fields, KPIs,
 //!   permissions…). A plugin that has its own `[i18n.<code>]` keeps it.
 //!
-//! The texts inside the UI of a plugin (its iframe) stay the business of that plugin.
+//! - `lang/ui/<plugin id>.json`: the texts inside the page of another plugin (its iframe) in this
+//!   language, a flat object from the English phrase to its translation (`{placeholders}` as in the
+//!   host texts). The shell hands it to the page, which reads it with `msk.t(phrase, vars?)`; a phrase
+//!   without a translation stays in English. A plugin that does not use `msk.t` keeps its own texts.
+//!
 //! `en` and `it` are built into the host and cannot be replaced by a plugin.
 
 use std::collections::BTreeMap;
@@ -22,12 +26,17 @@ use crate::{Error, Result};
 pub const HOST_FILE: &str = "host.json";
 /// The folder with the texts of the manifests of other plugins, inside the package.
 pub const PLUGINS_DIR: &str = "plugins/";
+/// The folder with the texts inside the pages of other plugins, one JSON file per plugin id.
+pub const UI_DIR: &str = "ui/";
 
 const MAX_HOST_BYTES: usize = 1024 * 1024;
 const MAX_HOST_TEXTS: usize = 6000;
 const MAX_TEXT_CHARS: usize = 1000;
 const MAX_PLUGIN_FILES: usize = 100;
 const MAX_PLUGIN_FILE_BYTES: usize = 200 * 1024;
+const MAX_UI_FILES: usize = 100;
+const MAX_UI_FILE_BYTES: usize = 512 * 1024;
+const MAX_UI_TEXTS: usize = 3000;
 
 /// A language the plugin brings, checked.
 #[derive(Debug, Clone, PartialEq)]
@@ -39,6 +48,8 @@ pub struct LanguagePack {
     pub host: BTreeMap<String, String>,
     /// id of a plugin → its texts in this language
     pub plugins: BTreeMap<String, Translation>,
+    /// id of a plugin → English phrase → translation, for the texts inside its page (`lang/ui/<id>.json`)
+    pub ui: BTreeMap<String, BTreeMap<String, String>>,
 }
 
 /// A code of a language: two or three lower case letters (`es`, `fr`, `pt`, `fil`), and not one of the
@@ -105,7 +116,26 @@ pub fn load_language(code: &str, name: &str, files: &BTreeMap<String, Vec<u8>>) 
         }
         plugins.insert(id.to_string(), tr);
     }
-    Ok(LanguagePack { code: code.to_string(), name: name.trim().to_string(), host, plugins })
+    let mut ui = BTreeMap::new();
+    for (path, bytes) in files.iter().filter(|(p, _)| p.starts_with(UI_DIR)) {
+        let id = path[UI_DIR.len()..].strip_suffix(".json").unwrap_or_default();
+        if !crate::manifest::is_plugin_id(id) {
+            return Err(bad(format!("{path}: the name must be the id of a plugin and end with .json")));
+        }
+        if ui.len() >= MAX_UI_FILES || bytes.len() > MAX_UI_FILE_BYTES {
+            return Err(bad(format!("{path}: too many or too large files of page texts")));
+        }
+        let m: BTreeMap<String, String> =
+            serde_json::from_slice(bytes).map_err(|e| bad(format!("{path}: {e}")))?;
+        if m.len() > MAX_UI_TEXTS {
+            return Err(bad(format!("{path}: at most {MAX_UI_TEXTS} texts")));
+        }
+        if let Some(k) = m.iter().find(|(k, v)| k.is_empty() || !text_ok(k) || !text_ok(v)).map(|(k, _)| k) {
+            return Err(bad(format!("{path}: invalid text «{}»", k.chars().take(40).collect::<String>())));
+        }
+        ui.insert(id.to_string(), m);
+    }
+    Ok(LanguagePack { code: code.to_string(), name: name.trim().to_string(), host, plugins, ui })
 }
 
 // ------------------------------------------------------------------ texts of the manifests
@@ -172,6 +202,33 @@ mod tests {
         assert!(load_language("es", "x", &files("{}", Some(("not an id", "name = \"x\"")))).is_err());
         assert!(load_language("es", "x", &files("{}", Some(("com.a.b", "unknown = 1")))).is_err());
         assert!(load_language("it", "x", &files("{}", None)).is_err());
+    }
+
+    #[test]
+    fn page_texts_are_read_and_checked() {
+        let mut f = files("{}", None);
+        f.insert(
+            "ui/com.mosaikit.files.json".into(),
+            br#"{"Upload": "Subir", "{n} files": "{n} archivos"}"#.to_vec(),
+        );
+        let p = load_language("es", "Español", &f).unwrap();
+        assert_eq!(p.ui["com.mosaikit.files"]["Upload"], "Subir");
+        assert_eq!(p.ui["com.mosaikit.files"]["{n} files"], "{n} archivos");
+        // no page texts: an empty map, as before
+        assert!(load_language("es", "x", &files("{}", None)).unwrap().ui.is_empty());
+        // a name that is not a plugin id, not JSON, not texts, a control character, an empty phrase
+        for (name, body) in [
+            ("ui/not an id.json", "{}"),
+            ("ui/com.a.b.toml", "{}"),
+            ("ui/com.a.b.json", "nope"),
+            ("ui/com.a.b.json", r#"{"a": 1}"#),
+            ("ui/com.a.b.json", r#"{"a": "b\u0007"}"#),
+            ("ui/com.a.b.json", r#"{"": "x"}"#),
+        ] {
+            let mut f = files("{}", None);
+            f.insert(name.into(), body.as_bytes().to_vec());
+            assert!(load_language("es", "x", &f).is_err(), "{name} {body}");
+        }
     }
 
     #[test]

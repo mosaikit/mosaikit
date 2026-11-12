@@ -1,5 +1,6 @@
 import { Bridge, BridgeError } from './bridge.ts'
 import { API_VERSION, checkHostApi } from './version.ts'
+import { translate, type Vars } from './text.ts'
 import type { RealtimeEvent, RealtimeMessage, RealtimePerson, RealtimeStatus, BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, Unzipped, UploadProgress, FolderSuggestion, FileInfo, FileTicket, UiContext, Values, WebProbe } from './protocol.ts'
 
 /** The extensions of the plugin on a resource (fields and actions other plugins add to its items). */
@@ -163,6 +164,24 @@ export class Msk {
    *  logic of the plugin enforce it anyway). With an older host, true. */
   can(key: string): boolean {
     return this.perms ? this.perms.includes(key) : true
+  }
+
+  private own: Record<string, Record<string, string>> = {}
+
+  /**
+   * The text in the language of the host. The key is the English phrase; `{name}` is replaced by `vars.name`. The
+   * translation comes from the language plugin (`lang/ui/<plugin id>.json`, passed in the `context`), then from the
+   * tables given to `ownTexts`; without one, the English phrase. Safe with an older host: the phrase itself.
+   */
+  t(phrase: string, vars?: Vars): string {
+    const lang = this.context?.lang ?? 'en'
+    return translate(phrase, vars, this.context?.texts, this.own[lang])
+  }
+
+  /** The translations the plugin carries itself, by language code (`{ it: { Upload: 'Carica' } }`): used by `t` when no
+   *  language plugin has the phrase. Lets a plugin keep its own `it` while the other languages come from plugins. */
+  ownTexts(tables: Record<string, Record<string, string>>) {
+    this.own = tables
   }
 
   /** Tells when the host changes language, theme or mode (already applied to `<html>`). */
@@ -459,7 +478,11 @@ export class Msk {
 /** @internal */
 export function applyContext(ctx: UiContext | undefined, root: HTMLElement = document.documentElement) {
   if (!ctx) return
-  if (/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(ctx.lang)) root.lang = ctx.lang
+  if (/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})?$/.test(ctx.lang)) {
+    root.lang = ctx.lang
+    // the languages written from right to left (the page of the host does the same)
+    root.dir = ['ar', 'he', 'fa', 'ur'].includes(ctx.lang.slice(0, 2)) ? 'rtl' : 'ltr'
+  }
   if (ctx.mode === 'light' || ctx.mode === 'dark') {
     root.dataset.mode = ctx.mode
     root.style.colorScheme = ctx.mode

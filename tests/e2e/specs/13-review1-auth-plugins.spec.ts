@@ -326,8 +326,10 @@ test.describe.serial('review round 1: auth and plugins', () => {
     // the list is public: only the languages of plugins, with their texts
     const list = (await (await page.request.get(`${BASE_URL}api/languages`)).json()) as { code: string; name: string }[]
     expect(list).toContainEqual({ code: 'es', name: 'Español' })
-    const es = (await (await page.request.get(`${BASE_URL}api/languages/es`)).json()) as { strings: Record<string, string> }
+    const es = (await (await page.request.get(`${BASE_URL}api/languages/es`)).json()) as { strings: Record<string, string>; ui: Record<string, Record<string, string>> }
     expect(es.strings['Sign in']).toBe('Iniciar sesión')
+    // the texts inside the pages of the plugins, by plugin id (an object even when the plugin has none)
+    expect(typeof es.ui).toBe('object')
     expect((await page.request.get(`${BASE_URL}api/languages/xx`)).status()).toBe(404)
   })
 })
