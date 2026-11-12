@@ -6,6 +6,10 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
 ## 1.0.13
 
+- Desktop (Windows): all'avvio e alla chiusura non lampeggiano più finestre di console: ogni processo di supporto del programma (`initdb`, `pg_ctl`, `pg_dump`, `icacls`) gira nascosto. I sidecar erano già avviati nascosti.
+- Desktop: solo «Open» del menu dell'icona (e il clic sull'icona) apre il browser; scegliere un'altra voce (Quit, Data folder...) non apre più una scheda.
+- Il file con le credenziali iniziali del primo avvio si chiama `initial-credentials.txt` (era `credenziali-iniziali.txt`); il menu dell'icona apre ancora il vecchio file di un'installazione precedente.
+
 - Comandi pubblici che scrivono: `[[public_commands]]` accetta `write = true` e `[[tables]]` accetta `insert_for = "visitor"`; chi visita un link pubblico può allora aggiungere righe (una risposta a un modulo, un voto) alle tabelle pensate per i visitatori, solo per l’elemento del link e senza mai modificarne o cancellarne una; 10 chiamate al minuto per link, mostrato all’Amministratore come «aggiunge dati».
 - Lingue scritte da destra a sinistra: la pagina prende la direzione (`dir`) dalla lingua (arabo, ebraico, persiano, urdu). I plugin di lingua ufficiali ora sono spagnolo, portoghese, francese, olandese, arabo, cinese e russo.
 - Canali in tempo reale: un plugin con `permissions.realtime` apre un canale su una risorsa con `msk.realtime.open` (presenza, messaggi a tutti o a una persona, un piccolo stato per persona, su SSE e POST); il kernel si limita a inoltrare, non salva nulla.
