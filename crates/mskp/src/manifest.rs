@@ -406,6 +406,11 @@ pub struct PublicCommandDecl {
     /// largest size of the arguments, in bytes (default and ceiling: [`MAX_PUBLIC_ARG_BYTES`])
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub max_arg_bytes: Option<usize>,
+    /// The command may WRITE, but only by inserting rows into the tables declared with `insert_for = "visitor"` (an
+    /// answer to a form, a vote): never update, delete or any other table. Sensitive: shown in red to the Administrator;
+    /// the calls of a visitor to a command that writes are limited more tightly. Needs `[requires] mosaikit = ">=1.0"`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub write: bool,
 }
 
 /// A contribution to a point (`[[contributes]]`): `point` names what it plugs into (reverse-DNS style,
@@ -455,13 +460,15 @@ pub const MAX_EMBEDS: usize = 8;
 /// person who can only read the resource write rows that are theirs: the insert needs `owner_column` to be the
 /// caller, and the change or the delete only reaches rows whose `owner_column` is the caller. For presence,
 /// comments, favourites and the like. A person never touches the row of another, and still needs to see the
-/// resource.
+/// resource. `insert_for = "visitor"` is the same and, besides, lets a visitor of a public link (no user) INSERT rows
+/// for the item of the link through a public command declared with `write = true`: the rows of the visitor are never
+/// changed or deleted by a visitor.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct TableDecl {
     /// the table, without the schema
     pub name: String,
-    /// only `"reader"`
+    /// `"reader"` or `"visitor"` (a reader, and a visitor of a public link that runs a public command with `write`)
     pub insert_for: String,
     /// the `uuid not null` column that holds the person who wrote the row (default `user_id`)
     #[serde(default = "default_owner_column")]
@@ -853,6 +860,18 @@ pub struct Permissions {
     /// `[requires] mosaikit = ">=1.0"`.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub directory: bool,
+    /// The plugin may use real-time channels (`msk.realtime` in the UI): ephemeral messages and presence between the
+    /// people who may see one of its resources, with the access rule of the resource (read to listen, write to send).
+    /// Nothing is stored by the kernel. Sensitive: the Administrator sees it when the plugin is installed. Default:
+    /// false. Needs `[requires] mosaikit = ">=1.0"`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub realtime: bool,
+    /// The frame of the plugin UI may pass the camera, the microphone and the screen to a page it embeds (`permissions.frame_src`):
+    /// a plugin that shows a meeting service. The shell adds `camera; microphone; display-capture` to the `allow` of the frame, and
+    /// the browser still asks the person. Sensitive: the Administrator sees it when the plugin is installed. Default: false. Needs
+    /// `[requires] mosaikit = ">=1.0"`.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub media: bool,
 }
 
 /// Most commands a plugin may declare in `permissions.run_commands`.
@@ -1609,8 +1628,8 @@ impl Manifest {
                     t.name, t.owner_column
                 ));
             }
-            if t.insert_for != "reader" {
-                return Err(format!("[[tables]] {}: insert_for must be \"reader\"", t.name));
+            if !matches!(t.insert_for.as_str(), "reader" | "visitor") {
+                return Err(format!("[[tables]] {}: insert_for must be \"reader\" or \"visitor\"", t.name));
             }
             if !seen.insert(t.name.clone()) {
                 return Err(format!("[[tables]]: '{}' is declared twice", t.name));
@@ -1664,6 +1683,12 @@ impl Manifest {
             if c.max_arg_bytes.is_some_and(|n| n == 0 || n > MAX_PUBLIC_ARG_BYTES) {
                 return Err(format!(
                     "public command '{}': max_arg_bytes must be between 1 and {MAX_PUBLIC_ARG_BYTES}",
+                    c.name
+                ));
+            }
+            if c.write && !self.tables.iter().any(|t| t.insert_for == "visitor") {
+                return Err(format!(
+                    "public command '{}': write = true needs a table with insert_for = \"visitor\" in [[tables]]",
                     c.name
                 ));
             }
@@ -2517,6 +2542,50 @@ target = \"https://svc:8080\"
     }
 
     #[test]
+    fn realtime_permission() {
+        let with = |v: &str| {
+            NOTES.replacen(
+                "hooks = [\"notes\"]",
+                &format!(
+                    "hooks = [\"notes\"]
+ realtime = {v}"
+                ),
+                1,
+            )
+        };
+        assert!(Manifest::from_toml(&with("true")).unwrap().permissions.realtime);
+        assert!(!Manifest::from_toml(&with("false")).unwrap().permissions.realtime);
+        assert!(!Manifest::from_toml(NOTES).unwrap().permissions.realtime);
+        assert!(Manifest::from_toml(&with("\"yes\"")).is_err());
+        let on = Manifest::from_toml(&with("true")).unwrap();
+        assert_eq!(serde_json::from_str::<Manifest>(&serde_json::to_string(&on).unwrap()).unwrap(), on);
+        let plain = serde_json::to_string(&Manifest::from_toml(NOTES).unwrap()).unwrap();
+        assert!(!plain.contains("realtime"), "{plain}");
+    }
+
+    #[test]
+    fn media_permission() {
+        let with = |v: &str| {
+            NOTES.replacen(
+                "hooks = [\"notes\"]",
+                &format!(
+                    "hooks = [\"notes\"]
+ media = {v}"
+                ),
+                1,
+            )
+        };
+        assert!(Manifest::from_toml(&with("true")).unwrap().permissions.media);
+        assert!(!Manifest::from_toml(&with("false")).unwrap().permissions.media);
+        assert!(!Manifest::from_toml(NOTES).unwrap().permissions.media);
+        assert!(Manifest::from_toml(&with("\"yes\"")).is_err());
+        let on = Manifest::from_toml(&with("true")).unwrap();
+        assert_eq!(serde_json::from_str::<Manifest>(&serde_json::to_string(&on).unwrap()).unwrap(), on);
+        let plain = serde_json::to_string(&Manifest::from_toml(NOTES).unwrap()).unwrap();
+        assert!(!plain.contains("media"), "{plain}");
+    }
+
+    #[test]
     fn directory_permission() {
         let with = |v: &str| {
             NOTES.replacen(
@@ -2536,6 +2605,36 @@ target = \"https://svc:8080\"
         assert_eq!(serde_json::from_str::<Manifest>(&serde_json::to_string(&on).unwrap()).unwrap(), on);
         let plain = serde_json::to_string(&Manifest::from_toml(NOTES).unwrap()).unwrap();
         assert!(!plain.contains("directory"), "{plain}");
+    }
+
+    #[test]
+    fn a_public_command_that_writes_needs_a_visitor_table() {
+        let ok = format!(
+            "{NOTES}
+[[tables]]
+name = \"answers\"
+insert_for = \"visitor\"
+[[public_commands]]
+name = \"answer\"
+description = \"adds an answer\"
+write = true
+"
+        );
+        let m = Manifest::from_toml(&ok).unwrap();
+        assert!(m.public_commands[0].write);
+        assert_eq!(m.tables[0].insert_for, "visitor");
+        assert_eq!(serde_json::from_str::<Manifest>(&serde_json::to_string(&m).unwrap()).unwrap(), m);
+        // a command that does not write says nothing about it in the JSON
+        let read = format!("{NOTES}\n[[public_commands]]\nname = \"r\"\ndescription = \"reads\"\n");
+        assert!(!serde_json::to_string(&Manifest::from_toml(&read).unwrap()).unwrap().contains("\"write\""));
+        // `write` without a table for visitors is refused, and so is any other value of insert_for
+        let alone =
+            format!("{NOTES}\n[[public_commands]]\nname = \"w\"\ndescription = \"x\"\nwrite = true\n");
+        assert!(Manifest::from_toml(&alone).unwrap_err().to_string().contains("insert_for = \"visitor\""));
+        let reader_only = format!("{NOTES}\n[[tables]]\nname = \"t\"\ninsert_for = \"reader\"\n[[public_commands]]\nname = \"w\"\ndescription = \"x\"\nwrite = true\n");
+        assert!(Manifest::from_toml(&reader_only).is_err());
+        let other = format!("{NOTES}\n[[tables]]\nname = \"t\"\ninsert_for = \"everybody\"\n");
+        assert!(Manifest::from_toml(&other).unwrap_err().to_string().contains("reader"));
     }
 
     #[test]

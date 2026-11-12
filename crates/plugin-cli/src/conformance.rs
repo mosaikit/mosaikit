@@ -167,7 +167,8 @@ fn permission_checks(m: &Manifest, used: &HostUse, from_source: bool, ui_uses_fi
     if used.service_key && m.service_keys.is_empty() {
         r.error(format!("the logic asks for a service key ({origin}) but there is no [[service_keys]]"));
     }
-    if used.call_plugin && p.calls.is_empty() {
+    // a plugin that collects contributions may call the contributors of its points as if they were in `calls`
+    if used.call_plugin && p.calls.is_empty() && p.contributions.is_empty() {
         r.error(format!("the logic calls another plugin ({origin}) but [permissions] calls is empty"));
     }
     for c in &used.called {

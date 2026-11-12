@@ -702,6 +702,9 @@ pub(crate) async fn call_depth(
 /// Calls per minute a public link allows on its public commands, and the tenant on all its links.
 const PUBLIC_CALLS_PER_LINK: u32 = 30;
 const PUBLIC_CALLS_PER_TENANT: u32 = 300;
+/// A public command that writes: calls a minute for a link and for a tenant (on top of the limits above).
+const PUBLIC_WRITES_PER_LINK: u32 = 10;
+const PUBLIC_WRITES_PER_TENANT: u32 = 100;
 const PUBLIC_WINDOW: std::time::Duration = std::time::Duration::from_secs(60);
 
 /// A public command of the plugin of the link, for whoever holds it (`POST /p/{token}/call/{name}`).
@@ -732,12 +735,30 @@ pub async fn call_public(k: &Kernel, r: &crate::links::Resolved, name: &str, arg
         return Err(Error::new(crate::Kind::TooMany, "too many requests: try again in a minute")
             .with_code("public_rate_limited"));
     }
-    let mut tx = k.db.begin_plugin_read(&p.id, &r.ctx()).await?;
-    tx.make_read_only().await?;
-    let (out, tx) = host::run_public(k, r, &p, tx, name, args).await?;
+    // a command that writes (an answer to a form, a vote) has its own, tighter limits and a transaction that may write
+    if decl.write
+        && (!k.limiter.hit(&format!("pubwrite:link:{}", r.link_id), PUBLIC_WRITES_PER_LINK, PUBLIC_WINDOW)
+            || !k.limiter.hit(
+                &format!("pubwrite:tenant:{}", r.tenant),
+                PUBLIC_WRITES_PER_TENANT,
+                PUBLIC_WINDOW,
+            ))
+    {
+        return Err(Error::new(crate::Kind::TooMany, "too many requests: try again in a minute")
+            .with_code("public_rate_limited"));
+    }
+    let tx = if decl.write {
+        k.db.begin_plugin(&p.id, &r.ctx()).await?
+    } else {
+        let mut tx = k.db.begin_plugin_read(&p.id, &r.ctx()).await?;
+        tx.make_read_only().await?;
+        tx
+    };
+    let (out, tx) = host::run_public(k, r, &p, tx, name, args, decl.write).await?;
     tx.commit().await?;
-    // one event per link and minute at most: an anonymous caller cannot flood the log
-    if k.limiter.hit(&format!("pubcall:audit:{}", r.link_id), 1, PUBLIC_WINDOW) {
+    // one event per link and minute at most: an anonymous caller cannot flood the log (a write is always recorded:
+    // it is rate limited and it changes data)
+    if decl.write || k.limiter.hit(&format!("pubcall:audit:{}", r.link_id), 1, PUBLIC_WINDOW) {
         events::record(
             k,
             Some(r.tenant),

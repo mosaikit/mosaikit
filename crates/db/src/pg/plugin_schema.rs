@@ -22,6 +22,8 @@ pub struct PgPluginSchema {
     pub extra_path: Vec<String>,
     /// `(table, owner column)`: a reader writes the rows that are theirs
     pub reader_tables: Vec<(String, String)>,
+    /// the reader tables where a visitor of a public link (no user) may also insert
+    pub visitor_tables: Vec<String>,
 }
 
 /// `core` functions the roles of the plugins may run.
@@ -292,11 +294,19 @@ impl PgPluginSchema {
                         }
                         None => "core.can_access(resource_id, 2)".to_string(),
                     };
+                    // a visitor of a public link (no user, level 1 on the item of the link) may insert, never change
+                    let insert_allowed = if self.visitor_tables.iter().any(|n| n == name) {
+                        format!(
+                            "({allowed} or (core.ctx_user() is null and core.can_access(resource_id, 1)))"
+                        )
+                    } else {
+                        allowed.clone()
+                    };
                     Self::exec(
                         tx,
                         &format!(
                             "create policy msk_insert on {t} for insert \
-                         with check ({allowed} and tenant_id = core.ctx_tenant())"
+                             with check ({insert_allowed} and tenant_id = core.ctx_tenant())"
                         ),
                     )
                     .await?;

@@ -200,7 +200,12 @@ pub async fn apply_schema(
     let schema = m.schema_name();
     let extra = check_requirements(k, tx, m).await?;
     let readers = m.tables.iter().map(|t| (t.name.clone(), t.owner_column.clone())).collect();
-    let ps = k.db.plugin_schema(&m.id, &schema).with_search_path(extra).with_reader_tables(readers);
+    let visitors = m.tables.iter().filter(|t| t.insert_for == "visitor").map(|t| t.name.clone()).collect();
+    let ps =
+        k.db.plugin_schema(&m.id, &schema)
+            .with_search_path(extra)
+            .with_reader_tables(readers)
+            .with_visitor_tables(visitors);
     let password: String = mosaikit_db::query_scalar("select role_password from core.plugins where id = $1")
         .bind(&m.id)
         .fetch_one(&mut **tx)

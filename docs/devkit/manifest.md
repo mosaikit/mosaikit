@@ -256,6 +256,7 @@ commands» (off by default) before they work. Needs `[requires] mosaikit = ">=1.
 | `name` | the command of the logic, identifier, unique |
 | `description` | required: what a visitor can do with it, shown to the Administrator |
 | `max_arg_bytes` | optional, 1 to 16384 (the default and the ceiling) |
+| `write` | optional, default false. `true`: the command may also **insert** rows (an answer to a form, a vote) into the tables declared with `insert_for = "visitor"` in `[[tables]]`, and nothing else: never an update, a delete, a resource or another table. The manifest is refused when `write` is set and no table has `insert_for = "visitor"`. Shown in red to the Administrator; a link may call such a command 10 times a minute and a tenant 100 |
 
 ## `[[schedules]]`
 

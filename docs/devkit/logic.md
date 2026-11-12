@@ -175,6 +175,13 @@ A command named in `[[public_commands]]` can be run by anyone who holds a public
   limited to 30 calls a minute and a tenant to 300; the fuel is a quarter of a normal command; arguments are at most
   `max_arg_bytes` (16 KiB). Errors: `command_not_public`, `public_commands_off`, `public_rate_limited`, `args_too_large`.
 
+A command declared with `write = true` also has `db.exec` (and `RETURNING` through `db.query`), **only for `INSERT`**, and only into
+the tables you declared with `[[tables]] insert_for = "visitor"` (the table needs the `resource_id`, `tenant_id` and owner
+columns as any table of the plugin): the policies of the table let a visitor, who has no user, insert rows for the item of the
+link and for no other item, and never change or delete one. The visitor has no identity: the owner column holds a value your
+command chooses (for example a random id the page keeps in the browser to say «one answer per browser»: a hint, not a proof; a
+visitor can always get another). Limit what a visitor can add yourself (the size and the number of the rows).
+
 The kernel limits what the command can **read**; it cannot limit what the logic **returns**. Follow the
 [review checklist](security.md#public-link-commands-review-checklist). Test with `MockHost::new().as_public("<item id>")`.
 

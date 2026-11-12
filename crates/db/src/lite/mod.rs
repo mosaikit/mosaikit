@@ -520,6 +520,7 @@ impl LiteDb {
             schema: schema.to_string(),
             db: self.inner.clone(),
             reader_tables: Vec::new(),
+            visitor_tables: Vec::new(),
         }
     }
 

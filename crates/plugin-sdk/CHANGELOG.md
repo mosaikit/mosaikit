@@ -5,6 +5,10 @@ version and is removed in the next.
 
 ## Unreleased
 
+- A public command declared with `write = true` (`[[public_commands]]`) may `db.exec` an `INSERT` into the tables declared with `[[tables]] insert_for = "visitor"`; nothing else changes in `Ctx` (`ctx.public` is still true, there is still no user). Additive.
+
+- `testing::MockHost::hook_with_previous(reg, hook, resource, values, previous)`: runs an update hook with the values before the change (`hook` is the same with none). Test helper only.
+
 - `Ctx::runs()` and `Runs::mint(&RunMint)` (host operation `runs.mint`): a ticket for the plugin and, with `RunTarget`, for the other plugins it declares in `[permissions] run_targets`; written when the command has committed. Plugin API unchanged (additive).
 
 - `Resources::list(plugin, kind, q, limit)` (host operation `resources.list`): the resources of another plugin that the caller sees, for a
