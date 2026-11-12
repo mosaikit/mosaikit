@@ -5,6 +5,10 @@ in Help › What is new (one `## <version>` heading per version, `- ` items, `##
 language of the person: this file in English, [CHANGELOG.it.md](CHANGELOG.it.md) in Italian (keep them
 in step).
 
+## 1.0.10
+
+- `[[sidecars]]` in `distribution.toml` now work for products built with the kit: `mosaikit-product build desktop` copies the executables into `sidecars/<name>/` and writes `sidecars.toml`, so the desktop application starts a Node service, a map server... before the kernel and stops it after. Keys: `command`, `args`, `env`, `health`, `port`, `depends_on`, `restart`, `kind = "oneshot"`, `files`. `validate` warns about a missing executable; `build docker` and `build k8s` print a warning (use `[docker] compose_files`).
+
 ## 1.0.9
 
 - `mosaikit-plugin dev`, `mosaikit-product dev` and `mosaikit-product test` take `--database postgres://…` (or `MOSAIKIT_DEV_DATABASE_URL`): the development server runs on a PostgreSQL database of this computer instead of SQLite, for plugins with `[requires] database = "postgres"` (PostGIS). The recipe is in `docs/devkit/data.md`.

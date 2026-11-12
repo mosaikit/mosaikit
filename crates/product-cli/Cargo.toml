@@ -27,6 +27,7 @@ serde_json = { workspace = true, features = ["preserve_order"] }
 toml.workspace = true
 zip.workspace = true
 mosaikit-mskp.workspace = true
+mosaikit-sidecars.workspace = true
 mosaikit-plugin-cli.workspace = true
 reqwest = { workspace = true, features = ["blocking"] }
 

@@ -321,9 +321,44 @@ pub fn desktop(d: &Distribution, base: &Path, o: &Options) -> Result<PathBuf> {
             port = d.desktop.port
         ),
     )?;
+    bundle_sidecars(d, &out)?;
     brand_executable(d, &product_exe, brand.as_deref());
     println!("desktop release: {}", out.display());
     Ok(out)
+}
+
+/// `[[sidecars]]`: the executables go to `sidecars/<name>/`, the overlay files to `sidecars/<name>/_files/` and
+/// `sidecars.toml` (next to the executable) tells the launcher what to start before the kernel.
+fn bundle_sidecars(d: &Distribution, out: &Path) -> Result<()> {
+    if d.sidecars.is_empty() {
+        return Ok(());
+    }
+    mosaikit_sidecars::check_desktop(&d.sidecars, &d.dir)?;
+    for s in &d.sidecars {
+        let Some(c) = &s.command else { continue };
+        let src = d.dir.join(mosaikit_sidecars::bundle_source(c));
+        let dest = out.join("sidecars").join(&s.name);
+        mosaikit_sidecars::copy_file_sources(s, &d.dir, &dest.join("_files"))?;
+        std::fs::create_dir_all(&dest)?;
+        if src.is_dir() {
+            copy_dir(&src, &dest)?;
+        } else {
+            let file = mosaikit_sidecars::resolve_command(&d.dir, c).context("sidecar executable")?;
+            std::fs::copy(&file, dest.join(file.file_name().context("file name")?))?;
+        }
+    }
+    std::fs::write(out.join("sidecars.toml"), mosaikit_sidecars::desktop_toml(&d.sidecars)?)?;
+    println!("{} sidecar(s) copied", d.sidecars.len());
+    Ok(())
+}
+
+/// Docker and Kubernetes releases do not use `[[sidecars]]`: say so instead of ignoring them silently.
+fn warn_sidecars(d: &Distribution, target: &str) {
+    if !d.sidecars.is_empty() {
+        eprintln!(
+            "warning: [[sidecars]] are for the desktop release; the {target} release does not start them (Docker: add the services with [docker] compose_files)"
+        );
+    }
 }
 
 /// Name, version and icon of the executable (Windows): with `rcedit` when it is on the PATH.
@@ -361,6 +396,7 @@ fn brand_executable(d: &Distribution, exe_path: &Path, brand: Option<&Path>) {
 /// `build docker`: the folder (context, Dockerfile, compose file) of the image of the product, `FROM` the base
 /// image. With `build` it also runs `docker build`.
 pub fn docker(d: &Distribution, base: &Path, base_image: &str, build: bool, o: &Options) -> Result<PathBuf> {
+    warn_sidecars(d, "Docker");
     let out = out_dir(d, o, "docker");
     fresh_dir(&out)?;
     // the registry of the base: the registry folder of a server bundle of the base kit
@@ -592,6 +628,7 @@ pub fn k8s(d: &Distribution, base_k8s: &Path, o: &Options) -> Result<PathBuf> {
     if !base_k8s.join("kustomization.yaml").is_file() {
         bail!("{}: no kustomization.yaml (give the k8s folder of the base kit)", base_k8s.display());
     }
+    warn_sidecars(d, "Kubernetes");
     let out = out_dir(d, o, "k8s");
     fresh_dir(&out)?;
     copy_dir(base_k8s, &out.join("base"))?;
@@ -625,6 +662,54 @@ mod tests {
             .replace("roots = [\"plugins\"]", "roots = []");
         std::fs::write(root.join("distribution.toml"), text).unwrap();
         Distribution::load(&root).unwrap()
+    }
+
+    #[test]
+    fn sidecars_go_to_the_desktop_bundle() {
+        let t = tempfile::tempdir().unwrap();
+        let mut d = product(t.path());
+        std::fs::create_dir_all(d.dir.join("geo/bin")).unwrap();
+        std::fs::write(d.dir.join("geo/bin/run.exe"), b"x").unwrap();
+        std::fs::write(d.dir.join("geo/bin/lib.dll"), b"y").unwrap();
+        std::fs::write(d.dir.join("geo.conf"), b"z").unwrap();
+        d.sidecars = toml::from_str::<toml::Table>(
+            "[[sidecars]]
+name = \"geo\"
+command = \"geo/bin/run.exe\"
+port = 9000
+health = \"tcp\"
+[[sidecars.files]]
+source = \"geo.conf\"
+target = \"conf/geo.conf\"
+",
+        )
+        .unwrap()["sidecars"]
+            .clone()
+            .try_into()
+            .unwrap();
+        let out = t.path().join("out");
+        std::fs::create_dir_all(&out).unwrap();
+        bundle_sidecars(&d, &out).unwrap();
+        assert!(out.join("sidecars/geo/bin/run.exe").is_file());
+        assert!(out.join("sidecars/geo/bin/lib.dll").is_file());
+        assert!(out.join("sidecars/geo/_files/geo.conf").is_file());
+        let toml = std::fs::read_to_string(out.join("sidecars.toml")).unwrap();
+        assert!(toml.contains("command = \"sidecars/geo/bin/run.exe\""), "{toml}");
+        assert!(toml.contains("sidecars/geo/_files/geo.conf"), "{toml}");
+    }
+
+    #[test]
+    fn a_missing_sidecar_executable_is_refused() {
+        let t = tempfile::tempdir().unwrap();
+        let mut d = product(t.path());
+        d.sidecars = vec![toml::from_str(
+            "name = \"geo\"
+command = \"nope.exe\"",
+        )
+        .unwrap()];
+        let out = t.path().join("out");
+        std::fs::create_dir_all(&out).unwrap();
+        assert!(bundle_sidecars(&d, &out).unwrap_err().to_string().contains("not found"));
     }
 
     fn package(signed: bool) -> (Vec<u8>, String) {

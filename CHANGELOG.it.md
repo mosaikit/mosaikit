@@ -4,6 +4,10 @@ Cosa cambia da una versione di Mosaikit alla successiva. La shell mostra la sezi
 Aiuto › Novità (un titolo `## <versione>` per versione, voci `- `, gruppi `### `). Questo file è la
 versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
+## 1.0.10
+
+- I `[[sidecars]]` di `distribution.toml` ora funzionano per i prodotti costruiti con il kit: `mosaikit-product build desktop` copia gli eseguibili in `sidecars/<name>/` e scrive `sidecars.toml`, così l'applicazione desktop avvia un servizio Node, un server di mappe... prima del kernel e lo ferma dopo. Chiavi: `command`, `args`, `env`, `health`, `port`, `depends_on`, `restart`, `kind = "oneshot"`, `files`. `validate` avvisa se manca l'eseguibile; `build docker` e `build k8s` stampano un avviso (usare `[docker] compose_files`).
+
 ## 1.0.9
 
 - `mosaikit-plugin dev`, `mosaikit-product dev` e `mosaikit-product test` accettano `--database postgres://…` (o `MOSAIKIT_DEV_DATABASE_URL`): il server di sviluppo gira su un database PostgreSQL di questo computer invece che su SQLite, per i plugin con `[requires] database = "postgres"` (PostGIS). La procedura è in `docs/devkit/data.md`.

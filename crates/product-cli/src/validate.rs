@@ -102,6 +102,20 @@ pub fn validate(dir: &Path, o: &Options) -> Result<Report> {
     {
         r.add(Level::Error, "[docker] compose_files: a file called compose.yml would replace the generated one: give it another name");
     }
+    // the sidecars of the desktop release: the executable must exist when the release is built
+    for s in &d.sidecars {
+        match &s.command {
+            Some(c) if mosaikit_sidecars::resolve_command(&d.dir, c).is_none() => r.add(
+                Level::Warning,
+                format!("[[sidecars]] \"{}\": executable {} not found (the desktop release needs it)", s.name, d.dir.join(c).display()),
+            ),
+            None => r.add(
+                Level::Warning,
+                format!("[[sidecars]] \"{}\": no `command`: the desktop release cannot start it (it needs `command`)", s.name),
+            ),
+            _ => {}
+        }
+    }
     // the brand
     match (&d.brand.dir, d.brand_dir()) {
         (Some(p), None) => r.add(Level::Error, format!("[brand] dir = {}: not a folder", p.display())),

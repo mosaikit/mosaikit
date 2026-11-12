@@ -1846,7 +1846,7 @@ dependencies = [
 
 [[package]]
 name = "mosaikit-db"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "chrono",
  "hex",
@@ -1865,7 +1865,7 @@ dependencies = [
 
 [[package]]
 name = "mosaikit-desktop"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "clap",
  "mosaikit-kernel",
@@ -1883,7 +1883,7 @@ dependencies = [
 
 [[package]]
 name = "mosaikit-kernel"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "argon2",
  "base64 0.22.1",
@@ -1926,7 +1926,7 @@ dependencies = [
 
 [[package]]
 name = "mosaikit-mskp"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "base64 0.22.1",
  "ed25519-dalek",
@@ -1942,7 +1942,7 @@ dependencies = [
 
 [[package]]
 name = "mosaikit-plugin-cli"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "anyhow",
  "clap",
@@ -1968,12 +1968,13 @@ dependencies = [
 
 [[package]]
 name = "mosaikit-product-cli"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "anyhow",
  "clap",
  "mosaikit-mskp",
  "mosaikit-plugin-cli",
+ "mosaikit-sidecars",
  "reqwest",
  "serde",
  "serde_json",
@@ -1985,7 +1986,7 @@ dependencies = [
 
 [[package]]
 name = "mosaikit-runtime"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "serde_json",
  "thiserror 2.0.21",
@@ -1995,7 +1996,7 @@ dependencies = [
 
 [[package]]
 name = "mosaikit-server"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "axum",
  "base64 0.22.1",
@@ -2030,8 +2031,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "mosaikit-sidecars"
+version = "1.0.10"
+dependencies = [
+ "anyhow",
+ "serde",
+ "toml 0.8.2",
+]
+
+[[package]]
 name = "mosaikit-sql-guard"
-version = "1.0.9"
+version = "1.0.10"
 dependencies = [
  "sqlparser",
  "thiserror 2.0.21",
@@ -4632,6 +4642,7 @@ dependencies = [
  "hex",
  "mosaikit-mskp",
  "mosaikit-plugin-cli",
+ "mosaikit-sidecars",
  "notify",
  "serde",
  "serde_json",

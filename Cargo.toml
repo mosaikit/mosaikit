@@ -2,6 +2,7 @@
 resolver = "2"
 members = [
     "crates/mskp",
+    "crates/sidecars",
     "crates/sql-guard",
     "crates/db",
     "crates/runtime",
@@ -15,7 +16,7 @@ members = [
 ]
 
 [workspace.package]
-version = "1.0.9"
+version = "1.0.10"
 edition = "2021"
 license = "Apache-2.0"
 rust-version = "1.85"
@@ -83,6 +84,7 @@ tokio-util = { version = "0.7", features = ["io"] }
 png = "0.17"
 
 mosaikit-mskp = { path = "crates/mskp", version = "1.0.0" }
+mosaikit-sidecars = { path = "crates/sidecars", version = "1.0.0" }
 mosaikit-sql-guard = { path = "crates/sql-guard", version = "1.0.0" }
 mosaikit-db = { path = "crates/db" }
 mosaikit-runtime = { path = "crates/runtime" }

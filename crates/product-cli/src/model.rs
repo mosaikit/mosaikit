@@ -121,8 +121,9 @@ pub struct Distribution {
     // that nobody reads (a typo such as `[quota_defaults]`) is refused instead of silently ignored.
     #[serde(default)]
     pub tests: Option<toml::Value>,
+    /// extra processes started with the desktop application (see `docs/devkit/manifest.md`)
     #[serde(default)]
-    pub sidecars: Option<toml::Value>,
+    pub sidecars: Vec<mosaikit_sidecars::Sidecar>,
     #[serde(default)]
     pub plugin_settings: Option<toml::Value>,
     #[serde(default)]
@@ -159,6 +160,10 @@ impl Distribution {
         if !id_ok {
             bail!("[product] id = \"{}\": lower case letters, digits and '-' only", d.product.id);
         }
+        mosaikit_sidecars::validate(&d.sidecars, d.desktop.port)
+            .with_context(|| format!("{}", file.display()))?;
+        mosaikit_sidecars::check_file_sources(&d.sidecars, &d.dir)
+            .with_context(|| format!("{}", file.display()))?;
         Ok(d)
     }
 
