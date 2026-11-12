@@ -5,6 +5,10 @@ in Help › What is new (one `## <version>` heading per version, `- ` items, `##
 language of the person: this file in English, [CHANGELOG.it.md](CHANGELOG.it.md) in Italian (keep them
 in step).
 
+## 1.0.12
+
+- Fix: `mosaikit-product build k8s` without `--base-k8s` (1.0.11) wrote the Kubernetes manifests with their `{{id}}`, `{{image}}`... placeholders unresolved and without the `initdb` script, so `kubectl kustomize` failed. The manifests are now rendered with the id, name, version, image and PostgreSQL image of the product, and the result is checked with `kubectl kustomize` in the tests.
+
 ## 1.0.11
 
 - `mosaikit-product build k8s` no longer needs `--base-k8s`: the Kubernetes manifests of the Base are built into the kit, so they always match its version. `--base-k8s <folder>` still replaces them. `[[sidecars]]` have no effect on Kubernetes (a warning says so).
