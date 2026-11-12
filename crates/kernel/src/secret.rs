@@ -98,7 +98,7 @@ fn write_private(path: &Path, data: &[u8]) -> Result<()> {
     #[cfg(windows)]
     {
         // S-1-3-4: OWNER RIGHTS, S-1-5-18: SYSTEM
-        let ok = std::process::Command::new("icacls")
+        let ok = crate::embedded::no_window(&mut std::process::Command::new("icacls"))
             .arg(path)
             .args(["/inheritance:r", "/grant:r", "*S-1-3-4:F", "*S-1-5-18:F"])
             .stdout(std::process::Stdio::null())

@@ -47,8 +47,21 @@ fn find_bin(cfg: &Config) -> Result<PathBuf> {
         })
 }
 
+/// Runs a child process of the kernel without a console window (Windows; the desktop program has no console, so
+/// every child would otherwise flash one).
+pub fn no_window(cmd: &mut Command) -> &mut Command {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    cmd
+}
+
 fn run(cmd: &mut Command) -> Result<String> {
-    let out = cmd.stdin(Stdio::null()).output().map_err(|e| Error::internal(format!("{cmd:?}: {e}")))?;
+    let out =
+        no_window(cmd).stdin(Stdio::null()).output().map_err(|e| Error::internal(format!("{cmd:?}: {e}")))?;
     if !out.status.success() {
         return Err(Error::internal(format!(
             "{cmd:?}: {}{}",
@@ -179,7 +192,7 @@ impl EmbeddedPg {
     }
 
     pub fn stop(self) {
-        let _ = Command::new(self.bin.join(exe("pg_ctl")))
+        let _ = no_window(&mut Command::new(self.bin.join(exe("pg_ctl"))))
             .arg("-D")
             .arg(&self.data)
             .args(["-m", "fast", "-w", "stop"])

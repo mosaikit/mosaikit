@@ -225,7 +225,7 @@ async fn dump_database(k: &Kernel, tmp: &Path) -> Result<Option<&'static str>> {
     let Some(url) = k.database_url().await else { return Ok(None) };
     let tmp = tmp.to_path_buf();
     let out = tokio::task::spawn_blocking(move || {
-        Command::new(bin)
+        crate::embedded::no_window(&mut Command::new(bin))
             .args(["--format=custom", "--no-owner", "--file"])
             .arg(&tmp)
             .arg("--dbname")

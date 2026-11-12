@@ -140,7 +140,15 @@ pub async fn verify_password(k: &Kernel, hash: Option<String>, pw: &str) -> Resu
 }
 
 /// File with the credentials generated at the first start (in the data folder).
-pub const INITIAL_CREDENTIALS: &str = "credenziali-iniziali.txt";
+pub const INITIAL_CREDENTIALS: &str = "initial-credentials.txt";
+
+/// Name of that file before 1.0.13 (an installation made earlier still has it): only read, never written.
+pub const LEGACY_INITIAL_CREDENTIALS: &str = "credenziali-iniziali.txt";
+
+/// The file with the initial credentials of a data folder: the current name, or the old one of an earlier installation.
+pub fn initial_credentials_file(data_dir: &std::path::Path) -> Option<std::path::PathBuf> {
+    [INITIAL_CREDENTIALS, LEGACY_INITIAL_CREDENTIALS].iter().map(|n| data_dir.join(n)).find(|p| p.is_file())
+}
 
 /// First start: tenant `system` with the Administrator `admin` and, if configured
 /// (`initial_tenant`, desktop version), a work tenant with its Tenant Manager.
@@ -985,6 +993,16 @@ pub fn valid_username(u: &str) -> bool {
 #[cfg(test)]
 mod limiter_tests {
     use super::*;
+
+    #[test]
+    fn the_credentials_file_has_the_english_name_and_the_old_one_is_still_found() {
+        let t = tempfile::tempdir().unwrap();
+        assert_eq!(initial_credentials_file(t.path()), None);
+        std::fs::write(t.path().join(LEGACY_INITIAL_CREDENTIALS), "old").unwrap();
+        assert_eq!(initial_credentials_file(t.path()), Some(t.path().join("credenziali-iniziali.txt")));
+        std::fs::write(t.path().join(INITIAL_CREDENTIALS), "new").unwrap();
+        assert_eq!(initial_credentials_file(t.path()), Some(t.path().join("initial-credentials.txt")));
+    }
 
     #[test]
     fn the_credentials_name_the_tenant_that_was_made() {

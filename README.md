@@ -466,7 +466,7 @@ in `data\pg`, with PostGIS if available.
    this change keep their account `utente`; nothing is renamed.
    The Administrator `admin` enters from *Administrator access*. The initial
    password of both is `mosaikit` (`initial_password`; also in
-   `data\credenziali-iniziali.txt`, icon menu → *Initial credentials*):
+   `data\initial-credentials.txt`, icon menu → *Initial credentials*):
    change it at once from the Account page.
 5. Icon menu → *Quit*: stops everything. Start errors appear in a
    message window.

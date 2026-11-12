@@ -9,7 +9,7 @@ Manager does is in [tenant-manager.md](tenant-manager.md); the work of everybody
 
 At the first start Mosaikit creates the Administrator `admin`. Its password is the one given to the server
 (`MOSAIKIT_ADMIN_PASSWORD`) or, if none was given, a generated one written in the file
-`credenziali-iniziali.txt` of the data folder (the desktop version may also create a first work tenant and
+`initial-credentials.txt` of the data folder (the desktop version may also create a first work tenant and
 its Tenant Manager `user`, listed in the same file; installs made before this change keep their account
 `utente`). Change the password at the first sign-in and delete the file.
 

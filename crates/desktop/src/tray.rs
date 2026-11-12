@@ -68,6 +68,9 @@ fn pump(timeout: Duration) {
     }
 }
 
+/// How long a click on the icon waits for a menu item that may come with it.
+const CLICK_DELAY: Duration = Duration::from_millis(400);
+
 fn open_file(p: &std::path::Path) {
     mosaikit_server::open_browser(&p.display().to_string());
 }
@@ -112,6 +115,10 @@ pub fn run(app: &App, stop: tokio::sync::oneshot::Sender<()>, status: Receiver<S
     let mut stop = Some(stop);
     let mut ready = false;
     let started = std::time::Instant::now();
+    // A left click on an item of the menu can also reach the icon as a click on the icon (Windows): the click
+    // opens the browser only if no menu item follows within a moment.
+    let mut pending_click: Option<std::time::Instant> = None;
+    let mut last_menu: Option<std::time::Instant> = None;
     loop {
         pump(Duration::from_millis(100));
         // slow start (first start, embedded PostgreSQL): window with phase and spinner
@@ -150,17 +157,22 @@ pub fn run(app: &App, stop: tokio::sync::oneshot::Sender<()>, status: Receiver<S
                 ..
             } = ev
             {
-                if ready {
-                    mosaikit_server::open_browser(&app.app_url);
+                if ready && !last_menu.is_some_and(|t| t.elapsed() < CLICK_DELAY) {
+                    pending_click = Some(std::time::Instant::now());
                 }
             }
         }
+        if pending_click.is_some_and(|t| t.elapsed() > CLICK_DELAY) {
+            pending_click = None;
+            mosaikit_server::open_browser(&app.app_url);
+        }
         while let Ok(ev) = MenuEvent::receiver().try_recv() {
+            pending_click = None;
+            last_menu = Some(std::time::Instant::now());
             if ev.id == *open.id() {
                 mosaikit_server::open_browser(&app.app_url);
             } else if ev.id == *creds.id() {
-                let f = app.data_dir.join(mosaikit_kernel::identity::INITIAL_CREDENTIALS);
-                if f.is_file() {
+                if let Some(f) = mosaikit_kernel::identity::initial_credentials_file(&app.data_dir) {
                     open_file(&f);
                 } else {
                     message_box(

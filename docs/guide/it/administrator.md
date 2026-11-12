@@ -10,7 +10,7 @@ elementi. Quello che fa il Tenant Manager è in [tenant-manager.md](tenant-manag
 
 Al primo avvio Mosaikit crea l'Administrator `admin`. La sua password è quella data al server
 (`MOSAIKIT_ADMIN_PASSWORD`) oppure, se non è stata data, una password generata scritta nel file
-`credenziali-iniziali.txt` della cartella dei dati (la versione desktop può creare anche una prima organizzazione di
+`initial-credentials.txt` della cartella dei dati (la versione desktop può creare anche una prima organizzazione di
 lavoro e il suo Tenant Manager, elencati nello stesso file). Cambia la password al primo accesso ed elimina
 il file.
 

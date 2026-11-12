@@ -111,7 +111,7 @@ url = "http://127.0.0.1:8080/mosaikit"
 # At the first start also creates a work tenant with this slug (name: the one of the product)
 # and its Tenant Manager "user", with a generated password. The Administrator has no
 # workspace: it is meant for local use (desktop version), where one works at once.
-# The credentials are in <data_dir>/credenziali-iniziali.txt.
+# The credentials are in <data_dir>/initial-credentials.txt.
 # Env: MOSAIKIT_INITIAL_TENANT
 # initial_tenant = "locale"
 

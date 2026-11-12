@@ -211,7 +211,7 @@ fn start_guide(postgres: bool) -> String {
          3. First sign-in: user \"user\", ready to work. For the\n   \
             administration (plugins, other tenants and users): link \"Administrator\n   \
             access\", user \"admin\". Initial password of both:\n   \
-            \"mosaikit\" (also in data\\credenziali-iniziali.txt, icon menu >\n   \
+            \"mosaikit\" (also in data\\initial-credentials.txt, icon menu >\n   \
             Initial credentials): change it at once from the Account page.\n\
          4. To stop: icon menu > Quit{stop}.\n\n\
          Log: data\\logs\\mosaikit.log (icon menu > Log).\n\

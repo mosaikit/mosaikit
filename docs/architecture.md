@@ -2168,8 +2168,8 @@ backend = "sqlite"      # or "postgres"; default: postgres if there is url or em
 ├── mosaikit.db                SQLite (with -wal and -shm), if the backend is SQLite
 ├── pg/                        desktop with PostgreSQL only: embedded cluster and generated credentials
 ├── logs/mosaikit.log          desktop only
-└── credenziali-iniziali.txt   only if passwords were generated at the first start (the name is kept
-                               for the existing installations)
+└── initial-credentials.txt    only if passwords were generated at the first start (before 1.0.13 the
+                               file was called credenziali-iniziali.txt; the icon menu still finds it)
 ```
 
 The contents of deleted resources are removed at once; at start a cleanup
@@ -2181,7 +2181,7 @@ servers on the same database, set the same `secret_key` (or `MOSAIKIT_SECRET_KEY
 
 The structured data are all in the database. At the first start the
 `system` tenant and the Administrator `admin` are created: the password is `MOSAIKIT_ADMIN_PASSWORD`
-or it is generated and written in `credenziali-iniziali.txt`. With
+or it is generated and written in `initial-credentials.txt`. With
 `initial_tenant` (desktop release: `"locale"`) the first start also creates a
 work tenant, with the name of the product, and its Tenant Manager `user`
 (generated password, in the same file; with `initial_password`, desktop release:
