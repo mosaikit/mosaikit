@@ -39,6 +39,7 @@ docs/     architecture, ui-plan, refactoring-ui, manual-tests, plugin-devkit-pla
 
 - UI rules and decisions: [docs/refactoring-ui.md](docs/refactoring-ui.md). Empty lists and pages: centred
   illustration, title, text, primary action (host and plugins).
+- **Plugin cards**: every plugin of `mosaikit-plugins` gets a descriptive card on the Mosaikit site, with screenshots in a carousel whenever possible (`media/`). A plugin is not finished without it. The text of the card is `CARD.md` in the plugin folder: what it is for and does, then `Uses:` with three typical cases; the site is rebuilt with `tools/site-cards.py`.
 - Plan: [docs/ui-plan.md](docs/ui-plan.md). Next: [docs/plugin-devkit-plan.md](docs/plugin-devkit-plan.md).
 - **Commits**: at the end of every plan phase, without asking, once checks pass. Never push (the one
   exception is the GitHub publish task, only when the user starts it). End commit messages with the

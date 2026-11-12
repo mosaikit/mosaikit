@@ -114,7 +114,9 @@ test.describe.serial('16-tables', () => {
     expect(asc).toEqual([...asc].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })))
     await page.getByRole('button', { name: 'Ascending' }).click()
     const desc = await names()
-    expect(desc).toEqual([...asc].reverse())
+    // the list is paged: the first page of the descending order is not the reverse of the first page of the ascending one
+    expect(desc).toEqual([...desc].sort((a, b) => b.localeCompare(a, undefined, { numeric: true })))
+    expect(desc[0]).not.toBe(asc[0])
     await cards.first().getByRole('checkbox').click()
     await expect(page.getByRole('group', { name: 'Actions on the selection' })).toBeVisible()
     await page.getByRole('button', { name: 'Deselect' }).click()
