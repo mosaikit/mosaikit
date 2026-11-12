@@ -207,7 +207,10 @@ mod tests {
     #[test]
     fn page_texts_are_read_and_checked() {
         let mut f = files("{}", None);
-        f.insert("ui/com.mosaikit.files.json".into(), br#"{"Upload": "Subir", "{n} files": "{n} archivos"}"#.to_vec());
+        f.insert(
+            "ui/com.mosaikit.files.json".into(),
+            br#"{"Upload": "Subir", "{n} files": "{n} archivos"}"#.to_vec(),
+        );
         let p = load_language("es", "Español", &f).unwrap();
         assert_eq!(p.ui["com.mosaikit.files"]["Upload"], "Subir");
         assert_eq!(p.ui["com.mosaikit.files"]["{n} files"], "{n} archivos");

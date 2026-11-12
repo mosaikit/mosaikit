@@ -108,12 +108,8 @@ fn language_plugins_translate_every_plugin_that_has_italian() {
 /// placeholders. The language packs must also pass the check the kernel makes when it installs them.
 #[test]
 fn language_plugins_have_the_page_texts_of_every_adopted_plugin() {
-    const ADOPTED: [&str; 4] = [
-        "com.mosaikit.files",
-        "com.mosaikit.maps",
-        "com.mosaikit.static-site",
-        "com.mosaikit.note-review",
-    ];
+    const ADOPTED: [&str; 4] =
+        ["com.mosaikit.files", "com.mosaikit.maps", "com.mosaikit.static-site", "com.mosaikit.note-review"];
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../mosaikit-plugins");
     let mut langs: Vec<String> = std::fs::read_dir(&root)
         .map(|d| {
@@ -176,7 +172,10 @@ fn language_plugins_have_the_page_texts_of_every_adopted_plugin() {
         let mut files = std::collections::BTreeMap::new();
         for sub in ["ui", "plugins"] {
             for e in std::fs::read_dir(dir.join(sub)).into_iter().flatten().flatten() {
-                files.insert(format!("{sub}/{}", e.file_name().to_string_lossy()), std::fs::read(e.path()).unwrap());
+                files.insert(
+                    format!("{sub}/{}", e.file_name().to_string_lossy()),
+                    std::fs::read(e.path()).unwrap(),
+                );
             }
         }
         files.insert("host.json".into(), std::fs::read(dir.join("host.json")).unwrap());

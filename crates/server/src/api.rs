@@ -400,7 +400,8 @@ async fn language_texts(State(s): State<AppState>, Path(code): Path<String>) -> 
             .into_iter()
             .find(|l| l.code == code)
             .ok_or_else(|| Error::not_found("language not installed"))?;
-    let mut res = Json(json!({ "code": pack.code, "name": pack.name, "strings": pack.host, "ui": pack.ui })).into_response();
+    let mut res = Json(json!({ "code": pack.code, "name": pack.name, "strings": pack.host, "ui": pack.ui }))
+        .into_response();
     res.headers_mut().insert(header::CACHE_CONTROL, HeaderValue::from_static("no-cache"));
     Ok(res)
 }
