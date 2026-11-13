@@ -950,7 +950,7 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
     if (event !== 'nav.reselect' || disposed || !views.length) return
     for (let i = 0; i < 2 && split.dataset.open === 'true'; i++) btnCancel.click()
   })
-  void load()
+  void msk.loading(load())
   const dispose = () => {
     disposed = true
     clearTimeout(typing)

@@ -1329,7 +1329,7 @@ A shared collection of reusable texts and pieces of code with tags, copied in on
 | UI15-06 | Share a resource you own, transfer the ownership to another person (not as Tenant Manager) | «Ownership transferred» and the dialog closes; no error message | manual |
 | UI15-08 | In a plugin whose page calls `msk.share(id, { principals: [people], level: "read" })` (for example the review flow of a distribution) open the share dialog on an item you manage | The dialog opens with the box «Suggested by the app»: the names, a level and the button «Share with N»; one press shares with all of them and says «Shared with N»; people already shared with at that level or more are not counted; without the box the dialog is the usual one | manual |
 | UI15-09 | With the developer profile on, sign in and look at the top bar on several pages | No banner under the bar; a round orange button with the bug icon, next to the tenant switcher and before the search box, on every page (the search box keeps its place and size); the tooltip and the panel opened by the pill read the whole warning and offer «Developer tools»; the sign-in page still has the full banner | e2e `18-developer-profile.spec.ts` + manual |
-| UI15-07 | Open an app from the sidebar | A spinner with «Loading <app>…» shows in the middle until the page of the app has loaded | manual |
+| UI15-07 | Open an app from the sidebar (slow the network in the browser tools to see it) | A spinner with «Loading <app>…» shows in the middle until the app has started; then the app shows the standard spinner (same ring, «Loading…», the page under it stays usable) while it reads its data, and it disappears when the data is drawn; an app with an error does not keep the spinner | manual |
 
 ## Navigation layout
 
