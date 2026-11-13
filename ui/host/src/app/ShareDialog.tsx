@@ -350,14 +350,13 @@ export default function ShareDialog({ ctx, resourceId, onClose, preselect }: { c
                             disabled={busy}
                             onClick={async () => {
                               if (!(await confirm(t('Transfer the ownership to {name}?', { name: p.name }), true))) return
-                              // the former owner may lose the access: the dialog closes instead of reading the grants again and showing an error
+                              // the former owner loses the access: the dialog closes instead of reading the grants again and showing an error
                               await run(() => api('POST', `${base}/owner`, { user_id: p.id }), t('Ownership transferred'), () => {
+                                // whoever was the owner (a Tenant Manager too) does not see the item any more: the grants are not read again
                                 void qc.invalidateQueries({ queryKey: ['m-resources', slug] })
-                                if (ctx.tenant.role === 'tenant_manager') reload()
-                                else {
-                                  qc.removeQueries({ queryKey: ['grants', resourceId] })
-                                  onClose()
-                                }
+                                qc.removeQueries({ queryKey: ['grants', resourceId] })
+                                qc.removeQueries({ queryKey: ['links', resourceId] })
+                                onClose()
                               })
                               setOwnerQ('')
                             }}
