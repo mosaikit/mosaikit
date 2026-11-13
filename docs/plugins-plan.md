@@ -184,13 +184,14 @@ The distributions (Geoportal first) run on the same kernel and must not break.
 
 ### 7.2b Left over from the phase 9 plugins
 
-- Announcements: reminders to the people who did not confirm; the audience (who should confirm) is not known to the plugin, so the author cannot yet see who is still missing.
-- Approvals: reminders by schedule; changing approvers of a request after creation.
-- Surveys and Forms: a public survey (Surveys has no public link, Forms does); anonymous mode; branching questions.
-- Calendar: reminders and notifications, time zones, exceptions in a series, attendees in the `.ics`.
-- Projects: works on PostgreSQL only; ordering of cards inside a column is approximate; burndown.
-- Whiteboard: arrows attached to objects, text co-editing inside a note, templates, frames.
-- Dashboard: widgets contributed by Bookmarks, Snippets, Chat and Projects; the labels of the widgets only in en, it and es (the other languages fall back to English).
+- Announcements: reminders to the people who did not confirm; the audience (who should confirm) is not readable by a plugin (it sees only `core.visible_resources` and `core.level_of`, never the grants), so the author cannot see who is still missing: needs a kernel request (a command or view that lists the people a resource is shared with).
+- Approvals: reminders by schedule.
+- Surveys: a public survey (Surveys has no public link, Forms does).
+- Calendar: reminders and notifications; time zone of the person in the form of an event is the one of the browser; the .ics uses TZID without a VTIMEZONE block; invitations of a series show the first occurrence only.
+- Projects: works on PostgreSQL only; ordering of cards inside a column is approximate; the burndown counts the tasks the project has today (no history of scope) and needs Tasks 0.7.1 for the completion day.
+- Whiteboard: arrows attached to objects, text co-editing inside a note; a frame carries what its centre contains, it does not resize with it.
+- Dashboard: the labels of the widgets only in en, it and es (the other languages fall back to English).
+- Forms and Surveys: single answers of an anonymous form cannot be deleted; an anonymous survey or form cannot be made named again.
 - Every phase 9 plugin: the texts inside the pages exist in en, it and es (the manifest texts exist in the seven languages): see 7.2.
 
 ### 7.3 Rules that every item above must respect

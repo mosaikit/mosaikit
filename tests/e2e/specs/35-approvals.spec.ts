@@ -53,6 +53,15 @@ test.describe.serial('Approvals', () => {
     const dlg = frame.getByRole('dialog')
     await expect(dlg).toContainText('A laptop for the new designer.')
     await accessible(page, 'approvals detail')
+    // APR-13: an open request lets a writer change its approvers; with none left the change is refused
+    await dlg.getByRole('button', { name: 'Change approvers' }).click()
+    const change = frame.getByRole('dialog').last()
+    await expect(change).toContainText('People who already decided stay on the request.')
+    await change.getByRole('button', { name: /^Remove: / }).click()
+    await change.getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(frame.locator('body')).toContainText('Choose at least one approver')
+    await change.getByRole('button', { name: 'Cancel', exact: true }).click()
+    await expect(dlg.locator('.msk-chip')).toHaveText('Pending')
     await dlg.getByRole('button', { name: 'Reject' }).click()
     await expect(frame.locator('body')).toContainText('Say why you reject the request')
     await expect(dlg.locator('.msk-chip')).toHaveText('Pending')
@@ -63,6 +72,7 @@ test.describe.serial('Approvals', () => {
     await expect(dlg.locator('.msk-chip')).toHaveText('Approved')
     await expect(dlg.getByRole('button', { name: 'Approve', exact: true })).toHaveCount(0)
     await expect(dlg.getByRole('button', { name: 'Reject' })).toHaveCount(0)
+    await expect(dlg.getByRole('button', { name: 'Change approvers' })).toHaveCount(0)
     await expect(dlg).toContainText('Within the budget.')
     await dlg.getByRole('button', { name: 'Close' }).click()
 

@@ -75,8 +75,25 @@ test.describe.serial('Calendar', () => {
     await expect(frame.getByTestId('period')).not.toHaveText(title)
     await expect(chip(frame, 'CAL weekly')).toBeVisible()
     await expect(chip(frame, 'CAL standup')).toHaveCount(0)
+
+    // CAL-13: one occurrence of the series changes on its own and comes back; another one is deleted alone
+    await chip(frame, 'CAL weekly').click()
+    await frame.getByRole('dialog').getByRole('button', { name: 'Edit this occurrence' }).click()
+    await frame.getByRole('dialog').getByRole('textbox', { name: 'Title', exact: true }).fill('CAL moved')
+    await frame.getByRole('dialog').getByRole('button', { name: 'Save', exact: true }).click()
+    await expect(chip(frame, 'CAL moved')).toBeVisible()
+    await expect(chip(frame, 'CAL weekly')).toHaveCount(0)
+    await chip(frame, 'CAL moved').click()
+    await expect(frame.getByTestId('detail-exception')).toBeVisible()
+    await frame.getByRole('dialog').getByRole('button', { name: 'Restore this occurrence' }).click()
+    await expect(chip(frame, 'CAL weekly')).toBeVisible()
+    await chip(frame, 'CAL weekly').click()
+    await frame.getByRole('dialog').getByRole('button', { name: 'Delete this occurrence' }).click()
+    await frame.getByRole('dialog').last().getByRole('button', { name: 'Delete this occurrence' }).click()
+    await expect(chip(frame, 'CAL weekly')).toHaveCount(0)
     await frame.getByRole('button', { name: 'Today', exact: true }).click()
     await expect(frame.getByTestId('period')).toHaveText(title)
+    await expect(chip(frame, 'CAL weekly')).toBeVisible()
 
     // the day view: the same hours
     await frame.getByRole('button', { name: 'Day', exact: true }).click()
@@ -137,7 +154,32 @@ test.describe.serial('Calendar', () => {
     expect(ics).toContain('SUMMARY:CAL invite')
     expect(ics).toContain('DTSTART:')
     expect(ics).toContain('\r\n')
+    // CAL-14: the invited are in the file with their answer (the answer is now «Maybe»)
+    expect(ics).toMatch(/ATTENDEE;CN="[^"]+";ROLE=REQ-PARTICIPANT;PARTSTAT=TENTATIVE:urn:uuid:/)
     await detail.getByRole('button', { name: 'Close' }).click()
+
+    // CAL-15: an event with a time zone is shown at the hour of the browser and written with its TZID in the file
+    await frame.getByTestId('new-event').click()
+    const zdlg = frame.getByRole('dialog')
+    await zdlg.getByRole('textbox', { name: 'Title', exact: true }).fill('CAL zone')
+    await zdlg.getByLabel('Start time', { exact: true }).fill('08:00')
+    await zdlg.getByTestId('zone').selectOption('Asia/Tokyo')
+    await expect(zdlg).toContainText('Times are in Asia/Tokyo')
+    await zdlg.getByRole('button', { name: 'Create event' }).click()
+    // 08:00 in Tokyo (UTC+9, no daylight saving) at the hour of the browser
+    const shown = await page.evaluate(() => {
+      const n = new Date()
+      const ms = Date.UTC(n.getFullYear(), n.getMonth(), n.getDate(), 8, 0) - 9 * 3600_000
+      return new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).format(new Date(ms))
+    })
+    await expect(chip(frame, 'CAL zone')).toHaveText(`${shown} CAL zone`)
+    await chip(frame, 'CAL zone').click()
+    const zdetail = frame.getByRole('dialog')
+    await expect(zdetail.getByTestId('detail-zone')).toContainText('Asia/Tokyo')
+    const [zdl] = await Promise.all([page.waitForEvent('download'), zdetail.getByRole('button', { name: /Add to my calendar/ }).click()])
+    expect(fs.readFileSync((await zdl.path())!, 'utf8')).toContain('DTSTART;TZID=Asia/Tokyo:')
+    await zdetail.getByRole('button', { name: 'Close' }).click()
+    await remove(frame, 'CAL zone')
 
     // CAL-09: delete the events (the series says that it deletes them all)
     await remove(frame, 'CAL invite')
