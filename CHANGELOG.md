@@ -5,6 +5,10 @@ in Help › What is new (one `## <version>` heading per version, `- ` items, `##
 language of the person: this file in English, [CHANGELOG.it.md](CHANGELOG.it.md) in Italian (keep them
 in step).
 
+## 1.0.14
+
+- Brand of a product: `tagline`, `login_message` and `footer` of `branding/brand.toml` can be written per language, as a table (`[login_message]` with `en = "..."` and `it = "..."`) in place of one string. The sign-in page shows the text of the language of the page, then the plain text, then `en`; a footer set in the platform settings still wins. `validate` accepts both forms.
+
 ## 1.0.13
 
 - Desktop of a product: the configuration file takes the name of the executable (`geoportal.exe` reads `geoportal.toml`, and the release ships `geoportal.example.toml`); `mosaikit.toml` is still read when there is no file with the new name, so an installation made earlier works. `START.txt` and the comments of the file name it. Not renamed (internal names the data depends on): `data/logs/mosaikit.log`, `data/database/mosaikit.db`, the PostgreSQL database `mosaikit`, the files of the Docker and Kubernetes releases (`mosaikit.toml` inside the image).

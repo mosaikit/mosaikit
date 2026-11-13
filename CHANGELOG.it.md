@@ -4,6 +4,10 @@ Cosa cambia da una versione di Mosaikit alla successiva. La shell mostra la sezi
 Aiuto › Novità (un titolo `## <versione>` per versione, voci `- `, gruppi `### `). Questo file è la
 versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
+## 1.0.14
+
+- Brand di un prodotto: `tagline`, `login_message` e `footer` di `branding/brand.toml` si possono scrivere per lingua, come tabella (`[login_message]` con `en = "..."` e `it = "..."`) al posto di una sola stringa. La pagina di accesso mostra il testo della lingua della pagina, poi il testo semplice, poi `en`; un piè di pagina impostato nelle impostazioni della piattaforma prevale ancora. `validate` accetta entrambe le forme.
+
 ## 1.0.13
 
 - Desktop di un prodotto: il file di configurazione prende il nome dell'eseguibile (`geoportal.exe` legge `geoportal.toml`, e la release include `geoportal.example.toml`); `mosaikit.toml` si legge ancora se non c'è il file con il nuovo nome, così un'installazione precedente funziona. `START.txt` e i commenti del file lo nominano. Non rinominati (nomi interni da cui dipendono i dati): `data/logs/mosaikit.log`, `data/database/mosaikit.db`, il database PostgreSQL `mosaikit`, i file delle release Docker e Kubernetes (`mosaikit.toml` dentro l'immagine).

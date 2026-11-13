@@ -11,6 +11,44 @@ use serde::{Deserialize, Serialize};
 
 use crate::{Error, Result};
 
+/// A text of the brand: one plain string, or one string per language (`en`, `it`, ...).
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(untagged)]
+pub enum LText {
+    Plain(String),
+    PerLang(BTreeMap<String, String>),
+}
+
+impl Default for LText {
+    fn default() -> LText {
+        LText::Plain(String::new())
+    }
+}
+
+impl From<&str> for LText {
+    fn from(s: &str) -> LText {
+        LText::Plain(s.to_string())
+    }
+}
+
+impl LText {
+    /// The text without a language: the plain string, else the `en` one, else the first one.
+    pub fn plain(&self) -> &str {
+        match self {
+            LText::Plain(s) => s,
+            LText::PerLang(m) => m.get("en").or_else(|| m.values().next()).map(String::as_str).unwrap_or(""),
+        }
+    }
+
+    /// The texts of the languages, when there are any.
+    pub fn per_lang(&self) -> Option<&BTreeMap<String, String>> {
+        match self {
+            LText::PerLang(m) if !m.is_empty() => Some(m),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct Brand {
@@ -22,13 +60,13 @@ pub struct Brand {
     pub version: Option<String>,
     /// phrase under the name on the sign-in page
     #[serde(default = "d_tagline")]
-    pub tagline: String,
+    pub tagline: LText,
     /// message on the sign-in page (e.g. whom to ask for an account)
     #[serde(default)]
-    pub login_message: String,
+    pub login_message: LText,
     /// footer text (e.g. copyright)
     #[serde(default)]
-    pub footer: String,
+    pub footer: LText,
     /// support or documentation address
     #[serde(default)]
     pub support_url: Option<String>,
@@ -51,7 +89,7 @@ pub struct Brand {
 fn d_name() -> String {
     "Mosaikit".into()
 }
-fn d_tagline() -> String {
+fn d_tagline() -> LText {
     "apps, data and sharing for every tenant".into()
 }
 
@@ -160,13 +198,23 @@ impl Brand {
 
     /// Public data for the UI (sign-in page included).
     pub fn public(&self) -> serde_json::Value {
+        // the plain values keep their name; the texts of a language are in `texts`
+        let mut texts = serde_json::Map::new();
+        for (k, v) in
+            [("tagline", &self.tagline), ("login_message", &self.login_message), ("footer", &self.footer)]
+        {
+            if let Some(m) = v.per_lang() {
+                texts.insert(k.into(), serde_json::json!(m));
+            }
+        }
         serde_json::json!({
             "name": self.name,
             "version": self.version(),
             "kernel_version": crate::KERNEL_VERSION,
-            "tagline": self.tagline,
-            "login_message": self.login_message,
-            "footer": self.footer,
+            "tagline": self.tagline.plain(),
+            "login_message": self.login_message.plain(),
+            "footer": self.footer.plain(),
+            "texts": texts,
             "support_url": self.support_url,
             "logo": self.logo.is_some(),
         })
@@ -201,6 +249,25 @@ mod tests {
             std::fs::write(dir.path().join("brand.toml"), bad).unwrap();
             assert!(Brand::load(dir.path()).is_err(), "{bad}");
         }
+        // one text per language, or one plain string
+        std::fs::write(
+            dir.path().join("brand.toml"),
+            "tagline = \"Maps\"
+[login_message]
+it = \"Per un account scrivi a noi\"
+en = \"Write to us\"
+[footer]
+it = \"Solo italiano\"
+",
+        )
+        .unwrap();
+        let b = Brand::load(dir.path()).unwrap();
+        let p = b.public();
+        assert_eq!(p["tagline"], "Maps");
+        assert_eq!(p["login_message"], "Write to us");
+        assert_eq!(p["footer"], "Solo italiano");
+        assert_eq!(p["texts"]["login_message"]["it"], "Per un account scrivi a noi");
+        assert!(p["texts"].get("tagline").is_none());
         assert_eq!(Brand::default().name, "Mosaikit");
         assert_eq!(Brand::default().css(), "");
     }

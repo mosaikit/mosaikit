@@ -220,6 +220,12 @@ async fn brand(State(s): State<AppState>) -> ApiResult<Json<Value>> {
         o.insert("welcome".into(), text("identity.welcome"));
         if v.get("identity.footer").and_then(Value::as_str).is_some_and(|f| !f.is_empty()) {
             o.insert("footer".into(), text("identity.footer"));
+            // a footer set in the platform settings replaces the one of the brand in every language
+            if v.get("identity.footer").and_then(Value::as_str) != Some(s.k.brand.footer.plain()) {
+                if let Some(t) = o.get_mut("texts").and_then(Value::as_object_mut) {
+                    t.remove("footer");
+                }
+            }
         }
         o.insert("privacy_url".into(), text("identity.privacy_url"));
         // the notice of the maintenance, for everybody (also before signing in)
