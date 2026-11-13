@@ -1625,7 +1625,7 @@ export function AdminPeople() {
                   {p.tenants.map((x) => (
                     <Badge key={x.tenant_id} variant={x.is_home ? 'default' : 'secondary'} className="font-normal" title={roleLabel(x.role)}>
                       {tenantName(x.tenant_id)}
-                      {x.role === 'tenant_manager' ? ' · TM' : ''}
+                      {x.role === 'tenant_manager' ? ` · ${roleLabel(x.role)}` : ''}
                       {x.status === 'suspended' ? ` · ${t('suspended')}` : ''}
                     </Badge>
                   ))}
