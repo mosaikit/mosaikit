@@ -6,7 +6,7 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
 ## 1.0.15
 
-- Amministratore: la tabella delle persone mostra il nome dell'organizzazione, non lo slug; le schede dei plugin non mostrano più la firma (resta nell'elenco e nella pagina del plugin) e sono abbastanza larghe per tutte le loro etichette; i filtri del registro non si sovrappongono più.
+- Amministratore: la tabella delle persone mostra il nome dell'organizzazione, non lo slug; le schede dei plugin mostrano una pillola «Firmato» al posto della riga della firma (chi ha firmato è nel suggerimento, e nell'elenco e nella pagina del plugin) e sono abbastanza larghe per tutte le loro etichette; i filtri del registro non si sovrappongono più.
 - Gestore: «Le tue app» nella panoramica è una sola riga che scorre di lato, quante che siano le app; le righe di «La mia attività recente» restano dentro la scheda.
 - Condivisione: un link pubblico può essere creato senza scadenza quando l'organizzazione non limita la durata, e la finestra dice che il link non scade (o fino a quando funziona) e che funziona a ogni visita; il trasferimento della proprietà non finisce più con un messaggio d'errore quando il vecchio proprietario perde l'accesso: la finestra si chiude.
 - La pagina di un plugin mostra una rotella con il suo nome finché non è caricata.
