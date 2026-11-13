@@ -10,7 +10,7 @@
       "args": ["--config", "${workspaceFolder}/xtask/mosaikit.dev.toml"],
       "cwd": "${workspaceFolder}",
       "environment": [
-        { "name": "MOSAIKIT_ADMIN_PASSWORD", "value": "admin-sviluppo" },
+        { "name": "MOSAIKIT_ADMIN_PASSWORD", "value": "mosaikit" },
         // development plugins (like cargo xtask dev): build them first with cargo xtask plugin build
         {
           "name": "MOSAIKIT_DEV_PLUGINS",

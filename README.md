@@ -167,7 +167,7 @@ cargo xtask --dist ../product dev     # or a distribution (its own brand and plu
 4. Starts **Vite** for the host UI on **http://127.0.0.1:5173**.
 
 First sign-in: *Administrator access* (`#/admin`), user `admin`, password
-`admin-sviluppo` (or the value of `MOSAIKIT_ADMIN_PASSWORD`). In development the
+`mosaikit` (or the value of `MOSAIKIT_ADMIN_PASSWORD`). In development the
 second factor is off (`admin_totp = false`).
 
 | Change | Effect |

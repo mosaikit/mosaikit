@@ -20,7 +20,10 @@ use notify::{RecursiveMode, Watcher};
 use crate::plugins::{self, Plugin};
 use crate::util::{npm, root, run};
 
-pub const DEV_ADMIN_PASSWORD: &str = "admin-sviluppo";
+/// Password of the development Administrator, set at the first start of a database (shorter than the policy of
+/// 10 characters: it goes in as `initial_password`, which the policy does not check; `MOSAIKIT_ADMIN_PASSWORD`, if
+/// set, replaces it and has to follow the policy).
+pub const DEV_ADMIN_PASSWORD: &str = "mosaikit";
 /// Address of the development Administrator (the email is required for every account).
 pub const DEV_ADMIN_EMAIL: &str = "admin@example.test";
 
@@ -102,16 +105,18 @@ fn build_server(inst: Option<&Instance>) -> Result<()> {
     run(&mut c)
 }
 
+/// The password shown at the start: the one of the environment, or the development one.
+fn dev_password() -> String {
+    std::env::var("MOSAIKIT_ADMIN_PASSWORD").unwrap_or_else(|_| DEV_ADMIN_PASSWORD.into())
+}
+
 fn server_cmd(plugins: &[Plugin], inst: Option<&Instance>) -> Result<Command> {
     let dirs = std::env::join_paths(plugins.iter().map(|p| p.dir.clone()))?;
     let mut c = Command::new("cargo");
     c.current_dir(root())
         .args(["run", "-p", "mosaikit-server", "--", "--config"])
         .arg(root().join("xtask").join("mosaikit.dev.toml"))
-        .env(
-            "MOSAIKIT_ADMIN_PASSWORD",
-            std::env::var("MOSAIKIT_ADMIN_PASSWORD").unwrap_or_else(|_| DEV_ADMIN_PASSWORD.into()),
-        )
+        .env("MOSAIKIT_INITIAL_PASSWORD", DEV_ADMIN_PASSWORD)
         .env("MOSAIKIT_DEV_EMAILS", "1")
         .env(
             "MOSAIKIT_ADMIN_EMAIL",
@@ -206,7 +211,7 @@ pub fn dev(no_ui: bool, inst: Option<Instance>) -> Result<()> {
             i.port + 1,
             i.port + 2,
             i.db(),
-            std::env::var("MOSAIKIT_ADMIN_PASSWORD").unwrap_or_else(|_| DEV_ADMIN_PASSWORD.into())
+            dev_password()
         );
     } else {
         println!(
@@ -214,7 +219,7 @@ pub fn dev(no_ui: bool, inst: Option<Instance>) -> Result<()> {
              server:         http://127.0.0.1:47080 (API)  ·  plugin: http://127.0.0.1:47081\n  \
              administrator:  tenant system, user admin, password {}\n  \
              (the password holds for a new database; Ctrl+C to quit)\n",
-            std::env::var("MOSAIKIT_ADMIN_PASSWORD").unwrap_or_else(|_| DEV_ADMIN_PASSWORD.into())
+            dev_password()
         );
     }
 

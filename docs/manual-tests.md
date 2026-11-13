@@ -35,7 +35,7 @@ looks and reads.
 
 | Who | Sign-in | Password | Email | Role |
 |---|---|---|---|---|
-| Administrator | `#/admin`, user `admin` | `admin-sviluppo` | `admin@example.test` | platform administrator (second factor at the first sign-in) |
+| Administrator | `#/admin`, user `admin` | `mosaikit` | `admin@example.test` | platform administrator (second factor at the first sign-in) |
 | Elena Ricci | tenant *Comune di Roma*, `e.ricci` | `password-prova-1` | `e.ricci@example.test` | Tenant Manager |
 | Marco Esposito | *Comune di Roma*, `m.esposito` | `password-prova-1` | `m.esposito@example.test` | Tenant Manager |
 | Sara Greco | *Comune di Roma*, `s.greco` | `password-prova-1` | `s.greco@example.test` | User |
