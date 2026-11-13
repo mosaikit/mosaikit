@@ -1341,4 +1341,8 @@ A shared collection of reusable texts and pieces of code with tags, copied in on
 | NAV-04 | Close the sidebar and hover a group | One icon for the group; a menu opens with all the apps of the group and of its subgroups | manual |
 | NAV-05 | Press «Restore» and save | The sidebar goes back to the groups of the platform (or of the distribution) | e2e `42-navigation.spec.ts` |
 | NAV-06 | As the Administrator set a layout in System › Identity and appearance › Navigation, with «Tenants may customize it» off | Every organization shows it; a Manager sees the setting locked | manual |
+| NAV-08 | In the sidebar look at the active item, open and closed | An accent bar on its left edge | manual |
+| NAV-09 | Closed sidebar: an app of a group gets an unread notification | A red dot on the icon of the group; it goes away when the notification is read | manual |
+| NAV-10 | In the editor drag an app onto another app, onto another group, a group onto another group, a subgroup onto another of the same group | The order follows the drop; the app leaves its old group; the arrows give the same result with the keyboard | manual |
+| NAV-11 | As the Administrator tick «Keep this group in every tenant» on a group and save; as a Tenant Manager set a layout of your own | The locked group is first in the sidebar of the tenant, then the groups of the tenant; «Of the platform» shows the platform's groups read only | manual |
 | NAV-07 | Switch the language to Italian | The group names written for Italian are shown; the others show the name of the base language | manual |

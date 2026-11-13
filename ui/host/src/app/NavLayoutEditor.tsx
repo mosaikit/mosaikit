@@ -2,13 +2,15 @@
 // groups (`NavGroupDef`); the page saves it as the setting `nav.layout`. Order is changed with the arrows, which
 // also work with the keyboard. An app is in one place only: adding it to a group takes it out of the previous one.
 
-import { ArrowDown, ArrowUp, FolderPlus, Plus, Trash2 } from 'lucide-react'
+import { ArrowDown, ArrowUp, FolderPlus, GripVertical, Plus, Trash2 } from 'lucide-react'
+import { useRef } from 'react'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import AppIcon, { ICON_NAMES } from './AppIcon.tsx'
 import { t } from './i18n.ts'
-import { groupIds, move, newGroupId, placed, unplace, type NavGroupDef } from './navgroups.ts'
+import { groupIds, move, newGroupId, placeApp, placed, reorder, unplace, type NavGroupDef } from './navgroups.ts'
 
 export interface EditorApp {
   id: string
@@ -17,6 +19,19 @@ export interface EditorApp {
 }
 
 type Lang = { id: string; name: string }
+
+/** What is being dragged: an app, or a group (`i`), or a subgroup (`i`, `j`). */
+type Drag = { kind: 'app'; plugin: string } | { kind: 'group'; i: number } | { kind: 'sub'; i: number; j: number }
+
+const startDrag = (e: React.DragEvent, set: () => void) => {
+  e.dataTransfer.effectAllowed = 'move'
+  e.dataTransfer.setData('text/plain', 'msk-nav')
+  set()
+}
+const over = (e: React.DragEvent) => {
+  e.preventDefault()
+  e.dataTransfer.dropEffect = 'move'
+}
 
 const none = '__none__'
 
@@ -65,15 +80,23 @@ function IconSelect({ g, onChange }: { g: NavGroupDef; onChange: (c: Partial<Nav
 }
 
 /** The apps of one group: order, remove and add (from the apps not placed anywhere, or taken from another group). */
-function AppsOf({ g, apps, all, onChange }: { g: NavGroupDef; apps: EditorApp[]; all: NavGroupDef[]; onChange: (plugins: string[], moved?: string) => void }) {
+function AppsOf({ g, apps, all, onChange, onDragApp, onDropApp }: { g: NavGroupDef; apps: EditorApp[]; all: NavGroupDef[]; onChange: (plugins: string[], moved?: string) => void; onDragApp: (plugin: string) => void; onDropApp: (before?: string) => void }) {
   const byId = new Map(apps.map((a) => [a.id, a]))
   const here = (g.plugins ?? []).filter((p) => byId.has(p))
   const inGroups = placed(all)
   const addable = apps.filter((a) => !(g.plugins ?? []).includes(a.id))
   return (
-    <div className="grid gap-1">
+    <div className="grid gap-1" onDragOver={over} onDrop={(e) => (e.preventDefault(), onDropApp())}>
       {here.map((p, i) => (
-        <div key={p} className="flex items-center gap-2 rounded-md border bg-background px-2 py-1 text-sm">
+        <div
+          key={p}
+          draggable
+          onDragStart={(e) => startDrag(e, () => onDragApp(p))}
+          onDragOver={over}
+          onDrop={(e) => (e.preventDefault(), e.stopPropagation(), onDropApp(p))}
+          className="flex cursor-grab items-center gap-2 rounded-md border bg-background px-2 py-1 text-sm active:cursor-grabbing"
+        >
+          <GripVertical className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
           <AppIcon id={p} name={byId.get(p)?.icon_name} className="size-4 text-primary" />
           <span className="min-w-0 flex-1 truncate">{byId.get(p)!.label}</span>
           <Button variant="ghost" size="icon" className="size-7" aria-label={t('Move {name} up', { name: byId.get(p)!.label })} disabled={i === 0} onClick={() => onChange(move(here, i, -1))}>
@@ -106,8 +129,9 @@ function AppsOf({ g, apps, all, onChange }: { g: NavGroupDef; apps: EditorApp[];
   )
 }
 
-export default function NavLayoutEditor({ value, apps, langs, onChange }: { value: NavGroupDef[]; apps: EditorApp[]; langs: Lang[]; onChange: (v: NavGroupDef[]) => void }) {
+export default function NavLayoutEditor({ value, apps, langs, onChange, canLock }: { value: NavGroupDef[]; apps: EditorApp[]; langs: Lang[]; onChange: (v: NavGroupDef[]) => void; canLock?: boolean }) {
   const ids = groupIds(value)
+  const drag = useRef<Drag | null>(null)
   const setApps = (path: { i: number; j?: number }, plugins: string[], moved?: string) => {
     // an app taken from another group first leaves it
     const base = moved ? unplace(value, moved) : value
@@ -119,6 +143,22 @@ export default function NavLayoutEditor({ value, apps, langs, onChange }: { valu
       }),
     )
   }
+  // a drop: an app goes before another app or at the end of a group; a group or a subgroup takes the place of another
+  const dropApp = (to: { i: number; j?: number }) => (before?: string) => {
+    const d = drag.current
+    drag.current = null
+    if (d?.kind === 'app' && d.plugin !== before) onChange(placeApp(value, d.plugin, to, before))
+  }
+  const dropGroup = (to: number) => {
+    const d = drag.current
+    drag.current = null
+    if (d?.kind === 'group') onChange(reorder(value, d.i, to))
+  }
+  const dropSub = (i: number, to: number) => {
+    const d = drag.current
+    drag.current = null
+    if (d?.kind === 'sub' && d.i === i) onChange(patch(value, i, { children: reorder(value[i].children ?? [], d.j, to) }))
+  }
   const addGroup = () => onChange([...value, { id: newGroupId(t('New group'), ids), label: t('New group'), plugins: [] }])
   const addSub = (i: number) => {
     const name = t('New subgroup')
@@ -129,8 +169,26 @@ export default function NavLayoutEditor({ value, apps, langs, onChange }: { valu
     <div className="grid gap-4" data-testid="nav-editor">
       {value.length === 0 && <p className="text-sm text-muted-foreground">{t('No groups: the apps show in one list. Add a group to start.')}</p>}
       {value.map((g, i) => (
-        <section key={g.id} className="grid gap-3 rounded-xl border bg-card p-4" aria-label={g.label || g.id}>
+        <section
+          key={g.id}
+          className="grid gap-3 rounded-xl border bg-card p-4"
+          aria-label={g.label || g.id}
+          onDragOver={over}
+          onDrop={(e) => {
+            e.preventDefault()
+            if (drag.current?.kind === 'group') dropGroup(i)
+          }}
+        >
           <div className="flex flex-wrap items-center gap-2">
+            <span
+              draggable
+              role="img"
+              aria-label={t('Drag the group')}
+              onDragStart={(e) => startDrag(e, () => (drag.current = { kind: 'group', i }))}
+              className="flex cursor-grab items-center text-muted-foreground active:cursor-grabbing"
+            >
+              <GripVertical className="size-5" />
+            </span>
             <IconSelect g={g} onChange={(c) => onChange(patch(value, i, c))} />
             <div className="min-w-48 flex-1">
               <LabelFields g={g} langs={langs} onChange={(c) => onChange(patch(value, i, c))} />
@@ -145,10 +203,35 @@ export default function NavLayoutEditor({ value, apps, langs, onChange }: { valu
               <Trash2 />
             </Button>
           </div>
-          <AppsOf g={g} apps={apps} all={value} onChange={(p, moved) => setApps({ i }, p, moved)} />
+          {canLock && (
+            <label className="flex items-center gap-2 text-sm">
+              <Checkbox checked={!!g.locked} onCheckedChange={(v) => onChange(patch(value, i, { locked: !!v }))} aria-label={t('Keep this group in every tenant')} />
+              {t('Keep this group in every tenant')}
+              <span className="text-xs text-muted-foreground">{t('A tenant that sets its own groups still has it, first')}</span>
+            </label>
+          )}
+          <AppsOf g={g} apps={apps} all={value} onChange={(p, moved) => setApps({ i }, p, moved)} onDragApp={(plugin) => (drag.current = { kind: 'app', plugin })} onDropApp={dropApp({ i })} />
           {(g.children ?? []).map((c, j) => (
-            <div key={c.id} className="ml-5 grid gap-3 border-l-2 pl-4" role="group" aria-label={c.label || c.id}>
+            <div
+              key={c.id}
+              className="ml-5 grid gap-3 border-l-2 pl-4"
+              role="group"
+              aria-label={c.label || c.id}
+              onDragOver={over}
+              onDrop={(e) => {
+                if (drag.current?.kind === 'sub') (e.preventDefault(), e.stopPropagation(), dropSub(i, j))
+              }}
+            >
               <div className="flex flex-wrap items-center gap-2">
+                <span
+                  draggable
+                  role="img"
+                  aria-label={t('Drag the subgroup')}
+                  onDragStart={(e) => (e.stopPropagation(), startDrag(e, () => (drag.current = { kind: 'sub', i, j })))}
+                  className="flex cursor-grab items-center text-muted-foreground active:cursor-grabbing"
+                >
+                  <GripVertical className="size-5" />
+                </span>
                 <IconSelect g={c} onChange={(ch) => onChange(patch(value, i, { children: (g.children ?? []).map((x, k) => (k === j ? { ...x, ...ch } : x)) }))} />
                 <div className="min-w-48 flex-1">
                   <LabelFields g={c} langs={langs} onChange={(ch) => onChange(patch(value, i, { children: (g.children ?? []).map((x, k) => (k === j ? { ...x, ...ch } : x)) }))} />
@@ -163,7 +246,7 @@ export default function NavLayoutEditor({ value, apps, langs, onChange }: { valu
                   <Trash2 />
                 </Button>
               </div>
-              <AppsOf g={c} apps={apps} all={value} onChange={(p, moved) => setApps({ i, j }, p, moved)} />
+              <AppsOf g={c} apps={apps} all={value} onChange={(p, moved) => setApps({ i, j }, p, moved)} onDragApp={(plugin) => (drag.current = { kind: 'app', plugin })} onDropApp={dropApp({ i, j })} />
             </div>
           ))}
           <div>

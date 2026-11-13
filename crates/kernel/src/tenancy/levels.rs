@@ -678,7 +678,20 @@ pub async fn effective(k: &Kernel, tenant: Option<Uuid>) -> Result<Map<String, V
     let defaults = Defaults::of(k);
     if let Some(id) = tenant {
         if let Some((own, name, false)) = tenant_row(k, id).await? {
-            return Ok(values(&tenant_view(&platform, &own, &name, &defaults)));
+            let mut v = values(&tenant_view(&platform, &own, &name, &defaults));
+            // a tenant with a layout of its own keeps the groups the platform locked, before its own
+            if let Some(Value::Array(mine)) = raw(&own, "nav.layout") {
+                let platform_nav = values(&platform_view(&platform, &defaults)).remove("nav.layout");
+                if let Some(Value::Array(theirs)) = platform_nav {
+                    let mut all: Vec<Value> =
+                        theirs.into_iter().filter(|g| g.get("locked") == Some(&json!(true))).collect();
+                    if !all.is_empty() {
+                        all.extend(mine);
+                        v.insert("nav.layout".into(), Value::Array(all));
+                    }
+                }
+            }
+            return Ok(v);
         }
     }
     Ok(values(&platform_view(&platform, &defaults)))

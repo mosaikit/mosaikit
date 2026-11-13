@@ -400,3 +400,28 @@ async fn the_navigation_layout_is_a_setting_with_subgroups() {
     let l = set_tenant(&t, &manager, &map(json!({ "nav.layout": null }))).await.unwrap();
     assert_eq!(get(&l, "nav.layout").value, layout);
 }
+
+#[tokio::test]
+async fn a_group_the_platform_locked_stays_in_the_layout_of_a_tenant() {
+    let t = start().await;
+    let admin = t.admin().await;
+    let g = t.tenant("alfa").await;
+    let manager = t.home(&g).await;
+    let alfa = manager.tenant.tenant_id;
+    let platform = json!([
+        { "id": "core", "label": "Core", "plugins": ["notes"], "locked": true },
+        { "id": "free", "label": "Free", "plugins": ["files"] },
+    ]);
+    set_platform(&t, &admin, &map(json!({ "nav.layout": platform })), &Map::new()).await.unwrap();
+    // without a layout of its own the tenant sees the platform's
+    assert_eq!(effective(&t, Some(alfa)).await.unwrap()["nav.layout"], platform);
+    // with one, the locked group comes first and the free one is the tenant's to drop
+    let own = json!([{ "id": "mine", "label": "Mine", "plugins": ["tasks"] }]);
+    set_tenant(&t, &manager, &map(json!({ "nav.layout": own }))).await.unwrap();
+    let v = effective(&t, Some(alfa)).await.unwrap();
+    let ids: Vec<_> =
+        v["nav.layout"].as_array().unwrap().iter().map(|x| x["id"].as_str().unwrap().to_string()).collect();
+    assert_eq!(ids, ["core", "mine"]);
+    // the platform itself shows its own layout
+    assert_eq!(effective(&t, None).await.unwrap()["nav.layout"], platform);
+}

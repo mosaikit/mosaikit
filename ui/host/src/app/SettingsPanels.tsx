@@ -212,7 +212,10 @@ export function NavigationPanel({ level }: { level: Level }) {
   const ctx = useTenantCtx(level.kind === 'tenant' ? level.slug : '')
   const admin = useApi<AdminPlugin[]>(['admin-plugins'], level.kind === 'platform' ? '/api/admin/plugins' : null)
   const langs = useLanguages()
-  const apps = (level.kind === 'tenant' ? ctx.data?.plugins : admin.data)?.filter(isApp) ?? []
+  // a tenant can look at the groups of the platform (read only) next to its own
+  const [view, setView] = useState<'own' | 'platform'>('own')
+  const apps = ((level.kind === 'tenant' ? ctx.data?.plugins : admin.data)?.filter(isApp) ?? []).map((p) => ({ id: p.id, label: p.label, icon_name: p.icon_name }))
+  const list = (v: unknown): NavGroupDef[] => (Array.isArray(v) ? (v as NavGroupDef[]) : [])
   return (
     <Panel
       level={level}
@@ -223,12 +226,29 @@ export function NavigationPanel({ level }: { level: Level }) {
       {(d, s) =>
         s('nav.layout') && (
           <Row level={level} d={d} s={s('nav.layout')!} display={(v) => (Array.isArray(v) && v.length ? `${v.length} ${t('groups')}` : t('No groups'))}>
-            <NavLayoutEditor
-              value={Array.isArray(d.value('nav.layout')) ? (d.value('nav.layout') as NavGroupDef[]) : []}
-              apps={apps.map((p) => ({ id: p.id, label: p.label, icon_name: p.icon_name }))}
-              langs={langs}
-              onChange={(v) => d.set('nav.layout', v)}
-            />
+            {level.kind === 'tenant' && (
+              <div className="mb-3 flex items-center gap-2" role="radiogroup" aria-label={t('Whose groups')}>
+                {(['own', 'platform'] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    role="radio"
+                    aria-checked={view === v}
+                    onClick={() => setView(v)}
+                    className={cn('h-7 rounded-full border px-3 text-xs hover:bg-accent', view === v && 'border-primary bg-primary text-primary-foreground hover:bg-primary')}
+                  >
+                    {v === 'own' ? t('Of my tenant') : t('Of the platform')}
+                  </button>
+                ))}
+              </div>
+            )}
+            {level.kind === 'tenant' && view === 'platform' ? (
+              <fieldset disabled className="opacity-80">
+                <NavLayoutEditor value={list(s('nav.layout')!.platform)} apps={apps} langs={langs} onChange={() => undefined} />
+              </fieldset>
+            ) : (
+              <NavLayoutEditor value={list(d.value('nav.layout'))} apps={apps} langs={langs} onChange={(v) => d.set('nav.layout', v)} canLock={level.kind === 'platform'} />
+            )}
           </Row>
         )
       }
