@@ -3,7 +3,7 @@
 // same model (slots.tsx, Shell.tsx, frames.tsx).
 
 import type { CSSProperties, ReactNode } from 'react'
-import { Activity, Building2, CalendarClock, Gauge, History, House, LayoutDashboard, LayoutGrid, Puzzle, Settings, Share2, ShieldCheck, Users } from 'lucide-react'
+import { Activity, Building2, CalendarClock, Gauge, History, LayoutDashboard, LayoutGrid, Puzzle, Settings, Share2, ShieldCheck, Users } from 'lucide-react'
 import type { PluginView, Session } from '../types.ts'
 import AppIcon from './AppIcon.tsx'
 import { useBrand } from '../brand.ts'
@@ -119,12 +119,12 @@ export function useNav(session: Session, route: Route, grouped = false): Nav {
   const groups: NavGroup[] = [
     {
       id: 'start',
-      label: manager ? t('Tenant overview') : t('Home'),
-      icon: <House />,
+      label: manager ? t('Tenant overview') : t('Overview'),
+      icon: <LayoutDashboard />,
       items: [
         manager
           ? { label: t('Tenant overview'), short: t('Overview'), icon: <LayoutDashboard />, href: to.tenant(slug), active: page === 'home' }
-          : { label: t('Home'), icon: <House />, href: to.tenant(slug), active: page === 'home' },
+          : { label: t('Overview'), icon: <LayoutDashboard />, href: to.tenant(slug), active: page === 'home' },
       ],
     },
     ...appGroups(apps, grouped ? defs : undefined),

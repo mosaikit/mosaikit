@@ -395,7 +395,7 @@ test.describe.serial('12-review-round1-platform', () => {
     await login(page, 'Overview Tenant', 'ov-user', PASSWORD)
     await test.step('R1-O-01 User: Home with pick up, due soon, for you, recent activity and shared by me', async () => {
       await page.goto('./#/t/ovw')
-      await expect(page.getByRole('heading', { name: 'Home', exact: true })).toBeVisible()
+      await expect(page.getByRole('heading', { name: 'Overview', exact: true })).toBeVisible()
       await expect(page.getByRole('navigation', { name: 'Your apps' })).toHaveCount(0)
       for (const name of ['Pick up where you left off', 'Due soon', 'For you']) await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
       await expect(page.getByRole('region', { name: 'Shared by me' })).toBeVisible()

@@ -261,7 +261,7 @@ export function IdentityPanel({ level }: { level: Level }) {
             {s('identity.legal_url') && <TextRow level={level} d={d} s={s('identity.legal_url')!} placeholder="https://" />}
             {s('identity.guide_url') && <TextRow level={level} d={d} s={s('identity.guide_url')!} placeholder="https://" />}
             {s('identity.landing') && (
-              <ChoiceRow level={level} d={d} s={s('identity.landing')!} options={[['home', t('Home')], ...apps.map((p): [string, string] => [p.id, p.label])]} />
+              <ChoiceRow level={level} d={d} s={s('identity.landing')!} options={[['home', t('Overview')], ...apps.map((p): [string, string] => [p.id, p.label])]} />
             )}
           </>
         )}
