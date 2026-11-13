@@ -133,7 +133,7 @@ async fn run(k: &Kernel, c: &Caller, plugin: &str, req: &Value, detach_audit: bo
             .await?
             .into_iter()
             .filter(|(_, u, n)| {
-                needle.is_empty() || u.to_lowercase().contains(&needle) || n.to_lowercase().contains(&needle)
+                needle.is_empty() || u.to_lowercase().contains(needle) || n.to_lowercase().contains(needle)
             })
             .take(q.limit as usize)
             .map(|(id, u, n)| json!({ "id": id.to_string(), "username": u, "name": n }))
