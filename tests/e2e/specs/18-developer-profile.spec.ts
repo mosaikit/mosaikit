@@ -128,6 +128,11 @@ async function signIn(page: Page, user: string) {
   await expect(page.getByRole('button', { name: /person menu/ })).toBeVisible()
 }
 
+async function openTools(page: import('@playwright/test').Page) {
+  await page.getByTestId('dev-pill').click()
+  await page.getByRole('button', { name: 'Developer tools' }).click()
+}
+
 test('the banner is there before and after signing in, and the test users are listed', async ({ page }) => {
   await page.goto(APP)
   const banner = page.getByTestId('dev-banner')
@@ -138,7 +143,12 @@ test('the banner is there before and after signing in, and the test users are li
   const health = await (await fetch(`${APP}api/health`)).json()
   expect(health.developer).toBe(true)
   await signIn(page, 'alice')
-  await expect(page.getByTestId('dev-banner')).toBeVisible()
+  // signed in: no full-width banner, a pill in the top bar that cannot be missed, with the whole warning in its panel
+  await expect(page.getByTestId('dev-banner')).toHaveCount(0)
+  await expect(page.getByTestId('dev-pill')).toContainText('Developer profile')
+  await page.getByTestId('dev-pill').click()
+  await expect(page.getByTestId('dev-pill-panel')).toContainText('Never use it for real data')
+  await page.keyboard.press('Escape')
   // the tenant is reachable: the sample content is there (the welcome notification)
   await page.goto(`${APP}#/t/dev/notifications`)
   await expect(page.getByText('Welcome to the developer profile').first()).toBeVisible()
@@ -153,7 +163,7 @@ test('the UI, the manifest and the migrations reload from the folder', async ({ 
   fs.writeFileSync(path.join(folder, 'ui', 'dist', 'index.html'), html('version two'))
   await expect(frame.locator('#v')).toHaveText('version two', { timeout: 20_000 })
   // the manifest as the server reads it follows the file
-  await page.getByRole('button', { name: 'Developer tools' }).click()
+  await openTools(page)
   const manifestTab = page.getByRole('tab', { name: 'Manifest' })
   await manifestTab.click()
   await expect(page.getByTestId('dev-manifest')).toContainText('"label": "Devloop"')
@@ -165,7 +175,7 @@ test('host calls with timings and errors, permissions, and the switch of test us
   await signIn(page, 'alice')
   await page.goto(`${APP}#/t/dev/p/${ID}`)
   await expect(page.frameLocator('iframe.plugin-frame').locator('#v')).toBeVisible()
-  await page.getByRole('button', { name: 'Developer tools' }).click()
+  await openTools(page)
   await page.getByRole('tab', { name: 'Host calls' }).click()
   const calls = page.getByTestId('dev-calls')
   await expect(calls).toContainText('crud.list')
@@ -178,7 +188,7 @@ test('host calls with timings and errors, permissions, and the switch of test us
   for (const u of ['admin', 'manager', 'alice', 'bob']) await expect(users).toContainText(u)
   await page.getByRole('button', { name: 'Switch to bob' }).click()
   await expect.poll(async () => (await (await page.request.get(`${APP}api/session`)).json()).user?.username).toBe('bob')
-  await expect(page.getByTestId('dev-banner')).toBeVisible()
+  await expect(page.getByTestId('dev-pill')).toBeVisible()
 })
 
 test('a changed migration asks before it deletes the data, and the reset button does the same on demand', async ({ page }) => {
@@ -192,7 +202,7 @@ test('a changed migration asks before it deletes the data, and the reset button 
   await ask.getByRole('button', { name: 'Confirm' }).click()
   await expect(page.getByText(/Data of .* deleted/).first()).toBeVisible()
   // the reset on demand, with its confirmation (and a no)
-  await page.getByRole('button', { name: 'Developer tools' }).click()
+  await openTools(page)
   await page.getByRole('tab', { name: 'Data' }).click()
   await page.getByRole('button', { name: 'Reset the data of this plugin' }).click()
   await page.getByRole('alertdialog').getByRole('button', { name: 'Cancel' }).click()
@@ -203,7 +213,7 @@ test('a changed migration asks before it deletes the data, and the reset button 
 
 test('the developer tools open on an empty state while no plugin is open', async ({ page }) => {
   await signIn(page, 'manager')
-  await page.getByRole('button', { name: 'Developer tools' }).click()
+  await openTools(page)
   await page.getByRole('tab', { name: 'Manifest' }).click()
   await expect(page.getByTestId('dev-panel').getByTestId('empty-compact')).toContainText('Open a plugin')
 })

@@ -9,7 +9,7 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { MaintenanceBanner } from './pages/operations.tsx'
-import { DevBanner } from './DevTools.tsx'
+import { DevBanner, DevPill } from './DevTools.tsx'
 import { useBrand } from '../brand.ts'
 import type { Session, ShellBand } from '../types.ts'
 import {
@@ -348,9 +348,12 @@ function TopBar({ session, route, band, bandImage }: { session: Session; route: 
         {ctxBand?.back && <BackButton back={ctxBand.back} onBack={() => bandEmit('band.back', {})} />}
       </div>
       {searchOn ? (
-        <BandSearch session={session} route={route} nav={nav} />
+        <div className="flex min-w-0 items-center gap-2">
+          <DevPill />
+          <div className="min-w-0 flex-1"><BandSearch session={session} route={route} nav={nav} /></div>
+        </div>
       ) : (
-        <div className="flex justify-center max-[900px]:flex-1">{modeSwitch}</div>
+        <div className="flex items-center justify-center gap-2 max-[900px]:flex-1"><DevPill />{modeSwitch}</div>
       )}
       <div className="flex items-center gap-2 justify-self-end">
         {searchOn && modeSwitch}

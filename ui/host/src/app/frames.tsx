@@ -19,7 +19,7 @@ import { cn } from '@/lib/utils'
 import { t } from './i18n.ts'
 import { HelpLayer } from './HelpLayer.tsx'
 import { MaintenanceBanner } from './pages/operations.tsx'
-import { DevBanner } from './DevTools.tsx'
+import { DevBanner, DevPill } from './DevTools.tsx'
 import { QuotaAlert } from './Quotas.tsx'
 import type { Route } from './router.ts'
 import type { LayoutInfo } from './layouts.ts'
@@ -194,7 +194,8 @@ export default function Frame({ session, route, band, layout, bandImage, childre
           <Breadcrumb crumbs={crumbs} />
         </>
       )}
-      <div className={cn('flex min-w-0 flex-1', wideSearch ? 'justify-start' : 'justify-center')}>
+      <div className={cn('flex min-w-0 flex-1 items-center gap-2', wideSearch ? 'justify-start' : 'justify-center')}>
+        <DevPill />
         {band.search && (
           <div className={cn('@container w-full', wideSearch ? 'max-w-[720px]' : 'max-w-[420px]')}>
             <BandSearch session={session} route={route} nav={nav} />
