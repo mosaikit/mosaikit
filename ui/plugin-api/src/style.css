@@ -357,3 +357,9 @@ dialog.msk-modal .msk-actions { position: sticky; bottom: -24px; margin: 18px -2
   .msk-skel-i { animation: none; }
   .msk-kcard, .msk-kcol, .msk-progress-fill { transition: none; }
 }
+
+/* the standard loading spinner (`msk.busy`, `msk.loading`): above the page, never in the way of the pointer */
+.msk-busy { position: fixed; inset: 0; z-index: 1000; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; pointer-events: none; background: color-mix(in srgb, var(--bg) 45%, transparent); color: var(--dim); font-size: 13px; }
+.msk-busy-ring { width: 28px; height: 28px; border-radius: 50%; border: 3px solid var(--line); border-top-color: var(--acc); animation: msk-spin 0.9s linear infinite; }
+@keyframes msk-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .msk-busy-ring { animation: none; border-top-color: var(--line); border-right-color: var(--acc); } }

@@ -1,6 +1,7 @@
 import { Bridge, BridgeError } from './bridge.ts'
 import { API_VERSION, checkHostApi } from './version.ts'
 import { translate, type Vars } from './text.ts'
+import { setBusy, withBusy } from './busy.ts'
 import type { RealtimeEvent, RealtimeMessage, RealtimePerson, RealtimeStatus, BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, Unzipped, UploadProgress, FolderSuggestion, FileInfo, FileTicket, UiContext, Values, WebProbe, SharePreselect } from './protocol.ts'
 
 /** The extensions of the plugin on a resource (fields and actions other plugins add to its items). */
@@ -429,6 +430,29 @@ export class Msk {
         void this.bridge.call('band.reset').catch(() => {})
       },
     }
+  }
+
+  /** «Loading…» in the language of the page: the phrase of the language plugin of the page, else the built-in three languages. */
+  private loadingLabel(): string {
+    const own = this.t('Loading…')
+    if (own !== 'Loading…') return own
+    const lang = this.context?.lang
+    return lang === 'it' ? 'Caricamento…' : lang === 'es' ? 'Cargando…' : own
+  }
+
+  /**
+   * The standard loading spinner of the page: `busy(true)` shows it, `busy(false)` hides it. It appears only if the
+   * work lasts a little, never blocks the page, is counted (two `true` need two `false`) and goes off by itself at an
+   * unhandled error of the page. `mountCrud` and the other views of the kit use it for their first load, so a plugin
+   * that only uses them has it without writing anything. Same look in every plugin.
+   */
+  busy(on: boolean): void {
+    setBusy(on, this.loadingLabel())
+  }
+
+  /** `busy(true)`, then the work, then `busy(false)` (also when it fails): `await msk.loading(msk.list(...))`. */
+  loading<T>(work: Promise<T> | (() => Promise<T>)): Promise<T> {
+    return withBusy(work, this.loadingLabel())
   }
 
   /**

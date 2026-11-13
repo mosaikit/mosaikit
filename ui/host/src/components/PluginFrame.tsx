@@ -76,6 +76,9 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
   const ref = useRef<HTMLIFrameElement>(null)
   const ui = useUi()
   const [loaded, setLoaded] = useState(false)
+  // the plugin has started and talked to the host (`hello`): until then the host shows the spinner; after it the plugin
+  // shows its own (`msk.busy`, `msk.loading`, built into the views of the kit) while it asks for its data
+  const [connected, setConnected] = useState(false)
   // the tabs of extensions open in the detail of an item of this plugin (drawn by the host, see ExtensionTab)
   const [tabs, setTabs] = useState<TabState[]>([])
   // with a wildcard plugin_url every plugin UI has a host (an origin) of its own: the server says which
@@ -86,6 +89,7 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
 
   useEffect(() => {
     setLoaded(false)
+    setConnected(false)
     setTabs([])
   }, [src])
 
@@ -175,6 +179,7 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
         switch (m.op) {
           case 'hello':
             checkPluginApi(m.args)
+            setConnected(true)
             // every document of the plugin starts with `hello`: the band and the channels of the page it replaces go
             resetBand(owner)
             closeStreams()
@@ -323,6 +328,8 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
         referrerPolicy="no-referrer"
         onLoad={() => {
           setLoaded(true)
+          // a page of the plugin that never says `hello` (no kit) must not keep the spinner forever
+          window.setTimeout(() => setConnected(true), 3000)
           // a new page of the plugin: its tabs went with the old one
           setTabs([])
         }}
@@ -330,7 +337,7 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
       {tabs.map((tab) => (
         <ExtensionTab key={tab.handle} tab={tab} session={session} ctx={ctx} reloadKey={reloadKey} context={(id) => uiContext(shellRef.current, id)} uiKey={uiKey} toBase={toBase} />
       ))}
-      {!loaded && (
+      {!connected && (
         <div className="frame-msg" role="status" data-testid="frame-loading">
           <span className="flex items-center gap-2">
             <Loader2 className="size-5 animate-spin text-primary" aria-hidden="true" />
