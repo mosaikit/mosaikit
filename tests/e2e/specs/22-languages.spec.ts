@@ -61,4 +61,19 @@ test.describe.serial('Language plugins', () => {
       await expect(frame.locator('html')).toHaveAttribute('dir', code === 'ar' ? 'rtl' : 'ltr')
     }
   })
+
+  test('LANG-04 Tasks (own table in Italian, language plugins in the others) and its crud view speak es and ar', async ({ page }) => {
+    const ui = (code: string): Record<string, string> => JSON.parse(fs.readFileSync(path.join(ROOT, `lang-${code}`, 'lang', 'ui', 'com.mosaikit.tasks.json'), 'utf8'))
+    await login(page, 'Alfa', 'manager', PASSWORD)
+    for (const code of ['es', 'ar', 'en']) {
+      await page.evaluate((c) => localStorage.setItem('msk_lang', c), code)
+      await page.goto('./#/t/alfa/p/com.mosaikit.tasks')
+      await page.reload()
+      const frame = page.frameLocator('iframe.plugin-frame')
+      // a text of the plugin and a built-in text of the crud view (the filter of the list)
+      await expect(frame.getByLabel(code === 'en' ? 'Quick add a task' : ui(code)['Quick add a task']).first()).toBeVisible()
+      await expect(frame.getByLabel(code === 'en' ? 'Filter' : ui(code)['Filter'], { exact: true }).first()).toBeVisible()
+      await expect(frame.locator('html')).toHaveAttribute('dir', code === 'ar' ? 'rtl' : 'ltr')
+    }
+  })
 })
