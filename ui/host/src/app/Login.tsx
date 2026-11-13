@@ -46,7 +46,7 @@ const TEST_USERS: TestUser[] = import.meta.env.DEV
       { tenant: 'regione-lazio', username: 'l.verdi', password: 'password-prova-1', who: `Luca Verdi · ${t('Tenant Manager')}` },
     ]
   : []
-const TEST_ADMINS: TestUser[] = import.meta.env.DEV ? [{ tenant: '', username: 'admin', password: 'admin-sviluppo', who: 'Administrator' }] : []
+const TEST_ADMINS: TestUser[] = import.meta.env.DEV ? [{ tenant: '', username: 'admin', password: 'mosaikit', who: 'Administrator' }] : []
 
 /** The suggestions of the Username field: picking one, the caller fills in the password. */
 function TestUsers({ id, users }: { id: string; users: TestUser[] }) {
