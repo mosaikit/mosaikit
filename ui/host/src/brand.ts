@@ -12,6 +12,8 @@ export interface Brand {
   tagline: string
   login_message: string
   footer: string
+  /** the texts of the brand written per language (`{ login_message: { it: '...' } }`): the plain ones above are the fallback */
+  texts?: Partial<Record<'tagline' | 'login_message' | 'footer', Record<string, string>>>
   support_url: string | null
   /** there is a brand logo (otherwise the Mosaikit symbol) */
   logo: boolean
@@ -42,6 +44,12 @@ export interface Brand {
   about?: { product: string | null; version: string | null; licence: string | null; text: string | null; base: string; base_range: string | null }
   /** maintenance mode and the planned one (recent servers) */
   maintenance?: { on: boolean; message: string; planned_at: string | null; planned_message: string }
+}
+
+/** A text of the brand in the language of the page: the one of the language, else the plain one. */
+export function brandText(b: Brand, key: 'tagline' | 'login_message' | 'footer', lang: string): string {
+  const per = b.texts?.[key]
+  return per?.[lang] ?? per?.[lang.split('-')[0]] ?? b[key]
 }
 
 export const DEFAULT_BRAND: Brand = {

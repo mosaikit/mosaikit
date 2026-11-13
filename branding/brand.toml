@@ -19,6 +19,10 @@ tagline = "apps, data and sharing for every tenant"
 
 # Message on the sign-in page (e.g. whom to ask for an account).
 # login_message = "For an account write to support@example.com"
+# `tagline`, `login_message` and `footer` can also be one string per language:
+# [login_message]
+# en = "For an account write to support@example.com"
+# it = "Per un account scrivi a support@example.com"
 
 # Text at the foot of the sign-in page (default: the name).
 # footer = "© 2026 Example Inc."

@@ -75,7 +75,7 @@ keycloak = true             # Keycloak e un tenant d'esempio che accede con esso
 
 ## 4. Brand e identità
 
-`branding/brand.toml`: `name`, `tagline`, `login_message`, `footer`, `support_url`, `logo`, `favicon`, `icon` (un `.ico` 16–256 px) e `[colors]`
+`branding/brand.toml`: `name`, `tagline`, `login_message`, `footer` (ognuno dei tre è una stringa, o una tabella con una stringa per lingua: `[login_message]` `en = "..."`, `it = "..."`; la pagina di accesso sceglie la lingua della pagina, poi la stringa semplice, poi `en`), `support_url`, `logo`, `favicon`, `icon` (un `.ico` 16–256 px) e `[colors]`
 (solo `#rrggbb`). I plugin ricevono gli stessi colori. `validate` controlla che i file esistano e che i colori siano `#rrggbb`.
 I nomi di `[colors]` sono `accent` (pulsanti, link, focus), `bg` (pagina), `panel`, `panel2` (schede e fasce), `line` (bordi), `fg` (testo),
 `dim` (testo secondario), `ok` ed `err`; ogni altro nome è rifiutato. I colori sono iniettati nella pagina che il server invia; `GET /api/brand`

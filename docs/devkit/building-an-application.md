@@ -115,7 +115,7 @@ Keys: `name`, `command`, `args`, `env`, `health`, `port` (1024-65535), `depends_
 
 ## 4. Brand and identity
 
-`branding/brand.toml`: `name`, `tagline`, `login_message`, `footer`, `support_url`, `logo` (svg, png or webp, about 64 px
+`branding/brand.toml`: `name`, `tagline`, `login_message`, `footer` (each of the three is a string, or a table with one string per language: `[login_message]` `en = "..."`, `it = "..."`; the sign-in page picks the language of the page, then the plain string, then `en`), `support_url`, `logo` (svg, png or webp, about 64 px
 high), `favicon`, `icon` (a `.ico` of 16–256 px, for the desktop executable and the notification area) and `[colors]` (`#rrggbb`
 only; the transparent variants of the accent are computed). The plugin UIs receive the same colours. `validate` checks that
 the files exist and that the colours are `#rrggbb`.

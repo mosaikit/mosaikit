@@ -260,6 +260,24 @@ fn check_brand(dir: &Path, r: &mut Report) {
             }
         }
     }
+    for k in ["tagline", "login_message", "footer"] {
+        match t.get(k) {
+            None => {}
+            Some(toml::Value::String(_)) => {}
+            Some(toml::Value::Table(m)) => {
+                if m.is_empty() || m.iter().any(|(l, v)| l.is_empty() || !v.is_str()) {
+                    r.add(
+                        Level::Error,
+                        format!("brand.toml: {k} takes one string per language, e.g. en = \"...\""),
+                    );
+                }
+            }
+            Some(_) => r.add(
+                Level::Error,
+                format!("brand.toml: {k} must be a string or a table of strings per language"),
+            ),
+        }
+    }
     if let Some(c) = t.get("colors").and_then(|v| v.as_table()) {
         for (k, v) in c {
             let ok = v.as_str().is_some_and(|s| {
@@ -299,6 +317,39 @@ mod tests {
         let all = format!("{:?}", r.findings);
         assert!(all.contains("gone.svg") && all.contains("colors.accent") && all.contains("banana"), "{all}");
         assert!(!r.ok());
+    }
+
+    #[test]
+    fn brand_texts_are_a_string_or_a_table_per_language() {
+        let t = tempfile::tempdir().unwrap();
+        let root = crate::scaffold::new_product("acme", t.path()).unwrap();
+        let opts = || Options { server: Some(t.path().join("no-server")), ..Options::default() };
+        let file = root.join("branding/brand.toml");
+        std::fs::write(
+            &file,
+            "tagline = \"x\"
+[login_message]
+en = \"a\"
+it = \"b\"
+",
+        )
+        .unwrap();
+        assert!(validate(&root, &opts()).unwrap().ok());
+        std::fs::write(
+            &file,
+            "footer = 3
+",
+        )
+        .unwrap();
+        assert!(!validate(&root, &opts()).unwrap().ok());
+        std::fs::write(
+            &file,
+            "[footer]
+it = 3
+",
+        )
+        .unwrap();
+        assert!(!validate(&root, &opts()).unwrap().ok());
     }
 
     #[test]

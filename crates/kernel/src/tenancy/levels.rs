@@ -404,7 +404,7 @@ impl Defaults {
     pub fn of(k: &Kernel) -> Defaults {
         Defaults {
             name: k.brand.name.clone(),
-            footer: k.brand.footer.clone(),
+            footer: k.brand.footer.plain().to_string(),
             session_hours: k.cfg.session_ttl_hours.clamp(1, 720),
             product: k.product.defaults.clone(),
             locked: k.product.locked.clone(),

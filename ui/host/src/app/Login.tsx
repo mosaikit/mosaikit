@@ -11,7 +11,7 @@ import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from 're
 import { useQueryClient } from '@tanstack/react-query'
 import { Check, Contrast, Globe, KeyRound, LifeBuoy, Loader2, LogIn, Moon, Sun } from 'lucide-react'
 import { api, ApiError, errText, isUnavailable, setCsrf } from '../api.ts'
-import { retryDelay, useBrand, useBrandState } from '../brand.ts'
+import { brandText, retryDelay, useBrand, useBrandState } from '../brand.ts'
 import type { LoginTenant, PendingLogin, Session, TotpSetup } from '../types.ts'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -73,7 +73,7 @@ function remembered(): string {
 export default function Login({ door, tenant }: { door: 'tenant' | 'admin'; tenant?: string }) {
   const { brand, status } = useBrandState()
   const qc = useQueryClient()
-  useLang() // the texts follow the chosen language
+  const lang = useLang() // the texts follow the chosen language
   const admin = door === 'admin'
   // the themes made with the theme editor, before the theme of the platform or of the tenant is applied
   useEffect(() => {
@@ -101,7 +101,7 @@ export default function Login({ door, tenant }: { door: 'tenant' | 'admin'; tena
   }, [styleKey])
   const privacy = tn?.privacy_url || brand.privacy_url
   const legal = tn?.legal_url || brand.legal_url
-  const footer = tn?.footer || brand.footer
+  const footer = tn?.footer || brandText(brand, 'footer', lang)
   const enter = (s: Session) => {
     setCsrf(s.csrf)
     qc.setQueryData(['session'], s)
@@ -110,7 +110,7 @@ export default function Login({ door, tenant }: { door: 'tenant' | 'admin'; tena
   }
   return (
     <div className="grid min-h-full bg-background lg:grid-cols-[minmax(0,1.05fr)_minmax(0,1fr)]">
-      <Hero admin={admin} name={tn?.name ?? brand.name} product={brand.name} tagline={tn ? '' : brand.tagline} welcome={tn?.welcome || brand.welcome} version={brand.version} logo={tn && (tn.logo_dark || tn.logo_light) ? `api/auth/tenants/${encodeURIComponent(tn.slug)}/logo/${tn.logo_dark ? 'logo_dark' : 'logo_light'}` : undefined} />
+      <Hero admin={admin} name={tn?.name ?? brand.name} product={brand.name} tagline={tn ? '' : brandText(brand, 'tagline', lang)} welcome={tn?.welcome || brand.welcome} version={brand.version} logo={tn && (tn.logo_dark || tn.logo_light) ? `api/auth/tenants/${encodeURIComponent(tn.slug)}/logo/${tn.logo_dark ? 'logo_dark' : 'logo_light'}` : undefined} />
       <section className="flex min-h-full flex-col">
         <div className="flex items-center justify-end gap-1 p-4">
           <LanguageSelect />
@@ -138,7 +138,7 @@ export default function Login({ door, tenant }: { door: 'tenant' | 'admin'; tena
             ) : (
               <TenantDoor initial={tenant ?? remembered()} platformTheme={brand.theme} onEnter={enter} onPick={setPicked} />
             )}
-            {brand.login_message && <p className="mt-6 border-l-2 border-primary pl-3 text-sm">{brand.login_message}</p>}
+            {brandText(brand, 'login_message', lang) && <p className="mt-6 border-l-2 border-primary pl-3 text-sm">{brandText(brand, 'login_message', lang)}</p>}
           </div>
         </main>
         <footer className="flex flex-wrap items-center justify-end gap-3 border-t px-6 py-4 text-xs text-muted-foreground">
