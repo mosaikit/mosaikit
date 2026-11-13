@@ -15,6 +15,12 @@ async function withGroups(page: Page) {
     const body = await res.json()
     await route.fulfill({ response: res, json: { ...body, nav_groups: GROUPS } })
   })
+  // the layout in use of the tenant (`nav.layout`, whose default is the groups of the distribution) comes with its context
+  await page.route('**/api/t/*/context', async (route) => {
+    const res = await route.fetch()
+    const body = await res.json()
+    await route.fulfill({ response: res, json: { ...body, config: { ...body.config, 'nav.layout': GROUPS } } })
+  })
 }
 const sidebar = (page: Page) => page.locator('[data-sidebar="sidebar"]').first()
 
