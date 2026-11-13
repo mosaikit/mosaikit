@@ -164,8 +164,11 @@ fn language_plugins_have_the_page_texts_of_every_adopted_plugin() {
         v
     };
     let mut problems = Vec::new();
-    let required: Vec<&str> =
-        ADOPTED.iter().copied().filter(|id| root.join("lang-es/lang/ui").join(format!("{id}.json")).is_file()).collect();
+    let required: Vec<&str> = ADOPTED
+        .iter()
+        .copied()
+        .filter(|id| root.join("lang-es/lang/ui").join(format!("{id}.json")).is_file())
+        .collect();
     for id in required.iter().copied() {
         // the phrases are the ones of the first language: every other one must have the same
         let Some(base) = read(&langs[0], id) else {
