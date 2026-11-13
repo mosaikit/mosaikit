@@ -4,7 +4,7 @@
 // tenants; the Tenant Manager turns ON the available ones and decides their permissions.
 
 import { Fragment, useRef, useState, type ReactNode } from 'react'
-import { ArrowUpCircle, ExternalLink, KeySquare, MessageSquarePlus, Power, Puzzle, RotateCcw, Trash2, Upload } from 'lucide-react'
+import { ArrowUpCircle, ExternalLink, KeySquare, MessageSquarePlus, Power, Puzzle, RotateCcw, ShieldCheck, Trash2, Upload } from 'lucide-react'
 import { api, fmtDate } from '../../api.ts'
 import type { AdminPlugin, CatalogItem, ConfigDecl, PluginConfig, PluginKind, PluginTenant, TenantPlugin, UninstallImpact } from '../../types.ts'
 import { Badge } from '@/components/ui/badge'
@@ -151,7 +151,17 @@ export function AdminPlugins({ section }: { section?: string }) {
         width: 'minmax(8rem,1fr)',
         sort: (p) => p.signed_by ?? '',
         className: 'text-sm',
-        cell: (p) => (p.signed_by ? <SignedBy value={p.signed_by} /> : <span className="text-warn">{t('unsigned')}</span>),
+        cell: (p) =>
+          p.signed_by ? (
+            <span className="flex flex-wrap items-center gap-1.5">
+              <SignedPill by={p.signed_by} />
+              <span className="text-xs text-muted-foreground">
+                <SignedBy value={p.signed_by} />
+              </span>
+            </span>
+          ) : (
+            <span className="text-warn">{t('unsigned')}</span>
+          ),
       },
       { key: 'status', title: t('Status'), width: 'minmax(7rem,.9fr)', sort: (p) => p.status, cell: (p) => <StatusBadge status={p.status} /> },
     ]
@@ -389,6 +399,7 @@ function PluginCard({ p, update, selected, onSelect }: { p: AdminPlugin; update?
       <PluginSummary card p={p} kind={kindLabel(kindOf(p))} href={to.adminPlugin(p.id)} className="pr-7" />
       <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
         <StatusBadge status={p.status} />
+        <SignedPill by={p.signed_by} />
         {p.dev && (
           <Badge variant="outline" className="font-normal">
             {t('development')}
@@ -1236,6 +1247,17 @@ function patternLabel(pattern: string): string {
 
 /** Who signed a package: the name of a known publisher, or a short fingerprint of the key (the whole key in
  *  the tooltip) instead of the raw base64. */
+/** «Signed» as a pill (the signer in the tooltip), for the cards and the list; nothing for an unsigned plugin. */
+function SignedPill({ by }: { by: string | null }) {
+  if (!by) return null
+  return (
+    <Badge variant="secondary" className="gap-1 font-normal" title={t('Signed by {key}', { key: by.length <= 24 ? by : `${by.slice(0, 8)}…` })} data-testid="signed-pill">
+      <ShieldCheck className="size-3" aria-hidden="true" />
+      {t('Signed')}
+    </Badge>
+  )
+}
+
 function SignedBy({ value }: { value: string }) {
   if (value.length <= 24) return <>{value}</>
   return (
