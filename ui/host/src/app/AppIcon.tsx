@@ -8,7 +8,7 @@ import {
   ChartPie, ClipboardList, Clock, Cloud, Code, Database, FileText, Files, Folder, Gauge, Globe, Image, Inbox,
   Kanban, Landmark, Layers, LayoutDashboard, LayoutGrid, Link, List, ListChecks, Mail, Map, MapPin, MessageSquare,
   NotebookPen, Package, PenTool, Puzzle, Receipt, Route, Server, Settings, Share2, ShieldCheck, ShoppingCart,
-  SquareCheckBig, Star, Table, Tag, Truck, Users, Wallet, Wrench, type LucideIcon,
+  SquareCheckBig, Star, Table, Tag, Truck, Users, Wallet, Wrench, Bookmark, CalendarDays, ClipboardCheck, FileInput, Languages, Megaphone, MessageCircle, Presentation, Video, Vote, type LucideIcon,
 } from 'lucide-react'
 
 /** The names a manifest may use. */
@@ -69,6 +69,16 @@ const ICONS: Record<string, LucideIcon> = {
   users: Users,
   wallet: Wallet,
   wrench: Wrench,
+  megaphone: Megaphone,
+  bookmark: Bookmark,
+  'calendar-days': CalendarDays,
+  'message-circle': MessageCircle,
+  'file-input': FileInput,
+  languages: Languages,
+  video: Video,
+  'clipboard-check': ClipboardCheck,
+  vote: Vote,
+  presentation: Presentation,
 }
 
 /** The icon names a manifest or a group of the navigation may use. */
