@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Loader2 } from 'lucide-react'
 import { channelName, checkPluginApi, errorReply, execute, OpError, routeOp, safePage, SHELL_API, themeVars, uuid } from '../bridge.ts'
 import type { PluginView, Session, TenantContext } from '../types.ts'
 import { appUrl, enc } from '../api.ts'
@@ -313,7 +314,14 @@ export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell
       {tabs.map((tab) => (
         <ExtensionTab key={tab.handle} tab={tab} session={session} ctx={ctx} reloadKey={reloadKey} context={(id) => uiContext(shellRef.current, id)} uiKey={uiKey} toBase={toBase} />
       ))}
-      {!loaded && <div className="frame-msg">{t('Loading {label}…', { label: plugin.label })}</div>}
+      {!loaded && (
+        <div className="frame-msg" role="status" data-testid="frame-loading">
+          <span className="flex items-center gap-2">
+            <Loader2 className="size-5 animate-spin text-primary" aria-hidden="true" />
+            {t('Loading {label}…', { label: plugin.label })}
+          </span>
+        </div>
+      )}
     </div>
   )
 }

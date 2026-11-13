@@ -5,6 +5,13 @@ in Help › What is new (one `## <version>` heading per version, `- ` items, `##
 language of the person: this file in English, [CHANGELOG.it.md](CHANGELOG.it.md) in Italian (keep them
 in step).
 
+## 1.0.15
+
+- Administrator: the table of the people shows the name of the organization, not its slug; the cards of the plugins no longer show the signature (it stays in the list and in the page of the plugin) and are wide enough for all their badges; the filters of the log no longer overlap.
+- Tenant Manager: «Your apps» in the overview is one row that scrolls sideways, however many apps there are; the lines of «My recent activity» stay inside their card.
+- Sharing: a public link can be made without an expiry when the organization does not limit the lifetime, and the dialog says that the link does not expire (or until when it works) and that it works on every visit; transferring the ownership no longer ends with an error message when the former owner loses the access: the dialog closes.
+- A plugin page shows a spinner with its name until the page is loaded.
+
 ## 1.0.14
 
 - Brand of a product: `tagline`, `login_message` and `footer` of `branding/brand.toml` can be written per language, as a table (`[login_message]` with `en = "..."` and `it = "..."`) in place of one string. The sign-in page shows the text of the language of the page, then the plain text, then `en`; a footer set in the platform settings still wins. `validate` accepts both forms.

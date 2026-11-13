@@ -145,7 +145,7 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
       {d && <HomeLists slug={slug} pickUp={d.me.pick_up ?? []} due={d.me.due ?? []} notifications={!manager} />}
       {d && d.me.activity.length > 0 && (
         <Widget id="ov-mine" title={t('My recent activity')} span={!manager}>
-          <ul className="grid gap-0.5">
+          <ul className="grid grid-cols-[minmax(0,1fr)] gap-0.5">
             {d.me.activity.slice(0, 5).map((e, i) => (
               <li key={i} className="flex items-baseline justify-between gap-3 py-0.5 text-sm">
                 <span className="min-w-0 truncate">{[describe(e), e.title].filter(Boolean).join(' · ')}</span>

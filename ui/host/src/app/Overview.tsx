@@ -97,20 +97,23 @@ export function AppsStrip({ slug, plugins }: { slug: string; plugins: PluginView
   const apps = plugins.filter(isApp)
   if (!apps.length) return null
   return (
-    <nav aria-label={t('Your apps')} className="flex flex-wrap items-center gap-2">
-      <span className="text-xs text-muted-foreground">{t('Your apps')}</span>
+    // one row that scrolls sideways, whatever the number of apps (it never grows into several rows)
+    <nav aria-label={t('Your apps')} className="flex items-center gap-3">
+      <span className="shrink-0 text-xs text-muted-foreground">{t('Your apps')}</span>
+      <div data-testid="apps-strip" className="flex min-w-0 flex-1 snap-x items-center gap-2 overflow-x-auto py-1 [scrollbar-width:thin] [mask-image:linear-gradient(to_right,#000_calc(100%-1.5rem),transparent)] pr-6">
       {apps.map((p) => (
         <button
           key={p.id}
           type="button"
           onClick={() => go(to.plugin(slug, p.id))}
           title={p.description}
-          className="flex h-8 items-center gap-1.5 rounded-full border bg-card px-3 text-sm outline-none hover:border-primary/50 hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex h-8 shrink-0 snap-start items-center gap-1.5 rounded-full border bg-card px-3 text-sm outline-none hover:border-primary/50 hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring"
         >
           <AppIcon id={p.id} name={p.icon_name} className="size-4 fill-current text-primary [fill-opacity:0.12]" />
           <b className="font-medium">{p.label}</b>
         </button>
       ))}
+      </div>
     </nav>
   )
 }
