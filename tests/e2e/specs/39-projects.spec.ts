@@ -105,6 +105,16 @@ test.describe.serial('Projects', () => {
     await expect(sprint.locator('[data-testid=sprint-task]', { hasText: 'PRJ one' })).toBeVisible()
     await accessible(page, 'projects sprints')
 
+    // PRJ-15: the burndown of the sprint: a project with no dates says so, a sprint draws the ideal and the real line
+    await frame.getByRole('button', { name: 'Burndown', exact: true }).click()
+    await expect(frame.getByTestId('empty-state')).toContainText('No dates to draw against')
+    await frame.getByTestId('burn-scope').selectOption({ label: 'PRJ Sprint 1' })
+    await expect(frame.getByTestId('burn-summary')).toContainText(/of 1 tasks still open/)
+    await expect(frame.getByTestId('burndown-chart')).toBeVisible()
+    await expect(frame.getByTestId('burndown-chart').locator('polyline')).toHaveCount(2)
+    await accessible(page, 'projects burndown')
+    await frame.getByRole('button', { name: 'Sprints', exact: true }).click()
+
     // PRJ-08: an existing task without a project is attached
     await nav(page, 'Tasks').click()
     await tasks.getByRole('textbox', { name: 'Quick add a task' }).fill('PRJ loose')
