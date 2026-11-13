@@ -1458,6 +1458,8 @@ export function AdminPeople() {
     invalidate: inval,
   })
   const clients = (tenants.data ?? []).filter((x) => !x.is_system)
+  // the table shows the name of an organization, the slug only while the names are not loaded
+  const tenantName = (key: string) => clients.find((c) => c.id === key || c.slug === key)?.name ?? key
   if (q.isLoading) return <Loading />
   if (q.error) return <ErrorBox error={q.error} />
   const rows = q.items
@@ -1612,7 +1614,7 @@ export function AdminPeople() {
                 </a>
               ),
             },
-            { key: 'home', title: t('Home tenant'), width: 'minmax(8rem,1fr)', sort: (p) => (p.is_admin ? '' : p.home_tenant), serverSort: true, cell: (p) => (p.is_admin ? <Badge>{t('Administrator')}</Badge> : p.home_tenant) },
+            { key: 'home', title: t('Home tenant'), width: 'minmax(8rem,1fr)', sort: (p) => (p.is_admin ? '' : p.home_tenant), serverSort: true, cell: (p) => (p.is_admin ? <Badge>{t('Administrator')}</Badge> : tenantName(p.home_tenant)) },
             {
               key: 'tenants',
               title: t('Tenants'),
@@ -1622,7 +1624,7 @@ export function AdminPeople() {
                 <div className="flex flex-wrap gap-1">
                   {p.tenants.map((x) => (
                     <Badge key={x.tenant_id} variant={x.is_home ? 'default' : 'secondary'} className="font-normal" title={roleLabel(x.role)}>
-                      {x.slug}
+                      {tenantName(x.tenant_id)}
                       {x.role === 'tenant_manager' ? ' · TM' : ''}
                       {x.status === 'suspended' ? ` · ${t('suspended')}` : ''}
                     </Badge>

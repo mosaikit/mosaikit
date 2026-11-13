@@ -8,6 +8,7 @@ import { api, errText, fmtDate } from '../api.ts'
 import type { Grant, Level, LinkInfo, Principal, ResourceMeta, TenantContext } from '../types.ts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -78,6 +79,10 @@ export default function ShareDialog({ ctx, resourceId, onClose }: { ctx: TenantC
   const [days, setDays] = useState(ctx.tenant.settings.public_link_max_days || 7)
   const [pw, setPw] = useState('')
   const [created, setCreated] = useState<string | null>(null)
+  const [createdExpiry, setCreatedExpiry] = useState<string | null>(null)
+  // the link of a tenant that does not limit the lifetime can be made without an expiry
+  const maxDays = ctx.tenant.settings.public_link_max_days
+  const [noExpiry, setNoExpiry] = useState(false)
   const [ownerQ, setOwnerQ] = useState('')
   const [busy, setBusy] = useState(false)
   const found = useDirectory(slug, q)
@@ -86,6 +91,7 @@ export default function ShareDialog({ ctx, resourceId, onClose }: { ctx: TenantC
     setQ('')
     setPick(null)
     setCreated(null)
+    setCreatedExpiry(null)
     setOwnerQ('')
   }, [resourceId])
 
@@ -96,12 +102,13 @@ export default function ShareDialog({ ctx, resourceId, onClose }: { ctx: TenantC
     void qc.invalidateQueries({ queryKey: ['links', resourceId] })
     void qc.invalidateQueries({ queryKey: ['m-resources', slug] })
   }
-  async function run(fn: () => Promise<unknown>, ok: string) {
+  async function run(fn: () => Promise<unknown>, ok: string, then?: () => void): Promise<void> {
     setBusy(true)
     try {
       await fn()
       toast.success(ok)
-      reload()
+      if (then) then()
+      else reload()
     } catch (e) {
       toast.error(errText(e))
     } finally {
@@ -221,6 +228,7 @@ export default function ShareDialog({ ctx, resourceId, onClose }: { ctx: TenantC
                       <Input
                         id="sh-days"
                         type="number"
+                        disabled={noExpiry}
                         className="w-32"
                         min={1}
                         max={ctx.tenant.settings.public_link_max_days || 3650}
@@ -228,6 +236,12 @@ export default function ShareDialog({ ctx, resourceId, onClose }: { ctx: TenantC
                         onChange={(e) => setDays(Number(e.target.value))}
                       />
                     </div>
+                    {!maxDays && (
+                      <label className="flex h-9 items-center gap-2 text-sm">
+                        <Checkbox checked={noExpiry} onCheckedChange={(v) => setNoExpiry(!!v)} aria-label={t('The link does not expire')} />
+                        {t('The link does not expire')}
+                      </label>
+                    )}
                     <div className="grid gap-1.5">
                       <Label htmlFor="sh-pw">{t('Password (optional)')}</Label>
                       <Input id="sh-pw" type="password" className="w-52" autoComplete="new-password" value={pw} onChange={(e) => setPw(e.target.value)} />
@@ -237,8 +251,9 @@ export default function ShareDialog({ ctx, resourceId, onClose }: { ctx: TenantC
                       disabled={busy}
                       onClick={() =>
                         void run(async () => {
-                          const l = await api<LinkInfo>('POST', `${base}/links`, { days, password: pw || null })
+                          const l = await api<LinkInfo>('POST', `${base}/links`, { days: noExpiry ? 0 : days, password: pw || null })
                           setCreated(l.url ?? null)
+                          setCreatedExpiry(l.expires_at ?? null)
                           setPw('')
                         }, t('Link created'))
                       }
@@ -255,6 +270,9 @@ export default function ShareDialog({ ctx, resourceId, onClose }: { ctx: TenantC
                           {t('Copy')}
                         </Button>
                       </div>
+                      <p className="text-xs text-muted-foreground">
+                        {createdExpiry ? t('The link works until {date}, on every visit.', { date: fmtDay(createdExpiry) }) : t('The link does not expire and works on every visit.')}
+                      </p>
                       <p className="text-xs text-muted-foreground">{t('The link is shown only now: the server keeps only a fingerprint of it.')}</p>
                       {res?.kind === 'folder' && <p className="text-xs text-muted-foreground">{t('Add the path of a file to the link to reach a file of this folder, for example …/tileset.json')}</p>}
                     </div>
@@ -301,7 +319,15 @@ export default function ShareDialog({ ctx, resourceId, onClose }: { ctx: TenantC
                             disabled={busy}
                             onClick={async () => {
                               if (!(await confirm(t('Transfer the ownership to {name}?', { name: p.name }), true))) return
-                              await run(() => api('POST', `${base}/owner`, { user_id: p.id }), t('Ownership transferred'))
+                              // the former owner may lose the access: the dialog closes instead of reading the grants again and showing an error
+                              await run(() => api('POST', `${base}/owner`, { user_id: p.id }), t('Ownership transferred'), () => {
+                                void qc.invalidateQueries({ queryKey: ['m-resources', slug] })
+                                if (ctx.tenant.role === 'tenant_manager') reload()
+                                else {
+                                  qc.removeQueries({ queryKey: ['grants', resourceId] })
+                                  onClose()
+                                }
+                              })
                               setOwnerQ('')
                             }}
                           >

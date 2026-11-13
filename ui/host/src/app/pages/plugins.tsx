@@ -300,6 +300,7 @@ export function AdminPlugins({ section }: { section?: string }) {
               </div>
               <CardGrid
                 label={t('Plugins')}
+                min="22rem"
                 rows={prepared}
                 rowKey={(p) => p.id}
                 card={(p) => (
@@ -380,7 +381,7 @@ export function AdminPlugins({ section }: { section?: string }) {
 }
 
 /** A plugin of the installed list as a card: the identity of the brochure (icon, name, description, badges), who made it
- *  and whether it is signed, its status; the whole card opens the plugin, the box selects it. */
+ *  its status (the signature is in the list and in the page of the plugin); the whole card opens the plugin, the box selects it. */
 function PluginCard({ p, update, selected, onSelect }: { p: AdminPlugin; update?: string; selected: boolean; onSelect: (on: boolean) => void }) {
   return (
     <div data-testid="plugin-card" data-state={selected ? 'selected' : undefined} className="relative flex h-full flex-col gap-3 rounded-2xl border bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-4 transition-colors hover:border-primary/50 data-[state=selected]:border-primary data-[state=selected]:from-primary/25">
@@ -399,10 +400,6 @@ function PluginCard({ p, update, selected, onSelect }: { p: AdminPlugin; update?
         <div className="flex min-w-0 items-baseline gap-1.5">
           <dt className="shrink-0 text-muted-foreground">{t('Author')}</dt>
           <dd className="min-w-0 truncate">{p.author ?? <span className="text-muted-foreground">{t('not declared')}</span>}</dd>
-        </div>
-        <div className="flex min-w-0 items-baseline gap-1.5">
-          <dt className="shrink-0 text-muted-foreground">{t('Signature')}</dt>
-          <dd className="min-w-0 truncate">{p.signed_by ? <SignedBy value={p.signed_by} /> : <span className="text-warn">{t('unsigned')}</span>}</dd>
         </div>
       </dl>
     </div>

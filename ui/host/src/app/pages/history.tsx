@@ -426,6 +426,7 @@ export function LogView({ scope, fixed = {}, compact = false }: { scope: LogScop
   const bar = compact ? null : (
         <div className="flex flex-wrap items-center gap-3">
           <Pills
+            plain
             items={[
               { id: 'all', label: t('Everything') },
               { id: 'failed', label: t('Only failures') },
