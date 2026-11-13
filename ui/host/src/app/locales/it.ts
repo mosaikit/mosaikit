@@ -235,6 +235,7 @@ export const IT: Record<string, string> = {
   'Public links': 'Link pubblici',
   'Created on {date}': 'Creato il {date}',
   'Expires on {date}': 'Scade il {date}',
+  'Developer profile': 'Profilo sviluppatore',
   'Suggested by the app': 'Suggeriti dall\'app',
   'Level for the suggested people': 'Livello per le persone suggerite',
   'Already shared with them': 'Già condiviso con loro',

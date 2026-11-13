@@ -11,6 +11,7 @@ import { Bug, RotateCcw, Trash2, UserRound, X } from 'lucide-react'
 import { api, appUrl, enc, errText, setCsrf } from '../api.ts'
 import type { Session } from '../types.ts'
 import { Button } from '@/components/ui/button'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { useTenantCtx } from './core.ts'
 import { clearCalls, setRecording, setReloadError, useCalls, useReloadError } from './devlog.ts'
 import { t } from './i18n.ts'
@@ -62,7 +63,51 @@ export default function DevShell({ session, route, children }: { session: Sessio
   )
 }
 
-/** The banner that cannot be closed, with the button of the developer tools once somebody is signed in. */
+const OPEN_PANEL = 'msk:dev-panel'
+
+/** The warning, in full: also the tooltip and the text of the panel of the pill. */
+const warning = () => t('Developer profile: known passwords, unsigned packages, test data. Never use it for real data.')
+
+/** Signed in: the developer profile is a pill of the top bar, before the search box (the full-width banner is only on
+ *  the sign-in page). It cannot be hidden or closed: it is on every page while the profile is on. A small panel
+ *  with the whole warning and the button of the developer tools opens from it. */
+export function DevPill() {
+  const on = useDeveloper()
+  const [open, setOpen] = useState(false)
+  if (!on) return null
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          data-testid="dev-pill"
+          title={warning()}
+          className="flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-amber-400 px-2.5 text-xs font-semibold text-black outline-none hover:bg-amber-300 focus-visible:ring-2 focus-visible:ring-white"
+        >
+          <Bug className="size-4 shrink-0" aria-hidden />
+          <span className="max-[1000px]:sr-only">{t('Developer profile')}</span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent align="start" className="w-80 border-amber-400 text-sm" data-testid="dev-pill-panel">
+        <p className="font-semibold">{t('Developer profile')}</p>
+        <p className="mt-1 text-muted-foreground">{warning()}</p>
+        <Button
+          size="sm"
+          className="mt-3"
+          onClick={() => {
+            setOpen(false)
+            window.dispatchEvent(new Event(OPEN_PANEL))
+          }}
+        >
+          {t('Developer tools')}
+        </Button>
+      </PopoverContent>
+    </Popover>
+  )
+}
+
+/** The banner that cannot be closed (on the sign-in page); once somebody is signed in it is the pill of the top bar
+ *  (`DevPill`) and this only keeps the developer tools and the reloads of the plugins. */
 export function DevBanner({ session, route }: { session: Session | undefined; route: Route }) {
   const on = useDeveloper()
   return on ? <DevBannerBody session={session} route={route} /> : null
@@ -72,9 +117,14 @@ function DevBannerBody({ session, route }: { session: Session | undefined; route
   const [open, setOpen] = useState(false)
   const info = useQuery({ queryKey: ['dev-info'], queryFn: () => api<DevInfo>('GET', '/api/dev/info'), staleTime: Infinity })
   useReloads(session)
+  useEffect(() => {
+    const show = () => setOpen(true)
+    window.addEventListener(OPEN_PANEL, show)
+    return () => window.removeEventListener(OPEN_PANEL, show)
+  }, [])
   return (
     <>
-      <div role="status" data-testid="dev-banner" className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 bg-amber-400 px-3 py-1 text-xs font-medium text-black">
+      {!session && <div role="status" data-testid="dev-banner" className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 bg-amber-400 px-3 py-1 text-xs font-medium text-black">
         <Bug className="size-4 shrink-0" aria-hidden />
         <span>
           {t('Developer profile: known passwords, unsigned packages, test data. Never use it for real data.')}
@@ -84,12 +134,7 @@ function DevBannerBody({ session, route }: { session: Session | undefined; route
             </span>
           )}
         </span>
-        {session && (
-          <Button size="sm" variant="outline" className="ml-auto h-6 border-black/40 bg-transparent px-2 text-xs text-black hover:bg-black/10" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-            {t('Developer tools')}
-          </Button>
-        )}
-      </div>
+      </div>}
       {session && open && <DevPanel session={session} route={route} info={info.data} onClose={() => setOpen(false)} />}
     </>
   )
