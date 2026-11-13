@@ -8,7 +8,7 @@ in step).
 ## 1.0.15
 
 - Administrator: the table of the people shows the name of the organization, not its slug; the cards of the plugins show a «Signed» pill instead of the signature line (the signer is in its tooltip, and in the list and the page of the plugin) and are wide enough for all their badges; the filters of the log no longer overlap.
-- Tenant Manager: «Your apps» in the overview is one row that scrolls sideways, however many apps there are; the lines of «My recent activity» stay inside their card.
+- Tenant Manager: the overview no longer opens with the list of the apps (the sidebar has them); the lines of «My recent activity» stay inside their card.
 - Sharing: a public link can be made without an expiry when the organization does not limit the lifetime, and the dialog says that the link does not expire (or until when it works) and that it works on every visit; transferring the ownership no longer ends with an error message when the former owner loses the access: the dialog closes.
 - A plugin page shows a spinner with its name until the page is loaded.
 - Plugins: `ctx.directory().users_with(permission, q, limit)` lists the people of the tenant who hold a permission of the plugin (`[[user_permissions]]`) and `msk.share(id, { principals, level })` opens the share dialog with people and groups ready to be shared with: a review flow can offer «share with the reviewers» and the owner confirms in one step. Same rights as the directory (`[permissions] directory = true`, Tenant Manager or `share`).
