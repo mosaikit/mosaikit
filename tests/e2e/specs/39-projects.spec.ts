@@ -105,6 +105,16 @@ test.describe.serial('Projects', () => {
     await expect(sprint.locator('[data-testid=sprint-task]', { hasText: 'PRJ one' })).toBeVisible()
     await accessible(page, 'projects sprints')
 
+    // PRJ-15: the burndown of the sprint: a project with no dates says so, a sprint draws the ideal and the real line
+    await frame.getByRole('button', { name: 'Burndown', exact: true }).click()
+    await expect(frame.getByTestId('empty-state')).toContainText('No dates to draw against')
+    await frame.getByTestId('burn-scope').selectOption({ label: 'PRJ Sprint 1' })
+    await expect(frame.getByTestId('burn-summary')).toContainText(/of 1 tasks still open/)
+    await expect(frame.getByTestId('burndown-chart')).toBeVisible()
+    await expect(frame.getByTestId('burndown-chart').locator('polyline')).toHaveCount(2)
+    await accessible(page, 'projects burndown')
+    await frame.getByRole('button', { name: 'Sprints', exact: true }).click()
+
     // PRJ-08: an existing task without a project is attached
     await nav(page, 'Tasks').click()
     await tasks.getByRole('textbox', { name: 'Quick add a task' }).fill('PRJ loose')
@@ -137,9 +147,12 @@ test.describe.serial('Projects', () => {
     // PRJ-10: details: a bad column list is refused, the status is changed, the columns are renamed
     await card.getByRole('button', { name: 'PRJ Alpha', exact: true }).click()
     await frame.getByRole('button', { name: 'Details', exact: true }).click()
-    await frame.getByRole('textbox', { name: /^Board columns/ }).fill('Only one')
-    await frame.getByRole('button', { name: 'Save', exact: true }).click()
-    await expect(frame.locator('body')).toContainText(/from 2 to 8 columns/i)
+    // the details form is drawn again once when the board has loaded: fill and save again until the refusal shows
+    await expect(async () => {
+      await frame.getByRole('textbox', { name: /^Board columns/ }).fill('Only one')
+      await frame.getByRole('button', { name: 'Save', exact: true }).click()
+      await expect(frame.locator('body')).toContainText(/from 2 to 8 columns/i, { timeout: 3000 })
+    }).toPass({ timeout: 20000 })
     await frame.getByRole('textbox', { name: /^Board columns/ }).fill('Backlog\nWorking\nShipped')
     await frame.getByLabel('Status', { exact: true }).selectOption('on_hold')
     await frame.getByRole('button', { name: 'Save', exact: true }).click()
