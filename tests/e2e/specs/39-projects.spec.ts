@@ -147,9 +147,12 @@ test.describe.serial('Projects', () => {
     // PRJ-10: details: a bad column list is refused, the status is changed, the columns are renamed
     await card.getByRole('button', { name: 'PRJ Alpha', exact: true }).click()
     await frame.getByRole('button', { name: 'Details', exact: true }).click()
-    await frame.getByRole('textbox', { name: /^Board columns/ }).fill('Only one')
-    await frame.getByRole('button', { name: 'Save', exact: true }).click()
-    await expect(frame.locator('body')).toContainText(/from 2 to 8 columns/i)
+    // the details form is drawn again once when the board has loaded: fill and save again until the refusal shows
+    await expect(async () => {
+      await frame.getByRole('textbox', { name: /^Board columns/ }).fill('Only one')
+      await frame.getByRole('button', { name: 'Save', exact: true }).click()
+      await expect(frame.locator('body')).toContainText(/from 2 to 8 columns/i, { timeout: 3000 })
+    }).toPass({ timeout: 20000 })
     await frame.getByRole('textbox', { name: /^Board columns/ }).fill('Backlog\nWorking\nShipped')
     await frame.getByLabel('Status', { exact: true }).selectOption('on_hold')
     await frame.getByRole('button', { name: 'Save', exact: true }).click()
