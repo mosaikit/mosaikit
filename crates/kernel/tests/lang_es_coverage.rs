@@ -108,8 +108,30 @@ fn language_plugins_translate_every_plugin_that_has_italian() {
 /// placeholders. The language packs must also pass the check the kernel makes when it installs them.
 #[test]
 fn language_plugins_have_the_page_texts_of_every_adopted_plugin() {
-    const ADOPTED: [&str; 4] =
-        ["com.mosaikit.files", "com.mosaikit.maps", "com.mosaikit.static-site", "com.mosaikit.note-review"];
+    // The plugins whose page reads its texts through `msk.t`. A plugin is only required once lang-es has its file
+    // (`lang/ui/<id>.json`): the two repositories check each other out, so the platform may land before the files.
+    const ADOPTED: [&str; 20] = [
+        "com.mosaikit.files",
+        "com.mosaikit.maps",
+        "com.mosaikit.static-site",
+        "com.mosaikit.note-review",
+        "com.mosaikit.notes",
+        "com.mosaikit.tasks",
+        "com.mosaikit.contacts",
+        "com.mosaikit.chat",
+        "com.mosaikit.meet",
+        "com.mosaikit.announcements",
+        "com.mosaikit.bookmarks",
+        "com.mosaikit.snippets",
+        "com.mosaikit.polls",
+        "com.mosaikit.surveys",
+        "com.mosaikit.approvals",
+        "com.mosaikit.dashboard",
+        "com.mosaikit.forms",
+        "com.mosaikit.projects",
+        "com.mosaikit.calendar",
+        "com.mosaikit.whiteboard",
+    ];
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../mosaikit-plugins");
     let mut langs: Vec<String> = std::fs::read_dir(&root)
         .map(|d| {
@@ -142,7 +164,9 @@ fn language_plugins_have_the_page_texts_of_every_adopted_plugin() {
         v
     };
     let mut problems = Vec::new();
-    for id in ADOPTED {
+    let required: Vec<&str> =
+        ADOPTED.iter().copied().filter(|id| root.join("lang-es/lang/ui").join(format!("{id}.json")).is_file()).collect();
+    for id in required.iter().copied() {
         // the phrases are the ones of the first language: every other one must have the same
         let Some(base) = read(&langs[0], id) else {
             problems.push(format!("{}: lang/ui/{id}.json is missing", langs[0]));
@@ -187,8 +211,8 @@ fn language_plugins_have_the_page_texts_of_every_adopted_plugin() {
         let code = lang.trim_start_matches("lang-");
         match mosaikit_mskp::language::load_language(code, "x", &files) {
             Ok(p) => {
-                for id in ADOPTED {
-                    if !p.ui.contains_key(id) {
+                for id in required.iter() {
+                    if !p.ui.contains_key(*id) {
                         problems.push(format!("{lang}: the pack has no page texts for {id}"));
                     }
                 }

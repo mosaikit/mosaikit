@@ -270,8 +270,12 @@ export function mountCrud(root: HTMLElement, msk: Msk, resource: string, opts: C
   // the texts of the view exist in three languages; the plugin gets the real code of the host
   const lang = (): 'en' | 'it' | 'es' => (msk.context?.lang === 'it' ? 'it' : msk.context?.lang === 'es' ? 'es' : 'en')
   const hostLang = () => msk.context?.lang ?? 'en'
-  const tr = (k: Text, vars: Record<string, string | number> = {}) =>
-    TEXTS[lang()][k].replace(/\{(\w+)\}/g, (_, v: string) => String(vars[v] ?? ''))
+  // the phrase of the language plugin of the page (`lang/ui/<plugin id>.json`, as `msk.t` reads it) first; then the three
+  // languages built in; otherwise English
+  const tr = (k: Text, vars: Record<string, string | number> = {}) => {
+    const hit = msk.context?.texts?.[TEXTS.en[k]]
+    return (hit || TEXTS[lang()][k]).replace(/\{(\w+)\}/g, (_, v: string) => String(vars[v] ?? ''))
+  }
 
   const filter = h('input', { type: 'search', class: 'msk-filter' })
   const btnNew = h('button', { type: 'button', class: 'msk-btn' })
