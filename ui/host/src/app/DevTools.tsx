@@ -82,10 +82,10 @@ export function DevPill() {
           type="button"
           data-testid="dev-pill"
           title={warning()}
-          className="flex h-7 shrink-0 items-center gap-1.5 rounded-full bg-amber-400 px-2.5 text-xs font-semibold text-black outline-none hover:bg-amber-300 focus-visible:ring-2 focus-visible:ring-white"
+          className="flex size-7 shrink-0 items-center justify-center rounded-full bg-amber-400 text-black outline-none hover:bg-amber-300 focus-visible:ring-2 focus-visible:ring-white"
         >
           <Bug className="size-4 shrink-0" aria-hidden />
-          <span className="max-[1000px]:sr-only">{t('Developer profile')}</span>
+          <span className="sr-only">{t('Developer profile')}</span>
         </button>
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80 border-amber-400 text-sm" data-testid="dev-pill-panel">
