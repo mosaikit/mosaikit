@@ -9,7 +9,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Lock, Pencil, Plus, RotateCcw, Trash2, Upload, X } from 'lucide-react'
 import { api, errText } from '../api.ts'
 import { reloadBrand } from '../brand.ts'
-import type { ServiceKey, Setting } from '../types.ts'
+import type { AdminPlugin, ServiceKey, Setting } from '../types.ts'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -23,7 +23,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { cn } from '@/lib/utils'
 import { isApp, useApi, useTenantCtx } from './core.ts'
 import { useTenantSignIn } from './signin.ts'
-import { LANGS, t } from './i18n.ts'
+import { LANGS, t, useLanguages } from './i18n.ts'
+import NavLayoutEditor from './NavLayoutEditor.tsx'
+import type { NavGroupDef } from './navgroups.ts'
 import { ErrorBox, Loading, Locked, SaveBar } from './kit.tsx'
 import { QuotasLocked } from './Quotas.tsx'
 
@@ -42,6 +44,7 @@ function labels(): Record<string, [string, string]> {
     'identity.legal_url': [t('Legal notes'), t('Address of the page, starting with https://')],
     'identity.guide_url': [t('Guide'), t('Address of the guide in the help menu, starting with https://; empty: the short guide of the shell')],
     'identity.landing': [t('Landing page'), t('What people see after signing in')],
+    'nav.layout': [t('Groups of the sidebar'), t('Groups and subgroups with an icon and a name, and the order of the apps. The apps that are in no group show below them.')],
     'appearance.mode': [t('Default mode'), t('For whoever did not choose one; everyone can change it in Account')],
     'lang.enabled': [t('Languages offered'), t('The ones people can choose')],
     'lang.default': [t('Default language'), t('For whoever did not choose one')],
@@ -198,6 +201,38 @@ export function ChoiceRow({ level, d, s, options }: { level: Level; d: Draft; s:
         </SelectContent>
       </Select>
     </Row>
+  )
+}
+
+/* ── Navigation ──────────────────────────────────────────────────────── */
+
+/** The groups of the sidebar and their order: the platform's for everybody, a tenant's for its people. The first
+ *  value is the one of the distribution (`[[nav_groups]]`). */
+export function NavigationPanel({ level }: { level: Level }) {
+  const ctx = useTenantCtx(level.kind === 'tenant' ? level.slug : '')
+  const admin = useApi<AdminPlugin[]>(['admin-plugins'], level.kind === 'platform' ? '/api/admin/plugins' : null)
+  const langs = useLanguages()
+  const apps = (level.kind === 'tenant' ? ctx.data?.plugins : admin.data)?.filter(isApp) ?? []
+  return (
+    <Panel
+      level={level}
+      keys={['nav.layout']}
+      title={t('Navigation')}
+      description={level.kind === 'platform' ? t('The groups of the sidebar for every tenant; a tenant may set its own if you allow it.') : t('The groups of the sidebar of your tenant.')}
+    >
+      {(d, s) =>
+        s('nav.layout') && (
+          <Row level={level} d={d} s={s('nav.layout')!} display={(v) => (Array.isArray(v) && v.length ? `${v.length} ${t('groups')}` : t('No groups'))}>
+            <NavLayoutEditor
+              value={Array.isArray(d.value('nav.layout')) ? (d.value('nav.layout') as NavGroupDef[]) : []}
+              apps={apps.map((p) => ({ id: p.id, label: p.label, icon_name: p.icon_name }))}
+              langs={langs}
+              onChange={(v) => d.set('nav.layout', v)}
+            />
+          </Row>
+        )
+      }
+    </Panel>
   )
 }
 

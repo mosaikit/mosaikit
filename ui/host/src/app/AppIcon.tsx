@@ -71,6 +71,9 @@ const ICONS: Record<string, LucideIcon> = {
   wrench: Wrench,
 }
 
+/** The icon names a manifest or a group of the navigation may use. */
+export const ICON_NAMES = Object.keys(ICONS).sort()
+
 /** The official plugins on a server that does not send the name of the icon yet. */
 const BY_APP: Record<string, LucideIcon> = {
   tasks: SquareCheckBig,

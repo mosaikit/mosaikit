@@ -38,7 +38,7 @@ import { describe } from '../logtext.ts'
 import { BulkBar, FilterColumn, ListPage, type FacetGroup } from '../listkit.tsx'
 import { ListTable } from '../ListTable.tsx'
 import { sortParams, type Sort } from '../tableutil.ts'
-import { EmbeddingPanel, IdentityPanel, KeysPanel, LanguagesPanel, ManagedPanel, ModePanel, NotificationsPanel, SecurityPanel } from '../SettingsPanels.tsx'
+import { EmbeddingPanel, IdentityPanel, KeysPanel, LanguagesPanel, ManagedPanel, ModePanel, NavigationPanel, NotificationsPanel, SecurityPanel } from '../SettingsPanels.tsx'
 import { UsageAlerts, UsageConsumers, UsagePanel, UsageQuotas, UsageTrend } from '../Quotas.tsx'
 import { totals, trashHint } from '../usage.ts'
 import { LayoutPanel, StylePanel } from '../LayoutSettings.tsx'
@@ -1602,6 +1602,7 @@ export function TenantSettingsPage({ slug, section }: { slug: string; section?: 
     { id: 'theme', label: t('Theme and mode') },
     { id: 'layout', label: t('Layout') },
     { id: 'style', label: t('Style') },
+    { id: 'navigation', label: t('Navigation') },
     { id: 'languages', label: t('Languages and formats') },
   ]
   // before: Sign-in (now in Managed by the platform)
@@ -1627,6 +1628,7 @@ export function TenantSettingsPage({ slug, section }: { slug: string; section?: 
           <div className="grid gap-6">
             <Tabs tabs={tabs} current={tab} href={(id) => to.tenant(slug, 'settings', id)} />
             {tab === 'identity' && <IdentityPanel level={level} />}
+            {tab === 'navigation' && <NavigationPanel level={level} />}
             {tab === 'theme' && (
               <div className="grid gap-6">
                 <TenantTheme slug={slug} />

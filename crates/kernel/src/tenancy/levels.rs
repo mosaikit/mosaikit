@@ -106,6 +106,8 @@ const DEFS: &[Def] = &[
     def("style.tabs", Kind::Custom, Scope::Both, style_tabs),
     def("style.buttons", Kind::Custom, Scope::Both, style_buttons),
     Def { inherit: true, ..upload("style.band_image", Scope::Both) },
+    // the groups of the sidebar (with subgroups): without a value the platform's, then the distribution's
+    def("nav.layout", Kind::Custom, Scope::Both, nav_layout),
     // languages and formats
     limit("lang.enabled", Rule::Subset, languages),
     def("lang.default", Kind::Custom, Scope::Both, lang_default),
@@ -180,6 +182,10 @@ fn name_text(v: &Value) -> Result<()> {
 
 fn text_300(v: &Value) -> Result<()> {
     text(v, 300)
+}
+
+fn nav_layout(v: &Value) -> Result<()> {
+    crate::navgroups::check_layout(v).map_err(|e| invalid(&e))
 }
 
 fn text_200(v: &Value) -> Result<()> {
@@ -398,6 +404,8 @@ pub struct Defaults {
     pub product: Map<String, Value>,
     /// settings the product locks: they keep the default and nobody can change them
     pub locked: Vec<String>,
+    /// the groups of the sidebar the distribution declared (`[[nav_groups]]`): the default of `nav.layout`
+    pub nav: Value,
 }
 
 impl Defaults {
@@ -408,6 +416,7 @@ impl Defaults {
             session_hours: k.cfg.session_ttl_hours.clamp(1, 720),
             product: k.product.defaults.clone(),
             locked: k.product.locked.clone(),
+            nav: json!(k.nav_groups),
         }
     }
 
@@ -443,6 +452,7 @@ impl Defaults {
             "trash.retention_days" => json!(crate::trash::DEFAULT_RETENTION_DAYS),
             "log.retention_days" => json!(crate::log::DEFAULT_RETENTION_DAYS),
             "layout" => json!(super::layouts::DEFAULT_LAYOUT),
+            "nav.layout" => self.nav.clone(),
             _ => Value::Null,
         }
     }
@@ -1037,6 +1047,7 @@ mod tests {
             session_hours: 8,
             product: Map::new(),
             locked: Vec::new(),
+            nav: json!([]),
         }
     }
 

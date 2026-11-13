@@ -24,7 +24,7 @@ import { go, to } from '../router.ts'
 import { bandOf } from '../prefs.ts'
 import { AppMark } from '../Shell.tsx'
 import { PlatformTheme } from '../ThemeSettings.tsx'
-import { EmbeddingPanel, IdentityPanel, KeysPanel, LanguagesPanel, ModePanel, NotificationsPanel, RetentionPanel, SecurityPanel, ThemeSwitch } from '../SettingsPanels.tsx'
+import { EmbeddingPanel, IdentityPanel, KeysPanel, LanguagesPanel, ModePanel, NavigationPanel, NotificationsPanel, RetentionPanel, SecurityPanel, ThemeSwitch } from '../SettingsPanels.tsx'
 import { SignInSettings } from '../SignInSettings.tsx'
 import { EmailPanel } from '../EmailPanel.tsx'
 import { TenantPluginsOfAdmin } from './plugins.tsx'
@@ -471,6 +471,7 @@ export function AdminSystem({ session, section }: { session: Session; section?: 
     { id: 'theme', label: t('Theme and mode') },
     { id: 'layout', label: t('Layout') },
     { id: 'style', label: t('Style') },
+    { id: 'navigation', label: t('Navigation') },
     { id: 'languages', label: t('Languages and formats') },
     { id: 'topbar', label: t('Top bar') },
   ]
@@ -494,6 +495,7 @@ export function AdminSystem({ session, section }: { session: Session; section?: 
           <div className="grid gap-6">
             <Tabs tabs={tabs} current={tab} href={(id) => to.admin('system', id)} />
             {tab === 'identity' && <IdentityPanel level={PLATFORM} />}
+            {tab === 'navigation' && <NavigationPanel level={PLATFORM} />}
             {tab === 'theme' && (
               <div className="grid gap-6">
                 <PlatformTheme session={session} />

@@ -7,7 +7,7 @@ import { Activity, Building2, CalendarClock, Gauge, History, House, LayoutDashbo
 import type { PluginView, Session } from '../types.ts'
 import AppIcon from './AppIcon.tsx'
 import { useBrand } from '../brand.ts'
-import { DEFAULT_GROUP_ICON, splitApps } from './navgroups.ts'
+import { allItems, DEFAULT_GROUP_ICON, splitApps, type Grouped } from './navgroups.ts'
 import type { SearchGroup } from './SearchBox.tsx'
 import { isApp, useTenantCtx } from './core.ts'
 import { lang, t } from './i18n.ts'
@@ -35,6 +35,8 @@ export interface NavGroup {
   items: NavItem[]
   /** a group of the distribution: collapsible heading in the open sidebar, one icon and a menu in the closed one */
   collapsible?: boolean
+  /** subgroups of a group of the distribution or of the layout of the tenant: indented under the apps of the group */
+  subgroups?: NavGroup[]
 }
 export interface Nav {
   groups: NavGroup[]
@@ -65,9 +67,12 @@ export const hasActive = (it: NavItem): boolean => it.active || (it.children ?? 
 /** The items of the navigation per role (docs/refactoring-ui.md §2): work, management of the scope, at the
  *  bottom the settings of the scope. The personal pages are in the menu of the person. */
 export function useNav(session: Session, route: Route, grouped = false): Nav {
-  const defs = useBrand().nav_groups
+  const brandDefs = useBrand().nav_groups
   const slug = route.area === 'tenant' ? route.tenant : ''
   const ctx = useTenantCtx(slug)
+  // the layout of the platform or of the tenant (Settings › Navigation), else the one of the distribution
+  const own = ctx.data?.config?.['nav.layout']
+  const defs = Array.isArray(own) ? (own as NonNullable<typeof brandDefs>) : brandDefs
   if (route.area === 'admin') {
     const page = route.page
     return {
@@ -149,14 +154,16 @@ export function useNav(session: Session, route: Route, grouped = false): Nav {
 function appGroups(apps: NavItem[], defs: Parameters<typeof splitApps>[1]): NavGroup[] {
   const { groups, rest } = splitApps(apps, defs, lang())
   if (!groups.length) return [{ id: 'apps', label: t('Apps'), icon: <LayoutGrid />, items: apps }]
+  const one = (g: Grouped<NavItem>): NavGroup => ({
+    id: `dist:${g.def.id}`,
+    label: g.label,
+    icon: <AppIcon id="" name={g.def.icon} fallback={DEFAULT_GROUP_ICON} />,
+    items: g.items,
+    collapsible: true,
+    ...(g.children ? { subgroups: g.children.map(one) } : {}),
+  })
   return [
-    ...groups.map((g) => ({
-      id: `dist:${g.def.id}`,
-      label: g.label,
-      icon: <AppIcon id="" name={g.def.icon} fallback={DEFAULT_GROUP_ICON} />,
-      items: g.items,
-      collapsible: true,
-    })),
+    ...groups.map(one),
     ...(rest.length ? [{ id: 'apps', label: t('Other apps'), icon: <LayoutGrid />, items: rest }] : []),
   ]
 }
@@ -169,7 +176,7 @@ export function flat(items: NavItem[]): NavItem[] {
 /** The groups of the search box from the navigation. */
 export function searchGroups(nav: Nav): SearchGroup[] {
   const isApps = (g: NavGroup) => g.id === 'apps' || g.collapsible
-  const apps = nav.groups.filter(isApps).flatMap((g) => g.items)
+  const apps = nav.groups.filter(isApps).flatMap((g) => allItems(g))
   const pages = [...nav.groups.filter((g) => !isApps(g)).flatMap((g) => g.items), ...nav.bottom]
   return [
     { id: 'pages', label: t('Pages'), items: pages.map((i) => ({ label: i.label, icon: i.icon, href: i.href ?? '' })) },
