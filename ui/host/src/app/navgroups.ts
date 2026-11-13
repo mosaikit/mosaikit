@@ -12,6 +12,8 @@ export interface NavGroupDef {
   i18n?: Record<string, { label?: string | null }>
   /** subgroups: one level only */
   children?: NavGroupDef[]
+  /** a group of the platform that the tenants keep when they set a layout of their own */
+  locked?: boolean
 }
 
 export interface Grouped<T> {
@@ -71,6 +73,31 @@ export function move<T>(list: T[], i: number, by: number): T[] {
   const [x] = out.splice(i, 1)
   out.splice(j, 0, x)
   return out
+}
+
+/** Moves the element `from` of a list to the place `to` (what a drop does). */
+export function reorder<T>(list: T[], from: number, to: number): T[] {
+  if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) return list
+  const out = list.slice()
+  const [x] = out.splice(from, 1)
+  out.splice(to, 0, x)
+  return out
+}
+
+/** Puts a plugin in the group `to` (`j`: a subgroup of the group `i`), before the plugin `before` or at the end; it
+ *  leaves the group it was in. */
+export function placeApp(defs: NavGroupDef[], plugin: string, to: { i: number; j?: number }, before?: string): NavGroupDef[] {
+  const put = (list: string[]): string[] => {
+    const rest = list.filter((p) => p !== plugin)
+    const at = before ? rest.indexOf(before) : -1
+    rest.splice(at < 0 ? rest.length : at, 0, plugin)
+    return rest
+  }
+  return unplace(defs, plugin).map((g, i) => {
+    if (i !== to.i) return g
+    if (to.j === undefined) return { ...g, plugins: put(g.plugins ?? []) }
+    return { ...g, children: (g.children ?? []).map((c, j) => (j === to.j ? { ...c, plugins: put(c.plugins ?? []) } : c)) }
+  })
 }
 
 /** A new group id from its name: lower case letters, digits and dashes, and a short suffix so two groups never collide. */

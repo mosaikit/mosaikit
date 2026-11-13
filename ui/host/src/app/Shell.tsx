@@ -33,7 +33,7 @@ import {
 } from '@/components/ui/sidebar'
 import { cn } from '@/lib/utils'
 import { t } from './i18n.ts'
-import { useLiveNotes } from './notes.ts'
+import { useLiveNotes, useNoteList } from './notes.ts'
 import { bandOf, navGroupOpen, setNavGroupOpen, sidebarOpen, useRailLabels } from './prefs.ts'
 import { allItems, arrowTarget } from './navgroups.ts'
 import { useHoverMenu } from './hoverMenu.ts'
@@ -57,6 +57,8 @@ const railButton = cn(
   '[&>svg]:fill-current [&>svg]:[fill-opacity:0.1] data-[active=true]:[&>svg]:[fill-opacity:0.2] hover:[&>svg]:[fill-opacity:0.16]',
   // no height or padding transition: while the sidebar closes the buttons would be 40-56px tall and the rows would not line up
   'msk-nav-item relative h-10 transition-none gap-2.5 rounded-[8px] px-2.5 text-sidebar-foreground hover:bg-sidebar-hover hover:text-sidebar-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:font-semibold data-[active=true]:text-sidebar-accent-foreground [&>svg]:size-5',
+  // the active item has an accent bar on its left edge, open and closed
+  "data-[active=true]:before:absolute data-[active=true]:before:top-2 data-[active=true]:before:bottom-2 data-[active=true]:before:left-0 data-[active=true]:before:w-[3px] data-[active=true]:before:rounded-r-full data-[active=true]:before:bg-sidebar-primary data-[active=true]:before:content-['']",
   // closed, like the Teams bar: icon and name below, grey (--rail-foreground); the active item
   // and the one under the mouse in the accent colour, the active one on a soft background too (no lines)
   'group-data-[collapsible=icon]:h-[56px]! group-data-[collapsible=icon]:w-full! group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-1.5 group-data-[collapsible=icon]:rounded-none group-data-[collapsible=icon]:p-0! group-data-[collapsible=icon]:data-[active=false]:bg-transparent! group-data-[collapsible=icon]:data-[active=true]:font-medium! group-data-[collapsible=icon]:font-normal! group-data-[collapsible=icon]:text-rail-foreground group-data-[collapsible=icon]:hover:text-sidebar-primary group-data-[collapsible=icon]:data-[active=true]:text-sidebar-accent-foreground group-data-[collapsible=icon]:data-[active=true]:[&>svg]:text-sidebar-primary group-data-[collapsible=icon]:[&>svg]:size-5 group-data-[collapsible=icon]:[&>svg]:stroke-[1.6]',
@@ -178,6 +180,10 @@ function DistGroup({ g, className }: { g: NavGroup; className: string }) {
   const labels = useRailLabels()
   const [open, setOpen] = useState(() => navGroupOpen(g.id))
   const active = allItems(g).some(hasActive)
+  // unread notifications of the apps of the group: a dot on the icon of the closed sidebar
+  const unread = useNoteList({ unread: true, limit: 50 }).data?.items ?? []
+  const ids = new Set(allItems(g).map((i) => i.plugin).filter(Boolean))
+  const fresh = unread.some((n) => ids.has(n.source))
   const label = g.label ?? g.id
   const body = `msk-navg-${g.id.replace(/[^a-z0-9_-]/gi, '_')}`
   const toggle = () => {
@@ -194,9 +200,10 @@ function DistGroup({ g, className }: { g: NavGroup; className: string }) {
                 hover={hover}
                 item={{ label, icon: g.icon, active, children: allItems(g) }}
                 trigger={
-                  <SidebarMenuButton isActive={active} className={cn(railButton, !labels && railIconsOnly)} aria-label={t('Open the apps of {name}', { name: label })}>
+                  <SidebarMenuButton isActive={active} className={cn(railButton, !labels && railIconsOnly)} aria-label={fresh ? `${t('Open the apps of {name}', { name: label })}, ${t('new notifications')}` : t('Open the apps of {name}', { name: label })}>
                     {g.icon}
                     <span>{label}</span>
+                    {fresh && <span data-testid="group-dot" aria-hidden="true" className="absolute top-1.5 right-3 size-2 rounded-full bg-destructive" />}
                   </SidebarMenuButton>
                 }
               />

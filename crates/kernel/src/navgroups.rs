@@ -35,6 +35,9 @@ pub struct NavGroupDef {
     /// subgroups, one level only: `[[nav_groups.children]]` (set in Settings › Navigation, or in the file)
     #[serde(default)]
     pub children: Vec<NavGroupDef>,
+    /// a group of the platform that the tenants keep even when they set a layout of their own (they come first)
+    #[serde(default)]
+    pub locked: bool,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
@@ -54,6 +57,8 @@ pub struct NavGroup {
     pub i18n: BTreeMap<String, NavGroupText>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub children: Vec<NavGroup>,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub locked: bool,
 }
 
 /// Validates the groups; `warn` receives one message per problem. Never fails.
@@ -108,7 +113,7 @@ fn norm(
         }
         let label = Some(d.label.trim()).filter(|l| !l.is_empty()).unwrap_or(&id).to_string();
         let icon = d.icon.as_ref().map(|i| i.trim().to_string()).filter(|i| !i.is_empty());
-        out.push(NavGroup { id, label, icon, plugins, i18n: d.i18n.clone(), children });
+        out.push(NavGroup { id, label, icon, plugins, i18n: d.i18n.clone(), children, locked: d.locked });
     }
     out
 }

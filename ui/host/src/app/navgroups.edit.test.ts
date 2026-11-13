@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { allItems, groupIds, move, newGroupId, placed, splitApps, unplace, type NavGroupDef } from './navgroups.ts'
+import { allItems, groupIds, move, newGroupId, placeApp, placed, reorder, splitApps, unplace, type NavGroupDef } from './navgroups.ts'
 
 const apps = ['a', 'b', 'c', 'd'].map((plugin) => ({ plugin }))
 const defs: NavGroupDef[] = [
@@ -22,6 +22,28 @@ describe('layout with subgroups', () => {
   })
   it('flattens a group with its subgroups', () => {
     expect(allItems({ items: [1], subgroups: [{ items: [2, 3] }] })).toEqual([1, 2, 3])
+  })
+})
+
+describe('drag and drop helpers', () => {
+  it('reorder moves an element to a place', () => {
+    expect(reorder([1, 2, 3, 4], 0, 2)).toEqual([2, 3, 1, 4])
+    expect(reorder([1, 2, 3], 2, 0)).toEqual([3, 1, 2])
+    expect(reorder([1, 2, 3], 1, 1)).toEqual([1, 2, 3])
+    expect(reorder([1, 2, 3], 5, 0)).toEqual([1, 2, 3])
+  })
+  it('placeApp puts an app before another, at the end, or into a subgroup, leaving its old group', () => {
+    const d: NavGroupDef[] = [
+      { id: 'g', label: 'G', plugins: ['a', 'b'], children: [{ id: 's', label: 'S', plugins: ['c'] }] },
+      { id: 'h', label: 'H', plugins: ['d'] },
+    ]
+    expect(placeApp(d, 'b', { i: 0 }, 'a')[0].plugins).toEqual(['b', 'a'])
+    const moved = placeApp(d, 'a', { i: 1 })
+    expect(moved[0].plugins).toEqual(['b'])
+    expect(moved[1].plugins).toEqual(['d', 'a'])
+    const sub = placeApp(d, 'd', { i: 0, j: 0 }, 'c')
+    expect(sub[0].children?.[0].plugins).toEqual(['d', 'c'])
+    expect(sub[1].plugins).toEqual([])
   })
 })
 
