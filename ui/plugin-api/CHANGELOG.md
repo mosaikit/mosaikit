@@ -5,6 +5,8 @@ version and is removed in the next.
 
 ## Unreleased
 
+- `msk.share(id, { principals, level? })` (types `SharePreselect`, `SharePrincipal`): the share dialog of the host starts with those people and groups ready to be shared with, at `level` (default `read`); the person confirms with one button or ignores it. The names are labels: the host checks the ids (at most 200) and the usual rules apply (the person must manage the resource). A host that does not know the options opens the plain dialog. Additive.
+
 - `msk.t(phrase, vars?)` and `msk.ownTexts(tables)`; `UiContext.texts` (host: `lang/ui/<plugin id>.json` of the active language plugin, English phrase to translation): the texts inside the page of a plugin in the language of the person, `{name}` placeholders, the English phrase when there is no translation or the host is older. Also `fillText`; `connect()` sets `dir="rtl"` on `<html>` for Arabic, Hebrew, Persian and Urdu. Plugin API unchanged (additive, opt-in).
 - `kanban`: the «nothing here» of an empty column is a `listitem` of its list (a list with no item failed the accessibility check `aria-required-children`). Visual no change.
 - `msk.publicCall(name, args)` also runs a public command declared with `write = true` (it may insert an answer, a vote); the call is the same. Additive.

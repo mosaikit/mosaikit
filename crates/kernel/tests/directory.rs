@@ -60,6 +60,7 @@ fn toml(id: &str, directory: bool) -> String {
          [requires]\nmosaikit = \">=1.0\"\n\
          [[resources]]\nname = \"items\"\nfields = [{{ key = \"title\", kind = \"text\" }}]\n\
          [[public_commands]]\nname = \"x\"\ndescription = \"public\"\n\
+         [[user_permissions]]\nkey = \"review\"\nlabel = \"Review\"\ndescription = \"Approves\"\ndefault = false\n\
          [permissions]\ndirectory = {directory}\nrun_commands = [\"x\"]\n"
     )
 }
@@ -348,4 +349,46 @@ async fn the_audit_log_has_one_event_a_minute_and_no_query() {
     for leak in ["bob", "SECRET", "ana", "username"] {
         assert!(!text.contains(leak), "{text}");
     }
+}
+
+#[tokio::test]
+async fn the_people_who_hold_a_permission_of_the_plugin_can_be_listed() {
+    let w = world().await;
+    let req = json!({ "kind": "user", "permission": "review" });
+    let list = |out: Value| {
+        out.as_array()
+            .unwrap()
+            .iter()
+            .map(|r| r["username"].as_str().unwrap().to_string())
+            .collect::<Vec<_>>()
+    };
+    // nobody holds it by default except the Tenant Manager (who holds every permission)
+    assert_eq!(list(dir::search(&w.t, &w.anna, DIR, &req).await.unwrap()), ["alfa-manager"]);
+    // a person who has it through a grant
+    let ana: uuid::Uuid = mosaikit_db::query_scalar("select id from core.users where username = 'ana'")
+        .fetch_one(&w.t.db)
+        .await
+        .unwrap();
+    access::set_plugin_grant(&w.t, &w.mgr, DIR, "user", ana, &["review".to_string()]).await.unwrap();
+    assert_eq!(list(dir::search(&w.t, &w.anna, DIR, &req).await.unwrap()), ["ana", "alfa-manager"]);
+    // a profile that lists the key gives it to its members
+    let rev = access::create_profile(&w.t, &w.mgr, "Reviewers", "", None).await.unwrap();
+    let ch = ProfileChange {
+        plugins: [(DIR.to_string(), vec!["use".to_string(), "review".to_string()])].into(),
+        ..Default::default()
+    };
+    access::update_profile(&w.t, &w.mgr, rev.id, &ch).await.unwrap();
+    access::set_member_profile(&w.t, &w.mgr, w.bob.user.user_id, Some(rev.id)).await.unwrap();
+    assert_eq!(list(dir::search(&w.t, &w.anna, DIR, &req).await.unwrap()), ["ana", "bob", "alfa-manager"]);
+    // `q` narrows it
+    let narrow = json!({ "kind": "user", "permission": "review", "q": "BO" });
+    assert_eq!(list(dir::search(&w.t, &w.anna, DIR, &narrow).await.unwrap()), ["bob"]);
+    // a key the plugin does not declare, a group search with a permission, and a plugin without the directory
+    for bad in [
+        json!({ "kind": "user", "permission": "nope" }),
+        json!({ "kind": "group", "permission": "review", "q": "a" }),
+    ] {
+        assert!(dir::search(&w.t, &w.anna, DIR, &bad).await.is_err(), "{bad}");
+    }
+    assert!(dir::search(&w.t, &w.anna, NODIR, &req).await.is_err());
 }

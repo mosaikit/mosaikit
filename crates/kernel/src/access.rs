@@ -190,6 +190,80 @@ pub async fn effective_all(
         .collect())
 }
 
+/// The active members of a tenant who hold the permission `key` of `plugin` (a Tenant Manager holds them all),
+/// as `(id, username, name)` in name order: through their profile, a grant to them or a grant to one of
+/// their groups. One query for the people, one for the grants and one for the groups: never one per person.
+pub async fn holders(
+    k: &Kernel,
+    tenant: Uuid,
+    plugin: &str,
+    key: &str,
+) -> Result<Vec<(Uuid, String, String)>> {
+    let p = k.plugins.active(plugin)?;
+    if !crate::plugins::tenants::is_on(k, tenant, plugin).await? {
+        return Err(crate::plugins::tenants::off_error(&p));
+    }
+    if !all_keys(&p).contains(key) {
+        return Err(Error::bad(format!("the plugin has no permission \"{key}\"")));
+    }
+    let people = mosaikit_db::query(
+        "select u.id, u.username, coalesce(nullif(u.display_name, ''), u.username), m.role, pr.perms
+         from core.memberships m join core.users u on u.id = m.user_id
+         left join core.permission_profiles pr on pr.tenant_id = m.tenant_id
+              and pr.id = coalesce(m.profile_id, (select d.id from core.permission_profiles d
+                                                   where d.tenant_id = m.tenant_id and d.is_default))
+         where m.tenant_id = $1 and m.status = 'active' and u.status = 'active'
+         order by lower(coalesce(nullif(u.display_name, ''), u.username)), u.username, u.id",
+    )
+    .bind(tenant)
+    .fetch_all(&k.db)
+    .await?;
+    let grants = mosaikit_db::query(
+        "select principal_type, principal_id, perms from core.plugin_grants where tenant_id = $1 and plugin_id = $2",
+    )
+    .bind(tenant)
+    .bind(plugin)
+    .fetch_all(&k.db)
+    .await?;
+    let with_key = |v: Value| keys_of(Some(&v)).is_some_and(|s| s.contains(key));
+    let mut users: BTreeSet<Uuid> = BTreeSet::new();
+    let mut groups: BTreeSet<Uuid> = BTreeSet::new();
+    for g in &grants {
+        if with_key(g.get::<Value, _>(2)) {
+            let id: Uuid = g.get(1);
+            if g.get::<String, _>(0) == "group" {
+                groups.insert(id);
+            } else {
+                users.insert(id);
+            }
+        }
+    }
+    if !groups.is_empty() {
+        let members = mosaikit_db::query(
+            "select gm.group_id, gm.user_id from core.group_members gm join core.groups g on g.id = gm.group_id
+             where g.tenant_id = $1",
+        )
+        .bind(tenant)
+        .fetch_all(&k.db)
+        .await?;
+        for m in &members {
+            if groups.contains(&m.get::<Uuid, _>(0)) {
+                users.insert(m.get(1));
+            }
+        }
+    }
+    Ok(people
+        .iter()
+        .filter(|r| {
+            let id: Uuid = r.get(0);
+            r.get::<String, _>(3) == "tenant_manager"
+                || users.contains(&id)
+                || profile_keys(&p, r.get::<Option<Value>, _>(4).as_ref()).contains(key)
+        })
+        .map(|r| (r.get(0), r.get(1), r.get(2)))
+        .collect())
+}
+
 /// What the caller may do in a plugin.
 pub async fn effective(k: &Kernel, c: &Caller, plugin: &str) -> Result<BTreeSet<String>> {
     Ok(effective_all(k, c.tenant.tenant_id, c.user.user_id, c.tenant.role)

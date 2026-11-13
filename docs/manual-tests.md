@@ -1327,6 +1327,7 @@ A shared collection of reusable texts and pieces of code with tags, copied in on
 | UI15-04 | As a Tenant Manager with many apps open the **Overview** | «Your apps» is one row that scrolls sideways, with a fade at the right; «My recent activity» stays inside its card, long lines end with «…» | manual |
 | UI15-05 | Share a resource, create a public link in an organization with no limit on the lifetime, with «The link does not expire» ticked | The dialog says that the link does not expire and works on every visit; with a limit, the box is not shown and the dialog says until when the link works | manual |
 | UI15-06 | Share a resource you own, transfer the ownership to another person (not as Tenant Manager) | «Ownership transferred» and the dialog closes; no error message | manual |
+| UI15-08 | In a plugin whose page calls `msk.share(id, { principals: [people], level: "read" })` (for example the review flow of a distribution) open the share dialog on an item you manage | The dialog opens with the box «Suggested by the app»: the names, a level and the button «Share with N»; one press shares with all of them and says «Shared with N»; people already shared with at that level or more are not counted; without the box the dialog is the usual one | manual |
 | UI15-07 | Open an app from the sidebar | A spinner with «Loading <app>…» shows in the middle until the page of the app has loaded | manual |
 
 ## Navigation layout
