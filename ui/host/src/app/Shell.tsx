@@ -345,15 +345,13 @@ function TopBar({ session, route, band, bandImage }: { session: Session; route: 
         <div className="max-[900px]:hidden">
           <TenantSwitcher session={session} route={route} />
         </div>
+        <DevPill />
         {ctxBand?.back && <BackButton back={ctxBand.back} onBack={() => bandEmit('band.back', {})} />}
       </div>
       {searchOn ? (
-        <div className="flex min-w-0 items-center gap-2">
-          <DevPill />
-          <div className="min-w-0 flex-1"><BandSearch session={session} route={route} nav={nav} /></div>
-        </div>
+        <BandSearch session={session} route={route} nav={nav} />
       ) : (
-        <div className="flex items-center justify-center gap-2 max-[900px]:flex-1"><DevPill />{modeSwitch}</div>
+        <div className="flex justify-center max-[900px]:flex-1">{modeSwitch}</div>
       )}
       <div className="flex items-center gap-2 justify-self-end">
         {searchOn && modeSwitch}

@@ -188,14 +188,14 @@ export default function Frame({ session, route, band, layout, bandImage, childre
       {navToggle}
       {(band.logo || !phone) && d.band.brand && <Brand compact={phone} />}
       {d.band.tenant === 'band' && !phone && <TenantSwitcher session={session} route={route} />}
+      <DevPill />
       {d.band.breadcrumb && !phone && (
         <>
           <span aria-hidden="true" className="h-5 w-px bg-band-line" />
           <Breadcrumb crumbs={crumbs} />
         </>
       )}
-      <div className={cn('flex min-w-0 flex-1 items-center gap-2', wideSearch ? 'justify-start' : 'justify-center')}>
-        <DevPill />
+      <div className={cn('flex min-w-0 flex-1', wideSearch ? 'justify-start' : 'justify-center')}>
         {band.search && (
           <div className={cn('@container w-full', wideSearch ? 'max-w-[720px]' : 'max-w-[420px]')}>
             <BandSearch session={session} route={route} nav={nav} />
