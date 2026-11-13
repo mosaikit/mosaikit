@@ -5,6 +5,8 @@ version and is removed in the next.
 
 ## Unreleased
 
+- `Directory::users_with(permission, q, limit)` (host operation `directory.search` with `permission`): the active members of the tenant who hold a permission of the plugin (a key of `[[user_permissions]]` or a standard one) through their profile, a grant or a group, and the Tenant Managers; up to 200, `q` may be empty. Same rights as `users` (`[permissions] directory = true`, Tenant Manager or `share`). `testing::MockHost::with_directory_holders` for the tests. Additive.
+
 - A public command declared with `write = true` (`[[public_commands]]`) may `db.exec` an `INSERT` into the tables declared with `[[tables]] insert_for = "visitor"`; nothing else changes in `Ctx` (`ctx.public` is still true, there is still no user). Additive.
 
 - `testing::MockHost::hook_with_previous(reg, hook, resource, values, previous)`: runs an update hook with the values before the change (`hook` is the same with none). Test helper only.

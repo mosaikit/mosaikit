@@ -373,6 +373,18 @@ impl Directory {
         let v = host::call("directory.search", json!({ "kind": "user", "q": q, "limit": limit }))?;
         Ok(serde_json::from_value(v)?)
     }
+    /// Active members of the tenant who hold the permission `permission` of this plugin (a key of its
+    /// `[[user_permissions]]`, or a standard one), in name order: through their profile, a grant to them or to a
+    /// group of theirs, or because they are Tenant Managers. `q` narrows the list (empty: all of them); up to
+    /// 200 rows, 200 by default. The same right is needed as for `users` (Tenant Manager or `share`), and a
+    /// key the plugin does not declare is refused (`invalid_argument`). For a review flow: «ask the reviewers».
+    pub fn users_with(&self, permission: &str, q: &str, limit: Option<u32>) -> Result<Vec<DirectoryUser>> {
+        let v = host::call(
+            "directory.search",
+            json!({ "kind": "user", "permission": permission, "q": q, "limit": limit }),
+        )?;
+        Ok(serde_json::from_value(v)?)
+    }
     /// Groups of the tenant whose name contains `q`, in name order.
     pub fn groups(&self, q: &str, limit: Option<u32>) -> Result<Vec<Group>> {
         let v = host::call("directory.search", json!({ "kind": "group", "q": q, "limit": limit }))?;

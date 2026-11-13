@@ -26,6 +26,8 @@ pub const MAX_Q: usize = 64;
 pub const DEFAULT_LIMIT: i64 = 20;
 /// Most rows a call may ask for; more is capped to this.
 pub const MAX_LIMIT: i64 = 50;
+/// The same for the people who hold a permission of the plugin (a list of reviewers is read whole).
+pub const MAX_LIMIT_HOLDERS: i64 = 200;
 /// Searches per minute: one person, and the whole tenant.
 pub const PER_USER: u32 = 30;
 pub const PER_TENANT: u32 = 300;
@@ -36,6 +38,10 @@ struct Query {
     users: bool,
     like: String,
     limit: i64,
+    /// only the people who hold this permission of the plugin (`q` may then be empty)
+    permission: Option<String>,
+    /// `q` in lower case, for the filter by permission
+    needle: String,
 }
 
 fn parse(req: &Value) -> Result<Query> {
@@ -45,9 +51,17 @@ fn parse(req: &Value) -> Result<Query> {
         Some("group") => false,
         _ => return Err(bad("kind must be \"user\" or \"group\"")),
     };
-    let q = req.get("q").and_then(Value::as_str).ok_or_else(|| bad("q is required"))?.trim();
+    let permission = match req.get("permission") {
+        None | Some(Value::Null) => None,
+        Some(Value::String(s)) if users && !s.is_empty() && s.len() <= 64 => Some(s.clone()),
+        _ => return Err(bad("permission is a key of the plugin, and only for kind \"user\"")),
+    };
+    let q = match (req.get("q"), &permission) {
+        (None | Some(Value::Null), Some(_)) => "",
+        (q, _) => q.and_then(Value::as_str).ok_or_else(|| bad("q is required"))?.trim(),
+    };
     let len = q.chars().count();
-    if len == 0 {
+    if len == 0 && permission.is_none() {
         return Err(bad("q must not be empty"));
     }
     if len > MAX_Q {
@@ -59,11 +73,21 @@ fn parse(req: &Value) -> Result<Query> {
     let limit = match req.get("limit") {
         None | Some(Value::Null) => DEFAULT_LIMIT,
         Some(v) => match v.as_i64() {
-            Some(n) if n >= 1 => n.min(MAX_LIMIT),
+            Some(n) if n >= 1 => n.min(if permission.is_some() { MAX_LIMIT_HOLDERS } else { MAX_LIMIT }),
             _ => return Err(bad("limit must be a positive integer")),
         },
     };
-    Ok(Query { users, like: format!("%{}%", crate::util::like_escape(q)), limit })
+    let limit = match (req.get("limit"), &permission) {
+        (None | Some(Value::Null), Some(_)) => MAX_LIMIT_HOLDERS,
+        _ => limit,
+    };
+    Ok(Query {
+        users,
+        like: format!("%{}%", crate::util::like_escape(q)),
+        limit,
+        permission,
+        needle: q.to_lowercase(),
+    })
 }
 
 /// `directory.search`: `{ kind: "user" | "group", q, limit? }` for the caller `c` in the plugin `plugin`.
@@ -102,7 +126,19 @@ async fn run(k: &Kernel, c: &Caller, plugin: &str, req: &Value, detach_audit: bo
             .with_code("directory_rate_limited"));
     }
     let tenant = c.tenant.tenant_id;
-    let rows = if q.users {
+    let rows = if let Some(key) = &q.permission {
+        // the people who hold the permission, filtered by `q` (empty: all of them), in name order
+        let needle = q.needle.as_str();
+        crate::access::holders(k, tenant, plugin, key)
+            .await?
+            .into_iter()
+            .filter(|(_, u, n)| {
+                needle.is_empty() || u.to_lowercase().contains(&needle) || n.to_lowercase().contains(&needle)
+            })
+            .take(q.limit as usize)
+            .map(|(id, u, n)| json!({ "id": id.to_string(), "username": u, "name": n }))
+            .collect::<Vec<_>>()
+    } else if q.users {
         // the limit is a validated integer, written into the text: it cannot carry anything else
         let sql = format!(
             "select u.id, u.username, coalesce(nullif(u.display_name, ''), u.username)

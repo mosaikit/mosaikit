@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { Activity, Bell, Frame, Gauge, Grid2x2, KeyRound, KeySquare, Link2, Lock, Mail, MoreHorizontal, Palette, Plus, Share2, ShieldCheck, ShieldOff, Trash2, TrendingUp, Upload, UserRound, Users } from 'lucide-react'
 import { api, appUrl, fmtBytes, fmtDate } from '../../api.ts'
 import PluginFrame from '../../components/PluginFrame.tsx'
-import { UiContext, useUi, type Ui } from '../../ui-context.ts'
+import { UiContext, useUi, type SharePre, type Ui } from '../../ui-context.ts'
 import ShareDialog from '../ShareDialog.tsx'
 import { SharedByMeSection } from './history.tsx'
 import type { AccessRequest, Group, HomeItem, Invitation, LinkInfo, Member, Overview, Profile, ResetLink, ResourceRow, Revoked, Session, TenantContext, TenantKpi, TenantSettings } from '../../types.ts'
@@ -247,12 +247,12 @@ export function PluginPage({ session, slug, id, at }: { session: Session; slug: 
   }
   const base = useUi()
   const reloads = useDevReload(session, slug)
-  const [share, setShare] = useState<{ id: string; done: () => void } | null>(null)
+  const [share, setShare] = useState<{ id: string; pre?: SharePre; done: () => void } | null>(null)
   // the sharing asked by the plugin opens the dialog of the host, which knows the tenant
   const services = useMemo<Ui>(
     () => ({
       ...base,
-      share: (rid) => new Promise<void>((done) => setShare({ id: rid, done })),
+      share: (rid, pre) => new Promise<void>((done) => setShare({ id: rid, pre, done })),
       open: (plugin, place) => {
         window.location.hash = `#/t/${slug}/p/${plugin}${place ? '/' + encodeURIComponent(place) : ''}`
       },
@@ -273,6 +273,7 @@ export function PluginPage({ session, slug, id, at }: { session: Session; slug: 
       <ShareDialog
         ctx={c}
         resourceId={share?.id ?? null}
+        preselect={share?.pre}
         onClose={() => {
           share?.done()
           setShare(null)

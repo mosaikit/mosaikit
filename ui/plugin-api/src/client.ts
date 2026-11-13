@@ -1,7 +1,7 @@
 import { Bridge, BridgeError } from './bridge.ts'
 import { API_VERSION, checkHostApi } from './version.ts'
 import { translate, type Vars } from './text.ts'
-import type { RealtimeEvent, RealtimeMessage, RealtimePerson, RealtimeStatus, BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, Unzipped, UploadProgress, FolderSuggestion, FileInfo, FileTicket, UiContext, Values, WebProbe } from './protocol.ts'
+import type { RealtimeEvent, RealtimeMessage, RealtimePerson, RealtimeStatus, BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, Unzipped, UploadProgress, FolderSuggestion, FileInfo, FileTicket, UiContext, Values, WebProbe, SharePreselect } from './protocol.ts'
 
 /** The extensions of the plugin on a resource (fields and actions other plugins add to its items). */
 export interface ExtensionsClient {
@@ -431,9 +431,14 @@ export class Msk {
     }
   }
 
-  /** Opens the share dialog of the host (users, groups, public links). */
-  async share(id: string): Promise<void> {
-    await this.bridge.call('share', { id })
+  /**
+   * Opens the share dialog of the host (users, groups, public links). With `opts.principals` the dialog starts with
+   * those people and groups ready to be shared with, at `opts.level` (default `read`): the person sees who they
+   * are, can share with all of them in one step or ignore it, and the usual rules apply (they must manage the
+   * resource). The names are only labels: the host checks the ids. At most 200 principals.
+   */
+  async share(id: string, opts?: SharePreselect): Promise<void> {
+    await this.bridge.call('share', opts ? { id, principals: opts.principals, level: opts.level } : { id })
   }
 
   toast(text: string, error = false) {

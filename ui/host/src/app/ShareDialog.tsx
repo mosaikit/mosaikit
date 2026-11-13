@@ -15,6 +15,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useApi, useConfirm } from './core.ts'
 import { fmtDay, t } from './i18n.ts'
+import type { SharePre } from '../ui-context.ts'
 import { levelHint, levelName } from './levels.ts'
 import { useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
@@ -28,6 +29,8 @@ function levels(): { v: Level; label: string; hint: string }[] {
     { v: 'manage', label: levelName('manage'), hint: levelHint('manage') },
   ]
 }
+
+const levelRank = (l: string): number => ['read', 'write', 'manage'].indexOf(l)
 
 function LevelSelect({ value, onChange, label }: { value: Level; onChange: (l: Level) => void; label: string }) {
   return (
@@ -65,7 +68,7 @@ function useDirectory(slug: string, q: string) {
   return found
 }
 
-export default function ShareDialog({ ctx, resourceId, onClose }: { ctx: TenantContext; resourceId: string | null; onClose: () => void }) {
+export default function ShareDialog({ ctx, resourceId, onClose, preselect }: { ctx: TenantContext; resourceId: string | null; onClose: () => void; preselect?: SharePre }) {
   const slug = ctx.tenant.slug
   const base = `/api/t/${enc(slug)}/resources/${resourceId}`
   const qc = useQueryClient()
@@ -115,6 +118,15 @@ export default function ShareDialog({ ctx, resourceId, onClose }: { ctx: TenantC
       setBusy(false)
     }
   }
+  // people and groups the app suggests (for example the reviewers): one step shares with all of them
+  const [suggestLevel, setSuggestLevel] = useState<Level>(preselect?.level ?? 'read')
+  useEffect(() => setSuggestLevel(preselect?.level ?? 'read'), [preselect])
+  const suggested = (preselect?.principals ?? []).filter((p) => p.id !== res?.owner_id)
+  const todo = suggested.filter((p) => !grants.some((x) => x.principal_id === p.id && levelRank(x.level) >= levelRank(suggestLevel)))
+  const shareWithSuggested = () =>
+    run(async () => {
+      for (const p of todo) await api('PUT', `${base}/grants`, { principal_type: p.type, principal_id: p.id, level: suggestLevel })
+    }, t('Shared with {n}', { n: todo.length }))
   const setGrant = (p: { principal_type: string; principal_id: string }, l: Level | null) =>
     run(() => api('PUT', `${base}/grants`, { ...p, level: l }), l ? t('Sharing updated') : t('Access revoked'))
   const candidates = found.filter((p) => p.id !== res?.owner_id && !grants.some((x) => x.principal_id === p.id))
@@ -142,6 +154,25 @@ export default function ShareDialog({ ctx, resourceId, onClose }: { ctx: TenantC
           <p className="text-sm text-destructive">{errText(g.error)}</p>
         ) : (
           <div className="grid gap-6">
+            {suggested.length > 0 && (
+              <section className="grid gap-3 rounded-lg border border-primary/30 bg-primary/5 p-3" aria-label={t('Suggested by the app')} data-testid="share-suggested">
+                <h3 className="text-sm font-semibold">{t('Suggested by the app')}</h3>
+                <ul className="flex flex-wrap gap-2">
+                  {suggested.map((p) => (
+                    <li key={p.id} className="flex items-center gap-1.5 rounded-full border bg-background px-3 py-1 text-sm">
+                      {icon(p.type)}
+                      {p.name || p.id.slice(0, 8)}
+                    </li>
+                  ))}
+                </ul>
+                <div className="flex flex-wrap items-center gap-2">
+                  <LevelSelect value={suggestLevel} onChange={setSuggestLevel} label={t('Level for the suggested people')} />
+                  <Button disabled={busy || todo.length === 0} onClick={() => void shareWithSuggested()}>
+                    {todo.length === 0 ? t('Already shared with them') : t('Share with {n}', { n: todo.length })}
+                  </Button>
+                </div>
+              </section>
+            )}
             <section className="grid gap-3">
               <h3 className="text-sm font-semibold">{t('People and groups of the tenant')}</h3>
               <div className="flex flex-wrap items-start gap-2">

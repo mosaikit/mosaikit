@@ -607,3 +607,16 @@ export function isReply(d: unknown): d is BridgeReply {
 export function isEvent(d: unknown): d is BridgeEvent {
   return !!d && typeof d === 'object' && (d as BridgeEvent).msk === 1 && typeof (d as BridgeEvent).event === 'string'
 }
+
+/** A person or a group the share dialog can start with (`msk.share(id, { principals })`). `name` is a label only. */
+export interface SharePrincipal {
+  type: 'user' | 'group'
+  id: string
+  name?: string
+}
+
+/** What the share dialog starts with: who to share with, and at which level (default `read`). */
+export interface SharePreselect {
+  principals: SharePrincipal[]
+  level?: 'read' | 'write' | 'manage'
+}

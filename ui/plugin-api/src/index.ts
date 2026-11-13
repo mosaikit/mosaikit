@@ -24,6 +24,8 @@ export type {
   DirectoryGroup,
   DirectorySearch,
   DirectoryUser,
+  SharePreselect,
+  SharePrincipal,
   EmbedUrl,
   EmbedsApi,
   Schedule,

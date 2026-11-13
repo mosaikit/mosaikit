@@ -268,6 +268,22 @@ impl MockHost {
     /// `(id, username, name)`, groups `(id, name)`. The mock does not know the rights of the caller: use
     /// `deny("directory.search", ...)` to test a refusal.
     pub fn with_directory(self, users: &[(&str, &str, &str)], groups: &[(&str, &str)]) -> MockHost {
+        self.with_directory_holders(users, groups, &[])
+    }
+
+    /// As [`MockHost::with_directory`], and the people who hold a permission of the plugin for
+    /// `Directory::users_with`: `(permission key, ids of the people)`. `q` may be empty for those calls, and
+    /// at most 200 rows come back.
+    pub fn with_directory_holders(
+        self,
+        users: &[(&str, &str, &str)],
+        groups: &[(&str, &str)],
+        holders: &[(&str, &[&str])],
+    ) -> MockHost {
+        let holders: Vec<(String, Vec<String>)> = holders
+            .iter()
+            .map(|(k, ids)| (k.to_string(), ids.iter().map(|i| i.to_string()).collect()))
+            .collect();
         let users: Vec<(String, String, String)> =
             users.iter().map(|(a, b, c)| (a.to_string(), b.to_string(), c.to_string())).collect();
         let groups: Vec<(String, String)> =
@@ -275,18 +291,39 @@ impl MockHost {
         self.on("directory.search", move |req| {
             let q = req.get("q").and_then(Value::as_str).unwrap_or_default().trim().to_lowercase();
             let len = q.chars().count();
-            if len == 0 || len > 64 {
+            let permission = req.get("permission").and_then(Value::as_str);
+            if (len == 0 && permission.is_none()) || len > 64 {
                 return Err("q must be 1 to 64 characters".to_string());
             }
+            let cap = if permission.is_some() { 200 } else { 50 };
             let limit = match req.get("limit") {
-                None | Some(Value::Null) => 20,
-                Some(v) => v.as_u64().filter(|n| *n >= 1).ok_or("limit must be a positive integer")?.min(50),
+                None | Some(Value::Null) => {
+                    if permission.is_some() {
+                        cap
+                    } else {
+                        20
+                    }
+                }
+                Some(v) => v.as_u64().filter(|n| *n >= 1).ok_or("limit must be a positive integer")?.min(cap),
             } as usize;
             match req.get("kind").and_then(Value::as_str) {
                 Some("user") => {
+                    let mine: Option<&Vec<String>> = match permission {
+                        Some(k) => Some(
+                            holders
+                                .iter()
+                                .find(|(key, _)| key == k)
+                                .map(|(_, ids)| ids)
+                                .ok_or("the plugin has no such permission")?,
+                        ),
+                        None => None,
+                    };
                     let mut rows: Vec<_> = users
                         .iter()
-                        .filter(|(_, u, n)| u.to_lowercase().contains(&q) || n.to_lowercase().contains(&q))
+                        .filter(|(id, u, n)| {
+                            mine.is_none_or(|ids| ids.contains(id))
+                                && (u.to_lowercase().contains(&q) || n.to_lowercase().contains(&q))
+                        })
                         .collect();
                     rows.sort_by_key(|(id, u, n)| (n.to_lowercase(), u.clone(), id.clone()));
                     Ok(Value::Array(
@@ -483,7 +520,7 @@ mod tests {
 
     crate::plugin! {
         hooks: { "notes.before_create" => default_tag, "notes.before_update" => reject },
-        commands: { "notes.count" => count, "t.greet" => greet, "t.locked" => locked, "t.tour" => tour, "t.dir" => directory_tour, "t.run" => run_tour },
+        commands: { "notes.count" => count, "t.greet" => greet, "t.locked" => locked, "t.tour" => tour, "t.dir" => directory_tour, "t.reviewers" => reviewers, "t.run" => run_tour },
     }
 
     #[test]
@@ -613,6 +650,10 @@ mod tests {
         assert!(host.command(&reg, "t.tour", Value::Null).unwrap_err().contains("files_read"));
     }
 
+    fn reviewers(ctx: &Ctx, _args: Value) -> Result<Value> {
+        Ok(json!(ctx.directory().users_with("review", "", None)?))
+    }
+
     fn directory_tour(ctx: &Ctx, _args: Value) -> Result<Value> {
         let users = ctx.directory().users("AN", Some(100))?;
         let groups = ctx.directory().groups("edit", None)?;
@@ -667,6 +708,25 @@ mod tests {
         let denied = MockHost::new()
             .deny("directory.search", "the plugin does not declare `directory` in [permissions]");
         assert!(denied.command(&reg, "t.dir", Value::Null).unwrap_err().contains("directory"));
+    }
+
+    #[test]
+    fn the_holders_of_a_permission_are_listed_with_an_empty_q() {
+        let reg = __msk_registry();
+        let host = MockHost::new().with_directory_holders(
+            &[("u2", "bruno", "Bruno"), ("u1", "anna", "Anna Rossi"), ("u3", "carla", "Carla")],
+            &[],
+            &[("review", &["u3", "u1"])],
+        );
+        let out = host.command(&reg, "t.reviewers", Value::Null).unwrap();
+        assert_eq!(
+            out,
+            json!([{ "id": "u1", "username": "anna", "name": "Anna Rossi" }, { "id": "u3", "username": "carla", "name": "Carla" }])
+        );
+        assert_eq!(host.calls()[0].1["permission"], "review");
+        // a key the plugin does not declare is refused
+        let none = MockHost::new().with_directory_holders(&[("u1", "anna", "Anna")], &[], &[]);
+        assert!(none.command(&reg, "t.reviewers", Value::Null).is_err());
     }
 
     #[test]
