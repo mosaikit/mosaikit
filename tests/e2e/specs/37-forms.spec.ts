@@ -260,7 +260,7 @@ test.describe.serial('Forms', () => {
     expect(csv.split(/\r?\n/).filter(Boolean)).toEqual(['Do you drive,Which car', 'Yes,Fiat Panda'])
 
     // the anonymous box cannot be turned off afterwards
-    await frame.getByRole('button', { name: 'Back to the forms' }).click()
+    await frame.getByRole('button', { name: '← Forms' }).click()
     await form(frame, 'FRM branching').getByRole('button', { name: 'Edit' }).click()
     await expect(frame.getByTestId('anonymous')).toBeChecked()
     await expect(frame.getByTestId('anonymous')).toBeDisabled()
