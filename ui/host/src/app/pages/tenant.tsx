@@ -160,7 +160,7 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
   )
   return (
     <>
-      <PageHeader title={manager ? t('Tenant overview') : t('Home')} sub={`${greeting()}, ${session.user.display_name || session.user.username} · ${t('{role} in {tenant}', { role: c.tenant.role === 'tenant_manager' ? t(ROLE.tenant_manager) : t('User'), tenant: c.tenant.name })}`} />
+      <PageHeader title={manager ? t('Tenant overview') : t('Overview')} sub={`${greeting()}, ${session.user.display_name || session.user.username} · ${t('{role} in {tenant}', { role: c.tenant.role === 'tenant_manager' ? t(ROLE.tenant_manager) : t('User'), tenant: c.tenant.name })}`} />
       <div className="grid gap-4 p-6 max-[620px]:p-4">
         {!c.plugins.some(isApp) && (
           <Empty compact art="apps" title={t('No active apps')}>
