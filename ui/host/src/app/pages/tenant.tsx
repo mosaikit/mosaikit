@@ -33,7 +33,7 @@ import { ImportDialog, InviteManyDialog } from '../BulkPeople.tsx'
 import { TenantTheme } from '../ThemeSettings.tsx'
 import { useTenantSignIn } from '../signin.ts'
 import { LinkDialog, ProfilesSection, RequestsTable } from './people.tsx'
-import { ActivityWidget, AppsStrip, KpiRow, NotesWidget, TrendWidget, WaitingWidget, Widget, WidgetGrid } from '../Overview.tsx'
+import { ActivityWidget, KpiRow, NotesWidget, TrendWidget, WaitingWidget, Widget, WidgetGrid } from '../Overview.tsx'
 import { describe } from '../logtext.ts'
 import { BulkBar, FilterColumn, ListPage, type FacetGroup } from '../listkit.tsx'
 import { ListTable } from '../ListTable.tsx'
@@ -162,12 +162,10 @@ export function TenantHome({ session, slug }: { session: Session; slug: string }
     <>
       <PageHeader title={manager ? t('Tenant overview') : t('Home')} sub={`${greeting()}, ${session.user.display_name || session.user.username} · ${t('{role} in {tenant}', { role: c.tenant.role === 'tenant_manager' ? t(ROLE.tenant_manager) : t('User'), tenant: c.tenant.name })}`} />
       <div className="grid gap-4 p-6 max-[620px]:p-4">
-        {!c.plugins.some(isApp) ? (
+        {!c.plugins.some(isApp) && (
           <Empty compact art="apps" title={t('No active apps')}>
             {t('An Administrator installs and turns them on.')}
           </Empty>
-        ) : (
-          <AppsStrip slug={slug} plugins={c.plugins} />
         )}
         <WidgetGrid>
           {manager && d?.tenant && (

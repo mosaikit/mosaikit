@@ -343,14 +343,12 @@ test.describe.serial('12-review-round1-platform', () => {
     await login(page, 'Overview Tenant', 'mgr', PASSWORD)
     expect((await call('POST', 'api/t/ovw/manage/members', { username: 'ov-user', display_name: 'Ov User', email: 'ov-user@ovw.example.org', password: PASSWORD, role: 'user' })).status).toBe(200)
 
-    await test.step('R1-O-02 Tenant Manager: waiting for you, active people, recent activity, notifications, usage, compact apps', async () => {
+    await test.step('R1-O-02 Tenant Manager: waiting for you, active people, recent activity, notifications, usage', async () => {
       await page.goto('./#/t/ovw')
       await expect(page.getByRole('heading', { name: 'Tenant overview' })).toBeVisible()
       for (const name of ['Waiting for you', 'Active people', 'Recent activity', 'For you']) await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
-      const strip = page.getByRole('navigation', { name: 'Your apps' })
-      await expect(strip.getByRole('button', { name: 'Notes' })).toBeVisible()
-      // compact: chips, not cards
-      expect((await strip.boundingBox())!.height).toBeLessThan(80)
+      // the apps are in the sidebar, not repeated at the top of the overview
+      await expect(page.getByRole('navigation', { name: 'Your apps' })).toHaveCount(0)
       await expect(page.getByRole('heading', { name: 'Your space' })).toBeVisible()
       await everywhere('tenant manager overview')
     })
@@ -395,10 +393,10 @@ test.describe.serial('12-review-round1-platform', () => {
     await logout(page)
 
     await login(page, 'Overview Tenant', 'ov-user', PASSWORD)
-    await test.step('R1-O-01 User: Home with the apps as chips, pick up, due soon, for you, recent activity and shared by me', async () => {
+    await test.step('R1-O-01 User: Home with pick up, due soon, for you, recent activity and shared by me', async () => {
       await page.goto('./#/t/ovw')
       await expect(page.getByRole('heading', { name: 'Home', exact: true })).toBeVisible()
-      await expect(page.getByRole('navigation', { name: 'Your apps' })).toBeVisible()
+      await expect(page.getByRole('navigation', { name: 'Your apps' })).toHaveCount(0)
       for (const name of ['Pick up where you left off', 'Due soon', 'For you']) await expect(page.getByRole('heading', { name, exact: true })).toBeVisible()
       await expect(page.getByRole('region', { name: 'Shared by me' })).toBeVisible()
       await expect(page.getByRole('heading', { name: 'Waiting for you' })).toHaveCount(0)

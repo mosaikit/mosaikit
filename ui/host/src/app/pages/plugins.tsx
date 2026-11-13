@@ -1103,11 +1103,11 @@ export function TenantPlugins({ slug }: { slug: string }) {
                   sort: (p) => p.label,
                   text: (p) => `${p.label} ${p.id} ${p.description}`,
                   cell: (p) => (
-                    <span className="flex items-center gap-2.5">
-                      <AppIcon id={p.id} name={p.icon} className="size-5 text-primary" />
-                      <span>
-                        <b className="block font-medium">{p.label}</b>
-                        <span className="line-clamp-1 text-xs text-muted-foreground">{p.description}</span>
+                    <span className="flex min-w-0 items-center gap-2.5">
+                      <AppIcon id={p.id} name={p.icon} className="size-5 shrink-0 text-primary" />
+                      <span className="min-w-0 flex-1">
+                        <b className="block truncate font-medium">{p.label}</b>
+                        <span className="block truncate text-xs text-muted-foreground" title={p.description}>{p.description}</span>
                       </span>
                     </span>
                   ),

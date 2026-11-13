@@ -6,15 +6,15 @@
 import type { ReactNode } from 'react'
 import { CircleAlert, History, Lock, Mail, Share2 } from 'lucide-react'
 import { fmtBytes, fmtDate } from '../api.ts'
-import type { AccessRequest, GlobalKpi, Invitation, LogEvent, LogPage, PluginKpi, PluginView, ResourceStat, TenantInfo } from '../types.ts'
+import type { AccessRequest, GlobalKpi, Invitation, LogEvent, LogPage, PluginKpi, ResourceStat, TenantInfo } from '../types.ts'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import AppIcon from './AppIcon.tsx'
 import { Donut, HBars } from './Charts.tsx'
-import { isApp, useApi, usePaged, type PageOf } from './core.ts'
+import { useApi, usePaged, type PageOf } from './core.ts'
 import { fmtNumber, t } from './i18n.ts'
 import { Loading } from './kit.tsx'
-import { go, to } from './router.ts'
+import { to } from './router.ts'
 import { about, describe } from './logtext.ts'
 import { useNoteList } from './notes.ts'
 import { NoteRow } from './notifications.tsx'
@@ -89,32 +89,6 @@ export function TrendWidget({ id, title, figure, caption, values, link }: { id: 
         <polyline points={points} fill="none" stroke="currentColor" strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
       </svg>
     </Widget>
-  )
-}
-
-/** The apps as a compact strip of chips (the first thing of a Home). */
-export function AppsStrip({ slug, plugins }: { slug: string; plugins: PluginView[] }) {
-  const apps = plugins.filter(isApp)
-  if (!apps.length) return null
-  return (
-    // one row that scrolls sideways, whatever the number of apps (it never grows into several rows)
-    <nav aria-label={t('Your apps')} className="flex items-center gap-3">
-      <span className="shrink-0 text-xs text-muted-foreground">{t('Your apps')}</span>
-      <div data-testid="apps-strip" className="flex min-w-0 flex-1 snap-x items-center gap-2 overflow-x-auto py-1 [scrollbar-width:thin] [mask-image:linear-gradient(to_right,#000_calc(100%-1.5rem),transparent)] pr-6">
-      {apps.map((p) => (
-        <button
-          key={p.id}
-          type="button"
-          onClick={() => go(to.plugin(slug, p.id))}
-          title={p.description}
-          className="flex h-8 shrink-0 snap-start items-center gap-1.5 rounded-full border bg-card px-3 text-sm outline-none hover:border-primary/50 hover:bg-accent/40 focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          <AppIcon id={p.id} name={p.icon_name} className="size-4 fill-current text-primary [fill-opacity:0.12]" />
-          <b className="font-medium">{p.label}</b>
-        </button>
-      ))}
-      </div>
-    </nav>
   )
 }
 
