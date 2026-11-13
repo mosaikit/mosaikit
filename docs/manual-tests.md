@@ -1316,3 +1316,27 @@ A shared collection of reusable texts and pieces of code with tags, copied in on
 | WBD-11 | Export the board as **PNG** and as **SVG** | Two files named after the board are downloaded; they show every object on the paper with the chosen background, with a margin around | manual |
 | WBD-12 | Delete a board from the list | After the confirmation the board is gone and, if it was the last one, the empty state is shown | e2e `41-whiteboard.spec.ts` |
 | WBD-13 | Draw a board bigger than a frame of the live channel (a few hundred notes), then open it in a second session | The second session receives the board in pieces and shows all of it; no error is shown | manual (unit tests of the frames) |
+
+## Interface 1.0.15
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| UI15-01 | As the Administrator open **People** | The column of the organizations shows the name of each organization (not its slug); the home organization too | manual |
+| UI15-02 | As the Administrator open **Plugins** in the card view, at 1280 px and at 400 px | The cards have no signature line; every badge (kind, status, development, update) is under the name, none is cut; the signature is still in the list view and in the page of the plugin | manual |
+| UI15-03 | As the Administrator open **Log** at 1280 px and at 800 px | The filters (search, who, what, organization) and «Show» sit in one wrapping row; no field overlaps another | manual |
+| UI15-04 | As a Tenant Manager with many apps open the **Overview** | «Your apps» is one row that scrolls sideways, with a fade at the right; «My recent activity» stays inside its card, long lines end with «…» | manual |
+| UI15-05 | Share a resource, create a public link in an organization with no limit on the lifetime, with «The link does not expire» ticked | The dialog says that the link does not expire and works on every visit; with a limit, the box is not shown and the dialog says until when the link works | manual |
+| UI15-06 | Share a resource you own, transfer the ownership to another person (not as Tenant Manager) | «Ownership transferred» and the dialog closes; no error message | manual |
+| UI15-07 | Open an app from the sidebar | A spinner with «Loading <app>…» shows in the middle until the page of the app has loaded | manual |
+
+## Navigation layout
+
+| Id | Check | Expected | Twin |
+|---|---|---|---|
+| NAV-01 | As a Tenant Manager open Tenant settings › Identity and appearance › Navigation and press «Customize» | The groups of the distribution (or none) become editable; «Add a group» adds a group with a name, an icon and the apps | e2e `42-navigation.spec.ts` |
+| NAV-02 | Add an app to a group, add a subgroup with another app, move them with the arrows, give the names in Italian too, save | «Settings saved»; an app is in one place only: adding it to a group takes it out of the previous one | e2e `42-navigation.spec.ts` |
+| NAV-03 | Look at the sidebar (open) | Each group is a heading with its icon, the number of apps and a chevron; its apps are under it and the subgroups are indented with a line at the left; the headings collapse and the state is remembered | e2e `42-navigation.spec.ts` |
+| NAV-04 | Close the sidebar and hover a group | One icon for the group; a menu opens with all the apps of the group and of its subgroups | manual |
+| NAV-05 | Press «Restore» and save | The sidebar goes back to the groups of the platform (or of the distribution) | e2e `42-navigation.spec.ts` |
+| NAV-06 | As the Administrator set a layout in System › Identity and appearance › Navigation, with «Tenants may customize it» off | Every organization shows it; a Manager sees the setting locked | manual |
+| NAV-07 | Switch the language to Italian | The group names written for Italian are shown; the others show the name of the base language | manual |

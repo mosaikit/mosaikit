@@ -32,6 +32,9 @@ pub struct NavGroupDef {
     /// texts in other languages: `[nav_groups.i18n.it] label = "..."`
     #[serde(default)]
     pub i18n: BTreeMap<String, NavGroupText>,
+    /// subgroups, one level only: `[[nav_groups.children]]` (set in Settings › Navigation, or in the file)
+    #[serde(default)]
+    pub children: Vec<NavGroupDef>,
 }
 
 #[derive(Debug, Clone, Default, Deserialize, Serialize, PartialEq)]
@@ -49,12 +52,24 @@ pub struct NavGroup {
     pub icon: Option<String>,
     pub plugins: Vec<String>,
     pub i18n: BTreeMap<String, NavGroupText>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub children: Vec<NavGroup>,
 }
 
 /// Validates the groups; `warn` receives one message per problem. Never fails.
 pub fn normalize(defs: &[NavGroupDef], warn: &mut dyn FnMut(String)) -> Vec<NavGroup> {
     let mut ids = HashSet::new();
     let mut used: BTreeMap<String, String> = BTreeMap::new();
+    norm(defs, 0, &mut ids, &mut used, warn)
+}
+
+fn norm(
+    defs: &[NavGroupDef],
+    depth: usize,
+    ids: &mut HashSet<String>,
+    used: &mut BTreeMap<String, String>,
+    warn: &mut dyn FnMut(String),
+) -> Vec<NavGroup> {
     let mut out = Vec::new();
     for d in defs {
         let id = d.id.trim().to_string();
@@ -79,15 +94,41 @@ pub fn normalize(defs: &[NavGroupDef], warn: &mut dyn FnMut(String)) -> Vec<NavG
                 }
             }
         }
-        if plugins.is_empty() {
+        let children = if depth == 0 {
+            norm(&d.children, 1, ids, used, warn)
+        } else {
+            if !d.children.is_empty() {
+                warn(format!("nav_groups: the subgroup \"{id}\" has subgroups, only one level is allowed"));
+            }
+            Vec::new()
+        };
+        if plugins.is_empty() && children.is_empty() {
             warn(format!("nav_groups: the group \"{id}\" has no plugin, it is hidden"));
             continue;
         }
         let label = Some(d.label.trim()).filter(|l| !l.is_empty()).unwrap_or(&id).to_string();
         let icon = d.icon.as_ref().map(|i| i.trim().to_string()).filter(|i| !i.is_empty());
-        out.push(NavGroup { id, label, icon, plugins, i18n: d.i18n.clone() });
+        out.push(NavGroup { id, label, icon, plugins, i18n: d.i18n.clone(), children });
     }
     out
+}
+
+/// A layout saved in the settings (`nav.layout`): groups with optional subgroups, checked before it is stored.
+pub fn check_layout(v: &serde_json::Value) -> Result<(), String> {
+    let defs: Vec<NavGroupDef> =
+        serde_json::from_value(v.clone()).map_err(|e| format!("the navigation is a list of groups: {e}"))?;
+    let count = |g: &NavGroupDef| 1 + g.children.len();
+    if defs.iter().map(count).sum::<usize>() > 60 || defs.iter().any(|g| g.plugins.len() > 200) {
+        return Err("too many groups or apps in the navigation".into());
+    }
+    let long = |s: &str| s.chars().count() > 60;
+    let bad = |g: &NavGroupDef| {
+        long(&g.id) || long(&g.label) || g.i18n.values().any(|t| t.label.as_deref().is_some_and(long))
+    };
+    if defs.iter().any(|g| bad(g) || g.children.iter().any(bad)) {
+        return Err("a name of a group is longer than 60 characters".into());
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -136,5 +177,48 @@ mod tests {
         assert_eq!(g[1].plugins, ["w"]);
         assert_eq!(g[1].label, "b", "an empty label falls back to the id");
         assert_eq!(w.len(), 4, "{w:?}");
+    }
+
+    #[test]
+    fn subgroups_are_one_level_and_share_the_plugin_rules() {
+        let (g, w) = run("[[nav_groups]]
+id = \"a\"
+label = \"A\"
+plugins = [\"x\"]
+             [[nav_groups.children]]
+id = \"b\"
+label = \"B\"
+plugins = [\"y\", \"x\"]
+             [[nav_groups.children.children]]
+id = \"c\"
+label = \"C\"
+plugins = [\"z\"]
+");
+        assert_eq!(g.len(), 1);
+        assert_eq!(g[0].children.len(), 1);
+        assert_eq!(g[0].children[0].plugins, ["y"]);
+        assert!(g[0].children[0].children.is_empty());
+        assert!(w.iter().any(|m| m.contains("only one level")), "{w:?}");
+        // a group with only subgroups stays
+        let (g, _) = run("[[nav_groups]]
+id = \"a\"
+label = \"A\"
+[[nav_groups.children]]
+id = \"b\"
+label = \"B\"
+plugins = [\"y\"]
+");
+        assert_eq!(g.len(), 1);
+    }
+
+    #[test]
+    fn a_saved_layout_is_checked() {
+        let ok = serde_json::json!([{ "id": "a", "label": "A", "plugins": ["x"], "children": [{ "id": "b", "label": "B", "plugins": ["y"] }] }]);
+        assert!(check_layout(&ok).is_ok());
+        assert!(check_layout(&serde_json::json!([])).is_ok());
+        assert!(check_layout(&serde_json::json!("x")).is_err());
+        assert!(check_layout(&serde_json::json!([{ "id": "a", "label": "A", "colour": "red" }])).is_err());
+        let long = "x".repeat(61);
+        assert!(check_layout(&serde_json::json!([{ "id": "a", "label": long }])).is_err());
     }
 }

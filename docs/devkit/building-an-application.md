@@ -205,7 +205,15 @@ icon = "database"           # one of the icon names below; an unknown one falls 
 plugins = ["com.acme.parcels", "com.mosaikit.notes"]    # plugin ids, in the order shown
 [nav_groups.i18n.it]
 label = "Dati"
+
+[[nav_groups.children]]      # a subgroup (one level only), with the same keys; shown indented under the group
+id = "archive"
+label = "Archive"
+plugins = ["com.mosaikit.files"]
 ```
+
+The Administrator and each Tenant Manager can change these groups in the settings (Navigation); what they save replaces the
+ones of the file for their scope, and `[locked] keys = ["nav.layout"]` in the policy of the product forbids it.
 
 A plugin that no group lists stays under "Other apps". A plugin that is not installed is ignored (a warning in the log), and
 a group with no plugin is hidden: list in a group only plugins of `include`, `validate` warns about the others. The icon

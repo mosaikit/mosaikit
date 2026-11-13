@@ -195,7 +195,9 @@ fn check_nav_groups(d: &Distribution, r: &mut Report) {
     let Some(groups) = d.nav_groups.as_ref().and_then(|v| v.as_array()) else { return };
     let own: Vec<String> = d.own_plugins().map(|o| o.into_iter().map(|p| p.id).collect()).unwrap_or_default();
     let official = d.official_ids().unwrap_or_default();
-    for g in groups {
+    // the groups and, one level down, their subgroups (`[[nav_groups.children]]`)
+    let subgroups = groups.iter().filter_map(|g| g.get("children")?.as_array()).flatten();
+    for g in groups.iter().chain(subgroups) {
         let name = g.get("id").and_then(|v| v.as_str()).unwrap_or("?");
         for id in g.get("plugins").and_then(|v| v.as_array()).into_iter().flatten().filter_map(|v| v.as_str())
         {

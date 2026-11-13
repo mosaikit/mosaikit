@@ -367,3 +367,36 @@ async fn admin_session_follows_the_platform() {
         other => panic!("{other:?}"),
     }
 }
+
+#[tokio::test]
+async fn the_navigation_layout_is_a_setting_with_subgroups() {
+    let t = start().await;
+    let admin = t.admin().await;
+    let g = t.tenant("alfa").await;
+    let manager = t.home(&g).await;
+    let anna = t.member(&g, "anna").await;
+    let anna = t.home(&anna).await;
+    let alfa = manager.tenant.tenant_id;
+
+    // without a value the layout is the one of the distribution (here none)
+    let l = tenant_settings(&t, alfa).await.unwrap();
+    assert_eq!(get(&l, "nav.layout").value, json!([]));
+
+    // a layout with a subgroup is stored; a wrong one is refused
+    let layout = json!([{ "id": "data", "label": "Data", "plugins": ["notes"],
+        "children": [{ "id": "files", "label": "Files", "plugins": ["files"] }] }]);
+    let bad = map(json!({ "nav.layout": "nope" }));
+    assert_eq!(set_platform(&t, &admin, &bad, &Map::new()).await.unwrap_err().code(), "setting_invalid");
+    set_platform(&t, &admin, &map(json!({ "nav.layout": layout })), &Map::new()).await.unwrap();
+    assert_eq!(effective(&t, Some(alfa)).await.unwrap()["nav.layout"], layout);
+
+    // the tenant inherits it, may set its own (only its Manager), and goes back to the platform's
+    let own = json!([{ "id": "mine", "label": "Mine", "plugins": ["tasks"] }]);
+    let v = map(json!({ "nav.layout": own }));
+    assert_eq!(set_tenant(&t, &anna, &v).await.unwrap_err().kind, Kind::Forbidden);
+    let l = set_tenant(&t, &manager, &v).await.unwrap();
+    assert_eq!(get(&l, "nav.layout").source, "tenant");
+    assert_eq!(effective(&t, Some(alfa)).await.unwrap()["nav.layout"], own);
+    let l = set_tenant(&t, &manager, &map(json!({ "nav.layout": null }))).await.unwrap();
+    assert_eq!(get(&l, "nav.layout").value, layout);
+}

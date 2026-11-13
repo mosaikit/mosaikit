@@ -10,12 +10,16 @@ export interface NavGroupDef {
   icon?: string | null
   plugins: string[]
   i18n?: Record<string, { label?: string | null }>
+  /** subgroups: one level only */
+  children?: NavGroupDef[]
 }
 
 export interface Grouped<T> {
   def: NavGroupDef
   label: string
   items: T[]
+  /** the subgroups, drawn indented under the items of the group */
+  children?: Grouped<T>[]
 }
 
 /** The label in the language of the person, else the declared one. */
@@ -30,21 +34,71 @@ export function splitApps<T extends { plugin?: string }>(items: T[], defs: NavGr
   const byPlugin = new Map(items.filter((i) => i.plugin).map((i) => [i.plugin!, i]))
   const taken = new Set<string>()
   const seen = new Set<string>()
-  const groups: Grouped<T>[] = []
-  for (const def of Array.isArray(defs) ? defs : []) {
-    if (!def || typeof def.id !== 'string' || !def.id || seen.has(def.id)) continue
-    seen.add(def.id)
-    const mine: T[] = []
-    for (const p of Array.isArray(def.plugins) ? def.plugins : []) {
-      const it = byPlugin.get(p)
-      if (it && !taken.has(p)) {
-        taken.add(p)
-        mine.push(it)
+  const build = (list: NavGroupDef[] | undefined, depth: number): Grouped<T>[] => {
+    const out: Grouped<T>[] = []
+    for (const def of Array.isArray(list) ? list : []) {
+      if (!def || typeof def.id !== 'string' || !def.id || seen.has(def.id)) continue
+      seen.add(def.id)
+      const mine: T[] = []
+      for (const p of Array.isArray(def.plugins) ? def.plugins : []) {
+        const it = byPlugin.get(p)
+        if (it && !taken.has(p)) {
+          taken.add(p)
+          mine.push(it)
+        }
       }
+      const children = depth === 0 ? build(def.children, 1) : []
+      if (mine.length || children.length) out.push({ def, label: groupLabel(def, lang), items: mine, ...(children.length ? { children } : {}) })
     }
-    if (mine.length) groups.push({ def, label: groupLabel(def, lang), items: mine })
+    return out
   }
+  const groups = build(defs, 0)
   return { groups, rest: items.filter((i) => !i.plugin || !taken.has(i.plugin)) }
+}
+
+/** The items of a group and of its subgroups, in the order shown (the closed sidebar and the search show them flat). */
+export function allItems<T>(g: { items: T[]; subgroups?: { items: T[]; subgroups?: unknown[] }[] }): T[] {
+  return [...g.items, ...(g.subgroups ?? []).flatMap((c) => allItems(c as { items: T[] }))]
+}
+
+// ── editing the layout (Settings › Navigation): pure helpers, the editor only calls them ──
+
+/** Moves the element `i` of a list by `by` places (never out of the list). */
+export function move<T>(list: T[], i: number, by: number): T[] {
+  const j = i + by
+  if (i < 0 || i >= list.length || j < 0 || j >= list.length) return list
+  const out = list.slice()
+  const [x] = out.splice(i, 1)
+  out.splice(j, 0, x)
+  return out
+}
+
+/** A new group id from its name: lower case letters, digits and dashes, and a short suffix so two groups never collide. */
+export function newGroupId(name: string, taken: Set<string>): string {
+  const base = name.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'group'
+  let id = base
+  for (let n = 2; taken.has(id); n++) id = `${base}-${n}`
+  return id
+}
+
+/** The ids of every group and subgroup of a layout. */
+export function groupIds(defs: NavGroupDef[]): Set<string> {
+  return new Set(defs.flatMap((g) => [g.id, ...(g.children ?? []).map((c) => c.id)]))
+}
+
+/** The plugin ids a layout places somewhere (the others are «not in a group»). */
+export function placed(defs: NavGroupDef[]): Set<string> {
+  return new Set(defs.flatMap((g) => [...(g.plugins ?? []), ...(g.children ?? []).flatMap((c) => c.plugins ?? [])]))
+}
+
+/** Takes a plugin out of every group (before it goes into another one: an app is in one place only). */
+export function unplace(defs: NavGroupDef[], plugin: string): NavGroupDef[] {
+  const cut = (g: NavGroupDef): NavGroupDef => ({
+    ...g,
+    plugins: (g.plugins ?? []).filter((p) => p !== plugin),
+    ...(g.children ? { children: g.children.map(cut) } : {}),
+  })
+  return defs.map(cut)
 }
 
 /** The icon drawn when a group declares none or a name the shell does not know. */

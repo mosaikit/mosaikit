@@ -35,7 +35,7 @@ import { cn } from '@/lib/utils'
 import { t } from './i18n.ts'
 import { useLiveNotes } from './notes.ts'
 import { bandOf, navGroupOpen, setNavGroupOpen, sidebarOpen, useRailLabels } from './prefs.ts'
-import { arrowTarget } from './navgroups.ts'
+import { allItems, arrowTarget } from './navgroups.ts'
 import { useHoverMenu } from './hoverMenu.ts'
 import { type Route } from './router.ts'
 import { QuotaAlert } from './Quotas.tsx'
@@ -177,7 +177,7 @@ function DistGroup({ g, className }: { g: NavGroup; className: string }) {
   const hover = useHoverMenu(rail)
   const labels = useRailLabels()
   const [open, setOpen] = useState(() => navGroupOpen(g.id))
-  const active = g.items.some(hasActive)
+  const active = allItems(g).some(hasActive)
   const label = g.label ?? g.id
   const body = `msk-navg-${g.id.replace(/[^a-z0-9_-]/gi, '_')}`
   const toggle = () => {
@@ -192,7 +192,7 @@ function DistGroup({ g, className }: { g: NavGroup; className: string }) {
             <SidebarMenuItem {...hover.areaProps}>
               <FlyoutMenu
                 hover={hover}
-                item={{ label, icon: g.icon, active, children: g.items }}
+                item={{ label, icon: g.icon, active, children: allItems(g) }}
                 trigger={
                   <SidebarMenuButton isActive={active} className={cn(railButton, !labels && railIconsOnly)} aria-label={t('Open the apps of {name}', { name: label })}>
                     {g.icon}
@@ -216,16 +216,56 @@ function DistGroup({ g, className }: { g: NavGroup; className: string }) {
     <SidebarGroup className={className} role="group" aria-label={label} onKeyDown={onKeyDown}>
       <SidebarGroupLabel asChild>
         <button type="button" data-navg-head className="msk-navg-head w-full cursor-pointer justify-between text-sidebar-foreground/85 hover:bg-sidebar-hover focus-visible:ring-2" aria-expanded={open} aria-controls={body} onClick={toggle}>
-          <span className={cn('truncate', active && !open && 'font-semibold text-sidebar-primary')}>{label}</span>
-          <ChevronDown className={cn('size-4 transition-transform', !open && '-rotate-90')} aria-hidden="true" />
+          <span className="flex min-w-0 items-center gap-2 [&>svg]:size-4 [&>svg]:shrink-0">
+            {g.icon}
+            <span className={cn('truncate', active && !open && 'font-semibold text-sidebar-primary')}>{label}</span>
+          </span>
+          <span className="flex shrink-0 items-center gap-1.5">
+            <span className="text-[11px] font-normal text-sidebar-foreground/60" aria-hidden="true">{allItems(g).length}</span>
+            <ChevronDown className={cn('size-4 transition-transform', !open && '-rotate-90')} aria-hidden="true" />
+          </span>
         </button>
       </SidebarGroupLabel>
       {open && (
         <SidebarGroupContent id={body} className="pl-3">
           <NavList items={g.items} />
+          {(g.subgroups ?? []).map((sg) => (
+            <SubGroup key={sg.id} g={sg} />
+          ))}
         </SidebarGroupContent>
       )}
     </SidebarGroup>
+  )
+}
+
+/** A subgroup of a group (one level): a smaller heading with its icon, its apps indented under it. */
+function SubGroup({ g }: { g: NavGroup }) {
+  const [open, setOpen] = useState(() => navGroupOpen(g.id))
+  const body = `msk-navg-${g.id.replace(/[^a-z0-9_-]/gi, '_')}`
+  const active = g.items.some(hasActive)
+  return (
+    <div className="mt-1 ml-1 border-l border-sidebar-border pl-2" role="group" aria-label={g.label}>
+      <button
+        type="button"
+        data-navg-head
+        aria-expanded={open}
+        aria-controls={body}
+        onClick={() => {
+          setOpen(!open)
+          setNavGroupOpen(g.id, !open)
+        }}
+        className="msk-navg-head flex h-7 w-full items-center gap-2 rounded-md px-2 text-xs font-medium text-sidebar-foreground/80 hover:bg-sidebar-hover focus-visible:ring-2 [&>svg]:size-4"
+      >
+        {g.icon}
+        <span className={cn('flex-1 truncate text-left', active && !open && 'font-semibold text-sidebar-primary')}>{g.label}</span>
+        <ChevronDown className={cn('size-3.5 transition-transform', !open && '-rotate-90')} aria-hidden="true" />
+      </button>
+      {open && (
+        <div id={body}>
+          <NavList items={g.items} />
+        </div>
+      )}
+    </div>
   )
 }
 
