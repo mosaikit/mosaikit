@@ -584,7 +584,7 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
             </Empty>
           ) : (
             <div>
-<ListTable
+<ListTable
                 label={t('Members')}
                 fit="inline"
                 searchLabel={t('Filter the members')}
@@ -630,7 +630,7 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
             </Empty>
           ) : (
             <div>
-<ListTable
+<ListTable
                 label={t('Shared with the group')}
                 fit="inline"
                 searchLabel={t('Filter the items')}

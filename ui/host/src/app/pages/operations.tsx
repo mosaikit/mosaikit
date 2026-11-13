@@ -1474,7 +1474,7 @@ function TenantsLoadPanel() {
   if (q.error) return <ErrorBox error={q.error} />
   return (
     <div>
-<ListTable
+<ListTable
         label={t('Tenants')}
         fit="inline"
         searchLabel={t('Filter the tenants')}
