@@ -43,7 +43,7 @@ in step).
 
 ## 1.0.15
 
-- The sidebar of the default distribution groups the official apps in four groups: Information, Work and projects, Communication, People and processes (`[[nav_groups]]` of `distribution.toml`, labels in eight languages; no change to the kernel).
+- The sidebar of the default distribution groups the official apps in four groups: Information, Work, Com, People (`[[nav_groups]]` of `distribution.toml`, labels in eight languages; no change to the kernel).
 - Administrator: the table of the people shows the name of the organization, not its slug; the cards of the plugins show a «Signed» pill instead of the signature line (the signer is in its tooltip, and in the list and the page of the plugin) and are wide enough for all their badges; the filters of the log no longer overlap.
 - Tenant Manager: the overview no longer opens with the list of the apps (the sidebar has them); the lines of «My recent activity» stay inside their card.
 - Sharing: a public link can be made without an expiry when the organization does not limit the lifetime, and the dialog says that the link does not expire (or until when it works) and that it works on every visit; transferring the ownership no longer ends with an error message when the former owner loses the access: the dialog closes.
