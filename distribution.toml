@@ -48,41 +48,41 @@ label = "Информация"
 
 [[nav_groups]]
 id = "work"
-label = "Work and projects"
+label = "Work"
 icon = "briefcase"
 plugins = ["com.mosaikit.tasks", "com.mosaikit.projects", "com.mosaikit.calendar", "com.mosaikit.dashboard", "com.mosaikit.maps"]
 [nav_groups.i18n.it]
-label = "Lavoro e progetti"
+label = "Lavoro"
 [nav_groups.i18n.es]
-label = "Trabajo y proyectos"
+label = "Trabajo"
 [nav_groups.i18n.pt]
-label = "Trabalho e projetos"
+label = "Trabalho"
 [nav_groups.i18n.fr]
-label = "Travail et projets"
+label = "Travail"
 [nav_groups.i18n.nl]
-label = "Werk en projecten"
+label = "Werk"
 [nav_groups.i18n.ar]
-label = "العمل والمشاريع"
+label = "العمل"
 [nav_groups.i18n.zh]
-label = "工作与项目"
+label = "工作"
 [nav_groups.i18n.ru]
-label = "Работа и проекты"
+label = "Работа"
 
 [[nav_groups]]
 id = "communication"
-label = "Communication"
+label = "Com"
 icon = "message-square"
 plugins = ["com.mosaikit.chat", "com.mosaikit.meet", "com.mosaikit.announcements"]
 [nav_groups.i18n.it]
-label = "Comunicazione"
+label = "Com"
 [nav_groups.i18n.es]
-label = "Comunicación"
+label = "Com"
 [nav_groups.i18n.pt]
-label = "Comunicação"
+label = "Com"
 [nav_groups.i18n.fr]
-label = "Communication"
+label = "Com"
 [nav_groups.i18n.nl]
-label = "Communicatie"
+label = "Com"
 [nav_groups.i18n.ar]
 label = "التواصل"
 [nav_groups.i18n.zh]
@@ -92,25 +92,25 @@ label = "Общение"
 
 [[nav_groups]]
 id = "people"
-label = "People and processes"
+label = "People"
 icon = "users"
 plugins = ["com.mosaikit.contacts", "com.mosaikit.approvals", "com.mosaikit.forms", "com.mosaikit.surveys", "com.mosaikit.polls"]
 [nav_groups.i18n.it]
-label = "Persone e processi"
+label = "Persone"
 [nav_groups.i18n.es]
-label = "Personas y procesos"
+label = "Personas"
 [nav_groups.i18n.pt]
-label = "Pessoas e processos"
+label = "Pessoas"
 [nav_groups.i18n.fr]
-label = "Personnes et processus"
+label = "Personnes"
 [nav_groups.i18n.nl]
-label = "Mensen en processen"
+label = "Mensen"
 [nav_groups.i18n.ar]
-label = "الأشخاص والعمليات"
+label = "الأشخاص"
 [nav_groups.i18n.zh]
-label = "人员与流程"
+label = "人员"
 [nav_groups.i18n.ru]
-label = "Люди и процессы"
+label = "Люди"
 
 [desktop]
 # database of the desktop version: "sqlite" (no server to start) or "postgres" (embedded PostgreSQL)
