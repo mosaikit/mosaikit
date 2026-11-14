@@ -3,7 +3,8 @@ import { Loader2 } from 'lucide-react'
 import { channelName, checkPluginApi, errorReply, execute, OpError, routeOp, safePage, SHELL_API, themeVars, uuid } from '../bridge.ts'
 import type { PluginView, Session, TenantContext } from '../types.ts'
 import { appUrl, enc } from '../api.ts'
-import { useUi, type SharePre } from '../ui-context.ts'
+import { useUi } from '../ui-context.ts'
+import { sharePre } from './sharepre.ts'
 import { pageTextsFor, t } from '../app/i18n.ts'
 import { timed } from '../app/devlog.ts'
 import { NAV_RESELECT, resetBand, sanitizeBand, setBand } from '../app/contextband.ts'
@@ -56,22 +57,6 @@ function uiContext(ui: Props['ui'], pluginId?: string) {
  * Iframe of the UI of the plugin (separate origin, sandbox) and host side of the bridge.
  * It accepts messages only from the current iframe and from the origin of the plugins.
  */
-/** The people and groups a plugin asks the share dialog to start with: only what is well formed (at most 200). */
-export function sharePre(args: Record<string, unknown> | undefined): SharePre | undefined {
-  const list = args?.principals
-  if (!Array.isArray(list)) return undefined
-  const ok = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-  const principals: SharePre['principals'] = []
-  for (const p of list.slice(0, 200)) {
-    const r = p as { type?: unknown; id?: unknown; name?: unknown }
-    if ((r.type !== 'user' && r.type !== 'group') || typeof r.id !== 'string' || !ok.test(r.id)) continue
-    principals.push({ type: r.type, id: r.id, ...(typeof r.name === 'string' ? { name: r.name.slice(0, 100) } : {}) })
-  }
-  if (!principals.length) return undefined
-  const level = args?.level === 'write' || args?.level === 'manage' ? args.level : 'read'
-  return { principals, level }
-}
-
 export default function PluginFrame({ plugin, session, ctx, reloadKey, ui: shell, at }: Props) {
   const ref = useRef<HTMLIFrameElement>(null)
   const ui = useUi()

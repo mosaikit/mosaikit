@@ -3,86 +3,8 @@
 // cannot load anything else); an unknown name falls back to the icon of the official plugins of an
 // older server, then to the puzzle piece.
 
-import {
-  Archive, BadgeCheck, BarChart3, Bell, Book, BookOpen, BookUser, Bot, Briefcase, Building2, Calendar, Camera,
-  ChartPie, ClipboardList, Clock, Cloud, Code, Database, FileText, Files, Folder, Gauge, Globe, Image, Inbox,
-  Kanban, Landmark, Layers, LayoutDashboard, LayoutGrid, Link, List, ListChecks, Mail, Map, MapPin, MessageSquare,
-  NotebookPen, Package, PenTool, Puzzle, Receipt, Route, Server, Settings, Share2, ShieldCheck, ShoppingCart,
-  SquareCheckBig, Star, Table, Tag, Truck, Users, Wallet, Wrench, Bookmark, CalendarDays, ClipboardCheck, FileInput, Languages, Megaphone, MessageCircle, Presentation, Video, Vote, type LucideIcon,
-} from 'lucide-react'
-
-/** The names a manifest may use. */
-const ICONS: Record<string, LucideIcon> = {
-  archive: Archive,
-  'badge-check': BadgeCheck,
-  'bar-chart-3': BarChart3,
-  bell: Bell,
-  book: Book,
-  'book-open': BookOpen,
-  'book-user': BookUser,
-  bot: Bot,
-  briefcase: Briefcase,
-  'building-2': Building2,
-  calendar: Calendar,
-  camera: Camera,
-  'chart-pie': ChartPie,
-  'clipboard-list': ClipboardList,
-  clock: Clock,
-  cloud: Cloud,
-  code: Code,
-  database: Database,
-  'file-text': FileText,
-  files: Files,
-  folder: Folder,
-  gauge: Gauge,
-  globe: Globe,
-  grid: LayoutGrid,
-  image: Image,
-  inbox: Inbox,
-  kanban: Kanban,
-  landmark: Landmark,
-  layers: Layers,
-  'layout-dashboard': LayoutDashboard,
-  link: Link,
-  list: List,
-  'list-checks': ListChecks,
-  mail: Mail,
-  map: Map,
-  'map-pin': MapPin,
-  'message-square': MessageSquare,
-  'notebook-pen': NotebookPen,
-  package: Package,
-  'pen-tool': PenTool,
-  puzzle: Puzzle,
-  receipt: Receipt,
-  route: Route,
-  server: Server,
-  settings: Settings,
-  'share-2': Share2,
-  'shield-check': ShieldCheck,
-  'shopping-cart': ShoppingCart,
-  'square-check-big': SquareCheckBig,
-  star: Star,
-  table: Table,
-  tag: Tag,
-  truck: Truck,
-  users: Users,
-  wallet: Wallet,
-  wrench: Wrench,
-  megaphone: Megaphone,
-  bookmark: Bookmark,
-  'calendar-days': CalendarDays,
-  'message-circle': MessageCircle,
-  'file-input': FileInput,
-  languages: Languages,
-  video: Video,
-  'clipboard-check': ClipboardCheck,
-  vote: Vote,
-  presentation: Presentation,
-}
-
-/** The icon names a manifest or a group of the navigation may use. */
-export const ICON_NAMES = Object.keys(ICONS).sort()
+import { type LucideIcon, Folder, SquareCheckBig, BookUser, Map, NotebookPen, LayoutGrid, Puzzle } from 'lucide-react'
+import { ICONS } from './appicons.ts'
 
 /** The official plugins on a server that does not send the name of the icon yet. */
 const BY_APP: Record<string, LucideIcon> = {
