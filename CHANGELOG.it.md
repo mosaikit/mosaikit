@@ -6,6 +6,7 @@ versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
 ## 1.0.15
 
+- La barra laterale della distribuzione predefinita raggruppa le app ufficiali in quattro gruppi: Informazioni, Lavoro e progetti, Comunicazione, Persone e processi (`[[nav_groups]]` di `distribution.toml`, etichette in otto lingue; nessuna modifica al kernel).
 - Amministratore: la tabella delle persone mostra il nome dell'organizzazione, non lo slug; le schede dei plugin mostrano una pillola «Firmato» al posto della riga della firma (chi ha firmato è nel suggerimento, e nell'elenco e nella pagina del plugin) e sono abbastanza larghe per tutte le loro etichette; i filtri del registro non si sovrappongono più.
 - Gestore: la panoramica non si apre più con l'elenco delle app (le ha la barra laterale); le righe di «La mia attività recente» restano dentro la scheda.
 - Condivisione: un link pubblico può essere creato senza scadenza quando l'organizzazione non limita la durata, e la finestra dice che il link non scade (o fino a quando funziona) e che funziona a ogni visita; il trasferimento della proprietà non finisce più con un messaggio d'errore quando il vecchio proprietario perde l'accesso: la finestra si chiude.

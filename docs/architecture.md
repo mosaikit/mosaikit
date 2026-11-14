@@ -2581,7 +2581,7 @@ validates the two tables whenever it loads the distribution (unknown fields refu
 
 ### 14.3 Navigation groups
 
-The sidebar lists the apps flat. A distribution can arrange them in a two-level tree, because the grouping is a
+The sidebar lists the apps flat unless the distribution arranges them. The default distribution (Mosaikit) ships four groups in its `distribution.toml`: Information (Documents, Notes, Snippets, Bookmarks, Whiteboard, Static site), Work and projects (Tasks, Projects, Calendar, Dashboard, Maps), Communication (Chat, Meet, Announcements) and People and processes (Contacts, Approvals, Forms, Surveys, Polls), with the labels in the eight languages of the product. A distribution can arrange them in a two-level tree, because the grouping is a
 product choice, not the plugin's (a manifest only has its own `[[nav]]`, the pages inside the plugin). In
 `distribution.toml`:
 
