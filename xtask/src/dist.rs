@@ -337,4 +337,31 @@ mod tests {
         assert!(d.has_seeds(), "the server must be given the file");
         assert!(load("[[nav_groups]]\nid='x'\nlabel='X'\ncolour='red'\n").is_err());
     }
+
+    #[test]
+    fn the_default_distribution_arranges_the_official_apps_in_groups() {
+        let d = Distribution::load(&root().join("distribution.toml")).unwrap();
+        let ids: Vec<&str> = d.nav_groups.iter().map(|g| g.id.as_str()).collect();
+        assert_eq!(ids, ["information", "work", "communication", "people"]);
+        let mut all = std::collections::BTreeSet::new();
+        for g in &d.nav_groups {
+            assert!(g.icon.is_some(), "{}: no icon", g.id);
+            for l in ["it", "es", "pt", "fr", "nl", "ar", "zh", "ru"] {
+                assert!(g.i18n.get(l).and_then(|t| t.label.as_ref()).is_some(), "{}: no label in {l}", g.id);
+            }
+            for p in &g.plugins {
+                assert!(all.insert(p.clone()), "{p} is in two groups");
+            }
+        }
+        assert_eq!(all.len(), 19);
+        // every listed app exists in the official plugins, when they are next to this repository
+        let plugins = root().join("../mosaikit-plugins");
+        if plugins.is_dir() {
+            for p in &all {
+                let dir = plugins.join(p.trim_start_matches("com.mosaikit."));
+                let toml = std::fs::read_to_string(dir.join("plugin.toml")).unwrap_or_default();
+                assert!(toml.contains(&format!("id = \"{p}\"")), "{p} is not in the official plugins");
+            }
+        }
+    }
 }

@@ -23,14 +23,94 @@ roots = ["../mosaikit-plugins"]
 # plugins to include in the releases: "*" = every one found
 include = ["*"]
 
-# Optional: arrange the apps of the sidebar in groups (architecture 14.3). Apps not listed stay flat at the bottom.
-# [[nav_groups]]
-# id = "work"
-# label = "Work"
-# icon = "briefcase"
-# plugins = ["com.mosaikit.notes", "com.mosaikit.tasks"]
-# [nav_groups.i18n.it]
-# label = "Lavoro"
+# The apps of the sidebar in four groups (architecture 14.3). Apps not listed stay flat at the bottom.
+[[nav_groups]]
+id = "information"
+label = "Information"
+icon = "book-open"
+plugins = ["com.mosaikit.files", "com.mosaikit.notes", "com.mosaikit.snippets", "com.mosaikit.bookmarks", "com.mosaikit.whiteboard", "com.mosaikit.static-site"]
+[nav_groups.i18n.it]
+label = "Informazioni"
+[nav_groups.i18n.es]
+label = "Información"
+[nav_groups.i18n.pt]
+label = "Informação"
+[nav_groups.i18n.fr]
+label = "Information"
+[nav_groups.i18n.nl]
+label = "Informatie"
+[nav_groups.i18n.ar]
+label = "المعلومات"
+[nav_groups.i18n.zh]
+label = "信息"
+[nav_groups.i18n.ru]
+label = "Информация"
+
+[[nav_groups]]
+id = "work"
+label = "Work and projects"
+icon = "briefcase"
+plugins = ["com.mosaikit.tasks", "com.mosaikit.projects", "com.mosaikit.calendar", "com.mosaikit.dashboard", "com.mosaikit.maps"]
+[nav_groups.i18n.it]
+label = "Lavoro e progetti"
+[nav_groups.i18n.es]
+label = "Trabajo y proyectos"
+[nav_groups.i18n.pt]
+label = "Trabalho e projetos"
+[nav_groups.i18n.fr]
+label = "Travail et projets"
+[nav_groups.i18n.nl]
+label = "Werk en projecten"
+[nav_groups.i18n.ar]
+label = "العمل والمشاريع"
+[nav_groups.i18n.zh]
+label = "工作与项目"
+[nav_groups.i18n.ru]
+label = "Работа и проекты"
+
+[[nav_groups]]
+id = "communication"
+label = "Communication"
+icon = "message-square"
+plugins = ["com.mosaikit.chat", "com.mosaikit.meet", "com.mosaikit.announcements"]
+[nav_groups.i18n.it]
+label = "Comunicazione"
+[nav_groups.i18n.es]
+label = "Comunicación"
+[nav_groups.i18n.pt]
+label = "Comunicação"
+[nav_groups.i18n.fr]
+label = "Communication"
+[nav_groups.i18n.nl]
+label = "Communicatie"
+[nav_groups.i18n.ar]
+label = "التواصل"
+[nav_groups.i18n.zh]
+label = "沟通"
+[nav_groups.i18n.ru]
+label = "Общение"
+
+[[nav_groups]]
+id = "people"
+label = "People and processes"
+icon = "users"
+plugins = ["com.mosaikit.contacts", "com.mosaikit.approvals", "com.mosaikit.forms", "com.mosaikit.surveys", "com.mosaikit.polls"]
+[nav_groups.i18n.it]
+label = "Persone e processi"
+[nav_groups.i18n.es]
+label = "Personas y procesos"
+[nav_groups.i18n.pt]
+label = "Pessoas e processos"
+[nav_groups.i18n.fr]
+label = "Personnes et processus"
+[nav_groups.i18n.nl]
+label = "Mensen en processen"
+[nav_groups.i18n.ar]
+label = "الأشخاص والعمليات"
+[nav_groups.i18n.zh]
+label = "人员与流程"
+[nav_groups.i18n.ru]
+label = "Люди и процессы"
 
 [desktop]
 # database of the desktop version: "sqlite" (no server to start) or "postgres" (embedded PostgreSQL)
