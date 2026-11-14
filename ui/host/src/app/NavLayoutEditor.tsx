@@ -8,7 +8,8 @@ import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import AppIcon, { ICON_NAMES } from './AppIcon.tsx'
+import AppIcon from './AppIcon.tsx'
+import { ICON_NAMES } from './appicons.ts'
 import { t } from './i18n.ts'
 import { groupIds, move, newGroupId, placeApp, placed, reorder, unplace, type NavGroupDef } from './navgroups.ts'
 
@@ -219,7 +220,10 @@ export default function NavLayoutEditor({ value, apps, langs, onChange, canLock 
               aria-label={c.label || c.id}
               onDragOver={over}
               onDrop={(e) => {
-                if (drag.current?.kind === 'sub') (e.preventDefault(), e.stopPropagation(), dropSub(i, j))
+                if (drag.current?.kind !== 'sub') return
+                e.preventDefault()
+                e.stopPropagation()
+                dropSub(i, j)
               }}
             >
               <div className="flex flex-wrap items-center gap-2">

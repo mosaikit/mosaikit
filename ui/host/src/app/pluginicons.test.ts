@@ -3,7 +3,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { ICON_NAMES } from './AppIcon.tsx'
+import { ICON_NAMES } from './appicons.ts'
 
 const root = resolve(process.cwd(), '../../../mosaikit-plugins')
 

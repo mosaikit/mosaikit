@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { sharePre } from './PluginFrame.tsx'
+import { sharePre } from './sharepre.ts'
 
 const id = '11111111-2222-3333-4444-555555555555'
 

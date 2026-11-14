@@ -31,7 +31,10 @@ test.describe.serial('Navigation layout', () => {
     // NAV-03: the sidebar shows the group as a heading and the app under it
     const side = page.locator('[data-sidebar="sidebar"]')
     await expect(side.getByRole('button', { name: /Daily work/ })).toBeVisible()
-    // (in the closed sidebar the group is one icon whose menu lists its apps)\n    await side.getByRole('button', { name: /Daily work/ }).first().click()\n    await expect(page.getByRole('link', { name: first.split('\n')[0], exact: true }).first()).toBeVisible()\n    await page.keyboard.press('Escape')
+    // (in the closed sidebar the group is one icon whose menu lists its apps)
+    await side.getByRole('button', { name: /Daily work/ }).first().click()
+    await expect(page.getByRole('menuitem', { name: first.split('\n')[0], exact: true }).first()).toBeVisible()
+    await page.keyboard.press('Escape')
 
     // NAV-04: «Restore» goes back to the groups of the distribution
     await page.getByRole('button', { name: 'Restore' }).click()
