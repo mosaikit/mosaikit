@@ -2435,6 +2435,7 @@ A **distribution** is a product based on Mosaikit, described by
 
 - `[[plugin_settings]]` and `[[service_key_values]]`: values to seed (14.2).
 - `[[nav_groups]]`: groups of the sidebar navigation (14.3).
+- `[[plugin_labels]]`: another name for an official app (`plugin`, `label`, `[plugin_labels.i18n.<lang>] label`); the kernel (`crates/kernel/src/pluginlabels.rs`) applies it when it loads the plugin, over the manifest and the language plugins (`Manifest::display`), so the sidebar, the title and the search show it.
 
 Mosaikit itself is the default distribution. `cargo xtask --dist <folder>`
 uses it for development, tests and release. The kernel does not change: brand and

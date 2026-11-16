@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `validate` checks `[[plugin_labels]]` (an entry without `plugin` or `label`, a name over 60 characters, a duplicate, a plugin that is not in `include`).
+
 - `validate` refuses a table or key of `distribution.toml` that nobody reads (a typo such as `[quota_defaults]`), warns about a `[[nav_groups]]` plugin that is not in `include`, and, with `--base`, about an official plugin of `include` missing from the registry of the base (`test` passes its `--base` on). `START.txt` names the real first tenant.
 
 ## 1.0.0

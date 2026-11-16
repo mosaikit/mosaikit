@@ -152,6 +152,7 @@ pub fn validate(dir: &Path, o: &Options) -> Result<Report> {
         }
     }
     check_nav_groups(&d, &mut r);
+    check_plugin_labels(&d, &mut r);
     if let Some(base) = o.base.as_deref().filter(|b| b.is_dir()) {
         check_base_registry(&d, base, &mut r);
     }
@@ -210,6 +211,50 @@ fn check_nav_groups(d: &Distribution, r: &mut Report) {
                     format!("[[nav_groups]] \"{name}\": the plugin {id} is not in [plugins] include, so the group will not show it"),
                 );
             }
+        }
+    }
+}
+
+/// `[[plugin_labels]]`: the server only warns at start and keeps the plugin's own name, so say it here.
+fn check_plugin_labels(d: &Distribution, r: &mut Report) {
+    let Some(list) = d.plugin_labels.as_ref().and_then(|v| v.as_array()) else { return };
+    let own: Vec<String> = d.own_plugins().map(|o| o.into_iter().map(|p| p.id).collect()).unwrap_or_default();
+    let official = d.official_ids().unwrap_or_default();
+    let mut seen: Vec<&str> = Vec::new();
+    let long = |s: &str| s.trim().chars().count() > 60;
+    for e in list {
+        let id = e.get("plugin").and_then(|v| v.as_str()).unwrap_or("").trim();
+        if id.is_empty() {
+            r.add(Level::Error, "[[plugin_labels]]: an entry has no `plugin`".to_string());
+            continue;
+        }
+        if seen.contains(&id) {
+            r.add(
+                Level::Warning,
+                format!("[[plugin_labels]]: the plugin {id} is listed twice, the first one wins"),
+            );
+        }
+        seen.push(id);
+        let label = e.get("label").and_then(|v| v.as_str()).unwrap_or("");
+        if label.trim().is_empty() {
+            r.add(
+                Level::Error,
+                format!("[[plugin_labels]] {id}: `label` is empty, the plugin keeps its own name"),
+            );
+        }
+        let texts = e.get("i18n").and_then(|v| v.as_table());
+        let tr = texts.into_iter().flatten().filter_map(|(_, t)| t.get("label")?.as_str());
+        if long(label) || tr.into_iter().any(long) {
+            r.add(Level::Error, format!("[[plugin_labels]] {id}: a name is longer than 60 characters"));
+        }
+        let carried = (own.iter().any(|o| o == id) && d.includes(id))
+            || official.iter().any(|o| o == id)
+            || d.all_official();
+        if !carried {
+            r.add(
+                Level::Warning,
+                format!("[[plugin_labels]] {id}: the plugin is not in [plugins] include, so the name will not show"),
+            );
         }
     }
 }
@@ -393,5 +438,30 @@ plugins = [\"com.mosaikit.notes\", \"com.acme.gone\"]
         assert!(r.ok(), "{all}");
         assert!(all.contains("com.acme.gone") && all.contains("not in [plugins] include"), "{all}");
         assert!(all.contains("not in the registry of the base"), "{all}");
+    }
+    #[test]
+    fn plugin_labels_are_checked() {
+        let t = tempfile::tempdir().unwrap();
+        let root = crate::scaffold::new_product("acme", t.path()).unwrap();
+        let mut text = std::fs::read_to_string(root.join("distribution.toml")).unwrap();
+        text = text.replace("include = [\"*\"]", "include = [\"com.mosaikit.files\"]");
+        text.push_str(
+            "
+[[plugin_labels]]
+plugin = \"com.mosaikit.files\"
+label = \"Files\"
+[plugin_labels.i18n.it]
+label = \"File\"
+             [[plugin_labels]]
+plugin = \"com.mosaikit.notes\"
+label = \"\"
+",
+        );
+        std::fs::write(root.join("distribution.toml"), text).unwrap();
+        let r = validate(&root, &Options { server: Some(t.path().join("no-server")), ..Options::default() })
+            .unwrap();
+        let all = format!("{:?}", r.findings);
+        assert!(!r.ok() && all.contains("`label` is empty"), "{all}");
+        assert!(all.contains("com.mosaikit.notes") && !all.contains("com.mosaikit.files:"), "{all}");
     }
 }

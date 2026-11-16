@@ -130,6 +130,9 @@ pub struct Distribution {
     pub service_key_values: Option<toml::Value>,
     #[serde(default)]
     pub nav_groups: Option<toml::Value>,
+    /// names of the official apps (`[[plugin_labels]]`), read by the server; checked by `validate`
+    #[serde(default)]
+    pub plugin_labels: Option<toml::Value>,
     #[serde(default)]
     pub defaults: Option<toml::Value>,
     #[serde(default)]

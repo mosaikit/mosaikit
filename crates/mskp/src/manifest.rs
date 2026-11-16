@@ -113,6 +113,10 @@ pub struct Manifest {
     /// Texts in other languages (`[i18n.it]`, ...); the texts above are the English ones.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub i18n: BTreeMap<String, Translation>,
+    /// Name a distribution gives the app in its sidebar, page title and search (`[[plugin_labels]]`): set by the
+    /// kernel when it loads the plugin, never read from a manifest. It wins over every language.
+    #[serde(skip)]
+    pub display: Option<DisplayOverride>,
     /// `[search]`: a command of the logic the kernel calls with `{ "q": ... }` to add results to the
     /// search of the shell (titles and searchable fields are found without it).
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -411,6 +415,15 @@ pub struct PublicCommandDecl {
     /// the calls of a visitor to a command that writes are limited more tightly. Needs `[requires] mosaikit = ">=1.0"`.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub write: bool,
+}
+
+/// The name a distribution gives an official app (`[[plugin_labels]]` of its `distribution.toml`): one for every
+/// language, and the ones it writes for a language of its own.
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct DisplayOverride {
+    pub label: String,
+    /// language code (`it`) to label
+    pub i18n: BTreeMap<String, String>,
 }
 
 /// A contribution to a point (`[[contributes]]`): `point` names what it plugs into (reverse-DNS style,
@@ -1792,6 +1805,17 @@ impl Manifest {
     /// The manifest with the texts of `lang` (e.g. `it`, `it-IT`) where it has them; English for
     /// the rest and for the languages it does not have.
     pub fn localized(&self, lang: &str) -> Manifest {
+        let mut m = self.localized_texts(lang);
+        if let Some(d) = &self.display {
+            let base = lang.split(['-', '_']).next().unwrap_or_default().to_ascii_lowercase();
+            let label = d.i18n.get(&base).unwrap_or(&d.label);
+            m.name = label.clone();
+            m.contribution.label = label.clone();
+        }
+        m
+    }
+
+    fn localized_texts(&self, lang: &str) -> Manifest {
         let mut m = self.clone();
         let base = lang.split(['-', '_']).next().unwrap_or_default().to_ascii_lowercase();
         // the texts of the manifest itself, else the ones a language plugin brings for this plugin

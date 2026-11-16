@@ -205,6 +205,28 @@ fn select_sql_lite(
     )
 }
 
+/// Puts `visibility` (`private`, `shared`, `organization`, `public`: the platform's own state, see `visibility`) on
+/// the rows, next to `shared` and `my_level`. A public link shows nothing about how the item is shared.
+async fn add_visibility(k: &Kernel, ctx: &Ctx, rows: &mut [Value]) -> Result<()> {
+    let Some(tenant) = ctx.tenant.filter(|_| ctx.link.is_none()) else { return Ok(()) };
+    let ids: Vec<Uuid> = rows
+        .iter()
+        .filter_map(|r| r.get("id").and_then(Value::as_str))
+        .filter_map(|s| s.parse().ok())
+        .collect();
+    if ids.is_empty() {
+        return Ok(());
+    }
+    let vis = crate::visibility::of(k, tenant, &ids).await?;
+    for r in rows.iter_mut() {
+        let id = r.get("id").and_then(Value::as_str).and_then(|s| s.parse::<Uuid>().ok());
+        if let (Some(id), Some(o)) = (id, r.as_object_mut()) {
+            o.insert("visibility".into(), json!(vis.get(&id).copied().unwrap_or("private")));
+        }
+    }
+    Ok(())
+}
+
 async fn fetch_rows(tx: &mut Tx, sql: &str, binds: &[Value]) -> Result<Vec<Value>> {
     let v: Value = host::bind_json(mosaikit_db::query(sql), binds).fetch_one(&mut **tx).await?.try_get(0)?;
     Ok(v.as_array().cloned().unwrap_or_default())
@@ -246,8 +268,9 @@ pub async fn list_ctx_paged(
     // reading only: on SQLite it does not wait for the writers
     let mut tx = k.db.begin_plugin_read(&p.id, ctx).await?;
     let Some(pg) = paging else {
-        let rows = fetch_rows(&mut tx, &select_sql(k, p, d, &cond), &binds).await?;
+        let mut rows = fetch_rows(&mut tx, &select_sql(k, p, d, &cond), &binds).await?;
         tx.commit().await?;
+        add_visibility(k, ctx, &mut rows).await?;
         return Ok(ListResult {
             resource: d.name.clone(),
             fields: d.fields.clone(),
@@ -301,6 +324,7 @@ pub async fn list_ctx_paged(
         fetch_rows(&mut tx, &sql, &binds).await?
     };
     tx.commit().await?;
+    add_visibility(k, ctx, &mut rows).await?;
     let next = if rows.len() as i64 > limit {
         rows.truncate(limit as usize);
         if order.is_some() {
@@ -332,6 +356,10 @@ pub async fn get_ctx(k: &Kernel, ctx: &Ctx, p: &LoadedPlugin, resource: &str, id
     let mut tx = k.db.begin_plugin_read(&p.id, ctx).await?;
     let row = get_in(k, &mut tx, p, d, id).await?;
     tx.commit().await?;
+    let mut row = row;
+    if let Some(r) = row.as_mut() {
+        add_visibility(k, ctx, std::slice::from_mut(r)).await?;
+    }
     row.ok_or_else(|| Error::not_found("record not found"))
 }
 
