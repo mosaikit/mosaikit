@@ -173,6 +173,16 @@ pub struct Docker {
     /// PostgreSQL image of the compose (e.g. postgis/postgis:17-3.5 if geospatial data are needed)
     #[serde(default)]
     pub postgres_image: Option<String>,
+    // read by `mosaikit-product build docker`; here only accepted so that the same file loads
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub keycloak: bool,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub compose_files: Vec<String>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub copy: Vec<String>,
 }
 
 /// `[[plugin_settings]]`: a setting of a plugin, seeded only while unset. `value` is a literal or
@@ -330,6 +340,20 @@ mod tests {
             assert!(load(bad).is_err(), "{bad}");
         }
         assert!(!load("").unwrap().has_seeds());
+    }
+
+    #[test]
+    fn a_product_file_with_docker_extras_loads() {
+        let d = load(
+            "[docker]
+image='x'
+keycloak=true
+compose_files=['a.yml']
+copy=['conf']
+",
+        )
+        .unwrap();
+        assert_eq!(d.docker.compose_files, ["a.yml"]);
     }
 
     #[test]
