@@ -104,7 +104,7 @@ pub async fn shares_from_logic(
         .and_then(|s| s.parse().ok())
         .ok_or_else(|| Error::bad("id is required"))?;
     let m = acl::meta(k, c, id).await?;
-    if m.plugin_id != plugin && !allowed.iter().any(|a| *a == m.plugin_id) {
+    if m.plugin_id != plugin && !allowed.contains(&m.plugin_id) {
         return Err(Error::forbidden(
             "the item is not of this plugin or of one declared in `resources_read` in [permissions]",
         )
