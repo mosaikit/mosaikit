@@ -701,7 +701,7 @@ mod tests {
         let out = host.command(&reg, "t.dir", Value::Null).unwrap();
         assert_eq!(out["users"][0], json!({ "id": "u1", "username": "anna", "name": "Anna Rossi" }));
         assert_eq!(out["users"].as_array().unwrap().len(), 2);
-        assert_eq!(out["groups"], json!([{ "id": "g1", "name": "Editors" }]));
+        assert_eq!(out["groups"], json!([{ "id": "g1", "name": "Editors", "all_members": false }]));
         // what the logic asked is what the host got (the host caps it)
         assert_eq!(host.calls()[0].1["limit"], 100);
         // a refusal of the host is an error of the logic

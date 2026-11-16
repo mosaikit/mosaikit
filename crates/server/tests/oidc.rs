@@ -500,7 +500,9 @@ async fn groups_of_the_provider_over_http() {
     let list = a.call(Some(&anna), Method::GET, "/api/t/grp/manage/groups", None).await;
     assert_eq!(list.status, StatusCode::OK);
     let groups = list.json();
-    let groups = groups.as_array().unwrap();
+    // the built-in group "All members" is always there; the others are only those with the prefix
+    let groups: Vec<&serde_json::Value> =
+        groups.as_array().unwrap().iter().filter(|g| g["builtin"].is_null()).collect();
     let names: Vec<&str> = groups.iter().filter_map(|g| g["name"].as_str()).collect();
     assert_eq!(names, vec!["staff"], "only the groups with the prefix");
     let staff = &groups[0];
