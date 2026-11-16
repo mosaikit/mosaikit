@@ -31,6 +31,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar'
+import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { t } from './i18n.ts'
 import { useLiveNotes, useNoteList } from './notes.ts'
@@ -228,7 +229,7 @@ function DistGroup({ g, className }: { g: NavGroup; className: string }) {
             <span className={cn('truncate', active && !open && 'font-semibold text-sidebar-primary')}>{label}</span>
           </span>
           <span className="flex shrink-0 items-center gap-1.5">
-            <span className="min-w-5 rounded-full bg-sidebar-accent px-1.5 py-px text-center text-[11px] font-medium leading-4 tabular-nums text-sidebar-accent-foreground" aria-hidden="true">{allItems(g).length}</span>
+            <Badge data-testid="group-count" className="h-[18px] min-w-[18px] px-1.5 text-[11px] leading-none tabular-nums" aria-hidden="true">{allItems(g).length}</Badge>
             <ChevronDown className={cn('size-4 transition-transform', !open && '-rotate-90')} aria-hidden="true" />
           </span>
         </button>
