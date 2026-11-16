@@ -229,7 +229,7 @@ function DistGroup({ g, className }: { g: NavGroup; className: string }) {
             <span className={cn('truncate', active && !open && 'font-semibold text-sidebar-primary')}>{label}</span>
           </span>
           <span className="flex shrink-0 items-center gap-1.5">
-            <Badge data-testid="group-count" className="h-[18px] min-w-[18px] px-1.5 text-[11px] leading-none tabular-nums" aria-hidden="true">{allItems(g).length}</Badge>
+            <Badge data-testid="group-count" className="h-5 min-w-5 px-1.5 py-0 text-[11px] leading-none tabular-nums" aria-hidden="true"><span className="[text-box:trim-both_cap_alphabetic]">{allItems(g).length}</span></Badge>
             <ChevronDown className={cn('size-4 transition-transform', !open && '-rotate-90')} aria-hidden="true" />
           </span>
         </button>
