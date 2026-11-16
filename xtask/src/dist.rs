@@ -37,6 +37,10 @@ pub struct Distribution {
     /// groups of the sidebar navigation (the server validates them and sends them to the shell)
     #[serde(default)]
     pub nav_groups: Vec<NavGroup>,
+    /// names of the official apps (`[[plugin_labels]]`, checked by the kernel at the start and by `mosaikit-product validate`)
+    #[serde(default)]
+    #[allow(dead_code)]
+    pub plugin_labels: Vec<toml::Table>,
     // --- the policy of a product, read and checked by the kernel at start (crates/kernel/src/product.rs) ---
     #[serde(default)]
     #[allow(dead_code)]
@@ -236,6 +240,7 @@ impl Distribution {
         !self.plugin_settings.is_empty()
             || !self.service_key_values.is_empty()
             || !self.nav_groups.is_empty()
+            || !self.plugin_labels.is_empty()
             || self.product.base.is_some()
             || [&self.defaults, &self.locked, &self.languages, &self.bootstrap, &self.database, &self.about]
                 .iter()
@@ -325,6 +330,21 @@ mod tests {
             assert!(load(bad).is_err(), "{bad}");
         }
         assert!(!load("").unwrap().has_seeds());
+    }
+
+    #[test]
+    fn plugin_labels_are_accepted_and_count_as_seeds() {
+        let d = load(
+            "[[plugin_labels]]
+plugin='com.mosaikit.files'
+label='Files'
+[plugin_labels.i18n.it]
+label='File'
+",
+        )
+        .unwrap();
+        assert_eq!(d.plugin_labels.len(), 1);
+        assert!(d.has_seeds());
     }
 
     #[test]
