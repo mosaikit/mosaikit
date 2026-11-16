@@ -71,6 +71,8 @@ pub(crate) async fn list_from_logic(
     let rows = mosaikit_db::query(&sql).bind(kind).bind(like).fetch_all(&mut *tx).await?;
     tx.commit().await?;
     let truncated = rows.len() as i64 > limit;
+    let ids: Vec<uuid::Uuid> = rows.iter().take(limit as usize).map(|r| r.get(0)).collect();
+    let visibility = crate::visibility::of(k, c.tenant.tenant_id, &ids).await?;
     let entries: Vec<Value> = rows
         .iter()
         .take(limit as usize)
@@ -82,6 +84,7 @@ pub(crate) async fn list_from_logic(
                 "title": r.get::<String, _>(3),
                 "owner_name": r.get::<String, _>(4),
                 "my_level": r.get::<String, _>(5),
+                "visibility": visibility.get(&r.get::<uuid::Uuid, _>(0)).copied().unwrap_or("private"),
                 "updated_at": r.get::<chrono::DateTime<chrono::Utc>, _>(6),
             })
         })

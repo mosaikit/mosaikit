@@ -208,6 +208,20 @@ pub(crate) async fn restore(
     if rows.is_empty() {
         return Ok(0);
     }
+    if table == "groups" {
+        // the triggers made the built-in group "All members" of the tenant when its row came in: the exported one
+        // (the grants name its id) replaces it, and the rows of `group_members` that follow refill it
+        for t in rows
+            .iter()
+            .filter(|r| r.get("builtin").and_then(Value::as_str) == Some("all"))
+            .filter_map(|r| r.get("tenant_id").and_then(Value::as_str).and_then(|s| s.parse::<Uuid>().ok()))
+        {
+            mosaikit_db::query("delete from core.groups where tenant_id = $1 and builtin = 'all'")
+                .bind(t)
+                .execute(&mut *tx)
+                .await?;
+        }
+    }
     let cols = columns(k, tx, physical).await?;
     let present: HashSet<&str> =
         rows.iter().filter_map(Value::as_object).flat_map(|o| o.keys().map(String::as_str)).collect();

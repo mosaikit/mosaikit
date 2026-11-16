@@ -610,7 +610,8 @@ export function isEvent(d: unknown): d is BridgeEvent {
 
 /** A person or a group the share dialog can start with (`msk.share(id, { principals })`). `name` is a label only. */
 export interface SharePrincipal {
-  type: 'user' | 'group'
+  /** `all`: every member of the tenant (the built-in group «All members»); it needs no real `id` */
+  type: 'user' | 'group' | 'all'
   id: string
   name?: string
 }

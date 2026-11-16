@@ -840,7 +840,9 @@ async fn resource_grants(
 
 #[derive(Deserialize)]
 struct GrantReq {
+    /// user | group | all (every member of the tenant: the built-in group, `principal_id` is not read)
     principal_type: String,
+    #[serde(default)]
     principal_id: Uuid,
     /// read | write | manage; absent or null = revoke
     level: Option<String>,

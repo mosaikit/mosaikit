@@ -3,7 +3,7 @@
 import { createContext, useContext } from 'react'
 
 export interface SharePre {
-  principals: { type: 'user' | 'group'; id: string; name?: string }[]
+  principals: { type: 'user' | 'group' | 'all'; id: string; name?: string }[]
   level: 'read' | 'write' | 'manage'
 }
 

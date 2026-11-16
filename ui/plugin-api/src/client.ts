@@ -459,7 +459,8 @@ export class Msk {
    * Opens the share dialog of the host (users, groups, public links). With `opts.principals` the dialog starts with
    * those people and groups ready to be shared with, at `opts.level` (default `read`): the person sees who they
    * are, can share with all of them in one step or ignore it, and the usual rules apply (they must manage the
-   * resource). The names are only labels: the host checks the ids. At most 200 principals.
+   * resource). The names are only labels: the host checks the ids. At most 200 principals. `{ type: 'all' }` stands
+   * for every member of the tenant (the built-in group «All members», no id needed).
    */
   async share(id: string, opts?: SharePreselect): Promise<void> {
     await this.bridge.call('share', opts ? { id, principals: opts.principals, level: opts.level } : { id })

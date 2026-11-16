@@ -5,6 +5,8 @@ version and is removed in the next.
 
 ## Unreleased
 
+- `msk.share(id, { principals: [{ type: 'all' }] })`: `type: 'all'` (no `id` needed) stands for every member of the tenant, the built-in group «All members»; the dialog suggests it and shares in one step. Additive.
+
 - `msk.busy(on)` and `msk.loading(work)` (kit `busy.ts`, style `.msk-busy`): the standard loading spinner of a plugin page, the same in every plugin. It appears only if the work lasts a little (150 ms), never blocks the page, is counted (two `busy(true)` need two `busy(false)`) and goes off by itself at an unhandled error of the page, so a plugin that forgets `busy(false)` is never stuck. `mountCrud` uses it for its first load. The host shows its own spinner only until the plugin says `hello`. Additive.
 
 - `msk.share(id, { principals, level? })` (types `SharePreselect`, `SharePrincipal`): the share dialog of the host starts with those people and groups ready to be shared with, at `level` (default `read`); the person confirms with one button or ignores it. The names are labels: the host checks the ids (at most 200) and the usual rules apply (the person must manage the resource). A host that does not know the options opens the plain dialog. Additive.

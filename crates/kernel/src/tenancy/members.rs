@@ -74,7 +74,7 @@ async fn members_where(
 async fn members_from(k: &Kernel, tenant: Uuid, rows: &[mosaikit_db::Row]) -> Result<Vec<MemberInfo>> {
     let groups = mosaikit_db::query(
         "select gm.user_id, g.name from core.group_members gm join core.groups g on g.id = gm.group_id
-         where g.tenant_id = $1 order by g.name",
+         where g.tenant_id = $1 and g.builtin is null order by g.name",
     )
     .bind(tenant)
     .fetch_all(&k.db)

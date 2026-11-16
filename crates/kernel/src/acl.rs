@@ -118,6 +118,9 @@ pub struct GrantInfo {
     pub detail: String,
     pub level: &'static str,
     pub granted_at: DateTime<Utc>,
+    /// `Some("all")`: the built-in group with every member of the tenant
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub builtin: Option<String>,
 }
 
 pub async fn grants(k: &Kernel, c: &Caller, rid: Uuid) -> Result<Vec<GrantInfo>> {
@@ -126,7 +129,7 @@ pub async fn grants(k: &Kernel, c: &Caller, rid: Uuid) -> Result<Vec<GrantInfo>>
         "select g.principal_type, g.principal_id,
                 case when g.principal_type = 'user' then coalesce(nullif(u.display_name, ''), u.username) else gr.name end,
                 case when g.principal_type = 'user' then u.username || '@' || h.slug else 'group' end,
-                g.level, g.granted_at
+                g.level, g.granted_at, gr.builtin
          from core.grants g
          left join core.users u on g.principal_type = 'user' and u.id = g.principal_id
          left join core.tenants h on h.id = u.home_tenant_id
@@ -145,6 +148,7 @@ pub async fn grants(k: &Kernel, c: &Caller, rid: Uuid) -> Result<Vec<GrantInfo>>
             detail: r.get::<Option<String>, _>(3).unwrap_or_default(),
             level: Level::from_i32(r.get::<i16, _>(4) as i32).name(),
             granted_at: r.get(5),
+            builtin: r.get(6),
         })
         .collect())
 }
@@ -158,6 +162,17 @@ pub async fn set_grant(
     principal_id: Uuid,
     level: Option<Level>,
 ) -> Result<()> {
+    // `all`: every member of the tenant, that is the built-in group «All members»
+    let all = if principal_type == "all" {
+        crate::visibility::all_members_group(k, c.tenant.tenant_id).await?
+    } else {
+        None
+    };
+    let (principal_type, principal_id) = match (principal_type, all) {
+        ("all", Some(g)) => ("group", g),
+        ("all", None) => return Err(Error::not_found("the group of all the members is missing")),
+        (t, _) => (t, principal_id),
+    };
     let m = require_level(k, c, rid, Level::Manage).await?;
     if level.is_some() {
         crate::access::require(k, c, &m.plugin_id, crate::access::SHARE).await?;

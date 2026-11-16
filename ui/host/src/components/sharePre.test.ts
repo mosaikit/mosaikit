@@ -14,6 +14,9 @@ describe('sharePre', () => {
     const out = sharePre({ principals: [{ type: 'tenant', id }, { type: 'user', id: 'nope' }, { type: 'user', id }], level: 'root' })
     expect(out).toEqual({ principals: [{ type: 'user', id }], level: 'read' })
   })
+  it('takes everybody in the tenant (type all) with no id', () => {
+    expect(sharePre({ principals: [{ type: 'all' }], level: 'read' })).toEqual({ principals: [{ type: 'all', id: 'all' }], level: 'read' })
+  })
   it('is nothing without principals, and at most 200', () => {
     expect(sharePre(undefined)).toBeUndefined()
     expect(sharePre({ principals: [] })).toBeUndefined()

@@ -5,6 +5,8 @@ version and is removed in the next.
 
 ## Unreleased
 
+- `Resources::shares(id)` (host operation `resource.shares`): who an item is shared with (users, groups, the built-in group «All members» marked `all_members`) and its public links (never the token), with the summary `visibility`; for a caller who manages the item, which is of the plugin or of one in `[permissions] resources_read`. `Resources::list` entries now carry `visibility` (`private`, `shared`, `organization`, `public`). Additive; no manifest key.
+
 - `Directory::users_with(permission, q, limit)` (host operation `directory.search` with `permission`): the active members of the tenant who hold a permission of the plugin (a key of `[[user_permissions]]` or a standard one) through their profile, a grant or a group, and the Tenant Managers; up to 200, `q` may be empty. Same rights as `users` (`[permissions] directory = true`, Tenant Manager or `share`). `testing::MockHost::with_directory_holders` for the tests. Additive.
 
 - A public command declared with `write = true` (`[[public_commands]]`) may `db.exec` an `INSERT` into the tables declared with `[[tables]] insert_for = "visitor"`; nothing else changes in `Ctx` (`ctx.public` is still true, there is still no user). Additive.

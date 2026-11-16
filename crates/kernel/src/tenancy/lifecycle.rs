@@ -52,7 +52,7 @@ pub async fn impact(k: &Kernel, admin: &SessionUser, id: Uuid) -> Result<Impact>
            (select count(*) from core.users where home_tenant_id = $1),
            (select count(*) from core.memberships m join core.users u on u.id = m.user_id
              where m.tenant_id = $1 and u.home_tenant_id <> $1),
-           (select count(*) from core.groups where tenant_id = $1),
+           (select count(*) from core.groups where tenant_id = $1 and builtin is null),
            (select count(*) from core.resources where tenant_id = $1),
            (select coalesce(sum(size_bytes), 0)::bigint from core.resources where tenant_id = $1),
            (select count(*) from core.public_links l join core.resources r on r.id = l.resource_id

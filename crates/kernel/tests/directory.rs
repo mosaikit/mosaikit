@@ -154,13 +154,14 @@ async fn a_member_with_the_share_right_and_the_manager_find_people() {
     keys.sort();
     assert_eq!(keys, ["id", "name", "username"]);
     assert!(!rows.to_string().contains("example.org"), "{rows}");
-    // groups: id and name
+    // groups: id, name and whether it is the built-in «All members»
     let g = dir::search(&w.t, &w.anna, DIR, &q("group", "ALFA")).await.unwrap();
     assert_eq!(g.as_array().unwrap().len(), 1);
     assert_eq!(g[0]["name"], "Alfa Team");
     let mut keys: Vec<_> = g[0].as_object().unwrap().keys().cloned().collect();
     keys.sort();
-    assert_eq!(keys, ["id", "name"]);
+    assert_eq!(keys, ["all_members", "id", "name"]);
+    assert_eq!(g[0]["all_members"], false);
     // a wildcard of LIKE is text, not a pattern
     assert!(names(&w, &w.anna, q("user", "%")).await.is_empty());
     assert!(names(&w, &w.anna, q("user", "a_a")).await.is_empty());

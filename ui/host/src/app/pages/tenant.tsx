@@ -948,19 +948,20 @@ function Groups({ slug, members, shell }: { slug: string; members: Member[]; she
         {q.items.map((g) => {
           const others = members.filter((m) => !g.members.some((x) => x.user_id === m.user_id))
           const idp = g.source === 'idp'
+          const builtin = g.builtin === 'all'
           return (
             <Card key={g.id}>
               <CardHeader className="flex-row items-center justify-between">
                 <div>
                   <CardTitle className="flex flex-wrap items-center gap-2 text-base">
                     <a className="hover:underline" href={to.group(slug, g.id)}>
-                      {g.name}
+                      {builtin ? t('All members') : g.name}
                     </a>
                     {idp && <IdpBadge />}
                   </CardTitle>
-                  <CardDescription>{t('{count} members', { count: g.members.length })}</CardDescription>
+                  <CardDescription>{builtin ? t('Every member of the organization') : t('{count} members', { count: g.members.length })}</CardDescription>
                 </div>
-                {!idp && (
+                {!idp && !builtin && (
                   <div className="flex gap-1">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -991,7 +992,8 @@ function Groups({ slug, members, shell }: { slug: string; members: Member[]; she
                 )}
               </CardHeader>
               <CardContent className="flex flex-wrap gap-1.5">
-                {g.members.length === 0 && <span className="text-sm text-muted-foreground">{t('No members.')}</span>}
+                {builtin && <span className="text-sm text-muted-foreground">{t('Kept by the platform: new members join it, people who leave are removed.')}</span>}
+                {!builtin && g.members.length === 0 && <span className="text-sm text-muted-foreground">{t('No members.')}</span>}
                 {g.members.map((m) => (
                   <Badge key={m.user_id} variant="secondary" className="gap-1 font-normal">
                     {m.display_name || m.username}
