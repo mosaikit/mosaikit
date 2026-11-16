@@ -34,9 +34,26 @@ pub fn discover() -> Result<Vec<Plugin>> {
             out.push(plugin);
         }
     }
+    // an official plugin the distribution includes but keeps no copy of (`mosaikit-product` takes it from the base): in
+    // development it comes from the checkout `mosaikit-plugins` next to this one, only the ones that are asked for
+    let missing: Vec<&String> =
+        d.plugins.include.iter().filter(|w| *w != "*" && !out.iter().any(|p| &p.id == *w)).collect();
+    if !missing.is_empty() {
+        let official = root().join("..").join("mosaikit-plugins");
+        let mut dirs: Vec<PathBuf> = std::fs::read_dir(&official)
+            .map(|rd| rd.flatten().map(|e| e.path()).filter(|p| p.join("plugin.toml").is_file()).collect())
+            .unwrap_or_default();
+        dirs.sort();
+        for dir in dirs {
+            let plugin = Plugin::load(&dir)?;
+            if missing.iter().any(|w| **w == plugin.id) {
+                out.push(plugin);
+            }
+        }
+    }
     for want in &d.plugins.include {
         if want != "*" && !out.iter().any(|p| &p.id == want) {
-            bail!("plugin {want} listed in distribution.toml but not found in the plugin folders");
+            bail!("plugin {want} listed in distribution.toml but not found in the plugin folders (nor in ../mosaikit-plugins)");
         }
     }
     Ok(out)
