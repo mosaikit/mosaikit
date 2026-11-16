@@ -83,6 +83,10 @@ async fn the_visibility_follows_the_shares_and_the_links_of_the_platform() {
 
     set_grant(&t, &anna, id, "user", bruno.user.user_id, Some(Level::Read)).await.unwrap();
     assert_eq!(vis_of(&t, tenant, id).await, "shared");
+    // the rows of the plugin's own list carry it too, next to `shared` and `my_level`
+    let l = crud::list(&t, &anna, NOTES, "notes", None, None).await.unwrap();
+    assert_eq!(l.rows[0]["visibility"], "shared");
+    assert_eq!(crud::get(&t, &anna, NOTES, "notes", id).await.unwrap()["visibility"], "shared");
 
     // everybody: the person added after the share sees it too
     set_grant(&t, &anna, id, "group", all, Some(Level::Read)).await.unwrap();

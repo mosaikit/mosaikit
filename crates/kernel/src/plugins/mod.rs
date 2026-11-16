@@ -73,10 +73,20 @@ impl LoadedPlugin {
     }
 }
 
+/// The loaded plugins, and the names the distribution gives to some of them (`[[plugin_labels]]`).
 #[derive(Default)]
-pub struct Plugins(RwLock<HashMap<String, Arc<LoadedPlugin>>>);
+pub struct Plugins(
+    RwLock<HashMap<String, Arc<LoadedPlugin>>>,
+    std::collections::BTreeMap<String, mosaikit_mskp::DisplayOverride>,
+);
 
 impl Plugins {
+    pub(crate) fn with_labels(
+        labels: std::collections::BTreeMap<String, mosaikit_mskp::DisplayOverride>,
+    ) -> Self {
+        Plugins(RwLock::default(), labels)
+    }
+
     pub fn get(&self, id: &str) -> Option<Arc<LoadedPlugin>> {
         self.0.read().expect("lock plugin").get(id).cloned()
     }
@@ -94,7 +104,13 @@ impl Plugins {
         v
     }
 
-    pub(crate) fn put(&self, p: LoadedPlugin) -> Arc<LoadedPlugin> {
+    pub(crate) fn put(&self, mut p: LoadedPlugin) -> Arc<LoadedPlugin> {
+        // the name the distribution gives the app: over the English text here, over every language in `localized`
+        if let Some(d) = self.1.get(&p.id) {
+            p.manifest.name = d.label.clone();
+            p.manifest.contribution.label = d.label.clone();
+            p.manifest.display = Some(d.clone());
+        }
         let p = Arc::new(p);
         self.0.write().expect("lock plugin").insert(p.id.clone(), p.clone());
         sync_language(&p);

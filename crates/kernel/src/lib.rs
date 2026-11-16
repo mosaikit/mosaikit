@@ -34,6 +34,7 @@ pub mod overview;
 pub mod paging;
 pub mod personal;
 pub mod plugin_directory;
+pub mod pluginlabels;
 pub mod plugins;
 pub mod product;
 pub mod profiles;
@@ -316,6 +317,7 @@ impl Kernel {
             None => brand::Brand::default(),
         };
         let nav_groups = seed::nav_groups(&cfg);
+        let plugin_labels = seed::plugin_labels(&cfg);
         let trusted = mosaikit_mskp::TrustedKeys::from_b64(&cfg.trusted_keys)?;
         let (dev_events, _) = broadcast::channel(64);
         let (live, _) = broadcast::channel(256);
@@ -324,7 +326,7 @@ impl Kernel {
             brand,
             nav_groups,
             product,
-            plugins: plugins::Plugins::default(),
+            plugins: plugins::Plugins::with_labels(plugin_labels.clone()),
             engine: Arc::new(mosaikit_runtime::Engine::new(mosaikit_runtime::Limits::default())),
             trusted,
             limiter: identity::LoginLimiter::default(),

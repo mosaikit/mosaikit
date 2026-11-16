@@ -5,6 +5,12 @@ in Help › What is new (one `## <version>` heading per version, `- ` items, `##
 language of the person: this file in English, [CHANGELOG.it.md](CHANGELOG.it.md) in Italian (keep them
 in step).
 
+## 1.0.17
+
+- Plugins: the rows of the plugin's own list and of a single record (`msk.crud(...).list()` and `get()`) carry `visibility` (`private`, `shared`, `organization`, `public`), next to `shared` and `my_level`, the same state as `resources.list`; no call per row is needed to show the exact badge. A public link does not carry it.
+- Distributions: `[[plugin_labels]]` in `distribution.toml` gives an official app another name in the sidebar, the page title and the search, in every language, with an optional `[plugin_labels.i18n.<lang>] label` for a language; the manifest of the plugin is not touched. `mosaikit-product validate` checks it.
+- The developer profile refuses to start on a database that holds tenants other than `dev` (it would seed demo data into real data); `developer_profile_allow_remote` lifts it.
+
 ## 1.0.16
 
 - Sharing with everybody: every organization has the built-in group **All members**, kept by the platform (people who join are added, people who leave are removed; it cannot be edited or deleted). The sharing dialog has a button «Share with all members», and `msk.share(id, { principals: [{ type: 'all' }] })` suggests it to the person.

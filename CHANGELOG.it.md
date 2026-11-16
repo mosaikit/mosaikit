@@ -4,6 +4,12 @@ Cosa cambia da una versione di Mosaikit alla successiva. La shell mostra la sezi
 Aiuto › Novità (un titolo `## <versione>` per versione, voci `- `, gruppi `### `). Questo file è la
 versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
+## 1.0.17
+
+- Plugin: le righe dell'elenco del plugin e del singolo record (`msk.crud(...).list()` e `get()`) portano `visibility` (`private`, `shared`, `organization`, `public`), accanto a `shared` e `my_level`, lo stesso stato di `resources.list`; non serve una chiamata per riga per mostrare l'etichetta esatta. Un link pubblico non la porta.
+- Distribuzioni: `[[plugin_labels]]` in `distribution.toml` dà a un'app ufficiale un altro nome nella barra laterale, nel titolo della pagina e nella ricerca, in ogni lingua, con un `[plugin_labels.i18n.<lingua>] label` facoltativo per una lingua; il manifest del plugin non si tocca. `mosaikit-product validate` lo controlla.
+- Il profilo sviluppatore non parte su un database con tenant diversi da `dev` (riempirebbe di dati di prova dati veri); `developer_profile_allow_remote` lo permette.
+
 ## 1.0.16
 
 - Condividere con tutti: ogni organizzazione ha il gruppo predefinito **Tutti i membri**, gestito dalla piattaforma (chi entra viene aggiunto, chi esce viene tolto; non si modifica né si elimina). La finestra di condivisione ha il pulsante «Condividi con tutti i membri» e `msk.share(id, { principals: [{ type: 'all' }] })` lo propone alla persona.

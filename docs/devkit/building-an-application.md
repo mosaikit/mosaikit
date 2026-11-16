@@ -212,6 +212,17 @@ label = "Archive"
 plugins = ["com.mosaikit.files"]
 ```
 
+**App names.** A product does not change the manifest of an official plugin, but it can give the app another name in the
+sidebar, the page title and the search, in every language, with `[[plugin_labels]]`:
+
+```toml
+[[plugin_labels]]
+plugin = "com.mosaikit.files"
+label = "Files"             # every language; `mosaikit-product validate` checks it
+[plugin_labels.i18n.it]
+label = "File"              # optional, for one language
+```
+
 The Administrator and each Tenant Manager can change these groups in the settings (Navigation); what they save replaces the
 ones of the file for their scope, and `[locked] keys = ["nav.layout"]` in the policy of the product forbids it.
 

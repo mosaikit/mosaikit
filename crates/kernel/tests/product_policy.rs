@@ -155,3 +155,21 @@ async fn a_base_outside_the_range_of_the_product_does_not_start() {
     assert_eq!(e.code(), "product_base", "{e}");
     assert!(e.message.contains(">=99.0"), "{e}");
 }
+
+#[tokio::test]
+async fn a_product_names_an_official_app_in_every_language() {
+    let (_dir, file) = seed_file(
+        "[product]\nid = \"x\"\nname = \"X\"\nversion = \"1.0.0\"\nbase = \">=1.0, <2\"\n\
+         [[plugin_labels]]\nplugin = \"com.mosaikit.notes\"\nlabel = \"Memos\"\n\
+         [plugin_labels.i18n.it]\nlabel = \"Appunti\"\n",
+    );
+    let t = start_with(|c| c.plugin_settings_file = Some(file.clone())).await;
+    t.install("notes").await;
+    let m = &t.plugins.get("com.mosaikit.notes").unwrap().manifest;
+    assert_eq!(m.name, "Memos");
+    // the name wins over the manifest's own translation and over a language without one of its own
+    assert_eq!(m.localized("it").name, "Appunti");
+    assert_eq!(m.localized("it").contribution.label, "Appunti");
+    assert_eq!(m.localized("fr").name, "Memos");
+    assert_eq!(m.localized("en").contribution.label, "Memos");
+}

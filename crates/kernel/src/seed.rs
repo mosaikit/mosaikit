@@ -41,6 +41,9 @@ pub struct SeedFile {
     /// groups of the navigation (see `navgroups.rs`), forwarded to the shell
     #[serde(default)]
     pub nav_groups: Vec<crate::navgroups::NavGroupDef>,
+    /// names of the official apps (see `pluginlabels.rs`), applied when the plugin is loaded
+    #[serde(default)]
+    pub plugin_labels: Vec<crate::pluginlabels::PluginLabelDef>,
     // --- the policy of a product (dev kit, phase 11): see `product.rs` ---
     #[serde(default)]
     pub product: crate::product::ProductSection,
@@ -164,6 +167,17 @@ pub fn nav_groups(cfg: &crate::config::Config) -> Vec<crate::navgroups::NavGroup
     match SeedFile::load(path) {
         Ok(f) => crate::navgroups::normalize(&f.nav_groups, &mut |m| tracing::warn!("{m}")),
         Err(_) => Vec::new(),
+    }
+}
+
+/// The validated names a distribution gives to its apps; a missing or unreadable file gives none.
+pub fn plugin_labels(
+    cfg: &crate::config::Config,
+) -> std::collections::BTreeMap<String, mosaikit_mskp::DisplayOverride> {
+    let Some(path) = &cfg.plugin_settings_file else { return Default::default() };
+    match SeedFile::load(path) {
+        Ok(f) => crate::pluginlabels::normalize(&f.plugin_labels, &mut |m| tracing::warn!("{m}")),
+        Err(_) => Default::default(),
     }
 }
 
