@@ -41,21 +41,21 @@ export function NoteRow({ n, onOpen, select }: { n: Note; onOpen?: () => void; s
     }
   }
   return (
-    <li className={cn('flex gap-3 rounded-lg p-2.5', !n.read && 'bg-primary/5', select?.on && 'ring-1 ring-primary')}>
+    <li className={cn('flex min-w-0 gap-3 rounded-lg p-2.5', !n.read && 'bg-primary/5', select?.on && 'ring-1 ring-primary')}>
       {select && <Checkbox className="mt-2" aria-label={t('Select: {what}', { what: title })} checked={select.on} onCheckedChange={(v) => select.set(!!v)} />}
       <KindIcon n={n} />
       <div className="min-w-0 flex-1">
         <div className="flex items-start gap-2">
           {n.link ? (
-            <button type="button" className="flex-1 text-left text-sm font-semibold hover:underline" onClick={open}>
+            <button type="button" className="min-w-0 flex-1 text-left text-sm font-semibold [overflow-wrap:anywhere] hover:underline" onClick={open}>
               {title}
             </button>
           ) : (
-            <b className="flex-1 text-sm">{title}</b>
+            <b className="min-w-0 flex-1 text-sm [overflow-wrap:anywhere]">{title}</b>
           )}
           {!n.read && <span role="img" className="mt-1.5 size-2 shrink-0 rounded-full bg-primary" aria-label={t('unread')} />}
         </div>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground [overflow-wrap:anywhere]">
           {[body, app, n.tenant_name, fmtDate(n.created_at)].filter(Boolean).join(' · ')}
         </p>
         {inv && (
