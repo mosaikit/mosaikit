@@ -161,7 +161,7 @@ async fn run(k: &Kernel, c: &Caller, plugin: &str, req: &Value, detach_audit: bo
             .collect::<Vec<_>>()
     } else {
         let sql = format!(
-            "select g.id, g.name from core.groups g
+            "select g.id, g.name, g.builtin from core.groups g
              where g.tenant_id = $1 and g.name ilike $2 escape '\\'
              order by lower(g.name), g.name, g.id
              limit {}",
@@ -169,7 +169,13 @@ async fn run(k: &Kernel, c: &Caller, plugin: &str, req: &Value, detach_audit: bo
         );
         let rows = mosaikit_db::query(&sql).bind(tenant).bind(q.like).fetch_all(&k.db).await?;
         rows.iter()
-            .map(|r| json!({ "id": r.get::<uuid::Uuid, _>(0).to_string(), "name": r.get::<String, _>(1) }))
+            .map(|r| {
+                json!({
+                    "id": r.get::<uuid::Uuid, _>(0).to_string(),
+                    "name": r.get::<String, _>(1),
+                    "all_members": r.get::<Option<String>, _>(2).is_some(),
+                })
+            })
             .collect::<Vec<_>>()
     };
     // one event per person and plugin per minute: a picker that searches on every key does not flood the log

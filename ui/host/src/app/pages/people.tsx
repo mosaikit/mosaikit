@@ -522,6 +522,8 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
   const others = (members.data ?? []).filter((m) => !g.members.some((x) => x.user_id === m.user_id))
   const label = (pid: string) => ctx.data?.plugins.find((p) => p.id === pid)?.label ?? pid
   const idp = g.source === 'idp'
+  const builtin = g.builtin === 'all'
+  const name = builtin ? t('All members') : g.name
   const addMenu = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -542,18 +544,19 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
   return (
     <>
       <PageHeader
-        title={g.name}
+        title={name}
         crumbs={[{ label: t('Tenant management') }, { label: t('Manage'), href: to.tenant(slug, 'manage', 'groups') }]}
-        sub={t('{count} members', { count: g.members.length })}
+        sub={builtin ? t('Every member of the organization') : t('{count} members', { count: g.members.length })}
         badge={idp ? <IdpBadge /> : undefined}
         actions={
           cur === 'members' &&
-          !idp && (
+          !idp &&
+          !builtin && (
             addMenu
           )
         }
         more={
-          idp ? undefined : (
+          idp || builtin ? undefined : (
             <DropdownMenuItem
               variant="destructive"
               onSelect={async () => {
@@ -579,8 +582,12 @@ export function GroupPage({ slug, id, tab }: { slug: string; id: string; tab?: s
       <div className="p-6 max-[620px]:p-4">
         {cur === 'members' &&
           (g.members.length === 0 ? (
-            <Empty art="people" title={t('No members.')} actions={idp ? undefined : addMenu}>
-              {idp ? t('The members of this group come from the identity provider.') : t('Add the people of the tenant who belong to this group.')}
+            <Empty art="people" title={builtin ? t('All members') : t('No members.')} actions={idp || builtin ? undefined : addMenu}>
+              {builtin
+                ? t('Kept by the platform: new members join it, people who leave are removed.')
+                : idp
+                  ? t('The members of this group come from the identity provider.')
+                  : t('Add the people of the tenant who belong to this group.')}
             </Empty>
           ) : (
             <div>

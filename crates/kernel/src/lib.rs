@@ -54,6 +54,7 @@ pub mod transfer;
 pub mod trash;
 pub mod uploads;
 mod util;
+pub mod visibility;
 pub mod webfetch;
 
 use std::sync::Arc;

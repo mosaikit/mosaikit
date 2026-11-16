@@ -424,6 +424,18 @@ impl KernelHost {
 }
 
 impl KernelHost {
+    /// `resource.shares`: see [`crate::visibility::shares_from_logic`].
+    fn resource_shares(&mut self, req: &Value) -> std::result::Result<Value, Coded> {
+        let k = self.kernel.clone().ok_or_else(|| Coded("internal", "kernel not available".into()))?;
+        let c = self.user().map_err(|m| Coded("permission_denied", m))?;
+        let (plugin, allowed) = (self.plugin_id.clone(), self.resources_read.clone());
+        self.rt
+            .block_on(crate::visibility::shares_from_logic(&k, &c, &plugin, &allowed, req))
+            .map_err(coded_of)
+    }
+}
+
+impl KernelHost {
     /// `runs.mint`: see [`crate::run_tickets::prepare_from_logic`]. Not in a nested call (a ticket names the plugin
     /// that runs, and the caller of a nested call is another plugin's), not in a call on behalf of a run (a ticket
     /// cannot mint a ticket); the ticket is written once the command has committed.
@@ -493,6 +505,10 @@ impl Host for KernelHost {
                 m
             }),
             "resources.list" => self.resources_list(req).map_err(|Coded(code, m)| {
+                self.last_code = Some(code.to_string());
+                m
+            }),
+            "resource.shares" => self.resource_shares(req).map_err(|Coded(code, m)| {
                 self.last_code = Some(code.to_string());
                 m
             }),
@@ -649,7 +665,7 @@ pub(crate) async fn run_public(
 async fn groups_of(k: &Kernel, c: &crate::Caller) -> Result<Value> {
     let rows = mosaikit_db::query(
         "select g.id, g.name from core.groups g join core.group_members gm on gm.group_id = g.id
-         where gm.user_id = $1 and g.tenant_id = $2 order by g.name, g.id",
+         where gm.user_id = $1 and g.tenant_id = $2 and g.builtin is null order by g.name, g.id",
     )
     .bind(c.user.user_id)
     .bind(c.tenant.tenant_id)

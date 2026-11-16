@@ -50,6 +50,11 @@ function LevelSelect({ value, onChange, label }: { value: Level; onChange: (l: L
 }
 
 /** People and groups of the tenant matching the search. */
+/** The name and detail of a person or group in the dialog: «All members» has its own, translated. */
+function shown(p: { name: string; detail: string; builtin?: 'all' }): { name: string; detail: string } {
+  return p.builtin ? { name: t('All members'), detail: t('Every member of the organization') } : { name: p.name, detail: p.detail }
+}
+
 function useDirectory(slug: string, q: string) {
   const [found, setFound] = useState<Principal[]>([])
   useEffect(() => {
@@ -122,16 +127,20 @@ export default function ShareDialog({ ctx, resourceId, onClose, preselect }: { c
   const [suggestLevel, setSuggestLevel] = useState<Level>(preselect?.level ?? 'read')
   useEffect(() => setSuggestLevel(preselect?.level ?? 'read'), [preselect])
   const suggested = (preselect?.principals ?? []).filter((p) => p.id !== res?.owner_id)
-  const todo = suggested.filter((p) => !grants.some((x) => x.principal_id === p.id && levelRank(x.level) >= levelRank(suggestLevel)))
+  const todo = suggested.filter((p) => !grants.some((x) => (p.type === 'all' ? x.builtin === 'all' : x.principal_id === p.id) && levelRank(x.level) >= levelRank(suggestLevel)))
   const shareWithSuggested = () =>
     run(async () => {
-      for (const p of todo) await api('PUT', `${base}/grants`, { principal_type: p.type, principal_id: p.id, level: suggestLevel })
+      for (const p of todo) await api('PUT', `${base}/grants`, p.type === 'all' ? { principal_type: 'all', level: suggestLevel } : { principal_type: p.type, principal_id: p.id, level: suggestLevel })
     }, t('Shared with {n}', { n: todo.length }))
+  // everybody in the tenant: the built-in group «All members»
+  const everyone = grants.some((x) => x.builtin === 'all')
+  const shareWithAll = () =>
+    run(() => api('PUT', `${base}/grants`, { principal_type: 'all', level: 'read' }), t('Shared with all members'))
   const setGrant = (p: { principal_type: string; principal_id: string }, l: Level | null) =>
     run(() => api('PUT', `${base}/grants`, { ...p, level: l }), l ? t('Sharing updated') : t('Access revoked'))
   const candidates = found.filter((p) => p.id !== res?.owner_id && !grants.some((x) => x.principal_id === p.id))
   const canOwn = !!res && (res.is_owner || ctx.tenant.role === 'tenant_manager')
-  const icon = (kind: string) => (kind === 'group' ? <Users className="size-4 text-muted-foreground" /> : <UserRound className="size-4 text-muted-foreground" />)
+  const icon = (kind: string) => (kind === 'group' || kind === 'all' ? <Users className="size-4 text-muted-foreground" /> : <UserRound className="size-4 text-muted-foreground" />)
 
   return (
     <Dialog open={!!resourceId} onOpenChange={(o) => !o && onClose()}>
@@ -161,7 +170,7 @@ export default function ShareDialog({ ctx, resourceId, onClose, preselect }: { c
                   {suggested.map((p) => (
                     <li key={p.id} className="flex items-center gap-1.5 rounded-full border bg-background px-3 py-1 text-sm">
                       {icon(p.type)}
-                      {p.name || p.id.slice(0, 8)}
+                      {p.type === 'all' ? t('All members') : p.name || p.id.slice(0, 8)}
                     </li>
                   ))}
                 </ul>
@@ -174,14 +183,20 @@ export default function ShareDialog({ ctx, resourceId, onClose, preselect }: { c
               </section>
             )}
             <section className="grid gap-3">
-              <h3 className="text-sm font-semibold">{t('People and groups of the tenant')}</h3>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold">{t('People and groups of the tenant')}</h3>
+                <Button variant="outline" size="sm" disabled={busy || everyone} onClick={() => void shareWithAll()} data-testid="share-all-members">
+                  <Users />
+                  {t('Share with all members')}
+                </Button>
+              </div>
               <div className="flex flex-wrap items-start gap-2">
                 <div className="relative min-w-56 flex-1">
                   <Input
                     type="search"
                     placeholder={t('Search people or groups…')}
                     aria-label={t('Search people or groups')}
-                    value={pick ? `${pick.name} (${pick.detail})` : q}
+                    value={pick ? `${shown(pick).name} (${shown(pick).detail})` : q}
                     onChange={(e) => {
                       setPick(null)
                       setQ(e.target.value)
@@ -199,8 +214,8 @@ export default function ShareDialog({ ctx, resourceId, onClose, preselect }: { c
                             onClick={() => setPick(p)}
                           >
                             {icon(p.kind)}
-                            <span className="flex-1">{p.name}</span>
-                            <span className="font-mono text-xs text-muted-foreground">{p.detail}</span>
+                            <span className="flex-1">{shown(p).name}</span>
+                            <span className="font-mono text-xs text-muted-foreground">{shown(p).detail}</span>
                           </button>
                         </li>
                       ))}
@@ -233,10 +248,10 @@ export default function ShareDialog({ ctx, resourceId, onClose, preselect }: { c
                   <li key={x.principal_type + x.principal_id} className="flex flex-wrap items-center gap-2 p-2 pl-3 text-sm">
                     {icon(x.principal_type)}
                     <span className="min-w-0 flex-1">
-                      {x.name} <span className="font-mono text-xs text-muted-foreground">{x.detail}</span>
+                      {shown(x).name} <span className="font-mono text-xs text-muted-foreground">{shown(x).detail}</span>
                     </span>
-                    <LevelSelect value={x.level} onChange={(l) => void setGrant(x, l)} label={t('Level of {name}', { name: x.name })} />
-                    <Button variant="ghost" size="sm" aria-label={t('Revoke from {name}', { name: x.name })} onClick={() => void setGrant(x, null)}>
+                    <LevelSelect value={x.level} onChange={(l) => void setGrant(x, l)} label={t('Level of {name}', { name: shown(x).name })} />
+                    <Button variant="ghost" size="sm" aria-label={t('Revoke from {name}', { name: shown(x).name })} onClick={() => void setGrant(x, null)}>
                       <X />
                     </Button>
                   </li>

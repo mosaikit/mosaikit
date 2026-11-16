@@ -1136,6 +1136,9 @@ pub struct GroupDetail {
     pub plugins: Vec<(String, Vec<String>)>,
     /// "mosaikit", or "idp" for a group of the identity provider (read-only)
     pub source: String,
+    /// `Some("all")`: «All members», kept by the platform (no list of people)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub builtin: Option<String>,
 }
 
 pub async fn group_detail(k: &Kernel, c: &Caller, group: Uuid) -> Result<GroupDetail> {
@@ -1160,6 +1163,7 @@ pub async fn group_detail(k: &Kernel, c: &Caller, group: Uuid) -> Result<GroupDe
         name: g.name,
         members: g.members,
         source: g.source,
+        builtin: g.builtin,
         shared: rows
             .iter()
             .map(|r| SharedItem {

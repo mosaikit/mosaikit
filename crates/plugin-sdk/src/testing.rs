@@ -350,7 +350,7 @@ impl MockHost {
     pub fn with_groups(mut self, groups: &[(&str, &str)]) -> MockHost {
         self.ctx.groups = groups
             .iter()
-            .map(|(id, name)| crate::Group { id: id.to_string(), name: name.to_string() })
+            .map(|(id, name)| crate::Group { id: id.to_string(), name: name.to_string(), all_members: false })
             .collect();
         self
     }

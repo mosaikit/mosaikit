@@ -8,6 +8,11 @@ export function sharePre(args: Record<string, unknown> | undefined): SharePre | 
   const principals: SharePre['principals'] = []
   for (const p of list.slice(0, 200)) {
     const r = p as { type?: unknown; id?: unknown; name?: unknown }
+    // everybody in the tenant: no id (the platform knows the group)
+    if (r.type === 'all') {
+      principals.push({ type: 'all', id: 'all' })
+      continue
+    }
     if ((r.type !== 'user' && r.type !== 'group') || typeof r.id !== 'string' || !ok.test(r.id)) continue
     principals.push({ type: r.type, id: r.id, ...(typeof r.name === 'string' ? { name: r.name.slice(0, 100) } : {}) })
   }

@@ -678,7 +678,7 @@ pub async fn consumers(k: &Kernel, c: &Caller) -> Result<Consumers> {
         "select g.id::text, g.name, count(r.id), coalesce(sum(r.size_bytes), 0)::bigint
          from core.groups g join core.group_members gm on gm.group_id = g.id
            join core.resources r on r.owner_id = gm.user_id and r.tenant_id = g.tenant_id
-         where g.tenant_id = $1 group by g.id, g.name order by 4 desc, 3 desc limit 20",
+         where g.tenant_id = $1 and g.builtin is null group by g.id, g.name order by 4 desc, 3 desc limit 20",
     )
     .bind(t)
     .fetch_all(&k.db)

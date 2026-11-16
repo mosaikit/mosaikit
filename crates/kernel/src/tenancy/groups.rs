@@ -22,6 +22,9 @@ pub struct GroupInfo {
     pub members: Vec<GroupMember>,
     /// "mosaikit", or "idp" for a group of the identity provider (read-only)
     pub source: String,
+    /// `Some("all")` for the group the platform keeps with every member of the tenant (read-only, no list of members)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub builtin: Option<String>,
 }
 
 /// The error of a change to a group of the identity provider.
@@ -32,16 +35,19 @@ fn from_idp() -> Error {
 
 /// Refuses changes to a group of the identity provider; `NotFound` for a group not of the tenant.
 async fn editable(k: &Kernel, c: &Caller, id: Uuid) -> Result<()> {
-    let source: Option<String> =
-        mosaikit_db::query_scalar("select source from core.groups where id = $1 and tenant_id = $2")
-            .bind(id)
-            .bind(c.tenant.tenant_id)
-            .fetch_optional(&k.db)
-            .await?;
-    match source.as_deref() {
-        None => Err(Error::not_found("group not found")),
-        Some("idp") => Err(from_idp()),
-        Some(_) => Ok(()),
+    let row = mosaikit_db::query("select source, builtin from core.groups where id = $1 and tenant_id = $2")
+        .bind(id)
+        .bind(c.tenant.tenant_id)
+        .fetch_optional(&k.db)
+        .await?;
+    let Some(row) = row else { return Err(Error::not_found("group not found")) };
+    if row.get::<Option<String>, _>(1).is_some() {
+        return Err(Error::bad("this group is kept by the platform with every member of the organization")
+            .with_code("group_builtin"));
+    }
+    match row.get::<String, _>(0).as_str() {
+        "idp" => Err(from_idp()),
+        _ => Ok(()),
     }
 }
 
@@ -55,8 +61,9 @@ pub async fn groups(k: &Kernel, c: &Caller) -> Result<Vec<GroupInfo>> {
 }
 
 const GROUPS_SQL: &str = "select g.id, g.name, coalesce(json_agg(json_build_object('user_id', u.id, 'username', u.username,
-        'display_name', u.display_name) order by u.username) filter (where u.id is not null), '[]'), g.source, lower(g.name)
-     from core.groups g left join core.group_members gm on gm.group_id = g.id left join core.users u on u.id = gm.user_id";
+        'display_name', u.display_name) order by u.username) filter (where u.id is not null), '[]'), g.source, lower(g.name), g.builtin
+     from core.groups g left join core.group_members gm on gm.group_id = g.id and g.builtin is null
+     left join core.users u on u.id = gm.user_id";
 
 /// A page of the groups of the tenant, by name, filtered by words in the name.
 pub async fn groups_page(
@@ -120,6 +127,7 @@ fn groups_from(rows: &[mosaikit_db::Row]) -> Result<Vec<GroupInfo>> {
                     })
                     .unwrap_or_default(),
                 source: r.get(3),
+                builtin: r.get(5),
             })
         })
         .collect()

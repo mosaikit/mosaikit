@@ -1346,3 +1346,11 @@ A shared collection of reusable texts and pieces of code with tags, copied in on
 | NAV-10 | In the editor drag an app onto another app, onto another group, a group onto another group, a subgroup onto another of the same group | The order follows the drop; the app leaves its old group; the arrows give the same result with the keyboard | manual |
 | NAV-11 | As the Administrator tick «Keep this group in every tenant» on a group and save; as a Tenant Manager set a layout of your own | The locked group is first in the sidebar of the tenant, then the groups of the tenant; «Of the platform» shows the platform's groups read only | manual |
 | NAV-07 | Switch the language to Italian | The group names written for Italian are shown; the others show the name of the base language | manual |
+
+## Sharing with all members
+| ID | Steps | Expected | Mode |
+|---|---|---|---|
+| SH16-01 | Open the sharing dialog of an item you manage and press «Share with all members» | «Shared with all members»; the list «Shared with» shows «All members»; the button is disabled; a person who joins the organization afterwards sees the item | manual |
+| SH16-02 | As a Tenant Manager open **Manage › Groups** | The group «All members» says «Every member of the organization», has no list of people, no «Add», no delete; the page of the group offers no edit | manual |
+| SH16-03 | In a plugin page call `msk.share(id, { principals: [{ type: 'all' }] })` | The dialog shows «All members» in the box «Suggested by the app»; one press shares with everybody | manual |
+| SH16-04 | A plugin reads `ctx.resources().shares(id)` for an item you manage, and `resources.list` | The first lists people, groups and links (no token) with `visibility`; each entry of the second has `visibility` (`private`, `shared`, `organization`, `public`); a person who only reads the item is refused | manual |

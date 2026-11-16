@@ -5,6 +5,11 @@ in Help › What is new (one `## <version>` heading per version, `- ` items, `##
 language of the person: this file in English, [CHANGELOG.it.md](CHANGELOG.it.md) in Italian (keep them
 in step).
 
+## 1.0.16
+
+- Sharing with everybody: every organization has the built-in group **All members**, kept by the platform (people who join are added, people who leave are removed; it cannot be edited or deleted). The sharing dialog has a button «Share with all members», and `msk.share(id, { principals: [{ type: 'all' }] })` suggests it to the person.
+- Plugins: `ctx.resources().shares(id)` (host operation `resource.shares`) reads who an item is shared with and its public links (never the token), for a person who manages it; `resources.list` entries carry `visibility` (`private`, `shared`, `organization`, `public`), the platform's own state, so a catalog needs no second flag. `Directory::groups` marks the group (`all_members`).
+
 ## 1.0.15
 
 - The sidebar of the default distribution groups the official apps in four groups: Information, Work and projects, Communication, People and processes (`[[nav_groups]]` of `distribution.toml`, labels in eight languages; no change to the kernel).

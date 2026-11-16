@@ -229,6 +229,8 @@ export interface Principal {
   id: string
   name: string
   detail: string
+  /** 'all': the group the platform keeps with every member of the tenant (shown with its own name) */
+  builtin?: 'all'
 }
 
 export interface Grant {
@@ -238,6 +240,7 @@ export interface Grant {
   detail: string
   level: Level
   granted_at: string
+  builtin?: 'all'
 }
 
 export interface ResourceMeta {
@@ -381,6 +384,8 @@ export interface GroupDetail {
   plugins: [string, string[]][]
   /** 'idp': a group of the identity provider, read-only */
   source?: 'mosaikit' | 'idp'
+  /** 'all': «All members», kept by the platform: no edits, no list of people */
+  builtin?: 'all'
 }
 
 export interface AccessRequest {
@@ -445,6 +450,8 @@ export interface Group {
   members: { user_id: string; username: string; display_name: string }[]
   /** 'idp': a group of the identity provider, read-only (servers before 1.1 omit it) */
   source?: 'mosaikit' | 'idp'
+  /** 'all': «All members», kept by the platform: no edits, no list of people */
+  builtin?: 'all'
 }
 
 export interface ResourceRow {

@@ -164,6 +164,9 @@ impl Ctx {
 pub struct Group {
     pub id: String,
     pub name: String,
+    /// `true` for the built-in group «All members» (every member of the tenant), as `Directory::groups` finds it
+    #[serde(default)]
+    pub all_members: bool,
 }
 
 /// A notification of the logic (`ctx.notify`). The plugin never names the recipients: with `resource`
@@ -319,7 +322,7 @@ impl Resources {
     }
 
     /// The resources of another plugin that the caller sees (needs the plugin in `[permissions]
-    /// resources_read`): `{ "entries": [{ id, plugin, kind, title, owner_name, my_level, updated_at }],
+    /// resources_read`): `{ "entries": [{ id, plugin, kind, title, owner_name, my_level, visibility, updated_at }],
     /// "truncated": bool }`, newest first. `kind` and `q` (a part of the title) narrow the list; `limit`
     /// is 50 by default and at most 200. Errors carry a code: `permission_denied`, `invalid_argument`.
     pub fn list(
@@ -330,6 +333,15 @@ impl Resources {
         limit: Option<u32>,
     ) -> Result<Value> {
         host::call("resources.list", json!({ "plugin": plugin, "kind": kind, "q": q, "limit": limit }))
+    }
+
+    /// Who an item is shared with, for a caller who manages it (the sharing dialog's rule): `{ id, visibility,
+    /// "shares": [{ principal_type, principal_id, name, level, all_members }], "links": [{ id, created_at,
+    /// expires_at, has_password, view_count, active }] }`. The item is of this plugin or of one in `[permissions]
+    /// resources_read`; a link's token is never returned. Errors carry a code: `permission_denied` (not
+    /// managing it, or not an item of the plugin), `not_found`, `invalid_argument`.
+    pub fn shares(&self, id: &str) -> Result<Value> {
+        host::call("resource.shares", json!({ "id": id }))
     }
 }
 

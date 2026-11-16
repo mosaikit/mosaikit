@@ -4,6 +4,11 @@ Cosa cambia da una versione di Mosaikit alla successiva. La shell mostra la sezi
 Aiuto › Novità (un titolo `## <versione>` per versione, voci `- `, gruppi `### `). Questo file è la
 versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
+## 1.0.16
+
+- Condividere con tutti: ogni organizzazione ha il gruppo predefinito **Tutti i membri**, gestito dalla piattaforma (chi entra viene aggiunto, chi esce viene tolto; non si modifica né si elimina). La finestra di condivisione ha il pulsante «Condividi con tutti i membri» e `msk.share(id, { principals: [{ type: 'all' }] })` lo propone alla persona.
+- Plugin: `ctx.resources().shares(id)` (operazione host `resource.shares`) legge con chi è condivisa una risorsa e i suoi link pubblici (mai il token), per chi la gestisce; le voci di `resources.list` portano `visibility` (`private`, `shared`, `organization`, `public`), lo stato della piattaforma, così un catalogo non ha bisogno di un secondo indicatore. `Directory::groups` segna il gruppo (`all_members`).
+
 ## 1.0.15
 
 - La barra laterale della distribuzione predefinita raggruppa le app ufficiali in quattro gruppi: Informazioni, Lavoro e progetti, Comunicazione, Persone e processi (`[[nav_groups]]` di `distribution.toml`, etichette in otto lingue; nessuna modifica al kernel).
