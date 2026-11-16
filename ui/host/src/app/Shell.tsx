@@ -228,7 +228,7 @@ function DistGroup({ g, className }: { g: NavGroup; className: string }) {
             <span className={cn('truncate', active && !open && 'font-semibold text-sidebar-primary')}>{label}</span>
           </span>
           <span className="flex shrink-0 items-center gap-1.5">
-            <span className="text-[11px] font-normal text-sidebar-foreground/60" aria-hidden="true">{allItems(g).length}</span>
+            <span className="min-w-5 rounded-full bg-sidebar-accent px-1.5 py-px text-center text-[11px] font-medium leading-4 tabular-nums text-sidebar-accent-foreground" aria-hidden="true">{allItems(g).length}</span>
             <ChevronDown className={cn('size-4 transition-transform', !open && '-rotate-90')} aria-hidden="true" />
           </span>
         </button>

@@ -64,7 +64,7 @@ export function Widget({
 export function WidgetGrid({ children }: { children: ReactNode }) {
   return (
     <div className="@container">
-      <div className="grid grid-flow-dense grid-cols-1 gap-4 @xl:grid-cols-2 @4xl:grid-cols-4">{children}</div>
+      <div className="grid grid-flow-dense grid-cols-[minmax(0,1fr)] gap-4 @xl:grid-cols-[repeat(2,minmax(0,1fr))] @4xl:grid-cols-[repeat(4,minmax(0,1fr))]">{children}</div>
     </div>
   )
 }
@@ -117,7 +117,7 @@ export function NotesWidget({ href }: { href: string }) {
       {notes.isLoading ? (
         <Loading />
       ) : items.length ? (
-        <ul className="grid gap-1">
+        <ul className="grid grid-cols-[minmax(0,1fr)] gap-1">
           {items.map((n) => (
             <NoteRow key={n.id} n={n} />
           ))}
