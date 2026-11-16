@@ -39,7 +39,10 @@ pub fn discover() -> Result<Vec<Plugin>> {
     let missing: Vec<&String> =
         d.plugins.include.iter().filter(|w| *w != "*" && !out.iter().any(|p| &p.id == *w)).collect();
     if !missing.is_empty() {
-        let official = root().join("..").join("mosaikit-plugins");
+        // `MOSAIKIT_PLUGINS_DIR` names another checkout (e.g. a worktree of the latest plugins)
+        let official = std::env::var_os("MOSAIKIT_PLUGINS_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|| root().join("..").join("mosaikit-plugins"));
         let mut dirs: Vec<PathBuf> = std::fs::read_dir(&official)
             .map(|rd| rd.flatten().map(|e| e.path()).filter(|p| p.join("plugin.toml").is_file()).collect())
             .unwrap_or_default();
@@ -53,7 +56,7 @@ pub fn discover() -> Result<Vec<Plugin>> {
     }
     for want in &d.plugins.include {
         if want != "*" && !out.iter().any(|p| &p.id == want) {
-            bail!("plugin {want} listed in distribution.toml but not found in the plugin folders (nor in ../mosaikit-plugins)");
+            bail!("plugin {want} listed in distribution.toml but not found in the plugin folders (nor in ../mosaikit-plugins or MOSAIKIT_PLUGINS_DIR)");
         }
     }
     Ok(out)
