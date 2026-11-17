@@ -367,6 +367,36 @@ impl Resources {
     pub fn shares(&self, id: &str) -> Result<Value> {
         host::call("resource.shares", json!({ "id": id }))
     }
+
+    /// Shares an item with a person (`principal_type = "user"`), a group (`"group"`) or every member (`"all"`, no id
+    /// needed) at `level` (`read`, `write`, `manage`), or changes that share. `actions`: the ones the plugin declares
+    /// for the kind of the item (`[[resources]] actions`); `Some` replaces the stored ones (`Some(&[])` clears
+    /// them), `None` keeps them. The rules of the sharing dialog: the caller manages the item and the plugin has the
+    /// `share` permission; the people are notified. The item is of this plugin or of one in `resources_read`.
+    /// Errors carry a code: `permission_denied`, `forbidden`, `not_found`, `invalid_argument`.
+    pub fn set_share(
+        &self,
+        id: &str,
+        principal_type: &str,
+        principal_id: Option<&str>,
+        level: &str,
+        actions: Option<&[&str]>,
+    ) -> Result<()> {
+        host::call(
+            "resource.share_set",
+            json!({ "id": id, "principal_type": principal_type, "principal_id": principal_id, "level": level, "actions": actions }),
+        )
+        .map(|_| ())
+    }
+
+    /// Removes the share of a person, a group or every member (see [`Resources::set_share`]).
+    pub fn remove_share(&self, id: &str, principal_type: &str, principal_id: Option<&str>) -> Result<()> {
+        host::call(
+            "resource.share_remove",
+            json!({ "id": id, "principal_type": principal_type, "principal_id": principal_id }),
+        )
+        .map(|_| ())
+    }
 }
 
 impl Files {

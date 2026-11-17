@@ -616,6 +616,24 @@ export interface SharePrincipal {
   name?: string
 }
 
+/** The answer of `msk.shares(id)`. */
+export interface ShareList {
+  resource: ResourceMeta
+  grants: {
+    principal_type: 'user' | 'group'
+    principal_id: string
+    name: string
+    detail: string
+    level: 'read' | 'write' | 'manage'
+    /** the actions of the share besides the level */
+    actions: string[]
+    /** `all`: the built-in group «All members» */
+    builtin?: 'all'
+  }[]
+  /** the actions the plugin declares for the kind of the item */
+  actions: string[]
+}
+
 /** What `msk.pickPrincipals` asks the picker of the host. */
 export interface PickPrincipalsOptions {
   /** what may be chosen (default `both`) */

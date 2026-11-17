@@ -469,6 +469,62 @@ impl KernelHost {
 }
 
 impl KernelHost {
+    /// `resource.share_set` / `resource.share_remove`: `{ id, principal_type, principal_id?, level, actions? }` /
+    /// `{ id, principal_type, principal_id? }`. The rules of the share dialog (the caller manages the item, the
+    /// `share` permission of the plugin, the actions the plugin declares), the people are notified. The item is of
+    /// this plugin or of one in `resources_read`.
+    fn resource_share(&mut self, req: &Value, remove: bool) -> std::result::Result<Value, Coded> {
+        let k = self.kernel.clone().ok_or_else(|| Coded("internal", "kernel not available".into()))?;
+        let c = self.user().map_err(|m| Coded("permission_denied", m))?;
+        let (plugin, allowed) = (self.plugin_id.clone(), self.resources_read.clone());
+        let bad = |m: &str| Coded("invalid_argument", m.to_string());
+        let id: uuid::Uuid = req
+            .get("id")
+            .and_then(Value::as_str)
+            .and_then(|s| s.parse().ok())
+            .ok_or_else(|| bad("id is required"))?;
+        let ptype = req
+            .get("principal_type")
+            .and_then(Value::as_str)
+            .ok_or_else(|| bad("principal_type is required"))?
+            .to_string();
+        let pid: uuid::Uuid = match (ptype.as_str(), req.get("principal_id").and_then(Value::as_str)) {
+            ("all", _) => uuid::Uuid::nil(),
+            (_, Some(s)) => s.parse().map_err(|_| bad("principal_id is not an id"))?,
+            _ => return Err(bad("principal_id is required")),
+        };
+        let level = if remove {
+            None
+        } else {
+            let l = req.get("level").and_then(Value::as_str).ok_or_else(|| bad("level is required"))?;
+            Some(crate::acl::Level::parse(l).map_err(|e| Coded("invalid_argument", e.message))?)
+        };
+        let actions: Option<Vec<String>> = match req.get("actions") {
+            None | Some(Value::Null) => None,
+            Some(Value::Array(a)) => Some(
+                a.iter()
+                    .map(|x| x.as_str().map(str::to_string).ok_or_else(|| bad("actions: names")))
+                    .collect::<std::result::Result<_, _>>()?,
+            ),
+            Some(_) => return Err(bad("actions must be a list of names")),
+        };
+        self.rt
+            .block_on(async {
+                let m = crate::acl::meta(&k, &c, id).await?;
+                if m.plugin_id != plugin && !allowed.contains(&m.plugin_id) {
+                    return Err(crate::Error::forbidden(
+                        "the item is not of this plugin or of one declared in `resources_read` in [permissions]",
+                    )
+                    .with_code("permission_denied"));
+                }
+                crate::acl::set_grant_with(&k, &c, id, &ptype, pid, level, actions.as_deref()).await?;
+                Ok(json!({ "ok": true }))
+            })
+            .map_err(coded_of)
+    }
+}
+
+impl KernelHost {
     /// `runs.mint`: see [`crate::run_tickets::prepare_from_logic`]. Not in a nested call (a ticket names the plugin
     /// that runs, and the caller of a nested call is another plugin's), not in a call on behalf of a run (a ticket
     /// cannot mint a ticket); the ticket is written once the command has committed.
@@ -549,6 +605,12 @@ impl Host for KernelHost {
                 self.last_code = Some(code.to_string());
                 m
             }),
+            "resource.share_set" | "resource.share_remove" => {
+                self.resource_share(req, op == "resource.share_remove").map_err(|Coded(code, m)| {
+                    self.last_code = Some(code.to_string());
+                    m
+                })
+            }
             "directory.search" => self.directory(req).map_err(|Coded(code, m)| {
                 self.last_code = Some(code.to_string());
                 m

@@ -54,6 +54,8 @@ the origin of the host and is accepted only from it. A call that gets no answer 
 | `msk.web.probe(url, image?)` | may the page be framed, its title and picture; only with `web`. Experimental |
 | `msk.resource(id)` | metadata of an item (owner, level, size…) |
 | `msk.share(id)` | the share dialog of the host, or the page the plugin of the item sets with `[ui] share_page` |
+| `msk.shares(id)` | who the item is shared with (level and actions per person or group) and the actions the plugin declares; the person must manage the item |
+| `msk.setShare(id, { principal, level, actions? })`, `msk.removeShare(id, principal)` | share an item or change/remove a share, with the rules of the dialog (manage the item, `share` permission, declared actions); people are notified. `principal` is a `SharePrincipal` (`{ type: 'all' }` for every member) |
 | `msk.pickPrincipals({ kind?, exclude?, multiple?, title? })` | the picker of the host: the person searches the people and groups of the tenant and chooses; returns `SharePrincipal[]` (empty on cancel) |
 | `msk.notify({ title, body?, at?, resource? })` | a notification; returns how many people got it. Experimental |
 | `msk.toast(text, error?)`, `msk.confirm(text)` | a toast; the confirmation dialog of the host |

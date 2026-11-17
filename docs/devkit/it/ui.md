@@ -52,6 +52,8 @@ dell'host ed è accettato solo da essa. Una chiamata che non riceve risposta in 
 | `msk.web.probe(url, image?)` | se la pagina si può incorporare, il suo titolo e la sua immagine; solo con `web`. Sperimentale |
 | `msk.resource(id)` | metadati di un elemento (proprietario, livello, dimensione…) |
 | `msk.share(id)` | la finestra di condivisione dell'host, o la pagina che il plugin dell'elemento imposta con `[ui] share_page` |
+| `msk.shares(id)` | con chi è condiviso l'elemento (livello e azioni per persona o gruppo) e le azioni che il plugin dichiara; serve la gestione dell'elemento |
+| `msk.setShare(id, { principal, level, actions? })`, `msk.removeShare(id, principal)` | condividono un elemento o cambiano/tolgono una condivisione, con le regole della finestra (gestire l'elemento, permesso `share`, azioni dichiarate); le persone sono avvisate. `principal` è un `SharePrincipal` (`{ type: 'all' }` per tutti i membri) |
 | `msk.pickPrincipals({ kind?, exclude?, multiple?, title? })` | il selettore dell'host: la persona cerca tra persone e gruppi dell'organizzazione e sceglie; restituisce `SharePrincipal[]` (vuoto se annulla) |
 | `msk.notify({ title, body?, at?, resource? })` | una notifica; restituisce quante persone l'hanno ricevuta. Sperimentale |
 | `msk.toast(text, error?)`, `msk.confirm(text)` | un avviso; la finestra di conferma dell'host |

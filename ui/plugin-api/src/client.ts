@@ -2,7 +2,7 @@ import { Bridge, BridgeError } from './bridge.ts'
 import { API_VERSION, checkHostApi } from './version.ts'
 import { translate, type Vars } from './text.ts'
 import { setBusy, withBusy } from './busy.ts'
-import type { RealtimeEvent, RealtimeMessage, RealtimePerson, RealtimeStatus, BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, Unzipped, UploadProgress, FolderSuggestion, FileInfo, FileTicket, UiContext, Values, WebProbe, SharePreselect, SharePrincipal, PickPrincipalsOptions } from './protocol.ts'
+import type { RealtimeEvent, RealtimeMessage, RealtimePerson, RealtimeStatus, BandApi, BandState, DirectoryApi, EmbedsApi, Schedule, SchedulesApi, DirectorySearch, ExtensionView, FileEntry, Hello, HostEventName, ListResult, Listing, Notify, PublicResource, Rect, ResourceMeta, Row, SiteInfo, TabInfo, Unzipped, UploadProgress, FolderSuggestion, FileInfo, FileTicket, UiContext, Values, WebProbe, SharePreselect, SharePrincipal, PickPrincipalsOptions, ShareList } from './protocol.ts'
 
 /** The extensions of the plugin on a resource (fields and actions other plugins add to its items). */
 export interface ExtensionsClient {
@@ -464,6 +464,30 @@ export class Msk {
    */
   async share(id: string, opts?: SharePreselect): Promise<void> {
     await this.bridge.call('share', opts ? { id, principals: opts.principals, level: opts.level } : { id })
+  }
+
+  /**
+   * Who an item is shared with, as the sharing dialog shows it (the person must manage the item):
+   * `{ resource, grants: [{ principal_type, principal_id, name, detail, level, actions, builtin? }], actions }`, where
+   * `actions` is what the plugin declares for the kind of the item (`[[resources]] actions`).
+   */
+  async shares(id: string): Promise<ShareList> {
+    return this.bridge.call<ShareList>('share.list', { id })
+  }
+
+  /**
+   * Shares an item with a person, a group or everybody (`{ type: 'all' }`), or changes that share: the level and,
+   * when `actions` is given, the actions (they replace the stored ones, `[]` clears them; without it they stay).
+   * The same rules as the dialog: the person must manage the item, the plugin needs the `share` permission, the
+   * actions must be declared by the plugin for the kind of the item. The people are notified as the dialog does.
+   */
+  async setShare(id: string, share: { principal: SharePrincipal; level: 'read' | 'write' | 'manage'; actions?: string[] }): Promise<void> {
+    await this.bridge.call('share.set', { id, principal: share.principal, level: share.level, ...(share.actions ? { actions: share.actions } : {}) })
+  }
+
+  /** Removes the share of a person, a group or everybody (`{ type: 'all' }`) on an item. */
+  async removeShare(id: string, principal: SharePrincipal): Promise<void> {
+    await this.bridge.call('share.remove', { id, principal })
   }
 
   /**
