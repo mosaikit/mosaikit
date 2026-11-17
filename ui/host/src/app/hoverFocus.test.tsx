@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { FlyoutMenu } from './slots.tsx'
 import { useHoverMenu } from './hoverMenu.ts'
 
@@ -27,7 +28,7 @@ describe('menu opened by hover', () => {
     const host = document.createElement('div')
     document.body.appendChild(host)
     const root = createRoot(host)
-    await act(async () => root.render(<Rail />))
+    await act(async () => root.render(<QueryClientProvider client={new QueryClient()}><Rail /></QueryClientProvider>))
     const input = host.querySelector<HTMLInputElement>('#typing')!
     input.focus()
     const area = host.querySelector('#area')!
