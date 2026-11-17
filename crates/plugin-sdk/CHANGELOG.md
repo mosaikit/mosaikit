@@ -5,6 +5,8 @@ version and is removed in the next.
 
 ## Unreleased
 
+- Actions of a share: `[[resources]] actions = [...]` in the manifest; `Ctx::can_on(id, action)` (host operation `resource.can`), `Resources::list_with_action(...)`, `Resources::set_share(...)` / `remove_share(...)` (host operations `resource.share_set`, `resource.share_remove`), `Resources::shares` returns `actions` per share, `testing::MockHost::with_resource_actions`. A manifest that uses them needs `[requires] mosaikit = ">=1.1"`. Additive.
+
 - The rows of `crud` lists and records carry `visibility` (`private`, `shared`, `organization`, `public`), like `resources.list`. Additive.
 
 - `Resources::shares(id)` (host operation `resource.shares`): who an item is shared with (users, groups, the built-in group «All members» marked `all_members`) and its public links (never the token), with the summary `visibility`; for a caller who manages the item, which is of the plugin or of one in `[permissions] resources_read`. `Resources::list` entries now carry `visibility` (`private`, `shared`, `organization`, `public`). Additive; no manifest key.
