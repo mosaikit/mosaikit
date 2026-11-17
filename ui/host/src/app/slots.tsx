@@ -31,7 +31,7 @@ import { PersonPicture } from './picture.tsx'
 import { bandIcon, hasActive, searchGroups, type Nav, type NavGroup, type NavItem } from './nav.tsx'
 import { setLang, t, useLang, useLanguages, type Lang } from './i18n.ts'
 import { NotificationsBell } from './notifications.tsx'
-import { useUnread } from './notes.ts'
+import { useUnread, useUnreadSources } from './notes.ts'
 import { go, personal, to, type Route } from './router.ts'
 import { markSvg, type MarkVariant } from './mark.ts'
 import { useFreshTour, useHelpItems } from './help.ts'
@@ -174,12 +174,14 @@ function TreeItem({ item, onPick, mini, depth = 0 }: { item: NavItem; onPick?: (
 
 /** The pages of an app in a menu (rail, closed sidebar, tabs): its own page first, then its entries. */
 export function FlyoutMenu({ item, trigger, side = 'right', hover }: { item: NavItem; trigger: ReactNode; side?: 'right' | 'bottom'; hover?: HoverMenu }) {
+  const unread = useUnreadSources()
   const rows = (items: NavItem[], depth: number): ReactNode[] =>
     items.flatMap((c) => [
       c.href ? (
         <DropdownMenuItem key={`${depth}-${c.label}-${c.href}`} onSelect={() => go(c.href!)} style={{ paddingLeft: `${8 + depth * 14}px` }} className={cn('gap-2', c.active && 'font-semibold')}>
           {c.icon}
           <span className="truncate">{c.label}</span>
+          {c.plugin && unread.has(c.plugin) && <span data-testid="app-dot" role="img" aria-label={t('new notifications')} className="ml-auto size-2 shrink-0 rounded-full bg-destructive" />}
         </DropdownMenuItem>
       ) : (
         <DropdownMenuLabel key={`${depth}-${c.label}`} className="text-xs text-muted-foreground" style={{ paddingLeft: `${8 + depth * 14}px` }}>

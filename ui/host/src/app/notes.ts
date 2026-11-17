@@ -2,7 +2,7 @@
 // unread ones kept live by the stream of the person (`/api/me/stream`, server-sent events): the bell and
 // the menu of the person update as soon as something arrives, in every open tab.
 
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useQuery, useQueryClient, type QueryClient } from '@tanstack/react-query'
 import { api, appUrl } from '../api.ts'
 import type { Session } from '../types.ts'
@@ -67,6 +67,12 @@ function query(f: NoteFilter): string {
 
 export function useNoteList(f: NoteFilter) {
   return useQuery({ queryKey: ['notes', 'list', f], queryFn: () => api<NotePage>('GET', query(f)) })
+}
+
+/** The plugins (their `source`) that have unread notifications: the dot of an app entry of the navigation. */
+export function useUnreadSources(): Set<string> {
+  const items = useNoteList({ unread: true, limit: 50 }).data?.items
+  return useMemo(() => new Set((items ?? []).map((n) => n.source)), [items])
 }
 
 export function useUnread() {

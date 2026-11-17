@@ -34,7 +34,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import { t } from './i18n.ts'
-import { useLiveNotes, useNoteList } from './notes.ts'
+import { useLiveNotes, useNoteList, useUnreadSources } from './notes.ts'
 import { bandOf, navGroupOpen, setNavGroupOpen, sidebarOpen, useRailLabels } from './prefs.ts'
 import { allItems, arrowTarget } from './navgroups.ts'
 import { useHoverMenu } from './hoverMenu.ts'
@@ -107,6 +107,9 @@ function RailEntry({ it }: { it: NavItem }) {
   const [open, setOpen] = useState(() => hasActive(it))
   const pick = () => isMobile && setOpenMobile(false)
   const kids = it.children ?? []
+  // unread notifications of this app: a dot
+  const unread = useUnreadSources()
+  const fresh = !!it.plugin && unread.has(it.plugin)
   return (
     <SidebarMenuItem {...(kids.length > 0 && rail ? hover.areaProps : {})}>
       <SidebarMenuButton asChild isActive={hasActive(it)} className={cn(railButton, !labels && railIconsOnly)}>
@@ -121,6 +124,8 @@ function RailEntry({ it }: { it: NavItem }) {
           }}
         >
           {it.icon}
+          {/* before the name: the rail styles (and hides) the LAST span, which must be the name */}
+          {fresh && <span data-testid="app-dot" role="img" aria-label={t('new notifications')} className="absolute top-1.5 right-3 size-2 rounded-full bg-destructive group-data-[collapsible=icon]:right-4" />}
           <span>{it.short ?? it.label}</span>
         </a>
       </SidebarMenuButton>
