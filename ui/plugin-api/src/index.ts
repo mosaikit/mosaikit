@@ -26,6 +26,7 @@ export type {
   DirectoryUser,
   SharePreselect,
   PickPrincipalsOptions,
+  ShareList,
   SharePrincipal,
   EmbedUrl,
   EmbedsApi,

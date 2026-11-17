@@ -43,6 +43,23 @@ describe('routeOp', () => {
     expect(() => routeOp('alfa', 'p.x', 'schedules.create', { cron: '* * * * *' })).toThrow(OpError)
   })
 
+  it('routes the share operations with checked arguments only', () => {
+    const rid = '11111111-2222-3333-4444-555555555555'
+    const uid = '66666666-7777-8888-9999-000000000000'
+    expect(routeOp('alfa', 'p.x', 'share.list', { id: rid })).toEqual({ method: 'GET', url: `/api/t/alfa/resources/${rid}/grants` })
+    expect(routeOp('alfa', 'p.x', 'share.set', { id: rid, principal: { type: 'user', id: uid }, level: 'read', actions: ['download'], tenant: 'beta' })).toEqual({
+      method: 'PUT',
+      url: `/api/t/alfa/resources/${rid}/grants`,
+      json: { principal_type: 'user', principal_id: uid, level: 'read', actions: ['download'] },
+    })
+    // everybody has no id; a removal has no level
+    expect(routeOp('alfa', 'p.x', 'share.set', { id: rid, principal: { type: 'all' }, level: 'write' }).json).toEqual({ principal_type: 'all', level: 'write' })
+    expect(routeOp('alfa', 'p.x', 'share.remove', { id: rid, principal: { type: 'group', id: uid }, level: 'manage' }).json).toEqual({ principal_type: 'group', principal_id: uid })
+    expect(() => routeOp('alfa', 'p.x', 'share.set', { id: rid, principal: { type: 'user', id: uid }, level: 'owner' })).toThrow()
+    expect(() => routeOp('alfa', 'p.x', 'share.set', { id: rid, principal: { type: 'user', id: 'x' }, level: 'read' })).toThrow()
+    expect(() => routeOp('alfa', 'p.x', 'share.set', { id: rid, principal: { type: 'user', id: uid }, level: 'read', actions: [1] })).toThrow()
+  })
+
   it('routes the directory search with checked arguments only', () => {
     const c = routeOp('alfa', 'p.x', 'directory.search', { kind: 'user', q: 'an', limit: 500, tenant: 'beta', plugin: 'p.evil' })
     expect(c).toEqual({ method: 'POST', url: '/api/t/alfa/p/p.x/directory/search', json: { kind: 'user', q: 'an', limit: 50 } })

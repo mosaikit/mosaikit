@@ -245,6 +245,27 @@ export function routeOp(tenant: string, plugin: string, op: string, rawArgs: unk
       return { method: 'POST', url: `${base}/web/probe`, json: { url: str(a.url, 'url', 2000), image: a.image === true } }
     case 'resource.meta':
       return { method: 'GET', url: `/api/t/${enc(tenant)}/resources/${uuid(a.id)}` }
+    // who an item is shared with, and the change of a share: the rules are those of the share dialog (the person
+    // must manage the item; the kernel checks it, the `share` permission of the plugin and the actions it declares)
+    case 'share.list':
+      return { method: 'GET', url: `/api/t/${enc(tenant)}/resources/${uuid(a.id)}/grants` }
+    case 'share.set':
+    case 'share.remove': {
+      const p = (a.principal ?? {}) as Args
+      const type = p.type
+      if (type !== 'user' && type !== 'group' && type !== 'all') throw new OpError('invalid principal')
+      const json: Args = { principal_type: type }
+      if (type !== 'all') json.principal_id = uuid(p.id)
+      if (op === 'share.set') {
+        if (a.level !== 'read' && a.level !== 'write' && a.level !== 'manage') throw new OpError('invalid level')
+        json.level = a.level
+        if (a.actions !== undefined && a.actions !== null) {
+          if (!Array.isArray(a.actions) || a.actions.length > 32 || a.actions.some((x) => typeof x !== 'string' || x.length > 32)) throw new OpError('invalid actions')
+          json.actions = a.actions
+        }
+      }
+      return { method: 'PUT', url: `/api/t/${enc(tenant)}/resources/${uuid(a.id)}/grants`, json }
+    }
     // the people and groups of the tenant, for a plugin that declares `directory` (the kernel checks the
     // permission, the right of the person and the limits)
     case 'directory.search': {
