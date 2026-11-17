@@ -835,6 +835,20 @@ does a resource they cannot see. Everything else about the table is unchanged (t
 as `uuid` (the install refuses it otherwise); other tables keep the default. On SQLite the same rule is in the triggers and in the rewriting of `update` and
 `delete`; the manifest is read from `core.plugins`. Tested on both backends (`a_reader_writes_only_the_rows_that_are_theirs_where_the_table_says_so`).
 
+**Rows the holders of an action write (`write_actions`).** A share can carry actions next to the level (`[[resources]] actions`, `core.grants.actions`; the
+function `core.can_action(resource_id, action)` is true for manage, or for a grant of the person or of their group, on the resource or a folder above it, that
+lists the action, and requires that the resource is visible). A table that holds data written on behalf of such an action names it:
+
+```toml
+[[tables]]
+name = "layer_metadata"
+write_actions = ["edit_metadata"]   # a reader who holds the action writes the rows, like a writer of the resource
+```
+
+The write policies become `(<the default or reader rule> or core.can_action(resource_id, 'edit_metadata'))`; `insert_for` is optional (empty: the default rule).
+On SQLite the same is in the triggers and in the rewriting of `update` and `delete`, and plugin SQL may call `core.can_action(rid, 'name')`. Tested on both
+backends (`a_holder_of_an_action_writes_the_table_that_names_it`).
+
 The read policy is a **set**: `core.ctx_levels()` (what the person of the context sees in the current
 plugin, public links included, the same rules as `can_access()`) is computed once per statement and
 the rows are kept by key, instead of one `can_access()` call per row (a third of the time of a list).

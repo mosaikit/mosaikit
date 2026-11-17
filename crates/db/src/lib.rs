@@ -582,6 +582,16 @@ impl PluginSchema {
         self
     }
 
+    /// Tables where a person who holds one of the actions of a share on the resource writes the rows although they
+    /// only read it (`[[tables]] write_actions`): `(table, actions)`.
+    pub fn with_action_tables(mut self, tables: Vec<(String, Vec<String>)>) -> PluginSchema {
+        match &mut self.0 {
+            SchemaInner::Pg(s) => s.action_tables = tables,
+            SchemaInner::Lite(s) => s.action_tables = tables,
+        }
+        self
+    }
+
     /// Creates (or updates) the space of the plugin. Idempotent.
     pub async fn provision(&self, tx: &mut TxConn, password: &str) -> Result<()> {
         match &self.0 {

@@ -22,6 +22,8 @@ pub struct LitePluginSchema {
     pub reader_tables: Vec<(String, String)>,
     /// the reader tables where a visitor of a public link (no user) may also insert
     pub visitor_tables: Vec<String>,
+    /// `(table, actions)`: holders of one of these actions of a share on the resource also write the rows
+    pub action_tables: Vec<(String, Vec<String>)>,
 }
 
 fn q(s: &str) -> String {
@@ -199,14 +201,29 @@ impl LitePluginSchema {
                 }
             }
             // `denied`: true when the statement is NOT allowed for the resource `r` and the row `row`
+            let acts: Vec<String> = self
+                .action_tables
+                .iter()
+                .find(|(t, _)| t == name)
+                .map(|(_, a)| a.clone())
+                .unwrap_or_default();
+            // a holder of an action the table names writes too (`write_actions`)
+            let by_action = |r: &str| -> String {
+                acts.iter()
+                    .map(|a| {
+                        format!(" AND NOT {}", tr::can_action(r, &format!("'{}'", a.replace("'", "''"))))
+                    })
+                    .collect()
+            };
             let denied = |r: &str, row: &str| match &owner {
                 Some(col) => format!(
-                    "({} < 2 AND NOT ({} >= 1 AND {row}.{} IS core_ctx_user()))",
+                    "({} < 2 AND NOT ({} >= 1 AND {row}.{} IS core_ctx_user()){})",
                     lv(r),
                     lv(r),
-                    q(col)
+                    q(col),
+                    by_action(r)
                 ),
-                None => format!("{} < 2", lv(r)),
+                None => format!("({} < 2{})", lv(r), by_action(r)),
             };
             // a visitor of a public link (no user, level 1 on the item of the link) may insert, never change
             let visitor = self.visitor_tables.iter().any(|t| t == name);

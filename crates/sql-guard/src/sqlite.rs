@@ -43,6 +43,8 @@ pub struct Scope {
     /// tables where a reader writes the rows that are theirs (`[[tables]] insert_for = "reader"`):
     /// name -> column of the owner
     pub reader_tables: BTreeMap<String, String>,
+    /// tables where the holders of an action of a share write too (`[[tables]] write_actions`): name -> actions
+    pub action_tables: BTreeMap<String, Vec<String>>,
 }
 
 impl Scope {
@@ -132,6 +134,15 @@ pub fn level_of(rid: &str) -> String {
     format!(
         "coalesce((SELECT {} FROM (SELECT ({rid}) AS v) msk_lx JOIN core_resources msk_lr ON msk_lr.id = msk_lx.v), 0)",
         level_row("msk_lr")
+    )
+}
+
+/// The context may do `action` on the resource `rid`: manage level, or a grant of the person (own or of a group, on the
+/// resource or on a folder above it) that lists the action. `action` is an SQL text expression.
+pub fn can_action(rid: &str, action: &str) -> String {
+    format!(
+        "({lv} >= 3 OR ({lv} >= 1 AND core_ctx_user() IS NOT NULL AND EXISTS (SELECT 1 FROM core_grants msk_ag             JOIN core_resources msk_ar ON msk_ar.id = ({rid})             WHERE (msk_ag.resource_id = msk_ar.id OR msk_ag.resource_id IN (SELECT value FROM json_each(msk_ar.ancestors)))               AND instr(',' || msk_ag.actions || ',', ',' || ({action}) || ',') > 0               AND ((msk_ag.principal_type = 'user' AND msk_ag.principal_id = core_ctx_user())                 OR (msk_ag.principal_type = 'group' AND msk_ag.principal_id IN (                     SELECT msk_agm.group_id FROM core_group_members msk_agm WHERE msk_agm.user_id = core_ctx_user()))))))",
+        lv = level_of(rid)
     )
 }
 
@@ -524,6 +535,7 @@ impl<'a> Tr<'a> {
                 return Ok(Some(parse_expr(&match name.as_str() {
                     "level_of" => level_of(&arg(0)?),
                     "can_access" => format!("({} >= ({}))", level_of(&arg(0)?), arg(1)?),
+                    "can_action" => can_action(&arg(0)?, &arg(1)?),
                     "level_for" => level_for(&arg(0)?, &arg(1)?, &arg(2)?, &arg(3)?),
                     "is_member" => is_member(&arg(0)?, &arg(1)?),
                     "in_trash" => in_trash(&arg(0)?),
@@ -746,13 +758,24 @@ fn sentinel() -> ObjectName {
     ObjectName(vec![Ident::new(SENTINEL)])
 }
 
-fn and_level(sel: &mut Option<Expr>, alias: &str, min: u8, owner: Option<&str>) -> Result<()> {
+fn and_level(
+    sel: &mut Option<Expr>,
+    alias: &str,
+    min: u8,
+    owner: Option<&str>,
+    actions: &[String],
+) -> Result<()> {
     let lv = level_of(&format!("\"{alias}\".resource_id"));
-    let cond = match owner {
+    let mut cond = match owner {
         // a reader reaches the rows of their own
         Some(col) => format!("({lv} >= {min} OR ({lv} >= 1 AND \"{alias}\".\"{col}\" = core_ctx_user()))"),
         None => format!("{lv} >= {min}"),
     };
+    // the holders of an action of a share the table names reach the rows too
+    for a in actions {
+        let q = a.replace("'", "''");
+        cond = format!("({cond} OR {})", can_action(&format!("\"{alias}\".resource_id"), &format!("'{q}'")));
+    }
     *sel = Some(match sel.take() {
         Some(s) => parse_expr(&format!("({s}) AND {cond}"))?,
         None => parse_expr(&cond)?,
@@ -974,7 +997,12 @@ fn translate_stmt(mut st: Statement, mode: Mode) -> Result<Translated> {
                     if filter {
                         let owner =
                             tr.scope().and_then(|s| s.reader_tables.get(&logical)).map(String::as_str);
-                        and_level(selection, &a, 2, owner)?;
+                        let acts = tr
+                            .scope()
+                            .and_then(|s| s.action_tables.get(&logical))
+                            .map(Vec::as_slice)
+                            .unwrap_or(&[]);
+                        and_level(selection, &a, 2, owner, acts)?;
                     }
                 }
             }
@@ -992,7 +1020,12 @@ fn translate_stmt(mut st: Statement, mode: Mode) -> Result<Translated> {
                     if filter {
                         let owner =
                             tr.scope().and_then(|s| s.reader_tables.get(&logical)).map(String::as_str);
-                        and_level(&mut d.selection, &a, 2, owner)?;
+                        let acts = tr
+                            .scope()
+                            .and_then(|s| s.action_tables.get(&logical))
+                            .map(Vec::as_slice)
+                            .unwrap_or(&[]);
+                        and_level(&mut d.selection, &a, 2, owner, acts)?;
                     }
                 }
             }
@@ -1039,6 +1072,7 @@ mod tests {
             .collect(),
             kpi_views: ["kpi_notes".to_string()].into_iter().collect(),
             reader_tables: [("tags".to_string(), "user_id".to_string())].into_iter().collect(),
+            action_tables: Default::default(),
         }
     }
 

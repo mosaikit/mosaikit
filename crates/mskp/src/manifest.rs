@@ -484,8 +484,15 @@ pub const MAX_EMBEDS: usize = 8;
 pub struct TableDecl {
     /// the table, without the schema
     pub name: String,
-    /// `"reader"` or `"visitor"` (a reader, and a visitor of a public link that runs a public command with `write`)
+    /// `"reader"` or `"visitor"` (a reader, and a visitor of a public link that runs a public command with `write`);
+    /// empty: only a writer of the resource writes (the default), which `write_actions` can widen
+    #[serde(default)]
     pub insert_for: String,
+    /// actions of a share (`[[resources]] actions`) whose holders may write the rows of the table although they only
+    /// read the resource: a row is written by a writer of the resource, or by a person who holds one of these
+    /// actions on it (`core.can_action`). The names are checked like the ones of `[[resources]] actions`
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub write_actions: Vec<String>,
     /// the `uuid not null` column that holds the person who wrote the row (default `user_id`)
     #[serde(default = "default_owner_column")]
     pub owner_column: String,
@@ -1670,8 +1677,23 @@ impl Manifest {
                     t.name, t.owner_column
                 ));
             }
-            if !matches!(t.insert_for.as_str(), "reader" | "visitor") {
+            if !matches!(t.insert_for.as_str(), "" | "reader" | "visitor") {
                 return Err(format!("[[tables]] {}: insert_for must be \"reader\" or \"visitor\"", t.name));
+            }
+            for a in &t.write_actions {
+                let well_formed = a.chars().next().is_some_and(|c| c.is_ascii_lowercase())
+                    && a.len() <= 32
+                    && a.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+                    && !["see", "read", "write", "manage"].contains(&a.as_str());
+                if !well_formed {
+                    return Err(format!(
+                        "[[tables]] {}: write_actions '{a}' is not a valid action name",
+                        t.name
+                    ));
+                }
+            }
+            if t.write_actions.len() > 8 {
+                return Err(format!("[[tables]] {}: write_actions has at most 8 names", t.name));
             }
             if !seen.insert(t.name.clone()) {
                 return Err(format!("[[tables]]: '{}' is declared twice", t.name));
