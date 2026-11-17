@@ -203,8 +203,9 @@ function DistGroup({ g, className }: { g: NavGroup; className: string }) {
                 trigger={
                   <SidebarMenuButton isActive={active} className={cn(railButton, !labels && railIconsOnly)} aria-label={fresh ? `${t('Open the apps of {name}', { name: label })}, ${t('new notifications')}` : t('Open the apps of {name}', { name: label })}>
                     {g.icon}
-                    <span>{label}</span>
+                    {/* the dot comes before the name: the rail styles (and hides) the LAST span, which must be the name */}
                     {fresh && <span data-testid="group-dot" aria-hidden="true" className="absolute top-1.5 right-3 size-2 rounded-full bg-destructive" />}
+                    <span>{label}</span>
                   </SidebarMenuButton>
                 }
               />
