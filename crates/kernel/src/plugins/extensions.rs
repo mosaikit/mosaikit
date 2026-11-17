@@ -154,6 +154,7 @@ fn decl_of(e: &LoadedPlugin, resource: &str) -> Result<ResourceDecl> {
         title_field: None,
         due_field: None,
         done_field: None,
+        actions: Vec::new(),
         fields,
     })
 }

@@ -124,6 +124,7 @@ pub async fn shares_from_logic(
                 "principal_id": g.principal_id,
                 "name": g.name,
                 "level": g.level,
+                "actions": g.actions,
                 "all_members": g.principal_type == "group" && Some(g.principal_id) == all,
             })
         })

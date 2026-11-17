@@ -104,6 +104,7 @@ CRUD, the search, sharing, trash and the `crud.*` calls of the UI.
 | `title_field` | string | a field of the resource; default the first `text` field |
 | `due_field` | string | a `date` field: the kernel copies it, and the Home of a person lists what is due soon |
 | `done_field` | string | a `bool` field: a done item is no longer due |
+| `actions` | array of names | actions a share of this resource type can carry besides read / write / manage (`download`, `run`...): lower case letters, digits and `_`, at most 32, not `see`/`read`/`write`/`manage`. Set per person or group on the share (`PUT /resources/{id}/grants` with `actions`); manage implies all of them. Ask with `ctx.can_on(id, "download")` or `resources().list_with_action(...)` |
 | `fields` | array, required | at least one |
 
 ### Fields
@@ -128,6 +129,7 @@ Adding a field to a resource of an installed plugin adds a column on update; the
 |---|---|
 | `entry` | the page of the UI, relative to `ui/dist`; default `index.html` |
 | `public_view` | optional viewer for public links, relative to `ui/dist` |
+| `share_page` | optional page that replaces the share dialog of the shell for the resources of this plugin: `<place>` of the plugin, or `<plugin id>/<place>` of another one. The Share button opens that page with `?resource=<id>` after the place; the grants API and `msk.pickPrincipals` stay available to it. A distribution may set it for an official app with `[[plugin_labels]] share_page` |
 
 Both are safe relative paths (no `..`, no absolute path, no `\`, no `:`, no names Windows reserves).
 

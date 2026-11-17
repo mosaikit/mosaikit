@@ -7,8 +7,9 @@ import { toast } from 'sonner'
 import { Activity, Bell, Frame, Gauge, Grid2x2, KeyRound, KeySquare, Link2, Lock, Mail, MoreHorizontal, Palette, Plus, Share2, ShieldCheck, ShieldOff, Trash2, TrendingUp, Upload, UserRound, Users } from 'lucide-react'
 import { api, appUrl, fmtBytes, fmtDate } from '../../api.ts'
 import PluginFrame from '../../components/PluginFrame.tsx'
-import { UiContext, useUi, type SharePre, type Ui } from '../../ui-context.ts'
+import { UiContext, useUi, type PickedPrincipal, type PickOptions, type SharePre, type Ui } from '../../ui-context.ts'
 import ShareDialog from '../ShareDialog.tsx'
+import PrincipalPicker from '../PrincipalPicker.tsx'
 import { SharedByMeSection } from './history.tsx'
 import type { AccessRequest, Group, HomeItem, Invitation, LinkInfo, Member, Overview, Profile, ResetLink, ResourceRow, Revoked, Session, TenantContext, TenantKpi, TenantSettings } from '../../types.ts'
 import { Badge } from '@/components/ui/badge'
@@ -25,6 +26,7 @@ import { isApp, passwordMin, useAction, useApi, useConfig, useConfirm, usePaged,
 import { fmtDay, t, useLang } from '../i18n.ts'
 import { Empty, ErrorBox, FormDialog, Kpi, Loading, MoreRows, PageHeader, PluginKpis, SaveBar, SelectAllRows, Sections, StatusBadge, Sliced, Tabs } from '../kit.tsx'
 import { go, to } from '../router.ts'
+import { resolveSharePage } from '../sharepage.ts'
 import { useNoteList, useUnread } from '../notes.ts'
 import { NoteRow } from '../notifications.tsx'
 import { effectiveMode, useTheme } from '../theme.ts'
@@ -246,16 +248,30 @@ export function PluginPage({ session, slug, id, at }: { session: Session; slug: 
   const base = useUi()
   const reloads = useDevReload(session, slug)
   const [share, setShare] = useState<{ id: string; pre?: SharePre; done: () => void } | null>(null)
+  const [pick, setPick] = useState<{ opts: PickOptions; done: (p: PickedPrincipal[]) => void } | null>(null)
   // the sharing asked by the plugin opens the dialog of the host, which knows the tenant
   const services = useMemo<Ui>(
     () => ({
       ...base,
-      share: (rid, pre) => new Promise<void>((done) => setShare({ id: rid, pre, done })),
+      share: async (rid, pre) => {
+        // a plugin may replace the dialog with a page of its own (`[ui] share_page`)
+        const plugins = ctx.data?.plugins ?? []
+        if (plugins.some((p) => p.share_page)) {
+          const meta = await api<{ plugin_id: string }>('GET', `/api/t/${slug}/resources/${rid}`).catch(() => null)
+          const page = meta && resolveSharePage(plugins, meta.plugin_id, rid)
+          if (page) {
+            window.location.hash = `#/t/${slug}/p/${page.plugin}/${encodeURIComponent(page.at)}`
+            return
+          }
+        }
+        return new Promise<void>((done) => setShare({ id: rid, pre, done }))
+      },
+      pickPrincipals: (opts) => new Promise((done) => setPick({ opts: opts ?? {}, done })),
       open: (plugin, place) => {
         window.location.hash = `#/t/${slug}/p/${plugin}${place ? '/' + encodeURIComponent(place) : ''}`
       },
     }),
-    [base, slug],
+    [base, slug, ctx.data?.plugins],
   )
   if (ctx.isLoading) return <Loading />
   if (ctx.error) return <ErrorBox error={ctx.error} />
@@ -268,6 +284,14 @@ export function PluginPage({ session, slug, id, at }: { session: Session; slug: 
         {/* another place (a notification) opens the page again at that place */}
         <PluginFrame key={`${p.id}|${slug}|${at ?? ''}`} plugin={p} session={session} ctx={c} reloadKey={reloads[p.id] ?? 0} ui={ui} at={at} />
       </div>
+      <PrincipalPicker
+        slug={slug}
+        request={pick?.opts ?? null}
+        onDone={(p) => {
+          pick?.done(p)
+          setPick(null)
+        }}
+      />
       <ShareDialog
         ctx={c}
         resourceId={share?.id ?? null}

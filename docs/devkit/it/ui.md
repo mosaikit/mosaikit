@@ -51,7 +51,8 @@ dell'host ed è accettato solo da essa. Una chiamata che non riceve risposta in 
 | `msk.content.upload(id, zip)`, `.url(id)` | contenuto di cartelle, solo con `content` |
 | `msk.web.probe(url, image?)` | se la pagina si può incorporare, il suo titolo e la sua immagine; solo con `web`. Sperimentale |
 | `msk.resource(id)` | metadati di un elemento (proprietario, livello, dimensione…) |
-| `msk.share(id)` | la finestra di condivisione dell'host |
+| `msk.share(id)` | la finestra di condivisione dell'host, o la pagina che il plugin dell'elemento imposta con `[ui] share_page` |
+| `msk.pickPrincipals({ kind?, exclude?, multiple?, title? })` | il selettore dell'host: la persona cerca tra persone e gruppi dell'organizzazione e sceglie; restituisce `SharePrincipal[]` (vuoto se annulla) |
 | `msk.notify({ title, body?, at?, resource? })` | una notifica; restituisce quante persone l'hanno ricevuta. Sperimentale |
 | `msk.toast(text, error?)`, `msk.confirm(text)` | un avviso; la finestra di conferma dell'host |
 | `msk.extensions(resource)` | `list`, `values(ids)`, `set(id, ext, values)`, `action(id, ext, key)`, `mountTab(el, id, ext, tab)` |

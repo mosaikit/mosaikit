@@ -53,7 +53,8 @@ the origin of the host and is accepted only from it. A call that gets no answer 
 | `msk.content.upload(id, zip)`, `.url(id)` | folder content, only with `content` |
 | `msk.web.probe(url, image?)` | may the page be framed, its title and picture; only with `web`. Experimental |
 | `msk.resource(id)` | metadata of an item (owner, level, size…) |
-| `msk.share(id)` | the share dialog of the host |
+| `msk.share(id)` | the share dialog of the host, or the page the plugin of the item sets with `[ui] share_page` |
+| `msk.pickPrincipals({ kind?, exclude?, multiple?, title? })` | the picker of the host: the person searches the people and groups of the tenant and chooses; returns `SharePrincipal[]` (empty on cancel) |
 | `msk.notify({ title, body?, at?, resource? })` | a notification; returns how many people got it. Experimental |
 | `msk.toast(text, error?)`, `msk.confirm(text)` | a toast; the confirmation dialog of the host |
 | `msk.extensions(resource)` | `list`, `values(ids)`, `set(id, ext, values)`, `action(id, ext, key)`, `mountTab(el, id, ext, tab)` |

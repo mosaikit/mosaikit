@@ -4,6 +4,14 @@ Cosa cambia da una versione di Mosaikit alla successiva. La shell mostra la sezi
 Aiuto › Novità (un titolo `## <versione>` per versione, voci `- `, gruppi `### `). Questo file è la
 versione italiana di [CHANGELOG.md](CHANGELOG.md): tenerli allineati.
 
+## 1.1.0
+
+- Plugin: una condivisione può portare delle **azioni** oltre al livello. `[[resources]] actions = ["download", "run"]` le dichiara per tipo di risorsa; l'API dei permessi (`PUT /resources/{id}/grants`) accetta `actions` accanto a `level` e le elenca; `resource.shares` le restituisce; la gestione le comprende tutte. La logica chiede `ctx.can_on(id, "download")`, e `resources().list_with_action(plugin, "download", ...)` / `resources.list` con `with_action` tiene gli elementi su cui chi chiama può agire. Un permesso su una cartella raggiunge ciò che contiene, come il livello. Un plugin che non dichiara nulla non vede cambiamenti.
+- Plugin: `msk.pickPrincipals({ kind?, exclude?, multiple?, title? })` apre un selettore di persone e gruppi dell'organizzazione e restituisce ciò che la persona ha scelto.
+- Plugin: `[ui] share_page` sostituisce la finestra di condivisione della shell con una pagina del plugin (o di un altro, `<id plugin>/<posto>`) per le sue risorse: il pulsante Condividi e `msk.share` la aprono con `?resource=<id>`. Una distribuzione la imposta per un'app ufficiale con `[[plugin_labels]] share_page` (la `label` diventa facoltativa).
+- Shell: le schede di «Per te» restano dentro la pagina, senza scorrimento orizzontale; i totali dei gruppi nella barra laterale sono badge con il numero centrato; un'app con notifiche non lette ha un pallino rosso nella barra, nel menu a comparsa e nel cassetto; l'etichetta di un gruppo chiuso mantiene il suo stile quando il gruppo ha notifiche non lette.
+- Sviluppo: `cargo xtask dev --dist` trova i plugin ufficiali in `MOSAIKIT_PLUGINS_DIR` o in `mosaikit-plugins` accanto al checkout.
+
 ## 1.0.17
 
 - Plugin: le righe dell'elenco del plugin e del singolo record (`msk.crud(...).list()` e `get()`) portano `visibility` (`private`, `shared`, `organization`, `public`), accanto a `shared` e `my_level`, lo stesso stato di `resources.list`; non serve una chiamata per riga per mostrare l'etichetta esatta. Un link pubblico non la porta.

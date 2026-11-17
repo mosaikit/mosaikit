@@ -51,11 +51,11 @@ function LevelSelect({ value, onChange, label }: { value: Level; onChange: (l: L
 
 /** People and groups of the tenant matching the search. */
 /** The name and detail of a person or group in the dialog: «All members» has its own, translated. */
-function shown(p: { name: string; detail: string; builtin?: 'all' }): { name: string; detail: string } {
+export function shown(p: { name: string; detail: string; builtin?: 'all' }): { name: string; detail: string } {
   return p.builtin ? { name: t('All members'), detail: t('Every member of the organization') } : { name: p.name, detail: p.detail }
 }
 
-function useDirectory(slug: string, q: string) {
+export function useDirectory(slug: string, q: string) {
   const [found, setFound] = useState<Principal[]>([])
   useEffect(() => {
     const s = q.trim()

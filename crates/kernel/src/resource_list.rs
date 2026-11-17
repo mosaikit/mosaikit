@@ -18,9 +18,12 @@ pub const DEFAULT_LIMIT: i64 = 50;
 pub const MAX_LIMIT: i64 = 200;
 /// Longest `q` and `kind`, in characters.
 pub const MAX_TEXT: usize = 64;
+/// Rows looked at when the list is filtered by an action (the filter runs after the query).
+const FILTER_SCAN: i64 = 1000;
 
 /// `resources.list` for the logic of the plugin `from`, which declared `allowed` in `resources_read`.
-/// `req`: `{ plugin, kind?, q?, limit? }`.
+/// `req`: `{ plugin, kind?, q?, limit?, with_action? }`; `with_action` keeps the items on which the caller may do
+/// that action (see [`crate::actions`]).
 pub(crate) async fn list_from_logic(
     k: &Kernel,
     c: &Caller,
@@ -47,6 +50,12 @@ pub(crate) async fn list_from_logic(
         }
     };
     let (kind, q) = (text("kind")?, text("q")?);
+    let with_action = text("with_action")?;
+    if let Some(a) = &with_action {
+        if !crate::actions::valid_name(a) {
+            return Err(bad("with_action: not a valid action name"));
+        }
+    }
     let limit = match req.get("limit") {
         None | Some(Value::Null) => DEFAULT_LIMIT,
         Some(v) => match v.as_i64() {
@@ -65,11 +74,18 @@ pub(crate) async fn list_from_logic(
          where kind <> 'folder' and ($1 is null or kind = $1) and ($2 is null or title ilike $2 escape '\\')
          order by updated_at desc, id
          limit {}",
-        limit + 1
+        // with an action filter the rows are cut after the filter: look at more of them
+        if with_action.is_some() { FILTER_SCAN } else { limit + 1 }
     );
     let mut tx = k.db.begin_plugin_read(&p.id, &c.ctx()).await?;
     let rows = mosaikit_db::query(&sql).bind(kind).bind(like).fetch_all(&mut *tx).await?;
     tx.commit().await?;
+    let mut rows = rows;
+    if let Some(action) = &with_action {
+        let all: Vec<uuid::Uuid> = rows.iter().map(|r| r.get(0)).collect();
+        let ok = crate::actions::allowed_among(k, c, &all, action).await?;
+        rows.retain(|r| ok.contains(&r.get::<uuid::Uuid, _>(0)));
+    }
     let truncated = rows.len() as i64 > limit;
     let ids: Vec<uuid::Uuid> = rows.iter().take(limit as usize).map(|r| r.get(0)).collect();
     let visibility = crate::visibility::of(k, c.tenant.tenant_id, &ids).await?;

@@ -436,6 +436,39 @@ impl KernelHost {
 }
 
 impl KernelHost {
+    /// `resource.can`: `{ id, action }` -> `{ allowed }`, see [`crate::actions::allowed`]. The item is of this plugin
+    /// or of one in `resources_read`; the caller is the person the call runs for.
+    fn resource_can(&mut self, req: &Value) -> std::result::Result<Value, Coded> {
+        let k = self.kernel.clone().ok_or_else(|| Coded("internal", "kernel not available".into()))?;
+        let c = self.user().map_err(|m| Coded("permission_denied", m))?;
+        let (plugin, allowed) = (self.plugin_id.clone(), self.resources_read.clone());
+        let id: uuid::Uuid = req
+            .get("id")
+            .and_then(Value::as_str)
+            .and_then(|s| s.parse().ok())
+            .ok_or_else(|| Coded("invalid_argument", "id is required".into()))?;
+        let action = req
+            .get("action")
+            .and_then(Value::as_str)
+            .ok_or_else(|| Coded("invalid_argument", "action is required".into()))?
+            .to_string();
+        self.rt
+            .block_on(async {
+                let m = crate::acl::meta(&k, &c, id).await?;
+                if m.plugin_id != plugin && !allowed.contains(&m.plugin_id) {
+                    return Err(crate::Error::forbidden(
+                        "the item is not of this plugin or of one declared in `resources_read` in [permissions]",
+                    )
+                    .with_code("permission_denied"));
+                }
+                let ok = crate::actions::allowed(&k, &c, id, &action).await?;
+                Ok(json!({ "allowed": ok }))
+            })
+            .map_err(coded_of)
+    }
+}
+
+impl KernelHost {
     /// `runs.mint`: see [`crate::run_tickets::prepare_from_logic`]. Not in a nested call (a ticket names the plugin
     /// that runs, and the caller of a nested call is another plugin's), not in a call on behalf of a run (a ticket
     /// cannot mint a ticket); the ticket is written once the command has committed.
@@ -509,6 +542,10 @@ impl Host for KernelHost {
                 m
             }),
             "resource.shares" => self.resource_shares(req).map_err(|Coded(code, m)| {
+                self.last_code = Some(code.to_string());
+                m
+            }),
+            "resource.can" => self.resource_can(req).map_err(|Coded(code, m)| {
                 self.last_code = Some(code.to_string());
                 m
             }),

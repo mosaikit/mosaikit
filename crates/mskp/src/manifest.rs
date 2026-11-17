@@ -421,7 +421,10 @@ pub struct PublicCommandDecl {
 /// language, and the ones it writes for a language of its own.
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct DisplayOverride {
+    /// empty: the plugin keeps its own name
     pub label: String,
+    /// page that replaces the share dialog for the resources of the plugin (see `UiDecl::share_page`)
+    pub share_page: Option<String>,
     /// language code (`it`) to label
     pub i18n: BTreeMap<String, String>,
 }
@@ -710,6 +713,10 @@ pub struct ResourceDecl {
     /// Bool field that says an item is done: a done item is no longer due (`kind = "bool"`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub done_field: Option<String>,
+    /// Actions a share of this resource type can carry besides read / write / manage (`download`, `run`...):
+    /// lower case names, set per person or group on the share. Manage implies all of them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub actions: Vec<String>,
     pub fields: Vec<FieldDecl>,
 }
 
@@ -783,6 +790,12 @@ pub struct UiDecl {
     /// Viewer for the public links, relative to `ui/`.
     #[serde(default)]
     pub public_view: Option<String>,
+    /// Page of the plugin (`<place>`) or of another one (`<plugin id>/<place>`) that replaces the share dialog of the
+    /// shell for the resources of this plugin: the Share button opens it with `?resource=<id>` after the place. A
+    /// distribution may set it for an official app (`[[plugin_labels]] share_page`). The kernel dialog and the grants
+    /// API stay: the page uses them (`msk.pickPrincipals`, `PUT /resources/{id}/grants`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub share_page: Option<String>,
 }
 
 fn default_entry() -> String {
@@ -1091,6 +1104,22 @@ impl Manifest {
                 }
                 if f.kind == FieldKind::Choice && f.options.is_empty() {
                     return bad(format!("the choice field '{}.{}' has no options", r.name, f.key));
+                }
+            }
+            let mut seen_actions = std::collections::BTreeSet::new();
+            for a in &r.actions {
+                let well_formed = a.chars().next().is_some_and(|c| c.is_ascii_lowercase())
+                    && a.len() <= 32
+                    && a.chars().all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+                    && !["see", "read", "write", "manage"].contains(&a.as_str());
+                if !well_formed {
+                    return bad(format!(
+                        "action '{a}' of '{}': lower case letters, digits and _ (not see/read/write/manage)",
+                        r.name
+                    ));
+                }
+                if !seen_actions.insert(a.as_str()) {
+                    return bad(format!("duplicate action '{a}' in '{}'", r.name));
                 }
             }
             if let Some(t) = &r.title_field {
@@ -1806,7 +1835,7 @@ impl Manifest {
     /// the rest and for the languages it does not have.
     pub fn localized(&self, lang: &str) -> Manifest {
         let mut m = self.localized_texts(lang);
-        if let Some(d) = &self.display {
+        if let Some(d) = self.display.as_ref().filter(|d| !d.label.is_empty()) {
             let base = lang.split(['-', '_']).next().unwrap_or_default().to_ascii_lowercase();
             let label = d.i18n.get(&base).unwrap_or(&d.label);
             m.name = label.clone();
